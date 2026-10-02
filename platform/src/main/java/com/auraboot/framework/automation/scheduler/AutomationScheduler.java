@@ -42,7 +42,11 @@ public class AutomationScheduler {
     @Scheduled(fixedDelay = 60_000, initialDelay = 30_000)
     public void checkScheduledAutomations() {
         try {
-            List<Automation> scheduled = automationMapper.findEnabledScheduled();
+            // Cross-tenant scan; per-automation execution below binds each row's
+            // tenant context. Explicit scope instead of a blanket table exemption
+            // (tenant-exemption cleanup W3).
+            List<Automation> scheduled = MetaContext.runWithoutTenantFilter(
+                    () -> automationMapper.findEnabledScheduled());
             if (scheduled.isEmpty()) {
                 return;
             }

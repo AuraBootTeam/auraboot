@@ -128,7 +128,12 @@ public class SemanticMetricAlertService {
      */
     @Scheduled(fixedDelay = 300_000)
     public void evaluateAll() {
-        List<AbSemanticMetricAlert> alerts = alertMapper.listActiveAcrossTenants();
+        // Cross-tenant scan on a @Scheduled thread; per-alert evaluation binds its
+        // own tenant. Explicit scope instead of relying on a registry exemption
+        // this table never had (surfaced by the W5 real-stack gate 2026-10-01 —
+        // this task has been failing on every tick prior to this fix).
+        List<AbSemanticMetricAlert> alerts = MetaContext.runWithoutTenantFilter(
+                () -> alertMapper.listActiveAcrossTenants());
         for (AbSemanticMetricAlert alert : alerts) {
             try {
                 evaluate(alert);

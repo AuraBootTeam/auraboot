@@ -1,6 +1,7 @@
 package com.auraboot.framework.scheduler.service.impl;
 
 import com.auraboot.framework.scheduler.entity.ScheduledTask;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.scheduler.mapper.ScheduledTaskMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -69,6 +70,16 @@ public class SystemTaskInitializer {
     );
 
     public void initializeSystemTasks() {
+        // Bootstrap registration plane: runs on the request thread before any
+        // tenant context exists; all reads/writes here are scheduler-plane rows
+        // addressed by explicit pid (tenant-exemption cleanup W3d, seam found
+        // by the W5 real-stack gate).
+        MetaContext.runWithoutTenantFilter(() -> {
+        initializeSystemTasksScoped();
+        });
+    }
+
+    private void initializeSystemTasksScoped() {
         int created = 0;
         for (TaskDef def : SYSTEM_TASKS) {
             ScheduledTask existing = taskMapper.findByPid(def.pid);

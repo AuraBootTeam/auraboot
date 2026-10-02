@@ -1,6 +1,7 @@
 package com.auraboot.framework.behavior.ingest;
 
 import com.auraboot.framework.behavior.dto.BehaviorEventInput;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.behavior.entity.BehaviorEvent;
 import com.auraboot.framework.behavior.mapper.BehaviorEventMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -45,16 +46,20 @@ public class BehaviorEventPersister {
 
     /** Persist every event in the envelope; returns the number durably stored (or idempotently present). */
     public int persistBatch(BehaviorIngestEnvelope env) {
-        if (env == null || env.events() == null || env.events().isEmpty()) {
-            return 0;
-        }
-        int persisted = 0;
-        for (BehaviorEventInput in : env.events()) {
-            if (persistOne(env.tenantId(), env.userId(), in)) {
-                persisted++;
+        // MQ ingest seam runs without MetaContext; envelope carries the tenant
+        // explicitly (tenant-exemption cleanup W3).
+        return MetaContext.runWithoutTenantFilter(() -> {
+            if (env == null || env.events() == null || env.events().isEmpty()) {
+                return 0;
             }
-        }
-        return persisted;
+            int persisted = 0;
+            for (BehaviorEventInput in : env.events()) {
+                if (persistOne(env.tenantId(), env.userId(), in)) {
+                    persisted++;
+                }
+            }
+            return persisted;
+        });
     }
 
     /** @return true if durably stored (or already present / idempotent), false if quarantined. */

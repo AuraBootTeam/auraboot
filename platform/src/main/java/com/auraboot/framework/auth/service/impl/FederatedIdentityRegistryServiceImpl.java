@@ -1,6 +1,7 @@
 package com.auraboot.framework.auth.service.impl;
 
 import com.auraboot.framework.auth.dto.ExternalIdentityAttributes;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.auth.dto.ExternalIdentityLinkSummary;
 import com.auraboot.framework.auth.dto.FederatedLoginContext;
 import com.auraboot.framework.auth.entity.ExternalIdentityLink;
@@ -38,6 +39,9 @@ public class FederatedIdentityRegistryServiceImpl implements FederatedIdentityRe
             String channelCode,
             String identityProviderCode,
             Long requestedTenantId) {
+        // Federated login IS the context-establishment step: every lookup here is
+        // pre-auth and scoped by explicit arguments (tenant-exemption cleanup W2c).
+        return MetaContext.runWithoutTenantFilter(() -> {
         String application = normalize(applicationCode, DEFAULT_APPLICATION);
         String channel = normalize(channelCode, DEFAULT_CHANNEL);
         String provider = requireText(identityProviderCode, "Identity provider code is required");
@@ -55,20 +59,21 @@ public class FederatedIdentityRegistryServiceImpl implements FederatedIdentityRe
         }
         featureGate.requireEnabled(context.getProviderType());
         return context;
+        });
     }
 
     @Override
     public ExternalIdentityLink findActiveLink(Long identityProviderInstanceId, String subject) {
-        return externalIdentityLinkMapper.findActiveBySubject(
+        return MetaContext.runWithoutTenantFilter(() -> externalIdentityLinkMapper.findActiveBySubject(
                 requirePositive(identityProviderInstanceId, "Identity provider instance is required"),
-                requireText(subject, "External subject is required"));
+                requireText(subject, "External subject is required")));
     }
 
     @Override
     public List<ExternalIdentityLinkSummary> listActiveLinks(Long userId, Long tenantId) {
-        return externalIdentityLinkMapper.listActiveByUser(
+        return MetaContext.runWithoutTenantFilter(() -> externalIdentityLinkMapper.listActiveByUser(
                 requirePositive(userId, "User is required"),
-                requirePositive(tenantId, "Business tenant context is required"));
+                requirePositive(tenantId, "Business tenant context is required")));
     }
 
     @Override
@@ -80,6 +85,7 @@ public class FederatedIdentityRegistryServiceImpl implements FederatedIdentityRe
         if (context == null || context.getIdentityProviderInstanceId() == null) {
             throw new IllegalArgumentException("Resolved federated login context is required");
         }
+        return MetaContext.runWithoutTenantFilter(() -> {
         Long validUserId = requirePositive(userId, "User is required");
         String subject = requireText(attributes == null ? null : attributes.subject(),
                 "External subject is required");
@@ -116,11 +122,13 @@ public class FederatedIdentityRegistryServiceImpl implements FederatedIdentityRe
             throw conflict("External identity link conflicts with an existing active link");
         }
         return link;
+        });
     }
 
     @Override
     @Transactional
     public void recordLogin(Long linkId) {
+        MetaContext.runWithoutTenantFilter(() -> {
         ExternalIdentityLink link = externalIdentityLinkMapper.selectById(
                 requirePositive(linkId, "External identity link is required"));
         if (link == null || link.getUnlinkedAt() != null) {
@@ -128,11 +136,13 @@ public class FederatedIdentityRegistryServiceImpl implements FederatedIdentityRe
         }
         link.setLastLoginAt(Instant.now());
         externalIdentityLinkMapper.updateById(link);
+        });
     }
 
     @Override
     @Transactional
     public void unlink(Long userId, Long identityProviderInstanceId) {
+        MetaContext.runWithoutTenantFilter(() -> {
         ExternalIdentityLink link = externalIdentityLinkMapper.findActiveByUserAndInstance(
                 requirePositive(userId, "User is required"),
                 requirePositive(identityProviderInstanceId, "Identity provider instance is required"));
@@ -141,6 +151,7 @@ public class FederatedIdentityRegistryServiceImpl implements FederatedIdentityRe
         }
         link.setUnlinkedAt(Instant.now());
         externalIdentityLinkMapper.updateById(link);
+        });
     }
 
     private Long resolveTenantId(Long requestedTenantId) {

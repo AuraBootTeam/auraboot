@@ -34,6 +34,69 @@ public class MybatisPlusConfig {
     private static volatile Set<String> envScopedTables;
 
     /**
+     * Tenant-table registry (schema-verified 2026-09-27 against
+     * db/snapshots/schema-current.sql; campaign plan: team docs
+     * 2026-09-27-tenant-exemption-cleanup-plan). The ignoreTable verdict may only
+     * come from these three sets:
+     * <ul>
+     *   <li>{@link #VERIFIED_GLOBAL_TABLES} — no tenant_id column; never shrinks.</li>
+     *   <li>{@link #AUTH_PLANE_TABLES} — HAS a tenant_id column, but membership/role
+     *       binding is queried across tenants by design (login, admission, bootstrap,
+     *       cross-tenant authorization); the query parameters ARE the scope. Every
+     *       pre-context seam is wrapped in {@link MetaContext#runWithoutTenantFilter};
+     *       new queries on these tables must keep explicit identifiers. Reviewed as
+     *       part of the W5 gate.</li>
+     *   <li>{@link #MIGRATION_PENDING_TABLES} — must shrink to empty; each removal
+     *       lands with its call-site migration (see W2a/W3e).</li>
+     * </ul>
+     * Adding a name back without schema evidence or an approved A4-class census is
+     * forbidden.
+     */
+    public static final Set<String> VERIFIED_GLOBAL_TABLES = Set.of(
+        // schema-verified: no tenant_id column (15)
+        "ab_user",                          // global identity
+        "ab_tenant",                        // the tenant registry itself
+        "ab_system_config",                 // platform config
+        "ab_bootstrap",                     // bootstrap state
+        "ab_billing_account",               // billing spine, publisher-scoped
+        "ab_api_connector_endpoint",        // parented by connector_pid
+        "ab_jdbc_connector_endpoint",       // parented by connector_pid
+        "ab_mkt_publisher_payout",          // publisher-scoped, not tenant-scoped
+        "ab_email_account_member",          // join table account_id+user_id
+        "ab_user_deactivation",
+        "ab_user_social_link",
+        "ab_verification_code",             // pre-auth OTP
+        "ab_auth_identity",                 // WeChat identity lookup before tenant context
+        "ab_login_application",             // pre-auth global application registry
+        "ab_login_channel_auth_method"      // parent channel is explicit
+    );
+
+    /**
+     * Auth-plane tables (A4 census 2026-10-01, owner-approved tier): rows carry a
+     * tenant_id but the binding itself is cross-tenant by design — "which tenants
+     * does this user belong to", "which roles in which tenants", "is this user a
+     * platform admin anywhere". The query parameters are the scope; automatic
+     * injection of the caller's tenant cannot express that (and the decisive seams
+     * run before any caller context exists). All pre-context seams are wrapped in
+     * {@link MetaContext#runWithoutTenantFilter}. Owner-approved as a permanent
+     * registry tier (W5, 2026-10-01).
+     */
+    public static final Set<String> AUTH_PLANE_TABLES = Set.of(
+        "ab_tenant_member",                 // user↔tenant membership (login, admission, bootstrap)
+        "ab_user_role",                     // member↔role binding (auth-filter role load, explicit tenantId)
+        "ab_role"                           // role definitions (login + initializers pass tenantId explicitly)
+    );
+
+    /**
+     * The migration ledger — kept as the W5 terminal gate. It closed at EMPTY on
+     * 2026-10-01 (W2a–W3e): every table that has a tenant_id column but needs an
+     * exemption is either in {@link #AUTH_PLANE_TABLES} (owner-approved tier) or
+     * was removed outright. Do not add entries here; new exemptions require an
+     * approved A4-class census and a new registry tier.
+     */
+    public static final Set<String> MIGRATION_PENDING_TABLES = Set.of();
+
+    /**
      * Whitelist of tables backing {@code @EnvScoped} entities, discovered via classpath scan
      * (env-layering #18). Adding a new env-scoped resource is now one-step: annotate the
      * entity. The MyBatis-Plus interceptor reads this set on every query.
@@ -71,7 +134,9 @@ public class MybatisPlusConfig {
 
     @Bean
     public MybatisPlusInterceptor mybatisPlusInterceptor(DatabaseDialect databaseDialect,
-                                                          ApplicationContext applicationContext) {
+                                                          ApplicationContext applicationContext,
+                                                          org.springframework.core.env.Environment environment) {
+        guardTenantBypassPrefixes(environment);
         MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
 
         // env-layering #19 — UPDATE/DELETE write-side lock guard. Registered FIRST so it sees
@@ -100,86 +165,37 @@ public class MybatisPlusConfig {
 
             @Override
             public boolean ignoreTable(String tableName) {
-                // ── Global tables (no tenant_id column) ──
-                return "ab_user".equals(tableName)
-                    || "ab_tenant".equals(tableName)
-                    || "ab_tenant_member".equals(tableName)           // Cross-tenant: "which tenants does user belong to"
-                    || "ab_invitation".equals(tableName)              // Pre-join: invitation verified before tenant context
-                    || "ab_user_session".equals(tableName)            // Global session/token lookup; effective tenant context is stored explicitly
-                    || "ab_user_social_link".equals(tableName)        // No tenant_id, global per user
-                    || "ab_login_application".equals(tableName)       // Pre-auth global application registry
-                    || "ab_login_channel".equals(tableName)           // Pre-auth routing; tenant selector is explicit
-                    || "ab_login_channel_auth_method".equals(tableName) // No tenant_id; parent channel is explicit
-                    || "ab_identity_provider_instance".equals(tableName) // Pre-auth routing; tenant selector is explicit
-                    || "ab_external_identity_link".equals(tableName)  // Identity lookup occurs before tenant context
-                    || "ab_auth_identity".equals(tableName)           // WeChat identity lookup occurs before tenant context (login/bind)
-                    || "ab_user_deactivation".equals(tableName)       // No tenant_id
-                    || "ab_verification_code".equals(tableName)       // No tenant_id, pre-auth OTP
-                    || "ab_system_config".equals(tableName)           // G1: no tenant_id
-                    || "ab_bootstrap".equals(tableName)               // G1: no tenant_id
-                    || "ab_billing_account".equals(tableName)         // Billing spine: no tenant_id (Task 1-3)
-                    || "ab_api_connector_endpoint".equals(tableName)  // No tenant_id
-                    || "ab_jdbc_connector_endpoint".equals(tableName)  // No tenant_id (parented by connector_pid)
-                    || "ab_mkt_publisher_payout".equals(tableName)    // No tenant_id, publisher-scoped (not tenant-scoped)
+                // Explicit code-level scope replaces blanket table exemptions
+                // (tenant-exemption cleanup W1): pre-auth lookups and system
+                // workers wrap their queries in MetaContext.runWithoutTenantFilter
+                // instead of the table being permanently exempt below.
+                if (MetaContext.isTenantFilterBypassed()) {
+                    return true;
+                }
+                // ── Tenant-table registry (schema-verified; see set javadoc) ──
+                if (VERIFIED_GLOBAL_TABLES.contains(tableName) || MIGRATION_PENDING_TABLES.contains(tableName)
+                        || AUTH_PLANE_TABLES.contains(tableName)) {
+                    return true;
+                }
 
-                    // ── Recursive CTE (not a real table) ──
-                    || "domain_tree".equals(tableName)               // DataDomainMapper.findDescendantIds recursive CTE. The interceptor was injecting "dt.tenant_id = ?" on the CTE alias → "column dt.tenant_id does not exist", 500'ing getUserDomainIdsWithDescendants / buildDomainFilter / filterByDomain in production (caught 2026-06-19 by the DataDomainServiceImpl coverage IT). The CTE's anchor + recursive terms already filter tenant_id explicitly.
+                // ── Recursive CTE (not a real table) ──
+                // "domain_tree": DataDomainMapper.findDescendantIds recursive CTE. The interceptor was
+                // injecting "dt.tenant_id = ?" on the CTE alias → "column dt.tenant_id does not exist",
+                // 500'ing getUserDomainIdsWithDescendants / buildDomainFilter / filterByDomain in
+                // production (caught 2026-06-19 by the DataDomainServiceImpl coverage IT). The CTE's
+                // anchor + recursive terms already filter tenant_id explicitly.
+                if ("domain_tree".equals(tableName)) {
+                    return true;
+                }
 
-                    // ── Currency (has tenant_id, but all queries pass it explicitly as @Param) ──
-                    || "ab_exchange_rate".equals(tableName)           // ExchangeRateMapper passes tenantId explicitly
+                // ── Application-contributed external stores ──
+                if (hasConfiguredBypassPrefix(tableName)) {
+                    return true;
+                }
 
-                    // ── Consolidation (explicit tenantId in @Select queries) ──
-                    || "ab_legal_entity".equals(tableName)
-                    || "ab_intercompany_txn".equals(tableName)
-
-                    // ── RBAC (has tenant_id, but queried during login before MetaContext is set) ──
-                    || "ab_user_role".equals(tableName)              // Login: countUserRolesInTenant passes tenantId explicitly
-                    || "ab_role".equals(tableName)                   // Login: role lookup by tenantId explicitly
-
-                    // ── Admin/entitlement (has tenant_id, but admin queries use explicit tenantId) ──
-                    || "ab_tenant_entitlement".equals(tableName)
-                    || "ab_license_audit_log".equals(tableName)
-                    || "ab_payment_order".equals(tableName)
-                    || "ab_payment_transaction".equals(tableName)
-                    || "ab_marketplace_solution_install".equals(tableName)
-                    || "ab_tenant_login_channel".equals(tableName)    // Queried by explicit tenantId before auth
-
-                    // ── Permission audit (has tenant_id, but @Async writes run without MetaContext) ──
-                    || "ab_permission_audit_log".equals(tableName)
-
-                    // ── Scheduler/async context (has tenant_id, but accessed without MetaContext) ──
-                    || "ab_i18n_resource".equals(tableName)           // Startup seeder writes tenantId=0 without context
-                    || "ab_outbox".equals(tableName)                  // Outbox processor runs without tenant context
-                    || "ab_scheduled_task".equals(tableName)          // Scheduler context, tenant_id NULLABLE
-                    || "ab_scheduled_task_log".equals(tableName)      // Scheduler context, tenant_id NULLABLE
-                    || "ab_notification_digest".equals(tableName)     // Scheduler flushes without tenant context
-                    || "ab_async_task".equals(tableName)              // Thread pool execution without MetaContext
-                    || "ab_sla_record".equals(tableName)              // Scheduler scans across all tenants every 60s
-                    || "ab_automation".equals(tableName)              // Scheduler scans across all tenants every 60s/300s
-                    || "ab_idempotency_record".equals(tableName)      // Scheduler cleanup runs across all tenants
-                    || "ab_idempotent_key".equals(tableName)          // Scheduler cleanup runs across all tenants
-                    || "ab_export_task".equals(tableName)             // @Async export + scheduler cleanup across tenants
-                    || "ab_behavior_event".equals(tableName)          // MQ consumer/analytics paths pass tenant_id explicitly
-                    || "ab_behavior_quarantine".equals(tableName)     // MQ consumer/replay sink; tenant_id is carried explicitly
-                    || "ab_behavior_outcome_outbox".equals(tableName)  // Server outcome relay scans across tenants; tenant_id is explicit
-                    || "ab_cloud_config".equals(tableName)            // PLATFORM-level rows have tenant_id=NULL
-                    || "ab_invariant_definition".equals(tableName)    // InvariantAlarmWorker scans across all tenants in thread pool
-                    || "ab_decision_definition".equals(tableName)     // DecisionAlarmWorker scans across all tenants in thread pool
-
-                    // ── Mobile config (no tenant_id, no auth required) ──
-                    || "ab_mobile_config".equals(tableName)
-                    || "ab_mobile_client_log".equals(tableName)
-
-                    // ── Email record-linking (join tables without tenant_id) ──
-                    || "ab_email_account_member".equals(tableName)    // Join table: account_id + user_id, no tenant_id
-
-                    // ── Application-contributed external stores ──
-                    || hasConfiguredBypassPrefix(tableName)
-
-                    // ── PostgreSQL system tables ──
-                    || tableName.startsWith("information_schema.")
-                    || "information_schema.tables".equals(tableName)
-                 ;
+                // ── PostgreSQL system tables ──
+                return tableName.startsWith("information_schema.")
+                    || "information_schema.tables".equals(tableName);
             }
         });
 
@@ -234,6 +250,29 @@ public class MybatisPlusConfig {
                 .map(String::trim)
                 .filter(prefix -> !prefix.isEmpty())
                 .anyMatch(tableName::startsWith);
+    }
+
+    /**
+     * The prefix bypass turns the tenant filter off for whole table families. That is a
+     * single-tenant/dev-store affordance; in any non-dev profile a configured bypass is a
+     * cross-tenant leak waiting for its first query. Fail fast at startup instead.
+     */
+    public void guardTenantBypassPrefixes(org.springframework.core.env.Environment environment) {
+        if (tenantBypassTablePrefixes == null || tenantBypassTablePrefixes.isBlank()) {
+            return;
+        }
+        java.util.Set<String> active = java.util.Set.of(environment.getActiveProfiles());
+        boolean devLike = active.stream().anyMatch(p ->
+                p.equals("dev") || p.equals("local") || p.equals("test") || p.equals("integration-test"));
+        if (!devLike) {
+            throw new IllegalStateException(
+                    "aura.persistence.tenant-bypass-table-prefixes is configured ('"
+                    + tenantBypassTablePrefixes + "') under non-dev profiles " + active
+                    + ". The prefix bypass disables tenant isolation for whole table families; "
+                    + "it is only permitted in dev/local/test profiles.");
+        }
+        log.warn("Tenant bypass table prefixes active under dev-like profiles {}: {}",
+                active, tenantBypassTablePrefixes);
     }
 
 }

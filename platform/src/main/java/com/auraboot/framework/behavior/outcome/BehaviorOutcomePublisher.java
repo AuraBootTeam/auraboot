@@ -1,6 +1,7 @@
 package com.auraboot.framework.behavior.outcome;
 
 import com.auraboot.framework.behavior.mapper.BehaviorOutcomeOutboxMapper;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +21,10 @@ public class BehaviorOutcomePublisher {
 
     @Transactional(propagation = Propagation.MANDATORY)
     public boolean publish(BehaviorOutcomeEvent event) {
-        validate(event);
+        // Outbox row carries explicit tenantId; scope keeps insert semantics
+        // stable for both relay (context-less) and request callers (W3).
+        return MetaContext.runWithoutTenantFilter(() -> {
+            validate(event);
         Instant now = Instant.now();
         BehaviorOutcomeOutbox row = new BehaviorOutcomeOutbox();
         row.setTenantId(event.getTenantId());
@@ -39,8 +43,9 @@ public class BehaviorOutcomePublisher {
         row.setStatus("pending");
         row.setAttempts(0);
         row.setNextAttemptAt(now);
-        row.setCreatedAt(now);
-        return mapper.insertPending(row) == 1;
+            row.setCreatedAt(now);
+            return mapper.insertPending(row) == 1;
+        });
     }
 
     private String toPayload(BehaviorOutcomeEvent event) {

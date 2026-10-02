@@ -4,6 +4,7 @@ import com.auraboot.framework.auth.entity.UserSession;
 import com.auraboot.framework.auth.mapper.UserSessionMapper;
 import com.auraboot.framework.auth.service.SessionManagementService;
 import com.auraboot.framework.auth.util.JwtUtil;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.common.util.UlidGenerator;
@@ -24,6 +25,16 @@ import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Session lifecycle on the auth plane. Every query here runs either before the
+ * tenant context is bound (token validation IS how the context is established)
+ * or addresses rows by token/pid/userId — {@code ab_user_session.tenant_id} is
+ * a descriptive copy of the JWT claim, not a partition key. The service runs
+ * under the explicit {@link MetaContext#runWithoutTenantFilter} scope so the
+ * tenant-line filter can apply to {@code ab_user_session} everywhere else
+ * (tenant-exemption cleanup W2a); future direct-mapper access outside this
+ * service no longer silently bypasses the filter.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -41,28 +52,30 @@ public class SessionManagementServiceImpl implements SessionManagementService {
     @Override
     @Transactional
     public UserSession createSession(Long userId, String token, String ipAddress, String userAgent) {
-        UserSession session = new UserSession();
-        String sid = extractSidClaim(token);
-        session.setPid(sid == null ? UlidGenerator.generate() : sid);
-        session.setUserId(userId);
-        session.setTokenHash(hashToken(token));
-        populateExecutionContext(session, token);
-        session.setIpAddress(ipAddress);
-        session.setUserAgent(userAgent != null && userAgent.length() > 512 ? userAgent.substring(0, 512) : userAgent);
-        session.setDeviceInfo(parseDeviceInfo(userAgent));
-        session.setCreatedAt(Instant.now());
-        session.setLastActiveAt(Instant.now());
-        session.setRevoked(false);
-        if (userSessionMapper.insertIfAbsent(session) == 0) {
-            UserSession existing = sid == null ? userSessionMapper.findByTokenHash(session.getTokenHash())
-                    : userSessionMapper.findByPid(sid);
-            if (existing == null) {
-                throw new IllegalStateException("Session idempotency conflict did not expose the existing row");
+        return MetaContext.runWithoutTenantFilter(() -> {
+            UserSession session = new UserSession();
+            String sid = extractSidClaim(token);
+            session.setPid(sid == null ? UlidGenerator.generate() : sid);
+            session.setUserId(userId);
+            session.setTokenHash(hashToken(token));
+            populateExecutionContext(session, token);
+            session.setIpAddress(ipAddress);
+            session.setUserAgent(userAgent != null && userAgent.length() > 512 ? userAgent.substring(0, 512) : userAgent);
+            session.setDeviceInfo(parseDeviceInfo(userAgent));
+            session.setCreatedAt(Instant.now());
+            session.setLastActiveAt(Instant.now());
+            session.setRevoked(false);
+            if (userSessionMapper.insertIfAbsent(session) == 0) {
+                UserSession existing = sid == null ? userSessionMapper.findByTokenHash(session.getTokenHash())
+                        : userSessionMapper.findByPid(sid);
+                if (existing == null) {
+                    throw new IllegalStateException("Session idempotency conflict did not expose the existing row");
+                }
+                log.debug("Session already exists for token, returning the persisted session");
+                return existing;
             }
-            log.debug("Session already exists for token, returning the persisted session");
-            return existing;
-        }
-        return session;
+            return session;
+        });
     }
 
     private void populateExecutionContext(UserSession session, String token) {
@@ -84,8 +97,10 @@ public class SessionManagementServiceImpl implements SessionManagementService {
 
     @Override
     public boolean isSessionValid(String token) {
-        UserSession session = findByToken(token);
-        return session != null && !Boolean.TRUE.equals(session.getRevoked());
+        return MetaContext.runWithoutTenantFilter(() -> {
+            UserSession session = findByToken(token);
+            return session != null && !Boolean.TRUE.equals(session.getRevoked());
+        });
     }
 
     /**
@@ -110,20 +125,24 @@ public class SessionManagementServiceImpl implements SessionManagementService {
         if (token == null || token.isBlank()) {
             return null;
         }
-        String sid = extractSidClaim(token);
-        return sid == null ? userSessionMapper.findByTokenHash(hashToken(token)) : userSessionMapper.findByPid(sid);
+        return MetaContext.runWithoutTenantFilter(() -> {
+            String sid = extractSidClaim(token);
+            return sid == null ? userSessionMapper.findByTokenHash(hashToken(token)) : userSessionMapper.findByPid(sid);
+        });
     }
 
     @Override
     @Transactional
     public void revokeSession(Long userId, String sessionPid) {
-        List<UserSession> sessions = userSessionMapper.findActiveByUserId(userId);
-        UserSession target = sessions.stream()
-                .filter(s -> s.getPid().equals(sessionPid))
-                .findFirst()
-                .orElseThrow(() -> new RootUnCheckedException(ResponseCode.NOT_FOUND, "Session not found"));
-        userSessionMapper.revokeSession(target.getId());
-        log.info("Session {} revoked for user {}", sessionPid, userId);
+        MetaContext.runWithoutTenantFilter(() -> {
+            List<UserSession> sessions = userSessionMapper.findActiveByUserId(userId);
+            UserSession target = sessions.stream()
+                    .filter(s -> s.getPid().equals(sessionPid))
+                    .findFirst()
+                    .orElseThrow(() -> new RootUnCheckedException(ResponseCode.NOT_FOUND, "Session not found"));
+            userSessionMapper.revokeSession(target.getId());
+            log.info("Session {} revoked for user {}", sessionPid, userId);
+        });
     }
 
     @Override
@@ -132,25 +151,29 @@ public class SessionManagementServiceImpl implements SessionManagementService {
         if (token == null || token.isBlank()) {
             return;
         }
-        UserSession session = findByToken(token);
-        if (session == null || Boolean.TRUE.equals(session.getRevoked())) {
-            return;
-        }
-        userSessionMapper.revokeSession(session.getId());
-        lastActiveThrottle.remove(hashToken(token));
-        log.info("Session {} revoked by current token", session.getPid());
+        MetaContext.runWithoutTenantFilter(() -> {
+            UserSession session = findByToken(token);
+            if (session == null || Boolean.TRUE.equals(session.getRevoked())) {
+                return;
+            }
+            userSessionMapper.revokeSession(session.getId());
+            lastActiveThrottle.remove(hashToken(token));
+            log.info("Session {} revoked by current token", session.getPid());
+        });
     }
 
     @Override
     @Transactional
     public void revokeAllSessions(Long userId) {
-        int count = userSessionMapper.revokeAllSessions(userId);
-        log.info("Revoked {} sessions for user {}", count, userId);
+        MetaContext.runWithoutTenantFilter(() -> {
+            int count = userSessionMapper.revokeAllSessions(userId);
+            log.info("Revoked {} sessions for user {}", count, userId);
+        });
     }
 
     @Override
     public List<UserSession> getActiveSessions(Long userId) {
-        return userSessionMapper.findActiveByUserId(userId);
+        return MetaContext.runWithoutTenantFilter(() -> userSessionMapper.findActiveByUserId(userId));
     }
 
     @Override
@@ -164,11 +187,13 @@ public class SessionManagementServiceImpl implements SessionManagementService {
             return;
         }
 
-        UserSession session = findByToken(token);
-        if (session != null) {
-            userSessionMapper.updateLastActive(session.getId());
-            lastActiveThrottle.put(hash, now);
-        }
+        MetaContext.runWithoutTenantFilter(() -> {
+            UserSession session = findByToken(token);
+            if (session != null) {
+                userSessionMapper.updateLastActive(session.getId());
+                lastActiveThrottle.put(hash, now);
+            }
+        });
     }
 
     /**
