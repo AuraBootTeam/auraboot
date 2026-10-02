@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Self-contained Linux CI runner for the complete Gradle `test` task. Some
-# historical tests still use the fixed skills-c2 PostgreSQL/Redis ports, while
+# historical tests use explicit PostgreSQL/Redis connection variables, while
 # newer smoke tests use Testcontainers. Provision both paths and retain the
 # dedicated Compose project after returning for owner evidence inspection.
 
@@ -42,11 +42,8 @@ export AURA_OSS_CI_POSTGRES_PORT AURA_OSS_CI_REDIS_PORT AURA_OSS_CI_KAFKA_PORT
 export AURA_OSS_CI_POSTGRES_CONTAINER="auraboot-oss-ci-postgres-$RUNTIME_TOKEN"
 export AURA_OSS_CI_REDIS_CONTAINER="auraboot-oss-ci-redis-$RUNTIME_TOKEN"
 COMPOSE_ARGS=(
-  -f "$PROJECT_ROOT/docker-compose.yml"
-  -f "$PROJECT_ROOT/docker-compose.skills-c2.override.yml"
   -f "$PROJECT_ROOT/docker-compose.oss-backend-ci.override.yml"
   -p "$COMPOSE_PROJECT"
-  --profile skills-c2-stack
 )
 FLYWAY_IMAGE='flyway/flyway:12.8.1@sha256:b8a2d72926b98234c1fb8f45659fd23d8a001af9ee7f450326aa46af14d447bb'
 
@@ -124,7 +121,7 @@ if ! PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT=120000 \
 fi
 
 if ! docker compose "${COMPOSE_ARGS[@]}" up -d --wait postgres redis kafka; then
-  environment_invalid 'skills-c2 PostgreSQL/Redis/Kafka stack did not become healthy'
+  environment_invalid 'CI PostgreSQL/Redis/Kafka stack did not become healthy'
 fi
 
 # The PostgreSQL image reports healthy while its temporary init server may still
@@ -143,7 +140,7 @@ while (( SECONDS < postgres_init_deadline )); do
   sleep 2
 done
 if [[ "$postgres_initialized" != true ]]; then
-  environment_invalid 'skills-c2 PostgreSQL did not finish schema initialization within 5 minutes'
+  environment_invalid 'CI PostgreSQL did not finish schema initialization within 5 minutes'
 fi
 
 FLYWAY_ARGS=(

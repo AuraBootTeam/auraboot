@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import test from 'node:test';
@@ -11,9 +11,19 @@ const gradleBuild = path.join(here, '..', 'platform', 'build.gradle');
 const source = readFileSync(runner, 'utf8');
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+test('every repository Compose input exists in a clean checkout', () => {
+  const inputs = [...source.matchAll(/-f "\$PROJECT_ROOT\/([^"]+)"/g)].map(match => match[1]);
+  assert.ok(inputs.length > 0, 'runner must declare its Compose inputs');
+  for (const input of inputs) {
+    const file = path.join(here, '..', input);
+    assert.ok(existsSync(file), `missing clean-checkout Compose input: ${input}`);
+    assert.ok(statSync(file).isFile(), `Compose input must be a regular file: ${input}`);
+  }
+});
+
 test('backend CI runner is executable and owns its complete infrastructure lifecycle', () => {
   assert.ok(statSync(runner).mode & 0o100);
-  assert.match(source, /docker-compose\.skills-c2\.override\.yml/);
+  assert.doesNotMatch(source, /docker-compose\.skills-c2\.override\.yml/);
   assert.match(source, /up -d --wait postgres redis kafka/);
   assert.match(source, /runtime retained and stopped; network released: compose_project=/);
   assert.match(source, /COMPOSE_PROJECT="aura-ci-oss-backend-\$RUNTIME_TOKEN"/);
@@ -33,7 +43,8 @@ test('backend CI runner migrates a blank database from the Flyway source of trut
   const override = readFileSync(composeOverride, 'utf8');
 
   assert.match(source, /docker-compose\.oss-backend-ci\.override\.yml/);
-  assert.match(override, /volumes:\s*!override/);
+  assert.match(override, /skills_c2_postgres_data:\/var\/lib\/postgresql\/data/);
+  assert.doesNotMatch(override, /container_name:|!override/);
   assert.doesNotMatch(override, /schema-current\.sql/);
   assert.match(source, /flyway\/flyway:12\.8\.1/);
   assert.match(source, /-locations=filesystem:\/flyway\/sql/);
@@ -87,7 +98,9 @@ test('backend CI runner pre-pulls every fixed and Testcontainers image', () => {
 });
 
 test('backend CI runner preserves Gradle product-test exit status', () => {
-  assert.match(source, /platform\/gradlew -p platform --continue cleanTest test bootstrapBillingAccountTest\s*$/);
+  assert.match(source, /^platform\/gradlew -p platform --continue cleanTest test bootstrapBillingAccountTest\s*$/m);
+  assert.match(source, /gradle_status=\$\?/);
+  assert.match(source, /exit "\$gradle_status"\s*$/);
   assert.doesNotMatch(source, /platform\/gradlew[^\n]*\|\| environment_invalid/);
 });
 
