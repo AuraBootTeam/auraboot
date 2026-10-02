@@ -9,6 +9,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 
 const fetchResultMock = vi.fn();
+const confirmMock = vi.hoisted(() => vi.fn());
+vi.mock('~/utils/confirmDialog', () => ({ confirmDialog: confirmMock }));
 vi.mock('~/shared/services/http-client', () => ({
   fetchResult: (...args: unknown[]) => fetchResultMock(...args),
 }));
@@ -39,7 +41,28 @@ function makeRuntime(overrides: Record<string, unknown> = {}): SchemaRuntime {
 }
 
 describe('useActionHandler - handlerParams.async polling', () => {
-  beforeEach(() => fetchResultMock.mockReset());
+  beforeEach(() => { fetchResultMock.mockReset(); confirmMock.mockReset(); });
+
+  it.each([
+    [{}, 'default'],
+    [{ danger: true }, 'danger'],
+    [{ variant: 'danger' }, 'danger'],
+  ] as const)('uses the declared confirmation intent and cancels before dispatch: %j', async (intent, expectedVariant) => {
+    confirmMock.mockResolvedValue(false);
+    const { result } = renderHook(() => useActionHandler({
+      runtime: makeRuntime(), navigate: vi.fn() as any, tableName: 'inv_arrival_notice',
+      locale: 'zh-CN', t: ((key: string, _params?: any, fallback?: string) => fallback ?? key) as any,
+    }));
+    await act(async () => {
+      await result.current.handleAction({
+        code: 'convert_to_inbound', confirm: 'Generate a draft receipt?', ...intent,
+        action: { type: 'command', command: 'inv:convert_notice_to_inbound' },
+      } as unknown as ButtonConfig, { pid: 'notice-1' });
+    });
+    expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ variant: expectedVariant }));
+    expect(fetchResultMock).not.toHaveBeenCalled();
+    expect(result.current.loading).toBe(false);
+  });
 
   it('keeps the action loading until the post-command detail refresh settles', async () => {
     fetchResultMock.mockResolvedValueOnce({
