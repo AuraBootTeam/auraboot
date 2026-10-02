@@ -18,6 +18,7 @@
 
 import { test, expect } from '@playwright/test';
 import { uniqueId } from '../helpers/index';
+import { BASE_URL } from '../../helpers/environments';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -39,7 +40,9 @@ async function createTestPage(
       pageKey,
       title: name,
       kind: 'list',
-      modelCode: 'tenant',
+      modelCode: 'page_schema',
+      schemaVersion: 4,
+      layout: { type: 'stack' },
       blocks: [{ id: 'blk1', blockType: 'table', config: {} }],
       metaInfo: { componentCount: 1 },
       semver: '0.1.0',
@@ -76,17 +79,18 @@ async function goToPageDesignerList(page: import('@playwright/test').Page): Prom
  * Returns the dialog locator.
  */
 async function openTemplateDialog(page: import('@playwright/test').Page) {
-  // Click the "From Template" button (first match — the route-level button)
-  const btn = page.getByTestId('create-from-template-btn').first();
-  await btn.waitFor({ state: 'visible', timeout: 10000 });
+  const btn = page.getByTestId('toolbar-create-from-template');
+  await expect(btn).toBeEnabled();
   await btn.click();
   const dialog = page.getByTestId('create-from-template-dialog');
-  const opened = await dialog.isVisible({ timeout: 3000 }).catch(() => false);
-  if (!opened) {
-    await btn.evaluate((el: HTMLElement) => el.click());
-  }
   await expect(dialog).toBeVisible({ timeout: 10000 });
   return dialog;
+}
+
+async function openTemplateEditor(page: import('@playwright/test').Page, pid: string): Promise<void> {
+  await page.goto(`/page-designer/${pid}`, { waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('list-config-panel')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('toolbar-create-from-template')).toBeEnabled();
 }
 
 // ---------------------------------------------------------------------------
@@ -101,7 +105,7 @@ test.describe('Page Templates', () => {
   let pageName: string;
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ baseURL: BASE_URL, extraHTTPHeaders: { Referer: `${BASE_URL}/` }, storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const p = await ctx.newPage();
     const result = await createTestPage(p);
     pagePid = result.pid;
@@ -153,12 +157,10 @@ test.describe('Page Templates', () => {
   // -------------------------------------------------------------------------
   // T2: Template gallery loads with search and kind filter
   // -------------------------------------------------------------------------
-  test.fixme('T2 — template gallery shows search + kind filter + at least one card after save', async ({
+  test('T2 — template gallery shows search + kind filter + at least one card after save', async ({
     page,
   }) => {
-    // CreateFromTemplateDialog component exists but is not wired into the UI yet.
-    // /page-designer redirects to /p/page_schema (DSL list) which doesn't render the template button.
-    await goToPageDesignerList(page);
+    await openTemplateEditor(page, pagePid);
 
     const dialog = await openTemplateDialog(page);
 
@@ -175,21 +177,18 @@ test.describe('Page Templates', () => {
     await expect(grid).toBeVisible({ timeout: 10000 });
 
     // At least one template card should exist
-    const cards = grid.locator('[data-testid^="template-card-"]');
-    await expect(cards.first()).toBeVisible({ timeout: 10000 });
+    await expect(grid.getByTestId(`template-card-${pagePid}`)).toBeVisible({ timeout: 10000 });
 
     // Dismiss dialog via close button (custom div modal, Escape not guaranteed)
-    await page.getByRole('button', { name: 'Close dialog' }).click();
+    await dialog.getByRole('button', { name: /Close dialog|\u5173\u95ed/ }).click();
     await expect(dialog).not.toBeVisible({ timeout: 5000 });
   });
 
   // -------------------------------------------------------------------------
   // T3: Search filters template cards
   // -------------------------------------------------------------------------
-  test.fixme('T3 — search input filters visible template cards', async ({ page }) => {
-    // CreateFromTemplateDialog component exists but is not wired into the UI yet.
-    // Same as T2: /page-designer list doesn't render the template trigger button.
-    await goToPageDesignerList(page);
+  test('T3 — search input filters visible template cards', async ({ page }) => {
+    await openTemplateEditor(page, pagePid);
     await openTemplateDialog(page);
 
     // Gallery loads
@@ -218,10 +217,8 @@ test.describe('Page Templates', () => {
   // -------------------------------------------------------------------------
   // T4: Create page from template — two-step flow
   // -------------------------------------------------------------------------
-  test.fixme('T4 — create page from template via two-step dialog', async ({ page }) => {
-    // CreateFromTemplateDialog component exists but is not wired into the UI yet.
-    // Same as T2/T3: /page-designer list doesn't render the template trigger button.
-    await goToPageDesignerList(page);
+  test('T4 — create page from template via two-step dialog', async ({ page }) => {
+    await openTemplateEditor(page, pagePid);
     const dialog = await openTemplateDialog(page);
 
     // Step 1: select template
@@ -231,7 +228,7 @@ test.describe('Page Templates', () => {
     await expect(grid).toBeVisible({ timeout: 10000 });
 
     // Click the first template card to advance to step 2
-    const firstCard = grid.locator('[data-testid^="template-card-"]').first();
+    const firstCard = grid.getByTestId(`template-card-${pagePid}`);
     await expect(firstCard).toBeVisible();
     await firstCard.click();
 
@@ -243,7 +240,7 @@ test.describe('Page Templates', () => {
 
     // Name is pre-filled with "<templateName> Copy"
     const prefixName = await nameInput.inputValue();
-    expect(prefixName).toContain('Copy');
+    expect(prefixName).toMatch(/copy|\u526f\u672c/i);
 
     // Page key is auto-generated (non-empty)
     const keyValue = await keyInput.inputValue();
@@ -277,8 +274,18 @@ test.describe('Page Templates', () => {
     await expect(dialog).not.toBeVisible({ timeout: 10000 });
 
     // Should navigate to the new page designer with the new pid
-    await page.waitForURL(/\/page-designer\/[a-zA-Z0-9]+$/, { timeout: 10000 });
-    await expect(page.getByTestId('designer-canvas')).toBeVisible({ timeout: 15000 });
+    const createdPid = respBody.data?.pid;
+    expect(createdPid, 'Created page must return its actual pid').toBeTruthy();
+    await expect(page).toHaveURL(`${BASE_URL}/page-designer/${createdPid}`);
+    await expect(page.getByTestId('list-config-panel')).toBeVisible({ timeout: 15000 });
+    await page.reload();
+    await expect(page.getByTestId('list-config-panel')).toBeVisible({ timeout: 15000 });
+    const persisted = await page.request.get(`/api/pages/${createdPid}`);
+    expect(persisted.ok()).toBe(true);
+    const persistedBody = await persisted.json();
+    expect(persistedBody.code).toBe('0');
+    expect(persistedBody.data).toMatchObject({ pid: createdPid, name: newName, pageKey: newKey,
+      modelCode: 'page_schema', schemaVersion: 4, blocks: [{ id: 'blk1', blockType: 'table', config: {} }] });
   });
 
   // -------------------------------------------------------------------------
