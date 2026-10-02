@@ -136,10 +136,12 @@ export default function CapabilityRoleEditor({
     (tier: string) => {
       const tieredCodes = new Set(capabilityCodesForTier(capabilityView.primaryGroups, 'admin'));
       const preservedSelection = selected.filter((code) => !tieredCodes.has(code));
-      setSelected([
+      const nextSelection = [
         ...preservedSelection,
         ...capabilityCodesForTier(capabilityView.primaryGroups, tier),
-      ]);
+      ];
+      setSelected(nextSelection);
+      setRevokedPartial((current) => current.filter((code) => !nextSelection.includes(code)));
     },
     [capabilityView.primaryGroups, primaryCodes, selected],
   );

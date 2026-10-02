@@ -46,8 +46,8 @@ describe('capabilityService', () => {
     await expect(capabilityService.getForRole('role-pid-5')).rejects.toThrow('boom');
   });
   it('sends explicit partial revocations separately from selected capabilities in preview and apply', async () => {
-    vi.mocked(post).mockResolvedValue({ code: OK, data: {} });
-    vi.mocked(put).mockResolvedValue({ code: OK, data: [] });
+    vi.mocked(post).mockResolvedValue({ code: OK, desc: '', data: {} });
+    vi.mocked(put).mockResolvedValue({ code: OK, desc: '', data: [] });
     await capabilityService.previewSelection('role/pid', ['cap.view'], ['cap.edit', 'cap.export']);
     expect(post).toHaveBeenCalledWith(
       '/api/permission/capabilities/preview?rolePid=role%2Fpid&revokePartial=cap.edit&revokePartial=cap.export',

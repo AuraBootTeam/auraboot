@@ -204,3 +204,105 @@ test('capability grant readback failure blocks stale editing and retry reads the
   await expect(page.getByTestId(`capability-checkbox-${capabilityCode}`)).toBeChecked();
   await expect(page.locator('[data-testid^="atomic-checkbox-"]')).toHaveCount(0);
 });
+
+test('partial revocation retains selected shared actions and completion persists', async ({
+  page,
+}, info) => {
+  const role = await createRole(page);
+  const capUrl = `${BASE}/api/permission/capabilities?rolePid=${encodeURIComponent(role.pid)}`;
+  const matrixUrl = `${BASE}/api/permissions/matrix/${encodeURIComponent(role.pid)}`;
+  const readCaps = async () => {
+    const response = await page.request.get(capUrl);
+    expect(response.ok()).toBe(true);
+    return (await response.json()).data.flatMap((group: any) => group.capabilities);
+  };
+  const readActions = async () => {
+    const response = await page.request.get(matrixUrl);
+    expect(response.ok()).toBe(true);
+    return (await response.json()).data.modules.flatMap((module: any) =>
+      module.resources.flatMap((resource: any) => resource.actions),
+    );
+  };
+  const caps = await readCaps();
+  const view = caps.find((cap: any) => cap.code === 'org.cap.role_view');
+  const manage = caps.find((cap: any) => cap.code === 'org.cap.role');
+  expect(view?.includes.length).toBeGreaterThan(0);
+  expect(manage?.includes).toContain('org.role.update');
+  const actions = await readActions();
+  const fixtureCodes = [...new Set<string>([...view.includes, 'org.role.update'])];
+  const fixturePids = fixtureCodes.map((code) => {
+    const action = actions.find((row: any) => row.code === code);
+    expect(action?.permissionPid, `fixture permission ${code}`).toBeTruthy();
+    return action.permissionPid;
+  });
+  const fixture = await page.request.post(`${BASE}/api/roles/${role.pid}/permissions`, {
+    data: fixturePids,
+  });
+  expect(fixture.ok()).toBe(true);
+  expect(String((await fixture.json()).code)).toBe('0');
+  expect((await readCaps()).find((cap: any) => cap.code === manage.code).authorizationState).toBe(
+    'partial',
+  );
+  await page.goto('/enterprise/permissions');
+  await expect(page.getByTestId('permission-page')).toBeVisible();
+  await page.getByTestId('role-search-input').fill(role.code);
+  await page.getByTestId(`role-item-${role.code}`).click();
+  await expect(page.getByTestId('capability-role-editor')).toHaveAttribute(
+    'data-role-pid',
+    role.pid,
+  );
+  const checkbox = page.getByTestId(`capability-checkbox-${manage.code}`);
+  await expect(checkbox).toHaveAttribute('aria-checked', 'mixed');
+  await expect(page.getByTestId(`capability-checkbox-${view.code}`)).toBeChecked();
+  await expect(page.getByTestId('capability-save')).toBeDisabled();
+  await page.getByTestId(`capability-revoke-partial-${manage.code}`).click();
+  await expect(checkbox).toHaveAttribute('aria-checked', 'false');
+  const previewResponse = page.waitForResponse(
+    (response) =>
+      response.url().includes('/api/permission/capabilities/preview') &&
+      response.request().method() === 'POST',
+  );
+  await page.getByTestId('capability-save').click();
+  const response = await previewResponse;
+  expect(response.ok()).toBe(true);
+  const plan = (await response.json()).data;
+  expect(plan.revokedCodes).toEqual(['org.role.update']);
+  expect(plan.grantedCodes).toEqual([]);
+  await expect(page.getByTestId('confirm-dialog')).toBeVisible();
+  await page.screenshot({
+    path: info.outputPath('partial-revocation-preview.png'),
+    fullPage: true,
+  });
+  const saved = page.waitForResponse(
+    (response) =>
+      response.url().includes('/api/permission/capabilities?') &&
+      response.request().method() === 'PUT',
+  );
+  await page.getByTestId('confirm-ok').click();
+  expect((await saved).ok()).toBe(true);
+  await expect(page.getByTestId('capability-save')).toBeDisabled();
+  const afterActions = await readActions();
+  expect(afterActions.find((row: any) => row.code === 'org.role.update').granted).toBe(false);
+  for (const code of view.includes)
+    expect(
+      afterActions.find((row: any) => row.code === code).granted,
+      `shared action ${code}`,
+    ).toBe(true);
+  await checkbox.check();
+  await page.getByTestId('capability-save').click();
+  await expect(page.getByTestId('confirm-dialog')).toBeVisible();
+  await page.getByTestId('confirm-ok').click();
+  await expect(checkbox).toBeChecked();
+  await expect(page.getByTestId('capability-save')).toBeDisabled();
+  expect((await readCaps()).find((cap: any) => cap.code === manage.code).authorizationState).toBe(
+    'full',
+  );
+  await page.reload();
+  await page.getByTestId('role-search-input').fill(role.code);
+  await page.getByTestId(`role-item-${role.code}`).click();
+  await expect(checkbox).toBeChecked();
+  await page.screenshot({
+    path: info.outputPath('partial-completed-persisted.png'),
+    fullPage: true,
+  });
+});

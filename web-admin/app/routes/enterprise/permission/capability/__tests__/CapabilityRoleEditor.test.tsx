@@ -394,4 +394,28 @@ describe('CapabilityRoleEditor', () => {
     );
     expect(capabilityService.applySelection).not.toHaveBeenCalled();
   });
+  it('clears conflicting partial revocation when a preset explicitly selects that capability', async () => {
+    mockData([
+      {
+        group: '报价单',
+        capabilities: [
+          {
+            ...cap('partial.cap', 'Partial capability', false),
+            tier: 'viewer',
+            authorizationState: 'partial',
+            includes: ['record.read', 'record.edit'],
+            missingCodes: ['record.edit'],
+          },
+        ],
+      },
+    ]);
+    render(<CapabilityRoleEditor rolePid="role-pid-5" />);
+    await screen.findByTestId('capability-revoke-partial-partial.cap');
+    fireEvent.click(screen.getByTestId('capability-revoke-partial-partial.cap'));
+    fireEvent.click(screen.getByTestId('capability-preset-viewer'));
+    expect(screen.getByTestId('capability-checkbox-partial.cap')).toBeChecked();
+    fireEvent.click(screen.getByTestId('capability-save'));
+    await screen.findByTestId('confirm-ok');
+    expect(capabilityService.previewSelection).toHaveBeenCalledWith('role-pid-5', ['partial.cap']);
+  });
 });
