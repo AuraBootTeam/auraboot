@@ -6,7 +6,9 @@ import * as path from 'node:path';
 
 test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json', locale: 'zh-CN' });
 
-const EV = process.env.AURA_EVIDENCE_DIR!;
+// Evidence dir must exist even when the env hook is unset (isolated stacks).
+const EV = process.env.AURA_EVIDENCE_DIR || 'test-results/artifacts/report-hifi';
+fs.mkdirSync(EV, { recursive: true });
 const run = `hifi_${randomUUID().replaceAll('-', '').slice(0, 8)}`;
 const STATUSES = ['draft', 'confirmed', 'shipped', 'completed'] as const;
 const TYPES = ['normal', 'urgent', 'bulk'] as const;

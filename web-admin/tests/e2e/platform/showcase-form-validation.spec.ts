@@ -155,7 +155,6 @@ test('VAL-001 — Create form: submit with empty required field is blocked', asy
           '.ant-form-item-explain-error',
           '[data-testid*="error"]',
           '.text-status-red:not(:empty)',
-            '.text-status-red:not(:empty)',
           '.field-error',
           '[role="alert"]',
           '.text-red-500',
@@ -205,7 +204,10 @@ test('VAL-002 — Edit form: clearing required field blocks submission', async (
   await waitForFormReady(page, 15_000);
 
   // Find the Name field — wait for it to be populated with data first
-  const nameInput = page.locator('input[name="sc_name"], [data-field="sc_name"] input').first();
+  const nameInput = page
+    .locator('[data-testid="form-field-sc_name"] input, input[name="sc_name"], [data-field="sc_name"] input')
+    .or(page.getByLabel(/名称|Name/).first())
+    .first();
   await expect(nameInput).toBeVisible({ timeout: 5_000 });
   await expect(nameInput).not.toHaveValue('', { timeout: 10_000 });
   await fillControlledInput(nameInput, '');
@@ -228,12 +230,16 @@ test('VAL-002 — Edit form: clearing required field blocks submission', async (
     await altBtn.click();
   }
 
-  // Should show error toast
-  const errorToast = page.locator('[role="alert"]').first();
-  await expect(errorToast).toBeVisible({ timeout: 5_000 });
+  // Should show error feedback: toast OR the inline DSL field error
+  // (请填写名称 renders via ErrorText's .text-status-red, no role=alert).
+  const errorFeedback = page
+    .locator('[role="alert"], .text-status-red:not(:empty), p:has-text("请填写名称"), p:has-text("必填")')
+    .filter({ hasText: /名称|Name|required|必填|请填写/i })
+    .first();
+  await expect(errorFeedback).toBeVisible({ timeout: 5_000 });
 
   // The error message should mention the field name or "required"
-  const toastText = await errorToast.textContent();
+  const toastText = await errorFeedback.textContent();
   expect(toastText).toBeTruthy();
   expect(
     /名称|Name|required|必填/i.test(toastText || ''),
@@ -260,7 +266,10 @@ test('VAL-003 — Edit form: submission succeeds when required field has value',
   await waitForFormReady(page, 15_000);
 
   // Verify Name field has value
-  const nameInput = page.locator('input[name="sc_name"], [data-field="sc_name"] input').first();
+  const nameInput = page
+    .locator('[data-testid="form-field-sc_name"] input, input[name="sc_name"], [data-field="sc_name"] input')
+    .or(page.getByLabel(/名称|Name/).first())
+    .first();
   await expect(nameInput).toBeVisible({ timeout: 5_000 });
 
   // Update the name to a new value
@@ -305,7 +314,10 @@ test('VAL-004 — Edit form: error toast contains field-specific message', async
   await waitForFormReady(page, 15_000);
 
   // Clear the required Name field — wait for it to have a value first
-  const nameInput = page.locator('input[name="sc_name"], [data-field="sc_name"] input').first();
+  const nameInput = page
+    .locator('[data-testid="form-field-sc_name"] input, input[name="sc_name"], [data-field="sc_name"] input')
+    .or(page.getByLabel(/名称|Name/).first())
+    .first();
   await expect(nameInput).toBeVisible({ timeout: 5_000 });
   // Ensure the field is loaded with data before clearing
   await expect(nameInput).not.toHaveValue('', { timeout: 8_000 });
@@ -330,10 +342,13 @@ test('VAL-004 — Edit form: error toast contains field-specific message', async
   }
 
   // Error toast should appear with field-specific message
-  const errorToast = page.locator('[role="alert"]').first();
-  await expect(errorToast).toBeVisible({ timeout: 8_000 });
+  const errorFeedback = page
+    .locator('[role="alert"], .text-status-red:not(:empty), p:has-text("请填写名称"), p:has-text("必填")')
+    .filter({ hasText: /名称|Name|required|必填|请填写/i })
+    .first();
+  await expect(errorFeedback).toBeVisible({ timeout: 8_000 });
 
-  const toastText = await errorToast.textContent();
+  const toastText = await errorFeedback.textContent();
   // Should mention the field name or "required" keyword
   expect(
     /名称|Name|required|必填/i.test(toastText || ''),
@@ -365,7 +380,10 @@ test('VAL-005 — Create form: duplicate name is rejected by uniqueness constrai
   await waitForFormReady(page, 15_000);
 
   // Fill sc_name with the SAME name as the anchor record (never modified by other tests)
-  const nameInput = page.locator('input[name="sc_name"], [data-field="sc_name"] input').first();
+  const nameInput = page
+    .locator('[data-testid="form-field-sc_name"] input, input[name="sc_name"], [data-field="sc_name"] input')
+    .or(page.getByLabel(/名称|Name/).first())
+    .first();
   await expect(nameInput).toBeVisible({ timeout: 5_000 });
   await nameInput.fill(UNIQUE_NAME);
 
