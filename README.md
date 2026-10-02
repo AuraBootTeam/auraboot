@@ -4,7 +4,7 @@
 </p>
 
 <p align="center">
-  <a href="LICENSE.txt"><img src="https://img.shields.io/badge/License-AuraBoot_v1.3-blue.svg" alt="License"></a>
+  <a href="LICENSE.txt"><img src="https://img.shields.io/badge/License-Apache_2.0_with_AuraBoot_supplements-blue.svg" alt="License"></a>
   <a href="#"><img src="https://img.shields.io/badge/Java-21-orange.svg" alt="Java 21"></a>
   <a href="#"><img src="https://img.shields.io/badge/Spring_Boot-3.5-green.svg" alt="Spring Boot 3.5"></a>
   <a href="#"><img src="https://img.shields.io/badge/React-19-blue.svg" alt="React 19"></a>

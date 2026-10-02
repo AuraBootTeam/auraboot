@@ -9,14 +9,12 @@
 ## 一、协议性质
 
 ### Q1. AuraBoot 是开源软件吗?
-**是,但更准确的说法是 "source-available with commercial restrictions"**。AuraBoot 协议以 Apache License 2.0 为基底,叠加了若干商业用途限制(主要是禁止把 AuraBoot 本身作为低代码/AI 平台 SaaS 转售,详见 §5.4)。它**不是 OSI 认证的开源协议**,因为 OSI 定义不允许"限制特定使用领域"。
+**是。** 自 v2.0 起,社区版以 **Apache License 2.0**(LICENSE.txt Part 1,全文随附)授权,叠加仅涉及**商标与商业联系方式的补充条款**(Part 2,不限制 Part 1 授予的任何权利)。v1.x 的"field-of-use 限制"模式已废弃。
 
-社区里类似定位的项目:Sentry、PostHog、Cal.com、n8n、Cockroach、HashiCorp。
-
-### Q2. 为什么不直接用 Apache-2.0 / MIT / AGPL?
-- **纯 Apache/MIT** 防不住云厂商把 AuraBoot 包装成托管服务卖钱,同时不回馈
-- **AGPL** 在国内大企业法务那里通过率低,会拦住正常自部署客户
-- **本协议** 的目标:对个人 / 内部使用 / ISV 项目交付完全友好;只对"把 AuraBoot 本身当低代码平台 SaaS 卖"的形态收费
+### Q2. 为什么不担心云厂商打包托管?护城河在哪里?
+- **社区版的护城河不在许可证限制,而在产品**:企业版能力(高级设计器、行业插件、治理组件)在独立的专有代码库中,以商业协议单独授权——开源代码卖服务挡不住,专有代码本来就卖不了
+- **品牌保护**走商标条款(Part 2 S3):以"AuraBoot"品牌转售需商标许可;**换自己的品牌**则完全自由
+- Apache-2.0 是企业法务通过率最高的协议,对自部署客户与 ISV 都是最短路径
 
 ### Q3. 协议会突然变更吗?
 未来版本可能修订,但**已发布版本对旧版本号代码永久有效**。新版本只对新发布的代码生效。这是社区信任的基线,我们不会做 ElasticSearch / Redis 那种事后追溯改 license。
@@ -82,7 +80,11 @@
 如果你的产品同时提供"租户自己用低代码改业务流程"的能力,边界开始模糊 — 建议通过 https://www.auraboot.com/contact 确认。
 
 ### Q12. 商业 License 能解锁多租户低代码 SaaS 吗?
-**仅靠 Commercial License 不够**。按 §5.4(并经 §7.3 强化)要求,把 AuraBoot 作为平台 SaaS 对外提供,**必须同时**(a)持有 Commercial License,(b)取得我方就该具体部署的**书面 SaaS / OEM 分发权利**。普通 Commercial License(用于 white-label / 去品牌)本身不授权多租户低代码平台 SaaS 转售。如果你的商业模式是平台 SaaS,需要在 Commercial License 之上单独签订 SaaS / OEM rider。请通过 https://www.auraboot.com/contact 协商。
+先分清两个东西:
+- **社区版**(本仓库,Apache-2.0 + 商标补充条款):以**你自己的品牌**把它做成多租户 SaaS,Part 1 本来就允许,不需要任何付费授权。唯一限制是**不得以 "AuraBoot" 品牌**对外(Part 2 S3,商标)。
+- **商业版/企业版**(独立专有代码库):高级设计器、行业插件、治理组件等不在本仓库,只能通过 Commercial License 及单独的 SaaS / OEM 协议获得。
+
+换言之:卖"基于社区版换牌的 SaaS"是 Apache-2.0 的自由;卖"AuraBoot 商业版能力"或"用 AuraBoot 品牌",才是需要与我们签约的部分。商务洽谈:https://www.auraboot.com/contact
 
 ---
 

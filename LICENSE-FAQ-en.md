@@ -9,14 +9,12 @@
 ## 1. Nature of the License
 
 ### Q1. Is AuraBoot open source?
-**Technically, it is "source-available with commercial restrictions."** AuraBoot's license is built on Apache License 2.0 with supplementary terms — primarily restrictions on reselling AuraBoot itself as a low-code / no-code / AI platform SaaS (see §5.4).
+**Yes.** As of v2.0 the community distribution is licensed under the **Apache License 2.0** (LICENSE.txt Part 1, reproduced in full), supplemented only by trademark and commercial-contact provisions (Part 2, which restrict nothing granted by Part 1). The v1.x "field-of-use restriction" model is retired.
 
-It is **not OSI-approved**, because OSI's definition disallows field-of-use restrictions. Comparable projects in this category: Sentry, PostHog, Cal.com, n8n, CockroachDB, HashiCorp.
-
-### Q2. Why not pure Apache-2.0 / MIT / AGPL?
-- **Pure Apache/MIT** doesn't prevent cloud vendors from packaging AuraBoot as a managed service without contributing back.
-- **AGPL** is widely banned by enterprise legal teams, blocking legitimate self-hosted customers.
-- **This license** aims to be friendly for individuals, internal use, and ISVs — while charging only those who repackage AuraBoot itself as a low-code platform SaaS.
+### Q2. Why aren't you worried about cloud vendors? Where is the moat?
+- **The moat is the product, not license restrictions**: enterprise capabilities (advanced designers, industry plugins, governance components) live in a separate proprietary codebase licensed under commercial agreements — open code being resold as a service doesn't diminish proprietary code that was never open.
+- **Brand protection** moved to trademark terms (Part 2 S3): reselling under the "AuraBoot" brand requires a trademark license; **running it under your own brand** is entirely free.
+- Apache-2.0 has the highest enterprise-legal acceptance rate — the shortest path for self-hosted customers and ISVs alike.
 
 ### Q3. Will the license change unexpectedly?
 Future versions may be revised, but **published versions remain valid in perpetuity for the code released under them**. New versions only apply to newly released code. We will not pull an "ElasticSearch / Redis" — no retroactive license changes on already-released code. This is a baseline community trust commitment.
@@ -82,7 +80,11 @@ If you only use AuraBoot to configure business applications (ERP / CRM / interna
 If your product also exposes "tenants can use low-code to modify their own business workflows," the boundary becomes ambiguous — please contact us through https://www.auraboot.com/contact to confirm.
 
 ### Q12. Does a commercial license unlock multi-tenant low-code SaaS?
-**No, not by itself.** Per §5.4 (and reinforced by §7.3), platform-as-a-service distribution requires **both** a Commercial License AND an explicit written grant of SaaS / OEM distribution rights for the specific deployment. A standard Commercial License (e.g., for white-labeling or removing branding) does not by itself authorize you to host AuraBoot itself as a multi-tenant low-code platform service. If that's your business model, a separate SaaS / OEM rider or addendum to your Commercial License is required. Contact us through https://www.auraboot.com/contact to negotiate the rider.
+Two different things are often conflated here:
+- **The community edition** (this repository, Apache-2.0 + trademark supplements): turning it into a multi-tenant SaaS **under your own brand** is permitted by Part 1 outright — no paid license needed. The only restriction is that you may not trade under the "AuraBoot" brand (Part 2 S3, trademark).
+- **The commercial/enterprise edition** (a separate proprietary codebase): the advanced designers, industry plugins, and governance components are not in this repository and are available only under a Commercial License and separate SaaS / OEM agreements.
+
+In short: selling a rebranded SaaS built on the community edition is Apache-2.0 freedom; selling AuraBoot commercial capabilities or using the AuraBoot brand is what requires an agreement with us. Contact: https://www.auraboot.com/contact
 
 ---
 
