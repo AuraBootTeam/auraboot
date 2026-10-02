@@ -366,7 +366,7 @@ test.describe.serial('SavedView Personal-only management', () => {
     expect(copied.viewConfig?.rowHeight).toBe('extra-tall');
   });
 
-  test('SV-PER-003b: discard restores the selected personal view state and clears transient sort URL', async ({
+  test('SV-PER-003b: explicit sort deep link overrides the view baseline and survives hydration', async ({
     page,
   }) => {
     const sourceName = `${RUN_PREFIX}-放弃排序`;
@@ -375,21 +375,22 @@ test.describe.serial('SavedView Personal-only management', () => {
       viewConfig: { rowHeight: 'medium', sorts: [] },
     });
 
-    // URL-specific regression: a shared link may carry both an explicit view and
-    // a transient sort. Discard must restore the saved view, not restage the URL sort.
+    // #1746 contract (docs/system-reference/web/list-url-savedview-state.md):
+    // a deep link carrying ?sort= silently OVERRIDES the SavedView baseline —
+    // it is not staged as a personal-view draft, and hydration must not
+    // rewrite the URL param or touch the saved viewConfig.
     await page.goto(`/p/e2et_order?view=${sourcePid}&sort=e2et_order_amount%3Adesc`);
     await expect(page.getByTestId('dynamic-list')).toBeVisible();
     await expect(page.getByTestId('view-selector-trigger')).toHaveAttribute(
       'data-current-view-name',
       sourceName,
     );
-    await expect(page.getByTestId('personal-view-draft-banner')).toBeVisible();
-    await expect(page.getByTestId('personal-view-draft-banner')).toContainText('排序 1 项');
-
-    await page.getByTestId('personal-view-discard-draft').click();
-
-    await expect(page).not.toHaveURL(/sort=/);
+    // Applied as the active sort, not staged as a pending draft.
+    await expect(page.getByRole('button', { name: /排序 1|Sort 1/ })).toBeVisible();
     await expect(page.getByTestId('personal-view-draft-banner')).toHaveCount(0);
+    await expect(page).toHaveURL(/sort=e2et_order_amount/i);
+
+    // The saved view itself stays untouched by the deep link.
     expect((await getView(page, sourcePid)).viewConfig?.sorts ?? []).toEqual([]);
 
     await page.reload();
@@ -397,8 +398,8 @@ test.describe.serial('SavedView Personal-only management', () => {
       'data-current-view-name',
       sourceName,
     );
-    await expect(page.getByTestId('personal-view-draft-banner')).toHaveCount(0);
-    await expect(page).not.toHaveURL(/sort=/);
+    await expect(page).toHaveURL(/sort=e2et_order_amount/i);
+    await expect(page.getByRole('button', { name: /排序 1|Sort 1/ })).toBeVisible();
   });
 
   test('SV-PER-003c: default view column context hide updates immediately and persists', async ({
