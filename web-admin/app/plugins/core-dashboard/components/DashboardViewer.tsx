@@ -83,24 +83,30 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
     return () => resizeObserver.disconnect();
   }, []);
 
-  const layout = useMemo(
-    () =>
-      widgets.map(
-        (widget): Layout => ({
-          i: widget.id,
-          x: widget.x,
-          y: widget.y,
-          w: widget.w,
-          h: widget.h,
-          minW: widget.minW,
-          minH: widget.minH,
-          maxW: widget.maxW,
-          maxH: widget.maxH,
-          static: true,
-        }),
-      ),
-    [widgets],
-  );
+  // Keep authored desktop geometry; stack narrow viewers in reading order.
+  const singleColumn = containerWidth < 640;
+  const layout = useMemo(() => {
+    const ordered = singleColumn
+      ? [...widgets].sort((a, b) => a.y - b.y || a.x - b.x)
+      : widgets;
+    let nextY = 0;
+    return ordered.map((widget): Layout => {
+      const row: Layout = {
+        i: widget.id,
+        x: singleColumn ? 0 : widget.x,
+        y: singleColumn ? nextY : widget.y,
+        w: singleColumn ? layoutConfig.columns : widget.w,
+        h: widget.h,
+        minW: singleColumn ? undefined : widget.minW,
+        minH: widget.minH,
+        maxW: singleColumn ? undefined : widget.maxW,
+        maxH: widget.maxH,
+        static: true,
+      };
+      nextY += widget.h;
+      return row;
+    });
+  }, [widgets, singleColumn, layoutConfig.columns]);
 
   const renderViewerWidget = (widget: Widget) => {
     const linkageConfig = widget.config.linkage;
