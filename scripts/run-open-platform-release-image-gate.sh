@@ -4,6 +4,7 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 PLATFORM_DIR="$REPO_ROOT/platform"
+source "$SCRIPT_DIR/ci/isolated-release-network.sh"
 
 fatal() { printf 'open-platform-release-image-gate: %s\n' "$*" >&2; exit 2; }
 fail() { printf 'open-platform-release-image-gate: %s\n' "$*" >&2; exit 1; }
@@ -142,7 +143,8 @@ docker build -f "$STAGE/platform/Dockerfile" -t "$IMAGE" \
   > "$ARTIFACTS/logs/docker-build.log" 2>&1 || fail "image build failed"
 DIGEST="$(docker image inspect "$IMAGE" --format '{{.Id}}')"
 
-docker network create "$NET" >/dev/null
+create_isolated_release_network "$NET" "$ARTIFACTS/network-allocation.tsv" \
+  || fatal "isolated release network unavailable"
 docker run -d --name "$PG" --network "$NET" -e POSTGRES_USER=auraboot \
   -e POSTGRES_PASSWORD=open_platform_ci -e POSTGRES_DB=open_platform_ci "$PGVECTOR_IMAGE" >/dev/null
 docker run -d --name "$REDIS" --network "$NET" "$REDIS_IMAGE" >/dev/null
