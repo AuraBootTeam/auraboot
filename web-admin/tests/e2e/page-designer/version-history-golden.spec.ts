@@ -153,6 +153,22 @@ test.describe.serial('Unified Designer version-history golden', () => {
 
   test.beforeEach(async ({ page }) => {
     await loginViaUI(page, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
+    // A fresh UI login can land in the System space (platform_admin only),
+    // which lacks page.page.manage — explicitly select the business space so
+    // page-seeding and the designer session share the business context.
+    const spaces = await page.request.get('/api/tenant-selection/my-spaces');
+    const spacesBody = (await spaces.json().catch(() => ({}))) as {
+      data?: Array<Record<string, unknown>>;
+    };
+    const business = (spacesBody?.data ?? []).find((sp) => sp.spaceType === 'business');
+    if (business && typeof business.tenantId === 'string') {
+      // Go through the BFF switch-space route so the session cookie is
+      // re-minted for the business space (a direct backend call rotates the
+      // credentials out from under the browser session → 401 re-login).
+      await page.request.post('/api/switch-space', {
+        form: { tenantId: String(business.tenantId), redirectTo: '/' },
+      });
+    }
   });
 
   test('C3: create snapshot grows the list; rollback restores the canvas + backend blocks', async ({
