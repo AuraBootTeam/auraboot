@@ -8,6 +8,8 @@ import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.organization.service.OrganizationService;
 import com.auraboot.framework.permission.engine.model.DataScopeCondition;
 import com.auraboot.framework.permission.entity.RoleDataScope;
+import com.auraboot.framework.exception.RootUnCheckedException;
+import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.permission.mapper.RoleDataScopeMapper;
 import com.auraboot.framework.rbac.mapper.UserRoleMapper;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
@@ -27,10 +29,12 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -41,6 +45,36 @@ import static org.mockito.Mockito.when;
  */
 @ExtendWith(MockitoExtension.class)
 class DataScopeServiceImplTest {
+
+    @Test
+    void invalidScopeCannotBePersistedOrPromotedToAll() {
+        for (String invalid : new String[] {null, "", "own", "share", "tem", "ALL"}) {
+            assertThatThrownBy(() -> service.setScope(100L, 7L, "quote", "read", invalid, "MAX"))
+                    .isInstanceOfSatisfying(RootUnCheckedException.class,
+                            e -> assertThat(e.getResponseCode()).isEqualTo(ResponseCode.BadParam));
+        }
+        verifyNoInteractions(roleDataScopeMapper);
+    }
+
+    @Test
+    void invalidMergeStrategyCannotBePersisted() {
+        assertThatThrownBy(() -> service.setScope(100L, 7L, "quote", "read", "self", "widest"))
+                .isInstanceOfSatisfying(RootUnCheckedException.class,
+                        e -> assertThat(e.getResponseCode()).isEqualTo(ResponseCode.BadParam));
+        verifyNoInteractions(roleDataScopeMapper);
+    }
+
+    @Test
+    void corruptStoredScopeFailsInsteadOfGrantingAllRows() {
+        when(userRoleMapper.findRoleIdsByMemberId(5L)).thenReturn(List.of(7L));
+        RoleDataScope corrupt = new RoleDataScope();
+        corrupt.setScopeType("tem");
+        corrupt.setMergeStrategy("MAX");
+        when(roleDataScopeMapper.findByRoleIdsAndResource(List.of(7L), "quote", "read"))
+                .thenReturn(List.of(corrupt));
+        assertThatThrownBy(() -> service.resolveScope(5L, "quote", "read"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 
     @Mock
     private RoleDataScopeMapper roleDataScopeMapper;

@@ -35,17 +35,15 @@ public enum DataScopeType {
      * Parse from database value (lowercase).
      *
      * @param code the scope type code from DB
-     * @return the matching enum, or ALL if unknown
+     * @return the matching enum
+     * @throws IllegalArgumentException when the stored value is missing or unknown
      */
     public static DataScopeType fromCode(String code) {
-        if (code == null) {
-            return ALL;
-        }
         for (DataScopeType type : values()) {
             if (type.code.equals(code)) {
                 return type;
             }
         }
-        return ALL;
+        throw new IllegalArgumentException("Invalid data scope type");
     }
 }

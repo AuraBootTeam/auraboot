@@ -3,7 +3,7 @@ package com.auraboot.framework.permission.controller;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.exception.RootUnCheckedException;
-import com.auraboot.framework.permission.engine.PermissionEvaluator;
+import com.auraboot.framework.permission.service.PermissionExplanationService;
 import com.auraboot.framework.permission.engine.model.PermissionExplanation;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
@@ -24,6 +24,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import static com.auraboot.framework.common.constant.ResponseCode.BadParam;
@@ -58,7 +59,7 @@ public class PermissionMatrixController {
     private final DataScopeService dataScopeService;
     private final PermissionPolicyService policyService;
     private final PermissionMapper permissionMapper;
-    private final PermissionEvaluator permissionEvaluator;
+    private final PermissionExplanationService permissionExplanationService;
 
     /**
      * Get the full permission matrix (no role context, all granted=false).
@@ -149,9 +150,10 @@ public class PermissionMatrixController {
      * it) AND materializes it onto the role's current grants.
      *
      * @param rolePid Role PID
-     * @param request Body with scopeType (all/dept_and_sub/dept/self/none; null clears)
+     * @param request Body with scopeType (all/dept_and_sub/team/dept/self/none; null clears)
      */
     @PutMapping("/{rolePid}/default-scope")
+    @Transactional
     @Operation(summary = "Set role default data scope")
     public ApiResponse<Void> setDefaultScope(
             @PathVariable String rolePid,
@@ -231,15 +233,7 @@ public class PermissionMatrixController {
             @RequestParam(required = false) String recordPid) {
         log.debug("Explaining permission decision: memberId={}, resource={}, action={}, recordPid={}",
                 memberId, resource, action, recordPid);
-        PermissionExplanation explanation = permissionEvaluator.explain(memberId, resource, action, null);
-        return ApiResponse.success(new PermissionExplanation(
-                explanation.memberId(),
-                explanation.resource(),
-                explanation.action(),
-                null,
-                recordPid,
-                explanation.finalResult(),
-                explanation.steps()));
+        return ApiResponse.success(permissionExplanationService.explain(memberId, resource, action, recordPid));
     }
 
     private Permission findPermissionByPid(String permissionPid) {
