@@ -34,6 +34,24 @@ class ApplicationRuntimeDefinitionCatalogTest {
     }
 
     @Test
+    void exposesImmutableExactReleaseSourceIdentities() {
+        var sources = catalog.modelSources(42L, "aura-edu").orElseThrow();
+        assertThat(sources).contains(new ApplicationRuntimeDefinitionCatalog.BoundModelSource("xy_student", "mt_xy_student"));
+        org.junit.jupiter.api.Assertions.assertThrows(UnsupportedOperationException.class, () -> sources.clear());
+        bound.status = "shadow";
+        assertThat(catalog.modelSources(42L, "aura-edu")).isEmpty();
+    }
+
+    @Test
+    void deniesDuplicateReleaseSourceModelKeys() {
+        var source = release("active");
+        var model = source.components().getFirst().manifest().getModels().getFirst();
+        source.components().getFirst().manifest().setModels(List.of(model, model));
+        when(resolver.boundRelease(42L, "aura-edu")).thenReturn(source);
+        org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class, () -> catalog.modelSources(42L, "aura-edu"));
+    }
+
+    @Test
     void materializesModelFieldsFromTheExactActiveRelease() {
         var model = catalog.findModel(42L, "aura-edu", "xy_student").orElseThrow();
 

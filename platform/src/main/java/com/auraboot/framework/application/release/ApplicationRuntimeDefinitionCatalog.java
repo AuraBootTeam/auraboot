@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.HashSet;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 /** Materializes runtime metadata directly from a tenant's immutable active Application Release. */
@@ -182,6 +183,27 @@ public final class ApplicationRuntimeDefinitionCatalog {
                             .uiSchema(extension.get("uiSchema") == null ? null : JsonUtil.toMap(extension.get("uiSchema")))
                             .build();
                 }).toList());
+    }
+
+    /** Immutable physical-source identities from one exact active Release. */
+    public record BoundModelSource(String code, String tableName) { }
+
+    public Optional<List<BoundModelSource>> modelSources(long tenantId, String applicationCode) {
+        var release = activeRelease(tenantId, applicationCode);
+        if (release == null) return Optional.empty();
+        List<BoundModelSource> sources = new ArrayList<>();
+        Set<String> codes = new HashSet<>();
+        for (var component : release.components()) {
+            for (ModelDefinitionDTO model : list(component.manifest().getModels())) {
+                if (model.getCode() == null || model.getCode().isBlank() || !codes.add(model.getCode())) {
+                    throw unavailable("Model key is missing or ambiguous in the active Application Release");
+                }
+                String table = model.getTableName();
+                if (table == null || table.isBlank()) table = SystemFieldConstants.generateTableName(model.getCode());
+                sources.add(new BoundModelSource(model.getCode(), table));
+            }
+        }
+        return Optional.of(List.copyOf(sources));
     }
 
     /** Empty means that this tenant has no active binding and must retain its existing read path. */
