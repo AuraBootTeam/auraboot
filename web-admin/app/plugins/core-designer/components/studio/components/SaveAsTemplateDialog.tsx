@@ -7,7 +7,8 @@
  * @since 3.2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useId } from 'react';
+import { useI18n } from '~/contexts/I18nContext';
 import { updatePage } from '~/plugins/core-designer/components/studio/services/page-manager/pageApi';
 
 interface SaveAsTemplateDialogProps {
@@ -27,7 +28,9 @@ export const SaveAsTemplateDialog: React.FC<SaveAsTemplateDialogProps> = ({
   currentName,
   onSuccess,
 }) => {
-  const [name, setName] = useState(`${currentName} 模板`);
+  const { t } = useI18n();
+  const dialogId = useId();
+  const [name, setName] = useState(() => t('designer_page_dialog.template_default', { name: currentName }));
   const [category, setCategory] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +39,7 @@ export const SaveAsTemplateDialog: React.FC<SaveAsTemplateDialogProps> = ({
 
   const handleSave = async () => {
     if (!name.trim()) {
-      setError('模板名称不能为空');
+      setError(t('designer_page_dialog.name_required'));
       return;
     }
     setSaving(true);
@@ -48,12 +51,12 @@ export const SaveAsTemplateDialog: React.FC<SaveAsTemplateDialogProps> = ({
         templateCategory: category.trim() || undefined,
       });
       if (result.code !== '0') {
-        throw new Error(result.message || '保存模板失败');
+        throw new Error(result.message || t('designer_page_dialog.save_failed'));
       }
       onSuccess();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '保存模板失败');
+      setError(err instanceof Error ? err.message : t('designer_page_dialog.save_failed'));
     } finally {
       setSaving(false);
     }
@@ -62,38 +65,45 @@ export const SaveAsTemplateDialog: React.FC<SaveAsTemplateDialogProps> = ({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onClick={onClose}
+      onClick={() => { if (!saving) onClose(); }}
     >
       <div
         className="w-[420px] rounded-lg bg-white p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={`${dialogId}-title`}
         data-testid="save-as-template-dialog"
       >
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">另存为模板</h2>
+        <h2 id={`${dialogId}-title`} className="mb-4 text-lg font-semibold text-gray-900">{t('designer_page_dialog.save_template')}</h2>
 
         <div className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              模板名称 *
+            <label htmlFor={`${dialogId}-name`} className="mb-1 block text-sm font-medium text-gray-700">
+              {t('designer_page_dialog.template_name')} *
             </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+              id={`${dialogId}-name`}
+              disabled={saving}
               data-testid="template-name-input"
               autoFocus
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">分类</label>
+            <label htmlFor={`${dialogId}-category`} className="mb-1 block text-sm font-medium text-gray-700">{t('designer_page_dialog.category')}</label>
             <input
               type="text"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              placeholder="例如 CRM、HR、财务"
+              placeholder={t('designer_page_dialog.category_hint')}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+              id={`${dialogId}-category`}
+              disabled={saving}
               data-testid="template-category-input"
             />
           </div>
@@ -101,6 +111,7 @@ export const SaveAsTemplateDialog: React.FC<SaveAsTemplateDialogProps> = ({
           {error && (
             <div
               className="rounded-md bg-red-50 p-3 text-sm text-red-600"
+              role="alert"
               data-testid="template-error"
             >
               {error}
@@ -114,7 +125,7 @@ export const SaveAsTemplateDialog: React.FC<SaveAsTemplateDialogProps> = ({
             className="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
             disabled={saving}
           >
-            取消
+            {t('designer_page_dialog.cancel')}
           </button>
           <button
             onClick={handleSave}
@@ -122,7 +133,7 @@ export const SaveAsTemplateDialog: React.FC<SaveAsTemplateDialogProps> = ({
             className="rounded-md bg-purple-600 px-4 py-2 text-sm text-white hover:bg-purple-700 disabled:opacity-50"
             data-testid="template-save-btn"
           >
-            {saving ? '保存中...' : '保存为模板'}
+            {t(saving ? 'designer_page_dialog.saving' : 'designer_page_dialog.save')}
           </button>
         </div>
       </div>
