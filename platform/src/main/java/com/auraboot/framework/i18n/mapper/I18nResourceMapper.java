@@ -2,6 +2,7 @@ package com.auraboot.framework.i18n.mapper;
 
 import com.auraboot.framework.i18n.entity.I18nResource;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.*;
@@ -47,14 +48,8 @@ public interface I18nResourceMapper extends BaseMapper<I18nResource> {
      * Find all resources for a language (for compilation)
      */
     @Select("SELECT * FROM ab_i18n_resource WHERE tenant_id = #{tenantId} AND lang = #{lang} AND status = 'approved' AND deleted_flag = false")
+    @InterceptorIgnore(tenantLine = "true") // Explicit tenant predicate also permits public system (0) translations.
     List<I18nResource> selectAllByLang(@Param("tenantId") Long tenantId, @Param("lang") String lang);
-
-    /**
-     * Find all approved resources for a language across all tenants (excluding tenant_id = 0).
-     * Used by public /api/i18n/{locale} endpoint where no tenant context is available.
-     */
-    @Select("SELECT * FROM ab_i18n_resource WHERE tenant_id != 0 AND lang = #{lang} AND status = 'approved' AND deleted_flag = false")
-    List<I18nResource> selectAllByLangAllTenants(@Param("lang") String lang);
 
     /**
      * Find resources by key prefix (scope query)
