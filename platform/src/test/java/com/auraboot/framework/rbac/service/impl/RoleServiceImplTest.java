@@ -99,6 +99,35 @@ class RoleServiceImplTest {
     }
 
     @Test
+    void createRejectsNullOrBlankCodeBeforeSaving() {
+        for (String code : new String[] {null, "", "  "}) {
+            RootUnCheckedException failure = assertThrows(RootUnCheckedException.class,
+                    () -> service.createRole(role(null, code)));
+            assertEquals(ResponseCode.BadParam, failure.getResponseCode());
+        }
+        org.mockito.Mockito.verifyNoInteractions(roleMapper);
+    }
+
+    @Test
+    void updateRejectsExplicitBlankCodeBeforeLookup() {
+        for (String code : new String[] {"", "  "}) {
+            RootUnCheckedException failure = assertThrows(RootUnCheckedException.class,
+                    () -> service.updateRole(role(1L, code)));
+            assertEquals(ResponseCode.BadParam, failure.getResponseCode());
+        }
+        org.mockito.Mockito.verifyNoInteractions(roleMapper);
+    }
+
+    @Test
+    void updateAllowsOmittedCodeForPartialUpdate() {
+        Role input = role(1L, null);
+        doReturn(role(1L, "existing")).when(spyService).getById(1L);
+        doReturn(true).when(spyService).updateById(input);
+        spyService.updateRole(input);
+        verify(spyService).updateById(input);
+    }
+
+    @Test
     @DisplayName("createRole rejects platform_admin in non-global scope")
     void createRolePlatformAdminBlocked() {
         Role r = role(null, "platform_admin");
