@@ -65,8 +65,8 @@ case "$PUBLISH_REGISTRY" in
   0|1) ;;
   *) fatal 'AURA_RELEASE_PUBLISH_REGISTRY must be 0 or 1' ;;
 esac
-PLAYWRIGHT_DOWNLOAD_HOST="${AURA_PLAYWRIGHT_DOWNLOAD_HOST:-https://cdn.npmmirror.com/binaries/playwright}"
-[[ "$PLAYWRIGHT_DOWNLOAD_HOST" == https://* ]] || fatal 'AURA_PLAYWRIGHT_DOWNLOAD_HOST must use HTTPS'
+PLAYWRIGHT_IMAGE="${AURA_CI_PLAYWRIGHT_IMAGE:-mcr.microsoft.com/playwright@sha256:9bd26ad900bb5e0f4dee75839e957a89ae89c2b7ab1e76050e559790e946b948}"
+[[ "$PLAYWRIGHT_IMAGE" =~ ^mcr.microsoft.com/playwright@sha256:[0-9a-f]{64}$ ]] || fatal 'Playwright image must be pinned to an official digest'
 if [[ "$PUBLISH_REGISTRY" == 1 ]]; then
   : "${AURA_RELEASE_REGISTRY:?AURA_RELEASE_REGISTRY is required when remote publication is enabled}"
   : "${AURA_RELEASE_REGISTRY_USERNAME:?AURA_RELEASE_REGISTRY_USERNAME is required when remote publication is enabled}"
@@ -173,6 +173,7 @@ PG_CONTAINER="$PROJECT-pg"
 BUILD_PG_CONTAINER="$PROJECT-build-pg"
 APP_CONTAINER="$PROJECT-app"
 PUBLISH_CONTAINER="$PROJECT-publisher"
+PLAYWRIGHT_CONTAINER="$PROJECT-playwright"
 PAYLOAD_CONTAINER="$PROJECT-payload"
 IMAGE_REF=''
 IMAGE_ID=''
@@ -194,11 +195,14 @@ cleanup() {
   if docker inspect "$PUBLISH_CONTAINER" >/dev/null 2>&1; then
     docker logs "$PUBLISH_CONTAINER" >"$ARTIFACTS/logs/publication-final.log" 2>&1 || true
   fi
+  if docker inspect "$PLAYWRIGHT_CONTAINER" >/dev/null 2>&1; then
+    docker logs "$PLAYWRIGHT_CONTAINER" >"$ARTIFACTS/logs/playwright-server.log" 2>&1 || true
+  fi
   if [[ -x "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" ]]; then
     AURA_APP_ARTIFACT_ROOT="$PRODUCT_RELEASE" AURA_STATE_ROOT="$STATE_ROOT" \
       "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" stop >/dev/null 2>&1 || true
   fi
-  docker rm -f "$APP_CONTAINER" "$PUBLISH_CONTAINER" "$PAYLOAD_CONTAINER" "$PG_CONTAINER" "$BUILD_PG_CONTAINER" >/dev/null 2>&1 || true
+  docker rm -f "$PLAYWRIGHT_CONTAINER" "$APP_CONTAINER" "$PUBLISH_CONTAINER" "$PAYLOAD_CONTAINER" "$PG_CONTAINER" "$BUILD_PG_CONTAINER" >/dev/null 2>&1 || true
   docker network rm "$NETWORK" >/dev/null 2>&1 || true
   [[ -z "$REGISTRY_IMAGE" ]] || docker image rm "$REGISTRY_IMAGE" >/dev/null 2>&1 || true
   [[ -z "$REGISTRY_DIGEST_REF" ]] || docker image rm "$REGISTRY_DIGEST_REF" >/dev/null 2>&1 || true
@@ -433,8 +437,29 @@ mkdir -p "$STATE_ROOT"; docker logs "$APP_CONTAINER" >"$STATE_ROOT/runtime.log" 
 env "${COMMON_ENV[@]}" "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" verify >"$ARTIFACTS/logs/verify.log" 2>&1 || fail 'artifact identity verification failed'
 
 env "${PRODUCT_PNPM_ENV[@]}" pnpm --dir "$PRODUCT_ROOT" install --frozen-lockfile --ignore-scripts >"$ARTIFACTS/logs/pnpm-install.log" 2>&1 || fatal 'product test dependencies unavailable'
-PLAYWRIGHT_DOWNLOAD_HOST="$PLAYWRIGHT_DOWNLOAD_HOST" pnpm --dir "$PRODUCT_ROOT" exec playwright install chromium \
-  >"$ARTIFACTS/logs/playwright-install.log" 2>&1 || fatal 'locked Playwright Chromium is unavailable'
+# Run the locked browser on a supported distribution while retaining the host
+# test driver and fixture processes. Source and dependencies are read-only.
+docker pull "$PLAYWRIGHT_IMAGE" >"$ARTIFACTS/logs/playwright-image.log" 2>&1 \
+  || fatal 'locked Playwright image is unavailable'
+PLAYWRIGHT_PACKAGE="$(cd "$PRODUCT_ROOT" && node -p "require.resolve('playwright/package.json', {paths:[require.resolve('@playwright/test')]})")"
+PLAYWRIGHT_VERSION="$(node -p "require(process.argv[1]).version" "$PLAYWRIGHT_PACKAGE")"
+PLAYWRIGHT_IMAGE_VERSION="$(docker run --rm --entrypoint node "$PLAYWRIGHT_IMAGE" -p "JSON.parse(require('fs').readFileSync('/ms-playwright/.docker-info','utf8')).driverVersion")"
+[[ "$PLAYWRIGHT_VERSION" == "$PLAYWRIGHT_IMAGE_VERSION" ]] || fatal 'locked Playwright and image versions differ'
+PLAYWRIGHT_PORT="$(node -e "const s=require('net').createServer();s.listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})")"
+docker run -d --name "$PLAYWRIGHT_CONTAINER" --label "aura.ci.job=$AURA_CI_JOB_ID" --init --network host --shm-size=2g \
+  --user "$(id -u):$(id -g)" -e HOME=/tmp -e PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
+  -v "$PRODUCT_ROOT:$PRODUCT_ROOT:ro" -w "$PRODUCT_ROOT" --entrypoint node \
+  "$PLAYWRIGHT_IMAGE" "${PLAYWRIGHT_PACKAGE%/package.json}/cli.js" \
+  run-server --host 127.0.0.1 --port "$PLAYWRIGHT_PORT" \
+  >"$ARTIFACTS/logs/playwright-server-start.log" 2>&1 || fatal 'Playwright server failed to start'
+export PW_TEST_CONNECT_WS_ENDPOINT="ws://127.0.0.1:$PLAYWRIGHT_PORT/"
+for attempt in $(seq 1 30); do
+  if curl -fsS "http://127.0.0.1:$PLAYWRIGHT_PORT/" >/dev/null; then break; fi
+  [[ "$attempt" -lt 30 ]] || fatal 'Playwright server never became ready'
+  sleep 1
+done
+printf 'version=%s\nimage=%s\nendpoint=%s\n' "$PLAYWRIGHT_VERSION" "$PLAYWRIGHT_IMAGE" "$PW_TEST_CONNECT_WS_ENDPOINT" \
+  >"$ARTIFACTS/playwright-environment.txt"
 env "${COMMON_ENV[@]}" PLAYWRIGHT_BASE_URL="http://127.0.0.1:$WEB_PORT" PW_SKIP_WEBSERVER=1 \
   PW_ARTIFACT_DIR="$ARTIFACTS/e2e/artifacts" PW_RESULTS_JSON="$ARTIFACTS/e2e/results.json" \
   pnpm --dir "$PRODUCT_ROOT" exec playwright test --config playwright.release.config.ts \
