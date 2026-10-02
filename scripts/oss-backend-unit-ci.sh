@@ -77,10 +77,10 @@ create_isolated_network() {
 }
 
 cleanup() {
-  status=$?
+  local status=$? network_status=not-created stop_status=stopped
   docker compose "${COMPOSE_ARGS[@]}" ps --all > "$ARTIFACTS/compose-ps.txt" 2>&1 || true
   docker compose "${COMPOSE_ARGS[@]}" logs --no-color > "$ARTIFACTS/compose.log" 2>&1 || true
-  docker compose "${COMPOSE_ARGS[@]}" stop >/dev/null 2>&1 || true
+  docker compose "${COMPOSE_ARGS[@]}" stop > "$ARTIFACTS/compose-stop.log" 2>&1 || stop_status=stop-failed
   # Retain containers and volumes for evidence, but release the finite Docker
   # address-pool allocation. Stopped containers can be reattached by Compose if
   # an owner later restarts this exact retained project.
@@ -89,10 +89,14 @@ cleanup() {
       [[ -n "$container_id" ]] || continue
       docker network disconnect -f "${COMPOSE_PROJECT}_default" "$container_id" >/dev/null 2>&1 || true
     done < <(docker compose "${COMPOSE_ARGS[@]}" ps -aq 2>/dev/null || true)
-    docker network rm "${COMPOSE_PROJECT}_default" >/dev/null 2>&1 || true
+    if docker network rm "${COMPOSE_PROJECT}_default" > "$ARTIFACTS/network-release.log" 2>&1; then
+      network_status=released
+    else
+      network_status=release-failed
+    fi
   fi
-  printf '[oss-backend-unit-ci] runtime retained and stopped; network released: compose_project=%s artifacts=%s\n' \
-    "$COMPOSE_PROJECT" "$ARTIFACTS"
+  printf '[oss-backend-unit-ci] runtime retained: stop_status=%s network_status=%s compose_project=%s artifacts=%s\n' \
+    "$stop_status" "$network_status" "$COMPOSE_PROJECT" "$ARTIFACTS"
   exit "$status"
 }
 trap cleanup EXIT HUP INT TERM

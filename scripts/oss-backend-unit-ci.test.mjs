@@ -27,7 +27,7 @@ test('backend CI runner is executable and owns its complete infrastructure lifec
   assert.ok(statSync(runner).mode & 0o100);
   assert.doesNotMatch(source, /docker-compose\.skills-c2\.override\.yml/);
   assert.match(source, /up -d --wait postgres redis kafka/);
-  assert.match(source, /runtime retained and stopped; network released: compose_project=/);
+  assert.match(source, /runtime retained: stop_status=%s network_status=%s compose_project=/);
   assert.match(source, /COMPOSE_PROJECT="aura-ci-oss-backend-\$RUNTIME_TOKEN"/);
   assert.match(source, /free_port 25000 25999/);
   assert.match(source, /free_port 26000 26999/);
@@ -198,4 +198,59 @@ test('unexpected Docker errors fail immediately instead of being retried as subn
   assert.equal(result.status, 2);
   assert.match(result.stdout, /calls=1/);
   assert.match(result.stderr, /isolated network creation failed/);
+});
+
+function cleanupWithDocker(t, { created, stopFails = false, releaseFails = false, initialStatus }) {
+  const artifacts = mkdtempSync(path.join(tmpdir(), 'oss-ci-cleanup-contract-'));
+  t.after(() => rmSync(artifacts, { recursive: true, force: true }));
+  const cleanup = source.match(/cleanup\(\) \{[\s\S]*?\n\}/)?.[0];
+  assert.ok(cleanup, 'runner must retain cleanup evidence');
+  const result = spawnSync('bash', ['-c', `
+    set -uo pipefail
+    COMPOSE_PROJECT=own-cleanup
+    COMPOSE_ARGS=(-p "$COMPOSE_PROJECT")
+    docker() {
+      printf '%s\\n' "$*" >> "$ARTIFACTS/commands.txt"
+      if [[ "$*" == 'compose -p own-cleanup ps -aq' ]]; then printf 'own-container\\n'; fi
+      if [[ "$*" == 'compose -p own-cleanup stop' && "$STOP_FAILS" == true ]]; then
+        printf 'stop failure fixture\\n' >&2; return 1
+      fi
+      if [[ "$*" == 'network rm own-cleanup_default' && "$RELEASE_FAILS" == true ]]; then
+        printf 'active endpoints fixture\\n' >&2; return 1
+      fi
+      return 0
+    }
+    ${cleanup}
+    (exit "$INITIAL_STATUS")
+    cleanup
+  `], { encoding: 'utf8', env: {
+    ...process.env, ARTIFACTS: artifacts, NETWORK_CREATED: String(created),
+    STOP_FAILS: String(stopFails), RELEASE_FAILS: String(releaseFails), INITIAL_STATUS: String(initialStatus),
+  } });
+  return { ...result, artifacts, commands: readFileSync(path.join(artifacts, 'commands.txt'), 'utf8') };
+}
+
+test('cleanup reports released only after Docker confirms removal and preserves a product failure', t => {
+  const result = cleanupWithDocker(t, { created: true, initialStatus: 1 });
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /stop_status=stopped network_status=released/);
+  assert.match(result.commands, /network disconnect -f own-cleanup_default own-container/);
+  assert.match(result.commands, /network rm own-cleanup_default/);
+  assert.doesNotMatch(result.commands, /down|prune|foreign/);
+});
+
+test('cleanup does not claim release or touch a network when allocation never succeeded', t => {
+  const result = cleanupWithDocker(t, { created: false, initialStatus: 2 });
+  assert.equal(result.status, 2);
+  assert.match(result.stdout, /network_status=not-created/);
+  assert.doesNotMatch(result.commands, /network (disconnect|rm)/);
+});
+
+test('cleanup retains stop and release errors without turning them into a successful release claim', t => {
+  const result = cleanupWithDocker(t, { created: true, stopFails: true, releaseFails: true, initialStatus: 0 });
+  assert.equal(result.status, 0, 'cleanup must preserve the original suite result');
+  assert.match(result.stdout, /stop_status=stop-failed network_status=release-failed/);
+  assert.match(readFileSync(path.join(result.artifacts, 'compose-stop.log'), 'utf8'), /stop failure fixture/);
+  assert.match(readFileSync(path.join(result.artifacts, 'network-release.log'), 'utf8'), /active endpoints fixture/);
+  assert.doesNotMatch(result.stdout, /network_status=released|network released/);
 });
