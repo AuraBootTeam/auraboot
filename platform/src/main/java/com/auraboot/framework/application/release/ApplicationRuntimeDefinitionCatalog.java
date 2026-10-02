@@ -9,6 +9,9 @@ import com.auraboot.framework.meta.dto.MetaFieldDTO;
 import com.auraboot.framework.meta.dto.DictDTO;
 import com.auraboot.framework.meta.entity.payload.DataSourceItemBean;
 import com.auraboot.framework.common.util.JsonUtil;
+import com.auraboot.framework.dashboard.entity.Dashboard;
+import com.auraboot.framework.meta.entity.NamedQuery;
+import com.auraboot.framework.meta.entity.NamedQueryField;
 import com.auraboot.framework.menu.entity.Menu;
 import com.auraboot.framework.menu.service.ApplicationNavigationPolicy;
 import com.auraboot.framework.meta.entity.payload.ExtensionBean;
@@ -45,6 +48,90 @@ public final class ApplicationRuntimeDefinitionCatalog {
         this.definitions = definitions;
         this.resolver = resolver;
         this.mapper = mapper;
+    }
+
+    public Optional<List<Dashboard>> dashboards(long tenantId, String applicationCode) {
+        var release = activeRelease(tenantId, applicationCode);
+        if (release == null) return Optional.empty();
+        Set<String> codes = new LinkedHashSet<>();
+        var result = release.components().stream()
+                .flatMap(component -> list(component.manifest().getDashboards()).stream()).map(source -> {
+                    if (source.getCode() == null || !codes.add(source.getCode())) {
+                        throw unavailable("Dashboard key must be present and unique in the active Application Release");
+                    }
+                    if (!"global".equals(source.getEffectiveScope())) {
+                        throw unavailable("Release dashboards must declare global scope: " + source.getCode());
+                    }
+                    Dashboard dashboard = new Dashboard();
+                    dashboard.setTenantId(tenantId);
+                    dashboard.setCode(source.getCode());
+                    dashboard.setTitle(source.getTitle());
+                    dashboard.setDescription(source.getDescription());
+                    dashboard.setScope(source.getEffectiveScope());
+                    dashboard.setStatus(source.getEffectiveStatus());
+                    dashboard.setIsDefault(source.getIsDefault());
+                    dashboard.setSortOrder(source.getSortOrder());
+                    dashboard.setLayoutConfig(mapper.valueToTree(source.getLayoutConfig() == null
+                            ? Map.of("columns", 12, "rowHeight", 100, "gap", 16, "compactType", "vertical")
+                            : source.getLayoutConfig()));
+                    dashboard.setWidgets(mapper.valueToTree(list(source.getWidgets())));
+                    Map<String, Object> extension = new LinkedHashMap<>(source.getExtension() == null
+                            ? Map.of() : source.getExtension());
+                    extension.put("releaseId", release.release().releaseId());
+                    dashboard.setExtension(mapper.valueToTree(extension));
+                    return dashboard;
+                }).sorted(Comparator.comparing(dashboard -> dashboard.getSortOrder() == null
+                        ? 0 : dashboard.getSortOrder())).toList();
+        return Optional.of(result);
+    }
+
+    /** Query and field whitelist are projected together from one immutable binding selection. */
+    public record BoundNamedQuery(NamedQuery query, List<NamedQueryField> fields) { }
+
+    public Optional<BoundNamedQuery> findNamedQuery(long tenantId, String applicationCode, String code) {
+        var release = activeRelease(tenantId, applicationCode);
+        if (release == null) return Optional.empty();
+        var matches = release.components().stream()
+                .flatMap(component -> list(component.manifest().getNamedQueries()).stream())
+                .filter(query -> code.equals(query.getCode())).toList();
+        if (matches.size() > 1) throw unavailable("Named query key is ambiguous in the active Application Release: " + code);
+        if (matches.isEmpty()) return Optional.empty();
+        var source = matches.getFirst();
+        NamedQuery query = new NamedQuery(tenantId, code, source.getEffectiveTitle(), source.getFromSql());
+        query.setDescription(source.getDescription());
+        query.setResourceCode(source.getResourceCode());
+        query.setActionCode(source.getActionCode());
+        query.setBaseWhere(source.getBaseWhere());
+        query.setDefaultOrder(source.getDefaultOrder());
+        query.setPolicy(source.getPolicy());
+        query.setStatus(source.getStatus() == null ? "draft" : source.getStatus().toLowerCase(java.util.Locale.ROOT));
+        Set<String> fieldCodes = new LinkedHashSet<>();
+        var fields = list(source.getFields()).stream().map(field -> {
+            if (field.getFieldCode() == null || !fieldCodes.add(field.getFieldCode())
+                    || field.getColumnExpr() == null || field.getColumnExpr().isBlank()
+                    || field.getDataType() == null || field.getDataType().isBlank()) {
+                throw unavailable("Release named query requires a complete, unique field whitelist: " + code);
+            }
+            NamedQueryField result = new NamedQueryField(tenantId, code, field.getFieldCode(),
+                    field.getColumnExpr(), field.getDataType());
+            if (field.getOperators() != null) result.setOperatorList(field.getOperators());
+            result.setDictCode(field.getDictCode());
+            result.setSortable(Boolean.TRUE.equals(field.getSortable()));
+            result.setSearchable(!Boolean.FALSE.equals(field.getSearchable()));
+            result.setUiComponent(field.getUiComponent() == null ? "text" : field.getUiComponent());
+            result.setPlaceholder(field.getPlaceholder());
+            result.setDefaultValue(field.getDefaultValue());
+            result.setLinkedField(field.getLinkedField());
+            result.setRequired(Boolean.TRUE.equals(field.getRequired()));
+            result.setDisplayName(field.getDisplayName());
+            result.setSortOrder(field.getSortOrder() == null ? 0 : field.getSortOrder());
+            result.setFieldGroup(field.getFieldGroup());
+            result.setUiConfig(field.getUiConfig());
+            result.setSource("release");
+            return result;
+        }).sorted(Comparator.comparing(NamedQueryField::getSortOrder)).toList();
+        if (fields.isEmpty()) throw unavailable("Release named query requires an explicit field whitelist: " + code);
+        return Optional.of(new BoundNamedQuery(query, fields));
     }
 
     public Optional<DictDTO> findDict(long tenantId, String applicationCode, String code) {

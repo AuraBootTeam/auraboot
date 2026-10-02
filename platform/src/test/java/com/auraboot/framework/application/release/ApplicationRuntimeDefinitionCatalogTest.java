@@ -92,6 +92,65 @@ class ApplicationRuntimeDefinitionCatalogTest {
     }
 
     @Test
+    void projectsReleaseDashboardsWithoutInventingPersistentIds() {
+        var source = release("active");
+        source.components().getFirst().manifest().setDashboards(List.of(
+                com.auraboot.framework.plugin.dto.imports.DashboardDefinitionDTO.builder()
+                        .code("class_overview").title("Class overview").widgets(List.of(Map.of("id", "count")))
+                        .extension(Map.of("workbenchContribution", Map.of("enabled", true))).build()));
+        when(resolver.boundRelease(42L, "aura-edu")).thenReturn(source);
+        var dashboard = catalog.dashboards(42L, "aura-edu").orElseThrow().getFirst();
+        assertThat(dashboard.getTenantId()).isEqualTo(42L);
+        assertThat(dashboard.getId()).isNull();
+        assertThat(dashboard.getPid()).isNull();
+        assertThat(dashboard.getCode()).isEqualTo("class_overview");
+        assertThat(dashboard.getWidgets().get(0).get("id").asText()).isEqualTo("count");
+        assertThat(dashboard.getExtension().get("releaseId").asText()).isEqualTo(bound.releaseId);
+        assertThat(dashboard.getLayoutConfig().get("columns").asInt()).isEqualTo(12);
+    }
+
+    @Test
+    void rejectsAmbiguousAndNonGlobalReleaseDashboards() {
+        var source = release("active");
+        var dashboard = com.auraboot.framework.plugin.dto.imports.DashboardDefinitionDTO.builder()
+                .code("count").title("Count").widgets(List.of(Map.of("id", "count"))).build();
+        source.components().getFirst().manifest().setDashboards(List.of(dashboard, dashboard));
+        when(resolver.boundRelease(42L, "aura-edu")).thenReturn(source);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> catalog.dashboards(42L, "aura-edu"))
+                .hasMessageContaining("unique");
+        source.components().getFirst().manifest().setDashboards(List.of(dashboard));
+        dashboard.setScope("personal");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> catalog.dashboards(42L, "aura-edu"))
+                .hasMessageContaining("global scope");
+    }
+
+    @Test
+    void projectsQueryAndWhitelistFromOneBindingAndRejectsMissingFields() {
+        var source = release("active");
+        var field = new com.auraboot.framework.meta.dto.NamedQueryFieldRequest();
+        field.setFieldCode("studentCount");
+        field.setColumnExpr("student_count");
+        field.setDataType("number");
+        field.setOperators(List.of("eq", "gt"));
+        var query = com.auraboot.framework.plugin.dto.imports.NamedQueryDefinitionDTO.builder()
+                .code("class_count").titleZhCN("学生人数").fromSql("mt_xy_student")
+                .resourceCode("xy_student").actionCode("read").status("published").fields(List.of(field)).build();
+        source.components().getFirst().manifest().setNamedQueries(List.of(query));
+        when(resolver.boundRelease(42L, "aura-edu")).thenReturn(source);
+        var definition = catalog.findNamedQuery(42L, "aura-edu", "class_count").orElseThrow();
+        assertThat(definition.query().getId()).isNull();
+        assertThat(definition.query().getPid()).isNull();
+        assertThat(definition.query().getTitle()).isEqualTo("学生人数");
+        assertThat(definition.query().getResourceCode()).isEqualTo("xy_student");
+        assertThat(definition.fields()).hasSize(1);
+        assertThat(definition.fields().getFirst().getOperatorList()).containsExactly("eq", "gt");
+        assertThat(definition.fields().getFirst().getId()).isNull();
+        query.setFields(List.of());
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> catalog.findNamedQuery(42L, "aura-edu", "class_count"))
+                .hasMessageContaining("explicit field whitelist");
+    }
+
+    @Test
     void leavesPlatformModelsOutsideTheApplicationReleaseOnTheLegacyPath() {
         assertThat(catalog.findModel(42L, "aura-edu", "platform_user")).isEmpty();
     }

@@ -45,6 +45,18 @@ import com.auraboot.framework.common.constant.StatusConstants;
 @RequiredArgsConstructor
 public class DashboardServiceImpl implements DashboardService {
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog applicationRuntimeDefinitionCatalog;
+    @org.springframework.beans.factory.annotation.Value("${aura.application.default-code:}")
+    private String defaultApplicationCode;
+    @org.springframework.beans.factory.annotation.Value("${aura.application.definition-read.runtime-primary-enabled:false}")
+    private boolean applicationRuntimePrimaryEnabled;
+
+    private boolean releaseReadsEnabled() {
+        return applicationRuntimePrimaryEnabled && MetaContext.exists()
+                && MetaContext.getCurrentTenantId() != null && StringUtils.hasText(defaultApplicationCode);
+    }
+
     private final DashboardMapper dashboardMapper;
     private final DashboardModuleMapper dashboardModuleMapper;
     private final ObjectMapper objectMapper;
@@ -158,6 +170,19 @@ public class DashboardServiceImpl implements DashboardService {
     @Override
     public DashboardDTO findByCode(String code) {
         Long tenantId = MetaContext.getCurrentTenantId();
+        if (releaseReadsEnabled()) {
+            var bound = applicationRuntimeDefinitionCatalog.dashboards(tenantId, defaultApplicationCode.trim());
+            if (bound.isPresent()) {
+                var match = bound.get().stream().filter(dashboard -> code.equals(dashboard.getCode())).findFirst();
+                if (match.isPresent()) {
+                    if (!StatusConstants.PUBLISHED.equals(match.get().getStatus())) {
+                        throw new ValidationException(ResponseCode.NOT_FOUND, "Release dashboard is not published: " + code);
+                    }
+                    validateReadAccess(match.get());
+                    return toDTO(match.get());
+                }
+            }
+        }
         Dashboard dashboard = dashboardMapper.findByCode(tenantId, code);
         if (dashboard == null) {
             return null;
@@ -609,7 +634,7 @@ public class DashboardServiceImpl implements DashboardService {
         Dashboard existing = dashboardMapper.findWorkbench(tenantId, currentUserPid);
         if (existing != null) {
             return composeWorkbenchContributions(toDTO(existing),
-                    dashboardMapper.findWorkbenchContributions(tenantId));
+                    workbenchContributions(tenantId));
         }
 
         // Create from template
@@ -624,7 +649,7 @@ public class DashboardServiceImpl implements DashboardService {
         workbench.setScope(WORKBENCH_SCOPE);
         workbench.setOwnerId(currentUserPid);
         workbench.setLayoutConfig(WorkbenchTemplateProvider.getDefaultLayoutConfig(objectMapper));
-        List<Dashboard> contributions = dashboardMapper.findWorkbenchContributions(tenantId);
+        List<Dashboard> contributions = workbenchContributions(tenantId);
         boolean hasContributions = contributions != null && !contributions.isEmpty();
         workbench.setWidgets(hasContributions
                 ? objectMapper.createArrayNode()
@@ -642,6 +667,17 @@ public class DashboardServiceImpl implements DashboardService {
 
         log.info("Workbench created: pid={}", workbench.getPid());
         return composeWorkbenchContributions(toDTO(workbench), contributions);
+    }
+
+    private List<Dashboard> workbenchContributions(Long tenantId) {
+        if (releaseReadsEnabled()) {
+            var bound = applicationRuntimeDefinitionCatalog.dashboards(tenantId, defaultApplicationCode.trim());
+            if (bound.isPresent()) {
+                return bound.get().stream().filter(dashboard -> StatusConstants.PUBLISHED.equals(dashboard.getStatus())
+                        && dashboard.getExtension().path("workbenchContribution").path("enabled").asBoolean(false)).toList();
+            }
+        }
+        return dashboardMapper.findWorkbenchContributions(tenantId);
     }
 
     private DashboardDTO composeWorkbenchContributions(
