@@ -1140,6 +1140,43 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
                 "Payload rows must not override the command-owned parent relation");
     }
 
+    @Test
+    @Order(62)
+    @DisplayName("P0-BE-6b: postAction CREATE_CHILDREN with absent payload list creates zero children")
+    void test62b_postAction_createChildrenAbsentList() {
+        String suffix = System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 4);
+        String parentModel = createModel("plan4_" + suffix, "name_" + suffix + ":STRING");
+        String childModel = createModel("line4_" + suffix,
+                "parent_id_" + suffix + ":STRING",
+                "sku_" + suffix + ":STRING");
+        String parentId = insertRecord(parentModel, Map.of("name_" + suffix, "Headless plan"));
+
+        String execConfig = """
+                {
+                    "postActions": [
+                        {
+                            "action": "create_children",
+                            "targetModel": "%s",
+                            "parentField": "parent_id_%s",
+                            "recordsFromPayload": "lines"
+                        }
+                    ]
+                }
+                """.formatted(childModel, suffix);
+        String commandCode = createCommand(parentModel, execConfig, null);
+
+        CommandExecuteRequest req = new CommandExecuteRequest();
+        req.setPayload(new HashMap<>());
+        req.setOperationType("update");
+        req.setTargetRecordId(parentId);
+        req.setExpectedVersion(1);
+        req.setClientRequestId("req_" + UUID.randomUUID());
+
+        assertNotNull(commandExecutor.execute(commandCode, req));
+        assertEquals(0, countRecords(childModel, "parent_id_" + suffix, parentId),
+                "Absent payload list must create zero children, not fail the command");
+    }
+
     // ==================== Combined Tests ====================
 
     @Test

@@ -461,21 +461,27 @@ public class PostExecutionPhase implements CommandPhase {
         String recordsFromPayload = (String) postAction.get("recordsFromPayload");
         if (StringUtils.hasText(recordsFromPayload)) {
             Object payloadRecords = payload == null ? null : payload.get(recordsFromPayload);
-            if (!(payloadRecords instanceof List<?> records)) {
+            if (payloadRecords == null) {
+                // The declared children source is absent from this payload:
+                // zero children (commands whose callers never send the list —
+                // e.g. simple fixture creators — remain valid no-op saves).
+                recordTemplates = List.of();
+            } else if (!(payloadRecords instanceof List<?> records)) {
                 throw new BusinessException(ResponseCode.BadParam,
                         "Post action recordsFromPayload must reference a record list: " + recordsFromPayload);
-            }
-            List<Map<String, Object>> resolved = new ArrayList<>();
-            for (Object record : records) {
-                if (!(record instanceof Map<?, ?> values)) {
-                    throw new BusinessException(ResponseCode.BadParam,
-                            "Post action recordsFromPayload contains a non-record value: " + recordsFromPayload);
+            } else {
+                List<Map<String, Object>> resolved = new ArrayList<>();
+                for (Object record : records) {
+                    if (!(record instanceof Map<?, ?> values)) {
+                        throw new BusinessException(ResponseCode.BadParam,
+                                "Post action recordsFromPayload contains a non-record value: " + recordsFromPayload);
+                    }
+                    Map<String, Object> copy = new LinkedHashMap<>();
+                    values.forEach((key, value) -> copy.put(String.valueOf(key), value));
+                    resolved.add(copy);
                 }
-                Map<String, Object> copy = new LinkedHashMap<>();
-                values.forEach((key, value) -> copy.put(String.valueOf(key), value));
-                resolved.add(copy);
+                recordTemplates = resolved;
             }
-            recordTemplates = resolved;
         }
         Integer count = postAction.get("count") != null ? ((Number) postAction.get("count")).intValue() : null;
 
