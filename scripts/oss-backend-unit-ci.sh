@@ -43,10 +43,8 @@ export AURA_OSS_CI_POSTGRES_CONTAINER="auraboot-oss-ci-postgres-$RUNTIME_TOKEN"
 export AURA_OSS_CI_REDIS_CONTAINER="auraboot-oss-ci-redis-$RUNTIME_TOKEN"
 COMPOSE_ARGS=(
   -f "$PROJECT_ROOT/docker-compose.yml"
-  -f "$PROJECT_ROOT/docker-compose.skills-c2.override.yml"
   -f "$PROJECT_ROOT/docker-compose.oss-backend-ci.override.yml"
   -p "$COMPOSE_PROJECT"
-  --profile skills-c2-stack
 )
 FLYWAY_IMAGE='flyway/flyway:12.8.1@sha256:b8a2d72926b98234c1fb8f45659fd23d8a001af9ee7f450326aa46af14d447bb'
 
@@ -80,6 +78,13 @@ command -v docker >/dev/null 2>&1 || environment_invalid 'docker is unavailable'
 command -v timeout >/dev/null 2>&1 || environment_invalid 'timeout is unavailable'
 docker compose version >/dev/null 2>&1 || environment_invalid 'docker compose v2 is unavailable'
 docker info >/dev/null 2>&1 || environment_invalid 'Docker daemon is unavailable to the CI account'
+command -v python3 >/dev/null 2>&1 || environment_invalid 'python3 is unavailable'
+# Inspect both Docker IPAM and every host routing table. Never prune another
+# owner's retained networks or change the daemon-wide address-pool policy.
+AURA_OSS_CI_SUBNET="$(python3 "$SCRIPT_DIR/oss-ci-subnet.py")" \
+  || environment_invalid 'cannot allocate a collision-free CI subnet'
+export AURA_OSS_CI_SUBNET
+printf '%s\n' "$AURA_OSS_CI_SUBNET" > "$ARTIFACTS/compose-subnet.txt"
 
 # Pre-pull every image referenced by this test denominator. A pull failure is a
 # machine/network precondition failure, not a product regression.

@@ -49,6 +49,9 @@ public interface PermissionService {
      * @return Permission DTO or null
      */
     PermissionDTO findById(Long id);
+
+    /** Find a permission by PID in the current tenant, or null when absent. */
+    PermissionDTO findByPid(String pid);
     
     /**
      * Find permission by code

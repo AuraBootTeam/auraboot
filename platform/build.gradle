@@ -441,6 +441,9 @@ dependencies {
     testImplementation platform('org.testcontainers:testcontainers-bom:1.21.4')
     testImplementation 'org.testcontainers:testcontainers'
     testImplementation 'org.testcontainers:mysql'
+    // Testcontainers does not supply its JDBC driver. Keep this test-only;
+    // production MySQL deployments still provide their own connector.
+    testRuntimeOnly 'com.mysql:mysql-connector-j'
     testImplementation 'org.testcontainers:postgresql'
     testImplementation 'org.testcontainers:junit-jupiter'
 

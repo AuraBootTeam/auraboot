@@ -65,6 +65,7 @@ fi
 [ -f "$WORKSPACE/dev.sh" ] || { echo "FATAL: cannot find workspace dev.sh for $REPO_ROOT"; exit 1; }
 CANONICAL="$WORKSPACE/auraboot"                      # canonical OSS checkout (for gradle wrapper / node_modules seed)
 DEV="$WORKSPACE/dev.sh"
+WORKSPACE_STATE_DIR="${AURA_WORKSPACE_STATE_DIR:-$WORKSPACE/.workspace}"
 
 ADMIN_EMAIL="admin@auraboot.com"
 ADMIN_PASSWORD="Test2026x"
@@ -109,11 +110,11 @@ acquire_stack_lock() {
   trap release_stack_lock EXIT
 }
 
-state_dir() { echo "$WORKSPACE/.workspace/golden/$1"; }
+state_dir() { echo "$WORKSPACE_STATE_DIR/golden/$1"; }
 
 # Read a key from the runtime env file.
 runtime_env() {
-  local name="$1" key="$2" f="$WORKSPACE/.workspace/env/$1.env"
+  local name="$1" key="$2" f="$WORKSPACE_STATE_DIR/env/$1.env"
   [ -f "$f" ] || die "runtime env not found: $f (run 'up' first / check the name)"
   grep -E "^${key}=" "$f" | head -1 | cut -d= -f2-
 }
@@ -363,7 +364,7 @@ cmd_up() {
     log "    ensured stable allocation (slot $slot, source=$REPO_ROOT, mode=$runtime_mode)"
   else
     local allocated_slot=""
-    local env_file="$WORKSPACE/.workspace/env/$name.env"
+    local env_file="$WORKSPACE_STATE_DIR/env/$name.env"
     if [ -f "$env_file" ]; then
       allocated_slot="$(grep -E '^AURA_WORKSPACE_SLOT=' "$env_file" | head -1 | cut -d= -f2- || true)"
     fi
