@@ -257,6 +257,37 @@ class SchemaManagementServiceMethodsTest {
                 "ALTER TABLE tb_test ALTER COLUMN row_version SET DEFAULT 1"));
     }
 
+    @Test
+    void syncLeavesAnAlreadyCorrectRowVersionDefaultUnchanged() {
+        when(metaModelService.getModelDefinitionFromDb("test_model")).thenReturn(Optional.of(testModel));
+        when(tableMetadataService.tableExists("tb_test")).thenReturn(true);
+        when(tableMetadataService.columnExists("tb_test", "test_column")).thenReturn(true);
+        when(tableMetadataService.getColumnTypeDefinition("tb_test", "test_column")).thenReturn("VARCHAR(255)");
+        when(tableMetadataService.isColumnNullable("tb_test", "test_column")).thenReturn(true);
+        when(ddlDialect.getName()).thenReturn("PostgreSQL");
+        when(tableMetadataService.hasPostgresIntegerDefaultOne("tb_test", "row_version")).thenReturn(true);
+        SchemaOperationResult result = schemaManagementService.syncModelToTable("test_model", SchemaSyncOptions.builder()
+                .syncMode(SchemaSyncOptions.SyncMode.DRY_RUN).build());
+        assertTrue(result.getSuccess());
+        assertEquals("No schema changes required", result.getMessage());
+        verifyNoInteractions(dynamicDataMapper);
+    }
+
+    @Test
+    void syncStillRepairsAWrongDefaultOnANonNullableRowVersion() {
+        when(metaModelService.getModelDefinitionFromDb("test_model")).thenReturn(Optional.of(testModel));
+        when(tableMetadataService.tableExists("tb_test")).thenReturn(true);
+        when(tableMetadataService.columnExists("tb_test", "test_column")).thenReturn(true);
+        when(tableMetadataService.getColumnTypeDefinition("tb_test", "test_column")).thenReturn("VARCHAR(255)");
+        when(tableMetadataService.isColumnNullable("tb_test", "test_column")).thenReturn(true);
+        when(ddlDialect.getName()).thenReturn("PostgreSQL");
+        SchemaOperationResult result = schemaManagementService.syncModelToTable("test_model", SchemaSyncOptions.builder()
+                .syncMode(SchemaSyncOptions.SyncMode.DRY_RUN).build());
+        assertTrue(result.getSuccess());
+        assertEquals(List.of("ALTER TABLE tb_test ALTER COLUMN row_version SET DEFAULT 1"), result.getExecutedDDL());
+        verifyNoInteractions(dynamicDataMapper);
+    }
+
     // ==================== addFieldToModel 测试 ====================
 
     @Test
