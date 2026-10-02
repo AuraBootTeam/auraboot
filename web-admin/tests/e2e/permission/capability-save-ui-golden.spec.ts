@@ -291,8 +291,16 @@ test('partial revocation retains selected shared actions and completion persists
   await checkbox.check();
   await page.getByTestId('capability-save').click();
   await expect(page.getByTestId('confirm-dialog')).toBeVisible();
+  const completion = page.waitForResponse(
+    (response) => response.url().includes('/api/permission/capabilities?') &&
+      response.request().method() === 'PUT',
+  );
   await page.getByTestId('confirm-ok').click();
+  const completed = await completion;
+  expect(completed.ok()).toBe(true);
+  expect(String((await completed.json()).code)).toBe('0');
   await expect(checkbox).toBeChecked();
+  await expect(page.getByTestId('capability-draft')).toHaveCount(0);
   await expect(page.getByTestId('capability-save')).toBeDisabled();
   expect((await readCaps()).find((cap: any) => cap.code === manage.code).authorizationState).toBe(
     'full',

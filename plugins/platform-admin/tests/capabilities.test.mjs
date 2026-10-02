@@ -39,3 +39,14 @@ test('platform DSL maintenance capabilities include model reads, CRUD and comman
     }
   }
 });
+
+test('member state capabilities use the runtime-derived verb, not the command suffix', () => {
+  const org = JSON.parse(source('../../org-management/config/capabilities.json'));
+  const includes = org.find(cap => cap.code === 'org.cap.member').includes;
+  const commands = JSON.parse(source('../config/commands.json'));
+  for (const action of ['approve', 'reject', 'suspend', 'restore']) {
+    assert.ok(commands.some(command => command.code === `admin:${action}_member` && command.type === 'state_transition'));
+    assert.ok(includes.includes(`model.tenant_member.${action}`));
+    assert.ok(!includes.includes(`model.tenant_member.${action}_member`));
+  }
+});

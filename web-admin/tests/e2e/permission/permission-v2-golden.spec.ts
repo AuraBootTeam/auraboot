@@ -5,8 +5,8 @@ import { test, expect, type Page } from '@playwright/test';
  *
  * Verifies the reorganized /enterprise/permissions page on a real browser against a host-first
  * stack: ① capability checklist is the default surface with business-language labels (no raw codes),
- * ② data-scope bar + drawer, ③ advanced atomic-actions escape hatch (collapsed by default) with a
- * source column, and the members surface free of raw i18n keys. Screenshots saved for review.
+ * ② data-scope bar + drawer, ③ read-only permission diagnostics (collapsed by default) with related
+ * capabilities, and the members surface free of raw i18n keys. Screenshots saved for review.
  */
 
 const SHOTS = 'test-results/rbac-v2-golden';
@@ -28,8 +28,8 @@ test('v2 permissions: capability is the default, business-language surface', asy
   await expect(page.getByTestId('data-scope-bar')).toBeVisible();
   // ① capability checklist present; ③ advanced present but COLLAPSED by default
   await expect(page.getByTestId('capability-checklist')).toBeVisible();
-  await expect(page.getByTestId('advanced-atomic-section')).toBeVisible();
-  await expect(page.getByTestId('advanced-atomic-body')).toHaveCount(0);
+  await expect(page.getByTestId('permission-diagnostics')).toBeVisible();
+  await expect(page.locator('[data-testid^="diagnostic-action-"]')).toHaveCount(0);
 
   // no capability label leaks a raw resource/module code (the §2.1 fix)
   const capLabels = await page
@@ -50,25 +50,21 @@ test('v2 permissions: capability is the default, business-language surface', asy
   await page.screenshot({ path: `${SHOTS}/01-capabilities-default.png`, fullPage: true });
 });
 
-test('v2 permissions: ③ advanced atomic actions show source coverage', async ({ page }) => {
+test('v2 permissions: diagnostics are read only and searchable', async ({ page }) => {
   await gotoPermissions(page);
-
-  await page.getByTestId('advanced-atomic-toggle').click();
-  await expect(page.getByTestId('advanced-atomic-body')).toBeVisible();
-
-  // at least one atomic row + its source pill (covered-by-capability OR exception) renders
-  const sources = page.locator('[data-testid^="atomic-source-"]');
-  await expect(sources.first()).toBeVisible({ timeout: 10_000 });
-  expect(await sources.count()).toBeGreaterThan(0);
-
-  // search filters the table
-  const before = await page.locator('[data-testid^="atomic-row-"]').count();
-  await page.getByTestId('advanced-atomic-search').fill('zzz-no-such-code');
-  await expect(page.getByTestId('advanced-atomic-empty')).toBeVisible();
-  await page.getByTestId('advanced-atomic-search').fill('');
-  await expect.poll(async () => page.locator('[data-testid^="atomic-row-"]').count()).toBe(before);
-
-  await page.screenshot({ path: `${SHOTS}/02-advanced-atomic.png`, fullPage: true });
+  const diagnostics = page.getByTestId('permission-diagnostics');
+  await diagnostics.locator('summary').first().click();
+  const rows = diagnostics.locator('[data-testid^="diagnostic-action-"]');
+  await expect(rows.first()).toBeVisible();
+  const before = await rows.count();
+  expect(before).toBeGreaterThan(0);
+  await expect(diagnostics.locator('input[type="checkbox"], select, button')).toHaveCount(0);
+  const search = diagnostics.getByRole('textbox');
+  await search.fill('zzz-no-such-code');
+  await expect(rows).toHaveCount(0);
+  await search.fill('');
+  await expect(rows).toHaveCount(before);
+  await page.screenshot({ path: `${SHOTS}/02-read-only-diagnostics.png`, fullPage: true });
 });
 
 test('v2 permissions: ② data-scope drawer opens with scope tiers', async ({ page }) => {
