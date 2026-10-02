@@ -159,9 +159,9 @@ class MetaContextTenantFilterScopeTest {
         @Test
         void pendingLedgerCountsDownTowardZero() {
             // The ledger IS the campaign dashboard: every wave that removes an
-            // exemption updates its expected count here. 33 = post-W2a state.
-            assertEquals(10, MybatisPlusConfig.MIGRATION_PENDING_TABLES.size(),
-                    "W4c removed tenant_login_channel (pre-auth reads scoped), permission_audit_log (@Async on decorated taskExecutor propagates tenant), and the two mobile tables (zero OSS code access); update this ledger per wave");
+            // exemption updates its expected count here. 34 = post-W2a peak.
+            assertEquals(6, MybatisPlusConfig.MIGRATION_PENDING_TABLES.size(),
+                    "W2a-c removed invitation + the IdP/login-channel family (pre-auth lookups scoped by explicit args); update this ledger per wave");
             assertEquals(15, MybatisPlusConfig.VERIFIED_GLOBAL_TABLES.size());
         }
 
@@ -186,6 +186,16 @@ class MetaContextTenantFilterScopeTest {
                     "ab_idempotency_record", "ab_idempotent_key"}) {
                 assertFalse(handler.ignoreTable(table),
                         "W3a removed this exemption; seams are wrapped in PlatformSeedService / cleanup tasks");
+            }
+        }
+
+        @Test
+        void w2InvitationAndIdpFamilyNoLongerExempt() {
+            var handler = tenantInterceptor().getTenantLineHandler();
+            for (String table : new String[]{"ab_invitation", "ab_login_channel",
+                    "ab_identity_provider_instance", "ab_external_identity_link"}) {
+                assertFalse(handler.ignoreTable(table),
+                        "W2a-c removed these exemptions; pre-auth seams scoped in TenantInviteServiceImpl / FederatedIdentityRegistryServiceImpl");
             }
         }
 

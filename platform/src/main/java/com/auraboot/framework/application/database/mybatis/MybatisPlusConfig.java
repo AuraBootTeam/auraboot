@@ -74,12 +74,7 @@ public class MybatisPlusConfig {
      * the old "@Async threads lack MetaContext" comments were wrong).
      */
     public static final Set<String> MIGRATION_PENDING_TABLES = Set.of(
-        // W2 pending — auth seam / cross-tenant by design
         "ab_tenant_member",                 // "which tenants does user belong to"; SINGLE-mode filter lookup
-        "ab_invitation",                    // pre-join invitation verified before tenant context
-        "ab_login_channel",                 // pre-auth routing; tenant selector is explicit
-        "ab_identity_provider_instance",    // pre-auth routing; tenant selector is explicit
-        "ab_external_identity_link",        // identity lookup occurs before tenant context
         // W2b pending — RBAC pair (highest fan-out: explicit-param style spreads context-less
         // callers across initializers/listeners/caches; needs a dedicated census)
         "ab_user_role",                     // login + auth-filter role load pass tenantId explicitly

@@ -229,7 +229,6 @@ public class MybatisPlusConfigTest {
                 "ab_user",
                 "ab_tenant",
                 "ab_tenant_member",
-                "ab_invitation",
                 "ab_user_social_link",
                 "ab_user_deactivation",
                 "ab_verification_code"
