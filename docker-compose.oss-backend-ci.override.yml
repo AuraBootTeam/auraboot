@@ -48,3 +48,9 @@ services:
 volumes:
   skills_c2_postgres_data:
     driver: local
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${AURA_OSS_CI_SUBNET:?A collision-free CI subnet is required}

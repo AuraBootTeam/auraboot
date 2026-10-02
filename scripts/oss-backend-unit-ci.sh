@@ -78,6 +78,13 @@ command -v docker >/dev/null 2>&1 || environment_invalid 'docker is unavailable'
 command -v timeout >/dev/null 2>&1 || environment_invalid 'timeout is unavailable'
 docker compose version >/dev/null 2>&1 || environment_invalid 'docker compose v2 is unavailable'
 docker info >/dev/null 2>&1 || environment_invalid 'Docker daemon is unavailable to the CI account'
+command -v python3 >/dev/null 2>&1 || environment_invalid 'python3 is unavailable'
+# Inspect both Docker IPAM and every host routing table. Never prune another
+# owner's retained networks or change the daemon-wide address-pool policy.
+AURA_OSS_CI_SUBNET="$(python3 "$SCRIPT_DIR/oss-ci-subnet.py")" \
+  || environment_invalid 'cannot allocate a collision-free CI subnet'
+export AURA_OSS_CI_SUBNET
+printf '%s\n' "$AURA_OSS_CI_SUBNET" > "$ARTIFACTS/compose-subnet.txt"
 
 # Pre-pull every image referenced by this test denominator. A pull failure is a
 # machine/network precondition failure, not a product regression.
