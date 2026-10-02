@@ -90,20 +90,11 @@ public class CommandTargetVersionLockPhase implements CommandPhase {
         CommandExecutorUtils.validateSqlIdentifier(
                 primaryKeyColumn, "command target version primary key");
 
-        // SECURITY: selectByQueryWithoutTenant bypasses the tenant interceptor. This query carries
-        // an explicit tenant_id predicate and binds both tenant and pid; identifiers are resolved
-        // from MetaModelService and independently validated above.
-        String sql = "SELECT row_version FROM " + tableName
-                + " WHERE tenant_id = #{params.tenantId}"
-                + " AND " + primaryKeyColumn + " = #{params.targetRecordPid}"
-                + " FOR UPDATE";
-        Map<String, Object> params = Map.of(
-                "tenantId", ctx.getTenantId(),
-                "targetRecordPid", ctx.getRequest().getTargetRecordId());
-        List<Map<String, Object>> rows = currentStateLock
-                ? dynamicDataMapper.selectTargetVersionForUpdate(tableName, primaryKeyColumn,
-                        ctx.getTenantId(), ctx.getRequest().getTargetRecordId())
-                : dynamicDataMapper.selectByQueryWithoutTenant(sql, params);
+        // This dedicated mapper validates identifiers and binds the tenant and target PID.
+        // The general SELECT provider deliberately rejects UPDATE, including FOR UPDATE.
+        List<Map<String, Object>> rows = dynamicDataMapper.selectTargetVersionForUpdate(
+                tableName, primaryKeyColumn, ctx.getTenantId(),
+                ctx.getRequest().getTargetRecordId());
         Long authoritative = resolveVersion(rows);
         Integer requested = ctx.getRequest().getExpectedVersion();
         if (authoritative == null || (!currentStateLock && requested.longValue() != authoritative)) {
