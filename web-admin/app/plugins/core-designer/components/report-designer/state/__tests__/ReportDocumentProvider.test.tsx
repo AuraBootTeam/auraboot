@@ -22,6 +22,24 @@ function richText(content = 'Hello'): Omit<RichTextBlock, 'id'> {
 }
 
 describe('ReportDocumentProvider', () => {
+  it.each([
+    { ...createEmptyReport('Stored report'), page: undefined },
+    { ...createEmptyReport('Stored report'), page: { size: 'A4' } },
+    { ...createEmptyReport('Stored report'), page: { margin: { left: 15, right: 15, top: 20, bottom: 20 }, orientation: 'portrait', size: 'A4' } },
+  ])('keeps loaded page defaults clean until a user edits them (%j)', (stored) => {
+    const { result } = renderHook(() => useReportDocument(), { wrapper: ReportDocumentProvider });
+    const original = JSON.stringify(stored);
+    act(() => result.current.loadDocument(stored as ReportDsl));
+    expect(JSON.stringify(stored)).toBe(original);
+    expect(result.current.report?.page.size).toBe('A4');
+    expect(result.current.isDirty).toBe(false);
+    act(() => result.current.updateTitle('Edited report'));
+    expect(result.current.isDirty).toBe(true);
+    act(() => result.current.undo());
+    // Title changes deliberately do not create undo entries.
+    expect(result.current.report?.title).toBe('Edited report');
+  });
+
   it('makes header edits undoable (whole-ReportDsl history scope)', () => {
     const { result } = renderHook(() => useReportDocument(), {
       wrapper: ReportDocumentProvider,

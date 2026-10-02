@@ -268,8 +268,9 @@ export const ReportDocumentProvider: React.FC<{ children: React.ReactNode }> = (
     (dsl: ReportDsl) => {
       // Programmatic/legacy definitions may omit page settings; the designer and its
       // renderers assume a PageConfig, so fill defaults before the document resets.
-      doc.reset(ensurePageConfig(dsl));
-      const snapshot = serializeDocument<ReportDsl>(dsl);
+      const normalized = ensurePageConfig(dsl);
+      doc.reset(normalized);
+      const snapshot = serializeDocument<ReportDsl>(normalized);
       setSavedSnapshot(snapshot);
       savedSnapshotRef.current = snapshot;
       selection.setSelectedBlockId(null);
