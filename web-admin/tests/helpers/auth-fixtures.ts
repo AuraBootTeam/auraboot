@@ -107,8 +107,9 @@ export async function ensureBusinessSpace(page: Page): Promise<void> {
     throw new Error(`ensureBusinessSpace: no business space in my-spaces (${await spaces.text()})`);
   }
   // Already inside a business space? A redundant switch-space 500s on the
-  // current stack — probe a business-scoped endpoint first and skip.
-  const alreadyBusiness = await page.request.get('/api/meta/models?page=1&pageSize=1');
+  // current stack — probe a page.page.manage-gated endpoint first (meta
+  // endpoints answer 200 in the System space too, so they cannot distinguish).
+  const alreadyBusiness = await page.request.get('/api/pages?page=1&pageSize=1');
   if (alreadyBusiness.ok()) return;
   let switched: Awaited<ReturnType<typeof page.request.post>> | null = null;
   let lastDetail = '';

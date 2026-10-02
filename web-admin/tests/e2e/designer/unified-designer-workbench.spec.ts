@@ -2837,7 +2837,11 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('designer-mode-preview').click();
     await expect(page.getByTestId('unified-runtime-preview')).toBeVisible();
 
-    await expect(page.getByTestId('runtime-input-field_customer_name')).toBeVisible();
+    // The WYSIWYG platform control renders the real input (label-bound); the
+    // legacy runtime-input-* testid only exists on the generic fallback branch.
+    await expect(
+      page.getByRole('textbox', { name: /Customer name/i }).first(),
+    ).toBeVisible({ timeout: 10_000 });
     await expect(page.getByTestId('runtime-field-field_customer_phone')).toHaveAttribute(
       'data-permission-code',
       missingPermissionCode,

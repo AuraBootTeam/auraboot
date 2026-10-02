@@ -571,7 +571,11 @@ pnpm sync-plugins > "$SYNC_PLUGINS_LOG" 2>&1
 
 aura_reset_assert_port_available "web" "$VITE_PORT"
 aura_reset_assert_port_available "bff" "$BFF_PORT"
-WEB_PID="$(aura_reset_spawn_detached "$WEB_ADMIN_DIR" "$FRONTEND_LOG" pnpm dev:web)"
+# SPRING_BOOT_URL is needed by the web (SSR) process too: /_action/* resource
+# routes (e.g. /_action/switch-space) fetch the backend directly from the SSR
+# runtime; without it they fall back to the :6443 host default and 500 on any
+# non-default BE_PORT.
+WEB_PID="$(aura_reset_spawn_detached "$WEB_ADMIN_DIR" "$FRONTEND_LOG" env SPRING_BOOT_URL="$AURA_BE_BASE" pnpm dev:web)"
 aura_reset_register_process "web" "$WEB_PID" "$VITE_PORT" "$WEB_ADMIN_DIR" "pnpm dev:web"
 # SPRING_BOOT_URL is mandatory in slot mode: bff.server.ts otherwise falls back
 # to AURA_BE_BASE (exported above) and finally the :6443 host-mode default,
