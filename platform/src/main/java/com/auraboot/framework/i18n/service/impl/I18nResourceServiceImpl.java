@@ -165,11 +165,17 @@ public class I18nResourceServiceImpl implements I18nResourceService {
     @Override
     public List<I18nResource> findAllByLang(String lang) {
         Long tenantId = getCurrentTenantId();
-        List<I18nResource> tenantResources = i18nResourceMapper.selectAllByLang(tenantId, lang);
+        // System/public reads declare their narrow scope; authenticated tenant reads
+        // keep the tenant interceptor. An implicit tenant=-1/real tenant would
+        // otherwise conflict with the explicit tenant_id=0 predicate.
+        List<I18nResource> tenantResources = tenantId == 0L
+            ? MetaContext.runWithoutTenantFilter(() -> i18nResourceMapper.selectAllByLang(0L, lang))
+            : i18nResourceMapper.selectAllByLang(tenantId, lang);
 
         // Also include system-level resources (tenant_id = 0)
         if (tenantId != 0L) {
-            List<I18nResource> systemResources = i18nResourceMapper.selectAllByLang(0L, lang);
+            List<I18nResource> systemResources = MetaContext.runWithoutTenantFilter(
+                () -> i18nResourceMapper.selectAllByLang(0L, lang));
             // Merge: tenant resources override system resources
             Map<String, I18nResource> merged = new LinkedHashMap<>();
             for (I18nResource resource : systemResources) {
@@ -185,7 +191,8 @@ public class I18nResourceServiceImpl implements I18nResourceService {
         // also load all tenant-level translations since i18n data is non-sensitive
         // and the endpoint is public (WhiteList). Without this, plugin-imported
         // translations (stored under real tenant IDs) would never appear.
-        List<I18nResource> allTenantResources = i18nResourceMapper.selectAllByLangAllTenants(lang);
+        List<I18nResource> allTenantResources = MetaContext.runWithoutTenantFilter(
+            () -> i18nResourceMapper.selectAllByLangAllTenants(lang));
         Map<String, I18nResource> merged = new LinkedHashMap<>();
         for (I18nResource resource : tenantResources) {
             merged.put(resource.getI18nKey(), resource);
