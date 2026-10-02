@@ -143,21 +143,20 @@ class SemanticPreaggIT {
     @AfterAll
     void cleanup() {
         MetaContext.setContext(TENANT_ID, USER_ID, "preagg-golden-pid", "preagg-golden-user");
-        jdbc.execute("DROP MATERIALIZED VIEW IF EXISTS mv_semantic_preagg_it_golden");
-        for (String[] stmt : new String[][]{
-                {"DELETE FROM ab_object_alias WHERE tenant_id = ? AND pid LIKE 'pg-golden-%'", TENANT_ID + ""},
-                {"DELETE FROM ab_semantic_preagg WHERE tenant_id = ?", TENANT_ID + ""},
-                {"DELETE FROM ab_semantic_metric WHERE semantic_model_pid = ?", modelPid + ""},
-                {"DELETE FROM ab_semantic_dimension WHERE semantic_model_pid = ?", modelPid + ""},
-                {"DELETE FROM ab_semantic_model WHERE pid = ?", modelPid + ""},
-                {"DELETE FROM ab_meta_model WHERE pid = ? OR id = 991950010", META_MODEL_PID}}) {
-            try {
-                jdbc.update(stmt[0], stmt[1]);
-            } catch (Exception e) {
-                log.warn("cleanup step failed (continuing): {}", e.getMessage());
+        try {
+            jdbc.execute("DROP MATERIALIZED VIEW IF EXISTS mv_semantic_preagg_it_golden");
+            for (Object[] stmt : new Object[][]{
+                    {"DELETE FROM ab_object_alias WHERE tenant_id = ? AND pid LIKE 'pg-golden-%'", TENANT_ID},
+                    {"DELETE FROM ab_semantic_preagg WHERE tenant_id = ?", TENANT_ID},
+                    {"DELETE FROM ab_semantic_metric WHERE semantic_model_pid = ?", modelPid},
+                    {"DELETE FROM ab_semantic_dimension WHERE semantic_model_pid = ?", modelPid},
+                    {"DELETE FROM ab_semantic_model WHERE pid = ?", modelPid},
+                    {"DELETE FROM ab_meta_model WHERE pid = ? OR id = 991950010", META_MODEL_PID}}) {
+                jdbc.update((String) stmt[0], stmt[1]);
             }
+        } finally {
+            MetaContext.clear();
         }
-        MetaContext.clear();
     }
 
     private long liveValue() {

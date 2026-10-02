@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -88,12 +89,12 @@ public class SemanticPreaggService {
         return preaggMapper.listByTenant(tenantId);
     }
 
+    @Transactional
     public void delete(String pid) {
         Long tenantId = MetaContext.get().getTenantId();
         AbSemanticPreagg preagg = requirePreagg(tenantId, pid);
-        preagg.setDeletedFlag(true);
-        preagg.setUpdatedAt(OffsetDateTime.now());
-        preaggMapper.updateById(preagg);
+        // updateById omits globally configured logical-delete fields.
+        preaggMapper.markDeleted(tenantId, pid, OffsetDateTime.now(ZoneOffset.UTC));
         jdbc.execute("DROP MATERIALIZED VIEW IF EXISTS " + preagg.getMvName());
     }
 
