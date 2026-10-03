@@ -254,6 +254,8 @@ test.describe('Open Platform golden journey', () => {
     for (const template of ['asset-management', 'simple-inventory']) {
       const installTemplate = await page.request.post(`/api/templates/${template}/install`, {
         data: {},
+        // Model provisioning is fixture setup, separate from action and production SLO budgets.
+        timeout: 30_000,
       });
       expect(installTemplate.status(), `install ${template}`).toBe(200);
       expect(await installTemplate.json()).toMatchObject({ success: true, status: 'SUCCESS' });
