@@ -53,7 +53,10 @@ const BLOCK_DEFINITIONS: BlockDefinition[] = [
     type: 'barcode',
     label: { zh: '条码', en: 'Barcode' },
     icon: 'barcode',
-    description: { zh: '使用固定值或数据字段生成条码', en: 'Barcode from static value or data field' },
+    description: {
+      zh: '使用固定值或数据字段生成条码',
+      en: 'Barcode from static value or data field',
+    },
   },
   {
     type: 'watermark',
@@ -207,7 +210,7 @@ export const BlockPalette: React.FC = () => {
     if (def.type === 'table') {
       addBlock({
         blockType: 'table',
-        title: 'New Table',
+        title: text({ zh: '新表格', en: 'New Table' }),
         dataSource: '',
         columns: [],
         showHeader: true,
@@ -217,7 +220,7 @@ export const BlockPalette: React.FC = () => {
     } else if (def.type === 'grouped-table') {
       addBlock({
         blockType: 'grouped-table',
-        title: 'Grouped Table',
+        title: text({ zh: '分组表格', en: 'Grouped Table' }),
         dataSource: '',
         groupByField: '',
         columns: [],
@@ -227,7 +230,7 @@ export const BlockPalette: React.FC = () => {
     } else if (def.type === 'stat-card') {
       addBlock({
         blockType: 'stat-card',
-        label: 'Metric',
+        label: text({ zh: '指标', en: 'Metric' }),
         dataSource: '',
         valueField: '',
         aggregation: 'sum',
@@ -241,7 +244,7 @@ export const BlockPalette: React.FC = () => {
     } else if (def.type === 'cross-tab') {
       addBlock({
         blockType: 'cross-tab',
-        title: 'Cross Tab',
+        title: text({ zh: '交叉表', en: 'Cross Tab' }),
         dataSource: '',
         rowField: '',
         columnField: '',
@@ -253,7 +256,7 @@ export const BlockPalette: React.FC = () => {
     } else if (def.type === 'chart') {
       addBlock({
         blockType: 'chart',
-        title: 'Chart',
+        title: text({ zh: '图表', en: 'Chart' }),
         dataSource: '',
         chartType: 'bar',
         categoryField: '',
@@ -275,7 +278,7 @@ export const BlockPalette: React.FC = () => {
     } else if (def.type === 'watermark') {
       addBlock({
         blockType: 'watermark',
-        text: 'confidential',
+        text: text({ zh: '机密', en: 'confidential' }),
         rotation: -30,
         opacity: 0.1,
         fontSize: 16,
@@ -288,7 +291,7 @@ export const BlockPalette: React.FC = () => {
         elements: [
           {
             type: 'text',
-            content: report?.title || 'Report',
+            content: report?.title || text({ zh: '报表', en: 'Report' }),
             align: 'center',
             style: { fontSize: 14, fontWeight: 'bold' },
           },

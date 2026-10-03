@@ -68,7 +68,7 @@ test.describe('Report Designer', () => {
 
     // Canvas should show "Header" label
     await expect(
-      page.getByTestId('report-canvas').getByText('Header', { exact: true }),
+      page.getByTestId('report-canvas').getByText(/页眉|Header/, { exact: true }),
     ).toBeVisible({ timeout: 10000 });
   });
 
@@ -81,7 +81,7 @@ test.describe('Report Designer', () => {
 
     // Canvas should show "Footer" label
     await expect(
-      page.getByTestId('report-canvas').getByText('Footer', { exact: true }),
+      page.getByTestId('report-canvas').getByText(/页脚|Footer/, { exact: true }),
     ).toBeVisible({ timeout: 10000 });
   });
 
@@ -160,7 +160,9 @@ test.describe('Report Designer', () => {
 
     // Canvas should show the grouped table placeholder
     await expect(
-      page.getByTestId('report-canvas').getByText('Select a group-by field'),
+      page
+        .getByTestId('report-canvas')
+        .getByText(/请在属性面板中选择分组字段|Select\ a\ group\-by\ field/),
     ).toBeVisible({ timeout: 10000 });
   });
 
@@ -184,7 +186,7 @@ test.describe('Report Designer', () => {
 
     // Canvas should show the rich text placeholder
     await expect(
-      page.getByTestId('report-canvas').getByText('Click to add text content'),
+      page.getByTestId('report-canvas').getByText(/点击添加文本内容|Click\ to\ add\ text\ content/),
     ).toBeVisible({ timeout: 10000 });
   });
 
@@ -194,11 +196,16 @@ test.describe('Report Designer', () => {
       .getByRole('button', { name: /分组表格|Grouped Table/ })
       .click();
     await expect(
-      page.getByTestId('report-canvas').getByText('Select a group-by field'),
+      page
+        .getByTestId('report-canvas')
+        .getByText(/请在属性面板中选择分组字段|Select\ a\ group\-by\ field/),
     ).toBeVisible({ timeout: 10000 });
 
     // Click the block to select it
-    await page.getByTestId('report-canvas').getByText('Select a group-by field').click();
+    await page
+      .getByTestId('report-canvas')
+      .getByText(/请在属性面板中选择分组字段|Select\ a\ group\-by\ field/)
+      .click();
 
     // Property panel should show "Grouped Table"
     await expect(
@@ -217,11 +224,14 @@ test.describe('Report Designer', () => {
       .getByTestId('block-palette')
       .getByRole('button', { name: /指标卡片|Stat Card/ })
       .click();
-    await expect(page.getByTestId('report-canvas').getByText('Metric')).toBeVisible({
+    await expect(page.getByTestId('report-canvas').getByText(/指标|Metric/)).toBeVisible({
       timeout: 10000,
     });
 
-    await page.getByTestId('report-canvas').getByText('Metric').click();
+    await page
+      .getByTestId('report-canvas')
+      .getByText(/指标|Metric/)
+      .click();
 
     await expect(
       page.getByTestId('block-property-panel').getByText(/^(指标卡片|Stat Card)$/),
@@ -237,10 +247,13 @@ test.describe('Report Designer', () => {
       .getByRole('button', { name: /富文本|Rich Text/ })
       .click();
     await expect(
-      page.getByTestId('report-canvas').getByText('Click to add text content'),
+      page.getByTestId('report-canvas').getByText(/点击添加文本内容|Click\ to\ add\ text\ content/),
     ).toBeVisible({ timeout: 10000 });
 
-    await page.getByTestId('report-canvas').getByText('Click to add text content').click();
+    await page
+      .getByTestId('report-canvas')
+      .getByText(/点击添加文本内容|Click\ to\ add\ text\ content/)
+      .click();
 
     await expect(
       page.getByTestId('block-property-panel').getByText(/^(富文本|Rich Text)$/),
@@ -304,7 +317,9 @@ test.describe('Report Designer', () => {
       .getByRole('button', { name: /交叉表|Cross Tab/ })
       .click();
     await expect(
-      page.getByTestId('report-canvas').getByText('Configure row, column, and value fields'),
+      page
+        .getByTestId('report-canvas')
+        .getByText(/请配置行、列和数值字段|Configure\ row,\ column,\ and\ value\ fields/),
     ).toBeVisible({ timeout: 10000 });
   });
 
@@ -314,7 +329,9 @@ test.describe('Report Designer', () => {
       .getByRole('button', { name: /图表|Chart/ })
       .click();
     await expect(
-      page.getByTestId('report-canvas').getByText('Configure category and value fields'),
+      page
+        .getByTestId('report-canvas')
+        .getByText(/请配置分类和数值字段|Configure\ category\ and\ value\ fields/),
     ).toBeVisible({ timeout: 10000 });
   });
 
@@ -324,12 +341,14 @@ test.describe('Report Designer', () => {
       .getByRole('button', { name: /交叉表|Cross Tab/ })
       .click();
     await expect(
-      page.getByTestId('report-canvas').getByText('Configure row, column, and value fields'),
+      page
+        .getByTestId('report-canvas')
+        .getByText(/请配置行、列和数值字段|Configure\ row,\ column,\ and\ value\ fields/),
     ).toBeVisible({ timeout: 10000 });
 
     await page
       .getByTestId('report-canvas')
-      .getByText('Configure row, column, and value fields')
+      .getByText(/请配置行、列和数值字段|Configure\ row,\ column,\ and\ value\ fields/)
       .click();
     await expect(
       page.getByTestId('block-property-panel').getByText(/^(交叉表|Cross Tab)$/),
@@ -347,12 +366,14 @@ test.describe('Report Designer', () => {
       .getByRole('button', { name: /图表|Chart/ })
       .click();
     await expect(
-      page.getByTestId('report-canvas').getByText('Configure category and value fields'),
+      page
+        .getByTestId('report-canvas')
+        .getByText(/请配置分类和数值字段|Configure\ category\ and\ value\ fields/),
     ).toBeVisible({ timeout: 10000 });
 
     await page
       .getByTestId('report-canvas')
-      .getByText('Configure category and value fields')
+      .getByText(/请配置分类和数值字段|Configure\ category\ and\ value\ fields/)
       .click();
     await expect(
       page.getByTestId('block-property-panel').getByText(/^(图表|Chart)$/),

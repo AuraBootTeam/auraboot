@@ -3,6 +3,7 @@
  * Groups rows by a field, shows group headers and optional subtotals
  */
 
+import { useSmartText } from '~/utils/i18n';
 import React from 'react';
 import type { GroupedTableBlock, SummaryColumnConfig } from '../types';
 
@@ -64,6 +65,7 @@ export const ReportGroupedTableBlock: React.FC<ReportGroupedTableBlockProps> = (
   mode,
   data = [],
 }) => {
+  const text = useSmartText();
   const columns = block.columns;
   const hasColumns = columns.length > 0;
   const cellBorder = block.border !== false ? 'border border-gray-300' : '';
@@ -73,10 +75,16 @@ export const ReportGroupedTableBlock: React.FC<ReportGroupedTableBlockProps> = (
     if (!hasColumns || !block.groupByField) {
       return (
         <div className="rounded border border-dashed border-gray-300 p-4 text-center text-sm text-gray-400">
-          <div className="mb-1 font-medium">{block.title || 'Grouped Table'}</div>
+          <div className="mb-1 font-medium">
+            {block.title || text({ zh: '分组表格', en: 'Grouped Table' })}
+          </div>
           <div>
-            {!block.groupByField ? 'Select a group-by field' : 'Configure columns'} in the property
-            panel
+            {!block.groupByField
+              ? text({
+                  zh: '请在属性面板中选择分组字段',
+                  en: 'Select a group-by field in the property panel',
+                })
+              : text({ zh: '请在属性面板中配置列', en: 'Configure columns in the property panel' })}
           </div>
         </div>
       );
@@ -137,7 +145,11 @@ export const ReportGroupedTableBlock: React.FC<ReportGroupedTableBlockProps> = (
                           className={`bg-gray-50 px-2 py-1 font-medium text-gray-600 ${cellBorder}`}
                           style={{ textAlign: col.align || 'left' }}
                         >
-                          {colIdx === 0 && !sc ? 'Subtotal' : sc ? `[${sc.aggregation}]` : ''}
+                          {colIdx === 0 && !sc
+                            ? text({ zh: '小计', en: 'Subtotal' })
+                            : sc
+                              ? `[${sc.aggregation}]`
+                              : ''}
                         </td>
                       );
                     })}
@@ -153,7 +165,11 @@ export const ReportGroupedTableBlock: React.FC<ReportGroupedTableBlockProps> = (
 
   // Runtime mode
   if (!hasColumns || !block.groupByField || data.length === 0) {
-    return <div className="py-4 text-center text-sm text-gray-500">No data available</div>;
+    return (
+      <div className="py-4 text-center text-sm text-gray-500">
+        {text({ zh: '暂无数据', en: 'No data available' })}
+      </div>
+    );
   }
 
   const groups = groupData(data, block.groupByField);
@@ -211,7 +227,9 @@ export const ReportGroupedTableBlock: React.FC<ReportGroupedTableBlockProps> = (
                         className={`bg-gray-50 px-3 py-1.5 font-medium ${cellBorder}`}
                         style={{ textAlign: col.align || 'right' }}
                       >
-                        {colIdx === 0 && !sc ? block.groupSubtotal?.label || 'Subtotal' : ''}
+                        {colIdx === 0 && !sc
+                          ? block.groupSubtotal?.label || text({ zh: '小计', en: 'Subtotal' })
+                          : ''}
                         {sc
                           ? formatValue(
                               computeAggregation(rows, sc.field, sc.aggregation),
@@ -235,7 +253,9 @@ export const ReportGroupedTableBlock: React.FC<ReportGroupedTableBlockProps> = (
                     className={`bg-gray-200 px-3 py-2 font-bold ${cellBorder}`}
                     style={{ textAlign: col.align || 'right' }}
                   >
-                    {colIdx === 0 && !sc ? block.grandTotal?.label || 'Grand Total' : ''}
+                    {colIdx === 0 && !sc
+                      ? block.grandTotal?.label || text({ zh: '总计', en: 'Grand Total' })
+                      : ''}
                     {sc
                       ? formatValue(
                           computeAggregation(data, sc.field, sc.aggregation),

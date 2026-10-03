@@ -103,7 +103,9 @@ async function openReportAndAddBand(page: Page, bandType: 'Page Header' | 'Page 
     .click();
   const canvas = page.getByTestId('report-canvas');
   await expect(
-    canvas.getByText(bandType === 'Page Header' ? 'Header' : 'Footer', { exact: true }),
+    canvas.getByText(bandType === 'Page Header' ? /^(页眉|Header)$/ : /^(页脚|Footer)$/, {
+      exact: true,
+    }),
   ).toBeVisible({
     timeout: 5000,
   });
@@ -1199,7 +1201,7 @@ test.describe('page-header/footer — BandEditor', () => {
   test('RPT-BD-02: Height input for header', async ({ page }) => {
     await openReportAndAddBand(page, 'Page Header');
     const panel = page.getByTestId('block-property-panel');
-    await expect(panel.locator('label', { hasText: /height/i })).toBeVisible();
+    await expect(panel.locator('label', { hasText: /高度|height/i })).toBeVisible();
     const heightInput = panel.locator('input[type="number"][min="5"]');
     await expect(heightInput).toBeVisible();
     await heightInput.fill('25');
@@ -1209,9 +1211,9 @@ test.describe('page-header/footer — BandEditor', () => {
   test('RPT-BD-03: Add Text element button adds element', async ({ page }) => {
     await openReportAndAddBand(page, 'Page Header');
     const panel = page.getByTestId('block-property-panel');
-    const addTextBtn = panel.getByRole('button', { name: /\+ Text/i });
+    const addTextBtn = panel.getByRole('button', { name: /\+ 文本|\+ Text/i });
     await expect(addTextBtn).toBeVisible();
-    const textLabels = panel.locator('span.uppercase', { hasText: 'text' });
+    const textLabels = panel.locator('span.uppercase', { hasText: /文本|text/i });
     const before = await textLabels.count();
     await addTextBtn.click();
     await expect(textLabels).toHaveCount(before + 1, { timeout: 3000 });
@@ -1220,7 +1222,7 @@ test.describe('page-header/footer — BandEditor', () => {
   test('RPT-BD-04: Add Page # element button', async ({ page }) => {
     await openReportAndAddBand(page, 'Page Header');
     const panel = page.getByTestId('block-property-panel');
-    const addPageBtn = panel.getByRole('button', { name: /\+ Page/i });
+    const addPageBtn = panel.getByRole('button', { name: /\+ 页码|\+ Page/i });
     await expect(addPageBtn).toBeVisible();
     await addPageBtn.click();
   });
@@ -1228,7 +1230,7 @@ test.describe('page-header/footer — BandEditor', () => {
   test('RPT-BD-05: Add Date element button', async ({ page }) => {
     await openReportAndAddBand(page, 'Page Header');
     const panel = page.getByTestId('block-property-panel');
-    const addDateBtn = panel.getByRole('button', { name: /\+ Date/i });
+    const addDateBtn = panel.getByRole('button', { name: /\+ 日期|\+ Date/i });
     await expect(addDateBtn).toBeVisible();
     await addDateBtn.click();
   });
@@ -1246,7 +1248,7 @@ test.describe('page-header/footer — BandEditor', () => {
   test('RPT-BD-07: Element font size input', async ({ page }) => {
     await openReportAndAddBand(page, 'Page Header');
     const panel = page.getByTestId('block-property-panel');
-    const fontSizeInput = panel.locator('input[type="number"][title*="Font size"]');
+    const fontSizeInput = panel.getByTitle(/字号（磅）|Font size \(pt\)/);
     await expect(fontSizeInput.first()).toBeVisible();
   });
 

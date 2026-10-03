@@ -2,6 +2,7 @@
  * ReportRichTextBlock — static text block for report descriptions/notes
  */
 
+import { useSmartText } from '~/utils/i18n';
 import React from 'react';
 import type { RichTextBlock } from '../types';
 
@@ -11,6 +12,7 @@ interface ReportRichTextBlockProps {
 }
 
 export const ReportRichTextBlock: React.FC<ReportRichTextBlockProps> = ({ block, mode }) => {
+  const text = useSmartText();
   const style: React.CSSProperties = {
     textAlign: block.align || 'left',
     fontSize: block.style?.fontSize ? `${block.style.fontSize}pt` : undefined,
@@ -21,7 +23,7 @@ export const ReportRichTextBlock: React.FC<ReportRichTextBlockProps> = ({ block,
   if (!block.content && mode === 'design') {
     return (
       <div className="rounded border border-dashed border-gray-300 p-4 text-center text-sm text-gray-400">
-        Click to add text content
+        {text({ zh: '点击添加文本内容', en: 'Click to add text content' })}
       </div>
     );
   }

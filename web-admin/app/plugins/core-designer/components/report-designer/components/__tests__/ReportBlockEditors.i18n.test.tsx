@@ -9,6 +9,12 @@ import { StatCardBlockEditor } from '../StatCardBlockEditor';
 import { GroupedTableBlockEditor } from '../GroupedTableBlockEditor';
 import { BarcodeBlockEditor } from '../BarcodeBlockEditor';
 import { WatermarkBlockEditor } from '../WatermarkBlockEditor';
+import { BandEditor } from '../BandEditor';
+import { ParametersBar } from '../ParametersBar';
+import { ReportBandBlock } from '../../blocks/ReportBandBlock';
+import { ReportChartBlock } from '../../blocks/ReportChartBlock';
+import { ReportRichTextBlock } from '../../blocks/ReportRichTextBlock';
+import { ReportGroupedTableBlock } from '../../blocks/ReportGroupedTableBlock';
 
 afterEach(cleanup);
 
@@ -27,6 +33,106 @@ function CurrentTitle() {
 for (const locale of ['zh-CN', 'en-US']) {
   describe(`report editors with real ${locale} context`, () => {
     const zh = locale === 'zh-CN';
+    it('localizes band controls and preserves the date element identifier', () => {
+      const change = vi.fn();
+      const band = { height: 20, elements: [{ type: 'text' as const, content: 'User Header' }] };
+      render(localized(locale, <BandEditor band={band} onChange={change} />));
+      expect(screen.getByLabelText(zh ? '高度（毫米）' : 'Height (mm)')).toBeTruthy();
+      expect(screen.getByPlaceholderText(zh ? '文本内容' : 'Text content')).toHaveValue(
+        'User Header',
+      );
+      fireEvent.click(screen.getByRole('button', { name: zh ? '+ 日期' : '+ Date' }));
+      expect(change).toHaveBeenCalledExactlyOnceWith({
+        ...band,
+        elements: [...band.elements, { type: 'date', align: 'left' }],
+      });
+    });
+    it('localizes runtime parameter chrome without changing payload keys or caller labels', () => {
+      const change = vi.fn(),
+        apply = vi.fn();
+      render(
+        localized(
+          locale,
+          <ParametersBar
+            parameters={[
+              {
+                name: 'region',
+                label: 'Region',
+                type: 'select',
+                options: [{ value: 'north', label: 'User North' }],
+              },
+              { name: 'period', label: 'Period', type: 'date-range' },
+            ]}
+            values={{ region: 'north' }}
+            onChange={change}
+            onApply={apply}
+            disabled
+          />,
+        ),
+      );
+      expect(screen.getByRole('option', { name: zh ? '全部' : 'All' })).toHaveValue('');
+      expect(screen.getByRole('option', { name: 'User North' })).toHaveValue('north');
+      fireEvent.change(screen.getByLabelText(zh ? 'Period 开始' : 'Period start'), {
+        target: { value: '2026-10-01' },
+      });
+      expect(change).toHaveBeenCalledExactlyOnceWith({
+        region: 'north',
+        period_start: '2026-10-01',
+      });
+      expect(screen.getByRole('button', { name: zh ? '应用' : 'Apply' })).toBeDisabled();
+      expect(apply).not.toHaveBeenCalled();
+    });
+    it('localizes design instructions while retaining user content', () => {
+      render(
+        localized(
+          locale,
+          <>
+            <ReportBandBlock
+              band={{
+                height: 20,
+                elements: [{ type: 'text', content: 'Custom Header' }, { type: 'page-number' }],
+              }}
+              mode="design"
+              position="header"
+            />
+            <ReportRichTextBlock
+              block={{ id: 'r', blockType: 'rich-text', content: '' }}
+              mode="design"
+            />
+            <ReportChartBlock
+              block={{
+                id: 'c',
+                blockType: 'chart',
+                dataSource: '',
+                chartType: 'bar',
+                categoryField: '',
+                valueField: '',
+              }}
+              mode="design"
+            />
+            <ReportGroupedTableBlock
+              block={{
+                id: 'g',
+                blockType: 'grouped-table',
+                dataSource: '',
+                groupByField: '',
+                columns: [],
+              }}
+              mode="design"
+            />
+          </>,
+        ),
+      );
+      for (const label of [
+        zh ? '页眉' : 'Header',
+        zh ? '第 1 页' : 'Page 1',
+        zh ? '点击添加文本内容' : 'Click to add text content',
+        zh ? '请配置分类和数值字段' : 'Configure category and value fields',
+        zh ? '请在属性面板中选择分组字段' : 'Select a group-by field in the property panel',
+        'Custom Header',
+      ])
+        expect(screen.getByText(label, { exact: true })).toBeTruthy();
+    });
     it('initializes the report title in the active language', () => {
       render(localized(locale, <CurrentTitle />));
       expect(screen.getByRole('status').textContent).toBe(zh ? '未命名报表' : 'Untitled Report');

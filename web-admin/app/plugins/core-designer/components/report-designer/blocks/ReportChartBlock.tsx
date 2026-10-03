@@ -4,6 +4,7 @@
  * Uses pure SVG for PDF compatibility with openhtmltopdf
  */
 
+import { useSmartText } from '~/utils/i18n';
 import React from 'react';
 import type { ChartBlock } from '../types';
 
@@ -215,6 +216,7 @@ const PieChart: React.FC<{
 };
 
 export const ReportChartBlock: React.FC<ReportChartBlockProps> = ({ block, mode, data = [] }) => {
+  const text = useSmartText();
   const colors = block.colors?.length ? block.colors : DEFAULT_COLORS;
   const w = block.width || 400;
   const h = block.height || 240;
@@ -223,8 +225,8 @@ export const ReportChartBlock: React.FC<ReportChartBlockProps> = ({ block, mode,
   if (mode === 'design' && (!block.categoryField || !block.valueField)) {
     return (
       <div className="rounded border border-dashed border-gray-300 p-4 text-center text-sm text-gray-400">
-        <div className="mb-1 font-medium">{block.title || 'Chart'}</div>
-        <div>Configure category and value fields</div>
+        <div className="mb-1 font-medium">{block.title || text({ zh: '图表', en: 'Chart' })}</div>
+        <div>{text({ zh: '请配置分类和数值字段', en: 'Configure category and value fields' })}</div>
       </div>
     );
   }
@@ -235,7 +237,11 @@ export const ReportChartBlock: React.FC<ReportChartBlockProps> = ({ block, mode,
       : aggregateData(data, block.categoryField, block.valueField, block.aggregation || 'sum');
 
   if (items.length === 0) {
-    return <div className="py-4 text-center text-sm text-gray-500">No data</div>;
+    return (
+      <div className="py-4 text-center text-sm text-gray-500">
+        {text({ zh: '暂无数据', en: 'No data' })}
+      </div>
+    );
   }
 
   return (

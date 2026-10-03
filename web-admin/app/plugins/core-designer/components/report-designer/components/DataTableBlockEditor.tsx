@@ -69,7 +69,9 @@ export const DataTableBlockEditor: React.FC<DataTableBlockEditorProps> = ({
     <div className="space-y-5">
       {/* Title */}
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">{text({ zh: '标题', en: 'Title' })}</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          {text({ zh: '标题', en: 'Title' })}
+        </label>
         <input
           type="text"
           value={block.title || ''}
@@ -81,7 +83,9 @@ export const DataTableBlockEditor: React.FC<DataTableBlockEditorProps> = ({
 
       {/* Data Source */}
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">{text({ zh: '数据源', en: 'Data Source' })}</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          {text({ zh: '数据源', en: 'Data Source' })}
+        </label>
         <select
           value={block.dataSource}
           onChange={(e) => onChange({ dataSource: e.target.value })}
@@ -165,7 +169,9 @@ export const DataTableBlockEditor: React.FC<DataTableBlockEditorProps> = ({
 
       {/* Columns */}
       <div>
-        <label className="mb-2 block text-sm font-medium text-gray-700">{text({ zh: '列', en: 'Columns' })}</label>
+        <label className="mb-2 block text-sm font-medium text-gray-700">
+          {text({ zh: '列', en: 'Columns' })}
+        </label>
         <div className="space-y-2">
           {block.columns.map((col, idx) => (
             <div key={idx} className="flex items-center gap-2 rounded bg-gray-50 p-2">
@@ -252,7 +258,9 @@ export const DataTableBlockEditor: React.FC<DataTableBlockEditorProps> = ({
 
       {/* Summary row */}
       <div className="space-y-2 border-t border-gray-200 pt-4">
-        <h3 className="text-xs font-medium tracking-wider text-gray-500 uppercase">{text({ zh: '汇总行', en: 'Summary Row' })}</h3>
+        <h3 className="text-xs font-medium tracking-wider text-gray-500 uppercase">
+          {text({ zh: '汇总行', en: 'Summary Row' })}
+        </h3>
         <label className="flex cursor-pointer items-center gap-2">
           <input
             type="checkbox"
@@ -261,14 +269,16 @@ export const DataTableBlockEditor: React.FC<DataTableBlockEditorProps> = ({
               onChange({
                 summary: {
                   enabled: e.target.checked,
-                  label: block.summary?.label || 'Total',
+                  label: block.summary?.label || text({ zh: '合计', en: 'Total' }),
                   columns: block.summary?.columns || [],
                 },
               })
             }
             className="h-4 w-4 rounded border-gray-300 text-blue-600"
           />
-          <span className="text-sm text-gray-700">{text({ zh: '显示汇总行', en: 'Show summary row' })}</span>
+          <span className="text-sm text-gray-700">
+            {text({ zh: '显示汇总行', en: 'Show summary row' })}
+          </span>
         </label>
         {block.summary?.enabled && (
           <div className="space-y-1 pl-6">
@@ -352,7 +362,9 @@ export const DataTableBlockEditor: React.FC<DataTableBlockEditorProps> = ({
 
       {/* Table style */}
       <div className="space-y-2 border-t border-gray-200 pt-4">
-        <h3 className="text-xs font-medium tracking-wider text-gray-500 uppercase">{text({ zh: '表格样式', en: 'Table Style' })}</h3>
+        <h3 className="text-xs font-medium tracking-wider text-gray-500 uppercase">
+          {text({ zh: '表格样式', en: 'Table Style' })}
+        </h3>
         <label className="flex cursor-pointer items-center gap-2">
           <input
             type="checkbox"
@@ -360,7 +372,9 @@ export const DataTableBlockEditor: React.FC<DataTableBlockEditorProps> = ({
             onChange={(e) => onChange({ showHeader: e.target.checked })}
             className="h-4 w-4 rounded border-gray-300 text-blue-600"
           />
-          <span className="text-sm text-gray-700">{text({ zh: '显示表头', en: 'Show header row' })}</span>
+          <span className="text-sm text-gray-700">
+            {text({ zh: '显示表头', en: 'Show header row' })}
+          </span>
         </label>
         <label className="flex cursor-pointer items-center gap-2">
           <input
@@ -369,7 +383,9 @@ export const DataTableBlockEditor: React.FC<DataTableBlockEditorProps> = ({
             onChange={(e) => onChange({ stripe: e.target.checked })}
             className="h-4 w-4 rounded border-gray-300 text-blue-600"
           />
-          <span className="text-sm text-gray-700">{text({ zh: '交替行底色', en: 'Striped rows' })}</span>
+          <span className="text-sm text-gray-700">
+            {text({ zh: '交替行底色', en: 'Striped rows' })}
+          </span>
         </label>
         <label className="flex cursor-pointer items-center gap-2">
           <input
@@ -378,7 +394,9 @@ export const DataTableBlockEditor: React.FC<DataTableBlockEditorProps> = ({
             onChange={(e) => onChange({ border: e.target.checked })}
             className="h-4 w-4 rounded border-gray-300 text-blue-600"
           />
-          <span className="text-sm text-gray-700">{text({ zh: '单元格边框', en: 'Cell borders' })}</span>
+          <span className="text-sm text-gray-700">
+            {text({ zh: '单元格边框', en: 'Cell borders' })}
+          </span>
         </label>
       </div>
     </div>
