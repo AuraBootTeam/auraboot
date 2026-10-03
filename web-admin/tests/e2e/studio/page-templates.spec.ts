@@ -279,7 +279,29 @@ test.describe('Page Templates', () => {
     expect(persistedBody.code).toBe('0');
     expect(persistedBody.data).toMatchObject({ pid: createdPid, name: newName, pageKey: newKey,
       modelCode: 'page_schema', schemaVersion: 4, blocks: [{ id: 'blk1', blockType: 'table', config: {} }] });
-    await page.screenshot({ path: testInfo.outputPath('T4-result.png'), fullPage: true });
+    for (const width of [1280, 900, 1920]) {
+      await page.setViewportSize({ width, height: 720 });
+      const summary = page.getByTestId('list-designer-summary');
+      await summary.scrollIntoViewIfNeeded();
+      await expect.poll(async () => summary.evaluate(element => {
+        const main = element.closest('main')!;
+        const heading = element.querySelector('h1')!;
+        return main.scrollWidth <= main.clientWidth + 1
+          && heading.getBoundingClientRect().width >= 180
+          && Array.from(element.querySelectorAll('.grid > div')).every(card =>
+            card.getBoundingClientRect().right <= element.getBoundingClientRect().right + 1);
+      })).toBe(true);
+      const preview = page.getByTestId('list-preview-pane');
+      await expect(preview).toBeVisible();
+      const mainBox = await page.getByTestId('list-config-main').boundingBox();
+      const previewBox = await preview.boundingBox();
+      expect(mainBox).not.toBeNull();
+      expect(previewBox).not.toBeNull();
+      if (width === 1920) expect(previewBox!.x).toBeGreaterThan(mainBox!.x);
+      else expect(previewBox!.y).toBeGreaterThanOrEqual(mainBox!.y + mainBox!.height - 1);
+      await page.screenshot({ path: testInfo.outputPath(width === 1280 ? 'T4-result.png' : `T4-result-${width}.png`), fullPage: true });
+    }
+    await page.setViewportSize({ width: 1280, height: 720 });
   });
 
   // -------------------------------------------------------------------------

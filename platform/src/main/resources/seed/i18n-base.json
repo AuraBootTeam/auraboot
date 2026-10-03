@@ -3939,5 +3939,155 @@
     "en-US": "Invalid source evidence. The form was not changed. Please retry.",
     "ja-JP": "原文の根拠が無効です。フォームは変更されていません。再試行してください。",
     "ko-KR": "원문 근거가 유효하지 않습니다. 양식은 변경되지 않았습니다. 다시 시도해 주세요."
+  },
+  {
+    "key": "list_designer.columns",
+    "zh-CN": "列结构",
+    "en-US": "Columns"
+  },
+  {
+    "key": "list_designer.columns_description",
+    "zh-CN": "决定表格的主信息密度与阅读顺序",
+    "en-US": "Choose the main table information and reading order"
+  },
+  {
+    "key": "list_designer.filters",
+    "zh-CN": "筛选器",
+    "en-US": "Filters"
+  },
+  {
+    "key": "list_designer.filters_description",
+    "zh-CN": "保留高频筛选，避免把查询条件堆满页头",
+    "en-US": "Keep frequent filters without crowding the page header"
+  },
+  {
+    "key": "list_designer.toolbar",
+    "zh-CN": "工具栏",
+    "en-US": "Toolbar"
+  },
+  {
+    "key": "list_designer.toolbar_description",
+    "zh-CN": "整理主操作，突出创建、导出与自定义动作",
+    "en-US": "Organize primary actions, including create, export and custom actions"
+  },
+  {
+    "key": "list_designer.behavior",
+    "zh-CN": "交互行为",
+    "en-US": "Behavior"
+  },
+  {
+    "key": "list_designer.behavior_description",
+    "zh-CN": "控制排序、分页、多视图等列表运行规则",
+    "en-US": "Configure sorting, pagination and multiple views"
+  },
+  {
+    "key": "list_designer.heading",
+    "zh-CN": "列表设计",
+    "en-US": "List designer"
+  },
+  {
+    "key": "list_designer.intro_heading",
+    "zh-CN": "先定义信息层级，再补充筛选与动作",
+    "en-US": "Define information first, then add filters and actions"
+  },
+  {
+    "key": "list_designer.intro_description",
+    "zh-CN": "把列表拆成结构、入口操作和运行行为三个层次。",
+    "en-US": "Configure the list structure, entry actions and runtime behavior."
+  },
+  {
+    "key": "list_designer.selected_columns",
+    "zh-CN": "已选列",
+    "en-US": "Selected columns"
+  },
+  {
+    "key": "list_designer.filter_count",
+    "zh-CN": "筛选项",
+    "en-US": "Filters"
+  },
+  {
+    "key": "list_designer.action_count",
+    "zh-CN": "工具动作",
+    "en-US": "Actions"
+  },
+  {
+    "key": "list_designer.editing",
+    "zh-CN": "当前编辑",
+    "en-US": "Editing"
+  },
+  {
+    "key": "list_designer.stage",
+    "zh-CN": "当前阶段：{label}",
+    "en-US": "Current stage: {label}"
+  },
+  {
+    "key": "list_designer.preview_sync",
+    "zh-CN": "预览同步更新",
+    "en-US": "Preview updates as you edit"
+  },
+  {
+    "key": "list_designer.capability_failure",
+    "zh-CN": "模型能力读取失败",
+    "en-US": "Unable to load model capabilities"
+  },
+  {
+    "key": "list_designer.capability_warning",
+    "zh-CN": "暂时无法读取模型能力，可继续编辑当前页面配置。请检查绑定的模型。",
+    "en-US": "Model capabilities are unavailable. You can continue editing this page configuration. Check the bound model."
+  },
+  {
+    "key": "list_designer.validation",
+    "zh-CN": "配置校验",
+    "en-US": "Configuration validation"
+  },
+  {
+    "key": "list_designer.conflict",
+    "zh-CN": "配置存在冲突",
+    "en-US": "Configuration conflicts"
+  },
+  {
+    "key": "list_designer.validation_hint",
+    "zh-CN": "配置提示",
+    "en-US": "Configuration notes"
+  },
+  {
+    "key": "list_designer.workspace",
+    "zh-CN": "工作区",
+    "en-US": "Workspace"
+  },
+  {
+    "key": "list_designer.workspace_description",
+    "zh-CN": "在这里完成当前阶段配置，预览会同步反映结构变化。",
+    "en-US": "Configure the current stage here. The preview reflects structural changes."
+  },
+  {
+    "key": "list_designer.preview",
+    "zh-CN": "实时预览",
+    "en-US": "Live preview"
+  },
+  {
+    "key": "list_designer.preview_heading",
+    "zh-CN": "列表结构预览",
+    "en-US": "List structure preview"
+  },
+  {
+    "key": "list_designer.preview_description",
+    "zh-CN": "用来检查筛选密度、操作优先级和表格可读性，不必频繁打开整页预览。",
+    "en-US": "Check filter density, action priority and table readability without opening the full-page preview."
+  },
+  {
+    "key": "list_designer.preview_columns",
+    "zh-CN": "列 {count}",
+    "en-US": "Columns {count}"
+  },
+  {
+    "key": "list_designer.preview_filters",
+    "zh-CN": "筛选 {count}",
+    "en-US": "Filters {count}"
+  },
+  {
+    "key": "list_designer.preview_actions",
+    "zh-CN": "动作 {count}",
+    "en-US": "Actions {count}"
   }
 ]

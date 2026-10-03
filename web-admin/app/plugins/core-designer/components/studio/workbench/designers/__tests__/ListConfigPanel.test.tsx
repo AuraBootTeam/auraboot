@@ -1,11 +1,25 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import React from 'react';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { parse } from 'yaml';
+import { I18nProvider } from '~/contexts/I18nContext';
+import { render as renderRaw, screen, waitFor, fireEvent, cleanup } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ListConfigPanel } from '../ListConfigPanel';
 import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import type {
   ModelCapabilities,
   UseModelCapabilitiesResult,
 } from '~/shared/hooks/useModelCapabilities';
+
+
+function dictionary(locale: string) {
+  return parse(readFileSync(path.resolve(process.cwd(), `../platform/src/main/resources/i18n.${locale}.yaml`), 'utf8'));
+}
+function render(element: React.ReactNode) {
+  return renderRaw(<I18nProvider initialLocale="zh-CN" initialData={dictionary('zh-CN')}>{element}</I18nProvider>);
+}
+afterEach(() => cleanup());
 
 const capabilitiesData = {
   list: true,
@@ -47,12 +61,43 @@ function baseSchema(): PageSchema {
 
 describe('ListConfigPanel', () => {
   beforeEach(() => {
+    localStorage.clear();
     mockedCapabilitiesResult = {
       data: capabilitiesData,
       loading: false,
       error: undefined,
       refetch: vi.fn(),
     };
+  });
+
+  it.each([
+    ['en-US', 'List designer', 'Live preview', 'Columns', 'Filters', 'Toolbar', 'Behavior', 'Unable to load model capabilities'],
+    ['zh-CN', '列表设计', '实时预览', '列结构', '筛选器', '工具栏', '交互行为', '模型能力读取失败'],
+  ])('localizes the shell and all tab transitions in %s without changing stored block types', async (locale, heading, preview, columns, filters, toolbar, behavior, failure) => {
+    mockedCapabilitiesResult = { data: undefined, loading: false, error: new Error('Unavailable'), refetch: vi.fn() };
+    const catalog = JSON.parse(readFileSync(path.resolve(process.cwd(), '../platform/src/main/resources/seed/i18n-base.json'), 'utf8'));
+    const entries = catalog.filter((entry: { key: string }) => entry.key.startsWith('list_designer.'));
+    expect(entries.length).toBeGreaterThan(20);
+    for (const entry of entries) {
+      expect(dictionary(locale).list_designer[entry.key.split('.')[1]]).toBe(entry[locale]);
+    }
+    const onChange = vi.fn();
+    renderRaw(<I18nProvider initialLocale={locale} initialData={dictionary(locale)}>
+      <ListConfigPanel schema={baseSchema()} onSchemaChange={onChange} />
+    </I18nProvider>);
+    expect(screen.getByText(heading)).toBeInTheDocument();
+    expect(screen.getByText(preview)).toBeInTheDocument();
+    expect(screen.getByTestId('capability-fallback-banner')).toHaveTextContent(failure);
+    for (const [id, label] of [['columns', columns], ['filters', filters], ['toolbar', toolbar], ['behavior', behavior]]) {
+      const button = screen.getByTestId(`list-tab-${id}`);
+      expect(button).toHaveTextContent(label);
+      fireEvent.click(button);
+      expect(await screen.findByTestId(`${id}-tab`)).toBeInTheDocument();
+      expect(screen.getByTestId('list-designer-summary').querySelector('h1')).toHaveTextContent(label);
+    }
+    await waitFor(() => expect(onChange).toHaveBeenCalled());
+    expect(onChange.mock.calls.at(-1)?.[0].blocks.map((block: { blockType: string }) => block.blockType))
+      .toEqual(['filters', 'toolbar', 'table']);
   });
 
   it('renders with an empty schema and shows the columns tab by default', async () => {
