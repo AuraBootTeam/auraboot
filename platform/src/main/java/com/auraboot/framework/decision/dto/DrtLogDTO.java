@@ -19,6 +19,7 @@ public class DrtLogDTO {
     private String traceId;
     private String correlationId;
     private String decisionCode;
+    private String decisionName;
     private Integer decisionVersion;
     private Integer selectedVersion;
     private String rolloutPolicyPid;

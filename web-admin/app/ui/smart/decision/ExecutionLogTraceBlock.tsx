@@ -81,12 +81,6 @@ const ROLLOUT_LABELS: Record<string, string> = {
   BASELINE: '基线',
   CANDIDATE: '候选',
 };
-const DECISION_LABELS: Record<string, string> = {
-  complaint_sla_deadline: '请假审批 SLA 截止时间',
-  sla_deadline: 'SLA 截止时间',
-  approval_routing: '请假审批分派',
-  leave_request_automation: '请假申请自动化策略',
-};
 const ACTION_TYPE_LABELS: Record<string, string> = {
   NOTIFY: '发送站内通知',
   SEND_SMS: '发送短信',
@@ -498,22 +492,18 @@ function rolloutDisplay(log: DecisionLogRecord): string {
   return `${rolloutLabel(log.rolloutArm)}${log.rolloutBucket != null ? ` #${log.rolloutBucket}` : ''}`;
 }
 
-function decisionLabel(value: unknown): string {
-  const code = display(value);
-  if (code === '-') return code;
-  return DECISION_LABELS[code] ?? code;
+function decisionLabel(log: DecisionLogRecord): string {
+  return log.decisionName?.trim() || '—';
 }
 
-function decisionTitle(value: unknown): string {
-  const code = display(value);
-  const label = decisionLabel(value);
-  return label === code ? code : `${label} (${code})`;
+function decisionTitle(log: DecisionLogRecord): string {
+  return decisionLabel(log);
 }
 
-function decisionCell(value: unknown) {
+function decisionCell(log: DecisionLogRecord) {
   return (
-    <div className="elta-cell-text" title={decisionTitle(value)}>
-      {decisionLabel(value)}
+    <div className="elta-cell-text" title={decisionTitle(log)}>
+      {decisionLabel(log)}
     </div>
   );
 }
@@ -1402,7 +1392,7 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
               {records.map((log) => (
                 <tr key={log.pid ?? log.traceId} data-testid={`elta-row-${log.pid ?? log.traceId}`}>
                   <td className="mono">{cellText(log.traceId, 'mono')}</td>
-                  <td>{decisionCell(log.decisionCode)}</td>
+                  <td>{decisionCell(log)}</td>
                   <td>{cellText(log.selectedVersion ?? log.decisionVersion)}</td>
                   <td>
                     <span
@@ -1477,8 +1467,8 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
               </button>
             </div>
             <div className="elta-drawer-meta">
-              <span title={decisionTitle(selectedLog.decisionCode)}>
-                决策 {decisionLabel(selectedLog.decisionCode)}
+              <span title={decisionTitle(selectedLog)}>
+                决策 {decisionLabel(selectedLog)}
               </span>
               <span title={display(selectedLog.status)}>
                 状态 {decisionStatusLabel(selectedLog.status)}
@@ -1552,8 +1542,8 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                   data-testid={`elta-chain-node-${log.pid ?? index}`}
                 >
                   <div className="elta-chain-main">
-                    <strong title={decisionTitle(log.decisionCode)}>
-                      {decisionLabel(log.decisionCode)}
+                    <strong title={decisionTitle(log)}>
+                      {decisionLabel(log)}
                     </strong>
                     <span
                       className={`elta-status elta-status-${log.status ?? 'UNKNOWN'}`}
