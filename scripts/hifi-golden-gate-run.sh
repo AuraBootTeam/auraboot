@@ -73,6 +73,9 @@ if [ -z "$WORKSPACE" ] || [ ! -f "$WORKSPACE/dev.sh" ]; then
   [ -n "${main_wt:-}" ] && [ -f "$(dirname "$main_wt")/dev.sh" ] && WORKSPACE="$(dirname "$main_wt")"
 fi
 
+source "$REPO_ROOT/scripts/lib/workspace-control.sh"
+aura_bind_workspace_control "$WORKSPACE" || exit 2
+
 slot_in_use() {
   local s="$1"
   if [ -n "$WORKSPACE" ]; then
