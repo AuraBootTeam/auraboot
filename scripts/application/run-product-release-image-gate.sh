@@ -439,6 +439,9 @@ env "${COMMON_ENV[@]}" "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" verify >"$ARTI
 env "${PRODUCT_PNPM_ENV[@]}" pnpm --dir "$PRODUCT_ROOT" install --frozen-lockfile --ignore-scripts >"$ARTIFACTS/logs/pnpm-install.log" 2>&1 || fatal 'product test dependencies unavailable'
 # Run the locked browser on a supported distribution while retaining the host
 # test driver and fixture processes. Source and dependencies are read-only.
+# A private network namespace keeps Chromium independent of unrelated host
+# interface churn. Playwright exposes only the driver loopback network, preserving
+# application URLs and Origin without sharing the host network namespace.
 docker pull "$PLAYWRIGHT_IMAGE" >"$ARTIFACTS/logs/playwright-image.log" 2>&1 \
   || fatal 'locked Playwright image is unavailable'
 PLAYWRIGHT_PACKAGE="$(cd "$PRODUCT_ROOT" && node -p "require.resolve('playwright/package.json', {paths:[require.resolve('@playwright/test')]})")"
@@ -446,19 +449,24 @@ PLAYWRIGHT_VERSION="$(node -p "require(process.argv[1]).version" "$PLAYWRIGHT_PA
 PLAYWRIGHT_IMAGE_VERSION="$(docker run --rm --entrypoint node "$PLAYWRIGHT_IMAGE" -p "JSON.parse(require('fs').readFileSync('/ms-playwright/.docker-info','utf8')).driverVersion")"
 [[ "$PLAYWRIGHT_VERSION" == "$PLAYWRIGHT_IMAGE_VERSION" ]] || fatal 'locked Playwright and image versions differ'
 PLAYWRIGHT_PORT="$(node -e "const s=require('net').createServer();s.listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})")"
-docker run -d --name "$PLAYWRIGHT_CONTAINER" --label "aura.ci.job=$AURA_CI_JOB_ID" --init --network host --shm-size=2g \
+docker run -d --name "$PLAYWRIGHT_CONTAINER" --label "aura.ci.job=$AURA_CI_JOB_ID" --init --network "$NETWORK" --shm-size=2g \
+  -p "127.0.0.1:$PLAYWRIGHT_PORT:$PLAYWRIGHT_PORT" \
   --user "$(id -u):$(id -g)" -e HOME=/tmp -e PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
   -v "$PRODUCT_ROOT:$PRODUCT_ROOT:ro" -w "$PRODUCT_ROOT" --entrypoint node \
   "$PLAYWRIGHT_IMAGE" "${PLAYWRIGHT_PACKAGE%/package.json}/cli.js" \
-  run-server --host 127.0.0.1 --port "$PLAYWRIGHT_PORT" \
+  run-server --host 0.0.0.0 --port "$PLAYWRIGHT_PORT" \
   >"$ARTIFACTS/logs/playwright-server-start.log" 2>&1 || fatal 'Playwright server failed to start'
 export PW_TEST_CONNECT_WS_ENDPOINT="ws://127.0.0.1:$PLAYWRIGHT_PORT/"
+export PW_TEST_CONNECT_EXPOSE_NETWORK='<loopback>'
+[[ "$(docker inspect --format '{{.HostConfig.NetworkMode}}' "$PLAYWRIGHT_CONTAINER")" == "$NETWORK" ]] \
+  || fatal 'Playwright browser is outside the isolated release network'
 for attempt in $(seq 1 30); do
   if curl -fsS "http://127.0.0.1:$PLAYWRIGHT_PORT/" >/dev/null; then break; fi
   [[ "$attempt" -lt 30 ]] || fatal 'Playwright server never became ready'
   sleep 1
 done
-printf 'version=%s\nimage=%s\nendpoint=%s\n' "$PLAYWRIGHT_VERSION" "$PLAYWRIGHT_IMAGE" "$PW_TEST_CONNECT_WS_ENDPOINT" \
+printf 'version=%s\nimage=%s\nendpoint=%s\nnetwork=%s\nexpose_network=%s\n' \
+  "$PLAYWRIGHT_VERSION" "$PLAYWRIGHT_IMAGE" "$PW_TEST_CONNECT_WS_ENDPOINT" "$NETWORK" "$PW_TEST_CONNECT_EXPOSE_NETWORK" \
   >"$ARTIFACTS/playwright-environment.txt"
 env "${COMMON_ENV[@]}" PLAYWRIGHT_BASE_URL="http://127.0.0.1:$WEB_PORT" PW_SKIP_WEBSERVER=1 \
   PW_ARTIFACT_DIR="$ARTIFACTS/e2e/artifacts" PW_RESULTS_JSON="$ARTIFACTS/e2e/results.json" \
