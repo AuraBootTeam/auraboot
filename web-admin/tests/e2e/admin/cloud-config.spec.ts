@@ -81,6 +81,7 @@ function cardFor(page: Page, pid: string | undefined) {
 
 test.describe.serial('Cloud Config Management', () => {
   let createdPid: string | undefined;
+  let incompletePid: string | undefined;
 
   test('CC-001: should load page with correct structure @smoke', async ({ page }, info) => {
     await gotoCloudConfig(page);
@@ -215,6 +216,7 @@ test.describe.serial('Cloud Config Management', () => {
     );
     expect(incomplete).toHaveLength(1);
     const pid = incomplete[0].pid;
+    incompletePid = pid;
     await page.reload();
     const response = page.waitForResponse(
       (r) =>
@@ -227,7 +229,9 @@ test.describe.serial('Cloud Config Management', () => {
       status: 'error',
       message: 'Missing required fields: secretId, secretKey, appId',
     });
-    await expect(page.getByText('连接测试失败', { exact: true })).toBeVisible();
+    const errorToast = page.getByRole('alert').filter({ hasText: '连接测试失败' });
+    await expect(errorToast).toBeVisible();
+    await expect(errorToast).toHaveCSS('opacity', '1');
     await page.screenshot({ path: info.outputPath('CC-008-connection-error.png'), fullPage: true });
   });
   test('CC-007: should delete a configuration', async ({ page }, info) => {
@@ -245,6 +249,7 @@ test.describe.serial('Cloud Config Management', () => {
     await expect(card).toHaveCount(0);
     expect((await platformConfigs(page)).some((c) => c.pid === pid)).toBe(false);
     await page.reload();
+    await expect(cardFor(page, incompletePid)).toBeVisible();
     await expect(card).toHaveCount(0);
     await page.screenshot({ path: info.outputPath('CC-007-deleted.png'), fullPage: true });
   });
