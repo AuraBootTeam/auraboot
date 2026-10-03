@@ -3939,5 +3939,12 @@
     "en-US": "Invalid source evidence. The form was not changed. Please retry.",
     "ja-JP": "原文の根拠が無効です。フォームは変更されていません。再試行してください。",
     "ko-KR": "원문 근거가 유효하지 않습니다. 양식은 변경되지 않았습니다. 다시 시도해 주세요."
+  },
+  {
+    "key": "common.loadDataFailed",
+    "zh-CN": "加载数据失败",
+    "en-US": "Failed to load data",
+    "ja-JP": "データの読み込みに失敗しました",
+    "ko-KR": "데이터를 불러오지 못했습니다"
   }
 ]
