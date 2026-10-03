@@ -20,6 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationContext;
+import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -29,6 +30,7 @@ import java.util.Optional;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.never;
@@ -102,6 +104,34 @@ class FieldMapPhaseTest {
         verify(cascadeDeleteExecutor).executeCascadeDeletePhase(ctx.getExecConfig(), 1L, ctx.getRequest());
         verify(fieldMapExecutor).executeImplicitFieldMapPhase(
                 ctx.getExecConfig(), ctx.getPayload(), 1L, ctx.getRequest(), ctx.getCommand());
+    }
+
+    @Test
+    void resolvesDeclaredHandlerNameWhenItDiffersFromBeanName() {
+        CommandPipelineContext ctx = handlerContext("admin:delete_member", "delete");
+        TenantMemberCommandHandler handler = new TenantMemberCommandHandler(
+                mock(TenantMemberApplicationService.class), mock(OrgEmployeeService.class));
+        when(applicationContext.getBean("tenantMemberCommandHandler", CommandHandler.class))
+                .thenThrow(new NoSuchBeanDefinitionException("tenantMemberCommandHandler"));
+        when(applicationContext.getBeansOfType(CommandHandler.class)).thenReturn(Map.of("differentBeanName", handler));
+
+        phase().execute(ctx);
+
+        verifyNoInteractions(fieldMapExecutor, cascadeDeleteExecutor);
+        assertThat(ctx.getFieldMapResults()).isEmpty();
+    }
+
+    @Test
+    void missingDeclaredHandlerFailsBeforeAnyGenericDelete() {
+        CommandPipelineContext ctx = handlerContext("admin:delete_member", "delete");
+        ctx.getRulesByType().get("handler").getFirst().setHandlerClass("missingHandler");
+        when(applicationContext.getBean("missingHandler", CommandHandler.class))
+                .thenThrow(new NoSuchBeanDefinitionException("missingHandler"));
+        when(applicationContext.getBeansOfType(CommandHandler.class)).thenReturn(Map.of());
+
+        assertThatThrownBy(() -> phase().execute(ctx)).isInstanceOf(NoSuchBeanDefinitionException.class);
+
+        verifyNoInteractions(fieldMapExecutor, cascadeDeleteExecutor);
     }
 
     private FieldMapPhase phase() {
