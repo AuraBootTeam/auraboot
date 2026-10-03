@@ -61,15 +61,23 @@ GRADLE_DISTRIBUTION_HASH="690y85m0j9nfaub7xoiayko8a"
 GRADLE_WRAPPER_HOME="${AURA_CI_GRADLE_WRAPPER_HOME:-${GRADLE_USER_HOME:-$HOME/.gradle}/wrapper}"
 GRADLE_DISTRIBUTION_DIR="$GRADLE_WRAPPER_HOME/dists/gradle-${GRADLE_VERSION}-bin/$GRADLE_DISTRIBUTION_HASH"
 
+DB_SAMPLE_PID=""
+DB_SAMPLE_STOP="$ARTIFACTS/db-sampling.stop"
+
 cleanup() {
   local status=$?
+  if [[ -n "$DB_SAMPLE_PID" ]]; then
+    : > "$DB_SAMPLE_STOP"
+    wait "$DB_SAMPLE_PID" || true
+  fi
   rm -f "$CREDENTIAL_ARTIFACT"
   if docker inspect "$APP" >/dev/null 2>&1; then
     docker logs "$APP" > "$ARTIFACTS/logs/app.log" 2>&1 || true
   fi
   # Verification environments require owner-authorized deletion. Stop only this
   # job's containers and retain their network, data and image for inspection.
-  docker stop "$APP" "$REDIS" "$PG" >/dev/null 2>&1 || true
+  docker stop --timeout 120 "$APP" "$REDIS" "$PG" >/dev/null 2>&1 || true
+  docker logs "$PG" > "$ARTIFACTS/logs/postgres.log" 2>&1 || true
   printf 'retained verification environment: app=%s postgres=%s redis=%s network=%s image=%s\n' \
     "$APP" "$PG" "$REDIS" "$NET" "$IMAGE" > "$ARTIFACTS/retained-environment.txt"
   if [[ -d "$LOCK_DIR" && "$(cat "$LOCK_DIR/owner" 2>/dev/null || true)" == "$LOCK_TOKEN" ]]; then
@@ -147,7 +155,8 @@ create_isolated_release_network "$NET" "$ARTIFACTS/network-allocation.tsv" \
   || fatal "isolated release network unavailable"
 docker run -d --name "$PG" --network "$NET" -e POSTGRES_USER=auraboot \
   -e POSTGRES_PASSWORD=open_platform_ci -e POSTGRES_DB=open_platform_ci "$PGVECTOR_IMAGE" \
-  -c shared_preload_libraries=pg_stat_statements >/dev/null
+  -c shared_preload_libraries=pg_stat_statements \
+  -c track_io_timing=on -c track_wal_io_timing=on >/dev/null
 docker run -d --name "$REDIS" --network "$NET" "$REDIS_IMAGE" >/dev/null
 for attempt in $(seq 1 30); do
   docker exec "$PG" pg_isready -U auraboot -d open_platform_ci >/dev/null 2>&1 && break
@@ -203,6 +212,12 @@ CLIENT_SECRET="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))
 docker exec "$PG" psql -U auraboot -d open_platform_ci -v ON_ERROR_STOP=1 -c \
   "CREATE EXTENSION IF NOT EXISTS pg_stat_statements; SELECT pg_stat_statements_reset();" \
   > "$ARTIFACTS/logs/sql-profile-init.log" 2>&1 || fatal "SQL profiling initialization failed"
+docker exec -i "$PG" psql -U auraboot -d open_platform_ci -At -v ON_ERROR_STOP=1 \
+  < "$SCRIPT_DIR/ci/open-platform-db-io.sql" > "$ARTIFACTS/db-io-before.json" \
+  2> "$ARTIFACTS/logs/db-io-before.log" || fatal "initial database I/O diagnostics failed"
+bash "$SCRIPT_DIR/ci/sample-open-platform-db.sh" "$PG" "$DB_SAMPLE_STOP" \
+  > "$ARTIFACTS/db-waits.jsonl" 2> "$ARTIFACTS/logs/db-waits.log" &
+DB_SAMPLE_PID=$!
 cat /proc/loadavg > "$ARTIFACTS/host-load-before.txt"
 
 info "running production-threshold k6 profile inside the CI network"
@@ -216,6 +231,12 @@ docker run --rm --user "$RUNNER_UID:$RUNNER_GID" --network "$NET" \
 # Preserve normalized statements (no bound credential values) on both red and
 # green exits. Diagnostic collection must not hide an already-failed SLO.
 PROFILE_RC=0
+: > "$DB_SAMPLE_STOP"
+wait "$DB_SAMPLE_PID" || PROFILE_RC=$?
+DB_SAMPLE_PID=""
+docker exec -i "$PG" psql -U auraboot -d open_platform_ci -At -v ON_ERROR_STOP=1 \
+  < "$SCRIPT_DIR/ci/open-platform-db-io.sql" > "$ARTIFACTS/db-io-after.json" \
+  2> "$ARTIFACTS/logs/db-io-after.log" || PROFILE_RC=$?
 docker exec -i "$PG" psql -U auraboot -d open_platform_ci -v ON_ERROR_STOP=1 -At \
   < "$SCRIPT_DIR/ci/open-platform-sql-profile.sql" \
   > "$ARTIFACTS/sql-profile.json" 2> "$ARTIFACTS/logs/sql-profile.log" || PROFILE_RC=$?

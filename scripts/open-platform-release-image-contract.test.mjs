@@ -48,4 +48,12 @@ assert.ok(gate.indexOf('pg_stat_statements_reset()') < gate.indexOf('SLO_RC=0'))
 assert.ok(gate.indexOf('sql-profile.json') < gate.indexOf('[[ "$SLO_RC" == 0 ]]'));
 assert.match(gate, /PROFILE_RC=0/);
 assert.match(gate, /container-resources.jsonl/);
+assert.match(gate, /track_wal_io_timing=on/);
+assert.match(gate, /docker stop --timeout 120/);
+assert.ok(gate.indexOf('db-io-before.json') < gate.indexOf('SLO_RC=0'));
+assert.ok(gate.indexOf('db-io-after.json') < gate.indexOf('[[ "$SLO_RC" == 0 ]]'));
+assert.match(gate, /wait "\$DB_SAMPLE_PID" \|\| PROFILE_RC=\$\?/);
+const sampler = fs.readFileSync(new URL('./ci/sample-open-platform-db.sh', import.meta.url), 'utf8');
+assert.match(sampler, /pg_blocking_pids/);
+assert.doesNotMatch(sampler, /SELECT \*|usename|query,|query AS|client_addr/);
 console.log('open-platform release-image contract: PASS');
