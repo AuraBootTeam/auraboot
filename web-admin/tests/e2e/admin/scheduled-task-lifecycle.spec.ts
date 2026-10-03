@@ -86,8 +86,9 @@ async function navigateToScheduledTaskList(page: Page): Promise<void> {
   if (!(await leaf.isVisible()))
     await nav.getByRole('button', { name: /系统管理|System Administration/ }).click();
   await expect(leaf).toBeVisible();
-  const response = page.waitForResponse((r) =>
-    new URL(r.url()).pathname === '/api/dynamic/scheduled_task/list');
+  const response = page.waitForResponse(
+    (r) => new URL(r.url()).pathname === '/api/dynamic/scheduled_task/list',
+  );
   await leaf.click();
   const result = await response;
   expect(result.status()).toBe(200);
@@ -100,13 +101,14 @@ async function navigateToScheduledTaskDetail(page: Page, pid: string): Promise<v
   await navigateToScheduledTaskList(page);
   const row = await findRowInPaginatedList(page, TASK_NAME, 12_000);
   await expect(row).toBeVisible();
-  const response = page.waitForResponse((r) =>
-    new URL(r.url()).pathname === `/api/dynamic/scheduled_task/${pid}`);
+  const response = page.waitForResponse(
+    (r) => new URL(r.url()).pathname === `/api/dynamic/scheduled_task/${pid}`,
+  );
   await row.getByTestId('row-action-detail').click();
   const result = await response;
   expect(result.status()).toBe(200);
   expect(String((await result.json()).code)).toBe('0');
-  await expect(page.getByText(/基本信息|Basic Information/).first()).toBeVisible();
+  await expect(page.getByText(/任务摘要|Task summary/).first()).toBeVisible();
 }
 
 // ---------------------------------------------------------------------------
@@ -130,7 +132,11 @@ async function selectTaskType(page: Page, label: RegExp): Promise<void> {
   if (await option.isVisible({ timeout: 3_000 }).catch(() => false)) {
     await option.click();
   } else {
-    await page.locator('[role="option"]').first().click().catch(() => null);
+    await page
+      .locator('[role="option"]')
+      .first()
+      .click()
+      .catch(() => null);
   }
   await page
     .locator('[role="listbox"]')
@@ -196,9 +202,7 @@ test.describe('Scheduled Task — Full Lifecycle (P0)', () => {
   // =========================================================================
   // ST-002 [D4 + D5]: create scheduled task via full UI form
   // =========================================================================
-  test('ST-002 @critical — Create scheduled task via full form → row appears', async ({
-    page,
-  }) => {
+  test('ST-002 @critical — Create scheduled task via full form → row appears', async ({ page }) => {
     await navigateToScheduledTaskList(page);
 
     const createBtn = page
@@ -230,10 +234,9 @@ test.describe('Scheduled Task — Full Lifecycle (P0)', () => {
       )
       .first();
     await expect(cronInput, 'cron_expression should render as text input').toBeVisible();
-    expect(
-      await cronInput.getAttribute('type'),
-      'cron input must not be a date picker',
-    ).not.toBe('date');
+    expect(await cronInput.getAttribute('type'), 'cron input must not be a date picker').not.toBe(
+      'date',
+    );
 
     // [D4] Fill ALL fields
     await fillField(page, 'name', TASK_NAME);
@@ -330,10 +333,7 @@ test.describe('Scheduled Task — Full Lifecycle (P0)', () => {
 
     // [PRODUCT-GAP] Empty sub-table drops <thead>; column headers absent.
     // Per task discipline, do NOT weaken to placeholder-text visibility.
-    test.fixme(
-      true,
-      'ST-003: empty execution_logs sub-table drops <thead>, DSL column headers not rendered',
-    );
+
     const triggerTypeHeader = page
       .locator('thead th, [role="columnheader"]')
       .filter({ hasText: /触发方式|Trigger Type/i })
@@ -415,8 +415,12 @@ test.describe('Scheduled Task — Full Lifecycle (P0)', () => {
       : submitBtnAlt;
     await btn.click();
 
-    await expect(page.getByTestId('form-field-name').getByText('请填写名称', { exact: true })).toBeVisible();
-    await expect(page.getByTestId('form-field-handler_bean').getByText('请填写处理器 Bean', { exact: true })).toBeVisible();
+    await expect(
+      page.getByTestId('form-field-name').getByText('请填写名称', { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByTestId('form-field-handler_bean').getByText('请填写处理器 Bean', { exact: true }),
+    ).toBeVisible();
     await expect(page.getByTestId('form-field-name').locator('input')).toHaveValue('');
   });
 
@@ -424,67 +428,39 @@ test.describe('Scheduled Task — Full Lifecycle (P0)', () => {
   // ST-006 [D10]: invalid cron rejected via Command pipeline
   // =========================================================================
   test('ST-006 — Negative: invalid cron rejected by create command', async ({ page }) => {
-    test.fixme(
-      true,
-      'product backend gap: admin:create_scheduled_task accepts arbitrary strings as cron_expression (e.g. "every-minute-please" returns code=0). No cron parser validation on the server. Backlog G-7: validate cron_expression with org.springframework.scheduling.support.CronExpression.parse() in the create/update handler before persisting.',
+    await navigateToScheduledTaskList(page);
+    await page.getByTestId('toolbar-btn-create').click();
+    await waitForFormReady(page, 15_000);
+    await fillField(page, 'name', `${UID}-invalid-cron`);
+    await selectTaskType(page, /Cron|表达式/i);
+    await fillField(page, 'cron_expression', CRON_INVALID);
+    await fillField(page, 'handler_bean', HANDLER_BEAN);
+    const response = (await clickSubmit(page)) as import('@playwright/test').Response;
+    const result = await response.json();
+    expect(String(result.code)).not.toBe('0');
+    await expect(page.getByRole('alert').filter({ hasText: /cron/i })).toBeVisible();
+    await expect(page.getByTestId('form-field-name').locator('input')).toHaveValue(
+      `${UID}-invalid-cron`,
     );
-    const invalidResult = await executeCommandViaApi(
-      page,
-      'admin:create_scheduled_task',
-      {
-        name: `${UID}-invalid-cron`,
-        description: 'invalid cron probe',
-        task_type: 'cron',
-        cron_expression: CRON_INVALID,
-        handler_bean: HANDLER_BEAN,
-        handler_method: HANDLER_METHOD,
-        params: '{}',
-        max_retries: 0,
-        timeout_ms: 1000,
-        enabled: true,
-      },
-      undefined,
-      'create',
-      { allowHttpError: true },
-    );
-    expect(
-      invalidResult.code !== '0',
-      `invalid cron "${CRON_INVALID}" must be rejected (got code=${invalidResult.code})`,
-    ).toBeTruthy();
   });
 
   // =========================================================================
   // ST-007 [D11]: duplicate name rejected via Command pipeline
   // =========================================================================
   test('ST-007 — Negative: duplicate name rejected by create command', async ({ page }) => {
-    test.fixme(
-      true,
-      'product backend gap: scheduled_task model has no unique constraint on name (or admin:create_scheduled_task does not enforce one). Creating two tasks with the same name returns code=0 both times. Backlog G-8: add @unique on scheduled_task.name in models.json + UNIQUE INDEX in schema.sql, OR enforce duplicate-name check in the create handler.',
-    );
     expect(taskPid, 'ST-007 requires ST-002 to have created TASK_NAME').toBeTruthy();
-    const dupResult = await executeCommandViaApi(
-      page,
-      'admin:create_scheduled_task',
-      {
-        name: TASK_NAME_DUP,
-        description: 'duplicate probe',
-        task_type: 'cron',
-        cron_expression: CRON_INITIAL,
-        handler_bean: HANDLER_BEAN,
-        handler_method: HANDLER_METHOD,
-        params: '{}',
-        max_retries: 0,
-        timeout_ms: 1000,
-        enabled: true,
-      },
-      undefined,
-      'create',
-      { allowHttpError: true },
-    );
-    expect(
-      dupResult.code !== '0',
-      `duplicate name "${TASK_NAME_DUP}" must be rejected (got code=${dupResult.code})`,
-    ).toBeTruthy();
+    await navigateToScheduledTaskList(page);
+    await page.getByTestId('toolbar-btn-create').click();
+    await waitForFormReady(page, 15_000);
+    await fillField(page, 'name', TASK_NAME_DUP);
+    await selectTaskType(page, /Cron|表达式/i);
+    await fillField(page, 'cron_expression', CRON_INITIAL);
+    await fillField(page, 'handler_bean', HANDLER_BEAN);
+    const response = (await clickSubmit(page)) as import('@playwright/test').Response;
+    const result = await response.json();
+    expect(String(result.code)).not.toBe('0');
+    await expect(page.getByRole('alert').filter({ hasText: /name|名称/i })).toBeVisible();
+    await expect(page.getByTestId('form-field-name').locator('input')).toHaveValue(TASK_NAME_DUP);
   });
 
   // =========================================================================
@@ -494,26 +470,16 @@ test.describe('Scheduled Task — Full Lifecycle (P0)', () => {
     await navigateToScheduledTaskList(page);
     await ensureFilterFormOpen(page);
 
-    const searchInput = page
-      .locator(
-        '[data-testid="search-input"], [data-testid="table-search-input"], input[placeholder*="搜索"], input[placeholder*="Search"]',
-      )
-      .first();
-    if (!(await searchInput.isVisible({ timeout: 3_000 }).catch(() => false))) {
-      test.fixme(
-        true,
-        'product gap: scheduled_task list page has no keyword search input — DSL has no toolbar search slot',
-      );
-      return;
-    }
-    const listResponsePromise = page.waitForResponse(
-      (r) => r.url().includes('scheduled_task') && r.url().includes('list') && r.status() === 200,
-      { timeout: 10_000 },
+    const searchInput = page.locator('[data-authoring-node-id="name"] input');
+    await expect(searchInput).toBeVisible();
+    const response = page.waitForResponse(
+      (r) => new URL(r.url()).pathname === '/api/dynamic/scheduled_task/list',
     );
-    await searchInput.click();
-    await searchInput.fill(UID.slice(0, 10));
-    await searchInput.press('Enter');
-    await listResponsePromise.catch(() => null);
+    await searchInput.fill(TASK_NAME);
+    await page.getByTestId('filter-search').click();
+    const result = await response;
+    expect(result.status()).toBe(200);
+    expect(String((await result.json()).code)).toBe('0');
 
     const rows = page.locator('tbody tr');
     const rowCount = await rows.count();
@@ -530,10 +496,6 @@ test.describe('Scheduled Task — Full Lifecycle (P0)', () => {
   test('ST-009 @critical — Delete scheduled task via row action with confirmation', async ({
     page,
   }) => {
-    test.fixme(
-      true,
-      'product gap: delete row-action fires admin:delete_scheduled_task and confirmation completes, but the deleted row remains visible in the list (12 retries, still "visible"). Either (a) delete command silently fails for this model, (b) softDelete is enabled in models.json but list query does not filter deleted_flag, or (c) list cache is not invalidated post-delete. Backlog G-9: investigate why scheduled_task delete does not remove the row.',
-    );
     // Create a dedicated record to delete (don't delete taskPid — used by ST-010 trace)
     const seed = await executeCommandViaApi(
       page,
@@ -568,7 +530,7 @@ test.describe('Scheduled Task — Full Lifecycle (P0)', () => {
         .waitFor({ state: 'visible', timeout: 3_000 })
         .catch(() => null);
     }
-    const deleteBtn = page.locator('[data-testid="row-action-delete"]').first();
+    const deleteBtn = row.getByTestId('row-action-delete');
     await deleteBtn.waitFor({ state: 'visible', timeout: 5_000 });
 
     const commandResponsePromise = page.waitForResponse(
@@ -592,17 +554,15 @@ test.describe('Scheduled Task — Full Lifecycle (P0)', () => {
       ? okBtn
       : okBtnAlt;
     await confirmBtn.click();
-    await commandResponsePromise;
+    const deletion = await commandResponsePromise;
+    expect(String((await deletion.json()).code)).toBe('0');
 
     // Row should disappear from list
-    await page
-      .waitForResponse(
-        (r) => r.url().includes('scheduled_task') && r.url().includes('list') && r.status() === 200,
-        { timeout: 10_000 },
-      )
-      .catch(() => null);
     const deletedRow = page.locator('tbody tr', { hasText: TASK_NAME_DELETE }).first();
-    await expect(deletedRow).not.toBeVisible({ timeout: 8_000 });
+    await expect(deletedRow).toHaveCount(0);
+    await page.reload();
+    await expect(page.locator('table').first()).toBeVisible();
+    await expect(page.locator('tbody tr', { hasText: TASK_NAME_DELETE })).toHaveCount(0);
   });
 
   // =========================================================================
@@ -612,16 +572,16 @@ test.describe('Scheduled Task — Full Lifecycle (P0)', () => {
     page,
   }) => {
     expect(taskPid, 'ST-010 requires taskPid from ST-002').toBeTruthy();
-    // Read via DynamicController (not the assumed REST endpoint)
+    await navigateToScheduledTaskDetail(page, taskPid);
+    await expect(page.getByText(CRON_EDITED, { exact: true })).toBeVisible();
+    // Read via DynamicController after the real detail entry.
     const resp = await page.request.get(`/api/dynamic/scheduled_task/${taskPid}`);
     expect(resp.ok(), 'dynamic get-by-pid should succeed').toBeTruthy();
     const body = await resp.json().catch(() => ({}));
     const data = body?.data ?? {};
     expect(data?.name).toBe(TASK_NAME);
     // After ST-004 cron was edited
-    expect(String(data?.cronExpression ?? data?.cron_expression ?? '')).toMatch(
-      /0 30 3 \* \* \?/,
-    );
+    expect(String(data?.cronExpression ?? data?.cron_expression ?? '')).toMatch(/0 30 3 \* \* \?/);
   });
 
   // =========================================================================

@@ -112,6 +112,8 @@ describe('SubTableViewer', () => {
     );
 
     await expect(screen.findByTestId('subtable-empty-state')).resolves.toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: '节点' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: '状态' })).toBeInTheDocument();
     expect(screen.getByTestId('subtable-toolbar-actions')).toBeInTheDocument();
     expect(screen.getByTestId('mock-subtable-toolbar')).toBeInTheDocument();
     const renderedBlock = toolbarRendererMock.mock.calls.at(-1)?.[0]?.block;
