@@ -15,6 +15,14 @@ class PostgresDdlDialectTest {
     private final PostgresDdlDialect dialect = new PostgresDdlDialect();
 
     @Test
+    void preservesExistingPluginFileIdentifiersAsStringColumns() {
+        assertEquals("VARCHAR(32)", dialect.mapDataType(FieldDefinition.builder()
+                .code("source_file").dataType("file").maxLength(32).build()));
+        assertEquals("'01M40R49GX8JJAH5KGNKGP5FJX'",
+                dialect.formatDefaultValue("01M40R49GX8JJAH5KGNKGP5FJX", "file"));
+    }
+
+    @Test
     void preservesConfiguredLengthForEnumAndReferenceCodes() {
         for (String type : new String[]{"enum", "reference"}) {
             assertEquals("VARCHAR(32)", dialect.mapDataType(FieldDefinition.builder()

@@ -18,6 +18,20 @@ class PostgresDdlCodeTypesIT {
     private final PostgresDdlDialect dialect = new PostgresDdlDialect();
 
     @Test
+    void legacyPluginFileIdentifiersRoundTripAsStrings() throws Exception {
+        try (Connection connection = connection(); var statement = connection.createStatement()) {
+            statement.execute("CREATE TEMP TABLE ddl_file_code (code " + type("file", 32)
+                    + " DEFAULT " + dialect.formatDefaultValue("01M40R49GX8JJAH5KGNKGP5FJX", "file") + ")");
+            statement.executeUpdate("INSERT INTO ddl_file_code DEFAULT VALUES");
+            try (var result = statement.executeQuery("SELECT code, pg_typeof(code)::text FROM ddl_file_code")) {
+                assertTrue(result.next());
+                assertEquals("01M40R49GX8JJAH5KGNKGP5FJX", result.getString(1));
+                assertEquals("character varying", result.getString(2));
+            }
+        }
+    }
+
+    @Test
     void enumAndReferenceDefaultsRoundTripThroughPostgres() throws Exception {
         try (Connection connection = connection(); var statement = connection.createStatement()) {
             String enumType = type("enum", 32);

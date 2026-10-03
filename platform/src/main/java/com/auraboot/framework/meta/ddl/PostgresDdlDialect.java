@@ -21,6 +21,7 @@ public class PostgresDdlDialect implements DdlDialect {
             case "string":
             case "enum":
             case "reference":
+            case "file":
                 Integer maxLength = field.getMaxLength();
                 if (maxLength != null && maxLength > 0) {
                     return getVarcharType(maxLength);
@@ -75,6 +76,7 @@ public class PostgresDdlDialect implements DdlDialect {
 
         if ("string".equalsIgnoreCase(dataType) || "text".equalsIgnoreCase(dataType)
                 || "enum".equalsIgnoreCase(dataType) || "reference".equalsIgnoreCase(dataType)
+                || "file".equalsIgnoreCase(dataType)
                 || "json".equalsIgnoreCase(dataType) || "jsonb".equalsIgnoreCase(dataType)) {
             return "'" + value.replace("'", "''") + "'";
         }
