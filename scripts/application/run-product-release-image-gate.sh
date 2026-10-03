@@ -49,6 +49,11 @@ wait_for_final_postgres() {
 : "${AURA_PRODUCT_LIFECYCLE:?AURA_PRODUCT_LIFECYCLE is required}"
 : "${AURA_RELEASE_SCREENSHOT_IDS:?AURA_RELEASE_SCREENSHOT_IDS is required}"
 EXPECT_RELEASE_REGISTRATION="${AURA_PRODUCT_EXPECTS_RELEASE_REGISTRATION:-0}"
+KEEP_RUNTIME="${AURA_RELEASE_KEEP_RUNTIME:-1}"
+case "$KEEP_RUNTIME" in
+  0|1) ;;
+  *) fatal 'AURA_RELEASE_KEEP_RUNTIME must be 0 or 1' ;;
+esac
 case "$EXPECT_RELEASE_REGISTRATION" in
   0|1) ;;
   *) fatal 'AURA_PRODUCT_EXPECTS_RELEASE_REGISTRATION must be 0 or 1' ;;
@@ -197,6 +202,17 @@ cleanup() {
   fi
   if docker inspect "$PLAYWRIGHT_CONTAINER" >/dev/null 2>&1; then
     docker logs "$PLAYWRIGHT_CONTAINER" >"$ARTIFACTS/logs/playwright-server.log" 2>&1 || true
+  fi
+  if [[ "$KEEP_RUNTIME" == 1 ]]; then
+    # Verification environments remain available for owner review after either verdict.
+    {
+      printf 'job=%s\nexit_code=%s\nnetwork=%s\nwork_root=%s\n' "$AURA_CI_JOB_ID" "$status" "$NETWORK" "$WORK_ROOT"
+      printf 'app_container=%s\npostgres_container=%s\n' "$APP_CONTAINER" "$PG_CONTAINER"
+      [[ -z "${WEB_PORT:-}" ]] || printf 'web_url=http://127.0.0.1:%s\n' "$WEB_PORT"
+      [[ -z "${APP_PORT:-}" ]] || printf 'backend_url=http://127.0.0.1:%s\n' "$APP_PORT"
+    } >"$ARTIFACTS/runtime-retained.txt"
+    info "retained verification environment: $ARTIFACTS/runtime-retained.txt"
+    exit "$status"
   fi
   if [[ -x "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" ]]; then
     AURA_APP_ARTIFACT_ROOT="$PRODUCT_RELEASE" AURA_STATE_ROOT="$STATE_ROOT" \
