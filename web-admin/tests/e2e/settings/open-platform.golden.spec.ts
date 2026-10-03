@@ -268,7 +268,8 @@ test.describe('Open Platform golden journey', () => {
         has: authorizedReference.locator('[data-path="/api/open/v1/whoami"]'),
       });
       await whoamiOperation.locator('.opblock-summary-control').click();
-      await whoamiOperation.getByRole('button', { name: 'Try it out', exact: true }).click();
+      // The product enables Try it out by default in its Swagger configuration.
+      await expect(whoamiOperation.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible();
       const browserWhoamiPromise = authorizedReference.waitForResponse(
         (response) => response.request().method() === 'GET'
           && response.url() === `${WEB_BASE_URL}/api/open/v1/whoami`,
