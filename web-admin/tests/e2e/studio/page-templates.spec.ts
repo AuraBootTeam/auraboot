@@ -281,6 +281,14 @@ test.describe('Page Templates', () => {
       modelCode: 'page_schema', schemaVersion: 4, blocks: [{ id: 'blk1', blockType: 'table', config: {} }] });
     for (const width of [1280, 900, 1920]) {
       await page.setViewportSize({ width, height: 720 });
+      await expect.poll(() => page.evaluate(() => {
+        const sidebar = document.getElementById('app-sidebar');
+        const settled = !sidebar || !sidebar.getAnimations().some(animation => animation.playState === 'running');
+        const sidebarBox = sidebar?.getBoundingClientRect();
+        const expectedPosition = !sidebarBox || (innerWidth < 1024 ? sidebarBox.right <= 1 : sidebarBox.left >= -1);
+        return settled && expectedPosition && scrollX === 0
+          && document.documentElement.scrollWidth <= innerWidth + 1;
+      })).toBe(true);
       const summary = page.getByTestId('list-designer-summary');
       await summary.scrollIntoViewIfNeeded();
       await expect.poll(async () => summary.evaluate(element => {
@@ -302,12 +310,25 @@ test.describe('Page Templates', () => {
       await page.screenshot({ path: testInfo.outputPath(width === 1280 ? 'T4-result.png' : `T4-result-${width}.png`), fullPage: true });
     }
     await page.setViewportSize({ width: 1280, height: 720 });
+    for (const [locale, label, heading] of [['en-US', 'English', 'Columns'], ['zh-CN', '简体中文', '列结构']]) {
+      await page.getByTestId('lang-toggle').getByRole('button').click();
+      await page.getByTestId('lang-dropdown').getByRole('button', { name: label }).click();
+      await expect(page.getByTestId('list-designer-summary').getByRole('heading', { name: heading, exact: true })).toBeVisible();
+      await page.reload();
+      await expect(page.getByTestId('list-designer-summary').getByRole('heading', { name: heading, exact: true })).toBeVisible();
+      const dictionary = await page.request.get(`/api/i18n/${locale}`);
+      expect(dictionary.ok()).toBe(true);
+      const dictionaryBody = await dictionary.json();
+      const translations = dictionaryBody.data ?? dictionaryBody;
+      expect(translations['list_designer.columns'] ?? translations.list_designer?.columns).toBe(heading);
+      await page.screenshot({ path: testInfo.outputPath(`T4-language-${locale}.png`), fullPage: true });
+    }
   });
 
   // -------------------------------------------------------------------------
   // T5: Duplicate through the actual DSL page-manager menu and row command
   // -------------------------------------------------------------------------
-  test('T5 - duplicate a legacy tree through the page configuration menu', async ({ page }, testInfo) => {
+  test('T5 - duplicate a legacy tree through the page configuration menu', async ({ page, browser }, testInfo) => {
     const dataSources = { main: { model: 'page_schema' } };
     const source = await createTestPage(page, {
       schemaVersion: 3,
@@ -365,6 +386,90 @@ test.describe('Page Templates', () => {
     expect(originalBody.code).toBe('0');
     expect(originalBody.data).toMatchObject({ pid: source.pid, schemaVersion: 3, dataSources });
     await page.screenshot({ path: testInfo.outputPath('duplicate-page-menu.png'), fullPage: true });
+
+    // Provision an authenticated member in this tenant with only base read access.
+    const roleCode = uniqueId('copy_denied').replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 60);
+    const role = await page.request.post('/api/roles', { data: {
+      code: roleCode, name: 'Page copy restricted member', type: 'custom', status: 'ACTIVE',
+    } });
+    expect(role.ok()).toBe(true);
+    const roleBody = await role.json();
+    expect(roleBody.code).toBe('0');
+    expect(roleBody.data.pid).toBeTruthy();
+    const grants = await page.request.put(`/api/permission/capabilities?rolePid=${roleBody.data.pid}`, {
+      data: ['sys.cap.member_base'],
+    });
+    expect(grants.ok()).toBe(true);
+    const grantBody = await grants.json();
+    expect(grantBody.code).toBe('0');
+    const grantedCodes = grantBody.data.flatMap((group: { capabilities: Array<{ code: string; granted: boolean }> }) =>
+      group.capabilities.filter(capability => capability.granted).map(capability => capability.code));
+    expect(grantedCodes).toEqual(['sys.cap.member_base']);
+    const email = `${roleCode}@e2e.local`;
+    const password = `Copy!${roleCode}9a`;
+    const provision = await page.request.post('/api/admin/users', { data: {
+      email, displayName: 'Page copy restricted member', initialPassword: password,
+      roleCodes: [roleCode], roleAssignmentMode: 'EXPLICIT', sendInviteEmail: false,
+    } });
+    expect(provision.ok()).toBe(true);
+    const provisionBody = await provision.json();
+    expect(provisionBody.code).toBe('0');
+    expect(provisionBody.data.assignedRoles).toEqual([roleCode]);
+    expect(provisionBody.data.mustChangePassword).toBe(false);
+    expect(provisionBody.data.userPid).toBeTruthy();
+    const copies = async () => {
+      const response = await page.request.get('/api/pages', { params: { keyword: source.name, pageSize: 100 } });
+      expect(response.ok()).toBe(true);
+      const body = await response.json();
+      expect(body.code).toBe('0');
+      expect(body.data.records.map((record: { pid: string }) => record.pid)).toEqual(expect.arrayContaining([source.pid, copiedPid]));
+      return body.data.records.map((record: { pid: string }) => record.pid).sort();
+    };
+    const beforeDenied = await copies();
+    const restricted = await browser.newContext({ baseURL: BASE_URL, locale: 'zh-CN',
+      storageState: { cookies: [], origins: [] }, extraHTTPHeaders: { Referer: `${BASE_URL}/` } });
+    try {
+      const restrictedPage = await restricted.newPage();
+      await restrictedPage.goto('/login');
+      await restrictedPage.locator('#identifier').fill(email);
+      await restrictedPage.locator('#password').fill(password);
+      await restrictedPage.locator('form').filter({ has: restrictedPage.locator('#identifier') }).locator('button[type="submit"]').click();
+      await expect(restrictedPage).not.toHaveURL(/\/login(?:\?|$)/);
+      if (restrictedPage.url().includes('/tenant-selection')) {
+        await restrictedPage.getByTestId(`space-business-${provisionBody.data.tenantId}`).click();
+        await expect(restrictedPage).not.toHaveURL(/tenant-selection/);
+      }
+      const profile = await restrictedPage.request.get('/api/user/profile');
+      expect(profile.ok()).toBe(true);
+      const profileBody = await profile.json();
+      expect(profileBody.code).toBe('0');
+      expect(profileBody.data).toMatchObject({ pid: provisionBody.data.userPid, email });
+      await restrictedPage.goto('/');
+      const menus = await restrictedPage.request.get('/api/menu/user');
+      expect(menus.ok()).toBe(true);
+      const menusBody = await menus.json();
+      expect(menusBody.code).toBe('0');
+      expect(JSON.stringify(menusBody.data)).not.toContain('page_schema_mgmt');
+      await expect(restrictedPage.locator('a[href="/p/page_schema"]')).toHaveCount(0);
+      const denied = await restrictedPage.request.post('/api/meta/commands/execute/pgm:duplicate_page_schema', {
+        data: { targetRecordPid: source.pid },
+      });
+      expect(denied.status()).toBe(403);
+      const deniedBody = await denied.json();
+      expect(deniedBody.code).not.toBe('0');
+      expect(deniedBody.message).toMatch(/permission|forbidden|denied|权限/i);
+      expect(deniedBody.message).not.toMatch(/entitlement/i);
+      expect(await copies()).toEqual(beforeDenied);
+      const unchanged = await page.request.get(`/api/pages/${source.pid}`);
+      expect(unchanged.ok()).toBe(true);
+      const unchangedBody = await unchanged.json();
+      expect(unchangedBody.code).toBe('0');
+      expect(unchangedBody.data).toEqual(originalBody.data);
+      await restrictedPage.screenshot({ path: testInfo.outputPath('T5-denied.png'), fullPage: true });
+    } finally {
+      await restricted.close();
+    }
+
   });
 
   // -------------------------------------------------------------------------
