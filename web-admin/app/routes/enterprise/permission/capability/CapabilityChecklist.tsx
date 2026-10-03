@@ -116,7 +116,7 @@ export default function CapabilityChecklist({
                         !revokedPartial.includes(cap.code) && (
                           <span
                             data-testid={`capability-partial-${cap.code}`}
-                            className="text-xs text-amber-700"
+                            className="text-text-2 text-xs"
                           >
                             {t(
                               'admin.permission.capability.partialActionsV2',

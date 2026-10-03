@@ -371,7 +371,11 @@ describe('CapabilityRoleEditor', () => {
       grantedCodes: ['qo.quote.update'],
       revokedCodes: ['qo.quote.read'],
       preservedCodes: ['legacy.read'],
-      resultingCapabilities: affected,
+      resultingCapabilities: [
+        ...affected,
+        { ...cap('qo.cap.quote_edit', '编辑报价', false), authorizationState: 'partial' },
+        { ...cap('qo.cap.quote_view', '查看报价', false), authorizationState: 'none' },
+      ],
       relatedMenus: ['Quotes', 'Organization'],
     });
     render(<CapabilityRoleEditor rolePid="role-pid-5" />);
@@ -381,8 +385,14 @@ describe('CapabilityRoleEditor', () => {
     const impact = (await screen.findByTestId('capability-preview-impact')) as HTMLDetailsElement;
     expect(impact.open).toBe(false);
     expect(screen.getByText('Grant: 编辑报价')).toBeTruthy();
-    expect(impact.querySelector('summary')).toHaveTextContent('affected capabilities (30)');
-    expect(screen.getByTestId('capability-preview-resulting').children).toHaveLength(30);
+    expect(impact.querySelector('summary')).toHaveTextContent('affected capabilities (32)');
+    expect(screen.getByTestId('capability-preview-resulting').querySelectorAll('li')).toHaveLength(32);
+    const secondary = screen.getByTestId('capability-preview-partial-impact') as HTMLDetailsElement;
+    expect(secondary.open).toBe(false);
+    expect(secondary.querySelectorAll('li')).toHaveLength(30);
+    expect(secondary).not.toHaveTextContent('编辑报价');
+    expect(secondary).not.toHaveTextContent('查看报价');
+    expect(secondary).toHaveTextContent('Partial actions do not grant the complete capability');
     expect(impact).toHaveTextContent('Shared capability 29');
     expect(impact).toHaveTextContent('Quotes / Organization');
     expect(impact).toHaveTextContent('Revoke: 查看报价单');

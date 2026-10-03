@@ -103,6 +103,29 @@ test('① capability save persists through the browser on a snowflake-id role', 
   await impact.locator('summary').click();
   await expect(impact).toHaveJSProperty('open', true);
   await expect(page.getByTestId('capability-preview-resulting')).toBeVisible();
+  const secondaryCapabilities = previewBody.data.resultingCapabilities.filter(
+    (affected: { code: string; authorizationState: string }) =>
+      affected.authorizationState === 'partial' && affected.code !== cap!.code,
+  );
+  const partialImpact = page.getByTestId('capability-preview-partial-impact');
+  await expect(partialImpact).toHaveCount(secondaryCapabilities.length > 0 ? 1 : 0);
+  if (secondaryCapabilities.length > 0) {
+    await expect(partialImpact).toHaveJSProperty('open', false);
+    await expect(partialImpact.locator('li')).toHaveCount(secondaryCapabilities.length);
+    for (const affected of secondaryCapabilities) {
+      await expect(page.getByTestId(`capability-preview-impact-${affected.code}`)).toBeHidden();
+    }
+    await expect(page.getByTestId(`capability-preview-impact-${cap!.code}`)).toBeVisible();
+    await page.screenshot({
+      path: info.outputPath('00-capability-preview-partial-collapsed.png'),
+      fullPage: true,
+    });
+    await partialImpact.locator('summary').click();
+    await expect(partialImpact).toHaveJSProperty('open', true);
+    for (const affected of secondaryCapabilities) {
+      await expect(page.getByTestId(`capability-preview-impact-${affected.code}`)).toBeVisible();
+    }
+  }
   await expect(page.getByTestId('capability-preview-resulting').locator('li')).toHaveCount(
     previewBody.data.resultingCapabilities.length,
   );

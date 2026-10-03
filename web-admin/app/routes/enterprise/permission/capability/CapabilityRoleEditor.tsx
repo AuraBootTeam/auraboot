@@ -259,6 +259,23 @@ export default function CapabilityRoleEditor({
       ),
     ),
   );
+  const changedCodes = new Set(changes.map((cap) => cap.code));
+  const secondaryPartial = (previewPlan?.resultingCapabilities ?? []).filter(
+    (cap) => cap.authorizationState === 'partial' && !changedCodes.has(cap.code),
+  );
+  const primaryImpact = (previewPlan?.resultingCapabilities ?? []).filter(
+    (cap) => cap.authorizationState !== 'partial' || changedCodes.has(cap.code),
+  );
+  const renderImpact = (cap: Capability) => (
+    <li key={cap.code} data-testid={`capability-preview-impact-${cap.code}`}>
+      {cap.label}:{' '}
+      {t(
+        `admin.permission.capability.${cap.authorizationState}V2`,
+        undefined,
+        cap.authorizationState ?? '',
+      )}
+    </li>
+  );
   const previewContent = previewPlan ? (
     <div className="space-y-4" data-testid="capability-preview-summary">
       <ul className="space-y-1">
@@ -294,18 +311,28 @@ export default function CapabilityRoleEditor({
           )}
         </summary>
         <div className="mt-3 space-y-3">
-          <ul className="space-y-1" data-testid="capability-preview-resulting">
-            {previewPlan.resultingCapabilities.map((cap) => (
-              <li key={cap.code}>
-                {cap.label}:{' '}
-                {t(
-                  `admin.permission.capability.${cap.authorizationState}V2`,
-                  undefined,
-                  cap.authorizationState ?? '',
-                )}
-              </li>
-            ))}
-          </ul>
+          <div data-testid="capability-preview-resulting" className="space-y-3">
+            {primaryImpact.length > 0 && (
+              <ul className="space-y-1">{primaryImpact.map(renderImpact)}</ul>
+            )}
+            {secondaryPartial.length > 0 && (
+              <details data-testid="capability-preview-partial-impact">
+                <summary className="text-text-2 cursor-pointer">
+                  {t('admin.permission.capability.partialV2', undefined, 'Partial actions')}
+                  {' · '}
+                  {secondaryPartial.length}
+                </summary>
+                <p className="text-text-2 mt-2 text-xs leading-5">
+                  {t(
+                    'admin.permission.capability.partialGuidanceV2',
+                    undefined,
+                    'Some actions may be shared dependencies of other capabilities. Partial actions do not grant the complete capability. Select to complete; review revocation effects before saving.',
+                  )}
+                </p>
+                <ul className="mt-2 space-y-1">{secondaryPartial.map(renderImpact)}</ul>
+              </details>
+            )}
+          </div>
           {previewPlan.relatedMenus.length > 0 && (
             <p>
               {t('admin.permission.capability.relatedMenusV2', undefined, 'Related menus')}:{' '}
