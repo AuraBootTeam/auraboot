@@ -99,6 +99,13 @@ test.describe('S2 — legacy .ppt and .xls', () => {
       });
       expect(JSON.stringify((await resp.json()).data)).toContain(fixture.text);
 
+      // API completion alone does not prove that the visible row reached its terminal state.
+      const status = page.getByRole('main').getByTestId(`doc-status-${doc.pid}`);
+      await expect(status).toHaveText(/completed/i);
+      const row = page.getByRole('main').locator('tr').filter({ has: status });
+      expect(doc.activeVersionPid).toEqual(expect.any(String));
+      await expect(row).not.toContainText(doc.activeVersionPid);
+
       await page.screenshot({
         path: `test-results/s2-legacy-${fixture.docType}.png`,
         fullPage: true,

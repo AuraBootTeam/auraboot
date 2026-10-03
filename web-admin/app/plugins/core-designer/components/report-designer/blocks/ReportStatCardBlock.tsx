@@ -66,6 +66,11 @@ export const ReportStatCardBlock: React.FC<ReportStatCardBlockProps> = ({
         {block.label || block.title || text({ zh: '指标', en: 'Metric' })}
       </div>
       <div className={`text-2xl font-bold ${colors.text}`}>{formatValue(value, block.format)}</div>
+      {mode === 'design' && (
+        <div className="mt-1 text-xs text-gray-500" data-testid="report-stat-design-preview">
+          {text({ zh: '示例数据', en: 'Sample data' })}
+        </div>
+      )}
       {mode === 'design' && !block.valueField && (
         <div className="mt-1 text-xs text-amber-500">
           {text({ zh: '请配置数值字段', en: 'Configure value field' })}
