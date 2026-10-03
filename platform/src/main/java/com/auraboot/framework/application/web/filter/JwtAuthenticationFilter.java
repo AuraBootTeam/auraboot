@@ -333,6 +333,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         String requestPath = request.getServletPath();
+        String authorizationHeader = request.getHeader("Authorization");
+        // Anonymous dictionaries are public. A supplied bearer must be verified so
+        // dictionary reads receive the caller's tenant context rather than tenant zero.
+        if ((requestPath.equals("/api/i18n") || requestPath.startsWith("/api/i18n/"))
+                && authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
+            return false;
+        }
         // Check both main whitelist and swagger whitelist
         // NOTE: for "/**" patterns, match by path-segment boundary:
         //   "/api/ext/*/public/**" must match product public routes but not authenticated siblings.
