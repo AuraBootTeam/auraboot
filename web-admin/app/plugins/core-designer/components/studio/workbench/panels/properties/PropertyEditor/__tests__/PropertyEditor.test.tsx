@@ -103,3 +103,36 @@ describe('property editor missing selection and width branch', () => {
     expect(fixture.save).toHaveBeenLastCalledWith('owned-width', 'width', 5, 2);
   });
 });
+
+
+describe('property width consistency with actual local storage', () => {
+  for (const [type, inputValue, expected] of [['number', '20', 12], ['number', '-2', 1], ['number', '0', 1], ['string', '800px', '800px'], ['string', '70vw', '70vw']] as const) {
+    it(`${type} width ${inputValue} preserves one value across updates, storage and export`, async () => {
+      const { PropertyPersistenceManager } = await vi.importActual<typeof import('~/plugins/core-designer/components/studio/services/state/PropertyPersistenceManager')>('~/plugins/core-designer/components/studio/services/state/PropertyPersistenceManager');
+      vi.useFakeTimers();
+      const manager = new PropertyPersistenceManager({ debounceDelay: 0, autoSaveInterval: 0, enableUndoRedo: false });
+      const id = `owned-width-${type}-${inputValue}`;
+      const storageKey = `component-properties-${id}`;
+      window.localStorage.setItem(storageKey, JSON.stringify({ width: 2, unrelated: 'preserved' }));
+      fixture.save.mockImplementation(manager.savePropertyChange.bind(manager));
+      try {
+        const onComponentChange = vi.fn(); const onPropertyChange = vi.fn();
+        const component = { id, type: 'formref', props: { width: 2 }, span: 2, size: { width: 100, height: 30, span: 2 } };
+        const config = { name: 'Configured name', propertySchema: [{ key: 'width', label: 'Width', type }] } as unknown as NonNullable<React.ComponentProps<typeof PropertyEditor>['config']>;
+        render(<PropertyEditor component={component} config={config} onComponentChange={onComponentChange} onPropertyChange={onPropertyChange} />);
+        fireEvent.change(screen.getByLabelText('Width'), { target: { value: inputValue } });
+        await vi.runAllTimersAsync();
+        const stored = await manager.loadComponentProperties(id);
+        expect(stored).toEqual({ width: expected, unrelated: 'preserved' });
+        expect((await manager.exportComponentProperties(component)).properties).toEqual(stored);
+        const expectedUpdates = type === 'number' ? { props: { width: expected }, span: expected, size: { width: 100, height: 30, span: expected } } : { props: { width: expected } };
+        expect(onComponentChange).toHaveBeenLastCalledWith(id, expectedUpdates);
+        expect(onPropertyChange).toHaveBeenLastCalledWith('width', expected);
+        expect(fixture.save).toHaveBeenLastCalledWith(id, 'width', expected, 2);
+      } finally {
+        cleanup(); manager.destroy(); fixture.save.mockReset();
+        window.localStorage.removeItem(storageKey); vi.useRealTimers();
+      }
+    });
+  }
+});

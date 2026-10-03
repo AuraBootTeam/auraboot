@@ -161,6 +161,9 @@ export const PropertyEditor: React.FC<PropertyEditorProps> = ({
 
       // 如果没有错误，更新属性值
       if (!error) {
+        const isGridWidth = property.key === 'width' && property.type === 'number';
+        const nextValue = isGridWidth ? Math.max(1, Math.min(12, Number(value) || 1)) : value;
+
         // 实时更新组件属性到设计器状态
         if (component?.id) {
           // 保存旧值用于持久化
@@ -169,14 +172,14 @@ export const PropertyEditor: React.FC<PropertyEditorProps> = ({
           const updates: any = {
             props: {
               ...component.props,
-              [property.key]: value,
+              [property.key]: nextValue,
             },
           };
 
           // 如果是width属性，同时更新span属性以保持兼容性
-          if (property.key === 'width') {
+          if (isGridWidth) {
             // 确保width值在有效范围内
-            const validWidth = Math.max(1, Math.min(12, Number(value) || 1));
+            const validWidth = nextValue;
             updates.props[property.key] = validWidth;
             updates.span = validWidth;
 
@@ -193,12 +196,12 @@ export const PropertyEditor: React.FC<PropertyEditorProps> = ({
 
           // ✅ 保存到 localStorage 以支持导出
           const persistenceManager = getPropertyPersistenceManager();
-          persistenceManager.savePropertyChange(component.id, property.key, value, oldValue);
+          persistenceManager.savePropertyChange(component.id, property.key, nextValue, oldValue);
         }
 
         // 调用外部回调
         if (onPropertyChange) {
-          onPropertyChange(property.key, value);
+          onPropertyChange(property.key, nextValue);
         }
       }
     },
