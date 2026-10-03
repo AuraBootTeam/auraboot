@@ -7,7 +7,11 @@ import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.decision.dto.DrtDefinitionCreateRequest;
 import com.auraboot.framework.decision.dto.DrtDefinitionDTO;
 import com.auraboot.framework.decision.entity.DrtDefinitionEntity;
+import com.auraboot.framework.decision.entity.DrtVersionEntity;
 import com.auraboot.framework.decision.mapper.DrtDefinitionMapper;
+import com.auraboot.framework.decision.mapper.DrtVersionMapper;
+import com.auraboot.framework.decision.model.VersionBinding;
+import com.auraboot.framework.decision.runtime.VersionSelector;
 import com.auraboot.framework.decision.service.DrtDefinitionService;
 import com.auraboot.framework.exception.ValidationException;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -20,6 +24,9 @@ import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -34,6 +41,7 @@ import java.util.stream.Collectors;
 public class DrtDefinitionServiceImpl implements DrtDefinitionService {
 
     private final DrtDefinitionMapper definitionMapper;
+    private final DrtVersionMapper versionMapper;
 
     // ─── tenant guard ────────────────────────────────────────────────────────
 
@@ -156,8 +164,10 @@ public class DrtDefinitionServiceImpl implements DrtDefinitionService {
 
         Page<DrtDefinitionEntity> pageResult = definitionMapper.selectPage(new Page<>(page, size), w);
 
+        Map<String, DrtVersionEntity> published = publishedVersions(tid, pageResult.getRecords().stream()
+                .map(DrtDefinitionEntity::getDecisionCode).distinct().toList());
         List<DrtDefinitionDTO> dtos = pageResult.getRecords().stream()
-                .map(this::toDTO)
+                .map(entity -> toDTO(entity, published.get(entity.getDecisionCode())))
                 .collect(Collectors.toList());
 
         PageResult<DrtDefinitionDTO> result = new PageResult<>();
@@ -175,6 +185,29 @@ public class DrtDefinitionServiceImpl implements DrtDefinitionService {
 
     private DrtDefinitionDTO toDTO(DrtDefinitionEntity e) {
         if (e == null) return null;
+        return toDTO(e, publishedVersions(e.getTenantId(), List.of(e.getDecisionCode()))
+                .get(e.getDecisionCode()));
+    }
+
+    private Map<String, DrtVersionEntity> publishedVersions(Long tenantId, List<String> codes) {
+        if (codes.isEmpty()) return Map.of();
+        LambdaQueryWrapper<DrtVersionEntity> query = new LambdaQueryWrapper<>();
+        query.eq(DrtVersionEntity::getTenantId, tenantId)
+                .in(DrtVersionEntity::getDecisionCode, codes)
+                .eq(DrtVersionEntity::getStatus, "PUBLISHED");
+        Map<String, List<DrtVersionEntity>> byCode = versionMapper.selectList(query).stream()
+                .filter(version -> Objects.equals(version.getTenantId(), tenantId))
+                .filter(version -> codes.contains(version.getDecisionCode()))
+                .collect(Collectors.groupingBy(DrtVersionEntity::getDecisionCode));
+        Map<String, DrtVersionEntity> result = new HashMap<>();
+        byCode.forEach((code, versions) -> {
+            DrtVersionEntity selected = VersionSelector.select(versions, VersionBinding.LATEST, null);
+            if (selected != null) result.put(code, selected);
+        });
+        return result;
+    }
+
+    private DrtDefinitionDTO toDTO(DrtDefinitionEntity e, DrtVersionEntity published) {
         DrtDefinitionDTO dto = new DrtDefinitionDTO();
         dto.setId(e.getId());
         dto.setPid(e.getPid());
@@ -186,6 +219,13 @@ public class DrtDefinitionServiceImpl implements DrtDefinitionService {
         dto.setScopeRef(e.getScopeRef());
         dto.setOwnerModule(e.getOwnerModule());
         dto.setEnabled(e.getEnabled());
+        if (published != null) {
+            dto.setPublishedVersion(published.getVersion());
+            dto.setOutputSchemaJson(published.getOutputSchemaJson());
+            if (published.getContentJson() != null && published.getContentJson().path("outputs").isArray()) {
+                dto.setOutputs(published.getContentJson().path("outputs"));
+            }
+        }
         dto.setCreatedBy(e.getCreatedBy());
         dto.setCreatedAt(e.getCreatedAt());
         dto.setUpdatedBy(e.getUpdatedBy());
