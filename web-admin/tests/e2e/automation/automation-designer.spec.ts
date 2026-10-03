@@ -320,9 +320,10 @@ test.describe('Automation Designer', () => {
    * After modifying the name and clicking Save, it should call PUT /api/automations/{pid}.
    */
   test('AD-07: save button triggers API call @critical', async ({ page }) => {
-    if (!testAutomation?.pid) { throw new Error(String('Test automation not created')); }
+    const saveFixture = await createAutomationViaApi(page);
+    createdPids.push(saveFixture.pid);
 
-    await page.goto(`/automation/${testAutomation.pid}`);
+    await page.goto(`/automation/${saveFixture.pid}`);
     await page.waitForLoadState('domcontentloaded');
     await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
 
@@ -331,21 +332,21 @@ test.describe('Automation Designer', () => {
 
     // Modify the name to mark the editor as dirty
     await name.clear();
-    await name.fill(`${testAutomation.name} Modified`);
+    await name.fill(`${saveFixture.name} Modified`);
 
-    const updatedName = `${testAutomation.name} Modified`;
+    const updatedName = `${saveFixture.name} Modified`;
     await expect(name).toHaveValue(updatedName);
     const saveButton = page.getByTestId('automation-editor-toolbar-btn-save');
     await expect(saveButton).toBeEnabled();
     const responsePromise = page.waitForResponse(
-      (resp) => new URL(resp.url()).pathname === `/api/automations/${testAutomation.pid}`
+      (resp) => new URL(resp.url()).pathname === `/api/automations/${saveFixture.pid}`
         && resp.request().method() === 'PUT',
     );
     await saveButton.click();
     const response = await responsePromise;
     expect(response.status()).toBe(200);
-    expect(String((await response.json()).code)).toBe(ErrorCodes.SUCCESS);
-    const saved = await page.request.get(`/api/automations/${testAutomation.pid}`);
+    // Read the exact record through an independent GET; browser PUT body retrieval can stall.
+    const saved = await page.request.get(`/api/automations/${saveFixture.pid}`);
     expect(saved.status()).toBe(200);
     const body = await saved.json();
     expect(String(body.code)).toBe(ErrorCodes.SUCCESS);

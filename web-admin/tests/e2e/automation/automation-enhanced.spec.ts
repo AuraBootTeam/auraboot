@@ -233,6 +233,8 @@ test.describe('Automation Enhanced', () => {
     expect(record.data.description).toBe('Created via E2E test');
     expect(record.data.flowConfig.nodes).toHaveLength(2);
     expect(record.data.flowConfig.edges).toHaveLength(1);
+    await expect(page).toHaveURL(new RegExp(`/automation/${created.data.pid}$`));
+    await expect(nameInput).toHaveValue(automationName);
     await page.reload();
     await expect(nameInput).toHaveValue(automationName);
     await expect(descInput).toHaveValue('Created via E2E test');
