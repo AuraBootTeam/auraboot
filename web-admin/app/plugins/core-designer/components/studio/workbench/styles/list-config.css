@@ -29,3 +29,32 @@
   }
   .list-config-preview { grid-column: auto; }
 }
+
+.list-config-workspace {
+  container: list-config-workspace / inline-size;
+}
+.list-config-tab-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.list-config-tab-stats {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+}
+@container list-config-workspace (min-width: 360px) {
+  .list-config-tab-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@container list-config-workspace (min-width: 720px) {
+  .list-config-tab-header {
+    flex-direction: row;
+    align-items: end;
+  }
+  .list-config-tab-stats {
+    flex: 0 0 384px;
+    min-width: 384px;
+  }
+}

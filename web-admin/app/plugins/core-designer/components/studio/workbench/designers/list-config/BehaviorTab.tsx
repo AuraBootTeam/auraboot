@@ -29,7 +29,10 @@ function sectionCardClasses(extra?: string): string {
  */
 const SORT_FIELD_NONE = '__none__';
 
-function rowClickActionLabel(value: BehaviorConfig['rowClickAction'] | undefined, t: (key: string) => string): string {
+function rowClickActionLabel(
+  value: BehaviorConfig['rowClickAction'] | undefined,
+  t: (key: string) => string,
+): string {
   switch (value) {
     case 'drawer':
       return t('list_behavior.open_drawer');
@@ -70,12 +73,7 @@ export const BehaviorTab: React.FC<BehaviorTabProps> = ({
   const { t } = useI18n();
   const sortableFields = capabilities?.sortableFields ?? fallbackSortFields;
   const schemas = useMemo(
-    () =>
-      buildBehaviorSchemas(
-        sortableFields,
-        capabilities?.filterableFields ?? [],
-        t,
-      ),
+    () => buildBehaviorSchemas(sortableFields, capabilities?.filterableFields ?? [], t),
     [capabilities, sortableFields, t],
   );
 
@@ -83,7 +81,7 @@ export const BehaviorTab: React.FC<BehaviorTabProps> = ({
     return (
       <div className="space-y-4" data-testid="behavior-tab">
         <div className={sectionCardClasses()}>
-          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+          <div className="text-xs font-semibold tracking-[0.16em] text-slate-400 uppercase">
             {t('list_behavior.configuration')}
           </div>
           <div className="mt-2 text-sm text-slate-500">{t('list_behavior.loading')}</div>
@@ -100,9 +98,12 @@ export const BehaviorTab: React.FC<BehaviorTabProps> = ({
         </div>
       )}
       <section className={sectionCardClasses()}>
-        <div className="flex flex-col gap-4 border-b border-slate-200 pb-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+        <div
+          className="list-config-tab-header border-b border-slate-200 pb-4"
+          data-testid="list-tab-summary-behavior"
+        >
+          <div className="min-w-0 flex-1">
+            <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold tracking-[0.16em] text-slate-500 uppercase">
               {t('list_behavior.rules')}
             </div>
             <h2 className="mt-4 text-2xl font-semibold tracking-tight text-slate-950">
@@ -112,19 +113,27 @@ export const BehaviorTab: React.FC<BehaviorTabProps> = ({
               {t('list_behavior.description')}
             </p>
           </div>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="list-config-tab-stats" data-testid="list-tab-statistics-behavior">
             <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-              <div className="text-[11px] uppercase tracking-[0.14em] text-slate-400">{t('list_behavior.default_pagination')}</div>
-              <div className="mt-2 text-xl font-semibold text-slate-900">{vm.behavior.pageSize}</div>
+              <div className="text-[11px] tracking-[0.14em] text-slate-400 uppercase">
+                {t('list_behavior.default_pagination')}
+              </div>
+              <div className="mt-2 text-xl font-semibold text-slate-900">
+                {vm.behavior.pageSize}
+              </div>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-              <div className="text-[11px] uppercase tracking-[0.14em] text-slate-400">{t('list_behavior.row_click')}</div>
+              <div className="text-[11px] tracking-[0.14em] text-slate-400 uppercase">
+                {t('list_behavior.row_click')}
+              </div>
               <div className="mt-2 text-xl font-semibold text-slate-900">
                 {rowClickActionLabel(vm.behavior.rowClickAction, t)}
               </div>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-              <div className="text-[11px] uppercase tracking-[0.14em] text-slate-400">{t('list_behavior.multi_select')}</div>
+              <div className="text-[11px] tracking-[0.14em] text-slate-400 uppercase">
+                {t('list_behavior.multi_select')}
+              </div>
               <div className="mt-2 text-xl font-semibold text-slate-900">
                 {vm.behavior.multiSelect ? t('list_behavior.on') : t('list_behavior.off')}
               </div>
@@ -144,10 +153,12 @@ export const BehaviorTab: React.FC<BehaviorTabProps> = ({
         </div>
         <div className="mt-5 rounded-[24px] border border-slate-200 bg-slate-50/70 p-5">
           <div className="mb-4 border-b border-slate-200 pb-4">
-            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+            <div className="text-xs font-semibold tracking-[0.16em] text-slate-400 uppercase">
               {t('list_behavior.properties')}
             </div>
-            <div className="mt-2 text-base font-semibold text-slate-950">{t('list_behavior.properties_heading')}</div>
+            <div className="mt-2 text-base font-semibold text-slate-950">
+              {t('list_behavior.properties_heading')}
+            </div>
             <div className="mt-1 text-sm text-slate-500">
               {t('list_behavior.properties_description')}
             </div>
@@ -155,9 +166,7 @@ export const BehaviorTab: React.FC<BehaviorTabProps> = ({
           <SchemaBlockConfigPanel
             schemas={schemas}
             value={behaviorToDisplay(vm.behavior)}
-            onChange={(next) =>
-              setVm({ ...vm, behavior: displayToBehavior(next) })
-            }
+            onChange={(next) => setVm({ ...vm, behavior: displayToBehavior(next) })}
             readonly={readonly}
           />
         </div>

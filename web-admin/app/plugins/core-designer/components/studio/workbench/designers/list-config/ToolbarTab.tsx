@@ -120,8 +120,11 @@ export const ToolbarTab: React.FC<ToolbarTabProps> = ({
   return (
     <div className="space-y-5" data-testid="toolbar-tab">
       <section className={sectionCardClasses()}>
-        <div className="flex flex-col gap-4 border-b border-slate-200 pb-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
+        <div
+          className="list-config-tab-header border-b border-slate-200 pb-4"
+          data-testid="list-tab-summary-toolbar"
+        >
+          <div className="min-w-0 flex-1">
             <div className="text-xs font-semibold tracking-[0.16em] text-slate-400 uppercase">
               {t('list_editor.preset_actions')}
             </div>
@@ -132,7 +135,7 @@ export const ToolbarTab: React.FC<ToolbarTabProps> = ({
               {t('list_editor.toolbar_description')}
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="list-config-tab-stats" data-testid="list-tab-statistics-toolbar">
             <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
               <div className="text-[11px] tracking-[0.14em] text-slate-400 uppercase">
                 {t('list_editor.enabled_presets')}

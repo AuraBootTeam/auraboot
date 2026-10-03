@@ -415,11 +415,25 @@ test.describe('Page Templates', () => {
           name: english ? 'Choose key columns, then order them' : '先选主列，再排阅读顺序',
         }),
       ).toBeVisible();
+      await expect(page.getByTestId('toolbar-draft-state')).toHaveText(
+        english ? 'Synced' : '已同步',
+      );
+      await expect(page.getByTestId('toolbar-save')).toBeDisabled();
+      await expect(page.getByTestId('toolbar-save-status')).toContainText(
+        english ? 'Saved' : '已保存',
+      );
       await page.getByTestId('column-item-0').click();
       const width = page.getByTestId('schema-config-field-width');
       await expect(width).toContainText(english ? 'Width (px)' : '宽度 (px)');
       await width.locator('input').fill('180');
       await expect(page.getByTestId('column-item-0')).toContainText('180px');
+      await expect(page.getByTestId('toolbar-draft-state')).toHaveText(
+        english ? 'Unsaved' : '待保存',
+      );
+      await expect(page.getByTestId('toolbar-save-status')).toHaveText(
+        english ? 'Unsaved changes' : '存在未保存修改',
+      );
+
       await page.screenshot({
         path: testInfo.outputPath(`T7-${locale}-columns.png`),
         fullPage: true,
@@ -499,6 +513,14 @@ test.describe('Page Templates', () => {
       ).toContainEqual({ preset: 'refresh' });
       expect(saved.request().postDataJSON().blocks).toEqual(body.data.blocks);
       await page.reload();
+      await expect(page.getByTestId('toolbar-draft-state')).toHaveText(
+        english ? 'Synced' : '已同步',
+      );
+      await expect(page.getByTestId('toolbar-save')).toBeDisabled();
+      await expect(page.getByTestId('toolbar-save-status')).toContainText(
+        english ? 'Saved' : '已保存',
+      );
+
       await expect(page.getByTestId('column-item-0')).toContainText('180px');
       await expect(page.getByTestId('preview-filter-name')).toContainText('Acme');
       await expect(page.getByTestId('preview-toolbar-refresh')).toHaveText(
@@ -515,6 +537,39 @@ test.describe('Page Templates', () => {
         path: testInfo.outputPath(`T7-${locale}-reloaded.png`),
         fullPage: true,
       });
+      for (const viewportWidth of [900, 1280, 1920]) {
+        await page.setViewportSize({ width: viewportWidth, height: 1600 });
+        for (const tab of ['toolbar', 'behavior']) {
+          await page.getByTestId(`list-tab-${tab}`).click();
+          const summary = page.getByTestId(`list-tab-summary-${tab}`);
+          const statistics = page.getByTestId(`list-tab-statistics-${tab}`);
+          await expect(summary).toBeVisible();
+          await expect(statistics.locator(':scope > div')).toHaveCount(3);
+          await expect
+            .poll(async () =>
+              statistics.evaluate((element) => {
+                const parent = element.parentElement!.getBoundingClientRect();
+                const boxes = Array.from(element.children).map((child) =>
+                  child.getBoundingClientRect(),
+                );
+                return boxes.every(
+                  (box) =>
+                    box.width >= 120 && box.left >= parent.left && box.right <= parent.right + 1,
+                );
+              }),
+            )
+            .toBe(true);
+          await expect(page.getByTestId('toolbar-draft-state')).toHaveText(
+            english ? 'Synced' : '已同步',
+          );
+          await expect(page.getByTestId('toolbar-save')).toBeDisabled();
+          await summary.scrollIntoViewIfNeeded();
+          await page.screenshot({
+            path: testInfo.outputPath(`T7-${locale}-${tab}-${viewportWidth}-saved.png`),
+            fullPage: true,
+          });
+        }
+      }
     });
   }
 

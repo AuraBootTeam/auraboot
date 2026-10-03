@@ -135,13 +135,16 @@ export const ListConfigPanel: React.FC<ListConfigPanelProps> = ({
     }));
   }, [capabilities, capabilitiesLoading, schemaFieldCodes]);
 
-  // Push VM changes out to schema.blocks. Use a ref guard + JSON compare to
-  // avoid echo loops when the parent re-pushes the same schema back in.
-  const lastPushedRef = useRef<string>('');
+  // Loading a projection is not an edit. Publish only subsequent VM changes.
+  const lastPushedRef = useRef<string | null>(null);
   useEffect(() => {
     const nextBlocks = viewModelToBlocks(vm);
     const serialized = JSON.stringify(nextBlocks);
-    if (serialized === lastPushedRef.current) return;
+    if (lastPushedRef.current === null) {
+      lastPushedRef.current = serialized;
+      return;
+    }
+    if (readonly || serialized === lastPushedRef.current) return;
     if (JSON.stringify(schema.blocks ?? []) === serialized) {
       lastPushedRef.current = serialized;
       return;
@@ -353,7 +356,7 @@ export const ListConfigPanel: React.FC<ListConfigPanelProps> = ({
           )}
 
           <section
-            className="rounded-[28px] border border-slate-200 bg-white/90 p-6 shadow-sm"
+            className="list-config-workspace rounded-[28px] border border-slate-200 bg-white/90 p-6 shadow-sm"
             data-testid="list-designer-workspace"
           >
             <div className="mb-6 flex flex-col gap-3 border-b border-slate-100 pb-5">

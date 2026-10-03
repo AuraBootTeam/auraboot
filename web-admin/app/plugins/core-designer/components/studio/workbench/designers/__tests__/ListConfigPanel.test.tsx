@@ -271,8 +271,8 @@ describe('ListConfigPanel', () => {
           <ListConfigPanel readonly schema={baseSchema()} onSchemaChange={onChange} />
         </I18nProvider>,
       );
-      await waitFor(() => expect(onChange).toHaveBeenCalled());
-      const calls = onChange.mock.calls.length;
+      expect(onChange).not.toHaveBeenCalled();
+      const calls = 0;
       for (const [tab, target] of [
         ['columns', 'column-toggle-name'],
         ['filters', 'filter-toggle-name'],
@@ -406,12 +406,39 @@ describe('ListConfigPanel', () => {
           label,
         );
       }
-      await waitFor(() => expect(onChange).toHaveBeenCalled());
-      expect(
-        onChange.mock.calls
-          .at(-1)?.[0]
-          .blocks.map((block: { blockType: string }) => block.blockType),
-      ).toEqual(['filters', 'toolbar', 'table']);
+      expect(onChange).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([false, true])(
+    'does not rewrite a stored page on mount or tab navigation (readonly=%s)',
+    async (readonly) => {
+      const onChange = vi.fn();
+      const schema = {
+        ...baseSchema(),
+        blocks: [
+          {
+            id: 'persisted_table',
+            blockType: 'table',
+            registryCode: 'platform.table',
+            columns: ['name'],
+            dataSource: 'main',
+            props: { pageSize: 50 },
+            config: { marker: 'preserve' },
+          },
+        ],
+      } as unknown as PageSchema;
+      const original = JSON.stringify(schema);
+      render(
+        <React.StrictMode>
+          <ListConfigPanel readonly={readonly} schema={schema} onSchemaChange={onChange} />
+        </React.StrictMode>,
+      );
+      expect(await screen.findByTestId('column-item-0')).toHaveTextContent('name');
+      for (const tab of ['filters', 'toolbar', 'behavior', 'columns'])
+        fireEvent.click(screen.getByTestId(`list-tab-${tab}`));
+      expect(onChange).not.toHaveBeenCalled();
+      expect(JSON.stringify(schema)).toBe(original);
     },
   );
 
@@ -549,9 +576,10 @@ describe('ListConfigPanel', () => {
     await waitFor(() => {
       expect(screen.getByTestId('columns-tab')).toBeInTheDocument();
     });
-    // Initial mount pushes the canonical 3-block shape outward.
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('column-toggle-name'));
     await waitFor(() => {
-      expect(onChange).toHaveBeenCalled();
+      expect(onChange).toHaveBeenCalledTimes(1);
     });
     const latest = onChange.mock.calls[onChange.mock.calls.length - 1][0];
     expect(Array.isArray(latest.blocks)).toBe(true);

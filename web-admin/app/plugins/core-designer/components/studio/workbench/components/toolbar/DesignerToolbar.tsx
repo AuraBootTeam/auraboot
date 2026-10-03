@@ -118,7 +118,7 @@ const ControlGroup: React.FC<{ label: string; children: React.ReactNode }> = ({
   children,
 }) => (
   <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white px-2 py-2">
-    <span className="px-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+    <span className="px-1 text-[11px] font-semibold tracking-[0.16em] text-slate-400 uppercase">
       {label}
     </span>
     <div className="flex flex-wrap items-center gap-2">{children}</div>
@@ -171,10 +171,7 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
   const canImport = canManage;
   const canExport = canManage;
   const { locale, t } = useI18n();
-  const l = useCallback(
-    (zh: string, en: string) => (locale === 'zh-CN' ? zh : en),
-    [locale],
-  );
+  const l = useCallback((zh: string, en: string) => (locale === 'zh-CN' ? zh : en), [locale]);
 
   const statusInfo = pageMeta?.status ? PAGE_STATUS_INFO[pageMeta.status] : null;
   const statusLabels = {
@@ -192,16 +189,21 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
   ];
   const currentDeviceMeta = devices.find((item) => item.id === currentDevice) ?? devices[0];
 
-  const formatLastSaved = useCallback((dateStr?: string) => {
-    if (!dateStr) return '';
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMin = Math.floor(diffMs / 60000);
-    if (diffMin < 1) return l('刚刚', 'just now');
-    if (diffMin < 60) return l(`${diffMin} 分钟前`, `${diffMin}m ago`);
-    return date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
-  }, [l, locale]);
+  const formatLastSaved = useCallback(
+    (dateStr?: string) => {
+      if (!dateStr) return '';
+      const date = new Date(dateStr);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffMin = Math.floor(diffMs / 60000);
+      if (diffMin < 1) return l('刚刚', 'just now');
+      if (diffMin < 60) return l(`${diffMin} 分钟前`, `${diffMin}m ago`);
+      return date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+    },
+    [l, locale],
+  );
+
+  const savedAt = lastSavedAt ?? pageMeta?.updatedAt;
 
   return (
     <div className="border-b border-slate-200 bg-white px-4 py-3">
@@ -238,20 +240,27 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
                 <span
                   className={`rounded-full px-2.5 py-1 text-xs font-medium ${
                     hasUnsavedChanges
-                      ? 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200'
-                      : 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200'
+                      ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 ring-inset'
+                      : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 ring-inset'
                   }`}
                   data-testid="toolbar-draft-state"
                 >
-                  {hasUnsavedChanges ? l('待保存', 'Unsaved') : l('已同步', 'Synced')}
+                  {hasUnsavedChanges
+                    ? l('待保存', 'Unsaved')
+                    : DESIGNER_I18N.autoSave.synced[locale]}
                 </span>
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-500">
                 <span>{l('页面设计器', 'Page Designer')}</span>
                 <span className="text-slate-300">/</span>
-                <span>{l('当前设备：', 'Device: ')}{currentDeviceMeta.label}</span>
+                <span>
+                  {l('当前设备：', 'Device: ')}
+                  {currentDeviceMeta.label}
+                </span>
                 <span className="text-slate-300">/</span>
-                <span>{l('缩放', 'Zoom')} {zoomLevel}%</span>
+                <span>
+                  {l('缩放', 'Zoom')} {zoomLevel}%
+                </span>
               </div>
             </div>
           </div>
@@ -285,17 +294,17 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
                     </svg>
                     <span className="font-medium text-blue-700">{l('正在保存', 'Saving')}</span>
                   </>
-                ) : lastSavedAt ? (
+                ) : hasUnsavedChanges ? (
+                  <span className="font-medium text-amber-600">
+                    {DESIGNER_I18N.autoSave.currentEdits[locale]}
+                  </span>
+                ) : savedAt ? (
                   <>
                     <span className="h-2 w-2 rounded-full bg-emerald-500" />
                     <span className="text-slate-700">
-                      {l('已保存', 'Saved')} {formatLastSaved(lastSavedAt)}
+                      {DESIGNER_I18N.autoSave.saved[locale]} {formatLastSaved(savedAt)}
                     </span>
                   </>
-                ) : hasUnsavedChanges ? (
-                  <span className="font-medium text-amber-600">
-                    {l('存在未保存修改', 'Unsaved changes')}
-                  </span>
                 ) : (
                   <span className="text-slate-500">{l('等待第一次保存', 'Not saved yet')}</span>
                 )}
@@ -448,7 +457,7 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3">
-          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+          <div className="text-xs font-semibold tracking-[0.16em] text-slate-400 uppercase">
             {l('工作台', 'Workbench')}
           </div>
 
