@@ -516,50 +516,43 @@ test.describe('Scheduled Task — Full Lifecycle (P0)', () => {
       'create',
     );
     expect(seed.code, 'seed create should succeed').toBe('0');
+    expect(seed.recordId).toBeTruthy();
 
     await navigateToScheduledTaskList(page);
     const row = await findRowInPaginatedList(page, TASK_NAME_DELETE, 12_000);
     await expect(row).toBeVisible();
 
     await row.hover();
-    const moreActionsBtn = row.locator('[data-testid="row-action-more"]').first();
-    if (await moreActionsBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
+    const moreActionsBtn = row.getByTestId('row-action-more');
+    let deleteBtn = row.getByTestId('row-action-delete');
+    if (await moreActionsBtn.isVisible()) {
       await moreActionsBtn.click();
-      await page
-        .locator('[data-testid="row-action-dropdown"]')
-        .waitFor({ state: 'visible', timeout: 3_000 })
-        .catch(() => null);
+      const menu = page.getByTestId('row-action-dropdown');
+      await expect(menu).toBeVisible();
+      deleteBtn = menu.getByTestId('row-action-delete');
     }
-    const deleteBtn = row.getByTestId('row-action-delete');
-    await deleteBtn.waitFor({ state: 'visible', timeout: 5_000 });
+    await expect(deleteBtn).toBeVisible();
 
     const commandResponsePromise = page.waitForResponse(
       (r) =>
         r.url().includes('/api/meta/commands/execute/admin:delete_scheduled_task') &&
-        r.status() === 200,
+        r.request().method() === 'POST',
       { timeout: 20_000 },
     );
     await deleteBtn.click();
 
-    const confirmDialog = page.locator(
-      '[data-testid="confirm-dialog"], [role="alertdialog"], .ant-modal-confirm, .ant-popconfirm',
-    );
-    await confirmDialog.waitFor({ state: 'visible', timeout: 5_000 });
-    const okBtn = page.locator('[data-testid="confirm-ok"]').first();
-    const okBtnAlt = confirmDialog
-      .locator('button')
-      .filter({ hasText: /确定|确认|OK|Yes|删除|Delete/i })
-      .first();
-    const confirmBtn = (await okBtn.isVisible({ timeout: 1_000 }).catch(() => false))
-      ? okBtn
-      : okBtnAlt;
-    await confirmBtn.click();
+    const confirmDialog = page.getByTestId('confirm-dialog');
+    await expect(confirmDialog).toBeVisible();
+    await confirmDialog.getByTestId('confirm-ok').click();
     const deletion = await commandResponsePromise;
+    expect(deletion.status()).toBe(200);
     expect(String((await deletion.json()).code)).toBe('0');
 
     // Row should disappear from list
     const deletedRow = page.locator('tbody tr', { hasText: TASK_NAME_DELETE }).first();
     await expect(deletedRow).toHaveCount(0);
+    const deletedRecord = await page.request.get(`/api/dynamic/scheduled_task/${seed.recordId}`);
+    expect(deletedRecord.status()).toBe(404);
     await page.reload();
     await expect(page.locator('table').first()).toBeVisible();
     await expect(page.locator('tbody tr', { hasText: TASK_NAME_DELETE })).toHaveCount(0);
