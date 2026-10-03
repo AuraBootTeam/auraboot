@@ -17,14 +17,10 @@
  */
 
 import { test, expect } from '../../fixtures';
-import {
-  uniqueId,
-  navigateToDynamicPage,
-  findRowInPaginatedList,
-  acceptConfirmDialog,
-} from '../helpers';
+import { uniqueId, navigateToDynamicPage, acceptConfirmDialog } from '../helpers';
 import { BASE_URL } from '../../helpers/playwright-env';
 const MEMBER_PAGE_KEY = 'tenant-member';
+test.use({ locale: 'zh-CN' });
 
 // ---------------------------------------------------------------------------
 // Shared: get first member pid via API
@@ -286,8 +282,19 @@ test('MEMBER-DETAIL-07: native lifecycle buttons execute commands and persist st
   const pid = member!.pid;
   expect(member!.status).toBe('active');
 
-  await navigateToDynamicPage(page, MEMBER_PAGE_KEY);
-  const row = await findRowInPaginatedList(page, stamp, 20000);
+  await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
+  await page.evaluate(() => localStorage.removeItem('sidebar-collapsed'));
+  await page.reload();
+  const membersLink = page.locator('nav a[href="/p/tenant_member"]');
+  if (!(await membersLink.isVisible())) {
+    await page.locator('nav button').filter({ hasText: '组织管理' }).first().click();
+  }
+  await expect(membersLink).toBeVisible();
+  await membersLink.click();
+  await expect(page).toHaveURL(/\/p\/tenant_member/);
+  const row = page.locator('table tbody tr').filter({ hasText: stamp });
+  await expect(row).toHaveCount(1, { timeout: 20000 });
+  await expect(row).toBeVisible();
   await row.click();
   await expect(page).toHaveURL(new RegExp(`/organization/members/${pid}$`));
   await expect(page.getByTestId('member-status')).toHaveText('active');
@@ -350,7 +357,9 @@ test('MEMBER-DETAIL-07: native lifecycle buttons execute commands and persist st
       expect(result.data.status).toBe(status);
       await page.reload();
       await expect(page.getByTestId('member-status')).toHaveText(status);
-      await capture(`native-member-${status}`);
+      await capture(
+        status === 'active' ? 'native-member-active-restored' : `native-member-${status}`,
+      );
     }
   };
   await act('暂停', 'admin:suspend_member', 'suspended', 'suspend');
