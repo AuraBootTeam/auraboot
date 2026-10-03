@@ -415,14 +415,9 @@ test.describe('Scheduled Task — Full Lifecycle (P0)', () => {
       : submitBtnAlt;
     await btn.click();
 
-    const errorVisible = await page
-      .locator(
-        '.ant-form-item-explain-error, [data-testid*="error"], .field-error, [role="alert"], .text-red-500, .text-destructive',
-      )
-      .first()
-      .isVisible({ timeout: 5_000 })
-      .catch(() => false);
-    expect(errorVisible, 'empty form submission should show validation errors').toBeTruthy();
+    await expect(page.getByTestId('form-field-name').getByText('请填写名称', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('form-field-handler_bean').getByText('请填写处理器 Bean', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('form-field-name').locator('input')).toHaveValue('');
   });
 
   // =========================================================================
