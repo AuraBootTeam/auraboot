@@ -70,6 +70,45 @@ class DashboardServiceImplTest {
         MetaContext.clear();
     }
 
+    @Test
+    void boundDashboardAndWorkbenchUseReleaseWithoutLocalMetadataWrites() {
+        var catalog = org.mockito.Mockito.mock(com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "applicationRuntimeDefinitionCatalog", catalog);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "applicationRuntimePrimaryEnabled", true);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "defaultApplicationCode", "aura-edu");
+        Dashboard contribution = fixture(null, "global", null);
+        contribution.setCode("class_overview");
+        contribution.setStatus(StatusConstants.PUBLISHED);
+        contribution.setWidgets(objectMapper.createArrayNode().add(widget("student-count", 0, 1)));
+        contribution.setExtension(objectMapper.createObjectNode().set("workbenchContribution",
+                objectMapper.createObjectNode().put("enabled", true)));
+        when(catalog.dashboards(10L, "aura-edu")).thenReturn(java.util.Optional.of(List.of(contribution)));
+        var existing = fixture("wb", "workbench", "u-1");
+        existing.setWidgets(objectMapper.createArrayNode());
+        when(dashboardMapper.findWorkbench(10L, "u-1")).thenReturn(existing);
+
+        assertEquals("class_overview", service.findByCode("class_overview").getCode());
+        var workbench = service.getOrCreateWorkbench();
+        assertEquals("workbench-contribution-class_overview-student-count", workbench.getWidgets().get(0).get("id").asText());
+        verify(dashboardMapper, never()).findByCode(any(), any());
+        verify(dashboardMapper, never()).findWorkbenchContributions(any());
+        verify(dashboardMapper, never()).insertDashboard(any());
+        verify(dashboardMapper, never()).updateDashboard(any());
+    }
+
+    @Test
+    void boundDraftDashboardDoesNotFallBackToPublishedResidualMetadata() {
+        var catalog = org.mockito.Mockito.mock(com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "applicationRuntimeDefinitionCatalog", catalog);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "applicationRuntimePrimaryEnabled", true);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "defaultApplicationCode", "aura-edu");
+        var draft = fixture(null, "global", null);
+        draft.setCode("draft_count");
+        when(catalog.dashboards(10L, "aura-edu")).thenReturn(java.util.Optional.of(List.of(draft)));
+        assertThrows(ValidationException.class, () -> service.findByCode("draft_count"));
+        verify(dashboardMapper, never()).findByCode(any(), any());
+    }
+
     private Dashboard fixture(String pid, String scope, String ownerPid) {
         Dashboard d = new Dashboard();
         d.setId(100L);

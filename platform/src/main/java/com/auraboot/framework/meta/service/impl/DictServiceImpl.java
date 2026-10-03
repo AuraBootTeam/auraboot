@@ -80,6 +80,20 @@ public class DictServiceImpl implements DictService {
 
     private final CacheManager cacheManager;
 
+    @Autowired
+    private com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog applicationRuntimeDefinitionCatalog;
+
+    @Value("${aura.application.default-code:}")
+    private String defaultApplicationCode;
+
+    @Value("${aura.application.definition-read.runtime-primary-enabled:false}")
+    private boolean applicationRuntimePrimaryEnabled;
+
+    public boolean releaseReadsEnabled() {
+        return applicationRuntimePrimaryEnabled && MetaContext.exists() && MetaContext.getCurrentTenantId() != null
+                && StringUtils.hasText(defaultApplicationCode);
+    }
+
     private static final String DICT_CACHE_NAME = "dictData";
 
     private static String logSafe(Object value) {
@@ -305,10 +319,15 @@ public class DictServiceImpl implements DictService {
     // Command-path hot read (per-field dict resolution): this method is hit ~120x per
     // create_and_submit command, each miss costing two queries (dict + items). The
     // dictData cache is already evicted by every write path below.
-    @Cacheable(value = "dictData", key = "T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix() + ':' + #code", unless = "#result == null")
+    @Cacheable(value = "dictData", key = "T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix() + ':' + #code", unless = "#result == null", condition = "!#root.target.releaseReadsEnabled()")
     public DictDTO findByCode(String code) {
         if (!StringUtils.hasText(code)) {
             return null;
+        }
+
+        if (releaseReadsEnabled()) {
+            var dict = applicationRuntimeDefinitionCatalog.findDict(MetaContext.getCurrentTenantId(), defaultApplicationCode.trim(), code);
+            if (dict.isPresent()) return dict.get();
         }
 
         Dict dict = dictMapper.findCurrentByCode(code);
@@ -886,6 +905,38 @@ public class DictServiceImpl implements DictService {
     public DictDataResult loadDictData(String code, String versionStrategy, String pinnedVersion) {
         log.info("加载字典数据: code={}, versionStrategy={}, pinnedVersion={}",
                 logSafe(code), logSafe(versionStrategy), logSafe(pinnedVersion));
+
+        if (releaseReadsEnabled()) {
+            var bound = applicationRuntimeDefinitionCatalog.findDict(MetaContext.getCurrentTenantId(), defaultApplicationCode.trim(), code);
+            if (bound.isPresent()) {
+                if (!"latest".equals(versionStrategy) || StringUtils.hasText(pinnedVersion)) {
+                    throw new ValidationException(ResponseCode.CommonValidationFailed,
+                            "Release dictionaries are pinned by the application binding; standalone dictionary versions are unavailable");
+                }
+                DictDTO dict = bound.get();
+                DictDataResult result = new DictDataResult();
+                result.setCode(dict.getCode());
+                result.setName(dict.getName());
+                result.setDictType(dict.getDictType());
+                result.setVersion(dict.getExtendedProps().get("releaseId").asText());
+                result.setVersionStrategy("latest");
+                Map<String, Object> itemMap = new LinkedHashMap<>();
+                result.setItems(dict.getItems().stream().filter(item -> !Boolean.TRUE.equals(item.getDisabled())).map(source -> {
+                    var item = new DictDataResult.DictItemData();
+                    item.setValue(String.valueOf(source.getValue()));
+                    item.setLabel(source.getLabel());
+                    item.setSortOrder(source.getOrder());
+                    item.setEnabled(true);
+                    item.setExtension(source.getExtra());
+                    itemMap.put(item.getValue(), item.getLabel());
+                    return item;
+                }).toList());
+                result.setItemMap(itemMap);
+                result.setSuccess(true);
+                result.setLoadTimestamp(System.currentTimeMillis());
+                return result;
+            }
+        }
 
         // 验证租户上下文
           

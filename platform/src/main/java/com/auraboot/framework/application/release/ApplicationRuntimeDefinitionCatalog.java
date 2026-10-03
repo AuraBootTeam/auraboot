@@ -5,7 +5,16 @@ import com.auraboot.framework.meta.dto.DataTypeMapping;
 import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.dto.CommandDefinitionDTO;
+import com.auraboot.framework.meta.dto.MetaFieldDTO;
+import com.auraboot.framework.meta.dto.DictDTO;
+import com.auraboot.framework.meta.entity.payload.DataSourceItemBean;
+import com.auraboot.framework.common.util.JsonUtil;
+import com.auraboot.framework.dashboard.entity.Dashboard;
+import com.auraboot.framework.meta.entity.NamedQuery;
+import com.auraboot.framework.meta.entity.NamedQueryField;
 import com.auraboot.framework.menu.entity.Menu;
+import com.auraboot.framework.menu.service.ApplicationNavigationPolicy;
+import com.auraboot.framework.meta.entity.payload.ExtensionBean;
 import com.auraboot.framework.plugin.dto.imports.MenuDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.RoleDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.FieldDefinitionDTO;
@@ -24,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.HashSet;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 /** Materializes runtime metadata directly from a tenant's immutable active Application Release. */
@@ -39,6 +49,161 @@ public final class ApplicationRuntimeDefinitionCatalog {
         this.definitions = definitions;
         this.resolver = resolver;
         this.mapper = mapper;
+    }
+
+    public Optional<List<Dashboard>> dashboards(long tenantId, String applicationCode) {
+        var release = activeRelease(tenantId, applicationCode);
+        if (release == null) return Optional.empty();
+        Set<String> codes = new LinkedHashSet<>();
+        var result = release.components().stream()
+                .flatMap(component -> list(component.manifest().getDashboards()).stream()).map(source -> {
+                    if (source.getCode() == null || !codes.add(source.getCode())) {
+                        throw unavailable("Dashboard key must be present and unique in the active Application Release");
+                    }
+                    if (!"global".equals(source.getEffectiveScope())) {
+                        throw unavailable("Release dashboards must declare global scope: " + source.getCode());
+                    }
+                    Dashboard dashboard = new Dashboard();
+                    dashboard.setTenantId(tenantId);
+                    dashboard.setCode(source.getCode());
+                    dashboard.setTitle(source.getTitle());
+                    dashboard.setDescription(source.getDescription());
+                    dashboard.setScope(source.getEffectiveScope());
+                    dashboard.setStatus(source.getEffectiveStatus());
+                    dashboard.setIsDefault(source.getIsDefault());
+                    dashboard.setSortOrder(source.getSortOrder());
+                    dashboard.setLayoutConfig(mapper.valueToTree(source.getLayoutConfig() == null
+                            ? Map.of("columns", 12, "rowHeight", 100, "gap", 16, "compactType", "vertical")
+                            : source.getLayoutConfig()));
+                    dashboard.setWidgets(mapper.valueToTree(list(source.getWidgets())));
+                    Map<String, Object> extension = new LinkedHashMap<>(source.getExtension() == null
+                            ? Map.of() : source.getExtension());
+                    extension.put("releaseId", release.release().releaseId());
+                    dashboard.setExtension(mapper.valueToTree(extension));
+                    return dashboard;
+                }).sorted(Comparator.comparing(dashboard -> dashboard.getSortOrder() == null
+                        ? 0 : dashboard.getSortOrder())).toList();
+        return Optional.of(result);
+    }
+
+    /** Query and field whitelist are projected together from one immutable binding selection. */
+    public record BoundNamedQuery(NamedQuery query, List<NamedQueryField> fields) { }
+
+    public Optional<BoundNamedQuery> findNamedQuery(long tenantId, String applicationCode, String code) {
+        var release = activeRelease(tenantId, applicationCode);
+        if (release == null) return Optional.empty();
+        var matches = release.components().stream()
+                .flatMap(component -> list(component.manifest().getNamedQueries()).stream())
+                .filter(query -> code.equals(query.getCode())).toList();
+        if (matches.size() > 1) throw unavailable("Named query key is ambiguous in the active Application Release: " + code);
+        if (matches.isEmpty()) return Optional.empty();
+        var source = matches.getFirst();
+        NamedQuery query = new NamedQuery(tenantId, code, source.getEffectiveTitle(), source.getFromSql());
+        query.setDescription(source.getDescription());
+        query.setResourceCode(source.getResourceCode());
+        query.setActionCode(source.getActionCode());
+        query.setBaseWhere(source.getBaseWhere());
+        query.setDefaultOrder(source.getDefaultOrder());
+        query.setPolicy(source.getPolicy());
+        query.setStatus(source.getStatus() == null ? "draft" : source.getStatus().toLowerCase(java.util.Locale.ROOT));
+        Set<String> fieldCodes = new LinkedHashSet<>();
+        var fields = list(source.getFields()).stream().map(field -> {
+            if (field.getFieldCode() == null || !fieldCodes.add(field.getFieldCode())
+                    || field.getColumnExpr() == null || field.getColumnExpr().isBlank()
+                    || field.getDataType() == null || field.getDataType().isBlank()) {
+                throw unavailable("Release named query requires a complete, unique field whitelist: " + code);
+            }
+            NamedQueryField result = new NamedQueryField(tenantId, code, field.getFieldCode(),
+                    field.getColumnExpr(), field.getDataType());
+            if (field.getOperators() != null) result.setOperatorList(field.getOperators());
+            result.setDictCode(field.getDictCode());
+            result.setSortable(Boolean.TRUE.equals(field.getSortable()));
+            result.setSearchable(!Boolean.FALSE.equals(field.getSearchable()));
+            result.setUiComponent(field.getUiComponent() == null ? "text" : field.getUiComponent());
+            result.setPlaceholder(field.getPlaceholder());
+            result.setDefaultValue(field.getDefaultValue());
+            result.setLinkedField(field.getLinkedField());
+            result.setRequired(Boolean.TRUE.equals(field.getRequired()));
+            result.setDisplayName(field.getDisplayName());
+            result.setSortOrder(field.getSortOrder() == null ? 0 : field.getSortOrder());
+            result.setFieldGroup(field.getFieldGroup());
+            result.setUiConfig(field.getUiConfig());
+            result.setSource("release");
+            return result;
+        }).sorted(Comparator.comparing(NamedQueryField::getSortOrder)).toList();
+        if (fields.isEmpty()) throw unavailable("Release named query requires an explicit field whitelist: " + code);
+        return Optional.of(new BoundNamedQuery(query, fields));
+    }
+
+    public Optional<DictDTO> findDict(long tenantId, String applicationCode, String code) {
+        var release = activeRelease(tenantId, applicationCode);
+        if (release == null) return Optional.empty();
+        var matches = release.components().stream().flatMap(component -> list(component.manifest().getDicts()).stream())
+                .filter(dict -> code.equals(dict.getCode())).toList();
+        if (matches.size() > 1) throw unavailable("Dictionary key is ambiguous in the active Application Release: " + code);
+        if (matches.isEmpty()) return Optional.empty();
+        var source = matches.getFirst();
+        Set<String> values = new LinkedHashSet<>();
+        List<DataSourceItemBean> items = list(source.getItems()).stream().map(item -> {
+            if (item.getValue() == null || !values.add(item.getValue())) {
+                throw unavailable("Release dictionary values must be present and unique: " + code);
+            }
+            DataSourceItemBean result = new DataSourceItemBean();
+            result.setValue(item.getValue());
+            result.setLabel(item.getEffectiveLabel());
+            result.setOrder(item.getSortNo());
+            result.setDisabled(!"enabled".equals(item.getStatus()));
+            Map<String, Object> extra = new LinkedHashMap<>(item.getExtra() == null ? Map.of() : item.getExtra());
+            extra.put("labels", item.getAllLocalizedLabels());
+            if (item.getParentValue() != null) extra.put("parentValue", item.getParentValue());
+            result.setExtra(extra);
+            return result;
+        }).sorted(Comparator.comparing(item -> item.getOrder() == null ? 0 : item.getOrder())).toList();
+        Map<String, Object> extension = new LinkedHashMap<>(source.getExtension() == null ? Map.of() : source.getExtension());
+        extension.put("releaseId", release.release().releaseId());
+        return Optional.of(DictDTO.builder().code(code).name(source.getEffectiveName()).dictType(source.getDictType())
+                .description(source.getDescription()).items(items).enabled(true).status("published")
+                .extendedProps(mapper.valueToTree(extension)).build());
+    }
+
+    /** Rendering metadata uses the same bound definitions as dynamic reads. */
+    public Optional<List<MetaFieldDTO>> findFieldMetadata(long tenantId, String applicationCode, String modelCode) {
+        return findModel(tenantId, applicationCode, modelCode).map(model -> model.getFields().stream()
+                .map(field -> {
+                    Map<String, Object> extension = new LinkedHashMap<>(
+                            field.getExtraProps() == null ? Map.of() : field.getExtraProps());
+                    if (field.getDisplayName() != null) extension.put("displayName", field.getDisplayName());
+                    if (field.getDefaultValue() != null) extension.put("defaultValue", field.getDefaultValue());
+                    return MetaFieldDTO.builder().code(field.getCode()).dataType(field.getDataType())
+                            .extension(extension).fieldOrder(field.getSortOrder()).required(field.getRequired())
+                            .feature(Map.of("required", Boolean.TRUE.equals(field.getRequired()),
+                                    "unique", Boolean.TRUE.equals(field.getUnique())))
+                            .dictCode(extension.get("dictCode") instanceof String code ? code : null)
+                            .refTarget(field.getRefTarget() == null ? null : JsonUtil.toMap(field.getRefTarget()))
+                            .uiSchema(extension.get("uiSchema") == null ? null : JsonUtil.toMap(extension.get("uiSchema")))
+                            .build();
+                }).toList());
+    }
+
+    /** Immutable physical-source identities from one exact active Release. */
+    public record BoundModelSource(String code, String tableName) { }
+
+    public Optional<List<BoundModelSource>> modelSources(long tenantId, String applicationCode) {
+        var release = activeRelease(tenantId, applicationCode);
+        if (release == null) return Optional.empty();
+        List<BoundModelSource> sources = new ArrayList<>();
+        Set<String> codes = new HashSet<>();
+        for (var component : release.components()) {
+            for (ModelDefinitionDTO model : list(component.manifest().getModels())) {
+                if (model.getCode() == null || model.getCode().isBlank() || !codes.add(model.getCode())) {
+                    throw unavailable("Model key is missing or ambiguous in the active Application Release");
+                }
+                String table = model.getTableName();
+                if (table == null || table.isBlank()) table = SystemFieldConstants.generateTableName(model.getCode());
+                sources.add(new BoundModelSource(model.getCode(), table));
+            }
+        }
+        return Optional.of(List.copyOf(sources));
     }
 
     /** Empty means that this tenant has no active binding and must retain its existing read path. */
@@ -222,6 +387,13 @@ public final class ApplicationRuntimeDefinitionCatalog {
                 menu.setI18nKey(source.getI18nKey());
                 menu.setRedirect(source.getRedirect());
                 menu.setPageKey(source.getPageKey());
+                if (source.getExtension() != null) {
+                    if (source.getExtension().containsKey("applicationNavigation")
+                            && source.getParentCode() != null && !source.getParentCode().isBlank()) {
+                        throw unavailable("Application navigation policy must be declared on a Release root menu");
+                    }
+                    menu.setExtension(mapper.convertValue(source.getExtension(), ExtensionBean.class));
+                }
                 if (menus.putIfAbsent(source.getCode(), menu) != null) {
                     throw unavailable("Menu key is ambiguous in the active Application Release: " + source.getCode());
                 }
@@ -240,6 +412,7 @@ public final class ApplicationRuntimeDefinitionCatalog {
             if (parent.getChildren() == null) parent.setChildren(new ArrayList<>());
             parent.getChildren().add(entry.getValue());
         }
+        roots = ApplicationNavigationPolicy.groupRoots(roots);
         sortMenus(roots);
         return List.copyOf(roots);
     }
