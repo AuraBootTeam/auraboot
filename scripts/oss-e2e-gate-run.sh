@@ -22,7 +22,7 @@
 #   * the backend runs with AGENT_LLM_STUB_MODE=true (deterministic, no key, no
 #     spend) — oss-golden-stack.sh `up` sets it, and this runner exports it
 #     before `up` so it is unambiguous;
-#   * the Playwright run is PW_PROFILE=oss --project=oss (NOT --project=chromium:
+#   * the Playwright run is PW_PROFILE=oss --project=oss --project=oss-deep (NOT --project=chromium:
 #     under chromium the setup project skips the test-fixtures import and ~2x of
 #     the failures are then phantom "Command not found: e2et:*" harness noise).
 #
@@ -142,7 +142,7 @@ node "$SCRIPT_DIR/dev/oss-disk-preflight.mjs" "$STATE_ROOT" || die_env "insuffic
 RUN_PATHS=()
 case "$SCOPE_MODE" in
   slice) RUN_PATHS=("${SLICE_DIRS[@]}");;
-  full)  RUN_PATHS=();;                       # no positional => whole `oss` project
+  full)  RUN_PATHS=();;                       # no positional => both OSS projects
   dirs)  RUN_PATHS=("${SCOPE_DIRS[@]}");;
 esac
 
@@ -248,11 +248,11 @@ log "    base=$PLAYWRIGHT_BASE_URL backend=$BACKEND_URL bff=$BFF_PORT (AGENT_LLM
 # aura-bpm and aura-crm release suites own those fixtures and denominators.
 
 # --- 3. run the gate slice under the OSS env contract ------------------------
-log "3/4 run gate: PW_PROFILE=oss --project=oss --no-deps (x$REPEAT)"
+log "3/4 run gate: PW_PROFILE=oss --project=oss --project=oss-deep --no-deps (x$REPEAT)"
 cd "$REPO_ROOT/web-admin" || die_env "web-admin not found under $REPO_ROOT"
 mkdir -p "$AURA_EVIDENCE_ROOT/playwright/report"
 export PLAYWRIGHT_JSON_OUTPUT_FILE="$AURA_EVIDENCE_ROOT/playwright/report/results.json"
-PW_ARGS=(--project=oss --no-deps --repeat-each="$REPEAT" --retries=0 --reporter=line,json)
+PW_ARGS=(--project=oss --project=oss-deep --no-deps --repeat-each="$REPEAT" --retries=0 --reporter=line,json)
 [[ -n "$WORKERS" ]] && PW_ARGS+=(--workers="$WORKERS")
 [[ ${#RUN_PATHS[@]} -gt 0 ]] && PW_ARGS+=("${RUN_PATHS[@]}")
 set +e

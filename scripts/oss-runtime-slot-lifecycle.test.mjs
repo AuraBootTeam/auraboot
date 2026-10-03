@@ -183,3 +183,13 @@ test('fresh gate marks its runtime as verification evidence rather than feature 
   assert.match(source, /PLAYWRIGHT_JSON_OUTPUT_FILE="\$AURA_EVIDENCE_ROOT/u);
   assert.match(stack, /export PW_ARTIFACT_DIR=\$evidence_root/u);
 });
+
+test('OSS gate includes the independent deep project instead of silently dropping requested deep specs', () => {
+  const source = readFileSync(gatePath, 'utf8');
+  const args = source.match(/^PW_ARGS=\((.*)\)$/m)?.[1].split(/\s+/);
+  assert.ok(args, 'the executable argument array must be present');
+  assert.ok(args.includes('--project=oss'));
+  assert.ok(args.includes('--project=oss-deep'));
+  assert.ok(args.includes('--no-deps'), 'canonical setup is already audited separately');
+  assert.ok(args.includes('--retries=0'));
+});
