@@ -238,6 +238,10 @@ test.describe('Automation Enhanced', () => {
     await page.reload();
     await expect(nameInput).toHaveValue(automationName);
     await expect(descInput).toHaveValue('Created via E2E test');
+    for (const node of record.data.flowConfig.nodes) {
+      await expect(page.getByTestId(`flow-node-${node.id}`)).toBeVisible();
+    }
+    await expect(page.locator('.react-flow__edge')).toHaveCount(1);
     await page.screenshot({ path: test.info().outputPath('AUTO-02-saved.png'), fullPage: true });
   });
 
