@@ -60,7 +60,7 @@ class CommandTargetVersionLockPhaseTest {
         assertThat(ctx.getTargetRecordVersion()).isEqualTo(7L);
         verify(dynamicDataMapper).selectByQueryWithoutTenant(
                 eq("SELECT row_version FROM dq_quote_request WHERE tenant_id = #{params.tenantId}"
-                        + " AND pid = #{params.targetRecordPid} FOR SHARE"),
+                        + " AND pid = #{params.targetRecordPid} FOR UPDATE"),
                 eq(Map.of("tenantId", 41L, "targetRecordPid", "REQ-1")));
     }
 
