@@ -505,6 +505,22 @@ bootRun {
 }
 
 tasks.withType(Test).configureEach {
+    // Frozen architecture rules may remove obsolete violations. Keep those writes
+    // in this task's build directory rather than mutating the checked-in baseline.
+    def architectureBaseline = file('src/test/resources/archunit_store')
+    def architectureStore = layout.buildDirectory.dir("tmp/${name}/archunit_store").get().asFile
+    systemProperty 'archunit.freeze.store.default.path', architectureStore.absolutePath
+    systemProperty 'archunit.freeze.store.default.allowStoreCreation', 'false'
+    doFirst {
+        if (!new File(architectureBaseline, 'stored.rules').isFile()) {
+            throw new GradleException('The committed ArchUnit violation baseline is missing')
+        }
+        delete architectureStore
+        copy {
+            from architectureBaseline
+            into architectureStore
+        }
+    }
     reports.junitXml {
         includeSystemOutLog = false
         includeSystemErrLog = false

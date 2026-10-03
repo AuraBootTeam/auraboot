@@ -16,6 +16,9 @@ import com.auraboot.framework.rbac.entity.RolePermission;
 import com.auraboot.framework.rbac.mapper.RoleMapper;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -71,6 +74,9 @@ class PermissionServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        TableInfoHelper.initTableInfo(
+                new MapperBuilderAssistant(new MybatisConfiguration(), "permission-service-unit"),
+                Permission.class);
         MetaContext.setContext(100L, 1L, "u-pid", "tester");
     }
 
@@ -87,6 +93,25 @@ class PermissionServiceImplTest {
         req.setResourceCode("model.user");
         req.setAction("read");
         return req;
+    }
+
+    @Test
+    void findByPidReturnsDTO() {
+        Permission permission = new Permission();
+        PermissionDTO dto = new PermissionDTO();
+        when(permissionMapper.findByPids(List.of("permission-pid"))).thenReturn(List.of(permission));
+        when(permissionConverter.toDTO(permission)).thenReturn(dto);
+
+        assertThat(service.findByPid("permission-pid")).isSameAs(dto);
+        verify(permissionMapper).findByPids(List.of("permission-pid"));
+    }
+
+    @Test
+    void findByPidReturnsNullWhenMissing() {
+        when(permissionMapper.findByPids(List.of("missing"))).thenReturn(List.of());
+
+        assertThat(service.findByPid("missing")).isNull();
+        verify(permissionConverter, never()).toDTO(any(Permission.class));
     }
 
     @Test

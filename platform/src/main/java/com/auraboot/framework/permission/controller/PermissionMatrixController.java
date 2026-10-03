@@ -11,8 +11,8 @@ import com.auraboot.framework.permission.dto.DataScopeUpdateRequest;
 import com.auraboot.framework.permission.dto.PermissionGrantRequest;
 import com.auraboot.framework.permission.dto.RoleDefaultScopeRequest;
 import com.auraboot.framework.permission.dto.PermissionMatrixDTO;
-import com.auraboot.framework.permission.entity.Permission;
-import com.auraboot.framework.permission.mapper.PermissionMapper;
+import com.auraboot.framework.permission.dto.PermissionDTO;
+import com.auraboot.framework.permission.service.PermissionService;
 import com.auraboot.framework.permission.service.DataScopeService;
 import com.auraboot.framework.permission.service.PermissionMatrixService;
 import com.auraboot.framework.permission.service.PermissionPolicyService;
@@ -58,7 +58,7 @@ public class PermissionMatrixController {
     private final RoleService roleService;
     private final DataScopeService dataScopeService;
     private final PermissionPolicyService policyService;
-    private final PermissionMapper permissionMapper;
+    private final PermissionService permissionService;
     private final PermissionExplanationService permissionExplanationService;
 
     /**
@@ -186,7 +186,7 @@ public class PermissionMatrixController {
         if (role == null) {
             throw new RootUnCheckedException(BadParam, "Role not found by PID: " + rolePid);
         }
-        Permission permission = findPermissionByPid(permissionPid);
+        PermissionDTO permission = findPermissionByPid(permissionPid);
         Map<String, Object> policy = policyService.getPolicy(role.getId(), permission.getId());
         return ApiResponse.success(policy);
     }
@@ -208,7 +208,7 @@ public class PermissionMatrixController {
         if (role == null) {
             throw new RootUnCheckedException(BadParam, "Role not found by PID: " + rolePid);
         }
-        Permission permission = findPermissionByPid(permissionPid);
+        PermissionDTO permission = findPermissionByPid(permissionPid);
         log.info("Setting policy for role+permission: rolePid={}, permissionPid={}, keys={}",
                 rolePid, permissionPid, policyValues.keySet());
         policyService.setPolicy(role.getId(), permission.getId(), policyValues);
@@ -236,11 +236,11 @@ public class PermissionMatrixController {
         return ApiResponse.success(permissionExplanationService.explain(memberId, resource, action, recordPid));
     }
 
-    private Permission findPermissionByPid(String permissionPid) {
-        List<Permission> permissions = permissionMapper.findByPids(List.of(permissionPid));
-        if (permissions.isEmpty()) {
+    private PermissionDTO findPermissionByPid(String permissionPid) {
+        PermissionDTO permission = permissionService.findByPid(permissionPid);
+        if (permission == null) {
             throw new RootUnCheckedException(BadParam, "Permission not found by PID: " + permissionPid);
         }
-        return permissions.get(0);
+        return permission;
     }
 }
