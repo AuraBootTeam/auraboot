@@ -544,6 +544,18 @@ tasks.register('instrumentMainOffline') {
 
 // 配置测试任务使用JUnit Platform
 test {
+    // FreezingArchRule removes resolved violations. Keep those generated updates
+    // outside tracked source files while still checking the committed baseline.
+    def runtimeArchunitStore = file("${buildDir}/test-fixtures/archunit_store")
+    systemProperty 'archunit.freeze.store.default.path', runtimeArchunitStore.absolutePath
+    systemProperty 'archunit.freeze.store.default.allowStoreCreation', 'false'
+    doFirst {
+        delete runtimeArchunitStore
+        copy {
+            from file('src/test/resources/archunit_store')
+            into runtimeArchunitStore
+        }
+    }
     useJUnitPlatform {
         // Real-LLM evals (@Tag("agent-eval-live")) call the explicit
         // AURA_LIVE_LLM_* validation profile. They are
@@ -560,8 +572,7 @@ test {
         if (!project.hasProperty('includeLiveEvals')) {
             excludeTags 'agent-eval-live'
         }
-        // Full bootstrap intentionally replaces the platform root data. Keep it in a
-        // terminal, single-test task so it cannot erase fixtures beneath the shared suite.
+        // Full bootstrap needs its own blank migrated database and a separate task.
         excludeTags 'destructive-bootstrap'
     }
     jvmArgs "-Djavax.xml.parsers.SAXParserFactory=com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl"
@@ -629,7 +640,7 @@ test {
 
 tasks.register('bootstrapBillingAccountTest', Test) {
     group = 'verification'
-    description = 'Run the destructive full-bootstrap billing account integration test last.'
+    description = 'Run full-bootstrap billing verification against a dedicated blank database.'
     useJUnitPlatform {
         includeTags 'destructive-bootstrap'
     }
@@ -639,6 +650,15 @@ tasks.register('bootstrapBillingAccountTest', Test) {
     // The database is recreated outside Gradle, so task outputs cannot prove the external
     // bootstrap contract was re-executed for this run.
     outputs.upToDateWhen { false }
+    doFirst {
+        def isolatedUrl = System.getenv('BOOTSTRAP_TEST_DATABASE_URL')
+        if (!isolatedUrl?.trim()) {
+            throw new GradleException('BOOTSTRAP_TEST_DATABASE_URL is required; retained/shared databases must not be reset')
+        }
+        ['TEST_DATABASE_URL', 'DATABASE_URL', 'SPRING_DATASOURCE_URL'].each {
+            environment it, isolatedUrl
+        }
+    }
     maxParallelForks = 1
 
     def bootstrapTestTmpDir = file("${buildDir}/tmp/bootstrapBillingAccountTest")

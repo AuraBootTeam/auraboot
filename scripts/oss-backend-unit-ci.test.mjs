@@ -124,12 +124,33 @@ test('backend CI runner keeps external DashScope checks out unless explicitly re
   assert.match(source, /DashScope live checks disabled/);
 });
 
-test('backend CI runner executes destructive bootstrap verification only after the shared suite', () => {
+test('backend CI runner executes isolated bootstrap verification only after the shared suite', () => {
   const buildSource = readFileSync(gradleBuild, 'utf8');
   assert.match(source, /--continue cleanTest test bootstrapBillingAccountTest/);
   assert.match(buildSource, /excludeTags 'destructive-bootstrap'/);
   assert.match(buildSource, /mustRunAfter tasks\.named\('test'\)/);
   assert.match(buildSource, /outputs\.upToDateWhen \{ false \}/);
+});
+
+test('bootstrap task has a separately migrated database and refuses implicit shared URLs', () => {
+  const buildSource = readFileSync(gradleBuild, 'utf8');
+  const fixture = readFileSync(path.join(here, '..', 'platform', 'src', 'test', 'java',
+    'com', 'auraboot', 'framework', 'saas', 'bootstrap', 'BootstrapBillingAccountIT.java'), 'utf8');
+  assert.match(source, /CREATE DATABASE aura_boot_bootstrap OWNER auraboot/);
+  assert.match(source, /run_flyway migrate aura_boot_bootstrap/);
+  assert.match(source, /run_flyway validate aura_boot_bootstrap/);
+  assert.match(source, /BOOTSTRAP_TEST_DATABASE_URL="jdbc:postgresql:[^\n]+aura_boot_bootstrap/);
+  assert.match(buildSource, /BOOTSTRAP_TEST_DATABASE_URL is required/);
+  assert.match(fixture, /bootstrap verification requires its own blank migrated database/);
+  assert.doesNotMatch(fixture, /TRUNCATE TABLE|DELETE FROM|reset-db\.sh/);
+});
+
+test('ArchUnit uses a copy of the committed store without refreezing new violations', () => {
+  const buildSource = readFileSync(gradleBuild, 'utf8');
+  assert.match(buildSource, /test-fixtures\/archunit_store/);
+  assert.match(buildSource, /from file\('src\/test\/resources\/archunit_store'\)/);
+  assert.match(buildSource, /archunit\.freeze\.store\.default\.allowStoreCreation', 'false'/);
+  assert.doesNotMatch(buildSource, /freeze\.refreeze/);
 });
 
 test('backend CI runner points fixed-stack tests at runtime-owned host ports', () => {

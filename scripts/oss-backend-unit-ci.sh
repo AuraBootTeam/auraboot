@@ -153,7 +153,6 @@ if [[ "$postgres_initialized" != true ]]; then
 fi
 
 FLYWAY_ARGS=(
-  -url=jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/aura_boot
   -user=auraboot
   -password=auraboot_dev
   -locations=filesystem:/flyway/sql
@@ -163,9 +162,10 @@ FLYWAY_ARGS=(
   -cleanDisabled=true
 )
 run_flyway() {
+  local target_database="${2:-aura_boot}"
   docker run --rm --network host \
     -v "$PROJECT_ROOT/platform/src/main/resources/db/migration/core:/flyway/sql:ro" \
-    "$FLYWAY_IMAGE" "${FLYWAY_ARGS[@]}" "$1"
+    "$FLYWAY_IMAGE" "-url=jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/$target_database" "${FLYWAY_ARGS[@]}" "$1"
 }
 
 if ! run_flyway migrate > "$ARTIFACTS/flyway-migrate.log" 2>&1; then
@@ -174,6 +174,18 @@ if ! run_flyway migrate > "$ARTIFACTS/flyway-migrate.log" 2>&1; then
 fi
 if ! run_flyway validate > "$ARTIFACTS/flyway-validate.log" 2>&1; then
   printf '[oss-backend-unit-ci] product-failure: Flyway validate failed\n' >&2
+  exit 1
+fi
+
+# Bootstrap never resets shared-suite fixtures or bypasses immutable binding guards.
+if ! docker compose "${COMPOSE_ARGS[@]}" exec -T postgres \
+  psql -U auraboot -d postgres -v ON_ERROR_STOP=1 \
+  -c 'CREATE DATABASE aura_boot_bootstrap OWNER auraboot' > "$ARTIFACTS/bootstrap-database-create.log" 2>&1; then
+  environment_invalid 'cannot create isolated bootstrap database'
+fi
+if ! run_flyway migrate aura_boot_bootstrap > "$ARTIFACTS/bootstrap-flyway-migrate.log" 2>&1 \
+  || ! run_flyway validate aura_boot_bootstrap > "$ARTIFACTS/bootstrap-flyway-validate.log" 2>&1; then
+  printf '[oss-backend-unit-ci] product-failure: bootstrap database migration failed\n' >&2
   exit 1
 fi
 
@@ -210,6 +222,7 @@ if [[ "${AURA_CI_INCLUDE_DASHSCOPE_LIVE:-0}" != "1" ]]; then
 fi
 
 TEST_DATABASE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/aura_boot?charSet=UTF8" \
+BOOTSTRAP_TEST_DATABASE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/aura_boot_bootstrap?charSet=UTF8" \
 TEST_DATABASE_USERNAME='auraboot' \
 TEST_DATABASE_PASSWORD='auraboot_dev' \
 DATABASE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/aura_boot?charSet=UTF8" \
