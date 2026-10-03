@@ -223,6 +223,33 @@ class FileAccessorImplTest {
                 .hasMessageContaining("relation");
     }
 
+    @Test
+    void saveAndAppendLink_neverUsesTheReplacingRelationOperation() {
+        var response = new FileUploadResponseDTO(); response.setFileId("new-file-pid");
+        response.setOriginalName("合同.txt"); response.setFileSize(3L);
+        when(fileService.uploadFile(org.mockito.ArgumentMatchers.any(MultipartFile.class), eq(42L))).thenReturn(response);
+        when(fileService.appendFileRelation(org.mockito.ArgumentMatchers.any(FileRelationRequestDTO.class), eq(42L))).thenReturn(true);
+        var accessor = new FileAccessorImpl(fileService, storageProvider, 42L);
+        var saved = accessor.saveAndAppendLink("合同.txt", "text/plain", new byte[]{1,2,3}, "BPM_TASK", "task-1", "attachment");
+        assertThat(saved.fileId()).isEqualTo("new-file-pid");
+        var relation = ArgumentCaptor.forClass(FileRelationRequestDTO.class);
+        verify(fileService).appendFileRelation(relation.capture(), eq(42L));
+        assertThat(relation.getValue().getFileIds()).containsExactly("new-file-pid");
+        assertThat(relation.getValue().getEntityId()).isEqualTo("task-1");
+        org.mockito.Mockito.verify(fileService, org.mockito.Mockito.never()).createFileRelation(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void saveAndAppendLink_failsClosedWhenAppendIsUnavailable() {
+        var response = new FileUploadResponseDTO(); response.setFileId("new-file-pid");
+        response.setOriginalName("合同.txt"); response.setFileSize(1L);
+        when(fileService.uploadFile(org.mockito.ArgumentMatchers.any(MultipartFile.class), eq(42L))).thenReturn(response);
+        var accessor = new FileAccessorImpl(fileService, storageProvider, 42L);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> accessor.saveAndAppendLink(
+                "合同.txt", "text/plain", new byte[]{1}, "BPM_TASK", "task-1", "attachment"))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("relation");
+    }
+
     private static FileEntity file(String pid, String storageKey, String originalName) {
         FileEntity entity = new FileEntity();
         entity.setPid(pid);

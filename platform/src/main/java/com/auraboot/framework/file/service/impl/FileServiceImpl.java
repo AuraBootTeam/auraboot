@@ -297,6 +297,41 @@ public class FileServiceImpl implements FileService {
     }
 
     @Override
+    @Transactional
+    public boolean appendFileRelation(FileRelationRequestDTO request, Long userId) {
+        if (!MetaContext.exists()) throw new BusinessException("An authenticated business file relation is required");
+        Long tenantId = MetaContext.getCurrentTenantId();
+        if (tenantId == null || userId == null || !userId.equals(MetaContext.getCurrentUserId())
+                || request == null || !StringUtils.hasText(request.getEntityType())
+                || !StringUtils.hasText(request.getEntityId()) || !StringUtils.hasText(request.getFieldName())
+                || request.getFileIds() == null || request.getFileIds().length == 0) {
+            throw new BusinessException("An authenticated business file relation is required");
+        }
+        int order = 0;
+        for (String publicFileId : request.getFileIds()) {
+            if (!StringUtils.hasText(publicFileId)) throw new BusinessException("A public file id is required");
+            FileEntity file = findByPid(publicFileId);
+            if (file == null || file.getId() == null || !publicFileId.equals(file.getPid())
+                    || Boolean.TRUE.equals(file.getDeletedFlag())
+                    || !UploadStatus.SUCCESS.getCode().equalsIgnoreCase(file.getStatus())
+                    || !userId.equals(file.getCreatedBy())) {
+                throw new BusinessException("Only an owned finalized public file can be appended");
+            }
+            FileRelationEntity relation = new FileRelationEntity();
+            relation.setTenantId(tenantId);
+            relation.setFileId(String.valueOf(file.getId()));
+            relation.setEntityType(request.getEntityType());
+            relation.setEntityId(request.getEntityId());
+            relation.setFieldName(request.getFieldName());
+            relation.setSortOrder(order++);
+            if (fileRelationMapper.insert(relation) != 1) {
+                throw new IllegalStateException("Additional file relation was not persisted");
+            }
+        }
+        return true;
+    }
+
+    @Override
     public List<FileEntity> getFilesByEntity(String entityType, String entityId) {
         List<Long> fileIds = fileRelationMapper.findFileIdsByEntity(entityType, entityId);
         if (fileIds.isEmpty()) {
