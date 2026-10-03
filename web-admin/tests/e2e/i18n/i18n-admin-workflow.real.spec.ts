@@ -246,6 +246,8 @@ test.describe('i18n admin real workflow', () => {
       const resource = await accepted<Resource>(await admin.page.request.post('/api/admin/i18n/resources', { data: {
         key: `e2e.ios-handover.${suffix}.permission`, lang: 'zh-CN', value: 'Permission fixture',
       } }));
+      const persistedBeforeDenials = await read(admin.page, resource.pid);
+      expect(persistedBeforeDenials).toMatchObject({ pid: resource.pid, value: 'Permission fixture', status: 'approved' });
       member = await openAsRole(browser, user.email, user.password);
       const snapshot = await fetchRoleSnapshot(member.page);
       expect(snapshot.roleCodes).toEqual(['tenant_member']);
@@ -283,12 +285,18 @@ test.describe('i18n admin real workflow', () => {
       const denied = [];
       for (const request of requests) {
         const response = await member.page.request.fetch(request.path, { method: request.method, data: request.data });
-        expect(response.status(), `${request.method} ${request.path}`).toBe(403);
+        // The canonical coarse admin-role guard precedes permission evaluation.
+        // Its denial is HTTP 200 with the exact business envelope, not HTTP 403.
+        expect(response.status(), `${request.method} ${request.path}`).toBe(200);
         const envelope = await response.json();
-        expect(envelope.code).not.toBe('0');
+        expect(envelope.code).toBe('409');
+        expect(envelope.message).toBe('admin role required');
         denied.push({ method: request.method, path: request.path, httpStatus: response.status(), code: envelope.code });
       }
-      expect(await read(admin.page, resource.pid)).toMatchObject({ value: 'Permission fixture', status: 'approved' });
+      expect(await read(admin.page, resource.pid)).toEqual(persistedBeforeDenials);
+      expect(await accepted<Resource | null>(await admin.page.request.get('/api/admin/i18n/resources/by-key', {
+        params: { key: `${resource.i18nKey}.forbidden`, lang: 'zh-CN' },
+      }))).toBeNull();
       await info.attach('authenticated-member-denials', { body: Buffer.from(JSON.stringify(denied, null, 2)), contentType: 'application/json' });
     } finally { await member?.context.close(); await admin.context.close(); }
   });
