@@ -2,6 +2,7 @@
 // An executed result and original screenshot review are required for acceptance.
 import { test, expect, request as requestFactory, type Page, type APIResponse, type APIRequestContext } from '@playwright/test';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
+import { loginViaUI } from '../../helpers/auth-fixtures';
 import { openAsRole, makeRoleUser, ensureRoleUser, fetchRoleSnapshot } from '../rbac/rbac-helpers';
 import { ensureSidebarExpanded } from '../helpers';
 
@@ -451,6 +452,53 @@ test.describe('i18n admin real workflow', () => {
       await expect(dialog.getByRole('alert')).toHaveText(body.message);
       expect(await read(page, resource.pid)).toEqual(approvedBeforeFailure);
       await info.attach('business-failure-original', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+
+      // A real second-tab login changes the shared httpOnly session while the
+      // first tab retains its already-open admin UI. No response interception.
+      await dialog.getByRole('button', { name: /^(取消|Cancel)$/ }).click();
+      const deniedKey = `${key}.session-change`;
+      const deniedResource = await accepted<Resource>(await page.request.post('/api/admin/i18n/resources', {
+        data: { key: deniedKey, lang: 'zh-CN', value: 'Session change review fixture' },
+      }));
+      await accepted(await page.request.put(`/api/admin/i18n/resources/${deniedResource.pid}/status`, { data: { status: 'draft' } }));
+      await accepted(await page.request.post(`/api/admin/i18n/resources/${deniedResource.pid}/submit-review`));
+      const member = makeRoleUser(`ios-i18n-session-change-${Date.now()}-${info.workerIndex}`, ['tenant_member']);
+      await ensureRoleUser(page, member);
+      await filter(page, deniedKey);
+      const reviewBeforeDenial = await persisted(page, deniedResource.pid, 'review');
+      const packBeforeDenial = await packValue(page, deniedKey);
+      await row(page, deniedKey).getByLabel(`reject-${deniedKey}`, { exact: true }).click();
+      const preservedReason = 'Preserve this reason after the session changes in another tab';
+      await reason.fill(preservedReason);
+      const sessionPage = await context.newPage();
+      await loginViaUI(sessionPage, member.email, member.password);
+      const memberIdentity = await accepted<{ user: { email: string } }>(await sessionPage.request.get('/api/auth/me'));
+      expect(memberIdentity.user.email).toBe(member.email);
+      const memberSnapshot = await fetchRoleSnapshot(sessionPage);
+      expect(memberSnapshot.roleCodes).toEqual(['tenant_member']);
+      expect(memberSnapshot.permissionCodes).not.toContain('system_management');
+      await expect(dialog).toBeVisible();
+      await expect(reason).toHaveValue(preservedReason);
+      const deniedResponse = page.waitForResponse(r => r.url().endsWith(`/resources/${deniedResource.pid}/reject`) && r.request().method() === 'POST');
+      await dialog.getByRole('button', { name: /^(驳回|Reject)$/ }).click();
+      const denied = await deniedResponse;
+      const deniedBody = await denied.json();
+      expect(denied.status()).toBe(200);
+      expect(deniedBody.code, JSON.stringify(deniedBody)).toBe('409');
+      expect(deniedBody.message).toBe('admin role required');
+      await expect(dialog).toBeVisible();
+      await expect(reason).toHaveValue(preservedReason);
+      await expect(dialog.getByRole('alert')).toHaveText(deniedBody.message);
+      const observer = await openAsRole(browser, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
+      try {
+        expect(await read(observer.page, deniedResource.pid)).toEqual(reviewBeforeDenial);
+        expect(await packValue(observer.page, deniedKey)).toBe(packBeforeDenial);
+      } finally { await observer.context.close(); }
+      await info.attach('http200-business-failure-original', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+      await info.attach('http200-business-failure-session', {
+        body: Buffer.from(JSON.stringify({ member: memberIdentity.user.email, roleSnapshot: memberSnapshot, status: denied.status(), code: deniedBody.code, message: deniedBody.message }, null, 2)),
+        contentType: 'application/json',
+      });
       // Retain the uniquely named fixture and artifacts for failure/owner review.
     } finally { await context.close(); }
   });
