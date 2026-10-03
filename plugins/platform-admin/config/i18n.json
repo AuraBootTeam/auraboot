@@ -5899,5 +5899,12 @@
     "en-US": "Draft has not been saved",
     "source": "import",
     "refType": "ui"
+  },
+  {
+    "key": "expression.fieldGroup.bpmContext",
+    "zh-CN": "流程上下文",
+    "en-US": "Workflow context",
+    "source": "import",
+    "refType": "ui"
   }
 ]

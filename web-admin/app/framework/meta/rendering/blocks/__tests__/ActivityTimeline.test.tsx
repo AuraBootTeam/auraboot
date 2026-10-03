@@ -110,6 +110,15 @@ describe('ActivityTimeline', () => {
         modelCode="crm_opportunity_common"
         recordPid="opportunity-1"
         locale="zh-CN"
+        businessRecordMapping={{
+          activityType: 'crm_act_type',
+          subject: 'crm_act_subject',
+          content: 'crm_act_content',
+          status: 'crm_act_status',
+          priority: 'crm_act_priority',
+          actorName: 'owner_name',
+          occurredAt: 'crm_act_date',
+        }}
         businessDataSource={{
           queryCode: 'crm_activities_by_object',
           params: { objectType: 'opportunity', objectId: '${recordPid}' },

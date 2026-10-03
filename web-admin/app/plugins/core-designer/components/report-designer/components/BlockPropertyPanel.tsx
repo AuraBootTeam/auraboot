@@ -46,13 +46,15 @@ const BlockActionBar: React.FC<{
   totalBlocks: number;
   onMove: (blockId: string, direction: 'up' | 'down') => void;
   onRemove: (blockId: string) => void;
-}> = ({ blockId, blockIndex, totalBlocks, onMove, onRemove }) => (
+}> = ({ blockId, blockIndex, totalBlocks, onMove, onRemove }) => {
+  const text = useSmartText();
+  return (
   <div className="flex items-center gap-1">
     <button
       onClick={() => onMove(blockId, 'up')}
       disabled={blockIndex === 0}
       className="rounded p-1.5 text-gray-500 hover:bg-blue-50 hover:text-blue-600 disabled:opacity-30"
-      title="Move up"
+      title={text({ zh: '上移', en: 'Move up' })}
     >
       <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
@@ -62,7 +64,7 @@ const BlockActionBar: React.FC<{
       onClick={() => onMove(blockId, 'down')}
       disabled={blockIndex === totalBlocks - 1}
       className="rounded p-1.5 text-gray-500 hover:bg-blue-50 hover:text-blue-600 disabled:opacity-30"
-      title="Move down"
+      title={text({ zh: '下移', en: 'Move down' })}
     >
       <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -71,12 +73,13 @@ const BlockActionBar: React.FC<{
     <button
       onClick={() => onRemove(blockId)}
       className="rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600"
-      title="Delete"
+      title={text({ zh: '删除', en: 'Delete' })}
     >
       <TrashIcon />
     </button>
   </div>
-);
+  );
+};
 
 /** Panel wrapper with consistent layout */
 const PanelShell: React.FC<{
@@ -119,8 +122,8 @@ export const BlockPropertyPanel: React.FC = () => {
   if (selectedBlockId === '__header' && report.header) {
     return (
       <PanelShell
-        title="Page Header"
-        actions={<DeleteButton onClick={() => updateHeader(undefined)} title="Remove header" />}
+        title={text({ zh: '页眉', en: 'Page Header' })}
+        actions={<DeleteButton onClick={() => updateHeader(undefined)} title={text({ zh: '移除页眉', en: 'Remove header' })} />}
       >
         <BandEditor band={report.header} onChange={updateHeader} />
       </PanelShell>
@@ -131,8 +134,8 @@ export const BlockPropertyPanel: React.FC = () => {
   if (selectedBlockId === '__footer' && report.footer) {
     return (
       <PanelShell
-        title="Page Footer"
-        actions={<DeleteButton onClick={() => updateFooter(undefined)} title="Remove footer" />}
+        title={text({ zh: '页脚', en: 'Page Footer' })}
+        actions={<DeleteButton onClick={() => updateFooter(undefined)} title={text({ zh: '移除页脚', en: 'Remove footer' })} />}
       >
         <BandEditor band={report.footer} onChange={updateFooter} />
       </PanelShell>
@@ -156,7 +159,7 @@ export const BlockPropertyPanel: React.FC = () => {
 
     if (block.blockType === 'table') {
       return (
-        <PanelShell title="Data Table" actions={actionBar}>
+        <PanelShell title={text({ zh: '数据表格', en: 'Data Table' })} actions={actionBar}>
           <DataTableBlockEditor
             block={block}
             dataSources={report.dataSources}
@@ -168,7 +171,7 @@ export const BlockPropertyPanel: React.FC = () => {
 
     if (block.blockType === 'grouped-table') {
       return (
-        <PanelShell title="Grouped Table" actions={actionBar}>
+        <PanelShell title={text({ zh: '分组表格', en: 'Grouped Table' })} actions={actionBar}>
           <GroupedTableBlockEditor
             block={block}
             dataSources={report.dataSources}
@@ -180,7 +183,7 @@ export const BlockPropertyPanel: React.FC = () => {
 
     if (block.blockType === 'stat-card') {
       return (
-        <PanelShell title="Stat Card" actions={actionBar}>
+        <PanelShell title={text({ zh: '指标卡片', en: 'Stat Card' })} actions={actionBar}>
           <StatCardBlockEditor
             block={block}
             dataSources={report.dataSources}
@@ -192,7 +195,7 @@ export const BlockPropertyPanel: React.FC = () => {
 
     if (block.blockType === 'rich-text') {
       return (
-        <PanelShell title="Rich Text" actions={actionBar}>
+        <PanelShell title={text({ zh: '富文本', en: 'Rich Text' })} actions={actionBar}>
           <RichTextBlockEditor
             block={block}
             onChange={(updates) => updateBlock(block.id, updates)}
@@ -203,7 +206,7 @@ export const BlockPropertyPanel: React.FC = () => {
 
     if (block.blockType === 'cross-tab') {
       return (
-        <PanelShell title="Cross Tab" actions={actionBar}>
+        <PanelShell title={text({ zh: '交叉表', en: 'Cross Tab' })} actions={actionBar}>
           <CrossTabBlockEditor
             block={block}
             dataSources={report.dataSources}
@@ -215,7 +218,7 @@ export const BlockPropertyPanel: React.FC = () => {
 
     if (block.blockType === 'chart') {
       return (
-        <PanelShell title="Chart" actions={actionBar}>
+        <PanelShell title={text({ zh: '图表', en: 'Chart' })} actions={actionBar}>
           <ChartBlockEditor
             block={block}
             dataSources={report.dataSources}
@@ -227,7 +230,7 @@ export const BlockPropertyPanel: React.FC = () => {
 
     if (block.blockType === 'barcode') {
       return (
-        <PanelShell title="Barcode" actions={actionBar}>
+        <PanelShell title={text({ zh: '条码', en: 'Barcode' })} actions={actionBar}>
           <BarcodeBlockEditor
             block={block}
             dataSources={report.dataSources}
@@ -239,7 +242,7 @@ export const BlockPropertyPanel: React.FC = () => {
 
     if (block.blockType === 'watermark') {
       return (
-        <PanelShell title="Watermark" actions={actionBar}>
+        <PanelShell title={text({ zh: '水印', en: 'Watermark' })} actions={actionBar}>
           <WatermarkBlockEditor
             block={block}
             onChange={(updates) => updateBlock(block.id, updates)}
@@ -267,20 +270,20 @@ export const BlockPropertyPanel: React.FC = () => {
         <div>
           <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-400">{text({ zh: '页面大小', en: 'Page Size' })}</label>
           <p className="text-sm text-gray-600">
-            {report.page.size} — {report.page.orientation}
+            {report.page.size} — {report.page.orientation === 'landscape' ? text({ zh: '横向', en: 'Landscape' }) : text({ zh: '纵向', en: 'Portrait' })}
           </p>
         </div>
 
         <div>
           <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-400">{text({ zh: '数据源', en: 'Data Sources' })}</label>
           <p className="text-sm text-gray-600">
-            {Object.keys(report.dataSources).length} configured
+            {Object.keys(report.dataSources).length} {text({ zh: '个已配置', en: 'configured' })}
           </p>
         </div>
 
         <div>
-          <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-400">Blocks</label>
-          <p className="text-sm text-gray-600">{report.body.length} block(s)</p>
+          <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-400">{text({ zh: '块', en: 'Blocks' })}</label>
+          <p className="text-sm text-gray-600">{report.body.length} {text({ zh: '个块', en: 'block(s)' })}</p>
         </div>
 
         {/* Parameter Editor */}

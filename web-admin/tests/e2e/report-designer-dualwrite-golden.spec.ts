@@ -37,8 +37,8 @@ test('report menu supports save, reopen, version rollback and canonical JSON dow
   await page.getByRole('button', { name: '取消', exact: true }).click();
   await expect(page.getByRole('heading', { name: '页面设置' })).toHaveCount(0);
 
-  await page.getByRole('button', { name: /Rich Text/ }).click();
-  await page.getByPlaceholder('Enter text content...').fill('Original analysis conclusion');
+  await page.getByRole('button', { name: /富文本|Rich Text/ }).click();
+  await page.getByPlaceholder(/^(输入文本内容…|Enter text content\.\.\.)$/).fill('Original analysis conclusion');
   await expect(page.getByTestId('report-canvas')).toContainText('Original analysis conclusion');
   const pageWrites: string[] = [];
   page.on('request', (request) => {
@@ -84,7 +84,7 @@ test('report menu supports save, reopen, version rollback and canonical JSON dow
     .getByTestId('report-canvas')
     .getByText('Original analysis conclusion', { exact: true })
     .click();
-  await page.getByPlaceholder('Enter text content...').fill('Revised analysis conclusion');
+  await page.getByPlaceholder(/^(输入文本内容…|Enter text content\.\.\.)$/).fill('Revised analysis conclusion');
   const updatedResponse = page.waitForResponse(
     (r) =>
       r.request().method() === 'PUT' &&

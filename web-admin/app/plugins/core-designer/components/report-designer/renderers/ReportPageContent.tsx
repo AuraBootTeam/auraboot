@@ -95,7 +95,7 @@ export const ReportPageContent: React.FC<ReportPageContentProps> = ({ pageKey })
         })}
       </div>
     );
-  if (!report) return <div className="mx-auto max-w-4xl p-8 text-gray-500">Report not found</div>;
+  if (!report) return <div className="mx-auto max-w-4xl p-8 text-gray-500">{text({ zh: '未找到报表', en: 'Report not found' })}</div>;
 
   return (
     <div className="mx-auto max-w-4xl p-8">
@@ -108,13 +108,13 @@ export const ReportPageContent: React.FC<ReportPageContentProps> = ({ pageKey })
             disabled={exporting || !query.canExport}
             className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
           >
-            {exporting ? 'Exporting...' : 'Export PDF'}
+            {exporting ? text({ zh: '正在导出…', en: 'Exporting…' }) : text({ zh: '导出 PDF', en: 'Export PDF' })}
           </button>
           <button
             onClick={handlePrint}
             className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
           >
-            Print
+            {text({ zh: '打印', en: 'Print' })}
           </button>
         </div>
       </div>

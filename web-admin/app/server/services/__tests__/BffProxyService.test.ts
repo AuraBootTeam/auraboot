@@ -111,7 +111,7 @@ describe('BffProxyService', () => {
     vi.stubEnv('BFF_VERBOSE_LOGGING', 'true');
     const service = new BffProxyService({ target: 'http://127.0.0.1:6443' });
     const { response } = createResponseRecorder();
-    const token = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiJ9.signature';
+    const token = 'test-session-token-'.repeat(100);
     const payload = Buffer.from(JSON.stringify({ data: { jwt: token, refreshToken: token } }));
     const log = vi.spyOn(logger, 'info').mockImplementation(() => undefined as never);
 

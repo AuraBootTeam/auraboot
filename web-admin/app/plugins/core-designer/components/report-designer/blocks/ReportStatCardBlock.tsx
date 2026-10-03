@@ -2,6 +2,7 @@
  * ReportStatCardBlock — KPI stat card for report headers
  */
 
+import { useSmartText } from '~/utils/i18n';
 import React from 'react';
 import type { StatCardBlock } from '../types';
 
@@ -53,6 +54,7 @@ export const ReportStatCardBlock: React.FC<ReportStatCardBlockProps> = ({
   mode,
   data = [],
 }) => {
+  const text = useSmartText();
   const colors = COLOR_MAP[block.color || 'blue'] || COLOR_MAP.blue;
   const value = mode === 'design' ? 12345 : computeValue(data, block.valueField, block.aggregation);
 
@@ -61,11 +63,13 @@ export const ReportStatCardBlock: React.FC<ReportStatCardBlockProps> = ({
       className={`inline-block min-w-[140px] rounded-lg border p-4 ${colors.bg} ${colors.border}`}
     >
       <div className="mb-1 text-xs tracking-wider text-gray-500 uppercase">
-        {block.label || block.title || 'Metric'}
+        {block.label || block.title || text({ zh: '指标', en: 'Metric' })}
       </div>
       <div className={`text-2xl font-bold ${colors.text}`}>{formatValue(value, block.format)}</div>
       {mode === 'design' && !block.valueField && (
-        <div className="mt-1 text-xs text-amber-500">Configure value field</div>
+        <div className="mt-1 text-xs text-amber-500">
+          {text({ zh: '请配置数值字段', en: 'Configure value field' })}
+        </div>
       )}
     </div>
   );

@@ -764,11 +764,9 @@
       "e2et_crm_opp_stage",
       "e2et_crm_opp_amount"
     ],
-    "execution": {
-      "permissions": [
-        "e2et.order.manage"
-      ]
-    }
+    "permissions": [
+      "e2et.order.manage"
+    ]
   },
   {
     "code": "e2et_crm_opp.update",
@@ -782,10 +780,8 @@
       "e2et_crm_opp_stage",
       "e2et_crm_opp_amount"
     ],
-    "execution": {
-      "permissions": [
-        "e2et.order.manage"
-      ]
-    }
+    "permissions": [
+      "e2et.order.manage"
+    ]
   }
 ]

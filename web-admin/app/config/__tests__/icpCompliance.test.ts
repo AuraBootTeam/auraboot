@@ -6,7 +6,7 @@ describe('ICP compliance configuration', () => {
     expect(resolveIcpComplianceConfig()).toEqual({
       enabled: false,
       siteTitle: '个人技术',
-      recordNumber: '浙ICP备XXXXXXX号',
+      recordNumber: '',
       siteDisplayName: 'AuraBoot',
     });
   });

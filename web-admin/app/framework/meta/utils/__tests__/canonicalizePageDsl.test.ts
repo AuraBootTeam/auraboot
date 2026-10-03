@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { validateStructure } from '../../validation/DslValidator';
 import { canonicalizePageSchemaDto, type PageSchemaDTO } from '../canonicalizePageDsl';
+import workflowFixture from './fixtures/workflow-pages.json';
 
 function collectPluginPageFiles(dir: string): string[] {
   if (!existsSync(dir)) return [];
@@ -29,6 +30,13 @@ function readPages(file: string): PageSchemaDTO[] {
 }
 
 describe('canonicalizePageSchemaDto', () => {
+  it('keeps workflow product pages outside the OSS platform plugin', () => {
+    const pages = readPages(resolve(process.cwd(), '../plugins/platform-admin/config/pages.json'));
+    const keys = new Set(pages.map((page) => page.pageKey));
+    for (const page of workflowFixture.pages) expect(keys.has(page.pageKey)).toBe(false);
+    expect(workflowFixture.source.commit).toMatch(/^[0-9a-f]{40}$/);
+  });
+
   it('builds a structurally valid canonical schema from a backend PageSchemaDTO', () => {
     const schema = canonicalizePageSchemaDto({
       pid: 'page-001',
@@ -570,10 +578,8 @@ describe('canonicalizePageSchemaDto', () => {
     });
   });
 
-  it('hosts SLA rule-center binding in the platform-admin DSL form and detail pages', () => {
-    const root = resolve(process.cwd(), '..');
-    const pagesFile = resolve(root, 'plugins/platform-admin/config/pages.json');
-    const pages = readPages(pagesFile);
+  it('canonicalizes the product-owned workflow SLA rule binding pages', () => {
+    const pages = workflowFixture.pages as PageSchemaDTO[];
     const formPage = pages.find((candidate) => candidate.pageKey === 'sla_config_form');
     const detailPage = pages.find((candidate) => candidate.pageKey === 'sla_config_detail');
 
@@ -591,7 +597,7 @@ describe('canonicalizePageSchemaDto', () => {
         mode: 'decision',
         valueField: 'rule_binding',
         consumerType: 'SLA',
-        initialDecisionCode: 'complaint_sla_deadline',
+        initialDecisionCode: 'wd_sla_deadline',
         fieldCatalogMode: 'merge',
       },
     });
@@ -612,7 +618,7 @@ describe('canonicalizePageSchemaDto', () => {
     expect(detailSchema.extension).toMatchObject({
       dataSource: {
         type: 'api',
-        endpoint: '/api/extensions/workflow/sla-configs/{pid}',
+        endpoint: '/api/bpm/sla-configs/{pid}',
         method: 'get',
       },
     });
@@ -669,17 +675,13 @@ describe('canonicalizePageSchemaDto', () => {
       },
     });
 
-    const fields = JSON.parse(
-      readFileSync(resolve(root, 'plugins/platform-admin/config/fields.json'), 'utf8'),
-    );
+    const fields = workflowFixture.fields;
     expect(fields.find((field: any) => field.code === 'action_policy')).toMatchObject({
       code: 'action_policy',
       dataType: 'jsonb',
     });
 
-    const commands = JSON.parse(
-      readFileSync(resolve(root, 'plugins/platform-admin/config/commands.json'), 'utf8'),
-    );
+    const commands = workflowFixture.commands;
     expect(
       commands.find((command: any) => command.code === 'admin:create_sla_config')?.inputFields,
     ).toContain('action_policy');
@@ -688,10 +690,8 @@ describe('canonicalizePageSchemaDto', () => {
     ).toContain('action_policy');
   });
 
-  it('keeps the BPM process list aligned with the imported model field contract', () => {
-    const root = resolve(process.cwd(), '..');
-    const pagesFile = resolve(root, 'plugins/platform-admin/config/pages.json');
-    const pages = readPages(pagesFile);
+  it('preserves product workflow list fields and API routing', () => {
+    const pages = workflowFixture.pages as PageSchemaDTO[];
     const listPage = pages.find((candidate) => candidate.pageKey === 'bpm_process_management_list');
 
     expect(listPage).toBeDefined();
@@ -699,7 +699,7 @@ describe('canonicalizePageSchemaDto', () => {
     const schema = canonicalizePageSchemaDto(listPage!);
     expect(schema.dataSource).toMatchObject({
       type: 'api',
-      endpoint: '/api/extensions/workflow/process-definitions',
+      endpoint: '/api/bpm/process-definitions',
       method: 'get',
     });
     const tableBlock = schema.blocks.find((block: any) => block.blockType === 'table') as any;
@@ -725,17 +725,15 @@ describe('canonicalizePageSchemaDto', () => {
           code: 'open_bpmn_designer',
           action: {
             type: 'navigate',
-            to: '/bpmn-designer?pid={pid}',
+            to: '/bpm/designer?pid={pid}',
           },
         }),
       ]),
     );
   });
 
-  it('uses the BPM process status dictionary on the process configuration form', () => {
-    const root = resolve(process.cwd(), '..');
-    const pagesFile = resolve(root, 'plugins/platform-admin/config/pages.json');
-    const pages = readPages(pagesFile);
+  it('preserves the product workflow status dictionary', () => {
+    const pages = workflowFixture.pages as PageSchemaDTO[];
     const formPage = pages.find((candidate) => candidate.pageKey === 'bpm_process_management_form');
     const schema = canonicalizePageSchemaDto(formPage!);
     const formSection = schema.blocks.find((block: any) => block.id === 'process_identity') as any;
@@ -747,10 +745,8 @@ describe('canonicalizePageSchemaDto', () => {
     });
   });
 
-  it('keeps the BPM process edit route from falling back to an auto-created stub page', () => {
-    const root = resolve(process.cwd(), '..');
-    const pagesFile = resolve(root, 'plugins/platform-admin/config/pages.json');
-    const pages = readPages(pagesFile);
+  it('preserves the product workflow configuration and designer routes', () => {
+    const pages = workflowFixture.pages as PageSchemaDTO[];
     const formPage = pages.find((candidate) => candidate.pageKey === 'bpm_process_management_form');
 
     expect(formPage).toBeDefined();
@@ -774,7 +770,7 @@ describe('canonicalizePageSchemaDto', () => {
     ).toMatchObject({
       action: {
         type: 'navigate',
-        to: '/bpmn-designer?pid={pid}',
+        to: '/bpm/designer?pid={pid}',
       },
     });
   });

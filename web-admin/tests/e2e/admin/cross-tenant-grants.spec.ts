@@ -26,7 +26,7 @@
  *
  * No PUT-API fallback, no retries:N, no sleeps. Verification uses expect().toBeVisible
  * with explicit timeouts. Each test owns its own seed via the public POST API
- * (admin storageState carries the platform_admin session) and cleans up via DELETE.
+ * (admin storageState carries the platform_admin session) and retains its seed and audit evidence.
  *
  * @since MERGED-P1-#12
  */
@@ -51,17 +51,14 @@ function genTenantPair(): { parent: number; child: number } {
 async function apiCreateGrant(
   request: APIRequestContext,
   body: { parentTenantId: number; childTenantId: number; note?: string },
-): Promise<number | null> {
+): Promise<string> {
   const resp = await request.post(API_BASE, { data: body });
-  if (!resp.ok()) return null;
-  const json = await resp.json().catch(() => null);
-  // Controller returns ApiResponse<Map<String, Object>> — id lives under data.id
-  const id = json?.data?.id;
-  return typeof id === 'number' ? id : null;
-}
-
-async function apiRevoke(request: APIRequestContext, id: number): Promise<void> {
-  await request.delete(`${API_BASE}/${id}`).catch(() => undefined);
+  expect(resp.ok(), `grant seed HTTP status ${resp.status()}`).toBe(true);
+  const json = await resp.json();
+  expect(json.code, json.message || 'grant seed envelope must succeed').toBe('0');
+  const id = json.data?.id;
+  expect(id, 'controller returns an exact decimal string ID').toMatch(/^[0-9]+$/);
+  return id;
 }
 
 async function gotoPage(page: Page): Promise<void> {
@@ -75,19 +72,7 @@ async function gotoPage(page: Page): Promise<void> {
 }
 
 test.describe.serial('Cross-Tenant Grants admin page', () => {
-  // Track ids created via the UI/API so we can clean up even if a test mid-fails.
-  const createdIds: (string | number)[] = [];
-
-  test.afterAll(async ({ browser }) => {
-    if (createdIds.length === 0) return;
-    const ctx = await browser.newContext({
-      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
-    });
-    for (const id of createdIds) {
-      await ctx.request.delete(`${API_BASE}/${id}`).catch(() => undefined);
-    }
-    await ctx.close();
-  });
+  // Keep created grants and audit traces; revoke only in the tested UI action.
 
   test('CTG-001: smoke — heading + create CTA render', async ({ page }) => {
     await gotoPage(page);
@@ -143,7 +128,6 @@ test.describe.serial('Cross-Tenant Grants admin page', () => {
       newId !== undefined && newId !== null && String(newId).length > 0,
       'created grant must carry an id',
     ).toBeTruthy();
-    createdIds.push(newId);
 
     // Modal closes; refreshed list contains the new row.
     await expect(modal).not.toBeVisible({ timeout: 5_000 });
@@ -189,7 +173,6 @@ test.describe.serial('Cross-Tenant Grants admin page', () => {
       note: 'e2e CTG-005 seed',
     });
     expect(seedId, 'API seed for CTG-005 must succeed (admin storageState carries platform_admin)').not.toBeNull();
-    createdIds.push(seedId as number);
 
     await gotoPage(page);
 
@@ -228,7 +211,6 @@ test.describe.serial('Cross-Tenant Grants admin page', () => {
       note: 'e2e CTG-006 seed',
     });
     expect(seedId, 'API seed for CTG-006 must succeed').not.toBeNull();
-    createdIds.push(seedId as number);
 
     await gotoPage(page);
     const row = page.getByTestId(`grant-row-${seedId}`);

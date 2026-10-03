@@ -18,40 +18,35 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 
-const TABLE_PLACEHOLDER = 'Configure columns in the property panel';
+const TABLE_PLACEHOLDER = /^(请在属性面板中配置列|Configure columns in the property panel)$/;
 const RICHTEXT_PLACEHOLDER = 'Click to add text content';
 
 function canvas(page: Page) {
   return page.getByTestId('report-canvas');
 }
 
-// Click a palette button and confirm the block landed on the canvas. The very
-// first interaction right after navigation can race React hydration (the SSR'd
-// button isn't wired yet, so the click is a no-op); retry the click until the
-// block actually appears. This exercises the real add behavior — it just does
-// not flake on a pre-hydration click.
-async function addPaletteBlock(page: Page, buttonName: RegExp, placeholder: string) {
-  const button = page.getByRole('button', { name: buttonName });
+// Initialization is asserted before actions; each block is added exactly once.
+async function addPaletteBlock(page: Page, buttonName: RegExp, placeholder: string | RegExp) {
+  const button = page.getByTestId('block-palette').getByRole('button', { name: buttonName });
   await expect(button).toBeEnabled();
-  await expect(async () => {
-    await button.click();
-    await expect(canvas(page).getByText(placeholder)).toBeVisible({ timeout: 2000 });
-  }).toPass({ timeout: 15000 });
+  await button.click();
+  await expect(canvas(page).getByText(placeholder)).toBeVisible();
 }
 
 async function addDataTable(page: Page) {
-  await addPaletteBlock(page, /Data Table/, TABLE_PLACEHOLDER);
+  await addPaletteBlock(page, /数据表格|Data Table/, TABLE_PLACEHOLDER);
 }
 
 async function addRichText(page: Page) {
-  await addPaletteBlock(page, /Rich Text/, RICHTEXT_PLACEHOLDER);
+  await addPaletteBlock(page, /富文本|Rich Text/, RICHTEXT_PLACEHOLDER);
 }
 
 test.describe('Report Designer — history & topology golden', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/report-designer', { waitUntil: 'domcontentloaded' });
+    await page.goto('/report-designer', { waitUntil: 'load' });
     await expect(page.getByTestId('block-palette')).toBeVisible();
     await expect(canvas(page)).toBeVisible();
+    await expect(page.getByTestId('report-designer-toolbar').getByText(/^(未保存|Unsaved)$/)).toBeVisible();
   });
 
   test('undo removes an added block; redo restores it', async ({ page }) => {
@@ -72,16 +67,16 @@ test.describe('Report Designer — history & topology golden', () => {
     // Select the block so the property panel shows the block action bar.
     await canvas(page).getByText(TABLE_PLACEHOLDER).click();
     const panel = page.getByTestId('block-property-panel');
-    await expect(panel.getByText('Data Table', { exact: true })).toBeVisible();
+    await expect(panel.getByText(/^(数据表格|Data Table)$/)).toBeVisible();
 
-    await panel.getByTitle('Delete').click();
+    await panel.getByTitle(/^(删除|Delete)$/).click();
     await expect(canvas(page).getByText(TABLE_PLACEHOLDER)).toHaveCount(0);
   });
 
   test('undo restores a deleted block', async ({ page }) => {
     await addDataTable(page);
     await canvas(page).getByText(TABLE_PLACEHOLDER).click();
-    await page.getByTestId('block-property-panel').getByTitle('Delete').click();
+    await page.getByTestId('block-property-panel').getByTitle(/^(删除|Delete)$/).click();
     await expect(canvas(page).getByText(TABLE_PLACEHOLDER)).toHaveCount(0);
 
     // Delete is an undoable step.
@@ -103,8 +98,8 @@ test.describe('Report Designer — history & topology golden', () => {
     // Select rich-text and move it up — order becomes [rich-text, data-table].
     await canvas(page).getByText(RICHTEXT_PLACEHOLDER).click();
     const panel = page.getByTestId('block-property-panel');
-    await expect(panel.getByText('Rich Text', { exact: true })).toBeVisible();
-    await panel.getByTitle('Move up').click();
+    await expect(panel.getByText(/^(富文本|Rich Text)$/)).toBeVisible();
+    await panel.getByTitle(/^(上移|Move up)$/).click();
 
     await expect
       .poll(async () => {
@@ -121,6 +116,6 @@ test.describe('Report Designer — history & topology golden', () => {
     await canvas(page).getByText(TABLE_PLACEHOLDER).click();
     const panel = page.getByTestId('block-property-panel');
     // The single (first) block cannot move up.
-    await expect(panel.getByTitle('Move up')).toBeDisabled();
+    await expect(panel.getByTitle(/^(上移|Move up)$/)).toBeDisabled();
   });
 });

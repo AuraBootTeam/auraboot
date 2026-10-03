@@ -20,6 +20,7 @@
  * history scope matches the prior store: header/footer/page/data-source edits are
  * undoable, exactly as before.
  */
+import { useSmartText } from '~/utils/i18n';
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import {
   createEmptyReport,
@@ -37,9 +38,10 @@ import {
 } from '../../unified-designer/document/useDesignerDocument';
 import { useDesignerSelection } from '../../unified-designer/selection/useDesignerSelection';
 
-
 /** Fill missing page settings so stored DSL from any producer renders safely. */
-export function ensurePageConfig<T extends { page?: Partial<PageConfig> }>(dsl: T): T & { page: PageConfig } {
+export function ensurePageConfig<T extends { page?: Partial<PageConfig> }>(
+  dsl: T,
+): T & { page: PageConfig } {
   const page = (dsl.page ?? {}) as Partial<PageConfig>;
   return {
     ...dsl,
@@ -103,7 +105,10 @@ export const ReportDocumentProvider: React.FC<{ children: React.ReactNode }> = (
   // savedSnapshot mirrors the last persisted document; isDirty is derived from it
   // (matches UnifiedDesignerWorkbench's pattern). A ref backs the synchronous
   // reads that setDirty(false) needs without forcing a re-snapshot.
-  const initialReport = useMemo(() => createEmptyReport('Untitled Report'), []);
+  const text = useSmartText();
+  const [initialReport] = useState(() =>
+    createEmptyReport(text({ zh: '未命名报表', en: 'Untitled Report' })),
+  );
   const [savedSnapshot, setSavedSnapshot] = useState<string>(() =>
     serializeDocument<ReportDsl>(initialReport),
   );
@@ -268,8 +273,9 @@ export const ReportDocumentProvider: React.FC<{ children: React.ReactNode }> = (
     (dsl: ReportDsl) => {
       // Programmatic/legacy definitions may omit page settings; the designer and its
       // renderers assume a PageConfig, so fill defaults before the document resets.
-      doc.reset(ensurePageConfig(dsl));
-      const snapshot = serializeDocument<ReportDsl>(dsl);
+      const normalized = ensurePageConfig(dsl);
+      doc.reset(normalized);
+      const snapshot = serializeDocument<ReportDsl>(normalized);
       setSavedSnapshot(snapshot);
       savedSnapshotRef.current = snapshot;
       selection.setSelectedBlockId(null);
