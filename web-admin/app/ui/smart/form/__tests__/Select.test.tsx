@@ -31,6 +31,24 @@ describe('Smart Select', () => {
     mockRefetch = vi.fn();
   });
 
+  it('provides a keyboard-accessible named clear action without changing the clear value contract', () => {
+    const onChange = vi.fn();
+    const onClear = vi.fn();
+    render(<Select name="source_type" label="Source type" value="fqc"
+      options={[{ label: 'FQC', value: 'fqc' }]} clearable onChange={onChange} onClear={onClear} />);
+    const clear = screen.getByRole('button', { name: /Source type/ });
+    expect(clear.tabIndex).toBe(0);
+    fireEvent.click(clear);
+    expect(onChange).toHaveBeenCalledWith('');
+    expect(onClear).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not expose a clear action for a read-only selection', () => {
+    render(<Select name="source_type" label="Source type" value="fqc"
+      options={[{ label: 'FQC', value: 'fqc' }]} clearable readOnly />);
+    expect(screen.queryByRole('button', { name: /Source type/ })).not.toBeInTheDocument();
+  });
+
   it('shows the selected option label after async options load without requiring reselection', () => {
     const { rerender } = render(
       <Select

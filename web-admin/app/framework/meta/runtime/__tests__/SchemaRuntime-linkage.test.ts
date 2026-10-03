@@ -162,6 +162,12 @@ describe('SchemaRuntime + LinkageEngine integration', () => {
     schema.extension = {
       linkageRules: [
         {
+          id: 'normalize-cleared-type',
+          trigger: { fieldCode: 'category', event: 'change', condition: "form.category === ''" },
+          actions: [{ type: 'setValue', target: 'category', value: 'null' }],
+          enabled: true,
+        },
+        {
           id: 'reset-source',
           trigger: { fieldCode: 'category', event: 'change' },
           actions: [{ type: 'setValue', target: 'subcategory', value: 'null' }],
@@ -185,6 +191,14 @@ describe('SchemaRuntime + LinkageEngine integration', () => {
     runtime.triggerFieldLinkage('category', 'change');
     expect(manager.getContext(scope).form).toMatchObject({
       category: 'fqc',
+      subcategory: null,
+      reason: 'Keep this note',
+    });
+    manager.updateField(scope, 'subcategory', 'new-source');
+    manager.updateField(scope, 'category', '');
+    runtime.triggerFieldLinkage('category', 'change');
+    expect(manager.getContext(scope).form).toMatchObject({
+      category: null,
       subcategory: null,
       reason: 'Keep this note',
     });
