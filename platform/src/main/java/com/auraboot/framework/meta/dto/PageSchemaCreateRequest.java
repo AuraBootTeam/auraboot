@@ -89,6 +89,12 @@ public class PageSchemaCreateRequest {
     private Map<String, Object> dataSources;
 
     /**
+     * Field linkage rules consumed by the shared schema runtime.
+     */
+    @JsonProperty("linkageRules")
+    private List<Object> linkageRules;
+
+    /**
      * Ordered list of page blocks (toolbar, filters, table, form-section, etc.).
      */
     @NotNull(message = "Blocks array is required")
