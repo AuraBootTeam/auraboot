@@ -1,20 +1,45 @@
-# Linux CI only: start the fixed-port PostgreSQL database empty. The backend
-# integration runner applies the canonical Flyway migrations after PostgreSQL
-# is healthy so both schema and migration-owned platform seed rows are tested.
+# Standalone Linux CI infrastructure. Flyway owns the blank database setup.
+# Every service and volume is scoped by the runner's unique Compose project.
 services:
   postgres:
-    volumes: !override
-      - skills_c2_postgres_data:/var/lib/postgresql/data
+    image: pgvector/pgvector:pg16
+    ports:
+      - "127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT:?CI PostgreSQL port is required}:5432"
+    environment:
+      POSTGRES_DB: aura_boot
+      POSTGRES_USER: auraboot
+      POSTGRES_PASSWORD: auraboot_dev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auraboot -d aura_boot"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:${AURA_OSS_CI_REDIS_PORT:?CI Redis port is required}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     ports:
-      - "${AURA_OSS_CI_KAFKA_PORT:-9092}:19092"
+      - "127.0.0.1:${AURA_OSS_CI_KAFKA_PORT:?CI Kafka port is required}:19092"
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:19092,CONTROLLER://0.0.0.0:29093
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:${AURA_OSS_CI_KAFKA_PORT:-9092}
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:${AURA_OSS_CI_KAFKA_PORT:?CI Kafka port is required}
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
@@ -30,3 +55,7 @@ services:
       timeout: 5s
       retries: 30
       start_period: 20s
+
+volumes:
+  postgres_data:
+  redis_data:

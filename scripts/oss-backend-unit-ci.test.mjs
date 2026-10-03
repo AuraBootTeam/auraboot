@@ -13,7 +13,12 @@ const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 test('backend CI runner is executable and owns its complete infrastructure lifecycle', () => {
   assert.ok(statSync(runner).mode & 0o100);
-  assert.match(source, /docker-compose\.skills-c2\.override\.yml/);
+  assert.doesNotMatch(source, /docker-compose\.skills-c2\.override\.yml/);
+  const composeInputs = [...source.matchAll(/-f "\$PROJECT_ROOT\/([^"]+)"/g)];
+  assert.equal(composeInputs.length, 1);
+  for (const match of composeInputs) {
+    assert.ok(statSync(path.join(here, '..', match[1])).isFile(), `Compose input must exist: ${match[1]}`);
+  }
   assert.match(source, /up -d --wait postgres redis kafka/);
   assert.match(source, /runtime retained and stopped; network released: compose_project=/);
   assert.match(source, /COMPOSE_PROJECT="aura-ci-oss-backend-\$RUNTIME_TOKEN"/);
@@ -33,7 +38,8 @@ test('backend CI runner migrates a blank database from the Flyway source of trut
   const override = readFileSync(composeOverride, 'utf8');
 
   assert.match(source, /docker-compose\.oss-backend-ci\.override\.yml/);
-  assert.match(override, /volumes:\s*!override/);
+  assert.doesNotMatch(source, /-f "\$PROJECT_ROOT\/docker-compose\.yml"/);
+  assert.doesNotMatch(override, /docker-entrypoint-initdb\.d|container_name:/);
   assert.doesNotMatch(override, /schema-current\.sql/);
   assert.match(source, /flyway\/flyway:12\.8\.1/);
   assert.match(source, /-locations=filesystem:\/flyway\/sql/);
@@ -87,7 +93,7 @@ test('backend CI runner pre-pulls every fixed and Testcontainers image', () => {
 });
 
 test('backend CI runner preserves Gradle product-test exit status', () => {
-  assert.match(source, /platform\/gradlew -p platform --continue cleanTest test bootstrapBillingAccountTest\s*$/);
+  assert.match(source, /platform\/gradlew -p platform --continue cleanTest test bootstrapBillingAccountTest[ \t]*$/m);
   assert.doesNotMatch(source, /platform\/gradlew[^\n]*\|\| environment_invalid/);
 });
 
