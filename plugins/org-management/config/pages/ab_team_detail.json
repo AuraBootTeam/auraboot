@@ -36,7 +36,8 @@
           "action": {
             "type": "navigate",
             "to": "/organization/teams/{pid}/edit"
-          }
+          },
+          "permissionCode": "org.team.manage"
         }
       ]
     },

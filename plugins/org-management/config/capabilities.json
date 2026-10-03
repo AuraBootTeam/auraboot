@@ -66,6 +66,22 @@
     "order": 20
   },
   {
+    "code": "org.cap.team_view",
+    "group": "组织与权限管理",
+    "displayGroupOrder": 90,
+    "name:zh-CN": "查看团队",
+    "name:en": "View Teams",
+    "description": "只读查看团队信息与团队成员",
+    "includes": [
+      "org.team.read",
+      "org_management",
+      "org_teams",
+      "model.ab_team.read"
+    ],
+    "tier": "viewer",
+    "order": 21
+  },
+  {
     "code": "org.cap.member",
     "group": "组织与权限管理",
     "displayGroupOrder": 90,

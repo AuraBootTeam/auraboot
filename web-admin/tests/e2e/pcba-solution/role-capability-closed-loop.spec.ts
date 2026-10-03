@@ -451,3 +451,208 @@ test('a standalone model-service capability manages tenant LLM settings without 
     await revoked.page.screenshot({ path: info.outputPath('standalone-model-service-revoked.png'), fullPage: true });
   } finally { await revoked.context.close(); }
 });
+
+test('a standalone team-view capability reads DSL team membership, denies writes and revokes access', async ({
+  page,
+  browser,
+}, info) => {
+  test.setTimeout(180_000);
+  const stamp = uniqueId('team-view');
+  const roleCode = `e2e_team_view_${stamp}`;
+  const createdRole = await page.request.post('/api/roles', {
+    data: { code: roleCode, name: stamp, type: 'custom' },
+  });
+  expect(createdRole.status()).toBe(200);
+  const roleBody = await createdRole.json();
+  expect(String(roleBody.code)).toBe('0');
+  const role = roleBody.data;
+  const viewer = makeQuoteRoleUser('team-view', stamp, [roleCode]);
+  const target = makeQuoteRoleUser('team-member', stamp, []);
+  await ensureQuoteRoleUser(page, viewer);
+  await ensureQuoteRoleUser(page, target);
+  const search = await page.request.post('/api/tenant/members/search', {
+    data: { keyword: target.email, pageNum: 1, pageSize: 50 },
+  });
+  expect(search.status()).toBe(200);
+  const searchBody = await search.json();
+  expect(String(searchBody.code)).toBe('0');
+  const member = searchBody.data.records.find(
+    (record: { user?: { email: string } }) => record.user?.email === target.email,
+  );
+  expect(member).toBeDefined();
+  const createdTeam = await page.request.post('/api/org/teams', {
+    data: { code: stamp, name: stamp, description: 'Independent team read boundary' },
+  });
+  expect(createdTeam.status()).toBe(200);
+  const teamBody = await createdTeam.json();
+  expect(String(teamBody.code)).toBe('0');
+  const team = teamBody.data;
+
+  async function openTeam(actor: Page, readOnly = false) {
+    await actor.goto('/home');
+    await ensureSidebarExpanded(actor);
+    const link = actor.locator('nav a[href="/organization/teams"]');
+    if (!(await link.isVisible())) {
+      await actor.locator('nav button').filter({ hasText: '组织管理' }).first().click();
+    }
+    await expect(link).toBeVisible();
+    await link.click();
+    const row = actor.locator('table tbody tr').filter({ hasText: stamp });
+    await expect(row).toHaveCount(1);
+    await expect(row).toBeVisible();
+    if (readOnly) {
+      await expect(actor.getByRole('button', { name: '新建团队', exact: true })).toHaveCount(0);
+      await expect(row.getByRole('button', { name: '编辑', exact: true })).toHaveCount(0);
+      await expect(row.getByRole('button', { name: '删除', exact: true })).toHaveCount(0);
+    }
+    await row.click();
+    await expect(actor).toHaveURL(new RegExp(`/organization/teams/${team.pid}$`));
+  }
+  async function selectRead(grant: boolean) {
+    await page.goto('/home');
+    await ensureSidebarExpanded(page);
+    await page.getByTestId('sidebar').locator('a[href="/enterprise/permissions"]').click();
+    await page.getByTestId('role-search-input').fill(roleCode);
+    await page.getByTestId(`role-item-${roleCode}`).click();
+    await expect(page.getByTestId('capability-role-editor')).toHaveAttribute(
+      'data-role-pid',
+      role.pid,
+    );
+    if (grant) {
+      await page.getByTestId('data-scope-modify-btn').click();
+      await page.getByTestId('data-scope-option-all').click();
+      await page.getByTestId('data-scope-apply').click();
+      await expect(page.getByTestId('data-scope-drawer')).toHaveCount(0);
+    }
+    await page.getByTestId('capability-checkbox-org.cap.team_view').setChecked(grant);
+    await page.getByTestId('capability-save').click();
+    await expect(page.getByTestId('confirm-dialog')).toBeVisible();
+    const saved = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'PUT' &&
+        response.url().includes('/api/permission/capabilities?'),
+    );
+    await page.getByTestId('confirm-ok').click();
+    const response = await saved;
+    expect(response.status()).toBe(200);
+    expect(String((await response.json()).code)).toBe('0');
+    expect(response.request().postDataJSON()).toEqual(grant ? ['org.cap.team_view'] : []);
+    await expect(page.getByTestId('capability-save')).toBeDisabled();
+  }
+  async function membership() {
+    const response = await page.request.get(`/api/org/teams/${team.pid}/members`);
+    expect(response.status()).toBe(200);
+    const body = await response.json();
+    expect(String(body.code)).toBe('0');
+    return body.data as Array<{ memberPid: string }>;
+  }
+
+  // Management positive path uses the exact active DSL custom block, with persisted payload proof.
+  await openTeam(page);
+  await page.getByTestId('team-members-add').click();
+  await page.getByTestId('team-members-select').selectOption(member.pid);
+  const added = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      new URL(response.url()).pathname === `/api/org/teams/${team.pid}/members`,
+  );
+  await page.getByTestId('team-members-confirm').click();
+  const addResponse = await added;
+  expect(addResponse.status()).toBe(200);
+  expect(addResponse.request().postDataJSON()).toEqual({ memberPid: member.pid, role: 'member' });
+  const addedBody = await addResponse.json();
+  expect(String(addedBody.code)).toBe('0');
+  const membershipPid = addedBody.data.pid as string;
+  expect(membershipPid).not.toBe(member.pid);
+  await expect(page.getByTestId(`team-members-remove-${membershipPid}`)).toBeVisible();
+  expect((await membership()).map((record) => record.memberPid)).toEqual([member.pid]);
+  await page.screenshot({ path: info.outputPath('team-manager-member-added.png'), fullPage: true });
+
+  await selectRead(true);
+  const opened = await openQuoteRolePage(browser, viewer);
+  const reader = opened.page;
+  try {
+    const snapshot = await fetchRoleSnapshot(reader);
+    expect(snapshot.permissionCodes).toEqual(
+      expect.arrayContaining([
+        'org.team.read',
+        'org_management',
+        'org_teams',
+        'model.ab_team.read',
+      ]),
+    );
+    for (const code of [
+      'org.team.manage',
+      'model.ab_team.create',
+      'model.ab_team.update',
+      'model.ab_team.delete',
+      'meta.command.execute',
+    ]) {
+      expect(snapshot.permissionCodes).not.toContain(code);
+    }
+    await info.attach('team-read-role-snapshot', {
+      body: JSON.stringify(snapshot),
+      contentType: 'application/json',
+    });
+    await openTeam(reader, true);
+    await expect(reader.getByText('查看团队成员与团队角色', { exact: true })).toBeVisible();
+    await expect(reader.getByText(target.displayName, { exact: true })).toBeVisible();
+    await expect(reader.getByTestId('team-members-add')).toHaveCount(0);
+    await expect(reader.getByTestId(`team-members-remove-${membershipPid}`)).toHaveCount(0);
+    await expect(reader.getByRole('button', { name: '编辑', exact: true })).toHaveCount(0);
+    await reader.screenshot({ path: info.outputPath('team-independent-read.png'), fullPage: true });
+    const deniedAdd = await reader.request.post(`/api/org/teams/${team.pid}/members`, {
+      data: { memberPid: member.pid, role: 'leader' },
+    });
+    const deniedRemove = await reader.request.delete(
+      `/api/org/teams/${team.pid}/members/${membershipPid}`,
+    );
+    expect(deniedAdd.status()).toBe(403);
+    expect(deniedRemove.status()).toBe(403);
+    expect((await membership()).map((record) => record.memberPid)).toEqual([member.pid]);
+    await info.attach('team-write-denials', {
+      body: JSON.stringify({
+        addStatus: deniedAdd.status(),
+        removeStatus: deniedRemove.status(),
+        preservedMemberPid: member.pid,
+      }),
+      contentType: 'application/json',
+    });
+    await selectRead(false);
+    const revokedRead = reader.waitForResponse(response =>
+      new URL(response.url()).pathname === `/api/dynamic/ab_team/${team.pid}` && response.request().method() === 'GET');
+    await reader.reload();
+    expect((await revokedRead).status()).toBe(403);
+    await expect(reader.getByRole('heading', { name: '无法访问此记录', exact: true })).toBeVisible();
+    await expect(reader.getByText('当前账号没有访问权限，请联系记录负责人。', { exact: true })).toBeVisible();
+    await expect(reader.getByText(target.displayName, { exact: true })).toHaveCount(0);
+    await expect(reader.getByTestId('team-members-add')).toHaveCount(0);
+    await reader.screenshot({ path: info.outputPath('team-read-revoked.png'), fullPage: true });
+    const revoked = await fetchRoleSnapshot(reader);
+    expect(revoked.permissionCodes).not.toContain('model.ab_team.read');
+    expect(revoked.permissionCodes).not.toContain('org_teams');
+    await reader.goto('/home');
+    await ensureSidebarExpanded(reader);
+    await expect(reader.locator('nav a[href="/organization/teams"]')).toHaveCount(0);
+  } finally {
+    await opened.context.close();
+  }
+
+  await openTeam(page);
+  page.once('dialog', (dialog) => dialog.accept());
+  const removed = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'DELETE' &&
+      new URL(response.url()).pathname === `/api/org/teams/${team.pid}/members/${membershipPid}`,
+  );
+  await page.getByTestId(`team-members-remove-${membershipPid}`).click();
+  const removeResponse = await removed;
+  expect(removeResponse.status()).toBe(200);
+  expect(String((await removeResponse.json()).code)).toBe('0');
+  expect(await membership()).toEqual([]);
+  await expect(page.getByText('暂无团队成员', { exact: true })).toBeVisible();
+  await page.screenshot({
+    path: info.outputPath('team-manager-member-removed.png'),
+    fullPage: true,
+  });
+});
