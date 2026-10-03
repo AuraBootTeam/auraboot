@@ -22,9 +22,8 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -51,23 +50,20 @@ class CommandTargetVersionLockPhaseTest {
     @Test
     void locksTheTenantScopedPidAndRetainsTheAuthoritativeVersion() {
         givenPhysicalModel();
-        when(dynamicDataMapper.selectByQueryWithoutTenant(anyString(), anyMap()))
+        when(dynamicDataMapper.selectTargetVersionForUpdate("dq_quote_request", "pid", 41L, "REQ-1"))
                 .thenReturn(List.of(Map.of("row_version", 7L)));
         CommandPipelineContext ctx = context(7);
 
         phase.execute(ctx);
 
         assertThat(ctx.getTargetRecordVersion()).isEqualTo(7L);
-        verify(dynamicDataMapper).selectByQueryWithoutTenant(
-                eq("SELECT row_version FROM dq_quote_request WHERE tenant_id = #{params.tenantId}"
-                        + " AND pid = #{params.targetRecordPid} FOR UPDATE"),
-                eq(Map.of("tenantId", 41L, "targetRecordPid", "REQ-1")));
+        verify(dynamicDataMapper).selectTargetVersionForUpdate("dq_quote_request", "pid", 41L, "REQ-1");
     }
 
     @Test
     void rejectsAStaleVersionAfterTheRowIsLocked() {
         givenPhysicalModel();
-        when(dynamicDataMapper.selectByQueryWithoutTenant(anyString(), anyMap()))
+        when(dynamicDataMapper.selectTargetVersionForUpdate("dq_quote_request", "pid", 41L, "REQ-1"))
                 .thenReturn(List.of(Map.of("row_version", 8L)));
 
         assertThatThrownBy(() -> phase.execute(context(7)))
@@ -79,7 +75,7 @@ class CommandTargetVersionLockPhaseTest {
     @Test
     void failsClosedWhenTheTargetDisappearsOrHasNoVersion() {
         givenPhysicalModel();
-        when(dynamicDataMapper.selectByQueryWithoutTenant(anyString(), anyMap()))
+        when(dynamicDataMapper.selectTargetVersionForUpdate("dq_quote_request", "pid", 41L, "REQ-1"))
                 .thenReturn(List.of());
 
         assertThatThrownBy(() -> phase.execute(context(7)))
@@ -94,7 +90,8 @@ class CommandTargetVersionLockPhaseTest {
         assertThatThrownBy(() -> phase.execute(context(7)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("active transaction");
-        verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
+        verify(dynamicDataMapper, never()).selectTargetVersionForUpdate(
+                anyString(), anyString(), anyLong(), anyString());
     }
 
     @Test
@@ -102,7 +99,8 @@ class CommandTargetVersionLockPhaseTest {
         CommandPipelineContext ctx = context(null);
 
         assertThat(phase.shouldSkip(ctx)).isTrue();
-        verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
+        verify(dynamicDataMapper, never()).selectTargetVersionForUpdate(
+                anyString(), anyString(), anyLong(), anyString());
     }
 
     @Test
@@ -113,7 +111,8 @@ class CommandTargetVersionLockPhaseTest {
         ctx.getRequest().setOperationType("UPDATE");
 
         assertThat(phase.shouldSkip(ctx)).isTrue();
-        verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
+        verify(dynamicDataMapper, never()).selectTargetVersionForUpdate(
+                anyString(), anyString(), anyLong(), anyString());
     }
 
     @Test
@@ -130,7 +129,8 @@ class CommandTargetVersionLockPhaseTest {
                         .isInstanceOf(CasVersionRequiredException.class)
                         .extracting(item -> ((CasVersionRequiredException) item).getConflictCode())
                         .isEqualTo(ConflictException.ConflictCodes.CAS_VERSION_REQUIRED));
-        verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
+        verify(dynamicDataMapper, never()).selectTargetVersionForUpdate(
+                anyString(), anyString(), anyLong(), anyString());
     }
 
     @Test
@@ -185,7 +185,8 @@ class CommandTargetVersionLockPhaseTest {
         assertThatThrownBy(() -> phase.execute(ctx))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("state_transition");
-        verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
+        verify(dynamicDataMapper, never()).selectTargetVersionForUpdate(
+                anyString(), anyString(), anyLong(), anyString());
     }
 
     @Test
@@ -197,7 +198,8 @@ class CommandTargetVersionLockPhaseTest {
         assertThatThrownBy(() -> phase.execute(ctx))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("fromStates");
-        verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
+        verify(dynamicDataMapper, never()).selectTargetVersionForUpdate(
+                anyString(), anyString(), anyLong(), anyString());
     }
 
     private CommandPipelineContext currentStateContext(Integer expectedVersion) {
