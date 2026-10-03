@@ -3,6 +3,7 @@ import { readFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import test from 'node:test';
+import YAML from 'yaml';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const runner = path.join(here, 'oss-backend-unit-ci.sh');
@@ -11,9 +12,18 @@ const gradleBuild = path.join(here, '..', 'platform', 'build.gradle');
 const source = readFileSync(runner, 'utf8');
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+test('every Compose input exists in the submitted source checkout', () => {
+  const inputs = [...source.matchAll(/-f "\$PROJECT_ROOT\/([^"]+)"/g)].map((match) => match[1]);
+  assert.ok(inputs.length > 0, 'runner must declare its Compose inputs');
+  for (const input of inputs) {
+    assert.ok(statSync(path.join(here, '..', input)).isFile(), `missing Compose input: ${input}`);
+  }
+});
+
 test('backend CI runner is executable and owns its complete infrastructure lifecycle', () => {
   assert.ok(statSync(runner).mode & 0o100);
-  assert.match(source, /docker-compose\.skills-c2\.override\.yml/);
+  assert.doesNotMatch(source, /docker-compose\.skills-c2\.override\.yml/);
+  assert.match(source, /config --quiet/);
   assert.match(source, /up -d --wait postgres redis kafka/);
   assert.match(source, /runtime retained and stopped; network released: compose_project=/);
   assert.match(source, /COMPOSE_PROJECT="aura-ci-oss-backend-\$RUNTIME_TOKEN"/);
@@ -87,8 +97,25 @@ test('backend CI runner pre-pulls every fixed and Testcontainers image', () => {
 });
 
 test('backend CI runner preserves Gradle product-test exit status', () => {
-  assert.match(source, /platform\/gradlew -p platform --continue cleanTest test bootstrapBillingAccountTest\s*$/);
+  assert.match(source, /platform\/gradlew -p platform --continue cleanTest test bootstrapBillingAccountTest\s+#[\s\S]*gradle_status=\$\?/);
+  assert.match(source, /exit "\$gradle_status"\s*$/);
   assert.doesNotMatch(source, /platform\/gradlew[^\n]*\|\| environment_invalid/);
+});
+
+test('CI Compose override owns ports, containers and an empty PostgreSQL volume', () => {
+  // Parse Compose sequence tags as ordinary sequences for structural checks;
+  // the Linux runner validates actual merge semantics with Compose itself.
+  const config = YAML.parse(readFileSync(composeOverride, 'utf8').replace(/!override[ \t]*/g, ''));
+  const { postgres, redis } = config.services;
+  assert.deepEqual(postgres.volumes, ['postgres_data:/var/lib/postgresql/data']);
+  assert.deepEqual(postgres.environment, {
+    POSTGRES_DB: 'aura_boot', POSTGRES_USER: 'auraboot', POSTGRES_PASSWORD: 'auraboot_dev',
+  });
+  assert.match(postgres.container_name, /AURA_OSS_CI_POSTGRES_CONTAINER:\?/);
+  assert.match(postgres.ports[0], /AURA_OSS_CI_POSTGRES_PORT:\?.*:5432/);
+  assert.match(redis.container_name, /AURA_OSS_CI_REDIS_CONTAINER:\?/);
+  assert.match(redis.ports[0], /AURA_OSS_CI_REDIS_PORT:\?.*:6379/);
+  assert.deepEqual(redis.profiles, ['skills-c2-stack']);
 });
 
 test('backend CI runner keeps external DashScope checks out unless explicitly requested', () => {

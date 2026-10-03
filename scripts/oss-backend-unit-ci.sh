@@ -43,7 +43,6 @@ export AURA_OSS_CI_POSTGRES_CONTAINER="auraboot-oss-ci-postgres-$RUNTIME_TOKEN"
 export AURA_OSS_CI_REDIS_CONTAINER="auraboot-oss-ci-redis-$RUNTIME_TOKEN"
 COMPOSE_ARGS=(
   -f "$PROJECT_ROOT/docker-compose.yml"
-  -f "$PROJECT_ROOT/docker-compose.skills-c2.override.yml"
   -f "$PROJECT_ROOT/docker-compose.oss-backend-ci.override.yml"
   -p "$COMPOSE_PROJECT"
   --profile skills-c2-stack
@@ -80,6 +79,8 @@ command -v docker >/dev/null 2>&1 || environment_invalid 'docker is unavailable'
 command -v timeout >/dev/null 2>&1 || environment_invalid 'timeout is unavailable'
 docker compose version >/dev/null 2>&1 || environment_invalid 'docker compose v2 is unavailable'
 docker info >/dev/null 2>&1 || environment_invalid 'Docker daemon is unavailable to the CI account'
+docker compose "${COMPOSE_ARGS[@]}" config --quiet \
+  || environment_invalid 'submitted PostgreSQL/Redis/Kafka Compose inputs are invalid'
 
 # Pre-pull every image referenced by this test denominator. A pull failure is a
 # machine/network precondition failure, not a product regression.
