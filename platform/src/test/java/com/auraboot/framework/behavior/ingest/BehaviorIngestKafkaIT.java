@@ -296,7 +296,13 @@ class BehaviorIngestKafkaIT {
     private static boolean kafkaAvailable() {
         try (AdminClient admin = adminClient()) {
             return !admin.describeCluster().nodes().get(2, TimeUnit.SECONDS).isEmpty();
-        } catch (Exception ignored) {
+        } catch (Exception failure) {
+            if (failure instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            if ("1".equals(System.getenv("AURA_CI_REQUIRE_KAFKA"))) {
+                throw new IllegalStateException("CI Kafka readiness probe failed at " + BOOTSTRAP, failure);
+            }
             return false;
         }
     }
