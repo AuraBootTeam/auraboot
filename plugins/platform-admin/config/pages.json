@@ -1660,7 +1660,7 @@
               "zh-CN": "编辑",
               "en-US": "Edit"
             },
-            "permissionCode": "system.scheduler.update",
+            "permissionCode": "model.scheduled_task.update",
             "action": {
               "type": "navigate",
               "to": "scheduled_task_form"
@@ -1674,7 +1674,7 @@
               "zh-CN": "删除",
               "en-US": "Delete"
             },
-            "permissionCode": "system.scheduler.delete",
+            "permissionCode": "model.scheduled_task.delete",
             "confirm": "delete.confirm",
             "action": {
               "type": "command",

@@ -79,56 +79,34 @@ const PARAMS_JSON = '{"channel":"e2e","tag":"' + UID + '"}';
 // Sidebar navigation — system management → scheduled tasks (D1)
 // ---------------------------------------------------------------------------
 async function navigateToScheduledTaskList(page: Page): Promise<void> {
-  await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
-
-  const nav = page.locator('nav');
-  await nav.first().waitFor({ state: 'visible', timeout: 10_000 });
-
-  // Expand parent menu "系统管理" / "System Administration"
-  const rootBtn = nav
-    .getByRole('button', { name: /系统管理|System|Administration/i })
-    .first();
-  await rootBtn.scrollIntoViewIfNeeded();
-  await rootBtn.evaluate((el: HTMLElement) => el.click());
-
-  // Click leaf menu — its href targets `/p/scheduled_task`
-  const leafLink = nav.locator('a[href*="scheduled_task"]').first();
-  await leafLink.waitFor({ state: 'attached', timeout: 8_000 });
-
-  const listResponsePromise = page.waitForResponse(
-    (r) =>
-      r.url().includes('/api/dynamic/scheduled_task') &&
-      r.url().includes('list') &&
-      r.status() === 200,
-    { timeout: 20_000 },
-  );
-  await leafLink.evaluate((el: HTMLElement) => el.click());
-  await listResponsePromise.catch(() => null);
-
-  await expect(
-    page.locator('table, [class*="ant-table"], [data-testid="dynamic-list"]').first(),
-  ).toBeVisible({ timeout: 15_000 });
+  await page.goto('/dashboards');
+  await expect(page.locator('header[data-hydrated]')).toHaveAttribute('data-hydrated', 'true');
+  const nav = page.locator('nav').first();
+  const leaf = nav.locator('a[href="/p/scheduled_task"]');
+  if (!(await leaf.isVisible()))
+    await nav.getByRole('button', { name: /系统管理|System Administration/ }).click();
+  await expect(leaf).toBeVisible();
+  const response = page.waitForResponse((r) =>
+    new URL(r.url()).pathname === '/api/dynamic/scheduled_task/list');
+  await leaf.click();
+  const result = await response;
+  expect(result.status()).toBe(200);
+  expect(String((await result.json()).code)).toBe('0');
+  await expect(page).toHaveURL(/\/p\/scheduled_task$/);
+  await expect(page.locator('table').first()).toBeVisible();
 }
 
 async function navigateToScheduledTaskDetail(page: Page, pid: string): Promise<void> {
   await navigateToScheduledTaskList(page);
-  const detailResponsePromise = page.waitForResponse(
-    (r) =>
-      r.url().includes('/api/dynamic/scheduled_task') && !r.url().includes('/list'),
-    { timeout: 15_000 },
-  );
-  // Detail route: `/p/:tableName/view/:recordId`
-  await page.goto(`/p/scheduled_task/view/${pid}`);
-  await detailResponsePromise.catch(() => null);
-  await page.waitForLoadState('domcontentloaded');
-  await page
-    .locator('text=加载中...')
-    .first()
-    .waitFor({ state: 'hidden', timeout: 15_000 })
-    .catch(() => null);
-  await expect(page.getByText(/基本信息|Basic Information/i).first()).toBeVisible({
-    timeout: 15_000,
-  });
+  const row = await findRowInPaginatedList(page, TASK_NAME, 12_000);
+  await expect(row).toBeVisible();
+  const response = page.waitForResponse((r) =>
+    new URL(r.url()).pathname === `/api/dynamic/scheduled_task/${pid}`);
+  await row.getByTestId('row-action-detail').click();
+  const result = await response;
+  expect(result.status()).toBe(200);
+  expect(String((await result.json()).code)).toBe('0');
+  await expect(page.getByText(/基本信息|Basic Information/).first()).toBeVisible();
 }
 
 // ---------------------------------------------------------------------------
