@@ -73,3 +73,33 @@ describe('property editor group labels', () => {
     });
   }
 });
+
+
+describe('property editor missing selection and width branch', () => {
+  for (const locale of ['en-US', 'zh-CN']) {
+    for (const missing of ['component', 'config']) {
+      it(`${locale} missing ${missing} shows the empty state without writes`, () => {
+        fixture.locale = locale;
+        const onComponentChange = vi.fn(); const onPropertyChange = vi.fn();
+        const component = { id: 'owned-empty', type: 'smart-input', props: {} };
+        const config = { name: 'Configured name', propertySchema: [] } as unknown as NonNullable<React.ComponentProps<typeof PropertyEditor>['config']>;
+        render(<PropertyEditor component={missing === 'component' ? null : component} config={missing === 'config' ? null : config} onComponentChange={onComponentChange} onPropertyChange={onPropertyChange} />);
+        expect(screen.getByText(locale === 'en-US' ? 'Select a component to edit its properties' : '\u8bf7\u9009\u62e9\u4e00\u4e2a\u7ec4\u4ef6\u8fdb\u884c\u5c5e\u6027\u7f16\u8f91')).toBeInTheDocument();
+        expect(onComponentChange).not.toHaveBeenCalled();
+        expect(onPropertyChange).not.toHaveBeenCalled();
+        expect(fixture.save).not.toHaveBeenCalled();
+      });
+    }
+  }
+  it('valid width updates props, span and size.span with the same persisted value', () => {
+    fixture.locale = 'en-US';
+    const onComponentChange = vi.fn(); const onPropertyChange = vi.fn();
+    const component = { id: 'owned-width', type: 'smart-input', props: { width: 2 }, span: 2, size: { width: 100, height: 30, span: 2 } };
+    const config = { name: 'Configured name', propertySchema: [{ key: 'width', label: 'Width', type: 'number' }] } as unknown as NonNullable<React.ComponentProps<typeof PropertyEditor>['config']>;
+    render(<PropertyEditor component={component} config={config} onComponentChange={onComponentChange} onPropertyChange={onPropertyChange} />);
+    fireEvent.change(screen.getByLabelText('Width'), { target: { value: '5' } });
+    expect(onComponentChange).toHaveBeenLastCalledWith('owned-width', { props: { width: 5 }, span: 5, size: { width: 100, height: 30, span: 5 } });
+    expect(onPropertyChange).toHaveBeenLastCalledWith('width', 5);
+    expect(fixture.save).toHaveBeenLastCalledWith('owned-width', 'width', 5, 2);
+  });
+});

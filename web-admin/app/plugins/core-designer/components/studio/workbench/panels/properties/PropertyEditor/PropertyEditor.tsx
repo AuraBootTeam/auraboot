@@ -13,8 +13,8 @@ import type { ComponentConfig } from '~/ui/smart/types';
 import type { Component } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 
 export interface PropertyEditorProps {
-  component: Component;
-  config: ComponentConfig;
+  component: Component | null;
+  config: ComponentConfig | null;
   /** Called when component props should be updated in the schema */
   onComponentChange?: (id: string, updates: Partial<Component>) => void;
   onPropertyChange?: (propertyName: string, value: any) => void;
@@ -79,7 +79,7 @@ export const PropertyEditor: React.FC<PropertyEditorProps> = ({
       groups[groupName].push(property);
       return groups;
     }, {});
-  }, [config.propertySchema]);
+  }, [config?.propertySchema]);
 
   // 移除重复的 handleGroupToggle 函数，使用 toggleGroup 替代
   // const handleGroupToggle = useCallback((groupName: string) => {
