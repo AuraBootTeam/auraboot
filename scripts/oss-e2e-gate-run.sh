@@ -213,7 +213,7 @@ log "1/4 fresh stack: reuse '$NAME' on the same slot; stop before reset + up --f
 # is what produces tests/storage/admin.json — both the seed and the `oss` project
 # need that storageState, so warm is required here (do NOT pass --no-warm).
 "$GS" up "$NAME" --slot "$SLOT" --ttl 3h --runtime-mode verification --fresh-db --plugin-profile demo \
-  || die_env "stack bring-up failed — see the golden-stack logs under $WORKSPACE/.workspace/golden/$NAME/"
+  || die_env "stack bring-up failed — see the golden-stack logs under $WORKSPACE/.workspace/runtimes/$NAME/oss-stack/"
 
 # The demo profile does not carry the internal test-fixtures plugin, and ~60 OSS
 # specs (incl. saved-view / automation) reference e2et_* models. Import it
@@ -222,7 +222,7 @@ log "1/4 fresh stack: reuse '$NAME' on the same slot; stop before reset + up --f
 # PW_PROFILE=oss auto-import — we do it here, deterministically.)
 log "1b/4 import internal test-fixtures plugin (e2et_* models)"
 "$GS" import "$NAME" --plugin-profile none --plugin test-fixtures \
-  || die_env "test-fixtures import failed — see $WORKSPACE/.workspace/golden/$NAME/import.log"
+  || die_env "test-fixtures import failed — see $WORKSPACE/.workspace/runtimes/$NAME/oss-stack/import.log"
 
 # --- 2. resolve the stack env (base URL + backend + PG*) ---------------------
 log "2/4 resolve stack env"

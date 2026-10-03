@@ -109,7 +109,41 @@ acquire_stack_lock() {
   trap release_stack_lock EXIT
 }
 
-state_dir() { echo "$WORKSPACE/.workspace/golden/$1"; }
+state_dir() {
+  local current="$WORKSPACE/.workspace/runtimes/$1/oss-stack"
+  local legacy="$WORKSPACE/.workspace/golden/$1"
+  if [ -L "$legacy" ]; then
+    [ "$(readlink "$legacy")" = "$current" ] || die "legacy state link belongs to another location; review required"
+  fi
+  if [ -d "$legacy" ] && [ ! -L "$legacy" ]; then
+    [ ! -e "$current" ] || die "both legacy and current stack state exist for $1; review before starting"
+    echo "$legacy"
+  else
+    echo "$current"
+  fi
+}
+
+prepare_state_dir() {
+  local name="$1" current="$WORKSPACE/.workspace/runtimes/$1/oss-stack"
+  local legacy="$WORKSPACE/.workspace/golden/$1"
+  # Caller has checked stopped processes and ensured the exact runtime identity.
+  assert_stack_stopped "$name" || return 1
+  python3 - "$legacy" "$current" <<'PYSTATE' || return 1
+import os
+import sys
+legacy, current = sys.argv[1:]
+if os.path.isdir(legacy) and not os.path.islink(legacy):
+    if os.path.lexists(current):
+        raise SystemExit('both legacy and current stack state exist; review required')
+    os.makedirs(os.path.dirname(current), exist_ok=True)
+    os.rename(legacy, current)
+    # Preserve historical readers without creating another physical state copy.
+    os.symlink(current, legacy)
+else:
+    os.makedirs(current, exist_ok=True)
+PYSTATE
+  echo "$current"
+}
 
 # Read a key from the runtime env file.
 runtime_env() {
@@ -350,7 +384,7 @@ cmd_up() {
     *) die "--runtime-mode must be development|verification|control|performance" ;;
   esac
 
-  local sd; sd="$(state_dir "$name")"
+  local sd; sd="$(state_dir "$name")" || return 1
   # Refuse to overwrite a running jar or reset a database served by a live stack.
   assert_stack_stopped "$name"
 
@@ -361,7 +395,7 @@ cmd_up() {
   local allocation_args=(--slot "$slot" --purpose "OSS host-first golden stack" --ttl "$ttl" --source-root "$REPO_ROOT" --mode "$runtime_mode")
   [ -z "$parallel_reason" ] || allocation_args+=(--parallel-reason "$parallel_reason")
   "$DEV" runtime ensure auraboot "$name" "${allocation_args[@]}" >/dev/null
-  mkdir -p "$sd"
+  sd="$(prepare_state_dir "$name")" || die "cannot prepare stable stack state"
   local evidence_root
   evidence_root="$("$DEV" runtime evidence begin "$name" --purpose "OSS golden stack rebuild")" \
     || die "cannot create a separate evidence round"
@@ -660,7 +694,7 @@ XML
 # ---- import plugins into a running host-first stack ----------------------------------
 cmd_import() {
   local name="$1"; shift
-  local sd; sd="$(state_dir "$name")"
+  local sd; sd="$(state_dir "$name")" || return 1
   [ -f "$sd/ports" ] || die "no running stack for '$name' (run 'up' first)"
   read -r server_port _vite_port _bff_port <"$sd/ports"
 
@@ -753,7 +787,7 @@ cmd_import() {
 #   3. Pre-warm /report-designer + /dashboard with a real authenticated headless nav so
 #      the client lazy chunk + Vite client deps are hot before any golden run.
 cmd_warm() {
-  local name="$1" sd; sd="$(state_dir "$name")"
+  local name="$1" sd; sd="$(state_dir "$name")" || return 1
   [ -f "$sd/ports" ] || die "no running stack for '$name' (run 'up' first)"
   local fe="$REPO_ROOT/web-admin"
   local admin_json="$fe/tests/storage/admin.json"
@@ -813,7 +847,7 @@ cmd_warm() {
 
 # ---- env -----------------------------------------------------------------------------
 cmd_env() {
-  local name="$1" sd; sd="$(state_dir "$name")"
+  local name="$1" sd; sd="$(state_dir "$name")" || return 1
   [ -f "$sd/ports" ] || die "no running stack for '$name' (run 'up' first)"
   read -r server_port vite_port bff_port <"$sd/ports"
   local pg_host pg_port pg_user pg_db pg_pass evidence_root
@@ -861,7 +895,7 @@ EOF
 
 # ---- status --------------------------------------------------------------------------
 cmd_status() {
-  local name="$1" sd; sd="$(state_dir "$name")"
+  local name="$1" sd; sd="$(state_dir "$name")" || return 1
   [ -f "$sd/ports" ] || { echo "no stack for '$name'"; return 1; }
   read -r server_port vite_port bff_port <"$sd/ports"
   local be vi
@@ -912,7 +946,7 @@ kill_listener_supervisor() {
 # ---- down (stop processes, keep runtime/DB) ------------------------------------------
 assert_stack_stopped() {
   local name="$1" sd pid port
-  sd="$(state_dir "$name")"
+  sd="$(state_dir "$name")" || return 1
   local component
   for component in backend frontend; do
     if [ -f "$sd/$component.pid" ]; then
@@ -932,7 +966,7 @@ assert_stack_stopped() {
 
 cmd_down() {
   local name="$1" sd pid cwd component
-  sd="$(state_dir "$name")"
+  sd="$(state_dir "$name")" || return 1
   [ -d "$sd" ] || { log "no stack for '$name'"; return 0; }
   # Validate every recorded process before stopping any of them. Never kill by port.
   for component in frontend backend; do

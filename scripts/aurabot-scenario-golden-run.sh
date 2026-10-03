@@ -191,7 +191,7 @@ teardown() {
   [[ "${AGENT_LLM_STUB_MODE:-true}" != "true" ]] && live=1
   if [[ "$KEEP" -eq 1 || "$failed" -gt 0 || "$live" -eq 1 ]]; then
     step "KEEPING stack '$RUNTIME' (slot $SLOT): keep=$KEEP failed=$failed live=$live"
-    step "  entry: backend http://localhost:$BE_PORT  db=$DB  logs=.workspace/golden/$RUNTIME/"
+    step "  entry: backend http://localhost:$BE_PORT  db=$DB  logs=.workspace/runtimes/$RUNTIME/oss-stack/"
     step "  destroy manually when done: ./scripts/oss-golden-stack.sh destroy $RUNTIME"
   else
     step "teardown: destroying '$RUNTIME' (stub-mode all-green gate run)"
@@ -400,7 +400,7 @@ f10_tools=$(curl -s --noproxy '*' -m 30 -X POST \
     -H "Authorization: Bearer $TOK" -H 'Content-Type: application/json' \
     -H 'Accept: text/event-stream' \
     -d '{"message":"帮我处理一下这件事","sessionId":"guard-f10-'"$$"'"}' 2>/dev/null | head -c 400)
-f10_log="$WORKSPACE_ROOT/.workspace/golden/$RUNTIME/backend.log"
+f10_log="$WORKSPACE_ROOT/.workspace/runtimes/$RUNTIME/oss-stack/backend.log"
 if [[ ! -f "$f10_log" ]]; then
   bad "F10 守卫: backend evidence log missing ($f10_log)"
 else
