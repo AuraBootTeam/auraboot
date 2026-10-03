@@ -36,19 +36,21 @@ describe('CapabilityChecklist', () => {
     expect(onToggle).toHaveBeenCalledWith('crm.cap.account');
   });
 
-  it('shows the unlocked menus for a capability (R6) and omits the row when there are none', () => {
+  it('keeps every related menu in a collapsed disclosure and omits empty disclosures', () => {
     const withMenus: CapabilityGroup[] = [
       {
         group: '客户管理',
         capabilities: [
-          { ...cap('crm.cap.account_view', false), unlockedMenus: ['客户'] },
+          { ...cap('crm.cap.account_view', false), unlockedMenus: ['客户', '客户联系人'] },
           { ...cap('crm.cap.account', true), unlockedMenus: [] },
         ],
       },
     ];
     render(<CapabilityChecklist groups={withMenus} selected={[]} onToggle={() => {}} />);
-    const menus = screen.getByTestId('capability-menus-crm.cap.account_view');
-    expect(menus.textContent).toContain('客户');
+    const menus = screen.getByTestId('capability-menus-crm.cap.account_view') as HTMLDetailsElement;
+    expect(menus.open).toBe(false);
+    expect(menus.querySelector('summary')?.textContent).toBe('Related menus · 2');
+    expect(Array.from(menus.querySelectorAll('li'), menu => menu.textContent)).toEqual(['客户', '客户联系人']);
     expect(screen.queryByTestId('capability-menus-crm.cap.account')).toBeNull();
   });
 });

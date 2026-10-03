@@ -261,7 +261,17 @@ test('quote sharing release gate: multiple members, role access and revocation t
         code: '404', message: 'Resource not found', data: null, context: null,
       });
     }
-    expect((await foreign.page.request.get(`/api/file/${sharedQuoteFileId}`)).status()).toBe(403);
+    const foreignFile = await foreign.page.request.get(`/api/file/${sharedQuoteFileId}`);
+    expect(foreignFile.status()).toBe(404);
+    expect(await foreignFile.json()).toMatchObject({
+      code: '404', message: 'Resource not found', data: null, context: null,
+    });
+    const missingFile = await foreign.page.request.get('/api/file/01NONEXISTENTFILE0000000000');
+    expect(missingFile.status()).toBe(404);
+    expect(await missingFile.json()).toMatchObject({
+      code: '404', message: 'Resource not found', data: null, context: null,
+    });
+    expect((await foreign.page.request.get(`/api/file/download/${sharedQuoteFileId}`)).status()).toBe(404);
     await foreign.page.screenshot({ path: testInfo.outputPath('quote-cross-tenant-denied.png'), fullPage: true });
   } finally { await foreign.context.close(); }
   for(const viewer of viewers) await viewer.context.close();

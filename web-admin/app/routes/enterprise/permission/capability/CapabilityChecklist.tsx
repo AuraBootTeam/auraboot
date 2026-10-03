@@ -18,7 +18,7 @@ interface CapabilityChecklistProps {
  * Permission v2 capability checklist: business-language capabilities folded by group, each a
  * checkbox, sensitive ones marked with a lock. Presentational — selection state and persistence
  * live in the parent (role editor). Replaces the raw resource x action matrix as the primary view;
- * the matrix stays as an advanced "escape hatch".
+ * atomic actions remain available as read-only diagnostics.
  */
 export default function CapabilityChecklist({
   groups,
@@ -87,8 +87,8 @@ export default function CapabilityChecklist({
                     aria-label={cap.label}
                     onChange={() => onToggle(cap.code)}
                   />
-                  <span className="flex min-w-0 flex-col gap-1">
-                    <span className="flex items-center gap-2">
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                       <label htmlFor={`capability-input-${cap.code}`} className="cursor-pointer">
                         {cap.label}
                       </label>
@@ -124,7 +124,11 @@ export default function CapabilityChecklist({
                           data-testid={`capability-revoke-partial-${cap.code}`}
                           disabled={disabled}
                           onClick={() => onRevokePartial(cap.code)}
-                          className="text-left text-xs text-red-700 hover:underline"
+                          className={
+                            revokedPartial.includes(cap.code)
+                              ? 'text-left text-xs text-amber-700 hover:underline'
+                              : 'text-left text-xs text-gray-500 hover:text-red-700 hover:underline'
+                          }
                         >
                           {revokedPartial.includes(cap.code)
                             ? t(
@@ -151,26 +155,29 @@ export default function CapabilityChecklist({
                       </button>
                     )}
                     {cap.unlockedMenus && cap.unlockedMenus.length > 0 && (
-                      <span
+                      <details
                         data-testid={`capability-menus-${cap.code}`}
-                        className="flex flex-wrap items-center gap-1 text-xs text-gray-400"
+                        className="text-xs text-gray-500"
                       >
-                        <span>
+                        <summary className="cursor-pointer hover:text-gray-700">
                           {t(
                             'admin.permission.capability.relatedMenusV2',
                             undefined,
                             'Related menus',
                           )}
-                          :
-                        </span>
-                        {cap.unlockedMenus.map((m) => (
-                          <span key={m} className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-500">
-                            {m}
-                          </span>
-                        ))}
-                      </span>
+                          {' · '}
+                          {cap.unlockedMenus.length}
+                        </summary>
+                        <ul className="mt-1 flex flex-wrap gap-1">
+                          {cap.unlockedMenus.map((m) => (
+                            <li key={m} className="rounded bg-gray-100 px-1.5 py-0.5">
+                              {m}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
                     )}
-                  </span>
+                  </div>
                 </div>
               ))}
             </div>

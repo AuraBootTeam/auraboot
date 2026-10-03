@@ -41,16 +41,19 @@ test('① capability save persists through the browser on a snowflake-id role', 
       includes: string[];
       granted: boolean;
       conventionDerived: boolean;
+      unlockedMenus: string[];
     }>;
   }>;
   expect(grantedCaps(view).length).toBe(0);
   const cap = view
     .flatMap((g) => g.capabilities)
-    .find((c) => !c.conventionDerived && (c.includes?.length ?? 0) > 0);
-  expect(cap, 'a capability with includes must exist').toBeTruthy();
+    .find((c) => !c.conventionDerived && (c.includes?.length ?? 0) > 0 && c.unlockedMenus?.length > 0);
+  expect(cap, 'a declared capability with real actions and related menus must exist').toBeTruthy();
 
   // drive the real browser flow: select the role, check the capability, Save, await the PUT
-  await page.goto('/enterprise/permissions');
+  await page.goto('/home');
+  await expect(page.locator('header[data-hydrated]')).toHaveAttribute('data-hydrated', 'true');
+  await page.getByRole('link', { name: /角色|Roles/, exact: true }).click();
   await expect(page.getByTestId('permission-page')).toBeVisible({ timeout: 30_000 });
   await page.getByTestId('role-search-input').fill(role.code);
   await expect(page.getByTestId(`role-item-${role.code}`)).toBeVisible({ timeout: 10_000 });
@@ -62,6 +65,16 @@ test('① capability save persists through the browser on a snowflake-id role', 
   );
 
   const checkbox = page.getByTestId(`capability-checkbox-${cap!.code}`);
+  const menus = page.getByTestId(`capability-menus-${cap!.code}`);
+  await expect(menus).toHaveJSProperty('open', false);
+  await menus.locator('summary').click();
+  await expect(menus).toHaveJSProperty('open', true);
+  await expect(menus.locator('li')).toHaveCount(cap!.unlockedMenus.length);
+  for (const menu of cap!.unlockedMenus) await expect(menus).toContainText(menu);
+  await menus.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: info.outputPath('00-capability-related-menus.png'), fullPage: true });
+  await menus.locator('summary').click();
+  await expect(menus).toHaveJSProperty('open', false);
   await checkbox.scrollIntoViewIfNeeded();
   await checkbox.check();
   await expect(page.getByTestId('capability-save')).toBeEnabled(); // waits for React to register the selection
