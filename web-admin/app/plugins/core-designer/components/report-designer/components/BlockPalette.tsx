@@ -340,6 +340,7 @@ export const BlockPalette: React.FC = () => {
       onItemClick={(item) => handleAddBlock(item.data as BlockDefinition)}
       className="w-56 bg-gray-50"
       testId="block-palette"
+      wrapDescriptions
     />
   );
 };

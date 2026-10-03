@@ -21,7 +21,9 @@ test.describe('Report Designer', () => {
     await expect(page.getByTestId('block-palette')).toBeVisible();
     await expect(page.getByTestId('report-canvas')).toBeVisible();
     // New-report initialization runs in a client effect; SSR visibility is insufficient.
-    await expect(page.getByTestId('report-designer-toolbar').getByText(/^(未保存|Unsaved)$/)).toBeVisible();
+    await expect(
+      page.getByTestId('report-designer-toolbar').getByText(/^(未保存|Unsaved)$/),
+    ).toBeVisible();
   });
 
   test('should load designer with 3-panel layout', async ({ page }) => {
@@ -44,17 +46,25 @@ test.describe('Report Designer', () => {
 
   test('should add a data-table block', async ({ page }) => {
     // Click "Data Table" button in palette using role selector for full button
-    await page.getByTestId('block-palette').getByRole('button', { name: /数据表格|Data Table/ }).click();
+    await page
+      .getByTestId('block-palette')
+      .getByRole('button', { name: /数据表格|Data Table/ })
+      .click();
 
     // Wait for the block to appear on canvas
     await expect(
-      page.getByTestId('report-canvas').getByText(/^(请在属性面板中配置列|Configure columns in the property panel)$/),
+      page
+        .getByTestId('report-canvas')
+        .getByText(/^(请在属性面板中配置列|Configure columns in the property panel)$/),
     ).toBeVisible({ timeout: 10000 });
   });
 
   test('should add page header', async ({ page }) => {
     // Click "Page Header" button
-    await page.getByTestId('block-palette').getByRole('button', { name: /页眉|Page Header/ }).click();
+    await page
+      .getByTestId('block-palette')
+      .getByRole('button', { name: /页眉|Page Header/ })
+      .click();
 
     // Canvas should show "Header" label
     await expect(
@@ -64,7 +74,10 @@ test.describe('Report Designer', () => {
 
   test('should add page footer', async ({ page }) => {
     // Click "Page Footer" button
-    await page.getByTestId('block-palette').getByRole('button', { name: /页脚|Page Footer/ }).click();
+    await page
+      .getByTestId('block-palette')
+      .getByRole('button', { name: /页脚|Page Footer/ })
+      .click();
 
     // Canvas should show "Footer" label
     await expect(
@@ -74,9 +87,14 @@ test.describe('Report Designer', () => {
 
   test('should select block and show property panel', async ({ page }) => {
     // Add a data-table block first
-    await page.getByTestId('block-palette').getByRole('button', { name: /数据表格|Data Table/ }).click();
+    await page
+      .getByTestId('block-palette')
+      .getByRole('button', { name: /数据表格|Data Table/ })
+      .click();
     await expect(
-      page.getByTestId('report-canvas').getByText(/^(请在属性面板中配置列|Configure columns in the property panel)$/),
+      page
+        .getByTestId('report-canvas')
+        .getByText(/^(请在属性面板中配置列|Configure columns in the property panel)$/),
     ).toBeVisible({ timeout: 10000 });
 
     // Click on the block in canvas to select it
@@ -97,7 +115,10 @@ test.describe('Report Designer', () => {
 
   test('should open page settings dialog', async ({ page }) => {
     // Click Settings button in toolbar
-    await page.getByTestId('report-designer-toolbar').getByRole('button', { name: /^(设置|Settings)$/ }).click();
+    await page
+      .getByTestId('report-designer-toolbar')
+      .getByRole('button', { name: /^(设置|Settings)$/ })
+      .click();
 
     // Settings dialog should appear
     await expect(page.getByText(/^(页面设置|Page Settings)$/)).toBeVisible();
@@ -132,7 +153,10 @@ test.describe('Report Designer', () => {
   // ==================== Phase 2b: New Block Types ====================
 
   test('should add a grouped-table block', async ({ page }) => {
-    await page.getByTestId('block-palette').getByRole('button', { name: /分组表格|Grouped Table/ }).click();
+    await page
+      .getByTestId('block-palette')
+      .getByRole('button', { name: /分组表格|Grouped Table/ })
+      .click();
 
     // Canvas should show the grouped table placeholder
     await expect(
@@ -141,7 +165,10 @@ test.describe('Report Designer', () => {
   });
 
   test('should add a stat-card block', async ({ page }) => {
-    await page.getByTestId('block-palette').getByRole('button', { name: /指标卡片|Stat Card/ }).click();
+    await page
+      .getByTestId('block-palette')
+      .getByRole('button', { name: /指标卡片|Stat Card/ })
+      .click();
 
     // Canvas should show the stat card with sample value
     await expect(page.getByTestId('report-canvas').getByText('12,345')).toBeVisible({
@@ -150,7 +177,10 @@ test.describe('Report Designer', () => {
   });
 
   test('should add a rich-text block', async ({ page }) => {
-    await page.getByTestId('block-palette').getByRole('button', { name: /富文本|Rich Text/ }).click();
+    await page
+      .getByTestId('block-palette')
+      .getByRole('button', { name: /富文本|Rich Text/ })
+      .click();
 
     // Canvas should show the rich text placeholder
     await expect(
@@ -159,7 +189,10 @@ test.describe('Report Designer', () => {
   });
 
   test('should select grouped-table and show property panel', async ({ page }) => {
-    await page.getByTestId('block-palette').getByRole('button', { name: /分组表格|Grouped Table/ }).click();
+    await page
+      .getByTestId('block-palette')
+      .getByRole('button', { name: /分组表格|Grouped Table/ })
+      .click();
     await expect(
       page.getByTestId('report-canvas').getByText('Select a group-by field'),
     ).toBeVisible({ timeout: 10000 });
@@ -175,12 +208,15 @@ test.describe('Report Designer', () => {
     await expect(
       page
         .getByTestId('block-property-panel')
-        .locator('input[placeholder="Field name to group by"]'),
+        .getByPlaceholder(/^(用于分组的字段|Field name to group by)$/),
     ).toBeVisible();
   });
 
   test('should select stat-card and show color picker', async ({ page }) => {
-    await page.getByTestId('block-palette').getByRole('button', { name: /指标卡片|Stat Card/ }).click();
+    await page
+      .getByTestId('block-palette')
+      .getByRole('button', { name: /指标卡片|Stat Card/ })
+      .click();
     await expect(page.getByTestId('report-canvas').getByText('Metric')).toBeVisible({
       timeout: 10000,
     });
@@ -190,11 +226,16 @@ test.describe('Report Designer', () => {
     await expect(
       page.getByTestId('block-property-panel').getByText(/^(指标卡片|Stat Card)$/),
     ).toBeVisible();
-    await expect(page.getByTestId('block-property-panel').getByText('Color')).toBeVisible();
+    await expect(
+      page.getByTestId('block-property-panel').getByText(/^(颜色|Color)$/),
+    ).toBeVisible();
   });
 
   test('should select rich-text and show content editor', async ({ page }) => {
-    await page.getByTestId('block-palette').getByRole('button', { name: /富文本|Rich Text/ }).click();
+    await page
+      .getByTestId('block-palette')
+      .getByRole('button', { name: /富文本|Rich Text/ })
+      .click();
     await expect(
       page.getByTestId('report-canvas').getByText('Click to add text content'),
     ).toBeVisible({ timeout: 10000 });
@@ -208,44 +249,80 @@ test.describe('Report Designer', () => {
     const content = panel.getByPlaceholder(/^(输入文本内容…|Enter text content\.\.\.)$/);
     await expect(content).toBeVisible();
     await content.fill('Localized report editor content');
-    await expect(page.getByTestId('report-canvas').getByText('Localized report editor content')).toBeVisible();
+    await expect(
+      page.getByTestId('report-canvas').getByText('Localized report editor content'),
+    ).toBeVisible();
     await panel.getByRole('button', { name: /^(居中|Center)$/ }).click();
-    await expect(panel.getByRole('button', { name: /^(居中|Center)$/ })).toHaveClass(/border-blue-300/);
+    await expect(panel.getByRole('button', { name: /^(居中|Center)$/ })).toHaveClass(
+      /border-blue-300/,
+    );
     await expect(panel.getByText(/^(字号（磅）|Font Size \(pt\))$/)).toBeVisible();
-    await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/report-rich-text-properties.png`, fullPage: true });
+    await page.screenshot({
+      path: `${process.env.AURA_EVIDENCE_DIR}/report-rich-text-properties.png`,
+      fullPage: true,
+    });
   });
 
   test('should have all 10 block types in palette', async ({ page }) => {
-    await expect(page.getByTestId('block-palette').getByRole('button', { name: /数据表格|Data Table/ })).toBeVisible();
-    await expect(page.getByTestId('block-palette').getByRole('button', { name: /分组表格|Grouped Table/ })).toBeVisible();
-    await expect(page.getByTestId('block-palette').getByRole('button', { name: /指标卡片|Stat Card/ })).toBeVisible();
-    await expect(page.getByTestId('block-palette').getByRole('button', { name: /富文本|Rich Text/ })).toBeVisible();
-    await expect(page.getByTestId('block-palette').getByRole('button', { name: /交叉表|Cross Tab/ })).toBeVisible();
-    await expect(page.getByTestId('block-palette').getByRole('button', { name: /图表|Chart/ })).toBeVisible();
-    await expect(page.getByTestId('block-palette').getByRole('button', { name: /页眉|Page Header/ })).toBeVisible();
-    await expect(page.getByTestId('block-palette').getByRole('button', { name: /页脚|Page Footer/ })).toBeVisible();
-    await expect(page.getByTestId('block-palette').getByRole('button', { name: /条码|Barcode/ })).toBeVisible();
-    await expect(page.getByTestId('block-palette').getByRole('button', { name: /水印|Watermark/ })).toBeVisible();
+    await expect(
+      page.getByTestId('block-palette').getByRole('button', { name: /数据表格|Data Table/ }),
+    ).toBeVisible();
+    await expect(
+      page.getByTestId('block-palette').getByRole('button', { name: /分组表格|Grouped Table/ }),
+    ).toBeVisible();
+    await expect(
+      page.getByTestId('block-palette').getByRole('button', { name: /指标卡片|Stat Card/ }),
+    ).toBeVisible();
+    await expect(
+      page.getByTestId('block-palette').getByRole('button', { name: /富文本|Rich Text/ }),
+    ).toBeVisible();
+    await expect(
+      page.getByTestId('block-palette').getByRole('button', { name: /交叉表|Cross Tab/ }),
+    ).toBeVisible();
+    await expect(
+      page.getByTestId('block-palette').getByRole('button', { name: /图表|Chart/ }),
+    ).toBeVisible();
+    await expect(
+      page.getByTestId('block-palette').getByRole('button', { name: /页眉|Page Header/ }),
+    ).toBeVisible();
+    await expect(
+      page.getByTestId('block-palette').getByRole('button', { name: /页脚|Page Footer/ }),
+    ).toBeVisible();
+    await expect(
+      page.getByTestId('block-palette').getByRole('button', { name: /条码|Barcode/ }),
+    ).toBeVisible();
+    await expect(
+      page.getByTestId('block-palette').getByRole('button', { name: /水印|Watermark/ }),
+    ).toBeVisible();
   });
 
   // ==================== Phase 2c: Cross Tab + Chart + Parameters ====================
 
   test('should add a cross-tab block', async ({ page }) => {
-    await page.getByTestId('block-palette').getByRole('button', { name: /交叉表|Cross Tab/ }).click();
+    await page
+      .getByTestId('block-palette')
+      .getByRole('button', { name: /交叉表|Cross Tab/ })
+      .click();
     await expect(
       page.getByTestId('report-canvas').getByText('Configure row, column, and value fields'),
     ).toBeVisible({ timeout: 10000 });
   });
 
   test('should add a chart block', async ({ page }) => {
-    await page.getByTestId('block-palette').getByRole('button', { name: /图表|Chart/ }).click();
+    await page
+      .getByTestId('block-palette')
+      .getByRole('button', { name: /图表|Chart/ })
+      .click();
     await expect(
       page.getByTestId('report-canvas').getByText('Configure category and value fields'),
     ).toBeVisible({ timeout: 10000 });
   });
 
   test('should select cross-tab and show property panel', async ({ page }) => {
-    await page.getByTestId('block-palette').getByRole('button', { name: /交叉表|Cross Tab/ }).click();
+    await page
+      .getByTestId('block-palette')
+      .getByRole('button', { name: /交叉表|Cross Tab/ })
+      .click();
     await expect(
       page.getByTestId('report-canvas').getByText('Configure row, column, and value fields'),
     ).toBeVisible({ timeout: 10000 });
@@ -260,12 +337,15 @@ test.describe('Report Designer', () => {
     await expect(
       page
         .getByTestId('block-property-panel')
-        .locator('input[placeholder="Field for row grouping"]'),
+        .getByPlaceholder(/^(用于行分组的字段|Field for row grouping)$/),
     ).toBeVisible();
   });
 
   test('should select chart and show chart type selector', async ({ page }) => {
-    await page.getByTestId('block-palette').getByRole('button', { name: /图表|Chart/ }).click();
+    await page
+      .getByTestId('block-palette')
+      .getByRole('button', { name: /图表|Chart/ })
+      .click();
     await expect(
       page.getByTestId('report-canvas').getByText('Configure category and value fields'),
     ).toBeVisible({ timeout: 10000 });
@@ -279,10 +359,14 @@ test.describe('Report Designer', () => {
     ).toBeVisible();
     // Chart type buttons
     await expect(
-      page.getByTestId('block-property-panel').getByRole('button', { name: 'Bar', exact: true }),
+      page
+        .getByTestId('block-property-panel')
+        .getByRole('button', { name: /^(柱状图|Bar)$/, exact: true }),
     ).toBeVisible();
     await expect(
-      page.getByTestId('block-property-panel').getByRole('button', { name: 'Pie', exact: true }),
+      page
+        .getByTestId('block-property-panel')
+        .getByRole('button', { name: /^(饼图|Pie)$/, exact: true }),
     ).toBeVisible();
   });
 
@@ -299,7 +383,10 @@ test.describe('Report Designer', () => {
     await panel.getByPlaceholder(/^(参数名|Parameter name)$/).fill('report_limit');
     await panel.getByPlaceholder(/^(显示名称|Display label)$/).fill('Row limit');
     await panel.getByRole('button', { name: /^(添加|Add)$/, exact: true }).scrollIntoViewIfNeeded();
-    await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/report-parameter-add.png`, fullPage: true });
+    await page.screenshot({
+      path: `${process.env.AURA_EVIDENCE_DIR}/report-parameter-add.png`,
+      fullPage: true,
+    });
     await panel.getByRole('button', { name: /^(添加|Add)$/, exact: true }).click();
     await expect(panel.getByText(/^Row limit \((文本|Text)\)$/)).toBeVisible();
     await expect(panel.getByPlaceholder(/^(参数名|name)$/)).toHaveValue('report_limit');

@@ -56,6 +56,8 @@ export interface DesignerPaletteProps {
    * (overrides the default `${testId}-item-${item.type}` pattern).
    */
   itemTestIdPrefix?: string;
+  /** Keep full descriptions readable in narrow report palettes. */
+  wrapDescriptions?: boolean;
 }
 
 // ==================== Component ====================
@@ -76,6 +78,7 @@ export function DesignerPalette({
   className,
   testId,
   itemTestIdPrefix,
+  wrapDescriptions = false,
 }: DesignerPaletteProps) {
   const [search, setSearch] = useState('');
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -178,7 +181,7 @@ export function DesignerPalette({
             {item.statusLabel && (
               <span
                 className={cn(
-                  'shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-none',
+                  'shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] leading-none font-medium',
                   statusToneClass(item.statusTone),
                 )}
                 data-testid={
@@ -194,7 +197,14 @@ export function DesignerPalette({
             )}
           </div>
           {item.description && (
-            <div className="mt-0.5 truncate text-xs text-gray-500">{item.description}</div>
+            <div
+              className={cn(
+                'mt-0.5 text-xs text-gray-500',
+                wrapDescriptions ? 'break-words whitespace-normal' : 'truncate',
+              )}
+            >
+              {item.description}
+            </div>
           )}
           {item.statusText && (
             <div
