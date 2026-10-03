@@ -1,16 +1,18 @@
 /**
  * Page Templates — E2E Tests
  *
- * Full lifecycle: Save as Template → Browse Templates → Create from Template → Clone Page
+ * Full lifecycle: Save as Template → Browse Templates → Create from Template → Duplicate Page
  *
  * Navigation: page.goto() is used because Page Designer is a platform designer tool,
  * not a sidebar menu page (allowed per AGENTS.md exception for designer workbenches).
+ * T5 drives the real sidebar page-configuration menu and DSL row command.
  *
  * Dimensions covered:
  * D2 (gallery renders after save), D4 (full form fill), D5 (template-name-input prefilled),
- * D6 (new page appears after create-from-template), D8 (clone name/key prefilled + editable),
+ * D6 (new page appears after create-from-template), D8 (duplicate command targets the exact source and preserves stored content),
  * D14 (dialog closes = operation feedback).
- * Not applicable: D1 (no sidebar menu for designer), D3/D9/D10 (no status machine),
+ * D1 is covered by T5; other designer journeys use the platform-tool exception.
+ * Not applicable: D3/D9/D10 (no status machine),
  * D7 (no detail page), D11 (not a delete flow).
  *
  * @since 4.1.0
@@ -29,6 +31,7 @@ import { BASE_URL } from '../../helpers/environments';
  */
 async function createTestPage(
   page: import('@playwright/test').Page,
+  content: Partial<{ schemaVersion: number; blocks: unknown[]; dataSources: Record<string, unknown> }> = {},
 ): Promise<{ pid: string; name: string }> {
   const name = uniqueId('tmpl');
   const pageKey = `e2e_tmpl_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
@@ -46,6 +49,7 @@ async function createTestPage(
       blocks: [{ id: 'blk1', blockType: 'table', config: {} }],
       metaInfo: { componentCount: 1 },
       semver: '0.1.0',
+      ...content,
     },
   });
   expect(resp.ok(), `Create page API failed: ${resp.status()}`).toBeTruthy();
@@ -54,24 +58,6 @@ async function createTestPage(
   const pid = body.data?.pid;
   expect(pid, 'Page pid must be returned').toBeTruthy();
   return { pid, name };
-}
-
-/**
- * Navigate to the page-designer list page and wait for Suspense to resolve.
- * The page list may show an empty state (API broken) or actual pages; either way
- * we wait until the React Suspense boundary has completed loading.
- */
-async function goToPageDesignerList(page: import('@playwright/test').Page): Promise<void> {
-  // Page designer may be at /page-designer or /p/page_schema
-  await page.goto('/page-designer', { waitUntil: 'domcontentloaded' });
-  await page.waitForLoadState('load');
-  await page.waitForSelector(
-    '[data-testid="page-list-create-btn"], [data-testid="page-card-clone-btn"], [data-testid="page-list-clone-btn"], [data-testid="create-from-template-btn"]',
-    { timeout: 15000 },
-  ).catch(() => {
-    // The list may still settle via later-rendered empty or toolbar state.
-  });
-  await page.getByTestId('create-from-template-btn').waitFor({ state: 'visible', timeout: 15_000 });
 }
 
 /**
@@ -289,110 +275,61 @@ test.describe('Page Templates', () => {
   });
 
   // -------------------------------------------------------------------------
-  // T5: Clone page from page list (via grid card dropdown menu)
+  // T5: Duplicate through the actual DSL page-manager menu and row command
   // -------------------------------------------------------------------------
-  test.fixme('T5 — clone existing page from page designer list (grid card menu)', async ({ page }) => {
-    // Page designer list card menu not wired for clone functionality yet.
-    // Navigate directly to the page designer for our test page so the designer knows about it
-    // Then go back to list — the list itself uses the broken GET /api/pages endpoint.
-    // Since the page list is empty (GET /api/pages broken), we test the clone dialog
-    // by invoking ClonePageDialog through the page designer route's back-and-clone flow.
-    //
-    // Alternative approach: navigate to the page designer directly, then open its list view.
-    // The page designer has a "back" button that returns to /page-designer list.
-    // But the list still uses the broken endpoint.
-    //
-    // Best approach for the current server state: test clone dialog by opening it directly
-    // with a page card. We use page.evaluate to trigger the clone state, but this violates
-    // E2E principles. Instead, we verify the dialog can be opened from the list when data exists.
-    //
-    // Note: this test requires GET /api/pages to be working. It is currently broken on the
-    // dev server (NoClassDefFoundError: CurrentMemberId) — restart backend after republishing core.
-    // The test below is written for the correct working state.
-    await goToPageDesignerList(page);
-
-    // After goToPageDesignerList we've already waited for "还没有页面" (or real pages).
-    // Check whether actual pages exist by seeing if the empty-state text is present.
-    // If empty, the page list has no data (GET /api/pages broken or no pages created yet).
-    const isEmpty = await page.locator('text=还没有页面').isVisible({ timeout: 3000 }).catch(() => false);
-    if (isEmpty) {
-      // Page list is empty — this can happen when GET /api/pages is broken.
-      // The clone button is not reachable without page rows in the list.
-      // Use test.skip() so the test is marked as skipped (not failed) when preconditions are absent.
-      test.skip(true, 'Page list is empty — GET /api/pages may be broken. Restart backend after republishing core.');
-    }
-
-    // Try grid clone first; cards may reveal actions only on hover.
-    const gridCloneBtn = page.getByTestId('page-card-clone-btn').first();
-    let cloneBtn = gridCloneBtn;
-    const gridCloneBtnVisible = await gridCloneBtn.isVisible({ timeout: 3000 }).catch(() => false);
-    if (!gridCloneBtnVisible) {
-      const firstCard = page.locator('[data-testid^="page-card-"]').first();
-      if (await firstCard.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await firstCard.hover();
-        await page.waitForFunction(() => true).catch(() => {});
-      }
-      if (!(await gridCloneBtn.isVisible({ timeout: 2000 }).catch(() => false))) {
-        const listViewBtn = page
-          .locator('div.flex.items-center.overflow-hidden.rounded-lg.border button')
-          .last();
-        const listViewVisible = await listViewBtn.isVisible({ timeout: 2000 }).catch(() => false);
-        if (listViewVisible) {
-          await listViewBtn.click();
-        }
-        cloneBtn = page.getByTestId('page-list-clone-btn').first();
-      }
-    }
-    const cloneVisible = await cloneBtn.isVisible({ timeout: 5000 }).catch(() => false);
-    test.skip(!cloneVisible, 'Clone action is not exposed in the current page list UI state');
-    await expect(cloneBtn).toBeVisible({ timeout: 10000 });
-    await cloneBtn.click();
-
-    // Clone dialog opens
-    const dialog = page.getByTestId('clone-page-dialog');
-    await expect(dialog).toBeVisible({ timeout: 5000 });
-
-    // Name pre-filled with "(Copy)"
-    const nameInput = page.getByTestId('clone-name-input');
-    await expect(nameInput).toBeVisible();
-    const preName = await nameInput.inputValue();
-    expect(preName).toContain('Copy');
-
-    // Key is pre-generated (non-empty)
-    const keyInput = page.getByTestId('clone-key-input');
-    await expect(keyInput).toBeVisible();
-    const preKey = await keyInput.inputValue();
-    expect(preKey.length).toBeGreaterThan(0);
-
-    // Edit name and key to avoid key conflicts
-    const cloneName = uniqueId('cloned');
-    const cloneKey = `e2e_clone_${Date.now().toString(36)}`;
-    await nameInput.clear();
-    await nameInput.fill(cloneName);
-    await keyInput.clear();
-    await keyInput.fill(cloneKey);
-
-    // Confirm clone
-    const confirmBtn = page.getByTestId('clone-confirm-btn');
-    await expect(confirmBtn).toBeEnabled();
-
-    const [cloneResp] = await Promise.all([
-      page.waitForResponse(
-        (r) => r.url().includes('/api/pages') && r.request().method() === 'POST',
-        { timeout: 15000 },
-      ),
-      confirmBtn.click(),
+  test('T5 - duplicate a legacy tree through the page configuration menu', async ({ page }, testInfo) => {
+    const dataSources = { main: { model: 'page_schema' } };
+    const source = await createTestPage(page, {
+      schemaVersion: 3,
+      dataSources,
+      blocks: [{ id: 'copy_root', blockType: 'list', blocks: [
+        { id: 'copy_table', blockType: 'table', dataSource: { ref: 'main' }, blocks: [
+          { id: 'copy_table_name', blockType: 'column', field: 'name' },
+        ] },
+      ] }],
+    });
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    const nav = page.locator('nav, aside, [role="navigation"]').first();
+    await expect(nav).toBeVisible();
+    await nav.getByRole('button', { name: /\u5143\u6570\u636e\u7ba1\u7406|Meta/i }).click();
+    const menu = nav.locator('a[href="/p/page_schema"]');
+    await expect(menu).toBeVisible();
+    await menu.click();
+    await expect(page).toHaveURL(`${BASE_URL}/p/page_schema`);
+    const sourceRow = page.getByRole('row').filter({ hasText: source.name });
+    await expect(sourceRow).toHaveCount(1);
+    await expect(sourceRow).toBeVisible();
+    await sourceRow.getByTestId('row-action-more').click();
+    const duplicate = page.getByTestId('row-action-dropdown').getByTestId('row-action-duplicate');
+    await expect(duplicate).toBeEnabled();
+    const [response] = await Promise.all([
+      page.waitForResponse(r => decodeURIComponent(r.url()).endsWith('/api/meta/commands/execute/pgm:duplicate_page_schema')
+        && r.request().method() === 'POST'),
+      duplicate.click(),
     ]);
-    const cloneBody = await cloneResp.json();
-    expect(cloneBody.code).toBe('0');
-    expect(cloneBody.data?.pid, 'Clone response must return new pid').toBeTruthy();
-
-    // Dialog closes after successful clone
-    await expect(dialog).not.toBeVisible({ timeout: 10000 });
-
-    // Navigates to the cloned page in designer
-    await page.waitForURL(/\/page-designer\/[a-zA-Z0-9]+$/, { timeout: 10000 });
-    await expect(page.getByTestId('designer-canvas')).toBeVisible({ timeout: 15000 });
+    expect(response.request().postDataJSON()).toMatchObject({ targetRecordPid: source.pid });
+    expect(response.ok()).toBe(true);
+    const result = await response.json();
+    expect(result.code).toBe('0');
+    const copiedPid = result.data?.pid;
+    expect(copiedPid).toBeTruthy();
+    expect(copiedPid).not.toBe(source.pid);
+    const copied = await page.request.get(`/api/pages/${copiedPid}`);
+    expect(copied.ok()).toBe(true);
+    const persisted = await copied.json();
+    expect(persisted.code).toBe('0');
+    expect(persisted.data).toMatchObject({ pid: copiedPid, name: `${source.name} (Copy)`,
+      schemaVersion: 4, kind: 'list', modelCode: 'page_schema', dataSources,
+      blocks: [{ id: 'copy_table', blockType: 'table', dataSource: 'main', columns: ['name'] }],
+      extension: { designerRootId: 'copy_root' } });
+    const copyRow = page.getByRole('row').filter({ hasText: `${source.name} (Copy)` });
+    await expect(copyRow).toBeVisible();
+    await page.reload();
+    await expect(copyRow).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath('duplicate-page-menu.png'), fullPage: true });
+    const original = await page.request.get(`/api/pages/${source.pid}`);
+    expect(original.ok()).toBe(true);
+    expect((await original.json()).data).toMatchObject({ pid: source.pid, schemaVersion: 3, dataSources });
   });
 
   // -------------------------------------------------------------------------
