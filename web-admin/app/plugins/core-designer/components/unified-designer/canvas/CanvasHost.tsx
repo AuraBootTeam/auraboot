@@ -149,9 +149,11 @@ export function CanvasHost({
             {kindLabel}
           </div>
           <div className="mt-1 text-lg font-semibold text-slate-900">{canvasSubject}</div>
-          <div className="mt-2 text-xs text-slate-500">
+          <div className="mt-2 text-xs text-slate-500" data-i18n-ui-copy>
             {resolveDesignerText(DESIGNER_I18N.unified.mode, locale)}:{' '}
-            <span className="font-medium text-blue-700">{mode}</span>
+            <span className="font-medium text-blue-700">
+              {resolveDesignerText(DESIGNER_I18N.unified[mode], locale)}
+            </span>
           </div>
         </RootDropZone>
         <div className="grid grid-cols-12 gap-4">
