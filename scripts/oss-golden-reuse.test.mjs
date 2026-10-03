@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -62,11 +62,14 @@ test('log compatibility pointers preserve old bytes and point into each independ
   const helper = source.split("<<'PYLOG'\n")[1].split('\nPYLOG')[0];
   const first = join(root, 'evidence/first'); const second = join(root, 'evidence/second');
   for (const round of [first, second]) mkdirSync(join(round, 'logs'), { recursive: true });
+  symlinkSync(join(first, 'logs'), join(sd, 'logs'));
   writeFileSync(join(sd, 'backend.log'), 'legacy bytes');
   execFileSync('python3', ['-c', helper, sd, first]);
   writeFileSync(join(first, 'logs/backend.log'), 'first round');
   assert.equal(readFileSync(join(sd, 'backend.log'), 'utf8'), 'first round');
   assert.equal(readFileSync(join(first, 'legacy-logs/backend.log'), 'utf8'), 'legacy bytes');
+  rmSync(join(sd, 'logs'));
+  symlinkSync(join(second, 'logs'), join(sd, 'logs'));
   execFileSync('python3', ['-c', helper, sd, second]);
   writeFileSync(join(second, 'logs/backend.log'), 'second round');
   assert.equal(readFileSync(join(sd, 'backend.log'), 'utf8'), 'second round');
