@@ -39,7 +39,7 @@ beforeEach(() => {
       json: async () => ({ code: '0', data: { downloadUrl: '/files/export' } }),
     });
   vi.stubGlobal('fetch', fetchMock);
-  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function () {
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
     downloads.push({ name: this.download, href: this.getAttribute('href')! });
   });
   vi.stubGlobal(
