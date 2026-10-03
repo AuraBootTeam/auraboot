@@ -22,6 +22,7 @@
 #                   otherwise refuses to run on a database that predates the current
 #                   snapshot (db/snapshots/schema-current.sql is a pg_dump — plain CREATE
 #                   TABLE, so it cannot back-fill columns into tables that already exist).
+#       --require-new-db: refuse an existing database before infra/schema/build writes.
 #       --product-migration-root: repeatable directory of product-owned V*.sql migrations.
 #                   Requires --fresh-db and applies after the Core snapshot but before backend
 #                   startup, recording path + SHA-256 in the runtime state directory.
@@ -63,7 +64,7 @@ if [ ! -f "$WORKSPACE/dev.sh" ]; then
 fi
 [ -f "$WORKSPACE/dev.sh" ] || { echo "FATAL: cannot find workspace dev.sh for $REPO_ROOT"; exit 1; }
 CANONICAL="$WORKSPACE/auraboot"                      # canonical OSS checkout (for gradle wrapper / node_modules seed)
-DEV="$WORKSPACE/dev.sh"
+DEV="$WORKSPACE/aura"
 
 ADMIN_EMAIL="admin@auraboot.com"
 ADMIN_PASSWORD="Test2026x"
@@ -331,7 +332,7 @@ PY
 # ---- up ------------------------------------------------------------------------------
 cmd_up() {
   local name="$1"; shift
-  local slot="" ttl="6h" runtime_mode="development" frontend=1 warm=1 fresh_db=0
+  local slot="" ttl="6h" runtime_mode="development" frontend=1 warm=1 fresh_db=0 require_new_db=0
   local plugin_profile="" import_plugins=() extra_plugin_roots=() product_migration_roots=()
   local extra_root migration_root plugin_item
   while [ $# -gt 0 ]; do case "$1" in
@@ -341,6 +342,7 @@ cmd_up() {
     --no-frontend) frontend=0; shift;;
     --no-warm) warm=0; shift;;
     --fresh-db) fresh_db=1; shift;;
+    --require-new-db) require_new_db=1; shift;;
     --product-migration-root)
       [ -d "$2" ] || die "product migration root does not exist: $2"
       product_migration_roots+=("$(cd "$2" && pwd)")
@@ -409,7 +411,6 @@ cmd_up() {
       "$DEV" runtime allocate auraboot "$name" --slot "$slot" --purpose "OSS host-first golden stack" --ttl "$ttl" >/dev/null
     fi
   fi
-  "$DEV" infra ensure "$name" --yes >/dev/null
 
   local server_port vite_port bff_port pg_db redis_db pg_host pg_port pg_user pg_pass
   server_port="$(runtime_env "$name" SERVER_PORT)"
@@ -421,6 +422,15 @@ cmd_up() {
   pg_port="$(runtime_env "$name" POSTGRES_PORT)"; pg_port="${pg_port:-5432}"
   pg_user="$(runtime_env "$name" POSTGRES_USER)"; pg_user="${pg_user:-auraboot}"
   pg_pass="$(runtime_env "$name" POSTGRES_PASSWORD)"; pg_pass="${pg_pass:-auraboot}"
+  if [ "$require_new_db" = 1 ]; then
+    [ "$fresh_db" = 0 ] || die "--require-new-db cannot be combined with --fresh-db"
+    [[ "$pg_db" =~ ^[a-z][a-z0-9_]*$ ]] || die "invalid database name"
+    local database_exists
+    database_exists="$(PGPASSWORD="$pg_pass" psql -v ON_ERROR_STOP=1 -h "$pg_host" -p "$pg_port" -U "$pg_user" -d postgres -tAc \
+      "SELECT count(*) FROM pg_database WHERE datname = '$pg_db'")" || die "cannot verify database absence"
+    [ "$database_exists" = 0 ] || die "database $pg_db already exists; retained data will not be modified"
+  fi
+  "$DEV" infra ensure "$name" --yes >/dev/null
   log "    backend=$server_port vite=$vite_port bff=$bff_port db=$pg_db redis-db=$redis_db"
   # Persist PG coordinates so 'env' can export PG* for the Playwright setup
   # project (00-bootstrap verifies the isolated DB via node-postgres / PG* vars).
@@ -496,21 +506,17 @@ cmd_up() {
     log "    applied $migration_count product migration(s); receipt: $sd/product-migrations.tsv"
   fi
 
-  log "3/9 seed gradle wrapper jar (fresh-worktree gotcha)"
-  if [ ! -f "$REPO_ROOT/platform/gradle/wrapper/gradle-wrapper.jar" ]; then
-    mkdir -p "$REPO_ROOT/platform/gradle/wrapper"
-    cp "$CANONICAL/platform/gradle/wrapper/gradle-wrapper.jar" "$REPO_ROOT/platform/gradle/wrapper/" \
-      || die "cannot seed gradle-wrapper.jar from $CANONICAL"
-    cp "$CANONICAL/platform/gradlew" "$REPO_ROOT/platform/gradlew" 2>/dev/null && chmod +x "$REPO_ROOT/platform/gradlew" || true
-  fi
+  log "3/9 verify the frozen Gradle wrapper"
+  [ -f "$REPO_ROOT/platform/gradle/wrapper/gradle-wrapper.jar" ] \
+    && [ -x "$REPO_ROOT/platform/gradlew" ] || die "frozen checkout lacks its Gradle wrapper"
 
-  log "4/9 build bootJar (default ~/.gradle for plugin/mirror resolution; --no-daemon)"
+  log "4/9 build bootJar through the runtime-managed wrapper (--no-daemon)"
   # --no-build-cache: a golden stack must produce a correct, reproducible jar. The
   # shared local Gradle build cache can hand a fresh worktree a corrupt :compileJava
   # entry (observed 2026-07-23: MqProvider.class/MqMessageHandler.class missing from
   # the cached output → platform-mq-kafka fails to resolve them, masked by UP-TO-DATE),
   # so bypass it here rather than trust a cross-worktree cache for a release build.
-  ( cd "$REPO_ROOT/platform" && ./gradlew --no-daemon --no-build-cache :bootJar -x test --console=plain ) >"$sd/bootjar.log" 2>&1 \
+  "$DEV" gradle "$name" --project "$REPO_ROOT/platform" -- --no-daemon --no-build-cache :bootJar -x test --console=plain >"$sd/bootjar.log" 2>&1 \
     || die "bootJar build failed — see $sd/bootjar.log"
   local jar; jar="$(ls "$REPO_ROOT"/platform/build/libs/*-boot.jar 2>/dev/null | head -1)"
   [ -n "$jar" ] || die "boot jar not found after build"
@@ -575,7 +581,7 @@ cmd_up() {
   curl --noproxy '*' -s -m 15 -X POST "http://127.0.0.1:$server_port/api/auth/login" -H 'Content-Type: application/json' \
     -d "{\"email\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASSWORD\"}" | grep -q '"jwt"' \
     || die "login round-trip failed after bootstrap"
-  log "    bootstrap OK ($ADMIN_EMAIL / $ADMIN_PASSWORD)"
+  log "    bootstrap OK (admin credential=SET)"
 
   if [ -n "$plugin_profile" ] || [ "${#import_plugins[@]}" -gt 0 ]; then
     local import_args=(--plugin-profile "${plugin_profile:-none}")

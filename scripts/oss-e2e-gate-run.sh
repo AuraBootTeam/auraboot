@@ -13,12 +13,9 @@
 #   4. prints a PASS/FAIL banner and EXITS WITH THE GATE RESULT — 0 = green,
 #      nonzero = a real failure. The exit code is the whole point: it is what a
 #      crontab line or a release step checks;
-#   6. tears the stack down on the way out, on success OR failure OR interrupt,
-#      via a trap — a failed gate never leaks a stack.
-#
-# The stack is destroyed-then-recreated each run (--fresh-db), so the gate never
-# inherits a stale-slot DB that would skip bootstrap and quietly run against the
-# wrong schema.
+#   5. retains the stack and database on success, failure, or interruption.
+#      Each attempt requires an unused name/slot/database; it never destroys
+#      a previous verification environment to make a new run appear fresh.
 #
 # ENV CONTRACT (baked in — an OSS survey documented each of these; getting any
 # one wrong roughly doubles the apparent debt with false failures):
@@ -37,13 +34,13 @@
 #                                                                  Playwright rc
 #
 # Prerequisites: the workspace native brokers (Postgres/Redis/Kafka) must be up —
-# the same ones `dev.sh runtime` uses. Run from any OSS auraboot checkout/worktree.
+# the same ones `aura runtime` uses. Run from any OSS auraboot checkout/worktree.
 #
 # Usage:
 #   scripts/oss-e2e-gate-run.sh [--slot N] [--name NAME] [--scope slice|full|<dir>...] [--keep] [--repeat K]
 #     --slot N     isolated-stack slot. Default: auto-pick a free one. Pick one
-#                  no other runtime uses (`../dev.sh runtime list`).
-#     --name NAME  runtime name        (default: oss-e2e-gate)
+#                  no other runtime uses (`../aura runtime list`).
+#     --name NAME  unused runtime name (default: CI job identity or timestamp/PID)
 #     --scope V    which specs the gate runs (default: slice):
 #                    slice  the curated, currently-green regression areas
 #                           (designer + saved-view + showcase + page-designer +
@@ -53,8 +50,7 @@
 #                           enterprise/deep exclusions). Use for a release sweep.
 #                    <dir>  one or more explicit tests/e2e/<dir>/ paths — repeat
 #                           --scope, or list them after --scope, to override.
-#     --keep       leave the stack up after the run (to debug a failure). By
-#                  default the stack is ALWAYS torn down, even on failure.
+#     --keep       compatibility flag; verification environments are always retained.
 #     --repeat K   run the slice K times (flakiness check; default: 1)
 #     --workers N  Playwright worker count (default: Playwright's own, PW_WORKERS
 #                  or 4). Heavy-canvas areas (designer/page-designer) need a low
@@ -86,13 +82,12 @@ if [ ! -f "$WORKSPACE/dev.sh" ]; then
   main_wt="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2; exit}')"
   [ -n "${main_wt:-}" ] && [ -f "$(dirname "$main_wt")/dev.sh" ] && WORKSPACE="$(dirname "$main_wt")"
 fi
-DEV="$WORKSPACE/dev.sh"
+DEV="$WORKSPACE/aura"
 
-NAME="oss-e2e-gate"
+NAME="oss-e2e-${AURA_CI_JOB_ID:-$(date -u +%Y%m%dT%H%M%S)-$$}"
 SLOT=""            # empty => auto-pick
 SCOPE_MODE="slice"
 SCOPE_DIRS=()      # explicit override paths
-KEEP=0
 REPEAT=1
 WORKERS=""         # empty => Playwright base default (PW_WORKERS||4)
 
@@ -132,7 +127,7 @@ while [[ $# -gt 0 ]]; do
         *)          SCOPE_MODE="dirs"; SCOPE_DIRS+=("$2"); shift 2;;
       esac
       ;;
-    --keep)   KEEP=1; shift;;
+    --keep)   shift;;
     -h|--help) awk 'NR>=2 && /^#/{sub(/^# ?/,""); print; next} NR>=2{exit}' "${BASH_SOURCE[0]}"; exit 0;;
     --) shift; while [[ $# -gt 0 ]]; do SCOPE_MODE="dirs"; SCOPE_DIRS+=("$1"); shift; done;;
     tests/e2e/*) SCOPE_MODE="dirs"; SCOPE_DIRS+=("$1"); shift;;   # bare path after --scope <dir>
@@ -141,7 +136,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -x "$GS" ]] || die "oss-golden-stack.sh not found/executable at $GS"
-[[ -f "$DEV" ]] || die "workspace dev.sh not found above $REPO_ROOT"
+[[ -x "$DEV" ]] || die "workspace aura CLI not found above $REPO_ROOT"
 
 # --- resolve the spec paths the gate will run --------------------------------
 RUN_PATHS=()
@@ -152,7 +147,7 @@ case "$SCOPE_MODE" in
 esac
 
 # --- pick a free slot if the caller did not name one -------------------------
-# A free slot = not claimed by any dev.sh runtime AND whose computed host ports
+# A free slot = not claimed by any aura runtime AND whose computed host ports
 # (backend 6400+slot / web 5100+slot / bff 6100+slot for the auraboot repo) have
 # no listener. oss-golden-stack.sh `up` also verifies port ownership and dies on
 # a foreign listener, so this is a courtesy pre-check, not the only guard.
@@ -169,37 +164,17 @@ registered_slot_for_name() {
   "$DEV" runtime list 2>/dev/null | awk -v name="$NAME" 'NR > 1 && $1 == name { print $3; exit }'
 }
 registered_slot="$(registered_slot_for_name)"
+[[ -z "$registered_slot" ]] || die_env "runtime '$NAME' already exists; use a new attempt name and unused slot"
+[[ ! -e "$WORKSPACE/.workspace/golden/$NAME" ]] || die_env "golden state '$NAME' already exists; retained evidence will not be overwritten"
 if [[ -z "$SLOT" ]]; then
-  if [[ -n "$registered_slot" ]]; then
-    SLOT="$registered_slot"
-    log "reusing prior slot $SLOT for runtime name '$NAME' before the fresh rebuild"
-  else
-    for cand in 73 74 75 76 77 80 81 82 83 84 85 86 87 90 91 92 93 94 95 96 97; do
-      if ! slot_in_use "$cand"; then SLOT="$cand"; break; fi
-    done
-  fi
-  [[ -n "$SLOT" ]] || die "could not auto-pick a free slot in 73..97 — pass --slot N explicitly"
-  [[ -n "$registered_slot" ]] || log "auto-picked free slot $SLOT"
-elif [[ -n "$registered_slot" && "$registered_slot" != "$SLOT" ]]; then
-  die "runtime '$NAME' is registered on slot $registered_slot, not requested slot $SLOT"
-elif [[ -n "$registered_slot" ]]; then
-  log "reusing requested slot $SLOT owned by runtime name '$NAME' before the fresh rebuild"
+  for cand in 73 74 75 76 77 80 81 82 83 84 85 86 87 90 91 92 93 94 95 96 97; do
+    if ! slot_in_use "$cand"; then SLOT="$cand"; break; fi
+  done
+  [[ -n "$SLOT" ]] || die_env "no free slot; pass --slot N explicitly"
 elif slot_in_use "$SLOT"; then
-  die "slot $SLOT is already in use (a runtime claims it, or a port is bound) — pick another with --slot"
+  die_env "slot $SLOT is occupied; no process will be stopped"
 fi
-
-# --- teardown trap: destroy on EXIT (success | failure | interrupt) ----------
-cleanup() {
-  local rc=$?
-  if [[ "$KEEP" == 1 ]]; then
-    log "--keep set; leaving stack '$NAME' up (env: $GS env $NAME; destroy: $GS destroy $NAME)"
-  else
-    log "tearing down stack '$NAME' (trap on exit rc=$rc)..."
-    "$GS" destroy "$NAME" >/dev/null 2>&1 || true
-  fi
-  return "$rc"
-}
-trap cleanup EXIT INT TERM
+log "retaining verification runtime '$NAME' and its database on every exit"
 
 LOG="/tmp/oss-e2e-gate-${NAME}-$(date +%Y%m%d-%H%M%S).log"
 echo "=============================================================="
@@ -212,13 +187,8 @@ echo "=============================================================="
 # Backend-side contract set BEFORE the stack starts: exported here so it is plain
 # that the backend booted with it, not asserted after the fact.
 export AGENT_LLM_STUB_MODE=true
-log "1/4 fresh stack: destroy any prior '$NAME' + up --fresh-db --plugin-profile demo"
-"$GS" destroy "$NAME" >/dev/null 2>&1 || true
-# --fresh-db => destroy-then-recreate the slot DB, guaranteeing a fresh bootstrap.
-# Default `up` runs the warm step (setup -> auth storageState -> pre-warm), which
-# is what produces tests/storage/admin.json — both the seed and the `oss` project
-# need that storageState, so warm is required here (do NOT pass --no-warm).
-"$GS" up "$NAME" --slot "$SLOT" --ttl 3h --runtime-mode verification --fresh-db --plugin-profile demo \
+log "1/4 fresh stack: up with a required new database and retained evidence"
+"$GS" up "$NAME" --slot "$SLOT" --ttl 3h --runtime-mode verification --require-new-db --plugin-profile demo \
   || die_env "stack bring-up failed — see the golden-stack logs under $WORKSPACE/.workspace/golden/$NAME/"
 
 # The demo profile does not carry the internal test-fixtures plugin, and ~60 OSS
