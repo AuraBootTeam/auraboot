@@ -73,7 +73,8 @@ class SemanticQueryServicePermissionTest {
                 mock(AbSemanticMetricMapper.class),
                 mock(AbSemanticQueryLogMapper.class),
                 metaModelService,
-                userPermissionService);
+                userPermissionService,
+                mock(SemanticFieldProtection.class));
         // JdbcTemplate intentionally not wired: a denied request must never reach it.
     }
 

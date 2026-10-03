@@ -67,6 +67,7 @@ public class SemanticQueryService {
     private final AbSemanticQueryLogMapper queryLogMapper;
     private final MetaModelService metaModelService;
     private final UserPermissionService userPermissionService;
+    private final SemanticFieldProtection fieldProtection;
     private final ObjectMapper jsonMapper = new ObjectMapper();
 
     /**
@@ -117,7 +118,10 @@ public class SemanticQueryService {
     private Compiled compile(SemanticQueryRequest req, UserContext user) {
         SemanticModelDTO model = resolveModel(req, user.tenantId());
         enforceMetricPermissions(model, req, user);
+        String sourceModelCode = model.getSemanticModel().getModelRef();
+        resolvePhysicalModelRef(model);
         CompiledQuery cq = compiler.compile(model, req, user);
+        fieldProtection.enforce(sourceModelCode, cq, user);
         return new Compiled(model, cq);
     }
 
@@ -208,7 +212,6 @@ public class SemanticQueryService {
             // Re-parse stored YAML to recover measures (v0.1 has no measure table).
             SemanticModelDTO model = parser.parse(row.getYamlSource());
             validator.validate(model);
-            resolvePhysicalModelRef(model);
             return model;
         } catch (Exception e) {
             if (e instanceof AccessDeniedException denied) throw denied;

@@ -16,6 +16,8 @@ import com.auraboot.framework.semantic.mapper.AbSemanticMetricAlertMapper;
 import com.auraboot.framework.semantic.mapper.AbSemanticMetricMapper;
 import com.auraboot.framework.semantic.mapper.AbSemanticModelMapper;
 import com.auraboot.framework.userattribute.service.UserAttributeService;
+import com.auraboot.framework.tenant.service.TenantMemberService;
+import org.springframework.security.access.AccessDeniedException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -57,6 +59,7 @@ public class SemanticMetricAlertService {
     private final SemanticQueryService queryService;
     private final NotificationService notificationService;
     private final UserAttributeService userAttributeService;
+    private final TenantMemberService tenantMemberService;
 
     // ==================== CRUD ====================
 
@@ -165,6 +168,13 @@ public class SemanticMetricAlertService {
                 return Map.of("skipped", "model_missing");
             }
 
+            var member = tenantMemberService.findByTenantIdAndUserId(alert.getTenantId(), alert.getCreatedBy());
+            if (member == null || !"ACTIVE".equals(member.getStatus()) || Boolean.TRUE.equals(member.getDeletedFlag())
+                    || !java.util.Objects.equals(member.getTenantId(), alert.getTenantId())
+                    || !java.util.Objects.equals(member.getUserId(), alert.getCreatedBy()) || member.getId() == null) {
+                throw new AccessDeniedException("Semantic alert creator is not an active tenant member");
+            }
+            MetaContext.setMemberId(member.getId());
             SemanticQueryRequest request = new SemanticQueryRequest();
             request.setMetrics(List.of(model.getCode() + "." + metric.getCode()));
             UserContext creator = new UserContext(alert.getCreatedBy(), alert.getTenantId(),

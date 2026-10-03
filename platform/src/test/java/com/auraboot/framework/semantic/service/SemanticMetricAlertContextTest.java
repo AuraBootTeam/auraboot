@@ -10,6 +10,9 @@ import com.auraboot.framework.semantic.mapper.AbSemanticMetricAlertMapper;
 import com.auraboot.framework.semantic.mapper.AbSemanticMetricMapper;
 import com.auraboot.framework.semantic.mapper.AbSemanticModelMapper;
 import com.auraboot.framework.userattribute.service.UserAttributeService;
+import com.auraboot.framework.tenant.service.TenantMemberService;
+import com.auraboot.framework.tenant.dao.entity.TenantMember;
+import org.springframework.security.access.AccessDeniedException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,6 +31,7 @@ class SemanticMetricAlertContextTest {
     private SemanticMetricAlertService service;
     private SemanticQueryService queries;
     private AbSemanticMetricMapper metrics;
+    private TenantMemberService members;
     private MetaContext.Snapshot caller;
 
     @BeforeEach
@@ -37,8 +41,12 @@ class SemanticMetricAlertContextTest {
         var models = mock(AbSemanticModelMapper.class);
         queries = mock(SemanticQueryService.class);
         var attributes = mock(UserAttributeService.class);
+        members = mock(TenantMemberService.class);
+        var member = new TenantMember(); member.setId(12L); member.setTenantId(1L);
+        member.setUserId(2L); member.setStatus("ACTIVE");
+        when(members.findByTenantIdAndUserId(1L, 2L)).thenReturn(member);
         service = new SemanticMetricAlertService(alerts, metrics, models, queries,
-                mock(NotificationService.class), attributes);
+                mock(NotificationService.class), attributes, members);
         var alert = new AbSemanticMetricAlert();
         alert.setPid("alert");
         alert.setTenantId(1L);
@@ -73,6 +81,27 @@ class SemanticMetricAlertContextTest {
     @Test
     void successRestoresCompleteCallerIdentity() {
         assertThat(service.evaluateNow("alert")).containsEntry("triggered", false);
+        assertThat(MetaContext.snapshot()).isEqualTo(caller);
+    }
+
+    @Test
+    void bindsCreatorMembershipBeforeGovernedQuery() {
+        when(queries.executeQuery(any(), any())).thenAnswer(invocation -> {
+            assertThat(MetaContext.getCurrentMemberId()).isEqualTo(12L);
+            assertThat(MetaContext.getCurrentTenantId()).isEqualTo(1L);
+            assertThat(MetaContext.getCurrentUserId()).isEqualTo(2L);
+            var response = new SemanticQueryResponse(); response.setRows(List.of(Map.of("count", 5)));
+            return response;
+        });
+        assertThat(service.evaluateNow("alert")).containsEntry("triggered", false);
+        assertThat(MetaContext.snapshot()).isEqualTo(caller);
+    }
+
+    @Test
+    void revokedCreatorMembershipDeniesQueryAndRestoresCaller() {
+        when(members.findByTenantIdAndUserId(1L, 2L)).thenReturn(null);
+        assertThatThrownBy(() -> service.evaluateNow("alert")).isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(queries);
         assertThat(MetaContext.snapshot()).isEqualTo(caller);
     }
 
