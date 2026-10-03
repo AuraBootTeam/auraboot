@@ -48,6 +48,11 @@ test('MEMBER-DETAIL-07: native lifecycle buttons execute commands and persist st
   const row = page.locator('table tbody tr').filter({ hasText: stamp });
   await expect(row).toHaveCount(1, { timeout: 20000 });
   await expect(row).toBeVisible();
+  const statusContent = row.locator('[data-testid$="-status"] div.truncate');
+  await expect(statusContent).toHaveText('已激活');
+  await expect.poll(() => statusContent.evaluate((content) =>
+    content.scrollWidth <= content.clientWidth),
+  { message: 'Member status label is readable without clipping' }).toBe(true);
   const createdDate = row.locator('[data-testid$="-created_at"]');
   await expect(createdDate).toContainText(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/);
   await expect.poll(() => createdDate.evaluate((cell) => {

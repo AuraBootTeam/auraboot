@@ -1162,7 +1162,7 @@
           },
           {
             "field": "status",
-            "width": 96,
+            "width": 120,
             "renderType": "tag",
             "dictCode": "member_status"
           },
