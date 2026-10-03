@@ -162,7 +162,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
       return { ...cached, branding } as RootLoaderData;
     }
 
-    const i18nData = await getI18nData(locale, request);
+    const i18nData = await getI18nData(locale, request, false);
     const edition = process.env.EDITION || 'enterprise';
     const result: RootLoaderData = {
       runtimeProfile,

@@ -1131,3 +1131,56 @@ describe('ActionRegistry notify handler', () => {
     warnSpy.mockRestore();
   });
 });
+
+describe('ActionRegistry API request failure boundaries', () => {
+  it.each(['35000', '403'])('stops the flow on business code %s before state or success feedback', async (code) => {
+    const context = createExpressionContext({ global: { locale: 'zh-CN', theme: 'light' } });
+    const updateState = vi.fn();
+    const showToast = vi.fn();
+    const flow = new FlowRunner({
+      evaluator: { evaluateCondition: () => true, evaluateTemplate: (value: string) => value, evaluateObject: (value: unknown) => value } as any,
+      actionRegistry,
+      stateManager: { getContext: () => context, updateState } as any,
+      scopeId: 'api-failure-boundary',
+      dataSourceManager: {} as any,
+      schema: {} as any,
+      getAllFormFields: () => [],
+      showToast,
+    });
+    const fetchResult = vi.fn().mockResolvedValue({
+      code, success: true, message: 'Request denied',
+      data: { valid: true }, context: { detail: 'The signing request was denied.' },
+    });
+    await expect(flow.run([
+      { action: 'api.request', endpoint: '/api/bpm/signatures/sign', method: 'post',
+        body: { documentId: 'LEAVE-ACCEPTANCE' }, target: 'signature' },
+      { action: 'toast.show', args: { message: 'Signed successfully', level: 'success' } },
+    ], { ...context, fetchResult, showToast } as any)).rejects.toThrow('The signing request was denied.');
+    expect(updateState).not.toHaveBeenCalled();
+    expect(showToast).not.toHaveBeenCalled();
+  });
+
+  it('rejects a raw unwrapped response rather than continuing with empty data', async () => {
+    await expect(actionRegistry.execute('api.request', {
+      fetchResult: vi.fn().mockResolvedValue({ valid: true, signatureCount: 1 }),
+      args: { endpoint: '/api/bpm/signatures/verify/LEAVE-ACCEPTANCE' },
+    })).rejects.toThrow();
+  });
+
+  it('retains successful request payload and updates the declared state target', async () => {
+    const data = { valid: true, signatureCount: 1 };
+    const fetchResult = vi.fn().mockResolvedValue({ code: '0', data });
+    const updateState = vi.fn();
+    await expect(actionRegistry.execute('api.request', {
+      fetchResult,
+      stateManager: { updateState } as any,
+      scopeId: 'api-success-boundary',
+      args: { endpoint: '/api/bpm/signatures/sign', method: 'post',
+        body: { documentId: 'LEAVE-ACCEPTANCE' }, target: 'signature' },
+    })).resolves.toBeUndefined();
+    expect(fetchResult).toHaveBeenCalledWith('/api/bpm/signatures/sign', {
+      method: 'post', params: { documentId: 'LEAVE-ACCEPTANCE' },
+    });
+    expect(updateState).toHaveBeenCalledWith('api-success-boundary', 'signature', data);
+  });
+});

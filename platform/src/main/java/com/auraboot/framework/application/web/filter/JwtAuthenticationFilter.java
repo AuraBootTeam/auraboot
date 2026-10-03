@@ -333,6 +333,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         String requestPath = request.getServletPath();
+
+        // Public translations remain anonymous only when no credentials were supplied.
+        // A tenant session must pass the same validation as protected endpoints.
+        if ((requestPath.equals("/api/i18n") || requestPath.startsWith("/api/i18n/"))
+                && request.getHeader("Authorization") != null) {
+            return false;
+        }
         // Check both main whitelist and swagger whitelist
         // NOTE: for "/**" patterns, match by path-segment boundary:
         //   "/api/ext/*/public/**" must match product public routes but not authenticated siblings.

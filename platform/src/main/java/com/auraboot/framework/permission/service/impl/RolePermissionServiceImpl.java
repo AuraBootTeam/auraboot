@@ -291,7 +291,8 @@ public class RolePermissionServiceImpl implements RolePermissionService {
     @Override
     @Transactional
     public boolean syncRolePermissionsByPids(Long roleId, List<String> permissionPids, String grantType) {
-        log.info("同步角色Permission (by PIDs): roleId={}, permissionCount={}", roleId, permissionPids.size());
+        List<Permission> permissions = resolveRequestedPermissions(permissionPids);
+        log.info("Sync role permissions: roleId={}, permissionCount={}", roleId, permissions.size());
         
         try {
             Long tenantId = MetaContext.getCurrentTenantId();
@@ -301,13 +302,8 @@ public class RolePermissionServiceImpl implements RolePermissionService {
             // 1. 移除现有绑定
             removeAllPermissionsByRoleId(roleId);
             
-            // 2. 查询Permission IDs by PIDs
-            List<Permission> permissions = permissionMapper.findByPids(
-                permissionPids  );
-            
             if (permissions.isEmpty()) {
-                log.warn("未找到任何Permission: pids={}", permissionPids);
-                return true; // 空列表也算成功
+                return true; // An explicit empty list clears the existing grants.
             }
             
             List<Long> permissionIds = permissions.stream()
@@ -326,19 +322,15 @@ public class RolePermissionServiceImpl implements RolePermissionService {
     @Override
     @Transactional
     public boolean removePermissionsFromRoleByPids(Long roleId, List<String> permissionPids) {
-        log.info("从角色移除Permission (by PIDs): roleId={}, permissionCount={}", roleId, permissionPids.size());
+        List<Permission> permissions = resolveRequestedPermissions(permissionPids);
+        log.info("Remove role permissions: roleId={}, permissionCount={}", roleId, permissions.size());
         
         try {
             Long tenantId = MetaContext.getCurrentTenantId();
                   
                   
             
-            // 查询Permission IDs by PIDs
-            List<Permission> permissions = permissionMapper.findByPids(
-                permissionPids  );
-            
             if (permissions.isEmpty()) {
-                log.warn("未找到任何Permission: pids={}", permissionPids);
                 return true;
             }
             
@@ -355,6 +347,21 @@ public class RolePermissionServiceImpl implements RolePermissionService {
         }
     }
     
+    private List<Permission> resolveRequestedPermissions(List<String> permissionPids) {
+        if (permissionPids == null || permissionPids.stream().anyMatch(
+                pid -> pid == null || pid.isBlank())) {
+            throw new BusinessException("Permission PIDs must not be null or blank");
+        }
+        if (permissionPids.isEmpty()) return Collections.emptyList();
+        Set<String> requested = new LinkedHashSet<>(permissionPids);
+        List<Permission> permissions = permissionMapper.findByPids(new ArrayList<>(requested));
+        Set<String> resolved = permissions.stream().map(Permission::getPid).collect(Collectors.toSet());
+        if (!resolved.equals(requested)) {
+            throw new BusinessException("One or more permission PIDs were not found");
+        }
+        return permissions;
+    }
+
     @Override
     public Map<String, Object> getRolePermissionStatistics(Long roleId) {
         log.debug("获取角色Permission统计: roleId={}", roleId);

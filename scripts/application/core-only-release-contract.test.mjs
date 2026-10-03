@@ -31,6 +31,8 @@ test('core release stages a compiled Web shell and a self-contained deployment d
 });
 
 test('product release-image gate is CI-only, Docker-only and evidence-backed', () => {
+  assert.match(productImageGate, /SPRING_PROFILES_ACTIVE=community/);
+  assert.doesNotMatch(productImageGate, /--aura\.persistence\.tenant-bypass-table-prefixes=/);
   assert.match(productImageGate, /AURA_CI_JOB_ID/);
   assert.match(productImageGate, /uname -s.*Linux/);
   assert.match(productImageGate, /uname -m.*x86_64/);

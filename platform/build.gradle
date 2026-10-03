@@ -505,6 +505,20 @@ bootRun {
 }
 
 tasks.withType(Test).configureEach {
+    // Frozen rules may remove resolved violations. Keep those writes out of tracked source.
+    def architectureBaseline = file("src/test/resources/archunit_store")
+    def architectureStore = layout.buildDirectory.dir("archunit-stores/${name}")
+    systemProperty "archunit.freeze.store.default.path", architectureStore.get().asFile.absolutePath
+    systemProperty "archunit.freeze.store.default.allowStoreCreation", "false"
+    doFirst {
+        if (!architectureBaseline.isDirectory()) {
+            throw new GradleException("Committed ArchUnit baseline is missing")
+        }
+        project.sync {
+            from architectureBaseline
+            into architectureStore.get().asFile
+        }
+    }
     reports.junitXml {
         includeSystemOutLog = false
         includeSystemErrLog = false
