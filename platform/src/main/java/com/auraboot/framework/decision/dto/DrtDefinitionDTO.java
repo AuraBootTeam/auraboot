@@ -1,6 +1,7 @@
 package com.auraboot.framework.decision.dto;
 
 import lombok.Data;
+import com.fasterxml.jackson.databind.JsonNode;
 
 import java.time.Instant;
 
@@ -22,6 +23,10 @@ public class DrtDefinitionDTO {
     private String scopeRef;
     private String ownerModule;
     private Boolean enabled;
+    /** Output catalogue of the highest PUBLISHED version, matching LATEST resolution. */
+    private Integer publishedVersion;
+    private JsonNode outputs;
+    private JsonNode outputSchemaJson;
     private String createdBy;
     private Instant createdAt;
     private String updatedBy;
