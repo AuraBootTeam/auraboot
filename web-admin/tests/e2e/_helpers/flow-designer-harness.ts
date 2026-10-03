@@ -124,6 +124,16 @@ async function closeCompactPaletteDrawer(page: Page): Promise<void> {
   }
 }
 
+/** Open a responsive designer panel using the same toggle as a user. */
+export async function openFlowDesignerPanel(page: Page, panel: 'palette' | 'inspector'): Promise<void> {
+  const shell = page.getByTestId(`flow-${panel}-shell`);
+  if (await shell.getAttribute('data-open') !== 'true') {
+    await page.getByTestId(`flow-toggle-${panel}`).click();
+  }
+  await expect(shell).toBeVisible();
+  await expect(shell).toHaveAttribute('data-open', 'true');
+}
+
 /** Current node ids on the canvas (by flow-node-<id> testid). */
 export async function currentNodeIds(page: Page): Promise<string[]> {
   return page.$$eval('[data-testid^="flow-node-"]', (els) =>

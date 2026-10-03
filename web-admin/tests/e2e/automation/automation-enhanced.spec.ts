@@ -18,6 +18,7 @@
 import { test, expect } from '../../fixtures';
 import { uniqueId } from '../helpers/index';
 import { AutomationListPage } from '../../pages/AutomationListPage';
+import { openFlowDesignerPanel, dragNodeToCanvas, fillNodeConfig, connectEdge } from '../_helpers/flow-designer-harness';
 import { ErrorCodes } from '~/shared/services/http-client/types';
 
 // Flow/BPMN designer uses a compact layout below 1600px (palette/inspector collapse
@@ -49,6 +50,7 @@ async function createAutomationViaApi(
       ...overrides,
     },
   });
+  expect(resp.status()).toBe(200);
   const body = await resp.json();
   if (String(body.code) !== ErrorCodes.SUCCESS) {
     throw new Error(`Failed to create automation: ${body.message || JSON.stringify(body)}`);
@@ -82,11 +84,9 @@ test.describe('Automation Enhanced', () => {
     try {
       seedAutomation = await createAutomationViaApi(page, `Seed ${uniqueId()}`);
       createdPids.push(seedAutomation.pid);
-    } catch (e) {
-      console.warn('Automation enhanced setup failed:', e);
+    } finally {
+      await context.close();
     }
-    await page.close();
-    await context.close();
   });
 
   test.afterAll(async ({ browser }) => {
@@ -107,6 +107,7 @@ test.describe('Automation Enhanced', () => {
     const ap = new AutomationListPage(page);
     await page.goto('/automations');
     await page.waitForLoadState('domcontentloaded');
+    await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
 
     // Detect server-side error (e.g. missing permission) and skip gracefully
     const errorMsg = page.locator('.text-red-500').first();
@@ -143,6 +144,7 @@ test.describe('Automation Enhanced', () => {
     const ap = new AutomationListPage(page);
     await page.goto('/automations');
     await page.waitForLoadState('domcontentloaded');
+    await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
 
     // Click "Create Automation"
     await expect(ap.createButton).toBeVisible({ timeout: 10000 });
@@ -189,12 +191,13 @@ test.describe('Automation Enhanced', () => {
     await expect(exportBtn).toBeVisible({ timeout: 5000 });
 
     // Verify the palette is visible with node categories
-    const palette = page.locator('[data-testid="flow-palette"]').first();
+    await openFlowDesignerPanel(page, 'palette');
+    const palette = page.getByTestId('flow-palette');
     await expect(palette).toBeVisible({ timeout: 5000 });
 
     // Verify ReactFlow canvas is loaded (attached to DOM)
     const reactFlow = page.locator('[data-testid="rf__wrapper"]');
-    await reactFlow.waitFor({ state: 'attached', timeout: 10000 });
+    await expect(reactFlow).toBeVisible();
 
     // Note: Full save requires configuring trigger/action nodes in the flow designer.
     // The create page form elements, designer palette, and toolbar are all functional.
@@ -202,6 +205,38 @@ test.describe('Automation Enhanced', () => {
     // zh-CN "调试", en-US "Debug"
     const debugBtn = page.locator('button').filter({ hasText: /Debug|调试/i });
     await expect(debugBtn).toHaveCount(0);
+    await page.screenshot({ path: test.info().outputPath('AUTO-02-palette.png'), fullPage: true });
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 220, y: 280 });
+    await fillNodeConfig(page, trigger, { modelCode: '测试订单' });
+    const action = await dragNodeToCanvas(page, 'action-send-notification', { x: 620, y: 280 });
+    await fillNodeConfig(page, action, {
+      notificationType: '站内消息', title: 'E2E creation',
+      content: 'Created through the designer', recipients: 'ROLE:admin',
+    });
+    const backdrop = page.getByTestId('flow-drawer-backdrop');
+    if (await backdrop.isVisible()) await backdrop.click();
+    await connectEdge(page, trigger, action);
+    await expect(nameInput).toHaveValue(automationName);
+    const responsePromise = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/automations' && r.request().method() === 'POST');
+    await page.getByTestId('automation-editor-toolbar-btn-save').click();
+    const response = await responsePromise;
+    expect(response.status()).toBe(200);
+    const created = await response.json();
+    expect(String(created.code)).toBe(ErrorCodes.SUCCESS);
+    expect(created.data.pid).toEqual(expect.any(String));
+    createdPids.push(created.data.pid);
+    const saved = await page.request.get(`/api/automations/${created.data.pid}`);
+    expect(saved.status()).toBe(200);
+    const record = await saved.json();
+    expect(String(record.code)).toBe(ErrorCodes.SUCCESS);
+    expect(record.data.name).toBe(automationName);
+    expect(record.data.description).toBe('Created via E2E test');
+    expect(record.data.flowConfig.nodes).toHaveLength(2);
+    expect(record.data.flowConfig.edges).toHaveLength(1);
+    await page.reload();
+    await expect(nameInput).toHaveValue(automationName);
+    await expect(descInput).toHaveValue('Created via E2E test');
+    await page.screenshot({ path: test.info().outputPath('AUTO-02-saved.png'), fullPage: true });
   });
 
   // -------------------------------------------------------------------------
@@ -214,6 +249,7 @@ test.describe('Automation Enhanced', () => {
     // Navigate directly to the editor page for the seed automation
     await page.goto(`/automation/${seedAutomation.pid}`);
     await page.waitForLoadState('domcontentloaded');
+    await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
 
     // Verify name input is pre-filled
     // zh-CN placeholder "自动化名称", en-US "Automation name"
@@ -223,7 +259,8 @@ test.describe('Automation Enhanced', () => {
 
     // Flow Palette: left sidebar with "Components" heading and draggable node items
     // The palette renders categories: trigger, action, control
-    const palette = page.locator('[data-testid="flow-palette"]').first();
+    await openFlowDesignerPanel(page, 'palette');
+    const palette = page.getByTestId('flow-palette');
     await expect(palette).toBeVisible({ timeout: 5000 });
 
     // Verify palette has category headings — match Chinese, English
@@ -248,26 +285,29 @@ test.describe('Automation Enhanced', () => {
     // ReactFlow's root div may have zero computed height in some layouts,
     // so we check for the wrapper via data-testid and role="application".
     const reactFlow = page.locator('[data-testid="rf__wrapper"]');
-    await reactFlow.waitFor({ state: 'attached', timeout: 10000 });
+    await expect(reactFlow).toBeVisible();
 
     // Controls (zoom buttons from ReactFlow) should be present
     const controls = page.locator('.react-flow__controls');
-    await controls.waitFor({ state: 'attached', timeout: 5000 });
+    await expect(controls).toBeVisible();
 
     // Verify zoom control buttons exist (ReactFlow uses title or aria-label)
     const zoomInBtn = page.locator('.react-flow__controls button').first();
     await expect(zoomInBtn).toBeVisible({ timeout: 5000 });
 
-    // MiniMap should be present
+    // Match the current automation designer config (controls enabled, minimap disabled).
     const minimap = page.locator('.react-flow__minimap');
-    await minimap.waitFor({ state: 'attached', timeout: 5000 });
+    // Automation's current designer config explicitly disables the minimap.
+    await expect(minimap).toHaveCount(0);
 
     // Property panel (right side, w-80 div): hint text when no node selected
     // zh-CN "选择一个节点进行配置", en-US "Select a node to configure"
-    const propertyPanel = page.locator('.w-80.border-l').first();
+    await openFlowDesignerPanel(page, 'inspector');
+    const propertyPanel = page.getByTestId('flow-inspector-shell');
     await expect(propertyPanel).toBeVisible({ timeout: 5000 });
     const panelHint = propertyPanel.getByText(/选择一个节点|Select a node/i).first();
     await expect(panelHint).toBeVisible({ timeout: 5000 });
+    await page.screenshot({ path: test.info().outputPath('AUTO-03-inspector.png'), fullPage: true });
 
     // Toolbar buttons: Import/导入, Export/导出 should be visible
     const importBtn = page.locator('button').filter({ hasText: /Import|导入/i }).first();
@@ -296,6 +336,7 @@ test.describe('Automation Enhanced', () => {
     const ap = new AutomationListPage(page);
     await page.goto('/automations');
     await page.waitForLoadState('domcontentloaded');
+    await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
     await page.getByText(seedAutomation.name).waitFor({ state: 'visible', timeout: 10000 });
 
     // Row and toggle button should be visible
@@ -317,7 +358,9 @@ test.describe('Automation Enhanced', () => {
     }, { timeout: 5000 }).toBe(true);
 
     // Click Enable — use PO method which polls for status change
-    await ap.toggle(seedAutomation.pid);
+    const toggleResponse = page.waitForResponse((r) => new URL(r.url()).pathname === `/api/automations/${seedAutomation.pid}/toggle` && r.request().method() === 'POST');
+    await toggleBtn.click();
+    expect((await toggleResponse).status()).toBe(200);
 
     // After toggle, button should say "Disable" and status badge "Enabled".
     // Under full-suite load the PATCH+refetch round-trip can exceed 10s — bump
@@ -359,6 +402,7 @@ test.describe('Automation Enhanced', () => {
 
     await page.goto('/automations');
     await page.waitForLoadState('domcontentloaded');
+    await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
 
     // Verify automation appears in the list
     await page.getByText(toDelete.name).waitFor({ state: 'visible', timeout: 10000 });
