@@ -2,8 +2,6 @@ package com.auraboot.framework.auth.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.auth.dto.UserInfoResponse;
-import com.auraboot.framework.permission.entity.Permission;
-import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.mapper.RoleMapper;
@@ -39,7 +37,6 @@ class UserInfoServiceImplTest {
     @Mock private UserService userService;
     @Mock private RoleMapper roleMapper;
     @Mock private UserPermissionService userPermissionService;
-    @Mock private PermissionMapper permissionMapper;
     @Mock private UserPreferenceService userPreferenceService;
     @Mock private TenantPreferenceService tenantPreferenceService;
     @Mock private TenantMemberService tenantMemberService;
@@ -49,7 +46,7 @@ class UserInfoServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new UserInfoServiceImpl(userService, roleMapper, userPermissionService,
-                permissionMapper, userPreferenceService, tenantPreferenceService);
+                userPreferenceService, tenantPreferenceService);
         ReflectionTestUtils.setField(service, "tenantMemberService", tenantMemberService);
         MetaContext.setContext(10L, 1L, "u-1", "user");
         MetaContext.setMemberId(99L);
@@ -80,19 +77,13 @@ class UserInfoServiceImplTest {
         return r;
     }
 
-    private Permission perm(String code) {
-        Permission p = new Permission();
-        p.setCode(code);
-        return p;
-    }
-
     @Test
     @DisplayName("buildCurrentUserInfo for admin returns all permission codes")
     void adminAllPermissions() {
         when(userService.findByUserId(1L)).thenReturn(user());
         when(tenantMemberService.getTenantNameById(10L)).thenReturn("Acme");
         when(roleMapper.findByMemberIdAndTenantId(99L, 10L)).thenReturn(List.of(role("tenant_admin")));
-        when(permissionMapper.selectList(any())).thenReturn(List.of(perm("p.read"), perm("p.write")));
+        when(userPermissionService.getUserPermissionCodes(1L)).thenReturn(java.util.Set.of("p.read", "p.write"));
         when(userPreferenceService.getPreferencesByPrefix(1L, "ui.")).thenReturn(Map.of());
         when(tenantPreferenceService.getPreferencesByPrefix(10L, "ui.")).thenReturn(Map.of());
 
@@ -111,7 +102,7 @@ class UserInfoServiceImplTest {
         when(userService.findByUserId(1L)).thenReturn(user());
         when(tenantMemberService.getTenantNameById(10L)).thenReturn("Acme");
         when(roleMapper.findByMemberIdAndTenantId(99L, 10L)).thenReturn(List.of(role("tenant_admin")));
-        when(permissionMapper.selectList(any())).thenReturn(List.of(perm("p.read")));
+        when(userPermissionService.getUserPermissionCodes(1L)).thenReturn(java.util.Set.of("p.read"));
         when(userPreferenceService.getPreferencesByPrefix(1L, "ui.")).thenReturn(Map.of());
         when(tenantPreferenceService.getPreferencesByPrefix(10L, "ui.")).thenReturn(Map.of());
 
@@ -127,13 +118,13 @@ class UserInfoServiceImplTest {
     void nonAdminViaUserPermissions() {
         when(userService.findByUserId(1L)).thenReturn(user());
         when(roleMapper.findByMemberIdAndTenantId(99L, 10L)).thenReturn(List.of(role("custom_role")));
-        when(userPermissionService.getUserPermissionIds(1L)).thenReturn(java.util.Set.of(101L, 102L));
-        when(permissionMapper.findByIds(any())).thenReturn(List.of(perm("p.x"), perm("p.y")));
+        when(userPermissionService.getUserPermissionCodes(1L)).thenReturn(java.util.Set.of("xy.class.read", "model.xy_import_job.create"));
         when(userPreferenceService.getPreferencesByPrefix(1L, "ui.")).thenReturn(Map.of());
         when(tenantPreferenceService.getPreferencesByPrefix(10L, "ui.")).thenReturn(Map.of());
 
         UserInfoResponse resp = service.buildCurrentUserInfo(1L, "u-1", 10L);
-        assertEquals(2, resp.getPermissions().getPermissionCodes().size());
+        assertEquals(java.util.Set.of("xy.class.read", "model.xy_import_job.create"),
+                new java.util.HashSet<>(resp.getPermissions().getPermissionCodes()));
     }
 
     @Test
@@ -141,7 +132,7 @@ class UserInfoServiceImplTest {
     void nonAdminNoPermissions() {
         when(userService.findByUserId(1L)).thenReturn(user());
         when(roleMapper.findByMemberIdAndTenantId(99L, 10L)).thenReturn(List.of(role("custom_role")));
-        when(userPermissionService.getUserPermissionIds(1L)).thenReturn(java.util.Set.of());
+        when(userPermissionService.getUserPermissionCodes(1L)).thenReturn(java.util.Set.of());
         when(userPreferenceService.getPreferencesByPrefix(1L, "ui.")).thenReturn(Map.of());
         when(tenantPreferenceService.getPreferencesByPrefix(10L, "ui.")).thenReturn(Map.of());
 
@@ -165,7 +156,7 @@ class UserInfoServiceImplTest {
     void preferencesResolutionOrder() {
         when(userService.findByUserId(1L)).thenReturn(user());
         when(roleMapper.findByMemberIdAndTenantId(99L, 10L)).thenReturn(List.of());
-        when(userPermissionService.getUserPermissionIds(1L)).thenReturn(java.util.Set.of());
+        when(userPermissionService.getUserPermissionCodes(1L)).thenReturn(java.util.Set.of());
 
         JsonNode userTz = JsonNodeFactory.instance.textNode("Asia/Shanghai");
         JsonNode tenantDate = JsonNodeFactory.instance.textNode("DD/MM/YYYY");

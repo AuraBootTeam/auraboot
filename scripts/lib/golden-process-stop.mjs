@@ -1,3 +1,4 @@
+import { goldenStackState } from './golden-stack-state.mjs';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, realpathSync, unlinkSync } from 'node:fs';
@@ -106,7 +107,7 @@ export function stopGoldenProcesses(name, repo, cli) {
   need(report.runtime === name && report.sources?.find(item => item.key === 'auraboot')?.expected.root === repo,
     'Registered source root mismatch');
   const token = readFileSync(join(report.stateDir, 'runtimes', name, 'processes', 'ownership.token'), 'utf8').trim();
-  const sd = join(report.stateDir, 'golden', name);
+  const sd = goldenStackState(report.stateDir, name);
   const frontendFile = join(sd, 'frontend.pid');
   const frontendPid = existsSync(frontendFile) ? Number(readFileSync(frontendFile, 'utf8').trim()) : null;
   const supervisor = report.processes.find(item => item.key === 'frontend-launch');

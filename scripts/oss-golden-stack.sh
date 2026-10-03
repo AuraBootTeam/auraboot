@@ -69,6 +69,8 @@ if [ ! -f "$WORKSPACE/dev.sh" ]; then
   fi
 fi
 [ -f "$WORKSPACE/dev.sh" ] || { echo "FATAL: cannot find workspace dev.sh for $REPO_ROOT"; exit 1; }
+source "$SCRIPT_DIR/lib/workspace-control.sh"
+aura_bind_workspace_control "$WORKSPACE" || exit 2
 CANONICAL="$WORKSPACE/auraboot"                      # canonical OSS checkout (for gradle wrapper / node_modules seed)
 DEV="$WORKSPACE/aura"
 [ -x "$DEV" ] || { echo "FATAL: canonical workspace aura CLI is missing" >&2; exit 1; }
@@ -117,7 +119,44 @@ acquire_stack_lock() {
   trap release_stack_lock EXIT
 }
 
-state_dir() { echo "$WORKSPACE_STATE/golden/$1"; }
+state_dir() {
+  local current="$WORKSPACE_STATE/runtimes/$1/oss-stack"
+  local legacy="$WORKSPACE_STATE/golden/$1"
+  [ ! -L "$current" ] && { [ ! -e "$current" ] || [ -d "$current" ]; } \
+    || die "invalid stable stack state for $1"
+  if [ -L "$legacy" ]; then
+    [ "$(readlink "$legacy")" = "$current" ] || die "legacy state link belongs to another location; review required"
+  fi
+  if [ -d "$legacy" ] && [ ! -L "$legacy" ]; then
+    [ ! -e "$current" ] || die "both legacy and current stack state exist for $1; review before starting"
+    echo "$legacy"
+  else
+    echo "$current"
+  fi
+}
+
+prepare_state_dir() {
+  local name="$1" current="$WORKSPACE_STATE/runtimes/$1/oss-stack"
+  local legacy="$WORKSPACE_STATE/golden/$1"
+  # Caller has checked stopped processes and ensured the exact runtime identity.
+  state_dir "$name" >/dev/null || return 1
+  assert_stack_stopped "$name" || return 1
+  python3 - "$legacy" "$current" <<'PYSTATE' || return 1
+import os
+import sys
+legacy, current = sys.argv[1:]
+if os.path.isdir(legacy) and not os.path.islink(legacy):
+    if os.path.lexists(current):
+        raise SystemExit('both legacy and current stack state exist; review required')
+    os.makedirs(os.path.dirname(current), exist_ok=True)
+    os.rename(legacy, current)
+    # Preserve historical readers without creating another physical state copy.
+    os.symlink(current, legacy)
+else:
+    os.makedirs(current, exist_ok=True)
+PYSTATE
+  echo "$current"
+}
 
 # Read a key from the runtime env file.
 runtime_env() {
@@ -179,8 +218,8 @@ stage_requested_backend_jars() {
   "$DEV" gradle "$runtime_name" --project "$REPO_ROOT/platform" -- \
       --no-build-cache \
       :platform-plugin-api:publishToMavenLocal :publishToMavenLocal --console=plain \
-      >"$sd/platform-publications.log" 2>&1 \
-    || die "platform-plugin-api/auraboot-core publish failed — see $sd/platform-publications.log"
+      >"$sd/logs/platform-publications.log" 2>&1 \
+    || die "platform-plugin-api/auraboot-core publish failed — see $sd/logs/platform-publications.log"
 
   # External hybrid plugins use artifact mode: they deliberately cannot resolve a moving
   # platform SNAPSHOT and require the immutable API jar produced by this exact Core checkout.
@@ -197,8 +236,8 @@ stage_requested_backend_jars() {
     "$DEV" gradle "$runtime_name" --project "$backend_dir" \
       --wrapper "$REPO_ROOT/platform/gradlew" -- clean jar \
       "-PplatformPluginApiJar=$platform_plugin_api_jar" --console=plain \
-      >"$sd/${plugin_name}-jar.log" 2>&1 \
-      || die "plugin backend jar build failed for $plugin_name — see $sd/${plugin_name}-jar.log"
+      >"$sd/logs/${plugin_name}-jar.log" 2>&1 \
+      || die "plugin backend jar build failed for $plugin_name — see $sd/logs/${plugin_name}-jar.log"
     [ -f "$jar_path" ] || die "plugin backend jar missing after build for $plugin_name: $jar_path"
     # JAR manifests fold physical lines after 72 bytes. Reassemble continuation
     # lines before comparing a long fully-qualified Plugin-Class value.
@@ -307,11 +346,13 @@ cmd_up() {
   local name="$1"; shift
   local slot="" ttl="6h" runtime_mode="development" frontend=1 warm=1 fresh_db=0 require_new_db=0
   local plugin_profile="" import_plugins=() extra_plugin_roots=() product_migration_roots=()
+  local parallel_reason=""
   local extra_root migration_root plugin_item
   while [ $# -gt 0 ]; do case "$1" in
     --slot) slot="$2"; shift 2;;
     --ttl) ttl="$2"; shift 2;;
     --runtime-mode) runtime_mode="$2"; shift 2;;
+    --parallel-reason) parallel_reason="$2"; shift 2;;
     --no-frontend) frontend=0; shift;;
     --no-warm) warm=0; shift;;
     --fresh-db) fresh_db=1; shift;;
@@ -358,33 +399,41 @@ cmd_up() {
     *) die "--runtime-mode must be development|verification|control|performance" ;;
   esac
 
-  local sd; sd="$(state_dir "$name")"; mkdir -p "$sd"
+  local sd; sd="$(state_dir "$name")" || return 1
+  # Refuse to overwrite a running jar or reset a database served by a live stack.
+  assert_stack_stopped "$name"
+
 
   acquire_stack_lock
 
   log "1/9 allocate runtime '$name' (slot $slot) + ensure infra"
-  # `runtime ensure` is the idempotent allocation contract: the same stable name + slot +
-  # source worktree is reused, while a different slot/worktree/branch is rejected. Keep a
-  # compatibility branch for workspaces that have not yet upgraded the root dispatcher.
-  if "$DEV" runtime 2>/dev/null | grep -q 'runtime ensure'; then
-    "$DEV" runtime ensure auraboot "$name" --slot "$slot" \
-      --purpose "OSS host-first golden stack" --ttl "$ttl" --source-root "$REPO_ROOT" \
-      --mode "$runtime_mode" >/dev/null
-    log "    ensured stable allocation (slot $slot, source=$REPO_ROOT, mode=$runtime_mode)"
-  else
-    local allocated_slot=""
-    local env_file="$WORKSPACE_STATE/env/$name.env"
-    if [ -f "$env_file" ]; then
-      allocated_slot="$(grep -E '^AURA_WORKSPACE_SLOT=' "$env_file" | head -1 | cut -d= -f2- || true)"
-    fi
-    if [ -n "$allocated_slot" ]; then
-      [ "$allocated_slot" = "$slot" ] \
-        || die "runtime '$name' is already allocated on slot $allocated_slot, not $slot — pick another name, or: $DEV runtime destroy $name"
-      log "    reusing existing allocation (slot $slot; legacy dispatcher)"
-    else
-      "$DEV" runtime allocate auraboot "$name" --slot "$slot" --purpose "OSS host-first golden stack" --ttl "$ttl" >/dev/null
-    fi
-  fi
+  local allocation_args=(--slot "$slot" --purpose "OSS host-first golden stack" --ttl "$ttl" --source-root "$REPO_ROOT" --mode "$runtime_mode")
+  [ -z "$parallel_reason" ] || allocation_args+=(--parallel-reason "$parallel_reason")
+  AURA_RUNTIME_AUTO_GC_BEFORE_ALLOCATE=false "$DEV" runtime ensure auraboot "$name" "${allocation_args[@]}" >/dev/null
+  sd="$(prepare_state_dir "$name")" || die "cannot prepare stable stack state"
+  local evidence_root
+  evidence_root="$("$DEV" runtime evidence begin "$name" --purpose "OSS golden stack rebuild")" \
+    || die "cannot create a separate evidence round"
+  mkdir -p "$evidence_root/logs"
+  ln -sfn "$evidence_root/logs" "$sd/logs"
+  printf '%s\n' "$evidence_root" >"$sd/evidence-root"
+  # Keep historical callers' log paths usable without keeping another copy of current logs.
+  python3 - "$sd" "$evidence_root" <<'PYLOG'
+import os
+import shutil
+import sys
+sd, evidence = sys.argv[1:]
+for name in ("backend.log", "frontend.log", "bootjar.log", "import.log", "warm.log"):
+    old = os.path.join(sd, name)
+    if os.path.lexists(old):
+        if os.path.islink(old):
+            os.unlink(old)
+        else:
+            archive = os.path.join(evidence, "legacy-logs")
+            os.makedirs(archive, exist_ok=True)
+            shutil.move(old, os.path.join(archive, name))
+    os.symlink(os.path.join("logs", name), old)
+PYLOG
 
   local runtime_source_args=("$name" "$REPO_ROOT" "$WORKSPACE")
   if [ "${#extra_plugin_roots[@]}" -gt 0 ]; then
@@ -460,13 +509,13 @@ cmd_up() {
 
   if [ "${skip_schema:-0}" != "1" ]; then
     PGPASSWORD=auraboot psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 5432 -U auraboot -d "$pg_db" \
-      -q -f "$REPO_ROOT/platform/src/main/resources/db/snapshots/schema-current.sql" >"$sd/schema-apply.log" 2>&1 \
-      || { tail -5 "$sd/schema-apply.log" >&2; die "schema apply failed — see $sd/schema-apply.log"; }
+      -q -f "$REPO_ROOT/platform/src/main/resources/db/snapshots/schema-current.sql" >"$sd/logs/schema-apply.log" 2>&1 \
+      || { tail -5 "$sd/logs/schema-apply.log" >&2; die "schema apply failed — see $sd/logs/schema-apply.log"; }
   fi
 
   if [ "${#product_migration_roots[@]}" -gt 0 ]; then
     log "2.5/9 apply product-owned migrations"
-    : >"$sd/product-migrations.log"
+    : >"$sd/logs/product-migrations.log"
     printf 'root\tfile\tsha256\n' >"$sd/product-migrations.tsv"
     local product_root migration_file migration_count=0 migration_hash
     for product_root in "${product_migration_roots[@]}"; do
@@ -478,8 +527,8 @@ cmd_up() {
           >>"$sd/product-migrations.tsv"
         PGPASSWORD="$pg_pass" psql -v ON_ERROR_STOP=1 \
           -h "$pg_host" -p "$pg_port" -U "$pg_user" -d "$pg_db" -f "$migration_file" \
-          >>"$sd/product-migrations.log" 2>&1 \
-          || { tail -20 "$sd/product-migrations.log" >&2; die "product migration failed: $migration_file"; }
+          >>"$sd/logs/product-migrations.log" 2>&1 \
+          || { tail -20 "$sd/logs/product-migrations.log" >&2; die "product migration failed: $migration_file"; }
       done < <(find "$product_root" -maxdepth 1 -type f -name 'V*.sql' -print | LC_ALL=C sort)
     done
     [ "$migration_count" -gt 0 ] || die "product migration roots contain no V*.sql files"
@@ -518,21 +567,37 @@ cmd_up() {
   fi
   stage_requested_backend_jars "$sd" "$name" "${staging_args[@]}"
 
+  # Bound backend logs independently of runtime lifetime; old rounds remain in evidence.
+  cat >"$sd/backend-logback.xml" <<'XML'
+<configuration>
+  <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+  <springProperty scope="context" name="BACKEND_LOG" source="logging.file.name"/>
+  <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>${BACKEND_LOG}</file>
+    <encoder><pattern>${FILE_LOG_PATTERN}</pattern></encoder>
+    <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+      <fileNamePattern>${BACKEND_LOG}.%d{yyyy-MM-dd}.%i.gz</fileNamePattern>
+      <maxFileSize>10MB</maxFileSize><maxHistory>3</maxHistory><totalSizeCap>30MB</totalSizeCap>
+    </rollingPolicy>
+  </appender>
+  <root level="INFO"><appender-ref ref="FILE"/></root>
+</configuration>
+XML
   log "5/9 start backend (java -jar) on $server_port"
   mkdir -p "$sd/pf4j-plugins"
-  spawn_detached "$sd/backend.pid" "$REPO_ROOT/platform" "$sd/backend.log" \
-    env AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" SERVER_PORT="$server_port" \
+  spawn_detached "$sd/backend.pid" "$REPO_ROOT/platform" "$sd/logs/backend-console.log" \
+    env AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" LOGGING_CONFIG="file:$sd/backend-logback.xml" LOGGING_FILE_NAME="$sd/logs/backend.log" SERVER_PORT="$server_port" \
       SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:5432/${pg_db}?charSet=UTF8" \
       SPRING_DATASOURCE_USERNAME=auraboot SPRING_DATASOURCE_PASSWORD=auraboot \
       SPRING_DATA_REDIS_HOST=127.0.0.1 SPRING_DATA_REDIS_PORT=6379 SPRING_DATA_REDIS_DATABASE="$redis_db" \
       SPRING_KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:9092 \
       AURA_PLUGINS_DIR="$sd/pf4j-plugins" \
-      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_META_MAPPER=DEBUG \
-      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_PERMISSION_MAPPER=DEBUG \
-      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_TENANT_MAPPER=DEBUG \
-      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_VIEW_MAPPER=DEBUG \
-      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_USER_MAPPER=DEBUG \
-      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_OBSERVABILITY_MAPPER=DEBUG \
+      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_META_MAPPER="${AURA_GOLDEN_MAPPER_LOG_LEVEL:-INFO}" \
+      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_PERMISSION_MAPPER="${AURA_GOLDEN_MAPPER_LOG_LEVEL:-INFO}" \
+      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_TENANT_MAPPER="${AURA_GOLDEN_MAPPER_LOG_LEVEL:-INFO}" \
+      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_VIEW_MAPPER="${AURA_GOLDEN_MAPPER_LOG_LEVEL:-INFO}" \
+      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_USER_MAPPER="${AURA_GOLDEN_MAPPER_LOG_LEVEL:-INFO}" \
+      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_OBSERVABILITY_MAPPER="${AURA_GOLDEN_MAPPER_LOG_LEVEL:-INFO}" \
       AURA_BUILTIN_PLUGINS_DIR="$REPO_ROOT/plugins" \
       AGENT_LLM_STUB_MODE="${AGENT_LLM_STUB_MODE:-true}" \
       java -jar "$run_jar"
@@ -540,7 +605,7 @@ cmd_up() {
     || die "backend launch process registration failed"
   echo "$server_port $vite_port $bff_port" >"$sd/ports"
   poll_http "http://127.0.0.1:$server_port/actuator/health" '"status":"UP"' 150 backend \
-    || die "backend did not become healthy — see $sd/backend.log"
+    || die "backend did not become healthy — see $sd/logs/backend.log"
   # Port-ownership guard (2026-07-20): a FOREIGN listener on the slot port
   # (e.g. an enterprise stack whose range overlaps) answers the health poll
   # and everything downstream silently runs against the wrong stack
@@ -548,7 +613,7 @@ cmd_up() {
   # listener is OUR spawned pid before proceeding.
   own_pid="$(cat "$sd/backend.pid")"
   if ! lsof -ti ":$server_port" 2>/dev/null | grep -qx "$own_pid"; then
-    die "port $server_port is served by a foreign process ($(lsof -ti ":$server_port" 2>/dev/null | head -1)), not our backend pid $own_pid — pick another slot; see $sd/backend.log"
+    die "port $server_port is served by a foreign process ($(lsof -ti ":$server_port" 2>/dev/null | head -1)), not our backend pid $own_pid — pick another slot; see $sd/logs/backend.log"
   fi
   golden_runtime_register_listener "$name" backend "$server_port" "$own_pid" "$REPO_ROOT/platform" "$runtime_token" \
     || die "backend listener registration failed"
@@ -600,14 +665,14 @@ cmd_up() {
           COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
           "$DEV" run "$name" --workdir "$REPO_ROOT/web-admin" -- \
             corepack install --global "pnpm@$pnpm_version" \
-            >"$sd/frontend-corepack.log" 2>&1 \
-          || die "pnpm $pnpm_version bootstrap failed — see $sd/frontend-corepack.log"
+            >"$sd/logs/frontend-corepack.log" 2>&1 \
+          || die "pnpm $pnpm_version bootstrap failed — see $sd/logs/frontend-corepack.log"
         CI=true NPM_CONFIG_REGISTRY="$npm_registry" \
           COREPACK_NPM_REGISTRY="$npm_registry" COREPACK_DEFAULT_TO_LATEST=0 \
           "$DEV" run "$name" --workdir "$REPO_ROOT/web-admin" -- \
             pnpm --filter auraboot-app install --frozen-lockfile --reporter=append-only \
-            >"$sd/frontend-dependencies.log" 2>&1 \
-          || die "web-admin dependency install failed — see $sd/frontend-dependencies.log"
+            >"$sd/logs/frontend-dependencies.log" 2>&1 \
+          || die "web-admin dependency install failed — see $sd/logs/frontend-dependencies.log"
         web_admin_node_modules_usable "$REPO_ROOT/web-admin/node_modules" \
           || die "web-admin dependency install completed without usable runtime packages"
       fi
@@ -622,7 +687,7 @@ cmd_up() {
       "$REPO_ROOT/web-admin/.vite/"*) rm -rf "$vite_cache_dir" ;;
       *) die "refusing to clear unexpected Vite cache path: $vite_cache_dir" ;;
     esac
-    spawn_detached "$sd/frontend.pid" "$REPO_ROOT/web-admin" "$sd/frontend.log" \
+    spawn_detached "$sd/frontend.pid" "$REPO_ROOT/web-admin" "$sd/logs/frontend.log" \
       env AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" VITE_PORT="$vite_port" BFF_PORT="$bff_port" SPRING_BOOT_URL="http://127.0.0.1:$server_port" \
       BFF_INTERNAL_URL="http://127.0.0.1:$server_port" NODE_ENV=development \
       pnpm dev:full
@@ -674,7 +739,7 @@ cmd_up() {
 # ---- import plugins into a running host-first stack ----------------------------------
 cmd_import() {
   local name="$1"; shift
-  local sd; sd="$(state_dir "$name")"
+  local sd; sd="$(state_dir "$name")" || return 1
   [ -f "$sd/ports" ] || die "no running stack for '$name' (run 'up' first)"
   read -r server_port _vite_port _bff_port <"$sd/ports"
 
@@ -751,8 +816,8 @@ cmd_import() {
     export PG_DB="$PGDATABASE"
     export PG_PASSWORD="$PGPASSWORD"
     "$SCRIPT_DIR/import-plugins.sh" "${args[@]}"
-  ) >"$sd/import.log" 2>&1 || die "plugin import failed — see $sd/import.log"
-  log "    plugin import OK — see $sd/import.log"
+  ) >"$sd/logs/import.log" 2>&1 || die "plugin import failed — see $sd/logs/import.log"
+  log "    plugin import OK — see $sd/logs/import.log"
 }
 
 # ---- warm (setup → auth storageState → pre-warm heavy routes) ------------------------
@@ -767,7 +832,7 @@ cmd_import() {
 #   3. Pre-warm /report-designer + /dashboard with a real authenticated headless nav so
 #      the client lazy chunk + Vite client deps are hot before any golden run.
 cmd_warm() {
-  local name="$1" sd; sd="$(state_dir "$name")"
+  local name="$1" sd; sd="$(state_dir "$name")" || return 1
   [ -f "$sd/ports" ] || die "no running stack for '$name' (run 'up' first)"
   local fe="$REPO_ROOT/web-admin"
   local admin_json="$fe/tests/storage/admin.json"
@@ -782,12 +847,12 @@ cmd_warm() {
          && npx playwright test --project=setup --no-deps \
               tests/api/setup/00-bootstrap.spec.ts \
               tests/api/setup/01-multi-role-users.spec.ts \
-              --reporter=line ) >>"$sd/warm.log" 2>&1; then
+              --reporter=line ) >>"$sd/logs/warm.log" 2>&1; then
       setup_ok=1; break
     fi
     sleep 3
   done
-  [ "$setup_ok" -eq 1 ] || die "warm: setup project failed after 5 attempts — see $sd/warm.log"
+  [ "$setup_ok" -eq 1 ] || die "warm: setup project failed after 5 attempts — see $sd/logs/warm.log"
 
   # 2) auth project — produces tests/storage/admin.json (storageState).
   i=0
@@ -797,7 +862,7 @@ cmd_warm() {
     log "    warm[auth] attempt $i/5"
     ( cd "$fe" && eval "$env_exports" \
         && npx playwright test --project=auth --no-deps \
-             --reporter=line ) >>"$sd/warm.log" 2>&1 || true
+             --reporter=line ) >>"$sd/logs/warm.log" 2>&1 || true
     # Require a NON-EMPTY admin.json with a __session cookie (empty {cookies:[]}
     # means login failed — never accept that as ready).
     if [ -s "$admin_json" ] && grep -q '__session' "$admin_json" 2>/dev/null; then
@@ -807,7 +872,7 @@ cmd_warm() {
     sleep 3
   done
   if ! { [ -s "$admin_json" ] && grep -q '__session' "$admin_json" 2>/dev/null; }; then
-    die "warm: admin.json never got a working session after 5 attempts — see $sd/warm.log"
+    die "warm: admin.json never got a working session after 5 attempts — see $sd/logs/warm.log"
   fi
 
   # 3) pre-warm the heavy lazy routes with a real authenticated headless nav.
@@ -815,12 +880,12 @@ cmd_warm() {
   if ( cd "$fe" && eval "$env_exports" \
        && npx playwright test --project=chromium --no-deps \
             tests/e2e/_golden-stack-warm.spec.ts \
-            --reporter=line ) >>"$sd/warm.log" 2>&1; then
+            --reporter=line ) >>"$sd/logs/warm.log" 2>&1; then
     log "    warm[routes] heavy routes hot ✓"
   else
     # Non-fatal: a failed warm nav doesn't break the stack; first golden will
     # just pay the chunk-compile cost. Surface it so the operator can look.
-    log "    warm[routes] WARNING: pre-warm nav failed (see $sd/warm.log); stack still usable"
+    log "    warm[routes] WARNING: pre-warm nav failed (see $sd/logs/warm.log); stack still usable"
   fi
   log "    warm OK"
 }
@@ -834,14 +899,18 @@ cmd_verify_artifacts() {
 }
 
 cmd_env() {
-  local name="$1" sd; sd="$(state_dir "$name")"
+  local name="$1" sd; sd="$(state_dir "$name")" || return 1
   [ -f "$sd/ports" ] || die "no running stack for '$name' (run 'up' first)"
   read -r server_port vite_port bff_port <"$sd/ports"
   local pg_host pg_port pg_user pg_db pg_pass evidence_root
   if [ -f "$sd/pgenv" ]; then
     read -r pg_host pg_port pg_user pg_db pg_pass <"$sd/pgenv"
   fi
-  evidence_root="$(runtime_env "$name" AURA_EVIDENCE_ROOT)"
+  if [ -f "$sd/evidence-root" ]; then
+    evidence_root="$(cat "$sd/evidence-root")"
+  else
+    evidence_root="$(runtime_env "$name" AURA_EVIDENCE_ROOT)"
+  fi
   [ -n "$evidence_root" ] || die "runtime env lacks AURA_EVIDENCE_ROOT; deploy the workspace runtime lifecycle before running this gate"
   cat <<EOF
 # Playwright env contract for golden specs against '$name' (run from web-admin/):
@@ -878,7 +947,7 @@ EOF
 
 # ---- status --------------------------------------------------------------------------
 cmd_status() {
-  local name="$1" sd; sd="$(state_dir "$name")"
+  local name="$1" sd; sd="$(state_dir "$name")" || return 1
   [ -f "$sd/ports" ] || { echo "no stack for '$name'"; return 1; }
   read -r server_port vite_port bff_port <"$sd/ports"
   local be vi
@@ -902,11 +971,16 @@ cmd_lifecycle_resume() {
 }
 
 cmd_resume_retained() {
-  local name="$1" sd recipe run_jar llm_stub_mode runtime_token server_port vite_port bff_port pg_db redis_db
+  local name="$1" sd recipe run_jar llm_stub_mode logging_config runtime_token server_port vite_port bff_port pg_db redis_db
   sd="$(state_dir "$name")"
   recipe="$(node "$SCRIPT_DIR/lib/golden-resume-state.mjs" load "$name" "$REPO_ROOT" "$DEV")" \
     || die "retained launch inputs changed; resume refused"
   run_jar="$(printf '%s\n' "$recipe" | sed -n '1p')"
+  local logging_args=()
+  logging_config="$(printf '%s\n' "$recipe" | sed -n '3p')"
+  if [ -n "$logging_config" ]; then
+    logging_args=("LOGGING_CONFIG=file:$logging_config" "LOGGING_FILE_NAME=$sd/logs/backend.log")
+  fi
   llm_stub_mode="$(printf '%s\n' "$recipe" | sed -n '2p')"
   server_port="$(runtime_env "$name" SERVER_PORT)"
   vite_port="$(runtime_env "$name" VITE_PORT)"
@@ -915,7 +989,7 @@ cmd_resume_retained() {
   redis_db="$(runtime_env "$name" REDIS_DATABASE)"
   runtime_token="$("$DEV" runtime process token "$name")" || die "runtime ownership token unavailable"
   spawn_detached "$sd/backend.pid" "$REPO_ROOT/platform" "$sd/backend.log" \
-    env AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" SERVER_PORT="$server_port" \
+    env "${logging_args[@]}" AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" SERVER_PORT="$server_port" \
       SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:5432/${pg_db}?charSet=UTF8" \
       SPRING_DATASOURCE_USERNAME=auraboot SPRING_DATASOURCE_PASSWORD=auraboot \
       SPRING_DATA_REDIS_HOST=127.0.0.1 SPRING_DATA_REDIS_PORT=6379 SPRING_DATA_REDIS_DATABASE="$redis_db" \
@@ -961,6 +1035,27 @@ cmd_resume_retained() {
   cmd_verify_artifacts "$name"
   log "resumed '$name' with retained database, artifacts and evidence"
 }
+
+assert_stack_stopped() {
+  local name="$1" sd pid port
+  sd="$(state_dir "$name")" || return 1
+  local component
+  for component in backend frontend; do
+    if [ -f "$sd/$component.pid" ]; then
+      pid="$(cat "$sd/$component.pid")"
+      if kill -0 "$pid" 2>/dev/null; then
+        die "runtime '$name' has a live $component process; use down before rebuilding"
+      fi
+    fi
+  done
+  if [ -f "$sd/ports" ]; then
+    for port in $(cat "$sd/ports"); do
+      [ -z "$(lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null || true)" ] \
+        || die "runtime '$name' port $port is still occupied; refusing rebuild/cleanup"
+    done
+  fi
+}
+
 
 # ---- down (stop verified processes, keep runtime/DB) ---------------------------------
 cmd_down() {

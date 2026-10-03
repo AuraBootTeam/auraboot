@@ -1,6 +1,7 @@
+import { goldenStackState } from './golden-stack-state.mjs';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, realpathSync, readdirSync, statSync, mkdirSync, writeFileSync, renameSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, readdirSync, statSync, mkdirSync, writeFileSync, renameSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { liveEnvironment } from './golden-product-identity.mjs';
@@ -31,7 +32,7 @@ export function fingerprintDirectory(root) {
   return { root: realpathSync(root), hash: digest.digest('hex') };
 }
 
-export function verifyResumeState({ report, repo, plan, planHash, manifest, dependencies, plugins }) {
+export function verifyResumeState({ report, repo, plan, planHash, manifest, dependencies, plugins, logging = null }) {
   need(report.verdict === 'ok', 'Workspace identity verification failed');
   need(plan.schemaVersion === 1 && plan.runtime === report.runtime && plan.repo === repo,
     'Resume plan owner mismatch');
@@ -57,7 +58,15 @@ export function verifyResumeState({ report, repo, plan, planHash, manifest, depe
     need(expected.root === actual.root && expected.hash === actual.hash, 'Retained launch input changed');
   }
   need(!/[\r\n]/.test(plan.backend.path), 'Unsupported backend path');
-  return { backend: plan.backend.path, llmStubMode: plan.llmStubMode };
+  if (plan.logging || logging) need(plan.logging && logging && plan.logging.path === logging.path &&
+    plan.logging.hash === logging.hash, 'Retained logging input changed');
+  return { backend: plan.backend.path, llmStubMode: plan.llmStubMode,
+    ...(plan.logging ? { loggingConfig: plan.logging.path } : {}) };
+}
+
+function loggingInput(report, name) {
+  const file = join(goldenStackState(report.stateDir, name), 'backend-logback.xml');
+  return existsSync(file) ? { path: realpathSync(file), hash: hash(readFileSync(file)) } : null;
 }
 
 function atomicJson(file, value) {
@@ -80,12 +89,13 @@ export function recordResumeState(name, repo, cli) {
     backend: manifest.backendArtifact, llmStubMode,
     ports: Object.fromEntries(Object.entries(report.ports).map(([key, item]) => [key, item.port])),
     database: manifest.database, redisDatabase: manifest.redisDatabase,
+    logging: loggingInput(report, name),
     dependencies: fingerprintDirectory(join(repo, 'web-admin/node_modules')),
-    plugins: fingerprintDirectory(join(report.stateDir, 'golden', name, 'pf4j-plugins')) };
+    plugins: fingerprintDirectory(join(goldenStackState(report.stateDir, name), 'pf4j-plugins')) };
   const planFile = join(root, 'resume.json');
   const planHash = hash(JSON.stringify(plan, null, 2) + '\n');
   verifyResumeState({ report, repo, plan, planHash, manifest: { ...manifest, resumePlan: { hash: planHash } },
-    dependencies: plan.dependencies, plugins: plan.plugins });
+    dependencies: plan.dependencies, plugins: plan.plugins, logging: plan.logging });
   atomicJson(planFile, plan);
   manifest.resumePlan = { hash: hash(readFileSync(planFile)) };
   atomicJson(file, manifest);
@@ -102,7 +112,8 @@ export function loadResumeState(name, repo, cli) {
   const manifest = JSON.parse(readFileSync(join(root, 'manifest.json'), 'utf8'));
   return verifyResumeState({ report, repo, plan, planHash: hash(bytes), manifest,
     dependencies: fingerprintDirectory(join(repo, 'web-admin/node_modules')),
-    plugins: fingerprintDirectory(join(report.stateDir, 'golden', name, 'pf4j-plugins')) });
+    plugins: fingerprintDirectory(join(goldenStackState(report.stateDir, name), 'pf4j-plugins')),
+    logging: loggingInput(report, name) });
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
@@ -110,7 +121,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     if (action === 'record') recordResumeState(name, repo, cli);
     else if (action === 'load') {
       const state = loadResumeState(name, repo, cli);
-      console.log(state.backend); console.log(state.llmStubMode);
+      console.log(state.backend); console.log(state.llmStubMode); console.log(state.loggingConfig || '');
     } else throw new Error('Unknown resume action');
   } catch { console.error('Retained golden launch identity refused; no database initialization performed'); process.exitCode = 1; }
 }

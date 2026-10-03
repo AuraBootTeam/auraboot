@@ -160,13 +160,18 @@ function resolveRuntimeTemplate(value: unknown, runtimeContext: Record<string, u
   );
 }
 
-function resolveCommandTargetRecordId(
+export function resolveCommandTargetRecordId(
   actionDef: Record<string, unknown>,
   runtimeContext: Record<string, unknown>,
   record: Record<string, any> | undefined,
   context: Record<string, any>,
 ): string | undefined {
   const explicitTarget = resolveRuntimeTemplate(actionDef.targetRecordPid, runtimeContext);
+  // CREATE actions may use the current page record as input context, but it is
+  // not the record being created. Keep explicit targets for fail-fast validation.
+  if (toNonBlankString(actionDef.operationType)?.toUpperCase() === 'CREATE') {
+    return toNonBlankString(explicitTarget);
+  }
   return (
     toNonBlankString(explicitTarget) ||
     getLegacyCompatibleRecordPid(record) ||

@@ -34,6 +34,8 @@ fi
 WORKSPACE="${WORKSPACE:-$REPO_ROOT}"
 while [[ "$WORKSPACE" != / && ! -x "$WORKSPACE/aura" ]]; do WORKSPACE="$(dirname "$WORKSPACE")"; done
 [[ -x "$WORKSPACE/aura" ]] || die_env 'workspace aura CLI not found'
+source "$REPO_ROOT/scripts/lib/workspace-control.sh"
+aura_bind_workspace_control "$WORKSPACE" || exit 2
 WORKSPACE_STATE="${AURA_WORKSPACE_STATE_DIR:-$WORKSPACE/.workspace}"
 [[ -x "$GS" && -f "$PROFILE" && -f "$AUDIT" ]] || die_env 'missing gate dependency'
 command -v pdftotext >/dev/null 2>&1 || die_env 'pdftotext (Poppler) is required to inspect exported PDF contents'

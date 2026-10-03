@@ -1,3 +1,4 @@
+import { registerFixtureWorkspace } from './fixtures/workspace-control.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -41,6 +42,7 @@ if(collection)console.log(JSON.stringify(report));else fs.writeFileSync(process.
 `);
   const calls = path.join(root, 'calls.log');
   fs.writeFileSync(calls, '');
+  registerFixtureWorkspace(root, repo);
   return { root, repo, calls, run: (extraEnv = {}, slotArgs = ['--slot', '900']) => spawnSync('bash', [path.join(repo, 'scripts/hifi-golden-gate-run.sh'), '--name', 'owned-run', ...slotArgs], {
     encoding: 'utf8', timeout: 10000,
     env: { ...process.env, AURA_WORKSPACE_ROOT: root, CALLS: calls, FAKE_MODE: mode,
@@ -71,6 +73,7 @@ test('legacy CI sibling checkouts locate the frozen workspace CLI', t => {
   const workspace = path.join(f.root, 'auraboot-workspace');
   fs.mkdirSync(workspace);
   fs.copyFileSync(path.join(f.root, 'aura'), path.join(workspace, 'aura'));
+  registerFixtureWorkspace(workspace, f.repo);
   const result = f.run({ AURA_WORKSPACE_ROOT: '', AURA_CI_WORKSPACE_ROOT: '' });
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.equal(JSON.parse(fs.readFileSync(path.join(workspace, '.workspace/evidence/owned-run/execution-ledger.json'))).executed, 8);

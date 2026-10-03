@@ -1,3 +1,4 @@
+import { registerFixtureWorkspace } from './fixtures/workspace-control.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -7,7 +8,7 @@ import { spawnSync } from 'node:child_process';
 
 // Shell orchestration with hermetic dependencies; no native/browser claim.
 function fixture(t, mode = '') {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'oss-gate-lifecycle-'));
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'oss-gate-lifecycle-')));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const repo = path.join(root, 'oss');
   fs.mkdirSync(path.join(repo, 'scripts/gates'), { recursive: true });
@@ -51,6 +52,7 @@ if(!collection && process.env.MODE==='skipped-result')report.suites[0].specs[0].
 if(!collection && process.env.MODE==='retried-result')report.suites[0].specs[0].tests[0].results.push({status:'passed',retry:1});
 if(collection)console.log(JSON.stringify(report));else{if(process.env.PLAYWRIGHT_JSON_OUTPUT_FILE)fs.writeFileSync(process.env.PLAYWRIGHT_JSON_OUTPUT_FILE,JSON.stringify(report));console.log('12 passed');}
 `, { mode: 0o755 });
+  registerFixtureWorkspace(root, repo);
   const env = { ...process.env, AURA_WORKSPACE_ROOT: root, AURA_WORKSPACE_STATE_DIR: path.join(root, 'state'),
     AURA_CI_JOB_ID: 'test-job', AURA_REGRESSION_SLOT: '900', MODE: mode, CALLS: calls,
     EVIDENCE: path.join(root, 'evidence'), PATH: path.join(root, 'bin') + path.delimiter + process.env.PATH };
@@ -124,7 +126,7 @@ fi
 test('real stack launcher rejects an existing database before infra or schema writes', t => {
   const f = fixture(t);
   fs.copyFileSync(new URL('../oss-golden-stack.sh', import.meta.url), path.join(f.repo, 'scripts/oss-golden-stack.sh'));
-  fs.mkdirSync(path.join(f.repo, 'scripts/lib'));
+  fs.mkdirSync(path.join(f.repo, 'scripts/lib'), { recursive: true });
   for (const file of ['web-admin-node-modules.sh', 'golden-new-database.sh', 'golden-runtime-identity.sh']) {
     fs.copyFileSync(new URL('../lib/' + file, import.meta.url), path.join(f.repo, 'scripts/lib', file));
   }
@@ -148,6 +150,7 @@ ENV
 fi
 `, { mode: 0o755 });
   fs.copyFileSync(path.join(f.root, 'dev.sh'), path.join(f.root, 'aura'));
+  registerFixtureWorkspace(f.root, f.repo);
   fs.writeFileSync(path.join(f.root, 'bin/psql'), '#!/usr/bin/env bash\ncat >> "$CALLS"\necho 1\n', { mode: 0o755 });
   const result = spawnSync('bash', [path.join(f.repo, 'scripts/oss-golden-stack.sh'), 'up', 'owned-run', '--slot', '900', '--require-new-db'], {
     env: f.env, encoding: 'utf8', timeout: 10000 });

@@ -1,3 +1,4 @@
+import { registerFixtureWorkspace } from './fixtures/workspace-control.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, rmSync, chmodSync, realpathSync, readFileSync } from 'node:fs';
@@ -123,8 +124,28 @@ for (const action of ['suspend', 'resume']) test(`product ${action} entry delega
   writeFileSync(join(root, 'aura'), '#!/usr/bin/env node\n' +
     `require('node:fs').appendFileSync(${JSON.stringify(calls)},JSON.stringify(process.argv.slice(2))+'\\n');process.exit(7);\n`,
   { mode: 0o755 });
+  registerFixtureWorkspace(root, root);
   const result = spawnSync('bash', [fileURLToPath(new URL('../oss-golden-stack.sh', import.meta.url)), action, 'owned'],
     { env: { ...process.env, AURA_WORKSPACE_ROOT: root, AURA_WORKSPACE_STATE_DIR: join(root, 'state') }, encoding: 'utf8' });
   assert.equal(result.status, 7, result.stderr);
   assert.deepEqual(readFileSync(calls, 'utf8').trim().split('\n').map(line => JSON.parse(line)), [['runtime', action, 'owned']]);
+});
+
+test('public loader binds bounded logging bytes and rejects later config drift', t => {
+  const { f, cli, plugins, privateRoot } = privateFixture(t);
+  const config = join(plugins, '..', 'backend-logback.xml');
+  writeFileSync(config, '<configuration>bounded log fixture</configuration>');
+  f.plan.logging = { path: realpathSync(config), hash: createHash('sha256').update(readFileSync(config)).digest('hex') };
+  const bytes = JSON.stringify(f.plan, null, 2) + '\n';
+  f.manifest.resumePlan.hash = createHash('sha256').update(bytes).digest('hex');
+  writeFileSync(join(privateRoot, 'resume.json'), bytes);
+  writeFileSync(join(privateRoot, 'manifest.json'), JSON.stringify(f.manifest));
+  assert.equal(loadResumeState('owned', f.repo, cli).loggingConfig, realpathSync(config));
+  writeFileSync(config, '<configuration>unbounded changed fixture</configuration>');
+  assert.throws(() => loadResumeState('owned', f.repo, cli), /Retained logging input changed/);
+});
+test('public loader refuses a logging config absent from the frozen legacy recipe', t => {
+  const { f, cli, plugins } = privateFixture(t);
+  writeFileSync(join(plugins, '..', 'backend-logback.xml'), '<configuration>unbound</configuration>');
+  assert.throws(() => loadResumeState('owned', f.repo, cli), /Retained logging input changed/);
 });

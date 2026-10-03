@@ -5,8 +5,6 @@ import com.auraboot.framework.auth.dto.UserInfoResponse;
 import com.auraboot.framework.auth.service.UserInfoService;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
-import com.auraboot.framework.permission.entity.Permission;
-import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.mapper.RoleMapper;
@@ -30,7 +28,6 @@ public class UserInfoServiceImpl implements UserInfoService {
     private final UserService userService;
     private final RoleMapper roleMapper;
     private final UserPermissionService userPermissionService;
-    private final PermissionMapper permissionMapper;
     private final UserPreferenceService userPreferenceService;
     private final TenantPreferenceService tenantPreferenceService;
 
@@ -85,22 +82,9 @@ public class UserInfoServiceImpl implements UserInfoService {
             Long memberId = MetaContext.getCurrentMemberId();
             roles = memberId != null ? roleMapper.findByMemberIdAndTenantId(memberId, tenantId) : List.of();
 
-            boolean isAdmin = roles.stream()
-                    .anyMatch(r -> "super_admin".equals(r.getCode()) || "tenant_admin".equals(r.getCode()));
-
-            if (isAdmin) {
-                List<Permission> allPermissions = permissionMapper.selectList(null);
-                permissionCodes = allPermissions.stream()
-                        .map(Permission::getCode)
-                        .collect(Collectors.toList());
-
-                // Fallback for bootstrap environments where tenant-scoped projection is incomplete
-                if (permissionCodes.isEmpty()) {
-                    permissionCodes = resolvePermissionsByUserId(userId);
-                }
-            } else {
-                permissionCodes = resolvePermissionsByUserId(userId);
-            }
+            // Use the same effective codes as backend authorization, including
+            // immutable Application Release roles in zero-import schools.
+            permissionCodes = new ArrayList<>(userPermissionService.getUserPermissionCodes(userId));
         }
 
         List<UserInfoResponse.RoleDTO> roleDTOs = roles.stream()
@@ -108,16 +92,6 @@ public class UserInfoServiceImpl implements UserInfoService {
                 .collect(Collectors.toList());
 
         return new UserInfoResponse.PermissionsDTO(roleDTOs, permissionCodes);
-    }
-
-    private List<String> resolvePermissionsByUserId(Long userId) {
-        Set<Long> permissionIds = userPermissionService.getUserPermissionIds(userId);
-        if (permissionIds.isEmpty()) {
-            return List.of();
-        }
-        return permissionMapper.findByIds(new ArrayList<>(permissionIds)).stream()
-                .map(Permission::getCode)
-                .collect(Collectors.toList());
     }
 
     private UserInfoResponse.PreferencesDTO buildPreferencesDTO(Long userId, Long tenantId) {

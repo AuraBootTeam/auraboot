@@ -83,6 +83,8 @@ if [ ! -f "$WORKSPACE/aura" ]; then
   main_wt="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2; exit}')"
   [ -n "${main_wt:-}" ] && [ -f "$(dirname "$main_wt")/aura" ] && WORKSPACE="$(dirname "$main_wt")"
 fi
+source "$SCRIPT_DIR/lib/workspace-control.sh"
+aura_bind_workspace_control "$WORKSPACE" || exit 2
 DEV="$WORKSPACE/aura"
 
 NAME="oss-e2e-${AURA_CI_JOB_ID:-$(date -u +%Y%m%dT%H%M%SZ)-$$}"
@@ -184,7 +186,7 @@ fi
 
 retain() {
   local rc=$?
-  log "retained runtime '$NAME' slot=$SLOT exit=$rc; inspect with: $GS status $NAME"
+  log "keeping stack; retained runtime '$NAME' slot=$SLOT exit=$rc; inspect with: $GS status $NAME"
   return "$rc"
 }
 trap retain EXIT
@@ -215,7 +217,7 @@ log "1/4 new isolated stack: $NAME slot=$SLOT"
 # PW_PROFILE=oss auto-import — we do it here, deterministically.)
 log "1b/4 import internal test-fixtures plugin (e2et_* models)"
 "$GS" import "$NAME" --plugin-profile none --plugin test-fixtures \
-  || die_env "test-fixtures import failed — see $WORKSPACE/.workspace/golden/$NAME/import.log"
+  || die_env "test-fixtures import failed — see $WORKSPACE/.workspace/runtimes/$NAME/oss-stack/import.log"
 
 # --- 2. resolve the stack env (base URL + backend + PG*) ---------------------
 log "2/4 resolve stack env"

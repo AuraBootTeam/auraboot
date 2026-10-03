@@ -972,6 +972,9 @@ export class ExpressionParser {
       if (prop.type !== 'Property') {
         throw new Error(`不支持的对象属性类型: ${prop.type}`);
       }
+      if (!prop.value) {
+        throw new Error('Object property value is missing');
+      }
       const keyNode = prop.key;
       const key =
         keyNode.type === 'Identifier'
