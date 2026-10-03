@@ -7,7 +7,6 @@ import com.auraboot.framework.semantic.compiler.UserContext;
 import com.auraboot.framework.semantic.entity.AbSemanticMetric;
 import com.auraboot.framework.semantic.mapper.AbSemanticMetricMapper;
 import com.auraboot.framework.semantic.parser.SemanticYamlParser;
-import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,8 +43,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DisplayName("ChatBI governed answer path eval — catalog questions + permission denial")
 class SemanticChatBiEvalIT {
 
-    private static final long TENANT_ID = 991_960_001L;
-    private static final long USER_ID = 991_960_002L;
+    private long tenantId;
+    private long userId;
+    private SemanticAcceptanceIdentity identity;
+    @Autowired private com.auraboot.framework.user.service.UserService fixtureUsers;
+    @Autowired private com.auraboot.framework.tenant.service.TenantService fixtureTenants;
+    @Autowired private com.auraboot.framework.tenant.service.TenantMemberService fixtureMembers;
+    @Autowired private com.auraboot.framework.meta.service.MetaModelService fixtureSources;
 
     /**
      * Offline evaluation set: catalog questions mapped to governed metrics.
@@ -153,32 +157,37 @@ class SemanticChatBiEvalIT {
 
     private String modelPid;
 
-    @PostConstruct
+    private void ensureIdentity() {
+        if (identity == null) {
+            identity = SemanticAcceptanceIdentity.create(fixtureUsers, fixtureTenants, fixtureMembers, "chatbi");
+            tenantId = identity.tenantId(); userId = identity.userId();
+        }
+    }
+
     void bindTenantContext() {
-        MetaContext.setContext(TENANT_ID, USER_ID, "chatbi-eval-pid", "chatbi-eval-user");
+        ensureIdentity();
+        identity.bind();
     }
 
     @BeforeEach
     void publishModels() {
-        MetaContext.setContext(TENANT_ID, USER_ID, "chatbi-eval-pid", "chatbi-eval-user");
+        ensureIdentity();
+        identity.bind();
         if (modelPid != null) return;
-        jdbc.update("INSERT INTO ab_meta_model (id, pid, tenant_id, code, table_name, "
-                + "source_type, is_current, status, version, created_at, updated_at, deleted_flag) "
-                + "VALUES (991960010, 'chatbi-eval-meta-model', ?, 'ab_object_alias', 'ab_object_alias', "
-                + "'physical', TRUE, 'published', 1, NOW(), NOW(), FALSE)", TENANT_ID);
+        identity.registerSource(fixtureSources);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_object_alias WHERE tenant_id = ?",
-                Long.class, TENANT_ID)).as("fresh governed-eval fixture namespace").isZero();
+                Long.class, tenantId)).as("fresh governed-eval fixture namespace").isZero();
         for (int n = 1; n <= 3; n++) {
             jdbc.update("INSERT INTO ab_object_alias (pid, tenant_id, model_code, alias, language, acp_priority, "
                             + "created_at, updated_at, created_by, updated_by, deleted_flag) "
                             + "VALUES (?, ?, 'chatbi_eval', ?, 'en-US', 0, NOW(), NOW(), ?, ?, FALSE)",
-                    com.auraboot.framework.common.util.UniqueIdGenerator.generate(), TENANT_ID,
-                    "Governed eval fixture " + n, USER_ID, USER_ID);
+                    com.auraboot.framework.common.util.UniqueIdGenerator.generate(), tenantId,
+                    "Governed eval fixture " + n, userId, userId);
         }
         modelPid = publishService.publishFromYaml(
-                MODEL_YAML.getBytes(StandardCharsets.UTF_8), "test-fixtures", TENANT_ID, USER_ID);
+                MODEL_YAML.getBytes(StandardCharsets.UTF_8), "test-fixtures", tenantId, userId);
         publishService.publishFromYaml(
-                FORBIDDEN_MODEL_YAML.getBytes(StandardCharsets.UTF_8), "test-fixtures", TENANT_ID, USER_ID);
+                FORBIDDEN_MODEL_YAML.getBytes(StandardCharsets.UTF_8), "test-fixtures", tenantId, userId);
     }
 
     @AfterAll
@@ -188,7 +197,7 @@ class SemanticChatBiEvalIT {
     }
 
     private UserContext user() {
-        return new UserContext(USER_ID, TENANT_ID, Map.of());
+        return new UserContext(userId, tenantId, Map.of());
     }
 
     @Test
@@ -208,16 +217,16 @@ class SemanticChatBiEvalIT {
     @Test
     @DisplayName("restricted metric is denied before execution (permission negative)")
     void restrictedMetricDenied() {
-        AbSemanticMetric secret = metricMapper.findByCode(TENANT_ID, "secret_count_metric", "0.1");
+        AbSemanticMetric secret = metricMapper.findByCode(tenantId, "secret_count_metric", "0.1");
         assertThat(secret).as("restricted metric fixture must be published").isNotNull();
         SemanticQueryRequest req = new SemanticQueryRequest();
         req.setMetrics(List.of("alert_eval_secret.secret_count_metric"));
         Long before = jdbc.queryForObject("SELECT count(*) FROM ab_semantic_query_log WHERE tenant_id = ?",
-                Long.class, TENANT_ID);
+                Long.class, tenantId);
         // The governed pipeline denies before data execution and audit insertion.
         assertThatThrownBy(() -> queryService.executeQuery(req, user()))
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_semantic_query_log WHERE tenant_id = ?",
-                Long.class, TENANT_ID)).isEqualTo(before);
+                Long.class, tenantId)).isEqualTo(before);
     }
 }

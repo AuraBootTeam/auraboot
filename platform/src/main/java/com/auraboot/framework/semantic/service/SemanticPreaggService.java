@@ -1,6 +1,9 @@
 package com.auraboot.framework.semantic.service;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.common.constant.StatusConstants;
+import com.auraboot.framework.tenant.service.TenantMemberService;
+import org.springframework.security.access.AccessDeniedException;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.semantic.compiler.SemanticQueryRequest;
 import com.auraboot.framework.semantic.compiler.UserContext;
@@ -50,6 +53,7 @@ public class SemanticPreaggService {
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
     private final PlatformTransactionManager transactionManager;
+    private final TenantMemberService tenantMemberService;
 
     // ==================== CRUD ====================
 
@@ -159,6 +163,14 @@ public class SemanticPreaggService {
         MetaContext.setContext(preagg.getTenantId(), preagg.getCreatedBy(),
                 "semantic-preagg", "semantic-preagg-refresher");
         try {
+            var member = tenantMemberService.findByTenantIdAndUserId(preagg.getTenantId(), preagg.getCreatedBy());
+            if (member == null || !StatusConstants.ACTIVE.equalsIgnoreCase(member.getStatus())
+                    || Boolean.TRUE.equals(member.getDeletedFlag()) || member.getId() == null
+                    || !java.util.Objects.equals(member.getTenantId(), preagg.getTenantId())
+                    || !java.util.Objects.equals(member.getUserId(), preagg.getCreatedBy())) {
+                throw new AccessDeniedException("Semantic preaggregation creator is not an active tenant member");
+            }
+            MetaContext.setMemberId(member.getId());
             SemanticQueryRequest request = new SemanticQueryRequest();
             request.setMetrics(List.of(model.getCode() + "." + preagg.getMetricCode()));
             request.setDimensions(qualifiedDimensions(model, preagg));

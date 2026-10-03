@@ -9,6 +9,9 @@ import com.auraboot.framework.semantic.mapper.AbSemanticModelMapper;
 import com.auraboot.framework.semantic.mapper.AbSemanticPreaggMapper;
 import com.auraboot.framework.userattribute.service.UserAttributeService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.auraboot.framework.tenant.service.TenantMemberService;
+import com.auraboot.framework.tenant.dao.entity.TenantMember;
+import org.springframework.security.access.AccessDeniedException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,6 +40,7 @@ class SemanticPreaggContextTest {
     private PlatformTransactionManager transactions;
     private TransactionStatus transaction;
     private JdbcTemplate jdbc;
+    private TenantMemberService members;
 
     @BeforeEach
     void setup() {
@@ -48,7 +52,11 @@ class SemanticPreaggContextTest {
         transactions = mock(PlatformTransactionManager.class);
         transaction = mock(TransactionStatus.class);
         when(transactions.getTransaction(any())).thenReturn(transaction);
-        service = new SemanticPreaggService(mapper, models, queries, attributes, jdbc, new ObjectMapper(), transactions);
+        members = mock(TenantMemberService.class);
+        var member = new TenantMember(); member.setId(12L); member.setTenantId(1L);
+        member.setUserId(2L); member.setStatus("active");
+        when(members.findByTenantIdAndUserId(1L, 2L)).thenReturn(member);
+        service = new SemanticPreaggService(mapper, models, queries, attributes, jdbc, new ObjectMapper(), transactions, members);
         AbSemanticModel model = new AbSemanticModel();
         model.setCode("orders");
         when(models.findByPid(1L, "model")).thenReturn(model);
@@ -75,6 +83,28 @@ class SemanticPreaggContextTest {
         MetaContext.setEnvironmentId(4L);
         MetaContext.setOtelTraceId("caller-trace");
         caller = MetaContext.snapshot();
+    }
+
+    @Test
+    void refreshBindsCreatorMembershipBeforeGovernedQuery() {
+        when(queries.explainQuery(any(), any())).thenAnswer(invocation -> {
+            assertThat(MetaContext.getCurrentMemberId()).isEqualTo(12L);
+            assertThat(MetaContext.getCurrentTenantId()).isEqualTo(1L);
+            assertThat(MetaContext.getCurrentUserId()).isEqualTo(2L);
+            var explained = new SemanticQueryResponse(); explained.setSql("SELECT 1 AS count");
+            explained.setParams(List.of()); return explained;
+        });
+        assertThat(service.refreshNow("preagg")).isEqualTo(1L);
+        assertThat(MetaContext.snapshot()).isEqualTo(caller);
+    }
+
+    @Test
+    void revokedCreatorDeniesRefreshBeforeDdlAndRestoresCaller() {
+        when(members.findByTenantIdAndUserId(1L, 2L)).thenReturn(null);
+        assertThatThrownBy(() -> service.refreshNow("preagg")).isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(queries, jdbc);
+        verify(transactions).rollback(transaction);
+        assertThat(MetaContext.snapshot()).isEqualTo(caller);
     }
 
     @Test

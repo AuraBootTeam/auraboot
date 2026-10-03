@@ -1,6 +1,7 @@
 package com.auraboot.framework.semantic.service;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.common.constant.StatusConstants;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.notification.service.NotificationService;
 import com.auraboot.framework.semantic.compiler.SemanticQueryRequest;
@@ -169,7 +170,7 @@ public class SemanticMetricAlertService {
             }
 
             var member = tenantMemberService.findByTenantIdAndUserId(alert.getTenantId(), alert.getCreatedBy());
-            if (member == null || !"ACTIVE".equals(member.getStatus()) || Boolean.TRUE.equals(member.getDeletedFlag())
+            if (member == null || !StatusConstants.ACTIVE.equalsIgnoreCase(member.getStatus()) || Boolean.TRUE.equals(member.getDeletedFlag())
                     || !java.util.Objects.equals(member.getTenantId(), alert.getTenantId())
                     || !java.util.Objects.equals(member.getUserId(), alert.getCreatedBy()) || member.getId() == null) {
                 throw new AccessDeniedException("Semantic alert creator is not an active tenant member");

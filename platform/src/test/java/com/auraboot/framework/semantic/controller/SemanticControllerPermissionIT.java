@@ -26,6 +26,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -56,6 +57,7 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -84,6 +86,12 @@ class SemanticControllerPermissionIT extends BaseIntegrationTest {
     @Autowired private SemanticPreaggService preaggs;
     @Autowired private AbSemanticMetricMapper metrics;
     @Autowired private com.auraboot.framework.semantic.service.SemanticQueryService queries;
+    @Autowired private com.auraboot.framework.meta.service.MetaModelService sourceModels;
+    @Autowired private com.auraboot.framework.meta.service.FieldMaskService fieldMasks;
+    @Autowired private com.auraboot.framework.meta.service.DataPermissionPolicyService columnPolicies;
+    @Autowired private com.auraboot.framework.permission.service.RolePermissionService rolePermissionService;
+    @Autowired private com.auraboot.framework.meta.mapper.AuditTrailMapper protectionAudits;
+    @Autowired private com.auraboot.framework.meta.service.impl.AuditTrailService auditTrails;
     private String modelPid;
     private String metricPid;
     private String alertPid;
@@ -314,7 +322,158 @@ class SemanticControllerPermissionIT extends BaseIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
-    private void grantOrdinaryPermissions(String... codes) {
+    private void declareProtectedSourceFields() {
+        var definition = sourceModels.getDefinitionByCode("ab_object_alias");
+        assertThat(definition).isNotNull();
+        var declared = new java.util.ArrayList<>(definition.getFields());
+        for (String column : List.of("pid", "language", "alias")) {
+            declared.add(com.auraboot.framework.meta.dto.FieldDefinition.builder()
+                    .code("sensitive_" + column).columnName(column).dataType("string").build());
+        }
+        definition.setFields(declared);
+        sourceModels.saveDefinition(definition);
+        assertThat(sourceModels.getColumnName("ab_object_alias", "sensitive_language")).isEqualTo("language");
+    }
+
+    private com.auraboot.framework.meta.entity.FieldMaskConfig protectSource(String field, String exemption) {
+        var config = new com.auraboot.framework.meta.entity.FieldMaskConfig();
+        config.setModelCode("ab_object_alias"); config.setFieldCode(field); config.setMaskType("FULL");
+        config.setEnabled(true); config.setApplyToList(false); config.setApplyToDetail(false);
+        config.setApplyToExport(true); config.setExemptPermissionCodes(exemption);
+        return fieldMasks.saveConfig(config);
+    }
+
+    private String protectedRequest(boolean dimension) throws Exception {
+        return json.writeValueAsString(dimension
+                ? Map.of("metrics", List.of("permission_fixture.count"), "dimensions", List.of("alias_language"))
+                : Map.of("metrics", List.of("permission_fixture.count")));
+    }
+
+    private long auditSequence() {
+        Long sequence = protectionAudits.getMaxSequenceNo(tenant.getId());
+        return sequence == null ? 0 : sequence;
+    }
+
+    private com.auraboot.framework.meta.entity.AuditTrail newProtectionAudit(long previous, String verdict) {
+        var records = protectionAudits.getBySequenceRange(tenant.getId(), previous + 1, Long.MAX_VALUE);
+        assertThat(records).hasSize(1);
+        var row = records.get(0);
+        assertThat(row.getEventType()).isEqualTo("SEMANTIC_QUERY_PROTECTION");
+        assertThat(row.getActorId()).isEqualTo(user.getId());
+        assertThat(row.getTenantId()).isEqualTo(tenant.getId());
+        assertThat(row.getEntityPid()).isNotBlank();
+        var metadata = row.getMetadata();
+        assertThat(metadata).isNotNull();
+        assertThat(metadata.path("format").asText()).isEqualTo("auraboot.semantic.protection.v1");
+        assertThat(metadata.path("phase").asText()).isEqualTo("admission");
+        assertThat(metadata.path("semanticModelCode").asText()).isEqualTo("permission_fixture");
+        assertThat(metadata.path("sqlFingerprint").asText()).matches("[a-f0-9]{64}");
+        assertThat(metadata.path("protectionPlan").path("sourceModelCode").asText()).isEqualTo("ab_object_alias");
+        assertThat(metadata.path("protectionPlan").path("verdict").asText()).isEqualTo(verdict);
+        assertThat(metadata.toString()).doesNotContain("en-US", "Permission fixture", user.getUserName());
+        assertThat(metadata.has("sql") || metadata.has("params") || metadata.has("rows") || metadata.has("filters")).isFalse();
+        assertThat(auditTrails.verifyChainIntegrity(tenant.getId(), row.getSequenceNo(), row.getSequenceNo()).isValid()).isTrue();
+        return row;
+    }
+
+    private void queryProtected(String request, boolean allow) throws Exception {
+        long sequence = auditSequence();
+        var operation = mvc.perform(MockMvcRequestBuilders.post("/api/semantic/query")
+                .contentType("application/json").content(request));
+        if (allow) {
+            var response = operation.andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"))
+                    .andExpect(jsonPath("$.data.rowcount").value(1))
+                    .andExpect(jsonPath("$.data.rows[0]['permission_fixture.count']").value(1)).andReturn();
+            var queryId = json.readTree(response.getResponse().getContentAsString()).path("data").path("queryId").asText();
+            assertThat(newProtectionAudit(sequence, "ALLOW").getEntityPid()).isEqualTo(queryId);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_semantic_query_log WHERE tenant_id = ? AND query_id = ?",
+                    Long.class, tenant.getId(), queryId)).isEqualTo(1);
+        } else {
+            operation.andExpect(status().isForbidden()).andExpect(jsonPath("$.data").doesNotExist());
+            var row = newProtectionAudit(sequence, "DENY");
+            assertThat(row.getMetadata().path("protectionPlan").path("reason").asText()).isEqualTo("PROTECTED_SOURCE_COLUMN");
+        }
+    }
+
+    @ParameterizedTest(name = "field-mask {0}")
+    @ValueSource(strings = {"dimension", "measure-expression", "metric-filter"})
+    void protectedDimensionsExpressionsAndFiltersDenyThenRecoverWithPlanAudit(String surface) throws Exception {
+        grantOrdinaryPermissions(MetaPermission.META_SEMANTIC_USE);
+        declareProtectedSourceFields();
+        String yaml = YAML;
+        if (surface.equals("measure-expression")) {
+            yaml = YAML.replace("    agg: COUNT\n    field_ref: pid", "    agg: COUNT\n    expr: \"CASE WHEN language = 'en-US' THEN pid ELSE NULL END\"");
+            assertThat(yaml).contains("expr:");
+        } else if (surface.equals("metric-filter")) {
+            yaml = YAML.replace("    type: simple", "    filter: \"language = 'en-US'\"\n    type: simple");
+            assertThat(yaml).contains("filter:");
+        }
+        publisher.publishFromYaml(yaml.getBytes(StandardCharsets.UTF_8), "permission-fixture", tenant.getId(), user.getId());
+        String request = protectedRequest(surface.equals("dimension"));
+        queryProtected(request, true);
+        var config = protectSource("sensitive_language", null);
+        Map<String, String> before = semanticSnapshot();
+        queryProtected(request, false);
+        assertThat(semanticSnapshot()).isEqualTo(before);
+        config.setEnabled(false); fieldMasks.saveConfig(config);
+        queryProtected(request, true);
+    }
+
+    @Test
+    void canonicalColumnPolicyBindingDeniesAndUnbindingRecovers() throws Exception {
+        Role role = grantOrdinaryPermissions(MetaPermission.META_SEMANTIC_USE);
+        declareProtectedSourceFields();
+        String request = protectedRequest(true);
+        queryProtected(request, true);
+        var policy = new com.auraboot.framework.meta.dto.DataPermissionPolicyCreateRequest();
+        policy.setName("Semantic protected language"); policy.setModelCode("ab_object_alias");
+        policy.setPolicyType("column"); policy.setFieldCode("sensitive_language"); policy.setMaskType("HIDE");
+        var created = columnPolicies.create(policy);
+        columnPolicies.bindToRole(created.getPid(), role.getPid());
+        Map<String, String> before = semanticSnapshot();
+        queryProtected(request, false);
+        assertThat(semanticSnapshot()).isEqualTo(before);
+        columnPolicies.unbindFromRole(created.getPid(), role.getPid());
+        queryProtected(request, true);
+    }
+
+    @Test
+    void exemptionGrantRevocationAndRestorationUseCanonicalPermissionServices() throws Exception {
+        String exempt = "fixture.semantic.unmask";
+        Role role = grantOrdinaryPermissions(MetaPermission.META_SEMANTIC_USE, exempt);
+        declareProtectedSourceFields();
+        protectSource("sensitive_language", exempt);
+        String request = protectedRequest(true);
+        queryProtected(request, true);
+        Permission exemption = register(exempt);
+        assertThat(rolePermissionService.removePermission(role.getId(), exemption.getId())).isTrue();
+        assertThat(userPermissions.hasPermission(user.getId(), MetaPermission.META_SEMANTIC_USE)).isTrue();
+        assertThat(userPermissions.hasPermission(user.getId(), exempt)).isFalse();
+        Map<String, String> before = semanticSnapshot();
+        queryProtected(request, false);
+        assertThat(semanticSnapshot()).isEqualTo(before);
+        assertThat(rolePermissionService.assignPermissionsToRole(role.getId(), List.of(
+                register(MetaPermission.META_SEMANTIC_USE).getId(), exemption.getId()))).isTrue();
+        assertThat(userPermissions.hasPermission(user.getId(), exempt)).isTrue();
+        queryProtected(request, true);
+    }
+
+    @Test
+    void protectedPreaggRollbackRetainsDeniedPlanAndOriginalView() throws Exception {
+        grantOrdinaryPermissions(MetaPermission.META_SEMANTIC_USE, MetaPermission.META_SEMANTIC_PUBLISH);
+        declareProtectedSourceFields();
+        protectSource("sensitive_pid", null);
+        Map<String, String> before = semanticSnapshot();
+        long sequence = auditSequence();
+        assertThatThrownBy(() -> preaggs.refreshNow(preaggPid)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(semanticSnapshot()).isEqualTo(before);
+        assertThat(newProtectionAudit(sequence, "DENY").getOperationType()).isEqualTo("EXPLAIN");
+        String mv = jdbc.queryForObject("SELECT mv_name FROM ab_semantic_preagg WHERE tenant_id = ? AND pid = ?",
+                String.class, tenant.getId(), preaggPid);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM " + mv, Long.class)).isEqualTo(1L);
+    }
+
+    private Role grantOrdinaryPermissions(String... codes) {
         Role role = new Role();
         role.setPid(UniqueIdGenerator.generate());
         role.setName("Semantic reader fixture");
@@ -349,6 +508,7 @@ class SemanticControllerPermissionIT extends BaseIntegrationTest {
         for (String code : codes) assertThat(userPermissions.hasPermission(user.getId(), code)).isTrue();
         assertThat(adminRoles.hasRole(tenant.getId(), user.getId(), RoleCodes.TENANT_ADMIN)).isFalse();
         assertThat(adminRoles.hasRole(tenant.getId(), user.getId(), RoleCodes.PLATFORM_ADMIN)).isFalse();
+        return role;
     }
 
     @ParameterizedTest(name = "authorized {index}: {0}")

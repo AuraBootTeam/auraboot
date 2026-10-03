@@ -4,7 +4,6 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.semantic.compiler.SemanticQueryRequest;
 import com.auraboot.framework.semantic.compiler.UserContext;
 import com.auraboot.framework.semantic.parser.SemanticYamlParser;
-import jakarta.annotation.PostConstruct;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -39,9 +38,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DisplayName("Semantic question resolver golden IT — offline catalog-anchored resolution")
 class SemanticQuestionResolverIT {
 
-    private static final long TENANT_ID = 991_970_001L;
-    private static final long USER_ID = 991_970_002L;
-    private static final String META_MODEL_PID = "resolver-golden-meta-model";
+    private long tenantId;
+    private long userId;
+    private SemanticAcceptanceIdentity identity;
+    @Autowired private com.auraboot.framework.user.service.UserService fixtureUsers;
+    @Autowired private com.auraboot.framework.tenant.service.TenantService fixtureTenants;
+    @Autowired private com.auraboot.framework.tenant.service.TenantMemberService fixtureMembers;
+    @Autowired private com.auraboot.framework.meta.service.MetaModelService fixtureSources;
     private static final String MODEL_YAML = """
             version: "0.1"
 
@@ -98,31 +101,35 @@ class SemanticQuestionResolverIT {
 
     private String modelPid;
 
-    @PostConstruct
+    private void ensureIdentity() {
+        if (identity == null) {
+            identity = SemanticAcceptanceIdentity.create(fixtureUsers, fixtureTenants, fixtureMembers, "resolver");
+            tenantId = identity.tenantId(); userId = identity.userId();
+        }
+    }
+
     void bindTenantContext() {
-        MetaContext.setContext(TENANT_ID, USER_ID, "resolver-golden-pid", "resolver-golden-user");
+        ensureIdentity();
+        identity.bind();
     }
 
     @BeforeEach
     void publishModelOnce() {
-        MetaContext.setContext(TENANT_ID, USER_ID, "resolver-golden-pid", "resolver-golden-user");
+        ensureIdentity();
+        identity.bind();
         if (modelPid != null) return;
-        jdbc.update("INSERT INTO ab_meta_model (id, pid, tenant_id, code, table_name, "
-                + "source_type, is_current, status, version, created_at, updated_at, deleted_flag) "
-                + "VALUES (991970010, ?, ?, 'ab_object_alias', 'ab_object_alias', "
-                + "'physical', TRUE, 'published', 1, NOW(), NOW(), FALSE)",
-                META_MODEL_PID, TENANT_ID);
+        identity.registerSource(fixtureSources);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_object_alias WHERE tenant_id = ?",
-                Long.class, TENANT_ID)).as("fresh resolver fixture namespace").isZero();
+                Long.class, tenantId)).as("fresh resolver fixture namespace").isZero();
         for (int n = 1; n <= 2; n++) {
             jdbc.update("INSERT INTO ab_object_alias (pid, tenant_id, model_code, alias, language, acp_priority, "
                             + "created_at, updated_at, created_by, updated_by, deleted_flag) "
                             + "VALUES (?, ?, 'resolver_golden', ?, 'en-US', 0, NOW(), NOW(), ?, ?, FALSE)",
-                    com.auraboot.framework.common.util.UniqueIdGenerator.generate(), TENANT_ID,
-                    "Resolver fixture " + n, USER_ID, USER_ID);
+                    com.auraboot.framework.common.util.UniqueIdGenerator.generate(), tenantId,
+                    "Resolver fixture " + n, userId, userId);
         }
         modelPid = publishService.publishFromYaml(
-                MODEL_YAML.getBytes(StandardCharsets.UTF_8), "test-fixtures", TENANT_ID, USER_ID);
+                MODEL_YAML.getBytes(StandardCharsets.UTF_8), "test-fixtures", tenantId, userId);
     }
 
     @AfterAll
@@ -141,7 +148,7 @@ class SemanticQuestionResolverIT {
     @Test
     @DisplayName("offline resolver maps the question set to the governed metric; unmatched resolves empty")
     void goldenResolverAccuracy() {
-        UserContext user = new UserContext(USER_ID, TENANT_ID, Map.of());
+        UserContext user = new UserContext(userId, tenantId, Map.of());
         for (Eval eval : QUESTION_SET) {
             Optional<SemanticQueryRequest> resolved = questionResolver.resolve(eval.question(), user);
             assertThat(resolved).as("question must resolve: " + eval.question()).isPresent();

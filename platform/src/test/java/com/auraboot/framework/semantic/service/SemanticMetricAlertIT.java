@@ -10,7 +10,6 @@ import com.auraboot.framework.semantic.exception.SemanticValidationException;
 import com.auraboot.framework.semantic.mapper.AbSemanticMetricAlertMapper;
 import com.auraboot.framework.semantic.mapper.AbSemanticMetricMapper;
 import com.auraboot.framework.semantic.parser.SemanticYamlParser;
-import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,8 +53,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 @DisplayName("Semantic metric alert golden IT — threshold/silence/boundary on the governed pipeline")
 class SemanticMetricAlertIT {
 
-    private static final long TENANT_ID = 992_180_001L;
-    private static final long USER_ID = 992_180_002L;
+    private long tenantId;
+    private long userId;
+    private SemanticAcceptanceIdentity identity;
+    @Autowired private com.auraboot.framework.user.service.UserService fixtureUsers;
+    @Autowired private com.auraboot.framework.tenant.service.TenantService fixtureTenants;
+    @Autowired private com.auraboot.framework.tenant.service.TenantMemberService fixtureMembers;
+    @Autowired private com.auraboot.framework.meta.service.MetaModelService fixtureSources;
     private static final String MODEL_YAML = """
             version: "0.1"
 
@@ -113,12 +117,19 @@ class SemanticMetricAlertIT {
 
     private String modelPid;
     private String metricPid;
-    private static final String META_MODEL_PID = "alert-golden-meta-model";
+
+    private void ensureIdentity() {
+        if (identity == null) {
+            identity = SemanticAcceptanceIdentity.create(fixtureUsers, fixtureTenants, fixtureMembers, "alert");
+            tenantId = identity.tenantId(); userId = identity.userId();
+        }
+    }
 
     @BeforeEach
     void bindTenantContext() {
-        MetaContext.setContext(TENANT_ID, USER_ID, "alert-golden-pid", "alert-golden-user");
-        MetaContext.setMemberId(992_180_003L);
+        ensureIdentity();
+        identity.bind();
+        MetaContext.setMemberId(identity.memberId());
         MetaContext.setEnvironmentId(992_180_004L);
         MetaContext.setOtelTraceId("alert-fixture-trace");
     }
@@ -138,28 +149,25 @@ class SemanticMetricAlertIT {
 
     @BeforeEach
     void publishModelOnce() {
-        MetaContext.setContext(TENANT_ID, USER_ID, "alert-golden-pid", "alert-golden-user");
+        ensureIdentity();
+        identity.bind();
         if (modelPid != null) return;
         // The semantic layer resolves model_ref through the meta-model catalog
         // (governance: YAML cannot target arbitrary physical tables). Register
         // the migration-owned ab_object_alias table as this tenant's meta model first.
-        jdbc.update("INSERT INTO ab_meta_model (id, pid, tenant_id, code, table_name, "
-                        + "source_type, is_current, status, version, created_at, updated_at, deleted_flag) "
-                        + "VALUES (992180010, ?, ?, 'ab_object_alias', 'ab_object_alias', "
-                        + "'physical', TRUE, 'published', 1, NOW(), NOW(), FALSE)",
-                META_MODEL_PID, TENANT_ID);
+        identity.registerSource(fixtureSources);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_object_alias WHERE tenant_id = ?",
-                Long.class, TENANT_ID)).as("fresh alert fixture namespace").isZero();
+                Long.class, tenantId)).as("fresh alert fixture namespace").isZero();
         for (int n = 1; n <= 3; n++) {
             jdbc.update("INSERT INTO ab_object_alias (pid, tenant_id, model_code, alias, language, acp_priority, "
                             + "created_at, updated_at, created_by, updated_by, deleted_flag) "
                             + "VALUES (?, ?, 'alert_golden', ?, 'en-US', 0, NOW(), NOW(), ?, ?, FALSE)",
-                    com.auraboot.framework.common.util.UniqueIdGenerator.generate(), TENANT_ID,
-                    "Alert fixture " + n, USER_ID, USER_ID);
+                    com.auraboot.framework.common.util.UniqueIdGenerator.generate(), tenantId,
+                    "Alert fixture " + n, userId, userId);
         }
         modelPid = publishService.publishFromYaml(
-                MODEL_YAML.getBytes(StandardCharsets.UTF_8), "test-fixtures", TENANT_ID, USER_ID);
-        AbSemanticMetric metric = metricMapper.listActiveByModel(TENANT_ID, modelPid).get(0);
+                MODEL_YAML.getBytes(StandardCharsets.UTF_8), "test-fixtures", tenantId, userId);
+        AbSemanticMetric metric = metricMapper.listActiveByModel(tenantId, modelPid).get(0);
         metricPid = metric.getPid();
     }
 
@@ -237,15 +245,15 @@ class SemanticMetricAlertIT {
         paused.setAlertStatus("paused");
         String pid = alertService.create(paused).getPid();
         assertThat(alertService.list()).extracting(SemanticMetricAlertDTO::getPid).contains(pid);
-        assertThat(alertMapper.findByPid(TENANT_ID, pid).getAlertStatus()).isEqualTo("paused");
-        assertThat(alertMapper.findByPid(TENANT_ID, pid).getLastEvaluatedAt()).isNull();
+        assertThat(alertMapper.findByPid(tenantId, pid).getAlertStatus()).isEqualTo("paused");
+        assertThat(alertMapper.findByPid(tenantId, pid).getLastEvaluatedAt()).isNull();
 
         Map<String, Object> beforeInvalid = jdbc.queryForMap(
-                "SELECT * FROM ab_semantic_metric_alert WHERE tenant_id = ? AND pid = ?", TENANT_ID, pid);
+                "SELECT * FROM ab_semantic_metric_alert WHERE tenant_id = ? AND pid = ?", tenantId, pid);
         assertThrows(SemanticValidationException.class,
                 () -> alertService.update(pid, request("invalid", "between", "3", 120)));
         assertThat(jdbc.queryForMap("SELECT * FROM ab_semantic_metric_alert WHERE tenant_id = ? AND pid = ?",
-                TENANT_ID, pid)).isEqualTo(beforeInvalid);
+                tenantId, pid)).isEqualTo(beforeInvalid);
 
         try {
             MetaContext.setContext(992_180_099L, 992_180_098L, "other-tenant", "other-user");
@@ -258,12 +266,12 @@ class SemanticMetricAlertIT {
             MetaContext.restore(caller);
         }
         assertThat(jdbc.queryForMap("SELECT * FROM ab_semantic_metric_alert WHERE tenant_id = ? AND pid = ?",
-                TENANT_ID, pid)).isEqualTo(beforeInvalid);
+                tenantId, pid)).isEqualTo(beforeInvalid);
 
         // Calling the real scheduler entry proves paused rows are excluded, and
         // then that the same owned row is evaluated after authoring resumes it.
         alertService.evaluateAll();
-        assertThat(alertMapper.findByPid(TENANT_ID, pid).getLastEvaluatedAt()).isNull();
+        assertThat(alertMapper.findByPid(tenantId, pid).getLastEvaluatedAt()).isNull();
         assertThat(notificationCount(pid)).isZero();
         assertThat(MetaContext.snapshot()).isEqualTo(caller);
 
@@ -274,12 +282,12 @@ class SemanticMetricAlertIT {
         assertThat(resumed.getThreshold()).isEqualByComparingTo("3");
         assertThat(resumed.getAlertStatus()).isEqualTo("active");
         alertService.evaluateAll();
-        assertThat(alertMapper.findByPid(TENANT_ID, pid).getLastEvaluatedAt()).isNotNull();
-        assertThat(alertMapper.findByPid(TENANT_ID, pid).getLastTriggeredAt()).isNotNull();
+        assertThat(alertMapper.findByPid(tenantId, pid).getLastEvaluatedAt()).isNotNull();
+        assertThat(alertMapper.findByPid(tenantId, pid).getLastTriggeredAt()).isNotNull();
         assertThat(notificationCount(pid)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT content FROM ab_notification WHERE tenant_id = ? "
                         + "AND user_id = ? AND source_type = 'semantic_metric_alert' AND source_id = ?",
-                String.class, TENANT_ID, USER_ID, pid)).contains("当前值 3", "阈值 3");
+                String.class, tenantId, userId, pid)).contains("当前值 3", "阈值 3");
         assertThat(MetaContext.snapshot()).isEqualTo(caller);
 
         SemanticMetricAlertRequest calm = request("lifecycle-no-breach", "gt", "999999", 120);
@@ -290,14 +298,14 @@ class SemanticMetricAlertIT {
 
         calm.setAlertStatus("paused");
         alertService.update(pid, calm);
-        var pausedAt = alertMapper.findByPid(TENANT_ID, pid).getLastEvaluatedAt();
+        var pausedAt = alertMapper.findByPid(tenantId, pid).getLastEvaluatedAt();
         alertService.evaluateAll();
-        assertThat(alertMapper.findByPid(TENANT_ID, pid).getLastEvaluatedAt()).isEqualTo(pausedAt);
+        assertThat(alertMapper.findByPid(tenantId, pid).getLastEvaluatedAt()).isEqualTo(pausedAt);
         assertThat(notificationCount(pid)).isEqualTo(1);
         alertService.delete(pid);
         assertThat(alertService.list()).extracting(SemanticMetricAlertDTO::getPid).doesNotContain(pid);
         assertThat(jdbc.queryForObject("SELECT deleted_flag FROM ab_semantic_metric_alert WHERE tenant_id = ? AND pid = ?",
-                Boolean.class, TENANT_ID, pid)).isTrue();
+                Boolean.class, tenantId, pid)).isTrue();
         assertThrows(SemanticValidationException.class, () -> alertService.evaluateNow(pid));
         assertThat(notificationCount(pid)).isEqualTo(1);
         assertThat(MetaContext.snapshot()).isEqualTo(caller);

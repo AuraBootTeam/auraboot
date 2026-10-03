@@ -45,6 +45,7 @@ class SemanticFieldProtectionTest {
     private JdbcTemplate jdbc;
     private TenantMemberService members;
     private SemanticQueryService service;
+    private SemanticQueryProtectionAudit audit;
 
     @BeforeEach void setup() {
         previous = MetaContext.snapshot();
@@ -55,9 +56,10 @@ class SemanticFieldProtectionTest {
         masks = mock(FieldMaskService.class);
         models = mock(MetaModelService.class);
         jdbc = mock(JdbcTemplate.class);
+        audit = mock(SemanticQueryProtectionAudit.class);
         members = mock(TenantMemberService.class);
         var member = new TenantMember(); member.setId(142L); member.setTenantId(1L);
-        member.setUserId(42L); member.setStatus("ACTIVE");
+        member.setUserId(42L); member.setStatus("active");
         when(members.findByTenantIdAndUserId(1L, 42L)).thenReturn(member);
         when(models.getTableName("source_record")).thenReturn("mt_source_record");
         when(policies.getFieldMaskRules(1L, "source_record", 42L)).thenReturn(List.of());
@@ -68,7 +70,7 @@ class SemanticFieldProtectionTest {
         service = new SemanticQueryService(new SemanticYamlParser(), new SemanticYamlValidator(),
                 new MetricCompiler(new AccessPolicyCompiler()), modelMapper,
                 mock(AbSemanticMetricMapper.class), mock(AbSemanticQueryLogMapper.class), models,
-                mock(UserPermissionService.class), new SemanticFieldProtection(policies, masks, models, members));
+                mock(UserPermissionService.class), new SemanticFieldProtection(policies, masks, models, members), audit);
         ReflectionTestUtils.setField(service, "jdbcTemplate", jdbc);
     }
     @AfterEach void restore() { MetaContext.clear(); MetaContext.restore(previous); }
@@ -131,10 +133,56 @@ class SemanticFieldProtectionTest {
                 .hasMessage("Protected field has no physical column mapping");
         verifyNoInteractions(jdbc);
     }
+    @Test void deniedPlanRetainsLogicalSourceAndAllReferencedColumns() {
+        protect("amount");
+        assertThatThrownBy(() -> call("sql")).isInstanceOf(AccessDeniedException.class);
+        var capture = org.mockito.ArgumentCaptor.forClass(SemanticFieldProtection.Plan.class);
+        verify(audit).record(anyString(), eq("EXPLAIN"), eq("g"), anyString(), capture.capture(), eq(user));
+        var plan = capture.getValue();
+        assertThat(plan.sourceModelCode()).isEqualTo("source_record");
+        assertThat(plan.verdict()).isEqualTo(SemanticFieldProtection.Verdict.DENY);
+        assertThat(plan.reason()).isEqualTo(SemanticFieldProtection.Reason.PROTECTED_SOURCE_COLUMN);
+        assertThat(plan.referencedColumns()).contains("amount", "discount", "secret_score", "secret_cost", "status");
+        assertThat(plan.protections()).containsExactly(new SemanticFieldProtection.Protection(
+                "sensitive", "amount", "column-policy", "HIDE"));
+        verifyNoInteractions(jdbc);
+    }
+    @Test void missingMetadataColumnIsRecordedAsDeniedInsteadOfDroppingTheRule() {
+        protect("amount");
+        when(models.getColumnName("source_record", "sensitive"))
+                .thenThrow(new com.auraboot.framework.meta.exception.MetaServiceException("field absent"));
+        assertThatThrownBy(() -> call("sql")).isInstanceOf(AccessDeniedException.class)
+                .hasMessage("Protected field has no physical column mapping");
+        var capture = org.mockito.ArgumentCaptor.forClass(SemanticFieldProtection.Plan.class);
+        verify(audit).record(anyString(), eq("EXPLAIN"), eq("g"), anyString(), capture.capture(), eq(user));
+        assertThat(capture.getValue().reason()).isEqualTo(SemanticFieldProtection.Reason.UNRESOLVED_PROTECTED_FIELD);
+        assertThat(capture.getValue().verdict()).isEqualTo(SemanticFieldProtection.Verdict.DENY);
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test void allowedPlanSharesResponseQueryIdAndSqlFingerprint() {
+        protect("private_notes");
+        var response = service.explainQuery(request(), user);
+        var capture = org.mockito.ArgumentCaptor.forClass(SemanticFieldProtection.Plan.class);
+        verify(audit).record(eq(response.getQueryId()), eq("EXPLAIN"), eq("g"),
+                eq(response.getSqlFingerprint()), capture.capture(), eq(user));
+        assertThat(capture.getValue().verdict()).isEqualTo(SemanticFieldProtection.Verdict.ALLOW);
+        assertThat(capture.getValue().reason()).isEqualTo(SemanticFieldProtection.Reason.NONE);
+        assertThat(response.getQueryId()).isNotBlank();
+    }
+    @ParameterizedTest @ValueSource(strings = {"query", "sql", "dry-run"})
+    void auditFailureStopsEveryEntryBeforeReturningSqlOrRows(String entry) {
+        doThrow(new IllegalStateException("audit unavailable")).when(audit)
+                .record(anyString(), anyString(), anyString(), anyString(), any(), any());
+        assertThatThrownBy(() -> call(entry)).isInstanceOf(IllegalStateException.class)
+                .hasMessage("audit unavailable");
+        verifyNoInteractions(jdbc);
+    }
+
     @ParameterizedTest @ValueSource(strings = {"missing", "inactive", "deleted", "wrong-member"})
     void membershipCannotBypassColumnPolicy(String state) {
         var member = new TenantMember(); member.setId(142L); member.setTenantId(1L);
-        member.setUserId(42L); member.setStatus(state.equals("inactive") ? "INACTIVE" : "ACTIVE");
+        member.setUserId(42L); member.setStatus(state.equals("inactive") ? "inactive" : "active");
         member.setDeletedFlag(state.equals("deleted"));
         when(members.findByTenantIdAndUserId(1L, 42L)).thenReturn(state.equals("missing") ? null : member);
         if (state.equals("wrong-member")) MetaContext.setMemberId(999L);

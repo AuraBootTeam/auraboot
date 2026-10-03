@@ -7,7 +7,6 @@ import com.auraboot.framework.semantic.entity.AbSemanticMetric;
 import com.auraboot.framework.semantic.entity.AbSemanticPreagg;
 import com.auraboot.framework.semantic.mapper.AbSemanticMetricMapper;
 import com.auraboot.framework.semantic.parser.SemanticYamlParser;
-import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,9 +39,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DisplayName("Semantic preagg golden IT — MV lifecycle, staleness, consistency")
 class SemanticPreaggIT {
 
-    private static final long TENANT_ID = 991_950_001L;
-    private static final long USER_ID = 991_950_002L;
-    private static final String META_MODEL_PID = "preagg-golden-meta-model";
+    private long tenantId;
+    private long userId;
+    private SemanticAcceptanceIdentity identity;
+    @Autowired private com.auraboot.framework.user.service.UserService fixtureUsers;
+    @Autowired private com.auraboot.framework.tenant.service.TenantService fixtureTenants;
+    @Autowired private com.auraboot.framework.tenant.service.TenantMemberService fixtureMembers;
+    @Autowired private com.auraboot.framework.meta.service.MetaModelService fixtureSources;
     private static final String MODEL_YAML = """
             version: "0.1"
 
@@ -102,23 +105,27 @@ class SemanticPreaggIT {
     private String modelPid;
     private String metricPid;
 
-    @PostConstruct
+    private void ensureIdentity() {
+        if (identity == null) {
+            identity = SemanticAcceptanceIdentity.create(fixtureUsers, fixtureTenants, fixtureMembers, "preagg");
+            tenantId = identity.tenantId(); userId = identity.userId();
+        }
+    }
+
     void bindTenantContext() {
-        MetaContext.setContext(TENANT_ID, USER_ID, "preagg-golden-pid", "preagg-golden-user");
+        ensureIdentity();
+        identity.bind();
     }
 
     @BeforeEach
     void publishModelOnce() {
-        MetaContext.setContext(TENANT_ID, USER_ID, "preagg-golden-pid", "preagg-golden-user");
+        ensureIdentity();
+        identity.bind();
         if (modelPid != null) return;
-        jdbc.update("INSERT INTO ab_meta_model (id, pid, tenant_id, code, table_name, "
-                        + "source_type, is_current, status, version, created_at, updated_at, deleted_flag) "
-                        + "VALUES (991950010, ?, ?, 'ab_object_alias', 'ab_object_alias', "
-                        + "'physical', TRUE, 'published', 1, NOW(), NOW(), FALSE)",
-                META_MODEL_PID, TENANT_ID);
+        identity.registerSource(fixtureSources);
         modelPid = publishService.publishFromYaml(
-                MODEL_YAML.getBytes(StandardCharsets.UTF_8), "test-fixtures", TENANT_ID, USER_ID);
-        AbSemanticMetric metric = metricMapper.listActiveByModel(TENANT_ID, modelPid).get(0);
+                MODEL_YAML.getBytes(StandardCharsets.UTF_8), "test-fixtures", tenantId, userId);
+        AbSemanticMetric metric = metricMapper.listActiveByModel(tenantId, modelPid).get(0);
         metricPid = metric.getPid();
     }
 
@@ -129,8 +136,9 @@ class SemanticPreaggIT {
     }
 
     private long liveValue() {
-        MetaContext.setContext(TENANT_ID, USER_ID, "preagg-golden-pid", "preagg-golden-user");
-        UserContext user = new UserContext(USER_ID, TENANT_ID, java.util.Map.of());
+        ensureIdentity();
+        identity.bind();
+        UserContext user = new UserContext(userId, tenantId, java.util.Map.of());
         SemanticQueryRequest req = new SemanticQueryRequest();
         req.setMetrics(List.of("preagg_golden_alias.alias_count_metric"));
         var resp = queryService.executeQuery(req, user);
@@ -151,17 +159,17 @@ class SemanticPreaggIT {
 
     private long aliasCount() {
         return jdbc.queryForObject("SELECT count(*) FROM ab_object_alias WHERE tenant_id = ? "
-                + "AND deleted_flag = FALSE", Long.class, TENANT_ID);
+                + "AND deleted_flag = FALSE", Long.class, tenantId);
     }
 
     private long insertAliasRow(String alias) {
         jdbc.update("INSERT INTO ab_object_alias (pid, tenant_id, model_code, alias, language, "
                         + "acp_priority, created_at, updated_at, created_by, updated_by, deleted_flag) "
                         + "VALUES (?, ?, 'preagg_golden', ?, 'zh-CN', 0, NOW(), NOW(), ?, ?, FALSE)",
-                "pg-" + alias, TENANT_ID, alias, USER_ID, USER_ID);
+                "pg-" + alias, tenantId, alias, userId, userId);
         long count = jdbc.queryForObject(
                 "SELECT count(*) FROM ab_object_alias WHERE tenant_id = ? AND deleted_flag = FALSE",
-                Long.class, TENANT_ID);
+                Long.class, tenantId);
         return count;
     }
 
@@ -177,16 +185,16 @@ class SemanticPreaggIT {
                         + "acp_priority, created_at, updated_at, created_by, updated_by, deleted_flag) "
                         + "SELECT ? || n::text, ?, 'preagg_golden', ? || n::text, ?, "
                         + "0, NOW(), NOW(), ?, ?, FALSE FROM generate_series(1, 100000) n",
-                prefix, TENANT_ID, prefix, language, USER_ID, USER_ID);
+                prefix, tenantId, prefix, language, userId, userId);
         assertThat(inserted).isEqualTo(100_000);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_object_alias WHERE tenant_id = ? "
-                + "AND language = ? AND deleted_flag = FALSE", Long.class, TENANT_ID, language))
+                + "AND language = ? AND deleted_flag = FALSE", Long.class, tenantId, language))
                 .isEqualTo(100_000L);
 
         SemanticQueryRequest request = new SemanticQueryRequest();
         request.setMetrics(List.of("preagg_golden_alias.alias_count_metric"));
         request.setFilters(List.of(new SemanticQueryRequest.Filter("alias_language", "eq", language)));
-        UserContext user = new UserContext(USER_ID, TENANT_ID, java.util.Map.of());
+        UserContext user = new UserContext(userId, tenantId, java.util.Map.of());
         int warmups = 5;
         int samples = 40;
         long[] durations = new long[samples];
@@ -219,7 +227,7 @@ class SemanticPreaggIT {
             // exact-source CI receipt and owning Allure result provide run identity.
             var evidence = new java.util.LinkedHashMap<String, Object>();
             evidence.put("schemaVersion", 1);
-            evidence.put("tenantId", TENANT_ID);
+            evidence.put("tenantId", tenantId);
             evidence.put("modelPid", modelPid);
             evidence.put("fixtureLanguage", language);
             evidence.put("expectedRows", 100_000);
@@ -244,7 +252,7 @@ class SemanticPreaggIT {
         Arrays.sort(sorted);
         long p95Nanos = sorted[(int) Math.ceil(samples * 0.95) - 1];
         log.info("BI_R3_PERF tenant={} rows={} warmups={} samples={} coldMs={} p95Ms={} samplesNs={}",
-                TENANT_ID, inserted, warmups, samples, coldNanos / 1_000_000.0,
+                tenantId, inserted, warmups, samples, coldNanos / 1_000_000.0,
                 p95Nanos / 1_000_000.0, Arrays.toString(durations));
         assertThat(p95Nanos).as("100k governed aggregation P95, nearest-rank over 40 samples")
                 .isLessThan(1_000_000_000L);
@@ -335,7 +343,7 @@ class SemanticPreaggIT {
         assertThat(mvLeft).isZero();
         assertThat(jdbc.queryForObject(
                 "SELECT deleted_flag FROM ab_semantic_preagg WHERE tenant_id = ? AND pid = ?",
-                Boolean.class, TENANT_ID, preagg.getPid())).isTrue();
+                Boolean.class, tenantId, preagg.getPid())).isTrue();
         assertThat(preaggService.list()).extracting(AbSemanticPreagg::getPid).doesNotContain(preagg.getPid());
         assertThatThrownBy(() -> preaggService.refreshNow(preagg.getPid()))
                 .isInstanceOf(com.auraboot.framework.semantic.exception.SemanticValidationException.class);
@@ -343,7 +351,8 @@ class SemanticPreaggIT {
     @Test
     @DisplayName("The scheduled sweep refreshes due data and leaves a not-due MV stale")
     void scheduledRefreshHonorsIntervalAndRestoresCaller() {
-        MetaContext.setContext(TENANT_ID, USER_ID, "preagg-golden-pid", "preagg-golden-user");
+        ensureIdentity();
+        identity.bind();
         long baseline = aliasCount();
         AbSemanticPreagg preagg = preaggService.create(
                 "preagg-scheduled", modelPid, "alias_count_metric", List.of(), 60);
@@ -351,12 +360,12 @@ class SemanticPreaggIT {
         assertThat(mvMetricValue(preagg.getMvName(), column)).isEqualTo(baseline);
         // Arrange only this test's persisted timer; no fixed sleep or shared-row repair.
         assertThat(jdbc.update("UPDATE ab_semantic_preagg SET last_refreshed_at = NOW() - INTERVAL '61 minutes' "
-                + "WHERE tenant_id = ? AND pid = ?", TENANT_ID, preagg.getPid())).isEqualTo(1);
+                + "WHERE tenant_id = ? AND pid = ?", tenantId, preagg.getPid())).isEqualTo(1);
         var dueTimestamp = jdbc.queryForObject("SELECT last_refreshed_at FROM ab_semantic_preagg WHERE pid = ?",
                 java.time.OffsetDateTime.class, preagg.getPid());
         assertThat(insertAliasRow("golden-scheduled-change")).isEqualTo(baseline + 1);
 
-        MetaContext.setMemberId(991_950_003L);
+        MetaContext.setMemberId(identity.memberId());
         MetaContext.setEnvironmentId(991_950_004L);
         MetaContext.setOtelTraceId("preagg-scheduled-trace");
         MetaContext.Snapshot caller = MetaContext.snapshot();

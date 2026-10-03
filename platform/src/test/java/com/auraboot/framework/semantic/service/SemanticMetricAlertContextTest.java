@@ -43,7 +43,7 @@ class SemanticMetricAlertContextTest {
         var attributes = mock(UserAttributeService.class);
         members = mock(TenantMemberService.class);
         var member = new TenantMember(); member.setId(12L); member.setTenantId(1L);
-        member.setUserId(2L); member.setStatus("ACTIVE");
+        member.setUserId(2L); member.setStatus("active");
         when(members.findByTenantIdAndUserId(1L, 2L)).thenReturn(member);
         service = new SemanticMetricAlertService(alerts, metrics, models, queries,
                 mock(NotificationService.class), attributes, members);
