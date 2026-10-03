@@ -24,6 +24,7 @@
 | script | refs | updated | purpose |
 |---|--:|---|---|
 | `check-agent-eval-boundary.mjs` | 2 | 2026-06-21 | OSS agent/RAG boundary gate. |
+| `check-batch4-gates.mjs` | 0 | 2026-10-03 | Check the large-file and i18n CJK structural ratchets. |
 | `check-cache-eviction.mjs` | 3 | 2026-07-14 | check-cache-eviction — every @Cacheable cache must have *someone* who evicts it. |
 | `check-capability-codes.mjs` | 0 | 2026-06-21 | Permission v2 capability-code drift gate. |
 | `check-command-permissions.mjs` | 0 | 2026-07-23 | A command whose handler stage does real work must declare the permission that authorizes it. |
@@ -54,6 +55,7 @@
 | `check-no-secret-echo.sh` | 0 | 2026-07-14 | Wrapper so this gate shows up in `ls scripts/check-*.sh` — the repo's local-gate inventory. |
 | `check-oss-boundary.sh` | 3 | 2026-06-18 | OSS / Enterprise boundary check. |
 | `check-oss-no-internal-docs.sh` | 1 | 2026-07-02 | Fail if internal-process docs are tracked in the public OSS repo. |
+| `check-oss-scope-consistency.mjs` | 0 | 2026-10-03 | Verify OSS scope modules, plugin directories, and registry disjointness. |
 | `check-public-record-id-contracts.sh` | 1 | 2026-06-24 |  |
 | `check-public-record-openapi-contract.mjs` | 1 | 2026-06-24 | Validate public-record pid-only naming in a live or captured OpenAPI document. |
 | `check-reset-init-contracts.sh` | 1 | 2026-05-28 |  |
