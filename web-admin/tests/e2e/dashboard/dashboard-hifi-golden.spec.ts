@@ -13,6 +13,41 @@ let dp: DashboardDesignerPage;
 const dashRun = `hifid_${randomUUID().replaceAll('-', '').slice(0, 12)}`;
 const dashTitle = `hifi_dash_${dashRun}`;
 let dashboardPid = '';
+const semanticA = `dash_sem_a_${dashRun}`;
+const semanticB = `dash_sem_b_${dashRun}`;
+const semanticGrains = ['day', 'week', 'month', 'quarter', 'year'] as const;
+const semanticDates = ['2026-01-15', '2026-02-15'];
+
+function semanticFixture(code: string, alternate: boolean) {
+  return `version: "0.1"
+semantic_model: {code: ${code}, model_ref: e2et_order, primary_entity: order}
+entities: [{name: order, type: primary, field_ref: pid}]
+dimensions:
+  - {code: ${alternate ? 'other_status' : 'order_status'}, type: categorical, field_ref: e2et_order_status}
+  - {code: ${alternate ? 'other_day' : 'order_day'}, type: time, field_ref: e2et_order_date, time_grains: [day, week, month, quarter, year], primary_time: true}
+  - {code: e2et_order_title, type: categorical, field_ref: e2et_order_title}
+measures: [{code: n, agg: COUNT, field_ref: pid}]
+metrics:
+  - {code: ${alternate ? 'other_count' : 'order_count'}, type: simple, type_params: {measure: n}}
+${alternate ? '' : "  - {code: draft_count, type: simple, type_params: {measure: n}, filter: \"e2et_order_status = 'draft'\"}"}
+access_policies:
+  - {access_grant: fixture_scope, user_attribute: fixture_scope, sql_filter: "e2et_order_title LIKE 'HiFi看板-${dashRun}-%'"}
+`;
+}
+
+test.beforeAll(async ({ request }) => {
+  // Setup only: authoring/publishing is covered by SC-00, not this API setup.
+  for (const [code, alternate] of [[semanticA, false], [semanticB, true]] as const) {
+    const response = await request.post('/api/semantic/publish', {
+      data: { yaml: semanticFixture(code, alternate), pluginCode: 'test-fixtures' },
+    });
+    expect(response.ok(), await response.text()).toBeTruthy();
+    const body = await response.json();
+    expect(String(body.code), JSON.stringify(body)).toBe('0');
+    expect(body.data.ok).toBe(true);
+    expect(body.data.pid).toBeTruthy();
+  }
+});
 
 test.describe('Dashboard designer high-fidelity', () => {
   test.beforeEach(async ({ page }) => {
@@ -35,6 +70,7 @@ test.describe('Dashboard designer high-fidelity', () => {
           e2et_order_type: ['normal', 'urgent', 'bulk'][i % 3],
           e2et_order_urgent: i % 4 === 0,
           e2et_order_status: ['draft', 'confirmed', 'shipped', 'completed'][i % 4],
+          e2et_order_date: semanticDates[i < 6 ? 0 : 1],
         },
       });
       expect(created.status(), await created.text()).toBe(200);
@@ -72,6 +108,7 @@ test.describe('Dashboard designer high-fidelity', () => {
     for (let i = 0; i < 2; i++) {
       assertBinding(body.data.widgets[i].config.dataSource, i);
     }
+    await exerciseSemanticDataSource(page, request);
   });
 
   test('DHIFI-02 presentation mode shows the data-bound dashboard', async ({ page }) => {
@@ -120,6 +157,183 @@ test.describe('Dashboard designer high-fidelity', () => {
     await dialog.getByRole('button', { name: /^(取消|Cancel)$/ }).click();
   });
 });
+
+// Reuse DHIFI-01 and its twelve owned rows; no new profile or API-driven core action.
+async function exerciseSemanticDataSource(page: import('@playwright/test').Page,
+  request: import('@playwright/test').APIRequestContext) {
+  await dp.widgets.nth(1).click();
+  const modelSelect = page.getByTestId('semantic-model-select');
+  const metricPicker = page.getByTestId('semantic-metric-picker');
+  const dimensionPicker = page.getByTestId('semantic-dimension-picker');
+  const metric = (code: string) => metricPicker.locator('label').filter({ hasText: `(${code})` }).getByRole('checkbox');
+  const dimension = (code: string) => dimensionPicker.locator('label').filter({ hasText: `(${code})` }).getByRole('checkbox');
+  let code = semanticA;
+  let metrics: string[] = [];
+  let dimensions: string[] = [];
+  const source = () => ({ type: 'aggregate', semanticModelCode: code,
+    metrics: metrics.map(field => ({ field, aggregation: 'none' })), dimensions,
+    filters: [{ field: 'e2et_order_title', operator: 'like', value: `HiFi看板-${dashRun}-` }] });
+  const expectedRows = () => {
+    const buckets = { day: semanticDates, week: ['2026-01-12', '2026-02-09'],
+      month: ['2026-01-01', '2026-02-01'], quarter: ['2026-01-01', '2026-01-01'],
+      year: ['2026-01-01', '2026-01-01'] };
+    const rows = new Map<string, Record<string, unknown>>();
+    for (let i = 0; i < 12; i++) {
+      const status = ['draft', 'confirmed', 'shipped', 'completed'][i % 4];
+      const dims = Object.fromEntries(dimensions.map(dim => {
+        if (dim.endsWith('_status')) return [dim, status];
+        const grain = dim.split('__')[1] as keyof typeof buckets;
+        return [dim, buckets[grain][i < 6 ? 0 : 1]];
+      }));
+      const key = JSON.stringify(dims);
+      const row = rows.get(key) || { ...dims, ...Object.fromEntries(metrics.map(m => [m, 0])) };
+      for (const m of metrics) row[m] = Number(row[m]) + (m === 'draft_count' ? Number(status === 'draft') : 1);
+      rows.set(key, row);
+    }
+    return [...rows.values()].map(r => JSON.stringify(r)).sort();
+  };
+  const queryResponse = () => page.waitForResponse(r => new URL(r.url()).pathname === '/api/meta/chart-data'
+    && r.request().method() === 'POST' && r.request().postDataJSON()?.semanticModelCode === code
+    && JSON.stringify(r.request().postDataJSON()?.metrics) === JSON.stringify(source().metrics)
+    && JSON.stringify(r.request().postDataJSON()?.dimensions) === JSON.stringify(dimensions));
+  const inspectQuery = async (response: import('@playwright/test').Response) => {
+    const payload = response.request().postDataJSON();
+    expect(payload).toMatchObject(source());
+    expect(payload).not.toHaveProperty('modelCode');
+    const body = await response.json();
+    expect(String(body.code), JSON.stringify(body)).toBe('0');
+    expect(body.data.meta.dimensions).toEqual(dimensions);
+    expect(body.data.meta.metrics).toEqual(metrics);
+    const actual = body.data.rows.map((r: Record<string, unknown>) => {
+      const row = Object.fromEntries(dimensions.map(dim => {
+        if (!dim.includes('__')) return [dim, r[dim]];
+        expect(String(r[dim])).toMatch(/^d{4}-d{2}-d{2}(?:T| )00:00:00(?:.0+)?(?:Z|[+-]00(?::?00)?)?$/);
+        return [dim, String(r[dim]).slice(0, 10)];
+      }));
+      for (const m of metrics) row[m] = Number(r[m]);
+      return JSON.stringify(row);
+    }).sort();
+    expect(actual).toEqual(expectedRows());
+  };
+  const changeAndQuery = async (action: () => Promise<unknown>) => {
+    const response = queryResponse();
+    await action();
+    await inspectQuery(await response);
+  };
+  const saveReload = async (screenshot: string) => {
+    const saved = page.waitForResponse(r => new URL(r.url()).pathname === `/api/dashboards/${dashboardPid}`
+      && r.request().method() === 'PUT');
+    await dp.saveButton.click();
+    const response = await saved;
+    expect(response.request().postDataJSON().widgets[1].config.dataSource).toMatchObject(source());
+    expect(response.request().postDataJSON().widgets[1].config.dataSource).not.toHaveProperty('modelCode');
+    expect(String((await response.json()).code)).toBe('0');
+    await dp.waitUntilSaved();
+    const read = await request.get(`/api/dashboards/${dashboardPid}`);
+    expect(read.ok()).toBeTruthy();
+    const body = await read.json();
+    expect(String(body.code)).toBe('0');
+    expect(body.data.widgets[1].config.dataSource).toMatchObject(source());
+    expect(body.data.widgets[1].config.dataSource).not.toHaveProperty('modelCode');
+    const restored = queryResponse();
+    await page.reload();
+    await inspectQuery(await restored);
+    await dp.widgets.nth(1).click();
+    await expect(modelSelect).toHaveValue(code);
+    for (const m of metrics) await expect(metric(m)).toBeChecked();
+    for (const dim of dimensions) {
+      const [base, grain] = dim.split('__');
+      await expect(dimension(base)).toBeChecked();
+      if (grain) await expect(dimensionPicker.getByRole('combobox', { name: `${base} 粒度` })).toHaveValue(grain);
+    }
+    await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/${screenshot}.png` });
+  };
+  await page.getByTestId('datasource-mode-semantic').click();
+  await expect(modelSelect).toHaveValue('');
+  await expect(modelSelect.locator('option').first()).toHaveText('请选择语义模型');
+  await expect(page.getByTestId('widget-prop-dataSource-modelCode')).toHaveCount(0);
+  await expect(metricPicker).toHaveCount(0);
+  await expect(dimensionPicker).toHaveCount(0);
+  await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/bi-ui-ds-mode-semantic-switch.png` });
+  await modelSelect.selectOption(code);
+  await expect(metric('order_count')).not.toBeChecked();
+  await expect(metric('draft_count')).not.toBeChecked();
+  await expect(dimension('order_status')).not.toBeChecked();
+  metrics = ['order_count'];
+  await changeAndQuery(() => metric('order_count').check());
+  metrics = ['order_count', 'draft_count'];
+  await changeAndQuery(() => metric('draft_count').check());
+  await saveReload('bi-ui-ds-semantic-metric-select');
+  metrics = ['draft_count'];
+  await changeAndQuery(() => metric('order_count').uncheck());
+  await expect(metric('draft_count')).toBeChecked();
+  await saveReload('bi-ui-ds-semantic-metric-remove');
+  metrics = ['draft_count', 'order_count'];
+  await changeAndQuery(() => metric('order_count').check());
+  dimensions = ['order_status'];
+  await changeAndQuery(() => dimension('order_status').check());
+  await saveReload('bi-ui-ds-semantic-dimension-categorical');
+  dimensions = ['order_status', 'order_day__day'];
+  await changeAndQuery(() => dimension('order_day').check());
+  const grainSelect = dimensionPicker.getByRole('combobox', { name: 'order_day 粒度' });
+  await expect(grainSelect.locator('option')).toHaveText([...semanticGrains]);
+  await expect(grainSelect).toHaveValue('day');
+  await saveReload('bi-ui-ds-semantic-dimension-time-default');
+  for (const grain of semanticGrains.slice(1)) {
+    dimensions = ['order_status', `order_day__${grain}`];
+    await changeAndQuery(() => grainSelect.selectOption(grain));
+    await saveReload(`bi-ui-ds-semantic-grain-${grain}`);
+  }
+  dimensions = ['order_status'];
+  await changeAndQuery(() => dimension('order_day').uncheck());
+  await expect(grainSelect).toHaveCount(0);
+  await expect(dimension('order_status')).toBeChecked();
+  await saveReload('bi-ui-ds-semantic-dimension-remove');
+  dimensions = ['order_status', 'order_day__day'];
+  await changeAndQuery(() => dimension('order_day').check());
+  await expect(grainSelect).toHaveValue('day');
+  await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/bi-ui-ds-semantic-grain-unselected.png` });
+  code = semanticB;
+  metrics = []; dimensions = [];
+  await modelSelect.selectOption(code);
+  await expect(metric('other_count')).not.toBeChecked();
+  await expect(metric('order_count')).toHaveCount(0);
+  await expect(metric('draft_count')).toHaveCount(0);
+  await expect(dimension('other_status')).not.toBeChecked();
+  await expect(dimension('order_status')).toHaveCount(0);
+  await expect(dimensionPicker.getByRole('combobox')).toHaveCount(0);
+  metrics = ['other_count'];
+  await changeAndQuery(() => metric('other_count').check());
+  await saveReload('bi-ui-ds-semantic-model-switch');
+  await page.getByTestId('datasource-mode-raw').click();
+  await expect(modelSelect).toHaveCount(0);
+  await expect(metricPicker).toHaveCount(0);
+  await expect(dimensionPicker).toHaveCount(0);
+  await page.getByTestId('widget-prop-dataSource-modelCode').fill('e2et_order');
+  const rawDimensions = dp.propertyPanel.locator('label', { hasText: /^分组维度$/ }).locator('..');
+  const rawResponse = page.waitForResponse(r => new URL(r.url()).pathname === '/api/meta/chart-data'
+    && r.request().method() === 'POST' && !r.request().postDataJSON()?.semanticModelCode
+    && JSON.stringify(r.request().postDataJSON()?.dimensions) === '["e2et_order_status"]');
+  await rawDimensions.locator('label').filter({ hasText: '(e2et_order_status)' }).getByRole('checkbox').check();
+  const response = await rawResponse;
+  assertBinding(response.request().postDataJSON(), 1);
+  expect(response.request().postDataJSON()).not.toHaveProperty('semanticModelCode');
+  expect(response.request().postDataJSON().metrics).toEqual([{ field: 'id', aggregation: 'count' }]);
+  const rawBody = await response.json();
+  expect(String(rawBody.code)).toBe('0');
+  expect(rawBody.data.rows).toHaveLength(4);
+  expect(rawBody.data.rows.map((r: Record<string, unknown>) => r.e2et_order_status).sort())
+    .toEqual(['completed', 'confirmed', 'draft', 'shipped']);
+  for (const row of rawBody.data.rows) expect(Number(row[rawBody.data.meta.metrics[0]])).toBe(3);
+  expect(await saveDashboard(page, 2)).toBe(dashboardPid);
+  const persisted = await request.get(`/api/dashboards/${dashboardPid}`);
+  expect(persisted.ok()).toBeTruthy();
+  const persistedBody = await persisted.json();
+  expect(String(persistedBody.code)).toBe('0');
+  expect(persistedBody.data.widgets[1].config.dataSource).not.toHaveProperty('semanticModelCode');
+  assertBinding(persistedBody.data.widgets[1].config.dataSource, 1);
+  await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/bi-ui-ds-mode-raw-switch.png` });
+}
 
 // A golden action must not retry, force clicks, dispatch events or remove errors.
 async function addWidgetBySingleClick(page: import('@playwright/test').Page, name: string) {
