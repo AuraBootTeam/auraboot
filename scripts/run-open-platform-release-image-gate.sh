@@ -146,7 +146,8 @@ DIGEST="$(docker image inspect "$IMAGE" --format '{{.Id}}')"
 create_isolated_release_network "$NET" "$ARTIFACTS/network-allocation.tsv" \
   || fatal "isolated release network unavailable"
 docker run -d --name "$PG" --network "$NET" -e POSTGRES_USER=auraboot \
-  -e POSTGRES_PASSWORD=open_platform_ci -e POSTGRES_DB=open_platform_ci "$PGVECTOR_IMAGE" >/dev/null
+  -e POSTGRES_PASSWORD=open_platform_ci -e POSTGRES_DB=open_platform_ci "$PGVECTOR_IMAGE" \
+  -c shared_preload_libraries=pg_stat_statements >/dev/null
 docker run -d --name "$REDIS" --network "$NET" "$REDIS_IMAGE" >/dev/null
 for attempt in $(seq 1 30); do
   docker exec "$PG" pg_isready -U auraboot -d open_platform_ci >/dev/null 2>&1 && break
@@ -197,13 +198,32 @@ docker run --rm --user "$RUNNER_UID:$RUNNER_GID" --network "$NET" \
 CLIENT_ID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["clientId"])' "$CREDENTIAL_ARTIFACT")"
 CLIENT_SECRET="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["clientSecret"])' "$CREDENTIAL_ARTIFACT")"
 
+# This job owns a fresh isolated database. Reset telemetry after bootstrap/protocol
+# so the captured SQL counts describe only the production SLO workload.
+docker exec "$PG" psql -U auraboot -d open_platform_ci -v ON_ERROR_STOP=1 -c \
+  "CREATE EXTENSION IF NOT EXISTS pg_stat_statements; SELECT pg_stat_statements_reset();" \
+  > "$ARTIFACTS/logs/sql-profile-init.log" 2>&1 || fatal "SQL profiling initialization failed"
+cat /proc/loadavg > "$ARTIFACTS/host-load-before.txt"
+
 info "running production-threshold k6 profile inside the CI network"
+SLO_RC=0
 docker run --rm --user "$RUNNER_UID:$RUNNER_GID" --network "$NET" \
   -v "$STAGE/tests/load/k6":/scripts:ro \
   -v "$ARTIFACTS":/artifacts -e PROFILE=production -e BASE_URL="http://$APP:6443" \
   -e CLIENT_ID="$CLIENT_ID" -e CLIENT_SECRET="$CLIENT_SECRET" \
   -e SUMMARY_PATH=/artifacts/slo-summary.json "$K6_IMAGE" run /scripts/open-platform-slo.js \
-  > "$ARTIFACTS/logs/k6.log" 2>&1 || fail "Open Platform production SLO thresholds failed"
+  > "$ARTIFACTS/logs/k6.log" 2>&1 || SLO_RC=$?
+# Preserve normalized statements (no bound credential values) on both red and
+# green exits. Diagnostic collection must not hide an already-failed SLO.
+PROFILE_RC=0
+docker exec -i "$PG" psql -U auraboot -d open_platform_ci -v ON_ERROR_STOP=1 -At \
+  < "$SCRIPT_DIR/ci/open-platform-sql-profile.sql" \
+  > "$ARTIFACTS/sql-profile.json" 2> "$ARTIFACTS/logs/sql-profile.log" || PROFILE_RC=$?
+cat /proc/loadavg > "$ARTIFACTS/host-load-after.txt"
+docker stats --no-stream --format '{{json .}}' "$APP" "$PG" "$REDIS" \
+  > "$ARTIFACTS/container-resources.jsonl" 2> "$ARTIFACTS/logs/container-resources.log" || true
+[[ "$SLO_RC" == 0 ]] || fail "Open Platform production SLO thresholds failed (k6 exit=$SLO_RC, SQL profile exit=$PROFILE_RC)"
+[[ "$PROFILE_RC" == 0 ]] || fatal "SQL profile could not be collected"
 rm -f "$CREDENTIAL_ARTIFACT"
 
 info "waiting for Webhook queue drain"
