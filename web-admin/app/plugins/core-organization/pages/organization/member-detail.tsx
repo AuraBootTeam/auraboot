@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import {
   ArrowLeftIcon,
@@ -8,8 +8,11 @@ import {
 } from '@heroicons/react/24/outline';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useI18n } from '~/contexts/I18nContext';
-import { get, post, put, del } from '~/shared/services/http-client';
+import { get } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
+import { useAuth } from '~/contexts/AuthContext';
+import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
+import type { ButtonConfig } from '~/framework/meta/schemas/types';
 
 // --- Types ---
 
@@ -77,8 +80,9 @@ const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
 export default function MemberDetailPage() {
   const { memberPid } = useParams();
   const navigate = useNavigate();
-  const { showSuccessToast, showErrorToast } = useToastContext();
-  const { locale } = useI18n();
+  const { showSuccessToast, showErrorToast, showWarningToast, showInfoToast } = useToastContext();
+  const { locale, t } = useI18n();
+  const { token, hasPermission } = useAuth();
   const l = useCallback((zh: string, en: string) => (locale === 'zh-CN' ? zh : en), [locale]);
 
   const [member, setMember] = useState<MemberData | null>(null);
@@ -86,7 +90,7 @@ export default function MemberDetailPage() {
   const [teams, setTeams] = useState<TeamMembership[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'basic' | 'org' | 'teams'>('basic');
-  const [actionLoading, setActionLoading] = useState(false);
+  const actionRefreshTarget = useRef<'detail' | 'list'>('detail');
 
   const loadData = useCallback(async () => {
     if (!memberPid) return;
@@ -137,61 +141,64 @@ export default function MemberDetailPage() {
     loadData();
   }, [loadData]);
 
-  // --- Action handlers ---
+  // Existing native detail delegates to the same action pipeline as the DSL list.
+  const { handleAction, loading: actionLoading } = useActionHandler({
+    navigate,
+    tableName: 'tenant_member',
+    locale,
+    t,
+    token: token || undefined,
+    context: {
+      loadData: async () => {
+        if (actionRefreshTarget.current === 'list') navigate('/p/tenant_member');
+        else await loadData();
+      },
+    },
+    showToast: (message, type) => {
+      if (type === 'error') showErrorToast(message);
+      else if (type === 'warning') showWarningToast(message);
+      else if (type === 'success') showSuccessToast(message);
+      else showInfoToast(message);
+    },
+  });
 
-  const handleAction = async (action: string, apiCall: () => Promise<any>) => {
-    const confirmMessages: Record<string, string> = {
-      approve: l('确认审批通过该成员？', 'Approve this member?'),
-      reject: l('确认拒绝该成员？', 'Reject this member?'),
-      suspend: l('确认暂停该成员？', 'Suspend this member?'),
-      restore: l('确认恢复该成员？', 'Restore this member?'),
-      leave: l('确认该成员离职？', 'Mark this member as inactive?'),
-      delete: l('确认删除该成员？此操作不可逆。', 'Delete this member? This cannot be undone.'),
+  const canPerform = (verb: string) =>
+    hasPermission('meta.command.execute') && hasPermission(`model.tenant_member.${verb}`);
+
+  const dispatchMemberAction = async (action: string, command: string, offboardingAction?: string) => {
+    if (!member || actionLoading) return;
+    const confirmations: Record<string, { 'zh-CN': string; en: string }> = {
+      approve: { 'zh-CN': '确认审批通过该成员？', en: 'Approve this member?' },
+      reject: { 'zh-CN': '确认拒绝该成员？', en: 'Reject this member?' },
+      suspend: { 'zh-CN': '确认暂停该成员？', en: 'Suspend this member?' },
+      restore: { 'zh-CN': '确认恢复该成员？', en: 'Restore this member?' },
+      leave: { 'zh-CN': '确认该成员离职？', en: 'Mark this member as inactive?' },
+      delete: { 'zh-CN': '确认移除该成员并交接资源？', en: 'Remove this member and transfer resources?' },
     };
-    if (!confirm(confirmMessages[action] || `Confirm ${action}?`)) return;
-
-    setActionLoading(true);
+    const inputFields = action === 'suspend' || action === 'leave' ? [{
+      field: 'reason',
+      label: { 'zh-CN': action === 'suspend' ? '暂停原因' : '离职说明', en: 'Reason' },
+      type: 'textarea',
+      required: action === 'suspend',
+    }] : [];
+    actionRefreshTarget.current = action === 'delete' ? 'list' : 'detail';
     try {
-      await apiCall();
-      showSuccessToast(l('操作成功', 'Action completed'));
-      loadData();
-    } catch (e: any) {
-      showErrorToast(e.message || l('操作失败', 'Action failed'));
+      await handleAction({
+        code: action,
+        confirm: confirmations[action],
+        action: { type: 'command', command, offboardingAction, inputFields },
+      } as ButtonConfig, member);
     } finally {
-      setActionLoading(false);
+      actionRefreshTarget.current = 'detail';
     }
   };
 
-  const doApprove = () =>
-    handleAction('approve', () =>
-      post(`/api/tenant/members/${memberPid}/approve`, { action: 'approve' }),
-    );
-
-  const doReject = () =>
-    handleAction('reject', () =>
-      post(`/api/tenant/members/${memberPid}/approve`, { action: 'reject' }),
-    );
-
-  const doSuspend = () =>
-    handleAction('suspend', () =>
-      put(`/api/tenant/members/${memberPid}/status`, { action: 'suspended' }),
-    );
-
-  const doRestore = () =>
-    handleAction('restore', () =>
-      put(`/api/tenant/members/${memberPid}/status`, { action: 'active' }),
-    );
-
-  const doLeave = () =>
-    handleAction('leave', () =>
-      put(`/api/tenant/members/${memberPid}/status`, { action: 'inactive' }),
-    );
-
-  const doDelete = () =>
-    handleAction('delete', async () => {
-      await del(`/api/tenant/members/${memberPid}`);
-      navigate('/p/tenant_member');
-    });
+  const doApprove = () => dispatchMemberAction('approve', 'admin:approve_member');
+  const doReject = () => dispatchMemberAction('reject', 'admin:reject_member');
+  const doSuspend = () => dispatchMemberAction('suspend', 'admin:suspend_member', 'suspend');
+  const doRestore = () => dispatchMemberAction('restore', 'admin:restore_member');
+  const doLeave = () => dispatchMemberAction('leave', 'admin:leave_member', 'deactivate');
+  const doDelete = () => dispatchMemberAction('delete', 'admin:delete_member', 'remove');
 
   // --- Render ---
 
@@ -273,32 +280,32 @@ export default function MemberDetailPage() {
       <div className="mb-6 flex flex-wrap gap-2" data-testid="action-bar">
         {member.status === 'pending' && (
           <>
-            <ActionButton onClick={doApprove} disabled={actionLoading} variant="primary">
+            {canPerform('approve') && (<ActionButton onClick={doApprove} disabled={actionLoading} variant="primary">
               {l('审批通过', 'Approve')}
-            </ActionButton>
-            <ActionButton onClick={doReject} disabled={actionLoading} variant="danger">
+            </ActionButton>)}
+            {canPerform('reject') && (<ActionButton onClick={doReject} disabled={actionLoading} variant="danger">
               {l('拒绝', 'Reject')}
-            </ActionButton>
+            </ActionButton>)}
           </>
         )}
         {member.status === 'active' && (
           <>
-            <ActionButton onClick={doSuspend} disabled={actionLoading} variant="warning">
+            {canPerform('suspend') && (<ActionButton onClick={doSuspend} disabled={actionLoading} variant="warning">
               {l('暂停', 'Suspend')}
-            </ActionButton>
-            <ActionButton onClick={doLeave} disabled={actionLoading} variant="danger">
+            </ActionButton>)}
+            {canPerform('leave') && (<ActionButton onClick={doLeave} disabled={actionLoading} variant="danger">
               {l('离职', 'Leave')}
-            </ActionButton>
+            </ActionButton>)}
           </>
         )}
-        {(member.status === 'suspended' || member.status === 'rejected') && (
+        {(member.status === 'suspended' || member.status === 'rejected') && canPerform('restore') && (
           <ActionButton onClick={doRestore} disabled={actionLoading} variant="primary">
             {l('恢复', 'Restore')}
           </ActionButton>
         )}
-        <ActionButton onClick={doDelete} disabled={actionLoading} variant="danger-outline">
+        {canPerform('delete') && (<ActionButton onClick={doDelete} disabled={actionLoading} variant="danger-outline">
           {l('删除', 'Delete')}
-        </ActionButton>
+        </ActionButton>)}
       </div>
 
       {/* Tabs */}
