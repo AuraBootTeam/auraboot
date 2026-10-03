@@ -69,7 +69,8 @@ cmd_warm sample
   });
 }
 
-test('capacity refusal exits environment-invalid without teardown of an absent allocation', () => {
+for (const keep of [false, true]) {
+test(`capacity refusal with keep=${keep} exits environment-invalid without teardown of an absent allocation`, () => {
   const fixture = mkdtempSync(join(tmpdir(), 'oss-capacity-contract-'));
   try {
     const calls = join(fixture, 'calls.log');
@@ -92,17 +93,20 @@ if [[ "$1" == */oss-disk-preflight.mjs ]]; then exit 0; fi
 exec '${process.execPath}' "$@"
 `);
     for (const file of ['aura', 'lsof', 'node']) chmodSync(join(fixture, file), 0o755);
-    const result = spawnSync('/bin/bash', [gatePath, '--name', 'capacity-fixture', '--slot', '249'], { encoding: 'utf8',
+    const result = spawnSync('/bin/bash', [gatePath, '--name', 'capacity-fixture', '--slot', '249', ...(keep ? ['--keep'] : [])], { encoding: 'utf8',
       env: { ...process.env, TMPDIR: fixture, PATH: `${fixture}:${process.env.PATH}`, AURA_FIXTURE_CALLS: calls,
         AURA_WORKSPACE_ROOT: fixture, AURA_WORKSPACE_STATE_DIR: join(fixture, 'state') } });
     assert.equal(result.status, 2, result.stderr);
     assert.match(result.stdout, /no allocation registered/);
+    assert.doesNotMatch(result.stdout, /remains available|allocated runtime .* retained/);
     assert.match(result.stderr, /ENVIRONMENT-INVALID/);
     const commands = readFileSync(calls, 'utf8');
     assert.match(commands, /runtime ensure auraboot capacity-fixture/);
     assert.doesNotMatch(commands, /runtime close|runtime destroy|infra cleanup/);
   } finally { rmSync(fixture, { recursive: true, force: true }); }
 });
+
+}
 
 test('public stack env routes screenshots, downloads and seed logs to managed evidence', () => {
   const fixture = mkdtempSync(join(tmpdir(), 'oss-env-contract-'));

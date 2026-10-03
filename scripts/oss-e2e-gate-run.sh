@@ -185,8 +185,7 @@ STACK_ATTEMPTED=0
 cleanup() {
   local rc=$?
   trap - EXIT INT TERM
-  if [[ "$STACK_ATTEMPTED" == 1 && "$KEEP" != 1 ]]; then
-    log "stopping owned processes; retaining database and evidence (exit rc=$rc)"
+  if [[ "$STACK_ATTEMPTED" == 1 ]]; then
     local allocation
     allocation="$("$DEV" runtime show "$NAME" --json | node -e 'let s="";process.stdin.on("data",x=>s+=x);process.stdin.on("end",()=>{const d=JSON.parse(s);if(d.allocation===null)console.log("absent");else if(d.allocation&&typeof d.allocation==="object")console.log("present");else process.exitCode=1})')" || allocation=unknown
     if [[ "$allocation" == absent ]]; then
@@ -194,14 +193,14 @@ cleanup() {
     elif [[ "$allocation" != present ]]; then
       log "allocation status unavailable; refusing cleanup"
       [[ "$rc" != 0 ]] || rc=2
+    elif [[ "$KEEP" == 1 ]]; then
+      log "--keep: allocated runtime '$NAME' retained; inspect its manifest for startup status"
     elif "$GS" down "$NAME"; then
       "$DEV" runtime close "$NAME" || { [[ "$rc" != 0 ]] || rc=2; }
     else
       log "owned stop refused; runtime retained for diagnosis"
       [[ "$rc" != 0 ]] || rc=2
     fi
-  elif [[ "$KEEP" == 1 ]]; then
-    log "--keep: stack '$NAME' remains available; database and evidence retained"
   fi
   exit "$rc"
 }
