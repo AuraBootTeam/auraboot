@@ -20,13 +20,14 @@ import {
   dragNodeToCanvas,
   currentNodeIds,
   deleteViaApi,
+  openFlowDesignerPanel,
 } from '../_helpers/flow-designer-harness';
 
 // Flow/BPMN designer uses a compact layout below 1600px (palette/inspector collapse
 // behind toggles + a drawer backdrop intercepts canvas clicks). These specs assert the
 // palette/canvas/nodes directly, so run them at the wide layout the designer targets.
 // See FlowDesigner.tsx COMPACT_FLOW_DESIGNER_QUERY '(max-width: 1599px)'.
-test.use({ viewport: { width: 1680, height: 1050 } });
+test.use({ viewport: { width: 1680, height: 1050 }, locale: 'zh-CN' });
 
 const DESIGNER_NEW = '/automation/new';
 const MODEL_CODE = 'e2et_order';
@@ -37,7 +38,7 @@ async function openNewDesigner(page: Page): Promise<void> {
   await page
     .locator('[data-testid="automation-editor-name-input"]')
     .waitFor({ state: 'visible', timeout: 30_000 });
-  await page.locator('[data-testid="flow-palette"]').waitFor({ state: 'visible', timeout: 20_000 });
+  await openFlowDesignerPanel(page, 'palette');
   await page.locator('.react-flow__pane').waitFor({ state: 'visible', timeout: 10_000 });
 }
 
