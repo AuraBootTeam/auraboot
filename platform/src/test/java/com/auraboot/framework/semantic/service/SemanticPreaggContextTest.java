@@ -104,7 +104,7 @@ class SemanticPreaggContextTest {
         doThrow(new IllegalStateException("drop failure")).when(jdbc)
                 .execute("DROP MATERIALIZED VIEW IF EXISTS mv_preagg");
         assertThatThrownBy(() -> service.delete("preagg")).hasMessage("drop failure");
-        verify(mapper).updateById(preagg);
+        verify(mapper).softDelete(eq(1L), eq("preagg"), any(OffsetDateTime.class));
         verify(transactions).rollback(transaction);
         verify(transactions, never()).commit(any());
     }

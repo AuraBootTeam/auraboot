@@ -105,9 +105,8 @@ public class SemanticPreaggService {
     private void deleteInTransaction(String pid) {
         Long tenantId = MetaContext.get().getTenantId();
         AbSemanticPreagg preagg = requirePreagg(tenantId, pid);
-        preagg.setDeletedFlag(true);
-        preagg.setUpdatedAt(OffsetDateTime.now());
-        preaggMapper.updateById(preagg);
+        // Keep tenant-scoped logical deletion in the same transaction as the MV drop.
+        preaggMapper.softDelete(tenantId, preagg.getPid(), OffsetDateTime.now());
         jdbc.execute("DROP MATERIALIZED VIEW IF EXISTS " + preagg.getMvName());
     }
 

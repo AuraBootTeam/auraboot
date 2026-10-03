@@ -265,7 +265,7 @@ class SemanticControllerPermissionIT extends BaseIntegrationTest {
         Map<String, String> state = new LinkedHashMap<>();
         for (String table : List.of("ab_semantic_model", "ab_semantic_metric", "ab_semantic_dimension",
                 "ab_semantic_lineage_edge", "ab_semantic_metric_alert", "ab_semantic_preagg", "ab_semantic_query_log", "ab_notification")) {
-            state.put(table, jdbc.queryForObject("SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY id)::text, '[]') FROM "
+            state.put(table, jdbc.queryForObject("SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text)::text, '[]') FROM "
                     + table + " t WHERE tenant_id = ?", String.class, tenantId));
         }
         state.put("materializedViews", jdbc.queryForObject(

@@ -104,9 +104,8 @@ public class SemanticMetricAlertService {
     public void delete(String pid) {
         Long tenantId = MetaContext.get().getTenantId();
         AbSemanticMetricAlert alert = requireAlert(tenantId, pid);
-        alert.setDeletedFlag(true);
-        alert.setUpdatedAt(OffsetDateTime.now());
-        alertMapper.updateById(alert);
+        // Global logical-delete fields are excluded from updateById SET clauses.
+        alertMapper.softDelete(tenantId, alert.getPid(), OffsetDateTime.now());
     }
 
     // ==================== Evaluation ====================

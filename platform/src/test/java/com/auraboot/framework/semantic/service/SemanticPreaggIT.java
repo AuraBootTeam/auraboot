@@ -333,6 +333,12 @@ class SemanticPreaggIT {
                 "SELECT count(*) FROM pg_matviews WHERE matviewname = ?",
                 Integer.class, mvName.replace("\"", ""));
         assertThat(mvLeft).isZero();
+        assertThat(jdbc.queryForObject(
+                "SELECT deleted_flag FROM ab_semantic_preagg WHERE tenant_id = ? AND pid = ?",
+                Boolean.class, TENANT_ID, preagg.getPid())).isTrue();
+        assertThat(preaggService.list()).extracting(AbSemanticPreagg::getPid).doesNotContain(preagg.getPid());
+        assertThatThrownBy(() -> preaggService.refreshNow(preagg.getPid()))
+                .isInstanceOf(com.auraboot.framework.semantic.exception.SemanticValidationException.class);
     }
     @Test
     @DisplayName("The scheduled sweep refreshes due data and leaves a not-due MV stale")
