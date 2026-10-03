@@ -386,7 +386,9 @@ describe('CapabilityRoleEditor', () => {
     expect(impact.open).toBe(false);
     expect(screen.getByText('Grant: 编辑报价')).toBeTruthy();
     expect(impact.querySelector('summary')).toHaveTextContent('affected capabilities (32)');
-    expect(screen.getByTestId('capability-preview-resulting').querySelectorAll('li')).toHaveLength(32);
+    expect(screen.getByTestId('capability-preview-resulting').querySelectorAll('li')).toHaveLength(
+      32,
+    );
     const secondary = screen.getByTestId('capability-preview-partial-impact') as HTMLDetailsElement;
     expect(secondary.open).toBe(false);
     expect(secondary.querySelectorAll('li')).toHaveLength(30);

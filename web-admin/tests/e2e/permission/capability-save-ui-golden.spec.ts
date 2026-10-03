@@ -47,7 +47,9 @@ test('① capability save persists through the browser on a snowflake-id role', 
   expect(grantedCaps(view).length).toBe(0);
   const cap = view
     .flatMap((g) => g.capabilities)
-    .find((c) => !c.conventionDerived && (c.includes?.length ?? 0) > 0 && c.unlockedMenus?.length > 0);
+    .find(
+      (c) => !c.conventionDerived && (c.includes?.length ?? 0) > 0 && c.unlockedMenus?.length > 0,
+    );
   expect(cap, 'a declared capability with real actions and related menus must exist').toBeTruthy();
 
   // drive the real browser flow: select the role, check the capability, Save, await the PUT
@@ -72,7 +74,10 @@ test('① capability save persists through the browser on a snowflake-id role', 
   await expect(menus.locator('li')).toHaveCount(cap!.unlockedMenus.length);
   for (const menu of cap!.unlockedMenus) await expect(menus).toContainText(menu);
   await menus.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: info.outputPath('00-capability-related-menus.png'), fullPage: true });
+  await page.screenshot({
+    path: info.outputPath('00-capability-related-menus.png'),
+    fullPage: true,
+  });
   await menus.locator('summary').click();
   await expect(menus).toHaveJSProperty('open', false);
   await checkbox.scrollIntoViewIfNeeded();
