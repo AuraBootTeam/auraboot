@@ -28,7 +28,15 @@ if [[ "$*" == 'runtime list' ]]; then printf 'NAME MODE SLOT\\n'; fi
   executable(path.join(repo, 'scripts/oss-golden-stack.sh'), `#!/usr/bin/env bash
 printf 'stack %s\\n' "$*" >> "$CALLS"
 if [[ "$1" == up && "$FAKE_MODE" == up-failure ]]; then exit 2; fi
-if [[ "$1" == env ]]; then printf 'export PLAYWRIGHT_BASE_URL=http://localhost:1 BACKEND_URL=http://localhost:2\\n'; fi
+if [[ "$1" == env ]]; then
+  printf 'export PLAYWRIGHT_BASE_URL=http://localhost:1 BACKEND_URL=http://localhost:2\\n'
+  if [[ "$FAKE_MODE" == evidence-round || "$FAKE_MODE" == evidence-collision ]]; then
+    round="$AURA_WORKSPACE_ROOT/.workspace/evidence/owned-run/rounds/native-round"
+    mkdir -p "$round"
+    [[ "$FAKE_MODE" != evidence-collision ]] || printf 'retain old bytes' >"$round/collection.json"
+    printf 'export AURA_EVIDENCE_ROOT=%q\\n' "$round"
+  fi
+fi
 `);
   executable(path.join(root, 'bin/pnpm'), `#!/usr/bin/env node
 const fs=require('node:fs');
@@ -128,3 +136,21 @@ for (const [mode, status] of [['', 0], ['up-failure', 2], ['missing-result', 1]]
     }
   });
 }
+
+test('native evidence round retains its matching collection and execution ledgers', t => {
+  const f = fixture(t, 'evidence-round'), result = f.run();
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  const round = path.join(f.root, '.workspace/evidence/owned-run/rounds/native-round');
+  for (const name of ['collection.json', 'collection.stderr.log', 'collection-ledger.json', 'runtime-verify.log', 'results.json', 'execution-ledger.json']) {
+    assert.equal(fs.existsSync(path.join(round, name)), true, name);
+  }
+  assert.equal(JSON.parse(fs.readFileSync(path.join(round, 'collection-ledger.json'))).executed, 0);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(round, 'execution-ledger.json'))).passed, 8);
+});
+test('evidence migration refuses prior round bytes before browser execution', t => {
+  const f = fixture(t, 'evidence-collision'), result = f.run();
+  assert.equal(result.status, 2, result.stdout + result.stderr);
+  const round = path.join(f.root, '.workspace/evidence/owned-run/rounds/native-round');
+  assert.equal(fs.readFileSync(path.join(round, 'collection.json'), 'utf8'), 'retain old bytes');
+  assert.equal(fs.existsSync(path.join(round, 'results.json')), false);
+});

@@ -87,9 +87,22 @@ log '3/6 import test-fixtures'
 log '4/6 verify runtime identity and resolve env'
 "$WORKSPACE/aura" runtime verify "$NAME" >"$AURA_EVIDENCE_ROOT/runtime-verify.log" \
   || die_env 'runtime ownership verification failed'
+PREFLIGHT_EVIDENCE_ROOT="$AURA_EVIDENCE_ROOT"
 eval "$("$GS" env "$NAME")" || die_env 'stack env unavailable'
-# The runtime's own env may set the evidence root; keep this run's unique path.
+if [[ "$PREFLIGHT_EVIDENCE_ROOT" != "$AURA_EVIDENCE_ROOT" ]]; then
+  mkdir -p "$AURA_EVIDENCE_ROOT" || die_env 'native evidence round unavailable'
+  for evidence_file in collection.json collection.stderr.log collection-ledger.json runtime-verify.log; do
+    [[ ! -e "$AURA_EVIDENCE_ROOT/$evidence_file" && ! -L "$AURA_EVIDENCE_ROOT/$evidence_file" ]] \
+      || die_env "native evidence round already contains $evidence_file; prior bytes retained"
+  done
+  for evidence_file in collection.json collection.stderr.log collection-ledger.json runtime-verify.log; do
+    cp "$PREFLIGHT_EVIDENCE_ROOT/$evidence_file" "$AURA_EVIDENCE_ROOT/$evidence_file" \
+      || die_env "cannot retain $evidence_file in the native evidence round"
+  done
+fi
+# Keep collection, execution and screenshots inside this native evidence round.
 export AURA_EVIDENCE_DIR="$AURA_EVIDENCE_ROOT/hifi-golden"
+mkdir -p "$AURA_EVIDENCE_DIR" || die_env 'golden screenshot directory unavailable'
 log "5/6 run exact profile: base=$PLAYWRIGHT_BASE_URL backend=$BACKEND_URL"
 set +e
 PLAYWRIGHT_JSON_OUTPUT_FILE="$AURA_EVIDENCE_ROOT/results.json" NO_PROXY=localhost,127.0.0.1 \
