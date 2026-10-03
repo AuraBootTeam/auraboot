@@ -243,19 +243,22 @@ test.describe('Open Platform golden journey', () => {
       await authorizedReference.getByRole('button', { name: 'Authorize', exact: true }).first().click();
       const authorizationDialog = authorizedReference.locator('.dialog-ux');
       await expect(authorizationDialog).toBeVisible();
-      await authorizationDialog.locator('#client_id').fill(clientId!);
-      await authorizationDialog.locator('#client_secret').fill(clientSecret!);
+      const oauthAuthorization = authorizationDialog.locator('.auth-container').filter({
+        hasText: 'oauth2ClientCredentials',
+      });
+      await oauthAuthorization.getByLabel('client_id:', { exact: true }).fill(clientId!);
+      await oauthAuthorization.getByLabel('client_secret:', { exact: true }).fill(clientSecret!);
       const browserTokenPromise = authorizedReference.waitForResponse(
         (response) => response.request().method() === 'POST'
           && response.url() === `${WEB_BASE_URL}/oauth2/token`,
       );
-      await authorizationDialog.getByRole('button', { name: 'Authorize', exact: true }).click();
+      await oauthAuthorization.getByRole('button', { name: 'Authorize', exact: true }).click();
       const browserTokenResponse = await browserTokenPromise;
       expect(browserTokenResponse.status()).toBe(200);
       const browserToken = await browserTokenResponse.json();
       expect(browserToken.token_type).toBe('Bearer');
       await expect(authorizationDialog.getByRole('button', { name: 'Logout', exact: true })).toBeVisible();
-      await authorizationDialog.getByRole('button', { name: 'Close', exact: true }).click();
+      await oauthAuthorization.getByRole('button', { name: 'Close', exact: true }).click();
       await expect(authorizationDialog).toHaveCount(0);
       const whoamiOperation = authorizedReference.locator('.opblock').filter({
         has: authorizedReference.locator('[data-path="/api/open/v1/whoami"]'),
