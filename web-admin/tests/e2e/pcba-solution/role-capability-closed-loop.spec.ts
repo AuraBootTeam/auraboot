@@ -508,7 +508,7 @@ test('a standalone team-view capability reads DSL team membership, denies writes
     await row.click();
     await expect(actor).toHaveURL(new RegExp(`/organization/teams/${team.pid}$`));
   }
-  async function selectRead(grant: boolean) {
+  async function selectRead(grant: boolean, unrelatedCommandCapability = false) {
     await page.goto('/home');
     await ensureSidebarExpanded(page);
     await page.getByTestId('sidebar').locator('a[href="/enterprise/permissions"]').click();
@@ -525,6 +525,9 @@ test('a standalone team-view capability reads DSL team membership, denies writes
       await expect(page.getByTestId('data-scope-drawer')).toHaveCount(0);
     }
     await page.getByTestId('capability-checkbox-org.cap.team_view').setChecked(grant);
+    await page.getByTestId('capability-checkbox-org.cap.member_offboarding').setChecked(
+      unrelatedCommandCapability,
+    );
     await page.getByTestId('capability-save').click();
     await expect(page.getByTestId('confirm-dialog')).toBeVisible();
     const saved = page.waitForResponse(
@@ -536,7 +539,15 @@ test('a standalone team-view capability reads DSL team membership, denies writes
     const response = await saved;
     expect(response.status()).toBe(200);
     expect(String((await response.json()).code)).toBe('0');
-    expect(response.request().postDataJSON()).toEqual(grant ? ['org.cap.team_view'] : []);
+    expect(response.request().postDataJSON()).toEqual(
+      expect.arrayContaining(grant ? ['org.cap.team_view'] : []),
+    );
+    expect(response.request().postDataJSON()).toHaveLength(
+      Number(grant) + Number(unrelatedCommandCapability),
+    );
+    if (unrelatedCommandCapability) {
+      expect(response.request().postDataJSON()).toContain('org.cap.member_offboarding');
+    }
     await expect(page.getByTestId('capability-save')).toBeDisabled();
   }
   async function membership() {
@@ -619,6 +630,31 @@ test('a standalone team-view capability reads DSL team membership, denies writes
       }),
       contentType: 'application/json',
     });
+    // A command grant from another business capability must not authorize team CRUD.
+    await selectRead(true, true);
+    await reader.reload();
+    const crossCapability = await fetchRoleSnapshot(reader);
+    expect(crossCapability.permissionCodes).toContain('meta.command.execute');
+    for (const operation of ['create', 'update', 'delete']) {
+      expect(crossCapability.permissionCodes).not.toContain(`model.ab_team.${operation}`);
+      const denied = await reader.request.post(`/api/meta/commands/execute/org:${operation}_team`, {
+        data: {
+          payload: operation === 'create'
+            ? { code: `${stamp}-forbidden`, name: `${stamp}-forbidden` }
+            : operation === 'update' ? { name: `${stamp}-forbidden-update` } : {},
+          ...(operation === 'create' ? {} : { targetRecordId: team.pid }),
+          operationType: operation,
+        },
+      });
+      expect(denied.status(), `Unrelated command capability must deny team ${operation}`).toBe(403);
+      expect(['403', '10403']).toContain(String((await denied.json()).code));
+    }
+    const unchanged = await page.request.get(`/api/dynamic/ab_team/${team.pid}`);
+    expect(unchanged.status()).toBe(200);
+    const unchangedBody = await unchanged.json();
+    expect(String(unchangedBody.code)).toBe('0');
+    expect(unchangedBody.data.name).toBe(stamp);
+    expect((await membership()).map((record) => record.memberPid)).toEqual([member.pid]);
     await selectRead(false);
     const revokedRead = reader.waitForResponse(response =>
       new URL(response.url()).pathname === `/api/dynamic/ab_team/${team.pid}` && response.request().method() === 'GET');
