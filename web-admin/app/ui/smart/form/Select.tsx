@@ -262,7 +262,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
                 fieldSizeStyles[size],
                 fieldInputHeightStyles[size],
                 meta.showError && 'border-red-500 focus:ring-red-500',
-                clearable && currentValue && 'pr-8',
+                clearable && currentValue && 'pr-16',
                 loading && 'opacity-50',
                 className,
               )}
@@ -332,13 +332,15 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           </BaseSelect>
           {/* Clear button overlaid on trigger */}
           {clearable && currentValue && !disabledValue && !loading && (
-            <button
+            <FieldActionButton
               type="button"
+              size="md"
+              iconOnly
               onClick={(e) => {
                 e.stopPropagation();
                 handleClearClick();
               }}
-              className="text-text-3 hover:text-text-2 absolute top-1/2 right-8 -translate-y-1/2 rounded-sm p-0.5"
+              className="absolute top-1/2 right-7 -translate-y-1/2"
               aria-label={clearLabel}
             >
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -349,7 +351,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
                   d="M6 18L18 6M6 6l12 12"
                 />
               </svg>
-            </button>
+            </FieldActionButton>
           )}
         </div>
       );
