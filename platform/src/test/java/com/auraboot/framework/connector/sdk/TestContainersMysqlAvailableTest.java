@@ -1,5 +1,7 @@
 package com.auraboot.framework.connector.sdk;
 
+import com.auraboot.framework.test.support.MySqlTestContainer;
+
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -15,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Testcontainers(disabledWithoutDocker = true)
 class TestContainersMysqlAvailableTest {
     @Container
-    static MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.0.39");
+    static MySQLContainer<?> mysql = new MySqlTestContainer("mysql:8.0.39");
 
     @Test
     void selectsConstant() throws Exception {

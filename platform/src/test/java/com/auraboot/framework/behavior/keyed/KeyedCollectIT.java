@@ -177,11 +177,11 @@ class KeyedCollectIT {
     }
 
     private String body(String eventId) {
-        return "{\"events\":[{\"eventId\":\"" + eventId + "\",\"eventName\":\"page_view\",\"anonId\":\"anon-it\"}]}";
+        return "{\"events\":[{\"schemaVersion\":\"1\",\"eventId\":\"" + eventId + "\",\"eventName\":\"page_view\",\"anonId\":\"anon-it\"}]}";
     }
 
     private String body(String eventId, String eventName, String anonId) {
-        return "{\"events\":[{\"eventId\":\"" + eventId + "\",\"eventName\":\"" + eventName
+        return "{\"events\":[{\"schemaVersion\":\"1\",\"eventId\":\"" + eventId + "\",\"eventName\":\"" + eventName
                 + "\",\"anonId\":\"" + anonId + "\"}]}";
     }
 
@@ -246,7 +246,7 @@ class KeyedCollectIT {
     void malformedEvent_quarantinedNotStored() {
         int quarantineBefore = quarantineCount(TENANT_A);
         ResponseEntity<String> resp = postKeyedBody(KEY_A,
-                "{\"events\":[{\"eventName\":\"page_view\",\"anonId\":\"anon-bad\"}]}");
+                "{\"events\":[{\"schemaVersion\":\"1\",\"eventName\":\"page_view\",\"anonId\":\"anon-bad\"}]}");
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(resp.getBody()).contains("\"accepted\":1");
@@ -333,8 +333,8 @@ class KeyedCollectIT {
         String longId = "e".repeat(60);
         int quarantineBefore = quarantineCount(TENANT_A);
         String body = "{\"events\":["
-                + "{\"eventId\":\"e-ok-resilient\",\"eventName\":\"page_view\",\"anonId\":\"anon-it\"},"
-                + "{\"eventId\":\"" + longId + "\",\"eventName\":\"page_view\",\"anonId\":\"anon-it\"}"
+                + "{\"schemaVersion\":\"1\",\"eventId\":\"e-ok-resilient\",\"eventName\":\"page_view\",\"anonId\":\"anon-it\"},"
+                + "{\"schemaVersion\":\"1\",\"eventId\":\"" + longId + "\",\"eventName\":\"page_view\",\"anonId\":\"anon-it\"}"
                 + "]}";
         HttpHeaders h = new HttpHeaders();
         h.setContentType(MediaType.APPLICATION_JSON);

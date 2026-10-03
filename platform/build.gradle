@@ -443,6 +443,9 @@ dependencies {
     testImplementation 'org.testcontainers:mysql'
     testImplementation 'org.testcontainers:postgresql'
     testImplementation 'org.testcontainers:junit-jupiter'
+    // MySQL container readiness uses MariaDB's compatible driver only in tests.
+    // Production JDBC drivers remain deployer-supplied; the Oracle driver stays excluded.
+    testRuntimeOnly 'org.mariadb.jdbc:mariadb-java-client'
 
     // Awaitility — async assertion polling (used by AdminAuditServiceIntegrationTest)
     testImplementation 'org.awaitility:awaitility:4.3.0'
