@@ -116,6 +116,13 @@ for (const scope of ['dept', 'team']) {
       fullPage: true,
     });
 
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await page.getByTestId('data-scope-current').scrollIntoViewIfNeeded();
+    await expect(page.getByTestId('data-scope-current')).toBeInViewport();
+    await expect(page.getByTestId('data-scope-default')).toBeInViewport();
+    await page.screenshot({ path: info.outputPath(`02-inherited-${scope}-summary.png`), fullPage: true });
+
     // backend cross-check: the role's stored default is persisted
     const defResp = await page.request.get(
       `${BASE}/api/permissions/matrix/${role.pid}/default-scope`,
@@ -152,6 +159,9 @@ test('actual mixed record scopes remain separate from the stored role default', 
     .flatMap((resource: any) => resource.actions);
   expect(actions.find((action: any) => action.code === 'model.qo_quote_common.read').scopeType).toBe('self');
   expect(actions.find((action: any) => action.code === 'model.qo_quote_line_common.read').scopeType).toBe('team');
+  await page.getByTestId('data-scope-current').scrollIntoViewIfNeeded();
+  await expect(page.getByTestId('data-scope-current')).toBeInViewport();
+  await expect(page.getByTestId('data-scope-default')).toBeInViewport();
   await page.screenshot({ path: info.outputPath('scope-mixed.png'), fullPage: true });
 });
 
@@ -172,6 +182,9 @@ test('missing, failed, and invalid role defaults do not preselect a broader scop
   mode = 'real';
   await page.getByTestId('data-scope-retry').click();
   await expect(page.getByTestId('data-scope-default')).toContainText(/未配置|Not configured/);
+  await page.getByTestId('data-scope-default').scrollIntoViewIfNeeded();
+  await expect(page.getByTestId('data-scope-default')).toBeInViewport();
+  await page.screenshot({ path: info.outputPath('scope-not-configured-summary.png'), fullPage: true });
   await page.getByTestId('data-scope-modify-btn').click();
   await expect(page.getByTestId('data-scope-apply')).toBeDisabled();
   await expect(page.getByTestId('data-scope-drawer').getByRole('radio', { checked: true })).toHaveCount(0);
@@ -180,6 +193,9 @@ test('missing, failed, and invalid role defaults do not preselect a broader scop
   mode = 'invalid';
   await selectRoleFromMenu(page, role);
   await expect(page.getByTestId('data-scope-default')).toContainText(/无效|Invalid scope/);
+  await page.getByTestId('data-scope-default').scrollIntoViewIfNeeded();
+  await expect(page.getByTestId('data-scope-default')).toBeInViewport();
+  await page.screenshot({ path: info.outputPath('scope-invalid-summary.png'), fullPage: true });
   await page.getByTestId('data-scope-modify-btn').click();
   await expect(page.getByTestId('data-scope-apply')).toBeDisabled();
   await expect(page.getByTestId('data-scope-drawer').getByRole('radio', { checked: true })).toHaveCount(0);
