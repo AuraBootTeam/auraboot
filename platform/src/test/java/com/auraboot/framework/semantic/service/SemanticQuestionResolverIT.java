@@ -107,32 +107,36 @@ class SemanticQuestionResolverIT {
     void publishModelOnce() {
         MetaContext.setContext(TENANT_ID, USER_ID, "resolver-golden-pid", "resolver-golden-user");
         if (modelPid != null) return;
-        jdbc.update("DELETE FROM ab_meta_model WHERE id = 991970010 OR pid = ?", META_MODEL_PID);
         jdbc.update("INSERT INTO ab_meta_model (id, pid, tenant_id, code, table_name, "
                 + "source_type, is_current, status, version, created_at, updated_at, deleted_flag) "
                 + "VALUES (991970010, ?, ?, 'ab_object_alias', 'ab_object_alias', "
                 + "'physical', TRUE, 'published', 1, NOW(), NOW(), FALSE)",
                 META_MODEL_PID, TENANT_ID);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_object_alias WHERE tenant_id = ?",
+                Long.class, TENANT_ID)).as("fresh resolver fixture namespace").isZero();
+        for (int n = 1; n <= 2; n++) {
+            jdbc.update("INSERT INTO ab_object_alias (pid, tenant_id, model_code, alias, language, acp_priority, "
+                            + "created_at, updated_at, created_by, updated_by, deleted_flag) "
+                            + "VALUES (?, ?, 'resolver_golden', ?, 'en-US', 0, NOW(), NOW(), ?, ?, FALSE)",
+                    com.auraboot.framework.common.util.UniqueIdGenerator.generate(), TENANT_ID,
+                    "Resolver fixture " + n, USER_ID, USER_ID);
+        }
         modelPid = publishService.publishFromYaml(
                 MODEL_YAML.getBytes(StandardCharsets.UTF_8), "test-fixtures", TENANT_ID, USER_ID);
     }
 
     @AfterAll
-    void cleanup() {
-        MetaContext.setContext(TENANT_ID, USER_ID, "resolver-golden-pid", "resolver-golden-user");
-        jdbc.update("DELETE FROM ab_semantic_metric WHERE semantic_model_pid = ?", modelPid);
-        jdbc.update("DELETE FROM ab_semantic_dimension WHERE semantic_model_pid = ?", modelPid);
-        jdbc.update("DELETE FROM ab_semantic_model WHERE pid = ?", modelPid);
-        jdbc.update("DELETE FROM ab_meta_model WHERE pid = ?", META_MODEL_PID);
+    void retainFixturesAndClearContext() {
+        // The isolated CI database is retained for owner inspection.
         MetaContext.clear();
     }
 
-    private record Eval(String question, String expectMetricCode, boolean expectRows) {}
+    private record Eval(String question, String expectMetricCode) {}
 
     private static final List<Eval> QUESTION_SET = List.of(
-            new Eval("对象别名总数是多少?", "alias_total", true),
-            new Eval("查一下对象别名总数", "alias_total", true),
-            new Eval("count the alias_total", "alias_total", true));
+            new Eval("对象别名总数是多少?", "alias_total"),
+            new Eval("查一下对象别名总数", "alias_total"),
+            new Eval("count the alias_total", "alias_total"));
 
     @Test
     @DisplayName("offline resolver maps the question set to the governed metric; unmatched resolves empty")
@@ -146,9 +150,10 @@ class SemanticQuestionResolverIT {
 
             // The resolved request must execute through the governed pipeline.
             var response = queryService.executeQuery(resolved.get(), user);
-            if (eval.expectRows()) {
-                assertThat(response.getRows()).as("question: " + eval.question()).isNotEmpty();
-            }
+            assertThat(response.getRows()).as("question: " + eval.question()).hasSize(1);
+            assertThat(response.getRows().get(0)).hasSize(1);
+            Object count = response.getRows().get(0).values().iterator().next();
+            assertThat(((Number) count).longValue()).isEqualTo(2L);
         }
 
         // Unmatched question: empty, never a guess.

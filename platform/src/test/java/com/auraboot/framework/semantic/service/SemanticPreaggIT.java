@@ -109,7 +109,6 @@ class SemanticPreaggIT {
     void publishModelOnce() {
         MetaContext.setContext(TENANT_ID, USER_ID, "preagg-golden-pid", "preagg-golden-user");
         if (modelPid != null) return;
-        jdbc.update("DELETE FROM ab_meta_model WHERE id = 991950010 OR pid = ?", META_MODEL_PID);
         jdbc.update("INSERT INTO ab_meta_model (id, pid, tenant_id, code, table_name, "
                         + "source_type, is_current, status, version, created_at, updated_at, deleted_flag) "
                         + "VALUES (991950010, ?, ?, 'ab_object_alias', 'ab_object_alias', "
@@ -122,22 +121,8 @@ class SemanticPreaggIT {
     }
 
     @AfterAll
-    void cleanup() {
-        MetaContext.setContext(TENANT_ID, USER_ID, "preagg-golden-pid", "preagg-golden-user");
-        jdbc.execute("DROP MATERIALIZED VIEW IF EXISTS mv_semantic_preagg_it_golden");
-        for (String[] stmt : new String[][]{
-                {"DELETE FROM ab_object_alias WHERE tenant_id = ? AND pid LIKE 'pg-golden-%'", TENANT_ID + ""},
-                {"DELETE FROM ab_semantic_preagg WHERE tenant_id = ?", TENANT_ID + ""},
-                {"DELETE FROM ab_semantic_metric WHERE semantic_model_pid = ?", modelPid + ""},
-                {"DELETE FROM ab_semantic_dimension WHERE semantic_model_pid = ?", modelPid + ""},
-                {"DELETE FROM ab_semantic_model WHERE pid = ?", modelPid + ""},
-                {"DELETE FROM ab_meta_model WHERE pid = ? OR id = 991950010", META_MODEL_PID}}) {
-            try {
-                jdbc.update(stmt[0], stmt[1]);
-            } catch (Exception e) {
-                log.warn("cleanup step failed (continuing): {}", e.getMessage());
-            }
-        }
+    void retainFixturesAndClearContext() {
+        // The isolated CI database is retained for owner inspection.
         MetaContext.clear();
     }
 
@@ -162,14 +147,18 @@ class SemanticPreaggIT {
         return value == null ? -1 : value;
     }
 
+    private long aliasCount() {
+        return jdbc.queryForObject("SELECT count(*) FROM ab_object_alias WHERE tenant_id = ? "
+                + "AND deleted_flag = FALSE", Long.class, TENANT_ID);
+    }
+
     private long insertAliasRow(String alias) {
-        jdbc.update("DELETE FROM ab_object_alias WHERE pid = ?", "pg-" + alias);
         jdbc.update("INSERT INTO ab_object_alias (pid, tenant_id, model_code, alias, language, "
                         + "acp_priority, created_at, updated_at, created_by, updated_by, deleted_flag) "
                         + "VALUES (?, ?, 'preagg_golden', ?, 'zh-CN', 0, NOW(), NOW(), ?, ?, FALSE)",
                 "pg-" + alias, TENANT_ID, alias, USER_ID, USER_ID);
         long count = jdbc.queryForObject(
-                "SELECT count(*) FROM ab_object_alias WHERE tenant_id = ? AND pid LIKE 'pg-golden-%'",
+                "SELECT count(*) FROM ab_object_alias WHERE tenant_id = ? AND deleted_flag = FALSE",
                 Long.class, TENANT_ID);
         return count;
     }
@@ -226,7 +215,6 @@ class SemanticPreaggIT {
     @Test
     @DisplayName("A failed metadata update restores the prior MV snapshot and refresh timestamp")
     void failedRefreshRollsBackViewAndMetadataTogether() {
-        jdbc.update("DELETE FROM ab_object_alias WHERE tenant_id = ? AND pid LIKE 'pg-golden-%'", TENANT_ID);
         insertAliasRow("golden-rollback-one");
         AbSemanticPreagg preagg = preaggService.create(
                 "preagg-refresh-rollback", modelPid, "alias_count_metric", List.of(), 60);
@@ -249,7 +237,6 @@ class SemanticPreaggIT {
                     java.time.OffsetDateTime.class, preagg.getPid())).isEqualTo(timestamp);
         } finally {
             jdbc.execute("ALTER TABLE ab_semantic_preagg DROP CONSTRAINT " + constraint);
-            preaggService.delete(preagg.getPid());
         }
     }
 
@@ -270,17 +257,17 @@ class SemanticPreaggIT {
                     Integer.class, preagg.getMvName())).isEqualTo(1);
         } finally {
             jdbc.execute("DROP VIEW " + dependent);
-            preaggService.delete(preagg.getPid());
         }
     }
 
     @Test
     @DisplayName("MV is consistent at refresh, goes stale on data change, converges on refresh")
     void goldenPreaggLifecycle() {
-        // Cross-run leftovers break the deterministic counts: purge every
-        // golden row before the lifecycle starts.
-        jdbc.update("DELETE FROM ab_object_alias WHERE tenant_id = ? AND pid LIKE 'pg-golden-%'", TENANT_ID);
+        // The independent SQL count includes retained fixtures; each owned
+        // insertion must increase the governed value by exactly one.
+        long baseline = aliasCount();
         long afterFirst = insertAliasRow("golden-one");
+        assertThat(afterFirst).isEqualTo(baseline + 1);
 
         AbSemanticPreagg preagg = preaggService.create(
                 "preagg-golden", modelPid, "alias_count_metric", List.of(), 60);
@@ -289,11 +276,12 @@ class SemanticPreaggIT {
         String metricColumn = "preagg_golden_alias." + preagg.getMetricCode();
 
         // Consistency at creation: the MV's metric value equals the live governed value.
-        assertThat(mvMetricValue(mvName, metricColumn)).isEqualTo(liveValue());
+        assertThat(mvMetricValue(mvName, metricColumn)).isEqualTo(liveValue()).isEqualTo(afterFirst);
         assertThat(preagg.getLastRefreshedAt()).isNotNull();
 
         // Data moves: the live value moves, the MV keeps the refresh snapshot (stale).
         long afterSecond = insertAliasRow("golden-two");
+        assertThat(afterSecond).isEqualTo(baseline + 2);
         assertThat(liveValue()).isEqualTo(afterSecond);
         assertThat(mvMetricValue(mvName, metricColumn)).isNotEqualTo(liveValue());
 
@@ -307,5 +295,40 @@ class SemanticPreaggIT {
                 "SELECT count(*) FROM pg_matviews WHERE matviewname = ?",
                 Integer.class, mvName.replace("\"", ""));
         assertThat(mvLeft).isZero();
+    }
+    @Test
+    @DisplayName("The scheduled sweep refreshes due data and leaves a not-due MV stale")
+    void scheduledRefreshHonorsIntervalAndRestoresCaller() {
+        MetaContext.setContext(TENANT_ID, USER_ID, "preagg-golden-pid", "preagg-golden-user");
+        long baseline = aliasCount();
+        AbSemanticPreagg preagg = preaggService.create(
+                "preagg-scheduled", modelPid, "alias_count_metric", List.of(), 60);
+        String column = "preagg_golden_alias.alias_count_metric";
+        assertThat(mvMetricValue(preagg.getMvName(), column)).isEqualTo(baseline);
+        // Arrange only this test's persisted timer; no fixed sleep or shared-row repair.
+        assertThat(jdbc.update("UPDATE ab_semantic_preagg SET last_refreshed_at = NOW() - INTERVAL '61 minutes' "
+                + "WHERE tenant_id = ? AND pid = ?", TENANT_ID, preagg.getPid())).isEqualTo(1);
+        var dueTimestamp = jdbc.queryForObject("SELECT last_refreshed_at FROM ab_semantic_preagg WHERE pid = ?",
+                java.time.OffsetDateTime.class, preagg.getPid());
+        assertThat(insertAliasRow("golden-scheduled-change")).isEqualTo(baseline + 1);
+
+        MetaContext.setMemberId(991_950_003L);
+        MetaContext.setEnvironmentId(991_950_004L);
+        MetaContext.setOtelTraceId("preagg-scheduled-trace");
+        MetaContext.Snapshot caller = MetaContext.snapshot();
+        preaggService.refreshAllDue();
+        assertThat(mvMetricValue(preagg.getMvName(), column)).isEqualTo(baseline + 1);
+        var refreshed = jdbc.queryForObject("SELECT last_refreshed_at FROM ab_semantic_preagg WHERE pid = ?",
+                java.time.OffsetDateTime.class, preagg.getPid());
+        assertThat(refreshed).isAfter(dueTimestamp);
+        assertThat(MetaContext.snapshot()).isEqualTo(caller);
+
+        assertThat(insertAliasRow("golden-not-due-change")).isEqualTo(baseline + 2);
+        preaggService.refreshAllDue();
+        assertThat(mvMetricValue(preagg.getMvName(), column)).isEqualTo(baseline + 1);
+        assertThat(jdbc.queryForObject("SELECT last_refreshed_at FROM ab_semantic_preagg WHERE pid = ?",
+                java.time.OffsetDateTime.class, preagg.getPid())).isEqualTo(refreshed);
+        assertThat(aliasCount()).isEqualTo(baseline + 2);
+        assertThat(MetaContext.snapshot()).isEqualTo(caller);
     }
 }

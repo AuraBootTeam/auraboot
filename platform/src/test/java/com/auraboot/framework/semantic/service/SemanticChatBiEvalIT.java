@@ -161,33 +161,29 @@ class SemanticChatBiEvalIT {
     @BeforeEach
     void publishModels() {
         MetaContext.setContext(TENANT_ID, USER_ID, "chatbi-eval-pid", "chatbi-eval-user");
-        jdbc.update("DELETE FROM ab_meta_model WHERE id IN (991960010, 991960011)");
+        if (modelPid != null) return;
         jdbc.update("INSERT INTO ab_meta_model (id, pid, tenant_id, code, table_name, "
                 + "source_type, is_current, status, version, created_at, updated_at, deleted_flag) "
                 + "VALUES (991960010, 'chatbi-eval-meta-model', ?, 'ab_object_alias', 'ab_object_alias', "
                 + "'physical', TRUE, 'published', 1, NOW(), NOW(), FALSE)", TENANT_ID);
-        if (modelPid == null) {
-            modelPid = publishService.publishFromYaml(
-                    MODEL_YAML.getBytes(StandardCharsets.UTF_8), "test-fixtures", TENANT_ID, USER_ID);
-            publishService.publishFromYaml(
-                    FORBIDDEN_MODEL_YAML.getBytes(StandardCharsets.UTF_8), "test-fixtures", TENANT_ID, USER_ID);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_object_alias WHERE tenant_id = ?",
+                Long.class, TENANT_ID)).as("fresh governed-eval fixture namespace").isZero();
+        for (int n = 1; n <= 3; n++) {
+            jdbc.update("INSERT INTO ab_object_alias (pid, tenant_id, model_code, alias, language, acp_priority, "
+                            + "created_at, updated_at, created_by, updated_by, deleted_flag) "
+                            + "VALUES (?, ?, 'chatbi_eval', ?, 'en-US', 0, NOW(), NOW(), ?, ?, FALSE)",
+                    com.auraboot.framework.common.util.UniqueIdGenerator.generate(), TENANT_ID,
+                    "Governed eval fixture " + n, USER_ID, USER_ID);
         }
+        modelPid = publishService.publishFromYaml(
+                MODEL_YAML.getBytes(StandardCharsets.UTF_8), "test-fixtures", TENANT_ID, USER_ID);
+        publishService.publishFromYaml(
+                FORBIDDEN_MODEL_YAML.getBytes(StandardCharsets.UTF_8), "test-fixtures", TENANT_ID, USER_ID);
     }
 
     @AfterAll
-    void cleanup() {
-        for (String pid : List.of("chatbi-eval-meta-model", "chatbi-eval-secret-meta-model")) {
-            try {
-                jdbc.update("DELETE FROM ab_semantic_metric WHERE semantic_model_pid = "
-                        + "(SELECT pid FROM ab_semantic_model WHERE pid = ?)", pid);
-                jdbc.update("DELETE FROM ab_semantic_dimension WHERE semantic_model_pid = "
-                        + "(SELECT pid FROM ab_semantic_model WHERE pid = ?)", pid);
-                jdbc.update("DELETE FROM ab_semantic_model WHERE pid = ?", pid);
-                jdbc.update("DELETE FROM ab_meta_model WHERE pid = ?", pid);
-            } catch (Exception ignored) {
-                // cleanup is best-effort; the fresh-seed DB is rebuilt per run
-            }
-        }
+    void retainFixturesAndClearContext() {
+        // The isolated CI database is retained for owner inspection.
         MetaContext.clear();
     }
 
@@ -196,13 +192,16 @@ class SemanticChatBiEvalIT {
     }
 
     @Test
-    @DisplayName("every catalog question resolves to a governed metric with rows")
+    @DisplayName("preassigned catalog metrics return the exact positive governed fixture count")
     void catalogQuestionsAnswered() {
         for (var entry : QUESTIONS) {
             SemanticQueryRequest req = new SemanticQueryRequest();
             req.setMetrics(List.of(entry.getValue()));
             var response = queryService.executeQuery(req, user());
-            assertThat(response.getRows()).as("question: " + entry.getKey()).isNotEmpty();
+            assertThat(response.getRows()).as("preassigned catalog question: " + entry.getKey()).hasSize(1);
+            assertThat(response.getRows().get(0)).hasSize(1);
+            Object count = response.getRows().get(0).values().iterator().next();
+            assertThat(((Number) count).longValue()).isEqualTo(3L);
         }
     }
 
@@ -213,8 +212,12 @@ class SemanticChatBiEvalIT {
         assertThat(secret).as("restricted metric fixture must be published").isNotNull();
         SemanticQueryRequest req = new SemanticQueryRequest();
         req.setMetrics(List.of("alert_eval_secret.secret_count_metric"));
-        // The governed pipeline denies via Spring Security BEFORE any SQL runs.
+        Long before = jdbc.queryForObject("SELECT count(*) FROM ab_semantic_query_log WHERE tenant_id = ?",
+                Long.class, TENANT_ID);
+        // The governed pipeline denies before data execution and audit insertion.
         assertThatThrownBy(() -> queryService.executeQuery(req, user()))
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_semantic_query_log WHERE tenant_id = ?",
+                Long.class, TENANT_ID)).isEqualTo(before);
     }
 }

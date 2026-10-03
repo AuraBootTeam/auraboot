@@ -43,9 +43,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  *   <li>creating an alert for an unknown metric fails validation.</li>
  * </ul>
  *
- * <p>The semantic model is published over {@code ab_tenant} — a
- * migration-owned table with bootstrap rows on every database, so the golden
- * runs on a fresh-seed CI database with no fixture imports.
+ * <p>The semantic model is published over {@code ab_object_alias} — a
+ * migration-owned table populated with three owned rows, so the golden
+ * runs on a fresh-seed CI database with a controlled positive metric value.
  */
 @Slf4j
 @SpringBootTest(classes = com.auraboot.framework.application.TestApplication.class)
@@ -54,8 +54,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 @DisplayName("Semantic metric alert golden IT — threshold/silence/boundary on the governed pipeline")
 class SemanticMetricAlertIT {
 
-    private static final long TENANT_ID = 991_800_001L;
-    private static final long USER_ID = 991_800_002L;
+    private static final long TENANT_ID = 992_180_001L;
+    private static final long USER_ID = 992_180_002L;
     private static final String MODEL_YAML = """
             version: "0.1"
 
@@ -92,7 +92,7 @@ class SemanticMetricAlertIT {
                 label:
                   zh-CN: 别名数指标
                   en-US: Alias Count Metric
-                description: Tenant-scoped count of object aliases (deterministically zero on a fresh seed).
+                description: Tenant-scoped count of object aliases (three controlled rows on a fresh seed).
                 type: simple
                 type_params:
                   measure: alias_count
@@ -118,23 +118,21 @@ class SemanticMetricAlertIT {
     @BeforeEach
     void bindTenantContext() {
         MetaContext.setContext(TENANT_ID, USER_ID, "alert-golden-pid", "alert-golden-user");
+        MetaContext.setMemberId(992_180_003L);
+        MetaContext.setEnvironmentId(992_180_004L);
+        MetaContext.setOtelTraceId("alert-fixture-trace");
     }
 
-    @org.junit.jupiter.api.AfterAll
-    void cleanupMetaModel() {
-        jdbc.update("DELETE FROM ab_meta_model WHERE pid = ?", META_MODEL_PID);
-    }
-
-    @org.junit.jupiter.api.AfterAll
-    void cleanup() {
-        jdbc.update("DELETE FROM ab_notification WHERE source_type = 'semantic_metric_alert' "
-                + "AND source_id IN (SELECT pid FROM ab_semantic_metric_alert WHERE tenant_id = ?)", TENANT_ID);
-        jdbc.update("DELETE FROM ab_semantic_metric_alert WHERE tenant_id = ?", TENANT_ID);
-        if (modelPid != null) {
-            jdbc.update("DELETE FROM ab_semantic_metric WHERE semantic_model_pid = ?", modelPid);
-            jdbc.update("DELETE FROM ab_semantic_dimension WHERE semantic_model_pid = ?", modelPid);
-            jdbc.update("DELETE FROM ab_semantic_model WHERE pid = ?", modelPid);
+    @AfterAll
+    void retainFixturesAndPauseBackgroundEvaluation() {
+        bindTenantContext();
+        for (SemanticMetricAlertDTO existing : alertService.list()) {
+            SemanticMetricAlertRequest paused = request(existing.getName(), existing.getComparator(),
+                    existing.getThreshold().toPlainString(), existing.getSilenceMinutes());
+            paused.setAlertStatus("paused");
+            alertService.update(existing.getPid(), paused);
         }
+        // Keep definitions, query logs and notifications; stop scheduled writes to this fixture.
         MetaContext.clear();
     }
 
@@ -144,12 +142,21 @@ class SemanticMetricAlertIT {
         if (modelPid != null) return;
         // The semantic layer resolves model_ref through the meta-model catalog
         // (governance: YAML cannot target arbitrary physical tables). Register
-        // the migration-owned ab_tenant table as this tenant's meta model first.
+        // the migration-owned ab_object_alias table as this tenant's meta model first.
         jdbc.update("INSERT INTO ab_meta_model (id, pid, tenant_id, code, table_name, "
                         + "source_type, is_current, status, version, created_at, updated_at, deleted_flag) "
-                        + "VALUES (991800010, ?, ?, 'ab_object_alias', 'ab_object_alias', "
+                        + "VALUES (992180010, ?, ?, 'ab_object_alias', 'ab_object_alias', "
                         + "'physical', TRUE, 'published', 1, NOW(), NOW(), FALSE)",
                 META_MODEL_PID, TENANT_ID);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_object_alias WHERE tenant_id = ?",
+                Long.class, TENANT_ID)).as("fresh alert fixture namespace").isZero();
+        for (int n = 1; n <= 3; n++) {
+            jdbc.update("INSERT INTO ab_object_alias (pid, tenant_id, model_code, alias, language, acp_priority, "
+                            + "created_at, updated_at, created_by, updated_by, deleted_flag) "
+                            + "VALUES (?, ?, 'alert_golden', ?, 'en-US', 0, NOW(), NOW(), ?, ?, FALSE)",
+                    com.auraboot.framework.common.util.UniqueIdGenerator.generate(), TENANT_ID,
+                    "Alert fixture " + n, USER_ID, USER_ID);
+        }
         modelPid = publishService.publishFromYaml(
                 MODEL_YAML.getBytes(StandardCharsets.UTF_8), "test-fixtures", TENANT_ID, USER_ID);
         AbSemanticMetric metric = metricMapper.listActiveByModel(TENANT_ID, modelPid).get(0);
@@ -180,32 +187,30 @@ class SemanticMetricAlertIT {
     void goldenThresholdSilenceBoundary() {
         // The publish transaction commit tears down the thread's MetaContext
         // (framework behaviour observed on main); rebind for the test body.
-        MetaContext.setContext(TENANT_ID, USER_ID, "alert-golden-pid", "alert-golden-user");
-        System.out.println("[ALERT-IT] ctx after rebind exists=" + MetaContext.exists()
-                + " thread=" + Thread.currentThread().getName());
+        bindTenantContext();
+        MetaContext.Snapshot caller = MetaContext.snapshot();
         // Unknown metric fails validation (fail-closed authoring).
         SemanticMetricAlertRequest bogus = request("bad-alert", "gt", "0", 60);
         bogus.setMetricPid("no-such-metric-pid");
         assertThrows(SemanticValidationException.class, () -> alertService.create(bogus));
 
-        // Non-breaching threshold: the tenant-scoped alias count is deterministically 0
-        // on a fresh seed (seed rows belong to tenant -1), so gt 999999 never fires.
+        // Three owned fixture rows make the non-breach and exact positive boundary falsifiable.
         SemanticMetricAlertDTO calm = alertService.create(request("never-fires", "gt", "999999", 0));
         Map<String, Object> calmResult = alertService.evaluateNow(calm.getPid());
         assertThat(calmResult.get("triggered")).isEqualTo(false);
         assertThat(calmResult.get("notified")).isEqualTo(false);
         assertThat(notificationCount(calm.getPid())).isZero();
 
-        // Breaching threshold: gte 0 is boundary-exact for a deterministically-zero value
-        // and fires on the first evaluation, exactly once.
-        SemanticMetricAlertDTO firing = alertService.create(request("fires-once", "gte", "0", 120));
+        // gte 3 is boundary-exact for the controlled positive count.
+        SemanticMetricAlertDTO firing = alertService.create(request("fires-once", "gte", "3", 120));
         String alertPid = firing.getPid();
         Map<String, Object> first = alertService.evaluateNow(alertPid);
         assertThat(first.get("triggered")).isEqualTo(true);
         assertThat(first.get("notified")).isEqualTo(true);
         BigDecimal value = (BigDecimal) first.get("value");
         assertThat(value).isNotNull();
-        assertThat(value.intValue()).isZero();
+        assertThat(value).isEqualByComparingTo("3");
+        assertThat(MetaContext.snapshot()).isEqualTo(caller);
         assertThat(notificationCount(alertPid)).isEqualTo(1);
 
         // Silence window: the breach persists, the notification does not duplicate.
@@ -215,12 +220,86 @@ class SemanticMetricAlertIT {
         assertThat(second.get("silenced")).isEqualTo(true);
         assertThat(notificationCount(alertPid)).isEqualTo(1);
 
-        // Boundary exactness: gte on the observed value still triggers (0-silence re-notifies).
+        // Boundary exactness: lte on the observed value still triggers (zero silence).
         SemanticMetricAlertRequest boundary = request("boundary-gte", "lte", value.toPlainString(), 0);
         boundary.setMetricPid(metricPid);
         SemanticMetricAlertDTO boundaryAlert = alertService.create(boundary);
         Map<String, Object> boundaryResult = alertService.evaluateNow(boundaryAlert.getPid());
         assertThat(boundaryResult.get("triggered")).isEqualTo(true);
         assertThat(notificationCount(boundaryAlert.getPid())).isEqualTo(1);
+    }
+    @Test
+    @DisplayName("CRUD, pause/resume, scheduled evaluation and tenant isolation retain exact state")
+    void lifecyclePauseResumeAndScheduledEvaluation() {
+        bindTenantContext();
+        MetaContext.Snapshot caller = MetaContext.snapshot();
+        SemanticMetricAlertRequest paused = request("lifecycle-paused", "gte", "3", 120);
+        paused.setAlertStatus("paused");
+        String pid = alertService.create(paused).getPid();
+        assertThat(alertService.list()).extracting(SemanticMetricAlertDTO::getPid).contains(pid);
+        assertThat(alertMapper.findByPid(TENANT_ID, pid).getAlertStatus()).isEqualTo("paused");
+        assertThat(alertMapper.findByPid(TENANT_ID, pid).getLastEvaluatedAt()).isNull();
+
+        Map<String, Object> beforeInvalid = jdbc.queryForMap(
+                "SELECT * FROM ab_semantic_metric_alert WHERE tenant_id = ? AND pid = ?", TENANT_ID, pid);
+        assertThrows(SemanticValidationException.class,
+                () -> alertService.update(pid, request("invalid", "between", "3", 120)));
+        assertThat(jdbc.queryForMap("SELECT * FROM ab_semantic_metric_alert WHERE tenant_id = ? AND pid = ?",
+                TENANT_ID, pid)).isEqualTo(beforeInvalid);
+
+        try {
+            MetaContext.setContext(992_180_099L, 992_180_098L, "other-tenant", "other-user");
+            assertThat(alertService.list()).extracting(SemanticMetricAlertDTO::getPid).doesNotContain(pid);
+            assertThrows(SemanticValidationException.class, () -> alertService.update(pid, paused));
+            assertThrows(SemanticValidationException.class, () -> alertService.delete(pid));
+            assertThrows(SemanticValidationException.class, () -> alertService.evaluateNow(pid));
+        } finally {
+            MetaContext.clear();
+            MetaContext.restore(caller);
+        }
+        assertThat(jdbc.queryForMap("SELECT * FROM ab_semantic_metric_alert WHERE tenant_id = ? AND pid = ?",
+                TENANT_ID, pid)).isEqualTo(beforeInvalid);
+
+        // Calling the real scheduler entry proves paused rows are excluded, and
+        // then that the same owned row is evaluated after authoring resumes it.
+        alertService.evaluateAll();
+        assertThat(alertMapper.findByPid(TENANT_ID, pid).getLastEvaluatedAt()).isNull();
+        assertThat(notificationCount(pid)).isZero();
+        assertThat(MetaContext.snapshot()).isEqualTo(caller);
+
+        SemanticMetricAlertRequest active = request("lifecycle-active", "gte", "3", 120);
+        active.setAlertStatus("active");
+        SemanticMetricAlertDTO resumed = alertService.update(pid, active);
+        assertThat(resumed.getName()).isEqualTo("lifecycle-active");
+        assertThat(resumed.getThreshold()).isEqualByComparingTo("3");
+        assertThat(resumed.getAlertStatus()).isEqualTo("active");
+        alertService.evaluateAll();
+        assertThat(alertMapper.findByPid(TENANT_ID, pid).getLastEvaluatedAt()).isNotNull();
+        assertThat(alertMapper.findByPid(TENANT_ID, pid).getLastTriggeredAt()).isNotNull();
+        assertThat(notificationCount(pid)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT content FROM ab_notification WHERE tenant_id = ? "
+                        + "AND user_id = ? AND source_type = 'semantic_metric_alert' AND source_id = ?",
+                String.class, TENANT_ID, USER_ID, pid)).contains("当前值 3", "阈值 3");
+        assertThat(MetaContext.snapshot()).isEqualTo(caller);
+
+        SemanticMetricAlertRequest calm = request("lifecycle-no-breach", "gt", "999999", 120);
+        alertService.update(pid, calm);
+        assertThat(alertService.evaluateNow(pid)).containsEntry("triggered", false).containsEntry("notified", false);
+        assertThat(notificationCount(pid)).isEqualTo(1);
+        assertThat(MetaContext.snapshot()).isEqualTo(caller);
+
+        calm.setAlertStatus("paused");
+        alertService.update(pid, calm);
+        var pausedAt = alertMapper.findByPid(TENANT_ID, pid).getLastEvaluatedAt();
+        alertService.evaluateAll();
+        assertThat(alertMapper.findByPid(TENANT_ID, pid).getLastEvaluatedAt()).isEqualTo(pausedAt);
+        assertThat(notificationCount(pid)).isEqualTo(1);
+        alertService.delete(pid);
+        assertThat(alertService.list()).extracting(SemanticMetricAlertDTO::getPid).doesNotContain(pid);
+        assertThat(jdbc.queryForObject("SELECT deleted_flag FROM ab_semantic_metric_alert WHERE tenant_id = ? AND pid = ?",
+                Boolean.class, TENANT_ID, pid)).isTrue();
+        assertThrows(SemanticValidationException.class, () -> alertService.evaluateNow(pid));
+        assertThat(notificationCount(pid)).isEqualTo(1);
+        assertThat(MetaContext.snapshot()).isEqualTo(caller);
     }
 }
