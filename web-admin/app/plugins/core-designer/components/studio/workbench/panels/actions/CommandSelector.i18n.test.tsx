@@ -9,9 +9,10 @@ const f = vi.hoisted(() => ({ locale: 'en-US' }));
 vi.mock('~/contexts/I18nContext', () => ({ useI18n: () => ({ locale: f.locale }) }));
 const imported = pluginCommands.find(c => c.code === 'admin:create_member')!;
 const command: CommandDefinitionDTO = {
-  pid: 'command-1', code: imported.code, displayName: 'Create member',
+  pid: 'command-1', code: imported.code, displayName: imported['displayName:zh-CN'],
   modelCode: imported.modelCode, description: imported.description,
   localizedDescriptions: imported.extension!.localizedDescriptions,
+  localizedDisplayNames: { 'en-US': imported['displayName:en'], 'zh-CN': imported['displayName:zh-CN'] },
 };
 const legacy: CommandDefinitionDTO = { pid: 'legacy-1', code: 'legacy:save', displayName: 'Legacy save', modelCode: 'member', description: 'Legacy description' };
 const changed = vi.fn();
@@ -30,7 +31,9 @@ describe('command selector descriptions and localized state semantics', () => {
       const description = command.localizedDescriptions![locale];
       expect(screen.getByText(description)).toBeTruthy();
       if (en) expect(screen.queryByText(command.description!)).toBeNull();
-      fireEvent.click(screen.getByRole('button', { name: new RegExp('Create member') }));
+      const name = command.localizedDisplayNames![locale];
+      expect(screen.getByText(name)).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: new RegExp(name) }));
       expect(changed).toHaveBeenCalledExactlyOnceWith(command.code, command);
       expect(toggle).toHaveAttribute('aria-expanded', 'false');
       expect(screen.queryByText(description)).toBeNull();
@@ -71,8 +74,12 @@ describe('command selector descriptions and localized state semantics', () => {
     const view = render(<CommandSelector {...p} />);
     fireEvent.click(screen.getAllByRole('button')[0]);
     expect(screen.getByText(command.localizedDescriptions!['en-US'])).toBeTruthy();
+    expect(screen.getAllByText(command.localizedDisplayNames!['en-US'])).toHaveLength(2);
+    expect(screen.queryByText(command.localizedDisplayNames!['zh-CN'])).toBeNull();
     f.locale = 'zh-CN'; view.rerender(<CommandSelector {...p} />);
     expect(screen.getByText(command.localizedDescriptions!['zh-CN'])).toBeTruthy();
+    expect(screen.getAllByText(command.localizedDisplayNames!['zh-CN'])).toHaveLength(2);
+    expect(screen.queryByText(command.localizedDisplayNames!['en-US'])).toBeNull();
     expect(screen.queryByText(command.localizedDescriptions!['en-US'])).toBeNull();
     expect(screen.getByRole('button', { name: '\u5173\u8054\u547d\u4ee4' })).toHaveAttribute('aria-expanded', 'true');
     expect(changed).not.toHaveBeenCalled(); expect(refreshed).not.toHaveBeenCalled();

@@ -118,6 +118,8 @@ public final class ApplicationRuntimeDefinitionCatalog {
                 CommandDefinitionDTO command = new CommandDefinitionDTO();
                 command.setCode(source.getCode());
                 command.setDisplayName(source.getEffectiveDisplayName());
+                command.setLocalizedDisplayNames(com.auraboot.framework.meta.dto.CommandDescriptionLocalization.displayNamesFrom(
+                        source.getEffectiveExtension().get("localizedDisplayNames")));
                 command.setDescription(source.getDescription());
                 command.setLocalizedDescriptions(com.auraboot.framework.meta.dto.CommandDescriptionLocalization.from(
                         source.getExtension() == null ? null : source.getExtension().get("localizedDescriptions")));

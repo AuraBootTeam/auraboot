@@ -364,6 +364,7 @@ public class CommandServiceImpl implements CommandService {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "Command extension must be an object");
         }
         CommandDescriptionLocalization.from(extension.get("localizedDescriptions"));
+        CommandDescriptionLocalization.displayNamesFrom(extension.get("localizedDisplayNames"));
         return extension;
     }
 
@@ -375,6 +376,8 @@ public class CommandServiceImpl implements CommandService {
         dto.setCode(entity.getCode());
         dto.setDisplayName(entity.getDisplayName());
         dto.setDescription(entity.getDescription());
+        dto.setLocalizedDisplayNames(CommandDescriptionLocalization.displayNamesFrom(entity.getExtension() == null
+                ? null : entity.getExtension().get("localizedDisplayNames")));
         dto.setLocalizedDescriptions(CommandDescriptionLocalization.from(entity.getExtension() == null
                 ? null : entity.getExtension().get("localizedDescriptions")));
         dto.setModelCode(entity.getModelCode());

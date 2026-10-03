@@ -26,6 +26,8 @@ export const CommandSelector: React.FC<CommandSelectorProps> = ({
 }) => {
   const { locale } = useI18n();
   const text = (key: keyof typeof TEXT) => getLocalizedText(TEXT[key], locale);
+  const displayName = (command: CommandDefinitionDTO) =>
+    getLocalizedText(command.localizedDisplayNames, locale) || command.displayName || command.code;
   const description = (command: CommandDefinitionDTO) =>
     getLocalizedText(command.localizedDescriptions, locale) || command.description;
   const [open, setOpen] = useState(false);
@@ -47,7 +49,7 @@ export const CommandSelector: React.FC<CommandSelectorProps> = ({
             {loading
               ? text('loading')
               : selected
-                ? selected.displayName || selected.code
+                ? displayName(selected)
                 : text('select')}
           </span>
           <svg
@@ -98,7 +100,7 @@ export const CommandSelector: React.FC<CommandSelectorProps> = ({
                   cmd.code === value ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
                 }`}
               >
-                <div className="font-medium">{cmd.displayName || cmd.code}</div>
+                <div className="font-medium">{displayName(cmd)}</div>
                 {description(cmd) && (
                   <div className="mt-0.5 truncate text-xs text-gray-400">{description(cmd)}</div>
                 )}

@@ -22,6 +22,7 @@ public class CommandDefinitionDTO {
     private String displayName;
     private String description;
     private Map<String, String> localizedDescriptions = Map.of();
+    private Map<String, String> localizedDisplayNames = Map.of();
     private String modelCode;
     private String type;
     private String inputSchema;

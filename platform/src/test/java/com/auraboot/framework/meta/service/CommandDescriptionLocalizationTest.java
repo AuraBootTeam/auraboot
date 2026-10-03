@@ -24,7 +24,7 @@ class CommandDescriptionLocalizationTest {
     private final CommandDefinitionMapper mapper = mock(CommandDefinitionMapper.class);
     private final CommandServiceImpl service = new CommandServiceImpl(mapper, mock(BindingRuleMapper.class),
             mock(CommandMetadataCacheService.class), mock(com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.class));
-    private static final String JSON = "{\"localizedDescriptions\":{\"en-US\":\"Create a member\",\"zh-CN\":\"Create member source\"},\"backendOnly\":true}";
+    private static final String JSON = "{\"localizedDescriptions\":{\"en-US\":\"Create a member\",\"zh-CN\":\"Create member source\"},\"localizedDisplayNames\":{\"en-US\":\"Create member\",\"zh-CN\":\"Source name\"},\"backendOnly\":true}";
     @BeforeEach void context() { MetaContext.setCurrentTenantId(42L); }
     @AfterEach void cleanup() { MetaContext.clear(); }
     private CommandDefinitionCreateRequest request() {
@@ -41,6 +41,7 @@ class CommandDescriptionLocalizationTest {
         assertThat(capture.getValue().getExtension().get("backendOnly")).isEqualTo(true);
         assertThat(dto.getLocalizedDescriptions()).containsEntry("en-US", "Create a member").hasSize(2);
         assertThat(dto.getDescription()).isEqualTo("Legacy description");
+        assertThat(dto.getLocalizedDisplayNames()).containsEntry("en-US", "Create member");
         assertThat(JsonUtil.toJson(dto)).doesNotContain("backendOnly", "\"extension\"");
     }
     @Test void updateWritesProvidedTranslationExtension() {
@@ -53,6 +54,7 @@ class CommandDescriptionLocalizationTest {
         var entity = existing(); when(mapper.findByPid("command-pid")).thenReturn(entity);
         assertThat(service.update("command-pid", request()).getLocalizedDescriptions()).containsEntry("en-US", "Create a member");
         assertThat(entity.getExtension().get("backendOnly")).isEqualTo(true);
+        assertThat(service.findByPid("command-pid").getLocalizedDisplayNames()).containsEntry("en-US", "Create member");
     }
     @Test void legacyCommandKeepsItsDescriptionWithNoLocalizedEntries() {
         var dto = service.create(request()); assertThat(dto.getDescription()).isEqualTo("Legacy description");
@@ -65,7 +67,7 @@ class CommandDescriptionLocalizationTest {
             assertThat(service.findByPid("command-pid").getLocalizedDescriptions()).containsEntry("en-US", "Create a member");
         }
     }
-    @ParameterizedTest @ValueSource(strings={"null", "[]", "{broken", "{\"localizedDescriptions\":[]}", "{\"localizedDescriptions\":{\"en-US\":4}}", "{\"localizedDescriptions\":{\"\":\"value\"}}"})
+    @ParameterizedTest @ValueSource(strings={"null", "[]", "{broken", "{\"localizedDescriptions\":[]}", "{\"localizedDescriptions\":{\"en-US\":4}}", "{\"localizedDescriptions\":{\"\":\"value\"}}", "{\"localizedDisplayNames\":[]}", "{\"localizedDisplayNames\":{\"en-US\":4}}", "{\"localizedDisplayNames\":{\"\":\"value\"}}"})
     void invalidExtensionIsRejectedBeforeWriting(String json) {
         var request = request(); request.setExtension(json);
         assertThatThrownBy(() -> service.create(request)).isInstanceOf(RuntimeException.class);

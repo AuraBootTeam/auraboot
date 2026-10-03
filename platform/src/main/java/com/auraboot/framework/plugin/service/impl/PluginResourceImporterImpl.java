@@ -987,7 +987,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             String inputSchemaJson = dto.getInputSchema() != null ? toJson(dto.getInputSchema()) : "{}";
             String targetModelsJson = dto.getTargetModels() != null ? toJson(dto.getTargetModels()) : "[]";
             String executionConfigJson = consolidatedConfig != null ? toJson(consolidatedConfig) : "{}";
-            String extensionJson = dto.getExtension() != null ? toJson(dto.getExtension()) : "{}";
+            String extensionJson = toJson(dto.getEffectiveExtension());
             String cmdRiskLevel = resolveCommandRiskLevel(dto, consolidatedConfig);
 
             commandDefinitionMapper.updateForPluginImport(
@@ -1029,7 +1029,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             request.setExecutionConfig(consolidatedConfig != null ? toJson(consolidatedConfig) : null);
             request.setCmdRiskLevel(resolveCommandRiskLevel(dto, consolidatedConfig));
             request.setPluginPid(pluginPid);  // Set plugin_pid via request
-            request.setExtension(dto.getExtension() != null ? toJson(dto.getExtension()) : "{}");
+            request.setExtension(toJson(dto.getEffectiveExtension()));
 
             com.auraboot.framework.meta.dto.CommandDefinitionDTO created = commandService.create(request);
 
