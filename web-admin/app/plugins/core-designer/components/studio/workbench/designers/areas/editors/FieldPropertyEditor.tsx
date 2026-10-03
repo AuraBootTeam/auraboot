@@ -1,5 +1,5 @@
 /**
- * FieldPropertyEditor - V4 字段属性编辑器
+ * FieldPropertyEditor - V4 field property editor
  *
  * Based on JSON configuration, renders property editing UI for DSL fields.
  * Supports conditional visibility based on block type and data type.
@@ -7,6 +7,8 @@
  * Uses simple native form components to avoid complex hook dependencies.
  */
 
+import { useI18n } from '~/contexts/I18nContext';
+import { getLocalizedText, type TranslatableText } from '~/utils/i18n';
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import type { DslFieldOverride, BlockType } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { parseFieldShorthand } from '~/plugins/core-designer/components/studio/domain/dsl/types';
@@ -120,7 +122,7 @@ interface FieldConfig {
 
 interface SectionConfig {
   code: string;
-  title: string;
+  title: TranslatableText;
   layout: { columns: number; gap: string };
   visible?: string;
   fields: FieldConfig[];
@@ -134,6 +136,7 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
   onClose,
   readonly,
 }) => {
+  const { locale, t } = useI18n();
   // DSL registry: use render components from server if available
   const { ensureLoaded, renderComponents } = useDslRegistry();
   useEffect(() => { ensureLoaded(); }, [ensureLoaded]);
@@ -247,12 +250,15 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
       const controlTestId = `field-property-${fieldConfig.field}`;
 
       // Get options for select
-      let options: Array<{ label: string; value: string }> = fieldConfig.props?.options || [];
+      let options: Array<{ label: TranslatableText; value: string | number }> = fieldConfig.props?.options || [];
       if (fieldConfig.optionsKey === 'componentOptions') {
         // getComponentOptions() is guaranteed non-undefined via FALLBACK map, but
         // guard with `?? []` as defence-in-depth against unexpected registry shapes.
         options = getComponentOptions() ?? [];
       }
+
+      const label = getLocalizedText(fieldConfig.props?.label, locale, t);
+      const placeholder = getLocalizedText(fieldConfig.props?.placeholder, locale, t);
 
       // Render based on component type
       let component: React.ReactNode;
@@ -260,10 +266,11 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
         case 'SmartInput':
           component = (
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">
-                {fieldConfig.props.label}
+              <label htmlFor={`${controlTestId}-input`} className="mb-1 block text-xs font-medium text-gray-600">
+                {label}
               </label>
               <input
+                id={`${controlTestId}-input`}
                 data-testid={`${controlTestId}-input`}
                 type={fieldConfig.props.type || 'text'}
                 value={fieldValue ?? ''}
@@ -276,7 +283,7 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
                       : e.target.value;
                   handleFieldChange(fieldConfig.field, val);
                 }}
-                placeholder={fieldConfig.props.placeholder}
+                placeholder={placeholder}
                 disabled={isDisabled}
                 min={fieldConfig.props.min}
                 className={`w-full rounded-md border border-gray-200 px-2 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none ${isDisabled ? 'bg-gray-50 text-gray-400' : 'bg-white'} `}
@@ -288,10 +295,11 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
         case 'SmartSelect':
           component = (
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">
-                {fieldConfig.props.label}
+              <label htmlFor={`${controlTestId}-select`} className="mb-1 block text-xs font-medium text-gray-600">
+                {label}
               </label>
               <select
+                id={`${controlTestId}-select`}
                 data-testid={`${controlTestId}-select`}
                 value={fieldValue ?? ''}
                 onChange={(e) => {
@@ -304,11 +312,11 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
                 className={`w-full rounded-md border border-gray-200 px-2 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none ${isDisabled ? 'bg-gray-50 text-gray-400' : 'bg-white'} `}
               >
                 {fieldConfig.props.allowClear && (
-                  <option value="">{fieldConfig.props.placeholder || '请选择'}</option>
+                  <option value="">{placeholder || getLocalizedText({ 'zh-CN': '请选择', 'en-US': 'Select an option' }, locale)}</option>
                 )}
-                {options.map((opt: { label: string; value: any }) => (
+                {options.map((opt: { label: TranslatableText; value: any }) => (
                   <option key={opt.value} value={opt.value}>
-                    {opt.label}
+                    {getLocalizedText(opt.label, locale, t)}
                   </option>
                 ))}
               </select>
@@ -321,8 +329,8 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
             <LocalizedTextInput
               value={fieldValue as LocalizedTextValue}
               onChange={(next) => handleFieldChange(fieldConfig.field, next ?? undefined)}
-              label={fieldConfig.props.label}
-              placeholder={fieldConfig.props.placeholder}
+              label={label}
+              placeholder={placeholder}
               disabled={isDisabled}
               testId={`field-${fieldConfig.field}`}
             />
@@ -332,7 +340,7 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
         case 'SmartSwitch':
           component = (
             <div className="flex items-center justify-between py-1">
-              <span className="text-xs font-medium text-gray-600">{fieldConfig.props.label}</span>
+              <span className="text-xs font-medium text-gray-600">{label}</span>
               <button
                 type="button"
                 role="switch"
@@ -364,7 +372,7 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
         </div>
       );
     },
-    [fieldData, evalVisible, handleFieldChange, readonly, getComponentOptions],
+    [fieldData, evalVisible, handleFieldChange, readonly, getComponentOptions, locale, t],
   );
 
   // Render a section
@@ -388,7 +396,7 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
             className="flex w-full items-center justify-between rounded-t border border-gray-200 bg-gray-50 p-2 transition-colors hover:bg-gray-100"
             onClick={() => toggleSection(section.code)}
           >
-            <span className="text-sm font-medium text-gray-700">{section.title}</span>
+            <span className="text-sm font-medium text-gray-700">{getLocalizedText(section.title, locale, t)}</span>
             <svg
               className={`h-4 w-4 transform text-gray-400 transition-transform ${
                 isExpanded ? 'rotate-180' : ''
@@ -418,7 +426,7 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
         </div>
       );
     },
-    [expandedSections, evalVisible, renderField, toggleSection],
+    [expandedSections, evalVisible, renderField, toggleSection, locale, t],
   );
 
   return (
@@ -429,7 +437,7 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
           <div className="flex items-center gap-2">
             <span className="text-lg">📝</span>
             <div>
-              <h3 className="text-sm font-medium text-gray-900">字段属性</h3>
+              <h3 className="text-sm font-medium text-gray-900">{getLocalizedText(fieldPropertyConfig.meta.title, locale, t)}</h3>
               <p className="text-xs text-gray-400">{fieldData.field}</p>
             </div>
           </div>
@@ -437,7 +445,7 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
             onClick={onClose}
             className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
           >
-            返回 Block
+            {getLocalizedText({ 'zh-CN': '返回 Block', 'en-US': 'Back to block' }, locale)}
           </button>
         </div>
       </div>
@@ -514,6 +522,7 @@ const WidgetSpecificPanel: React.FC<WidgetSpecificPanelProps> = ({
   expanded,
   onToggle,
 }) => {
+  const { locale } = useI18n();
   const schema: PropertySchema<string>[] = useMemo(() => {
     if (!component) return [];
     return WidgetRegistry.getSchema(component);
@@ -559,7 +568,7 @@ const WidgetSpecificPanel: React.FC<WidgetSpecificPanelProps> = ({
         onClick={onToggle}
       >
         <span className="text-sm font-medium text-gray-700">
-          {widgetName} Properties
+          {widgetName} {getLocalizedText({ 'zh-CN': '属性', 'en-US': 'Properties' }, locale)}
         </span>
         <svg
           className={`h-4 w-4 transform text-gray-400 transition-transform ${
