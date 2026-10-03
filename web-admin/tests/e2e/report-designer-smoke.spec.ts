@@ -204,7 +204,15 @@ test.describe('Report Designer', () => {
     await expect(
       page.getByTestId('block-property-panel').getByText(/^(富文本|Rich Text)$/),
     ).toBeVisible();
-    await expect(page.getByTestId('block-property-panel').locator('textarea')).toBeVisible();
+    const panel = page.getByTestId('block-property-panel');
+    const content = panel.getByPlaceholder(/^(输入文本内容…|Enter text content\.\.\.)$/);
+    await expect(content).toBeVisible();
+    await content.fill('Localized report editor content');
+    await expect(page.getByTestId('report-canvas').getByText('Localized report editor content')).toBeVisible();
+    await panel.getByRole('button', { name: /^(居中|Center)$/ }).click();
+    await expect(panel.getByRole('button', { name: /^(居中|Center)$/ })).toHaveClass(/border-blue-300/);
+    await expect(panel.getByText(/^(字号（磅）|Font Size \(pt\))$/)).toBeVisible();
+    await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/report-rich-text-properties.png`, fullPage: true });
   });
 
   test('should have all 10 block types in palette', async ({ page }) => {
@@ -284,7 +292,17 @@ test.describe('Report Designer', () => {
 
     // Property panel should show "Report Properties" with Parameter section
     await expect(
-      page.getByTestId('block-property-panel').getByText('Parameters', { exact: true }),
+      page.getByTestId('block-property-panel').getByText(/^(参数|Parameters)$/, { exact: true }),
     ).toBeVisible();
+    const panel = page.getByTestId('block-property-panel');
+    await panel.getByRole('button', { name: /^(\+ 添加|\+ Add)$/ }).click();
+    await panel.getByPlaceholder(/^(参数名|Parameter name)$/).fill('report_limit');
+    await panel.getByPlaceholder(/^(显示名称|Display label)$/).fill('Row limit');
+    await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/report-parameter-add.png`, fullPage: true });
+    await panel.getByRole('button', { name: /^(添加|Add)$/, exact: true }).click();
+    await expect(panel.getByText(/^Row limit \((文本|Text)\)$/)).toBeVisible();
+    await expect(panel.getByPlaceholder(/^(参数名|name)$/)).toHaveValue('report_limit');
+    await panel.getByRole('button', { name: /^(删除参数|Remove parameter)$/ }).click();
+    await expect(panel.getByText(/^Row limit/)).toHaveCount(0);
   });
 });

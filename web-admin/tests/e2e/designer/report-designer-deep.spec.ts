@@ -723,7 +723,7 @@ test.describe('data-table Block — All Properties', () => {
     const addInput = panel.getByPlaceholder('Field name').last();
     await addInput.fill('col1');
     await panel.getByRole('button', { name: 'Add', exact: true }).first().click();
-    for (const align of ['Left', 'Center', 'Right']) {
+    for (const align of [/^(左对齐|Left)$/, /^(居中|Center)$/, /^(右对齐|Right)$/]) {
       await expect(panel.locator('option', { hasText: align }).first()).toBeAttached();
     }
     for (const fmt of ['Default', 'Number', 'Currency', 'Percent', 'Date']) {
@@ -876,7 +876,7 @@ test.describe('rich-text Block — All Properties', () => {
     await openReportAndAddBlock(page, 'Rich Text');
     const textarea = page
       .getByTestId('block-property-panel')
-      .getByPlaceholder('Enter text content...');
+      .getByPlaceholder(/^(输入文本内容…|Enter text content\.\.\.)$/);
     await expect(textarea).toBeVisible();
     const content = 'Test paragraph ' + uniqueId('RT');
     await textarea.fill(content);
@@ -886,17 +886,17 @@ test.describe('rich-text Block — All Properties', () => {
   test('RPT-RT-03: Alignment buttons (Left, Center, Right)', async ({ page }) => {
     await openReportAndAddBlock(page, 'Rich Text');
     const panel = page.getByTestId('block-property-panel');
-    await expect(panel.locator('label', { hasText: 'Alignment' })).toBeVisible();
-    for (const align of ['Left', 'Center', 'Right']) {
+    await expect(panel.locator('label', { hasText: /^(对齐方式|Alignment)$/ })).toBeVisible();
+    for (const align of [/^(左对齐|Left)$/, /^(居中|Center)$/, /^(右对齐|Right)$/]) {
       await expect(panel.getByRole('button', { name: align })).toBeVisible();
     }
-    await panel.getByRole('button', { name: 'Center' }).click();
+    await panel.getByRole('button', { name: /^(居中|Center)$/ }).click();
   });
 
   test('RPT-RT-04: Font Size input', async ({ page }) => {
     await openReportAndAddBlock(page, 'Rich Text');
     const panel = page.getByTestId('block-property-panel');
-    await expect(panel.locator('label', { hasText: /font size/i })).toBeVisible();
+    await expect(panel.locator('label', { hasText: /字号|font size/i })).toBeVisible();
     const fontSizeInput = panel.locator('input[type="number"]').first();
     await expect(fontSizeInput).toBeVisible();
     await fontSizeInput.fill('14');
@@ -908,10 +908,10 @@ test.describe('rich-text Block — All Properties', () => {
     const panel = page.getByTestId('block-property-panel');
     // Wait for block editor to render (Rich Text title confirms correct panel)
     await expect(panel.locator('h2', { hasText: 'Rich Text' })).toBeVisible({ timeout: 5000 });
-    const label = panel.locator('label', { hasText: /font weight/i });
+    const label = panel.locator('label', { hasText: /字重|font weight/i });
     await label.scrollIntoViewIfNeeded().catch(() => {});
     await expect(label).toBeVisible({ timeout: 5000 });
-    for (const w of ['Normal', 'Bold']) {
+    for (const w of [/^(常规|Normal)$/, /^(粗体|Bold)$/]) {
       await expect(panel.locator('option', { hasText: w }).first()).toBeAttached();
     }
   });
@@ -1141,7 +1141,7 @@ test.describe('page-header/footer — BandEditor', () => {
   test('RPT-BD-06: Element alignment select', async ({ page }) => {
     await openReportAndAddBand(page, 'Page Header');
     const panel = page.getByTestId('block-property-panel');
-    for (const align of ['Left', 'Center', 'Right']) {
+    for (const align of [/^(左对齐|Left)$/, /^(居中|Center)$/, /^(右对齐|Right)$/]) {
       await expect(panel.locator('option', { hasText: align }).first()).toBeAttached();
     }
   });
