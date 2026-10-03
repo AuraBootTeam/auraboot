@@ -27,6 +27,8 @@ assert.match(gate, /RUNNER_GID="\$\(id -g\)"/);
 assert.equal((gate.match(/docker run --rm --user "\$RUNNER_UID:\$RUNNER_GID"/g) ?? []).length, 2);
 assert.match(gate, /PROFILE=production/);
 assert.match(gate, /SPRING_PROFILES_ACTIVE=community/);
+assert.match(gate, /JWT_KEY="\$\(openssl rand -base64 64/);
+assert.match(gate, /-e JWT_SECRET="\$JWT_KEY"/);
 assert.doesNotMatch(probe, /\/api\/test\/seed/);
 assert.match(slo, /open_api_errors/);
 assert.match(slo, /p\(95\)<250/);

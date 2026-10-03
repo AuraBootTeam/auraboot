@@ -160,6 +160,7 @@ docker run --rm --network "$NET" -v "$STAGE/platform/src/main/resources/db/migra
   > "$ARTIFACTS/logs/flyway.log" 2>&1 || fail "Flyway migration failed"
 
 PROTOCOL_KEY="$(openssl rand -base64 48 | tr -d '\n')"
+JWT_KEY="$(openssl rand -base64 64 | tr -d '\n')"
 # AURA_PLUGINS_DIR is the PF4J jar-plugin root and must NOT share
 # AURA_BUILTIN_PLUGINS_DIR: the baked /app/plugins tree holds the DSL
 # builtin-import plugins (plugin.json + config/, no PF4J descriptor), and
@@ -168,6 +169,7 @@ PROTOCOL_KEY="$(openssl rand -base64 48 | tr -d '\n')"
 docker run -d --name "$APP" --network "$NET" \
   -v "$STAGE/plugins":/plugins:ro \
   -e SERVER_PORT=6443 -e SPRING_PROFILES_ACTIVE=community \
+  -e JWT_SECRET="$JWT_KEY" \
   -e DATABASE_URL="jdbc:postgresql://$PG:5432/open_platform_ci" \
   -e SPRING_DATASOURCE_USERNAME=auraboot -e SPRING_DATASOURCE_PASSWORD=open_platform_ci \
   -e REDIS_HOST="$REDIS" -e REDIS_PORT=6379 \
