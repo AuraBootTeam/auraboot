@@ -40,12 +40,12 @@ test.describe('Dashboard designer high-fidelity', () => {
       expect(created.status(), await created.text()).toBe(200);
       expect(String((await created.json()).code)).toBe('0');
     }
-    await dp.addWidget('数字卡片');
+    await addWidgetBySingleClick(page, '数字卡片');
     await bindAggregate(page, 0, false, (rows, metric) => {
       expect(rows).toHaveLength(1); expect(Number(rows[0][metric])).toBe(12);
     });
     dashboardPid = await saveDashboard(page, 1);
-    await dp.addWidget('柱状图');
+    await addWidgetBySingleClick(page, '柱状图');
     await bindAggregate(page, 1, true, (rows, metric) => {
       expect(rows).toHaveLength(4);
       expect(rows.map(r => r.e2et_order_status).sort()).toEqual(['completed', 'confirmed', 'draft', 'shipped']);
@@ -120,6 +120,18 @@ test.describe('Dashboard designer high-fidelity', () => {
     await dialog.getByRole('button', { name: /^(取消|Cancel)$/ }).click();
   });
 });
+
+// A golden action must not retry, force clicks, dispatch events or remove errors.
+async function addWidgetBySingleClick(page: import('@playwright/test').Page, name: string) {
+  const before = await dp.widgets.count();
+  const item = dp.paletteItem(name);
+  await expect(page.locator('vite-error-overlay')).toHaveCount(0);
+  await expect(item).toBeVisible();
+  await item.click();
+  await expect(dp.widgets).toHaveCount(before + 1);
+  await expect(dp.propertyPanel.locator('h2').filter({ hasText: name })).toBeVisible();
+  await expect(page.locator('vite-error-overlay')).toHaveCount(0);
+}
 
 async function createFromManagement(page: import('@playwright/test').Page) {
   await page.getByTestId('toolbar-btn-create').click();
