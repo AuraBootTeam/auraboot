@@ -2351,8 +2351,25 @@ export function FormPageContent(props: PageContentProps) {
         dirtyFieldsRef.current.add(fieldCode);
         clearFieldError(fieldCode);
         syncRuntimeFieldValue(fieldCode, value);
+        if (runtime) {
+          runtime.triggerFieldLinkage(fieldCode, 'change');
+          const nextForm = runtime.getStateManager().getContext(runtime.getScopeId()).form;
+          const linkedChanges = Object.fromEntries(
+            Object.entries(nextForm).filter(
+              ([key, nextValue]) =>
+                key !== fieldCode && key !== 'pid' && nextValue !== formData[key],
+            ),
+          );
+          for (const key of Object.keys(linkedChanges)) {
+            dirtyFieldsRef.current.add(key);
+            clearFieldError(key);
+          }
+          if (Object.keys(linkedChanges).length) {
+            setFormData((previous) => ({ ...previous, ...linkedChanges }));
+          }
+        }
       }),
-    [formData, pageContext, fieldErrors, clearFieldError, syncRuntimeFieldValue],
+    [formData, pageContext, fieldErrors, clearFieldError, syncRuntimeFieldValue, runtime],
   );
 
   // Stable runtime context for custom blocks. Memoized so the props
