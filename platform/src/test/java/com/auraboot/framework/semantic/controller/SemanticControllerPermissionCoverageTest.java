@@ -15,6 +15,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** Hermetic contract check: every real controller mapping/media variant has an IT request. */
 class SemanticControllerPermissionCoverageTest {
     @Test
+    void tenantBoundaryHarnessIsAnExecutableIntegrationTest() throws Exception {
+        var method = SemanticControllerPermissionIT.class.getDeclaredMethod("explicitGrantsDoNotCrossTheCurrentTenantBoundary");
+        assertThat(method.isAnnotationPresent(Test.class)).isTrue();
+    }
+
+    @Test
     void positiveHarnessUsesTheSameDeclaredEndpointProvider() throws Exception {
         var method = SemanticControllerPermissionIT.class.getDeclaredMethod(
                 "ordinaryMemberReceivesExactBusinessResultWithExplicitGrants", SemanticControllerPermissionIT.Endpoint.class);

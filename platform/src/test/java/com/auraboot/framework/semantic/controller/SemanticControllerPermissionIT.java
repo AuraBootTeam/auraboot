@@ -83,6 +83,7 @@ class SemanticControllerPermissionIT extends BaseIntegrationTest {
     @Autowired private SemanticMetricAlertService alerts;
     @Autowired private SemanticPreaggService preaggs;
     @Autowired private AbSemanticMetricMapper metrics;
+    @Autowired private com.auraboot.framework.semantic.service.SemanticQueryService queries;
     private String modelPid;
     private String metricPid;
     private String alertPid;
@@ -178,6 +179,10 @@ class SemanticControllerPermissionIT extends BaseIntegrationTest {
     }
 
     private void seedExistingArtifacts() {
+        seedExistingArtifacts(YAML);
+    }
+
+    private void seedExistingArtifacts(String yaml) {
         jdbc.update("INSERT INTO ab_meta_model (id, pid, tenant_id, code, table_name, source_type, "
                         + "is_current, status, version, created_at, updated_at, deleted_flag) "
                         + "VALUES (?, ?, ?, 'ab_object_alias', 'ab_object_alias', 'physical', TRUE, 'published', 1, NOW(), NOW(), FALSE)",
@@ -186,7 +191,7 @@ class SemanticControllerPermissionIT extends BaseIntegrationTest {
                         + "created_at, updated_at, created_by, updated_by, deleted_flag) "
                         + "VALUES (?, ?, 'permission_fixture', 'Permission fixture', 'en-US', 0, NOW(), NOW(), ?, ?, FALSE)",
                 UniqueIdGenerator.generate(), tenant.getId(), user.getId(), user.getId());
-        modelPid = publisher.publishFromYaml(YAML.getBytes(StandardCharsets.UTF_8), "permission-fixture", tenant.getId(), user.getId());
+        modelPid = publisher.publishFromYaml(yaml.getBytes(StandardCharsets.UTF_8), "permission-fixture", tenant.getId(), user.getId());
         bindOrdinaryContext();
         metricPid = metrics.findByCode(tenant.getId(), "count", "0.1").getPid();
         SemanticMetricAlertRequest alert = new SemanticMetricAlertRequest();
@@ -253,11 +258,15 @@ class SemanticControllerPermissionIT extends BaseIntegrationTest {
     }
 
     private Map<String, String> semanticSnapshot() {
+        return semanticSnapshot(tenant.getId());
+    }
+
+    private Map<String, String> semanticSnapshot(Long tenantId) {
         Map<String, String> state = new LinkedHashMap<>();
         for (String table : List.of("ab_semantic_model", "ab_semantic_metric", "ab_semantic_dimension",
                 "ab_semantic_lineage_edge", "ab_semantic_metric_alert", "ab_semantic_preagg", "ab_semantic_query_log", "ab_notification")) {
             state.put(table, jdbc.queryForObject("SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY id)::text, '[]') FROM "
-                    + table + " t WHERE tenant_id = ?", String.class, tenant.getId()));
+                    + table + " t WHERE tenant_id = ?", String.class, tenantId));
         }
         state.put("materializedViews", jdbc.queryForObject(
                 "SELECT COALESCE(jsonb_agg(to_jsonb(v) ORDER BY matviewname)::text, '[]') "
@@ -518,5 +527,115 @@ class SemanticControllerPermissionIT extends BaseIntegrationTest {
         Map<String, Object> row = jdbc.queryForMap("SELECT * FROM " + mv);
         assertThat(row).hasSize(1);
         return new BigDecimal(row.values().iterator().next().toString()).longValueExact();
+    }
+
+    record ForeignArtifacts(Long tenantId, String modelPid, String metricPid, String alertPid, String preaggPid) {}
+
+    private ForeignArtifacts seedSecondMembership() {
+        Tenant originalTenant = tenant;
+        TenantMember originalMember = member;
+        String originalModel = modelPid, originalMetric = metricPid, originalAlert = alertPid, originalPreagg = preaggPid;
+        MetaContext.Snapshot caller = MetaContext.snapshot();
+        try {
+            Tenant draft = new Tenant();
+            draft.setPid(UniqueIdGenerator.generate());
+            draft.setName("semantic-foreign-" + UUID.randomUUID());
+            draft.setDisplayName("Foreign semantic fixture");
+            draft.setStatus("active");
+            draft.setDeletedFlag(false);
+            draft.setCreatedAt(Instant.now());
+            draft.setUpdatedAt(Instant.now());
+            tenant = tenants.createTenant(draft);
+            member = null;
+            bindOrdinaryContext();
+            member = members.addMember(user.getId(), tenant.getId(), "active");
+            bindOrdinaryContext();
+            seedExistingArtifacts(YAML.replace("code: permission_fixture", "code: foreign_fixture"));
+            bindOrdinaryContext();
+            jdbc.update("INSERT INTO ab_object_alias (pid, tenant_id, model_code, alias, language, acp_priority, "
+                            + "created_at, updated_at, created_by, updated_by, deleted_flag) "
+                            + "VALUES (?, ?, 'foreign_fixture', 'Foreign extra row', 'en-US', 0, NOW(), NOW(), ?, ?, FALSE)",
+                    UniqueIdGenerator.generate(), tenant.getId(), user.getId(), user.getId());
+            preaggs.refreshNow(preaggPid);
+            bindOrdinaryContext();
+            var request = new com.auraboot.framework.semantic.compiler.SemanticQueryRequest();
+            request.setMetrics(List.of("foreign_fixture.count"));
+            var response = queries.executeQuery(request,
+                    new com.auraboot.framework.semantic.compiler.UserContext(user.getId(), tenant.getId(), Map.of()));
+            assertThat(response.getRows()).hasSize(1);
+            assertThat(new BigDecimal(response.getRows().get(0).values().iterator().next().toString())).isEqualByComparingTo("2");
+            return new ForeignArtifacts(tenant.getId(), modelPid, metricPid, alertPid, preaggPid);
+        } finally {
+            tenant = originalTenant;
+            member = originalMember;
+            modelPid = originalModel;
+            metricPid = originalMetric;
+            alertPid = originalAlert;
+            preaggPid = originalPreagg;
+            MetaContext.clear();
+            MetaContext.restore(caller);
+        }
+    }
+
+    @Test
+    void explicitGrantsDoNotCrossTheCurrentTenantBoundary() throws Exception {
+        ForeignArtifacts foreign = seedSecondMembership();
+        grantOrdinaryPermissions(MetaPermission.META_SEMANTIC_USE, MetaPermission.META_SEMANTIC_PUBLISH);
+        var ownQuery = mvc.perform(MockMvcRequestBuilders.post("/api/semantic/query").contentType("application/json")
+                .content("{\"metrics\":[\"permission_fixture.count\"]}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.rowcount").value(1)).andReturn();
+        var ownRows = json.readTree(ownQuery.getResponse().getContentAsString()).path("data").path("rows");
+        assertThat(ownRows.size()).isEqualTo(1);
+        assertThat(ownRows.get(0).size()).isEqualTo(1);
+        assertThat(ownRows.get(0).elements().next().decimalValue()).isEqualByComparingTo("1");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_semantic_query_log WHERE tenant_id = ? AND rowcount = 1",
+                Long.class, tenant.getId())).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_semantic_query_log WHERE tenant_id = ? AND rowcount = 1",
+                Long.class, foreign.tenantId())).isEqualTo(1);
+        Map<String, String> ownBefore = semanticSnapshot();
+        Map<String, String> foreignBefore = semanticSnapshot(foreign.tenantId());
+        mvc.perform(MockMvcRequestBuilders.get("/api/semantic/meta"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.models.length()").value(1))
+                .andExpect(jsonPath("$.data.models[0].pid").value(modelPid));
+        mvc.perform(MockMvcRequestBuilders.get("/api/semantic/alerts"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].pid").value(alertPid));
+        mvc.perform(MockMvcRequestBuilders.get("/api/semantic/preaggs"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].pid").value(preaggPid));
+        mvc.perform(MockMvcRequestBuilders.get("/api/semantic/usage/summary?days=7"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalQueries").value(1))
+                .andExpect(jsonPath("$.data.totalRows").value(1)).andExpect(jsonPath("$.data.activeUsers").value(1));
+        mvc.perform(MockMvcRequestBuilders.get("/api/semantic/lineage/" + foreign.modelPid()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.incoming.length()").value(0))
+                .andExpect(jsonPath("$.data.outgoing.length()").value(0));
+        record Rejected(String method, String path, String body, String error, Class<?> controller, String handler) {}
+        String foreignAlert = json.writeValueAsString(Map.of("name", "Foreign attempt", "metricPid", foreign.metricPid(),
+                "comparator", "gte", "threshold", 2, "alertStatus", "paused", "silenceMinutes", 0));
+        for (Rejected rejected : List.of(
+                new Rejected("POST", "/api/semantic/query", "{\"metrics\":[\"foreign_fixture.count\"]}", "UNKNOWN_METRIC", SemanticController.class, "query"),
+                new Rejected("POST", "/api/semantic/sql", "{\"metrics\":[\"foreign_fixture.count\"]}", "UNKNOWN_METRIC", SemanticController.class, "explain"),
+                new Rejected("POST", "/api/semantic/alerts", foreignAlert, "SEMANTIC_ALERT_METRIC_MISSING", SemanticMetricAlertController.class, "create"),
+                new Rejected("PUT", "/api/semantic/alerts/" + foreign.alertPid(), foreignAlert, "SEMANTIC_ALERT_MISSING", SemanticMetricAlertController.class, "update"),
+                new Rejected("DELETE", "/api/semantic/alerts/" + foreign.alertPid(), null, "SEMANTIC_ALERT_MISSING", SemanticMetricAlertController.class, "delete"),
+                new Rejected("POST", "/api/semantic/alerts/" + foreign.alertPid() + "/evaluate", null, "SEMANTIC_ALERT_MISSING", SemanticMetricAlertController.class, "evaluate"),
+                new Rejected("POST", "/api/semantic/preaggs?name=foreign-attempt&metricCode=count&semanticModelPid=" + foreign.modelPid(), null, "SEMANTIC_PREAGG_MODEL_MISSING", SemanticPreaggController.class, "create"),
+                new Rejected("POST", "/api/semantic/preaggs/" + foreign.preaggPid() + "/refresh", null, "SEMANTIC_PREAGG_MISSING", SemanticPreaggController.class, "refresh"),
+                new Rejected("DELETE", "/api/semantic/preaggs/" + foreign.preaggPid(), null, "SEMANTIC_PREAGG_MISSING", SemanticPreaggController.class, "delete"))) {
+            var request = MockMvcRequestBuilders.request(HttpMethod.valueOf(rejected.method()), rejected.path());
+            if (rejected.body() != null) request.contentType("application/json").content(rejected.body());
+            var result = mvc.perform(request).andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.data.errorCode").value(rejected.error()))
+                    .andExpect(jsonPath("$.data.rows").doesNotExist()).andReturn();
+            assertThat(result.getHandler()).isInstanceOf(HandlerMethod.class);
+            var handler = (HandlerMethod) result.getHandler();
+            assertThat(handler.getBeanType()).isEqualTo(rejected.controller());
+            assertThat(handler.getMethod().getName()).isEqualTo(rejected.handler());
+            assertThat(semanticSnapshot()).isEqualTo(ownBefore);
+            assertThat(semanticSnapshot(foreign.tenantId())).isEqualTo(foreignBefore);
+        }
+        String foreignMv = jdbc.queryForObject("SELECT mv_name FROM ab_semantic_preagg WHERE tenant_id = ? AND pid = ?",
+                String.class, foreign.tenantId(), foreign.preaggPid());
+        assertThat(mvValue(foreignMv)).isEqualTo(2);
     }
 }
