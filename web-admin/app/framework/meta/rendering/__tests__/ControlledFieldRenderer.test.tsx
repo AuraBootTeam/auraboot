@@ -9,6 +9,26 @@ describe('ControlledFieldRenderer', () => {
     capturedPropsSpy.mockClear();
   });
 
+  it('retains current-field normalization after the controlled input change', async () => {
+    vi.resetModules();
+    vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
+      ComponentLoader: ({ props }: { props: Record<string, any> }) =>
+        <button onClick={() => props.onChange('')}>Clear source</button>,
+    }));
+    const { createFieldRenderer } = await import('~/framework/meta/utils/createFieldRenderer');
+    function Form() {
+      const [data, setData] = React.useState<Record<string, any>>({ source: 'fqc', notes: 'Preserve' });
+      const renderField = createFieldRenderer(data, setData,
+        { locale: 'zh-CN', t: (key: string) => key } as any, {},
+        (field, value) => { if (value === '') setData(previous => ({ ...previous, [field]: null })); });
+      return <>{renderField({ field: 'source', component: 'SmartSelect' } as any)}
+        <output data-testid="state">{JSON.stringify(data)}</output></>;
+    }
+    render(<Form />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Clear source' }));
+    expect(JSON.parse(screen.getByTestId('state').textContent!)).toEqual({ source: null, notes: 'Preserve' });
+  });
+
   it('keeps wrapper-owned controlled state authoritative over metadata props', async () => {
     vi.resetModules();
     vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({

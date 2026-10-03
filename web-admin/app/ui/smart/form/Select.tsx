@@ -214,9 +214,10 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       [dataSource, dataSourceDependenciesMet, disabledValue, refetch],
     );
 
+    const accessibleLabel = labelText || st((restProps as React.AriaAttributes)['aria-label']);
     const clearLabel = st({
-      'zh-CN': labelText ? `清空${labelText}` : '清空选项',
-      en: labelText ? `Clear ${labelText}` : 'Clear selection',
+      'zh-CN': accessibleLabel ? `清空${accessibleLabel}` : '清空选项',
+      en: accessibleLabel ? `Clear ${accessibleLabel}` : 'Clear selection',
     });
 
     // 处理清除

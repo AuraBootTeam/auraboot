@@ -2357,7 +2357,7 @@ export function FormPageContent(props: PageContentProps) {
           const linkedChanges = Object.fromEntries(
             Object.entries(nextForm).filter(
               ([key, nextValue]) =>
-                key !== fieldCode && key !== 'pid' && nextValue !== formData[key],
+                key !== 'pid' && nextValue !== (key === fieldCode ? value : formData[key]),
             ),
           );
           for (const key of Object.keys(linkedChanges)) {

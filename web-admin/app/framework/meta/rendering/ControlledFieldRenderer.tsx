@@ -427,6 +427,7 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
     name: field.field,
     // label is rendered by ControlledFieldRenderer wrapper, not passed to component
     // to ensure consistent vertical label-above-input layout across all components
+    'aria-label': resolvedLabel,
     value: adaptedValue,
     onChange: adaptedOnChange,
     disabled: isDisabled,

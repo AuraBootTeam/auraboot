@@ -43,6 +43,12 @@ describe('Smart Select', () => {
     expect(onClear).toHaveBeenCalledTimes(1);
   });
 
+  it('names the clear action from an external wrapper accessible label', () => {
+    render(<Select name="source_type" aria-label="来源类型" value="fqc"
+      options={[{ label: 'FQC', value: 'fqc' }]} clearable />);
+    expect(screen.getByRole('button', { name: '清空来源类型' })).toBeInTheDocument();
+  });
+
   it('does not expose a clear action for a read-only selection', () => {
     render(<Select name="source_type" label="Source type" value="fqc"
       options={[{ label: 'FQC', value: 'fqc' }]} clearable readOnly />);
