@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { createCookieSessionStorage } from 'react-router';
 import path from 'node:path';
 import { BACKEND_URL, BASE_URL as WEB_BASE_URL } from '../../helpers/environments';
+import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 
 const EVIDENCE_DIR = path.join(process.env.AURA_EVIDENCE_ROOT || '/tmp', 'ui-golden-20260914');
 const sessionStorage = createCookieSessionStorage({
@@ -16,15 +17,34 @@ const sessionStorage = createCookieSessionStorage({
 });
 
 async function authenticate(page: import('@playwright/test').Page) {
-  const seedResponse = await page.request.post(
-    `${BACKEND_URL}/api/test/seed?testRunId=open-platform-ui-20260914`,
-    { timeout: 30_000 },
+  const loginResponse = await page.request.post(`${BACKEND_URL}/api/auth/login`, {
+    data: { email: DEFAULT_TEST_ACCOUNT.email, password: DEFAULT_TEST_ACCOUNT.password },
+  });
+  expect(loginResponse.status()).toBe(200);
+  const login = await loginResponse.json();
+  expect(String(login.code)).toBe('0');
+  expect(login.data.jwt).toEqual(expect.any(String));
+  const authorization = { Authorization: `Bearer ${login.data.jwt}` };
+  const spacesResponse = await page.request.get(`${BACKEND_URL}/api/tenant-selection/my-spaces`, {
+    headers: authorization,
+  });
+  expect(spacesResponse.status()).toBe(200);
+  const spaces = await spacesResponse.json();
+  expect(String(spaces.code)).toBe('0');
+  const business = spaces.data.find(
+    (space: { spaceType: string; tenantId: string }) => space.spaceType === 'business',
   );
-  expect(seedResponse.ok()).toBeTruthy();
-  const seed = await seedResponse.json();
-  expect(seed.jwt).toEqual(expect.any(String));
+  expect(business).toBeDefined();
+  const selectionResponse = await page.request.post(`${BACKEND_URL}/api/tenant-selection/process`, {
+    headers: authorization,
+    data: { action: 'select', tenantId: business.tenantId },
+  });
+  expect(selectionResponse.status()).toBe(200);
+  const selected = await selectionResponse.json();
+  expect(String(selected.code)).toBe('0');
+  expect(selected.data.jwt).toEqual(expect.any(String));
   const session = await sessionStorage.getSession();
-  session.set('jwtToken', seed.jwt);
+  session.set('jwtToken', selected.data.jwt);
   const setCookie = await sessionStorage.commitSession(session, { maxAge: 604800 });
   const value = setCookie.match(/__session=([^;]+)/)?.[1];
   expect(value).toBeTruthy();
