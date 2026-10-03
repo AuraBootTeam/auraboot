@@ -33,6 +33,7 @@
 #   ./scripts/oss-golden-stack.sh env  <name>          # print the Playwright env exports
 #   ./scripts/oss-golden-stack.sh status <name>
 #   ./scripts/oss-golden-stack.sh down <name>          # stop backend+frontend (keep runtime/DB)
+#   ./scripts/oss-golden-stack.sh verify-artifacts <name> # read-only live identity probes + manifest publication
 #   ./scripts/oss-golden-stack.sh destroy <name>       # down + infra cleanup + runtime destroy
 #
 # Then run golden specs (the `up` banner prints this, `env` re-prints it):
@@ -651,6 +652,9 @@ cmd_up() {
     log "8/9 warm: skipped (--no-frontend)"
   fi
 
+  if [ "$frontend" -eq 1 ]; then
+    cmd_verify_artifacts "$name"
+  fi
   log "9/9 ready ✓"
   echo
   cmd_env "$name"
@@ -811,6 +815,11 @@ cmd_warm() {
 }
 
 # ---- env -----------------------------------------------------------------------------
+cmd_verify_artifacts() {
+  node "$SCRIPT_DIR/lib/golden-product-identity.mjs" "$1" "$REPO_ROOT" "$DEV" \
+    || die "product artifact verification failed"
+}
+
 cmd_env() {
   local name="$1" sd; sd="$(state_dir "$name")"
   [ -f "$sd/ports" ] || die "no running stack for '$name' (run 'up' first)"
@@ -960,7 +969,8 @@ case "$sub" in
   warm) cmd_warm "$name";;
   env) cmd_env "$name";;
   status) cmd_status "$name";;
+  verify-artifacts) cmd_verify_artifacts "$name";;
   down) cmd_down "$name";;
   destroy) cmd_destroy "$name";;
-  *) die "unknown subcommand: $sub (up|import|warm|env|status|down|destroy)";;
+  *) die "unknown subcommand: $sub (up|import|warm|env|status|verify-artifacts|down|destroy)";;
 esac
