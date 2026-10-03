@@ -10,164 +10,200 @@
 import type { ExtendedPropertySchema } from '~/shared/designer/SchemaBlockConfigPanel';
 
 /** Per-column detail editor schema (applied when a column is selected). */
-export const columnDetailSchemas: ExtendedPropertySchema<string>[] = [
-  {
-    key: 'width',
-    label: '宽度 (px)',
-    type: 'number',
-    group: '尺寸',
-    placeholder: 'auto',
-    description: '只为关键列设置固定宽度，其余列尽量保持自适应。',
-  },
-  {
-    key: 'align',
-    label: '对齐',
-    type: 'select',
-    group: '尺寸',
-    description: '数字通常右对齐，文本或标签通常左对齐。',
-    options: [
-      { label: '左对齐', value: 'left' },
-      { label: '居中', value: 'center' },
-      { label: '右对齐', value: 'right' },
-    ],
-  },
-  {
-    key: 'renderer',
-    label: '渲染器',
-    type: 'select',
-    group: '显示',
-    description: '优先用最朴素的表现形式，只有语义明确时才升级为标签或链接。',
-    options: [
-      { label: '文本', value: 'text' },
-      { label: '富文本', value: 'richtext' },
-      { label: '标签', value: 'badge' },
-      { label: '链接', value: 'link' },
-      { label: '图片', value: 'image' },
-    ],
-  },
-  {
-    key: 'format',
-    label: '格式化模板',
-    type: 'text',
-    group: '显示',
-    placeholder: 'e.g. YYYY-MM-DD / {0}件',
-    description: '仅用于提升可读性，不要把复杂业务计算塞进显示模板。',
-  },
-];
+export function buildColumnDetailSchemas(
+  t: (key: string) => string,
+): ExtendedPropertySchema<string>[] {
+  return [
+    {
+      key: 'width',
+      label: t('list_editor.width'),
+      type: 'number',
+      group: t('list_editor.size_group'),
+      placeholder: t('list_editor.auto'),
+      description: t('list_editor.width_hint'),
+    },
+    {
+      key: 'align',
+      label: t('list_editor.align'),
+      type: 'select',
+      group: t('list_editor.size_group'),
+      description: t('list_editor.align_hint'),
+      options: [
+        { label: t('list_editor.left_align'), value: 'left' },
+        { label: t('list_editor.center_align'), value: 'center' },
+        { label: t('list_editor.right_align'), value: 'right' },
+      ],
+    },
+    {
+      key: 'renderer',
+      label: t('list_editor.renderer'),
+      type: 'select',
+      group: t('list_editor.display_group'),
+      description: t('list_editor.renderer_hint'),
+      options: [
+        { label: t('list_editor.text'), value: 'text' },
+        { label: t('list_editor.richtext'), value: 'richtext' },
+        { label: t('list_editor.badge'), value: 'badge' },
+        { label: t('list_editor.link'), value: 'link' },
+        { label: t('list_editor.image'), value: 'image' },
+      ],
+    },
+    {
+      key: 'format',
+      label: t('list_editor.format'),
+      type: 'text',
+      group: t('list_editor.display_group'),
+      placeholder: t('list_editor.format_placeholder'),
+      description: t('list_editor.format_hint'),
+    },
+  ];
+}
 
 /** Per-filter detail editor schema (applied when a filter is selected). */
-export const filterDetailSchemas: ExtendedPropertySchema<string>[] = [
-  {
-    key: 'operator',
-    label: '操作符',
-    type: 'select',
-    group: '条件',
-    description: '让用户一眼就能理解筛选逻辑，避免默认使用过宽泛的条件。',
-    options: [
-      { label: '等于', value: 'eq' },
-      { label: '不等', value: 'neq' },
-      { label: '包含', value: 'like' },
-      { label: '介于', value: 'between' },
-      { label: '大于', value: 'gt' },
-      { label: '大于等于', value: 'gte' },
-      { label: '小于', value: 'lt' },
-      { label: '小于等于', value: 'lte' },
-    ],
-  },
-  {
-    key: 'defaultValue',
-    label: '默认值',
-    type: 'text',
-    group: '条件',
-    description: '只给真正高频的筛选项设置默认值，避免用户一进来就被过度限制。',
-  },
-  {
-    key: 'displayMode',
-    label: '显示模式',
-    type: 'select',
-    group: '外观',
-    description: '高频项适合内联，次要筛选更适合收进抽屉或顶部栏。',
-    options: [
-      { label: '内联', value: 'inline' },
-      { label: '抽屉', value: 'drawer' },
-      { label: '顶部栏', value: 'top-bar' },
-    ],
-  },
-];
+export function buildFilterDetailSchemas(
+  t: (key: string) => string,
+): ExtendedPropertySchema<string>[] {
+  return [
+    {
+      key: 'operator',
+      label: t('list_editor.operator'),
+      type: 'select',
+      group: t('list_editor.condition_group'),
+      description: t('list_editor.operator_hint'),
+      options: [
+        { label: t('list_editor.equal'), value: 'eq' },
+        { label: t('list_editor.not_equal_option'), value: 'neq' },
+        { label: t('list_editor.contains'), value: 'like' },
+        { label: t('list_editor.between_option'), value: 'between' },
+        { label: t('list_editor.greater_than'), value: 'gt' },
+        { label: t('list_editor.greater_or_equal'), value: 'gte' },
+        { label: t('list_editor.less_than'), value: 'lt' },
+        { label: t('list_editor.less_or_equal'), value: 'lte' },
+      ],
+    },
+    {
+      key: 'defaultValue',
+      label: t('list_editor.default_value'),
+      type: 'text',
+      group: t('list_editor.condition_group'),
+      description: t('list_editor.default_value_hint'),
+    },
+    {
+      key: 'displayMode',
+      label: t('list_editor.display_mode'),
+      type: 'select',
+      group: t('list_editor.appearance_group'),
+      description: t('list_editor.display_mode_hint'),
+      options: [
+        { label: t('list_editor.inline'), value: 'inline' },
+        { label: t('list_editor.drawer'), value: 'drawer' },
+        { label: t('list_editor.top_bar'), value: 'top-bar' },
+      ],
+    },
+  ];
+}
 
 /** Toolbar preset toggles (gated by capabilities at render time). */
-export const toolbarPresetSchemas: ExtendedPropertySchema<string>[] = [
-  { key: 'presetCreate', label: '新增', type: 'boolean', group: '预设按钮' },
-  { key: 'presetRefresh', label: '刷新', type: 'boolean', group: '预设按钮' },
-  { key: 'presetExport', label: '导出', type: 'boolean', group: '预设按钮' },
-  { key: 'presetBulkDelete', label: '批量删除', type: 'boolean', group: '预设按钮' },
-];
+export function buildToolbarPresetSchemas(
+  t: (key: string) => string,
+): ExtendedPropertySchema<string>[] {
+  return [
+    {
+      key: 'presetCreate',
+      label: t('list_editor.create'),
+      type: 'boolean',
+      group: t('list_editor.preset_buttons'),
+    },
+    {
+      key: 'presetRefresh',
+      label: t('list_editor.refresh'),
+      type: 'boolean',
+      group: t('list_editor.preset_buttons'),
+    },
+    {
+      key: 'presetExport',
+      label: t('list_editor.export'),
+      type: 'boolean',
+      group: t('list_editor.preset_buttons'),
+    },
+    {
+      key: 'presetBulkDelete',
+      label: t('list_editor.bulk_delete'),
+      type: 'boolean',
+      group: t('list_editor.preset_buttons'),
+    },
+  ];
+}
 
 /** Custom button schema (for the add-custom-button list editor). */
-export const customButtonSchemas: ExtendedPropertySchema<string>[] = [
-  {
-    key: 'label',
-    label: '按钮文字',
-    type: 'text',
-    required: true,
-    group: '基础',
-    description: '尽量使用动词短语，例如“批量指派”“导出报表”。',
-  },
-  {
-    key: 'icon',
-    label: '图标',
-    type: 'icon',
-    group: '基础',
-    description: '图标只做辅助识别，不要替代按钮文案。',
-  },
-  {
-    key: 'code',
-    label: '按钮编码',
-    type: 'text',
-    group: '基础',
-    placeholder: 'refresh_orders',
-    description: '用于运行态 testid 和行为识别。刷新类自定义按钮请使用稳定、唯一的编码。',
-  },
-  {
-    key: 'actionKind',
-    label: '动作类型',
-    type: 'select',
-    group: '绑定',
-    defaultValue: 'command',
-    description: '普通业务动作绑定 Command;数据刷新动作绑定指定 dataSource。',
-    options: [
-      { label: '执行 Command', value: 'command' },
-      { label: '刷新数据源', value: 'refresh' },
-    ],
-  },
-  {
-    key: 'command',
-    label: 'Command',
-    type: 'text',
-    required: true,
-    placeholder: 'plugin:action',
-    group: '绑定',
-    dependsOn: { field: 'actionKind', anyOf: [undefined, 'command'] },
-    description: '绑定清晰的 command，避免一个按钮承担多个隐式行为。',
-  },
-  {
-    key: 'targetDataSource',
-    label: '目标数据源',
-    type: 'text',
-    required: true,
-    placeholder: 'ds_list',
-    group: '绑定',
-    dependsOn: { field: 'actionKind', value: 'refresh' },
-    description: '运行态点击按钮时刷新这个 page dataSource。',
-  },
-  {
-    key: 'requiresSelection',
-    label: '需要选中行',
-    type: 'boolean',
-    group: '绑定',
-    description: '批量类动作应开启，页面级动作通常不需要。',
-  },
-];
+export function buildCustomButtonSchemas(
+  t: (key: string) => string,
+): ExtendedPropertySchema<string>[] {
+  return [
+    {
+      key: 'label',
+      label: t('list_editor.button_label'),
+      type: 'text',
+      required: true,
+      group: t('list_editor.basic_group'),
+      description: t('list_editor.button_label_hint'),
+    },
+    {
+      key: 'icon',
+      label: t('list_editor.icon'),
+      type: 'icon',
+      group: t('list_editor.basic_group'),
+      description: t('list_editor.icon_hint'),
+    },
+    {
+      key: 'code',
+      label: t('list_editor.button_code'),
+      type: 'text',
+      group: t('list_editor.basic_group'),
+      placeholder: 'refresh_orders',
+      description: t('list_editor.button_code_hint'),
+    },
+    {
+      key: 'actionKind',
+      label: t('list_editor.action_kind'),
+      type: 'select',
+      group: t('list_editor.binding_group'),
+      defaultValue: 'command',
+      description: t('list_editor.action_kind_hint'),
+      options: [
+        { label: t('list_editor.execute_command'), value: 'command' },
+        { label: t('list_editor.refresh_source'), value: 'refresh' },
+      ],
+    },
+    {
+      key: 'command',
+      label: t('list_editor.command'),
+      type: 'text',
+      required: true,
+      placeholder: 'plugin:action',
+      group: t('list_editor.binding_group'),
+      dependsOn: { field: 'actionKind', anyOf: [undefined, 'command'] },
+      description: t('list_editor.command_hint'),
+    },
+    {
+      key: 'targetDataSource',
+      label: t('list_editor.target_source'),
+      type: 'text',
+      required: true,
+      placeholder: 'ds_list',
+      group: t('list_editor.binding_group'),
+      dependsOn: { field: 'actionKind', value: 'refresh' },
+      description: t('list_editor.target_source_hint'),
+    },
+    {
+      key: 'requiresSelection',
+      label: t('list_editor.selection_required'),
+      type: 'boolean',
+      group: t('list_editor.binding_group'),
+      description: t('list_editor.selection_required_hint'),
+    },
+  ];
+}
 
 /**
  * Behavior tab schemas — option lists for sort fields are derived from

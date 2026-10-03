@@ -31,7 +31,11 @@ import { BASE_URL } from '../../helpers/environments';
  */
 async function createTestPage(
   page: import('@playwright/test').Page,
-  content: Partial<{ schemaVersion: number; blocks: unknown[]; dataSources: Record<string, unknown> }> = {},
+  content: Partial<{
+    schemaVersion: number;
+    blocks: unknown[];
+    dataSources: Record<string, unknown>;
+  }> = {},
 ): Promise<{ pid: string; name: string }> {
   const name = `Approval workflow ${uniqueId('tmpl').split('_').at(-1)}`;
   const pageKey = `e2e_tmpl_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
@@ -73,7 +77,10 @@ async function openTemplateDialog(page: import('@playwright/test').Page) {
   return dialog;
 }
 
-async function openTemplateEditor(page: import('@playwright/test').Page, pid: string): Promise<void> {
+async function openTemplateEditor(
+  page: import('@playwright/test').Page,
+  pid: string,
+): Promise<void> {
   await page.goto(`/page-designer/${pid}`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByTestId('list-config-panel')).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId('toolbar-create-from-template')).toBeEnabled();
@@ -91,7 +98,11 @@ test.describe('Page Templates', () => {
   let pageName: string;
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ baseURL: BASE_URL, extraHTTPHeaders: { Referer: `${BASE_URL}/` }, storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({
+      baseURL: BASE_URL,
+      extraHTTPHeaders: { Referer: `${BASE_URL}/` },
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
+    });
     const p = await ctx.newPage();
     const result = await createTestPage(p);
     pagePid = result.pid;
@@ -277,28 +288,53 @@ test.describe('Page Templates', () => {
     expect(persisted.ok()).toBe(true);
     const persistedBody = await persisted.json();
     expect(persistedBody.code).toBe('0');
-    expect(persistedBody.data).toMatchObject({ pid: createdPid, name: newName, pageKey: newKey,
-      modelCode: 'page_schema', schemaVersion: 4, blocks: [{ id: 'blk1', blockType: 'table', config: {} }] });
+    expect(persistedBody.data).toMatchObject({
+      pid: createdPid,
+      name: newName,
+      pageKey: newKey,
+      modelCode: 'page_schema',
+      schemaVersion: 4,
+      blocks: [{ id: 'blk1', blockType: 'table', config: {} }],
+    });
     for (const width of [1280, 900, 1920]) {
       await page.setViewportSize({ width, height: 720 });
-      await expect.poll(() => page.evaluate(() => {
-        const sidebar = document.getElementById('app-sidebar');
-        const settled = !sidebar || !sidebar.getAnimations().some(animation => animation.playState === 'running');
-        const sidebarBox = sidebar?.getBoundingClientRect();
-        const expectedPosition = !sidebarBox || (innerWidth < 1024 ? sidebarBox.right <= 1 : sidebarBox.left >= -1);
-        return settled && expectedPosition && scrollX === 0
-          && document.documentElement.scrollWidth <= innerWidth + 1;
-      })).toBe(true);
+      await expect
+        .poll(() =>
+          page.evaluate(() => {
+            const sidebar = document.getElementById('app-sidebar');
+            const settled =
+              !sidebar ||
+              !sidebar.getAnimations().some((animation) => animation.playState === 'running');
+            const sidebarBox = sidebar?.getBoundingClientRect();
+            const expectedPosition =
+              !sidebarBox || (innerWidth < 1024 ? sidebarBox.right <= 1 : sidebarBox.left >= -1);
+            return (
+              settled &&
+              expectedPosition &&
+              scrollX === 0 &&
+              document.documentElement.scrollWidth <= innerWidth + 1
+            );
+          }),
+        )
+        .toBe(true);
       const summary = page.getByTestId('list-designer-summary');
       await summary.scrollIntoViewIfNeeded();
-      await expect.poll(async () => summary.evaluate(element => {
-        const main = element.closest('main')!;
-        const heading = element.querySelector('h1')!;
-        return main.scrollWidth <= main.clientWidth + 1
-          && heading.getBoundingClientRect().width >= 180
-          && Array.from(element.querySelectorAll('.grid > div')).every(card =>
-            card.getBoundingClientRect().right <= element.getBoundingClientRect().right + 1);
-      })).toBe(true);
+      await expect
+        .poll(async () =>
+          summary.evaluate((element) => {
+            const main = element.closest('main')!;
+            const heading = element.querySelector('h1')!;
+            return (
+              main.scrollWidth <= main.clientWidth + 1 &&
+              heading.getBoundingClientRect().width >= 180 &&
+              Array.from(element.querySelectorAll('.grid > div')).every(
+                (card) =>
+                  card.getBoundingClientRect().right <= element.getBoundingClientRect().right + 1,
+              )
+            );
+          }),
+        )
+        .toBe(true);
       const preview = page.getByTestId('list-preview-pane');
       await expect(preview).toBeVisible();
       const mainBox = await page.getByTestId('list-config-main').boundingBox();
@@ -307,37 +343,206 @@ test.describe('Page Templates', () => {
       expect(previewBox).not.toBeNull();
       if (width === 1920) expect(previewBox!.x).toBeGreaterThan(mainBox!.x);
       else expect(previewBox!.y).toBeGreaterThanOrEqual(mainBox!.y + mainBox!.height - 1);
-      await page.screenshot({ path: testInfo.outputPath(width === 1280 ? 'T4-result.png' : `T4-result-${width}.png`), fullPage: true });
+      await page.screenshot({
+        path: testInfo.outputPath(width === 1280 ? 'T4-result.png' : `T4-result-${width}.png`),
+        fullPage: true,
+      });
     }
     await page.setViewportSize({ width: 1280, height: 720 });
-    for (const [locale, label, heading] of [['en-US', 'English', 'Columns'], ['zh-CN', '简体中文', '列结构']]) {
+    for (const [locale, label, heading] of [
+      ['en-US', 'English', 'Columns'],
+      ['zh-CN', '简体中文', '列结构'],
+    ]) {
       await page.getByTestId('lang-toggle').getByRole('button').click();
       await page.getByTestId('lang-dropdown').getByRole('button', { name: label }).click();
-      await expect(page.getByTestId('list-designer-summary').getByRole('heading', { name: heading, exact: true })).toBeVisible();
+      await expect(
+        page
+          .getByTestId('list-designer-summary')
+          .getByRole('heading', { name: heading, exact: true }),
+      ).toBeVisible();
       await page.reload();
-      await expect(page.getByTestId('list-designer-summary').getByRole('heading', { name: heading, exact: true })).toBeVisible();
+      await expect(
+        page
+          .getByTestId('list-designer-summary')
+          .getByRole('heading', { name: heading, exact: true }),
+      ).toBeVisible();
       const dictionary = await page.request.get(`/api/i18n/${locale}`);
       expect(dictionary.ok()).toBe(true);
       const dictionaryBody = await dictionary.json();
       const translations = dictionaryBody.data ?? dictionaryBody;
-      expect(translations['list_designer.columns'] ?? translations.list_designer?.columns).toBe(heading);
-      await page.screenshot({ path: testInfo.outputPath(`T4-language-${locale}.png`), fullPage: true });
+      expect(translations['list_designer.columns'] ?? translations.list_designer?.columns).toBe(
+        heading,
+      );
+      await page.screenshot({
+        path: testInfo.outputPath(`T4-language-${locale}.png`),
+        fullPage: true,
+      });
     }
   });
+
+  for (const locale of ['en-US', 'zh-CN']) {
+    test(`T7 - persist all list editor tabs through the page configuration menu in ${locale}`, async ({
+      page,
+    }, testInfo) => {
+      test.setTimeout(90_000);
+      const english = locale === 'en-US';
+      const source = await createTestPage(page, {
+        blocks: [
+          { id: 'editor_table', blockType: 'table', columns: ['name'], props: { pageSize: 20 } },
+        ],
+        dataSources: { tableData: { model: 'page_schema' } },
+      });
+      await page.goto('/', { waitUntil: 'domcontentloaded' });
+      await page.getByTestId('lang-toggle').getByRole('button').click();
+      await page
+        .getByTestId('lang-dropdown')
+        .getByRole('button', { name: english ? 'English' : '简体中文' })
+        .click();
+      const nav = page.locator('nav, aside, [role="navigation"]').first();
+      await nav.getByRole('button', { name: /元数据管理|Meta/i }).click();
+      await nav.locator('a[href="/p/page_schema"]').click();
+      const row = page.getByRole('row').filter({ hasText: source.name });
+      await expect(row).toHaveCount(1);
+      await row.getByTestId('row-action-more').click();
+      await page.getByTestId('row-action-dropdown').getByTestId('row-action-edit_legacy').click();
+      await expect(page).toHaveURL(`${BASE_URL}/page-designer/${source.pid}`);
+      await expect(
+        page
+          .getByTestId('columns-tab')
+          .getByRole('heading', {
+            name: english ? 'Choose key columns, then order them' : '先选主列，再排阅读顺序',
+          }),
+      ).toBeVisible();
+      await page.getByTestId('column-item-0').click();
+      const width = page.getByTestId('schema-config-field-width');
+      await expect(width).toContainText(english ? 'Width (px)' : '宽度 (px)');
+      await width.locator('input').fill('180');
+      await expect(page.getByTestId('column-item-0')).toContainText('180px');
+      await page.screenshot({
+        path: testInfo.outputPath(`T7-${locale}-columns.png`),
+        fullPage: true,
+      });
+      await page.getByTestId('list-tab-filters').click();
+      await expect(
+        page
+          .getByTestId('filters-tab')
+          .getByRole('heading', { name: english ? 'Keep frequent filters' : '只保留高频筛选' }),
+      ).toBeVisible();
+      await page.getByTestId('filter-search-input').fill('UNMATCHED_FIELD');
+      await expect(page.getByTestId('filters-tab')).toContainText(
+        english ? 'No matching filter fields.' : '没有匹配的筛选字段。',
+      );
+      await page.getByTestId('filter-search-input').clear();
+      await page.getByTestId('filter-toggle-name').click();
+      await page.getByTestId('filter-item-0').click();
+      await page.getByTestId('schema-config-field-operator').getByRole('combobox').click();
+      await page.getByRole('option', { name: english ? 'Contains' : '包含', exact: true }).click();
+      await page.getByTestId('schema-config-field-defaultValue').locator('input').fill('Acme');
+      await expect(page.getByTestId('preview-filter-name')).toContainText('Acme');
+      await page.screenshot({
+        path: testInfo.outputPath(`T7-${locale}-filters.png`),
+        fullPage: true,
+      });
+      await page.getByTestId('list-tab-toolbar').click();
+      await expect(
+        page
+          .getByTestId('toolbar-tab')
+          .getByRole('heading', {
+            name: english ? 'Start with preset actions' : '先用预设动作占住主操作',
+          }),
+      ).toBeVisible();
+      await page.getByTestId('toolbar-preset-refresh').check();
+      await expect(page.getByTestId('preview-toolbar-refresh')).toHaveText(
+        english ? 'Refresh' : '刷新',
+      );
+      await page.screenshot({
+        path: testInfo.outputPath(`T7-${locale}-toolbar.png`),
+        fullPage: true,
+      });
+      await page.getByTestId('list-tab-behavior').click();
+      const pageSize = page.getByTestId('schema-config-field-pageSize');
+      await expect(pageSize).toContainText(english ? 'Page size' : '每页条数');
+      await pageSize.locator('input').fill('50');
+      await page.getByTestId('schema-config-field-rowClickAction').getByRole('combobox').click();
+      await page
+        .getByRole('option', { name: english ? 'Open drawer' : '打开抽屉', exact: true })
+        .click();
+      await page.screenshot({
+        path: testInfo.outputPath(`T7-${locale}-behavior.png`),
+        fullPage: true,
+      });
+      const [saved] = await Promise.all([
+        page.waitForResponse(
+          (r) =>
+            new URL(r.url()).pathname === `/api/pages/${source.pid}` &&
+            r.request().method() === 'PUT',
+        ),
+        page.getByTestId('toolbar-save').click(),
+      ]);
+      expect(saved.ok()).toBe(true);
+      expect((await saved.json()).code).toBe('0');
+      const persisted = await page.request.get(`/api/pages/${source.pid}`);
+      expect(persisted.ok()).toBe(true);
+      const body = await persisted.json();
+      expect(body.code).toBe('0');
+      expect(
+        body.data.blocks.find((b: { blockType: string }) => b.blockType === 'table'),
+      ).toMatchObject({
+        columns: [{ field: 'name', width: 180 }],
+        props: { pageSize: 50, rowClickAction: 'drawer' },
+      });
+      expect(
+        body.data.blocks.find((b: { blockType: string }) => b.blockType === 'filters'),
+      ).toMatchObject({ fields: [{ field: 'name', operator: 'like', defaultValue: 'Acme' }] });
+      expect(
+        body.data.blocks.find((b: { blockType: string }) => b.blockType === 'toolbar').buttons,
+      ).toContainEqual({ preset: 'refresh' });
+      expect(saved.request().postDataJSON().blocks).toEqual(body.data.blocks);
+      await page.reload();
+      await expect(page.getByTestId('column-item-0')).toContainText('180px');
+      await expect(page.getByTestId('preview-filter-name')).toContainText('Acme');
+      await expect(page.getByTestId('preview-toolbar-refresh')).toHaveText(
+        english ? 'Refresh' : '刷新',
+      );
+      await page.getByTestId('list-tab-behavior').click();
+      await expect(page.getByTestId('schema-config-field-pageSize').locator('input')).toHaveValue(
+        '50',
+      );
+      await expect(
+        page.getByTestId('schema-config-field-rowClickAction').getByRole('combobox'),
+      ).toContainText(english ? 'Open drawer' : '打开抽屉');
+      await page.screenshot({
+        path: testInfo.outputPath(`T7-${locale}-reloaded.png`),
+        fullPage: true,
+      });
+    });
+  }
 
   // -------------------------------------------------------------------------
   // T5: Duplicate through the actual DSL page-manager menu and row command
   // -------------------------------------------------------------------------
-  test('T5 - duplicate a legacy tree through the page configuration menu', async ({ page, browser }, testInfo) => {
+  test('T5 - duplicate a legacy tree through the page configuration menu', async ({
+    page,
+    browser,
+  }, testInfo) => {
     const dataSources = { main: { model: 'page_schema' } };
     const source = await createTestPage(page, {
       schemaVersion: 3,
       dataSources,
-      blocks: [{ id: 'copy_root', blockType: 'list', blocks: [
-        { id: 'copy_table', blockType: 'table', dataSource: { ref: 'main' }, blocks: [
-          { id: 'copy_table_name', blockType: 'column', field: 'name' },
-        ] },
-      ] }],
+      blocks: [
+        {
+          id: 'copy_root',
+          blockType: 'list',
+          blocks: [
+            {
+              id: 'copy_table',
+              blockType: 'table',
+              dataSource: { ref: 'main' },
+              blocks: [{ id: 'copy_table_name', blockType: 'column', field: 'name' }],
+            },
+          ],
+        },
+      ],
     });
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     const nav = page.locator('nav, aside, [role="navigation"]').first();
@@ -355,16 +560,23 @@ test.describe('Page Templates', () => {
     await expect(duplicate).toBeEnabled();
     await page.screenshot({ path: testInfo.outputPath('T5-menu.png'), fullPage: true });
     const [response] = await Promise.all([
-      page.waitForResponse(r => decodeURIComponent(r.url()).endsWith('/api/meta/commands/execute/pgm:duplicate_page_schema')
-        && r.request().method() === 'POST'),
+      page.waitForResponse(
+        (r) =>
+          decodeURIComponent(r.url()).endsWith(
+            '/api/meta/commands/execute/pgm:duplicate_page_schema',
+          ) && r.request().method() === 'POST',
+      ),
       duplicate.click(),
     ]);
     expect(response.request().postDataJSON()).toMatchObject({ targetRecordPid: source.pid });
     expect(response.ok()).toBe(true);
     const result = await response.json();
     expect(result.code).toBe('0');
-    expect(result.data).toMatchObject({ commandCode: 'pgm:duplicate_page_schema',
-      phaseReached: 'completed', data: { handlerExecuted: true } });
+    expect(result.data).toMatchObject({
+      commandCode: 'pgm:duplicate_page_schema',
+      phaseReached: 'completed',
+      data: { handlerExecuted: true },
+    });
     const copiedPid = result.data?.data?.pid;
     expect(copiedPid).toBeTruthy();
     expect(copiedPid).not.toBe(source.pid);
@@ -372,10 +584,16 @@ test.describe('Page Templates', () => {
     expect(copied.ok()).toBe(true);
     const persisted = await copied.json();
     expect(persisted.code).toBe('0');
-    expect(persisted.data).toMatchObject({ pid: copiedPid, name: `${source.name} (Copy)`,
-      schemaVersion: 4, kind: 'list', modelCode: 'page_schema', dataSources,
+    expect(persisted.data).toMatchObject({
+      pid: copiedPid,
+      name: `${source.name} (Copy)`,
+      schemaVersion: 4,
+      kind: 'list',
+      modelCode: 'page_schema',
+      dataSources,
       blocks: [{ id: 'copy_table', blockType: 'table', dataSource: 'main', columns: ['name'] }],
-      extension: { designerRootId: 'copy_root' } });
+      extension: { designerRootId: 'copy_root' },
+    });
     const copyRow = page.getByRole('row').filter({ hasText: `${source.name} (Copy)` });
     await expect(copyRow).toBeVisible();
     await page.reload();
@@ -388,29 +606,49 @@ test.describe('Page Templates', () => {
     await page.screenshot({ path: testInfo.outputPath('duplicate-page-menu.png'), fullPage: true });
 
     // Provision an authenticated member in this tenant with only base read access.
-    const roleCode = uniqueId('copy_denied').replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 60);
-    const role = await page.request.post('/api/roles', { data: {
-      code: roleCode, name: 'Page copy restricted member', type: 'custom', status: 'ACTIVE',
-    } });
+    const roleCode = uniqueId('copy_denied')
+      .replace(/[^a-zA-Z0-9_]/g, '_')
+      .slice(0, 60);
+    const role = await page.request.post('/api/roles', {
+      data: {
+        code: roleCode,
+        name: 'Page copy restricted member',
+        type: 'custom',
+        status: 'ACTIVE',
+      },
+    });
     expect(role.ok()).toBe(true);
     const roleBody = await role.json();
     expect(roleBody.code).toBe('0');
     expect(roleBody.data.pid).toBeTruthy();
-    const grants = await page.request.put(`/api/permission/capabilities?rolePid=${roleBody.data.pid}`, {
-      data: ['sys.cap.member_base'],
-    });
+    const grants = await page.request.put(
+      `/api/permission/capabilities?rolePid=${roleBody.data.pid}`,
+      {
+        data: ['sys.cap.member_base'],
+      },
+    );
     expect(grants.ok()).toBe(true);
     const grantBody = await grants.json();
     expect(grantBody.code).toBe('0');
-    const grantedCodes = grantBody.data.flatMap((group: { capabilities: Array<{ code: string; granted: boolean }> }) =>
-      group.capabilities.filter(capability => capability.granted).map(capability => capability.code));
+    const grantedCodes = grantBody.data.flatMap(
+      (group: { capabilities: Array<{ code: string; granted: boolean }> }) =>
+        group.capabilities
+          .filter((capability) => capability.granted)
+          .map((capability) => capability.code),
+    );
     expect(grantedCodes).toEqual(['sys.cap.member_base']);
     const email = `${roleCode}@e2e.local`;
     const password = `Copy!${roleCode}9a`;
-    const provision = await page.request.post('/api/admin/users', { data: {
-      email, displayName: 'Page copy restricted member', initialPassword: password,
-      roleCodes: [roleCode], roleAssignmentMode: 'EXPLICIT', sendInviteEmail: false,
-    } });
+    const provision = await page.request.post('/api/admin/users', {
+      data: {
+        email,
+        displayName: 'Page copy restricted member',
+        initialPassword: password,
+        roleCodes: [roleCode],
+        roleAssignmentMode: 'EXPLICIT',
+        sendInviteEmail: false,
+      },
+    });
     expect(provision.ok()).toBe(true);
     const provisionBody = await provision.json();
     expect(provisionBody.code).toBe('0');
@@ -418,22 +656,34 @@ test.describe('Page Templates', () => {
     expect(provisionBody.data.mustChangePassword).toBe(false);
     expect(provisionBody.data.userPid).toBeTruthy();
     const copies = async () => {
-      const response = await page.request.get('/api/pages', { params: { keyword: source.name, pageSize: 100 } });
+      const response = await page.request.get('/api/pages', {
+        params: { keyword: source.name, pageSize: 100 },
+      });
       expect(response.ok()).toBe(true);
       const body = await response.json();
       expect(body.code).toBe('0');
-      expect(body.data.records.map((record: { pid: string }) => record.pid)).toEqual(expect.arrayContaining([source.pid, copiedPid]));
+      expect(body.data.records.map((record: { pid: string }) => record.pid)).toEqual(
+        expect.arrayContaining([source.pid, copiedPid]),
+      );
       return body.data.records.map((record: { pid: string }) => record.pid).sort();
     };
     const beforeDenied = await copies();
-    const restricted = await browser.newContext({ baseURL: BASE_URL, locale: 'zh-CN',
-      storageState: { cookies: [], origins: [] }, extraHTTPHeaders: { Referer: `${BASE_URL}/` } });
+    const restricted = await browser.newContext({
+      baseURL: BASE_URL,
+      locale: 'zh-CN',
+      storageState: { cookies: [], origins: [] },
+      extraHTTPHeaders: { Referer: `${BASE_URL}/` },
+    });
     try {
       const restrictedPage = await restricted.newPage();
       await restrictedPage.goto('/login');
       await restrictedPage.locator('#identifier').fill(email);
       await restrictedPage.locator('#password').fill(password);
-      await restrictedPage.locator('form').filter({ has: restrictedPage.locator('#identifier') }).locator('button[type="submit"]').click();
+      await restrictedPage
+        .locator('form')
+        .filter({ has: restrictedPage.locator('#identifier') })
+        .locator('button[type="submit"]')
+        .click();
       await expect(restrictedPage).not.toHaveURL(/\/login(?:\?|$)/);
       if (restrictedPage.url().includes('/tenant-selection')) {
         await restrictedPage.getByTestId(`space-business-${provisionBody.data.tenantId}`).click();
@@ -451,9 +701,12 @@ test.describe('Page Templates', () => {
       expect(menusBody.code).toBe('0');
       expect(JSON.stringify(menusBody.data)).not.toContain('page_schema_mgmt');
       await expect(restrictedPage.locator('a[href="/p/page_schema"]')).toHaveCount(0);
-      const denied = await restrictedPage.request.post('/api/meta/commands/execute/pgm:duplicate_page_schema', {
-        data: { targetRecordPid: source.pid },
-      });
+      const denied = await restrictedPage.request.post(
+        '/api/meta/commands/execute/pgm:duplicate_page_schema',
+        {
+          data: { targetRecordPid: source.pid },
+        },
+      );
       expect(denied.status()).toBe(403);
       const deniedBody = await denied.json();
       expect(deniedBody.code).not.toBe('0');
@@ -465,17 +718,21 @@ test.describe('Page Templates', () => {
       const unchangedBody = await unchanged.json();
       expect(unchangedBody.code).toBe('0');
       expect(unchangedBody.data).toEqual(originalBody.data);
-      await restrictedPage.screenshot({ path: testInfo.outputPath('T5-denied.png'), fullPage: true });
+      await restrictedPage.screenshot({
+        path: testInfo.outputPath('T5-denied.png'),
+        fullPage: true,
+      });
     } finally {
       await restricted.close();
     }
-
   });
 
   // -------------------------------------------------------------------------
   // T6: Save as Template — validation: empty name disables the save button
   // -------------------------------------------------------------------------
-  test('T6 — save-as-template dialog disables save when name is empty', async ({ page }, testInfo) => {
+  test('T6 — save-as-template dialog disables save when name is empty', async ({
+    page,
+  }, testInfo) => {
     await page.goto(`/page-designer/${pagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('list-config-panel')).toBeVisible({ timeout: 15000 });
 
