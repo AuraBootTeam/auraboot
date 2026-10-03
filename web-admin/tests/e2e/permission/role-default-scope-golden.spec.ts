@@ -78,14 +78,19 @@ for (const scope of ['dept', 'team']) {
     await expect(scopeSelect).toHaveValue(scope);
     const dialog = page.getByTestId('capability-scope-dialog');
     const scopedActions = [
-      'qo.quote.read', 'qo.quote.material.read', 'sys.file.read',
-      'model.qo_quote_common.read', 'model.qo_quote_line_common.read',
-      'model.crm_customer_request_common.read', 'model.crm_customer_request_pcba_rfq.read',
+      'qo.quote.read',
+      'sys.file.read',
+      'model.qo_quote_common.read',
+      'model.qo_quote_line_common.read',
+      'model.crm_customer_request_common.read',
+      'model.crm_customer_request_pcba_rfq.read',
       'model.qo_supplier_request_line_common.read',
     ];
     await expect(dialog.getByRole('combobox')).toHaveCount(scopedActions.length);
     for (const action of scopedActions)
       await expect(dialog.getByTestId(`capability-scope-${action}`)).toHaveValue(scope);
+    // Tab visibility is still granted, but has no record resource/action scope mapping.
+    await expect(dialog.getByTestId('capability-scope-qo.quote.material.read')).toHaveCount(0);
     await expect(dialog).not.toContainText('范围配置无效');
     await expect(dialog).not.toContainText('Qo_supplier_request_line_common');
     const matrixResponse = await page.request.get(`${BASE}/api/permissions/matrix/${role.pid}`);
@@ -96,8 +101,15 @@ for (const scope of ['dept', 'team']) {
     expect(
       actions.find((action: any) => action.code === 'model.qo_quote_common.read').scopeType,
     ).toBe(scope);
+    expect(actions.find((action: any) => action.code === 'qo.quote.material.read')).toMatchObject({
+      granted: true,
+      scopeType: null,
+    });
 
-    await page.screenshot({ path: info.outputPath(`01-inherited-${scope}-scope.png`), fullPage: true });
+    await page.screenshot({
+      path: info.outputPath(`01-inherited-${scope}-scope.png`),
+      fullPage: true,
+    });
 
     // backend cross-check: the role's stored default is persisted
     const defResp = await page.request.get(

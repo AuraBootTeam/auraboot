@@ -105,7 +105,7 @@ test('① capability save persists through the browser on a snowflake-id role', 
   await page.screenshot({ path: info.outputPath('00-capability-preview.png'), fullPage: true });
   const impact = page.getByTestId('capability-preview-impact');
   await expect(impact).toHaveJSProperty('open', false);
-  await impact.locator('summary').click();
+  await impact.locator(':scope > summary').click();
   await expect(impact).toHaveJSProperty('open', true);
   await expect(page.getByTestId('capability-preview-resulting')).toBeVisible();
   const secondaryCapabilities = previewBody.data.resultingCapabilities.filter(

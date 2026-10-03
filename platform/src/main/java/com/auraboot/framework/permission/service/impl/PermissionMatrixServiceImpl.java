@@ -212,7 +212,6 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
 
         List<PermissionDTO> orphanActions = actions.stream()
             .filter(action -> action.getId() == null || !attachedActionIds.contains(action.getId()))
-            .filter(action -> action.getResourceCode() != null || action.getAction() != null)
             .toList();
         moduleDTOs.addAll(buildFlatModules(orphanActions, grantedIds, scopeMap, policyMap));
 

@@ -108,6 +108,35 @@ class PermissionMatrixServiceImplTest {
     }
 
     @Test
+    void getMatrixPreservesGrantedVisibilityPermissionWithoutRecordMapping() {
+        PermissionDTO module = permission(1L, "model", 1, null, "MODEL", null, null);
+        PermissionDTO resource = permission(2L, "model.user", 2, 1L, "MODEL", "model.user", null);
+        PermissionDTO action = permission(3L, "model.user.read", 3, 2L, "MODEL", "model.user", "read");
+        PermissionDTO visibility = permission(4L, "qo.quote.material.read", null, null, "data", null, null);
+        when(permissionService.findAllActive()).thenReturn(List.of(module, resource, action, visibility));
+        when(rolePermissionService.getPermissionIdsByRoleId(7L)).thenReturn(Set.of(4L));
+        when(dataScopeService.getScopesByRole(100L, 7L)).thenReturn(List.of());
+        when(policyService.getPoliciesByRoleId(7L)).thenReturn(Map.of());
+
+        PermissionMatrixDTO matrix = service.getMatrixForRole(100L, 7L);
+
+        var visibleAction = matrix.modules().stream()
+            .flatMap(m -> m.resources().stream())
+            .flatMap(r -> r.actions().stream())
+            .filter(a -> "qo.quote.material.read".equals(a.code()))
+            .findFirst().orElseThrow();
+        assertThat(visibleAction.granted()).isTrue();
+        assertThat(visibleAction.scopeType()).isNull();
+        assertThat(visibleAction.action()).isEqualTo("unknown");
+        assertThat(matrix.modules().stream()
+            .flatMap(m -> m.resources().stream())
+            .flatMap(r -> r.actions().stream()))
+            .extracting(a -> a.code()).containsExactly("model.user.read", "qo.quote.material.read");
+        verify(dataScopeService, never()).setScope(anyLong(), anyLong(), org.mockito.ArgumentMatchers.anyString(),
+            org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
     void getMatrixFallsBackToFlatGrouping() {
         // No level=1 or level=2 — falls back to grouping by resourceType + resourceCode
         PermissionDTO p1 = permission(10L, "model.user.read", null, null, "MODEL", "model.user", "read");
