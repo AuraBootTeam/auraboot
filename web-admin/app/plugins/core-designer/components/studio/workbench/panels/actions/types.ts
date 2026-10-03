@@ -62,6 +62,7 @@ export interface CommandDefinitionDTO {
   code: string;
   displayName: string;
   description?: string;
+  localizedDescriptions?: Record<string, string>;
   modelCode: string;
   inputSchema?: string;
   executionConfig?: string;

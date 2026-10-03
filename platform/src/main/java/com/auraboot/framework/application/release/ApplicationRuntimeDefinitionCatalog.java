@@ -119,6 +119,8 @@ public final class ApplicationRuntimeDefinitionCatalog {
                 command.setCode(source.getCode());
                 command.setDisplayName(source.getEffectiveDisplayName());
                 command.setDescription(source.getDescription());
+                command.setLocalizedDescriptions(com.auraboot.framework.meta.dto.CommandDescriptionLocalization.from(
+                        source.getExtension() == null ? null : source.getExtension().get("localizedDescriptions")));
                 command.setModelCode(source.getModelCode());
                 command.setType(source.getType());
                 command.setInputSchema(json(source.getInputSchema(), "{}"));

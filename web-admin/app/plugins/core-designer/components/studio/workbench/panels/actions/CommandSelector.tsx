@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import type { CommandDefinitionDTO } from './types';
+import { useI18n } from '~/contexts/I18nContext';
+import { getLocalizedText } from '~/utils/i18n';
+import TEXT from './CommandSelector.i18n.json';
 
 interface CommandSelectorProps {
   commands: CommandDefinitionDTO[];
@@ -21,25 +24,31 @@ export const CommandSelector: React.FC<CommandSelectorProps> = ({
   onChange,
   onRefresh,
 }) => {
+  const { locale } = useI18n();
+  const text = (key: keyof typeof TEXT) => getLocalizedText(TEXT[key], locale);
+  const description = (command: CommandDefinitionDTO) =>
+    getLocalizedText(command.localizedDescriptions, locale) || command.description;
   const [open, setOpen] = useState(false);
   const selected = commands.find((c) => c.code === value);
 
   return (
     <div className="relative">
-      <label className="mb-1 block text-xs font-medium text-gray-500">关联命令</label>
+      <label className="mb-1 block text-xs font-medium text-gray-500">{text('label')}</label>
       <div className="flex items-center gap-1">
         <button
           type="button"
           onClick={() => setOpen(!open)}
           className="flex flex-1 items-center justify-between rounded-md border border-gray-300 bg-white px-3 py-2 text-sm hover:border-blue-400 focus:ring-1 focus:ring-blue-400 focus:outline-none"
-          disabled={loading}
+          disabled={loading || !!error}
+          aria-label={text('label')}
+          aria-expanded={open}
         >
           <span className={selected ? 'text-gray-900' : 'text-gray-400'}>
             {loading
-              ? '加载中...'
+              ? text('loading')
               : selected
                 ? selected.displayName || selected.code
-                : '选择命令...'}
+                : text('select')}
           </span>
           <svg
             className="h-4 w-4 text-gray-400"
@@ -53,8 +62,10 @@ export const CommandSelector: React.FC<CommandSelectorProps> = ({
         <button
           type="button"
           onClick={onRefresh}
+          disabled={loading}
           className="rounded p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-          title="刷新命令列表"
+          title={text('refresh')}
+          aria-label={text('refresh')}
         >
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -70,10 +81,10 @@ export const CommandSelector: React.FC<CommandSelectorProps> = ({
       {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
 
       {/* Dropdown */}
-      {open && !loading && (
+      {open && !loading && !error && (
         <div className="absolute z-10 mt-1 max-h-60 w-full overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
           {commands.length === 0 ? (
-            <div className="px-3 py-4 text-center text-sm text-gray-400">暂无可用命令</div>
+            <div className="px-3 py-4 text-center text-sm text-gray-400">{text('empty')}</div>
           ) : (
             commands.map((cmd) => (
               <button
@@ -88,8 +99,8 @@ export const CommandSelector: React.FC<CommandSelectorProps> = ({
                 }`}
               >
                 <div className="font-medium">{cmd.displayName || cmd.code}</div>
-                {cmd.description && (
-                  <div className="mt-0.5 truncate text-xs text-gray-400">{cmd.description}</div>
+                {description(cmd) && (
+                  <div className="mt-0.5 truncate text-xs text-gray-400">{description(cmd)}</div>
                 )}
                 <div className="mt-0.5 font-mono text-xs text-gray-300">{cmd.code}</div>
               </button>

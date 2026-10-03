@@ -4,6 +4,7 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Command Definition DTO
@@ -20,6 +21,7 @@ public class CommandDefinitionDTO {
     private String code;
     private String displayName;
     private String description;
+    private Map<String, String> localizedDescriptions = Map.of();
     private String modelCode;
     private String type;
     private String inputSchema;
