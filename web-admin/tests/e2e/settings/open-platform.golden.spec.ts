@@ -252,7 +252,9 @@ test.describe('Open Platform golden journey', () => {
         (response) => response.request().method() === 'POST'
           && response.url() === `${WEB_BASE_URL}/oauth2/token`,
       );
-      await oauthAuthorization.getByRole('button', { name: 'Authorize', exact: true }).click();
+      await oauthAuthorization.getByRole('button', {
+        name: 'Apply given OAuth2 credentials', exact: true,
+      }).click();
       const browserTokenResponse = await browserTokenPromise;
       expect(browserTokenResponse.status()).toBe(200);
       const browserToken = await browserTokenResponse.json();
