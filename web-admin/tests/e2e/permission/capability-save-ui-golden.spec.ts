@@ -69,6 +69,9 @@ test('① capability save persists through the browser on a snowflake-id role', 
   const diagnostics = page.getByTestId('permission-diagnostics');
   await expect(diagnostics).toHaveJSProperty('open', false);
   await expect(page.getByTestId('advanced-atomic-section')).toHaveCount(0);
+  await expect(page.getByTestId('data-scope-default')).toContainText(/未配置|Not configured/);
+  await page.getByTestId('data-scope-default').scrollIntoViewIfNeeded();
+  await expect(page.getByTestId('data-scope-default')).toBeInViewport();
   await page.screenshot({ path: info.outputPath('rbac-initial.png'), fullPage: true });
   await diagnostics.locator(':scope > summary').click();
   await diagnostics.locator('input').fill('model.qo_quote_common.read');
