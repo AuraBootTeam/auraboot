@@ -742,6 +742,7 @@ test.describe('User Profile', () => {
     const context = await browser.newContext({
       baseURL,
       locale: 'zh-CN',
+      viewport: { width: 1440, height: 1000 },
       storageState: { cookies: [], origins: [] },
     });
     const ownPage = await context.newPage();
@@ -783,6 +784,15 @@ test.describe('User Profile', () => {
       await expect(
         ownPage.getByText('昵称', { exact: true }).locator('..').locator('p'),
       ).toHaveText(newNickname);
+      const emailValue = ownPage.getByText('邮箱', { exact: true }).locator('..').locator('p');
+      await expect(emailValue).toHaveText(email);
+      expect(await emailValue.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+      const registeredAt = ownPage
+        .getByText('注册时间', { exact: true })
+        .locator('..')
+        .locator('p');
+      if (persisted.data.createdAt == null) await expect(registeredAt).toHaveText('未设置');
+      else await expect(registeredAt).not.toContainText('1970');
       await ownPage.screenshot({
         path: test.info().outputPath('PRF-005-saved.png'),
         fullPage: true,
@@ -804,7 +814,9 @@ test.describe('User Profile', () => {
     await page.goto('/personal/profile', { waitUntil: 'load' });
     await expect(page.locator('h1:has-text("个人资料")')).toBeVisible({ timeout: 10000 });
 
-    await expect(page.getByText('Social Account Binding')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /^(社交账号绑定|Social Account Binding)$/ }),
+    ).toBeVisible();
     await expect(page.locator('[data-testid="profile-social-links-link"]')).toBeVisible();
   });
 
@@ -812,7 +824,9 @@ test.describe('User Profile', () => {
     await page.goto('/personal/profile', { waitUntil: 'load' });
     await expect(page.locator('h1:has-text("个人资料")')).toBeVisible({ timeout: 10000 });
 
-    await expect(page.getByText('Account Deactivation')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /^(注销账户|Account Deactivation)$/ }),
+    ).toBeVisible();
     await expect(page.locator('[data-testid="profile-deactivation-link"]')).toBeVisible();
   });
 });
