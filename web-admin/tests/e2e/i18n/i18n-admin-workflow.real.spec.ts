@@ -5,7 +5,7 @@ import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { openAsRole, makeRoleUser, ensureRoleUser, fetchRoleSnapshot } from '../rbac/rbac-helpers';
 import { ensureSidebarExpanded } from '../helpers';
 
-type Resource = { pid: string; i18nKey: string; value: string; source: string; status: string; rejectReason: string | null; reviewedAt: string | null };
+type Resource = { pid: string; i18nKey: string; value: string; source: string; status: string; rejectReason: string | null; reviewedAt: string | null; reviewedBy?: string | null; refType?: string | null; refId?: string | null };
 async function accepted<T>(response: APIResponse): Promise<T> {
   expect(response.ok(), `HTTP ${response.status()} from ${response.url()}`).toBe(true);
   const envelope = await response.json();
@@ -212,6 +212,9 @@ test.describe('i18n admin real workflow', () => {
           data: { key: `${prefix}${String(i).padStart(2, '0')}`, lang: 'zh-CN', value: i === 20 ? 'Unique last-page wording' : `Page wording ${i}` },
         })));
       }
+      const english = await accepted<Resource>(await page.request.post('/api/admin/i18n/resources', {
+        data: { key: `${prefix}english`, lang: 'en-US', value: 'English-only filter fixture' },
+      }));
       await openResources(page);
       await filter(page, prefix);
       const rows = page.getByTestId('i18n-resources-table').locator('tbody tr');
@@ -233,6 +236,12 @@ test.describe('i18n admin real workflow', () => {
       await expect(row(page, `${prefix}20`)).toBeVisible();
       await expect(page.getByRole('button', { name: /^(下一页|Next)$/ })).toBeDisabled();
       await info.attach('filtered-pagination-original', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+      await page.getByPlaceholder(/^(关键字|keyword)$/).fill('');
+      await page.getByLabel('lang', { exact: true }).selectOption('en-US');
+      await page.getByRole('button', { name: /^(查询|Search)$/ }).click();
+      await expect(rows).toHaveCount(1);
+      await expect(row(page, english.i18nKey)).toBeVisible();
+      await expect(page.getByText('1 / 1', { exact: true })).toBeVisible();
     } finally { await context.close(); }
   });
 
@@ -248,6 +257,7 @@ test.describe('i18n admin real workflow', () => {
       } }));
       const persistedBeforeDenials = await read(admin.page, resource.pid);
       expect(persistedBeforeDenials).toMatchObject({ pid: resource.pid, value: 'Permission fixture', status: 'approved' });
+      expect(await packValue(admin.page, resource.i18nKey)).toBe('Permission fixture');
       member = await openAsRole(browser, user.email, user.password);
       const snapshot = await fetchRoleSnapshot(member.page);
       expect(snapshot.roleCodes).toEqual(['tenant_member']);
@@ -294,6 +304,8 @@ test.describe('i18n admin real workflow', () => {
         denied.push({ method: request.method, path: request.path, httpStatus: response.status(), code: envelope.code });
       }
       expect(await read(admin.page, resource.pid)).toEqual(persistedBeforeDenials);
+      expect(await packValue(admin.page, resource.i18nKey)).toBe('Permission fixture');
+      expect(await packValue(admin.page, `${resource.i18nKey}.forbidden`)).toBeUndefined();
       expect(await accepted<Resource | null>(await admin.page.request.get('/api/admin/i18n/resources/by-key', {
         params: { key: `${resource.i18nKey}.forbidden`, lang: 'zh-CN' },
       }))).toBeNull();
@@ -305,6 +317,7 @@ test.describe('i18n admin real workflow', () => {
     const { context, page } = await openAsRole(browser, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
     const key = `e2e.ios-handover.${Date.now()}.${info.workerIndex}.journey`;
     try {
+      const reviewer = await accepted<{ user: { id: string } }>(await page.request.get('/api/auth/me'));
       await openResources(page);
       await filter(page, key);
       await expect(row(page, key)).toHaveCount(0);
@@ -323,16 +336,22 @@ test.describe('i18n admin real workflow', () => {
       await persisted(page, created.pid, 'approved');
       expect(await packValue(page, key)).toBe('Original handover translation');
       await expect(page.getByPlaceholder('key', { exact: true })).toHaveValue('');
+      await openSidebarPage(page, '/settings/i18n-workflow');
+      await openResources(page);
+      await filter(page, key);
+      await expect(row(page, key).getByText('Original handover translation', { exact: true })).toBeVisible();
 
       // Supported admin fixture operation establishes the draft under review.
       await accepted(await page.request.put(`/api/admin/i18n/resources/${created.pid}/status`, { data: { status: 'draft' } }));
       await filter(page, key);
-      await persisted(page, created.pid, 'draft');
+      const draftBeforeEdit = await persisted(page, created.pid, 'draft');
       expect(await packValue(page, key)).toBeUndefined();
       await row(page, key).getByLabel(`edit-${key}`, { exact: true }).click();
       await row(page, key).getByRole('textbox').fill('Revised handover translation');
       await row(page, key).getByRole('button', { name: /^(保存|Save)$/ }).click();
-      expect((await persisted(page, created.pid, 'draft')).value).toBe('Revised handover translation');
+      const editedDraft = await persisted(page, created.pid, 'draft');
+      expect(editedDraft.value).toBe('Revised handover translation');
+      expect([editedDraft.source, editedDraft.refType, editedDraft.refId]).toEqual([draftBeforeEdit.source, draftBeforeEdit.refType, draftBeforeEdit.refId]);
       expect(await packValue(page, key)).toBeUndefined();
       await expect(row(page, key).getByLabel(`approve-${key}`, { exact: true })).toHaveCount(0);
       await row(page, key).getByLabel(`submit-review-${key}`, { exact: true }).click();
@@ -346,6 +365,11 @@ test.describe('i18n admin real workflow', () => {
       await reason.fill('   ');
       await expect(reject).toBeDisabled();
       expect((await read(page, created.pid))?.status).toBe('review');
+      const beforeEmptyReject = await read(page, created.pid);
+      const emptyReject = await page.request.post(`/api/admin/i18n/resources/${created.pid}/reject`, { data: { reason: '   ' } });
+      expect(emptyReject.status()).toBe(400);
+      expect((await emptyReject.json()).code).toBe('35000');
+      expect(await read(page, created.pid)).toEqual(beforeEmptyReject);
       await reason.fill('Please clarify this wording');
       await reject.click();
       await expect(dialog).toHaveCount(0);
@@ -353,15 +377,37 @@ test.describe('i18n admin real workflow', () => {
       expect(rejected.rejectReason).toBe('Please clarify this wording');
       expect(Number.isFinite(Date.parse(rejected.reviewedAt!))).toBe(true);
       await info.attach('rejected-original', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+      await openSidebarPage(page, '/settings/i18n-workflow');
+      await page.locator('select').filter({ has: page.locator('option[value="draft"]') }).selectOption('draft');
+      await page.getByPlaceholder('Search by key or value…', { exact: true }).fill(key);
+      await page.getByRole('button', { name: 'Search', exact: true }).click();
+      const rejectedWorkflowRow = page.locator('table').getByRole('row').filter({ has: page.getByRole('cell', { name: key, exact: true }) });
+      await expect(rejectedWorkflowRow.getByText('Please clarify this wording')).toBeVisible();
+      await info.attach('workflow-rejection-feedback-original', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+      await openResources(page);
+      await filter(page, key);
 
       await row(page, key).getByLabel(`submit-review-${key}`, { exact: true }).click();
       await persisted(page, created.pid, 'review');
       await row(page, key).getByLabel(`approve-${key}`, { exact: true }).click();
       const approved = await persisted(page, created.pid, 'approved');
       expect(approved.rejectReason).toBeNull();
+      expect(String(approved.reviewedBy)).toBe(String(reviewer.user.id));
       expect(Number.isFinite(Date.parse(approved.reviewedAt!))).toBe(true);
       expect(await packValue(page, key)).toBe('Revised handover translation');
       await info.attach('approved-original', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+      await expect(row(page, key).getByLabel(`submit-review-${key}`, { exact: true })).toHaveCount(0);
+      const illegalSubmit = await page.request.post(`/api/admin/i18n/resources/${created.pid}/submit-review`);
+      expect(illegalSubmit.status()).toBe(400);
+      expect((await illegalSubmit.json()).code).toBe('35000');
+      expect(await read(page, created.pid)).toEqual(approved);
+      await row(page, key).getByLabel(`edit-${key}`, { exact: true }).click();
+      await row(page, key).getByRole('textbox').fill('Final approved handover translation');
+      await row(page, key).getByRole('button', { name: /^(保存|Save)$/ }).click();
+      const editedApproved = await persisted(page, created.pid, 'approved');
+      expect(editedApproved.value).toBe('Final approved handover translation');
+      expect([editedApproved.source, editedApproved.refType, editedApproved.refId]).toEqual([approved.source, approved.refType, approved.refId]);
+      expect(await packValue(page, key)).toBe('Final approved handover translation');
 
       await row(page, key).getByLabel(`delete-${key}`, { exact: true }).click();
       await page.getByRole('dialog').getByRole('button', { name: /^(取消|Cancel)$/ }).click();
