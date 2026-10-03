@@ -47,6 +47,7 @@ export interface PageSchemaDTO {
   blocks?: any[];
   layout?: Record<string, any> | null;
   dataSources?: Record<string, DataSourceConfig> | null;
+  linkageRules?: UnifiedSchema['linkageRules'] | null;
   profile?: string | null;
   schemaVersion?: number | null;
   metaInfo?: Record<string, unknown> | null;
@@ -448,6 +449,7 @@ export function canonicalizePageSchemaDto(pageSchemaDTO: PageSchemaDTO): Unified
     ),
     layout: pageSchemaDTO.layout || { type: 'stack' },
     dataSources: pageSchemaDTO.dataSources || undefined,
+    linkageRules: pageSchemaDTO.linkageRules ?? undefined,
     profile: pageSchemaDTO.profile || 'admin',
     schemaVersion: pageSchemaDTO.schemaVersion ?? undefined,
     pageKey: pageSchemaDTO.pageKey,
