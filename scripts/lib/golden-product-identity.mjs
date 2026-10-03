@@ -62,7 +62,7 @@ function run(file, args, options = {}) {
   try { return execFileSync(file, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...options }); }
   catch { throw new Error(`Product identity probe failed: ${file}`); }
 }
-function liveEnvironment(pid) {
+export function liveEnvironment(pid) {
   let entries;
   if (process.platform === 'linux') entries = readFileSync(`/proc/${pid}/environ`, 'utf8').split('\0');
   else if (process.platform === 'darwin') {

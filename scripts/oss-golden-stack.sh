@@ -622,6 +622,8 @@ cmd_up() {
       env AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" VITE_PORT="$vite_port" BFF_PORT="$bff_port" SPRING_BOOT_URL="http://127.0.0.1:$server_port" \
       BFF_INTERNAL_URL="http://127.0.0.1:$server_port" NODE_ENV=development \
       pnpm dev:full
+    node "$SCRIPT_DIR/lib/golden-process-stop.mjs" register-supervisor "$name" "$REPO_ROOT" "$DEV" "$(cat "$sd/frontend.pid")" \
+      || die "frontend supervisor registration failed"
     # Wait for Vite to start accepting connections (302 → /login is fine). Poll
     # on HTTP status, not body — a 302 has an empty body that a grep-poll would
     # never match (it would stall the full timeout before warm could start).
@@ -634,6 +636,9 @@ cmd_up() {
       lsof -nP -iTCP:"$bff_port" -sTCP:LISTEN -t >/dev/null 2>&1 && break
       sleep 1
     done
+    # Re-register after exec and listener readiness so the descriptor captures the final supervisor.
+    node "$SCRIPT_DIR/lib/golden-process-stop.mjs" register-supervisor "$name" "$REPO_ROOT" "$DEV" "$frontend_pid" \
+      || die "ready frontend supervisor registration failed"
     golden_runtime_register_listener "$name" web "$vite_port" "$frontend_pid" "$REPO_ROOT/web-admin" "$runtime_token" \
       || die "Web listener registration failed"
     golden_runtime_register_listener "$name" bff "$bff_port" "$frontend_pid" "$REPO_ROOT/web-admin" "$runtime_token" \
@@ -875,85 +880,20 @@ cmd_status() {
   echo "backend($server_port)=$be  vite($vite_port)=$vi  bff=$bff_port"
 }
 
-# Recursively SIGKILL a PID and ALL its descendants (post-order: leaves first).
-# The frontend tree is pnpm dev:full → sh -c → concurrently → {vite, bff}; a plain
-# `pkill -P` only reaps direct children and orphans vite/bff (which keep their
-# listeners and break the next 'up' with EADDRINUSE). SIGKILL (not SIGTERM) is
-# required because `concurrently --restart-tries 20` traps SIGTERM and respawns
-# its children; -9 stops it dead.
-kill_tree() {
-  local pid="$1" child sig="${2:-KILL}"
-  for child in $(pgrep -P "$pid" 2>/dev/null); do kill_tree "$child" "$sig"; done
-  kill -"$sig" "$pid" 2>/dev/null || true
-}
-
-# SIGKILL the process listening on $1 AND its ancestor chain UP TO the
-# `concurrently` supervisor (matched by command line), so the restart-loop leader
-# dies too. Scoped to a single exact port → never touches another slot's stack.
-kill_listener_supervisor() {
-  local port="$1" pid ppid cmd
-  for pid in $(lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null || true); do
-    [ -n "$pid" ] || continue
-    # Walk up to (and including) the concurrently restart-loop leader, then kill
-    # that whole subtree. If the tree has already detached/reparented, keep the
-    # highest repo/frontend-related ancestor as the kill target.
-    local cur="$pid" sup="$pid" i=0
-    while [ "$i" -lt 12 ]; do
-      cmd="$(ps -o command= -p "$cur" 2>/dev/null || true)"
-      case "$cmd" in
-        *concurrently*) sup="$cur"; break;;
-        *"$REPO_ROOT/web-admin"*|*"pnpm dev:"*) sup="$cur";;
-      esac
-      ppid="$(ps -o ppid= -p "$cur" 2>/dev/null | tr -d ' ')"
-      [ -n "$ppid" ] && [ "$ppid" != "1" ] && [ "$ppid" != "0" ] || break
-      cur="$ppid"; i=$((i+1))
-    done
-    kill_tree "$sup"
-    kill_tree "$pid"
-  done
-}
-
-# ---- down (stop processes, keep runtime/DB) ------------------------------------------
+# ---- down (stop verified processes, keep runtime/DB) ---------------------------------
 cmd_down() {
-  local name="$1" sd; sd="$(state_dir "$name")"
-  [ -d "$sd" ] || { echo "no stack for '$name'"; return 0; }
-  # Kill recorded supervisor trees before relying on port listeners; pnpm/concurrently
-  # can otherwise respawn vite/bff while the shutdown is in progress.
-  if [ -f "$sd/frontend.pid" ]; then local fp; fp="$(cat "$sd/frontend.pid")"; kill_tree "$fp"; fi
-  if [ -f "$sd/backend.pid" ]; then kill_tree "$(cat "$sd/backend.pid")"; fi
-  sleep 2
-  # Belt: kill anything still bound to THIS runtime's exact ports only (never a
-  # shared/other-slot port). For the frontend ports, walk up to the concurrently
-  # restart-loop leader and SIGKILL its subtree — killing just the listener lets
-  # `--restart-tries` respawn it. Retry a few times to absorb a mid-restart race.
-  if [ -f "$sd/ports" ]; then
-    read -r server_port vite_port bff_port <"$sd/ports"
-    local attempt
-    for attempt in 1 2 3 4; do
-      local any=0
-      # frontend ports: kill the supervisor subtree behind the listener
-      for p in "$vite_port" "$bff_port"; do
-        local pid; pid="$(lsof -nP -iTCP:"$p" -sTCP:LISTEN -t 2>/dev/null || true)"
-        if [ -n "$pid" ]; then any=1; kill_listener_supervisor "$p"; log "killed frontend supervisor on $p (attempt $attempt)"; fi
-      done
-      # backend port: a plain SIGKILL of the listener is enough (no restart loop)
-      local bpid; bpid="$(lsof -nP -iTCP:"$server_port" -sTCP:LISTEN -t 2>/dev/null || true)"
-      if [ -n "$bpid" ]; then any=1; kill -9 $bpid 2>/dev/null && log "killed straggler on $server_port (attempt $attempt)" || true; fi
-      [ "$any" -eq 0 ] && break
-      sleep 1
-    done
-  fi
-  rm -f "$sd/backend.pid" "$sd/frontend.pid"
-  log "stopped '$name' processes (runtime/DB kept; 'destroy' to remove)"
+  node "$SCRIPT_DIR/lib/golden-process-stop.mjs" stop "$1" "$REPO_ROOT" "$DEV" \
+    || die "owned process stop refused; runtime/DB retained"
+  log "stopped '$1' verified processes (runtime/DB retained)"
 }
 
 # ---- destroy (down + infra cleanup + runtime destroy) --------------------------------
 cmd_destroy() {
   local name="$1"
-  cmd_down "$name" || true
+  cmd_down "$name"
   log "infra cleanup + runtime destroy '$name'"
-  "$DEV" infra cleanup "$name" --yes >/dev/null 2>&1 || true
-  "$DEV" runtime destroy "$name" --yes >/dev/null 2>&1 || true
+  "$DEV" infra cleanup "$name" --yes >/dev/null || die "infra cleanup failed; runtime state retained"
+  "$DEV" runtime destroy "$name" --yes >/dev/null || die "runtime destroy failed; golden state retained"
   rm -rf "$(state_dir "$name")"
   # remove the node_modules symlink we created (gitignored, but keep the worktree clean)
   [ -L "$REPO_ROOT/web-admin/node_modules" ] && rm -f "$REPO_ROOT/web-admin/node_modules" || true
