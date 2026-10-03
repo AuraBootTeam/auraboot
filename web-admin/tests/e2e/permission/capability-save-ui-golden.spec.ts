@@ -108,6 +108,13 @@ test('① capability save persists through the browser on a snowflake-id role', 
   await impact.locator(':scope > summary').click();
   await expect(impact).toHaveJSProperty('open', true);
   await expect(page.getByTestId('capability-preview-resulting')).toBeVisible();
+  const previewMenus = page.getByTestId('capability-preview-menus');
+  await expect(previewMenus).toHaveCount(previewBody.data.relatedMenus.length ? 1 : 0);
+  if (previewBody.data.relatedMenus.length) {
+    await expect(previewMenus).toHaveJSProperty('open', false);
+    await expect(previewMenus.locator('li')).toHaveCount(previewBody.data.relatedMenus.length);
+    for (const item of await previewMenus.locator('li').all()) await expect(item).toBeHidden();
+  }
   const secondaryCapabilities = previewBody.data.resultingCapabilities.filter(
     (affected: { code: string; authorizationState: string }) =>
       affected.authorizationState === 'partial' && affected.code !== cap!.code,
@@ -141,6 +148,20 @@ test('① capability save persists through the browser on a snowflake-id role', 
     path: info.outputPath('00-capability-preview-impact.png'),
     fullPage: true,
   });
+  if (previewBody.data.relatedMenus.length) {
+    await previewMenus.locator(':scope > summary').click();
+    await expect(previewMenus).toHaveJSProperty('open', true);
+    expect(await previewMenus.locator('li').allTextContents()).toEqual(
+      previewBody.data.relatedMenus,
+    );
+    for (const item of await previewMenus.locator('li').all()) await expect(item).toBeVisible();
+    if (secondaryCapabilities.length > 0) await partialImpact.locator(':scope > summary').click();
+    await previewMenus.scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: info.outputPath('00-capability-preview-menus.png'),
+      fullPage: true,
+    });
+  }
   await page.getByTestId('confirm-ok').click();
   expect((await saveResp).status()).toBe(200);
 
@@ -203,6 +224,13 @@ test('capability draft survives failed save and canceled navigation', async ({ p
     after.flatMap((g: any) => g.capabilities).find((c: any) => c.code === cap.code).granted,
   ).toBe(false);
   await checkbox.scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: info.outputPath('02-draft-selected-after-error.png'),
+    fullPage: true,
+  });
+  await page.getByTestId('capability-save').scrollIntoViewIfNeeded();
+  await expect(page.getByTestId('capability-save')).toBeInViewport({ ratio: 1 });
+  await expect(page.getByTestId('capability-draft')).toBeInViewport({ ratio: 1 });
   await page.screenshot({ path: info.outputPath('02-draft-save-error.png'), fullPage: true });
   await page.unroute('**/api/permission/capabilities?**');
   await page.getByTestId('permission-right-tab-members').click();

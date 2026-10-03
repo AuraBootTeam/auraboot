@@ -396,7 +396,13 @@ describe('CapabilityRoleEditor', () => {
     expect(secondary).not.toHaveTextContent('查看报价');
     expect(secondary).toHaveTextContent('Partial actions do not grant the complete capability');
     expect(impact).toHaveTextContent('Shared capability 29');
-    expect(impact).toHaveTextContent('Quotes / Organization');
+    const menus = screen.getByTestId('capability-preview-menus') as HTMLDetailsElement;
+    expect(menus.open).toBe(false);
+    expect(menus.querySelector('summary')).toHaveTextContent('Related menus · 2');
+    expect(Array.from(menus.querySelectorAll('li'), (item) => item.textContent)).toEqual([
+      'Quotes',
+      'Organization',
+    ]);
     expect(impact).toHaveTextContent('Revoke: 查看报价单');
     expect(capabilityService.applySelection).not.toHaveBeenCalled();
   });

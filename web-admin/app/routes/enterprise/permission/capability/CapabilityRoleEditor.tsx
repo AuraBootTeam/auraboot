@@ -334,10 +334,18 @@ export default function CapabilityRoleEditor({
             )}
           </div>
           {previewPlan.relatedMenus.length > 0 && (
-            <p>
-              {t('admin.permission.capability.relatedMenusV2', undefined, 'Related menus')}:{' '}
-              {previewPlan.relatedMenus.join(' / ')}
-            </p>
+            <details data-testid="capability-preview-menus">
+              <summary className="text-text-2 cursor-pointer">
+                {t('admin.permission.capability.relatedMenusV2', undefined, 'Related menus')}
+                {' · '}
+                {previewPlan.relatedMenus.length}
+              </summary>
+              <ul className="mt-2 space-y-1">
+                {previewPlan.relatedMenus.map((name) => (
+                  <li key={name}>{name}</li>
+                ))}
+              </ul>
+            </details>
           )}
           <ul className="space-y-1">
             {previewPlan.revokedCodes.map((code) => (
