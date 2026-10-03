@@ -26,7 +26,9 @@ async function createRole(page: Page) {
   return (await resp.json()).data as { pid: string; code: string };
 }
 
-test('① capability save persists through the browser on a snowflake-id role', async ({ page }, info) => {
+test('① capability save persists through the browser on a snowflake-id role', async ({
+  page,
+}, info) => {
   const role = await createRole(page);
   const capUrl = `${BASE}/api/permission/capabilities?rolePid=${encodeURIComponent(role.pid)}`;
   const grantedCaps = (groups: any[]) =>
@@ -68,12 +70,36 @@ test('① capability save persists through the browser on a snowflake-id role', 
     (r) => r.url().includes('/api/permission/capabilities') && r.request().method() === 'PUT',
     { timeout: 15_000 },
   );
+  const previewResponse = page.waitForResponse(
+    (response) =>
+      response.url().includes('/api/permission/capabilities/preview') &&
+      response.request().method() === 'POST',
+  );
   await page.getByTestId('capability-save').click();
+  const previewResult = await previewResponse;
+  expect(previewResult.status()).toBe(200);
+  const previewBody = await previewResult.json();
+  expect(String(previewBody.code)).toBe('0');
   await expect(page.getByTestId('confirm-dialog')).toBeVisible();
   await expect(page.getByRole('dialog')).toBeInViewport({ ratio: 1 });
   await expect(page.getByTestId('confirm-ok')).toBeInViewport({ ratio: 1 });
   await expect(page.getByTestId('confirm-cancel')).toBeInViewport({ ratio: 1 });
   await page.screenshot({ path: info.outputPath('00-capability-preview.png'), fullPage: true });
+  const impact = page.getByTestId('capability-preview-impact');
+  await expect(impact).toHaveJSProperty('open', false);
+  await impact.locator('summary').click();
+  await expect(impact).toHaveJSProperty('open', true);
+  await expect(page.getByTestId('capability-preview-resulting')).toBeVisible();
+  await expect(page.getByTestId('capability-preview-resulting').locator('li')).toHaveCount(
+    previewBody.data.resultingCapabilities.length,
+  );
+  for (const affected of previewBody.data.resultingCapabilities) {
+    await expect(page.getByTestId('capability-preview-resulting')).toContainText(affected.label);
+  }
+  await page.screenshot({
+    path: info.outputPath('00-capability-preview-impact.png'),
+    fullPage: true,
+  });
   await page.getByTestId('confirm-ok').click();
   expect((await saveResp).status()).toBe(200);
 
@@ -193,7 +219,10 @@ test('capability grant readback failure blocks stale editing and retry reads the
     .flatMap((module: any) => module.resources)
     .flatMap((resource: any) => resource.actions);
   expect(actions.find((action: any) => action.code === code).granted).toBe(true);
-  await page.screenshot({ path: info.outputPath('03-capability-readback-error.png'), fullPage: true });
+  await page.screenshot({
+    path: info.outputPath('03-capability-readback-error.png'),
+    fullPage: true,
+  });
   await page.unroute(`**${matrixPath}`);
   await page
     .getByTestId('capability-editor-error')

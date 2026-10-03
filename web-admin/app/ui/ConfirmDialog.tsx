@@ -1,10 +1,10 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, type ReactNode } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
 
 export interface ConfirmDialogProps {
   open: boolean;
   title: string;
-  content: string;
+  content: ReactNode;
   confirmText?: string;
   cancelText?: string;
   variant?: 'default' | 'danger';
@@ -39,7 +39,7 @@ export default function ConfirmDialog({
 
       if (e.key === 'Tab' && dialogRef.current) {
         const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+          'button, summary, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
         );
         if (focusable.length === 0) return;
 
@@ -100,12 +100,18 @@ export default function ConfirmDialog({
         className="rounded-card bg-panel relative mx-4 flex max-h-[calc(100dvh-2rem)] w-full max-w-md scale-100 transform flex-col opacity-100 shadow-xl transition-all duration-200 dark:bg-gray-800"
       >
         <div className="flex min-h-0 flex-col p-6">
-          <h3 id={titleId} className="text-text mb-2 shrink-0 text-lg font-semibold dark:text-white">
+          <h3
+            id={titleId}
+            className="text-text mb-2 shrink-0 text-lg font-semibold dark:text-white"
+          >
             {title}
           </h3>
-          <p id={descId} className="text-text-2 min-h-0 overflow-y-auto overscroll-contain text-sm whitespace-pre-wrap dark:text-gray-300">
+          <div
+            id={descId}
+            className="text-text-2 min-h-0 overflow-y-auto overscroll-contain text-sm whitespace-pre-wrap dark:text-gray-300"
+          >
             {content}
-          </p>
+          </div>
         </div>
         <div className="flex shrink-0 justify-end gap-3 px-6 pb-6">
           <button

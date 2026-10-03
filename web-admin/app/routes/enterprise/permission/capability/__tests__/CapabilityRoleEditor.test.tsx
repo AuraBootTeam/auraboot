@@ -337,6 +337,58 @@ describe('CapabilityRoleEditor', () => {
     await screen.findByTestId('capability-role-editor');
   });
 
+  it('keeps authoritative shared impacts in a collapsed disclosure without burying the requested change', async () => {
+    mockData(groups, {
+      modules: [
+        {
+          moduleCode: 'quote',
+          moduleName: 'Quote',
+          resources: [
+            {
+              resourceCode: 'qo.quote',
+              resourceName: 'Quote',
+              actions: [
+                {
+                  permissionId: 1,
+                  permissionPid: 'p1',
+                  code: 'qo.quote.read',
+                  action: 'read',
+                  label: 'Read quote',
+                  granted: true,
+                  supported: true,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    const affected = Array.from({ length: 30 }, (_, index) => ({
+      ...cap(`shared.${index}`, `Shared capability ${index}`, false),
+      authorizationState: 'partial' as const,
+    }));
+    vi.mocked(capabilityService.previewSelection).mockResolvedValue({
+      grantedCodes: ['qo.quote.update'],
+      revokedCodes: ['qo.quote.read'],
+      preservedCodes: ['legacy.read'],
+      resultingCapabilities: affected,
+      relatedMenus: ['Quotes', 'Organization'],
+    });
+    render(<CapabilityRoleEditor rolePid="role-pid-5" />);
+    await screen.findByTestId('capability-role-editor');
+    fireEvent.click(screen.getByTestId('capability-checkbox-qo.cap.quote_edit'));
+    fireEvent.click(screen.getByTestId('capability-save'));
+    const impact = (await screen.findByTestId('capability-preview-impact')) as HTMLDetailsElement;
+    expect(impact.open).toBe(false);
+    expect(screen.getByText('Grant: 编辑报价')).toBeTruthy();
+    expect(impact.querySelector('summary')).toHaveTextContent('affected capabilities (30)');
+    expect(screen.getByTestId('capability-preview-resulting').children).toHaveLength(30);
+    expect(impact).toHaveTextContent('Shared capability 29');
+    expect(impact).toHaveTextContent('Quotes / Organization');
+    expect(impact).toHaveTextContent('Revoke: 查看报价单');
+    expect(capabilityService.applySelection).not.toHaveBeenCalled();
+  });
+
   it('does not submit when authoritative preview fails and preserves the draft', async () => {
     mockData();
     vi.mocked(capabilityService.previewSelection).mockRejectedValue(

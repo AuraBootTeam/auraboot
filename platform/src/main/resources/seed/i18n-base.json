@@ -4201,6 +4201,11 @@
     "en-US": "Add {added} actions, remove {removed}; {preserved} existing actions remain unchanged."
   },
   {
+    "key": "admin.permission.editor.impactDetailsV2",
+    "zh-CN": "查看受影响的能力（{count} 项）、菜单及动作明细",
+    "en-US": "Review affected capabilities ({count}), menus and action details"
+  },
+  {
     "key": "admin.permission.editor.roleLocalV2",
     "zh-CN": "变更仅作用于当前角色。用户访问仍受其他角色、记录范围和共享关系共同影响。",
     "en-US": "This changes this role only. Other roles, record scopes and sharing still determine user access."

@@ -259,13 +259,20 @@ export default function CapabilityRoleEditor({
       ),
     ),
   );
-  const previewContent = previewPlan
-    ? [
-        ...changes.map(
-          (cap) =>
-            `${selected.includes(cap.code) ? t('admin.permission.editor.add', undefined, 'Grant') : t('admin.permission.editor.remove', undefined, 'Revoke')}: ${cap.label}`,
-        ),
-        t(
+  const previewContent = previewPlan ? (
+    <div className="space-y-4" data-testid="capability-preview-summary">
+      <ul className="space-y-1">
+        {changes.map((cap) => (
+          <li key={cap.code}>
+            {selected.includes(cap.code)
+              ? t('admin.permission.editor.add', undefined, 'Grant')
+              : t('admin.permission.editor.remove', undefined, 'Revoke')}
+            : {cap.label}
+          </li>
+        ))}
+      </ul>
+      <p>
+        {t(
           'admin.permission.editor.atomicDiffV2',
           {
             added: previewPlan.grantedCodes.length,
@@ -273,27 +280,60 @@ export default function CapabilityRoleEditor({
             preserved: previewPlan.preservedCodes.length,
           },
           `Add ${previewPlan.grantedCodes.length} actions, remove ${previewPlan.revokedCodes.length}; ${previewPlan.preservedCodes.length} existing actions outside the selection remain unchanged.`,
-        ),
-        ...previewPlan.revokedCodes.map(
-          (code) =>
-            `${t('admin.permission.editor.remove', undefined, 'Revoke')}: ${actionLabels.get(code) ?? t('admin.permission.diagnostics.unmappedV2', undefined, 'No declared capability')}`,
-        ),
-        ...previewPlan.resultingCapabilities.map(
-          (cap) =>
-            `${cap.label}: ${t(`admin.permission.capability.${cap.authorizationState}V2`, undefined, cap.authorizationState ?? '')}`,
-        ),
-        previewPlan.relatedMenus.length
-          ? `${t('admin.permission.capability.relatedMenusV2', undefined, 'Related menus')}: ${previewPlan.relatedMenus.join(' / ')}`
-          : '',
-        t(
+        )}
+      </p>
+      <details
+        data-testid="capability-preview-impact"
+        className="border-border rounded-card border p-3"
+      >
+        <summary className="cursor-pointer font-medium">
+          {t(
+            'admin.permission.editor.impactDetailsV2',
+            { count: previewPlan.resultingCapabilities.length },
+            `Review affected capabilities (${previewPlan.resultingCapabilities.length}), menus and action details`,
+          )}
+        </summary>
+        <div className="mt-3 space-y-3">
+          <ul className="space-y-1" data-testid="capability-preview-resulting">
+            {previewPlan.resultingCapabilities.map((cap) => (
+              <li key={cap.code}>
+                {cap.label}:{' '}
+                {t(
+                  `admin.permission.capability.${cap.authorizationState}V2`,
+                  undefined,
+                  cap.authorizationState ?? '',
+                )}
+              </li>
+            ))}
+          </ul>
+          {previewPlan.relatedMenus.length > 0 && (
+            <p>
+              {t('admin.permission.capability.relatedMenusV2', undefined, 'Related menus')}:{' '}
+              {previewPlan.relatedMenus.join(' / ')}
+            </p>
+          )}
+          <ul className="space-y-1">
+            {previewPlan.revokedCodes.map((code) => (
+              <li key={code}>
+                {t('admin.permission.editor.remove', undefined, 'Revoke')}:{' '}
+                {actionLabels.get(code) ??
+                  t('admin.permission.diagnostics.unmappedV2', undefined, 'No declared capability')}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </details>
+      <p className="text-text-3">
+        {t(
           'admin.permission.editor.roleLocalV2',
           undefined,
           'This changes this role only. Other roles, record scopes and sharing still determine user access.',
-        ),
-      ]
-        .filter(Boolean)
-        .join('\n')
-    : '';
+        )}
+      </p>
+    </div>
+  ) : (
+    ''
+  );
 
   return (
     <div
