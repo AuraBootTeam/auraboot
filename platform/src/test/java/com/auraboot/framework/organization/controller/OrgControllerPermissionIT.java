@@ -2,6 +2,13 @@ package com.auraboot.framework.organization.controller;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.auth.dto.CustomUserDetails;
+import com.auraboot.framework.common.constant.ResponseCode;
+import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.organization.service.OrgEmployeeService;
+import com.auraboot.framework.tenant.dao.entity.Tenant;
+import com.auraboot.framework.tenant.dao.entity.TenantMember;
+import com.auraboot.framework.tenant.service.TenantService;
+import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.permission.service.UserPermissionService;
@@ -27,12 +34,14 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.time.Instant;
 import java.nio.file.Path;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -47,6 +56,8 @@ class OrgControllerPermissionIT extends BaseIntegrationTest {
     @Autowired private JdbcTemplate jdbc;
     @Autowired private UserService users;
     @Autowired private TenantMemberService members;
+    @Autowired private TenantService tenants;
+    @Autowired private OrgEmployeeService employees;
 
     private MockMvc mvc;
     private String departmentPid;
@@ -205,6 +216,90 @@ class OrgControllerPermissionIT extends BaseIntegrationTest {
     void memberManagerCannotWriteOrganizationRecordsThroughNativeEmployeeEndpoints() throws Exception {
         grantCapability("org.cap.member");
         assertEmployeeWritesDenied();
+    }
+
+    @Test
+    void hrManagerCannotLinkForeignTenantMemberThroughNativeEndpoint() throws Exception {
+        grantCapability("org.cap.hr");
+        applyTestMetaContext();
+        var foreign = foreignMember();
+        var before = memberRow(foreign.getPid());
+        long employeeCount = employeeCount();
+        String position = position(departmentPid);
+
+        var denied = mvc.perform(body(post("/api/org/employees/link"), Map.of(
+                        "memberPid", foreign.getPid(), "deptPid", departmentPid, "positionPid", position)))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("404")).andReturn();
+
+        assertThat(denied.getResponse().getContentAsString()).doesNotContain(foreign.getPid());
+        assertThat(memberRow(foreign.getPid())).isEqualTo(before);
+        assertThat(employeeCount()).isEqualTo(employeeCount);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM mt_org_employee WHERE org_emp_member_id = ?",
+                Long.class, foreign.getPid())).isZero();
+    }
+
+    @Test
+    void existingEmployeeCannotBeLinkedToForeignTenantMember() throws Exception {
+        grantCapability("org.cap.hr");
+        applyTestMetaContext();
+        var foreign = foreignMember();
+        String employeePid = data.create("org_employee", Map.of(
+                "org_emp_name", "Unlinked foreign-boundary fixture " + System.nanoTime(),
+                "org_emp_dept_id", departmentPid, "org_emp_position_id", position(departmentPid))).get("pid").toString();
+        var employeeBefore = employee(employeePid);
+        var memberBefore = memberRow(foreign.getPid());
+
+        var denied = assertThrows(BusinessException.class,
+                () -> employees.linkExistingMember(employeePid, foreign.getPid()));
+
+        assertThat(denied.getResponseCode()).isEqualTo(ResponseCode.NOT_FOUND);
+        assertThat(memberRow(foreign.getPid())).isEqualTo(memberBefore);
+        assertThat(employee(employeePid)).isEqualTo(employeeBefore);
+    }
+
+    @Test
+    void existingEmployeeCanBeLinkedToOwnTenantMember() throws Exception {
+        grantCapability("org.cap.hr");
+        applyTestMetaContext();
+        var account = users.signUp("org-existing-link-" + System.nanoTime() + "@example.test", "Test-password-2026!");
+        var member = members.addMember(account.getId(), getTestTenant().getId(), "active");
+        String employeePid = data.create("org_employee", Map.of(
+                "org_emp_name", "Unlinked own-tenant fixture " + System.nanoTime(),
+                "org_emp_dept_id", departmentPid, "org_emp_position_id", position(departmentPid))).get("pid").toString();
+
+        var linked = employees.linkExistingMember(employeePid, member.getPid());
+
+        assertThat(linked.pid()).isEqualTo(employeePid);
+        var employee = employee(employeePid);
+        assertThat(employee.get("org_emp_member_id")).isEqualTo(member.getPid());
+        assertThat(employee.get("org_emp_user_id")).isEqualTo(account.getPid());
+        assertThat(memberRow(member.getPid()).get("employee_id")).isEqualTo(employee.get("id"));
+    }
+
+    private TenantMember foreignMember() {
+        Tenant tenant = new Tenant();
+        tenant.setPid(UniqueIdGenerator.generate());
+        tenant.setName("org-foreign-boundary-" + System.nanoTime());
+        tenant.setDisplayName("Foreign organization boundary fixture");
+        tenant.setStatus("active");
+        tenant.setContactEmail("admin@foreign-boundary.example.test");
+        tenant.setCreatedAt(Instant.now());
+        tenant.setUpdatedAt(Instant.now());
+        tenant = tenants.createTenant(tenant);
+        var account = users.signUp("org-foreign-member-" + System.nanoTime() + "@example.test", "Test-password-2026!");
+        var member = members.addMember(account.getId(), tenant.getId(), "active");
+        assertThat(member.getTenantId()).isNotEqualTo(getTestTenant().getId());
+        assertThat(member.getEmployeeId()).isNull();
+        return member;
+    }
+
+    private Map<String, Object> memberRow(String pid) {
+        return jdbc.queryForMap("SELECT * FROM ab_tenant_member WHERE pid = ?", pid);
+    }
+
+    private long employeeCount() {
+        return jdbc.queryForObject("SELECT count(*) FROM mt_org_employee WHERE tenant_id = ?",
+                Long.class, getTestTenant().getId());
     }
 
     private void assertEmployeeWritesDenied() throws Exception {
