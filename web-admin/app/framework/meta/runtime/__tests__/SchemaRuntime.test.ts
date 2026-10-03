@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
+import { Activity, createElement } from 'react';
 import { useSchemaRuntime } from '~/framework/meta/hooks/useSchemaRuntime';
 import { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
@@ -330,6 +331,29 @@ vi.mock('~/contexts/ToastContext', () => ({
 }));
 
 describe('page runtime manager lifecycle', () => {
+  it('never synchronizes a destroyed runtime when preserved effects reconnect', async () => {
+    const consoleError = vi.spyOn(console, 'error');
+    const manager = createManager();
+    let mode: 'visible' | 'hidden' = 'visible';
+    try {
+      const { result, rerender, unmount } = renderHook(({ status }) => useSchemaRuntime({
+        schema: minimalSchema, dataSourceManager: manager, navigate: vi.fn(), locale: 'en', t: key => key,
+        disableAutoFetch: true, skipDataSourceRegistration: true,
+        initialContext: { record: { inv_fgpt_status: status } },
+      }), { initialProps: { status: 'pending_pack' }, wrapper: ({ children }) => createElement(Activity, { mode }, children) });
+      await waitFor(() => expect(result.current?.getContext()).toMatchObject({ record: { inv_fgpt_status: 'pending_pack' } }));
+      mode = 'hidden';
+      rerender({ status: 'pending_pack' });
+      mode = 'visible';
+      rerender({ status: 'received' });
+      await waitFor(() => expect(result.current?.getContext()).toMatchObject({ record: { inv_fgpt_status: 'received' } }));
+      unmount();
+      expect(consoleError).not.toHaveBeenCalled();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it('rebinds the same schema to a new data manager instead of retaining a destroyed scope', async () => {
     const first = createManager();
     const second = createManager();

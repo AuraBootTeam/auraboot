@@ -23,7 +23,7 @@
  * ```
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { NavigateFunction } from 'react-router';
 import { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import type { UnifiedSchema } from '~/framework/meta/schemas/types';
@@ -110,6 +110,7 @@ function buildGlobalState(options: UseSchemaRuntimeOptions) {
  */
 export function useSchemaRuntime(options: UseSchemaRuntimeOptions): SchemaRuntime | null {
   const [runtime, setRuntime] = useState<SchemaRuntime | null>(null);
+  const activeRuntimeRef = useRef<SchemaRuntime | null>(null);
   const { showSuccessToast, showErrorToast, showWarningToast, showInfoToast } = useToastContext();
   const toastHandler = useCallback(
     (message: string, level: RuntimeToastLevel = 'info') => {
@@ -164,10 +165,12 @@ export function useSchemaRuntime(options: UseSchemaRuntimeOptions): SchemaRuntim
       initialContext: options.initialContext,
     });
 
+    activeRuntimeRef.current = rt;
     setRuntime(rt);
 
     // Cleanup also runs before a schema or manager replacement.
     return () => {
+      if (activeRuntimeRef.current === rt) activeRuntimeRef.current = null;
       rt.destroy();
     };
     // 只依赖 schema 和 dataSourceManager，避免不必要的重建
@@ -175,7 +178,11 @@ export function useSchemaRuntime(options: UseSchemaRuntimeOptions): SchemaRuntim
   }, [schema?.id, dataSourceManager]);
 
   useEffect(() => {
-    runtime?.syncContext(options.initialContext);
+    // Preserved effects may reconnect before the replacement state renders.
+    // Only synchronize the instance owned by the currently mounted effect.
+    if (runtime && activeRuntimeRef.current === runtime) {
+      runtime.syncContext(options.initialContext);
+    }
   }, [runtime, options.initialContext]);
 
   return runtime;
