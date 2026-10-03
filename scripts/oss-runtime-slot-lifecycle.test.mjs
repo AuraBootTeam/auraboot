@@ -13,8 +13,8 @@ test('fresh OSS gate keeps the registered slot for the same stable runtime name'
   assert.match(source, /reusing prior slot .* before the fresh rebuild/u);
   assert.ok(
     source.indexOf('registered_slot="$(registered_slot_for_name)"')
-      < source.indexOf('"$GS" destroy "$NAME"'),
-    'the old allocation must identify the stable slot before the fresh destroy',
+      < source.indexOf('"$GS" down "$NAME"'),
+    'the old allocation must identify the stable slot before stopping the same stack',
   );
 });
 
@@ -33,8 +33,8 @@ test('golden stack uses idempotent runtime identity with source worktree metadat
   const source = readFileSync(stackPath, 'utf8');
   assert.match(source, /runtime ensure auraboot "\$name"/u);
   assert.match(source, /--source-root "\$REPO_ROOT"/u);
-  assert.match(source, /runtime allocate auraboot "\$name"/u);
-  assert.match(source, /legacy dispatcher/u);
+  assert.match(source, /runtime evidence begin/u);
+  assert.doesNotMatch(source, /runtime allocate auraboot/u);
   assert.match(source, /--mode "\$runtime_mode"/u);
 });
 
@@ -42,6 +42,6 @@ test('fresh gate marks its runtime as verification evidence rather than feature 
   const source = readFileSync(gatePath, 'utf8');
   const stack = readFileSync(stackPath, 'utf8');
   assert.match(source, /--runtime-mode verification/u);
-  assert.match(source, /SEED_LOG_DIR="\$AURA_EVIDENCE_ROOT/u);
+  assert.match(source, /LOG="\$AURA_EVIDENCE_ROOT\/logs\/oss-e2e-gate/u);
   assert.match(stack, /export PW_ARTIFACT_DIR=\$evidence_root/u);
 });
