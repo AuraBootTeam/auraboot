@@ -9,7 +9,6 @@ import { BASE_URL } from '../../helpers/environments';
  * grant time), not just apply to current grants. Grants via the primary capability editor and verifies the inherited scope in the capability settings.
  */
 
-const SHOTS = 'test-results/rbac-default-scope';
 const BASE = BASE_URL;
 
 async function createRole(page: Page) {
@@ -29,7 +28,7 @@ async function createRole(page: Page) {
 for (const scope of ['dept', 'team']) {
   test(`a role default ${scope} data scope is inherited by newly-granted permissions`, async ({
     page,
-  }) => {
+  }, info) => {
     const role = await createRole(page);
 
     await page.goto('/enterprise/permissions');
@@ -98,7 +97,7 @@ for (const scope of ['dept', 'team']) {
       actions.find((action: any) => action.code === 'model.qo_quote_common.read').scopeType,
     ).toBe(scope);
 
-    await page.screenshot({ path: `${SHOTS}/01-inherited-${scope}-scope.png`, fullPage: true });
+    await page.screenshot({ path: info.outputPath(`01-inherited-${scope}-scope.png`), fullPage: true });
 
     // backend cross-check: the role's stored default is persisted
     const defResp = await page.request.get(

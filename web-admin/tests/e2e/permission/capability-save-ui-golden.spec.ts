@@ -10,7 +10,6 @@ import { BASE_URL } from '../../helpers/environments';
  * the wrong (non-existent) role and the grant silently fails — this test then goes red.
  */
 
-const SHOTS = 'test-results/rbac-capability-save';
 const BASE = BASE_URL;
 
 async function createRole(page: Page) {
@@ -27,7 +26,7 @@ async function createRole(page: Page) {
   return (await resp.json()).data as { pid: string; code: string };
 }
 
-test('① capability save persists through the browser on a snowflake-id role', async ({ page }) => {
+test('① capability save persists through the browser on a snowflake-id role', async ({ page }, info) => {
   const role = await createRole(page);
   const capUrl = `${BASE}/api/permission/capabilities?rolePid=${encodeURIComponent(role.pid)}`;
   const grantedCaps = (groups: any[]) =>
@@ -74,7 +73,7 @@ test('① capability save persists through the browser on a snowflake-id role', 
   await expect(page.getByRole('dialog')).toBeInViewport({ ratio: 1 });
   await expect(page.getByTestId('confirm-ok')).toBeInViewport({ ratio: 1 });
   await expect(page.getByTestId('confirm-cancel')).toBeInViewport({ ratio: 1 });
-  await page.screenshot({ path: `${SHOTS}/00-capability-preview.png`, fullPage: true });
+  await page.screenshot({ path: info.outputPath('00-capability-preview.png'), fullPage: true });
   await page.getByTestId('confirm-ok').click();
   expect((await saveResp).status()).toBe(200);
 
@@ -88,10 +87,10 @@ test('① capability save persists through the browser on a snowflake-id role', 
   expect(grantedCaps(after).some((c: any) => c.code === cap!.code)).toBeTruthy();
 
   await checkbox.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: `${SHOTS}/01-capability-saved.png`, fullPage: true });
+  await page.screenshot({ path: info.outputPath('01-capability-saved.png'), fullPage: true });
 });
 
-test('capability draft survives failed save and canceled navigation', async ({ page }) => {
+test('capability draft survives failed save and canceled navigation', async ({ page }, info) => {
   const role = await createRole(page);
   const capUrl = `${BASE}/api/permission/capabilities?rolePid=${encodeURIComponent(role.pid)}`;
   const before = (await (await page.request.get(capUrl)).json()).data;
@@ -136,7 +135,7 @@ test('capability draft survives failed save and canceled navigation', async ({ p
   expect(
     after.flatMap((g: any) => g.capabilities).find((c: any) => c.code === cap.code).granted,
   ).toBe(false);
-  await page.screenshot({ path: `${SHOTS}/02-draft-save-error.png`, fullPage: true });
+  await page.screenshot({ path: info.outputPath('02-draft-save-error.png'), fullPage: true });
   await page.unroute('**/api/permission/capabilities?**');
   await page.getByTestId('permission-right-tab-members').click();
   await page.getByTestId('confirm-ok').click();
@@ -145,7 +144,7 @@ test('capability draft survives failed save and canceled navigation', async ({ p
 
 test('capability grant readback failure blocks stale editing and retry reads the persisted grant', async ({
   page,
-}) => {
+}, info) => {
   test.info().annotations.push({
     type: 'fault-injection',
     description: 'Browser GET matrix returns 503 after a real persisted capability grant.',
@@ -194,7 +193,7 @@ test('capability grant readback failure blocks stale editing and retry reads the
     .flatMap((module: any) => module.resources)
     .flatMap((resource: any) => resource.actions);
   expect(actions.find((action: any) => action.code === code).granted).toBe(true);
-  await page.screenshot({ path: `${SHOTS}/03-capability-readback-error.png`, fullPage: true });
+  await page.screenshot({ path: info.outputPath('03-capability-readback-error.png'), fullPage: true });
   await page.unroute(`**${matrixPath}`);
   await page
     .getByTestId('capability-editor-error')

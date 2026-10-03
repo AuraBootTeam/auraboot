@@ -261,7 +261,7 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
         expectExcludes(snapshot.permissionCodes, BOM_ADMIN_PERMISSIONS, `${label} permissions`);
         expectIncludes(
           snapshot.menuPaths,
-          [...QUOTE_MENU_PATHS, ...BUSINESS_MENU_PATHS],
+          [...QUOTE_MENU_PATHS, ...BUSINESS_MENU_PATHS, BOM_FORMAT_PROFILE_PATH],
           `${label} menu paths`,
         );
         expectExcludes(
@@ -288,12 +288,12 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
       expectExcludes(snapshot.permissionCodes, ['bom.rule.manage'], 'bom_engineering permissions');
       expectIncludes(
         snapshot.menuPaths,
-        [...QUOTE_MENU_PATHS, ...BUSINESS_MENU_PATHS, BOM_MATERIAL_LIBRARY_PATH],
+        [...QUOTE_MENU_PATHS, ...BUSINESS_MENU_PATHS, BOM_MATERIAL_LIBRARY_PATH, BOM_FORMAT_PROFILE_PATH],
         'bom_engineering menu paths',
       );
       expectExcludes(
         snapshot.menuPaths,
-        [BOM_REVIEW_QUEUE_PATH, BOM_FORMAT_PROFILE_PATH],
+        [BOM_REVIEW_QUEUE_PATH],
         'bom_engineering menu paths',
       );
     });
@@ -323,11 +323,10 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
       await withRolePage(browser, user, async (page) => {
         await assertSidebarLinks(
           page,
-          [...QUOTE_MENU_PATHS, ...BUSINESS_MENU_PATHS],
+          [...QUOTE_MENU_PATHS, ...BUSINESS_MENU_PATHS, BOM_FORMAT_PROFILE_PATH],
           [
             BOM_REVIEW_QUEUE_PATH,
             BOM_MATERIAL_LIBRARY_PATH,
-            BOM_FORMAT_PROFILE_PATH,
           ],
         );
         await expectUnavailableByDirectUrl(page, BOM_MATERIAL_LIBRARY_PATH);
@@ -337,8 +336,8 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
     await withRolePage(browser, users.bomEngineering, async (page) => {
       await assertSidebarLinks(
         page,
-        [...QUOTE_MENU_PATHS, ...BUSINESS_MENU_PATHS, BOM_MATERIAL_LIBRARY_PATH],
-        [BOM_REVIEW_QUEUE_PATH, BOM_FORMAT_PROFILE_PATH],
+        [...QUOTE_MENU_PATHS, ...BUSINESS_MENU_PATHS, BOM_MATERIAL_LIBRARY_PATH, BOM_FORMAT_PROFILE_PATH],
+        [BOM_REVIEW_QUEUE_PATH],
       );
     });
 
