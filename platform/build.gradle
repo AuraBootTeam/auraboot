@@ -443,6 +443,8 @@ dependencies {
     testImplementation 'org.testcontainers:mysql'
     testImplementation 'org.testcontainers:postgresql'
     testImplementation 'org.testcontainers:junit-jupiter'
+    // MySQL containers need a JDBC driver to become ready; keep it out of production artifacts.
+    testRuntimeOnly 'com.mysql:mysql-connector-j'
 
     // Awaitility — async assertion polling (used by AdminAuditServiceIntegrationTest)
     testImplementation 'org.awaitility:awaitility:4.3.0'
