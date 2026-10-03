@@ -158,7 +158,7 @@ public class CommandServiceImpl implements CommandService {
         // tenant_id is automatically added by TenantLineInnerInterceptor
         CommandDefinition entity = commandDefinitionMapper.findCurrentByCode(code);
         if (entity == null) {
-            throw new BusinessException(ResponseCode.BadParam, "Command not found: " + code);
+            throw new com.auraboot.framework.meta.exception.CommandNotFoundException(code);
         }
         CommandDefinitionDTO dto = toDTO(entity);
         dto.setBindingRules(getBindingRulesInternal(entity.getId()));

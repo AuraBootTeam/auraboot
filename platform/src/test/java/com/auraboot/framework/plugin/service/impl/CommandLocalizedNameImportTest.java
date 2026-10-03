@@ -38,6 +38,7 @@ class CommandLocalizedNameImportTest {
     }
     @Test void newImportRetainsDeclaredNamesAndOtherExtensionMetadata() {
         var created = new com.auraboot.framework.meta.dto.CommandDefinitionDTO(); created.setPid("command-1");
+        when(commands.findByCode("member:create")).thenThrow(new com.auraboot.framework.meta.exception.CommandNotFoundException("member:create"));
         when(commands.create(any())).thenReturn(created);
         run(resource());
         var request = ArgumentCaptor.forClass(CommandDefinitionCreateRequest.class);
@@ -81,6 +82,30 @@ class CommandLocalizedNameImportTest {
         when(commands.findByCode("member:create")).thenReturn(existing);
         var dto = resource(); dto.setExtension(JsonUtil.parse(json, Map.class));
         assertThatThrownBy(() -> run(dto)).isInstanceOf(ValidationException.class);
+        verify(commands, never()).create(any()); verifyNoInteractions(mapper, cache);
+    }
+
+    @ParameterizedTest @ValueSource(strings={"database", "unrelated-bad-param", "invalid-metadata"})
+    void readFailurePropagatesUnchangedWithoutImportWrites(String failure) {
+        RuntimeException error = switch (failure) {
+            case "database" -> new IllegalStateException("Database unavailable");
+            case "unrelated-bad-param" -> new com.auraboot.framework.exception.BusinessException(
+                    com.auraboot.framework.common.constant.ResponseCode.BadParam, "Command not found: misleading text");
+            default -> new ValidationException(com.auraboot.framework.common.constant.ResponseCode.CommonValidationFailed, "Invalid command metadata");
+        };
+        var created = new com.auraboot.framework.meta.dto.CommandDefinitionDTO(); created.setPid("unexpected-write");
+        when(commands.create(any())).thenReturn(created);
+        when(commands.findByCode("member:create")).thenThrow(error);
+        assertThatThrownBy(() -> run(resource())).isSameAs(error);
+        verify(commands, never()).create(any()); verifyNoInteractions(mapper, cache);
+    }
+    @Test void explicitAbsenceAndNullResultAreTheOnlyNegativeExistenceOutcomes() {
+        when(commands.findByCode("absent")).thenThrow(new com.auraboot.framework.meta.exception.CommandNotFoundException("absent"));
+        assertThat(importer.checkCommandExists(42L, "absent")).isFalse();
+        assertThat(importer.checkCommandExists(42L, "null-result")).isFalse();
+        var found = new com.auraboot.framework.meta.dto.CommandDefinitionDTO();
+        when(commands.findByCode("found")).thenReturn(found);
+        assertThat(importer.checkCommandExists(42L, "found")).isTrue();
         verify(commands, never()).create(any()); verifyNoInteractions(mapper, cache);
     }
 

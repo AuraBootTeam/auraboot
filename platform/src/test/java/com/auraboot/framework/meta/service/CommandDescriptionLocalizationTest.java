@@ -79,4 +79,16 @@ class CommandDescriptionLocalizationTest {
         assertThat(result).containsEntry("en-US", "Original");
         assertThatThrownBy(() -> result.put("en-US", "Changed")).isInstanceOf(UnsupportedOperationException.class);
     }
+    @Test void absentCommandHasAnExactTypeWhileRetainingTheExistingPublicError() {
+        assertThatThrownBy(() -> service.findByCode("missing-command"))
+                .isInstanceOfSatisfying(com.auraboot.framework.meta.exception.CommandNotFoundException.class,
+                        error -> {
+                            assertThat(error.getResponseCode()).isEqualTo(com.auraboot.framework.common.constant.ResponseCode.BadParam);
+                            assertThat(error.getMessage()).isEqualTo("Command not found: missing-command");
+                            assertThat(error).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+                        });
+        verify(mapper).findCurrentByCode("missing-command");
+        verify(mapper, never()).insertIdempotent(any()); verify(mapper, never()).updateById(any(CommandDefinition.class));
+    }
+
 }

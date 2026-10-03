@@ -194,14 +194,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     @Override
     public boolean checkCommandExists(Long tenantId, String code) {
         try {
-            com.auraboot.framework.meta.dto.CommandDefinitionDTO cmd = commandService.findByCode(code);
-            return cmd != null;
-        } catch (Exception e) {
-            // findByCode lacks a NotFoundException type today; any failure is treated as
-            // "does not exist" so a re-import can proceed with create. Logged at debug
-            // so a real DB/connectivity failure is still observable when troubleshooting.
-            log.debug("checkCommandExists treating exception as 'not exists' for code={}: {}",
-                    logSafe(code), logSafe(e.toString()));
+            return commandService.findByCode(code) != null;
+        } catch (com.auraboot.framework.meta.exception.CommandNotFoundException absent) {
             return false;
         }
     }
