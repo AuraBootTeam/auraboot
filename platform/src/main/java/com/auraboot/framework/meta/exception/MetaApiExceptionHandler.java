@@ -24,6 +24,14 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice(basePackages = "com.auraboot.framework.meta.controller")
 public class MetaApiExceptionHandler {
 
+    /** Absent and out-of-tenant records share a response without internal identifiers. */
+    @ExceptionHandler(MetaRecordNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleRecordNotFoundException(MetaRecordNotFoundException e) {
+        log.warn("Meta record unavailable: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error(ResponseCode.NOT_FOUND, null));
+    }
+
     /**
      * Handle Meta service exceptions (business logic errors).
      */

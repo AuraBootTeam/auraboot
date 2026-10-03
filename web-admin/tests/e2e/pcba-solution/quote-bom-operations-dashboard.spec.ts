@@ -1,5 +1,6 @@
 import type { Browser, Page } from '@playwright/test';
 import { test, expect } from '../../fixtures';
+import { BASE_URL } from '../../helpers/environments';
 import { ensureSidebarExpanded, uniqueId } from '../helpers';
 import {
   ensureQuoteRoleUser,
@@ -35,7 +36,7 @@ async function queryRecords(page: Page, code: string): Promise<Record<string, un
 
 async function expectFourCharts(page: Page, path: string): Promise<void> {
   const expectedSeries: number[][] = [];
-  const targetPath = new URL(path, page.url()).pathname;
+  const targetPath = new URL(path, BASE_URL).pathname;
   const trends = TREND_QUERIES.map((code) =>
     page
       .waitForResponse((response) => {

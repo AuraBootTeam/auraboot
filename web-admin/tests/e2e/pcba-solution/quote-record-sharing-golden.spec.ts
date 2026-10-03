@@ -236,15 +236,30 @@ test('quote sharing release gate: multiple members, role access and revocation t
     const deniedRecord = foreign.page.waitForResponse(response =>
       new URL(response.url()).pathname === root && response.request().method() === 'GET');
     await foreign.page.goto(new URL(`/p/qo_quote_common/view/${quote.quoteId}`, page.url()).href);
-    expect((await deniedRecord).status()).toBe(403);
+    // Tenant filtering deliberately makes a foreign record indistinguishable
+    // from an absent record; it must not query other tenants to return 403.
+    const foreignRecord = await deniedRecord;
+    expect(foreignRecord.status()).toBe(404);
+    expect(await foreignRecord.json()).toMatchObject({
+      code: '404', message: 'Resource not found', data: null, context: null,
+    });
+    const absentRecord = await foreign.page.request.get('/api/dynamic/qo_quote_common/01NONEXISTENTQUOTE000000000');
+    expect(absentRecord.status()).toBe(404);
+    expect(await absentRecord.json()).toMatchObject({
+      code: '404', message: 'Resource not found', data: null, context: null,
+    });
     await expect(foreign.page.getByTestId('ab:detail:qo_quote_common:container')
-      .getByRole('heading', { level: 2 })).toHaveText('无法访问此记录');
+      .getByRole('heading', { level: 2 })).toHaveText(/记录不存在|未找到记录|Record not found/);
+    await expect(foreign.page.getByText(quote.quoteCode, { exact: false })).toHaveCount(0);
     await expect(foreign.page.getByTestId(`table-row-${quote.lineId}`)).toHaveCount(0);
     for (const query of ['qo_quote_bom_price_metrics', 'qo_quote_process_fee_unassigned_facts']) {
       const deniedQuery = await foreign.page.request.post(`/api/meta/named-queries/${query}/execute`, {
         data: { parameters: { quoteId: quote.quoteId } },
       });
-      expect(deniedQuery.status()).toBe(403);
+      expect(deniedQuery.status()).toBe(404);
+      expect(await deniedQuery.json()).toMatchObject({
+        code: '404', message: 'Resource not found', data: null, context: null,
+      });
     }
     expect((await foreign.page.request.get(`/api/file/${sharedQuoteFileId}`)).status()).toBe(403);
     await foreign.page.screenshot({ path: testInfo.outputPath('quote-cross-tenant-denied.png'), fullPage: true });
