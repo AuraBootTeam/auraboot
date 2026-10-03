@@ -9,8 +9,19 @@
  * #5: BPMN Canvas drag feedback
  */
 
-import { test, expect, type Page } from '@playwright/test';
-import { uniqueId } from './helpers';
+import { test, expect } from '@playwright/test';
+
+// Match the product's localized accessible names without changing its locale.
+const DATA_TABLE = /Data Table|数据表格/;
+const STAT_CARD = /Stat Card|指标卡片/;
+const RICH_TEXT = /Rich Text|富文本/;
+const MOVE_UP = /^(Move up|上移)$/;
+const MOVE_DOWN = /^(Move down|下移)$/;
+const DELETE = /^(Delete|删除)$/;
+
+test.afterEach(async ({ page }, testInfo) => {
+  await page.screenshot({ path: testInfo.outputPath('designer-ux-terminal.png'), fullPage: true });
+});
 
 // ============================================================================
 // #1: Report Designer Block Drag Reorder
@@ -31,7 +42,7 @@ test.describe('Report Designer — Block Drag Reorder (#1)', () => {
   test('should show drag handles on block hover', async ({ page }) => {
     // Add a block via palette click
     const palette = page.getByTestId('block-palette');
-    await palette.getByRole('button', { name: /Data Table/ }).click();
+    await palette.getByRole('button', { name: DATA_TABLE }).click();
 
     // Wait for a draggable block to appear in canvas
     const canvas = page.getByTestId('report-canvas');
@@ -52,14 +63,18 @@ test.describe('Report Designer — Block Drag Reorder (#1)', () => {
     const blocks = canvas.locator('[draggable="true"]');
 
     // Add three blocks in order
-    await palette.getByRole('button', { name: /Data Table/ }).click();
+    await palette.getByRole('button', { name: DATA_TABLE }).click();
     await expect(blocks).toHaveCount(1, { timeout: 10000 });
 
-    await palette.getByRole('button', { name: /Stat Card/ }).click();
+    await palette.getByRole('button', { name: STAT_CARD }).click();
     await expect(blocks).toHaveCount(2, { timeout: 10000 });
 
-    await palette.getByRole('button', { name: /Rich Text/ }).click();
+    await palette.getByRole('button', { name: RICH_TEXT }).click();
     await expect(blocks).toHaveCount(3, { timeout: 10000 });
+
+    const handles = canvas.locator('[data-testid^="drag-handle-"]');
+    const originalOrder = await handles.evaluateAll((items) => items.map((item) => item.getAttribute('data-testid')));
+    expect(originalOrder).toHaveLength(3);
 
     // Drag the third block to the first position
     const thirdBlock = blocks.nth(2);
@@ -67,8 +82,10 @@ test.describe('Report Designer — Block Drag Reorder (#1)', () => {
 
     await thirdBlock.dragTo(firstBlock, { targetPosition: { x: 10, y: 5 } });
 
-    // Verify blocks still exist after reorder
     await expect(blocks).toHaveCount(3);
+    // The operation must change order, not merely leave three blocks attached.
+    await expect.poll(() => handles.evaluateAll((items) => items.map((item) => item.getAttribute('data-testid'))))
+      .toEqual([originalOrder[2], originalOrder[0], originalOrder[1]]);
   });
 
   test('should have draggable blocks after adding multiple', async ({ page }) => {
@@ -77,10 +94,10 @@ test.describe('Report Designer — Block Drag Reorder (#1)', () => {
     const blocks = canvas.locator('[draggable="true"]');
 
     // Add two blocks
-    await palette.getByRole('button', { name: /Data Table/ }).click();
+    await palette.getByRole('button', { name: DATA_TABLE }).click();
     await expect(blocks).toHaveCount(1, { timeout: 10000 });
 
-    await palette.getByRole('button', { name: /Stat Card/ }).click();
+    await palette.getByRole('button', { name: STAT_CARD }).click();
     await expect(blocks).toHaveCount(2, { timeout: 10000 });
 
     // Both blocks should be draggable
@@ -96,6 +113,9 @@ test.describe('Report Designer — Block Drag Reorder (#1)', () => {
 test.describe('Designer i18n (#2)', () => {
   test('report designer empty state renders localized text', async ({ page }) => {
     await page.goto('/report-designer', { waitUntil: 'domcontentloaded' });
+    // Navigation may briefly retain the previous route tree during hydration.
+    // Keep uniqueness as an assertion rather than silently selecting one canvas.
+    await expect(page.getByTestId('report-canvas')).toHaveCount(1);
     await expect(page.getByTestId('report-canvas')).toBeVisible();
 
     // Empty state should show localized text (not raw i18n keys)
@@ -194,6 +214,9 @@ test.describe('Dashboard Designer — Drag Preview (#3)', () => {
 test.describe('Unified Empty State (#4)', () => {
   test('report designer shows dashed variant empty state', async ({ page }) => {
     await page.goto('/report-designer', { waitUntil: 'domcontentloaded' });
+    // Navigation may briefly retain the previous route tree during hydration.
+    // Keep uniqueness as an assertion rather than silently selecting one canvas.
+    await expect(page.getByTestId('report-canvas')).toHaveCount(1);
     await expect(page.getByTestId('report-canvas')).toBeVisible();
 
     const emptyState = page.getByTestId('report-canvas-empty');
@@ -224,7 +247,7 @@ test.describe('Unified Empty State (#4)', () => {
     // Add a block
     await page
       .getByTestId('block-palette')
-      .getByRole('button', { name: /Data Table/ })
+      .getByRole('button', { name: DATA_TABLE })
       .click();
     const blocks = page.getByTestId('report-canvas').locator('[draggable="true"]');
     await expect(blocks).toHaveCount(1, { timeout: 10000 });
@@ -241,7 +264,7 @@ test.describe('Unified Empty State (#4)', () => {
 test.describe('BPMN Designer — Drag Feedback (#5)', () => {
   test.beforeEach(async ({ page }) => {
     // Navigate to BPMN designer — may need to go through menu or direct URL
-    await page.goto('/bpmn-designer', { waitUntil: 'domcontentloaded' });
+    await page.goto('/bpm/designer', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('.react-flow')).toBeVisible({ timeout: 15000 });
   });
 
@@ -276,7 +299,7 @@ test.describe('Report Designer — BlockActionBar (#1 refactoring)', () => {
     const blocks = canvas.locator('[draggable="true"]');
 
     // Add a data-table block
-    await palette.getByRole('button', { name: /Data Table/ }).click();
+    await palette.getByRole('button', { name: DATA_TABLE }).click();
     await expect(blocks).toHaveCount(1, { timeout: 10000 });
 
     // Select the block by clicking it
@@ -284,11 +307,11 @@ test.describe('Report Designer — BlockActionBar (#1 refactoring)', () => {
 
     // Property panel should show the block action buttons
     const panel = page.getByTestId('block-property-panel');
-    await expect(panel.getByText('Data Table', { exact: true })).toBeVisible();
+    await expect(panel.getByText(/^(Data Table|数据表格)$/)).toBeVisible();
 
-    await expect(panel.getByTitle('Move up')).toBeVisible();
-    await expect(panel.getByTitle('Move down')).toBeVisible();
-    await expect(panel.getByTitle('Delete')).toBeVisible();
+    await expect(panel.getByTitle(MOVE_UP)).toBeVisible();
+    await expect(panel.getByTitle(MOVE_DOWN)).toBeVisible();
+    await expect(panel.getByTitle(DELETE)).toBeVisible();
   });
 
   test('should enable move down when multiple blocks exist', async ({ page }) => {
@@ -297,25 +320,25 @@ test.describe('Report Designer — BlockActionBar (#1 refactoring)', () => {
     const blocks = canvas.locator('[draggable="true"]');
 
     // Add two blocks
-    await palette.getByRole('button', { name: /Data Table/ }).click();
+    await palette.getByRole('button', { name: DATA_TABLE }).click();
     await expect(blocks).toHaveCount(1, { timeout: 10000 });
 
-    await palette.getByRole('button', { name: /Stat Card/ }).click();
+    await palette.getByRole('button', { name: STAT_CARD }).click();
     await expect(blocks).toHaveCount(2, { timeout: 10000 });
 
     // Select the first block
     await blocks.first().click();
 
     const panel = page.getByTestId('block-property-panel');
-    await expect(panel.getByText('Data Table', { exact: true })).toBeVisible();
+    await expect(panel.getByText(/^(Data Table|数据表格)$/)).toBeVisible();
 
     // Move down should be enabled for the first block
-    const moveDown = panel.getByTitle('Move down');
+    const moveDown = panel.getByTitle(MOVE_DOWN);
     await expect(moveDown).toBeVisible();
     await expect(moveDown).toBeEnabled();
 
     // Move up should be disabled for the first block
-    const moveUp = panel.getByTitle('Move up');
+    const moveUp = panel.getByTitle(MOVE_UP);
     await expect(moveUp).toBeVisible();
     await expect(moveUp).toBeDisabled();
   });
@@ -326,12 +349,12 @@ test.describe('Report Designer — BlockActionBar (#1 refactoring)', () => {
     const blocks = canvas.locator('[draggable="true"]');
 
     // Add a block
-    await palette.getByRole('button', { name: /Rich Text/ }).click();
+    await palette.getByRole('button', { name: RICH_TEXT }).click();
     await expect(blocks).toHaveCount(1, { timeout: 10000 });
 
     // Select and delete
     await blocks.first().click();
-    await page.getByTestId('block-property-panel').getByTitle('Delete').click();
+    await page.getByTestId('block-property-panel').getByTitle(DELETE).click();
 
     // Block should be removed, empty state should return
     await expect(page.getByTestId('report-canvas-empty')).toBeVisible();
