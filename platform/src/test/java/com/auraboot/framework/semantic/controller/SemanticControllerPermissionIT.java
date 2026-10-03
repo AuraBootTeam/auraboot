@@ -385,14 +385,61 @@ class SemanticControllerPermissionIT extends BaseIntegrationTest {
                     .andExpect(jsonPath("$.data.rowcount").value(1))
                     .andExpect(jsonPath("$.data.rows[0]['permission_fixture.count']").value(1)).andReturn();
             var queryId = json.readTree(response.getResponse().getContentAsString()).path("data").path("queryId").asText();
-            assertThat(newProtectionAudit(sequence, "ALLOW").getEntityPid()).isEqualTo(queryId);
+            var audit = newProtectionAudit(sequence, "ALLOW");
+            assertThat(audit.getEntityPid()).isEqualTo(queryId);
+            assertThat(audit.getOperationType()).isEqualTo("QUERY");
+            assertThat(audit.getMetadata().path("sqlFingerprint").asText()).isEqualTo(
+                    json.readTree(response.getResponse().getContentAsString()).path("data").path("sqlFingerprint").asText());
             assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_semantic_query_log WHERE tenant_id = ? AND query_id = ?",
                     Long.class, tenant.getId(), queryId)).isEqualTo(1);
         } else {
             operation.andExpect(status().isForbidden()).andExpect(jsonPath("$.data").doesNotExist());
             var row = newProtectionAudit(sequence, "DENY");
+            assertThat(row.getOperationType()).isEqualTo("QUERY");
             assertThat(row.getMetadata().path("protectionPlan").path("reason").asText()).isEqualTo("PROTECTED_SOURCE_COLUMN");
         }
+        compileProtected(request, allow);
+    }
+
+    private void compileProtected(String request, boolean allow) throws Exception {
+        // Compile-only HTTP and service boundaries must make the same decision as
+        // execution, without adding query-log rows or changing business records.
+        Map<String, String> before = semanticSnapshot();
+        long sequence = auditSequence();
+        var operation = mvc.perform(MockMvcRequestBuilders.post("/api/semantic/sql")
+                .contentType("application/json").content(request));
+        if (allow) {
+            var response = operation.andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"))
+                    .andExpect(jsonPath("$.data.rowcount").value(0))
+                    .andExpect(jsonPath("$.data.rows").isEmpty()).andReturn();
+            var data = json.readTree(response.getResponse().getContentAsString()).path("data");
+            assertThat(data.path("sql").asText()).contains("ab_object_alias");
+            assertThat(data.path("params").isArray()).isTrue();
+            var audit = newProtectionAudit(sequence, "ALLOW");
+            assertThat(audit.getEntityPid()).isEqualTo(data.path("queryId").asText());
+            assertThat(audit.getOperationType()).isEqualTo("EXPLAIN");
+            assertThat(audit.getMetadata().path("sqlFingerprint").asText()).isEqualTo(data.path("sqlFingerprint").asText());
+        } else {
+            operation.andExpect(status().isForbidden()).andExpect(jsonPath("$.data").doesNotExist());
+            var audit = newProtectionAudit(sequence, "DENY");
+            assertThat(audit.getOperationType()).isEqualTo("EXPLAIN");
+            assertThat(audit.getMetadata().path("protectionPlan").path("reason").asText()).isEqualTo("PROTECTED_SOURCE_COLUMN");
+        }
+        assertThat(semanticSnapshot()).isEqualTo(before);
+        sequence = auditSequence();
+        var query = json.readValue(request, com.auraboot.framework.semantic.compiler.SemanticQueryRequest.class);
+        var caller = new com.auraboot.framework.semantic.compiler.UserContext(user.getId(), tenant.getId(), Map.of());
+        if (allow) {
+            queries.validateQuery(query, caller);
+        } else {
+            assertThatThrownBy(() -> queries.validateQuery(query, caller))
+                    .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        }
+        var audit = newProtectionAudit(sequence, allow ? "ALLOW" : "DENY");
+        assertThat(audit.getOperationType()).isEqualTo("VALIDATE");
+        if (!allow) assertThat(audit.getMetadata().path("protectionPlan").path("reason").asText())
+                .isEqualTo("PROTECTED_SOURCE_COLUMN");
+        assertThat(semanticSnapshot()).isEqualTo(before);
     }
 
     @ParameterizedTest(name = "field-mask {0}")
