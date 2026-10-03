@@ -15,6 +15,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -39,6 +40,7 @@ public class OpenPlatformBearerAuthenticator implements ExternalMachineAuthentic
     }
 
     @Override
+    @Transactional
     public MachinePrincipal authenticate(HttpServletRequest request) {
         OpenApiCapabilityRegistry.Capability capability = capabilityRegistry
                 .resolve(request.getMethod(), request.getRequestURI())
