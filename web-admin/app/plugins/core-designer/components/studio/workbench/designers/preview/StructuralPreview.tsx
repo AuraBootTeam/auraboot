@@ -27,7 +27,7 @@ export const StructuralPreview: React.FC<StructuralPreviewProps> = ({
     [fields],
   );
   const rows = useMemo(() => {
-    if (overrideRows && overrideRows.length > 0) return overrideRows;
+    if (overrideRows !== undefined) return overrideRows;
     return generateMockRows(
       vm.columns.map((c) => c.field),
       fields ?? [],
@@ -36,7 +36,7 @@ export const StructuralPreview: React.FC<StructuralPreviewProps> = ({
   }, [vm.columns, fields, overrideRows]);
   const totalActions = vm.toolbar.presets.length + vm.toolbar.customButtons.length;
   const pageSize = vm.behavior.pageSize || 20;
-  const pageLabel = `${Math.max(rows.length, 1)} / ${pageSize}`;
+  const pageLabel = `${rows.length} / ${pageSize}`;
 
   return (
     <div className="flex-1 overflow-auto bg-slate-50 px-5 py-5" data-testid="structural-preview">
@@ -222,6 +222,11 @@ export const StructuralPreview: React.FC<StructuralPreviewProps> = ({
               </tbody>
             </table>
           </div>
+          {rows.length === 0 && (
+            <div className="px-4 py-6 text-center text-slate-500" data-testid="preview-data-empty">
+              {vm.behavior.emptyStateText || t('list_editor.no_data')}
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 bg-slate-50 px-4 py-3">
             <span className="rounded-full bg-white px-3 py-1 text-[11px] font-medium text-slate-500">
               {t('list_editor.current_page_prefix')}

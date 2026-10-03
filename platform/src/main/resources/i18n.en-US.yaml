@@ -2316,3 +2316,11 @@ list_editor:
   unknown_type: "Unknown"
   auto: "Auto"
   command: "Command"
+
+list_sample:
+  heading: "Sample data"
+  description: "Load three real records to check field names and column widths."
+  load: "Load sample data"
+  loading: "Loading..."
+  loaded: "Loaded {count} records"
+  failed: "Could not load sample data. Try again."

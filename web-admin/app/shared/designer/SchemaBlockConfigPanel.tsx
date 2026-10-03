@@ -115,9 +115,6 @@ export function SchemaBlockConfigPanel<T extends Record<string, unknown>>({
                           </div>
                         ) : null}
                       </div>
-                      <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-slate-400">
-                        {schema.type}
-                      </span>
                     </div>
                     <PropertyFieldRenderer
                       schema={rendererSchema as PropertySchema<string>}

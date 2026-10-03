@@ -5274,5 +5274,35 @@
     "key": "list_editor.command",
     "zh-CN": "命令",
     "en-US": "Command"
+  },
+  {
+    "key": "list_sample.heading",
+    "zh-CN": "样例数据",
+    "en-US": "Sample data"
+  },
+  {
+    "key": "list_sample.description",
+    "zh-CN": "拉取 3 条真实数据，验证字段命名与列宽是否合理。",
+    "en-US": "Load three real records to check field names and column widths."
+  },
+  {
+    "key": "list_sample.load",
+    "zh-CN": "加载样例数据",
+    "en-US": "Load sample data"
+  },
+  {
+    "key": "list_sample.loading",
+    "zh-CN": "加载中...",
+    "en-US": "Loading..."
+  },
+  {
+    "key": "list_sample.loaded",
+    "zh-CN": "已加载 {count} 条",
+    "en-US": "Loaded {count} records"
+  },
+  {
+    "key": "list_sample.failed",
+    "zh-CN": "样例数据加载失败，请重试。",
+    "en-US": "Could not load sample data. Try again."
   }
 ]

@@ -31,6 +31,24 @@ describe('SchemaBlockConfigPanel', () => {
     expect(getByText(sortHint)).toBeInTheDocument();
   });
 
+  it('keeps numeric and boolean controls usable without exposing raw schema type badges', () => {
+    const onChange = vi.fn();
+    const { queryByText, getByRole } = render(
+      <SchemaBlockConfigPanel
+        schemas={[
+          { key: 'amount', label: 'Amount', type: 'number' },
+          { key: 'enabled', label: 'Enabled', type: 'boolean' },
+        ]}
+        value={{ amount: 3, enabled: false }}
+        onChange={onChange}
+      />,
+    );
+    expect(queryByText('number', { exact: true })).not.toBeInTheDocument();
+    expect(queryByText('boolean', { exact: true })).not.toBeInTheDocument();
+    expect(getByRole('spinbutton')).toHaveValue(3);
+    expect(getByRole('switch')).not.toBeChecked();
+  });
+
   const schemas: ExtendedPropertySchema<string>[] = [
     { key: 'name', label: 'Name', type: 'text', group: 'Basic' },
     { key: 'icon', label: 'Icon', type: 'icon', group: 'Basic' },

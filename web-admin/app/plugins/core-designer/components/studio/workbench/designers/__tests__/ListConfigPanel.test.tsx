@@ -13,6 +13,9 @@ import {
 } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ListConfigPanel } from '../ListConfigPanel';
+import { SampleDataLoader } from '../preview/SampleDataLoader';
+import { StructuralPreview } from '../preview/StructuralPreview';
+import { blocksToViewModel } from '../list-config/mapper';
 import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import type {
   ModelCapabilities,
@@ -631,4 +634,159 @@ describe('ListConfigPanel', () => {
     });
     expect(screen.queryByTestId('filter-toggle-createdAt')).toBeInTheDocument();
   });
+});
+
+describe('List sample preview contract', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it.each(['en-US', 'zh-CN'])(
+    'localizes idle/loading/success without writing the schema in %s',
+    async (locale) => {
+      const catalog = dictionary(locale);
+      let resolveResponse!: (value: Response) => void;
+      const pending = new Promise<Response>((resolve) => {
+        resolveResponse = resolve;
+      });
+      const fetchMock = vi.fn().mockReturnValue(pending);
+      vi.stubGlobal('fetch', fetchMock);
+      const onLoaded = vi.fn();
+      renderRaw(
+        <I18nProvider initialLocale={locale} initialData={catalog}>
+          <SampleDataLoader modelCode="test_model" onLoaded={onLoaded} />
+        </I18nProvider>,
+      );
+      const button = screen.getByTestId('sample-data-load-btn');
+      expect(button).toHaveTextContent(catalog.list_sample.load);
+      expect(screen.getByTestId('sample-data-loader')).toHaveTextContent(
+        catalog.list_sample.heading,
+      );
+      fireEvent.click(button);
+      expect(button).toBeDisabled();
+      expect(button).toHaveTextContent(catalog.list_sample.loading);
+      const rows = [{ name: 'Acme' }, { name: 'Beacon' }];
+      resolveResponse(
+        new Response(JSON.stringify({ code: '0', data: { records: rows } }), { status: 200 }),
+      );
+      await waitFor(() => expect(onLoaded).toHaveBeenCalledExactlyOnceWith(rows));
+      expect(screen.getByTestId('sample-data-count')).toHaveTextContent(
+        catalog.list_sample.loaded.replace('{count}', '2'),
+      );
+      expect(button).toBeEnabled();
+      expect(fetchMock).toHaveBeenCalledExactlyOnceWith(
+        '/api/dynamic/test_model/list?pageNum=1&pageSize=3',
+      );
+    },
+  );
+
+  it.each([
+    { code: '403', message: 'Access forbidden', data: null },
+    { code: '0', data: [] },
+    { code: '0', data: { records: [null] } },
+  ])('rejects business failure and invalid response shape: %j', async (body) => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(body), { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ code: '0', data: { records: [{ name: 'Recovered' }] } }), {
+          status: 200,
+        }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    const onLoaded = vi.fn();
+    render(<SampleDataLoader modelCode="test_model" onLoaded={onLoaded} />);
+    fireEvent.click(screen.getByTestId('sample-data-load-btn'));
+    await screen.findByTestId('sample-data-error');
+    expect(onLoaded).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('sample-data-count')).not.toBeInTheDocument();
+    expect(screen.getByTestId('sample-data-load-btn')).toBeEnabled();
+    fireEvent.click(screen.getByTestId('sample-data-load-btn'));
+    await waitFor(() => expect(onLoaded).toHaveBeenCalledExactlyOnceWith([{ name: 'Recovered' }]));
+    expect(screen.queryByTestId('sample-data-error')).not.toBeInTheDocument();
+  });
+
+  it.each(['en-US', 'zh-CN'])(
+    'accepts a valid empty page and disables an unbound model in %s',
+    async (locale) => {
+      const catalog = dictionary(locale);
+      vi.stubGlobal(
+        'fetch',
+        vi
+          .fn()
+          .mockResolvedValue(
+            new Response(JSON.stringify({ code: '0', data: { records: [] } }), { status: 200 }),
+          ),
+      );
+      const onLoaded = vi.fn();
+      const { rerender } = renderRaw(
+        <I18nProvider initialLocale={locale} initialData={catalog}>
+          <SampleDataLoader onLoaded={onLoaded} />
+        </I18nProvider>,
+      );
+      expect(screen.getByTestId('sample-data-load-btn')).toBeDisabled();
+      rerender(
+        <I18nProvider initialLocale={locale} initialData={catalog}>
+          <SampleDataLoader modelCode="test_model" onLoaded={onLoaded} />
+        </I18nProvider>,
+      );
+      fireEvent.click(screen.getByTestId('sample-data-load-btn'));
+      await waitFor(() => expect(onLoaded).toHaveBeenCalledExactlyOnceWith([]));
+      expect(screen.getByTestId('sample-data-count')).toHaveTextContent(
+        catalog.list_sample.loaded.replace('{count}', '0'),
+      );
+      expect(screen.queryByTestId('sample-data-error')).not.toBeInTheDocument();
+    },
+  );
+});
+
+describe('Real sample preview emptiness', () => {
+  it.each(['en-US', 'zh-CN'])(
+    'does not substitute generated records for an empty real result in %s',
+    (locale) => {
+      const catalog = dictionary(locale);
+      const vm = blocksToViewModel([{ id: 'sample_table', blockType: 'table', columns: ['name'] }]);
+      const { rerender } = renderRaw(
+        <I18nProvider initialLocale={locale} initialData={catalog}>
+          <StructuralPreview vm={vm} />
+        </I18nProvider>,
+      );
+      expect(screen.getByTestId('preview-table').querySelectorAll('tbody tr')).toHaveLength(3);
+      rerender(
+        <I18nProvider initialLocale={locale} initialData={catalog}>
+          <StructuralPreview vm={vm} overrideRows={[]} />
+        </I18nProvider>,
+      );
+      expect(screen.getByTestId('preview-data-empty')).toHaveTextContent(
+        catalog.list_editor.no_data,
+      );
+      expect(screen.getByTestId('preview-table').querySelectorAll('tbody tr')).toHaveLength(0);
+      expect(screen.getByTestId('preview-table')).toHaveTextContent('0 / 20');
+    },
+  );
+});
+
+describe('Sample transport failures', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it.each(['http', 'network', 'json'])(
+    'shows localized failure without publishing rows for %s failure',
+    async (failure) => {
+      const fetchMock = vi.fn();
+      if (failure === 'network') fetchMock.mockRejectedValue(new Error('Connection lost'));
+      else
+        fetchMock.mockResolvedValue(
+          new Response(failure === 'json' ? 'invalid JSON' : '{}', {
+            status: failure === 'http' ? 500 : 200,
+          }),
+        );
+      vi.stubGlobal('fetch', fetchMock);
+      const onLoaded = vi.fn();
+      render(<SampleDataLoader modelCode="test_model" onLoaded={onLoaded} />);
+      fireEvent.click(screen.getByTestId('sample-data-load-btn'));
+      expect(await screen.findByTestId('sample-data-error')).toHaveTextContent(
+        dictionary('zh-CN').list_sample.failed,
+      );
+      expect(screen.queryByTestId('sample-data-count')).not.toBeInTheDocument();
+      expect(onLoaded).not.toHaveBeenCalled();
+      expect(screen.getByTestId('sample-data-load-btn')).toBeEnabled();
+    },
+  );
 });

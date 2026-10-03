@@ -2620,3 +2620,11 @@ list_editor:
   unknown_type: "未知"
   auto: "自动"
   command: "命令"
+
+list_sample:
+  heading: "样例数据"
+  description: "拉取 3 条真实数据，验证字段命名与列宽是否合理。"
+  load: "加载样例数据"
+  loading: "加载中..."
+  loaded: "已加载 {count} 条"
+  failed: "样例数据加载失败，请重试。"

@@ -563,6 +563,22 @@ test.describe('Page Templates', () => {
             english ? 'Synced' : '已同步',
           );
           await expect(page.getByTestId('toolbar-save')).toBeDisabled();
+          await expect
+            .poll(async () =>
+              page.getByTestId('page-designer-editor').evaluate((element) => {
+                const editor = element.getBoundingClientRect();
+                const content = element
+                  .closest('[data-aura-scroll-container="page-content"]')!
+                  .getBoundingClientRect();
+                return (
+                  editor.top >= content.top - 1 &&
+                  editor.bottom <= content.bottom + 1 &&
+                  editor.left >= content.left - 1 &&
+                  editor.right <= content.right + 1
+                );
+              }),
+            )
+            .toBe(true);
           await summary.scrollIntoViewIfNeeded();
           await page.screenshot({
             path: testInfo.outputPath(`T7-${locale}-${tab}-${viewportWidth}-saved.png`),
@@ -570,6 +586,41 @@ test.describe('Page Templates', () => {
           });
         }
       }
+      const sampleButton = page.getByTestId('sample-data-load-btn');
+      await expect(sampleButton).toHaveText(english ? 'Load sample data' : '加载样例数据');
+      const [sampleResponse] = await Promise.all([
+        page.waitForResponse(
+          (response) =>
+            new URL(response.url()).pathname === '/api/dynamic/page_schema/list' &&
+            response.request().method() === 'GET',
+        ),
+        sampleButton.click(),
+      ]);
+      expect(sampleResponse.ok()).toBe(true);
+      const sampleBody = await sampleResponse.json();
+      expect(sampleBody.code).toBe('0');
+      expect(sampleBody.data.records.length).toBeGreaterThan(0);
+      expect(sampleBody.data.records.length).toBeLessThanOrEqual(3);
+      await expect(page.getByTestId('sample-data-count')).toHaveText(
+        english
+          ? `Loaded ${sampleBody.data.records.length} records`
+          : `已加载 ${sampleBody.data.records.length} 条`,
+      );
+      const previewRows = page.getByTestId('preview-table').locator('tbody tr');
+      await expect(previewRows).toHaveCount(sampleBody.data.records.length);
+      for (const record of sampleBody.data.records) {
+        expect(typeof record.name).toBe('string');
+        await expect(page.getByTestId('preview-table')).toContainText(record.name);
+      }
+      await expect(page.getByTestId('toolbar-draft-state')).toHaveText(
+        english ? 'Synced' : '已同步',
+      );
+      await expect(page.getByTestId('toolbar-save')).toBeDisabled();
+      await page.getByTestId('sample-data-loader').scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: testInfo.outputPath(`T7-${locale}-sample-loaded.png`),
+        fullPage: true,
+      });
     });
   }
 
