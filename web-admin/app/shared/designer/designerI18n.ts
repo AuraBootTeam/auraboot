@@ -6,6 +6,16 @@
 type L = Record<string, string>;
 
 export const DESIGNER_I18N = {
+  semanticMeta: {
+    modelsLabel: { 'zh-CN': '语义模型', 'en-US': 'Semantic model' } as L,
+    selectModel: { 'zh-CN': '请选择语义模型', 'en-US': 'Select a semantic model' } as L,
+    loadingModels: { 'zh-CN': '加载语义模型中…', 'en-US': 'Loading semantic models…' } as L,
+    noModels: { 'zh-CN': '当前没有可用的语义模型', 'en-US': 'No semantic models are available' } as L,
+    failed: { 'zh-CN': '无法加载语义模型，请重试', 'en-US': 'Unable to load the semantic model. Please retry.' } as L,
+    denied: { 'zh-CN': '无权读取语义模型，请联系管理员', 'en-US': 'You cannot access this semantic model. Contact an administrator.' } as L,
+    unavailable: { 'zh-CN': '该语义模型当前不可用，请重新选择', 'en-US': 'This semantic model is unavailable. Select another model.' } as L,
+    retry: { 'zh-CN': '重试', 'en-US': 'Retry' } as L,
+  },
   // ── Empty state ───────────────────────────────────────────────
   emptyState: {
     dragToCanvas: {

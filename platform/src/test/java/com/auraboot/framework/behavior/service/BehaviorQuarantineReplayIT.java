@@ -1,6 +1,7 @@
 package com.auraboot.framework.behavior.service;
 
 import com.auraboot.framework.application.TestApplication;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.behavior.dto.BehaviorQuarantineReplayResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -22,6 +23,7 @@ class BehaviorQuarantineReplayIT {
 
     private static final long TENANT = 990_351L;
     private static final long USER = 990_352L;
+    private MetaContext.Snapshot previousContext;
 
     @Autowired
     private JdbcTemplate jdbc;
@@ -32,13 +34,20 @@ class BehaviorQuarantineReplayIT {
 
     @BeforeEach
     void setup() {
+        previousContext = MetaContext.snapshot();
+        MetaContext.setContext(TENANT, USER, "quarantine-replay-it", "quarantine-replay-it");
         ensureTables();
         cleanup();
     }
 
     @AfterEach
     void tearDown() {
-        cleanup();
+        try {
+            cleanup();
+        } finally {
+            MetaContext.clear();
+            MetaContext.restore(previousContext);
+        }
     }
 
     @Test

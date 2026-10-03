@@ -10,6 +10,7 @@
  * declared CAPABILITY_MATRIX, never about echarts/svg internals.
  */
 
+import { aggregateModelField, hasAggregateModel } from '../utils/aggregateModel';
 import type { ChartSpec } from './chart-spec';
 import { type ChartRenderTarget, type ChartRenderTargetId, getRenderTarget } from './chart-spec';
 
@@ -40,8 +41,11 @@ export interface ChartSpecValidationResult {
 /** Heuristic: a spec plots a potentially unbounded set when no measure aggregates
  * and the data source sets no limit. On a print target this needs sampling/table. */
 function isUnbounded(spec: ChartSpec): boolean {
-  const anyAggregation = spec.measures.some((m) => !!m.aggregation);
-  const ds = spec.dataSource as { limit?: number; type?: string };
+  const ds = spec.dataSource;
+  // Governed metrics are aggregated by the semantic compiler, not chart measures.
+  const governedAggregation = ds.type === 'aggregate' && aggregateModelField(ds) === 'semanticModelCode'
+    && hasAggregateModel(ds) && !!ds.metrics?.length;
+  const anyAggregation = governedAggregation || spec.measures.some((m) => !!m.aggregation);
   const hasLimit = typeof ds.limit === 'number' && ds.limit > 0;
   // static data is inherently bounded
   if (ds.type === 'static') return false;

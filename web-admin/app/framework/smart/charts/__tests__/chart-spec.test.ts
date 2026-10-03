@@ -237,3 +237,25 @@ describe('bindingFromFields (DSL chartConfig field binding)', () => {
     expect(r.measures).toEqual([{ field: 'sales' }]);
   });
 });
+
+describe('governed aggregate adaptation', () => {
+  it('preserves semantic routing and typed metrics without a raw measure aggregation', () => {
+    const { spec } = chartConfigToSpec({ id: 'semantic', title: 'Semantic chart', type: 'bar', dataSource: {
+      type: 'aggregate', semanticModelCode: 'governed_orders', dimensions: ['status'],
+      metrics: [{ field: 'order_count', aggregation: 'none' }],
+    } });
+    expect(spec.dataSource.semanticModelCode).toBe('governed_orders');
+    expect(spec.dataSource).not.toHaveProperty('modelCode');
+    expect(spec.dataSource.metrics).toEqual([{ field: 'order_count', aggregation: 'none' }]);
+    expect(spec.measures).toEqual([{ field: 'order_count', aggregation: undefined, label: undefined }]);
+    expect(validateChartSpecForTarget(spec, 'svg-print').ok).toBe(true);
+  });
+
+  it('does not count an incomplete semantic selection as a governed aggregation', () => {
+    const { spec } = chartConfigToSpec({ id: 'incomplete', title: 'Incomplete chart', type: 'bar', dataSource: {
+      type: 'aggregate', semanticModelCode: '', modelCode: 'stale_raw_model', dimensions: ['status'],
+      metrics: [{ field: 'order_count', aggregation: 'none' }],
+    } });
+    expect(validateChartSpecForTarget(spec, 'svg-print').errors.map(e => e.code)).toContain('UNBOUNDED_DATASET');
+  });
+});

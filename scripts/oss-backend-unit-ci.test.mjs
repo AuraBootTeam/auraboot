@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import { readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync, mkdtempSync, rmSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import test from 'node:test';
@@ -11,11 +13,21 @@ const gradleBuild = path.join(here, '..', 'platform', 'build.gradle');
 const source = readFileSync(runner, 'utf8');
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+test('every repository Compose input exists in a clean checkout', () => {
+  const inputs = [...source.matchAll(/-f "\$PROJECT_ROOT\/([^"]+)"/g)].map(match => match[1]);
+  assert.ok(inputs.length > 0, 'runner must declare its Compose inputs');
+  for (const input of inputs) {
+    const file = path.join(here, '..', input);
+    assert.ok(existsSync(file), `missing clean-checkout Compose input: ${input}`);
+    assert.ok(statSync(file).isFile(), `Compose input must be a regular file: ${input}`);
+  }
+});
+
 test('backend CI runner is executable and owns its complete infrastructure lifecycle', () => {
   assert.ok(statSync(runner).mode & 0o100);
-  assert.match(source, /docker-compose\.skills-c2\.override\.yml/);
+  assert.doesNotMatch(source, /docker-compose\.skills-c2\.override\.yml/);
   assert.match(source, /up -d --wait postgres redis kafka/);
-  assert.match(source, /runtime retained and stopped; network released: compose_project=/);
+  assert.match(source, /runtime retained: stop_status=%s network_status=%s compose_project=/);
   assert.match(source, /COMPOSE_PROJECT="aura-ci-oss-backend-\$RUNTIME_TOKEN"/);
   assert.match(source, /free_port 25000 25999/);
   assert.match(source, /free_port 26000 26999/);
@@ -33,7 +45,8 @@ test('backend CI runner migrates a blank database from the Flyway source of trut
   const override = readFileSync(composeOverride, 'utf8');
 
   assert.match(source, /docker-compose\.oss-backend-ci\.override\.yml/);
-  assert.match(override, /volumes:\s*!override/);
+  assert.match(override, /skills_c2_postgres_data:\/var\/lib\/postgresql\/data/);
+  assert.doesNotMatch(override, /container_name:|!override/);
   assert.doesNotMatch(override, /schema-current\.sql/);
   assert.match(source, /flyway\/flyway:12\.8\.1/);
   assert.match(source, /-locations=filesystem:\/flyway\/sql/);
@@ -87,7 +100,9 @@ test('backend CI runner pre-pulls every fixed and Testcontainers image', () => {
 });
 
 test('backend CI runner preserves Gradle product-test exit status', () => {
-  assert.match(source, /platform\/gradlew -p platform --continue cleanTest test bootstrapBillingAccountTest\s*$/);
+  assert.match(source, /^platform\/gradlew -p platform --continue "\$@"\s*$/m);
+  assert.match(source, /gradle_status=\$\?/);
+  assert.match(source, /exit "\$gradle_status"\s*$/);
   assert.doesNotMatch(source, /platform\/gradlew[^\n]*\|\| environment_invalid/);
 });
 
@@ -99,17 +114,20 @@ test('backend CI runner keeps external DashScope checks out unless explicitly re
 
 test('backend CI runner executes destructive bootstrap verification only after the shared suite', () => {
   const buildSource = readFileSync(gradleBuild, 'utf8');
-  assert.match(source, /--continue cleanTest test bootstrapBillingAccountTest/);
+  assert.match(source, /run_gradle_tests aura_boot cleanTest test/);
+  assert.match(source, /run_gradle_tests aura_boot_bootstrap cleanBootstrapBillingAccountTest bootstrapBillingAccountTest/);
+  assert.match(source, /createdb -U auraboot aura_boot_bootstrap/);
+  assert.match(source, /run_flyway "\$operation" aura_boot_bootstrap/);
   assert.match(buildSource, /excludeTags 'destructive-bootstrap'/);
   assert.match(buildSource, /mustRunAfter tasks\.named\('test'\)/);
   assert.match(buildSource, /outputs\.upToDateWhen \{ false \}/);
 });
 
 test('backend CI runner points fixed-stack tests at runtime-owned host ports', () => {
-  assert.match(source, /TEST_DATABASE_URL="jdbc:postgresql:\/\/127\.0\.0\.1:\$\{AURA_OSS_CI_POSTGRES_PORT\}\/aura_boot/);
+  assert.match(source, /TEST_DATABASE_URL="jdbc:postgresql:\/\/127\.0\.0\.1:\$\{AURA_OSS_CI_POSTGRES_PORT\}\/\$test_database/);
   assert.match(source, /TEST_DATABASE_USERNAME='auraboot'/);
   assert.match(source, /TEST_DATABASE_PASSWORD='auraboot_dev'/);
-  assert.match(source, /SPRING_DATASOURCE_URL="jdbc:postgresql:\/\/127\.0\.0\.1:\$\{AURA_OSS_CI_POSTGRES_PORT\}\/aura_boot/);
+  assert.match(source, /SPRING_DATASOURCE_URL="jdbc:postgresql:\/\/127\.0\.0\.1:\$\{AURA_OSS_CI_POSTGRES_PORT\}\/\$test_database/);
   assert.match(source, /SPRING_DATASOURCE_USERNAME='auraboot'/);
   assert.match(source, /SPRING_DATASOURCE_PASSWORD='auraboot_dev'/);
   assert.match(source, /SPRING_DATA_REDIS_HOST='127\.0\.0\.1'/);
@@ -129,4 +147,142 @@ test('backend CI override provisions a required native Kafka broker', () => {
   assert.match(override, /INTERNAL:\/\/kafka:9092/);
   assert.match(override, /KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL/);
   assert.match(override, /kafka-topics --bootstrap-server localhost:9092 --list/);
+});
+
+function allocateWithDocker(t, mode) {
+  const artifacts = mkdtempSync(path.join(tmpdir(), 'oss-ci-network-contract-'));
+  t.after(() => rmSync(artifacts, { recursive: true, force: true }));
+  const allocator = source.match(/create_isolated_network\(\) \{[\s\S]*?\n\}/)?.[0];
+  assert.ok(allocator, 'runner must allocate an explicit subnet before Compose');
+  return spawnSync('bash', ['-c', `
+    COMPOSE_PROJECT=own-contract
+    AURA_OSS_CI_NETWORK=own-contract_default
+    NETWORK_CREATED=false
+    calls=0
+    environment_invalid() { printf '%s\\n' "$*" >&2; printf 'calls=%s\\n' "$calls"; exit 2; }
+    docker() {
+      calls=$((calls + 1))
+      printf '%s\\n' "$*" >> "$ARTIFACTS/commands.txt"
+      if [[ "$MODE" == unexpected ]]; then printf 'permission denied\\n' >&2; return 1; fi
+      if [[ "$MODE" == exhausted || "$calls" == 1 ]]; then
+        printf 'Error response from daemon: Pool overlaps with other one on this address space\\n' >&2
+        return 1
+      fi
+      printf 'created-network-id\\n'
+    }
+    ${allocator}
+    create_isolated_network
+    printf 'created=%s calls=%s\\n' "$NETWORK_CREATED" "$calls"
+    cat "$ARTIFACTS/commands.txt"
+  `], { encoding: 'utf8', env: { ...process.env, ARTIFACTS: artifacts, MODE: mode } });
+}
+
+test('CI network allocation advances only after overlap and Compose uses the owned external network', t => {
+  const result = allocateWithDocker(t, 'overlap');
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /created=true calls=2/);
+  assert.match(result.stdout, /network create --subnet 10\.247\.1\.0\/24 --label aura\.ci\.compose-project=own-contract own-contract_default/);
+  const compose = readFileSync(composeOverride, 'utf8');
+  assert.match(compose, /networks:\s+default:\s+external: true\s+name: "\$\{AURA_OSS_CI_NETWORK:\?/);
+  assert.ok(source.indexOf('\ncreate_isolated_network\n') < source.indexOf('up -d --wait postgres redis kafka'));
+  assert.match(source, /if \[\[ "\$NETWORK_CREATED" == true \]\]; then/);
+});
+
+test('an exhausted explicit network pool fails environment-invalid without claiming creation', t => {
+  const result = allocateWithDocker(t, 'exhausted');
+  assert.equal(result.status, 2);
+  assert.match(result.stdout, /calls=256/);
+  assert.match(result.stderr, /no free isolated CI network/);
+  assert.doesNotMatch(result.stdout, /created=true/);
+});
+
+test('unexpected Docker errors fail immediately instead of being retried as subnet collisions', t => {
+  const result = allocateWithDocker(t, 'unexpected');
+  assert.equal(result.status, 2);
+  assert.match(result.stdout, /calls=1/);
+  assert.match(result.stderr, /isolated network creation failed/);
+});
+
+function cleanupWithDocker(t, { created, stopFails = false, releaseFails = false, initialStatus }) {
+  const artifacts = mkdtempSync(path.join(tmpdir(), 'oss-ci-cleanup-contract-'));
+  t.after(() => rmSync(artifacts, { recursive: true, force: true }));
+  const cleanup = source.match(/cleanup\(\) \{[\s\S]*?\n\}/)?.[0];
+  assert.ok(cleanup, 'runner must retain cleanup evidence');
+  const result = spawnSync('bash', ['-c', `
+    set -uo pipefail
+    COMPOSE_PROJECT=own-cleanup
+    COMPOSE_ARGS=(-p "$COMPOSE_PROJECT")
+    docker() {
+      printf '%s\\n' "$*" >> "$ARTIFACTS/commands.txt"
+      if [[ "$*" == 'compose -p own-cleanup ps -aq' ]]; then printf 'own-container\\n'; fi
+      if [[ "$*" == 'compose -p own-cleanup stop' && "$STOP_FAILS" == true ]]; then
+        printf 'stop failure fixture\\n' >&2; return 1
+      fi
+      if [[ "$*" == 'network rm own-cleanup_default' && "$RELEASE_FAILS" == true ]]; then
+        printf 'active endpoints fixture\\n' >&2; return 1
+      fi
+      return 0
+    }
+    ${cleanup}
+    (exit "$INITIAL_STATUS")
+    cleanup
+  `], { encoding: 'utf8', env: {
+    ...process.env, ARTIFACTS: artifacts, NETWORK_CREATED: String(created),
+    STOP_FAILS: String(stopFails), RELEASE_FAILS: String(releaseFails), INITIAL_STATUS: String(initialStatus),
+  } });
+  return { ...result, artifacts, commands: readFileSync(path.join(artifacts, 'commands.txt'), 'utf8') };
+}
+
+test('cleanup reports released only after Docker confirms removal and preserves a product failure', t => {
+  const result = cleanupWithDocker(t, { created: true, initialStatus: 1 });
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /stop_status=stopped network_status=released/);
+  assert.match(result.commands, /network disconnect -f own-cleanup_default own-container/);
+  assert.match(result.commands, /network rm own-cleanup_default/);
+  assert.doesNotMatch(result.commands, /down|prune|foreign/);
+});
+
+test('cleanup does not claim release or touch a network when allocation never succeeded', t => {
+  const result = cleanupWithDocker(t, { created: false, initialStatus: 2 });
+  assert.equal(result.status, 2);
+  assert.match(result.stdout, /network_status=not-created/);
+  assert.doesNotMatch(result.commands, /network (disconnect|rm)/);
+});
+
+test('cleanup retains stop and release errors without turning them into a successful release claim', t => {
+  const result = cleanupWithDocker(t, { created: true, stopFails: true, releaseFails: true, initialStatus: 0 });
+  assert.equal(result.status, 0, 'cleanup must preserve the original suite result');
+  assert.match(result.stdout, /stop_status=stop-failed network_status=release-failed/);
+  assert.match(readFileSync(path.join(result.artifacts, 'compose-stop.log'), 'utf8'), /stop failure fixture/);
+  assert.match(readFileSync(path.join(result.artifacts, 'network-release.log'), 'utf8'), /active endpoints fixture/);
+  assert.doesNotMatch(result.stdout, /network_status=released|network released/);
+});
+
+for (const [sharedStatus, bootstrapStatus, expected] of [[0, 0, 0], [1, 0, 1], [0, 1, 1], [2, 1, 2]]) {
+  test(`independent bootstrap preserves statuses ${sharedStatus}/${bootstrapStatus}`, () => {
+    const calls = source.slice(source.indexOf('run_gradle_tests aura_boot cleanTest test'), source.indexOf('# Preserve the original test status'));
+    const result = spawnSync('bash', ['-c', `
+      run_gradle_tests() {
+        printf '%s\\n' "$*"
+        if [[ "$1" == aura_boot ]]; then return "$SHARED_STATUS"; fi
+        return "$BOOTSTRAP_STATUS"
+      }
+      ${calls}
+      exit "$gradle_status"
+    `], { encoding: 'utf8', env: { ...process.env, SHARED_STATUS: String(sharedStatus), BOOTSTRAP_STATUS: String(bootstrapStatus) } });
+    assert.equal(result.status, expected, result.stderr);
+    assert.match(result.stdout, /aura_boot cleanTest test/);
+    assert.match(result.stdout, /aura_boot_bootstrap cleanBootstrapBillingAccountTest bootstrapBillingAccountTest/);
+  });
+}
+
+test('bootstrap fixture requires fresh state and preserves immutable tenant bindings', () => {
+  const fixture = readFileSync(path.join(here, '../platform/src/test/java/com/auraboot/framework/saas/bootstrap/BootstrapBillingAccountIT.java'), 'utf8');
+  assert.match(fixture, /SELECT COUNT\(\*\) FROM ab_tenant/);
+  assert.match(fixture, /bootstrap result: %s/);
+  assert.match(fixture, /SELECT billing_account_id FROM ab_tenant WHERE id = \?/);
+  assert.doesNotMatch(fixture, /TRUNCATE|DELETE FROM|cleanupBootstrapRows|@Disabled|Assumptions/);
+  const build = readFileSync(gradleBuild, 'utf8');
+  assert.match(build, /systemProperty 'allure.results.directory', retainedAllure/);
+  assert.doesNotMatch(source, /cp -a.*build\/allure-results/);
 });

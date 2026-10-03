@@ -1,6 +1,7 @@
 package com.auraboot.framework.semantic.service;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.common.constant.StatusConstants;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.notification.service.NotificationService;
 import com.auraboot.framework.semantic.compiler.SemanticQueryRequest;
@@ -16,6 +17,8 @@ import com.auraboot.framework.semantic.mapper.AbSemanticMetricAlertMapper;
 import com.auraboot.framework.semantic.mapper.AbSemanticMetricMapper;
 import com.auraboot.framework.semantic.mapper.AbSemanticModelMapper;
 import com.auraboot.framework.userattribute.service.UserAttributeService;
+import com.auraboot.framework.tenant.service.TenantMemberService;
+import org.springframework.security.access.AccessDeniedException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -57,6 +60,7 @@ public class SemanticMetricAlertService {
     private final SemanticQueryService queryService;
     private final NotificationService notificationService;
     private final UserAttributeService userAttributeService;
+    private final TenantMemberService tenantMemberService;
 
     // ==================== CRUD ====================
 
@@ -104,9 +108,8 @@ public class SemanticMetricAlertService {
     public void delete(String pid) {
         Long tenantId = MetaContext.get().getTenantId();
         AbSemanticMetricAlert alert = requireAlert(tenantId, pid);
-        alert.setDeletedFlag(true);
-        alert.setUpdatedAt(OffsetDateTime.now());
-        alertMapper.updateById(alert);
+        // Global logical-delete fields are excluded from updateById SET clauses.
+        alertMapper.softDelete(tenantId, alert.getPid(), OffsetDateTime.now());
     }
 
     // ==================== Evaluation ====================
@@ -148,7 +151,8 @@ public class SemanticMetricAlertService {
         // API caller's thread, where wiping the context would break every
         // subsequent request on it. Only the scheduler thread has no prior
         // context to restore.
-        MetaContext previous = MetaContext.exists() ? MetaContext.get() : null;
+        MetaContext.Snapshot previous = MetaContext.snapshot();
+        MetaContext.clear();
         MetaContext.setContext(alert.getTenantId(), alert.getCreatedBy(),
                 "semantic-alert", "semantic-alert-evaluator");
         try {
@@ -165,6 +169,13 @@ public class SemanticMetricAlertService {
                 return Map.of("skipped", "model_missing");
             }
 
+            var member = tenantMemberService.findByTenantIdAndUserId(alert.getTenantId(), alert.getCreatedBy());
+            if (member == null || !StatusConstants.ACTIVE.equalsIgnoreCase(member.getStatus()) || Boolean.TRUE.equals(member.getDeletedFlag())
+                    || !java.util.Objects.equals(member.getTenantId(), alert.getTenantId())
+                    || !java.util.Objects.equals(member.getUserId(), alert.getCreatedBy()) || member.getId() == null) {
+                throw new AccessDeniedException("Semantic alert creator is not an active tenant member");
+            }
+            MetaContext.setMemberId(member.getId());
             SemanticQueryRequest request = new SemanticQueryRequest();
             request.setMetrics(List.of(model.getCode() + "." + metric.getCode()));
             UserContext creator = new UserContext(alert.getCreatedBy(), alert.getTenantId(),
@@ -201,12 +212,8 @@ public class SemanticMetricAlertService {
             if (triggered && !notify) out.put("silenced", true);
             return out;
         } finally {
-            if (previous != null) {
-                MetaContext.setContext(previous.getTenantId(), previous.getUserId(),
-                        previous.getUserPid(), previous.getUsername(), previous.getCurrentRoleIds());
-            } else {
-                MetaContext.clear();
-            }
+            MetaContext.clear();
+            MetaContext.restore(previous);
         }
     }
 

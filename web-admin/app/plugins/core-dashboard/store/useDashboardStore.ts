@@ -17,6 +17,7 @@ import type {
   ValidationError,
 } from '../types';
 import { dashboardService } from '../services/dashboardService';
+import { aggregateModelField, hasAggregateModel } from '~/framework/smart/utils/aggregateModel';
 
 /**
  * Generate unique widget ID using crypto.randomUUID for collision resistance
@@ -446,10 +447,10 @@ export const useDashboardStore = create<DashboardStore>()(
           } else {
             const ds = widget.config.dataSource;
             if (ds.type === 'aggregate') {
-              if (!ds.modelCode) {
+              if (!hasAggregateModel(ds)) {
                 errors.push({
                   widgetId: widget.id,
-                  field: 'dataSource.modelCode',
+                  field: `dataSource.${aggregateModelField(ds)}`,
                   message: `组件 "${widget.config.title}" 缺少模型配置`,
                   type: 'error',
                 });

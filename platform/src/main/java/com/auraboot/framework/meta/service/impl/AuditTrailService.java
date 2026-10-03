@@ -294,6 +294,11 @@ public class AuditTrailService {
      * Null values are represented as empty strings.
      */
     String buildCanonicalString(AuditTrail record) {
+        // Versioned opt-in preserves hashes already written using the legacy format.
+        // JSONB changes object key order; new semantic Plan records use canonical JSON
+        // so a write/read round trip does not invalidate their integrity chain.
+        boolean canonicalJson = record.getMetadata() != null
+                && record.getMetadata().path("auditHashVersion").asInt() == 2;
         StringBuilder sb = new StringBuilder();
         sb.append(nullSafe(record.getTenantId()));
         sb.append('|');
@@ -319,13 +324,13 @@ public class AuditTrailService {
         sb.append('|');
         sb.append(nullSafe(record.getTimestamp()));
         sb.append('|');
-        sb.append(jsonToString(record.getBeforeSnapshot()));
+        sb.append(jsonToString(record.getBeforeSnapshot(), canonicalJson));
         sb.append('|');
-        sb.append(jsonToString(record.getAfterSnapshot()));
+        sb.append(jsonToString(record.getAfterSnapshot(), canonicalJson));
         sb.append('|');
         sb.append(stringArrayToString(record.getChangedFields()));
         sb.append('|');
-        sb.append(jsonToString(record.getMetadata()));
+        sb.append(jsonToString(record.getMetadata(), canonicalJson));
         return sb.toString();
     }
 
@@ -347,11 +352,27 @@ public class AuditTrailService {
         return value != null ? value.toString() : "";
     }
 
-    private String jsonToString(JsonNode node) {
+    private String jsonToString(JsonNode node, boolean canonical) {
         if (node == null || node.isNull()) {
             return "";
         }
-        return node.toString();
+        return canonical ? canonicalJson(node).toString() : node.toString();
+    }
+
+    private JsonNode canonicalJson(JsonNode node) {
+        if (node.isObject()) {
+            var result = com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
+            java.util.List<String> names = new java.util.ArrayList<>();
+            node.fieldNames().forEachRemaining(names::add);
+            names.stream().sorted().forEach(name -> result.set(name, canonicalJson(node.get(name))));
+            return result;
+        }
+        if (node.isArray()) {
+            var result = com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.arrayNode();
+            node.forEach(value -> result.add(canonicalJson(value)));
+            return result;
+        }
+        return node;
     }
 
     private String stringArrayToString(String[] arr) {

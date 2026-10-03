@@ -539,3 +539,41 @@ describe('useDashboardStore', () => {
     });
   });
 });
+
+describe('semantic aggregate validation and saved state', () => {
+  beforeEach(() => {
+    useDashboardStore.getState().reset();
+    vi.clearAllMocks();
+  });
+  it('validates, saves and restores a semantic widget without raw modelCode', async () => {
+    const source = { type: 'aggregate' as const, semanticModelCode: 'governed_orders',
+      metrics: [{ field: 'order_count', aggregation: 'none' as const }], dimensions: ['order_status'] };
+    useDashboardStore.getState().createDashboard('Semantic board');
+    useDashboardStore.getState().addWidget(widgetData({ config: { title: 'Governed count', dataSource: source } }));
+    expect(useDashboardStore.getState().validate().valid).toBe(true);
+    createDashboardMock.mockImplementation(async payload => ({ ...payload, pid: 'semantic-board' }));
+    await useDashboardStore.getState().saveDashboard();
+    const payload = createDashboardMock.mock.calls[0][0];
+    expect(payload.widgets[0].config.dataSource).toEqual(source);
+    expect(payload.widgets[0].config.dataSource).not.toHaveProperty('modelCode');
+    findByPidMock.mockResolvedValue(JSON.parse(JSON.stringify({ ...payload, pid: 'semantic-board' })));
+    useDashboardStore.getState().reset();
+    await useDashboardStore.getState().loadDashboard('semantic-board');
+    expect(useDashboardStore.getState().widgets[0].config.dataSource).toEqual(source);
+    expect(useDashboardStore.getState().validate().valid).toBe(true);
+  });
+  for (const code of ['', '   ']) {
+    it(`rejects incomplete semantic identity despite stale raw model: ${JSON.stringify(code)}`, () => {
+      useDashboardStore.getState().createDashboard('Semantic board');
+      useDashboardStore.getState().addWidget(widgetData({ config: { title: 'Governed count', dataSource: {
+        type: 'aggregate', semanticModelCode: code, modelCode: 'stale_raw_model',
+        metrics: [{ field: 'order_count', aggregation: 'none' }],
+      } } }));
+      const validation = useDashboardStore.getState().validate();
+      expect(validation.valid).toBe(false);
+      expect(validation.errors).toContainEqual(expect.objectContaining({ field: 'dataSource.semanticModelCode', type: 'error' }));
+      expect(createDashboardMock).not.toHaveBeenCalled();
+      expect(updateDashboardMock).not.toHaveBeenCalled();
+    });
+  }
+});

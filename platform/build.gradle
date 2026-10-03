@@ -441,6 +441,9 @@ dependencies {
     testImplementation platform('org.testcontainers:testcontainers-bom:1.21.4')
     testImplementation 'org.testcontainers:testcontainers'
     testImplementation 'org.testcontainers:mysql'
+    // MySQLContainer opens JDBC connections while starting its fixture. The
+    // driver stays test-only; deployers still supply it for product MySQL use.
+    testRuntimeOnly 'com.mysql:mysql-connector-j'
     testImplementation 'org.testcontainers:postgresql'
     testImplementation 'org.testcontainers:junit-jupiter'
 
@@ -505,6 +508,26 @@ bootRun {
 }
 
 tasks.withType(Test).configureEach {
+    def retainedAllure = providers.environmentVariable('AURA_ALLURE_RESULTS').orNull
+    if (retainedAllure) {
+        systemProperty 'allure.results.directory', retainedAllure
+    }
+    // Frozen architecture rules may remove obsolete violations. Keep those writes
+    // in this task's build directory rather than mutating the checked-in baseline.
+    def architectureBaseline = file('src/test/resources/archunit_store')
+    def architectureStore = layout.buildDirectory.dir("tmp/${name}/archunit_store").get().asFile
+    systemProperty 'archunit.freeze.store.default.path', architectureStore.absolutePath
+    systemProperty 'archunit.freeze.store.default.allowStoreCreation', 'false'
+    doFirst {
+        if (!new File(architectureBaseline, 'stored.rules').isFile()) {
+            throw new GradleException('The committed ArchUnit violation baseline is missing')
+        }
+        delete architectureStore
+        copy {
+            from architectureBaseline
+            into architectureStore
+        }
+    }
     reports.junitXml {
         includeSystemOutLog = false
         includeSystemErrLog = false
@@ -626,7 +649,7 @@ test {
 
 tasks.register('bootstrapBillingAccountTest', Test) {
     group = 'verification'
-    description = 'Run the destructive full-bootstrap billing account integration test last.'
+    description = 'Run full-bootstrap billing account integration on a dedicated fresh database.'
     useJUnitPlatform {
         includeTags 'destructive-bootstrap'
     }

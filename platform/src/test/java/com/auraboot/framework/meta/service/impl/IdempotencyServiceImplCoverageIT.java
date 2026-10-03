@@ -146,7 +146,11 @@ class IdempotencyServiceImplCoverageIT {
                 return outcome;
             }));
 
-            assertTrue(firstClaimed.await(10, TimeUnit.SECONDS));
+            boolean claimed = firstClaimed.await(10, TimeUnit.SECONDS);
+            if (!claimed && first.isDone()) {
+                first.get(); // Surface the worker's original failure instead of a latch timeout.
+            }
+            assertTrue(claimed);
             Future<Map<String, Object>> second = pool.submit(() -> inTransaction(() -> {
                 Map<String, Object> replay = idempotencyService.claimScopedIdempotency(
                         reqId, "demo:confirm", intent, TENANT_ID);
@@ -194,7 +198,15 @@ class IdempotencyServiceImplCoverageIT {
     }
 
     private <T> T inTransaction(Supplier<T> work) {
-        return new TransactionTemplate(transactionManager).execute(status -> work.get());
+        MetaContext.Snapshot previous = MetaContext.snapshot();
+        try {
+            // Each executor worker represents the same authenticated tenant request.
+            MetaContext.setContext(TENANT_ID, 991_800_002L, "idem-test-pid", "idem-test-user");
+            return new TransactionTemplate(transactionManager).execute(status -> work.get());
+        } finally {
+            MetaContext.clear();
+            MetaContext.restore(previous);
+        }
     }
 
     private void await(CountDownLatch latch) {

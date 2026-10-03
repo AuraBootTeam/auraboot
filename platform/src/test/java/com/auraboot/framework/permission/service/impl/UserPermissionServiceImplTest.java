@@ -24,6 +24,9 @@ import static org.mockito.Mockito.when;
 class UserPermissionServiceImplTest {
 
     @Mock
+    private com.auraboot.framework.application.security.AdminRoleChecker adminRoleChecker;
+
+    @Mock
     private PermissionSnapshotCache permissionSnapshotCache;
 
     @Mock
