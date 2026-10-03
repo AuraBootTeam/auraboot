@@ -256,11 +256,31 @@ PW_ARGS=(--project=oss --project=oss-deep --no-deps --repeat-each="$REPEAT" --re
 [[ -n "$WORKERS" ]] && PW_ARGS+=(--workers="$WORKERS")
 [[ ${#RUN_PATHS[@]} -gt 0 ]] && PW_ARGS+=("${RUN_PATHS[@]}")
 set +e
+if [[ "$SCOPE_MODE" == full ]]; then
+  # The empty-application journey needs the pristine bootstrap tenant. Run it
+  # before shared-tenant fixtures, retaining every test in the full catalog.
+  REPORT_ROOT="$AURA_EVIDENCE_ROOT/playwright/report"
+  PLAYWRIGHT_JSON_OUTPUT_FILE="$REPORT_ROOT/catalog.json" PW_PROFILE=oss NO_PROXY=localhost,127.0.0.1 \
+    pnpm exec playwright test "${PW_ARGS[@]}" --list --reporter=json > "$REPORT_ROOT/collection.log" 2>&1
+  COLLECTION_RC=$?
+  [[ "$COLLECTION_RC" == 0 ]] || die_env "full catalog collection failed; see $REPORT_ROOT/collection.log"
+  PLAYWRIGHT_JSON_OUTPUT_FILE="$REPORT_ROOT/pristine.json" PW_PROFILE=oss NO_PROXY=localhost,127.0.0.1 \
+    pnpm exec playwright test "${PW_ARGS[@]}" tests/e2e/settings/open-platform.golden.spec.ts 2>&1 | tee "$LOG"
+  PRISTINE_RC=${PIPESTATUS[0]}
+  PLAYWRIGHT_JSON_OUTPUT_FILE="$REPORT_ROOT/remaining.json" PW_PROFILE=oss NO_PROXY=localhost,127.0.0.1 \
+    pnpm exec playwright test "${PW_ARGS[@]}" --grep-invert 'Open Platform golden journey' 2>&1 | tee -a "$LOG"
+  REMAINING_RC=${PIPESTATUS[0]}
+  node "$SCRIPT_DIR/dev/oss-gate-catalog-results.mjs" "$REPORT_ROOT/catalog.json" \
+    "$PLAYWRIGHT_JSON_OUTPUT_FILE" "$REPORT_ROOT/pristine.json" "$REPORT_ROOT/remaining.json"
+  GATE_RC=$?
+  if [[ "$PRISTINE_RC" != 0 || "$REMAINING_RC" != 0 ]]; then GATE_RC=1; fi
+else
 PW_PROFILE=oss NO_PROXY=localhost,127.0.0.1 \
   pnpm exec playwright test "${PW_ARGS[@]}" 2>&1 | tee "$LOG"
 GATE_RC=${PIPESTATUS[0]}
 if [[ "$GATE_RC" == 0 ]]; then
   node "$SCRIPT_DIR/dev/oss-gate-results.mjs" "$PLAYWRIGHT_JSON_OUTPUT_FILE" || GATE_RC=1
+fi
 fi
 
 # --- 4. report + exit = gate result ------------------------------------------

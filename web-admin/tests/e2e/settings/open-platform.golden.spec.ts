@@ -878,6 +878,9 @@ test.describe('Open Platform golden journey', () => {
     await dismissToasts(page);
     await capture(page, 'OP-UI-02');
 
+    // A context-injected Referer overrides noreferrer and Chromium blocks the
+    // popup. Let the browser apply the real navigation policy for this action.
+    await context.setExtraHTTPHeaders({});
     const popupPromise = context.waitForEvent('page');
     await page.getByRole('button', { name: /API 参考/ }).click();
     const apiReference = await popupPromise;
@@ -891,6 +894,7 @@ test.describe('Open Platform golden journey', () => {
     );
     await capture(apiReference, 'OP-UI-13', false);
     await apiReference.close();
+    await context.setExtraHTTPHeaders({ Referer: `${WEB_BASE_URL}/` });
 
     await page.route('**/api/open-platform/event-catalog', async (route) => {
       await route.fulfill({
