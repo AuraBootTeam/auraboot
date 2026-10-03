@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, renderHook, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, renderHook, waitFor, fireEvent, act } from '@testing-library/react';
 import {
   encodeDimension,
   decodeDimension,
@@ -48,7 +48,7 @@ const META_RESPONSE = {
 };
 
 function mockFetchOk(body: unknown) {
-  return vi.fn().mockResolvedValue({ json: () => Promise.resolve(body) } as Response);
+  return vi.fn().mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve(body) } as Response);
 }
 
 beforeEach(() => {
@@ -201,4 +201,76 @@ describe('SemanticDimensionPicker', () => {
     fireEvent.click(screen.getByText('区域').closest('label')!.querySelector('input')!);
     expect(onChange).toHaveBeenCalledWith(['region']);
   });
+});
+
+
+describe('semantic metadata failure boundaries', () => {
+  type MetaState = ReturnType<typeof useSemanticModelMeta> & { error?: { kind: string } | null };
+  for (const [status, kind] of [[403, 'denied'], [401, 'denied'], [500, 'failed']] as const) {
+    it(`rejects HTTP ${status} even if its body claims success`, async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status, json: async () => META_RESPONSE }));
+      const { result } = renderHook(() => useSemanticModelMeta('sales_semantic'));
+      await waitFor(() => expect((result.current as MetaState).error?.kind).toBe(kind));
+      expect(result.current.metrics).toEqual([]);
+      expect(result.current.dimensions).toEqual([]);
+      expect(result.current.isLoading).toBe(false);
+    });
+  }
+  for (const body of [{ code: '1', message: 'private SQL detail' }, { code: '0', data: { models: {} } }]) {
+    it(`rejects an unsuccessful or malformed catalog: ${JSON.stringify(body)}`, async () => {
+      vi.stubGlobal('fetch', mockFetchOk(body));
+      const { result } = renderHook(() => useSemanticModelMeta('sales_semantic'));
+      await waitFor(() => expect((result.current as MetaState).error?.kind).toBe('failed'));
+      expect(result.current.metrics).toEqual([]);
+      expect(result.current.dimensions).toEqual([]);
+    });
+  }
+  it('distinguishes a catalog omission from a genuine empty model', async () => {
+    const { result } = renderHook(() => useSemanticModelMeta('not_in_catalog'));
+    await waitFor(() => expect((result.current as MetaState).error?.kind).toBe('unavailable'));
+    expect(result.current.metrics).toEqual([]);
+  });
+  it('clears old options when the new model metadata request fails', async () => {
+    const fetchMock = mockFetchOk(META_RESPONSE);
+    fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => META_RESPONSE } as Response)
+      .mockRejectedValueOnce(new Error('private transport detail'));
+    vi.stubGlobal('fetch', fetchMock);
+    const { result, rerender } = renderHook(({ code }: { code: string }) => useSemanticModelMeta(code), { initialProps: { code: 'sales_semantic' } });
+    await waitFor(() => expect(result.current.metrics).toHaveLength(2));
+    rerender({ code: 'new_model' });
+    expect(result.current.metrics).toEqual([]);
+    expect(result.current.dimensions).toEqual([]);
+    await waitFor(() => expect((result.current as MetaState).error?.kind).toBe('failed'));
+  });
+  it('clears loading when selection is removed during a request', async () => {
+    let resolve!: (r: Response) => void;
+    vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise<Response>(done => { resolve = done; })));
+    const { result, rerender } = renderHook(({ code }: { code: string | undefined }) => useSemanticModelMeta(code), { initialProps: { code: 'sales_semantic' as string | undefined } });
+    expect(result.current.isLoading).toBe(true);
+    rerender({ code: undefined });
+    expect(result.current.isLoading).toBe(false);
+    await act(async () => { resolve({ ok: true, status: 200, json: async () => META_RESPONSE } as Response); });
+    expect(result.current.metrics).toEqual([]);
+    expect(result.current.dimensions).toEqual([]);
+  });
+  for (const [name, Picker] of [['metric', SemanticMetricPicker], ['dimension', SemanticDimensionPicker]] as const) {
+    it(`shows a safe permission message for the ${name} picker`, async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 403, json: async () => ({ code: '1', message: 'private SQL detail' }) }));
+      render(<Picker semanticModelCode="sales_semantic" value={[]} onChange={vi.fn()} />);
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent('无权读取语义模型');
+      expect(alert).not.toHaveTextContent('private SQL detail');
+      expect(screen.queryByText(/暂无指标|暂无维度/)).not.toBeInTheDocument();
+    });
+    it(`retries a failed ${name} lookup against the real hook request path`, async () => {
+      const fetchMock = mockFetchOk(META_RESPONSE).mockRejectedValueOnce(new Error('private transport detail'));
+      vi.stubGlobal('fetch', fetchMock);
+      render(<Picker semanticModelCode="sales_semantic" value={[]} onChange={vi.fn()} />);
+      expect(await screen.findByRole('alert')).toHaveTextContent('无法加载语义模型');
+      fireEvent.click(screen.getByRole('button', { name: '重试' }));
+      await screen.findByText(name === 'metric' ? '销售额' : '区域');
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+  }
 });
