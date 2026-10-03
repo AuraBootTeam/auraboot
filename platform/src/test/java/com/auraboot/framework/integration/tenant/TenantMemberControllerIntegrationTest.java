@@ -223,9 +223,24 @@ class TenantMemberControllerIntegrationTest extends BaseIntegrationTest {
     void nativeMemberDetailRejectsMissingReadGrant() throws Exception {
         prepareMemberModel();
         TenantMember target = createMemberFixture(true);
+        evictMemberGrants();
         assertThat(userPermissions.getUserPermissionCodes(getTestUser().getId()))
                 .doesNotContain("model.tenant_member.read", "admin_tenant_member");
         mockMvc.perform(get("/api/tenant/members/" + target.getPid()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void nativeMemberTeamsHonorsReadSelfScope() throws Exception {
+        prepareMemberModel();
+        grantMemberAction("read");
+        TenantMember owned = createMemberFixture(true);
+        TenantMember hidden = createMemberFixture(false);
+        scopes.setScope(getTestTenant().getId(), getTestRole().getId(), "tenant_member", "read", "self", "MAX");
+        mockMvc.perform(get("/api/tenant/members/" + owned.getPid() + "/teams"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data").isArray());
+        mockMvc.perform(get("/api/tenant/members/" + hidden.getPid() + "/teams"))
                 .andExpect(status().isForbidden());
     }
 
