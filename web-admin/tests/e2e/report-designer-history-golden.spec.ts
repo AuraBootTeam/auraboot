@@ -19,7 +19,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
 const TABLE_PLACEHOLDER = /^(请在属性面板中配置列|Configure columns in the property panel)$/;
-const RICHTEXT_PLACEHOLDER = 'Click to add text content';
+const RICHTEXT_PLACEHOLDER = /点击添加文本内容|Click to add text content/;
 
 function canvas(page: Page) {
   return page.getByTestId('report-canvas');
@@ -46,7 +46,9 @@ test.describe('Report Designer — history & topology golden', () => {
     await page.goto('/report-designer', { waitUntil: 'load' });
     await expect(page.getByTestId('block-palette')).toBeVisible();
     await expect(canvas(page)).toBeVisible();
-    await expect(page.getByTestId('report-designer-toolbar').getByText(/^(未保存|Unsaved)$/)).toBeVisible();
+    await expect(
+      page.getByTestId('report-designer-toolbar').getByText(/^(未保存|Unsaved)$/),
+    ).toBeVisible();
   });
 
   test('undo removes an added block; redo restores it', async ({ page }) => {
@@ -76,7 +78,10 @@ test.describe('Report Designer — history & topology golden', () => {
   test('undo restores a deleted block', async ({ page }) => {
     await addDataTable(page);
     await canvas(page).getByText(TABLE_PLACEHOLDER).click();
-    await page.getByTestId('block-property-panel').getByTitle(/^(删除|Delete)$/).click();
+    await page
+      .getByTestId('block-property-panel')
+      .getByTitle(/^(删除|Delete)$/)
+      .click();
     await expect(canvas(page).getByText(TABLE_PLACEHOLDER)).toHaveCount(0);
 
     // Delete is an undoable step.

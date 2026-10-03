@@ -59,7 +59,12 @@ const reportOptionNames: Record<string, string> = {
 
 function reportOptionName(name: string | RegExp): RegExp {
   if (name instanceof RegExp) return name;
-  return new RegExp(`^(${reportOptionNames[name] ?? name}|${name})$`, 'i');
+  if (name === 'Currency') return /^(货币|金额（¥）|Currency(?: \(¥\))?)$/i;
+  if (name === 'Percent') return /^(百分比(?:（%）)?|Percent(?: \(%\))?)$/i;
+  return new RegExp(
+    `^(${reportOptionNames[name] ?? reportOptionNames[name.toUpperCase()] ?? name}|${name})$`,
+    'i',
+  );
 }
 
 async function waitForDesignerLoad(page: Page) {
@@ -156,18 +161,12 @@ async function createReportExportPage(page: Page) {
     ],
   };
 
-  const createResp = await page.request.post('/api/pages', {
+  const createResp = await page.request.post('/api/report-definitions', {
     data: {
-      pageKey,
-      name: title,
+      code: pageKey,
       title,
-      kind: 'list',
-      profile: 'report',
-      blocks: [],
-      schemaVersion: 4,
-      semver: '0.1.0',
-      metaInfo: { e2eArtifact: 'report-excel' },
-      extension: { reportDsl },
+      profile: 'paged-media',
+      dsl: reportDsl,
     },
   });
   expect(createResp.ok(), `Create report page failed: ${createResp.status()}`).toBeTruthy();
@@ -212,18 +211,12 @@ async function createReportPdfVisualFidelityPage(page: Page) {
     ],
   };
 
-  const createResp = await page.request.post('/api/pages', {
+  const createResp = await page.request.post('/api/report-definitions', {
     data: {
-      pageKey,
-      name: title,
+      code: pageKey,
       title,
-      kind: 'list',
-      profile: 'report',
-      blocks: [],
-      schemaVersion: 4,
-      semver: '0.1.0',
-      metaInfo: { e2eArtifact: 'report-pdf-visual-fidelity' },
-      extension: { reportDsl },
+      profile: 'paged-media',
+      dsl: reportDsl,
     },
   });
   expect(
@@ -337,18 +330,12 @@ async function createReportNonTableExportPage(page: Page) {
     ],
   };
 
-  const createResp = await page.request.post('/api/pages', {
+  const createResp = await page.request.post('/api/report-definitions', {
     data: {
-      pageKey,
-      name: title,
+      code: pageKey,
       title,
-      kind: 'list',
-      profile: 'report',
-      blocks: [],
-      schemaVersion: 4,
-      semver: '0.1.0',
-      metaInfo: { e2eArtifact: 'report-non-table-export' },
-      extension: { reportDsl },
+      profile: 'paged-media',
+      dsl: reportDsl,
     },
   });
   expect(
@@ -559,18 +546,12 @@ async function createReportNonStaticDataSourceExportPage(page: Page) {
     ],
   };
 
-  const createResp = await page.request.post('/api/pages', {
+  const createResp = await page.request.post('/api/report-definitions', {
     data: {
-      pageKey,
-      name: title,
+      code: pageKey,
       title,
-      kind: 'list',
-      profile: 'report',
-      blocks: [],
-      schemaVersion: 4,
-      semver: '0.1.0',
-      metaInfo: { e2eArtifact: 'report-non-static-data-source-export' },
-      extension: { reportDsl },
+      profile: 'paged-media',
+      dsl: reportDsl,
     },
   });
   expect(
@@ -684,7 +665,7 @@ test.describe('data-table Block — All Properties', () => {
   test('RPT-DT-04: Data Source has "Add new" button', async ({ page }) => {
     await openReportAndAddBlock(page, 'Data Table');
     const panel = page.getByTestId('block-property-panel');
-    const addBtn = panel.getByText(/Add new data source/i);
+    const addBtn = panel.getByText(/添加数据源|Add new data source/i);
     await expect(addBtn).toBeVisible();
   });
 
@@ -1268,14 +1249,14 @@ test.describe('Report Operations', () => {
   test('RPT-OP-01: Move up/down buttons visible in property panel', async ({ page }) => {
     await openReportAndAddBlock(page, 'Rich Text');
     const panel = page.getByTestId('block-property-panel');
-    await expect(panel.locator('button[title="Move up"]')).toBeVisible();
-    await expect(panel.locator('button[title="Move down"]')).toBeVisible();
+    await expect(panel.getByTitle(/^(上移|Move up)$/)).toBeVisible();
+    await expect(panel.getByTitle(/^(下移|Move down)$/)).toBeVisible();
   });
 
   test('RPT-OP-02: Delete block button removes block', async ({ page }) => {
     await openReportAndAddBlock(page, 'Rich Text');
     const panel = page.getByTestId('block-property-panel');
-    const deleteBtn = panel.locator('button[title="Delete"]');
+    const deleteBtn = panel.getByTitle(/^(删除|Delete)$/);
     await expect(deleteBtn).toBeVisible();
     await deleteBtn.click();
     await expect(panel.locator('h2', { hasText: /^(报表属性|Report\ Properties)$/ })).toBeVisible({
@@ -1319,14 +1300,25 @@ test.describe('Report Operations', () => {
     await expect(saveBtn).toBeVisible({ timeout: 5000 });
     const responsePromise = page.waitForResponse(
       (res) =>
-        res.url().includes('/api/pages') &&
+        res.url().endsWith('/api/report-definitions') &&
         (res.request().method().toLowerCase() === 'post' ||
           res.request().method().toLowerCase() === 'put'),
       { timeout: 10000 },
     );
     await saveBtn.click();
     const response = await responsePromise;
-    expect(response.status()).toBeDefined();
+    expect(response.status()).toBe(200);
+    const saved = await response.json();
+    expect(saved.code).toBe('0');
+    expect(saved.data.pid).toBeTruthy();
+    const persisted = await page.request.get('/api/report-definitions/' + saved.data.pid);
+    expect(persisted.ok()).toBeTruthy();
+    const record = (await persisted.json()).data;
+    expect(record.dsl.body).toHaveLength(1);
+    expect(record.dsl.body[0].blockType).toBe('table');
+    await page.goto('/report-designer/' + saved.data.pid);
+    await expect(page.getByTestId('report-canvas')).toBeVisible();
+    await expect(page.locator('#report-export-status')).toBeHidden();
   });
 
   test('RPT-OP-05: Block palette has all 10 block types', async ({ page }) => {
@@ -1406,7 +1398,11 @@ test.describe('Report Operations', () => {
         [exportRows[1].region, exportRows[1].cases, exportRows[1].owner],
       ]);
     } finally {
-      await page.request.delete(`/api/pages/${pid}`).catch(() => {});
+      // Retain report definitions and artifacts as acceptance evidence.
+      await page.screenshot({
+        path: path.join(testInfo.outputDir, 'export-final-state.png'),
+        fullPage: true,
+      });
     }
   });
 
@@ -1445,7 +1441,11 @@ test.describe('Report Operations', () => {
       expect(bytes.length).toBeGreaterThan(1_000);
       expect(pdfText).toContain('/Type /Page');
     } finally {
-      await page.request.delete(`/api/pages/${pid}`).catch(() => {});
+      // Retain report definitions and artifacts as acceptance evidence.
+      await page.screenshot({
+        path: path.join(testInfo.outputDir, 'export-final-state.png'),
+        fullPage: true,
+      });
     }
   });
 
@@ -1518,7 +1518,11 @@ test.describe('Report Operations', () => {
       expect(workbook.Sheets['Report Text'].B4.v).toBe('CONFIDENTIAL');
       expect(workbook.Sheets['Report Text'].B5.v).toBe('Operations Footer');
     } finally {
-      await page.request.delete(`/api/pages/${pid}`).catch(() => {});
+      // Retain report definitions and artifacts as acceptance evidence.
+      await page.screenshot({
+        path: path.join(testInfo.outputDir, 'export-final-state.png'),
+        fullPage: true,
+      });
     }
   });
 
@@ -1561,7 +1565,11 @@ test.describe('Report Operations', () => {
       expect(pdfContentText).toContain('OPS-2026-EXPORT');
       expect(pdfContentText).toContain('CONFIDENTIAL');
     } finally {
-      await page.request.delete(`/api/pages/${pid}`).catch(() => {});
+      // Retain report definitions and artifacts as acceptance evidence.
+      await page.screenshot({
+        path: path.join(testInfo.outputDir, 'export-final-state.png'),
+        fullPage: true,
+      });
     }
   });
 
@@ -1637,7 +1645,11 @@ test.describe('Report Operations', () => {
         [apiTitle, 'Report API Customer', 'normal'],
       ]);
     } finally {
-      await page.request.delete(`/api/pages/${pid}`).catch(() => {});
+      // Retain report definitions and artifacts as acceptance evidence.
+      await page.screenshot({
+        path: path.join(testInfo.outputDir, 'export-final-state.png'),
+        fullPage: true,
+      });
     }
   });
 
@@ -1702,7 +1714,11 @@ test.describe('Report Operations', () => {
       expect(payload.dataSets?.namedQueryOrders?.[0]?.e2et_order_title).toBe(namedQueryTitle);
       expect(payload.dataSets?.apiOrders?.[0]?.e2et_order_title).toBe(apiTitle);
     } finally {
-      await page.request.delete(`/api/pages/${pid}`).catch(() => {});
+      // Retain report definitions and artifacts as acceptance evidence.
+      await page.screenshot({
+        path: path.join(testInfo.outputDir, 'export-final-state.png'),
+        fullPage: true,
+      });
     }
   });
 
@@ -1759,7 +1775,11 @@ test.describe('Report Operations', () => {
       expect(blockTitleObject.fontSize).toBe(12);
       expect(titleObject.y).toBeGreaterThan(blockTitleObject.y);
     } finally {
-      await page.request.delete(`/api/pages/${pid}`).catch(() => {});
+      // Retain report definitions and artifacts as acceptance evidence.
+      await page.screenshot({
+        path: path.join(testInfo.outputDir, 'export-final-state.png'),
+        fullPage: true,
+      });
     }
   });
 });
