@@ -51,6 +51,31 @@ test('member state capabilities use the runtime-derived verb, not the command su
   }
 });
 
+test('member provisioning includes the employee selector and display-name read dependencies', () => {
+  const pages = JSON.parse(source('../config/pages.json'));
+  const page = pages.find(item => item.pageKey === 'tenant_member_list');
+  const button = page.blocks.find(block => block.id === 'toolbar').buttons
+    .find(item => item.action?.command === 'admin:provision_member_from_employee');
+  const selector = button.action.inputFields.find(field => field.field === 'employeePid');
+  assert.equal(selector.dataSource.endpoint, '/api/org/employees?pageNum=1&pageSize=500');
+  const service = source('../../../platform/src/main/java/com/auraboot/framework/organization/service/impl/OrganizationServiceImpl.java');
+  assert.match(service, /dynamicDataService\.list\(MODEL_EMPLOYEE, request\)/);
+  assert.match(service, /dynamicDataService\.getById\(MODEL_DEPARTMENT, deptPid\)/);
+  assert.match(service, /dynamicDataService\.getById\(MODEL_POSITION, positionPid\)/);
+  const models = [...service.matchAll(/private static final String MODEL_(?:EMPLOYEE|DEPARTMENT|POSITION) = "(\w+)";/g)]
+    .map(match => match[1]).sort();
+  assert.deepEqual(models, ['org_department', 'org_employee', 'org_position']);
+  const org = JSON.parse(source('../../org-management/config/capabilities.json'));
+  const management = org.find(cap => cap.code === 'org.cap.member');
+  assert.ok(management.includes.includes('model.tenant_member.provision_member_from_employee'));
+  for (const model of models) {
+    assert.ok(management.includes.includes(`model.${model}.read`), `org.cap.member: model.${model}.read`);
+    assert.ok(!management.includes.some(permission => new RegExp(`^model\\.${model}\\.(create|update|delete)$`).test(permission)));
+    for (const code of ['org.cap.member_view', 'org.cap.member_offboarding', 'org.cap.member_remove'])
+      assert.ok(!org.find(cap => cap.code === code).includes.includes(`model.${model}.read`), code);
+  }
+});
+
 test('member commands enforce their action permissions at the command boundary', () => {
   const commands = JSON.parse(source('../config/commands.json'));
   const org = JSON.parse(source('../../org-management/config/capabilities.json'));

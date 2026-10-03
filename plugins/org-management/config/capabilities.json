@@ -80,6 +80,9 @@
       "model.tenant_member.restore",
       "model.tenant_member.reset_member_password",
       "model.tenant_member.provision_member_from_employee",
+      "model.org_employee.read",
+      "model.org_department.read",
+      "model.org_position.read",
       "org_management",
       "member_management",
       "meta.command.execute"
