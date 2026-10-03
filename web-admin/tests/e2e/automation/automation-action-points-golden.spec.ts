@@ -162,11 +162,13 @@ test.describe('Automation designer — Undo / Redo action points @golden', () =>
     await expect(undo, 'undo disabled at empty history').toBeDisabled();
     await expect(redo, 'redo disabled at empty history').toBeDisabled();
     expect((await currentNodeIds(page)).length, 'canvas starts empty').toBe(0);
+    await page.screenshot({ path: test.info().outputPath('G5-empty.png'), fullPage: true });
 
     // Happy: a real drag adds a node and enables Undo.
     const nodeId = await dragNodeToCanvas(page, 'trigger-record-create', { x: 180, y: 160 });
     expect((await currentNodeIds(page)).length, 'node added by drag').toBe(1);
     await expect(undo, 'undo enabled after an edit').toBeEnabled({ timeout: 5_000 });
+    await page.screenshot({ path: test.info().outputPath('G5-added.png'), fullPage: true });
 
     // Undo via the real toolbar button → the node is removed and Redo becomes enabled.
     await undo.click();
@@ -174,6 +176,7 @@ test.describe('Automation designer — Undo / Redo action points @golden', () =>
       .poll(async () => (await currentNodeIds(page)).length, { timeout: 5_000 })
       .toBe(0);
     await expect(redo, 'redo enabled after an undo').toBeEnabled({ timeout: 5_000 });
+    await page.screenshot({ path: test.info().outputPath('G5-undo.png'), fullPage: true });
 
     // Redo via the real toolbar button → the node comes back.
     await redo.click();
@@ -181,14 +184,21 @@ test.describe('Automation designer — Undo / Redo action points @golden', () =>
       .poll(async () => (await currentNodeIds(page)).length, { timeout: 5_000 })
       .toBe(1);
     expect((await currentNodeIds(page)), 'same node id restored').toContain(nodeId);
+    await page.screenshot({ path: test.info().outputPath('G5-redo.png'), fullPage: true });
 
     // Keyboard parity: Ctrl/Cmd+Z undoes again.
     const mod = process.platform === 'darwin' ? 'Meta' : 'Control';
-    await page.locator('.react-flow__pane').click({ position: { x: 40, y: 40 } });
+    const pane = page.locator('.react-flow__pane');
+    const paneBox = await pane.boundingBox();
+    expect(paneBox, 'canvas geometry exists before keyboard focus').not.toBeNull();
+    // Compact panel toggles overlay the pane's top-left corner. Focus a blank
+    // lower-center canvas point without bypassing pointer interception checks.
+    await pane.click({ position: { x: paneBox!.width / 2, y: paneBox!.height - 80 } });
     await page.keyboard.press(`${mod}+z`);
     await expect
       .poll(async () => (await currentNodeIds(page)).length, { timeout: 5_000 })
       .toBe(0);
+    await page.screenshot({ path: test.info().outputPath('G5-keyboard-undo.png'), fullPage: true });
   });
 });
 
