@@ -13,10 +13,9 @@
 #   4. prints a PASS/FAIL banner and EXITS WITH THE GATE RESULT — 0 = green,
 #      nonzero = a real failure. The exit code is the whole point: it is what a
 #      crontab line or a release step checks;
-#   6. tears the stack down on the way out, on success OR failure OR interrupt,
-#      via a trap — a failed gate never leaks a stack.
+#   6. retains the same stack and independent round evidence for owner review.
 #
-# The stack is destroyed-then-recreated each run (--fresh-db), so the gate never
+# The stack is rebuilt on the same runtime name and slot each run (--fresh-db), so the gate never
 # inherits a stale-slot DB that would skip bootstrap and quietly run against the
 # wrong schema.
 #
@@ -86,7 +85,7 @@ if [ ! -f "$WORKSPACE/dev.sh" ]; then
   main_wt="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2; exit}')"
   [ -n "${main_wt:-}" ] && [ -f "$(dirname "$main_wt")/dev.sh" ] && WORKSPACE="$(dirname "$main_wt")"
 fi
-DEV="$WORKSPACE/dev.sh"
+DEV="$WORKSPACE/aura"
 
 NAME="oss-e2e-gate"
 SLOT=""            # empty => auto-pick
@@ -191,12 +190,7 @@ fi
 # --- teardown trap: destroy on EXIT (success | failure | interrupt) ----------
 cleanup() {
   local rc=$?
-  if [[ "$KEEP" == 1 ]]; then
-    log "--keep set; leaving stack '$NAME' up (env: $GS env $NAME; destroy: $GS destroy $NAME)"
-  else
-    log "tearing down stack '$NAME' (trap on exit rc=$rc)..."
-    "$GS" destroy "$NAME" >/dev/null 2>&1 || true
-  fi
+  log "keeping stack '$NAME' and this round's evidence for review (exit rc=$rc)"
   return "$rc"
 }
 trap cleanup EXIT INT TERM
@@ -212,9 +206,9 @@ echo "=============================================================="
 # Backend-side contract set BEFORE the stack starts: exported here so it is plain
 # that the backend booted with it, not asserted after the fact.
 export AGENT_LLM_STUB_MODE=true
-log "1/4 fresh stack: destroy any prior '$NAME' + up --fresh-db --plugin-profile demo"
-"$GS" destroy "$NAME" >/dev/null 2>&1 || true
-# --fresh-db => destroy-then-recreate the slot DB, guaranteeing a fresh bootstrap.
+log "1/4 fresh stack: reuse '$NAME' on the same slot; stop before reset + up --fresh-db --plugin-profile demo"
+"$GS" down "$NAME" || die_env "cannot stop the owned stack before rebuilding"
+# --fresh-db => reset the existing slot DB, guaranteeing a fresh bootstrap.
 # Default `up` runs the warm step (setup -> auth storageState -> pre-warm), which
 # is what produces tests/storage/admin.json — both the seed and the `oss` project
 # need that storageState, so warm is required here (do NOT pass --no-warm).
