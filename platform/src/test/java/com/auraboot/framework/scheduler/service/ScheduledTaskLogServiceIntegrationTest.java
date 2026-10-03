@@ -44,7 +44,7 @@ class ScheduledTaskLogServiceIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     public void insertTestLogs() {
-        testTaskPid = "test-task-" + java.util.UUID.randomUUID();
+        testTaskPid = com.auraboot.framework.common.util.UniqueIdGenerator.generate();
         // Insert two test log entries via mapper (not going through service creation)
         insertLog(testTaskPid, "success", 100L, null);
         insertLog(testTaskPid, "failure", 200L, "DB timeout");

@@ -182,24 +182,19 @@ class CapabilityControllerEnforcementIT extends BaseIntegrationTest {
             permission.setUpdatedAt(java.time.Instant.now());
             permissionMapper.insert(permission);
         }
-        boolean notAssigned = rolePermissionMapper.selectList(
-                new LambdaQueryWrapper<RolePermission>()
-                        .eq(RolePermission::getRoleId, getTestRole().getId())
-                        .eq(RolePermission::getPermissionId, permission.getId())
-                        .eq(RolePermission::getDeletedFlag, false)).isEmpty();
-        if (notAssigned) {
-            RolePermission rp = new RolePermission();
-            rp.setPid(com.auraboot.framework.common.util.UniqueIdGenerator.generate());
-            rp.setRoleId(getTestRole().getId());
-            rp.setPermissionId(permission.getId());
-            rp.setGrantType("grant");
-            rp.setStatus("active");
-            rp.setDeletedFlag(false);
-            rp.setTenantId(getTestTenant().getId());
-            rp.setCreatedAt(java.time.Instant.now());
-            rp.setUpdatedAt(java.time.Instant.now());
-            rolePermissionMapper.insert(rp);
-        }
+        RolePermission rp = new RolePermission();
+        rp.setPid(com.auraboot.framework.common.util.UniqueIdGenerator.generate());
+        rp.setRoleId(getTestRole().getId());
+        rp.setPermissionId(permission.getId());
+        rp.setGrantType("grant");
+        rp.setStatus("active");
+        rp.setDeletedFlag(false);
+        rp.setTenantId(getTestTenant().getId());
+        rp.setCreatedAt(java.time.Instant.now());
+        rp.setUpdatedAt(java.time.Instant.now());
+        // The unique key includes soft-deleted bindings. Use the production
+        // grant operation to restore them rather than inserting a duplicate.
+        rolePermissionMapper.batchInsert(java.util.List.of(rp));
         userPermissionService.evictPermissionDefinitions(getTestTenant().getId());
         userPermissionService.evictRoleUsers(getTestTenant().getId(), getTestRole().getId());
     }
