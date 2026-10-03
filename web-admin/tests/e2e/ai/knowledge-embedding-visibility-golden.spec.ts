@@ -16,6 +16,11 @@
 import { test, expect } from '@playwright/test';
 import { uniqueId } from '../helpers';
 
+// This spec asserts English labels; pin SSR locale rather than inheriting the admin default.
+test.beforeEach(async ({ context }) => {
+  await context.addCookies([{ name: 'locale', value: 'en-US', domain: '127.0.0.1', path: '/' }]);
+});
+
 const KB_NAME = `S2 Embed ${uniqueId('KB')}`;
 
 const DOC = `Support hours.

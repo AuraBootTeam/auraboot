@@ -102,7 +102,9 @@ test.describe('S2 — legacy .ppt and .xls', () => {
       // API completion alone does not prove that the visible row reached its terminal state.
       const status = page.getByRole('main').getByTestId(`doc-status-${doc.pid}`);
       await expect(status).toHaveText(/completed/i);
-      const row = page.getByRole('main').locator('tr').filter({ has: status });
+      const row = page.getByRole('main').getByRole('row').filter({
+        has: page.getByTestId(`doc-status-${doc.pid}`),
+      });
       expect(doc.activeVersionPid).toEqual(expect.any(String));
       await expect(row).not.toContainText(doc.activeVersionPid);
 
