@@ -24,12 +24,25 @@ class GateContracts(unittest.TestCase):
         self.executable(self.root / 'dev.sh', '#!/bin/bash\nexit 0\n')
         self.executable(self.root / 'aura', '#!/bin/bash\nif [ "$2" = list ]; then printf "name repo slot\\n%s" "${EXISTING_RUNTIME:-}"; else echo "runtime ensure"; fi\n')
         self.executable(self.repo / 'bin/lsof', '#!/bin/bash\nexit 1\n')
-        self.executable(self.repo / 'bin/pnpm', '#!/bin/bash\nprintf "%s\\n" "$*" >> "$CALLS"\nprintf "4 passed\\n"\nexit "${PW_EXIT:-0}"\n')
+        self.executable(self.repo / 'bin/pnpm', """#!/bin/bash
+printf '%s\\n' "$*" >> "$CALLS"
+python3 - <<'REPORT_FIXTURE'
+import json,os
+from pathlib import Path
+p=Path(os.environ['PW_RESULTS_JSON']);p.parent.mkdir(parents=True,exist_ok=True)
+if os.environ.get('REPORT_MISSING')!='1':
+ n=int(os.environ.get('REPORT_COUNT','12'))
+ tests=[{'status':'expected','results':[{'status':'passed','retry':int(os.environ.get('REPORT_RETRY','0'))}]} for _ in range(n)]
+ p.write_text(json.dumps({'stats':{'expected':n,'unexpected':0,'skipped':int(os.environ.get('REPORT_SKIPPED','0')),'flaky':0},'errors':[], 'config':{'projects':[{'name':'oss','retries':0}]},'suites':[{'specs':[{'tests':tests}]}]}))
+REPORT_FIXTURE
+printf '12 passed\\n'
+exit "${PW_EXIT:-0}"
+""")
         self.executable(self.repo / 'scripts/oss-golden-stack.sh', '''#!/bin/bash
 printf '%s\n' "$*" >> "$CALLS"
 case "$1" in
  up) exit "${UP_EXIT:-0}";;
- env) printf 'export PLAYWRIGHT_BASE_URL=http://private-fixture BACKEND_URL=http://private-fixture BFF_PORT=1\n';;
+ env) printf 'export PLAYWRIGHT_BASE_URL=http://private-fixture BACKEND_URL=http://private-fixture BFF_PORT=1 PW_RESULTS_JSON=$AURA_EVIDENCE_ROOT/report/results.json\n';;
  destroy|down) exit 99;;
 esac
 ''')
@@ -59,6 +72,19 @@ esac
         self.assertNotIn('--fresh-db', calls)
         self.assertIn('--project=oss --no-deps --repeat-each=1', calls)
         self.assertEqual(calls.count('.spec.ts'), 4)
+        self.assertNotIn('--reporter=', calls)
+
+    def test_missing_json_rejects_process_green(self):
+        self.assertEqual(self.run_gate(REPORT_MISSING='1').returncode, 1)
+
+    def test_skipped_report_rejects_process_green(self):
+        self.assertEqual(self.run_gate(REPORT_SKIPPED='1').returncode, 1)
+
+    def test_changed_slice_count_rejects_process_green(self):
+        self.assertEqual(self.run_gate(REPORT_COUNT='11').returncode, 1)
+
+    def test_retry_rejects_process_green(self):
+        self.assertEqual(self.run_gate(REPORT_RETRY='1').returncode, 1)
 
     def test_browser_failure_keeps_exit_and_environment(self):
         r = self.run_gate(PW_EXIT='1')

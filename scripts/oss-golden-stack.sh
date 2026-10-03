@@ -665,8 +665,7 @@ cmd_up() {
   fi
 
   log "9/9 ready ✓"
-  echo
-  cmd_env "$name"
+  log "    env exports available through the env command; credentials are not printed during startup"
 }
 
 # ---- import plugins into a running host-first stack ----------------------------------

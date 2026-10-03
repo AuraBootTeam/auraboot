@@ -213,7 +213,7 @@ log "    base=$PLAYWRIGHT_BASE_URL backend=$BACKEND_URL bff=$BFF_PORT (AGENT_LLM
 # --- 3. run the gate slice under the OSS env contract ------------------------
 log "3/4 run gate: PW_PROFILE=oss --project=oss --no-deps (x$REPEAT)"
 cd "$REPO_ROOT/web-admin" || die_env "web-admin not found under $REPO_ROOT"
-PW_ARGS=(--project=oss --no-deps --repeat-each="$REPEAT" --reporter=line)
+PW_ARGS=(--project=oss --no-deps --repeat-each="$REPEAT")
 [[ -n "$WORKERS" ]] && PW_ARGS+=(--workers="$WORKERS")
 [[ ${#RUN_PATHS[@]} -gt 0 ]] && PW_ARGS+=("${RUN_PATHS[@]}")
 set +e
@@ -221,6 +221,43 @@ PW_PROFILE=oss NO_PROXY=localhost,127.0.0.1 \
   pnpm exec playwright test "${PW_ARGS[@]}" 2>&1 | tee "$LOG"
 GATE_RC=${PIPESTATUS[0]}
 set -e 2>/dev/null || true
+# The config emits JSON when PW_RESULTS_JSON is set. Never override its reporters.
+if [[ "$GATE_RC" == 0 ]]; then
+  python3 - "$PW_RESULTS_JSON" "$SCOPE_MODE" "$REPEAT" <<'REPORT_PY' || GATE_RC=1
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+if not path.is_file():
+    raise SystemExit("OSS gate failed: Playwright JSON report is missing")
+report = json.loads(path.read_text())
+stats = report.get("stats", {})
+if any(stats.get(key) != 0 for key in ("unexpected", "skipped", "flaky")):
+    raise SystemExit("OSS gate failed: failed, skipped, flaky, or incomplete report")
+if not isinstance(stats.get("expected"), int) or stats["expected"] <= 0 or report.get("errors") != []:
+    raise SystemExit("OSS gate failed: empty execution or global errors")
+projects = report.get("config", {}).get("projects", [])
+if not projects or any(project.get("retries") != 0 for project in projects):
+    raise SystemExit("OSS gate failed: retries must remain zero")
+if sys.argv[2] == "slice" and stats["expected"] != 12 * int(sys.argv[3]):
+    raise SystemExit("OSS gate failed: original slice execution count changed")
+tests = []
+def walk(suites):
+    for suite in suites:
+        for spec in suite.get("specs", []):
+            tests.extend(spec.get("tests", []))
+        walk(suite.get("suites", []))
+walk(report.get("suites", []))
+if len(tests) != stats["expected"]:
+    raise SystemExit("OSS gate failed: test details do not match reported count")
+for test in tests:
+    results = test.get("results", [])
+    if test.get("status") != "expected" or len(results) != 1 or results[0].get("status") != "passed" or results[0].get("retry") != 0:
+        raise SystemExit("OSS gate failed: missing pass, retry, or unexpected test result")
+print(f"OSS JSON evidence verified: {len(tests)} passed, zero skips/retries/flaky/errors")
+REPORT_PY
+fi
 
 # --- 4. report + exit = gate result ------------------------------------------
 log "4/4 result"
