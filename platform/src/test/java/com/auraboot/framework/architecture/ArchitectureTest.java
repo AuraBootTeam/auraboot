@@ -15,9 +15,9 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
  * These tests prevent architectural drift by codifying layer dependency rules.
  *
  * Uses FreezingArchRule for rules with existing violations:
- * - First run records violations in src/test/resources/archunit_store/
- * - Subsequent runs only fail on NEW violations
- * - Removing a violation from the codebase auto-removes it from the store
+ * - Gradle resets a task-local build copy of the committed baseline before each run
+ * - Missing rules fail closed; new violations are blocked
+ * - Fixed violations shrink only the build copy, never the committed baseline
  */
 class ArchitectureTest {
 

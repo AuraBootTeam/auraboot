@@ -505,6 +505,19 @@ bootRun {
 }
 
 tasks.withType(Test).configureEach {
+    // Frozen rules may shrink their store when a known violation disappears.
+    // Reset a task-local copy for every execution; tracked baselines remain immutable.
+    def frozenArchitectureBaseline = layout.projectDirectory.dir('src/test/resources/archunit_store')
+    def frozenArchitectureStore = layout.buildDirectory.dir("archunit-stores/${name}")
+    inputs.dir(frozenArchitectureBaseline).withPropertyName('frozenArchitectureBaseline')
+    systemProperty 'archunit.freeze.store.default.path', frozenArchitectureStore.get().asFile.absolutePath
+    systemProperty 'archunit.freeze.store.default.allowStoreCreation', 'false'
+    doFirst {
+        project.sync {
+            from frozenArchitectureBaseline
+            into frozenArchitectureStore
+        }
+    }
     reports.junitXml {
         includeSystemOutLog = false
         includeSystemErrLog = false
