@@ -93,5 +93,26 @@
   { "key": "model.sc_monthly_metric.sc_units.label", "zh-CN": "数量", "en-US": "Units", "source": "import", "refType": "field" },
   { "key": "model.sc_monthly_metric.sc_metric_remark.label", "zh-CN": "备注", "en-US": "Remark", "source": "import", "refType": "field" },
   { "key": "command.sc:create_monthly_metric.label", "zh-CN": "新建月度指标", "en-US": "Create Monthly Metric", "source": "import", "refType": "command" },
-  { "key": "command.sc:delete_monthly_metric.label", "zh-CN": "删除月度指标", "en-US": "Delete Monthly Metric", "source": "import", "refType": "command" }
+  { "key": "command.sc:delete_monthly_metric.label", "zh-CN": "删除月度指标", "en-US": "Delete Monthly Metric", "source": "import", "refType": "command" },
+
+  {"key": "model.showcase_all_fields.sc_name.placeholder", "zh-CN": "请输入展示项名称", "en-US": "Enter the showcase item name", "source": "import", "refType": "field"},
+  {"key": "model.showcase_all_fields.sc_code.placeholder", "zh-CN": "保存后自动生成", "en-US": "Generated automatically after saving", "source": "import", "refType": "field"},
+  {"key": "model.showcase_all_fields.sc_description.placeholder", "zh-CN": "简要描述该展示项的用途、特性或说明", "en-US": "Briefly describe the purpose, features or notes for this item", "source": "import", "refType": "field"},
+  {"key": "model.showcase_all_fields.sc_quantity.placeholder", "zh-CN": "请输入数量", "en-US": "Enter a quantity", "source": "import", "refType": "field"},
+  {"key": "model.showcase_all_fields.sc_status.placeholder", "zh-CN": "选择状态", "en-US": "Select a status", "source": "import", "refType": "field"},
+  {"key": "model.showcase_all_fields.sc_priority.placeholder", "zh-CN": "选择优先级", "en-US": "Select a priority", "source": "import", "refType": "field"},
+  {"key": "model.showcase_all_fields.sc_category.placeholder", "zh-CN": "选择分类", "en-US": "Select a category", "source": "import", "refType": "field"},
+  {"key": "model.showcase_all_fields.sc_tags.placeholder", "zh-CN": "输入标签后回车，多个用逗号分隔", "en-US": "Enter a tag and press Enter; separate multiple tags with commas", "source": "import", "refType": "field"},
+  {"key": "model.showcase_all_fields.sc_advanced_settings.placeholder", "zh-CN": "状态为「启用」时填写高级配置（JSON 或说明）", "en-US": "Enter advanced settings when the status is Active (JSON or notes)", "source": "import", "refType": "field"},
+  {"key": "model.showcase_all_fields.sc_cascade_category.placeholder", "zh-CN": "逐级选择分类", "en-US": "Select a category level by level", "source": "import", "refType": "field"},
+  {"key": "model.showcase_all_fields.sc_tree_node.placeholder", "zh-CN": "搜索并选择节点", "en-US": "Search and select a node", "source": "import", "refType": "field"},
+  {"key": "model.showcase_all_fields.sc_assignee.placeholder", "zh-CN": "选择负责人", "en-US": "Select an assignee", "source": "import", "refType": "field"},
+  {"key": "model.showcase_all_fields.sc_team_members.placeholder", "zh-CN": "选择团队成员（可多选）", "en-US": "Select team members (multiple selections allowed)", "source": "import", "refType": "field"},
+  {"key": "model.showcase_all_fields.sc_department.placeholder", "zh-CN": "选择所属部门", "en-US": "Select a department", "source": "import", "refType": "field"},
+  {"key": "model.showcase_all_fields.sc_owner_user.placeholder", "zh-CN": "搜索并选择所有者", "en-US": "Search and select an owner", "source": "import", "refType": "field"},
+  {"key": "model.showcase_all_fields.sc_phone.placeholder", "zh-CN": "如 021-58769300 或 138-0000-0000", "en-US": "For example, 021-58769300 or 138-0000-0000", "source": "import", "refType": "field"},
+  {"key": "model.showcase_all_fields.sc_address.placeholder", "zh-CN": "请输入详细地址（省 / 市 / 区 / 街道门牌）", "en-US": "Enter the full address (province, city, district and street address)", "source": "import", "refType": "field"},
+  {"key": "model.showcase_all_fields.sc_richtext_content.placeholder", "zh-CN": "输入图文富文本内容…", "en-US": "Enter rich text and images…", "source": "import", "refType": "field"},
+  {"key": "model.showcase_all_fields.sc_ai_summary.placeholder", "zh-CN": "AI 将根据内容自动生成摘要", "en-US": "AI will generate a summary from the content", "source": "import", "refType": "field"},
+  {"key": "model.showcase_all_fields.sc_remark.placeholder", "zh-CN": "补充说明（选填）", "en-US": "Additional notes (optional)", "source": "import", "refType": "field"}
 ]
