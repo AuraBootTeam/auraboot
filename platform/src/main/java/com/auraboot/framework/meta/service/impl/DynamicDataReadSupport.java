@@ -69,7 +69,6 @@ final class DynamicDataReadSupport {
     private static final Set<String> AUDIT_USER_DISPLAY_FIELDS = Set.of("created_by", "updated_by");
 
     private static String logSafe(Object value) { return LogSanitizer.safe(value); }
-    private static boolean hasText(String value) { return value != null && !value.isBlank(); }
     List<Map<String, Object>> applyFieldPermissionFilter(String modelCode, List<Map<String, Object>> records) {
         if (records == null || records.isEmpty()) {
             return records;
@@ -403,7 +402,7 @@ final class DynamicDataReadSupport {
      */
     ReferenceReadAccess evaluateReferenceReadAccess(
             Long tenantId, Long userId, String targetModelCode) {
-        if (tenantId == null || userId == null || !hasText(targetModelCode)) {
+        if (tenantId == null || userId == null || !org.springframework.util.StringUtils.hasText(targetModelCode)) {
             return ReferenceReadAccess.denied();
         }
         if (SYSTEM_TABLE_MAP.containsKey(targetModelCode)) {

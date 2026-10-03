@@ -88,10 +88,6 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         return LogSanitizer.safe(value);
     }
 
-    private static String nullToBlank(String value) {
-        return value == null ? "" : value;
-    }
-
     private final MetaModelMapper metaModelMapper;
     private final MetaFieldMapper metaFieldMapper;
     private final QueryBuilderService queryBuilderService;

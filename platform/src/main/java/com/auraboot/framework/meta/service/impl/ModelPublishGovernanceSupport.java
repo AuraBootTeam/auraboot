@@ -50,10 +50,6 @@ final class ModelPublishGovernanceSupport {
     private final PermissionEvaluator permissionEvaluator;
     private final java.util.function.Function<ExtensionBean, Map<String, Object>> extensionFlattener;
 
-    private static String logSafe(Object value) {
-        return LogSanitizer.safe(value);
-    }
-
     private static String nullToBlank(String value) {
         return value == null ? "" : value;
     }
@@ -1421,7 +1417,7 @@ final class ModelPublishGovernanceSupport {
     void recordModelPublishAcknowledgement(Model model, ModelPublishGovernanceDTO governance, String note) {
         if (decisionImpactAckService == null) {
             log.warn("Decision impact acknowledgement service unavailable; model publish ack not persisted: model={}",
-                    logSafe(model.getCode()));
+                    LogSanitizer.safe(model.getCode()));
             return;
         }
         decisionImpactAckService.recordAcknowledgement(
