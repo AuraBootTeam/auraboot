@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { getLocalizedText } from '~/utils/i18n';
 import { WidgetRegistry } from '~/plugins/core-designer/components/studio/registry/widget-registry';
 import type { DslFieldOverride } from '~/plugins/core-designer/components/studio/domain/dsl/types';
@@ -19,13 +19,13 @@ function expandSection(code: string) {
 }
 const expectedFields = {
   'form-section': ['field', 'label', 'placeholder', 'component', 'required', 'readonly', 'maxLength', 'minLength', 'pattern', 'visible', 'disabled', 'span'],
-  'filter-form': ['field', 'label', 'placeholder', 'component', 'required', 'readonly', 'maxLength', 'minLength', 'pattern', 'visible', 'disabled', 'advanced', 'span'],
-  'data-table': ['field', 'label', 'visible', 'disabled', 'sortable', 'copyable', 'ellipsis', 'width', 'fixed', 'render'],
+  'filters': ['field', 'label', 'placeholder', 'component', 'required', 'readonly', 'maxLength', 'minLength', 'pattern', 'visible', 'disabled', 'advanced', 'span'],
+  'table': ['field', 'label', 'visible', 'disabled', 'sortable', 'copyable', 'ellipsis', 'width', 'fixed', 'render'],
 } as const;
 
 describe('field property editor localization and DSL values', () => {
   for (const locale of ['zh-CN', 'en-US']) {
-    for (const blockType of ['form-section', 'filter-form', 'data-table'] as const) {
+    for (const blockType of ['form-section', 'filters', 'table'] as const) {
       it(`${locale} renders the configured labels/options and exact visible fields for ${blockType}`, () => {
         fixture.locale = locale;
         render(<FieldPropertyEditor fieldRef="account_name" blockType={blockType} onChange={vi.fn()} onClose={vi.fn()} />);
@@ -33,16 +33,17 @@ describe('field property editor localization and DSL values', () => {
         expandSection('behavior'); expandSection('layout');
         for (const section of config.sections) {
           for (const field of section.fields) {
-            const control = screen.queryByTestId(`field-property-${field.field}`);
+            const control = screen.queryByTestId(`field-property-${field.field}`) as HTMLElement | null;
             if (!(expectedFields[blockType] as readonly string[]).includes(field.field)) { expect(control).toBeNull(); continue; }
             expect(control, field.field).toBeTruthy();
-            expect(within(control!).getByText(getLocalizedText(field.props.label, locale))).toBeTruthy();
+            expect(control).toHaveTextContent(getLocalizedText(field.props.label, locale));
             if ('placeholder' in field.props && field.component === 'SmartInput') {
-              expect(within(control!).getByRole('textbox')).toHaveAttribute('placeholder', getLocalizedText(field.props.placeholder, locale));
+              expect(control!.querySelector('input')).toHaveAttribute('placeholder', getLocalizedText(field.props.placeholder, locale));
             }
             if ('options' in field.props) {
-              for (const option of field.props.options) {
-                expect(within(control!).getByRole('option', { name: getLocalizedText(option.label, locale) })).toHaveValue(String(option.value));
+              for (const option of field.props.options ?? []) {
+                const renderedOption = Array.from(control!.querySelectorAll('option')).find(optionElement => optionElement.textContent === getLocalizedText(option.label, locale));
+                expect(renderedOption).toHaveValue(String(option.value));
               }
             }
           }
@@ -51,7 +52,7 @@ describe('field property editor localization and DSL values', () => {
     }
   }
   it('changes UI locale while retaining string/numeric/boolean overrides and props', () => {
-    const initial: DslFieldOverride = { field: 'account_name', required: false, maxLength: 20, props: { customFlag: 'retained' } };
+    const initial: DslFieldOverride & { maxLength: number } = { field: 'account_name', required: false, maxLength: 20, props: { customFlag: 'retained' } };
     const changed = vi.fn();
     function Controlled() {
       const [field, setField] = useState(initial);
@@ -82,7 +83,7 @@ describe('field property editor localization and DSL values', () => {
     fireEvent.change(screen.getByLabelText('Minimum value'), { target: { value: '1.25' } });
     expect(change).toHaveBeenLastCalledWith({ minValue: 1.25 });
     view.unmount();
-    render(<FieldPropertyEditor fieldRef="amount" dataType="decimal" blockType="data-table" onChange={change} onClose={vi.fn()} />);
+    render(<FieldPropertyEditor fieldRef="amount" dataType="decimal" blockType="table" onChange={change} onClose={vi.fn()} />);
     expandSection('layout');
     fireEvent.change(screen.getByLabelText('Fixed column'), { target: { value: 'right' } });
     expect(change).toHaveBeenLastCalledWith({ fixed: 'right' });
@@ -105,7 +106,7 @@ describe('field property editor localization and DSL values', () => {
     const change = vi.fn();
     const view = render(<FieldPropertyEditor fieldRef={{ field: 'account_name', component: 'fixture-input', props: { note: 'old', retained: true } }} blockType="form-section" onChange={change} onClose={vi.fn()} />);
     expect(screen.getByRole('button', { name: 'Fixture widget Properties' })).toBeTruthy();
-    fireEvent.change(within(screen.getByTestId('widget-prop-note')).getByRole('textbox'), { target: { value: 'new' } });
+    fireEvent.change(screen.getByTestId('widget-prop-note').querySelector('input')!, { target: { value: 'new' } });
     expect(change).toHaveBeenLastCalledWith({ props: { note: 'new', retained: true } });
     fixture.locale = 'zh-CN';
     view.rerender(<FieldPropertyEditor fieldRef={{ field: 'account_name', component: 'fixture-input' }} blockType="form-section" onChange={change} onClose={vi.fn()} />);

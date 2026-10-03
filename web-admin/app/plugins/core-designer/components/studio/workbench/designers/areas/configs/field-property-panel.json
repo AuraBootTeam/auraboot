@@ -25,7 +25,7 @@
           "field": "placeholder",
           "component": "SmartInput",
           "props": { "label": { "zh-CN": "占位符", "en-US": "Placeholder" }, "placeholder": { "zh-CN": "请输入...", "en-US": "Enter a value..." }, "size": "small" },
-          "visible": "blockType !== 'data-table'"
+          "visible": "blockType !== 'table'"
         },
         {
           "field": "component",
@@ -37,7 +37,7 @@
             "placeholder": { "zh-CN": "自动选择", "en-US": "Automatic selection" }
           },
           "optionsKey": "componentOptions",
-          "visible": "blockType !== 'data-table'"
+          "visible": "blockType !== 'table'"
         }
       ]
     },
@@ -45,7 +45,7 @@
       "code": "validation",
       "title": { "zh-CN": "验证规则", "en-US": "Validation rules" },
       "layout": { "columns": 2, "gap": "small" },
-      "visible": "blockType !== 'data-table'",
+      "visible": "blockType !== 'table'",
       "fields": [
         {
           "field": "required",
@@ -115,25 +115,25 @@
           "field": "advanced",
           "component": "SmartSwitch",
           "props": { "label": { "zh-CN": "高级筛选", "en-US": "Advanced filter" } },
-          "visible": "blockType === 'filter-form'"
+          "visible": "blockType === 'filters'"
         },
         {
           "field": "sortable",
           "component": "SmartSwitch",
           "props": { "label": { "zh-CN": "可排序", "en-US": "Sortable" } },
-          "visible": "blockType === 'data-table'"
+          "visible": "blockType === 'table'"
         },
         {
           "field": "copyable",
           "component": "SmartSwitch",
           "props": { "label": { "zh-CN": "可复制", "en-US": "Copyable" } },
-          "visible": "blockType === 'data-table'"
+          "visible": "blockType === 'table'"
         },
         {
           "field": "ellipsis",
           "component": "SmartSwitch",
           "props": { "label": { "zh-CN": "省略文本", "en-US": "Ellipsis" } },
-          "visible": "blockType === 'data-table'"
+          "visible": "blockType === 'table'"
         }
       ]
     },
@@ -155,13 +155,13 @@
               { "label": { "zh-CN": "4列", "en-US": "4 columns" }, "value": 4 }
             ]
           },
-          "visible": "blockType !== 'data-table'"
+          "visible": "blockType !== 'table'"
         },
         {
           "field": "width",
           "component": "SmartInput",
           "props": { "label": { "zh-CN": "列宽 (px)", "en-US": "Column width (px)" }, "type": "number", "min": 50, "size": "small" },
-          "visible": "blockType === 'data-table'"
+          "visible": "blockType === 'table'"
         },
         {
           "field": "fixed",
@@ -175,7 +175,7 @@
               { "label": { "zh-CN": "右侧", "en-US": "Right" }, "value": "right" }
             ]
           },
-          "visible": "blockType === 'data-table'"
+          "visible": "blockType === 'table'"
         },
         {
           "field": "render",
@@ -192,7 +192,7 @@
               { "label": { "zh-CN": "图片", "en-US": "Image" }, "value": "image" }
             ]
           },
-          "visible": "blockType === 'data-table'"
+          "visible": "blockType === 'table'"
         }
       ]
     }

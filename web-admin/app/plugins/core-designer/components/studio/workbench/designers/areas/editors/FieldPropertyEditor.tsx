@@ -8,7 +8,7 @@
  */
 
 import { useI18n } from '~/contexts/I18nContext';
-import { getLocalizedText, type TranslatableText } from '~/utils/i18n';
+import { getLocalizedText, type LocalizedText } from '~/utils/i18n';
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import type { DslFieldOverride, BlockType } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { parseFieldShorthand } from '~/plugins/core-designer/components/studio/domain/dsl/types';
@@ -122,7 +122,7 @@ interface FieldConfig {
 
 interface SectionConfig {
   code: string;
-  title: TranslatableText;
+  title: string | LocalizedText;
   layout: { columns: number; gap: string };
   visible?: string;
   fields: FieldConfig[];
@@ -250,7 +250,7 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
       const controlTestId = `field-property-${fieldConfig.field}`;
 
       // Get options for select
-      let options: Array<{ label: TranslatableText; value: string | number }> = fieldConfig.props?.options || [];
+      let options: Array<{ label: string | LocalizedText; value: string | number }> = fieldConfig.props?.options || [];
       if (fieldConfig.optionsKey === 'componentOptions') {
         // getComponentOptions() is guaranteed non-undefined via FALLBACK map, but
         // guard with `?? []` as defence-in-depth against unexpected registry shapes.
@@ -314,7 +314,7 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
                 {fieldConfig.props.allowClear && (
                   <option value="">{placeholder || getLocalizedText({ 'zh-CN': '请选择', 'en-US': 'Select an option' }, locale)}</option>
                 )}
-                {options.map((opt: { label: TranslatableText; value: any }) => (
+                {options.map((opt: { label: string | LocalizedText; value: any }) => (
                   <option key={opt.value} value={opt.value}>
                     {getLocalizedText(opt.label, locale, t)}
                   </option>
