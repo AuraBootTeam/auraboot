@@ -4089,5 +4089,260 @@
     "key": "list_designer.preview_actions",
     "zh-CN": "动作 {count}",
     "en-US": "Actions {count}"
+  },
+  {
+    "key": "list_behavior.configuration",
+    "zh-CN": "行为配置",
+    "en-US": "Behavior configuration"
+  },
+  {
+    "key": "list_behavior.loading",
+    "zh-CN": "正在读取排序与筛选能力。",
+    "en-US": "Loading sorting and filtering capabilities."
+  },
+  {
+    "key": "list_behavior.capability_error",
+    "zh-CN": "无法读取排序与筛选能力，当前排序字段已回退为页面中已引用的字段。",
+    "en-US": "Sorting and filtering capabilities are unavailable. Sort fields use the fields already referenced by this page."
+  },
+  {
+    "key": "list_behavior.rules",
+    "zh-CN": "运行规则",
+    "en-US": "Runtime rules"
+  },
+  {
+    "key": "list_behavior.heading",
+    "zh-CN": "定义列表的运行方式",
+    "en-US": "How the list works"
+  },
+  {
+    "key": "list_behavior.description",
+    "zh-CN": "这里决定默认排序、分页、多选和行点击行为，属于列表体验的底层规则，不应和列配置混在一起。",
+    "en-US": "Set default sorting, pagination, selection and row clicks separately from column presentation."
+  },
+  {
+    "key": "list_behavior.default_pagination",
+    "zh-CN": "默认分页",
+    "en-US": "Default page size"
+  },
+  {
+    "key": "list_behavior.row_click",
+    "zh-CN": "行点击",
+    "en-US": "Row click"
+  },
+  {
+    "key": "list_behavior.multi_select",
+    "zh-CN": "多选",
+    "en-US": "Multiple selection"
+  },
+  {
+    "key": "list_behavior.on",
+    "zh-CN": "开",
+    "en-US": "On"
+  },
+  {
+    "key": "list_behavior.off",
+    "zh-CN": "关",
+    "en-US": "Off"
+  },
+  {
+    "key": "list_behavior.sort_tip",
+    "zh-CN": "排序规则影响首屏感知",
+    "en-US": "Sorting shapes the first view"
+  },
+  {
+    "key": "list_behavior.row_tip",
+    "zh-CN": "行点击行为要和详情策略一致",
+    "en-US": "Keep row clicks consistent with detail navigation"
+  },
+  {
+    "key": "list_behavior.pagination_tip",
+    "zh-CN": "分页大小不要牺牲可读性",
+    "en-US": "Keep page size readable"
+  },
+  {
+    "key": "list_behavior.properties",
+    "zh-CN": "属性面板",
+    "en-US": "Properties"
+  },
+  {
+    "key": "list_behavior.properties_heading",
+    "zh-CN": "运行规则属性",
+    "en-US": "Runtime properties"
+  },
+  {
+    "key": "list_behavior.properties_description",
+    "zh-CN": "先用这里统一默认行为，再回头检查右侧预览是否符合预期阅读节奏。",
+    "en-US": "Set defaults here, then check the preview for the intended reading flow."
+  },
+  {
+    "key": "list_behavior.open_detail",
+    "zh-CN": "进入详情",
+    "en-US": "Open details"
+  },
+  {
+    "key": "list_behavior.open_drawer",
+    "zh-CN": "打开抽屉",
+    "en-US": "Open drawer"
+  },
+  {
+    "key": "list_behavior.no_action",
+    "zh-CN": "不响应",
+    "en-US": "No action"
+  },
+  {
+    "key": "list_behavior.sort_field",
+    "zh-CN": "默认排序字段",
+    "en-US": "Default sort field"
+  },
+  {
+    "key": "list_behavior.sorting_group",
+    "zh-CN": "排序",
+    "en-US": "Sorting"
+  },
+  {
+    "key": "list_behavior.sort_description",
+    "zh-CN": "决定用户进入列表时第一眼看到的优先级顺序。",
+    "en-US": "Choose the order in which users first see list records."
+  },
+  {
+    "key": "list_behavior.sort_unset",
+    "zh-CN": "(不设)",
+    "en-US": "(Not set)"
+  },
+  {
+    "key": "list_behavior.sort_order",
+    "zh-CN": "排序方向",
+    "en-US": "Sort direction"
+  },
+  {
+    "key": "list_behavior.sort_order_description",
+    "zh-CN": "新记录优先出现通常用降序，基线数据浏览更适合升序。",
+    "en-US": "Use descending order for recent records first, or ascending order for baseline browsing."
+  },
+  {
+    "key": "list_behavior.descending",
+    "zh-CN": "降序",
+    "en-US": "Descending"
+  },
+  {
+    "key": "list_behavior.ascending",
+    "zh-CN": "升序",
+    "en-US": "Ascending"
+  },
+  {
+    "key": "list_behavior.page_size",
+    "zh-CN": "每页条数",
+    "en-US": "Page size"
+  },
+  {
+    "key": "list_behavior.pagination_group",
+    "zh-CN": "分页",
+    "en-US": "Pagination"
+  },
+  {
+    "key": "list_behavior.page_size_description",
+    "zh-CN": "更大页容量提升效率，但会牺牲首屏扫描压力。",
+    "en-US": "Larger pages show more records, but require more effort to scan."
+  },
+  {
+    "key": "list_behavior.enable_multi_select",
+    "zh-CN": "启用多选",
+    "en-US": "Enable multiple selection"
+  },
+  {
+    "key": "list_behavior.interaction_group",
+    "zh-CN": "交互",
+    "en-US": "Interaction"
+  },
+  {
+    "key": "list_behavior.multi_select_description",
+    "zh-CN": "仅在存在明确批量动作时开启，避免多余的选择态。",
+    "en-US": "Enable selection when the list has a clear bulk action."
+  },
+  {
+    "key": "list_behavior.row_click_action",
+    "zh-CN": "行点击行为",
+    "en-US": "Row click action"
+  },
+  {
+    "key": "list_behavior.row_click_description",
+    "zh-CN": "应与详情页策略一致，避免同一模块出现两套打开方式。",
+    "en-US": "Keep row clicks consistent with the detail page navigation strategy."
+  },
+  {
+    "key": "list_behavior.empty_text",
+    "zh-CN": "空态文案",
+    "en-US": "Empty state message"
+  },
+  {
+    "key": "list_behavior.display_group",
+    "zh-CN": "显示",
+    "en-US": "Display"
+  },
+  {
+    "key": "list_behavior.empty_placeholder",
+    "zh-CN": "暂无数据",
+    "en-US": "No data yet"
+  },
+  {
+    "key": "list_behavior.empty_description",
+    "zh-CN": "空态要说明下一步动作，而不是只提示“没有数据”。",
+    "en-US": "Explain the next action in the empty state, rather than only saying there is no data."
+  },
+  {
+    "key": "schema_config.general",
+    "zh-CN": "常规",
+    "en-US": "General"
+  },
+  {
+    "key": "schema_config.count_hint",
+    "zh-CN": "本组包含 {count} 个可配置项",
+    "en-US": "This group has {count} configurable settings."
+  },
+  {
+    "key": "schema_config.size_hint",
+    "zh-CN": "控制宽度、间距和对齐方式，让表格更易扫读。",
+    "en-US": "Set width, spacing and alignment to make the table easier to scan."
+  },
+  {
+    "key": "schema_config.display_hint",
+    "zh-CN": "决定字段如何被呈现，优先保证识别效率和阅读稳定性。",
+    "en-US": "Choose how fields appear, keeping them recognizable and readable."
+  },
+  {
+    "key": "schema_config.condition_hint",
+    "zh-CN": "定义筛选逻辑、默认值和匹配方式。",
+    "en-US": "Define filter logic, default values and matching rules."
+  },
+  {
+    "key": "schema_config.appearance_hint",
+    "zh-CN": "控制筛选项在页面中的出现位置和占用空间。",
+    "en-US": "Set where filters appear and how much space they use."
+  },
+  {
+    "key": "schema_config.binding_hint",
+    "zh-CN": "把当前配置绑定到明确的动作和交互规则上。",
+    "en-US": "Bind the configuration to explicit actions and interaction rules."
+  },
+  {
+    "key": "schema_config.sort_hint",
+    "zh-CN": "决定用户进入页面后最先看到的排序结果。",
+    "en-US": "Choose which records appear first when the page opens."
+  },
+  {
+    "key": "schema_config.pagination_hint",
+    "zh-CN": "平衡列表密度、浏览成本和首屏压力。",
+    "en-US": "Balance list density, browsing effort and the first view."
+  },
+  {
+    "key": "schema_config.interaction_hint",
+    "zh-CN": "定义用户可以直接在列表面上完成什么操作。",
+    "en-US": "Define the actions users can perform directly in the list."
+  },
+  {
+    "key": "schema_config.basic_hint",
+    "zh-CN": "先定义最核心的信息和文案，再补充附加能力。",
+    "en-US": "Start with essential information and labels, then add other capabilities."
   }
 ]

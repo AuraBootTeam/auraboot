@@ -1,11 +1,35 @@
-import { render } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import React from 'react';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { parse } from 'yaml';
+import { I18nProvider } from '~/contexts/I18nContext';
+import { render, cleanup } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   SchemaBlockConfigPanel,
   type ExtendedPropertySchema,
 } from '../SchemaBlockConfigPanel';
 
+afterEach(() => cleanup());
+
 describe('SchemaBlockConfigPanel', () => {
+
+  it.each([
+    ['en-US', 'General', 'This group has 2 configurable settings.', 'Choose which records appear first when the page opens.'],
+    ['zh-CN', '常规', '本组包含 2 个可配置项', '决定用户进入页面后最先看到的排序结果。'],
+  ])('localizes shared group hints and interpolates ungrouped counts in %s', (locale, general, countHint, sortHint) => {
+    const catalog = parse(readFileSync(path.resolve(process.cwd(), `../platform/src/main/resources/i18n.${locale}.yaml`), 'utf8'));
+    const { getByText, getByRole } = render(<I18nProvider initialLocale={locale} initialData={catalog}>
+      <SchemaBlockConfigPanel schemas={[
+        { key: 'name', label: 'Name', type: 'text' },
+        { key: 'note', label: 'Note', type: 'text' },
+        { key: 'sort', label: 'Sort', type: 'text', group: 'Sorting' },
+      ]} value={{}} onChange={vi.fn()} />
+    </I18nProvider>);
+    expect(getByRole('heading', { name: general })).toBeInTheDocument();
+    expect(getByText(countHint)).toBeInTheDocument();
+    expect(getByText(sortHint)).toBeInTheDocument();
+  });
 
   const schemas: ExtendedPropertySchema<string>[] = [
     { key: 'name', label: 'Name', type: 'text', group: 'Basic' },

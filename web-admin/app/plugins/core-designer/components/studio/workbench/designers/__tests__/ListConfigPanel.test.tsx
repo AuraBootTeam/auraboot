@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { parse } from 'yaml';
 import { I18nProvider } from '~/contexts/I18nContext';
-import { render as renderRaw, screen, waitFor, fireEvent, cleanup } from '@testing-library/react';
+import { render as renderRaw, screen, within, waitFor, fireEvent, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ListConfigPanel } from '../ListConfigPanel';
 import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
@@ -68,6 +68,38 @@ describe('ListConfigPanel', () => {
       error: undefined,
       refetch: vi.fn(),
     };
+  });
+
+  it.each([
+    ['en-US', 'How the list works', 'Default sort field', 'Sort direction', 'Page size', 'Open drawer', '(Not set)'],
+    ['zh-CN', '定义列表的运行方式', '默认排序字段', '排序方向', '每页条数', '打开抽屉', '(不设)'],
+  ])('localizes behavior controls in %s while preserving numeric, enum and unset-sort payloads', async (locale, heading, sortField, sortOrder, pageSize, drawer, unset) => {
+    const onChange = vi.fn();
+    renderRaw(<I18nProvider initialLocale={locale} initialData={dictionary(locale)}>
+      <ListConfigPanel schema={baseSchema()} onSchemaChange={onChange} />
+    </I18nProvider>);
+    fireEvent.click(screen.getByTestId('list-tab-behavior'));
+    expect(await screen.findByRole('heading', { name: heading })).toBeInTheDocument();
+    const sort = screen.getByTestId('schema-config-field-defaultSortField');
+    expect(sort).toHaveTextContent(sortField);
+    expect(screen.queryByTestId('schema-config-field-defaultSortOrder')).not.toBeInTheDocument();
+    fireEvent.click(within(sort).getByRole('combobox'));
+    fireEvent.click(await screen.findByRole('option', { name: 'name', exact: true }));
+    expect(await screen.findByTestId('schema-config-field-defaultSortOrder')).toHaveTextContent(sortOrder);
+    const pagination = screen.getByTestId('schema-config-field-pageSize');
+    expect(pagination).toHaveTextContent(pageSize);
+    const input = pagination.querySelector('input');
+    expect(input).toBeTruthy();
+    fireEvent.change(input!, { target: { value: '50' } });
+    fireEvent.click(within(screen.getByTestId('schema-config-field-rowClickAction')).getByRole('combobox'));
+    fireEvent.click(await screen.findByRole('option', { name: drawer, exact: true }));
+    const tableProps = () => onChange.mock.calls.at(-1)?.[0].blocks.find((block: { blockType: string }) => block.blockType === 'table')?.props;
+    await waitFor(() => expect(tableProps()).toMatchObject({ pageSize: 50, defaultSortField: 'name', rowClickAction: 'drawer' }));
+    fireEvent.click(within(screen.getByTestId('schema-config-field-defaultSortField')).getByRole('combobox'));
+    fireEvent.click(await screen.findByRole('option', { name: unset, exact: true }));
+    await waitFor(() => expect(tableProps()).not.toHaveProperty('defaultSortField'));
+    expect(tableProps()).toMatchObject({ pageSize: 50, rowClickAction: 'drawer' });
+    expect(screen.queryByTestId('schema-config-field-defaultSortOrder')).not.toBeInTheDocument();
   });
 
   it.each([

@@ -43,7 +43,7 @@ export function SchemaBlockConfigPanel<T extends Record<string, unknown>>({
   readonly,
   className,
 }: SchemaBlockConfigPanelProps<T>) {
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
   const resolveGroup = (group: unknown): string | undefined => {
     if (group == null) return undefined;
     return getLocalizedText(group as string | Record<string, string>, locale) || undefined;
@@ -61,7 +61,7 @@ export function SchemaBlockConfigPanel<T extends Record<string, unknown>>({
         const visible = groupSchemas.filter((s) => evaluateDependsOn(s.dependsOn, value));
         if (visible.length === 0) return null;
         const groupLabel = groupKey ?? 'default';
-        const title = groupKey ?? 'General';
+        const title = groupKey ?? t('schema_config.general', undefined, 'General');
         return (
           <section
             key={groupLabel}
@@ -74,7 +74,7 @@ export function SchemaBlockConfigPanel<T extends Record<string, unknown>>({
                   {title}
                 </h3>
                 <p className="mt-1 text-sm text-slate-500">
-                  {buildGroupHint(groupKey, visible.length)}
+                  {buildGroupHint(groupKey, visible.length, t)}
                 </p>
               </div>
               <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-500">
@@ -174,37 +174,38 @@ function toRendererSchema<TLabel>(
 function buildGroupHint(
   groupKey: string | undefined,
   visibleCount: number,
+  t: ReturnType<typeof useI18n>['t'],
 ): string {
   if (!groupKey) {
-    return `本组包含 ${visibleCount} 个可配置项`;
+    return t('schema_config.count_hint', { count: visibleCount }, 'This group has ' + visibleCount + ' configurable settings.');
   }
   const normalized = groupKey.toLowerCase();
   if (normalized.includes('size') || normalized.includes('尺寸')) {
-    return '控制宽度、间距和对齐方式，让表格更易扫读。';
+    return t('schema_config.size_hint', undefined, "Set width, spacing and alignment to make the table easier to scan.");
   }
   if (normalized.includes('display') || normalized.includes('显示')) {
-    return '决定字段如何被呈现，优先保证识别效率和阅读稳定性。';
+    return t('schema_config.display_hint', undefined, "Choose how fields appear, keeping them recognizable and readable.");
   }
   if (normalized.includes('condition') || normalized.includes('条件')) {
-    return '定义筛选逻辑、默认值和匹配方式。';
+    return t('schema_config.condition_hint', undefined, "Define filter logic, default values and matching rules.");
   }
   if (normalized.includes('appearance') || normalized.includes('外观')) {
-    return '控制筛选项在页面中的出现位置和占用空间。';
+    return t('schema_config.appearance_hint', undefined, "Set where filters appear and how much space they use.");
   }
   if (normalized.includes('binding') || normalized.includes('绑定')) {
-    return '把当前配置绑定到明确的动作和交互规则上。';
+    return t('schema_config.binding_hint', undefined, "Bind the configuration to explicit actions and interaction rules.");
   }
   if (normalized.includes('sort') || normalized.includes('排序')) {
-    return '决定用户进入页面后最先看到的排序结果。';
+    return t('schema_config.sort_hint', undefined, "Choose which records appear first when the page opens.");
   }
   if (normalized.includes('pagination') || normalized.includes('分页')) {
-    return '平衡列表密度、浏览成本和首屏压力。';
+    return t('schema_config.pagination_hint', undefined, "Balance list density, browsing effort and the first view.");
   }
   if (normalized.includes('interaction') || normalized.includes('交互')) {
-    return '定义用户可以直接在列表面上完成什么操作。';
+    return t('schema_config.interaction_hint', undefined, "Define the actions users can perform directly in the list.");
   }
   if (normalized.includes('basic') || normalized.includes('基础')) {
-    return '先定义最核心的信息和文案，再补充附加能力。';
+    return t('schema_config.basic_hint', undefined, "Start with essential information and labels, then add other capabilities.");
   }
-  return `本组包含 ${visibleCount} 个可配置项`;
+  return t('schema_config.count_hint', { count: visibleCount }, 'This group has ' + visibleCount + ' configurable settings.');
 }
