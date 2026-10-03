@@ -438,7 +438,7 @@ test.describe('Scheduled Task — Full Lifecycle (P0)', () => {
     const response = (await clickSubmit(page)) as import('@playwright/test').Response;
     const result = await response.json();
     expect(String(result.code)).not.toBe('0');
-    await expect(page.getByRole('alert').filter({ hasText: /cron/i })).toBeVisible();
+    await expect(page.getByTestId('form-error-summary')).toContainText(/Invalid cron expression/i);
     await expect(page.getByTestId('form-field-name').locator('input')).toHaveValue(
       `${UID}-invalid-cron`,
     );
@@ -459,7 +459,7 @@ test.describe('Scheduled Task — Full Lifecycle (P0)', () => {
     const response = (await clickSubmit(page)) as import('@playwright/test').Response;
     const result = await response.json();
     expect(String(result.code)).not.toBe('0');
-    await expect(page.getByRole('alert').filter({ hasText: /name|名称/i })).toBeVisible();
+    await expect(page.getByTestId('form-error-summary')).toContainText(/name already exists/i);
     await expect(page.getByTestId('form-field-name').locator('input')).toHaveValue(TASK_NAME_DUP);
   });
 

@@ -1556,7 +1556,7 @@
           "field": "created_at",
           "order": "desc"
         },
-        "emptyState": {
+        "empty": {
           "title": {
             "zh-CN": "暂无定时任务",
             "en-US": "No scheduled tasks"
