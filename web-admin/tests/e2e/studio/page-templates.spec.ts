@@ -33,7 +33,7 @@ async function createTestPage(
   page: import('@playwright/test').Page,
   content: Partial<{ schemaVersion: number; blocks: unknown[]; dataSources: Record<string, unknown> }> = {},
 ): Promise<{ pid: string; name: string }> {
-  const name = uniqueId('tmpl');
+  const name = `Approval workflow ${uniqueId('tmpl').split('_').at(-1)}`;
   const pageKey = `e2e_tmpl_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
 
   const resp = await page.request.post('/api/pages', {
@@ -102,7 +102,7 @@ test.describe('Page Templates', () => {
   // -------------------------------------------------------------------------
   // T1: Save as Template — toolbar button opens dialog, name is prefilled
   // -------------------------------------------------------------------------
-  test('T1 — save page as template via toolbar button', async ({ page }) => {
+  test('T1 — save page as template via toolbar button', async ({ page }, testInfo) => {
     // Navigate directly to page designer (platform tool — page.goto() allowed)
     await page.goto(`/page-designer/${pagePid}`, { waitUntil: 'domcontentloaded' });
 
@@ -134,6 +134,7 @@ test.describe('Page Templates', () => {
     // Click Save as Template
     const saveBtn = page.getByTestId('template-save-btn');
     await expect(saveBtn).toBeEnabled();
+    await page.screenshot({ path: testInfo.outputPath('T1-dialog.png'), fullPage: true });
     await saveBtn.click();
 
     // Dialog must close on success (API call completes and dialog dismisses)
@@ -145,7 +146,7 @@ test.describe('Page Templates', () => {
   // -------------------------------------------------------------------------
   test('T2 — template gallery shows search + kind filter + at least one card after save', async ({
     page,
-  }) => {
+  }, testInfo) => {
     await openTemplateEditor(page, pagePid);
 
     const dialog = await openTemplateDialog(page);
@@ -165,6 +166,8 @@ test.describe('Page Templates', () => {
     // At least one template card should exist
     await expect(grid.getByTestId(`template-card-${pagePid}`)).toBeVisible({ timeout: 10000 });
 
+    await page.screenshot({ path: testInfo.outputPath('T2-gallery.png'), fullPage: true });
+
     // Dismiss dialog via close button (custom div modal, Escape not guaranteed)
     await dialog.getByRole('button', { name: /Close dialog|\u5173\u95ed/ }).click();
     await expect(dialog).not.toBeVisible({ timeout: 5000 });
@@ -173,7 +176,7 @@ test.describe('Page Templates', () => {
   // -------------------------------------------------------------------------
   // T3: Search filters template cards
   // -------------------------------------------------------------------------
-  test('T3 — search input filters visible template cards', async ({ page }) => {
+  test('T3 — search input filters visible template cards', async ({ page }, testInfo) => {
     await openTemplateEditor(page, pagePid);
     await openTemplateDialog(page);
 
@@ -193,17 +196,20 @@ test.describe('Page Templates', () => {
     // Empty state should appear since no template matches
     const emptyState = page.getByTestId('template-empty');
     await expect(emptyState).toBeVisible({ timeout: 5000 });
+    await page.screenshot({ path: testInfo.outputPath('T3-empty.png'), fullPage: true });
 
     // Clear search — grid should return (if there are templates)
     await searchInput.clear();
     const grid = page.getByTestId('template-grid');
     await expect(grid).toBeVisible({ timeout: 5000 });
+    await expect(grid.getByTestId(`template-card-${pagePid}`)).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath('T3-clear.png'), fullPage: true });
   });
 
   // -------------------------------------------------------------------------
   // T4: Create page from template — two-step flow
   // -------------------------------------------------------------------------
-  test('T4 — create page from template via two-step dialog', async ({ page }) => {
+  test('T4 — create page from template via two-step dialog', async ({ page }, testInfo) => {
     await openTemplateEditor(page, pagePid);
     const dialog = await openTemplateDialog(page);
 
@@ -233,7 +239,7 @@ test.describe('Page Templates', () => {
     expect(keyValue.length).toBeGreaterThan(0);
 
     // Override with unique values
-    const newName = uniqueId('from_tmpl');
+    const newName = `Approval copy ${uniqueId('from_tmpl').split('_').at(-1)}`;
     const newKey = `e2e_ft_${Date.now().toString(36)}`;
     await nameInput.clear();
     await nameInput.fill(newName);
@@ -244,6 +250,7 @@ test.describe('Page Templates', () => {
     // Use the one inside the dialog to avoid matching the route-level button
     const createBtn = dialog.getByTestId('create-from-template-btn');
     await expect(createBtn).toBeEnabled();
+    await page.screenshot({ path: testInfo.outputPath('T4-create.png'), fullPage: true });
 
     // Wait for POST /api/pages response after clicking create
     const [navigationResp] = await Promise.all([
@@ -272,6 +279,7 @@ test.describe('Page Templates', () => {
     expect(persistedBody.code).toBe('0');
     expect(persistedBody.data).toMatchObject({ pid: createdPid, name: newName, pageKey: newKey,
       modelCode: 'page_schema', schemaVersion: 4, blocks: [{ id: 'blk1', blockType: 'table', config: {} }] });
+    await page.screenshot({ path: testInfo.outputPath('T4-result.png'), fullPage: true });
   });
 
   // -------------------------------------------------------------------------
@@ -302,6 +310,7 @@ test.describe('Page Templates', () => {
     await sourceRow.getByTestId('row-action-more').click();
     const duplicate = page.getByTestId('row-action-dropdown').getByTestId('row-action-duplicate');
     await expect(duplicate).toBeEnabled();
+    await page.screenshot({ path: testInfo.outputPath('T5-menu.png'), fullPage: true });
     const [response] = await Promise.all([
       page.waitForResponse(r => decodeURIComponent(r.url()).endsWith('/api/meta/commands/execute/pgm:duplicate_page_schema')
         && r.request().method() === 'POST'),
@@ -311,7 +320,9 @@ test.describe('Page Templates', () => {
     expect(response.ok()).toBe(true);
     const result = await response.json();
     expect(result.code).toBe('0');
-    const copiedPid = result.data?.pid;
+    expect(result.data).toMatchObject({ commandCode: 'pgm:duplicate_page_schema',
+      phaseReached: 'completed', data: { handlerExecuted: true } });
+    const copiedPid = result.data?.data?.pid;
     expect(copiedPid).toBeTruthy();
     expect(copiedPid).not.toBe(source.pid);
     const copied = await page.request.get(`/api/pages/${copiedPid}`);
@@ -326,16 +337,18 @@ test.describe('Page Templates', () => {
     await expect(copyRow).toBeVisible();
     await page.reload();
     await expect(copyRow).toBeVisible();
-    await page.screenshot({ path: testInfo.outputPath('duplicate-page-menu.png'), fullPage: true });
     const original = await page.request.get(`/api/pages/${source.pid}`);
     expect(original.ok()).toBe(true);
-    expect((await original.json()).data).toMatchObject({ pid: source.pid, schemaVersion: 3, dataSources });
+    const originalBody = await original.json();
+    expect(originalBody.code).toBe('0');
+    expect(originalBody.data).toMatchObject({ pid: source.pid, schemaVersion: 3, dataSources });
+    await page.screenshot({ path: testInfo.outputPath('duplicate-page-menu.png'), fullPage: true });
   });
 
   // -------------------------------------------------------------------------
   // T6: Save as Template — validation: empty name disables the save button
   // -------------------------------------------------------------------------
-  test('T6 — save-as-template dialog disables save when name is empty', async ({ page }) => {
+  test('T6 — save-as-template dialog disables save when name is empty', async ({ page }, testInfo) => {
     await page.goto(`/page-designer/${pagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('list-config-panel')).toBeVisible({ timeout: 15000 });
 
@@ -352,6 +365,7 @@ test.describe('Page Templates', () => {
     // Save button should be disabled when name is empty
     const saveBtn = page.getByTestId('template-save-btn');
     await expect(saveBtn).toBeDisabled();
+    await page.screenshot({ path: testInfo.outputPath('T6-empty-name.png'), fullPage: true });
 
     // Restore name and button becomes enabled
     await nameInput.fill('Restored Name');
