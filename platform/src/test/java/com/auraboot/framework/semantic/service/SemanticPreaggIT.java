@@ -87,6 +87,8 @@ class SemanticPreaggIT {
     @Autowired
     private SemanticYamlParser parser;
     @Autowired
+    private com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    @Autowired
     private SemanticPublishService publishService;
     @Autowired
     private SemanticPreaggService preaggService;
@@ -165,7 +167,7 @@ class SemanticPreaggIT {
 
     @Test
     @DisplayName("Governed aggregation over 100k isolated rows has P95 below one second")
-    void hundredThousandRowAggregationP95() {
+    void hundredThousandRowAggregationP95() throws Exception {
         // Migration-owned table; a unique language keeps other IT fixtures out
         // of both the expected value and the measured governed query.
         String run = UUID.randomUUID().toString().replace("-", "").substring(0, 6);
@@ -189,18 +191,54 @@ class SemanticPreaggIT {
         int samples = 40;
         long[] durations = new long[samples];
         long coldNanos = 0;
-        for (int i = 0; i < warmups + samples; i++) {
-            long started = System.nanoTime();
-            var response = queryService.executeQuery(request, user);
-            long elapsed = System.nanoTime() - started;
-            if (i == 0) coldNanos = elapsed;
-            // Verify every result, so a cheap empty or incorrect query cannot
-            // satisfy the latency bound. Compilation, DB and audit are timed.
-            assertThat(response.getRows()).hasSize(1);
-            assertThat(response.getRows().get(0)).hasSize(1);
-            Object value = response.getRows().get(0).values().iterator().next();
-            assertThat(((Number) value).longValue()).isEqualTo(100_000L);
-            if (i >= warmups) durations[i - warmups] = elapsed;
+        var iterations = new java.util.ArrayList<java.util.Map<String, Object>>();
+        int verifiedIterations = 0;
+        try {
+            for (int i = 0; i < warmups + samples; i++) {
+                long startedAt = System.currentTimeMillis();
+                long started = System.nanoTime();
+                var response = queryService.executeQuery(request, user);
+                long elapsed = System.nanoTime() - started;
+                if (i == 0) coldNanos = elapsed;
+                iterations.add(java.util.Map.of("iteration", i + 1, "phase", i < warmups ? "warmup" : "sample",
+                        "startedAt", startedAt, "elapsedNs", elapsed, "queryId", response.getQueryId(),
+                        "sqlFingerprint", response.getSqlFingerprint(), "rowcount", response.getRowcount(),
+                        "rows", response.getRows(), "cacheHit", response.isCacheHit()));
+                // Verify every result, so a cheap empty or incorrect query cannot
+                // satisfy the latency bound. Compilation, DB and audit are timed.
+                assertThat(response.getRows()).hasSize(1);
+                assertThat(response.getRows().get(0)).hasSize(1);
+                assertThat(response.getRowcount()).isEqualTo(1);
+                Object value = response.getRows().get(0).values().iterator().next();
+                assertThat(new java.math.BigDecimal(value.toString())).isEqualByComparingTo("100000");
+                verifiedIterations++;
+                if (i >= warmups) durations[i - warmups] = elapsed;
+            }
+        } finally {
+            // Attach raw responses even on a partial/failing measurement. The
+            // exact-source CI receipt and owning Allure result provide run identity.
+            var evidence = new java.util.LinkedHashMap<String, Object>();
+            evidence.put("schemaVersion", 1);
+            evidence.put("tenantId", TENANT_ID);
+            evidence.put("modelPid", modelPid);
+            evidence.put("fixtureLanguage", language);
+            evidence.put("expectedRows", 100_000);
+            evidence.put("warmups", warmups);
+            evidence.put("samples", samples);
+            evidence.put("verifiedIterations", verifiedIterations);
+            evidence.put("measurementComplete", verifiedIterations == warmups + samples);
+            evidence.put("thresholdNs", 1_000_000_000L);
+            evidence.put("percentileMethod", "nearest-rank, ceil(0.95 * 40), excluding five warmups");
+            evidence.put("timedScope", "semantic compile + real JDBC + query audit");
+            evidence.put("coldNs", coldNanos);
+            evidence.put("iterations", iterations);
+            if (verifiedIterations == warmups + samples) {
+                long[] ordered = durations.clone();
+                Arrays.sort(ordered);
+                evidence.put("p95Ns", ordered[(int) Math.ceil(samples * 0.95) - 1]);
+            }
+            io.qameta.allure.Allure.addAttachment("BI_R3_PERF raw measurements", "application/json",
+                    new java.io.ByteArrayInputStream(objectMapper.writeValueAsBytes(evidence)), ".json");
         }
         long[] sorted = durations.clone();
         Arrays.sort(sorted);
