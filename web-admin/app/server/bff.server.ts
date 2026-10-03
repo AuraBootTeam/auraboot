@@ -6,7 +6,7 @@ import * as http from 'http';
 import * as https from 'https';
 import dns from 'node:dns';
 import { createRequestHandler } from '@react-router/express';
-import { BffProxyService } from '~/server/services/BffProxyService';
+import { BffProxyService, shouldParseProxyBody } from '~/server/services/BffProxyService';
 import { bffFlowDesignerService } from '~/server/services/BffFlowDesignerService';
 
 import uploadRouter from '~/server/routes/upload';
@@ -69,10 +69,10 @@ app.use(requestLogger);
 
 // React Router actions (for example POST /login) must receive the original
 // request body. Express body parsers consume it before the RR adapter can call
-// request.formData(), so only parse BFF-owned /api requests here.
+// request.formData(), so only parse BFF-owned API and OAuth token requests here.
 const skipBodyParsing = (req: express.Request) => {
   const contentType = req.headers['content-type'] || '';
-  return !req.path.startsWith('/api') || contentType.includes('multipart/form-data');
+  return !shouldParseProxyBody(req.path, contentType);
 };
 
 app.use((req, res, next) => {
@@ -97,7 +97,13 @@ app.use((req, res, next) => {
   if (skipBodyParsing(req)) {
     return next();
   }
-  express.urlencoded({ extended: true, limit: '10mb' })(req, res, next);
+  express.urlencoded({
+    extended: true,
+    limit: '10mb',
+    verify: (request, _response, buffer) => {
+      if (buffer.length) (request as express.Request & { rawBody?: Buffer }).rawBody = Buffer.from(buffer);
+    },
+  })(req, res, next);
 });
 
 app.use((req, res, next) => {
@@ -410,6 +416,7 @@ app.use('/api', proxyService.createProxyMiddleware());
 // Keep API reference assets and schemas on the browser origin in both dev and
 // production. Backend security still decides access to the documentation.
 app.get(/^\/(swagger-ui(?:\/|$)|v3\/api-docs(?:\/|$))/, proxyService.createProxyMiddleware());
+app.post('/oauth2/token', proxyService.createProxyMiddleware());
 
 // 健康检查端点
 app.get('/health', async (req, res) => {

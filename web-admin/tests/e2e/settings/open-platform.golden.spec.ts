@@ -226,6 +226,67 @@ test.describe('Open Platform golden journey', () => {
     expect(principal.applicationPid).toEqual(expect.any(String));
     expect(principal.installationPid).toEqual(expect.any(String));
 
+    // Exercise the developer entry while this credential is active. Document
+    // loading alone cannot prove the OAuth and API transport paths work.
+    await context.setExtraHTTPHeaders({});
+    const authorizedReferencePromise = context.waitForEvent('page');
+    await page.getByRole('button', { name: /API 参考/ }).click();
+    const authorizedReference = await authorizedReferencePromise;
+    try {
+      await expect(authorizedReference).toHaveURL(
+        `${WEB_BASE_URL}/swagger-ui/index.html?urls.primaryName=open-platform`,
+      );
+      await expect(authorizedReference.locator('.opblock').first()).toBeVisible({ timeout: 30_000 });
+      const publicDocument = await authorizedReference.request.get(`${WEB_BASE_URL}/v3/api-docs/open-platform`);
+      expect(publicDocument.status()).toBe(200);
+      expect((await publicDocument.json()).servers).toEqual([{ url: '/' }]);
+      await authorizedReference.getByRole('button', { name: 'Authorize', exact: true }).first().click();
+      const authorizationDialog = authorizedReference.locator('.dialog-ux');
+      await expect(authorizationDialog).toBeVisible();
+      await authorizationDialog.locator('#client_id').fill(clientId!);
+      await authorizationDialog.locator('#client_secret').fill(clientSecret!);
+      const browserTokenPromise = authorizedReference.waitForResponse(
+        (response) => response.request().method() === 'POST'
+          && response.url() === `${WEB_BASE_URL}/oauth2/token`,
+      );
+      await authorizationDialog.getByRole('button', { name: 'Authorize', exact: true }).click();
+      const browserTokenResponse = await browserTokenPromise;
+      expect(browserTokenResponse.status()).toBe(200);
+      const browserToken = await browserTokenResponse.json();
+      expect(browserToken.token_type).toBe('Bearer');
+      await expect(authorizationDialog.getByRole('button', { name: 'Logout', exact: true })).toBeVisible();
+      await authorizationDialog.getByRole('button', { name: 'Close', exact: true }).click();
+      await expect(authorizationDialog).toHaveCount(0);
+      const whoamiOperation = authorizedReference.locator('.opblock').filter({
+        has: authorizedReference.locator('[data-path="/api/open/v1/whoami"]'),
+      });
+      await whoamiOperation.locator('.opblock-summary-control').click();
+      await whoamiOperation.getByRole('button', { name: 'Try it out', exact: true }).click();
+      const browserWhoamiPromise = authorizedReference.waitForResponse(
+        (response) => response.request().method() === 'GET'
+          && response.url() === `${WEB_BASE_URL}/api/open/v1/whoami`,
+      );
+      await whoamiOperation.getByRole('button', { name: 'Execute', exact: true }).click();
+      const browserWhoamiResponse = await browserWhoamiPromise;
+      // Swagger renders the live Authorization header in its curl example.
+      // Redact only evidence text after the actual browser request has completed.
+      await authorizedReference.locator('body').evaluate((body, accessToken: string) => {
+        const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+          if (node.nodeValue?.includes(accessToken)) {
+            node.nodeValue = node.nodeValue.replaceAll(accessToken, '[redacted for evidence]');
+          }
+        }
+      }, browserToken.access_token);
+      expect(browserWhoamiResponse.status()).toBe(200);
+      expect(await browserWhoamiResponse.json()).toEqual(principal);
+      await expect(whoamiOperation.locator('.responses-wrapper')).toContainText('production');
+      await capture(authorizedReference, 'OP-UI-13-authorized', false);
+    } finally {
+      await authorizedReference.close();
+      await context.setExtraHTTPHeaders({ Referer: `${WEB_BASE_URL}/` });
+    }
+
     const externalEvent = {
       id: 'order-10001-created',
       type: 'order.created',

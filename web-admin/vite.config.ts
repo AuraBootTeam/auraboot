@@ -186,7 +186,7 @@ export default defineConfig({
       ],
     },
     proxy: {
-      '^/(swagger-ui(?:/|$)|v3/api-docs(?:/|$))': {
+      '^/(swagger-ui(?:/|$)|v3/api-docs(?:/|$)|oauth2/token$)': {
         target: bffProxyTarget,
         changeOrigin: true,
         xfwd: true,

@@ -577,6 +577,19 @@ cmd_up() {
     || die "login round-trip failed after bootstrap"
   log "    bootstrap OK ($ADMIN_EMAIL / $ADMIN_PASSWORD)"
 
+  # Explicit initialization owns the versioned built-in playbook. Application
+  # startup must never install or repair this definition implicitly.
+  PGPASSWORD="$pg_pass" psql -X -v ON_ERROR_STOP=1 \
+    -h "$pg_host" -p "$pg_port" -U "$pg_user" -d "$pg_db" \
+    -f "$REPO_ROOT/scripts/seed-form-fill-skill.sql" \
+    >"$sd/form-fill-init.log" 2>&1 || die "form draft skill initialization failed"
+  local form_fill_ready
+  form_fill_ready="$(PGPASSWORD="$pg_pass" psql -X -v ON_ERROR_STOP=1 \
+    -h "$pg_host" -p "$pg_port" -U "$pg_user" -d "$pg_db" -tAc \
+    "SELECT count(*) FROM ab_agent_skill WHERE tenant_id=1 AND skill_code='form_draft_fill' AND skill_version='1.1.0' AND skill_status='active' AND is_builtin=TRUE AND actionability='read_only' AND skill_tools='[\"platform.fill_form\"]'::jsonb")" \
+    || die "form draft skill precondition query failed"
+  [ "$form_fill_ready" = "1" ] || die "form draft skill initialization contract not met"
+
   if [ -n "$plugin_profile" ] || [ "${#import_plugins[@]}" -gt 0 ]; then
     local import_args=(--plugin-profile "${plugin_profile:-none}")
     if [ "${#extra_plugin_roots[@]}" -gt 0 ]; then
