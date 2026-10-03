@@ -59,6 +59,9 @@ class CapabilityControllerEnforcementIT extends BaseIntegrationTest {
     @BeforeEach
     void cleanSlate() {
         grantTenantAdminRoleToTestUser();
+        // Registered permissions exercise strict grants, not first-deployment bootstrap.
+        registerPermission(MetaPermission.ROLE_READ);
+        registerPermission(MetaPermission.ROLE_MANAGE);
         revokeFromTestRole(MetaPermission.ROLE_READ);
         revokeFromTestRole(MetaPermission.ROLE_MANAGE);
         userPermissionService.evictPermissionDefinitions(getTestTenant().getId());
@@ -159,7 +162,7 @@ class CapabilityControllerEnforcementIT extends BaseIntegrationTest {
         adminRoleChecker.invalidateAll();
     }
 
-    private void grantToTestRole(String code) {
+    private Permission registerPermission(String code) {
         Permission permission = permissionMapper.findByCode(code);
         if (permission == null) {
             String[] parts = code.split("\\.");
@@ -178,6 +181,11 @@ class CapabilityControllerEnforcementIT extends BaseIntegrationTest {
             permission.setUpdatedAt(java.time.Instant.now());
             permissionMapper.insert(permission);
         }
+        return permission;
+    }
+
+    private void grantToTestRole(String code) {
+        Permission permission = registerPermission(code);
         boolean notAssigned = rolePermissionMapper.selectList(
                 new LambdaQueryWrapper<RolePermission>()
                         .eq(RolePermission::getRoleId, getTestRole().getId())
