@@ -336,10 +336,10 @@ function MemberRecordShareDialog({
       <section
         aria-labelledby="record-share-title"
         aria-modal="true"
-        className="rounded-card bg-panel border-border max-h-[92vh] w-full max-w-3xl overflow-hidden border shadow-2xl"
+        className="rounded-card bg-panel border-border flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden border shadow-2xl"
         role="dialog"
       >
-        <header className="border-border bg-subtle flex items-start justify-between gap-4 border-b px-6 py-5">
+        <header className="border-border bg-subtle flex shrink-0 items-start justify-between gap-4 border-b px-6 py-5">
           <div className="flex min-w-0 items-start gap-3">
             <span className="bg-accent-weak text-accent rounded-control flex h-10 w-10 shrink-0 items-center justify-center">
               <UsersRound className="h-5 w-5" />
@@ -368,7 +368,7 @@ function MemberRecordShareDialog({
           </button>
         </header>
 
-        <div className="grid max-h-[calc(92vh-85px)] gap-6 overflow-y-auto px-6 py-6 md:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
+        <div className="grid min-h-0 gap-6 overflow-y-auto px-6 py-6 md:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
           <section className="space-y-5">
             <div>
               <div className="mb-3 flex items-center gap-2">

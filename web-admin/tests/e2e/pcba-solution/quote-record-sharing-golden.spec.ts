@@ -106,6 +106,7 @@ test('quote sharing release gate: multiple members, role access and revocation t
   await expect(sharedLine).toContainText(quote.mpn, {timeout: 20_000});
   await expect(sharedLine).toContainText(/1\.1111|1\.111|1\.11/);
   await expect(viewers[0].page.locator('main')).not.toContainText(/加载中\.\.\.|Loading\.\.\./);
+  await expect(viewers[0].page.getByTestId('metric-strip-item-customer_code').locator('span').last()).toHaveText('-');
   await viewers[0].page.screenshot({path:testInfo.outputPath('quote-collaborator-all-tabs.png'), fullPage:true});
   expect((await viewers[0].page.request.put(root,{data:{qo_quote_customer:'Denied shared edit'}})).status()).toBe(403);
   const reader = viewers[0].page;
@@ -173,7 +174,13 @@ test('quote sharing release gate: multiple members, role access and revocation t
   await completion.getByRole('button',{name:'关闭',exact:true}).last().click();
   await expect.poll(async () => (await (await page.request.get(root)).json()).data.qo_quote_set_count).toBe(3);
   await probe(0,false);
-  await dialog.getByRole('heading',{name:'添加协作成员',exact:true}).scrollIntoViewIfNeeded();
+  const shareSave = dialog.getByRole('button', { name: '保存协作成员', exact: true });
+  await shareSave.scrollIntoViewIfNeeded();
+  const saveBounds = await shareSave.boundingBox();
+  const dialogBounds = await dialog.getByRole('dialog').boundingBox();
+  expect(saveBounds).not.toBeNull();
+  expect(dialogBounds).not.toBeNull();
+  expect(saveBounds!.y + saveBounds!.height, 'the entire save button stays inside the scrollable dialog').toBeLessThanOrEqual(dialogBounds!.y + dialogBounds!.height);
   await page.screenshot({path:testInfo.outputPath('quote-role-sharing.png'), fullPage:true});
   await dialog.getByTestId('record-share-dialog-close').click();
   await page.reload();
@@ -244,6 +251,8 @@ test('quote sharing release gate: multiple members, role access and revocation t
     expect(await foreignRecord.json()).toMatchObject({
       code: '404', message: 'Resource not found', data: null, context: null,
     });
+    await expect(foreign.page.getByText('请求的记录不存在或已不可用。', { exact: true })).toBeVisible();
+    await expect(foreign.page.getByText('Resource not found', { exact: true })).toHaveCount(0);
     const absentRecord = await foreign.page.request.get('/api/dynamic/qo_quote_common/01NONEXISTENTQUOTE000000000');
     expect(absentRecord.status()).toBe(404);
     expect(await absentRecord.json()).toMatchObject({
