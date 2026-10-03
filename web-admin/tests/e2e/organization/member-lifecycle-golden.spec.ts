@@ -96,6 +96,9 @@ test('MEMBER-DETAIL-07: native lifecycle buttons execute commands and persist st
       await page.getByTestId('form-dialog-submit').click();
     } else {
       await expect(page.getByTestId('confirm-dialog')).toBeVisible();
+      await expect(page.getByTestId('confirm-ok')).toHaveClass(
+        command === 'admin:restore_member' ? /bg-accent/ : /bg-red-600/,
+      );
       await capture(`${command.split(':')[1]}-confirm`);
       await acceptConfirmDialog(page);
     }
@@ -140,5 +143,8 @@ test('MEMBER-DETAIL-07: native lifecycle buttons execute commands and persist st
   const result = await after.json();
   expect(result.code).toBe('0');
   expect(result.data.records.some((entry: { pid: string }) => entry.pid === pid)).toBe(false);
+  await expect(page.locator('table')).toBeVisible();
+  await expect(page.locator('table').getByRole('columnheader').first()).toBeVisible();
+  await expect(page.locator('table tbody tr').filter({ hasText: stamp })).toHaveCount(0);
   await capture('native-member-removed-list');
 });

@@ -14,6 +14,7 @@ vi.mock('~/shared/services/http-client', () => ({
 }));
 
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
+import * as confirmations from '~/utils/confirmDialog';
 import * as promptUpload from '~/framework/meta/utils/promptUpload';
 import * as actionRegistry from '~/framework/meta/runtime/actions/ActionRegistry';
 import type { ButtonConfig } from '~/framework/meta/schemas/types';
@@ -1727,5 +1728,33 @@ describe('useActionHandler - handlerParams.async polling', () => {
         }),
       }),
     );
+  });
+});
+
+
+describe('useActionHandler - explicit confirmation style', () => {
+  it.each([
+    [undefined, 'danger'],
+    ['default', 'default'],
+    ['danger', 'danger'],
+  ] as const)('uses %s confirmation style and preserves cancellation', async (variant, expected) => {
+    fetchResultMock.mockReset();
+    const confirm = vi.spyOn(confirmations, 'confirmDialog').mockResolvedValue(false);
+    try {
+      const { result } = renderHook(() => useActionHandler({
+        runtime: makeRuntime(), navigate: vi.fn() as any, tableName: 'tenant_member',
+        locale: 'en-US', t: key => key,
+      }));
+      await act(async () => {
+        await result.current.handleAction({
+          code: 'restore', confirm: 'Restore this member?', confirmVariant: variant,
+          action: { type: 'command', command: 'admin:restore_member' },
+        } as ButtonConfig, { pid: 'MEMBER-1' });
+      });
+      expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ variant: expected }));
+      expect(fetchResultMock).not.toHaveBeenCalled();
+    } finally {
+      confirm.mockRestore();
+    }
   });
 });

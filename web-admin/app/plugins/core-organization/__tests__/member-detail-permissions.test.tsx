@@ -9,9 +9,9 @@ vi.mock('~/contexts/ToastContext', () => ({ useToastContext: () => mocks.toast }
 vi.mock('~/shared/services/http-client', () => ({ get: mocks.get, post: vi.fn(), put: vi.fn(), del: vi.fn() }));
 vi.mock('~/framework/meta/hooks/useActionHandler', () => ({ useActionHandler: () => ({ handleAction: mocks.handleAction, loading: false }) }));
 import MemberDetailPage from '../pages/organization/member-detail';
-async function loadMember() {
+async function loadMember(status = 'active') {
   mocks.get.mockImplementation(async (url: string) => ({ code: '0', data: url.endsWith('/teams') ? [] : {
-    pid: 'MEMBER-1', status: 'active', user: null, joinDate: null, leaveDate: null,
+    pid: 'MEMBER-1', status, user: null, joinDate: null, leaveDate: null,
     createdAt: '2026-10-03T00:00:00Z', updatedAt: '2026-10-03T00:00:00Z',
   } }));
   render(<MemberDetailPage />);
@@ -33,6 +33,16 @@ describe('native member lifecycle authorization', () => {
       onSubmit: vi.fn(), onCancel: vi.fn(),
     } }));
     await waitFor(() => expect(screen.getByTestId('form-dialog-field-reason')).toBeVisible());
+  });
+  it('uses a non-destructive confirmation for independently granted restoration', async () => {
+    mocks.permissions.add('model.tenant_member.restore');
+    mocks.permissions.add('meta.command.execute');
+    await loadMember('suspended');
+    fireEvent.click(screen.getByRole('button', { name: '恢复', exact: true }));
+    await waitFor(() => expect(mocks.handleAction).toHaveBeenCalledWith(
+      expect.objectContaining({ confirmVariant: 'default', action: expect.objectContaining({ command: 'admin:restore_member' }) }),
+      expect.objectContaining({ pid: 'MEMBER-1' }),
+    ));
   });
   it.each([
     ['leave', '离职', 'admin:leave_member', 'deactivate', '删除'],

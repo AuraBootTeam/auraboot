@@ -195,6 +195,7 @@ export default function MemberDetailPage() {
       await handleAction({
         code: action,
         confirm: confirmations[action],
+        confirmVariant: action === 'approve' || action === 'restore' ? 'default' : 'danger',
         action: {
           type: 'command', command, offboardingAction, inputFields,
           inputFieldsTitle: action === 'suspend'
