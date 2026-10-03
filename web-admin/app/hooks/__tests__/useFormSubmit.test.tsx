@@ -129,6 +129,23 @@ describe('useFormSubmit', () => {
     expect(onError).toHaveBeenCalled();
   });
 
+  it.each(['10000', '401', '403', '40000', '1'])(
+    'keeps structured error callbacks without implicit toasts when disabled (%s)',
+    (code) => {
+      const { result } = renderHook(() => useFormSubmit());
+      const onError = vi.fn();
+      const failure = { code, message: 'Access forbidden', data: null, success: false };
+
+      result.current.handleSubmitResult(failure, { showToast: false, onError });
+
+      expect(onError).toHaveBeenCalledWith(failure);
+      expect(showSuccessToast).not.toHaveBeenCalled();
+      expect(showErrorToast).not.toHaveBeenCalled();
+      expect(showWarningToast).not.toHaveBeenCalled();
+      expect(mockNavigate).not.toHaveBeenCalled();
+    },
+  );
+
   describe('validateFormAndAuth', () => {
     it('returns isValid=false with auth error when token is null', () => {
       const { result } = renderHook(() => useFormSubmit());
