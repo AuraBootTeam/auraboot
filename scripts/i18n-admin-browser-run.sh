@@ -17,7 +17,7 @@ fi
 trap 'echo "[i18n-browser] retained runtime and evidence: $NAME"' EXIT
 # Exercise the documented placeholder strategy without paid provider calls.
 export AGENT_LLM_STUB_MODE=true
-"$GS" up "$NAME" --slot auto --ttl 2h --no-warm --runtime-mode verification || exit 2
+"$GS" up "$NAME" --slot auto --ttl 2h --no-warm --runtime-mode verification --system-mode multi || exit 2
 "$GS" import "$NAME" || exit 2
 eval "$("$GS" env "$NAME")"
 mkdir -p "$PW_REPORT_DIR"

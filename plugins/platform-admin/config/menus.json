@@ -292,6 +292,25 @@
     "visible": true
   },
   {
+    "code": "i18n_resources",
+    "parentCode": "system_management",
+    "name": "翻译资源管理",
+    "name:zh-CN": "翻译资源管理",
+    "name:en": "Translation Resources",
+    "path": "/i18n-resources",
+    "component": null,
+    "icon": "translation",
+    "type": 1,
+    "permissionCode": "system_management",
+    "orderNo": 91,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
+  },
+  {
     "code": "i18n_coverage",
     "parentCode": "system_management",
     "name": "翻译覆盖率",

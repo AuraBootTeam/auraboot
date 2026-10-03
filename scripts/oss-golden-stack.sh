@@ -298,13 +298,14 @@ PY
 # ---- up ------------------------------------------------------------------------------
 cmd_up() {
   local name="$1"; shift
-  local slot="" ttl="6h" runtime_mode="development" frontend=1 warm=1 fresh_db=0
+  local slot="" ttl="6h" runtime_mode="development" frontend=1 warm=1 fresh_db=0 system_mode="single"
   local plugin_profile="" import_plugins=() extra_plugin_roots=() product_migration_roots=()
   local extra_root migration_root plugin_item
   while [ $# -gt 0 ]; do case "$1" in
     --slot) slot="$2"; shift 2;;
     --ttl) ttl="$2"; shift 2;;
     --runtime-mode) runtime_mode="$2"; shift 2;;
+    --system-mode) system_mode="$2"; shift 2;;
     --no-frontend) frontend=0; shift;;
     --no-warm) warm=0; shift;;
     --fresh-db) fresh_db=1; shift;;
@@ -344,6 +345,10 @@ cmd_up() {
   [ -n "$slot" ] || die "--slot N is required for 'up' (pick a free slot: $DEV runtime list)"
   [ "${#product_migration_roots[@]}" -eq 0 ] || [ "$fresh_db" = "1" ] \
     || die "--product-migration-root requires --fresh-db so product SQL is never replayed onto an unknown database"
+  case "$system_mode" in
+    single|multi|hybrid) ;;
+    *) die "--system-mode must be single|multi|hybrid" ;;
+  esac
   case "$runtime_mode" in
     development|verification|control|performance) ;;
     *) die "--runtime-mode must be development|verification|control|performance" ;;
@@ -536,7 +541,7 @@ cmd_up() {
   log "6/9 bootstrap (minimal admin + tenant; idempotent)"
   if ! curl --noproxy '*' -s -m 10 "http://127.0.0.1:$server_port/api/bootstrap/status" 2>/dev/null | grep -q '"initialized":true'; then
     curl --noproxy '*' -s -m 60 -X POST "http://127.0.0.1:$server_port/api/bootstrap/setup" -H 'Content-Type: application/json' \
-      -d "{\"companyName\":\"AuraBoot Dev\",\"adminEmail\":\"$ADMIN_EMAIL\",\"adminPassword\":\"$ADMIN_PASSWORD\",\"adminDisplayName\":\"Admin\",\"systemMode\":\"single\",\"seedDemoData\":false}" \
+      -d "{\"companyName\":\"AuraBoot Dev\",\"adminEmail\":\"$ADMIN_EMAIL\",\"adminPassword\":\"$ADMIN_PASSWORD\",\"adminDisplayName\":\"Admin\",\"systemMode\":\"$system_mode\",\"seedDemoData\":false}" \
       | grep -q '"success":true' || die "bootstrap failed"
   fi
   curl --noproxy '*' -s -m 15 -X POST "http://127.0.0.1:$server_port/api/auth/login" -H 'Content-Type: application/json' \
