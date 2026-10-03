@@ -63,7 +63,7 @@ public class OrgController {
      * Create a new department.
      */
     @PostMapping("/departments")
-    @RequirePermission("org.team.manage")
+    @RequirePermission("org.hr.manage")
     public ApiResponse<Map<String, Object>> createDepartment(@RequestBody @jakarta.validation.constraints.NotEmpty Map<String, Object> data) {
         Map<String, Object> created = dynamicDataService.create(MODEL_ORG_DEPARTMENT, data);
         return ApiResponse.success(created);
@@ -73,7 +73,7 @@ public class OrgController {
      * Update a department by PID.
      */
     @PutMapping("/departments/{pid}")
-    @RequirePermission("org.team.manage")
+    @RequirePermission("org.hr.manage")
     public ApiResponse<Void> updateDepartment(
             @PathVariable String pid,
             @RequestBody @jakarta.validation.constraints.NotEmpty Map<String, Object> data) {
@@ -86,7 +86,7 @@ public class OrgController {
      * Validates no child departments and no employees exist before deletion.
      */
     @DeleteMapping("/departments/{pid}")
-    @RequirePermission("org.team.manage")
+    @RequirePermission("org.hr.manage")
     public ApiResponse<Void> deleteDepartment(@PathVariable String pid) {
         requireDepartmentExists(pid);
 
@@ -139,7 +139,7 @@ public class OrgController {
      * Batch reorder departments. Each item is applied independently.
      */
     @PostMapping("/departments/sort")
-    @RequirePermission("org.team.manage")
+    @RequirePermission("org.hr.manage")
     public ApiResponse<Void> sortDepartments(
             @Valid @RequestBody DepartmentAdminRequests.SortRequest request) {
         for (DepartmentAdminRequests.SortItem item : request.items()) {
@@ -155,7 +155,7 @@ public class OrgController {
      * user by the approver resolver.
      */
     @PostMapping("/departments/{pid}/set-commander")
-    @RequirePermission("org.team.manage")
+    @RequirePermission("org.hr.manage")
     public ApiResponse<Void> setDepartmentCommander(
             @PathVariable String pid,
             @Valid @RequestBody DepartmentAdminRequests.SetCommanderRequest request) {

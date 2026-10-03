@@ -1,6 +1,7 @@
 package com.auraboot.framework.organization.controller;
 
 import com.auraboot.framework.exception.RootUnCheckedException;
+import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.organization.dto.DepartmentAdminRequests;
@@ -40,6 +41,22 @@ class OrgControllerDepartmentAdminTest {
 
     @InjectMocks
     private OrgController controller;
+
+    @Test
+    void departmentWriteEndpointsRequireHrManagementWithoutTeamManagement() {
+        var writeMethods = List.of("createDepartment", "updateDepartment", "deleteDepartment",
+            "sortDepartments", "setDepartmentCommander");
+        var handlers = java.util.Arrays.stream(OrgController.class.getDeclaredMethods())
+            .filter(method -> writeMethods.contains(method.getName()))
+            .toList();
+        assertThat(handlers).hasSize(writeMethods.size());
+        for (var handler : handlers) {
+            var guard = handler.getAnnotation(RequirePermission.class);
+            assertThat(guard).as("%s must declare its write permission", handler.getName()).isNotNull();
+            assertThat(guard.value()).as("%s belongs to organization maintenance, not team maintenance",
+                handler.getName()).isEqualTo("org.hr.manage");
+        }
+    }
 
     private void mockDepartmentExists(String pid) {
         when(dynamicDataService.getById("org_department", pid))
