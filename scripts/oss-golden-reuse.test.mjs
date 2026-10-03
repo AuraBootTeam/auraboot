@@ -1,17 +1,18 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 const source = readFileSync(new URL('./oss-golden-stack.sh', import.meta.url), 'utf8');
 const stopped = source.slice(source.indexOf('assert_stack_stopped() {'), source.indexOf('# ---- destroy'));
+const stateHelpers = source.slice(source.indexOf('state_dir() {'), source.indexOf('# Read a key'));
 const killTree = source.slice(source.indexOf('kill_tree() {'), source.indexOf('kill_listener_supervisor() {'));
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'golden-reuse-'));
-  const sd = join(root, '.workspace/golden/session'); mkdirSync(sd, { recursive: true });
+  const sd = join(root, '.workspace/runtimes/session/oss-stack'); mkdirSync(sd, { recursive: true });
   t.after(() => rmSync(root, { recursive: true, force: true }));
-  const run = (body) => spawnSync('bash', ['-c', `set -euo pipefail\nREPO_ROOT="$1"\nWORKSPACE="$1"\nlog() { :; }\ndie() { echo "$*" >&2; exit 1; }\nstate_dir() { echo "$WORKSPACE/.workspace/golden/$1"; }\n${killTree}\n${stopped}\n${body}`, '--', root], { encoding: 'utf8' });
+  const run = (body) => spawnSync('bash', ['-c', `set -euo pipefail\nREPO_ROOT="$1"\nWORKSPACE="$1"\nlog() { :; }\ndie() { echo "$*" >&2; exit 1; }\n${stateHelpers}\n${killTree}\n${stopped}\n${body}`, '--', root], { encoding: 'utf8' });
   return { root, sd, run };
 }
 async function sleeper(t, cwd) {
@@ -20,6 +21,38 @@ async function sleeper(t, cwd) {
   t.after(() => child.kill());
   return child;
 }
+test('fresh and repeated stack preparation uses runtime state without creating golden', (t) => {
+  const { root, run } = fixture(t);
+  const first = run('prepare_state_dir fresh'); const second = run('prepare_state_dir fresh');
+  assert.equal(first.status, 0, first.stderr); assert.equal(second.status, 0, second.stderr);
+  assert.equal(first.stdout.trim(), join(root, '.workspace/runtimes/fresh/oss-stack'));
+  assert.equal(first.stdout, second.stdout);
+  assert.equal(existsSync(join(root, '.workspace/golden')), false);
+});
+test('stopped legacy state moves once and keeps old readers as an alias', (t) => {
+  const { root, run } = fixture(t); const legacy = join(root, '.workspace/golden/legacy');
+  mkdirSync(legacy, { recursive: true }); writeFileSync(join(legacy, 'backend.log'), 'old evidence');
+  const result = run('prepare_state_dir legacy'); assert.equal(result.status, 0, result.stderr);
+  const current = join(root, '.workspace/runtimes/legacy/oss-stack');
+  assert.equal(realpathSync(legacy), realpathSync(current));
+  assert.equal(readFileSync(join(current, 'backend.log'), 'utf8'), 'old evidence');
+  assert.equal(run('prepare_state_dir legacy').stdout.trim(), current);
+});
+test('ambiguous old and new state is refused without moving either copy', (t) => {
+  const { root, sd, run } = fixture(t); const legacy = join(root, '.workspace/golden/session');
+  mkdirSync(legacy, { recursive: true }); writeFileSync(join(legacy, 'keep'), 'old');
+  const result = run('prepare_state_dir session'); assert.equal(result.status, 1);
+  assert.equal(readFileSync(join(legacy, 'keep'), 'utf8'), 'old');
+  assert.equal(existsSync(sd), true);
+});
+test('foreign legacy alias cannot be ignored to create another stack', (t) => {
+  const { root, run } = fixture(t); const legacy = join(root, '.workspace/golden/foreign');
+  mkdirSync(join(root, '.workspace/golden')); symlinkSync(root, legacy);
+  const result = run('prepare_state_dir foreign'); assert.equal(result.status, 1);
+  assert.match(result.stderr, /another location/);
+  assert.equal(existsSync(join(root, '.workspace/runtimes/foreign')), false);
+  assert.equal(realpathSync(legacy), realpathSync(root));
+});
 test('rebuild rejects live process before touching current runtime or evidence', async (t) => {
   const { root, sd, run } = fixture(t); const child = await sleeper(t, root);
   writeFileSync(join(sd, 'backend.pid'), String(child.pid));

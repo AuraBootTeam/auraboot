@@ -114,14 +114,14 @@ export AGENT_LLM_STUB_MODE=true
 log "1/5 fresh stack: reuse '$NAME' on the same slot; stop before reset + up --fresh-db --plugin-profile demo"
 "$GS" down "$NAME" || die_env "cannot stop the owned stack before rebuilding"
 "$GS" up "$NAME" --slot "$SLOT" --ttl 3h --runtime-mode verification --fresh-db --plugin-profile demo \
-  || die_env "stack bring-up failed — see the golden-stack logs under ${WORKSPACE:-$REPO_ROOT}/.workspace/golden/$NAME/"
+  || die_env "stack bring-up failed — see the golden-stack logs under ${WORKSPACE:-$REPO_ROOT}/.workspace/runtimes/$NAME/oss-stack/"
 
 # The demo profile does not carry the internal test-fixtures plugin; the hifi
 # specs seed orders through the e2et_order model it provides. Import it before
 # anything that references e2et_* or the run fails on phantom missing models.
 log "2/5 import internal test-fixtures plugin (e2et_* models)"
 "$GS" import "$NAME" --plugin-profile none --plugin test-fixtures \
-  || die_env "test-fixtures import failed — see ${WORKSPACE:-$REPO_ROOT}/.workspace/golden/$NAME/import.log"
+  || die_env "test-fixtures import failed — see ${WORKSPACE:-$REPO_ROOT}/.workspace/runtimes/$NAME/oss-stack/import.log"
 
 log "3/5 resolve stack env"
 eval "$("$GS" env "$NAME")" || die_env "could not resolve stack env for '$NAME'"
