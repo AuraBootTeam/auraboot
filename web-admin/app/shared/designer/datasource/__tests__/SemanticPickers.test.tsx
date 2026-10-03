@@ -17,7 +17,7 @@ import {
 } from '../SemanticDimensionPicker';
 import { SemanticDimensionPicker } from '../SemanticDimensionPicker';
 import { SemanticMetricPicker } from '../SemanticMetricPicker';
-import { useSemanticModelMeta } from '../useMetaModels';
+import { useSemanticModelMeta, useSemanticModels } from '../useMetaModels';
 import type { SemanticMetricOption, SemanticDimensionOption } from '../types';
 
 const META_RESPONSE = {
@@ -53,6 +53,47 @@ function mockFetchOk(body: unknown) {
 
 beforeEach(() => {
   vi.stubGlobal('fetch', mockFetchOk(META_RESPONSE));
+});
+
+describe('semantic model catalog failure boundaries', () => {
+  for (const [status, kind] of [[401, 'denied'], [403, 'denied'], [500, 'failed']] as const) {
+    it(`rejects HTTP ${status} even when the body resembles success`, async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status, json: async () => META_RESPONSE }));
+      const { result } = renderHook(() => useSemanticModels());
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+      expect(result.current.error?.kind).toBe(kind);
+      expect(result.current.models).toEqual([]);
+    });
+  }
+  for (const body of [{ code: '1', message: 'private SQL detail', data: META_RESPONSE.data },
+    { code: '0', data: { models: {} } }, { code: '0', data: { models: [null] } }]) {
+    it('reports an invalid catalog instead of presenting an empty success', async () => {
+      vi.stubGlobal('fetch', mockFetchOk(body));
+      const { result } = renderHook(() => useSemanticModels());
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+      expect(result.current.error?.kind).toBe('failed');
+      expect(result.current.models).toEqual([]);
+    });
+  }
+  it('accepts a real successful empty catalog without fabricating an error', async () => {
+    vi.stubGlobal('fetch', mockFetchOk({ code: '0', data: { models: [] } }));
+    const { result } = renderHook(() => useSemanticModels());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.error).toBeNull(); expect(result.current.models).toEqual([]);
+  });
+  it('invalidates obsolete options and pending responses when explicitly reloading', async () => {
+    let obsolete!: (value: Response) => void;
+    const fetchMock = mockFetchOk(META_RESPONSE)
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { obsolete = resolve; }));
+    vi.stubGlobal('fetch', fetchMock);
+    const { result } = renderHook(() => useSemanticModels());
+    act(() => result.current.refetch());
+    await waitFor(() => expect(result.current.models[0]?.code).toBe('sales_semantic'));
+    await act(async () => obsolete({ ok: false, status: 403, json: async () => ({}) } as Response));
+    expect(result.current.error).toBeNull();
+    expect(result.current.models[0]?.code).toBe('sales_semantic');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });
 
 afterEach(() => {

@@ -4,7 +4,9 @@
  * Uses shared ModelPicker, NamedQueryPicker, FieldSelector, and FilterBuilder.
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useId } from 'react';
+import { useI18n } from '~/contexts/I18nContext';
+import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer/designerI18n';
 import type {
   ChartDataSource,
   MetricConfig as ChartMetricConfig,
@@ -20,6 +22,7 @@ import {
   KeyValueEditor,
   TimeGrainPicker,
   SemanticMetricPicker,
+  SemanticMetaFeedback,
   SemanticDimensionPicker,
   isDateField,
   parseGrainDimension,
@@ -38,7 +41,12 @@ interface DataSourceConfigProps {
 
 export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({ value, onChange }) => {
   const { fields } = useModelFields(value.type === 'aggregate' ? value.modelCode : undefined);
-  const { models: semanticModels } = useSemanticModels();
+  const { models: semanticModels, isLoading: semanticModelsLoading, error: semanticModelsError,
+    refetch: refetchSemanticModels } = useSemanticModels();
+  const semanticModelInputId = useId();
+  const { locale } = useI18n();
+  const semanticText = (key: keyof typeof DESIGNER_I18N.semanticMeta) =>
+    resolveDesignerText(DESIGNER_I18N.semanticMeta[key], locale);
 
   // Semantic mode is engaged when the config carries a semanticModelCode key
   // (even an empty string — "semantic mode, model not yet chosen"). Raw mode
@@ -299,22 +307,33 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({ value, onCha
           {isSemantic && (
             <>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  语义模型 <span className="text-red-500">*</span>
+                <label htmlFor={semanticModelInputId} className="mb-1 block text-sm font-medium text-gray-700">
+                  {semanticText('modelsLabel')} <span className="text-red-500">*</span>
                 </label>
                 <select
                   data-testid="semantic-model-select"
+                  id={semanticModelInputId}
+                  disabled={semanticModelsLoading || Boolean(semanticModelsError) || semanticModels.length === 0}
+                  aria-busy={semanticModelsLoading}
+                  aria-invalid={Boolean(semanticModelsError)}
                   value={value.semanticModelCode || ''}
                   onChange={(e) => handleSemanticModelChange(e.target.value)}
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 >
-                  <option value="">请选择语义模型</option>
+                  <option value="">{semanticText('selectModel')}</option>
                   {semanticModels.map((m) => (
                     <option key={m.code} value={m.code}>
                       {m.name}
                     </option>
                   ))}
                 </select>
+                {semanticModelsLoading && <p role="status" className="mt-1 text-sm text-gray-500">{semanticText('loadingModels')}</p>}
+                {!semanticModelsLoading && semanticModelsError && (
+                  <SemanticMetaFeedback error={semanticModelsError} onRetry={refetchSemanticModels} />
+                )}
+                {!semanticModelsLoading && !semanticModelsError && semanticModels.length === 0 && (
+                  <p role="status" className="mt-1 text-sm text-gray-400">{semanticText('noModels')}</p>
+                )}
               </div>
 
               {value.semanticModelCode && (
