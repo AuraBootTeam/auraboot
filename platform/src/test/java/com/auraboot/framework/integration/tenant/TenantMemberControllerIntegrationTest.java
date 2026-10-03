@@ -203,6 +203,32 @@ class TenantMemberControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data[?(@.memberPid == '" + hidden.getPid() + "')]").isEmpty());
     }
 
+    @Test
+    void nativeMemberDetailHonorsReadSelfScope() throws Exception {
+        prepareMemberModel();
+        grantMemberAction("read");
+        TenantMember owned = createMemberFixture(true);
+        TenantMember hidden = createMemberFixture(false);
+        scopes.setScope(getTestTenant().getId(), getTestRole().getId(), "tenant_member", "read", "self", "MAX");
+        assertThat(userPermissions.getUserPermissionCodes(getTestUser().getId()))
+                .contains("model.tenant_member.read").doesNotContain("admin_tenant_member");
+        mockMvc.perform(get("/api/tenant/members/" + owned.getPid()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.pid").value(owned.getPid()));
+        mockMvc.perform(get("/api/tenant/members/" + hidden.getPid()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void nativeMemberDetailRejectsMissingReadGrant() throws Exception {
+        prepareMemberModel();
+        TenantMember target = createMemberFixture(true);
+        assertThat(userPermissions.getUserPermissionCodes(getTestUser().getId()))
+                .doesNotContain("model.tenant_member.read", "admin_tenant_member");
+        mockMvc.perform(get("/api/tenant/members/" + target.getPid()))
+                .andExpect(status().isForbidden());
+    }
+
     private void prepareMemberModel() {
         applyTestMetaContext();
         Model model = models.findCurrentByCode("tenant_member");
