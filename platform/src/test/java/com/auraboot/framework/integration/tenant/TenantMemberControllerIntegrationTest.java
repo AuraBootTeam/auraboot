@@ -16,6 +16,14 @@ import com.auraboot.framework.meta.entity.Model;
 import com.auraboot.framework.meta.entity.payload.ExtensionBean;
 import com.auraboot.framework.meta.mapper.MetaModelMapper;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.meta.dto.CommandExecuteRequest;
+import com.auraboot.framework.meta.entity.CommandDefinition;
+import com.auraboot.framework.meta.entity.BindingRule;
+import com.auraboot.framework.meta.handler.TenantMemberCommandHandler;
+import com.auraboot.framework.meta.service.CommandHandlerContext;
+import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
+import com.auraboot.framework.meta.service.impl.pipeline.phases.FieldMapPhase;
+import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.permission.entity.Permission;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.permission.service.UserPermissionService;
@@ -27,8 +35,11 @@ import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
 import java.time.Instant;
 import java.util.Map;
+import java.util.HashMap;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import jakarta.servlet.Filter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -69,6 +80,8 @@ class TenantMemberControllerIntegrationTest extends BaseIntegrationTest {
     @Autowired private DataScopeService scopes;
     @Autowired private MetaModelMapper models;
     @Autowired private MetaModelService modelService;
+    @Autowired private FieldMapPhase fieldMapPhase;
+    @Autowired private TenantMemberCommandHandler memberCommandHandler;
 
     private MockMvc mockMvc;
 
@@ -76,6 +89,51 @@ class TenantMemberControllerIntegrationTest extends BaseIntegrationTest {
     private String teamBravoPid;
 
     private final String runId = String.valueOf(System.nanoTime());
+
+    @ParameterizedTest(name = "domain-owned removal preserves target until handler; self={0}")
+    @CsvSource({"false", "true"})
+    void removalPreservesMemberUntilDomainChecks(boolean self) {
+        prepareMemberModel();
+        grantMemberAction("read");
+        grantMemberAction("delete");
+        TenantMember target = self
+                ? tenantMemberService.findByTenantIdAndUserId(getTestTenant().getId(), getTestUser().getId())
+                : createMemberFixture(false);
+        applyTestMetaContext();
+        CommandExecuteRequest request = new CommandExecuteRequest();
+        request.setOperationType("delete");
+        request.setTargetRecordId(target.getPid());
+        CommandDefinition command = new CommandDefinition();
+        command.setCode("admin:delete_member");
+        command.setModelCode("tenant_member");
+        BindingRule rule = new BindingRule();
+        rule.setHandlerClass("tenantMemberCommandHandler");
+        CommandPipelineContext ctx = CommandPipelineContext.builder()
+                .commandCode(command.getCode()).command(command).request(request)
+                .tenantId(getTestTenant().getId()).userId(getTestUser().getId())
+                .startTime(System.currentTimeMillis()).payload(new HashMap<>())
+                .execConfig(new HashMap<>(Map.of("type", "delete")))
+                .rulesByType(Map.of("handler", List.of(rule))).build();
+
+        fieldMapPhase.execute(ctx);
+
+        assertThat(tenantMemberService.findByPid(target.getPid())).isNotNull()
+                .extracting(TenantMember::getStatus).isEqualTo(target.getStatus());
+        assertThat(ctx.getFieldMapResults()).isEmpty();
+        CommandHandlerContext handlerContext = CommandHandlerContext.builder()
+                .commandCode(command.getCode()).targetRecordId(target.getPid())
+                .tenantId(getTestTenant().getId()).userId(getTestUser().getId())
+                .payload(Map.of()).fieldMapResults(ctx.getFieldMapResults()).build();
+        if (self) {
+            assertThatThrownBy(() -> memberCommandHandler.execute(handlerContext))
+                    .isInstanceOf(BusinessException.class);
+            assertThat(tenantMemberService.findByPid(target.getPid())).isNotNull();
+        } else {
+            assertThat(memberCommandHandler.execute(handlerContext))
+                    .containsEntry("removed", true).containsEntry("handlerExecuted", true);
+            assertThat(tenantMemberService.findByPid(target.getPid())).isNull();
+        }
+    }
 
     @BeforeEach
     void setup() {

@@ -45,7 +45,9 @@ describe('native member lifecycle authorization', () => {
     expect(screen.queryByRole('button', { name: '暂停', exact: true })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: label, exact: true }));
     await waitFor(() => expect(mocks.handleAction).toHaveBeenCalledWith(
-      expect.objectContaining({ action: expect.objectContaining({ command, offboardingAction }) }),
+      expect.objectContaining({ action: expect.objectContaining({ command, offboardingAction,
+        inputFieldsTitle: verb === 'leave' ? '办理离职' : undefined,
+      }) }),
       expect.objectContaining({ pid: 'MEMBER-1' }),
     ));
   });

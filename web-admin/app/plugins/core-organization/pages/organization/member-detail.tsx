@@ -195,7 +195,12 @@ export default function MemberDetailPage() {
       await handleAction({
         code: action,
         confirm: confirmations[action],
-        action: { type: 'command', command, offboardingAction, inputFields },
+        action: {
+          type: 'command', command, offboardingAction, inputFields,
+          inputFieldsTitle: action === 'suspend'
+            ? l('暂停成员', 'Suspend member')
+            : action === 'leave' ? l('办理离职', 'Offboard member') : undefined,
+        },
       } as ButtonConfig, member);
     } finally {
       actionRefreshTarget.current = 'detail';

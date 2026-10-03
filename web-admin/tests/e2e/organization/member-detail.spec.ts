@@ -336,6 +336,9 @@ test('MEMBER-DETAIL-07: native lifecycle buttons execute commands and persist st
     }
     if (command === 'admin:suspend_member' || command === 'admin:leave_member') {
       await expect(page.getByTestId('form-dialog')).toBeVisible();
+      await expect(page.getByTestId('form-dialog').getByRole('heading')).toHaveText(
+        command === 'admin:suspend_member' ? '暂停成员' : '办理离职',
+      );
       await page.getByTestId('form-dialog-field-reason').fill(`E2E ${command}`);
       await capture(`${command.split(':')[1]}-input`);
       await page.getByTestId('form-dialog-submit').click();
