@@ -63,6 +63,8 @@ if [ ! -f "$WORKSPACE/dev.sh" ]; then
   fi
 fi
 [ -f "$WORKSPACE/dev.sh" ] || { echo "FATAL: cannot find workspace dev.sh for $REPO_ROOT"; exit 1; }
+source "$SCRIPT_DIR/lib/workspace-control.sh"
+aura_bind_workspace_control "$WORKSPACE" || exit 2
 CANONICAL="$WORKSPACE/auraboot"                      # canonical OSS checkout (for gradle wrapper / node_modules seed)
 DEV="$WORKSPACE/aura"
 

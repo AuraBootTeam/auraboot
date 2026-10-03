@@ -57,6 +57,9 @@ else
 fi
 [[ -f "$WORKSPACE_ROOT/dev.sh" ]] \
   || { echo "cannot locate workspace root for golden evidence: $WORKSPACE_ROOT" >&2; exit 2; }
+source "$REPO_ROOT/scripts/lib/workspace-control.sh"
+aura_bind_workspace_control "$WORKSPACE_ROOT" || exit 2
+WORKSPACE_ROOT="$WORKSPACE"
 SLOT=111
 NAME="aurabot-scenario-golden"
 KEEP=0
