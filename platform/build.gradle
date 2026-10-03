@@ -441,6 +441,9 @@ dependencies {
     testImplementation platform('org.testcontainers:testcontainers-bom:1.21.4')
     testImplementation 'org.testcontainers:testcontainers'
     testImplementation 'org.testcontainers:mysql'
+    // MySQLContainer opens JDBC connections while starting its fixture. The
+    // driver stays test-only; deployers still supply it for product MySQL use.
+    testRuntimeOnly 'com.mysql:mysql-connector-j'
     testImplementation 'org.testcontainers:postgresql'
     testImplementation 'org.testcontainers:junit-jupiter'
 
