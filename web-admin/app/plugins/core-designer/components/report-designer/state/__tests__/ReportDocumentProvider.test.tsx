@@ -97,6 +97,26 @@ describe('ReportDocumentProvider', () => {
     expect(result.current.report?.body[0].id).toBe(addedId);
   });
 
+  it('retains report title and description through saved block undo and redo', () => {
+    const { result } = renderHook(() => useReportDocument(), { wrapper: ReportDocumentProvider });
+    act(() => result.current.loadDocument(createEmptyReport('Original')));
+    act(() => result.current.updateTitle('This run report'));
+    act(() => result.current.updateDescription('This run description'));
+    act(() => result.current.addBlock(richText('This run block')));
+    act(() => result.current.markSaved());
+    expect(result.current.isDirty).toBe(false);
+    act(() => result.current.undo());
+    expect(result.current.report?.body).toHaveLength(0);
+    expect(result.current.report?.title).toBe('This run report');
+    expect(result.current.report?.description).toBe('This run description');
+    expect(result.current.isDirty).toBe(true);
+    act(() => result.current.redo());
+    expect(result.current.report?.body).toHaveLength(1);
+    expect(result.current.report?.title).toBe('This run report');
+    expect(result.current.report?.description).toBe('This run description');
+    expect(result.current.isDirty).toBe(false);
+  });
+
   it('selectBlock sets selectedBlockId', () => {
     const { result } = renderHook(() => useReportDocument(), {
       wrapper: ReportDocumentProvider,

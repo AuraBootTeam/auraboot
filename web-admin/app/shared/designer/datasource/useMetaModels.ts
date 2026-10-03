@@ -16,7 +16,12 @@ import type {
 interface SemanticMetaModel {
   code: string;
   label?: Record<string, string>;
-  metrics?: Array<{ code: string; type?: string; label?: Record<string, string>; description?: string }>;
+  metrics?: Array<{
+    code: string;
+    type?: string;
+    label?: Record<string, string>;
+    description?: string;
+  }>;
   dimensions?: Array<{
     code: string;
     type?: string;
@@ -248,26 +253,36 @@ export function useSemanticModelMeta(semanticModelCode: string | undefined) {
 export function useNamedQueries() {
   const [namedQueries, setNamedQueries] = useState<NamedQueryOption[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     let mounted = true;
     setIsLoading(true);
+    setError(null);
 
-    fetch('/api/meta/named-queries?status=enabled')
-      .then((res) => res.json())
+    fetch('/api/meta/named-queries/enabled')
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Named query catalog returned ${response.status}`);
+        return response.json();
+      })
       .then((result) => {
         if (!mounted) return;
-        if (ResultHelper.isSuccess(result) && result.data?.content) {
-          setNamedQueries(
-            result.data.content.map((q: { pid: string; code: string; title: string }) => ({
-              pid: q.pid,
-              code: q.code,
-              title: q.title,
-            })),
-          );
+        if (!ResultHelper.isSuccess(result) || !Array.isArray(result.data)) {
+          throw new Error('Malformed named query catalog response');
         }
+        setNamedQueries(
+          result.data.map((q: { pid: string; code: string; title: string }) => ({
+            pid: q.pid,
+            code: q.code,
+            title: q.title,
+          })),
+        );
       })
-      .catch((error) => console.error('Failed to fetch named queries:', error))
+      .catch((failure: unknown) => {
+        if (!mounted) return;
+        setNamedQueries([]);
+        setError(failure instanceof Error ? failure : new Error('Named query catalog unavailable'));
+      })
       .finally(() => {
         if (mounted) setIsLoading(false);
       });
@@ -277,5 +292,5 @@ export function useNamedQueries() {
     };
   }, []);
 
-  return { namedQueries, isLoading };
+  return { namedQueries, isLoading, error };
 }

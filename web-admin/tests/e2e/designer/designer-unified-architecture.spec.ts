@@ -40,6 +40,18 @@ async function openReportDesigner(page: import('@playwright/test').Page) {
   await expect(titleInput).toHaveValue('未命名报表', { timeout: 15000 });
 }
 
+async function waitForVersionPanelPosition(page: import('@playwright/test').Page, open: boolean) {
+  const panel = page.getByTestId('version-history-panel');
+  await expect
+    .poll(async () => {
+      const box = await panel.boundingBox();
+      const viewport = page.viewportSize();
+      if (!box || !viewport) return false;
+      return open ? Math.abs(box.x + box.width - viewport.width) <= 1 : box.x >= viewport.width - 1;
+    })
+    .toBe(true);
+}
+
 async function saveAndVerifyReport(page: import('@playwright/test').Page, title: string) {
   const saveResponse = page.waitForResponse(
     (response) =>
@@ -76,6 +88,7 @@ async function openSavedVersionHistory(page: import('@playwright/test').Page, pi
   await expect(panel.getByRole('heading', { name: '版本历史', exact: true })).toBeVisible();
   await expect(panel.getByText(`v${history.data[0].version}`, { exact: true })).toBeVisible();
   await expect(panel.getByText(`${history.data.length} 个可用版本`, { exact: true })).toBeVisible();
+  await waitForVersionPanelPosition(page, true);
 }
 
 // =========================================================================
@@ -179,6 +192,7 @@ test.describe('GAP 2: Report Version History', () => {
         .getByTestId('version-history-panel')
         .getByText('保存后会生成第一个版本', { exact: true }),
     ).toBeVisible();
+    await waitForVersionPanelPosition(page, true);
     await page.screenshot({ path: test.info().outputPath('DUA-06.png'), fullPage: true });
   });
 
@@ -189,6 +203,7 @@ test.describe('GAP 2: Report Version History', () => {
     // Open panel
     await page.getByTitle(/^(版本历史|Version History)$/).click();
     await expect(panel).toHaveClass(/translate-x-0/, { timeout: 5000 });
+    await waitForVersionPanelPosition(page, true);
 
     // Verify close button exists in panel header
     await expect(panel.getByRole('button', { name: '关闭版本面板', exact: true })).toBeVisible();
@@ -196,6 +211,7 @@ test.describe('GAP 2: Report Version History', () => {
     // Close with ESC
     await page.keyboard.press('Escape');
     await expect(panel).toHaveClass(/translate-x-full/, { timeout: 5000 });
+    await waitForVersionPanelPosition(page, false);
     await page.screenshot({ path: test.info().outputPath('DUA-07.png'), fullPage: true });
   });
 
@@ -250,6 +266,11 @@ test.describe('GAP 3: Report DataSource — Shared Pickers', () => {
     expect(options).toContain('模型');
     expect(options).toContain('命名查询');
     expect(options).toContain('API');
+    await expect(
+      addDsForm
+        .locator('select')
+        .filter({ has: page.locator('option[value=""]', { hasText: '选择模型' }) }),
+    ).toBeEnabled();
     await page.screenshot({ path: test.info().outputPath('DUA-11.png'), fullPage: true });
   });
 
@@ -291,6 +312,22 @@ test.describe('GAP 3: Report DataSource — Shared Pickers', () => {
   });
 
   test('DUA-13: NamedQuery type shows shared NamedQueryPicker', async ({ page }) => {
+    const queryCode = uniqueId('dua_nq');
+    const created = await page.request.post('/api/meta/named-queries', {
+      data: {
+        code: queryCode,
+        title: `DUA ${queryCode}`,
+        status: 'published',
+        resourceCode: 'e2et_order',
+        actionCode: 'read',
+        fromSql: 'SELECT pid FROM mt_e2et_order',
+        fields: [
+          { fieldCode: 'record_key', columnExpr: 'pid', dataType: 'string', operators: ['eq'] },
+        ],
+      },
+    });
+    expect(created.status()).toBe(200);
+    expect(Number((await created.json()).code)).toBe(0);
     await openReportDesigner(page);
 
     await page.getByTestId('block-palette-item-table').click();
@@ -311,7 +348,7 @@ test.describe('GAP 3: Report DataSource — Shared Pickers', () => {
       .locator('select')
       .filter({ has: page.locator('option[value="namedQuery"]') });
     const queriesResponse = page.waitForResponse(
-      (resp) => new URL(resp.url()).pathname === '/api/meta/named-queries',
+      (resp) => new URL(resp.url()).pathname === '/api/meta/named-queries/enabled',
     );
     await typeSelect.selectOption('namedQuery');
 
@@ -319,13 +356,30 @@ test.describe('GAP 3: Report DataSource — Shared Pickers', () => {
     expect(response.status()).toBe(200);
     const payload = await response.json();
     expect(Number(payload.code)).toBe(0);
-    expect(Array.isArray(payload.data.content)).toBe(true);
+    expect(Array.isArray(payload.data)).toBe(true);
+    expect(payload.data.some((q: { code: string }) => q.code === queryCode)).toBe(true);
 
     // NamedQueryPicker visible
     const nqSelect = panel
       .locator('select')
       .filter({ has: page.locator('option[value=""]', { hasText: '选择命名查询' }) });
     await expect(nqSelect).toBeVisible();
+    await nqSelect.selectOption(queryCode);
+    await expect(nqSelect).toHaveValue(queryCode);
+    await page.screenshot({ path: test.info().outputPath('DUA-13-picker.png'), fullPage: true });
+    await addDsForm.getByPlaceholder('名称（例如 main）', { exact: true }).fill('main');
+    await addDsForm.getByRole('button', { name: '添加', exact: true }).click();
+    await expect(
+      panel.locator('select').filter({ has: page.locator('option[value="main"]') }),
+    ).toHaveValue('main');
+    const title = `Named query ${queryCode}`;
+    await page.getByPlaceholder(/^(报表标题|Report Title)$/).fill(title);
+    const reportPid = await saveAndVerifyReport(page, title);
+    const persisted = await page.request.get(`/api/report-definitions/${reportPid}`);
+    expect(persisted.status()).toBe(200);
+    const saved = await persisted.json();
+    expect(Number(saved.code)).toBe(0);
+    expect(saved.data.dsl.dataSources.main).toEqual({ type: 'namedQuery', queryCode });
     await page.screenshot({ path: test.info().outputPath('DUA-13.png'), fullPage: true });
   });
 
@@ -391,12 +445,15 @@ test.describe('Integration', () => {
     await openSavedVersionHistory(page, pid);
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('version-history-panel')).toHaveClass(/translate-x-full/);
+    await waitForVersionPanelPosition(page, false);
 
     // 5. Undo block addition
     await undoBtn.click();
     await expect(canvas.getByText('点击添加文本内容', { exact: true })).not.toBeVisible({
       timeout: 5000,
     });
+
+    await expect(page.getByPlaceholder(/^(报表标题|Report Title)$/)).toHaveValue(title);
 
     // 6. Unsaved indicator visible (undid after save)
     await expect(
