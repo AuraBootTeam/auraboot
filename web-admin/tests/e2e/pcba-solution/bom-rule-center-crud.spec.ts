@@ -265,7 +265,7 @@ for (const c of cases) {
       await expect(readerRow).toHaveCount(1);
       await clickRowActionByLocator(denied.page, readerRow, 'view', '查看');
       await expect(denied.page).toHaveURL(new RegExp(`/p/${c.model}/view/${saved.pid}$`));
-      const readerKey = denied.page.getByTestId(`field-${c.key}`);
+      const readerKey = denied.page.getByTestId(`form-field-${c.key}`);
       await expect(readerKey).toBeVisible();
       await expect.poll(() => readerKey.evaluate(element => [
         element.textContent,
