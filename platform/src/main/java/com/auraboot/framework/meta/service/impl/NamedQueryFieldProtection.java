@@ -62,6 +62,12 @@ public class NamedQueryFieldProtection {
             // NamedQuerySourceModels.PLATFORM_REFERENCE_SOURCES.
             if (model.startsWith(NamedQuerySourceModels.PLATFORM_REFERENCE_MARKER)
                     || model.startsWith(com.auraboot.framework.meta.service.impl.NamedQuerySourceModels.ENGINE_SOURCE_MARKER_PREFIX)) continue;
+            if (model.startsWith(NamedQuerySourceModels.NATIVE_SOURCE_MARKER_PREFIX)) {
+                String resource = model.substring(NamedQuerySourceModels.NATIVE_SOURCE_MARKER_PREFIX.length());
+                if (!aggregateRootGrant && (memberId == null || !permissionEvaluator.canAction(memberId, resource, "read")))
+                    throw new AccessDeniedException("Access denied for native named query source: " + resource);
+                continue;
+            }
             // The caller was already authorized against the exact declared aggregate root
             // through the normal record ACL (owner/self, data scope, or collaborator share).
             // Demanding raw model read on joined implementation tables would deny a trusted,
@@ -81,6 +87,9 @@ public class NamedQueryFieldProtection {
         }
         Set<String> resources = new TreeSet<>(sourceModels.values());
         resources.removeIf(model -> model.startsWith(NamedQuerySourceModels.PLATFORM_REFERENCE_MARKER));
+        resources = resources.stream().map(model -> model.startsWith(NamedQuerySourceModels.NATIVE_SOURCE_MARKER_PREFIX)
+                ? model.substring(NamedQuerySourceModels.NATIVE_SOURCE_MARKER_PREFIX.length()) : model)
+                .collect(java.util.stream.Collectors.toCollection(TreeSet::new));
         if (query.getResourceCode() != null && !query.getResourceCode().isBlank()) resources.add(query.getResourceCode());
         var evidence = JSON.createObjectNode();
         evidence.set("sourceModels", JSON.valueToTree(sourceModels));
@@ -93,6 +102,10 @@ public class NamedQueryFieldProtection {
                 // Global reference table joined by unique pid against a tenant-scoped anchor:
                 // no tenant column to filter and no model policies to apply.
                 scope = "true";
+            } else if (source.getValue().startsWith(NamedQuerySourceModels.NATIVE_SOURCE_MARKER_PREFIX)) {
+                // An untyped decimal literal works with native bigint and text tenant
+                // columns without casting the column or discarding its index.
+                scope = "tenant_id = '" + MetaContext.getCurrentTenantId() + "'";
             } else if (source.getValue().startsWith(NamedQuerySourceModels.ENGINE_SOURCE_MARKER_PREFIX)) {
                 // Engine tables (se_*) keep their own tenant_id column (varchar in the BPM
                 // store). Filter on the text form so the literal cannot collide with a
@@ -141,7 +154,8 @@ public class NamedQueryFieldProtection {
                 throw new AccessDeniedException("Protected field has no physical column mapping");
             protectedColumns.put(column, field);
         }
-        String table = resolved.models().entrySet().stream().filter(entry -> entry.getValue().equals(resource))
+        String table = resolved.models().entrySet().stream().filter(entry -> entry.getValue().equals(resource)
+                        || entry.getValue().equals(NamedQuerySourceModels.NATIVE_SOURCE_MARKER_PREFIX + resource))
                 .map(Map.Entry::getKey).findFirst().orElseGet(() -> NamedQuerySourceModels.identity(models.getTableName(resource)));
         Map<String, String> aliases = new LinkedHashMap<>();
         var origins = new NamedQueryColumnLineage(resolved.views()).resolve(query.getFromSql(), fields);
