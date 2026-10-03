@@ -387,6 +387,15 @@ test('category metadata: duplicate category fails safely without changing the ex
     }
     await link.click();
     await expect(client).toHaveURL(/\/p\/bom_category_meta$/);
+    const search = client.getByTestId('list-search-input');
+    await expect(search).toBeVisible();
+    await search.fill(String(row.bom_cm_category));
+    const filtered = client.waitForResponse(response =>
+      response.url().includes('/api/dynamic/bom_category_meta/list') && response.request().method() === 'GET');
+    await search.press('Enter');
+    const listResponse = await filtered;
+    expect(listResponse.status()).toBe(200);
+    expect(String((await listResponse.json()).code)).toBe('0');
     const target = client.getByRole('row').filter({ has: client.getByRole('cell', { name: categoryLabel, exact: true }) });
     await expect(target).toHaveCount(1);
     const responses = policyQueries.map(suffix => client.waitForResponse(response => {
