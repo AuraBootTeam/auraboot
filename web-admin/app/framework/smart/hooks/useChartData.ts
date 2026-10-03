@@ -250,13 +250,24 @@ export function useChartData(options: UseChartDataOptions): UseChartDataResult {
     const currentDrillFilters = drillFiltersRef.current;
     const currentLinkageFilters = linkageFiltersRef.current;
 
+    // Invalidate the previous response even when the new selection cannot query.
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    const ownsRequest = () => mountedRef.current
+      && abortControllerRef.current === controller && !controller.signal.aborted;
+
     if (!enabled) {
+      setData(null);
+      setLoading(false);
+      setError(null);
       return;
     }
 
     if (!currentDataSource) {
       setData(null);
       setLoading(false);
+      setError(null);
       return;
     }
 
@@ -269,14 +280,9 @@ export function useChartData(options: UseChartDataOptions): UseChartDataResult {
     if (!isDataSourceComplete(currentDataSource)) {
       setData(null);
       setLoading(false);
+      setError(null);
       return;
     }
-
-    // Abort any pending request
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    abortControllerRef.current = new AbortController();
 
     setLoading(true);
     setError(null);
@@ -284,7 +290,7 @@ export function useChartData(options: UseChartDataOptions): UseChartDataResult {
     try {
       if (currentDataSource.type === 'api') {
         const response = await fetchApiChartData(currentDataSource.url!, apiParamsKey);
-        if (mountedRef.current) {
+        if (ownsRequest()) {
           setData(response);
           setError(null);
         }
@@ -317,8 +323,8 @@ export function useChartData(options: UseChartDataOptions): UseChartDataResult {
             })
           : await chartDataService.fetchChartData(request);
 
-      // Only update state if component is still mounted
-      if (mountedRef.current) {
+      // A late success must not overwrite a newer model or filter selection.
+      if (ownsRequest()) {
         setData(response);
         setError(null);
       }
@@ -328,12 +334,12 @@ export function useChartData(options: UseChartDataOptions): UseChartDataResult {
         return;
       }
 
-      if (mountedRef.current) {
+      if (ownsRequest()) {
         setError(err instanceof Error ? err : new Error('Unknown error'));
         setData(null);
       }
     } finally {
-      if (mountedRef.current) {
+      if (ownsRequest()) {
         setLoading(false);
       }
     }

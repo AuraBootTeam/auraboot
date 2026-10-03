@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { DashboardQueryContext } from '../DashboardQueryContext';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { fetchChartDataMock, fetchDashboardWidgetMock, fetchResultMock } = vi.hoisted(() => ({
@@ -21,6 +21,7 @@ vi.mock('~/shared/services/http-client', () => ({
 }));
 
 import { useChartData } from '../useChartData';
+import type { ChartDataSource } from '../../types/chart';
 
 describe('useChartData', () => {
   beforeEach(() => {
@@ -270,5 +271,91 @@ describe('aggregate model routing', () => {
     } }));
     expect(fetchChartDataMock).not.toHaveBeenCalled();
     expect(result.current.data).toBeNull();
+  });
+});
+
+
+describe('chart request ownership', () => {
+  beforeEach(() => {
+    fetchChartDataMock.mockReset();
+    fetchDashboardWidgetMock.mockReset();
+    fetchResultMock.mockReset();
+  });
+
+  function pending() {
+    let resolve!: (value: { rows: { count: number }[]; meta: { dimensions: string[]; metrics: string[] } }) => void;
+    let reject!: (error: Error) => void;
+    const promise = new Promise<Parameters<typeof resolve>[0]>((done, fail) => { resolve = done; reject = fail; });
+    return { promise, resolve, reject };
+  }
+  const response = (count: number) => ({ rows: [{ count }], meta: { dimensions: [], metrics: ['count'] } });
+  const source = (code: string): ChartDataSource => ({
+    type: 'aggregate', semanticModelCode: code, metrics: [{ field: 'count', aggregation: 'none' }],
+  });
+
+  for (const outcome of ['success', 'error'] as const) {
+    it(`ignores an obsolete ${outcome} after the new model resolves`, async () => {
+      const old = pending();
+      fetchChartDataMock.mockReturnValueOnce(old.promise).mockResolvedValueOnce(response(22));
+      const { result, rerender } = renderHook(({ dataSource }: { dataSource: ChartDataSource }) => useChartData({ dataSource }), {
+        initialProps: { dataSource: source('old') },
+      });
+      await waitFor(() => expect(fetchChartDataMock).toHaveBeenCalledTimes(1));
+      rerender({ dataSource: source('new') });
+      await waitFor(() => expect(result.current.data?.rows).toEqual([{ count: 22 }]));
+      await act(async () => { if (outcome === 'success') old.resolve(response(11)); else old.reject(new Error('Old model denied')); });
+      expect(result.current.data?.rows).toEqual([{ count: 22 }]);
+      expect(result.current.error).toBeNull();
+      expect(result.current.loading).toBe(false);
+    });
+  }
+
+  for (const code of ['', '   ']) {
+    it(`keeps a cleared model empty after its previous request resolves: ${String(code)}`, async () => {
+      const old = pending();
+      fetchChartDataMock.mockReturnValueOnce(old.promise);
+      const { result, rerender } = renderHook(({ dataSource }: { dataSource: ChartDataSource }) => useChartData({ dataSource }), {
+        initialProps: { dataSource: source('old') },
+      });
+      await waitFor(() => expect(result.current.loading).toBe(true));
+      rerender({ dataSource: source(code) });
+      expect(result.current.data).toBeNull();
+      expect(result.current.loading).toBe(false);
+      await act(async () => { old.resolve(response(11)); });
+      expect(result.current.data).toBeNull();
+      expect(result.current.error).toBeNull();
+      expect(fetchChartDataMock).toHaveBeenCalledTimes(1);
+    });
+  }
+
+  it('does not end the new request loading state when the old request settles', async () => {
+    const old = pending(); const current = pending();
+    fetchChartDataMock.mockReturnValueOnce(old.promise).mockReturnValueOnce(current.promise);
+    const { result, rerender } = renderHook(({ dataSource }: { dataSource: ChartDataSource }) => useChartData({ dataSource }), {
+      initialProps: { dataSource: source('old') },
+    });
+    rerender({ dataSource: source('new') });
+    await waitFor(() => expect(fetchChartDataMock).toHaveBeenCalledTimes(2));
+    await act(async () => { old.resolve(response(11)); });
+    expect(result.current.loading).toBe(true);
+    expect(result.current.data).toBeNull();
+    await act(async () => { current.resolve(response(22)); });
+    expect(result.current.loading).toBe(false);
+    expect(result.current.data?.rows).toEqual([{ count: 22 }]);
+  });
+
+  it('invalidates an outstanding request when disabled', async () => {
+    const old = pending();
+    fetchChartDataMock.mockReturnValueOnce(old.promise);
+    const { result, rerender } = renderHook(({ enabled }: { enabled: boolean }) => useChartData({ enabled, dataSource: source('old') }), {
+      initialProps: { enabled: true },
+    });
+    await waitFor(() => expect(result.current.loading).toBe(true));
+    rerender({ enabled: false });
+    expect(result.current.loading).toBe(false);
+    await act(async () => { old.resolve(response(11)); });
+    expect(result.current.data).toBeNull();
+    expect(result.current.error).toBeNull();
+    expect(fetchChartDataMock).toHaveBeenCalledTimes(1);
   });
 });
