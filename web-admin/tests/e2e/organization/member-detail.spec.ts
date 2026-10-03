@@ -142,7 +142,7 @@ test.describe('MEMBER-DETAIL: Detail page', () => {
     // Status badge visible
     const statusBadge = page.locator('[data-testid="member-status"]');
     await expect(statusBadge).toBeVisible();
-    const statusText = await statusBadge.textContent();
+    const statusText = await statusBadge.getAttribute('data-status');
     expect(['active', 'pending', 'suspended', 'rejected', 'inactive']).toContain(statusText);
   });
 
@@ -207,7 +207,7 @@ test.describe('MEMBER-DETAIL: Detail page', () => {
     await expect(actionBar).toBeVisible({ timeout: 10000 });
 
     const statusBadge = page.locator('[data-testid="member-status"]');
-    const status = await statusBadge.textContent();
+    const status = await statusBadge.getAttribute('data-status');
 
     // Delete button always present
     await expect(actionBar.getByText(/Delete|删除/)).toBeVisible();
@@ -297,7 +297,8 @@ test('MEMBER-DETAIL-07: native lifecycle buttons execute commands and persist st
   await expect(row).toBeVisible();
   await row.click();
   await expect(page).toHaveURL(new RegExp(`/organization/members/${pid}$`));
-  await expect(page.getByTestId('member-status')).toHaveText('active');
+  await expect(page.getByTestId('member-status')).toHaveAttribute('data-status', 'active');
+  await expect(page.getByTestId('member-status')).toHaveText('已激活');
 
   const capture = async (name: string) => {
     const path = testInfo.outputPath(`${name}.png`);
@@ -349,14 +350,24 @@ test('MEMBER-DETAIL-07: native lifecycle buttons execute commands and persist st
     expect(payload.targetRecordPid).toBe(pid);
     expect((await response.json()).code).toBe('0');
     if (status) {
-      await expect(page.getByTestId('member-status')).toHaveText(status);
+      await expect(page.getByTestId('member-status')).toHaveAttribute('data-status', status);
+      await expect(page.getByTestId('member-status')).toHaveText(
+        ({ active: '已激活', suspended: '已暂停', inactive: '已离职' } as Record<string, string>)[
+          status
+        ],
+      );
       const persisted = await page.request.get(`/api/tenant/members/${pid}`);
       expect(persisted.ok()).toBe(true);
       const result = await persisted.json();
       expect(result.code).toBe('0');
       expect(result.data.status).toBe(status);
       await page.reload();
-      await expect(page.getByTestId('member-status')).toHaveText(status);
+      await expect(page.getByTestId('member-status')).toHaveAttribute('data-status', status);
+      await expect(page.getByTestId('member-status')).toHaveText(
+        ({ active: '已激活', suspended: '已暂停', inactive: '已离职' } as Record<string, string>)[
+          status
+        ],
+      );
       await capture(
         status === 'active' ? 'native-member-active-restored' : `native-member-${status}`,
       );

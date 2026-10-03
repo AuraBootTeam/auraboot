@@ -13,11 +13,11 @@ import { ResultHelper } from '~/utils/type';
 import { useAuth } from '~/contexts/AuthContext';
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
 import type { ButtonConfig } from '~/framework/meta/schemas/types';
+import FormDialog from '~/framework/meta/runtime/actions/FormDialog';
 
 // --- Types ---
 
 interface UserInfo {
-  id: number;
   pid: string;
   username: string;
   email: string;
@@ -28,7 +28,6 @@ interface UserInfo {
 
 interface MemberData {
   pid: string;
-  userId: number;
   status: string;
   joinDate: string | null;
   leaveDate: string | null;
@@ -74,6 +73,16 @@ const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
   rejected: { bg: 'bg-gray-100 dark:bg-gray-700', text: 'text-gray-800 dark:text-gray-300' },
   inactive: { bg: 'bg-gray-100 dark:bg-gray-700', text: 'text-gray-600 dark:text-gray-400' },
 };
+
+const MEMBER_STATUS_LABELS: Record<string, [string, string]> = {
+  active: ['已激活', 'Active'], pending: ['待审批', 'Pending approval'],
+  suspended: ['已暂停', 'Suspended'], rejected: ['已拒绝', 'Rejected'],
+  inactive: ['已离职', 'Inactive'],
+};
+function memberStatusLabel(status: string, l: (zh: string, en: string) => string) {
+  const label = MEMBER_STATUS_LABELS[status];
+  return label ? l(label[0], label[1]) : l('未知状态', 'Unknown status');
+}
 
 // --- Main Component ---
 
@@ -218,14 +227,14 @@ export default function MemberDetailPage() {
     );
   }
 
-  const statusStyle = STATUS_STYLES[member.status] || STATUS_STYLES.INACTIVE;
+  const statusStyle = STATUS_STYLES[member.status] || STATUS_STYLES.inactive;
   const displayName =
     employee?.org_emp_name ||
     member.user?.realName ||
     member.user?.username ||
     member.user?.email ||
-    `User #${member.userId}`;
-  const accountName = member.user?.username || `User #${member.userId}`;
+    l('未命名成员', 'Unnamed member');
+  const accountName = member.user?.username || member.user?.email || l('未设置账号名称', 'Account name not set');
   const avatarText = (displayName || accountName).charAt(0).toUpperCase();
 
   const tabs = [
@@ -261,15 +270,16 @@ export default function MemberDetailPage() {
               </h1>
               <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500 dark:text-gray-400">
                 <span className="font-medium text-gray-700 dark:text-gray-300">{accountName}</span>
-                {member.user?.email && <span>{member.user.email}</span>}
+                {member.user?.email && member.user.email !== accountName && <span>{member.user.email}</span>}
                 {member.user?.phone && <span>{member.user.phone}</span>}
               </p>
             </div>
             <span
               className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusStyle.bg} ${statusStyle.text}`}
               data-testid="member-status"
+              data-status={member.status}
             >
-              {member.status}
+              {memberStatusLabel(member.status, l)}
             </span>
           </div>
         </div>
@@ -347,6 +357,7 @@ export default function MemberDetailPage() {
         {activeTab === 'org' && <OrgInfoTab employee={employee} l={l} />}
         {activeTab === 'teams' && <TeamsTab teams={teams} l={l} navigate={navigate} />}
       </div>
+      <FormDialog />
     </div>
   );
 }
@@ -393,7 +404,7 @@ function BasicInfoTab({
           <div key={i}>
             <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">{f.label}</dt>
             <dd className="mt-1 text-sm text-gray-900 dark:text-white">
-              {f.isStatus ? <StatusBadge status={f.value || ''} /> : f.value || '-'}
+              {f.isStatus ? <StatusBadge status={f.value || ''} label={memberStatusLabel(f.value || '', l)} /> : f.value || '-'}
             </dd>
           </div>
         ))}
@@ -528,13 +539,13 @@ function TeamsTab({
 
 // --- Shared Components ---
 
-function StatusBadge({ status }: { status: string }) {
-  const style = STATUS_STYLES[status] || STATUS_STYLES.INACTIVE;
+function StatusBadge({ status, label }: { status: string; label?: string }) {
+  const style = STATUS_STYLES[status] || STATUS_STYLES.inactive;
   return (
     <span
       className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${style.bg} ${style.text}`}
     >
-      {status}
+      {label ?? status}
     </span>
   );
 }
