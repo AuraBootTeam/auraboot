@@ -25,7 +25,7 @@ import { ErrorCodes } from '~/shared/services/http-client/types';
 // behind toggles + a drawer backdrop intercepts canvas clicks). These specs assert the
 // palette/canvas/nodes directly, so run them at the wide layout the designer targets.
 // See FlowDesigner.tsx COMPACT_FLOW_DESIGNER_QUERY '(max-width: 1599px)'.
-test.use({ viewport: { width: 1680, height: 1050 } });
+test.use({ viewport: { width: 1680, height: 1050 }, locale: 'zh-CN' });
 
 // ---------------------------------------------------------------------------
 // API helpers — ONLY for data setup & cleanup
@@ -347,6 +347,11 @@ test.describe('Automation Enhanced', () => {
 
     // Row and toggle button should be visible
     await expect(ap.automationRow(seedAutomation.pid)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByTestId('btn-import-automation')).toHaveText('导入');
+    await expect(page.getByTestId('btn-new-from-template')).toHaveText('从模板创建');
+    await expect(page.getByTestId(`btn-export-${seedAutomation.pid}`)).toHaveText('导出');
+    await expect(page.getByTestId(`btn-duplicate-${seedAutomation.pid}`)).toHaveText('复制');
+    await page.screenshot({ path: test.info().outputPath('AUTO-01-list.png'), fullPage: true });
     const toggleBtn = ap.toggleButton(seedAutomation.pid);
     await expect(toggleBtn).toBeVisible({ timeout: 3000 });
 
@@ -366,7 +371,13 @@ test.describe('Automation Enhanced', () => {
     // Click Enable — use PO method which polls for status change
     const toggleResponse = page.waitForResponse((r) => new URL(r.url()).pathname === `/api/automations/${seedAutomation.pid}/toggle` && r.request().method() === 'POST');
     await toggleBtn.click();
-    expect((await toggleResponse).status()).toBe(200);
+    const response = await toggleResponse;
+    if (response.status() !== 200) {
+      await expect(page.getByText('切换自动化状态失败，请重试', { exact: true })).toBeVisible();
+      await expect(statusBadge).toContainText('已禁用');
+      await page.screenshot({ path: test.info().outputPath('AUTO-04-failure.png'), fullPage: true });
+    }
+    expect(response.status()).toBe(200);
 
     // After toggle, button should say "Disable" and status badge "Enabled".
     // Under full-suite load the PATCH+refetch round-trip can exceed 10s — bump

@@ -24,7 +24,7 @@ import { openFlowDesignerPanel } from '../_helpers/flow-designer-harness';
 import { ErrorCodes } from '~/shared/services/http-client/types';
 
 // Keep the original viewport and drive responsive panels through their UI toggles.
-test.use({ viewport: { width: 1680, height: 1050 } });
+test.use({ viewport: { width: 1680, height: 1050 }, locale: 'zh-CN' });
 
 // ---------------------------------------------------------------------------
 // Locator helpers — handle both Chinese (zh-CN) and English (en-US) i18n
@@ -148,6 +148,11 @@ test.describe('Automation Designer', () => {
     await openFlowDesignerPanel(page, 'inspector');
     const properties = page.getByTestId('flow-inspector-shell');
     await expect(properties).toBeVisible({ timeout: 5000 });
+    const panelBox = await properties.locator(':scope > div').last().boundingBox();
+    const shellBox = await properties.boundingBox();
+    expect(panelBox).not.toBeNull();
+    expect(shellBox).not.toBeNull();
+    expect(Math.abs(panelBox!.height - shellBox!.height)).toBeLessThanOrEqual(1);
     await page.screenshot({ path: test.info().outputPath('AD-01-inspector.png'), fullPage: true });
   });
 
@@ -362,6 +367,31 @@ test.describe('Automation Designer', () => {
    *
    * The AutomationEditor shows a "Debug" button (bg-gray-800) when automationId is set.
    */
+  test('AD-07-invalid: localized validation prevents a persistence request', async ({ page }) => {
+    const fixture = await createAutomationViaApi(page, { actions: [
+      { type: 'send_notification', config: { message: 'Incomplete fixture' }, sequence: 0 },
+    ] });
+    createdPids.push(fixture.pid);
+    await page.goto(`/automation/${fixture.pid}`);
+    await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
+    await nameInput(page).fill(`${fixture.name} Unsaved`);
+    let puts = 0;
+    page.on('request', (request) => {
+      if (new URL(request.url()).pathname === `/api/automations/${fixture.pid}` && request.method() === 'PUT') puts++;
+    });
+    await page.getByTestId('automation-editor-toolbar-btn-save').click();
+    for (const field of ['notificationType', 'title', 'content', 'recipients']) {
+      await expect(page.getByTestId(`prop-field-${field}`)).toContainText('此字段必填');
+    }
+    const response = await page.request.get(`/api/automations/${fixture.pid}`);
+    expect(response.status()).toBe(200);
+    const saved = await response.json();
+    expect(String(saved.code)).toBe(ErrorCodes.SUCCESS);
+    expect(saved.data.name).toBe(fixture.name);
+    expect(puts).toBe(0);
+    await page.screenshot({ path: test.info().outputPath('AD-07-invalid.png'), fullPage: true });
+  });
+
   test('AD-08: debug button is visible for existing automation', async ({ page }) => {
     if (!testAutomation?.pid) { throw new Error(String('Test automation not created')); }
 
