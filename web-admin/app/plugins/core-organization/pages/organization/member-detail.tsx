@@ -98,17 +98,24 @@ export default function MemberDetailPage() {
   const [employee, setEmployee] = useState<EmployeeData | null>(null);
   const [teams, setTeams] = useState<TeamMembership[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<'forbidden' | 'not-found' | 'error' | null>(null);
   const [activeTab, setActiveTab] = useState<'basic' | 'org' | 'teams'>('basic');
   const actionRefreshTarget = useRef<'detail' | 'list'>('detail');
 
   const loadData = useCallback(async () => {
     if (!memberPid) return;
     setLoading(true);
+    setLoadError(null);
+    setMember(null);
+    setEmployee(null);
+    setTeams([]);
     try {
       // 1. Fetch member info
       const memberResult = await get<MemberData>(`/api/tenant/members/${memberPid}`);
       if (!ResultHelper.isSuccess(memberResult) || !memberResult.data) {
-        throw new Error(memberResult.desc || 'Failed to load member');
+        const status = Number(memberResult.httpStatus ?? memberResult.code);
+        setLoadError(status === 403 ? 'forbidden' : status === 404 ? 'not-found' : 'error');
+        return;
       }
       const m = memberResult.data;
       setMember(m);
@@ -139,8 +146,8 @@ export default function MemberDetailPage() {
       } catch {
         // teams may be empty
       }
-    } catch (e: any) {
-      showErrorToast(e.message || l('加载成员信息失败', 'Failed to load member info'));
+    } catch {
+      setLoadError('error');
     } finally {
       setLoading(false);
     }
@@ -227,8 +234,15 @@ export default function MemberDetailPage() {
 
   if (!member) {
     return (
-      <div className="p-6 py-20 text-center text-gray-500 dark:text-gray-400">
-        {l('成员不存在', 'Member not found')}
+      <div className="p-6 py-20 text-center text-gray-500 dark:text-gray-400" data-testid="member-load-error" data-error-kind={loadError}>
+        <p>{loadError === 'forbidden'
+          ? l('无权查看此成员', 'You do not have permission to view this member')
+          : loadError === 'error'
+            ? l('加载成员信息失败，请重试。', 'Failed to load member information. Please try again.')
+            : l('成员不存在', 'Member not found')}</p>
+        <button type="button" className="mt-4 text-blue-600 hover:underline" onClick={() => navigate('/p/tenant_member')}>
+          {l('返回成员列表', 'Back to members')}
+        </button>
       </div>
     );
   }

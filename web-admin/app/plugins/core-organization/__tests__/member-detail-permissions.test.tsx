@@ -20,6 +20,21 @@ async function loadMember(status = 'active') {
 describe('native member lifecycle authorization', () => {
   beforeEach(() => { vi.clearAllMocks(); mocks.permissions.clear(); });
   afterEach(cleanup);
+  it.each([
+    [403, '403', 'forbidden', '无权查看此成员'],
+    [404, '404', 'not-found', '成员不存在'],
+    [500, '403', 'error', '加载成员信息失败，请重试。'],
+  ])('distinguishes HTTP %s from missing records and clears member content', async (httpStatus, code, kind, message) => {
+    mocks.get.mockResolvedValue({ code, httpStatus, data: null, desc: 'Access forbidden' });
+    render(<MemberDetailPage />);
+    await waitFor(() => expect(screen.getByTestId('member-load-error')).toHaveAttribute('data-error-kind', kind));
+    expect(screen.getByText(message)).toBeVisible();
+    expect(screen.queryByTestId('member-name')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('action-bar')).not.toBeInTheDocument();
+    expect(mocks.toast.showErrorToast).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '返回成员列表' }));
+    expect(mocks.navigate).toHaveBeenCalledWith('/p/tenant_member');
+  });
   it('does not expose lifecycle buttons to a read-only member viewer', async () => {
     mocks.permissions.add('model.tenant_member.read');
     await loadMember();

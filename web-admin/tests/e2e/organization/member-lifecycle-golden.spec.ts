@@ -1,5 +1,6 @@
 import { test, expect } from '../../fixtures';
 import { uniqueId, acceptConfirmDialog } from '../helpers';
+import { ensureQuoteRoleUser, fetchRoleSnapshot, makeQuoteRoleUser, openQuoteRolePage } from '../pcba-solution/quote-e2e-helpers';
 
 test.use({ locale: 'zh-CN' });
 
@@ -152,4 +153,118 @@ test('MEMBER-DETAIL-07: native lifecycle buttons execute commands and persist st
   await expect(page.getByTestId('invite-section')).toHaveText('邀请成员');
   await expect(page.getByTestId('member-import-entry')).toHaveText('导入成员');
   await capture('native-member-removed-list');
+});
+
+
+test('MEMBER-DETAIL-08: independent member-view capability permits reading and revocation denies access @critical', async ({ page, browser }, info) => {
+  test.setTimeout(120000);
+  const stamp = uniqueId('member-view');
+  const roleCode = `e2e_member_view_${stamp}`;
+  const roleResponse = await page.request.post('/api/roles', {
+    data: { code: roleCode, name: `Member view ${stamp}`, type: 'custom', description: 'Independent member read boundary' },
+  });
+  expect(roleResponse.ok()).toBe(true);
+  const roleBody = await roleResponse.json();
+  expect(String(roleBody.code)).toBe('0');
+  const role = roleBody.data as { pid: string };
+  const viewer = makeQuoteRoleUser('member-view', stamp, [roleCode]);
+  const target = makeQuoteRoleUser('member-target', stamp, []);
+  await ensureQuoteRoleUser(page, viewer);
+  await ensureQuoteRoleUser(page, target);
+  const found = await page.request.post('/api/tenant/members/search', {
+    data: { keyword: target.email, pageNum: 1, pageSize: 50 },
+  });
+  expect(found.ok()).toBe(true);
+  const foundBody = await found.json();
+  expect(String(foundBody.code)).toBe('0');
+  const member = foundBody.data.records.find((row: { user?: { email: string } }) => row.user?.email === target.email);
+  expect(member).toBeDefined();
+  expect(member.status).toBe('active');
+  const pid = member.pid as string;
+
+  await page.goto('/home');
+  await expect(page.locator('header[data-hydrated]')).toHaveAttribute('data-hydrated', 'true');
+  await page.getByRole('link', { name: /角色|Roles/, exact: true }).click();
+  await page.getByTestId('role-search-input').fill(roleCode);
+  await page.getByTestId(`role-item-${roleCode}`).click();
+  await expect(page.getByTestId('capability-role-editor')).toHaveAttribute('data-role-pid', role.pid);
+  await page.getByTestId('data-scope-modify-btn').click();
+  await page.getByTestId('data-scope-option-all').click();
+  await page.getByTestId('data-scope-apply').click();
+  await expect(page.getByTestId('data-scope-drawer')).toHaveCount(0);
+  const checkbox = page.getByTestId('capability-checkbox-org.cap.member_view');
+  const saveSelection = async (grant: boolean) => {
+    await checkbox.scrollIntoViewIfNeeded();
+    await checkbox.setChecked(grant);
+    await page.getByTestId('capability-save').click();
+    await expect(page.getByTestId('confirm-dialog')).toBeVisible();
+    const savedPromise = page.waitForResponse(response => response.request().method() === 'PUT' &&
+      response.url().includes('/api/permission/capabilities?'));
+    await page.getByTestId('confirm-ok').click();
+    const response = await savedPromise;
+    expect(response.status()).toBe(200);
+    expect(String((await response.json()).code)).toBe('0');
+    expect(response.request().postDataJSON()).toEqual(grant ? ['org.cap.member_view'] : []);
+    await expect(page.getByTestId('capability-save')).toBeDisabled();
+  };
+  await saveSelection(true);
+  const opened = await openQuoteRolePage(browser, viewer);
+  const viewerPage = opened.page;
+  try {
+    const snapshot = await fetchRoleSnapshot(viewerPage);
+    expect(snapshot.roleCodes).toContain(roleCode);
+    expect(snapshot.permissionCodes).toContain('model.tenant_member.read');
+    for (const code of ['admin_tenant_member', 'model.tenant_member.suspend', 'model.tenant_member.leave', 'model.tenant_member.delete']) {
+      expect(snapshot.permissionCodes).not.toContain(code);
+    }
+    await info.attach('member-view-role-snapshot', { body: JSON.stringify(snapshot), contentType: 'application/json' });
+    await viewerPage.evaluate(() => localStorage.removeItem('sidebar-collapsed'));
+    await viewerPage.reload();
+    const membersLink = viewerPage.locator('nav a[href="/p/tenant_member"]');
+    if (!(await membersLink.isVisible())) {
+      await viewerPage.locator('nav button').filter({ hasText: '组织管理' }).first().click();
+    }
+    await expect(membersLink).toBeVisible();
+    await membersLink.click();
+    const row = viewerPage.locator('table tbody tr').filter({ hasText: target.displayName });
+    await expect(row).toHaveCount(1);
+    const readPromise = viewerPage.waitForResponse(response => new URL(response.url()).pathname === `/api/tenant/members/${pid}`);
+    await row.click();
+    const read = await readPromise;
+    expect(read.status()).toBe(200);
+    const readBody = await read.json();
+    expect(String(readBody.code)).toBe('0');
+    expect(readBody.data.pid).toBe(pid);
+    await expect(viewerPage.getByTestId('member-name')).toHaveText(target.displayName);
+    await expect(viewerPage.getByTestId('member-status')).toHaveAttribute('data-status', 'active');
+    await expect(viewerPage.getByTestId('action-bar').getByRole('button')).toHaveCount(0);
+    await viewerPage.screenshot({ path: info.outputPath('independent-member-view.png'), fullPage: true });
+
+    const impact = await viewerPage.request.get(`/api/tenant/members/${pid}/offboarding-impact?action=suspend`);
+    expect(impact.status()).toBe(403);
+    const command = await viewerPage.request.post('/api/meta/commands/execute/admin:suspend_member', {
+      data: { targetRecordPid: pid, data: { reason: 'Must be denied for read-only role' } },
+    });
+    expect(command.status()).toBe(403);
+    const persisted = await page.request.get(`/api/tenant/members/${pid}`);
+    expect(persisted.ok()).toBe(true);
+    expect((await persisted.json()).data.status).toBe('active');
+    await info.attach('member-write-denials', { body: JSON.stringify({ impact: await impact.json(), command: await command.json(), targetPid: pid, persistedStatus: 'active' }), contentType: 'application/json' });
+    await viewerPage.screenshot({ path: info.outputPath('independent-member-write-denied.png'), fullPage: true });
+
+    await saveSelection(false);
+    const revokedReadPromise = viewerPage.waitForResponse(response => new URL(response.url()).pathname === `/api/tenant/members/${pid}`);
+    await viewerPage.reload();
+    const revoked = await revokedReadPromise;
+    expect(revoked.status()).toBe(403);
+    await expect(viewerPage.getByTestId('member-name')).toHaveCount(0);
+    await expect(viewerPage.getByTestId('member-status')).toHaveCount(0);
+    await expect(viewerPage.getByTestId('member-load-error')).toHaveAttribute('data-error-kind', 'forbidden');
+    await expect(viewerPage.getByText('无权查看此成员', { exact: true })).toBeVisible();
+    await expect(viewerPage.getByText('成员不存在', { exact: true })).toHaveCount(0);
+    await expect(viewerPage.getByText('Access forbidden', { exact: true })).toHaveCount(0);
+    await viewerPage.screenshot({ path: info.outputPath('independent-member-read-revoked.png'), fullPage: true });
+  } finally {
+    await opened.context.close();
+  }
 });

@@ -1,4 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { BASE_URL } from '../../helpers/environments';
 
 /**
@@ -486,4 +488,113 @@ test('partial revocation retains selected shared actions and completion persists
     path: info.outputPath('partial-completed-persisted.png'),
     fullPage: true,
   });
+});
+
+
+test('configured display groups support upper-level grant and revoke without changing actions', async ({ page }, info) => {
+  const coreRoot = process.env.AURA_CORE_PROJECT_ROOT ?? resolve(process.cwd(), '..');
+  const manifest = JSON.parse(readFileSync(resolve(coreRoot, 'plugins/org-management/plugin.json'), 'utf8'));
+  const definitions = JSON.parse(readFileSync(resolve(coreRoot, 'plugins/org-management/config/capabilities.json'), 'utf8'));
+  const original = definitions.find((item: { code: string }) => item.code === 'org.cap.member_view');
+  expect(original).toBeTruthy();
+  // Import only the existing declaration; do not import models, menus, or commands.
+  delete manifest.resourceDirs;
+  const groupName = `验收配置分组 ${Date.now()}`;
+  const modified = { ...original, group: groupName, 'name:zh-CN': '验收配置成员查看' };
+  const role = await createRole(page);
+  const capUrl = `${BASE}/api/permission/capabilities?rolePid=${encodeURIComponent(role.pid)}`;
+  const readGroups = async () => {
+    const response = await page.request.get(capUrl);
+    expect(response.status()).toBe(200);
+    const body = await response.json();
+    expect(String(body.code)).toBe('0');
+    return body.data as Array<{ group: string; capabilities: Array<{
+      code: string; includes: string[]; granted: boolean; authorizationState: string;
+    }> }>;
+  };
+  const codesOf = (groups: Awaited<ReturnType<typeof readGroups>>) =>
+    groups.flatMap(group => group.capabilities.map(cap => cap.code)).sort();
+  const initial = await readGroups();
+  expect(initial.flatMap(group => group.capabilities).filter(cap => cap.granted)).toEqual([]);
+  const importDeclaration = async (declaration: typeof original, dryRun = false) => {
+    const response = await page.request.post(
+      `${BASE}/api/plugins/import/execute-direct?conflictStrategy=OVERWRITE&autoDeployProcesses=false&dryRun=${dryRun}`,
+      { data: { ...manifest, capabilities: [declaration] } },
+    );
+    expect(response.status()).toBe(200);
+    const result = await response.json();
+    expect(dryRun ? result.valid : result.success).toBe(true);
+    return result;
+  };
+  const readCap = async () => (await readGroups()).flatMap(group => group.capabilities)
+    .find(cap => cap.code === original.code)!;
+
+  await importDeclaration(modified, true);
+  // Always restore this temporary display update, including after a failed UI assertion.
+  // Created roles and grant/revoke evidence remain; no database cleanup is performed.
+  try {
+    const imported = await importDeclaration(modified);
+    await info.attach('configured-group-import', { body: JSON.stringify(imported), contentType: 'application/json' });
+    const updated = await readGroups();
+    expect(codesOf(updated)).toEqual(codesOf(initial));
+    expect(updated.find(group => group.group === groupName)?.capabilities.map(cap => cap.code)).toEqual([original.code]);
+    expect((await readCap()).includes).toEqual(original.includes);
+    expect((await readCap()).authorizationState).toBe('none');
+
+    await page.goto('/home');
+    await expect(page.locator('header[data-hydrated]')).toHaveAttribute('data-hydrated', 'true');
+    await page.getByRole('link', { name: /角色|Roles/, exact: true }).click();
+    await expect(page.getByTestId('permission-page')).toBeVisible();
+    await page.getByTestId('role-search-input').fill(role.code);
+    await page.getByTestId(`role-item-${role.code}`).click();
+    await expect(page.getByTestId('capability-role-editor')).toHaveAttribute('data-role-pid', role.pid);
+    const group = page.getByTestId(`capability-group-${groupName}`);
+    const checkbox = group.getByTestId(`capability-checkbox-${original.code}`);
+    await group.scrollIntoViewIfNeeded();
+    await expect(group).toContainText('验收配置成员查看');
+    await expect(checkbox).not.toBeChecked();
+    await expect(page.getByTestId('advanced-atomic-section')).toHaveCount(0);
+    await page.screenshot({ path: info.outputPath('configured-group-none.png'), fullPage: true });
+
+    for (const grant of [true, false]) {
+      await checkbox.scrollIntoViewIfNeeded();
+      await checkbox.setChecked(grant);
+      const previewPromise = page.waitForResponse(response =>
+        response.url().includes('/api/permission/capabilities/preview') && response.request().method() === 'POST');
+      await page.getByTestId('capability-save').click();
+      const previewResponse = await previewPromise;
+      expect(previewResponse.status()).toBe(200);
+      const preview = await previewResponse.json();
+      expect(String(preview.code)).toBe('0');
+      expect(preview.data[grant ? 'grantedCodes' : 'revokedCodes'].sort()).toEqual([...original.includes].sort());
+      expect(previewResponse.request().postDataJSON()).toEqual(grant ? [original.code] : []);
+      await expect(page.getByTestId('confirm-dialog')).toBeVisible();
+      await info.attach(grant ? 'configured-group-grant-preview' : 'configured-group-revoke-preview',
+        { body: JSON.stringify(preview.data), contentType: 'application/json' });
+      await page.screenshot({ path: info.outputPath(`configured-group-${grant ? 'grant' : 'revoke'}-preview.png`), fullPage: true });
+      const savedPromise = page.waitForResponse(response =>
+        response.url().includes('/api/permission/capabilities') && response.request().method() === 'PUT');
+      await page.getByTestId('confirm-ok').click();
+      const saved = await savedPromise;
+      expect(saved.status()).toBe(200);
+      expect(String((await saved.json()).code)).toBe('0');
+      expect(saved.request().postDataJSON()).toEqual(grant ? [original.code] : []);
+      expect((await readCap()).authorizationState).toBe(grant ? 'full' : 'none');
+      await page.reload();
+      await page.getByTestId('role-search-input').fill(role.code);
+      await page.getByTestId(`role-item-${role.code}`).click();
+      await expect(page.getByTestId('capability-role-editor')).toHaveAttribute('data-role-pid', role.pid);
+      await group.scrollIntoViewIfNeeded();
+      await expect(checkbox).toBeChecked({ checked: grant });
+      await page.screenshot({ path: info.outputPath(`configured-group-${grant ? 'granted' : 'revoked'}.png`), fullPage: true });
+    }
+  } finally {
+    const restored = await importDeclaration(original);
+    await info.attach('configured-group-restored', { body: JSON.stringify(restored), contentType: 'application/json' });
+    const groups = await readGroups();
+    expect(codesOf(groups)).toEqual(codesOf(initial));
+    expect(groups.some(group => group.group === groupName)).toBe(false);
+    expect(groups.find(group => group.group === original.group)?.capabilities.some(cap => cap.code === original.code)).toBe(true);
+    expect((await readCap()).includes).toEqual(original.includes);
+  }
 });
