@@ -529,7 +529,25 @@ test.describe('Scheduled Task — Full Lifecycle (P0)', () => {
     await expect(deletedRow).toHaveCount(0);
     const deletedRecord = await page.request.get(`/api/dynamic/scheduled_task/${seed.recordId}`);
     expect(deletedRecord.status()).toBe(404);
+    const reloadedList = page.waitForResponse(
+      (r) => new URL(r.url()).pathname === '/api/dynamic/scheduled_task/list',
+    );
     await page.reload();
+    const filteredList = await reloadedList;
+    expect(filteredList.status()).toBe(200);
+    expect(String((await filteredList.json()).code)).toBe('0');
+    // The row lookup intentionally retains its keyword across reload.
+    const keyword = page.getByRole('textbox', { name: /查询|Search/ });
+    await expect(keyword).toHaveValue(TASK_NAME_DELETE);
+    await expect(page.getByText('暂无定时任务', { exact: true })).toBeVisible();
+    const unfilteredList = page.waitForResponse(
+      (r) => new URL(r.url()).pathname === '/api/dynamic/scheduled_task/list',
+    );
+    await keyword.fill('');
+    await keyword.press('Enter');
+    const restoredList = await unfilteredList;
+    expect(restoredList.status()).toBe(200);
+    expect(String((await restoredList.json()).code)).toBe('0');
     await expect(page.locator('tbody tr', { hasText: TASK_NAME })).toBeVisible();
     await expect(page.locator('tbody tr', { hasText: TASK_NAME_DELETE })).toHaveCount(0);
   });
