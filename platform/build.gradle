@@ -19,6 +19,39 @@ bootJar {
     archiveClassifier = 'boot'
 }
 
+// Fixture endpoints are a separate opt-in artifact, never production classes.
+// Reuse the six canonical fixture sources without JUnit or integration tests.
+sourceSets {
+    testApi {
+        java {
+            srcDir 'src/test/java'
+            include 'com/auraboot/framework/test/test/controller/*.java'
+            include 'com/auraboot/framework/test/test/dto/*.java'
+        }
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+configurations {
+    testApiImplementation.extendsFrom implementation
+    testApiCompileOnly.extendsFrom compileOnly
+    testApiAnnotationProcessor.extendsFrom annotationProcessor
+}
+
+tasks.named('compileTestApiJava', JavaCompile) {
+    options.encoding = 'UTF-8'
+    options.compilerArgs += ['-parameters']
+}
+
+tasks.register('testApiJar', Jar) {
+    group = 'verification'
+    description = 'Build opt-in test-profile seed/fixture API without production packaging changes'
+    archiveClassifier = 'test-api'
+    from sourceSets.testApi.output
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+
 publishing {
     publications {
         mavenJava(MavenPublication) {
