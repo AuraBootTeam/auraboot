@@ -46,6 +46,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"            # the auraboot checkout this script lives in
 source "$SCRIPT_DIR/lib/web-admin-node-modules.sh"
 source "$SCRIPT_DIR/lib/golden-new-database.sh"
+source "$SCRIPT_DIR/lib/golden-runtime-identity.sh"
 # CI uses sibling repositories; local worktrees usually find dev.sh above them.
 WORKSPACE="${AURA_WORKSPACE_ROOT:-${AURA_CI_WORKSPACE_ROOT:-}}"
 if [ -z "$WORKSPACE" ] && [ -f "$(dirname "$REPO_ROOT")/auraboot-workspace/dev.sh" ]; then
@@ -66,7 +67,8 @@ if [ ! -f "$WORKSPACE/dev.sh" ]; then
 fi
 [ -f "$WORKSPACE/dev.sh" ] || { echo "FATAL: cannot find workspace dev.sh for $REPO_ROOT"; exit 1; }
 CANONICAL="$WORKSPACE/auraboot"                      # canonical OSS checkout (for gradle wrapper / node_modules seed)
-DEV="$WORKSPACE/dev.sh"
+DEV="$WORKSPACE/aura"
+[ -x "$DEV" ] || { echo "FATAL: canonical workspace aura CLI is missing" >&2; exit 1; }
 WORKSPACE_STATE="${AURA_WORKSPACE_STATE_DIR:-$WORKSPACE/.workspace}"
 
 ADMIN_EMAIL="admin@auraboot.com"
@@ -381,6 +383,16 @@ cmd_up() {
     fi
   fi
 
+  local runtime_source_args=("$name" "$REPO_ROOT" "$WORKSPACE")
+  if [ "${#extra_plugin_roots[@]}" -gt 0 ]; then
+    runtime_source_args+=("${extra_plugin_roots[@]}")
+  fi
+  if [ "${#product_migration_roots[@]}" -gt 0 ]; then
+    runtime_source_args+=("${product_migration_roots[@]}")
+  fi
+  golden_runtime_bind_sources "${runtime_source_args[@]}" \
+    || die "immutable runtime sources could not be bound"
+
   local server_port vite_port bff_port pg_db redis_db pg_host pg_port pg_user pg_pass
   server_port="$(runtime_env "$name" SERVER_PORT)"
   vite_port="$(runtime_env "$name" VITE_PORT)"
@@ -471,30 +483,24 @@ cmd_up() {
     log "    applied $migration_count product migration(s); receipt: $sd/product-migrations.tsv"
   fi
 
-  log "3/9 seed gradle wrapper jar (fresh-worktree gotcha)"
-  if [ ! -f "$REPO_ROOT/platform/gradle/wrapper/gradle-wrapper.jar" ]; then
-    mkdir -p "$REPO_ROOT/platform/gradle/wrapper"
-    cp "$CANONICAL/platform/gradle/wrapper/gradle-wrapper.jar" "$REPO_ROOT/platform/gradle/wrapper/" \
-      || die "cannot seed gradle-wrapper.jar from $CANONICAL"
-    cp "$CANONICAL/platform/gradlew" "$REPO_ROOT/platform/gradlew" 2>/dev/null && chmod +x "$REPO_ROOT/platform/gradlew" || true
-  fi
+  log "3/9 verify this source's Gradle wrapper (managed CLI provisions its jar)"
+  [ -x "$REPO_ROOT/platform/gradlew" ] || die "source Gradle wrapper is missing or not executable"
 
-  log "4/9 build bootJar (default ~/.gradle for plugin/mirror resolution; --no-daemon)"
+  log "4/9 build bootJar (runtime-owned Gradle cache; --no-daemon)"
   # --no-build-cache: a golden stack must produce a correct, reproducible jar. The
   # shared local Gradle build cache can hand a fresh worktree a corrupt :compileJava
   # entry (observed 2026-07-23: MqProvider.class/MqMessageHandler.class missing from
   # the cached output → platform-mq-kafka fails to resolve them, masked by UP-TO-DATE),
   # so bypass it here rather than trust a cross-worktree cache for a release build.
-  ( cd "$REPO_ROOT/platform" && ./gradlew --no-daemon --no-build-cache :bootJar -x test --console=plain ) >"$sd/bootjar.log" 2>&1 \
+  "$DEV" gradle "$name" --project "$REPO_ROOT/platform" -- --no-daemon --no-build-cache :bootJar -x test --console=plain >"$sd/bootjar.log" 2>&1 \
     || die "bootJar build failed — see $sd/bootjar.log"
   local jar; jar="$(ls "$REPO_ROOT"/platform/build/libs/*-boot.jar 2>/dev/null | head -1)"
   [ -n "$jar" ] || die "boot jar not found after build"
-  # Run from a copy, not the build output: the JVM lazily re-opens nested jars from this
-  # path for its whole lifetime, and a build that rewrites build/libs mid-boot (CI suite,
-  # second 'up' that lost the lock race on an older checkout) kills the process. The
-  # golden-stack lock above only covers cooperating golden-stack runs.
-  local run_jar="$sd/boot-run.jar"
-  cp "$jar" "$run_jar"
+  local run_jar runtime_token
+  run_jar="$(golden_runtime_stage_backend "$name" "$jar")" \
+    || die "backend artifact registration failed"
+  runtime_token="$("$DEV" runtime process token "$name")" \
+    || die "runtime ownership token could not be obtained"
 
   local staging_args=(--profile "${plugin_profile:-none}")
   if [ "${#extra_plugin_roots[@]}" -gt 0 ]; then
@@ -512,7 +518,7 @@ cmd_up() {
   log "5/9 start backend (java -jar) on $server_port"
   mkdir -p "$sd/pf4j-plugins"
   spawn_detached "$sd/backend.pid" "$REPO_ROOT/platform" "$sd/backend.log" \
-    env SERVER_PORT="$server_port" \
+    env AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" SERVER_PORT="$server_port" \
       SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:5432/${pg_db}?charSet=UTF8" \
       SPRING_DATASOURCE_USERNAME=auraboot SPRING_DATASOURCE_PASSWORD=auraboot \
       SPRING_DATA_REDIS_HOST=127.0.0.1 SPRING_DATA_REDIS_PORT=6379 SPRING_DATA_REDIS_DATABASE="$redis_db" \
@@ -539,6 +545,8 @@ cmd_up() {
   if ! lsof -ti ":$server_port" 2>/dev/null | grep -qx "$own_pid"; then
     die "port $server_port is served by a foreign process ($(lsof -ti ":$server_port" 2>/dev/null | head -1)), not our backend pid $own_pid — pick another slot; see $sd/backend.log"
   fi
+  golden_runtime_register_listener "$name" backend "$server_port" "$own_pid" "$REPO_ROOT/platform" "$runtime_token" \
+    || die "backend listener registration failed"
   log "    backend UP (pid $own_pid, port ownership verified)"
 
   log "6/9 bootstrap (minimal admin + tenant; idempotent)"
@@ -610,7 +618,7 @@ cmd_up() {
       *) die "refusing to clear unexpected Vite cache path: $vite_cache_dir" ;;
     esac
     spawn_detached "$sd/frontend.pid" "$REPO_ROOT/web-admin" "$sd/frontend.log" \
-      env VITE_PORT="$vite_port" BFF_PORT="$bff_port" SPRING_BOOT_URL="http://127.0.0.1:$server_port" \
+      env AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" VITE_PORT="$vite_port" BFF_PORT="$bff_port" SPRING_BOOT_URL="http://127.0.0.1:$server_port" \
       BFF_INTERNAL_URL="http://127.0.0.1:$server_port" NODE_ENV=development \
       pnpm dev:full
     # Wait for Vite to start accepting connections (302 → /login is fine). Poll
@@ -619,6 +627,16 @@ cmd_up() {
     poll_http_up "http://127.0.0.1:$vite_port/" 120 || true
     local code; code="$(curl --noproxy '*' -s -m 3 -o /dev/null -w '%{http_code}' "http://127.0.0.1:$vite_port/" 2>/dev/null || true)"
     case "$code" in ""|000) die "Vite did not come up on $vite_port — see $sd/frontend.log";; esac
+    local frontend_pid bff_wait
+    frontend_pid="$(cat "$sd/frontend.pid")"
+    for bff_wait in $(seq 1 120); do
+      lsof -nP -iTCP:"$bff_port" -sTCP:LISTEN -t >/dev/null 2>&1 && break
+      sleep 1
+    done
+    golden_runtime_register_listener "$name" web "$vite_port" "$frontend_pid" "$REPO_ROOT/web-admin" "$runtime_token" \
+      || die "Web listener registration failed"
+    golden_runtime_register_listener "$name" bff "$bff_port" "$frontend_pid" "$REPO_ROOT/web-admin" "$runtime_token" \
+      || die "BFF listener registration failed"
     log "    frontend UP (supervisor pid $(cat "$sd/frontend.pid"), vite http=$code)"
   else
     log "7/9 frontend: skipped (--no-frontend)"

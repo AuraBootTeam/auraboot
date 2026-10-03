@@ -125,7 +125,7 @@ test('real stack launcher rejects an existing database before infra or schema wr
   const f = fixture(t);
   fs.copyFileSync(new URL('../oss-golden-stack.sh', import.meta.url), path.join(f.repo, 'scripts/oss-golden-stack.sh'));
   fs.mkdirSync(path.join(f.repo, 'scripts/lib'));
-  for (const file of ['web-admin-node-modules.sh', 'golden-new-database.sh']) {
+  for (const file of ['web-admin-node-modules.sh', 'golden-new-database.sh', 'golden-runtime-identity.sh']) {
     fs.copyFileSync(new URL('../lib/' + file, import.meta.url), path.join(f.repo, 'scripts/lib', file));
   }
   const state = f.env.AURA_WORKSPACE_STATE_DIR;
@@ -147,6 +147,7 @@ POSTGRES_PASSWORD=fixture
 ENV
 fi
 `, { mode: 0o755 });
+  fs.copyFileSync(path.join(f.root, 'dev.sh'), path.join(f.root, 'aura'));
   fs.writeFileSync(path.join(f.root, 'bin/psql'), '#!/usr/bin/env bash\ncat >> "$CALLS"\necho 1\n', { mode: 0o755 });
   const result = spawnSync('bash', [path.join(f.repo, 'scripts/oss-golden-stack.sh'), 'up', 'owned-run', '--slot', '900', '--require-new-db'], {
     env: f.env, encoding: 'utf8', timeout: 10000 });
@@ -154,6 +155,7 @@ fi
   assert.match(result.stderr, /database freshness could not be established/);
   const calls = fs.readFileSync(f.calls, 'utf8');
   assert.match(calls, /runtime ensure/);
+  assert.ok(calls.includes(`runtime migrate owned-run --source auraboot=${f.repo} --source workspace=${f.root}`));
   assert.doesNotMatch(calls, /infra ensure|CREATE|DROP|schema-current/);
   assert.ok(fs.existsSync(path.join(state, 'env/owned-run.env')), 'failed allocation must remain inspectable');
   assert.equal(fs.existsSync(path.join(state, 'golden/owned-run/pgenv')), false);
