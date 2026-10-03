@@ -201,8 +201,8 @@ info "running production-threshold k6 profile inside the CI network"
 docker run --rm --user "$RUNNER_UID:$RUNNER_GID" --network "$NET" \
   -v "$STAGE/tests/load/k6":/scripts:ro \
   -v "$ARTIFACTS":/artifacts -e PROFILE=production -e BASE_URL="http://$APP:6443" \
-  -e CLIENT_ID="$CLIENT_ID" -e CLIENT_SECRET="$CLIENT_SECRET" "$K6_IMAGE" run \
-  --summary-export /artifacts/slo-summary.json /scripts/open-platform-slo.js \
+  -e CLIENT_ID="$CLIENT_ID" -e CLIENT_SECRET="$CLIENT_SECRET" \
+  -e SUMMARY_PATH=/artifacts/slo-summary.json "$K6_IMAGE" run /scripts/open-platform-slo.js \
   > "$ARTIFACTS/logs/k6.log" 2>&1 || fail "Open Platform production SLO thresholds failed"
 rm -f "$CREDENTIAL_ARTIFACT"
 
