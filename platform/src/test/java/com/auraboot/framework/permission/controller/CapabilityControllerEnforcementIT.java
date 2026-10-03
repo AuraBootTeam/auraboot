@@ -59,6 +59,10 @@ class CapabilityControllerEnforcementIT extends BaseIntegrationTest {
     @BeforeEach
     void cleanSlate() {
         grantTenantAdminRoleToTestUser();
+        // Registered permissions exercise the strict grant path. Missing codes
+        // intentionally allow tenant-admin bootstrap and cannot prove denial.
+        grantToTestRole(MetaPermission.ROLE_READ);
+        grantToTestRole(MetaPermission.ROLE_MANAGE);
         revokeFromTestRole(MetaPermission.ROLE_READ);
         revokeFromTestRole(MetaPermission.ROLE_MANAGE);
         userPermissionService.evictPermissionDefinitions(getTestTenant().getId());

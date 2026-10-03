@@ -508,6 +508,10 @@ bootRun {
 }
 
 tasks.withType(Test).configureEach {
+    def retainedAllure = providers.environmentVariable('AURA_ALLURE_RESULTS').orNull
+    if (retainedAllure) {
+        systemProperty 'allure.results.directory', retainedAllure
+    }
     // Frozen architecture rules may remove obsolete violations. Keep those writes
     // in this task's build directory rather than mutating the checked-in baseline.
     def architectureBaseline = file('src/test/resources/archunit_store')
@@ -645,7 +649,7 @@ test {
 
 tasks.register('bootstrapBillingAccountTest', Test) {
     group = 'verification'
-    description = 'Run the destructive full-bootstrap billing account integration test last.'
+    description = 'Run full-bootstrap billing account integration on a dedicated fresh database.'
     useJUnitPlatform {
         includeTags 'destructive-bootstrap'
     }

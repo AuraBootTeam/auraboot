@@ -63,7 +63,9 @@ class AsyncTaskServiceImplCoverageIT {
         request.setTaskType("lease-fixture");
         request.setTaskName("execution lease integration");
         AsyncTaskDTO submitted = asyncTaskService.submitTask(request, TENANT_ID, USER_ID);
-        org.awaitility.Awaitility.await().atMost(java.time.Duration.ofSeconds(10)).untilAsserted(() -> {
+        // Poll on the authenticated test thread; the product executor remains asynchronous.
+        org.awaitility.Awaitility.await().pollInSameThread()
+                .atMost(java.time.Duration.ofSeconds(10)).untilAsserted(() -> {
             AsyncTask task = asyncTaskMapper.findByTaskCode(submitted.getTaskCode());
             assertEquals(AsyncTask.STATUS_COMPLETED, task.getStatus());
             assertEquals(100, task.getProgress());

@@ -174,7 +174,6 @@ if [[ "$postgres_initialized" != true ]]; then
 fi
 
 FLYWAY_ARGS=(
-  -url=jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/aura_boot
   -user=auraboot
   -password=auraboot_dev
   -locations=filesystem:/flyway/sql
@@ -186,7 +185,7 @@ FLYWAY_ARGS=(
 run_flyway() {
   docker run --rm --network host \
     -v "$PROJECT_ROOT/platform/src/main/resources/db/migration/core:/flyway/sql:ro" \
-    "$FLYWAY_IMAGE" "${FLYWAY_ARGS[@]}" "$1"
+    "$FLYWAY_IMAGE" "-url=jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/${2:-aura_boot}" "${FLYWAY_ARGS[@]}" "$1"
 }
 
 if ! run_flyway migrate > "$ARTIFACTS/flyway-migrate.log" 2>&1; then
@@ -230,13 +229,29 @@ if [[ "${AURA_CI_INCLUDE_DASHSCOPE_LIVE:-0}" != "1" ]]; then
     '[oss-backend-unit-ci] DashScope live checks disabled; set AURA_CI_INCLUDE_DASHSCOPE_LIVE=1 to opt in'
 fi
 
-TEST_DATABASE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/aura_boot?charSet=UTF8" \
+# Bootstrap owns a second blank database; immutable tenant bindings in the shared
+# integration database are never removed to manufacture a fresh bootstrap state.
+if ! docker compose "${COMPOSE_ARGS[@]}" exec -T postgres \
+    createdb -U auraboot aura_boot_bootstrap; then
+  environment_invalid 'cannot create dedicated bootstrap database'
+fi
+for operation in migrate validate; do
+  if ! run_flyway "$operation" aura_boot_bootstrap > "$ARTIFACTS/bootstrap-flyway-$operation.log" 2>&1; then
+    printf '[oss-backend-unit-ci] product-failure: bootstrap Flyway %s failed\n' "$operation" >&2
+    exit 1
+  fi
+done
+
+run_gradle_tests() {
+  local test_database="$1"
+  shift
+TEST_DATABASE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/$test_database?charSet=UTF8" \
 TEST_DATABASE_USERNAME='auraboot' \
 TEST_DATABASE_PASSWORD='auraboot_dev' \
-DATABASE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/aura_boot?charSet=UTF8" \
+DATABASE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/$test_database?charSet=UTF8" \
 DATABASE_USERNAME='auraboot' \
 DATABASE_PASSWORD='auraboot_dev' \
-SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/aura_boot?charSet=UTF8" \
+SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/$test_database?charSet=UTF8" \
 SPRING_DATASOURCE_USERNAME='auraboot' \
 SPRING_DATASOURCE_PASSWORD='auraboot_dev' \
 SPRING_DATA_REDIS_HOST='127.0.0.1' \
@@ -245,15 +260,21 @@ SPRING_DATA_REDIS_URL="redis://127.0.0.1:$AURA_OSS_CI_REDIS_PORT" \
 SPRING_KAFKA_BOOTSTRAP_SERVERS="127.0.0.1:$AURA_OSS_CI_KAFKA_PORT" \
 AURA_CI_REQUIRE_KAFKA='1' \
 AURA_CI_KAFKA_BOOTSTRAP_SERVERS="127.0.0.1:$AURA_OSS_CI_KAFKA_PORT" \
-platform/gradlew -p platform --continue cleanTest test bootstrapBillingAccountTest
+platform/gradlew -p platform --continue "$@"
+}
 
-# The test task remains the sole gate authority.  Allure is an additional
-# evidence format: copy results only after Gradle finishes and never mask its
-# exit status when report generation or copying fails.
+run_gradle_tests aura_boot cleanTest test
 gradle_status=$?
-if [[ -n "${AURA_ALLURE_RESULTS:-}" && -d "$PROJECT_ROOT/platform/build/allure-results" ]]; then
-  mkdir -p "$AURA_ALLURE_RESULTS"
-  cp -a "$PROJECT_ROOT/platform/build/allure-results/." "$AURA_ALLURE_RESULTS/" || \
-    printf '[oss-backend-unit-ci] warning: unable to copy Allure results\n' >&2
-fi
+run_gradle_tests aura_boot_bootstrap cleanBootstrapBillingAccountTest bootstrapBillingAccountTest
+bootstrap_status=$?
+if (( gradle_status == 0 )); then gradle_status=$bootstrap_status; fi
+
+# Preserve the original test status while retaining both tasks' JUnit evidence.
+mkdir -p "$ARTIFACTS/junit"
+for task in test bootstrapBillingAccountTest; do
+  if [[ -d "$PROJECT_ROOT/platform/build/test-results/$task" ]]; then
+    cp -a "$PROJECT_ROOT/platform/build/test-results/$task" "$ARTIFACTS/junit/" || \
+      printf '[oss-backend-unit-ci] warning: unable to copy %s JUnit results\n' "$task" >&2
+  fi
+done
 exit "$gradle_status"

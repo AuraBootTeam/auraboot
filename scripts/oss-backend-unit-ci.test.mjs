@@ -100,7 +100,7 @@ test('backend CI runner pre-pulls every fixed and Testcontainers image', () => {
 });
 
 test('backend CI runner preserves Gradle product-test exit status', () => {
-  assert.match(source, /^platform\/gradlew -p platform --continue cleanTest test bootstrapBillingAccountTest\s*$/m);
+  assert.match(source, /^platform\/gradlew -p platform --continue "\$@"\s*$/m);
   assert.match(source, /gradle_status=\$\?/);
   assert.match(source, /exit "\$gradle_status"\s*$/);
   assert.doesNotMatch(source, /platform\/gradlew[^\n]*\|\| environment_invalid/);
@@ -114,17 +114,20 @@ test('backend CI runner keeps external DashScope checks out unless explicitly re
 
 test('backend CI runner executes destructive bootstrap verification only after the shared suite', () => {
   const buildSource = readFileSync(gradleBuild, 'utf8');
-  assert.match(source, /--continue cleanTest test bootstrapBillingAccountTest/);
+  assert.match(source, /run_gradle_tests aura_boot cleanTest test/);
+  assert.match(source, /run_gradle_tests aura_boot_bootstrap cleanBootstrapBillingAccountTest bootstrapBillingAccountTest/);
+  assert.match(source, /createdb -U auraboot aura_boot_bootstrap/);
+  assert.match(source, /run_flyway "\$operation" aura_boot_bootstrap/);
   assert.match(buildSource, /excludeTags 'destructive-bootstrap'/);
   assert.match(buildSource, /mustRunAfter tasks\.named\('test'\)/);
   assert.match(buildSource, /outputs\.upToDateWhen \{ false \}/);
 });
 
 test('backend CI runner points fixed-stack tests at runtime-owned host ports', () => {
-  assert.match(source, /TEST_DATABASE_URL="jdbc:postgresql:\/\/127\.0\.0\.1:\$\{AURA_OSS_CI_POSTGRES_PORT\}\/aura_boot/);
+  assert.match(source, /TEST_DATABASE_URL="jdbc:postgresql:\/\/127\.0\.0\.1:\$\{AURA_OSS_CI_POSTGRES_PORT\}\/\$test_database/);
   assert.match(source, /TEST_DATABASE_USERNAME='auraboot'/);
   assert.match(source, /TEST_DATABASE_PASSWORD='auraboot_dev'/);
-  assert.match(source, /SPRING_DATASOURCE_URL="jdbc:postgresql:\/\/127\.0\.0\.1:\$\{AURA_OSS_CI_POSTGRES_PORT\}\/aura_boot/);
+  assert.match(source, /SPRING_DATASOURCE_URL="jdbc:postgresql:\/\/127\.0\.0\.1:\$\{AURA_OSS_CI_POSTGRES_PORT\}\/\$test_database/);
   assert.match(source, /SPRING_DATASOURCE_USERNAME='auraboot'/);
   assert.match(source, /SPRING_DATASOURCE_PASSWORD='auraboot_dev'/);
   assert.match(source, /SPRING_DATA_REDIS_HOST='127\.0\.0\.1'/);
@@ -253,4 +256,33 @@ test('cleanup retains stop and release errors without turning them into a succes
   assert.match(readFileSync(path.join(result.artifacts, 'compose-stop.log'), 'utf8'), /stop failure fixture/);
   assert.match(readFileSync(path.join(result.artifacts, 'network-release.log'), 'utf8'), /active endpoints fixture/);
   assert.doesNotMatch(result.stdout, /network_status=released|network released/);
+});
+
+for (const [sharedStatus, bootstrapStatus, expected] of [[0, 0, 0], [1, 0, 1], [0, 1, 1], [2, 1, 2]]) {
+  test(`independent bootstrap preserves statuses ${sharedStatus}/${bootstrapStatus}`, () => {
+    const calls = source.slice(source.indexOf('run_gradle_tests aura_boot cleanTest test'), source.indexOf('# Preserve the original test status'));
+    const result = spawnSync('bash', ['-c', `
+      run_gradle_tests() {
+        printf '%s\\n' "$*"
+        if [[ "$1" == aura_boot ]]; then return "$SHARED_STATUS"; fi
+        return "$BOOTSTRAP_STATUS"
+      }
+      ${calls}
+      exit "$gradle_status"
+    `], { encoding: 'utf8', env: { ...process.env, SHARED_STATUS: String(sharedStatus), BOOTSTRAP_STATUS: String(bootstrapStatus) } });
+    assert.equal(result.status, expected, result.stderr);
+    assert.match(result.stdout, /aura_boot cleanTest test/);
+    assert.match(result.stdout, /aura_boot_bootstrap cleanBootstrapBillingAccountTest bootstrapBillingAccountTest/);
+  });
+}
+
+test('bootstrap fixture requires fresh state and preserves immutable tenant bindings', () => {
+  const fixture = readFileSync(path.join(here, '../platform/src/test/java/com/auraboot/framework/saas/bootstrap/BootstrapBillingAccountIT.java'), 'utf8');
+  assert.match(fixture, /SELECT COUNT\(\*\) FROM ab_tenant/);
+  assert.match(fixture, /bootstrap result: %s/);
+  assert.match(fixture, /SELECT billing_account_id FROM ab_tenant WHERE id = \?/);
+  assert.doesNotMatch(fixture, /TRUNCATE|DELETE FROM|cleanupBootstrapRows|@Disabled|Assumptions/);
+  const build = readFileSync(gradleBuild, 'utf8');
+  assert.match(build, /systemProperty 'allure.results.directory', retainedAllure/);
+  assert.doesNotMatch(source, /cp -a.*build\/allure-results/);
 });
