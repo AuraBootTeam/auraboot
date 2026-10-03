@@ -33,6 +33,8 @@ import jakarta.servlet.Filter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -144,55 +146,58 @@ class TenantMemberControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(status().isMethodNotAllowed());
     }
 
-    @Test
-    void memberActionOnlyPreflightAllowsAndThenRejectsRevokedGrant() throws Exception {
+    @ParameterizedTest(name = "{1} preflight requires only its own action and rejects revocation")
+    @CsvSource({"suspend,suspend,remove,delete", "leave,leave,remove,delete", "delete,remove,leave,leave"})
+    void memberActionOnlyPreflightAllowsAndThenRejectsRevokedGrant(
+            String verb, String action, String otherAction, String otherVerb) throws Exception {
         prepareMemberModel();
         grantMemberAction("read");
-        RolePermission suspend = grantMemberAction("suspend");
+        RolePermission actionGrant = grantMemberAction(verb);
         TenantMember target = createMemberFixture(false);
         assertThat(userPermissions.getUserPermissionCodes(getTestUser().getId()))
-                .contains("model.tenant_member.read", "model.tenant_member.suspend")
-                .doesNotContain("admin_tenant_member", "org.role.update", "model.tenant_member.delete");
+                .contains("model.tenant_member.read", "model.tenant_member." + verb)
+                .doesNotContain("admin_tenant_member", "org.role.update", "model.tenant_member." + otherVerb);
         String api = "/api/tenant/members/" + target.getPid();
-        mockMvc.perform(get(api + "/offboarding-impact").param("action", "suspend"))
+        mockMvc.perform(get(api + "/offboarding-impact").param("action", action))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.data.memberPid").value(target.getPid()))
                 .andExpect(jsonPath("$.data.resources").isArray());
-        mockMvc.perform(get(api + "/offboarding-candidates").param("action", "suspend"))
+        mockMvc.perform(get(api + "/offboarding-candidates").param("action", action))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"));
-        mockMvc.perform(get(api + "/offboarding-impact").param("action", "remove"))
+        mockMvc.perform(get(api + "/offboarding-impact").param("action", otherAction))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(get(api + "/offboarding-candidates").param("action", "remove"))
+        mockMvc.perform(get(api + "/offboarding-candidates").param("action", otherAction))
                 .andExpect(status().isForbidden());
         applyTestMetaContext();
-        grants.deleteById(suspend.getId());
+        grants.deleteById(actionGrant.getId());
         evictMemberGrants();
-        assertThat(userPermissions.hasPermission(getTestUser().getId(), "model.tenant_member.suspend")).isFalse();
-        mockMvc.perform(get(api + "/offboarding-impact").param("action", "suspend"))
+        assertThat(userPermissions.hasPermission(getTestUser().getId(), "model.tenant_member." + verb)).isFalse();
+        mockMvc.perform(get(api + "/offboarding-impact").param("action", action))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(get(api + "/offboarding-candidates").param("action", "suspend"))
+        mockMvc.perform(get(api + "/offboarding-candidates").param("action", action))
                 .andExpect(status().isForbidden());
         applyTestMetaContext();
         assertThat(tenantMemberService.findByPid(target.getPid()).getStatus()).isEqualTo("active");
     }
 
-    @Test
-    void memberPreflightAndRecipientsHonorRealSelfScope() throws Exception {
+    @ParameterizedTest(name = "{1} impact and candidates honor the real self scope")
+    @CsvSource({"suspend,suspend", "leave,leave", "delete,remove"})
+    void memberPreflightAndRecipientsHonorRealSelfScope(String verb, String action) throws Exception {
         prepareMemberModel();
         grantMemberAction("read");
-        grantMemberAction("suspend");
+        grantMemberAction(verb);
         TenantMember owned = createMemberFixture(true);
         TenantMember hidden = createMemberFixture(false);
         scopes.setScope(getTestTenant().getId(), getTestRole().getId(), "tenant_member", "read", "self", "MAX");
         assertThat(scopes.resolveScope(testTenantMember.getId(), "tenant_member", "read").scopeType())
                 .isEqualTo("self");
-        mockMvc.perform(get("/api/tenant/members/" + owned.getPid() + "/offboarding-impact").param("action", "suspend"))
+        mockMvc.perform(get("/api/tenant/members/" + owned.getPid() + "/offboarding-impact").param("action", action))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"));
-        mockMvc.perform(get("/api/tenant/members/" + hidden.getPid() + "/offboarding-impact").param("action", "suspend"))
+        mockMvc.perform(get("/api/tenant/members/" + hidden.getPid() + "/offboarding-impact").param("action", action))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(get("/api/tenant/members/" + hidden.getPid() + "/offboarding-candidates").param("action", "suspend"))
+        mockMvc.perform(get("/api/tenant/members/" + hidden.getPid() + "/offboarding-candidates").param("action", action))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(get("/api/tenant/members/" + owned.getPid() + "/offboarding-candidates").param("action", "suspend"))
+        mockMvc.perform(get("/api/tenant/members/" + owned.getPid() + "/offboarding-candidates").param("action", action))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.data[?(@.memberPid == '" + testTenantMember.getPid() + "')]").isNotEmpty())
                 .andExpect(jsonPath("$.data[?(@.memberPid == '" + hidden.getPid() + "')]").isEmpty());
