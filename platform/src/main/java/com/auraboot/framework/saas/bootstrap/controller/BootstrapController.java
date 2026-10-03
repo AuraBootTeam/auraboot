@@ -9,6 +9,7 @@ import com.auraboot.framework.saas.bootstrap.dto.BootstrapRequest;
 import com.auraboot.framework.saas.bootstrap.dto.BootstrapStatusResponse;
 import com.auraboot.framework.saas.config.service.SystemConfigService;
 import com.auraboot.framework.saas.constant.BootstrapStatus;
+import com.auraboot.framework.saas.constant.SystemConfigKeys;
 import com.auraboot.framework.scheduler.service.SchedulerEngine;
 import com.auraboot.framework.scheduler.service.impl.SystemTaskInitializer;
 import lombok.RequiredArgsConstructor;
@@ -48,6 +49,7 @@ public class BootstrapController {
 
         return ApiResponse.success(BootstrapStatusResponse.builder()
                 .initialized(initialized)
+                .mode(systemConfigService.get(SystemConfigKeys.SYSTEM_MODE).orElse(null))
                 .inProgress(inProgress)
                 .missingParts(initialized ? List.of() : List.of(BootstrapMissingPart.SYSTEM_CONFIG))
                 .reason(initialized ? null : REASON_NOT_INITIALIZED)
