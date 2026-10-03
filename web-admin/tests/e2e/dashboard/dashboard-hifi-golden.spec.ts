@@ -207,7 +207,7 @@ async function exerciseSemanticDataSource(page: import('@playwright/test').Page,
     const actual = body.data.rows.map((r: Record<string, unknown>) => {
       const row = Object.fromEntries(dimensions.map(dim => {
         if (!dim.includes('__')) return [dim, r[dim]];
-        expect(String(r[dim])).toMatch(/^d{4}-d{2}-d{2}(?:T| )00:00:00(?:.0+)?(?:Z|[+-]00(?::?00)?)?$/);
+        expect(String(r[dim])).toMatch(/^\d{4}-\d{2}-\d{2}(?:T| )00:00:00(?:\.0+)?(?:Z|[+-]00(?::?00)?)?$/);
         return [dim, String(r[dim]).slice(0, 10)];
       }));
       for (const m of metrics) row[m] = Number(r[m]);
