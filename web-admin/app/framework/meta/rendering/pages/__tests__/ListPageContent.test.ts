@@ -1,6 +1,8 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  areListSortFilterQueriesEqual,
+  isListQuerySettled,
   applyLocalSortUpdate,
   beginLatestListRequest,
   buildListReferenceDisplayCacheKey,
@@ -1008,5 +1010,35 @@ describe('reference filter chip labels', () => {
       { b: '主仓' },
     );
     expect(values).toEqual(['a', 'c']);
+  });
+});
+
+
+describe('list query settlement', () => {
+  const empty = { activeSorts: [], chipFilters: [] };
+  const filtered = {
+    activeSorts: [],
+    chipFilters: [{ fieldCode: 'warehouse', operator: 'eq' as const, value: 'warehouse-one' }],
+  };
+
+  it('stays unsettled while a new filter is waiting for the debounce', () => {
+    expect(isListQuerySettled(filtered, empty, empty)).toBe(false);
+  });
+
+  it('stays unsettled after debounce delivery until the new request is scheduled', () => {
+    expect(isListQuerySettled(filtered, filtered, empty)).toBe(false);
+  });
+
+  it('settles only the query that was actually scheduled', () => {
+    expect(isListQuerySettled(filtered, filtered, filtered)).toBe(true);
+    expect(isListQuerySettled(empty, empty, undefined)).toBe(false);
+  });
+
+  it('recognizes an explicitly loaded view without duplicating its request', () => {
+    expect(areListSortFilterQueriesEqual(structuredClone(filtered), filtered)).toBe(true);
+    expect(areListSortFilterQueriesEqual(empty, filtered)).toBe(false);
+    expect(areListSortFilterQueriesEqual({
+      ...empty, activeSorts: [{ fieldCode: 'qty', direction: 'asc', priority: 0 }],
+    }, empty)).toBe(false);
   });
 });

@@ -348,6 +348,25 @@ function stableConfigString(value: unknown): string {
  * only the most recently started request may update data, pagination, errors,
  * or loading state.
  */
+type ListSortFilterQuery = { activeSorts: SortConfig[]; chipFilters: ViewFilterConfig[] };
+
+export function areListSortFilterQueriesEqual(
+  left: ListSortFilterQuery,
+  right: ListSortFilterQuery | undefined,
+): boolean {
+  return Boolean(right && areSortsEqual(left.activeSorts, right.activeSorts)
+    && areFiltersEqual(left.chipFilters, right.chipFilters));
+}
+
+export function isListQuerySettled(
+  current: ListSortFilterQuery,
+  debounced: ListSortFilterQuery,
+  scheduled: ListSortFilterQuery | undefined,
+): boolean {
+  return areListSortFilterQueriesEqual(current, debounced)
+    && areListSortFilterQueriesEqual(current, scheduled);
+}
+
 export function beginLatestListRequest(sequenceRef: { current: number }): () => boolean {
   const requestSequence = ++sequenceRef.current;
   return () => requestSequence === sequenceRef.current;
@@ -1509,6 +1528,7 @@ function ListPageContentInner(props: PageContentProps) {
   // When restoring a preset view from ?preset= on mount, skip the first run of
   // the debounced sort/filter effect so it doesn't re-fetch with empty filters.
   const skipFirstSortFilterEffectRef = useRef(false);
+  const lastScheduledSortFilterValuesRef = useRef<ListSortFilterQuery | undefined>(undefined);
   const loadDataRef = useRef<((params?: ListLoadDataParams) => Promise<void>) | null>(null);
   // Monotonic sequence for loadData invocations. Concurrent triggers (debounced
   // keyword auto-search, URL-sync effect, Enter commit, pagination) can overlap;
@@ -2146,6 +2166,10 @@ function ListPageContentInner(props: PageContentProps) {
         const requestedPageSize = params?.size ?? pagination.pageSize;
         const requestedPageZeroBased = Math.max(requestedPageNum - 1, 0);
         const requestedSorts = params?.sorts ?? activeSorts;
+        lastScheduledSortFilterValuesRef.current = {
+          activeSorts: requestedSorts,
+          chipFilters: params?.chipFilters ?? chipFiltersRef.current,
+        };
         const queryParams: Record<string, any> = {};
 
         if (isApiDatasource) {
@@ -2775,9 +2799,23 @@ function ListPageContentInner(props: PageContentProps) {
       skipFirstSortFilterEffectRef.current = false;
       return;
     }
-    loadData({ page: 0, size: pagination.pageSize, filters });
+    // Explicit loads (initialization or view selection) already scheduled the
+    // same query. Do not start a second request after the debounce catches up.
+    if (areListSortFilterQueriesEqual(
+      debouncedSortFilterValues, lastScheduledSortFilterValuesRef.current,
+    )) return;
+    loadData({
+      page: 0, size: pagination.pageSize, filters,
+      sorts: debouncedSortFilterValues.activeSorts,
+      chipFilters: debouncedSortFilterValues.chipFilters,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSortFilterValues, skipListData]);
+
+  const listQuerySettled = skipListData || isListQuerySettled(
+    { activeSorts, chipFilters }, debouncedSortFilterValues,
+    lastScheduledSortFilterValuesRef.current,
+  );
 
   // Auto-save sorts to SavedView (debounced) + sync to URL
   useEffect(() => {
@@ -4742,8 +4780,8 @@ function ListPageContentInner(props: PageContentProps) {
         className="bg-subtle min-h-[calc(100vh-3.5rem)] w-full px-4 py-5 sm:px-6 lg:px-8"
         data-testid="dynamic-list"
         data-model-code={modelCode}
-        data-ready={dataReady && !loading}
-        aria-busy={!dataReady || loading}
+        data-ready={dataReady && !loading && !viewsLoading && listQuerySettled}
+        aria-busy={!dataReady || loading || viewsLoading || !listQuerySettled}
         data-ab-testid={deriveTestId('list', modelCode, 'container')}
       >
         <div className="rounded-card border-border bg-panel relative overflow-hidden border shadow-sm">
