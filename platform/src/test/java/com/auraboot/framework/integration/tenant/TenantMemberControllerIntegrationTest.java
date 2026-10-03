@@ -244,6 +244,20 @@ class TenantMemberControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    void nativeMemberLegacyAdminRetainsTenantWideRead() throws Exception {
+        prepareMemberModel();
+        grantMemberPermission("admin_tenant_member", "manage");
+        TenantMember target = createMemberFixture(false);
+        scopes.setScope(getTestTenant().getId(), getTestRole().getId(), "tenant_member", "read", "self", "MAX");
+        assertThat(userPermissions.getUserPermissionCodes(getTestUser().getId()))
+                .contains("admin_tenant_member").doesNotContain("model.tenant_member.read");
+        mockMvc.perform(get("/api/tenant/members/" + target.getPid()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.pid").value(target.getPid()));
+        mockMvc.perform(get("/api/tenant/members/" + target.getPid() + "/teams"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data").isArray());
+    }
+
     private void prepareMemberModel() {
         applyTestMetaContext();
         Model model = models.findCurrentByCode("tenant_member");
@@ -282,8 +296,11 @@ class TenantMemberControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     private RolePermission grantMemberAction(String action) {
+        return grantMemberPermission("model.tenant_member." + action, action);
+    }
+
+    private RolePermission grantMemberPermission(String code, String action) {
         applyTestMetaContext();
-        String code = "model.tenant_member." + action;
         Permission permission = permissions.findByCode(code);
         if (permission == null) {
             permission = new Permission();

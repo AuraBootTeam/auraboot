@@ -1,6 +1,7 @@
 package com.auraboot.framework.tenant.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.auth.service.PasswordManagementService;
 import com.auraboot.framework.auth.service.PasswordPolicyService;
 import com.auraboot.framework.auth.service.SessionManagementService;
@@ -270,6 +271,7 @@ class TenantMemberApplicationServiceImplTest {
         when(tenantMemberService.findByPid("p")).thenReturn(member(1L, 99L, 5L, StatusConstants.ACTIVE));
         metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(99L);
         when(userService.findByUserId(5L)).thenReturn(u(5L, "u@x.com"));
+        when(userPermissionService.hasPermission(7L, MetaPermission.TENANT_MEMBER_MANAGE)).thenReturn(true);
 
         MemberResponse resp = service.getMemberById("p", 7L);
         assertNotNull(resp);
@@ -483,6 +485,8 @@ class TenantMemberApplicationServiceImplTest {
     void getMemberTeamsOk() {
         when(tenantMemberService.findByPid("p")).thenReturn(member(1L, 99L, 5L, StatusConstants.ACTIVE));
         metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(99L);
+        metaContextMock.when(MetaContext::getCurrentUserId).thenReturn(7L);
+        when(userPermissionService.hasPermission(7L, MetaPermission.TENANT_MEMBER_MANAGE)).thenReturn(true);
         List<Map<String, Object>> teams = List.of(Map.of("id", 1L));
         when(teamMemberService.getTeamMembershipsByUserId(5L, 99L)).thenReturn(teams);
 
