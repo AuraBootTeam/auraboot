@@ -11,6 +11,12 @@ import { BASE_URL } from '../../helpers/environments';
 
 const BASE = BASE_URL;
 
+async function captureStablePage(page: Page, path: string) {
+  // Wait for transient notifications to finish without hiding persistent error states.
+  await expect(page.getByRole('button', { name: 'Close notification', exact: true })).toHaveCount(0);
+  await page.screenshot({ path, fullPage: true });
+}
+
 async function createRole(page: Page) {
   const code = `e2e_defscope_${Date.now()}`;
   const resp = await page.request.post(`${BASE}/api/roles`, {
@@ -111,17 +117,14 @@ for (const scope of ['dept', 'team']) {
     );
     await expect(page.getByTestId('data-scope-current')).not.toContainText(/多种范围|混合|Mixed|Multiple scopes/);
 
-    await page.screenshot({
-      path: info.outputPath(`01-inherited-${scope}-scope.png`),
-      fullPage: true,
-    });
+    await captureStablePage(page, info.outputPath(`01-inherited-${scope}-scope.png`));
 
     await page.keyboard.press('Escape');
     await expect(dialog).toHaveCount(0);
     await page.getByTestId('data-scope-current').scrollIntoViewIfNeeded();
     await expect(page.getByTestId('data-scope-current')).toBeInViewport();
     await expect(page.getByTestId('data-scope-default')).toBeInViewport();
-    await page.screenshot({ path: info.outputPath(`02-inherited-${scope}-summary.png`), fullPage: true });
+    await captureStablePage(page, info.outputPath(`02-inherited-${scope}-summary.png`));
 
     // backend cross-check: the role's stored default is persisted
     const defResp = await page.request.get(
@@ -162,7 +165,7 @@ test('actual mixed record scopes remain separate from the stored role default', 
   await page.getByTestId('data-scope-current').scrollIntoViewIfNeeded();
   await expect(page.getByTestId('data-scope-current')).toBeInViewport();
   await expect(page.getByTestId('data-scope-default')).toBeInViewport();
-  await page.screenshot({ path: info.outputPath('scope-mixed.png'), fullPage: true });
+  await captureStablePage(page, info.outputPath('scope-mixed.png'));
 });
 
 test('missing, failed, and invalid role defaults do not preselect a broader scope', async ({ page }, info) => {
@@ -178,28 +181,28 @@ test('missing, failed, and invalid role defaults do not preselect a broader scop
   await selectRoleFromMenu(page, role);
   await expect(page.getByTestId('data-scope-default')).toContainText(/读取.*失败|Could not load|加载.*失败/);
   await expect(page.getByTestId('data-scope-modify-btn')).toBeDisabled();
-  await page.screenshot({ path: info.outputPath('scope-load-error.png'), fullPage: true });
+  await captureStablePage(page, info.outputPath('scope-load-error.png'));
   mode = 'real';
   await page.getByTestId('data-scope-retry').click();
   await expect(page.getByTestId('data-scope-default')).toContainText(/未配置|Not configured/);
   await page.getByTestId('data-scope-default').scrollIntoViewIfNeeded();
   await expect(page.getByTestId('data-scope-default')).toBeInViewport();
-  await page.screenshot({ path: info.outputPath('scope-not-configured-summary.png'), fullPage: true });
+  await captureStablePage(page, info.outputPath('scope-not-configured-summary.png'));
   await page.getByTestId('data-scope-modify-btn').click();
   await expect(page.getByTestId('data-scope-apply')).toBeDisabled();
   await expect(page.getByTestId('data-scope-drawer').getByRole('radio', { checked: true })).toHaveCount(0);
-  await page.screenshot({ path: info.outputPath('scope-not-configured.png'), fullPage: true });
+  await captureStablePage(page, info.outputPath('scope-not-configured.png'));
   await page.keyboard.press('Escape');
   mode = 'invalid';
   await selectRoleFromMenu(page, role);
   await expect(page.getByTestId('data-scope-default')).toContainText(/无效|Invalid scope/);
   await page.getByTestId('data-scope-default').scrollIntoViewIfNeeded();
   await expect(page.getByTestId('data-scope-default')).toBeInViewport();
-  await page.screenshot({ path: info.outputPath('scope-invalid-summary.png'), fullPage: true });
+  await captureStablePage(page, info.outputPath('scope-invalid-summary.png'));
   await page.getByTestId('data-scope-modify-btn').click();
   await expect(page.getByTestId('data-scope-apply')).toBeDisabled();
   await expect(page.getByTestId('data-scope-drawer').getByRole('radio', { checked: true })).toHaveCount(0);
-  await page.screenshot({ path: info.outputPath('scope-invalid.png'), fullPage: true });
+  await captureStablePage(page, info.outputPath('scope-invalid.png'));
   const stored = await page.request.get(url);
   expect(stored.status()).toBe(200);
   expect((await stored.json()).data).toBeNull();

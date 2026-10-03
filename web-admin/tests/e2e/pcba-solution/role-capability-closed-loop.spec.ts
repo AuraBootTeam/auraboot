@@ -566,6 +566,7 @@ test('a standalone team-view capability reads DSL team membership, denies writes
   expect(membershipPid).not.toBe(member.pid);
   await expect(page.getByTestId(`team-members-remove-${membershipPid}`)).toBeVisible();
   expect((await membership()).map((record) => record.memberPid)).toEqual([member.pid]);
+  await expect(page.getByRole('button', { name: 'Close notification', exact: true })).toHaveCount(0);
   await page.screenshot({ path: info.outputPath('team-manager-member-added.png'), fullPage: true });
 
   await selectRead(true);
@@ -651,6 +652,7 @@ test('a standalone team-view capability reads DSL team membership, denies writes
   expect(String((await removeResponse.json()).code)).toBe('0');
   expect(await membership()).toEqual([]);
   await expect(page.getByText('暂无团队成员', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Close notification', exact: true })).toHaveCount(0);
   await page.screenshot({
     path: info.outputPath('team-manager-member-removed.png'),
     fullPage: true,
