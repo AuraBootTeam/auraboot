@@ -255,7 +255,7 @@ class SemanticControllerPermissionIT extends BaseIntegrationTest {
     private Map<String, String> semanticSnapshot() {
         Map<String, String> state = new LinkedHashMap<>();
         for (String table : List.of("ab_semantic_model", "ab_semantic_metric", "ab_semantic_dimension",
-                "ab_semantic_metric_alert", "ab_semantic_preagg", "ab_semantic_query_log", "ab_notification")) {
+                "ab_semantic_lineage_edge", "ab_semantic_metric_alert", "ab_semantic_preagg", "ab_semantic_query_log", "ab_notification")) {
             state.put(table, jdbc.queryForObject("SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY id)::text, '[]') FROM "
                     + table + " t WHERE tenant_id = ?", String.class, tenant.getId()));
         }
@@ -295,6 +295,17 @@ class SemanticControllerPermissionIT extends BaseIntegrationTest {
 
     @Test
     void ordinaryMemberCanReadCatalogWithExplicitUseGrant() throws Exception {
+        grantOrdinaryPermissions(MetaPermission.META_SEMANTIC_USE);
+        mvc.perform(MockMvcRequestBuilders.get("/api/semantic/meta"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.models[0].pid").value(modelPid))
+                .andExpect(jsonPath("$.data.models[0].metrics[0].code").value("count"));
+        mvc.perform(MockMvcRequestBuilders.post("/api/semantic/publish").contentType("application/json")
+                .content(json.writeValueAsString(Map.of("yaml", YAML, "pluginCode", "permission-fixture"))))
+                .andExpect(status().isForbidden());
+    }
+
+    private void grantOrdinaryPermissions(String... codes) {
         Role role = new Role();
         role.setPid(UniqueIdGenerator.generate());
         role.setName("Semantic reader fixture");
@@ -311,26 +322,201 @@ class SemanticControllerPermissionIT extends BaseIntegrationTest {
         role.setUpdatedAt(Instant.now());
         role = roles.createRole(role);
         assertThat(userRoles.assignRolesToMember(member.getId(), List.of(role.getId()), tenant.getId(), null)).isTrue();
-        RolePermission grant = new RolePermission();
-        grant.setPid(UniqueIdGenerator.generate());
-        grant.setRoleId(role.getId());
-        grant.setPermissionId(register(MetaPermission.META_SEMANTIC_USE).getId());
-        grant.setTenantId(tenant.getId());
-        grant.setGrantType("grant");
-        grant.setStatus("active");
-        grant.setDeletedFlag(false);
-        grant.setCreatedAt(Instant.now());
-        grant.setUpdatedAt(Instant.now());
-        rolePermissions.insert(grant);
+        for (String code : codes) {
+            RolePermission grant = new RolePermission();
+            grant.setPid(UniqueIdGenerator.generate());
+            grant.setRoleId(role.getId());
+            grant.setPermissionId(register(code).getId());
+            grant.setTenantId(tenant.getId());
+            grant.setGrantType("grant");
+            grant.setStatus("active");
+            grant.setDeletedFlag(false);
+            grant.setCreatedAt(Instant.now());
+            grant.setUpdatedAt(Instant.now());
+            rolePermissions.insert(grant);
+        }
         userPermissions.evictRoleUsers(tenant.getId(), role.getId());
-        assertThat(userPermissions.hasPermission(user.getId(), MetaPermission.META_SEMANTIC_USE)).isTrue();
+        bindOrdinaryContext();
+        for (String code : codes) assertThat(userPermissions.hasPermission(user.getId(), code)).isTrue();
         assertThat(adminRoles.hasRole(tenant.getId(), user.getId(), RoleCodes.TENANT_ADMIN)).isFalse();
-        mvc.perform(MockMvcRequestBuilders.get("/api/semantic/meta"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"))
-                .andExpect(jsonPath("$.data.models[0].pid").value(modelPid))
-                .andExpect(jsonPath("$.data.models[0].metrics[0].code").value("count"));
-        mvc.perform(MockMvcRequestBuilders.post("/api/semantic/publish").contentType("application/json")
-                .content(json.writeValueAsString(Map.of("yaml", YAML, "pluginCode", "permission-fixture"))))
-                .andExpect(status().isForbidden());
+        assertThat(adminRoles.hasRole(tenant.getId(), user.getId(), RoleCodes.PLATFORM_ADMIN)).isFalse();
+    }
+
+    @ParameterizedTest(name = "authorized {index}: {0}")
+    @MethodSource("endpoints")
+    void ordinaryMemberReceivesExactBusinessResultWithExplicitGrants(Endpoint endpoint) throws Exception {
+        grantOrdinaryPermissions(MetaPermission.META_SEMANTIC_USE, MetaPermission.META_SEMANTIC_PUBLISH);
+        String requestYaml = endpoint.handler().startsWith("publish")
+                ? YAML.replace("code: permission_fixture", "code: authorized_publish") : YAML;
+        if (endpoint.controller() == SemanticUsageController.class) {
+            mvc.perform(MockMvcRequestBuilders.post("/api/semantic/query").contentType("application/json")
+                    .content("{\"metrics\":[\"permission_fixture.count\"]}"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.rowcount").value(1));
+        }
+        String oldMv = jdbc.queryForObject("SELECT mv_name FROM ab_semantic_preagg WHERE tenant_id = ? AND pid = ?",
+                String.class, tenant.getId(), preaggPid);
+        if (endpoint.controller() == SemanticPreaggController.class && endpoint.handler().equals("refresh")) {
+            jdbc.update("INSERT INTO ab_object_alias (pid, tenant_id, model_code, alias, language, acp_priority, "
+                            + "created_at, updated_at, created_by, updated_by, deleted_flag) "
+                            + "VALUES (?, ?, 'permission_fixture', 'Refresh fixture', 'en-US', 0, NOW(), NOW(), ?, ?, FALSE)",
+                    UniqueIdGenerator.generate(), tenant.getId(), user.getId(), user.getId());
+            assertThat(mvValue(oldMv)).isEqualTo(1);
+        }
+        Map<String, String> before = semanticSnapshot();
+        var request = MockMvcRequestBuilders.request(HttpMethod.valueOf(endpoint.method()), resolve(endpoint.path()));
+        if (endpoint.mediaType() != null) request.contentType(endpoint.mediaType());
+        if (endpoint.body() != null) {
+            String body = switch (endpoint.body()) {
+                case "@yaml" -> requestYaml;
+                case "@yaml-json" -> json.writeValueAsString(Map.of("yaml", requestYaml, "pluginCode", "permission-fixture"));
+                default -> resolve(endpoint.body());
+            };
+            if (endpoint.controller() == SemanticMetricAlertController.class) {
+                var authored = json.readTree(body);
+                ((com.fasterxml.jackson.databind.node.ObjectNode) authored).put("alertStatus", "paused");
+                body = json.writeValueAsString(authored);
+            }
+            request.content(body);
+        }
+        var result = mvc.perform(request).andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0")).andReturn();
+        assertThat(result.getHandler()).isInstanceOf(HandlerMethod.class);
+        var handler = (HandlerMethod) result.getHandler();
+        assertThat(handler.getBeanType()).isEqualTo(endpoint.controller());
+        assertThat(handler.getMethod().getName()).isEqualTo(endpoint.handler());
+        var data = json.readTree(result.getResponse().getContentAsString()).path("data");
+        if (endpoint.controller() == SemanticController.class) {
+            switch (endpoint.handler()) {
+                case "query" -> {
+                    assertThat(data.path("rowcount").asInt()).isEqualTo(1);
+                    assertThat(data.path("rows").size()).isEqualTo(1);
+                    assertThat(data.path("rows").get(0).size()).isEqualTo(1);
+                    assertThat(data.path("rows").get(0).elements().next().decimalValue()).isEqualByComparingTo("1");
+                    assertThat(data.path("queryId").asText()).isNotBlank();
+                    assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_semantic_query_log WHERE tenant_id = ? "
+                                    + "AND user_id = ? AND rowcount = 1", Long.class, tenant.getId(), user.getId())).isEqualTo(1);
+                }
+                case "explain" -> {
+                    assertThat(data.path("sql").asText()).contains("ab_object_alias");
+                    List<Object> params = json.convertValue(data.path("params"), new com.fasterxml.jackson.core.type.TypeReference<>() {});
+                    var rows = jdbc.queryForList(data.path("sql").asText(), params.toArray());
+                    assertThat(rows).hasSize(1);
+                    assertThat(rows.get(0)).hasSize(1);
+                    assertThat(new BigDecimal(rows.get(0).values().iterator().next().toString())).isEqualByComparingTo("1");
+                    assertThat(semanticSnapshot()).isEqualTo(before);
+                }
+                case "validate", "validateJson" -> {
+                    assertThat(data.path("ok").asBoolean()).isTrue();
+                    assertThat(data.path("modelCode").asText()).isEqualTo("permission_fixture");
+                    assertThat(data.path("metricCount").asInt()).isEqualTo(1);
+                    assertThat(data.path("dimensionCount").asInt()).isEqualTo(1);
+                    assertThat(semanticSnapshot()).isEqualTo(before);
+                }
+                case "publish", "publishJson" -> {
+                    assertThat(data.path("ok").asBoolean()).isTrue();
+                    String publishedPid = data.path("pid").asText();
+                    assertThat(publishedPid).isNotBlank().isNotEqualTo(modelPid);
+                    assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_semantic_model WHERE tenant_id = ? "
+                            + "AND pid = ? AND code = 'authorized_publish' AND created_by = ? AND deleted_flag = FALSE",
+                            Long.class, tenant.getId(), publishedPid, user.getId())).isEqualTo(1);
+                    assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_semantic_metric WHERE tenant_id = ? "
+                            + "AND semantic_model_pid = ? AND code = 'count' AND deleted_flag = FALSE",
+                            Long.class, tenant.getId(), publishedPid)).isEqualTo(1);
+                }
+                case "meta" -> {
+                    assertThat(data.path("models").size()).isEqualTo(1);
+                    assertThat(data.path("models").get(0).path("pid").asText()).isEqualTo(modelPid);
+                    assertThat(data.path("models").get(0).path("metrics").get(0).path("code").asText()).isEqualTo("count");
+                    assertThat(semanticSnapshot()).isEqualTo(before);
+                }
+                case "lineage" -> {
+                    assertThat(data.path("nodePid").asText()).isEqualTo(modelPid);
+                    assertThat(data.path("nodeType").asText()).isEqualTo("model");
+                    assertThat(data.path("incoming").size()).isEqualTo(1);
+                    assertThat(data.path("incoming").get(0).path("srcPid").asText()).isEqualTo(modelPid + ":metric:count");
+                    assertThat(data.path("incoming").get(0).path("dstPid").asText()).isEqualTo(modelPid);
+                    assertThat(data.path("outgoing").size()).isZero();
+                    assertThat(semanticSnapshot()).isEqualTo(before);
+                }
+                default -> throw new AssertionError("Unasserted semantic handler: " + endpoint);
+            }
+        } else if (endpoint.controller() == SemanticUsageController.class) {
+            assertThat(data.path("days").asInt()).isEqualTo(7);
+            assertThat(data.path("totalQueries").asLong()).isEqualTo(1);
+            assertThat(data.path("activeUsers").asLong()).isEqualTo(1);
+            assertThat(data.path("totalRows").asLong()).isEqualTo(1);
+            assertThat(data.path("daily").size()).isEqualTo(1);
+            assertThat(semanticSnapshot()).isEqualTo(before);
+        } else if (endpoint.controller() == SemanticMetricAlertController.class) {
+            switch (endpoint.handler()) {
+                case "list" -> {
+                    assertThat(data.size()).isEqualTo(1);
+                    assertThat(data.get(0).path("pid").asText()).isEqualTo(alertPid);
+                    assertThat(semanticSnapshot()).isEqualTo(before);
+                }
+                case "create", "update" -> {
+                    String pid = data.path("pid").asText();
+                    assertThat(pid).isNotBlank();
+                    if (endpoint.handler().equals("update")) assertThat(pid).isEqualTo(alertPid);
+                    assertThat(data.path("name").asText()).isEqualTo("permission-fixture");
+                    assertThat(data.path("alertStatus").asText()).isEqualTo("paused");
+                    assertThat(jdbc.queryForObject("SELECT name FROM ab_semantic_metric_alert WHERE tenant_id = ? "
+                            + "AND pid = ? AND deleted_flag = FALSE", String.class, tenant.getId(), pid)).isEqualTo("permission-fixture");
+                }
+                case "evaluate" -> {
+                    assertThat(data.path("value").decimalValue()).isEqualByComparingTo("1");
+                    assertThat(data.path("triggered").asBoolean()).isTrue();
+                    assertThat(data.path("notified").asBoolean()).isTrue();
+                    assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_notification WHERE tenant_id = ? "
+                            + "AND user_id = ? AND source_type = 'semantic_metric_alert' AND source_id = ?",
+                            Long.class, tenant.getId(), user.getId(), alertPid)).isEqualTo(1);
+                }
+                case "delete" -> {
+                    assertThat(jdbc.queryForObject("SELECT deleted_flag FROM ab_semantic_metric_alert WHERE tenant_id = ? AND pid = ?",
+                            Boolean.class, tenant.getId(), alertPid)).isTrue();
+                    mvc.perform(MockMvcRequestBuilders.get("/api/semantic/alerts")).andExpect(status().isOk())
+                            .andExpect(jsonPath("$.data.length()").value(0));
+                }
+                default -> throw new AssertionError("Unasserted alert handler: " + endpoint);
+            }
+        } else if (endpoint.controller() == SemanticPreaggController.class) {
+            switch (endpoint.handler()) {
+                case "list" -> {
+                    assertThat(data.size()).isEqualTo(1);
+                    assertThat(data.get(0).path("pid").asText()).isEqualTo(preaggPid);
+                    assertThat(semanticSnapshot()).isEqualTo(before);
+                }
+                case "create" -> {
+                    String pid = data.path("pid").asText();
+                    assertThat(pid).isNotBlank().isNotEqualTo(preaggPid);
+                    assertThat(data.path("dimensionCodes").asText()).isEqualTo("[]");
+                    String mv = jdbc.queryForObject("SELECT mv_name FROM ab_semantic_preagg WHERE tenant_id = ? "
+                            + "AND pid = ? AND deleted_flag = FALSE", String.class, tenant.getId(), pid);
+                    assertThat(mvValue(mv)).isEqualTo(1);
+                }
+                case "refresh" -> {
+                    assertThat(data.path("rows").asLong()).isEqualTo(1);
+                    assertThat(mvValue(oldMv)).isEqualTo(2);
+                }
+                case "delete" -> {
+                    assertThat(jdbc.queryForObject("SELECT deleted_flag FROM ab_semantic_preagg WHERE tenant_id = ? AND pid = ?",
+                            Boolean.class, tenant.getId(), preaggPid)).isTrue();
+                    assertThat(jdbc.queryForObject("SELECT count(*) FROM pg_matviews WHERE schemaname = 'public' AND matviewname = ?",
+                            Long.class, oldMv)).isZero();
+                    mvc.perform(MockMvcRequestBuilders.get("/api/semantic/preaggs")).andExpect(status().isOk())
+                            .andExpect(jsonPath("$.data.length()").value(0));
+                }
+                default -> throw new AssertionError("Unasserted preaggregation handler: " + endpoint);
+            }
+        } else {
+            throw new AssertionError("Unasserted controller: " + endpoint);
+        }
+    }
+
+    private long mvValue(String mv) {
+        assertThat(mv).matches("mv_semantic_preagg_[a-z0-9]+");
+        Map<String, Object> row = jdbc.queryForMap("SELECT * FROM " + mv);
+        assertThat(row).hasSize(1);
+        return new BigDecimal(row.values().iterator().next().toString()).longValueExact();
     }
 }

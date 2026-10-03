@@ -15,6 +15,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** Hermetic contract check: every real controller mapping/media variant has an IT request. */
 class SemanticControllerPermissionCoverageTest {
     @Test
+    void positiveHarnessUsesTheSameDeclaredEndpointProvider() throws Exception {
+        var method = SemanticControllerPermissionIT.class.getDeclaredMethod(
+                "ordinaryMemberReceivesExactBusinessResultWithExplicitGrants", SemanticControllerPermissionIT.Endpoint.class);
+        assertThat(method.isAnnotationPresent(org.junit.jupiter.params.ParameterizedTest.class)).isTrue();
+        var source = method.getAnnotation(org.junit.jupiter.params.provider.MethodSource.class);
+        assertThat(source).isNotNull();
+        assertThat(source.value()).containsExactly("endpoints");
+    }
+
+    @Test
     void coversEveryControllerMethodAndDeclaredMediaType() {
         var cases = SemanticControllerPermissionIT.endpoints().toList();
         Set<String> covered = cases.stream().map(e -> e.controller().getName() + "#" + e.handler()).collect(Collectors.toSet());
