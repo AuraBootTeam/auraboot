@@ -528,6 +528,9 @@ test('a standalone team-view capability reads DSL team membership, denies writes
     await page.getByTestId('capability-checkbox-org.cap.member_offboarding').setChecked(
       unrelatedCommandCapability,
     );
+    if (!grant) {
+      await page.getByTestId('capability-checkbox-org.cap.member_view').setChecked(false);
+    }
     await page.getByTestId('capability-save').click();
     await expect(page.getByTestId('confirm-dialog')).toBeVisible();
     const saved = page.waitForResponse(
@@ -612,6 +615,12 @@ test('a standalone team-view capability reads DSL team membership, denies writes
     await expect(reader.getByTestId('team-members-add')).toHaveCount(0);
     await expect(reader.getByTestId(`team-members-remove-${membershipPid}`)).toHaveCount(0);
     await expect(reader.getByRole('button', { name: '编辑', exact: true })).toHaveCount(0);
+    const nativeTeam = await reader.request.get(`/api/org/teams/${team.pid}`);
+    expect(nativeTeam.status()).toBe(200);
+    const nativeTeamBody = await nativeTeam.json();
+    expect(String(nativeTeamBody.code)).toBe('0');
+    expect(nativeTeamBody.data.pid).toBe(team.pid);
+    expect(nativeTeamBody.data.name).toBe(stamp);
     await reader.screenshot({ path: info.outputPath('team-independent-read.png'), fullPage: true });
     const deniedAdd = await reader.request.post(`/api/org/teams/${team.pid}/members`, {
       data: { memberPid: member.pid, role: 'leader' },
@@ -668,6 +677,10 @@ test('a standalone team-view capability reads DSL team membership, denies writes
     const revoked = await fetchRoleSnapshot(reader);
     expect(revoked.permissionCodes).not.toContain('model.ab_team.read');
     expect(revoked.permissionCodes).not.toContain('org_teams');
+    for (const endpoint of [`/api/org/teams/${team.pid}`, `/api/org/teams/${team.pid}/members`]) {
+      const nativeRead = await reader.request.get(endpoint);
+      expect(nativeRead.status(), `Team read revocation must protect ${endpoint}`).toBe(403);
+    }
     await reader.goto('/home');
     await ensureSidebarExpanded(reader);
     await expect(reader.locator('nav a[href="/organization/teams"]')).toHaveCount(0);
