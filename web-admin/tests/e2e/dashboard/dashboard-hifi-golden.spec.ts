@@ -255,7 +255,23 @@ async function exerciseSemanticDataSource(page: import('@playwright/test').Page,
   await expect(metricPicker).toHaveCount(0);
   await expect(dimensionPicker).toHaveCount(0);
   await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/bi-ui-ds-mode-semantic-switch.png` });
-  await modelSelect.selectOption(code);
+  // Delay real metadata requests, then continue them unchanged. No fulfilled fixture response.
+  let releaseMetadata!: () => void;
+  const metadataGate = new Promise<void>(resolve => { releaseMetadata = resolve; });
+  const holdMetadata = async (route: import('@playwright/test').Route) => {
+    await metadataGate;
+    await route.continue();
+  };
+  await page.route('**/api/semantic/meta', holdMetadata);
+  try {
+    await modelSelect.selectOption(code);
+    await expect(metricPicker).toContainText('加载指标中…');
+    await expect(dimensionPicker).toContainText('加载维度中…');
+    await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/bi-ui-ds-semantic-loading.png` });
+  } finally {
+    releaseMetadata();
+    await page.unroute('**/api/semantic/meta', holdMetadata);
+  }
   await expect(metric('order_count')).not.toBeChecked();
   await expect(metric('draft_count')).not.toBeChecked();
   await expect(dimension('order_status')).not.toBeChecked();
