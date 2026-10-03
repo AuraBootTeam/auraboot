@@ -239,6 +239,42 @@ for (const c of cases) {
     await ensureQuoteRoleUser(page, deniedUser);
     const denied = await openQuoteRolePage(page.context().browser()!, deniedUser);
     try {
+      await denied.page.goto('/home', { waitUntil: 'domcontentloaded' });
+      await ensureSidebarExpanded(denied.page);
+      const readerSidebar = denied.page.getByTestId('sidebar');
+      const readerLink = readerSidebar.locator(`a[href="/p/${c.model}"]`);
+      if (!(await readerLink.isVisible())) {
+        const center = readerSidebar.getByRole('button', { name: '规则中心', exact: true });
+        if (!(await center.isVisible()))
+          await readerSidebar.getByRole('button', { name: 'BOM转化工具', exact: true }).click();
+        await center.click();
+      }
+      await readerLink.click();
+      await expect(denied.page).toHaveURL(new RegExp(`/p/${c.model}$`));
+      await expect(denied.page.locator('main').getByRole('button', { name: '新建', exact: true })).toHaveCount(0);
+      const readerSearch = denied.page.getByTestId('list-search-input');
+      await expect(readerSearch).toBeVisible();
+      await readerSearch.fill(marker);
+      const filtered = denied.page.waitForResponse(response =>
+        response.url().includes(`/api/dynamic/${c.model}/list`) && response.request().method() === 'GET');
+      await readerSearch.press('Enter');
+      const readerListResponse = await filtered;
+      expect(readerListResponse.status()).toBe(200);
+      expect(String((await readerListResponse.json()).code)).toBe('0');
+      const readerRow = denied.page.getByRole('row').filter({ hasText: marker });
+      await expect(readerRow).toHaveCount(1);
+      await clickRowActionByLocator(denied.page, readerRow, 'view', '查看');
+      await expect(denied.page).toHaveURL(new RegExp(`/p/${c.model}/view/${saved.pid}$`));
+      const readerKey = denied.page.getByTestId(`field-${c.key}`);
+      await expect(readerKey).toBeVisible();
+      await expect.poll(() => readerKey.evaluate(element => [
+        element.textContent,
+        ...Array.from(element.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea')).map(input => input.value),
+      ].join(' '))).toContain(marker);
+      await expect(denied.page.getByTestId('toolbar-btn-edit')).toHaveCount(0);
+      await expect(denied.page.getByTestId('toolbar-btn-delete')).toHaveCount(0);
+      await expect(denied.page.locator('main input:not([readonly]):not([disabled]), main textarea:not([readonly]):not([disabled]), main [contenteditable="true"]')).toHaveCount(0);
+      await denied.page.screenshot({ path: info.outputPath('rule-reader-detail.png'), fullPage: true });
       await denied.page.goto(`/p/${c.model}/new?commandCode=bom:create_${c.command}`, {
         waitUntil: 'domcontentloaded',
       });
