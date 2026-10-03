@@ -370,7 +370,100 @@ test('category metadata: duplicate category fails safely without changing the ex
   await page.goto('/home', { waitUntil: 'domcontentloaded' });
   const before = await records();
   expect(before).toHaveLength(1);
-  await page.goto('/p/bom_category_meta', { waitUntil: 'domcontentloaded' });
+  const capacitors = await queryDynamicRecords(page, 'bom_category_meta', [
+    { fieldName: 'bom_cm_category', operator: 'EQ', value: 'capacitor' },
+  ]);
+  expect(capacitors).toHaveLength(1);
+  const policyQueries = ['attributes', 'recipe', 'veto', 'fit'];
+  const parse = (value: unknown): any => typeof value === 'string' ? JSON.parse(value) : value;
+  const openCategory = async (client: Page, row: Record<string, any>, categoryLabel: string, reader: boolean) => {
+    await ensureSidebarExpanded(client);
+    const sidebar = client.getByTestId('sidebar');
+    const link = sidebar.locator('a[href="/p/bom_category_meta"]');
+    if (!(await link.isVisible())) {
+      const center = sidebar.getByRole('button', { name: '规则中心', exact: true });
+      if (!(await center.isVisible())) await sidebar.getByRole('button', { name: 'BOM转化工具', exact: true }).click();
+      await center.click();
+    }
+    await link.click();
+    await expect(client).toHaveURL(/\/p\/bom_category_meta$/);
+    const target = client.getByRole('row').filter({ has: client.getByRole('cell', { name: categoryLabel, exact: true }) });
+    await expect(target).toHaveCount(1);
+    const responses = policyQueries.map(suffix => client.waitForResponse(response => {
+      const url = new URL(response.url());
+      return url.pathname === '/api/datasource/list' &&
+        url.searchParams.get('datasourceId') === `nq:bom_category_policy_${suffix}` &&
+        url.searchParams.get('categoryMetaPid') === String(row.pid);
+    }));
+    await clickRowActionByLocator(client, target, 'view', '查看');
+    await expect(client).toHaveURL(new RegExp(`/p/bom_category_meta/view/${row.pid}$`));
+    const projections: Record<string, any[]> = {};
+    for (let index = 0; index < responses.length; index++) {
+      const response = await responses[index];
+      expect(response.status()).toBe(200);
+      const body = await response.json();
+      expect(String(body.code)).toBe('0');
+      expect(Array.isArray(body.data.records)).toBe(true);
+      projections[policyQueries[index]] = body.data.records;
+    }
+    const attributeRows = ['required', 'recommended'].flatMap(requirement =>
+      (parse(row[`bom_cm_${requirement}_attrs_json`]) || []).map((attribute: string, index: number) =>
+        ({ requirement, position: index + 1, attribute })));
+    expect(projections.attributes.map(({ requirement, position, attribute }) => ({ requirement, position, attribute })))
+      .toEqual(attributeRows);
+    const recipe = parse(row.bom_cm_match_text_recipe_json);
+    expect(projections.recipe.filter(record => record.purpose === 'field').map(record => record.attribute)).toEqual(recipe.fields);
+    expect(projections.veto.map(({ attribute, comparison, tolerance_percent }) => ({ attribute, comparison, tolerance_percent })))
+      .toEqual(parse(row.bom_cm_veto_attrs_json).map((veto: any) => ({ attribute: veto.attr, comparison: veto.op, tolerance_percent: veto.tol === undefined ? null : veto.tol * 100 })));
+    const block = (suffix: string) => client.locator(`[data-aura-block-id="bom_category_policy_${suffix}"]`);
+    await expect(client.getByTestId('form-field-bom_cm_category')).toContainText(categoryLabel);
+    await expect(client.getByTestId('form-field-bom_cm_primary_attr')).toContainText(categoryLabel === '电阻' ? '阻值' : '容值');
+    await expect(client.getByTestId('form-field-bom_cm_remark')).toContainText(String(row.bom_cm_remark));
+    await expect(block('attributes')).toContainText('必需属性');
+    await expect(block('attributes')).toContainText('推荐属性');
+    await expect(block('recipe')).toContainText('参与匹配的字段');
+    await expect(block('recipe')).toContainText('封装');
+    await expect(block('veto')).toContainText('在容差内相等');
+    await expect(block('veto').getByRole('cell', { name: '5', exact: true })).toHaveCount(1);
+    if (categoryLabel === '电容') {
+      const fit = parse(row.bom_cm_fit_policy_json);
+      expect(projections.fit.map(({ attribute, comparison, weight, missing_handling, aggregation }) => ({ attribute, comparison, weight, missing_handling, aggregation })))
+        .toEqual(fit.dimensions.map((dimension: any) => ({ attribute: dimension.attr, comparison: dimension.direction, weight: dimension.weight, missing_handling: dimension.missing, aggregation: fit.aggregation })));
+      await expect(block('fit')).toContainText('加权平均');
+      await expect(block('fit')).toContainText('候选值不低于需求');
+      await expect(block('fit')).toContainText('该项按零分计');
+    } else {
+      expect(projections.fit).toEqual([]);
+      await expect(block('fit')).toContainText('未单独配置工程适配维度');
+    }
+    for (const suffix of policyQueries)
+      await expect(block(suffix)).not.toContainText(/resistance_ohms|capacitance_farads|weighted_average|eq_tol|policyId|\{"/);
+    await expect(client.getByTestId('toolbar-btn-edit')).toHaveCount(0);
+    await expect(client.getByTestId('toolbar-btn-delete')).toHaveCount(0);
+    await expect(client.locator('main input:not([readonly]):not([disabled]), main textarea:not([readonly]):not([disabled]), main [contenteditable="true"]')).toHaveCount(0);
+    await client.screenshot({ path: info.outputPath(`category-${row.bom_cm_category}-${reader ? 'reader' : 'admin'}-detail.png`), fullPage: true });
+  };
+  await openCategory(page, before[0], '电阻', false);
+  await openCategory(page, capacitors[0], '电容', false);
+  const user = makeQuoteRoleUser('category-reader', String(Date.now()), ['qo_procurement']);
+  await ensureQuoteRoleUser(page, user);
+  const reader = await openQuoteRolePage(page.context().browser()!, user);
+  try {
+    await reader.page.goto('/home', { waitUntil: 'domcontentloaded' });
+    await openCategory(reader.page, before[0], '电阻', true);
+    await openCategory(reader.page, capacitors[0], '电容', true);
+    for (const operation of ['create', 'update', 'delete'])
+      await expectCommandDenied(reader.page, `bom:${operation}_category_meta`, {
+        bom_cm_category: 'resistor', bom_cm_group: 'resistive', bom_cm_remark: 'denied-reader-write',
+      }, operation === 'create' ? undefined : String(before[0].pid), operation);
+  } finally {
+    await reader.context.close();
+  }
+  expect(await records()).toEqual(before);
+  expect(await queryDynamicRecords(page, 'bom_category_meta', [{ fieldName: 'bom_cm_category', operator: 'EQ', value: 'capacitor' }]))
+    .toEqual(capacitors);
+  await page.getByTestId('toolbar-btn-back').click();
+  await expect(page).toHaveURL(/\/p\/bom_category_meta$/);
   await page.locator('main').getByRole('button', { name: '新建', exact: true }).click();
   await page.getByTestId('form-field-bom_cm_category').getByRole('combobox').first().click();
   await page.getByRole('option', { name: '电阻', exact: true }).click();
