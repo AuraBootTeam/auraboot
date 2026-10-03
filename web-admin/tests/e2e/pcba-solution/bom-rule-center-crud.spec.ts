@@ -757,6 +757,51 @@ test('header alias enabled/disabled affects new BOM conversions and preserves pr
   lifecycle.push({ taskId: reused.taskId, profileDecision: reusedDecision });
   await page.goto(`/p/bom_source_format_profile/view/${profileId}`, { waitUntil: 'domcontentloaded' });
 
+  // Procurement has rules_view: prove the active revision and its regression evidence are
+  // readable through the real menu while every lifecycle write remains unauthorized.
+  profile = (await profiles())[0];
+  const readerUser = makeQuoteRoleUser('profile-reader-proc', marker.toLowerCase(), ['qo_procurement']);
+  await ensureQuoteRoleUser(page, readerUser);
+  const reader = await openQuoteRolePage(page.context().browser()!, readerUser);
+  try {
+    await reader.page.goto('/home', { waitUntil: 'domcontentloaded' });
+    await ensureSidebarExpanded(reader.page);
+    const sidebar = reader.page.getByTestId('sidebar');
+    const profileLink = sidebar.locator('a[href="/p/bom_source_format_profile"]');
+    if (!(await profileLink.isVisible())) {
+      const center = sidebar.getByRole('button', { name: '规则中心', exact: true });
+      if (!(await center.isVisible())) await sidebar.getByRole('button', { name: 'BOM转化工具', exact: true }).click();
+      await center.click();
+    }
+    await profileLink.click();
+    await expect(reader.page).toHaveURL(/\/p\/bom_source_format_profile$/);
+    await expect(reader.page.locator('main').getByRole('button', { name: '新建', exact: true })).toHaveCount(0);
+    await searchBusinessList(reader.page, '/p/bom_source_format_profile', String(profile.bom_sfp_code));
+    const row = reader.page.getByRole('row').filter({ hasText: String(profile.bom_sfp_code) });
+    await expect(row).toHaveCount(1);
+    await clickRowActionByLocator(reader.page, row, 'view', '查看');
+    await expect(reader.page).toHaveURL(new RegExp(`/view/${profileId}$`));
+    await expect(reader.page.locator('main').getByText(String(profile.bom_sfp_code), { exact: true })).toBeVisible();
+    const regressionRuns = await queryDynamicRecords(reader.page, 'bom_profile_regression_run', [
+      { fieldName: 'bom_prr_profile_id', operator: 'EQ', value: profileId },
+    ]);
+    expect(regressionRuns).toHaveLength(1);
+    expect(regressionRuns[0].pid).toBe(profile.bom_sfp_last_regression_run_id);
+    const readerCases = await queryDynamicRecords(reader.page, 'bom_profile_regression_case', [
+      { fieldName: 'bom_prc_run_id', operator: 'EQ', value: profile.bom_sfp_last_regression_run_id },
+    ]);
+    expect(readerCases.map(record => record.pid).sort()).toEqual(regressionCases.map(record => record.pid).sort());
+    await expect(reader.page.getByRole('row').filter({ hasText: String(regressionRuns[0].bom_prr_code) })).toBeVisible();
+    for (const label of ['编辑候选修订', '运行历史样本回归', '晋升为生效版本', '隔离', '废弃修订', '删除'])
+      await expect(reader.page.locator('main').getByRole('button', { name: label, exact: true })).toHaveCount(0);
+    for (const action of ['update', 'promote', 'run_source_format_profile_regression', 'quarantine', 'deprecate', 'delete']) {
+      const command = action === 'run_source_format_profile_regression' ? `bom:${action}` : `bom:${action}_source_format_profile`;
+      await expectCommandDenied(reader.page, command, { reason: 'unauthorized', overrideReason: 'unauthorized' }, profileId, action === 'delete' ? 'delete' : 'update');
+    }
+    expect((await profiles())[0]).toEqual(profile);
+    await reader.page.screenshot({ path: info.outputPath('profile-reader-active.png') });
+  } finally { await reader.context.close(); }
+
   await profileAction('隔离', 'bom:quarantine_source_format_profile', { reason: `E2E quarantine ${marker}` });
   profile = (await profiles())[0];
   expect(profile.bom_sfp_status).toBe('quarantined');
@@ -781,19 +826,6 @@ test('header alias enabled/disabled affects new BOM conversions and preserves pr
   await page.screenshot({ path: info.outputPath('profile-deprecated.png') });
   for (const snapshot of snapshots)
     expect(await queryDynamicRecords(page, 'bom_raw_line_pcba', [{ fieldName: 'bom_raw_task_id', operator: 'EQ', value: snapshot.taskId }])).toEqual(snapshot.raw);
-  const deniedUser = makeQuoteRoleUser('profile-denied-proc', marker.toLowerCase(), ['qo_procurement']);
-  await ensureQuoteRoleUser(page, deniedUser);
-  const denied = await openQuoteRolePage(page.context().browser()!, deniedUser);
-  try {
-    await denied.page.goto(`/p/bom_source_format_profile/view/${profileId}`, { waitUntil: 'domcontentloaded' });
-    await expect(denied.page.locator('main')).toContainText(/Page Unavailable|Access forbidden|Access denied|无权限|未授权|权限不足/i);
-    for (const action of ['update', 'promote', 'run_source_format_profile_regression', 'quarantine', 'deprecate', 'delete']) {
-      const command = action === 'run_source_format_profile_regression' ? `bom:${action}` : `bom:${action}_source_format_profile`;
-      await expectCommandDenied(denied.page, command, { reason: 'unauthorized', overrideReason: 'unauthorized' }, profileId, action === 'delete' ? 'delete' : 'update');
-    }
-    expect((await profiles())[0]).toEqual(profile);
-    await denied.page.screenshot({ path: info.outputPath('profile-denied.png') });
-  } finally { await denied.context.close(); }
   info.annotations.push({ type: 'profile-lifecycle', description: JSON.stringify({ profileId, finalStatus: profile.bom_sfp_status }) });
 
 });

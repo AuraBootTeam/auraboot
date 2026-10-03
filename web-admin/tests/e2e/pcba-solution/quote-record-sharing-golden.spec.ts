@@ -100,12 +100,13 @@ test('quote sharing release gate: multiple members, role access and revocation t
   for (const tabName of ['资料上传','BOM价格计算','加工点数','Gerber校验','报价Excel']) {
     await expect(viewers[0].page.getByRole('tab',{name:tabName,exact:true})).toBeVisible();
   }
-  await viewers[0].page.screenshot({path:testInfo.outputPath('quote-collaborator-all-tabs.png'), fullPage:true});
   await expect(viewers[0].page.getByTestId('ab:detail:qo_quote_common:share-btn')).toHaveCount(0);
   await viewers[0].page.getByRole('tab',{name:'BOM价格计算',exact:true}).click();
   const sharedLine = viewers[0].page.getByTestId(`table-row-${quote.lineId}`);
   await expect(sharedLine).toContainText(quote.mpn, {timeout: 20_000});
   await expect(sharedLine).toContainText(/1\.1111|1\.111|1\.11/);
+  await expect(viewers[0].page.locator('main')).not.toContainText(/加载中\.\.\.|Loading\.\.\./);
+  await viewers[0].page.screenshot({path:testInfo.outputPath('quote-collaborator-all-tabs.png'), fullPage:true});
   expect((await viewers[0].page.request.put(root,{data:{qo_quote_customer:'Denied shared edit'}})).status()).toBe(403);
   const reader = viewers[0].page;
   await reader.getByRole('button',{name:/修改套数/}).click();
@@ -326,13 +327,14 @@ test('quote sharing release gate: collaborator full processing, record isolation
   for (const tabName of ['资料上传','BOM价格计算','加工点数','Gerber校验','报价Excel']) {
     await expect(memberPage.getByRole('tab',{name:tabName,exact:true})).toBeVisible();
   }
-  await memberPage.screenshot({path:testInfo.outputPath('shared-full-tabs.png'), fullPage:true});
 
   // 资料上传 tab renders the quote materials surface for the collaborator. The seed quote
   // has no materials yet, so the table shows its headers without rows.
   await memberPage.getByRole('tab',{name:'资料上传',exact:true}).click();
   await expect(memberPage.getByRole('columnheader', { name: '资料类型' })).toBeVisible();
   await expect(memberPage.getByRole('columnheader', { name: '文件名' })).toBeVisible();
+  await expect(memberPage.locator('main')).not.toContainText(/加载中\.\.\.|Loading\.\.\./);
+  await memberPage.screenshot({path:testInfo.outputPath('shared-full-tabs.png'), fullPage:true});
 
   // 报价Excel tab: generate, download and parse the workbook as the collaborator, before the
   // process-fee recalculation step below changes the quote's fee accounting. The workbook
