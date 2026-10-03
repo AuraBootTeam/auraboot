@@ -15,15 +15,16 @@
 # need the full showcase data, run scripts/oss-reset-and-init.sh separately (dormancy-guarded).
 #
 # Usage:
-#   ./scripts/oss-golden-stack.sh up   <name> [--slot N] [--runtime-mode development|verification|control|performance] [--no-frontend] [--no-warm] [--fresh-db] [--ttl 6h] [--product-migration-root PATH] [--extra-plugin-root PATH] [--plugin-profile P|--plugin X]
+#   ./scripts/oss-golden-stack.sh up   <name> [--slot N] [--runtime-mode development|verification|control|performance] [--no-frontend] [--no-warm] [--fresh-db|--require-new-db] [--ttl 6h] [--product-migration-root PATH] [--extra-plugin-root PATH] [--plugin-profile P|--plugin X]
 #       --no-warm : keep the frontend but skip the setup/auth/pre-warm step — for goldens
 #                   that self-provision accounts and run with --no-deps (no storageState).
 #       --fresh-db: drop + recreate the slot's database before applying the snapshot. `up`
 #                   otherwise refuses to run on a database that predates the current
 #                   snapshot (db/snapshots/schema-current.sql is a pg_dump — plain CREATE
 #                   TABLE, so it cannot back-fill columns into tables that already exist).
+#       --require-new-db: create an absent database; refuse existing databases without dropping them.
 #       --product-migration-root: repeatable directory of product-owned V*.sql migrations.
-#                   Requires --fresh-db and applies after the Core snapshot but before backend
+#                   Requires a fresh database flag and applies after the Core snapshot but before backend
 #                   startup, recording path + SHA-256 in the runtime state directory.
 #       --extra-plugin-root: repeatable explicit fallback after this checkout's OSS plugins;
 #                            sibling plugin repositories are never guessed implicitly.
@@ -44,6 +45,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"            # the auraboot checkout this script lives in
 source "$SCRIPT_DIR/lib/web-admin-node-modules.sh"
+source "$SCRIPT_DIR/lib/golden-new-database.sh"
 # CI uses sibling repositories; local worktrees usually find dev.sh above them.
 WORKSPACE="${AURA_WORKSPACE_ROOT:-${AURA_CI_WORKSPACE_ROOT:-}}"
 if [ -z "$WORKSPACE" ] && [ -f "$(dirname "$REPO_ROOT")/auraboot-workspace/dev.sh" ]; then
@@ -298,7 +300,7 @@ PY
 # ---- up ------------------------------------------------------------------------------
 cmd_up() {
   local name="$1"; shift
-  local slot="" ttl="6h" runtime_mode="development" frontend=1 warm=1 fresh_db=0
+  local slot="" ttl="6h" runtime_mode="development" frontend=1 warm=1 fresh_db=0 require_new_db=0
   local plugin_profile="" import_plugins=() extra_plugin_roots=() product_migration_roots=()
   local extra_root migration_root plugin_item
   while [ $# -gt 0 ]; do case "$1" in
@@ -308,6 +310,7 @@ cmd_up() {
     --no-frontend) frontend=0; shift;;
     --no-warm) warm=0; shift;;
     --fresh-db) fresh_db=1; shift;;
+    --require-new-db) require_new_db=1; shift;;
     --product-migration-root)
       [ -d "$2" ] || die "product migration root does not exist: $2"
       product_migration_roots+=("$(cd "$2" && pwd)")
@@ -342,8 +345,9 @@ cmd_up() {
     *) die "unknown arg: $1";;
   esac; done
   [ -n "$slot" ] || die "--slot N is required for 'up' (pick a free slot: $DEV runtime list)"
-  [ "${#product_migration_roots[@]}" -eq 0 ] || [ "$fresh_db" = "1" ] \
-    || die "--product-migration-root requires --fresh-db so product SQL is never replayed onto an unknown database"
+  [ "$fresh_db$require_new_db" != "11" ] || die "--fresh-db and --require-new-db are mutually exclusive"
+  [ "${#product_migration_roots[@]}" -eq 0 ] || [ "$fresh_db" = "1" ] || [ "$require_new_db" = "1" ] \
+    || die "--product-migration-root requires a fresh database flag so product SQL is never replayed onto an unknown database"
   case "$runtime_mode" in
     development|verification|control|performance) ;;
     *) die "--runtime-mode must be development|verification|control|performance" ;;
@@ -376,7 +380,6 @@ cmd_up() {
       "$DEV" runtime allocate auraboot "$name" --slot "$slot" --purpose "OSS host-first golden stack" --ttl "$ttl" >/dev/null
     fi
   fi
-  "$DEV" infra ensure "$name" --yes >/dev/null
 
   local server_port vite_port bff_port pg_db redis_db pg_host pg_port pg_user pg_pass
   server_port="$(runtime_env "$name" SERVER_PORT)"
@@ -388,6 +391,11 @@ cmd_up() {
   pg_port="$(runtime_env "$name" POSTGRES_PORT)"; pg_port="${pg_port:-5432}"
   pg_user="$(runtime_env "$name" POSTGRES_USER)"; pg_user="${pg_user:-auraboot}"
   pg_pass="$(runtime_env "$name" POSTGRES_PASSWORD)"; pg_pass="${pg_pass:-auraboot}"
+  if [ "$require_new_db" = "1" ]; then
+    golden_create_new_database "$pg_host" "$pg_port" "$pg_user" "$pg_pass" "$pg_db" \
+      || die "database freshness could not be established; allocation retained, infra untouched"
+  fi
+  "$DEV" infra ensure "$name" --yes >/dev/null
   log "    backend=$server_port vite=$vite_port bff=$bff_port db=$pg_db redis-db=$redis_db"
   # Persist PG coordinates so 'env' can export PG* for the Playwright setup
   # project (00-bootstrap verifies the isolated DB via node-postgres / PG* vars).

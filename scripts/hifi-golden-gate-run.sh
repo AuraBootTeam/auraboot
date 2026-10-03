@@ -78,7 +78,7 @@ node "$AUDIT" "$PROFILE" "$AURA_EVIDENCE_ROOT/collection.json" collection "$REPE
   >"$AURA_EVIDENCE_ROOT/collection-ledger.json" || exit 1
 export AGENT_LLM_STUB_MODE=true
 log "2/6 fresh stack name=$NAME slot=$SLOT (no existing runtime is destroyed)"
-"$GS" up "$NAME" --slot "$SLOT" --ttl 12h --runtime-mode verification --fresh-db --plugin-profile demo \
+"$GS" up "$NAME" --slot "$SLOT" --ttl 12h --runtime-mode verification --require-new-db --plugin-profile demo \
   || die_env 'stack bring-up failed; inspect retained golden-stack logs'
 log '3/6 import test-fixtures'
 "$GS" import "$NAME" --plugin-profile none --plugin test-fixtures || die_env 'test-fixtures import failed'

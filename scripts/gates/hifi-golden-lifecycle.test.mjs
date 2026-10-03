@@ -94,6 +94,7 @@ test('gate evidence and real golden-stack env use the same shared CI state', t =
   fs.copyFileSync(new URL('../oss-golden-stack.sh', import.meta.url), path.join(f.repo, 'scripts/oss-golden-stack.sh'));
   fs.mkdirSync(path.join(f.repo, 'scripts/lib'), { recursive: true });
   fs.copyFileSync(new URL('../lib/web-admin-node-modules.sh', import.meta.url), path.join(f.repo, 'scripts/lib/web-admin-node-modules.sh'));
+  fs.copyFileSync(new URL('../lib/golden-new-database.sh', import.meta.url), path.join(f.repo, 'scripts/lib/golden-new-database.sh'));
   fs.writeFileSync(path.join(f.root, 'dev.sh'), '#!/usr/bin/env bash\nexit 0\n', { mode: 0o755 });
   fs.mkdirSync(path.join(state, 'golden/owned-run'), { recursive: true });
   fs.mkdirSync(path.join(state, 'env'), { recursive: true });
