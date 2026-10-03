@@ -17,7 +17,12 @@
  */
 
 import { test, expect } from '../../fixtures';
-import { uniqueId, navigateToDynamicPage } from '../helpers';
+import {
+  uniqueId,
+  navigateToDynamicPage,
+  findRowInPaginatedList,
+  acceptConfirmDialog,
+} from '../helpers';
 import { BASE_URL } from '../../helpers/playwright-env';
 const MEMBER_PAGE_KEY = 'tenant-member';
 
@@ -48,12 +53,16 @@ test.describe('MEMBER-MENU: Sidebar Organization menu', () => {
     // Navigate to any page first, clear the sidebar-collapsed flag, then navigate
     // to the member page (which is in org_management submenu) so 组织管理 auto-expands.
     await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
-    await page.evaluate(() => { localStorage.removeItem('sidebar-collapsed'); });
+    await page.evaluate(() => {
+      localStorage.removeItem('sidebar-collapsed');
+    });
 
-    const listResp = page.waitForResponse(
-      (r) => r.url().includes('/api/dynamic/tenant-member') && r.status() === 200,
-      { timeout: 10000 },
-    ).catch(() => null);
+    const listResp = page
+      .waitForResponse(
+        (r) => r.url().includes('/api/dynamic/tenant-member') && r.status() === 200,
+        { timeout: 10000 },
+      )
+      .catch(() => null);
     await page.goto('/p/tenant_member', { waitUntil: 'domcontentloaded' });
     await listResp;
 
@@ -61,7 +70,10 @@ test.describe('MEMBER-MENU: Sidebar Organization menu', () => {
 
     // 组织管理 parent menu label should be visible in the expanded sidebar submenu button
     // (SidebarSubmenu renders it as a <button> with the menu name)
-    const orgGroupBtn = nav.locator('button').filter({ hasText: /组织管理/ }).first();
+    const orgGroupBtn = nav
+      .locator('button')
+      .filter({ hasText: /组织管理/ })
+      .first();
     await expect(orgGroupBtn).toBeVisible({ timeout: 10000 });
 
     // Members should be visible under Organization
@@ -168,8 +180,9 @@ test.describe('MEMBER-DETAIL: Detail page', () => {
     await expect(tabContent).toBeVisible();
 
     // Either has employee data fields or empty state message
-    const hasOrgData = await tabContent.locator('dl').count() > 0;
-    const hasEmptyState = await tabContent.getByText(/No organization info|暂无组织信息/i).count() > 0;
+    const hasOrgData = (await tabContent.locator('dl').count()) > 0;
+    const hasEmptyState =
+      (await tabContent.getByText(/No organization info|暂无组织信息/i).count()) > 0;
     expect(hasOrgData || hasEmptyState).toBeTruthy();
   });
 
@@ -185,8 +198,9 @@ test.describe('MEMBER-DETAIL: Detail page', () => {
     const tabContent = page.locator('[data-testid="tab-content"]');
     await expect(tabContent).toBeVisible();
 
-    const hasTeamTable = await tabContent.locator('table').count() > 0;
-    const hasEmptyState = await tabContent.getByText(/Not a member of any team|暂未加入任何团队/i).count() > 0;
+    const hasTeamTable = (await tabContent.locator('table').count()) > 0;
+    const hasEmptyState =
+      (await tabContent.getByText(/Not a member of any team|暂未加入任何团队/i).count()) > 0;
     expect(hasTeamTable || hasEmptyState).toBeTruthy();
   });
 
@@ -239,4 +253,117 @@ test.describe('MEMBER-API: Teams endpoint', () => {
     expect(body.code).toBe('0');
     expect(Array.isArray(body.data)).toBeTruthy();
   });
+});
+
+// Dedicated records are created through the public admin API as fixtures. Every
+// lifecycle mutation below is driven by the native detail button, never by API fallback.
+test('MEMBER-DETAIL-07: native lifecycle buttons execute commands and persist state @critical', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(120000);
+  const stamp = uniqueId('native-member');
+  const email = `${stamp}@e2e.local`;
+  const created = await page.request.post('/api/admin/users', {
+    data: {
+      email,
+      displayName: stamp,
+      initialPassword: 'MemberE2e!2026',
+      roleCodes: ['crm_sales'],
+      sendInviteEmail: false,
+    },
+  });
+  expect(created.ok()).toBe(true);
+  expect((await created.json()).code).toBe('0');
+  const found = await page.request.post('/api/tenant/members/search', {
+    data: { keyword: email, pageNum: 1, pageSize: 50 },
+  });
+  expect(found.ok()).toBe(true);
+  const body = await found.json();
+  expect(body.code).toBe('0');
+  const rows = body.data.records as Array<{ pid: string; status: string; user: { email: string } }>;
+  const member = rows.find((row) => row.user?.email === email);
+  expect(member, 'newly provisioned lifecycle fixture').toBeDefined();
+  const pid = member!.pid;
+  expect(member!.status).toBe('active');
+
+  await navigateToDynamicPage(page, MEMBER_PAGE_KEY);
+  const row = await findRowInPaginatedList(page, stamp, 20000);
+  await row.click();
+  await expect(page).toHaveURL(new RegExp(`/organization/members/${pid}$`));
+  await expect(page.getByTestId('member-status')).toHaveText('active');
+
+  const capture = async (name: string) => {
+    const path = testInfo.outputPath(`${name}.png`);
+    await page.screenshot({ path, fullPage: true });
+    await testInfo.attach(name, { path, contentType: 'image/png' });
+  };
+  await capture('native-member-active');
+  const act = async (
+    label: string,
+    command: string,
+    status?: string,
+    offboardingAction?: string,
+  ) => {
+    const commandResponse = page.waitForResponse(
+      (response) =>
+        response.url().endsWith(`/api/meta/commands/execute/${command}`) &&
+        response.request().method() === 'POST',
+    );
+    const impactResponse = offboardingAction
+      ? page.waitForResponse((response) => {
+          const url = new URL(response.url());
+          return (
+            url.pathname === `/api/tenant/members/${pid}/offboarding-impact` &&
+            url.searchParams.get('action') === offboardingAction
+          );
+        })
+      : null;
+    await page.getByTestId('action-bar').getByRole('button', { name: label, exact: true }).click();
+    if (impactResponse) {
+      const impact = await impactResponse;
+      expect(impact.ok()).toBe(true);
+      const result = await impact.json();
+      expect(result.code).toBe('0');
+      expect(result.data.transferRequired, 'fixture owns no resources').toBe(false);
+    }
+    if (command === 'admin:suspend_member' || command === 'admin:leave_member') {
+      await expect(page.getByTestId('form-dialog')).toBeVisible();
+      await page.getByTestId('form-dialog-field-reason').fill(`E2E ${command}`);
+      await capture(`${command.split(':')[1]}-input`);
+      await page.getByTestId('form-dialog-submit').click();
+    } else {
+      await expect(page.getByTestId('confirm-dialog')).toBeVisible();
+      await capture(`${command.split(':')[1]}-confirm`);
+      await acceptConfirmDialog(page);
+    }
+    const response = await commandResponse;
+    expect(response.ok()).toBe(true);
+    const payload = response.request().postDataJSON();
+    expect(payload.targetRecordPid).toBe(pid);
+    expect((await response.json()).code).toBe('0');
+    if (status) {
+      await expect(page.getByTestId('member-status')).toHaveText(status);
+      const persisted = await page.request.get(`/api/tenant/members/${pid}`);
+      expect(persisted.ok()).toBe(true);
+      const result = await persisted.json();
+      expect(result.code).toBe('0');
+      expect(result.data.status).toBe(status);
+      await page.reload();
+      await expect(page.getByTestId('member-status')).toHaveText(status);
+      await capture(`native-member-${status}`);
+    }
+  };
+  await act('暂停', 'admin:suspend_member', 'suspended', 'suspend');
+  await act('恢复', 'admin:restore_member', 'active');
+  await act('离职', 'admin:leave_member', 'inactive', 'deactivate');
+  await act('删除', 'admin:delete_member', undefined, 'remove');
+  await expect(page).toHaveURL(/\/p\/tenant_member$/);
+  const after = await page.request.post('/api/tenant/members/search', {
+    data: { keyword: email, pageNum: 1, pageSize: 50 },
+  });
+  expect(after.ok()).toBe(true);
+  const result = await after.json();
+  expect(result.code).toBe('0');
+  expect(result.data.records.some((entry: { pid: string }) => entry.pid === pid)).toBe(false);
+  await capture('native-member-removed-list');
 });
