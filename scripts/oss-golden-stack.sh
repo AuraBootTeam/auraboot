@@ -808,16 +808,14 @@ cmd_warm() {
   fi
 
   # 3) pre-warm the heavy lazy routes with a real authenticated headless nav.
-  log "    warm[routes] navigating /report-designer + /dashboard (real auth)"
+  log "    warm[routes] navigating /report-designer + /dashboard + custom form (real auth)"
   if ( cd "$fe" && eval "$env_exports" \
        && npx playwright test --project=chromium --no-deps \
             tests/e2e/_golden-stack-warm.spec.ts \
             --reporter=line ) >>"$sd/warm.log" 2>&1; then
     log "    warm[routes] heavy routes hot ✓"
   else
-    # Non-fatal: a failed warm nav doesn't break the stack; first golden will
-    # just pay the chunk-compile cost. Surface it so the operator can look.
-    log "    warm[routes] WARNING: pre-warm nav failed (see $sd/warm.log); stack still usable"
+    die "warm: declared route readiness failed — see $sd/warm.log"
   fi
   log "    warm OK"
 }
