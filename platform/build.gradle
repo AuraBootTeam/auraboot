@@ -512,6 +512,24 @@ tasks.withType(Test).configureEach {
         includeSystemOutLog = false
         includeSystemErrLog = false
     }
+    // Frozen architecture rules may remove resolved violations from their store.
+    // Give each task a fresh writable copy, never the versioned source baseline.
+    def architectureBaseline = file('src/test/resources/archunit_store')
+    def architectureStore = layout.buildDirectory.dir("archunit/${name}").get().asFile
+    inputs.dir architectureBaseline
+    systemProperty 'archunit.freeze.store.default.path', architectureStore.absolutePath
+    systemProperty 'archunit.freeze.store.default.allowStoreCreation', 'false'
+    systemProperty 'archunit.freeze.refreeze', 'false'
+    doFirst {
+        if (!new File(architectureBaseline, 'stored.rules').isFile()) {
+            throw new GradleException('Versioned architecture baseline is missing')
+        }
+        project.delete architectureStore
+        project.copy {
+            from architectureBaseline
+            into architectureStore
+        }
+    }
     // See bootRun comment above — needed in tests too.
     jvmArgs '-Djdk.httpclient.allowRestrictedHeaders=host'
 }
