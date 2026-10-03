@@ -129,9 +129,10 @@ class IdempotencyServiceImplCoverageIT {
         CountDownLatch firstClaimed = new CountDownLatch(1);
         CountDownLatch releaseFirst = new CountDownLatch(1);
         AtomicInteger owners = new AtomicInteger();
+        MetaContext.Snapshot callerContext = MetaContext.snapshot();
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {
-            Future<Map<String, Object>> first = pool.submit(() -> inTransaction(() -> {
+            Future<Map<String, Object>> first = pool.submit(() -> inWorkerTransaction(callerContext, () -> {
                 Map<String, Object> replay = idempotencyService.claimScopedIdempotency(
                         reqId, "demo:confirm", intent, TENANT_ID);
                 if (replay != null) {
@@ -146,8 +147,11 @@ class IdempotencyServiceImplCoverageIT {
                 return outcome;
             }));
 
-            assertTrue(firstClaimed.await(10, TimeUnit.SECONDS));
-            Future<Map<String, Object>> second = pool.submit(() -> inTransaction(() -> {
+            if (!firstClaimed.await(10, TimeUnit.SECONDS)) {
+                first.get(10, TimeUnit.SECONDS);
+                org.junit.jupiter.api.Assertions.fail("The first worker did not acquire its claim");
+            }
+            Future<Map<String, Object>> second = pool.submit(() -> inWorkerTransaction(callerContext, () -> {
                 Map<String, Object> replay = idempotencyService.claimScopedIdempotency(
                         reqId, "demo:confirm", intent, TENANT_ID);
                 if (replay != null) {
@@ -191,6 +195,15 @@ class IdempotencyServiceImplCoverageIT {
             return completed;
         });
         assertEquals("REV-RETRY", outcome.get("pid"));
+    }
+
+    private <T> T inWorkerTransaction(MetaContext.Snapshot callerContext, Supplier<T> work) {
+        MetaContext.restore(callerContext);
+        try {
+            return inTransaction(work);
+        } finally {
+            MetaContext.clear();
+        }
     }
 
     private <T> T inTransaction(Supplier<T> work) {
