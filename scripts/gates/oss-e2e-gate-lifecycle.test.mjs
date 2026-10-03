@@ -10,7 +10,10 @@ function fixture(t, mode = '') {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'oss-gate-lifecycle-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const repo = path.join(root, 'oss');
-  fs.mkdirSync(path.join(repo, 'scripts'), { recursive: true });
+  fs.mkdirSync(path.join(repo, 'scripts/gates'), { recursive: true });
+  for (const file of ['oss-e2e-gate-profile.json', 'hifi-golden-results.mjs']) {
+    fs.copyFileSync(new URL(file, import.meta.url), path.join(repo, 'scripts/gates', file));
+  }
   fs.mkdirSync(path.join(repo, 'web-admin'));
   fs.mkdirSync(path.join(root, 'bin'));
   fs.copyFileSync(new URL('../oss-e2e-gate-run.sh', import.meta.url), path.join(repo, 'scripts/oss-e2e-gate-run.sh'));
@@ -32,11 +35,22 @@ fi
 [[ "$MODE:$1" != up-failure:up ]] || exit 1
 if [[ "$1" == env ]]; then printf 'export AURA_EVIDENCE_ROOT=%q PLAYWRIGHT_BASE_URL=http://localhost:1 BACKEND_URL=http://localhost:2 BFF_PORT=3\\n' "$EVIDENCE"; fi
 `);
-  script(path.join(root, 'bin/pnpm'), `printf 'pnpm %s\\n' "$*" >> "$CALLS"
-[[ "$MODE" != test-failure ]] || exit 1
-[[ "$MODE" != signal ]] || { kill -TERM "$PPID"; exit 0; }
-printf '4 passed\\n'
-`);
+  fs.writeFileSync(path.join(root, 'bin/pnpm'), `#!/usr/bin/env node
+const fs=require('node:fs');
+const args=process.argv.slice(2);
+fs.appendFileSync(process.env.CALLS,'pnpm '+args.join(' ')+'\\n');
+const collection=args.includes('--list');
+if(!collection && process.env.MODE==='test-failure')process.exit(1);
+if(!collection && process.env.MODE==='signal'){process.kill(process.ppid,'SIGTERM');process.exit(0);}
+const profile=JSON.parse(fs.readFileSync('../scripts/gates/oss-e2e-gate-profile.json','utf8'));
+const report={errors:[],suites:[{specs:profile.tests.map(t=>({file:t.file,title:t.title,tests:[{
+projectName:t.project,expectedStatus:'passed',status:'expected',results:collection?[]:[{status:'passed',retry:0}]}]}))}]};
+if(process.env.MODE==='zero-tests')report.suites[0].specs=[];
+if(!collection && process.env.MODE==='missing-result')report.suites[0].specs.pop();
+if(!collection && process.env.MODE==='skipped-result')report.suites[0].specs[0].tests[0].results[0].status='skipped';
+if(!collection && process.env.MODE==='retried-result')report.suites[0].specs[0].tests[0].results.push({status:'passed',retry:1});
+if(collection)console.log(JSON.stringify(report));else{if(process.env.PLAYWRIGHT_JSON_OUTPUT_FILE)fs.writeFileSync(process.env.PLAYWRIGHT_JSON_OUTPUT_FILE,JSON.stringify(report));console.log('12 passed');}
+`, { mode: 0o755 });
   const env = { ...process.env, AURA_WORKSPACE_ROOT: root, AURA_WORKSPACE_STATE_DIR: path.join(root, 'state'),
     AURA_CI_JOB_ID: 'test-job', AURA_REGRESSION_SLOT: '900', MODE: mode, CALLS: calls,
     EVIDENCE: path.join(root, 'evidence'), PATH: path.join(root, 'bin') + path.delimiter + process.env.PATH };
@@ -70,7 +84,8 @@ for (const [mode, status] of [['', 0], ['up-failure', 2], ['verify-failure', 2],
     if (mode === 'up-failure' || mode === 'verify-failure') assert.doesNotMatch(calls, /pnpm /);
     if (status === 0) {
       assert.match(calls, /aura runtime verify owned-run/);
-      const paths = calls.match(/tests\/e2e\/[^\s]+/g);
+      const execution = calls.split('\n').find(line => line.startsWith('pnpm ') && !line.includes('--list'));
+      const paths = execution.match(/tests\/e2e\/[^\s]+/g);
       assert.deepEqual(paths, ['tests/e2e/page-designer/form-buttons-refresh-runtime.spec.ts',
         'tests/e2e/showcase/runtime-rendering-e2e.spec.ts', 'tests/e2e/saved-view/saved-view-gantt.spec.ts',
         'tests/e2e/saved-view/saved-view-kanban.spec.ts']);
@@ -143,3 +158,11 @@ fi
   assert.ok(fs.existsSync(path.join(state, 'env/owned-run.env')), 'failed allocation must remain inspectable');
   assert.equal(fs.existsSync(path.join(state, 'golden/owned-run/pgenv')), false);
 });
+for (const mode of ['zero-tests', 'missing-result', 'skipped-result', 'retried-result']) {
+  test(`successful Playwright exit cannot hide ${mode}`, t => {
+    const f = fixture(t, mode); const result = f.run();
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.doesNotMatch(result.stdout, /OSS E2E GATE: PASS/);
+    assert.doesNotMatch(fs.readFileSync(f.calls, 'utf8'), /destroy|down|stop/);
+  });
+}

@@ -138,6 +138,7 @@ done
 
 [[ -x "$GS" ]] || die "oss-golden-stack.sh not found/executable at $GS"
 [[ -x "$DEV" ]] || die "workspace aura not found above $REPO_ROOT"
+[[ "$REPEAT" =~ ^[1-9][0-9]*$ ]] || die "repeat must be a positive integer"
 [[ "$NAME" =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]*$ ]] || die "invalid runtime name"
 [[ -z "$SLOT" || "$SLOT" =~ ^[1-9][0-9]*$ ]] || die "slot must be a positive integer"
 STATE="${AURA_WORKSPACE_STATE_DIR:-$WORKSPACE/.workspace}"
@@ -227,13 +228,23 @@ log "    base=$PLAYWRIGHT_BASE_URL backend=$BACKEND_URL bff=$BFF_PORT (AGENT_LLM
 # aura-bpm and aura-crm release suites own those fixtures and denominators.
 
 # --- 3. run the gate slice under the OSS env contract ------------------------
-log "3/4 run gate: PW_PROFILE=oss --project=oss --no-deps (x$REPEAT)"
 cd "$REPO_ROOT/web-admin" || die_env "web-admin not found under $REPO_ROOT"
-PW_ARGS=(--project=oss --no-deps --repeat-each="$REPEAT" --reporter=line)
+if [[ "$SCOPE_MODE" == slice ]]; then
+  PROFILE="$REPO_ROOT/scripts/gates/oss-e2e-gate-profile.json"
+  AUDIT="$REPO_ROOT/scripts/gates/hifi-golden-results.mjs"
+  [[ -f "$PROFILE" && -f "$AUDIT" ]] || die_env "fixed slice contract is missing"
+  PW_PROFILE=oss pnpm exec playwright test "${RUN_PATHS[@]}" --project=oss --no-deps \
+    --repeat-each="$REPEAT" --list --reporter=json >"$AURA_EVIDENCE_ROOT/collection.json" \
+    2>"$AURA_EVIDENCE_ROOT/collection.stderr.log" || exit 1
+  node "$AUDIT" "$PROFILE" "$AURA_EVIDENCE_ROOT/collection.json" collection "$REPEAT" \
+    >"$AURA_EVIDENCE_ROOT/collection-ledger.json" || exit 1
+fi
+log "3/4 run gate: PW_PROFILE=oss --project=oss --no-deps (x$REPEAT)"
+PW_ARGS=(--project=oss --no-deps --repeat-each="$REPEAT" --retries=0 --reporter=line,json)
 [[ -n "$WORKERS" ]] && PW_ARGS+=(--workers="$WORKERS")
 [[ ${#RUN_PATHS[@]} -gt 0 ]] && PW_ARGS+=("${RUN_PATHS[@]}")
 set +e
-PW_PROFILE=oss NO_PROXY=localhost,127.0.0.1 \
+PLAYWRIGHT_JSON_OUTPUT_FILE="$AURA_EVIDENCE_ROOT/results.json" PW_PROFILE=oss NO_PROXY=localhost,127.0.0.1 \
   pnpm exec playwright test "${PW_ARGS[@]}" 2>&1 | tee "$LOG"
 GATE_RC=${PIPESTATUS[0]}
 set -e 2>/dev/null || true
@@ -243,6 +254,10 @@ log "4/4 result"
 # Informational counts parsed from the reporter line. The AUTHORITATIVE signal is
 # GATE_RC (the process exit code), never the parsed text — a tee pipeline's own
 # exit code would lie, which is why GATE_RC comes from PIPESTATUS above.
+if [[ "$GATE_RC" == 0 && "$SCOPE_MODE" == slice ]]; then
+  node "$AUDIT" "$PROFILE" "$AURA_EVIDENCE_ROOT/results.json" execution "$REPEAT" \
+    >"$AURA_EVIDENCE_ROOT/execution-ledger.json" || exit 1
+fi
 SUMMARY="$(grep -aoE '[0-9]+ (passed|failed|flaky|skipped|did not run)' "$LOG" 2>/dev/null | tail -6 | tr '\n' ' ')"
 echo "=============================================================="
 if [[ "$GATE_RC" == 0 ]]; then
