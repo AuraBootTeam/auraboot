@@ -84,7 +84,7 @@ export const DashboardExportExcel: React.FC<DashboardExportExcelProps> = ({
       }
 
       if (sheetCount === 0) {
-        showErrorToast('No data to export');
+        showErrorToast(t('dashboard.exportEmpty'));
         return;
       }
 
@@ -99,20 +99,20 @@ export const DashboardExportExcel: React.FC<DashboardExportExcelProps> = ({
       a.click();
       URL.revokeObjectURL(url);
 
-      showSuccessToast(`Exported ${sheetCount} sheets`);
+      showSuccessToast(t('dashboard.exportSuccess', { count: sheetCount }));
     } catch {
-      showErrorToast('Excel export failed');
+      showErrorToast(t('dashboard.exportFailed'));
     } finally {
       setExporting(false);
     }
-  }, [widgets, fileName, showSuccessToast, showErrorToast]);
+  }, [widgets, fileName, locale, t, showSuccessToast, showErrorToast]);
 
   return (
     <button
       onClick={handleExport}
       disabled={exporting || widgets.length === 0}
       className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-      title="Export to Excel"
+      title={t('dashboard.exportExcel')}
       data-testid="toolbar-btn-export-excel"
     >
       <TableCellsIcon className="h-4 w-4" />

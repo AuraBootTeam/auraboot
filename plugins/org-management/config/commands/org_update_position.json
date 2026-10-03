@@ -1,9 +1,17 @@
 {
   "code": "org:update_position",
-  "displayName:zh-CN": "Update Position",
+  "displayName:zh-CN": "更新岗位",
   "displayName:en": "Update Position",
   "type": "update",
   "modelCode": "org_position",
-  "inputFields": ["org_pos_code", "org_pos_name", "org_pos_dept_id", "org_pos_level", "org_pos_status"],
-  "permissions": ["ORG.hr.manage"]
+  "inputFields": [
+    "org_pos_code",
+    "org_pos_name",
+    "org_pos_dept_id",
+    "org_pos_level",
+    "org_pos_status"
+  ],
+  "permissions": [
+    "ORG.hr.manage"
+  ]
 }

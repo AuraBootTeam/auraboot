@@ -49,6 +49,7 @@ import { resolvePageTargetPath } from '~/framework/meta/runtime/actions/resolveP
 import { useModelCapabilities } from '~/shared/hooks/useModelCapabilities';
 import { checkKindCompatibility } from '~/shared/utils/kindCapability';
 import type { ComputedFieldDef } from '~/framework/meta/runtime/computed/types';
+import { applyFormFieldChange } from './form/applyFormFieldChange';
 import { useFormDraft } from '~/framework/meta/rendering/pages/form/useFormDraft';
 import { RestoreDraftBanner } from '~/framework/meta/rendering/pages/form/RestoreDraftBanner';
 import {
@@ -2348,11 +2349,14 @@ export function FormPageContent(props: PageContentProps) {
   const renderSmartField = useMemo(
     () =>
       createFieldRenderer(formData, setFormData, pageContext, fieldErrors, (fieldCode, value) => {
-        dirtyFieldsRef.current.add(fieldCode);
-        clearFieldError(fieldCode);
-        syncRuntimeFieldValue(fieldCode, value);
+        const patch = applyFormFieldChange(runtime, fieldCode, value);
+        for (const changedField of Object.keys(patch)) {
+          dirtyFieldsRef.current.add(changedField);
+          clearFieldError(changedField);
+        }
+        setFormData((prev) => ({ ...prev, ...patch }));
       }),
-    [formData, pageContext, fieldErrors, clearFieldError, syncRuntimeFieldValue],
+    [formData, pageContext, fieldErrors, clearFieldError, runtime],
   );
 
   // Stable runtime context for custom blocks. Memoized so the props

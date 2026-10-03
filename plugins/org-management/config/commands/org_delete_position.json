@@ -1,12 +1,14 @@
 {
   "code": "org:delete_position",
-  "displayName:zh-CN": "Delete Position",
+  "displayName:zh-CN": "删除岗位",
   "displayName:en": "Delete Position",
   "type": "delete",
   "modelCode": "org_position",
-  "permissions": ["ORG.hr.manage"],
+  "permissions": [
+    "ORG.hr.manage"
+  ],
   "extension": {
-    "confirmMessage:zh-CN": "Confirm delete this position?",
+    "confirmMessage:zh-CN": "确认删除这个岗位？",
     "confirmMessage:en": "Confirm delete this position?"
   }
 }

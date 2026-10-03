@@ -9,7 +9,7 @@
  */
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { UnifiedDesignerWorkbench } from '../workbench/UnifiedDesignerWorkbench';
 import type { ModelFieldsByModel, PageSchemaV3 } from '../types';
 
@@ -58,6 +58,14 @@ const modelFieldsByModel: ModelFieldsByModel = {
 };
 
 describe('Canvas field WYSIWYG', () => {
+  it('shows localized edit and layout modes rather than internal enum values', () => {
+    render(<UnifiedDesignerWorkbench initialDocument={doc} modelFieldsByModel={{}} />);
+    const canvas = screen.getByTestId('unified-canvas-host');
+    expect(canvas).toHaveTextContent('模式: 编辑');
+    fireEvent.click(screen.getByRole('button', { name: '布局', exact: true }));
+    expect(canvas).toHaveTextContent('模式: 布局');
+  });
+
   it('renders the real platform control on the edit canvas when model metadata is available', () => {
     render(<UnifiedDesignerWorkbench initialDocument={doc} modelFieldsByModel={modelFieldsByModel} />);
 

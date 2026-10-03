@@ -20,7 +20,7 @@ export function ListTabs({ tabs, activeTab, onTabChange, locale, t }: ListTabsPr
 
   return (
     <div className="border-border border-b px-6">
-      <nav className="-mb-px flex space-x-6" aria-label="Tabs">
+      <nav className="-mb-px flex space-x-6" aria-label={t('table.statusTabs')}>
         {tabs.map((tab: any) => (
           <button
             key={tab.key}
