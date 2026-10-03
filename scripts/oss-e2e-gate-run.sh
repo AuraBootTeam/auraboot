@@ -146,6 +146,13 @@ case "$SCOPE_MODE" in
   dirs)  RUN_PATHS=("${SCOPE_DIRS[@]}");;
 esac
 
+if [[ ${#RUN_PATHS[@]} -gt 0 ]]; then
+  for spec_path in "${RUN_PATHS[@]}"; do
+    [[ "$spec_path" == tests/e2e/* && "$spec_path" != *..* && -e "$REPO_ROOT/web-admin/$spec_path" ]] \
+      || die_env "requested test path does not exist or is outside tests/e2e: $spec_path; no allocation created"
+  done
+fi
+
 # --- pick a free slot if the caller did not name one -------------------------
 # A free slot = not claimed by any dev.sh runtime AND whose computed host ports
 # (backend 6400+slot / web 5100+slot / bff 6100+slot for the auraboot repo) have

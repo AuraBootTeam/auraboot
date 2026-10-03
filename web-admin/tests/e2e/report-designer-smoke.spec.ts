@@ -298,6 +298,7 @@ test.describe('Report Designer', () => {
     await panel.getByRole('button', { name: /^(\+ 添加|\+ Add)$/ }).click();
     await panel.getByPlaceholder(/^(参数名|Parameter name)$/).fill('report_limit');
     await panel.getByPlaceholder(/^(显示名称|Display label)$/).fill('Row limit');
+    await panel.getByRole('button', { name: /^(添加|Add)$/, exact: true }).scrollIntoViewIfNeeded();
     await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/report-parameter-add.png`, fullPage: true });
     await panel.getByRole('button', { name: /^(添加|Add)$/, exact: true }).click();
     await expect(panel.getByText(/^Row limit \((文本|Text)\)$/)).toBeVisible();

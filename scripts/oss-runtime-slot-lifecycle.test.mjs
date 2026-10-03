@@ -9,6 +9,23 @@ import { fileURLToPath } from 'node:url';
 const gatePath = fileURLToPath(new URL('./oss-e2e-gate-run.sh', import.meta.url));
 const stackPath = fileURLToPath(new URL('./oss-golden-stack.sh', import.meta.url));
 
+test('a misspelled explicit scope fails before allocating any runtime', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'oss-scope-contract-'));
+  try {
+    const calls = join(fixture, 'calls.log');
+    writeFileSync(join(fixture, 'dev.sh'), '#!/bin/bash\n');
+    writeFileSync(join(fixture, 'aura'), '#!/bin/bash\nprintf called >> "$AURA_FIXTURE_CALLS"\nexit 99\n');
+    chmodSync(join(fixture, 'aura'), 0o755);
+    const result = spawnSync('/bin/bash', [gatePath, '--scope', 'tests/e2e/admin/admin-cross-tenant-grants.spec.ts'], {
+      encoding: 'utf8', env: { ...process.env, AURA_WORKSPACE_ROOT: fixture,
+        AURA_WORKSPACE_STATE_DIR: fixture, AURA_FIXTURE_CALLS: calls },
+    });
+    assert.equal(result.status, 2, result.stderr);
+    assert.match(result.stderr, /requested test path does not exist/);
+    assert.equal(existsSync(calls), false, 'no workspace allocation or cleanup command may run');
+  } finally { rmSync(fixture, { recursive: true, force: true }); }
+});
+
 for (const scenario of ['passed', 'skip-setup', 'skip-route']) {
   test(`canonical warm execution audit: ${scenario}`, () => {
     const fixture = mkdtempSync(join(tmpdir(), 'oss-warm-contract-'));
