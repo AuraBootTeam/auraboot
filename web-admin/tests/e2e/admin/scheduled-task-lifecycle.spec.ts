@@ -123,26 +123,12 @@ async function selectTaskType(page: Page, label: RegExp): Promise<void> {
     .first();
   await trigger.waitFor({ state: 'visible', timeout: 10_000 });
   await trigger.click();
-  await page
-    .locator('[role="listbox"]')
-    .first()
-    .waitFor({ state: 'visible', timeout: 5_000 })
-    .catch(() => null);
-  const option = page.locator('[role="option"]').filter({ hasText: label }).first();
-  if (await option.isVisible({ timeout: 3_000 }).catch(() => false)) {
-    await option.click();
-  } else {
-    await page
-      .locator('[role="option"]')
-      .first()
-      .click()
-      .catch(() => null);
-  }
-  await page
-    .locator('[role="listbox"]')
-    .first()
-    .waitFor({ state: 'hidden', timeout: 3_000 })
-    .catch(() => null);
+  const listbox = page.getByRole('listbox');
+  await expect(listbox).toBeVisible();
+  const option = listbox.getByRole('option', { name: label });
+  await expect(option).toBeVisible();
+  await option.click();
+  await expect(listbox).toBeHidden();
 }
 
 async function fillField(page: Page, fieldCode: string, value: string): Promise<void> {
@@ -210,11 +196,9 @@ test.describe('Scheduled Task — Full Lifecycle (P0)', () => {
       .or(page.getByRole('button', { name: /^(新建|创建|Create|新增)$/i }))
       .first();
     await expect(createBtn).toBeVisible();
-    await createBtn.evaluate((el: HTMLElement) => el.click());
+    await createBtn.click();
 
-    await page
-      .waitForURL(/\/p\/scheduled_task(?:_form)?(?:\/new)?(?:\?|$)/, { timeout: 15_000 })
-      .catch(() => null);
+    await expect(page).toHaveURL(/\/p\/scheduled_task(?:_form)?(?:\/new)?(?:\?|$)/);
     await waitForFormReady(page, 15_000);
 
     // [D5] task_type renders as combobox (Radix Select)
@@ -250,17 +234,13 @@ test.describe('Scheduled Task — Full Lifecycle (P0)', () => {
     const maxRetries = page
       .locator('[data-testid="form-field-max_retries"] input, [data-field="max_retries"] input')
       .first();
-    if (await maxRetries.isVisible({ timeout: 2_000 }).catch(() => false)) {
-      await maxRetries.click();
-      await maxRetries.fill('3');
-    }
+    await expect(maxRetries).toBeVisible();
+    await maxRetries.fill('3');
     const timeoutMs = page
       .locator('[data-testid="form-field-timeout_ms"] input, [data-field="timeout_ms"] input')
       .first();
-    if (await timeoutMs.isVisible({ timeout: 2_000 }).catch(() => false)) {
-      await timeoutMs.click();
-      await timeoutMs.fill('30000');
-    }
+    await expect(timeoutMs).toBeVisible();
+    await timeoutMs.fill('30000');
 
     // enabled — boolean toggle (default may be true; ensure on)
     const enabledToggle = page
@@ -271,12 +251,11 @@ test.describe('Scheduled Task — Full Lifecycle (P0)', () => {
           '[data-field="enabled"] input[type="checkbox"]',
       )
       .first();
-    if (await enabledToggle.isVisible({ timeout: 2_000 }).catch(() => false)) {
-      const state = await enabledToggle.getAttribute('aria-checked').catch(() => null);
-      if (state === 'false') {
-        await enabledToggle.click();
-      }
+    await expect(enabledToggle).toBeVisible();
+    if ((await enabledToggle.getAttribute('aria-checked')) === 'false') {
+      await enabledToggle.click();
     }
+    await expect(enabledToggle).toBeChecked();
 
     // Submit through Command pipeline
     const commandResponse = await clickSubmit(page);
@@ -287,8 +266,8 @@ test.describe('Scheduled Task — Full Lifecycle (P0)', () => {
     taskPid = String(result?.recordPid ?? result?.recordId ?? result?.pid ?? '');
     expect(taskPid, 'create should return a valid pid').toBeTruthy();
 
-    await waitForToast(page, undefined, 5_000).catch(() => null);
-    await page.waitForURL(/\/p\/scheduled_task/, { timeout: 15_000 }).catch(() => null);
+    await waitForToast(page, undefined, 5_000);
+    await expect(page).toHaveURL(/\/p\/scheduled_task$/);
 
     // New row appears with correct values
     const row = await findRowInPaginatedList(page, TASK_NAME, 12_000);
@@ -481,13 +460,10 @@ test.describe('Scheduled Task — Full Lifecycle (P0)', () => {
     expect(result.status()).toBe(200);
     expect(String((await result.json()).code)).toBe('0');
 
-    const rows = page.locator('tbody tr');
-    const rowCount = await rows.count();
-    expect(rowCount, 'search by UID prefix should yield ≥ 1 row').toBeGreaterThanOrEqual(1);
-    for (let i = 0; i < Math.min(rowCount, 5); i++) {
-      const txt = await rows.nth(i).innerText();
-      expect(txt, `row ${i} should contain UID prefix`).toContain(UID.slice(0, 10));
-    }
+    await expect(page.locator('tbody tr', { hasText: TASK_NAME })).toBeVisible();
+    const names = await page.locator('tbody tr td:first-child').allInnerTexts();
+    expect(names.length).toBeGreaterThan(0);
+    for (const name of names) expect(name).toBe(TASK_NAME);
   });
 
   // =========================================================================
@@ -554,7 +530,7 @@ test.describe('Scheduled Task — Full Lifecycle (P0)', () => {
     const deletedRecord = await page.request.get(`/api/dynamic/scheduled_task/${seed.recordId}`);
     expect(deletedRecord.status()).toBe(404);
     await page.reload();
-    await expect(page.locator('table').first()).toBeVisible();
+    await expect(page.locator('tbody tr', { hasText: TASK_NAME })).toBeVisible();
     await expect(page.locator('tbody tr', { hasText: TASK_NAME_DELETE })).toHaveCount(0);
   });
 

@@ -1944,7 +1944,13 @@
           }
         ]
       }
-    ]
+    ],
+    "extension": {
+      "showShare": false,
+      "showReport": false,
+      "showPrint": false,
+      "showPdfExport": false
+    }
   },
   {
     "pageKey": "enterprise_info_detail",
