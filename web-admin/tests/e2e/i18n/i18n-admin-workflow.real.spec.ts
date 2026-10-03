@@ -436,15 +436,20 @@ test.describe('i18n admin real workflow', () => {
       await reason.fill('Preserve this reason after the concurrent approval');
       // Actual concurrent state transition. No route interception or fake envelope.
       await accepted(await page.request.post(`/api/admin/i18n/resources/${resource.pid}/approve`));
+      const approvedBeforeFailure = await read(page, resource.pid);
+      expect(approvedBeforeFailure?.status).toBe('approved');
       const failure = page.waitForResponse(r => r.url().endsWith(`/resources/${resource.pid}/reject`) && r.request().method() === 'POST');
       await dialog.getByRole('button', { name: /^(驳回|Reject)$/ }).click();
       const response = await failure;
       const body = await response.json();
-      expect(body.code, JSON.stringify(body)).not.toBe('0');
+      expect(response.status()).toBe(400);
+      expect(body.code, JSON.stringify(body)).toBe('35000');
+      expect(typeof body.message).toBe('string');
+      expect(body.message.trim().length).toBeGreaterThan(0);
       await expect(dialog).toBeVisible();
       await expect(reason).toHaveValue('Preserve this reason after the concurrent approval');
-      await expect(dialog.getByRole('alert')).toContainText(/Cannot reject/);
-      expect((await read(page, resource.pid))?.status).toBe('approved');
+      await expect(dialog.getByRole('alert')).toHaveText(body.message);
+      expect(await read(page, resource.pid)).toEqual(approvedBeforeFailure);
       await info.attach('business-failure-original', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
       // Retain the uniquely named fixture and artifacts for failure/owner review.
     } finally { await context.close(); }
