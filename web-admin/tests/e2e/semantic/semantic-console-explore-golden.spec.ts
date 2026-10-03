@@ -186,6 +186,16 @@ test('SC-01 console exploration: TopN, governed run, time grain, save-restore', 
   for (const grain of grains) {
     await page.getByTestId('semantic-grain-created_day').selectOption(grain);
     await runQuery(grain);
+    const restored = page.waitForResponse(r => r.url().endsWith('/api/semantic/meta'));
+    await page.reload();
+    expect(String((await (await restored).json()).code)).toBe('0');
+    await page.getByTestId(`semantic-model-item-${model}`).click();
+    await expect(page.getByTestId('semantic-grain-created_day')).toHaveValue(grain);
+    await expect(page.getByTestId('semantic-limit')).toHaveValue('10');
+    await expect(page.getByTestId('semantic-dim-order_status').locator('input')).toBeChecked();
+    await expect(page.getByTestId('semantic-dim-created_day').locator('input')).toBeChecked();
+    await expect(page.getByTestId('semantic-metric-order_count_metric').locator('input')).toBeChecked();
+    await runQuery(grain);
     await page.screenshot({ path: `${EV}/bi-ui-13-grain-${grain}.png`, fullPage: true });
   }
   await page.getByTestId('semantic-grain-created_day').selectOption('month');
@@ -239,16 +249,16 @@ test('SC-01 console exploration: TopN, governed run, time grain, save-restore', 
   for (const limit of limits) {
     await page.getByTestId('semantic-limit').selectOption(String(limit));
     await runTopN(limit);
+    const restored = page.waitForResponse(r => r.url().endsWith('/api/semantic/meta'));
+    await page.reload();
+    expect(String((await (await restored).json()).code)).toBe('0');
+    await page.getByTestId(`semantic-model-item-${topnModel}`).click();
+    await expect(page.getByTestId('semantic-limit')).toHaveValue(String(limit));
+    await expect(page.getByTestId('semantic-dim-order_title').locator('input')).toBeChecked();
+    await expect(page.getByTestId('semantic-metric-order_count_metric').locator('input')).toBeChecked();
+    await runTopN(limit);
     await page.screenshot({ path: `${EV}/bi-ui-14-limit-${limit}.png` });
   }
-  const topnRestored = page.waitForResponse(r => r.url().endsWith('/api/semantic/meta'));
-  await page.reload();
-  expect(String((await (await topnRestored).json()).code)).toBe('0');
-  await page.getByTestId(`semantic-model-item-${topnModel}`).click();
-  await expect(page.getByTestId('semantic-limit')).toHaveValue('500');
-  await expect(page.getByTestId('semantic-dim-order_title').locator('input')).toBeChecked();
-  await expect(page.getByTestId('semantic-metric-order_count_metric').locator('input')).toBeChecked();
-  await runTopN(500);
   // Switching back must restore the first model's independent preferences.
   await page.getByTestId(`semantic-model-item-${model}`).click();
   await expect(page.getByTestId('semantic-limit')).toHaveValue('10');
