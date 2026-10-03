@@ -67,6 +67,19 @@ class CapabilitySelectionTransactionIT extends BaseIntegrationTest {
         capabilities.applyCapabilitySelection(roleId, Set.of(prefix + ".new"));
         assertThat(persisted()).containsExactly(newId);
     }
+    @Test void replacingDeclarationDependenciesPreservesExistingRoleGrants() {
+        registry.saveDefinition(CapabilityDefinitionDTO.builder()
+                .code(prefix + ".old").group("Updated transaction fixture")
+                .includes(List.of(prefix + ".new.read")).build());
+
+        assertThat(registry.listDeclarations(getTestTenant().getId()))
+                .filteredOn(declaration -> (prefix + ".old").equals(declaration.getCode()))
+                .singleElement().satisfies(declaration -> {
+                    assertThat(declaration.getGroup()).isEqualTo("Updated transaction fixture");
+                    assertThat(declaration.getIncludes()).containsExactly(prefix + ".new.read");
+                });
+        assertThat(persisted()).containsExactly(oldId).doesNotContain(newId);
+    }
     @Test void failureAfterBothRealWritesRollsBackTheWholeSelection() {
         doAnswer(invocation -> {
             Object result = invocation.callRealMethod();
