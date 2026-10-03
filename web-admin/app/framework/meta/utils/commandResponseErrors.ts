@@ -80,11 +80,21 @@ export function resolveCommandErrorMessage(
   // PF4J/platform wrappers are implementation details, not business feedback. Keep
   // the handler's actionable reason while removing the transport prefix from every
   // DSL command surface (detail, form, workbench and list actions).
-  return resolved
+  const reason = resolved
     .replace(
       /^(?:plugin (?:extension )?handler execution failed|command handler execution failed)\s*:\s*/i,
       '',
     )
     .trim();
-}
 
+  if (/^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+$/i.test(reason)) {
+    const localized = translate?.(reason);
+    if (localized && localized !== reason) {
+      return localized;
+    }
+    return locale?.toLowerCase().startsWith('zh')
+      ? '操作未完成，请检查输入后重试。'
+      : 'The operation could not be completed. Check your input and try again.';
+  }
+  return reason;
+}

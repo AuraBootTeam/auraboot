@@ -185,7 +185,7 @@ class BehaviorCollectControllerIT {
     @Test
     @DisplayName("authenticated malformed event → accepted, user-scoped quarantine, no behavior row")
     void authenticatedCollect_malformedQuarantinedWithUser() {
-        ResponseEntity<String> resp = postCollect("{\"events\":[{\"eventName\":\"page_view\",\"anonId\":\"auth-bad\"}]}");
+        ResponseEntity<String> resp = postCollect("{\"events\":[{\"schemaVersion\":\"1\",\"eventName\":\"page_view\",\"anonId\":\"auth-bad\"}]}");
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(resp.getBody()).contains("\"accepted\":1");
@@ -213,7 +213,7 @@ class BehaviorCollectControllerIT {
     }
 
     private String body(String eventId, String eventName, String anonId) {
-        return "{\"events\":[{\"eventId\":\"" + eventId + "\",\"eventName\":\"" + eventName
+        return "{\"events\":[{\"schemaVersion\":\"1\",\"eventId\":\"" + eventId + "\",\"eventName\":\"" + eventName
                 + "\",\"anonId\":\"" + anonId + "\"}]}";
     }
 

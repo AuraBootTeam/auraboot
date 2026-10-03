@@ -241,6 +241,28 @@ describe('collectFormFieldDataTypes', () => {
 });
 
 describe('buildFormCommandPayload', () => {
+  it('preserves only explicitly cleared model fields and omits unknown or undefined values', () => {
+    const payload = buildFormCommandPayload(
+      { source_type: null, source_id: null, untouched: null, absent: undefined, unknown: null, notes: 'Keep' },
+      { source_type: { dataType: 'string' }, source_id: { dataType: 'reference' },
+        untouched: { dataType: 'string' }, absent: { dataType: 'string' }, notes: { dataType: 'string' } },
+      [], new Set(['source_type', 'source_id', 'unknown', 'absent']),
+    );
+    expect(payload).toEqual({ source_type: null, source_id: null, notes: 'Keep' });
+  });
+
+  it('keeps null defaults omitted when no explicit update clear is declared', () => {
+    expect(buildFormCommandPayload({ source_type: null, notes: 'Keep' },
+      { source_type: { dataType: 'string' }, notes: { dataType: 'string' } }))
+      .toEqual({ notes: 'Keep' });
+  });
+
+  it('preserves explicit null with absent metadata without submitting reserved identity fields', () => {
+    expect(buildFormCommandPayload({ source_type: null, pid: null, untouched: null, absent: undefined },
+      {}, [], new Set(['source_type', 'pid', 'absent'])))
+      .toEqual({ source_type: null });
+  });
+
   it('keeps ordinary command payloads limited to model-backed fields', () => {
     const payload = buildFormCommandPayload(
       {

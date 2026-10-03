@@ -42,11 +42,16 @@ class ScheduledTaskLogServiceIntegrationTest extends BaseIntegrationTest {
 
     private final String testTaskPid = "test-task-" + System.currentTimeMillis();
 
-    @BeforeAll
+    private boolean fixtureInserted;
+
+    @BeforeEach
     public void insertTestLogs() {
+        // BaseIntegrationTest establishes tenant context in its superclass BeforeEach.
+        if (fixtureInserted) return;
         // Insert two test log entries via mapper (not going through service creation)
         insertLog(testTaskPid, "success", 100L, null);
         insertLog(testTaskPid, "failure", 200L, "DB timeout");
+        fixtureInserted = true;
         log.info("Inserted test logs for task={}", testTaskPid);
     }
 

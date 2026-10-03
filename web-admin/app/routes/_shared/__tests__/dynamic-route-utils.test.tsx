@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DynamicField, resolveLocalMenuRedirect } from '../dynamic-route-utils';
 
@@ -161,7 +161,9 @@ describe('DynamicField', () => {
         value="NODE"
         onChange={vi.fn()}
         readOnly
-        getDictItems={(code) => (code === 'sla_target_type' ? [{ value: 'node', label: '节点' }] : [])}
+        getDictItems={(code) =>
+          code === 'sla_target_type' ? [{ value: 'node', label: '节点' }] : []
+        }
       />,
     );
 
@@ -359,7 +361,7 @@ describe('DynamicField', () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
-  it('falls back to the raw id when the referenced record cannot be loaded', async () => {
+  it('shows recoverable feedback without the raw id when the referenced record cannot be loaded', async () => {
     const ulid = '01KT4MISSING000000000000000';
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: false,
@@ -381,8 +383,126 @@ describe('DynamicField', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(ulid)).toBeInTheDocument();
+      expect(screen.getByTestId('reference-readonly-error')).toHaveTextContent('来源暂时无法读取');
+      expect(screen.queryByText(ulid)).not.toBeInTheDocument();
     });
+  });
+
+  it('resolves the configured display field again when it changes', async () => {
+    const id = 'reference-display-field-contract';
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ code: '0', data: { name: 'Account name', code: 'ACC-42' } }),
+    }) as unknown as typeof fetch;
+    const props = { value: id, onChange: vi.fn(), readOnly: true };
+    const { rerender } = render(
+      <DynamicField
+        {...props}
+        field={{
+          field: 'source',
+          component: 'reference',
+          refTarget: { targetModel: 'crm_account', displayField: 'name' },
+        }}
+      />,
+    );
+    await waitFor(() => expect(screen.getByText('Account name')).toBeInTheDocument());
+    rerender(
+      <DynamicField
+        {...props}
+        field={{
+          field: 'source',
+          component: 'reference',
+          refTarget: { targetModel: 'crm_account', displayField: 'code' },
+        }}
+      />,
+    );
+    await waitFor(() => expect(screen.getByText('ACC-42')).toBeInTheDocument());
+  });
+
+  it('does not reuse a previous mounted identity label after permission changes', async () => {
+    const id = 'reference-permission-contract';
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ code: '0', data: { name: 'Private account' } }),
+      })
+      .mockResolvedValueOnce({ ok: false, status: 403 });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const props = {
+      field: {
+        field: 'source',
+        component: 'reference',
+        refTarget: { targetModel: 'crm_account', displayField: 'name' },
+      },
+      value: id,
+      onChange: vi.fn(),
+      readOnly: true,
+    };
+    const first = render(<DynamicField {...props} />);
+    await waitFor(() => expect(screen.getByText('Private account')).toBeInTheDocument());
+    first.unmount();
+    render(<DynamicField {...props} />);
+    await waitFor(() =>
+      expect(screen.getByTestId('reference-readonly-error')).toHaveTextContent('无权读取来源'),
+    );
+    expect(screen.queryByText('Private account')).not.toBeInTheDocument();
+    expect(screen.queryByText(id)).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries an unavailable source and replaces feedback with its business label', async () => {
+    const id = 'reference-retry-contract';
+    globalThis.fetch = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ code: '0', data: { code: 'NCR-42' } }),
+      }) as unknown as typeof fetch;
+    render(
+      <DynamicField
+        field={{
+          field: 'source',
+          component: 'reference',
+          refTarget: { targetModel: 'qc_ncr', displayField: 'code' },
+        }}
+        value={id}
+        onChange={vi.fn()}
+        readOnly
+      />,
+    );
+    await waitFor(() => expect(screen.getByTestId('reference-readonly-error')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: '重试' }));
+    await waitFor(() => expect(screen.getByText('NCR-42')).toBeInTheDocument());
+    expect(screen.queryByTestId('reference-readonly-error')).not.toBeInTheDocument();
+    expect(screen.queryByText(id)).not.toBeInTheDocument();
+  });
+
+  it('reports a missing business label without falling back to internal identity', async () => {
+    const id = 'reference-unnamed-contract';
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValue({
+        ok: true,
+        json: async () => ({ code: '0', data: { pid: id } }),
+      }) as unknown as typeof fetch;
+    render(
+      <DynamicField
+        field={{
+          field: 'source',
+          component: 'reference',
+          refTarget: { targetModel: 'qc_ncr', displayField: 'code' },
+        }}
+        value={id}
+        onChange={vi.fn()}
+        readOnly
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('reference-readonly-error')).toHaveTextContent('来源缺少业务名称'),
+    );
+    expect(screen.queryByText(id)).not.toBeInTheDocument();
   });
 
   it('does not treat dict-coded fields as references', () => {

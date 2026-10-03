@@ -100,7 +100,7 @@ test('OSS reset uses fail-closed runtime ownership instead of global process mat
 test('stable XXL true-stack smoke builds once and runs the executable jar', () => {
   const smoke = read('scripts/dev/xxl-job-true-stack-smoke.sh');
 
-  assert.match(smoke, /\.\/gradlew --no-daemon :bootJar -x test/);
+  assert.match(smoke, /\.\/gradlew -PwithSchedulerXxl=true --no-daemon :bootJar -x test/);
   assert.match(smoke, /exec env SPRING_PROFILES_ACTIVE=dev/);
   assert.match(smoke, /java -jar "\$BOOT_JAR"/);
   assert.doesNotMatch(smoke, /:bootRun/);

@@ -2,6 +2,20 @@ import { describe, expect, it } from 'vitest';
 import { resolveCommandErrorMessage } from '../commandResponseErrors';
 
 describe('resolveCommandErrorMessage — string context reason key', () => {
+  it('translates a handler reason key after removing the platform wrapper', () => {
+    expect(resolveCommandErrorMessage({code:'35000', context:{
+      detail:'Plugin handler execution failed: qc.error.rework_source_pair_required',
+    }}, 'qc:create_rework_order', key => key === 'qc.error.rework_source_pair_required'
+      ? '请同时选择来源类型和来源单据，或同时留空' : key, 'zh-CN'))
+      .toBe('请同时选择来源类型和来源单据，或同时留空');
+  });
+
+  it('does not expose an untranslated dotted handler error key', () => {
+    expect(resolveCommandErrorMessage({code:'35000', context:{
+      detail:'Plugin handler execution failed: qc.error.unavailable_translation',
+    }}, 'qc:create_rework_order', key => key, 'zh-CN'))
+      .toBe('操作未完成，请检查输入后重试。');
+  });
   it('translates a bare context reason key through the locale catalog', () => {
     const result = resolveCommandErrorMessage(
       {
