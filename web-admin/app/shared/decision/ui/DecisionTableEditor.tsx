@@ -185,8 +185,8 @@ export function DecisionTableEditor({
   onRoundTripDmnXml,
   fieldOptions = [],
 }: DecisionTableEditorProps) {
-  const [openFieldPicker, setOpenFieldPicker] = useState<string | null>(null);
-  const [fieldQueries, setFieldQueries] = useState<Record<string, string>>({});
+  const [openFieldPicker, setOpenFieldPicker] = useState<number | null>(null);
+  const [fieldQueries, setFieldQueries] = useState<Record<number, string>>({});
   const emitRules = (rules: TableRule[]) => onChange({ ...value, rules });
 
   const addRule = () => {
@@ -239,6 +239,11 @@ export function DecisionTableEditor({
   };
 
   const emitInputs = (inputs: TableInput[]) => onChange({ ...value, inputs });
+  const moveInput = (from: number, to: number) => {
+    setOpenFieldPicker(null);
+    setFieldQueries({});
+    emitInputs(move(value.inputs, from, to));
+  };
   const emitOutputs = (outputs: TableOutput[]) => onChange({ ...value, outputs });
 
   const updateInput = (idx: number, patch: Partial<TableInput>) => {
@@ -281,6 +286,8 @@ export function DecisionTableEditor({
   const deleteInput = (idx: number) => {
     const inputId = value.inputs[idx]?.id;
     if (!inputId) return;
+    setOpenFieldPicker(null);
+    setFieldQueries({});
     const inputs = value.inputs.filter((_, i) => i !== idx);
     const rules = value.rules.map((rule) => {
       const when = { ...rule.when };
@@ -467,28 +474,28 @@ export function DecisionTableEditor({
                   <button
                     type="button"
                     data-testid={`dt-input-field-picker-${idx}`}
-                    onClick={() => setOpenFieldPicker((current) => (current === input.id ? null : input.id))}
+                    onClick={() => setOpenFieldPicker((current) => (current === idx ? null : idx))}
                   >
                     选择字段
                   </button>
-                  {openFieldPicker === input.id && (
+                  {openFieldPicker === idx && (
                     <div
                       className="dt-field-picker"
                       data-testid={`dt-input-field-picker-panel-${idx}`}
                     >
                       <input
                         aria-label={`input-field-search-${idx}`}
-                        value={fieldQueries[input.id] ?? ''}
+                        value={fieldQueries[idx] ?? ''}
                         placeholder="搜索字段"
                         onChange={(e) =>
                           setFieldQueries((current) => ({
                             ...current,
-                            [input.id]: e.target.value,
+                            [idx]: e.target.value,
                           }))
                         }
                       />
                       <div className="dt-field-picker-list">
-                        {groupedFieldOptions(fieldOptions, fieldQueries[input.id] ?? '').map(([label, groupFields]) => (
+                        {groupedFieldOptions(fieldOptions, fieldQueries[idx] ?? '').map(([label, groupFields]) => (
                           <div key={label} className="dt-field-picker-group">
                             <strong>{label}</strong>
                             {groupFields.map((field) => (
@@ -504,7 +511,7 @@ export function DecisionTableEditor({
                             ))}
                           </div>
                         ))}
-                        {groupedFieldOptions(fieldOptions, fieldQueries[input.id] ?? '').length === 0 && (
+                        {groupedFieldOptions(fieldOptions, fieldQueries[idx] ?? '').length === 0 && (
                           <span className="dt-field-picker-empty">没有匹配字段</span>
                         )}
                       </div>
@@ -525,8 +532,8 @@ export function DecisionTableEditor({
                 </select>
               </label>
               <div className="dt-column-actions">
-                <button type="button" aria-label={`move-input-up-${idx}`} onClick={() => emitInputs(move(value.inputs, idx, idx - 1))}>↑</button>
-                <button type="button" aria-label={`move-input-down-${idx}`} onClick={() => emitInputs(move(value.inputs, idx, idx + 1))}>↓</button>
+                <button type="button" aria-label={`move-input-up-${idx}`} onClick={() => moveInput(idx, idx - 1)}>↑</button>
+                <button type="button" aria-label={`move-input-down-${idx}`} onClick={() => moveInput(idx, idx + 1)}>↓</button>
                 <button type="button" aria-label={`delete-input-${idx}`} onClick={() => deleteInput(idx)}>删除</button>
               </div>
             </div>

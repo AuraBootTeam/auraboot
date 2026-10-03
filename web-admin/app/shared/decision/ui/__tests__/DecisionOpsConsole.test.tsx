@@ -44,6 +44,7 @@ const recentTraceLog = {
   pid: 'log-1',
   traceId: 'trace-live',
   decisionCode: 'complaint_sla_deadline',
+  decisionName: '请假审批 SLA 截止时间',
   selectedVersion: 3,
   status: 'MATCHED',
   callerType: 'API',
