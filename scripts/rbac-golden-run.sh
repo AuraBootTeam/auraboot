@@ -2,33 +2,22 @@
 #
 # rbac-golden-run.sh — self-contained RBAC platform-baseline browser golden runner.
 #
-# For teams that run their own gates at release time or via a nightly crontab (NOT
-# GitHub Actions). One command, hands-off: it brings up an isolated host-first stack
-# (zero docker, slot-isolated — safe alongside concurrent sessions, never
-# oss-reset-and-init's global pkill), imports the core plugins so menus exist, runs
-# the per-role browser golden (web-admin/tests/e2e/rbac/), prints a PASS/FAIL banner,
-# and tears the stack down. Exit code == golden result (0 = all green).
+# Runs the platform-baseline browser suite using an isolated host-first stack.
+# The named runtime, database, caches and evidence are retained on success/failure.
+# Capacity exhaustion is a failure; this runner never closes other runtime owners.
+# Reuses the stable name/slot. Schema drift must be resolved explicitly by the owner.
+# Backend RBAC integration tests run separately in the backend suite.
 #
-# The stack is destroyed-then-recreated each run, so the golden always sees a fresh
-# bootstrap (tenant_admin + tenant_member) — never a stale-DB role model from a prior
-# slot reuse. The golden's own assertions catch any role-model drift.
-#
-# NOTE: this covers the B-layer (browser) golden that needs the full stack. The A-layer
-# backend ITs (RbacEnforcementMatrixIT / RbacAccessMatrixConsistencyTest /
-# AgentDiscoveryAnonymousAuthIT) run via `./gradlew :test` in the normal backend suite.
-#
-# Prerequisites: the workspace native brokers (Postgres/Redis/Kafka) must be up — the
-# same ones `dev.sh runtime` uses. Run from any OSS auraboot checkout/worktree.
-#
+# Prerequisites: native workspace brokers and the managed workspace controller.
 # Usage:
-#   scripts/rbac-golden-run.sh [--slot N] [--name NAME] [--keep] [--repeat K]
-#     --slot N     isolated-stack slot (default: 71). Pick one not used by other runtimes.
-#     --name NAME  runtime name        (default: rbac-golden-nightly)
-#     --keep       leave the stack up after the run (for debugging a failure)
-#     --repeat K   run the golden K times (flakiness check; default: 1)
-#
-# Crontab example (nightly 02:30):
-#   30 2 * * *  cd /path/to/auraboot && ./scripts/rbac-golden-run.sh >> /var/log/rbac-golden.log 2>&1
+#   scripts/rbac-golden-run.sh [--slot N] [--name NAME] [--repeat K]
+#                            [--runtime-mode MODE] [--keep]
+#     --slot N       stable isolated slot (default: 71)
+#     --name NAME    stable runtime name (default: rbac-golden-nightly)
+#     --repeat K     positive browser repetition count (default: 1)
+#     --runtime-mode development|verification|control|performance
+#                    defaults to development; does not override capacity
+#     --keep         compatibility option; retention is always enabled
 #
 set -uo pipefail
 
@@ -51,83 +40,47 @@ while [[ $# -gt 0 ]]; do
     --repeat) [[ $# -ge 2 ]] || die "--repeat requires a value"; REPEAT="$2"; shift 2;;
     --keep)   KEEP=1; shift;;
     --runtime-mode) [[ $# -ge 2 ]] || die "--runtime-mode requires a value"; RUNTIME_MODE="$2"; shift 2;;
-    -h|--help) sed -n '2,40p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0;;
+    -h|--help) sed -n '2,/^set -uo pipefail/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0;;
     *) die "unknown arg: $1";;
   esac
 done
 
 [[ -x "$GS" ]] || die "oss-golden-stack.sh not found/executable at $GS"
 
-cleanup() {
+[[ "$SLOT" =~ ^[0-9]+$ ]] || die "--slot must be a nonnegative integer"
+[[ "$REPEAT" =~ ^[1-9][0-9]*$ ]] || die "--repeat must be a positive integer"
+[[ "$NAME" =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]*$ ]] || die "--name must be a runtime identifier"
+case "$RUNTIME_MODE" in
+  development|verification|control|performance) ;;
+  *) die "invalid --runtime-mode";;
+esac
+
+retain() {
   local rc=$?
-  if [[ "$KEEP" == 1 ]]; then
-    echo "[rbac-golden-run] --keep set; leaving stack '$NAME' up (env: $GS env $NAME)"
-  else
-    echo "[rbac-golden-run] tearing down stack '$NAME'..."
-    "$GS" destroy "$NAME" >/dev/null 2>&1 || true
-  fi
-  return $rc
+  echo "[rbac-golden-run] retained stack '$NAME' and evidence (exit=$rc; env: $GS env $NAME)"
+  return "$rc"
 }
-trap cleanup EXIT
+trap retain EXIT
+
+run_phase() {
+  local rc
+  "$@"
+  rc=$?
+  [[ "$rc" == 0 ]] || exit "$rc"
+}
 
 echo "[rbac-golden-run] === RBAC platform-baseline golden — name=$NAME slot=$SLOT mode=$RUNTIME_MODE repeat=$REPEAT ==="
-
-# 0/4 GC — concurrent sessions routinely leave DEAD verification stacks
-# resident (backend process gone, resident entry kept), which exhausts the
-# ephemeral class capacity and blocks allocation. Close any owner whose
-# SERVER_PORT has no listener. Skips live stacks unconditionally.
-gc_dead_owners() {
-  local ws1="$REPO_ROOT/../.workspace/env"
-  local ws2="/Users/ghj/work/auraboot/auraboot-workspace"
-  local R="$SCRIPT_DIR/../../../scripts/dev/runtime.sh"
-  [ -x "$R" ] || R="/Users/ghj/work/auraboot/scripts/dev/runtime.sh"
-  local env_file name port closed=0
-  for env_file in "$ws1"/*.env "$ws2"/*.env; do
-    [ -f "$env_file" ] || continue
-    name="$(basename "$env_file" .env)"
-    [ "$name" = "$NAME" ] && continue
-    port="$(grep -E '^SERVER_PORT=' "$env_file" 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')"
-    [ -n "$port" ] || continue
-    if lsof -tiTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
-      continue  # alive — concurrent session, leave it alone
-    fi
-    echo "[rbac-golden-run] GC: closing dead resident owner '$name' (port $port has no listener)"
-    bash "$R" close "$name" >/dev/null 2>&1 || true
-    closed=$((closed + 1))
-  done
-  echo "[rbac-golden-run] GC: closed $closed dead owner(s)"
-}
-gc_dead_owners
-
-# 1. Fresh isolated stack (destroy any prior instance of this name first so the DB is
-#    always freshly bootstrapped — guards against a stale-slot role model).
-echo "[rbac-golden-run] 1/4 fresh stack (destroy prior + up + import)"
-"$GS" destroy "$NAME" >/dev/null 2>&1 || true
-# --no-warm: the rbac golden self-provisions its member and runs with --no-deps, so it does
-# NOT need the setup/auth/pre-warm step (which runs the full generic setup project).
-# Under multi-session load the ephemeral class can be momentarily saturated
-# by LIVE concurrent gates — retry with backoff before giving up (dead owners
-# are already GC'd by the step-0 sweep).
-up_ok=0
-# 6 attempts x 10 min = ~1h retry window: concurrent iteration gates run for
-# hours at a stretch, and the ephemeral budget (raised 5→7→10) is routinely
-# subscribed by live multi-session workloads.
-for attempt in 1 2 3 4 5 6; do
-  if "$GS" up "$NAME" --slot "$SLOT" --ttl 2h --no-warm --runtime-mode "$RUNTIME_MODE"; then
-    up_ok=1
-    break
-  fi
-  [ "$attempt" = 6 ] || {
-    echo "[rbac-golden-run] bring-up attempt $attempt failed — retrying in 10 min (concurrent ephemeral capacity)"
-    sleep 600
-  }
-done
-[ "$up_ok" = 1 ] || die "stack bring-up failed after 6 attempts (spread over ~1h)"
-"$GS" import "$NAME" || die "plugin import failed"
+echo "[rbac-golden-run] 1/4 ensure stable stack + import (no reset or automatic retry)"
+run_phase "$GS" up "$NAME" --slot "$SLOT" --ttl 2h --no-warm --runtime-mode "$RUNTIME_MODE"
+run_phase "$GS" import "$NAME"
 
 # 2. Export the Playwright env (PW_SKIP_WEBSERVER + base URL + backend + PG*).
 echo "[rbac-golden-run] 2/4 resolve stack env"
-eval "$("$GS" env "$NAME")" || die "could not resolve stack env"
+env_exports="$("$GS" env "$NAME")"
+env_rc=$?
+[[ "$env_rc" == 0 ]] || exit "$env_rc"
+eval "$env_exports" || die "could not resolve stack env"
+[[ -n "${PLAYWRIGHT_BASE_URL:-}" && -n "${BACKEND_URL:-}" ]] || die "stack env lacks browser/backend URLs"
 echo "[rbac-golden-run]     base=$PLAYWRIGHT_BASE_URL backend=$BACKEND_URL"
 
 # 3. Run the golden.
@@ -148,8 +101,8 @@ if [[ "$GOLDEN_RC" == 0 ]]; then
 else
   echo "[rbac-golden-run] ############################################"
   echo "[rbac-golden-run]   RBAC GOLDEN: FAIL (rc=$GOLDEN_RC)"
-  echo "[rbac-golden-run]   artifacts: web-admin/test-results/"
-  echo "[rbac-golden-run]   (re-run with --keep to inspect the live stack)"
+  echo "[rbac-golden-run]   artifacts: ${PW_ARTIFACT_DIR:-not registered}"
+  echo "[rbac-golden-run]   stack retained for inspection"
   echo "[rbac-golden-run] ############################################"
 fi
 
