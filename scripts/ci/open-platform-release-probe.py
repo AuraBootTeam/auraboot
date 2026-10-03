@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Release-image HTTP probe: seed, install two real plugins, provision OAuth, then exercise v1."""
+"""Release-image HTTP probe: bootstrap, install two real plugins, provision OAuth, then exercise v1."""
 
 import json
 import os
@@ -8,6 +8,12 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+import importlib.util
+from pathlib import Path
+
+bootstrap_spec = importlib.util.spec_from_file_location("release_bootstrap", Path(__file__).with_name("release-bootstrap.py"))
+bootstrap_module = importlib.util.module_from_spec(bootstrap_spec)
+bootstrap_spec.loader.exec_module(bootstrap_module)
 
 BASE = os.environ.get("BASE_URL", "http://app:6443").rstrip("/")
 ARTIFACT = os.environ.get("CREDENTIAL_ARTIFACT", "/artifacts/open-platform-credentials.json")
@@ -44,9 +50,7 @@ def data(body):
     return body
 
 
-_, seed, _ = request("/api/test/seed?testRunId=open-platform-release-image", method="POST", body={})
-jwt = data(seed)["jwt"]
-admin = {"Authorization": f"Bearer {jwt}"}
+admin = bootstrap_module.bootstrap_admin(request)
 
 for template in ("asset-management", "simple-inventory"):
     _, installed, _ = request(f"/api/templates/{template}/install", method="POST", body={}, headers=admin)

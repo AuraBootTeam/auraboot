@@ -167,7 +167,7 @@ PROTOCOL_KEY="$(openssl rand -base64 48 | tr -d '\n')"
 # skipping them. The image pre-creates the empty jar root /app/pf4j-plugins.
 docker run -d --name "$APP" --network "$NET" \
   -v "$STAGE/plugins":/plugins:ro \
-  -e SERVER_PORT=6443 -e SPRING_PROFILES_ACTIVE=test \
+  -e SERVER_PORT=6443 -e SPRING_PROFILES_ACTIVE=community \
   -e DATABASE_URL="jdbc:postgresql://$PG:5432/open_platform_ci" \
   -e SPRING_DATASOURCE_USERNAME=auraboot -e SPRING_DATASOURCE_PASSWORD=open_platform_ci \
   -e REDIS_HOST="$REDIS" -e REDIS_PORT=6379 \

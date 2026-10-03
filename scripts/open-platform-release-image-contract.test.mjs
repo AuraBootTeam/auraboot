@@ -26,6 +26,8 @@ assert.match(gate, /RUNNER_UID="\$\(id -u\)"/);
 assert.match(gate, /RUNNER_GID="\$\(id -g\)"/);
 assert.equal((gate.match(/docker run --rm --user "\$RUNNER_UID:\$RUNNER_GID"/g) ?? []).length, 2);
 assert.match(gate, /PROFILE=production/);
+assert.match(gate, /SPRING_PROFILES_ACTIVE=community/);
+assert.doesNotMatch(probe, /\/api\/test\/seed/);
 assert.match(slo, /open_api_errors/);
 assert.match(slo, /p\(95\)<250/);
 assert.match(gate, /delivery_status IN \('pending','processing','failed','dead_letter'\)/);
