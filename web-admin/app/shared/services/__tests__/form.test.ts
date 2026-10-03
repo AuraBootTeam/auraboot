@@ -2,9 +2,9 @@
  * Unit tests for form service
  * Tests fetchResult-based functions (getFormSchema, getFormData, submitFormData,
  * saveFormDesign, getItemList, submitSearchQuery).
- * getI18nData uses native fetch + process.env and is skipped (too many side effects).
+ * Translation reads exercise authenticated and anonymous request boundaries.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { fetchResultMock, getTokenMock } = vi.hoisted(() => ({
   fetchResultMock: vi.fn(),
@@ -24,6 +24,7 @@ vi.mock('~/shared/services/session.js', () => ({
 }));
 
 import {
+  getI18nData,
   getFormSchema,
   getFormData,
   submitFormData,
@@ -216,5 +217,41 @@ describe('form service', () => {
 
       expect(result).toBeNull();
     });
+  });
+});
+
+
+describe('translation request identity', () => {
+  beforeEach(() => {
+    getTokenMock.mockReset();
+    getTokenMock.mockResolvedValue(TOKEN);
+    vi.stubEnv('BFF_INTERNAL_URL', 'http://127.0.0.1:5445');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ code: '0', data: { label: 'translated' } }),
+    }));
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it('forwards the current token for tenant translations', async () => {
+    expect(await getI18nData('zh-CN', FAKE_REQUEST)).toEqual({ label: 'translated' });
+    expect(fetch).toHaveBeenCalledWith('http://127.0.0.1:5445/api/i18n/zh-CN',
+      expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer ' + TOKEN }) }));
+  });
+
+  it('public shell translations never read or forward an admin token', async () => {
+    expect(await getI18nData('zh-CN', FAKE_REQUEST, false)).toEqual({ label: 'translated' });
+    expect(getTokenMock).not.toHaveBeenCalled();
+    const options = vi.mocked(fetch).mock.calls[0][1];
+    expect(options?.headers).not.toHaveProperty('Authorization');
+  });
+
+  it('an anonymous tenant-shell request has no authorization header', async () => {
+    getTokenMock.mockResolvedValue(null);
+    await getI18nData('zh-CN', FAKE_REQUEST);
+    expect(vi.mocked(fetch).mock.calls[0][1]?.headers).not.toHaveProperty('Authorization');
   });
 });
