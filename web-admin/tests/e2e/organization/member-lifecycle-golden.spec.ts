@@ -48,6 +48,15 @@ test('MEMBER-DETAIL-07: native lifecycle buttons execute commands and persist st
   const row = page.locator('table tbody tr').filter({ hasText: stamp });
   await expect(row).toHaveCount(1, { timeout: 20000 });
   await expect(row).toBeVisible();
+  const createdDate = row.locator('[data-testid$="-created_at"]');
+  await expect(createdDate).toContainText(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/);
+  await expect.poll(() => createdDate.evaluate((cell) => {
+    const content = cell.querySelector('div.truncate');
+    const actions = cell.closest('tr')?.querySelector('td:last-child');
+    return Boolean(content && actions && content.scrollWidth <= content.clientWidth &&
+      cell.getBoundingClientRect().right <= actions.getBoundingClientRect().left + 1);
+  }), { message: 'Full creation timestamp is readable and not covered by pinned actions' }).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('native-member-list-dates.png'), fullPage: true });
   await row.click();
   await expect(page).toHaveURL(new RegExp(`/organization/members/${pid}$`));
   await expect(page.getByTestId('member-status')).toHaveAttribute('data-status', 'active');

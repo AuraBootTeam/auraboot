@@ -1150,7 +1150,7 @@
               "zh-CN": "用户",
               "en-US": "User"
             },
-            "width": 280,
+            "width": 220,
             "sortable": true,
             "valueType": "user_identity",
             "render": {
@@ -1162,21 +1162,21 @@
           },
           {
             "field": "status",
-            "width": 120,
+            "width": 96,
             "renderType": "tag",
             "dictCode": "member_status"
           },
           {
             "field": "join_date",
-            "width": 140
+            "width": 128
           },
           {
             "field": "leave_date",
-            "width": 140
+            "width": 128
           },
           {
             "field": "created_at",
-            "width": 180,
+            "width": 208,
             "valueType": "datetime"
           }
         ],
