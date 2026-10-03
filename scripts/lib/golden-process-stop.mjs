@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, realpathSync, unlinkSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { liveEnvironment } from './golden-product-identity.mjs';
 
@@ -22,7 +22,8 @@ function snapshot(pid) {
   const cwd = process.platform === 'linux' ? realpathSync(`/proc/${pid}/cwd`) :
     realpathSync(run('lsof', ['-a', '-p', String(pid), '-d', 'cwd', '-Fn']).split('\n').find(line => line.startsWith('n'))?.slice(1));
   const env = liveEnvironment(pid);
-  return { pid, cwd, commandHash: hash(run('ps', ['-ww', '-p', String(pid), '-o', 'command=']).trimEnd()),
+  const command = run('ps', ['-ww', '-p', String(pid), '-o', 'command=']).trimEnd();
+  return { pid, cwd, commandHash: hash(command), executable: basename(command.trim().split(/\s+/)[0]),
     startedAt: run('ps', ['-p', String(pid), '-o', 'lstart=']).trim(),
     parent: Number(run('ps', ['-p', String(pid), '-o', 'ppid=']).trim()),
     runtime: env.AURA_RUNTIME_NAME, token: env.AURA_RUNTIME_OWNERSHIP_TOKEN };
@@ -70,21 +71,34 @@ export function executeGoldenStop(plan, readSnapshot, signal) {
   }
 }
 
-export async function registerGoldenSupervisor(name, repo, cli, pid) {
+export function stableGoldenLaunch(current, previous, { runtime, token, cwd, executable }) {
+  return Boolean(current && previous && current.cwd === cwd && current.runtime === runtime && current.token === token &&
+    current.executable === executable && current.commandHash === previous.commandHash &&
+    current.startedAt === previous.startedAt);
+}
+export async function registerGoldenLaunch(name, repo, cli, pid, key) {
+  need(['frontend-launch', 'backend-launch'].includes(key), 'Unsupported launch process');
+  const cwd = key === 'frontend-launch' ? 'web-admin' : 'platform';
+  const executable = key === 'frontend-launch' ? 'node' : 'java';
   const report = JSON.parse(run(cli, ['runtime', 'show', name, '--json']));
+  need(report.runtime === name && report.sources?.find(item => item.key === 'auraboot')?.expected.root === realpathSync(repo),
+    'Launch source owner mismatch');
   const token = readFileSync(join(report.stateDir, 'runtimes', name, 'processes', 'ownership.token'), 'utf8').trim();
-  let current;
+  let current, previous, ready = false;
   for (let attempt = 0; attempt < 100; attempt++) {
     current = snapshot(pid);
     if (!current) break;
-    if (current.runtime === name && current.token === token) break;
+    if (stableGoldenLaunch(current, previous, { runtime: name, token, cwd: join(realpathSync(repo), cwd), executable })) {
+      ready = true; break;
+    }
     // spawn_detached returns after fork; the child still has to exec its environment.
+    previous = current;
     await new Promise(resolve => setTimeout(resolve, 20));
   }
-  need(current?.cwd === join(realpathSync(repo), 'web-admin') && current.runtime === name && current.token === token,
-    'Frontend supervisor ownership mismatch');
-  run(cli, ['runtime', 'process', 'register', name, '--key', 'frontend-launch', '--pid', String(pid), '--token', token]);
+  need(ready, 'Launch process ownership mismatch');
+  run(cli, ['runtime', 'process', 'register', name, '--key', key, '--pid', String(pid), '--token', token]);
 }
+export const registerGoldenSupervisor = (name, repo, cli, pid) => registerGoldenLaunch(name, repo, cli, pid, 'frontend-launch');
 
 export function stopGoldenProcesses(name, repo, cli) {
   repo = realpathSync(repo);
@@ -148,6 +162,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   try {
     const [action, name, repo, cli, pid] = process.argv.slice(2);
     if (action === 'register-supervisor') await registerGoldenSupervisor(name, repo, cli, Number(pid));
+    else if (action === 'register-backend') await registerGoldenLaunch(name, repo, cli, Number(pid), 'backend-launch');
     else if (action === 'stop') console.log(JSON.stringify({ runtime: name, stopped: stopGoldenProcesses(name, repo, cli), retained: ['allocation', 'database', 'evidence'] }));
     else throw new Error('Unknown owned process action');
   } catch { console.error('Owned golden process operation refused; inspect runtime process identity'); process.exitCode = 1; }

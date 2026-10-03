@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
 import net from 'node:net';
-import { planGoldenStop, executeGoldenStop, stopGoldenProcesses } from '../lib/golden-process-stop.mjs';
+import { planGoldenStop, executeGoldenStop, stopGoldenProcesses, stableGoldenLaunch, registerGoldenSupervisor } from '../lib/golden-process-stop.mjs';
 
 // Workspace API is mocked; OS fixtures belong only to this test, with no product runtime.
 const supervisor = 1000000010, backend = 1000000020, child = 1000000011;
@@ -70,14 +70,15 @@ test('never signals a recycled child PID after already stopping its owned superv
   assert.deepEqual(calls, [[supervisor, 'SIGKILL'], [backend, 'SIGKILL']]);
 });
 
-async function processFixture(t, runtime) {
+async function processFixture(t, runtime, workdir = 'platform') {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'golden-stop-boundary-'));
   const root = fs.realpathSync(temporary), repo = path.join(root, 'oss'), state = path.join(root, 'state');
   fs.mkdirSync(path.join(repo, 'platform'), { recursive: true });
+  fs.mkdirSync(path.join(repo, 'web-admin'), { recursive: true });
   fs.mkdirSync(path.join(state, 'runtimes/owned/processes'), { recursive: true });
   fs.writeFileSync(path.join(state, 'runtimes/owned/processes/ownership.token'), 'fixture-token\n');
   const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
-    cwd: path.join(repo, 'platform'), stdio: 'ignore',
+    cwd: path.join(repo, workdir), stdio: 'ignore',
     env: { ...process.env, AURA_RUNTIME_NAME: runtime, AURA_RUNTIME_OWNERSHIP_TOKEN: 'fixture-token' },
   });
   await new Promise((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject); });
@@ -104,6 +105,27 @@ test('public-entry boundary stops a test-owned live process after checking the W
   assert.equal(f.child.signalCode, 'SIGKILL');
   assert.equal(result.length, 1); assert.equal(result[0].pid, f.child.pid);
   assert.match(fs.readFileSync(f.calls, 'utf8'), /"process","check","owned","backend"/);
+});
+
+test('launch registration rejects the transient env executable and unstable generations', () => {
+  const previous = { cwd: '/oss/web-admin', runtime: 'owned', token: 'fixture-token',
+    executable: 'node', commandHash: 'hash', startedAt: 'start' };
+  const expected = { cwd: '/oss/web-admin', runtime: 'owned', token: 'fixture-token', executable: 'node' };
+  assert.equal(stableGoldenLaunch({ ...previous }, previous, expected), true);
+  assert.equal(stableGoldenLaunch({ ...previous }, null, expected), false);
+  for (const [key, value] of Object.entries({ executable: 'env', commandHash: 'changed', startedAt: 'changed',
+    cwd: '/foreign', runtime: 'foreign', token: 'foreign' })) {
+    assert.equal(stableGoldenLaunch({ ...previous, [key]: value }, previous, expected), false, key);
+  }
+});
+test('registers a stable test-owned Node supervisor through the public Workspace entry', async t => {
+  const f = await processFixture(t, 'owned', 'web-admin');
+  await registerGoldenSupervisor('owned', f.repo, f.cli, f.child.pid);
+  const calls = fs.readFileSync(f.calls, 'utf8').trim().split('\n').map(line => JSON.parse(line));
+  assert.deepEqual(calls.at(-1).slice(0, 5), ['runtime', 'process', 'register', 'owned', '--key']);
+  assert.equal(calls.at(-1)[5], 'frontend-launch');
+  assert.equal(calls.at(-1)[7], String(f.child.pid));
+  assert.equal(f.child.signalCode, null);
 });
 test('public-entry boundary refuses a foreign marker and leaves the test-owned process alive', async t => {
   const f = await processFixture(t, 'foreign');

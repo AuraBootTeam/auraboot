@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 
 const environmentKeys = ['AURA_RUNTIME_NAME', 'AURA_RUNTIME_OWNERSHIP_TOKEN',
   'SERVER_PORT', 'SPRING_DATASOURCE_URL', 'SPRING_DATA_REDIS_DATABASE',
-  'VITE_PORT', 'BFF_PORT', 'SPRING_BOOT_URL', 'BFF_INTERNAL_URL'];
+  'VITE_PORT', 'BFF_PORT', 'SPRING_BOOT_URL', 'BFF_INTERNAL_URL', 'AGENT_LLM_STUB_MODE'];
 const requireIdentity = (condition, message) => { if (!condition) throw new Error(message); };
 
 // Compare independent live observations. Never include credentials or raw commands in evidence.

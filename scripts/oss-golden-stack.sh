@@ -32,6 +32,8 @@
 #   ./scripts/oss-golden-stack.sh warm <name>          # re-run setup→auth→pre-warm (up does this)
 #   ./scripts/oss-golden-stack.sh env  <name>          # print the Playwright env exports
 #   ./scripts/oss-golden-stack.sh status <name>
+#   ./scripts/oss-golden-stack.sh suspend <name>       # release capacity; retain DB/artifacts/evidence
+#   ./scripts/oss-golden-stack.sh resume <name>        # reuse retained bytes; no build/seed/import
 #   ./scripts/oss-golden-stack.sh down <name>          # stop backend+frontend (keep runtime/DB)
 #   ./scripts/oss-golden-stack.sh verify-artifacts <name> # read-only live identity probes + manifest publication
 #   ./scripts/oss-golden-stack.sh destroy <name>       # down + infra cleanup + runtime destroy
@@ -534,6 +536,8 @@ cmd_up() {
       AURA_BUILTIN_PLUGINS_DIR="$REPO_ROOT/plugins" \
       AGENT_LLM_STUB_MODE="${AGENT_LLM_STUB_MODE:-true}" \
       java -jar "$run_jar"
+  node "$SCRIPT_DIR/lib/golden-process-stop.mjs" register-backend "$name" "$REPO_ROOT" "$DEV" "$(cat "$sd/backend.pid")" \
+    || die "backend launch process registration failed"
   echo "$server_port $vite_port $bff_port" >"$sd/ports"
   poll_http "http://127.0.0.1:$server_port/actuator/health" '"status":"UP"' 150 backend \
     || die "backend did not become healthy — see $sd/backend.log"
@@ -659,6 +663,8 @@ cmd_up() {
 
   if [ "$frontend" -eq 1 ]; then
     cmd_verify_artifacts "$name"
+    "$DEV" runtime lifecycle bind "$name" --handler "$SCRIPT_DIR/oss-golden-lifecycle.sh" >/dev/null \
+      || die "golden lifecycle binding failed"
   fi
   log "9/9 ready ✓"
   echo
@@ -823,6 +829,8 @@ cmd_warm() {
 cmd_verify_artifacts() {
   node "$SCRIPT_DIR/lib/golden-product-identity.mjs" "$1" "$REPO_ROOT" "$DEV" \
     || die "product artifact verification failed"
+  node "$SCRIPT_DIR/lib/golden-resume-state.mjs" record "$1" "$REPO_ROOT" "$DEV" \
+    || die "retained launch recipe registration failed"
 }
 
 cmd_env() {
@@ -880,6 +888,80 @@ cmd_status() {
   echo "backend($server_port)=$be  vite($vite_port)=$vi  bff=$bff_port"
 }
 
+# Workspace has already checked capacity, source-set identity and free ports.
+cmd_lifecycle_resume() {
+  local name="$1"
+  acquire_stack_lock
+  # Use a separate shell so errexit remains active inside the launch transaction.
+  if "$SCRIPT_DIR/oss-golden-stack.sh" lifecycle-resume-run "$name"; then
+    return 0
+  fi
+  node "$SCRIPT_DIR/lib/golden-process-stop.mjs" stop "$name" "$REPO_ROOT" "$DEV" \
+    || log "resume cleanup refused unknown or changed process identity; allocation/DB retained"
+  die "retained resume failed; Workspace must keep the runtime suspended"
+}
+
+cmd_resume_retained() {
+  local name="$1" sd recipe run_jar llm_stub_mode runtime_token server_port vite_port bff_port pg_db redis_db
+  sd="$(state_dir "$name")"
+  recipe="$(node "$SCRIPT_DIR/lib/golden-resume-state.mjs" load "$name" "$REPO_ROOT" "$DEV")" \
+    || die "retained launch inputs changed; resume refused"
+  run_jar="$(printf '%s\n' "$recipe" | sed -n '1p')"
+  llm_stub_mode="$(printf '%s\n' "$recipe" | sed -n '2p')"
+  server_port="$(runtime_env "$name" SERVER_PORT)"
+  vite_port="$(runtime_env "$name" VITE_PORT)"
+  bff_port="$(runtime_env "$name" BFF_PORT)"
+  pg_db="$(runtime_env "$name" POSTGRES_DB)"
+  redis_db="$(runtime_env "$name" REDIS_DATABASE)"
+  runtime_token="$("$DEV" runtime process token "$name")" || die "runtime ownership token unavailable"
+  spawn_detached "$sd/backend.pid" "$REPO_ROOT/platform" "$sd/backend.log" \
+    env AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" SERVER_PORT="$server_port" \
+      SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:5432/${pg_db}?charSet=UTF8" \
+      SPRING_DATASOURCE_USERNAME=auraboot SPRING_DATASOURCE_PASSWORD=auraboot \
+      SPRING_DATA_REDIS_HOST=127.0.0.1 SPRING_DATA_REDIS_PORT=6379 SPRING_DATA_REDIS_DATABASE="$redis_db" \
+      SPRING_KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:9092 \
+      AURA_PLUGINS_DIR="$sd/pf4j-plugins" \
+      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_META_MAPPER=DEBUG \
+      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_PERMISSION_MAPPER=DEBUG \
+      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_TENANT_MAPPER=DEBUG \
+      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_VIEW_MAPPER=DEBUG \
+      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_USER_MAPPER=DEBUG \
+      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_OBSERVABILITY_MAPPER=DEBUG \
+      AURA_BUILTIN_PLUGINS_DIR="$REPO_ROOT/plugins" \
+      AGENT_LLM_STUB_MODE="$llm_stub_mode" \
+      java -jar "$run_jar"
+  node "$SCRIPT_DIR/lib/golden-process-stop.mjs" register-backend "$name" "$REPO_ROOT" "$DEV" "$(cat "$sd/backend.pid")" \
+    || die "backend launch process registration failed"
+  poll_http "http://127.0.0.1:$server_port/actuator/health" '"status":"UP"' 150 backend \
+    || die "retained backend did not become healthy"
+  golden_runtime_register_listener "$name" backend "$server_port" "$(cat "$sd/backend.pid")" "$REPO_ROOT/platform" "$runtime_token" \
+    || die "resumed backend listener identity mismatch"
+  # Execute the existing frontend commands directly; dev:full would sync/generate plugins.
+  spawn_detached "$sd/frontend.pid" "$REPO_ROOT/web-admin" "$sd/frontend.log" \
+    env AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" VITE_PORT="$vite_port" BFF_PORT="$bff_port" \
+      SPRING_BOOT_URL="http://127.0.0.1:$server_port" BFF_INTERNAL_URL="http://127.0.0.1:$server_port" NODE_ENV=development \
+      pnpm exec concurrently --names "web,bff" --prefix-colors "cyan,green" --restart-tries 20 --restart-after 2000 "pnpm dev:web" "pnpm dev:bff"
+  node "$SCRIPT_DIR/lib/golden-process-stop.mjs" register-supervisor "$name" "$REPO_ROOT" "$DEV" "$(cat "$sd/frontend.pid")" \
+    || die "resumed supervisor registration failed"
+  poll_http_up "http://127.0.0.1:$vite_port/" 120 || die "retained Web did not become reachable"
+  local attempt
+  for attempt in $(seq 1 120); do
+    lsof -nP -iTCP:"$bff_port" -sTCP:LISTEN -t >/dev/null 2>&1 && break
+    sleep 1
+  done
+  node "$SCRIPT_DIR/lib/golden-process-stop.mjs" register-supervisor "$name" "$REPO_ROOT" "$DEV" "$(cat "$sd/frontend.pid")" \
+    || die "ready resumed supervisor registration failed"
+  golden_runtime_register_listener "$name" web "$vite_port" "$(cat "$sd/frontend.pid")" "$REPO_ROOT/web-admin" "$runtime_token" \
+    || die "resumed Web listener identity mismatch"
+  golden_runtime_register_listener "$name" bff "$bff_port" "$(cat "$sd/frontend.pid")" "$REPO_ROOT/web-admin" "$runtime_token" \
+    || die "resumed BFF listener identity mismatch"
+  # Recheck retained bytes after startup before replacing the old product manifest.
+  node "$SCRIPT_DIR/lib/golden-resume-state.mjs" load "$name" "$REPO_ROOT" "$DEV" >/dev/null \
+    || die "retained launch inputs changed during resume"
+  cmd_verify_artifacts "$name"
+  log "resumed '$name' with retained database, artifacts and evidence"
+}
+
 # ---- down (stop verified processes, keep runtime/DB) ---------------------------------
 cmd_down() {
   node "$SCRIPT_DIR/lib/golden-process-stop.mjs" stop "$1" "$REPO_ROOT" "$DEV" \
@@ -910,7 +992,11 @@ case "$sub" in
   env) cmd_env "$name";;
   status) cmd_status "$name";;
   verify-artifacts) cmd_verify_artifacts "$name";;
+  suspend) "$DEV" runtime suspend "$name";;
+  resume) "$DEV" runtime resume "$name";;
+  lifecycle-resume) cmd_lifecycle_resume "$name";;
+  lifecycle-resume-run) cmd_resume_retained "$name";;
   down) cmd_down "$name";;
   destroy) cmd_destroy "$name";;
-  *) die "unknown subcommand: $sub (up|import|warm|env|status|verify-artifacts|down|destroy)";;
+  *) die "unknown subcommand: $sub (up|import|warm|env|status|verify-artifacts|suspend|resume|down|destroy)";;
 esac
