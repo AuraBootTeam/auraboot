@@ -126,7 +126,7 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
               onClick={onInvite}
               className="rounded-control inline-flex h-9 items-center gap-1.5 bg-emerald-600 px-3.5 text-sm font-medium text-white shadow-sm transition-colors duration-150 hover:bg-emerald-700"
             >
-              Invite
+              {resolveLabel({ code: 'invite_member', label: { 'zh-CN': '邀请成员', en: 'Invite' } })}
             </button>
           )}
           {isTenantMemberPage && onImportMembers && (
@@ -136,7 +136,7 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
               onClick={onImportMembers}
               className="rounded-control bg-accent hover:bg-accent-hover inline-flex h-9 items-center gap-1.5 px-3.5 text-sm font-medium text-white shadow-sm transition-colors duration-150"
             >
-              Import Members
+              {resolveLabel({ code: 'import_members', label: { 'zh-CN': '导入成员', en: 'Import Members' } })}
             </button>
           )}
           <ToolbarActionGroup

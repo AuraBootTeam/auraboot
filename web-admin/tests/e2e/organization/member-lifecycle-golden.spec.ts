@@ -145,6 +145,11 @@ test('MEMBER-DETAIL-07: native lifecycle buttons execute commands and persist st
   expect(result.data.records.some((entry: { pid: string }) => entry.pid === pid)).toBe(false);
   await expect(page.locator('table')).toBeVisible();
   await expect(page.locator('table').getByRole('columnheader').first()).toBeVisible();
+  await expect(page.locator('table tbody')).not.toContainText(/加载中|Loading/i);
+  await expect(page.locator('table tbody tr').first()).toBeVisible();
+  await expect(page.locator('table tbody')).not.toContainText(/暂无数据|No data/i);
   await expect(page.locator('table tbody tr').filter({ hasText: stamp })).toHaveCount(0);
+  await expect(page.getByTestId('invite-section')).toHaveText('邀请成员');
+  await expect(page.getByTestId('member-import-entry')).toHaveText('导入成员');
   await capture('native-member-removed-list');
 });
