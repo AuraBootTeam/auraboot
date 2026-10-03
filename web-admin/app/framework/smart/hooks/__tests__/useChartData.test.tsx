@@ -220,3 +220,55 @@ describe('useChartData', () => {
     expect(fetchResultMock).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('aggregate model routing', () => {
+  beforeEach(() => {
+    fetchChartDataMock.mockReset();
+    fetchDashboardWidgetMock.mockReset();
+    fetchResultMock.mockReset();
+  });
+  for (const legacyModel of [undefined, 'stale_raw_model']) {
+    it(`queries a semantic model without forwarding raw identity: ${legacyModel}`, async () => {
+      fetchChartDataMock.mockResolvedValue({ rows: [{ order_count: 12 }], meta: { dimensions: [], metrics: ['order_count'] } });
+      const { result } = renderHook(() => useChartData({ dataSource: {
+        type: 'aggregate', semanticModelCode: 'governed_orders', modelCode: legacyModel,
+        metrics: [{ field: 'order_count', aggregation: 'none' }], dimensions: [],
+      } }));
+      await waitFor(() => expect(result.current.data?.rows).toEqual([{ order_count: 12 }]));
+      const payload = fetchChartDataMock.mock.calls[0][0];
+      expect(payload.semanticModelCode).toBe('governed_orders');
+      expect(payload).not.toHaveProperty('modelCode');
+      expect(payload.metrics).toEqual([{ field: 'order_count', aggregation: 'none' }]);
+      expect(fetchDashboardWidgetMock).not.toHaveBeenCalled();
+    });
+  }
+  for (const code of ['', '   ']) {
+    it(`does not query or fall back from incomplete semantic identity: ${JSON.stringify(code)}`, () => {
+      const { result } = renderHook(() => useChartData({ dataSource: {
+        type: 'aggregate', semanticModelCode: code, modelCode: 'stale_raw_model',
+        metrics: [{ field: 'order_count', aggregation: 'none' }],
+      } }));
+      expect(fetchChartDataMock).not.toHaveBeenCalled();
+      expect(fetchDashboardWidgetMock).not.toHaveBeenCalled();
+      expect(result.current.data).toBeNull();
+      expect(result.current.loading).toBe(false);
+    });
+  }
+  it('continues querying raw aggregates without semantic identity', async () => {
+    fetchChartDataMock.mockResolvedValue({ rows: [{ count: 12 }], meta: { dimensions: [], metrics: ['count'] } });
+    const { result } = renderHook(() => useChartData({ dataSource: {
+      type: 'aggregate', modelCode: 'orders', metrics: [{ field: 'pid', aggregation: 'count', alias: 'count' }],
+    } }));
+    await waitFor(() => expect(result.current.data?.rows).toEqual([{ count: 12 }]));
+    const payload = fetchChartDataMock.mock.calls[0][0];
+    expect(payload.modelCode).toBe('orders');
+    expect(payload).not.toHaveProperty('semanticModelCode');
+  });
+  it('keeps a selected semantic model with no metrics incomplete', () => {
+    const { result } = renderHook(() => useChartData({ dataSource: {
+      type: 'aggregate', semanticModelCode: 'governed_orders', metrics: [],
+    } }));
+    expect(fetchChartDataMock).not.toHaveBeenCalled();
+    expect(result.current.data).toBeNull();
+  });
+});

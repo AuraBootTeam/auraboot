@@ -181,13 +181,11 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({ value, onCha
       // metric definition, so a placeholder keeps the {field, aggregation} shape.
       onChange({
         ...value,
-        // Semantic metrics carry no raw aggregation (it lives in the *.semantic.yml
-        // definition); the backend ignores it on the semantic path. The placeholder
-        // keeps the {field, aggregation} shape, hence the cast through unknown.
-        metrics: codes.map((code) => ({
+        // The typed placeholder preserves the wire shape without raw aggregation.
+        metrics: codes.map((code): ChartMetricConfig => ({
           field: code,
           aggregation: 'none',
-        })) as unknown as ChartMetricConfig[],
+        })),
       });
     },
     [value, onChange],

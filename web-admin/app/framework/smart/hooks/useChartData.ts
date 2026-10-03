@@ -17,6 +17,7 @@ import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { useDimensionLabels } from './useDimensionLabels';
 import { DashboardQueryContext } from './DashboardQueryContext';
+import { aggregateModelField, hasAggregateModel } from '../utils/aggregateModel';
 
 type ApiDataPayload =
   | { records?: Record<string, unknown>[]; rows?: Record<string, unknown>[] }
@@ -122,7 +123,7 @@ function isDataSourceComplete(dataSource: ChartDataSource | undefined): boolean 
 
   switch (dataSource.type) {
     case 'aggregate':
-      return !!(dataSource.modelCode && dataSource.metrics?.length);
+      return hasAggregateModel(dataSource) && !!dataSource.metrics?.length;
     case 'namedQuery':
       return !!dataSource.queryCode;
     case 'api':
@@ -291,9 +292,10 @@ export function useChartData(options: UseChartDataOptions): UseChartDataResult {
       }
 
       // Build the request from data source configuration
+      const modelField = currentDataSource.type === 'aggregate' ? aggregateModelField(currentDataSource) : 'modelCode';
       const request: AggregateQueryRequest = {
         type: currentDataSource.type === 'namedQuery' ? 'namedQuery' : 'aggregate',
-        modelCode: currentDataSource.modelCode,
+        [modelField]: currentDataSource[modelField],
         queryCode: currentDataSource.queryCode,
         dimensions: currentDataSource.dimensions,
         metrics: currentDataSource.metrics,
@@ -304,11 +306,6 @@ export function useChartData(options: UseChartDataOptions): UseChartDataResult {
         limit: currentDataSource.limit,
         timeRange: currentDataSource.timeRange,
         drillFilters: currentDrillFilters,
-        // When a semantic model is configured, pass it through so the backend
-        // delegates to SemanticQueryService instead of the raw SQL path.
-        ...(currentDataSource.semanticModelCode
-          ? { semanticModelCode: currentDataSource.semanticModelCode }
-          : {}),
       };
 
       const response =
