@@ -1568,6 +1568,7 @@ export function StrategyStudioWorkbench({
             </div>
             <div className="strategy-table-panel">
               <DecisionTableEditor
+                key={activeScenario.key}
                 value={scenarioTable}
                 onChange={(next) => updateScenarioTable(activeScenario.key, next)}
                 analysis={tableAnalyses[activeScenario.key] ?? null}
