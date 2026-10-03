@@ -35,17 +35,39 @@ async function queryRecords(page: Page, code: string): Promise<Record<string, un
 
 async function expectFourCharts(page: Page, path: string): Promise<void> {
   const expectedSeries: number[][] = [];
-  const trends = TREND_QUERIES.map((code) => page.waitForResponse((response) => {
-    if (response.request().method() !== 'POST') return false;
-    try { return response.request().postDataJSON()?.queryCode === code; }
-    catch { return false; }
-  }));
-  await page.goto(path, { waitUntil: 'domcontentloaded' });
-  for (const pending of trends) {
-    const response = await pending;
-    expect(response.ok()).toBe(true);
-    const payload = response.request().postDataJSON();
-    const body = await response.json();
+  const targetPath = new URL(path, page.url()).pathname;
+  const trends = TREND_QUERIES.map((code) =>
+    page
+      .waitForResponse((response) => {
+        const request = response.request();
+        if (
+          request.method() !== 'POST' ||
+          new URL(response.url()).pathname !== '/api/meta/chart-data'
+        )
+          return false;
+        // The previous document can still issue chart requests while goto is pending.
+        // Never bind the next page's assertions to an old-document response.
+        if (
+          request.frame() !== page.mainFrame() ||
+          new URL(request.frame().url()).pathname !== targetPath
+        )
+          return false;
+        try {
+          return request.postDataJSON()?.queryCode === code;
+        } catch {
+          return false;
+        }
+      })
+      .then(async (response) => {
+        expect(response.ok()).toBe(true);
+        return { payload: response.request().postDataJSON(), body: await response.json() };
+      }),
+  );
+  const [results] = await Promise.all([
+    Promise.all(trends),
+    page.goto(path, { waitUntil: 'domcontentloaded' }),
+  ]);
+  for (const { payload, body } of results) {
     const rows = body.data.rows;
     expect(rows).toHaveLength(12);
     expectedSeries.push(rows.map((row: any) => Number(row.quote_count ?? row.bom_count)));

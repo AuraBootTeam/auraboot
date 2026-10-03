@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { readFileSync } from 'node:fs';
 import { test, expect } from '../../fixtures';
 import { ensureQuoteRoleUser, makeQuoteRoleUser, openQuoteRolePage, openQuoteDetailFromList,
   seedBomPriceManualReviewQuote, seedDownloadableQuote, type QuoteRoleUser } from './quote-e2e-helpers';
@@ -207,6 +208,31 @@ test('quote sharing release gate: multiple members, role access and revocation t
     expect(foreignMe.user.tenantId).toBeTruthy();
     expect(String(foreignMe.user.tenantId)).not.toBe(String(ownerMe.user.tenantId));
     expect(foreignMe.permissions.roles.map((role: { code: string }) => role.code)).toContain('tenant_admin');
+    // /api/test/seed installs test-fixtures only. The foreign tenant needs the
+    // same product page before this journey can exercise the record boundary.
+    const quoteRoot = process.env.AURA_QUOTE_ROOT;
+    expect(quoteRoot, 'The gate must provide its manifest-bound AURA_QUOTE_ROOT').toBeTruthy();
+    expect(path.isAbsolute(quoteRoot!)).toBe(true);
+    const pluginPath = path.join(quoteRoot!, 'plugin-aura', 'quote-core');
+    const manifest = JSON.parse(readFileSync(path.join(pluginPath, 'plugin.json'), 'utf8'));
+    expect(manifest.pluginId).toBe('com.auraboot.quote-core');
+    const imported = await foreign.page.request.post('/api/plugins/import/import-directory-sync', {
+      data: {
+        path: pluginPath,
+        conflictStrategy: 'OVERWRITE',
+        autoPublishModels: true,
+        autoPublishFields: true,
+        autoPublishCommands: true,
+        autoPublishPages: true,
+        deferReferenceValidation: true,
+      },
+      timeout: 90_000,
+    });
+    expect(imported.status()).toBe(200);
+    expect((await imported.json()).success).toBe(true);
+    const foreignSchema = await foreign.page.request.get('/api/pages/key/qo_quote_common_detail');
+    expect(foreignSchema.status()).toBe(200);
+    expect(String((await foreignSchema.json()).code)).toBe('0');
     const deniedRecord = foreign.page.waitForResponse(response =>
       new URL(response.url()).pathname === root && response.request().method() === 'GET');
     await foreign.page.goto(new URL(`/p/qo_quote_common/view/${quote.quoteId}`, page.url()).href);
