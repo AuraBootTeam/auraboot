@@ -14,7 +14,9 @@ export function grantedActions(matrix: PermissionMatrixDTO | null): GrantedActio
   for (const mod of matrix.modules) {
     for (const res of mod.resources) {
       for (const act of res.actions) {
-        if (act.granted) {
+        // Match capability scope settings: menu/tab grants have no record scope.
+        // Missing model scopes remain visible as configuration gaps.
+        if (act.granted && (act.code.startsWith('model.') || act.scopeType != null)) {
           out.push({
             resourceCode: res.resourceCode,
             actionCode: act.action,

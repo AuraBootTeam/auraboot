@@ -7,6 +7,8 @@ import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.plugin.dto.imports.ImportRequest;
 import com.auraboot.framework.plugin.service.PluginImportService;
+import com.auraboot.framework.tenant.service.TenantMemberService;
+import com.auraboot.framework.user.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.Filter;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,15 +36,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-/** Real permission interceptor, imported organization DSL, and persisted department writes. */
+/** Real permission interceptor, imported organization DSL, and persisted organization writes. */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class OrgControllerDepartmentPermissionIT extends BaseIntegrationTest {
+class OrgControllerPermissionIT extends BaseIntegrationTest {
     @Autowired private WebApplicationContext context;
     @Autowired private PluginImportService imports;
     @Autowired private DynamicDataService data;
     @Autowired private UserPermissionService permissions;
     @Autowired private ObjectMapper json;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private UserService users;
+    @Autowired private TenantMemberService members;
 
     private MockMvc mvc;
     private String departmentPid;
@@ -127,6 +131,129 @@ class OrgControllerDepartmentPermissionIT extends BaseIntegrationTest {
     void teamManagerCannotWriteDepartments() throws Exception {
         grantCapability("org.cap.team");
         assertDepartmentWritesDenied();
+    }
+
+    @Test
+    void hrCapabilityCanCreateLinkUpdateAndTransferEmployeesWithoutTeamManagement() throws Exception {
+        grantCapability("org.cap.hr");
+        applyTestMetaContext();
+        assertThat(permissions.getUserPermissionCodes(getTestUser().getId()))
+                .contains("org.hr.manage").doesNotContain("org.team.manage");
+        String position = position(departmentPid);
+        String email = "org-create-" + System.nanoTime() + "@example.test";
+        var created = mvc.perform(body(post("/api/org/employees"), Map.of(
+                        "name", "HR created employee", "email", email, "phone", "13800000000",
+                        "deptPid", departmentPid, "positionPid", position)))
+                .andExpect(success()).andExpect(jsonPath("$.code").value("0")).andReturn();
+        var dto = json.readTree(created.getResponse().getContentAsString()).path("data");
+        String employeePid = dto.path("pid").asText();
+        assertThat(employeePid).isNotBlank();
+        var employee = employee(employeePid);
+        var account = jdbc.queryForMap("SELECT id, pid FROM ab_user WHERE email = ? AND deleted_flag = false", email);
+        var member = jdbc.queryForMap("SELECT pid, employee_id FROM ab_tenant_member WHERE tenant_id = ? AND user_id = ? AND deleted_flag = false",
+                getTestTenant().getId(), account.get("id"));
+        assertThat(employee.get("org_emp_user_id")).isEqualTo(account.get("pid"));
+        assertThat(employee.get("org_emp_member_id")).isEqualTo(member.get("pid"));
+        assertThat(member.get("employee_id")).isEqualTo(employee.get("id"));
+        assertThat(dto.path("memberPid").asText()).isEqualTo(member.get("pid"));
+
+        applyTestMetaContext();
+        var existingUser = users.signUp("org-link-" + System.nanoTime() + "@example.test", "Test-password-2026!");
+        var existingMember = members.addMember(existingUser.getId(), getTestTenant().getId(), "active");
+        var linked = mvc.perform(body(post("/api/org/employees/link"), Map.of("memberPid", existingMember.getPid(),
+                        "deptPid", departmentPid, "positionPid", position)))
+                .andExpect(success()).andExpect(jsonPath("$.code").value("0")).andReturn();
+        String linkedPid = json.readTree(linked.getResponse().getContentAsString()).path("data").path("pid").asText();
+        assertThat(linkedPid).isNotBlank();
+        var linkedEmployee = employee(linkedPid);
+        assertThat(linkedEmployee.get("org_emp_user_id")).isEqualTo(existingUser.getPid());
+        assertThat(linkedEmployee.get("org_emp_member_id")).isEqualTo(existingMember.getPid());
+        assertThat(jdbc.queryForObject("SELECT employee_id FROM ab_tenant_member WHERE tenant_id = ? AND pid = ?",
+                Long.class, getTestTenant().getId(), existingMember.getPid())).isEqualTo(linkedEmployee.get("id"));
+
+        mvc.perform(body(put("/api/org/employees/{pid}", employeePid), Map.of("org_emp_name", "Updated HR employee")))
+                .andExpect(success()).andExpect(jsonPath("$.code").value("0"));
+        assertThat(employee(employeePid).get("org_emp_name")).isEqualTo("Updated HR employee");
+        applyTestMetaContext();
+        String target = data.create("org_department", Map.of("org_dept_name", "Transfer target " + System.nanoTime()))
+                .get("pid").toString();
+        String targetPosition = position(target);
+        mvc.perform(body(put("/api/org/employees/{pid}/transfer", employeePid),
+                        Map.of("newDeptPid", target, "newPositionPid", targetPosition)))
+                .andExpect(success()).andExpect(jsonPath("$.code").value("0"));
+        assertEmployeeAssignment(employeePid, target, targetPosition);
+        mvc.perform(body(put("/api/org/employees/batch-transfer"), Map.of("employeePids", List.of(employeePid, linkedPid),
+                        "newDeptPid", departmentPid, "newPositionPid", position)))
+                .andExpect(success()).andExpect(jsonPath("$.code").value("0"));
+        assertEmployeeAssignment(employeePid, departmentPid, position);
+        assertEmployeeAssignment(linkedPid, departmentPid, position);
+    }
+
+    @Test
+    void hrReaderCannotWriteEmployeesOrAccounts() throws Exception {
+        grantCapability("org.cap.hr_view");
+        assertEmployeeWritesDenied();
+    }
+
+    @Test
+    void teamManagerCannotWriteEmployeesOrAccounts() throws Exception {
+        grantCapability("org.cap.team");
+        assertEmployeeWritesDenied();
+    }
+
+    @Test
+    void memberManagerCannotWriteOrganizationRecordsThroughNativeEmployeeEndpoints() throws Exception {
+        grantCapability("org.cap.member");
+        assertEmployeeWritesDenied();
+    }
+
+    private void assertEmployeeWritesDenied() throws Exception {
+        applyTestMetaContext();
+        String position = position(departmentPid);
+        String employeePid = data.create("org_employee", Map.of("org_emp_name", "Employee denial fixture",
+                "org_emp_dept_id", departmentPid, "org_emp_position_id", position)).get("pid").toString();
+        var user = users.signUp("org-link-deny-" + System.nanoTime() + "@example.test", "Test-password-2026!");
+        var member = members.addMember(user.getId(), getTestTenant().getId(), "active");
+        var originalEmployee = employee(employeePid);
+        var originalMember = jdbc.queryForMap("SELECT * FROM ab_tenant_member WHERE tenant_id = ? AND pid = ?",
+                getTestTenant().getId(), member.getPid());
+        long originalCount = jdbc.queryForObject("SELECT count(*) FROM mt_org_employee WHERE tenant_id = ?",
+                Long.class, getTestTenant().getId());
+        String deniedEmail = "org-create-deny-" + System.nanoTime() + "@example.test";
+        var requests = List.of(
+                body(post("/api/org/employees"), Map.of("name", "Denied employee", "email", deniedEmail,
+                        "phone", "13800000000", "deptPid", departmentPid, "positionPid", position)),
+                body(post("/api/org/employees/link"), Map.of("memberPid", member.getPid(), "deptPid", departmentPid,
+                        "positionPid", position)),
+                body(put("/api/org/employees/{pid}", employeePid), Map.of("org_emp_name", "Denied update")),
+                body(put("/api/org/employees/{pid}/transfer", employeePid), Map.of("newDeptPid", "denied-target")),
+                body(put("/api/org/employees/batch-transfer"), Map.of("employeePids", List.of(employeePid),
+                        "newDeptPid", "denied-target")));
+        for (var request : requests) {
+            mvc.perform(request).andExpect(status().isForbidden());
+            assertThat(employee(employeePid)).isEqualTo(originalEmployee);
+            assertThat(jdbc.queryForMap("SELECT * FROM ab_tenant_member WHERE tenant_id = ? AND pid = ?",
+                    getTestTenant().getId(), member.getPid())).isEqualTo(originalMember);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM mt_org_employee WHERE tenant_id = ?",
+                    Long.class, getTestTenant().getId())).isEqualTo(originalCount);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_user WHERE email = ?", Long.class, deniedEmail)).isZero();
+        }
+    }
+
+    private String position(String departmentPid) {
+        return data.create("org_position", Map.of("org_pos_name", "Permission fixture position " + System.nanoTime(),
+                "org_pos_dept_id", departmentPid, "org_pos_level", "staff")).get("pid").toString();
+    }
+
+    private Map<String, Object> employee(String pid) {
+        return jdbc.queryForMap("SELECT * FROM mt_org_employee WHERE tenant_id = ? AND pid = ?",
+                getTestTenant().getId(), pid);
+    }
+
+    private void assertEmployeeAssignment(String pid, String department, String position) {
+        var employee = employee(pid);
+        assertThat(employee.get("org_emp_dept_id")).isEqualTo(department);
+        assertThat(employee.get("org_emp_position_id")).isEqualTo(position);
     }
 
     private void assertDepartmentWritesDenied() throws Exception {

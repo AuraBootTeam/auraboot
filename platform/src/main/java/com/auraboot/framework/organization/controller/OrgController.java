@@ -210,7 +210,7 @@ public class OrgController {
      * One-stop employee creation: creates user + member + employee with bidirectional linking.
      */
     @PostMapping("/employees")
-    @RequirePermission("org.team.manage")
+    @RequirePermission("org.hr.manage")
     public ApiResponse<OrgEmployeeDTO> createEmployee(@Valid @RequestBody CreateEmployeeRequest request) {
         OrgEmployeeDTO employee = orgEmployeeService.createWithUser(request);
         return ApiResponse.success(employee);
@@ -220,7 +220,7 @@ public class OrgController {
      * Link an existing tenant member to a new employee record.
      */
     @PostMapping("/employees/link")
-    @RequirePermission("org.team.manage")
+    @RequirePermission("org.hr.manage")
     public ApiResponse<OrgEmployeeDTO> linkMember(@Valid @RequestBody LinkMemberRequest request) {
         OrgEmployeeDTO employee = orgEmployeeService.linkMember(request);
         return ApiResponse.success(employee);
@@ -230,7 +230,7 @@ public class OrgController {
      * Update an employee record via dynamic data service.
      */
     @PutMapping("/employees/{pid}")
-    @RequirePermission("org.team.manage")
+    @RequirePermission("org.hr.manage")
     public ApiResponse<Void> updateEmployee(
             @PathVariable String pid,
             @RequestBody @jakarta.validation.constraints.NotEmpty Map<String, Object> data) {
@@ -242,7 +242,7 @@ public class OrgController {
      * Transfer an employee to a new department and/or position.
      */
     @PutMapping("/employees/{pid}/transfer")
-    @RequirePermission("org.team.manage")
+    @RequirePermission("org.hr.manage")
     public ApiResponse<Void> transferEmployee(
             @PathVariable String pid,
             @Valid @RequestBody TransferRequest request) {
@@ -254,7 +254,7 @@ public class OrgController {
      * Batch transfer multiple employees to a new department and/or position.
      */
     @PutMapping("/employees/batch-transfer")
-    @RequirePermission("org.team.manage")
+    @RequirePermission("org.hr.manage")
     public ApiResponse<Void> batchTransferEmployees(@Valid @RequestBody BatchTransferRequest request) {
         TransferRequest transferRequest = new TransferRequest();
         transferRequest.setNewDeptPid(request.newDeptPid());

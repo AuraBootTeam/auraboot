@@ -25,22 +25,23 @@ async function createRole(page: Page) {
   return (await resp.json()).data as { pid: string; code: string };
 }
 
+async function selectRoleFromMenu(page: Page, role: { pid: string; code: string }) {
+  await page.goto('/home');
+  await expect(page.locator('header[data-hydrated]')).toHaveAttribute('data-hydrated', 'true');
+  await page.getByRole('link', { name: /角色|Roles/, exact: true }).click();
+  await expect(page.getByTestId('permission-page')).toBeVisible();
+  await page.getByTestId('role-search-input').fill(role.code);
+  await page.getByTestId(`role-item-${role.code}`).click();
+  await expect(page.getByTestId('capability-role-editor')).toHaveAttribute('data-role-pid', role.pid);
+}
+
 for (const scope of ['dept', 'team']) {
   test(`a role default ${scope} data scope is inherited by newly-granted permissions`, async ({
     page,
   }, info) => {
     const role = await createRole(page);
 
-    await page.goto('/enterprise/permissions');
-    await expect(page.getByTestId('permission-page')).toBeVisible({ timeout: 30_000 });
-    await page.getByTestId('role-search-input').fill(role.code);
-    await expect(page.getByTestId(`role-item-${role.code}`)).toBeVisible({ timeout: 10_000 });
-    await page.getByTestId(`role-item-${role.code}`).click();
-    await expect(page.getByTestId('capability-role-editor')).toHaveAttribute(
-      'data-role-pid',
-      role.pid,
-      { timeout: 15_000 },
-    );
+    await selectRoleFromMenu(page, role);
 
     // ② set the role default scope to "dept" (仅本部门) via the drawer
     await page.getByTestId('data-scope-modify-btn').click();
@@ -105,6 +106,10 @@ for (const scope of ['dept', 'team']) {
       granted: true,
       scopeType: null,
     });
+    await expect(page.getByTestId('data-scope-current')).toContainText(
+      scope === 'team' ? /团队|My teams/ : /仅本部门|Dept Only|本部门/,
+    );
+    await expect(page.getByTestId('data-scope-current')).not.toContainText(/多种范围|混合|Mixed|Multiple scopes/);
 
     await page.screenshot({
       path: info.outputPath(`01-inherited-${scope}-scope.png`),
@@ -119,6 +124,71 @@ for (const scope of ['dept', 'team']) {
     expect((await defResp.json()).data).toBe(scope);
   });
 }
+
+test('actual mixed record scopes remain separate from the stored role default', async ({ page }, info) => {
+  const role = await createRole(page);
+  await selectRoleFromMenu(page, role);
+  await page.getByTestId('data-scope-modify-btn').click();
+  await page.getByTestId('data-scope-option-team').click();
+  await page.getByTestId('data-scope-apply').click();
+  await expect(page.getByTestId('data-scope-drawer')).toHaveCount(0);
+  await page.getByTestId('capability-checkbox-qo.cap.quote_view').check();
+  await page.getByTestId('capability-save').click();
+  await page.getByTestId('confirm-ok').click();
+  await expect(page.getByTestId('capability-save')).toBeDisabled();
+  await expect(page.getByTestId('data-scope-current')).toContainText(/团队|My teams/);
+  await page.getByTestId('capability-scope-configure-qo.cap.quote_view').click();
+  await page.getByTestId('capability-scope-model.qo_quote_common.read').selectOption('self');
+  const write = page.waitForResponse(response => response.request().method() === 'PUT' &&
+    response.url().includes(`/api/permissions/matrix/${role.pid}/scope`));
+  await page.getByTestId('capability-scope-apply').click();
+  expect((await write).status()).toBe(200);
+  await expect(page.getByTestId('capability-scope-dialog')).toHaveCount(0);
+  await expect(page.getByTestId('data-scope-current')).toContainText(/多种范围|混合|Mixed|Multiple scopes/);
+  await expect(page.getByTestId('data-scope-default')).toContainText(/团队|My teams/);
+  const response = await page.request.get(`${BASE}/api/permissions/matrix/${role.pid}`);
+  expect(response.status()).toBe(200);
+  const actions = (await response.json()).data.modules.flatMap((module: any) => module.resources)
+    .flatMap((resource: any) => resource.actions);
+  expect(actions.find((action: any) => action.code === 'model.qo_quote_common.read').scopeType).toBe('self');
+  expect(actions.find((action: any) => action.code === 'model.qo_quote_line_common.read').scopeType).toBe('team');
+  await page.screenshot({ path: info.outputPath('scope-mixed.png'), fullPage: true });
+});
+
+test('missing, failed, and invalid role defaults do not preselect a broader scope', async ({ page }, info) => {
+  const role = await createRole(page);
+  const url = `${BASE}/api/permissions/matrix/${role.pid}/default-scope`;
+  let mode: 'error' | 'real' | 'invalid' = 'error';
+  await page.route(url, async route => {
+    if (route.request().method() !== 'GET' || mode === 'real') return route.continue();
+    await route.fulfill({ status: mode === 'error' ? 503 : 200, contentType: 'application/json',
+      body: JSON.stringify(mode === 'error' ? { code: '503', message: 'Injected unavailable' } :
+        { code: '0', data: 'invalid-scope-fixture' }) });
+  });
+  await selectRoleFromMenu(page, role);
+  await expect(page.getByTestId('data-scope-default')).toContainText(/读取.*失败|Could not load|加载.*失败/);
+  await expect(page.getByTestId('data-scope-modify-btn')).toBeDisabled();
+  await page.screenshot({ path: info.outputPath('scope-load-error.png'), fullPage: true });
+  mode = 'real';
+  await page.getByTestId('data-scope-retry').click();
+  await expect(page.getByTestId('data-scope-default')).toContainText(/未配置|Not configured/);
+  await page.getByTestId('data-scope-modify-btn').click();
+  await expect(page.getByTestId('data-scope-apply')).toBeDisabled();
+  await expect(page.getByTestId('data-scope-drawer').getByRole('radio', { checked: true })).toHaveCount(0);
+  await page.screenshot({ path: info.outputPath('scope-not-configured.png'), fullPage: true });
+  await page.keyboard.press('Escape');
+  mode = 'invalid';
+  await selectRoleFromMenu(page, role);
+  await expect(page.getByTestId('data-scope-default')).toContainText(/无效|Invalid scope/);
+  await page.getByTestId('data-scope-modify-btn').click();
+  await expect(page.getByTestId('data-scope-apply')).toBeDisabled();
+  await expect(page.getByTestId('data-scope-drawer').getByRole('radio', { checked: true })).toHaveCount(0);
+  await page.screenshot({ path: info.outputPath('scope-invalid.png'), fullPage: true });
+  const stored = await page.request.get(url);
+  expect(stored.status()).toBe(200);
+  expect((await stored.json()).data).toBeNull();
+  await page.unroute(url);
+});
 
 test('capability save grants via the precision-safe rolePid endpoint (snowflake-id role)', async ({
   page,

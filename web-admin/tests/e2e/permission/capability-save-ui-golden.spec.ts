@@ -66,6 +66,25 @@ test('① capability save persists through the browser on a snowflake-id role', 
     { timeout: 15_000 },
   );
 
+  const diagnostics = page.getByTestId('permission-diagnostics');
+  await expect(diagnostics).toHaveJSProperty('open', false);
+  await expect(page.getByTestId('advanced-atomic-section')).toHaveCount(0);
+  await page.screenshot({ path: info.outputPath('rbac-initial.png'), fullPage: true });
+  await diagnostics.locator(':scope > summary').click();
+  await diagnostics.locator('input').fill('model.qo_quote_common.read');
+  const diagnosticRow = diagnostics.getByTestId('diagnostic-action-model.qo_quote_common.read');
+  await expect(diagnosticRow).toBeVisible();
+  const quoteReadCapability = view.flatMap(group => group.capabilities)
+    .find(item => item.code === 'qo.cap.quote_view');
+  expect(quoteReadCapability).toBeTruthy();
+  await expect(diagnostics.locator('input[type="checkbox"]')).toHaveCount(0);
+  await expect(diagnostics.locator('select')).toHaveCount(0);
+  await expect(diagnostics.locator('button')).toHaveCount(0);
+  await expect(page.getByTestId('capability-draft')).toHaveCount(0);
+  await diagnostics.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: info.outputPath('advanced-source.png'), fullPage: true });
+  await diagnostics.locator(':scope > summary').click();
+
   const checkbox = page.getByTestId(`capability-checkbox-${cap!.code}`);
   const menus = page.getByTestId(`capability-menus-${cap!.code}`);
   await expect(menus).toHaveJSProperty('open', false);
@@ -236,6 +255,44 @@ test('capability draft survives failed save and canceled navigation', async ({ p
   await page.getByTestId('permission-right-tab-members').click();
   await page.getByTestId('confirm-ok').click();
   await expect(page.getByTestId('role-member-tab')).toBeVisible();
+});
+
+test('switching roles requires draft confirmation and never saves the discarded selection', async ({ page }, info) => {
+  const original = await createRole(page);
+  const other = await createRole(page);
+  const url = `${BASE}/api/permission/capabilities?rolePid=${encodeURIComponent(original.pid)}`;
+  const before = await page.request.get(url);
+  expect(before.status()).toBe(200);
+  const capability = (await before.json()).data.flatMap((group: any) => group.capabilities)
+    .find((item: any) => !item.conventionDerived && item.includes.length > 0);
+  expect(capability).toBeTruthy();
+  await page.goto('/home');
+  await expect(page.locator('header[data-hydrated]')).toHaveAttribute('data-hydrated', 'true');
+  await page.getByRole('link', { name: /角色|Roles/, exact: true }).click();
+  await page.getByTestId('role-search-input').fill(original.code);
+  await page.getByTestId(`role-item-${original.code}`).click();
+  await expect(page.getByTestId('capability-role-editor')).toHaveAttribute('data-role-pid', original.pid);
+  await page.getByTestId(`capability-checkbox-${capability.code}`).check();
+  await expect(page.getByTestId('capability-draft')).toBeVisible();
+  await page.getByTestId('role-search-input').fill(other.code);
+  await page.getByTestId(`role-item-${other.code}`).click();
+  await expect(page.getByTestId('confirm-dialog')).toBeVisible();
+  await expect(page.getByTestId('capability-role-editor')).toHaveAttribute('data-role-pid', original.pid);
+  await page.screenshot({ path: info.outputPath('rbac-discard-confirm.png'), fullPage: true });
+  await page.getByTestId('confirm-cancel').click();
+  await expect(page.getByTestId(`capability-checkbox-${capability.code}`)).toBeChecked();
+  await page.getByTestId(`role-item-${other.code}`).click();
+  await page.getByTestId('confirm-ok').click();
+  await expect(page.getByTestId('capability-role-editor')).toHaveAttribute('data-role-pid', other.pid);
+  await expect(page.getByTestId('capability-draft')).toHaveCount(0);
+  await page.getByTestId('role-search-input').fill(original.code);
+  await page.getByTestId(`role-item-${original.code}`).click();
+  await expect(page.getByTestId('capability-role-editor')).toHaveAttribute('data-role-pid', original.pid);
+  await expect(page.getByTestId(`capability-checkbox-${capability.code}`)).not.toBeChecked();
+  const after = await page.request.get(url);
+  expect(after.status()).toBe(200);
+  expect((await after.json()).data.flatMap((group: any) => group.capabilities)
+    .find((item: any) => item.code === capability.code).granted).toBe(false);
 });
 
 test('capability grant readback failure blocks stale editing and retry reads the persisted grant', async ({
