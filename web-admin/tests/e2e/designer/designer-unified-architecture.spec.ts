@@ -31,10 +31,11 @@ test.use({ locale: 'zh-CN' });
 
 async function openReportDesigner(page: import('@playwright/test').Page) {
   await page.goto('/report-designer', { waitUntil: 'domcontentloaded' });
+  // SSR already contains the default title; wait for actual client event binding.
+  await expect(page.locator('header[data-hydrated="true"]')).toBeVisible({ timeout: 30000 });
   // Wait for block palette to appear (may be SSR-rendered or client-rendered)
   await expect(page.getByTestId('block-palette')).toBeVisible({ timeout: 30000 });
-  // Wait for React hydration + store initialization: the title input gets a value
-  // only after the useEffect runs createReport(), which happens after hydration.
+  // Confirm the initialized localized document before editing.
   const titleInput = page.getByPlaceholder(/^(报表标题|Report Title)$/);
   await expect(titleInput).toHaveValue('未命名报表', { timeout: 15000 });
 }
@@ -226,7 +227,7 @@ test.describe('GAP 3: Report DataSource — Shared Pickers', () => {
     await openReportDesigner(page);
 
     // Add data-table block and select it
-    await page.getByTestId('block-palette-item-data-table').click();
+    await page.getByTestId('block-palette-item-table').click();
     await expect(
       page.getByTestId('report-canvas').getByText('请在属性面板中配置列', { exact: true }),
     ).toBeVisible({ timeout: 10000 });
@@ -255,7 +256,7 @@ test.describe('GAP 3: Report DataSource — Shared Pickers', () => {
   test('DUA-12: Model type loads shared ModelPicker with API data', async ({ page }) => {
     await openReportDesigner(page);
 
-    await page.getByTestId('block-palette-item-data-table').click();
+    await page.getByTestId('block-palette-item-table').click();
     await expect(
       page.getByTestId('report-canvas').getByText('请在属性面板中配置列', { exact: true }),
     ).toBeVisible({ timeout: 10000 });
@@ -292,7 +293,7 @@ test.describe('GAP 3: Report DataSource — Shared Pickers', () => {
   test('DUA-13: NamedQuery type shows shared NamedQueryPicker', async ({ page }) => {
     await openReportDesigner(page);
 
-    await page.getByTestId('block-palette-item-data-table').click();
+    await page.getByTestId('block-palette-item-table').click();
     await expect(
       page.getByTestId('report-canvas').getByText('请在属性面板中配置列', { exact: true }),
     ).toBeVisible({ timeout: 10000 });
@@ -331,7 +332,7 @@ test.describe('GAP 3: Report DataSource — Shared Pickers', () => {
   test('DUA-14: API type shows URL text input', async ({ page }) => {
     await openReportDesigner(page);
 
-    await page.getByTestId('block-palette-item-data-table').click();
+    await page.getByTestId('block-palette-item-table').click();
     await expect(
       page.getByTestId('report-canvas').getByText('请在属性面板中配置列', { exact: true }),
     ).toBeVisible({ timeout: 10000 });

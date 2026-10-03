@@ -742,7 +742,7 @@ test.describe('User Profile', () => {
     const context = await browser.newContext({
       baseURL,
       locale: 'zh-CN',
-      viewport: { width: 1440, height: 1000 },
+      viewport: { width: 1280, height: 1000 },
       storageState: { cookies: [], origins: [] },
     });
     const ownPage = await context.newPage();
