@@ -421,6 +421,9 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
     ...(componentLower === 'smartdatepicker' && fieldKind === 'datetime'
       ? { dateType: 'datetime-local' }
       : {}),
+    ...(field.placeholder !== undefined
+      ? { placeholder: getLocalizedText(field.placeholder, context.locale || 'zh-CN', t) }
+      : {}),
     ...field.props,
     // Controlled identity, state, and governance resolved by this wrapper are authoritative and
     // must never be shadowed by metadata extension keys.
