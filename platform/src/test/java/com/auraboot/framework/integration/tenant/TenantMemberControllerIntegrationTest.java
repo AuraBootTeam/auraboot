@@ -147,7 +147,7 @@ class TenantMemberControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @ParameterizedTest(name = "{1} preflight requires only its own action and rejects revocation")
-    @CsvSource({"suspend,suspend,remove,delete", "leave,leave,remove,delete", "delete,remove,leave,leave"})
+    @CsvSource({"suspend,suspend,remove,delete", "leave,deactivate,remove,delete", "delete,remove,deactivate,leave"})
     void memberActionOnlyPreflightAllowsAndThenRejectsRevokedGrant(
             String verb, String action, String otherAction, String otherVerb) throws Exception {
         prepareMemberModel();
@@ -181,7 +181,7 @@ class TenantMemberControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @ParameterizedTest(name = "{1} impact and candidates honor the real self scope")
-    @CsvSource({"suspend,suspend", "leave,leave", "delete,remove"})
+    @CsvSource({"suspend,suspend", "leave,deactivate", "delete,remove"})
     void memberPreflightAndRecipientsHonorRealSelfScope(String verb, String action) throws Exception {
         prepareMemberModel();
         grantMemberAction("read");
