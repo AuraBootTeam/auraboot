@@ -539,6 +539,19 @@ test.describe('Page Templates', () => {
       });
       for (const viewportWidth of [900, 1280, 1920]) {
         await page.setViewportSize({ width: viewportWidth, height: 1600 });
+        // Wait for the responsive sidebar transition before judging or capturing layout.
+        await expect
+          .poll(async () =>
+            page.getByTestId('sidebar').evaluate((element) => {
+              const sidebar = element.getBoundingClientRect();
+              const content = document.querySelector('[data-print="content"]')!
+                .getBoundingClientRect();
+              return window.matchMedia('(min-width: 1024px)').matches
+                ? Math.abs(sidebar.left) < 1 && Math.abs(sidebar.right - content.left) < 1
+                : sidebar.right <= 1 && Math.abs(content.left) < 1;
+            }),
+          )
+          .toBe(true);
         for (const tab of ['toolbar', 'behavior']) {
           await page.getByTestId(`list-tab-${tab}`).click();
           const summary = page.getByTestId(`list-tab-summary-${tab}`);
