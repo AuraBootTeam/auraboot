@@ -490,8 +490,8 @@ export const setupBffRoutes = (_expressApp: express.Application) => {
 // 独立服务器启动（用于生产环境或独立运行）
 // 启动服务器（仅在直接运行此文件时）
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1].includes('bff.server')) {
-  const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 BFF Server running on http://0.0.0.0:${PORT}`);
+  const server = app.listen(PORT, config.server.host, () => {
+    console.log(`🚀 BFF Server running on http://${config.server.host}:${PORT}`);
     console.log(`📡 Proxying /api/* (including /api/ai/*) to Gateway at ${SPRING_BOOT_URL}`);
     console.log(`✅ All AI requests now go through Gateway for auth, RBAC, and tenant isolation`);
     console.log(`🔧 CORS enabled for cross-origin requests`);

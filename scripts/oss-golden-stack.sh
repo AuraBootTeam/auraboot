@@ -543,7 +543,7 @@ cmd_up() {
   log "5/9 start backend (java -jar) on $server_port"
   mkdir -p "$sd/pf4j-plugins"
   spawn_detached "$sd/backend.pid" "$REPO_ROOT/platform" "$sd/backend.log" \
-    env SERVER_PORT="$server_port" \
+    env SERVER_PORT="$server_port" SERVER_ADDRESS=127.0.0.1 \
       SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:5432/${pg_db}?charSet=UTF8" \
       SPRING_DATASOURCE_USERNAME=auraboot SPRING_DATASOURCE_PASSWORD=auraboot \
       SPRING_DATA_REDIS_HOST=127.0.0.1 SPRING_DATA_REDIS_PORT=6379 SPRING_DATA_REDIS_DATABASE="$redis_db" \
@@ -641,7 +641,7 @@ cmd_up() {
       *) die "refusing to clear unexpected Vite cache path: $vite_cache_dir" ;;
     esac
     spawn_detached "$sd/frontend.pid" "$REPO_ROOT/web-admin" "$sd/frontend.log" \
-      env VITE_PORT="$vite_port" BFF_PORT="$bff_port" SPRING_BOOT_URL="http://127.0.0.1:$server_port" \
+      env VITE_PORT="$vite_port" VITE_HOST=127.0.0.1 BFF_PORT="$bff_port" BFF_HOST=127.0.0.1 SPRING_BOOT_URL="http://127.0.0.1:$server_port" \
       BFF_INTERNAL_URL="http://127.0.0.1:$server_port" NODE_ENV=development \
       pnpm dev:full
     # Wait for Vite to start accepting connections (302 → /login is fine). Poll

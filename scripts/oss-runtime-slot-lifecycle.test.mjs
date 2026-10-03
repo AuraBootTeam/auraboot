@@ -6,16 +6,11 @@ import { fileURLToPath } from 'node:url';
 const gatePath = fileURLToPath(new URL('./oss-e2e-gate-run.sh', import.meta.url));
 const stackPath = fileURLToPath(new URL('./oss-golden-stack.sh', import.meta.url));
 
-test('fresh OSS gate keeps the registered slot for the same stable runtime name', () => {
+test('fresh OSS gate refuses an existing runtime instead of destroying evidence', () => {
   const source = readFileSync(gatePath, 'utf8');
   assert.match(source, /registered_slot_for_name\(\)/u);
-  assert.match(source, /SLOT="\$registered_slot"/u);
-  assert.match(source, /reusing prior slot .* before the fresh rebuild/u);
-  assert.ok(
-    source.indexOf('registered_slot="$(registered_slot_for_name)"')
-      < source.indexOf('"$GS" destroy "$NAME"'),
-    'the old allocation must identify the stable slot before the fresh destroy',
-  );
+  assert.match(source, /\[\[ -z "\$registered_slot" \]\] \|\| die_env/u);
+  assert.doesNotMatch(source, /"\$GS" destroy|"\$GS" down/u);
 });
 
 test('OSS gate resolves the workspace in local and sibling-repository CI layouts', () => {
@@ -42,6 +37,6 @@ test('fresh gate marks its runtime as verification evidence rather than feature 
   const source = readFileSync(gatePath, 'utf8');
   const stack = readFileSync(stackPath, 'utf8');
   assert.match(source, /--runtime-mode verification/u);
-  assert.match(source, /SEED_LOG_DIR="\$AURA_EVIDENCE_ROOT/u);
+  assert.match(source, /LOG="\$AURA_EVIDENCE_ROOT\/logs\//u);
   assert.match(stack, /export PW_ARTIFACT_DIR=\$evidence_root/u);
 });
