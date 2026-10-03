@@ -393,25 +393,27 @@ test.describe('Page Templates', () => {
         dataSources: { tableData: { model: 'page_schema' } },
       });
       await page.goto('/', { waitUntil: 'domcontentloaded' });
+      await expect(page.locator('header[data-hydrated]')).toHaveAttribute('data-hydrated', 'true');
       await page.getByTestId('lang-toggle').getByRole('button').click();
       await page
         .getByTestId('lang-dropdown')
         .getByRole('button', { name: english ? 'English' : '简体中文' })
         .click();
       const nav = page.locator('nav, aside, [role="navigation"]').first();
-      await nav.getByRole('button', { name: /元数据管理|Meta/i }).click();
-      await nav.locator('a[href="/p/page_schema"]').click();
+      const menu = nav.locator('a[href="/p/page_schema"]');
+      if (!(await menu.isVisible()))
+        await nav.getByRole('button', { name: /元数据管理|Meta/i }).click();
+      await expect(menu).toBeVisible();
+      await menu.click();
       const row = page.getByRole('row').filter({ hasText: source.name });
       await expect(row).toHaveCount(1);
       await row.getByTestId('row-action-more').click();
       await page.getByTestId('row-action-dropdown').getByTestId('row-action-edit_legacy').click();
       await expect(page).toHaveURL(`${BASE_URL}/page-designer/${source.pid}`);
       await expect(
-        page
-          .getByTestId('columns-tab')
-          .getByRole('heading', {
-            name: english ? 'Choose key columns, then order them' : '先选主列，再排阅读顺序',
-          }),
+        page.getByTestId('columns-tab').getByRole('heading', {
+          name: english ? 'Choose key columns, then order them' : '先选主列，再排阅读顺序',
+        }),
       ).toBeVisible();
       await page.getByTestId('column-item-0').click();
       const width = page.getByTestId('schema-config-field-width');
@@ -445,11 +447,9 @@ test.describe('Page Templates', () => {
       });
       await page.getByTestId('list-tab-toolbar').click();
       await expect(
-        page
-          .getByTestId('toolbar-tab')
-          .getByRole('heading', {
-            name: english ? 'Start with preset actions' : '先用预设动作占住主操作',
-          }),
+        page.getByTestId('toolbar-tab').getByRole('heading', {
+          name: english ? 'Start with preset actions' : '先用预设动作占住主操作',
+        }),
       ).toBeVisible();
       await page.getByTestId('toolbar-preset-refresh').check();
       await expect(page.getByTestId('preview-toolbar-refresh')).toHaveText(
