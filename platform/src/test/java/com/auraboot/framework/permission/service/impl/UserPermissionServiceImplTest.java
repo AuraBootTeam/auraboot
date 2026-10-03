@@ -32,6 +32,9 @@ class UserPermissionServiceImplTest {
     @Mock
     private com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog applicationRuntimeDefinitionCatalog;
 
+    @Mock
+    private com.auraboot.framework.application.security.AdminRoleChecker adminRoleChecker;
+
     @InjectMocks
     private UserPermissionServiceImpl service;
 

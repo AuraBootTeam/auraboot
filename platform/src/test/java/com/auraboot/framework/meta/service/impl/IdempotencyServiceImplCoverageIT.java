@@ -47,6 +47,7 @@ class IdempotencyServiceImplCoverageIT {
 
     private static final long TENANT_ID = 991_800_001L;
     private final AtomicLong seq = new AtomicLong();
+    private MetaContext.Snapshot testContext;
 
     @Autowired
     private IdempotencyService idempotencyService;
@@ -58,6 +59,7 @@ class IdempotencyServiceImplCoverageIT {
     @BeforeEach
     void setUp() {
         MetaContext.setContext(TENANT_ID, 991_800_002L, "idem-test-pid", "idem-test-user");
+        testContext = MetaContext.snapshot();
     }
 
     @AfterAll
@@ -194,7 +196,14 @@ class IdempotencyServiceImplCoverageIT {
     }
 
     private <T> T inTransaction(Supplier<T> work) {
-        return new TransactionTemplate(transactionManager).execute(status -> work.get());
+        MetaContext.Snapshot previous = MetaContext.snapshot();
+        MetaContext.restore(testContext);
+        try {
+            return new TransactionTemplate(transactionManager).execute(status -> work.get());
+        } finally {
+            if (previous == null) MetaContext.clear();
+            else MetaContext.restore(previous);
+        }
     }
 
     private void await(CountDownLatch latch) {

@@ -59,6 +59,9 @@ class CapabilityControllerEnforcementIT extends BaseIntegrationTest {
     @BeforeEach
     void cleanSlate() {
         grantTenantAdminRoleToTestUser();
+        // Denial of registered codes is distinct from the first-import admin allowance.
+        grantToTestRole(MetaPermission.ROLE_READ);
+        grantToTestRole(MetaPermission.ROLE_MANAGE);
         revokeFromTestRole(MetaPermission.ROLE_READ);
         revokeFromTestRole(MetaPermission.ROLE_MANAGE);
         userPermissionService.evictPermissionDefinitions(getTestTenant().getId());
