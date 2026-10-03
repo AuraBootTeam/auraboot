@@ -1167,17 +1167,17 @@
             "dictCode": "member_status"
           },
           {
+            "field": "created_at",
+            "width": 200,
+            "valueType": "datetime"
+          },
+          {
             "field": "join_date",
             "width": 140
           },
           {
             "field": "leave_date",
             "width": 140
-          },
-          {
-            "field": "created_at",
-            "width": 180,
-            "valueType": "datetime"
           }
         ],
         "selection": {
