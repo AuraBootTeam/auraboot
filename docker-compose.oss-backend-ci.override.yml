@@ -45,3 +45,9 @@ services:
       timeout: 5s
       retries: 30
       start_period: 20s
+
+networks:
+  default:
+    ipam:
+      config: !override
+        - subnet: ${AURA_OSS_CI_SUBNET:?CI runner must allocate a non-overlapping subnet}

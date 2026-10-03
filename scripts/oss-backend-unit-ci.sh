@@ -79,6 +79,11 @@ command -v docker >/dev/null 2>&1 || environment_invalid 'docker is unavailable'
 command -v timeout >/dev/null 2>&1 || environment_invalid 'timeout is unavailable'
 docker compose version >/dev/null 2>&1 || environment_invalid 'docker compose v2 is unavailable'
 docker info >/dev/null 2>&1 || environment_invalid 'Docker daemon is unavailable to the CI account'
+AURA_OSS_CI_SUBNET="$(node "$SCRIPT_DIR/lib/oss-ci-subnet.mjs")" \
+  || environment_invalid 'cannot allocate a private subnet without overlapping retained networks or host routes'
+[[ -n "$AURA_OSS_CI_SUBNET" ]] || environment_invalid 'CI subnet allocator returned no subnet'
+export AURA_OSS_CI_SUBNET
+printf '%s\n' "$AURA_OSS_CI_SUBNET" > "$ARTIFACTS/compose-subnet.txt"
 docker compose "${COMPOSE_ARGS[@]}" config --quiet \
   || environment_invalid 'submitted PostgreSQL/Redis/Kafka Compose inputs are invalid'
 
