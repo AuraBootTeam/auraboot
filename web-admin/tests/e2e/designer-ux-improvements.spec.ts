@@ -9,7 +9,7 @@
  * #5: BPMN Canvas drag feedback
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
 // Match the product's localized accessible names without changing its locale.
 const DATA_TABLE = /Data Table|数据表格/;
@@ -19,7 +19,23 @@ const MOVE_UP = /^(Move up|上移)$/;
 const MOVE_DOWN = /^(Move down|下移)$/;
 const DELETE = /^(Delete|删除)$/;
 
+// SSR markup alone is not proof that the interactive designer is ready.
+async function openDesigner(page: Page, route: string) {
+  await page.goto(route, { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
+  const rootId = route === '/bpm/designer' ? 'bpmn-designer-workspace'
+    : route === '/dashboard-designer' ? 'designer-canvas' : 'report-canvas';
+  const root = page.getByTestId(rootId);
+  await expect(root).toHaveCount(1);
+  await expect(root).toBeVisible();
+}
+
 test.afterEach(async ({ page }, testInfo) => {
+  if (testInfo.status === testInfo.expectedStatus) {
+    await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
+    await expect(page.getByTestId('route-loading-fallback')).toHaveCount(0);
+    await expect(page.getByTestId('dashboard-widget-loading')).toHaveCount(0);
+  }
   await page.screenshot({ path: testInfo.outputPath('designer-ux-terminal.png'), fullPage: true });
 });
 
@@ -29,7 +45,7 @@ test.afterEach(async ({ page }, testInfo) => {
 
 test.describe('Report Designer — Block Drag Reorder (#1)', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/report-designer', { waitUntil: 'domcontentloaded' });
+    await openDesigner(page, '/report-designer');
     await expect(page.getByTestId('block-palette')).toBeVisible();
     await expect(page.getByTestId('report-canvas')).toBeVisible();
   });
@@ -112,7 +128,7 @@ test.describe('Report Designer — Block Drag Reorder (#1)', () => {
 
 test.describe('Designer i18n (#2)', () => {
   test('report designer empty state renders localized text', async ({ page }) => {
-    await page.goto('/report-designer', { waitUntil: 'domcontentloaded' });
+    await openDesigner(page, '/report-designer');
     // Navigation may briefly retain the previous route tree during hydration.
     // Keep uniqueness as an assertion rather than silently selecting one canvas.
     await expect(page.getByTestId('report-canvas')).toHaveCount(1);
@@ -130,15 +146,14 @@ test.describe('Designer i18n (#2)', () => {
   });
 
   test('dashboard designer empty state renders localized text', async ({ page }) => {
-    await page.goto('/dashboard-designer', { waitUntil: 'domcontentloaded' });
+    await openDesigner(page, '/dashboard-designer');
     // Wait for the canvas
     await expect(page.getByTestId('designer-canvas')).toBeVisible({ timeout: 15000 });
 
     // Check the empty state component
     const emptyState = page.getByTestId('dashboard-canvas-empty');
-    // Dashboard may or may not have widgets — only check if empty
-    const isEmpty = await emptyState.isVisible().catch(() => false);
-    if (isEmpty) {
+    await expect(emptyState).toBeVisible();
+    {
       const text = await emptyState.textContent();
       expect(text?.length).toBeGreaterThan(5);
       expect(text).not.toContain('designer.');
@@ -146,7 +161,7 @@ test.describe('Designer i18n (#2)', () => {
   });
 
   test('dashboard widget palette shows localized text', async ({ page }) => {
-    await page.goto('/dashboard-designer', { waitUntil: 'domcontentloaded' });
+    await openDesigner(page, '/dashboard-designer');
     await expect(page.getByTestId('widget-palette')).toBeVisible({ timeout: 15000 });
 
     // Header should show localized text, not hardcoded Chinese or raw keys
@@ -163,7 +178,7 @@ test.describe('Designer i18n (#2)', () => {
 
 test.describe('Dashboard Designer — Drag Preview (#3)', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/dashboard-designer', { waitUntil: 'domcontentloaded' });
+    await openDesigner(page, '/dashboard-designer');
     await expect(page.getByTestId('widget-palette')).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId('designer-canvas')).toBeVisible();
   });
@@ -181,20 +196,22 @@ test.describe('Dashboard Designer — Drag Preview (#3)', () => {
     const widgetBox = await firstWidget.boundingBox();
     const canvasBox = await canvas.boundingBox();
 
-    if (widgetBox && canvasBox) {
-      await page.mouse.move(widgetBox.x + widgetBox.width / 2, widgetBox.y + widgetBox.height / 2);
-      await page.mouse.down();
-      await page.mouse.move(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2, {
-        steps: 5,
-      });
+    expect(widgetBox).not.toBeNull();
+    expect(canvasBox).not.toBeNull();
+    if (!widgetBox || !canvasBox) throw new Error('Visible drag source and canvas need bounds');
+    const widgets = canvas.locator('[data-widget-id]');
+    const beforeCount = await widgets.count();
+    await page.mouse.move(widgetBox.x + widgetBox.width / 2, widgetBox.y + widgetBox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2, { steps: 5 });
+    // HTML dragover requires movement after entering the destination.
+    await page.mouse.move(canvasBox.x + canvasBox.width / 2 + 1, canvasBox.y + canvasBox.height / 2 + 1);
+    await expect(canvas).toHaveClass(/ring-blue-300/);
+    await expect(page.getByTestId('drop-preview')).toBeVisible();
+    await page.mouse.up();
+    await expect(widgets).toHaveCount(beforeCount + 1);
+    await expect(page.getByTestId('drop-preview')).toHaveCount(0);
 
-      // The canvas should have the drag-over styling (ring-2 ring-blue-300)
-      // Check that canvas is in drag-over state via class
-      const canvasClasses = await canvas.getAttribute('class');
-      // Drop preview element may or may not be visible depending on timing
-      // But the canvas should at minimum accept the drag
-      await page.mouse.up();
-    }
   });
 
   test('widget palette items should have pre-rendered drag preview refs', async ({ page }) => {
@@ -213,7 +230,7 @@ test.describe('Dashboard Designer — Drag Preview (#3)', () => {
 
 test.describe('Unified Empty State (#4)', () => {
   test('report designer shows dashed variant empty state', async ({ page }) => {
-    await page.goto('/report-designer', { waitUntil: 'domcontentloaded' });
+    await openDesigner(page, '/report-designer');
     // Navigation may briefly retain the previous route tree during hydration.
     // Keep uniqueness as an assertion rather than silently selecting one canvas.
     await expect(page.getByTestId('report-canvas')).toHaveCount(1);
@@ -228,12 +245,12 @@ test.describe('Unified Empty State (#4)', () => {
   });
 
   test('dashboard designer shows subtle variant empty state', async ({ page }) => {
-    await page.goto('/dashboard-designer', { waitUntil: 'domcontentloaded' });
+    await openDesigner(page, '/dashboard-designer');
     await expect(page.getByTestId('designer-canvas')).toBeVisible({ timeout: 15000 });
 
     const emptyState = page.getByTestId('dashboard-canvas-empty');
-    const isEmpty = await emptyState.isVisible().catch(() => false);
-    if (isEmpty) {
+    await expect(emptyState).toBeVisible();
+    {
       // Subtle variant should NOT have border-dashed
       const classes = await emptyState.getAttribute('class');
       expect(classes).not.toContain('border-dashed');
@@ -241,7 +258,7 @@ test.describe('Unified Empty State (#4)', () => {
   });
 
   test('empty state disappears when blocks are added', async ({ page }) => {
-    await page.goto('/report-designer', { waitUntil: 'domcontentloaded' });
+    await openDesigner(page, '/report-designer');
     await expect(page.getByTestId('report-canvas-empty')).toBeVisible();
 
     // Add a block
@@ -264,7 +281,7 @@ test.describe('Unified Empty State (#4)', () => {
 test.describe('BPMN Designer — Drag Feedback (#5)', () => {
   test.beforeEach(async ({ page }) => {
     // Navigate to BPMN designer — may need to go through menu or direct URL
-    await page.goto('/bpm/designer', { waitUntil: 'domcontentloaded' });
+    await openDesigner(page, '/bpm/designer');
     await expect(page.locator('.react-flow')).toBeVisible({ timeout: 15000 });
   });
 
@@ -288,7 +305,7 @@ test.describe('BPMN Designer — Drag Feedback (#5)', () => {
 
 test.describe('Report Designer — BlockActionBar (#1 refactoring)', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/report-designer');
+    await openDesigner(page, '/report-designer');
     await expect(page.getByTestId('block-palette')).toBeVisible();
     await expect(page.getByTestId('report-canvas')).toBeVisible();
   });
