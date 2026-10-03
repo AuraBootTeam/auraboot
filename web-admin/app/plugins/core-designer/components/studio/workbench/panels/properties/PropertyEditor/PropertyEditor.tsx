@@ -3,6 +3,7 @@
  * 动态属性编辑器，支持不同类型的属性输入控件
  */
 
+import { usePropertyEditorText } from './propertyEditorI18n';
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { PropertyGroup } from '~/plugins/core-designer/components/studio/workbench/panels/properties/PropertyEditor/PropertyGroup';
 import { PropertyInput } from '~/plugins/core-designer/components/studio/workbench/panels/properties/PropertyEditor/PropertyInput';
@@ -28,6 +29,7 @@ export const PropertyEditor: React.FC<PropertyEditorProps> = ({
   onValidationError,
 }) => {
   const lt = useLocalizedText();
+  const text = usePropertyEditorText();
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['basic']));
 
@@ -104,32 +106,32 @@ export const PropertyEditor: React.FC<PropertyEditorProps> = ({
         switch (rule.type) {
           case 'required':
             if (rule.value && (value === undefined || value === null || value === '')) {
-              return rule.message || `${translatedLabel} 是必填项`;
+              return rule.message || text('required', { label: translatedLabel, value: rule.value });
             }
             break;
           case 'minLength':
             if (typeof value === 'string' && value.length < rule.value) {
-              return rule.message || `${translatedLabel} 最少需要 ${rule.value} 个字符`;
+              return rule.message || text('minLength', { label: translatedLabel, value: rule.value });
             }
             break;
           case 'maxLength':
             if (typeof value === 'string' && value.length > rule.value) {
-              return rule.message || `${translatedLabel} 最多允许 ${rule.value} 个字符`;
+              return rule.message || text('maxLength', { label: translatedLabel, value: rule.value });
             }
             break;
           case 'min':
             if (typeof value === 'number' && value < rule.value) {
-              return rule.message || `${translatedLabel} 最小值为 ${rule.value}`;
+              return rule.message || text('min', { label: translatedLabel, value: rule.value });
             }
             break;
           case 'max':
             if (typeof value === 'number' && value > rule.value) {
-              return rule.message || `${translatedLabel} 最大值为 ${rule.value}`;
+              return rule.message || text('max', { label: translatedLabel, value: rule.value });
             }
             break;
           case 'pattern':
             if (typeof value === 'string' && !new RegExp(rule.value).test(value)) {
-              return rule.message || `${translatedLabel} 格式不正确`;
+              return rule.message || text('pattern', { label: translatedLabel, value: rule.value });
             }
             break;
         }
@@ -137,7 +139,7 @@ export const PropertyEditor: React.FC<PropertyEditorProps> = ({
 
       return null;
     },
-    [lt],
+    [lt, text],
   );
 
   // 处理属性值变更
@@ -226,18 +228,18 @@ export const PropertyEditor: React.FC<PropertyEditorProps> = ({
   // 获取组的显示信息
   const getGroupInfo = (groupName: string) => {
     const groupMap: Record<string, { title: string; icon?: string; description?: string }> = {
-      basic: { title: '基础属性', icon: '⚙️', description: '组件的基本配置' },
-      validation: { title: '验证规则', icon: '✅', description: '输入验证和约束' },
-      style: { title: '外观样式', icon: '🎨', description: '组件的视觉样式' },
-      behavior: { title: '行为配置', icon: '⚡', description: '组件的交互行为' },
-      data: { title: '数据配置', icon: '📊', description: '数据源和绑定' },
+      basic: { title: text('basicTitle'), icon: '⚙️', description: text('basicDescription') },
+      validation: { title: text('validationTitle'), icon: '✅', description: text('validationDescription') },
+      style: { title: text('styleTitle'), icon: '🎨', description: text('styleDescription') },
+      behavior: { title: text('behaviorTitle'), icon: '⚡', description: text('behaviorDescription') },
+      data: { title: text('dataTitle'), icon: '📊', description: text('dataDescription') },
     };
 
     return groupMap[groupName] || { title: groupName };
   };
 
   if (!component || !config) {
-    return <div className="p-4 text-center text-gray-500">请选择一个组件进行属性编辑</div>;
+    return <div className="p-4 text-center text-gray-500">{text('empty')}</div>;
   }
 
   return (

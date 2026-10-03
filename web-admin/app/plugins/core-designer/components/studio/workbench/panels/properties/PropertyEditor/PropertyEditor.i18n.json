@@ -1,0 +1,90 @@
+{
+  "required": {
+    "zh-CN": "{label} 是必填项",
+    "en": "{label} is required"
+  },
+  "minLength": {
+    "zh-CN": "{label} 最少需要 {value} 个字符",
+    "en": "{label} requires at least {value} characters"
+  },
+  "maxLength": {
+    "zh-CN": "{label} 最多允许 {value} 个字符",
+    "en": "{label} allows at most {value} characters"
+  },
+  "min": {
+    "zh-CN": "{label} 最小值为 {value}",
+    "en": "{label} must be at least {value}"
+  },
+  "max": {
+    "zh-CN": "{label} 最大值为 {value}",
+    "en": "{label} must be at most {value}"
+  },
+  "pattern": {
+    "zh-CN": "{label} 格式不正确",
+    "en": "{label} has an invalid format"
+  },
+  "basicTitle": {
+    "zh-CN": "基础属性",
+    "en": "Basic properties"
+  },
+  "basicDescription": {
+    "zh-CN": "组件的基本配置",
+    "en": "Basic component configuration"
+  },
+  "validationTitle": {
+    "zh-CN": "验证规则",
+    "en": "Validation rules"
+  },
+  "validationDescription": {
+    "zh-CN": "输入验证和约束",
+    "en": "Input validation and constraints"
+  },
+  "styleTitle": {
+    "zh-CN": "外观样式",
+    "en": "Appearance"
+  },
+  "styleDescription": {
+    "zh-CN": "组件的视觉样式",
+    "en": "Component appearance"
+  },
+  "behaviorTitle": {
+    "zh-CN": "行为配置",
+    "en": "Behavior"
+  },
+  "behaviorDescription": {
+    "zh-CN": "组件的交互行为",
+    "en": "Component interactions"
+  },
+  "dataTitle": {
+    "zh-CN": "数据配置",
+    "en": "Data"
+  },
+  "dataDescription": {
+    "zh-CN": "数据源和绑定",
+    "en": "Data sources and bindings"
+  },
+  "empty": {
+    "zh-CN": "请选择一个组件进行属性编辑",
+    "en": "Select a component to edit its properties"
+  },
+  "enter": {
+    "zh-CN": "请输入{label}",
+    "en": "Enter {label}"
+  },
+  "select": {
+    "zh-CN": "请选择{label}",
+    "en": "Select {label}"
+  },
+  "array": {
+    "zh-CN": "请输入JSON格式的数组，如: [1, 2, 3]",
+    "en": "Enter a JSON array, e.g. [1, 2, 3]"
+  },
+  "object": {
+    "zh-CN": "请输入JSON格式的对象，如: {\"key\": \"value\"}",
+    "en": "Enter a JSON object, e.g. {\"key\": \"value\"}"
+  },
+  "loading": {
+    "zh-CN": "加载中...",
+    "en": "Loading..."
+  }
+}
