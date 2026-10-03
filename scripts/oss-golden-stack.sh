@@ -368,6 +368,23 @@ cmd_up() {
   mkdir -p "$evidence_root/logs"
   ln -sfn "$evidence_root/logs" "$sd/logs"
   printf '%s\n' "$evidence_root" >"$sd/evidence-root"
+  # Keep historical callers' log paths usable without keeping another copy of current logs.
+  python3 - "$sd" "$evidence_root" <<'PYLOG'
+import os
+import shutil
+import sys
+sd, evidence = sys.argv[1:]
+for name in ("backend.log", "frontend.log", "bootjar.log", "import.log", "warm.log"):
+    old = os.path.join(sd, name)
+    if os.path.lexists(old):
+        if os.path.islink(old):
+            os.unlink(old)
+        else:
+            archive = os.path.join(evidence, "legacy-logs")
+            os.makedirs(archive, exist_ok=True)
+            shutil.move(old, os.path.join(archive, name))
+    os.symlink(os.path.join("logs", name), old)
+PYLOG
   "$DEV" infra ensure "$name" --yes >/dev/null
 
   local server_port vite_port bff_port pg_db redis_db pg_host pg_port pg_user pg_pass
