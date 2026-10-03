@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.meta.dto.AuditTrailEvent;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.module.meta.event.CommandCompletedEvent;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -14,6 +15,8 @@ import org.springframework.util.StringUtils;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 /**
  * Listens for CommandCompletedEvent and records a tamper-proof audit trail entry.
@@ -38,8 +41,17 @@ public class AuditTrailEventListener {
     @Async("eventTaskExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onCommandCompleted(CommandCompletedEvent event) {
+        MetaContext.Snapshot caller = MetaContext.snapshot();
         try {
             AuditTrailEvent auditEvent = buildAuditEvent(event);
+            Long tenantId = Objects.requireNonNull(auditEvent.getTenantId(),
+                    "Command audit event requires a tenant");
+            // AFTER_COMMIT may enqueue after the publisher's thread context has
+            // ended. Bind the immutable event identity without inheriting roles
+            // or an unrelated caller's environment/member scope.
+            MetaContext.restore(new MetaContext.Snapshot(
+                    tenantId, auditEvent.getActorId(), null, auditEvent.getActorName(),
+                    Set.of(), null, null, null, null));
             auditTrailService.recordAudit(auditEvent);
         } catch (Exception e) {
             // Audit trail failures must never break the main flow.
@@ -47,6 +59,12 @@ public class AuditTrailEventListener {
             log.error("Failed to record audit trail for command={}, model={}, record={}: {}",
                     event.getCommandCode(), event.getModelCode(),
                     event.getRecordId(), e.getMessage(), e);
+        } finally {
+            if (caller == null) {
+                MetaContext.clear();
+            } else {
+                MetaContext.restore(caller);
+            }
         }
     }
 
