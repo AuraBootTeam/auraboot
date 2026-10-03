@@ -186,6 +186,12 @@ export default defineConfig({
       ],
     },
     proxy: {
+      '^/(swagger-ui(?:/|$)|v3/api-docs(?:/|$))': {
+        target: bffProxyTarget,
+        changeOrigin: true,
+        xfwd: true,
+        secure: false,
+      },
       '/api/notifications/stream': {
         target: bffProxyTarget,
         changeOrigin: true,

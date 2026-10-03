@@ -407,6 +407,10 @@ app.post(
 // Gateway 会处理认证、RBAC、租户隔离，然后转发到相应的服务
 app.use('/api', proxyService.createProxyMiddleware());
 
+// Keep API reference assets and schemas on the browser origin in both dev and
+// production. Backend security still decides access to the documentation.
+app.get(/^\/(swagger-ui(?:\/|$)|v3\/api-docs(?:\/|$))/, proxyService.createProxyMiddleware());
+
 // 健康检查端点
 app.get('/health', async (req, res) => {
   try {

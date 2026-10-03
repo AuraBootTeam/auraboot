@@ -883,9 +883,8 @@ test.describe('Open Platform golden journey', () => {
     const apiReference = await popupPromise;
     await apiReference.waitForLoadState('domcontentloaded');
     await expect(apiReference).toHaveURL(
-      /swagger-ui\/index\.html\?urls\.primaryName=open-platform/,
+      `${WEB_BASE_URL}/swagger-ui/index.html?urls.primaryName=open-platform`,
     );
-    await apiReference.goto(`${BACKEND_URL}/swagger-ui/index.html?urls.primaryName=open-platform`);
     await expect(apiReference.locator('.opblock').first()).toBeVisible({ timeout: 30_000 });
     await expect(apiReference.locator('body')).not.toContainText(
       /Whitelabel Error Page|404 Not Found|Loading page configuration/,
