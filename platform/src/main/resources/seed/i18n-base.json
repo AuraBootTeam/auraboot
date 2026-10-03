@@ -4107,8 +4107,18 @@
   },
   {
     "key": "admin.permission.capability.partialV2",
-    "zh-CN": "部分授权，勾选可补齐",
-    "en-US": "Partially granted; select to complete"
+    "zh-CN": "部分动作已授权",
+    "en-US": "Some actions granted"
+  },
+  {
+    "key": "admin.permission.capability.partialActionsV2",
+    "zh-CN": "部分动作 {granted}/{total}",
+    "en-US": "Actions {granted}/{total}"
+  },
+  {
+    "key": "admin.permission.capability.partialGuidanceV2",
+    "zh-CN": "部分动作可能来自其他能力的共享依赖，不代表该能力已完整可用。勾选可补齐，撤销影响以保存前预览为准。",
+    "en-US": "Some actions may be shared dependencies of other capabilities. Partial actions do not grant the complete capability. Select to complete; review revocation effects before saving."
   },
   {
     "key": "admin.permission.capability.noneV2",

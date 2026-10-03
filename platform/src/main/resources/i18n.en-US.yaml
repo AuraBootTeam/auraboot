@@ -1764,7 +1764,9 @@ aurabot:
 "admin.permission.editor.roleHint": "Select business capabilities, then review and save. Data scope controls which records can be accessed."
 "admin.permission.advanced.colCoverage": "Capability coverage"
 
-"admin.permission.capability.partialV2": "Partially granted; select to complete"
+"admin.permission.capability.partialV2": "Some actions granted"
+"admin.permission.capability.partialActionsV2": "Actions {granted}/{total}"
+"admin.permission.capability.partialGuidanceV2": "Some actions may be shared dependencies of other capabilities. Partial actions do not grant the complete capability. Select to complete; review revocation effects before saving."
 "admin.permission.capability.noneV2": "Not granted"
 "admin.permission.capability.fullV2": "Fully granted"
 "admin.permission.capability.relatedMenusV2": "Related menus"

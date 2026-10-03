@@ -2070,7 +2070,9 @@ aurabot:
 "admin.permission.editor.roleHint": "选择业务能力，核对变更后保存；数据范围决定能访问哪些记录。"
 "admin.permission.advanced.colCoverage": "能力覆盖"
 
-"admin.permission.capability.partialV2": "部分授权，勾选可补齐"
+"admin.permission.capability.partialV2": "部分动作已授权"
+"admin.permission.capability.partialActionsV2": "部分动作 {granted}/{total}"
+"admin.permission.capability.partialGuidanceV2": "部分动作可能来自其他能力的共享依赖，不代表该能力已完整可用。勾选可补齐，撤销影响以保存前预览为准。"
 "admin.permission.capability.noneV2": "未授权"
 "admin.permission.capability.fullV2": "完整授权"
 "admin.permission.capability.relatedMenusV2": "相关菜单"

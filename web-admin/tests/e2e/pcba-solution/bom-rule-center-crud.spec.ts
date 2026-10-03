@@ -422,7 +422,7 @@ test('category metadata: duplicate category fails safely without changing the ex
       .toEqual(attributeRows);
     const recipe = parse(row.bom_cm_match_text_recipe_json);
     expect(projections.recipe.filter(record => record.purpose === 'field').map(record => record.attribute)).toEqual(recipe.fields);
-    expect(projections.veto.map(({ attribute, comparison, tolerance_percent }) => ({ attribute, comparison, tolerance_percent })))
+    expect(projections.veto.map(({ attribute, comparison, tolerance_percent }) => ({ attribute, comparison, tolerance_percent: tolerance_percent ?? null })))
       .toEqual(parse(row.bom_cm_veto_attrs_json).map((veto: any) => ({ attribute: veto.attr, comparison: veto.op, tolerance_percent: veto.tol === undefined ? null : veto.tol * 100 })));
     const block = (suffix: string) => client.locator(`[data-aura-block-id="bom_category_policy_${suffix}"]`);
     await expect(client.getByTestId('form-field-bom_cm_category')).toContainText(categoryLabel);
@@ -447,10 +447,20 @@ test('category metadata: duplicate category fails safely without changing the ex
     }
     for (const suffix of policyQueries)
       await expect(block(suffix)).not.toContainText(/resistance_ohms|capacitance_farads|weighted_average|eq_tol|policyId|\{"/);
+    await expect(client.getByTestId('export-pdf-button')).toHaveCount(0);
     await expect(client.getByTestId('toolbar-btn-edit')).toHaveCount(0);
     await expect(client.getByTestId('toolbar-btn-delete')).toHaveCount(0);
     await expect(client.locator('main input:not([readonly]):not([disabled]), main textarea:not([readonly]):not([disabled]), main [contenteditable="true"]')).toHaveCount(0);
-    await client.screenshot({ path: info.outputPath(`category-${row.bom_cm_category}-${reader ? 'reader' : 'admin'}-detail.png`), fullPage: true });
+    for (const suffix of policyQueries) {
+      const heading = client.locator(`[data-aura-block-id="bom_category_policy_${suffix}_heading"]`);
+      await block(suffix).scrollIntoViewIfNeeded();
+      await block(suffix).evaluate(element => element.scrollIntoView({ block: 'center' }));
+      await expect(heading).toBeInViewport({ ratio: 1 });
+      await expect(block(suffix)).toBeInViewport({ ratio: 1 });
+      await client.screenshot({ path: info.outputPath(`category-${row.bom_cm_category}-${reader ? 'reader' : 'admin'}-${suffix}.png`) });
+    }
+    await client.getByTestId('form-field-bom_cm_category').scrollIntoViewIfNeeded();
+    await client.screenshot({ path: info.outputPath(`category-${row.bom_cm_category}-${reader ? 'reader' : 'admin'}-detail.png`) });
   };
   await openCategory(page, before[0], '电阻', false);
   await openCategory(page, capacitors[0], '电容', false);

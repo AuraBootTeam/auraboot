@@ -174,6 +174,7 @@ test('capability draft survives failed save and canceled navigation', async ({ p
   expect(
     after.flatMap((g: any) => g.capabilities).find((c: any) => c.code === cap.code).granted,
   ).toBe(false);
+  await checkbox.scrollIntoViewIfNeeded();
   await page.screenshot({ path: info.outputPath('02-draft-save-error.png'), fullPage: true });
   await page.unroute('**/api/permission/capabilities?**');
   await page.getByTestId('permission-right-tab-members').click();
@@ -297,6 +298,13 @@ test('partial revocation retains selected shared actions and completion persists
   );
   const checkbox = page.getByTestId(`capability-checkbox-${manage.code}`);
   await expect(checkbox).toHaveAttribute('aria-checked', 'mixed');
+  const partialSnapshot = (await readCaps()).find((cap: any) => cap.code === manage.code);
+  await expect(page.getByTestId(`capability-partial-${manage.code}`)).toContainText(
+    `${partialSnapshot.includes.length - partialSnapshot.missingCodes.length}/${partialSnapshot.includes.length}`,
+  );
+  await expect(page.getByTestId('capability-partial-guidance')).toHaveCount(1);
+  await checkbox.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: info.outputPath('partial-actions-status.png') });
   await expect(page.getByTestId(`capability-checkbox-${view.code}`)).toBeChecked();
   await expect(page.getByTestId('capability-save')).toBeDisabled();
   await page.getByTestId(`capability-revoke-partial-${manage.code}`).click();
@@ -357,6 +365,7 @@ test('partial revocation retains selected shared actions and completion persists
   await page.getByTestId(`role-item-${role.code}`).click();
   await expect(checkbox).toBeChecked();
   await expect(page.getByTestId('data-scope-bar')).not.toContainText(/加载中|Loading/i);
+  await checkbox.scrollIntoViewIfNeeded();
   await page.screenshot({
     path: info.outputPath('partial-completed-persisted.png'),
     fullPage: true,

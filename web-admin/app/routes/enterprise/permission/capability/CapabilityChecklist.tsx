@@ -38,6 +38,25 @@ export default function CapabilityChecklist({
       data-testid="capability-checklist"
       className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2"
     >
+      {groups.some((group) =>
+        group.capabilities.some(
+          (cap) =>
+            cap.authorizationState === 'partial' &&
+            !selectedSet.has(cap.code) &&
+            !revokedPartial.includes(cap.code),
+        ),
+      ) && (
+        <p
+          data-testid="capability-partial-guidance"
+          className="text-text-2 col-span-full text-xs leading-5"
+        >
+          {t(
+            'admin.permission.capability.partialGuidanceV2',
+            undefined,
+            'Some actions may be shared dependencies of other capabilities. Partial actions do not grant the complete capability. Select to complete; review revocation effects before saving.',
+          )}
+        </p>
+      )}
       {groups.map((group) => {
         const total = group.capabilities.length;
         const granted = group.capabilities.filter((cap) => selectedSet.has(cap.code)).length;
@@ -100,9 +119,12 @@ export default function CapabilityChecklist({
                             className="text-xs text-amber-700"
                           >
                             {t(
-                              'admin.permission.capability.partialV2',
-                              { count: cap.missingCodes?.length ?? 0 },
-                              'Partially granted; select to complete',
+                              'admin.permission.capability.partialActionsV2',
+                              {
+                                granted: cap.includes.length - (cap.missingCodes?.length ?? 0),
+                                total: cap.includes.length,
+                              },
+                              `Actions ${cap.includes.length - (cap.missingCodes?.length ?? 0)}/${cap.includes.length}`,
                             )}
                           </span>
                         )}
@@ -115,34 +137,34 @@ export default function CapabilityChecklist({
                           🔒
                         </span>
                       )}
+                      {cap.authorizationState === 'partial' &&
+                        onRevokePartial &&
+                        !selectedSet.has(cap.code) && (
+                          <button
+                            type="button"
+                            data-testid={`capability-revoke-partial-${cap.code}`}
+                            disabled={disabled}
+                            onClick={() => onRevokePartial(cap.code)}
+                            className={
+                              revokedPartial.includes(cap.code)
+                                ? 'text-left text-xs text-amber-700 hover:underline'
+                                : 'text-left text-xs text-gray-500 hover:text-red-700 hover:underline'
+                            }
+                          >
+                            {revokedPartial.includes(cap.code)
+                              ? t(
+                                  'admin.permission.capability.undoRevokeV2',
+                                  undefined,
+                                  'Pending revocation · undo',
+                                )
+                              : t(
+                                  'admin.permission.capability.revokePartialV2',
+                                  undefined,
+                                  'Revoke existing grants',
+                                )}
+                          </button>
+                        )}
                     </span>
-                    {cap.authorizationState === 'partial' &&
-                      onRevokePartial &&
-                      !selectedSet.has(cap.code) && (
-                        <button
-                          type="button"
-                          data-testid={`capability-revoke-partial-${cap.code}`}
-                          disabled={disabled}
-                          onClick={() => onRevokePartial(cap.code)}
-                          className={
-                            revokedPartial.includes(cap.code)
-                              ? 'text-left text-xs text-amber-700 hover:underline'
-                              : 'text-left text-xs text-gray-500 hover:text-red-700 hover:underline'
-                          }
-                        >
-                          {revokedPartial.includes(cap.code)
-                            ? t(
-                                'admin.permission.capability.undoRevokeV2',
-                                undefined,
-                                'Pending revocation · undo',
-                              )
-                            : t(
-                                'admin.permission.capability.revokePartialV2',
-                                undefined,
-                                'Revoke existing grants',
-                              )}
-                        </button>
-                      )}
                     {onConfigureScope && scopeConfigurableCodes?.has(cap.code) && (
                       <button
                         type="button"
