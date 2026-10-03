@@ -56,3 +56,19 @@ test('gate retains runtime while logs and Playwright outputs use independent rou
   assert.match(source, /export PW_REPORT_DIR=\$evidence_root/);
   assert.match(source, /<maxFileSize>10MB<\/maxFileSize>/);
 });
+
+test('log compatibility pointers preserve old bytes and point into each independent round', (t) => {
+  const { root, sd } = fixture(t);
+  const helper = source.split("<<'PYLOG'\n")[1].split('\nPYLOG')[0];
+  const first = join(root, 'evidence/first'); const second = join(root, 'evidence/second');
+  for (const round of [first, second]) mkdirSync(join(round, 'logs'), { recursive: true });
+  writeFileSync(join(sd, 'backend.log'), 'legacy bytes');
+  execFileSync('python3', ['-c', helper, sd, first]);
+  writeFileSync(join(first, 'logs/backend.log'), 'first round');
+  assert.equal(readFileSync(join(sd, 'backend.log'), 'utf8'), 'first round');
+  assert.equal(readFileSync(join(first, 'legacy-logs/backend.log'), 'utf8'), 'legacy bytes');
+  execFileSync('python3', ['-c', helper, sd, second]);
+  writeFileSync(join(second, 'logs/backend.log'), 'second round');
+  assert.equal(readFileSync(join(sd, 'backend.log'), 'utf8'), 'second round');
+  assert.equal(readFileSync(join(first, 'logs/backend.log'), 'utf8'), 'first round');
+});
