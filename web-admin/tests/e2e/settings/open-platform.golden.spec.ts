@@ -259,7 +259,9 @@ test.describe('Open Platform golden journey', () => {
       expect(browserTokenResponse.status()).toBe(200);
       const browserToken = await browserTokenResponse.json();
       expect(browserToken.token_type).toBe('Bearer');
-      await expect(authorizationDialog.getByRole('button', { name: 'Logout', exact: true })).toBeVisible();
+      await expect(oauthAuthorization.getByRole('button', {
+        name: 'Remove authorization', exact: true,
+      })).toBeVisible();
       await oauthAuthorization.getByRole('button', { name: 'Close', exact: true }).click();
       await expect(authorizationDialog).toHaveCount(0);
       const whoamiOperation = authorizedReference.locator('.opblock').filter({
