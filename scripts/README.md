@@ -246,6 +246,10 @@ Co-located `*.test.mjs`; run via the repo test task. Not listed individually.
 
 ## Package distribution self-tests
 
+`pnpm test:open-platform-tools` validates the shared probe transport and independent webhook
+receiver, requires an invalid-signature mutation to fail, and verifies restoration. See
+[`ci/README.md`](ci/README.md) for receiver operation and the explicitly unverified deployed-target scope.
+
 `pnpm test:package-distribution` runs `test-package-distribution.py`: rejects missing or competing license text, retired v1.3 text, metadata/identity/privacy drift, missing exports and README mismatch. The pack gate also executes `fixtures/open-platform-consumer/consumer.test.mjs` and typechecks `fixtures/open-platform-consumer/consumer-ts-check.ts` against a freshly installed tarball outside the repositories. These contract tests use a loopback fixture server; they do not certify a staging deployment.
 
 | script | refs | updated | purpose |

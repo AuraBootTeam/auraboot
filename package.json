@@ -23,6 +23,7 @@
     "validate:scripts-index": "node scripts/check-scripts-index.mjs",
     "validate:package-distribution": "python3 scripts/check-package-distribution.py",
     "test:package-distribution": "python3 scripts/test-package-distribution.py",
+    "test:open-platform-tools": "node scripts/open-platform-canary-tools.test.mjs && node scripts/open-platform-release-image-contract.test.mjs",
     "test:airflow-provider": "bash scripts/check-airflow-provider-coverage.sh"
   },
   "devDependencies": {
