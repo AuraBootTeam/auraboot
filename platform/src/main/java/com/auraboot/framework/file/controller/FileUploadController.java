@@ -246,7 +246,8 @@ public class FileUploadController {
     }
 
     private boolean isInlineDisplayType(MediaType contentType) {
-        return "image".equalsIgnoreCase(contentType.getType());
+        return "image".equalsIgnoreCase(contentType.getType())
+                || MediaType.APPLICATION_PDF.includes(contentType);
     }
 
     private String downloadFileName(FileEntity fileEntity, String fileId) {

@@ -172,6 +172,8 @@ class DynamicDataAnalyticsCoverageIT extends BaseIntegrationTest {
         assertNotNull(result);
         assertEquals(Boolean.TRUE, result.getSuccess(), String.valueOf(result.getFilePath()));
         assertEquals(3L, result.getRecordCount());
+        assertNotNull(result.getRowSetDigest());
+        assertEquals(64, result.getRowSetDigest().length());
     }
 
     private String pidByName(String name) {

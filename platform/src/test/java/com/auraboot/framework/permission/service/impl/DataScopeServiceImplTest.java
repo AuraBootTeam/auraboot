@@ -8,6 +8,8 @@ import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.organization.service.OrganizationService;
 import com.auraboot.framework.permission.engine.model.DataScopeCondition;
 import com.auraboot.framework.permission.entity.RoleDataScope;
+import com.auraboot.framework.exception.RootUnCheckedException;
+import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.permission.mapper.RoleDataScopeMapper;
 import com.auraboot.framework.rbac.mapper.UserRoleMapper;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
@@ -27,10 +29,12 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -41,6 +45,36 @@ import static org.mockito.Mockito.when;
  */
 @ExtendWith(MockitoExtension.class)
 class DataScopeServiceImplTest {
+
+    @Test
+    void invalidScopeCannotBePersistedOrPromotedToAll() {
+        for (String invalid : new String[] {null, "", "own", "share", "tem", "ALL"}) {
+            assertThatThrownBy(() -> service.setScope(100L, 7L, "quote", "read", invalid, "MAX"))
+                    .isInstanceOfSatisfying(RootUnCheckedException.class,
+                            e -> assertThat(e.getResponseCode()).isEqualTo(ResponseCode.BadParam));
+        }
+        verifyNoInteractions(roleDataScopeMapper);
+    }
+
+    @Test
+    void invalidMergeStrategyCannotBePersisted() {
+        assertThatThrownBy(() -> service.setScope(100L, 7L, "quote", "read", "self", "widest"))
+                .isInstanceOfSatisfying(RootUnCheckedException.class,
+                        e -> assertThat(e.getResponseCode()).isEqualTo(ResponseCode.BadParam));
+        verifyNoInteractions(roleDataScopeMapper);
+    }
+
+    @Test
+    void corruptStoredScopeFailsInsteadOfGrantingAllRows() {
+        when(userRoleMapper.findRoleIdsByMemberId(5L)).thenReturn(List.of(7L));
+        RoleDataScope corrupt = new RoleDataScope();
+        corrupt.setScopeType("tem");
+        corrupt.setMergeStrategy("MAX");
+        when(roleDataScopeMapper.findByRoleIdsAndResource(List.of(7L), "quote", "read"))
+                .thenReturn(List.of(corrupt));
+        assertThatThrownBy(() -> service.resolveScope(5L, "quote", "read"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 
     @Mock
     private RoleDataScopeMapper roleDataScopeMapper;
@@ -57,6 +91,9 @@ class DataScopeServiceImplTest {
     @Mock
     private MetaModelService metaModelService;
 
+    @Mock
+    private com.auraboot.framework.organization.service.TeamMemberService teamMemberService;
+
     @InjectMocks
     private DataScopeServiceImpl service;
 
@@ -71,6 +108,9 @@ class DataScopeServiceImplTest {
         var metaField = DataScopeServiceImpl.class.getDeclaredField("metaModelService");
         metaField.setAccessible(true);
         metaField.set(service, metaModelService);
+        var teamField = DataScopeServiceImpl.class.getDeclaredField("teamMemberService");
+        teamField.setAccessible(true);
+        teamField.set(service, teamMemberService);
     }
 
     @AfterEach
@@ -227,6 +267,96 @@ class DataScopeServiceImplTest {
 
         assertThat(c.scopeType()).isEqualTo("dept");
         assertThat(c.deptPids()).containsExactly("dept-1");
+    }
+
+    @Test
+    void resolveScopeBuildsTeamConditionFromMembershipsAndDeclaredTeamField() {
+        when(userRoleMapper.findRoleIdsByMemberId(5L)).thenReturn(List.of(7L));
+        RoleDataScope scope = new RoleDataScope();
+        scope.setScopeType("team");
+        when(roleDataScopeMapper.findByRoleIdsAndResource(any(), anyString(), anyString())).thenReturn(List.of(scope));
+        TenantMember m = new TenantMember();
+        m.setId(5L);
+        m.setPid("member-pid");
+        m.setTenantId(100L);
+        m.setUserId(1L);
+        when(tenantMemberMapper.selectById(5L)).thenReturn(m);
+        when(teamMemberService.getTeamPidsByUserId(1L, 100L)).thenReturn(List.of("team-1", "team-2"));
+        when(metaModelService.getModelDefinition("model.task")).thenReturn(Optional.of(ModelDefinition.builder().build()));
+        when(metaModelService.findByCode("model.task")).thenReturn(MetaModelDTO.builder()
+                .extension(Map.of("dataScope", Map.of("teamField", "org_team_pid")))
+                .build());
+
+        DataScopeCondition c = service.resolveScope(5L, "model.task", "read");
+
+        assertThat(c.scopeType()).isEqualTo("team");
+        assertThat(c.deptField()).isEqualTo("org_team_pid");
+        assertThat(c.deptPids()).containsExactlyInAnyOrder("team-1", "team-2");
+    }
+
+    @Test
+    void teamScopeWithoutDeclaredTeamFieldFailsClosed() {
+        when(userRoleMapper.findRoleIdsByMemberId(5L)).thenReturn(List.of(7L));
+        RoleDataScope scope = new RoleDataScope();
+        scope.setScopeType("team");
+        when(roleDataScopeMapper.findByRoleIdsAndResource(any(), anyString(), anyString())).thenReturn(List.of(scope));
+        when(metaModelService.getModelDefinition("model.user")).thenReturn(Optional.empty());
+
+        DataScopeCondition c = service.resolveScope(5L, "model.user", "read");
+
+        assertThat(c.scopeType()).isEqualTo("none");
+    }
+
+    @Test
+    void teamScopeWithNoMembershipsFallsBackToSelfOutsideHistoricalEvaluation() {
+        when(userRoleMapper.findRoleIdsByMemberId(5L)).thenReturn(List.of(7L));
+        RoleDataScope scope = new RoleDataScope();
+        scope.setScopeType("team");
+        when(roleDataScopeMapper.findByRoleIdsAndResource(any(), anyString(), anyString())).thenReturn(List.of(scope));
+        TenantMember m = new TenantMember();
+        m.setId(5L);
+        m.setPid("member-pid");
+        m.setTenantId(100L);
+        m.setUserId(1L);
+        when(tenantMemberMapper.selectById(5L)).thenReturn(m);
+        when(teamMemberService.getTeamPidsByUserId(1L, 100L)).thenReturn(List.of());
+        when(metaModelService.getModelDefinition("model.task")).thenReturn(Optional.of(ModelDefinition.builder().build()));
+        when(metaModelService.findByCode("model.task")).thenReturn(MetaModelDTO.builder()
+                .extension(Map.of("dataScope", Map.of("teamField", "org_team_pid")))
+                .build());
+
+        DataScopeCondition c = service.resolveScope(5L, "model.task", "read");
+        assertThat(c.scopeType()).isEqualTo("self");
+
+        DataScopeCondition historical = service.resolveHistoricalScope(5L, "model.task", "read");
+        assertThat(historical.scopeType()).isEqualTo("none");
+    }
+
+    @Test
+    void teamScopeWinsMaxMergeOverDept() {
+        when(userRoleMapper.findRoleIdsByMemberId(5L)).thenReturn(List.of(7L, 8L));
+        RoleDataScope dept = new RoleDataScope();
+        dept.setScopeType("dept");
+        dept.setMergeStrategy("MAX");
+        RoleDataScope team = new RoleDataScope();
+        team.setScopeType("team");
+        team.setMergeStrategy("MAX");
+        when(roleDataScopeMapper.findByRoleIdsAndResource(any(), anyString(), anyString()))
+                .thenReturn(List.of(dept, team));
+        TenantMember m = new TenantMember();
+        m.setId(5L);
+        m.setPid("member-pid");
+        m.setTenantId(100L);
+        m.setUserId(1L);
+        when(tenantMemberMapper.selectById(5L)).thenReturn(m);
+        when(teamMemberService.getTeamPidsByUserId(1L, 100L)).thenReturn(List.of("team-1"));
+        when(metaModelService.getModelDefinition("model.task")).thenReturn(Optional.of(ModelDefinition.builder().build()));
+        when(metaModelService.findByCode("model.task")).thenReturn(MetaModelDTO.builder()
+                .extension(Map.of("dataScope", Map.of("teamField", "org_team_pid")))
+                .build());
+
+        // MAX takes the higher-priority TEAM condition (documented merge rule)
+        assertThat(service.resolveScope(5L, "model.task", "read").scopeType()).isEqualTo("team");
     }
 
     @Test

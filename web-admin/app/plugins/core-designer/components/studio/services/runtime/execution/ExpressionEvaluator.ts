@@ -7,6 +7,8 @@ import type {
   ActionContext,
   ExpressionEvaluator as IExpressionEvaluator,
 } from '~/plugins/core-designer/components/studio/services/runtime/execution/types';
+import { createExpressionParser } from '~/framework/meta/runtime/expression/parser';
+import jsep from 'jsep';
 
 /**
  * 表达式求值器实现
@@ -228,26 +230,11 @@ export class ExpressionEvaluator implements IExpressionEvaluator {
         throw new Error('表达式包含不安全的代码');
       }
 
-      // 创建函数来执行表达式
-      const func = new Function(
-        ...Object.keys(context),
-        `
-        "use strict";
-        return (${expression});
-      `,
-      );
-
-      // 设置执行超时（5秒）
-      const timeout = 5000;
-      const startTime = Date.now();
-
-      // 执行函数
-      const result = func(...Object.values(context));
-
-      // 检查执行时间
-      if (Date.now() - startTime > timeout) {
-        throw new Error('表达式执行超时');
-      }
+      // 沙箱 AST 解释器求值（原 new Function 编译绕过 FORBIDDEN_GLOBALS，为
+      // 注入向量）。标识符经 context 桥接解析，未知标识符宽松回落 undefined。
+      const result = createExpressionParser(
+        { ...context } as never,
+      ).evaluate(expression);
 
       return result;
     } catch (error) {
@@ -302,8 +289,8 @@ export class ExpressionEvaluator implements IExpressionEvaluator {
     try {
       const expressionContent = this.extractExpression(expression);
 
-      // 尝试创建函数来验证语法
-      new Function(`return (${expressionContent})`);
+      // 纯语法校验（jsep 解析，不执行——原 new Function 会真实运行表达式）
+      jsep(expressionContent);
 
       return { valid: true };
     } catch (error) {

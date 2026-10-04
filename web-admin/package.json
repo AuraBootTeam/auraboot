@@ -120,7 +120,6 @@
     "@react-router/express": "7.17.0",
     "@react-router/node": "7.17.0",
     "@react-router/serve": "7.17.0",
-    "@reduxjs/toolkit": "^2.0.1",
     "@tanstack/react-query": "^5.101.0",
     "@tanstack/react-virtual": "^3.14.2",
     "@tiptap/extension-link": "^3.25.0",
@@ -162,7 +161,6 @@
     "jsonwebtoken": "^9.0.2",
     "jspdf": "^4.1.0",
     "jsqr": "^1.4.0",
-    "leaflet": "^1.9.4",
     "lodash": "^4.17.21",
     "lucide-react": "^0.577.0",
     "match-sorter": "^6.3.1",
@@ -178,7 +176,6 @@
     "react-dom": "^19.2.6",
     "react-draggable": "^4.5.0",
     "react-grid-layout": "^2.2.2",
-    "react-leaflet": "^5.0.0",
     "react-markdown": "^10.1.0",
     "react-resizable": "^3.2.0",
     "react-router": "7.17.0",
@@ -195,7 +192,8 @@
     "vconsole": "^3.15.1",
     "xlsx": "npm:@e965/xlsx@^0.20.3",
     "zod": "^4.3.6",
-    "zustand": "^5.0.8"
+    "zustand": "^5.0.8",
+    "@jsep-plugin/object": "^1.2.2"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
@@ -225,8 +223,6 @@
     "allure": "3.18.0",
     "allure-playwright": "3.10.2",
     "concurrently": "^9.2.1",
-    "daisyui": "^5.0.2",
-    "eruda": "^3.4.3",
     "eslint": "^8.47.0",
     "eslint-plugin-react-hooks": "^4.6.2",
     "husky": "^9.0.11",

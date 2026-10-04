@@ -1,0 +1,28 @@
+[
+  {
+    "code": "exchange_job_type",
+    "name:zh-CN": "数据任务类型",
+    "name:en": "Data Job Type",
+    "dictType": "static",
+    "items": [
+      { "value": "import", "label:zh-CN": "数据导入", "label:en": "Import", "sortNo": 10, "status": "enabled", "extension": { "color": "blue" } },
+      { "value": "export", "label:zh-CN": "数据导出", "label:en": "Export", "sortNo": 20, "status": "enabled", "extension": { "color": "green" } },
+      { "value": "document", "label:zh-CN": "正式文档", "label:en": "Document", "sortNo": 30, "status": "enabled", "extension": { "color": "amber" } }
+    ]
+  },
+  {
+    "code": "exchange_job_status",
+    "name:zh-CN": "数据任务状态",
+    "name:en": "Data Job Status",
+    "dictType": "static",
+    "items": [
+      { "value": "pending", "label:zh-CN": "等待执行", "label:en": "Pending", "sortNo": 10, "status": "enabled", "extension": { "color": "gray" } },
+      { "value": "running", "label:zh-CN": "执行中", "label:en": "Running", "sortNo": 20, "status": "enabled", "extension": { "color": "blue" } },
+      { "value": "completed", "label:zh-CN": "已完成", "label:en": "Completed", "sortNo": 30, "status": "enabled", "extension": { "color": "green" } },
+      { "value": "completed_with_issues", "label:zh-CN": "部分完成", "label:en": "Completed with issues", "sortNo": 40, "status": "enabled", "extension": { "color": "amber" } },
+      { "value": "failed", "label:zh-CN": "失败", "label:en": "Failed", "sortNo": 50, "status": "enabled", "extension": { "color": "red" } },
+      { "value": "cancelled", "label:zh-CN": "已取消", "label:en": "Cancelled", "sortNo": 60, "status": "enabled", "extension": { "color": "gray" } },
+      { "value": "expired", "label:zh-CN": "产物已过期", "label:en": "Artifact expired", "sortNo": 70, "status": "enabled", "extension": { "color": "gray" } }
+    ]
+  }
+]

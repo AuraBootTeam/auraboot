@@ -19,35 +19,81 @@
 import { test, expect } from '../../fixtures';
 import type { Locator, Page } from '@playwright/test';
 import { uniqueId } from '../helpers';
+import { serializePageTreeToFlat } from '../../../app/plugins/core-designer/components/unified-designer/persistence/flatPageSerializer';
+import type { PageSchemaV3 } from '../../../app/plugins/core-designer/components/unified-designer/types';
 
 type TestBlock = {
   id: string;
   blockType?: string;
+  title?: string;
+  field?: string;
   actionType?: string;
   widgetType?: string;
   layout?: Record<string, unknown>;
   props?: Record<string, unknown>;
   blocks?: TestBlock[];
+  fields?: Array<string | Record<string, unknown>>;
+  columns?: Array<string | Record<string, unknown>>;
+  tabs?: Array<Record<string, unknown>>;
+  span?: number;
 };
 type CreatedDesignerPage = { pageKey: string; pid: string };
+
+/**
+ * Seed helper: authors pages as readable v3 trees, then stores them through the
+ * designer's own v4 flat serializer — the exact dialect `savePageSchemaV3`
+ * persists. `designerRootId` keeps the synthetic kind-root (and therefore every
+ * outline-item-* id) stable across boot and save/reload cycles.
+ */
+function postFlatPageDoc(doc: {
+  name: string;
+  pageKey: string;
+  title: string;
+  kind: 'form' | 'list' | 'detail';
+  modelCode: string;
+  extension: Record<string, unknown>;
+  wrappedBlocks: unknown[];
+}): Record<string, unknown> {
+  const tree = {
+    schemaVersion: 3 as const,
+    kind: doc.kind,
+    id: doc.pageKey,
+    pageKey: doc.pageKey,
+    modelCode: doc.modelCode,
+    title: doc.title,
+    layout: undefined,
+    blocks: doc.wrappedBlocks,
+    extension: doc.extension,
+  } as unknown as PageSchemaV3;
+  const flat = serializePageTreeToFlat(tree);
+  return {
+    name: doc.name,
+    pageKey: doc.pageKey,
+    title: doc.title,
+    kind: doc.kind,
+    modelCode: doc.modelCode,
+    schemaVersion: flat.schemaVersion,
+    blocks: flat.blocks,
+    extension: { ...doc.extension, designerRootId: flat.rootBlockId ?? `${doc.kind}_root` },
+  };
+}
 type AdvancedContainerBlockType = 'repeater' | 'subform';
 type ListBlockMoveType = 'table' | 'filter-bar' | 'action-bar' | 'widget';
 type LeafBlockMoveType = 'column' | 'filter-field';
 type ActionLeafParentType = 'action-bar' | 'table';
 type ActionLeafCrossParentRoute = { source: ActionLeafParentType; target: ActionLeafParentType };
 
-async function createFormPage(page: Page): Promise<string> {
+async function createFormPage(page: Page): Promise<CreatedDesignerPage> {
   const id = uniqueId('udw_kind');
   const pageKey = `udw_kind_${id}`;
   const resp = await page.request.post('/api/pages', {
-    data: {
+    data: postFlatPageDoc({
       name: `UDW kind ${id}`,
       pageKey,
       title: `UDW kind ${id}`,
       kind: 'form',
       modelCode: 'page_schema',
-      schemaVersion: 3,
-      blocks: [
+      wrappedBlocks: [
         {
           id: 'form_root',
           blockType: 'form',
@@ -81,12 +127,12 @@ async function createFormPage(page: Page): Promise<string> {
         },
       ],
       extension: { e2e: true, scenario: 'unified-designer-kind-and-binding' },
-    },
+    }),
   });
   expect(resp.ok(), await resp.text()).toBe(true);
   const body = await resp.json();
   expect(body.code).toBe('0');
-  return pageKey;
+  return { pageKey, pid: String(body.data?.pid ?? '') };
 }
 
 async function createPaletteAuthoringFormPage(page: Page): Promise<CreatedDesignerPage> {
@@ -99,26 +145,21 @@ async function createPaletteAuthoringFormPage(page: Page): Promise<CreatedDesign
       title: `UDW palette container ${id}`,
       kind: 'form',
       modelCode: 'page_schema',
-      schemaVersion: 3,
+      schemaVersion: 4,
       blocks: [
         {
-          id: 'form_root',
-          blockType: 'form',
-          title: 'Form root',
-          dataSource: { model: 'page_schema' },
-          layout: { span: 12 },
-          blocks: [
-            {
-              id: 'section_main',
-              blockType: 'form-section',
-              title: 'Main section',
-              layout: { span: 12 },
-              blocks: [],
-            },
-          ],
+          id: 'section_main',
+          blockType: 'form-section',
+          title: 'Main section',
+          fields: [],
+          span: 12,
         },
       ],
-      extension: { e2e: true, scenario: 'unified-designer-palette-container-authoring' },
+      extension: {
+        e2e: true,
+        scenario: 'unified-designer-palette-container-authoring',
+        designerRootId: 'form_root',
+      },
     },
   });
   expect(resp.ok(), await resp.text()).toBe(true);
@@ -153,14 +194,13 @@ async function createCrossContainerFormPage(
         },
       ];
   const resp = await page.request.post('/api/pages', {
-    data: {
+    data: postFlatPageDoc({
       name: `UDW cross container ${id}`,
       pageKey,
       title: `UDW cross container ${id}`,
       kind: 'form',
       modelCode: 'page_schema',
-      schemaVersion: 3,
-      blocks: [
+      wrappedBlocks: [
         {
           id: 'form_root',
           blockType: 'form',
@@ -201,7 +241,7 @@ async function createCrossContainerFormPage(
         },
       ],
       extension: { e2e: true, scenario: 'unified-designer-cross-container-move' },
-    },
+    }),
   });
   expect(resp.ok(), await resp.text()).toBe(true);
   const body = await resp.json();
@@ -216,87 +256,91 @@ async function createCrossContainerSubTableFormPage(
 ): Promise<CreatedDesignerPage> {
   const id = uniqueId('udw_sub_table_move');
   const pageKey = `udw_sub_table_move_${id}`;
-  const targetBlocks = options.emptyTarget
-    ? []
-    : [
+  // v4 dialect: sections carry fields only, so cross-container container moves
+  // are re-based onto top-level siblings and an empty tab as the move target.
+  const rootBlocks = [
+    {
+      id: 'section_source',
+      blockType: 'form-section',
+      title: 'Source section',
+      fields: [
         {
-          id: 'sub_table_target',
-          blockType: 'sub-table',
-          title: 'Target items',
-          layout: { span: 12 },
-          blocks: [
-            {
-              id: 'target_col_status',
-              blockType: 'column',
-              field: 'status',
-              props: { label: 'Target status' },
-            },
-          ],
+          id: 'field_source_name',
+          blockType: 'field',
+          field: 'name',
+          layout: { span: 6 },
+          props: { label: 'Source name', component: 'input' },
         },
-      ];
+      ],
+      span: 12,
+    },
+    ...(options.emptyTarget
+      ? []
+      : [
+          {
+            id: 'sub_table_target',
+            blockType: 'sub-table',
+            title: 'Target items',
+            span: 12,
+            blocks: [
+              {
+                id: 'target_col_status',
+                blockType: 'column',
+                field: 'status',
+                props: { label: 'Target status' },
+              },
+            ],
+          },
+        ]),
+    {
+      id: 'sub_table_move_candidate',
+      blockType: 'sub-table',
+      title: 'Move candidate items',
+      span: 12,
+      blocks: [
+        {
+          id: 'candidate_col_title',
+          blockType: 'column',
+          field: 'name',
+          props: { label: 'Candidate title' },
+        },
+        {
+          id: 'candidate_action_add',
+          blockType: 'action',
+          actionType: 'create',
+          props: { label: 'Add item' },
+        },
+      ],
+    },
+    ...(options.emptyTarget
+      ? [
+          {
+            id: 'tabs_holder',
+            blockType: 'tabs',
+            title: 'Tabs holder',
+            span: 12,
+            blocks: [{ id: 'tab_empty', blockType: 'tab', title: 'Empty target tab', blocks: [] }],
+          },
+        ]
+      : []),
+  ];
   const resp = await page.request.post('/api/pages', {
-    data: {
+    data: postFlatPageDoc({
       name: `UDW sub table move ${id}`,
       pageKey,
       title: `UDW sub table move ${id}`,
       kind: 'form',
       modelCode: 'page_schema',
-      schemaVersion: 3,
-      blocks: [
+      extension: { e2e: true, scenario: 'unified-designer-sub-table-cross-container-move' },
+      wrappedBlocks: [
         {
           id: 'form_root',
           blockType: 'form',
           title: 'Form root',
-          dataSource: { model: 'page_schema' },
-          layout: { span: 12 },
-          blocks: [
-            {
-              id: 'section_source',
-              blockType: 'form-section',
-              title: 'Source section',
-              layout: { span: 12 },
-              blocks: [
-                {
-                  id: 'field_source_name',
-                  blockType: 'field',
-                  field: 'name',
-                  layout: { span: 6 },
-                  props: { label: 'Source name', component: 'input' },
-                },
-                {
-                  id: 'sub_table_move_candidate',
-                  blockType: 'sub-table',
-                  title: 'Move candidate items',
-                  layout: { span: 12 },
-                  blocks: [
-                    {
-                      id: 'candidate_col_title',
-                      blockType: 'column',
-                      field: 'name',
-                      props: { label: 'Candidate title' },
-                    },
-                    {
-                      id: 'candidate_action_add',
-                      blockType: 'action',
-                      actionType: 'create',
-                      props: { label: 'Add item' },
-                    },
-                  ],
-                },
-              ],
-            },
-            {
-              id: 'section_target',
-              blockType: 'form-section',
-              title: 'Target section',
-              layout: { span: 12 },
-              blocks: targetBlocks,
-            },
-          ],
+          blocks: rootBlocks,
         },
       ],
-      extension: { e2e: true, scenario: 'unified-designer-sub-table-cross-container-move' },
-    },
+    }),
   });
   expect(resp.ok(), await resp.text()).toBe(true);
   const body = await resp.json();
@@ -314,68 +358,72 @@ async function createCrossContainerAdvancedContainerFormPage(
   const pageKey = `udw_${blockType}_move_${id}`;
   const candidateId = `${blockType}_move_candidate`;
   const targetId = `${blockType}_target`;
-  const targetBlocks = options.emptyTarget
-    ? []
-    : [
+  const rootBlocks: TestBlock[] = [
+    {
+      id: 'section_source',
+      blockType: 'form-section',
+      title: 'Source section',
+      fields: [
         {
-          id: targetId,
-          blockType,
-          title: `Target ${blockType}`,
-          layout: { span: 12 },
-          blocks: createAdvancedContainerChildren(blockType, 'target'),
+          id: 'field_source_name',
+          blockType: 'field',
+          field: 'name',
+          layout: { span: 6 },
+          props: { label: 'Source name', component: 'input' },
         },
-      ];
+      ],
+      span: 12,
+    },
+    ...(options.emptyTarget
+      ? []
+      : [
+          {
+            id: targetId,
+            blockType,
+            title: `Target ${blockType}`,
+            span: 12,
+            blocks: createAdvancedContainerChildren(blockType, 'target'),
+          },
+        ]),
+    {
+      id: candidateId,
+      blockType,
+      title: `Move candidate ${blockType}`,
+      span: 12,
+      blocks: createAdvancedContainerChildren(blockType, 'candidate'),
+    },
+    ...(options.emptyTarget
+      ? [
+          {
+            id: 'tabs_holder',
+            blockType: 'tabs',
+            title: 'Tabs holder',
+            span: 12,
+            blocks: [{ id: 'tab_empty', blockType: 'tab', title: 'Empty target tab', blocks: [] }],
+          },
+        ]
+      : []),
+  ];
 
   const resp = await page.request.post('/api/pages', {
-    data: {
+    data: postFlatPageDoc({
       name: `UDW ${blockType} move ${id}`,
       pageKey,
       title: `UDW ${blockType} move ${id}`,
       kind: 'form',
       modelCode: 'page_schema',
-      schemaVersion: 3,
-      blocks: [
+      wrappedBlocks: [
         {
           id: 'form_root',
           blockType: 'form',
           title: 'Form root',
           dataSource: { model: 'page_schema' },
           layout: { span: 12 },
-          blocks: [
-            {
-              id: 'section_source',
-              blockType: 'form-section',
-              title: 'Source section',
-              layout: { span: 12 },
-              blocks: [
-                {
-                  id: 'field_source_name',
-                  blockType: 'field',
-                  field: 'name',
-                  layout: { span: 6 },
-                  props: { label: 'Source name', component: 'input' },
-                },
-                {
-                  id: candidateId,
-                  blockType,
-                  title: `Move candidate ${blockType}`,
-                  layout: { span: 12 },
-                  blocks: createAdvancedContainerChildren(blockType, 'candidate'),
-                },
-              ],
-            },
-            {
-              id: 'section_target',
-              blockType: 'form-section',
-              title: 'Target section',
-              layout: { span: 12 },
-              blocks: targetBlocks,
-            },
-          ],
+          blocks: rootBlocks,
         },
       ],
       extension: { e2e: true, scenario: `unified-designer-${blockType}-cross-container-move` },
-    },
+    }),
   });
   expect(resp.ok(), await resp.text()).toBe(true);
   const body = await resp.json();
@@ -499,14 +547,13 @@ async function createCrossContainerActionBarFormPage(
         ];
 
   const resp = await page.request.post('/api/pages', {
-    data: {
+    data: postFlatPageDoc({
       name: `UDW action bar move ${id}`,
       pageKey,
       title: `UDW action bar move ${id}`,
       kind: 'form',
       modelCode: 'page_schema',
-      schemaVersion: 3,
-      blocks: [
+      wrappedBlocks: [
         {
           id: 'form_root',
           blockType: 'form',
@@ -520,7 +567,7 @@ async function createCrossContainerActionBarFormPage(
         e2e: true,
         scenario: `unified-designer-action-bar-${options.source}-cross-container-move`,
       },
-    },
+    }),
   });
   expect(resp.ok(), await resp.text()).toBe(true);
   const body = await resp.json();
@@ -605,14 +652,13 @@ async function createCrossContainerFormSectionPage(
         ];
 
   const resp = await page.request.post('/api/pages', {
-    data: {
+    data: postFlatPageDoc({
       name: `UDW form-section move ${id}`,
       pageKey,
       title: `UDW form-section move ${id}`,
       kind: 'form',
       modelCode: 'page_schema',
-      schemaVersion: 3,
-      blocks: [
+      wrappedBlocks: [
         {
           id: 'form_root',
           blockType: 'form',
@@ -626,7 +672,7 @@ async function createCrossContainerFormSectionPage(
         e2e: true,
         scenario: `unified-designer-form-section-${options.source}-cross-container-move`,
       },
-    },
+    }),
   });
   expect(resp.ok(), await resp.text()).toBe(true);
   const body = await resp.json();
@@ -742,14 +788,13 @@ async function createCrossContainerListBlockPage(
         ];
 
   const resp = await page.request.post('/api/pages', {
-    data: {
+    data: postFlatPageDoc({
       name: `UDW ${blockType} move ${id}`,
       pageKey,
       title: `UDW ${blockType} move ${id}`,
       kind: 'list',
       modelCode: 'page_schema',
-      schemaVersion: 3,
-      blocks: [
+      wrappedBlocks: [
         {
           id: 'list_root',
           blockType: 'list',
@@ -763,7 +808,7 @@ async function createCrossContainerListBlockPage(
         e2e: true,
         scenario: `unified-designer-${blockType}-${options.source}-cross-container-move`,
       },
-    },
+    }),
   });
   expect(resp.ok(), await resp.text()).toBe(true);
   const body = await resp.json();
@@ -812,14 +857,13 @@ async function createCrossContainerLeafBlockListPage(
   };
 
   const resp = await page.request.post('/api/pages', {
-    data: {
+    data: postFlatPageDoc({
       name: `UDW ${blockType} leaf move ${id}`,
       pageKey,
       title: `UDW ${blockType} leaf move ${id}`,
       kind: 'list',
       modelCode: 'page_schema',
-      schemaVersion: 3,
-      blocks: [
+      wrappedBlocks: [
         {
           id: 'list_root',
           blockType: 'list',
@@ -833,7 +877,7 @@ async function createCrossContainerLeafBlockListPage(
         e2e: true,
         scenario: `unified-designer-${blockType}-leaf-cross-container-move`,
       },
-    },
+    }),
   });
   expect(resp.ok(), await resp.text()).toBe(true);
   const body = await resp.json();
@@ -956,14 +1000,13 @@ async function createCrossParentActionLeafListPage(
   );
 
   const resp = await page.request.post('/api/pages', {
-    data: {
+    data: postFlatPageDoc({
       name: `UDW ax ${sourceKey} to ${targetKey} ${id}`,
       pageKey,
       title: `UDW ax ${sourceKey} to ${targetKey} ${id}`,
       kind: 'list',
       modelCode: 'page_schema',
-      schemaVersion: 3,
-      blocks: [
+      wrappedBlocks: [
         {
           id: 'list_root',
           blockType: 'list',
@@ -977,7 +1020,7 @@ async function createCrossParentActionLeafListPage(
         e2e: true,
         scenario: `unified-designer-${route.source}-to-${route.target}-action-leaf-cross-parent-move`,
       },
-    },
+    }),
   });
   expect(resp.ok(), await resp.text()).toBe(true);
   const body = await resp.json();
@@ -1074,11 +1117,11 @@ function expectListBlockChildren(
     expect(movedBlock?.blocks ?? []).toEqual([]);
     // The flat v4 metric card IS the stat-card block; the designer's
     // number-card widget converges to it on save.
-    expect(movedBlock?.widgetType).toBe('stat-card');
+    expect(movedBlock?.blockType).toBe('stat-card');
     expect(movedBlock?.props?.title).toBe('Candidate metric');
     expect(movedBlock?.props?.value).toBe('42');
     expect(movedBlock?.props?.suffix).toBe('widgets');
-    expect(movedBlock?.layout?.span).toBe(12);
+    expect(movedBlock?.span).toBe(12);
     expect(movedBlock?.layout?.w).toBe(3);
     expect(movedBlock?.layout?.h).toBe(2);
     return;
@@ -1091,14 +1134,13 @@ async function createCrossKindGuardFormPage(page: Page): Promise<CreatedDesigner
   const id = uniqueId('udw_cross_kind_guard');
   const pageKey = `udw_cross_kind_guard_${id}`;
   const resp = await page.request.post('/api/pages', {
-    data: {
+    data: postFlatPageDoc({
       name: `UDW cross kind guard ${id}`,
       pageKey,
       title: `UDW cross kind guard ${id}`,
       kind: 'form',
       modelCode: 'page_schema',
-      schemaVersion: 3,
-      blocks: [
+      wrappedBlocks: [
         {
           id: 'form_root',
           blockType: 'form',
@@ -1155,7 +1197,7 @@ async function createCrossKindGuardFormPage(page: Page): Promise<CreatedDesigner
         },
       ],
       extension: { e2e: true, scenario: 'unified-designer-cross-kind-guard' },
-    },
+    }),
   });
   expect(resp.ok(), await resp.text()).toBe(true);
   const body = await resp.json();
@@ -1305,12 +1347,16 @@ async function createCrossKindWorkflowGuardListPage(page: Page): Promise<Created
  * navigation can race optimizeDeps and render a transient "Application Error";
  * reload once (Vite is warm by then) before asserting on the workbench.
  */
-async function openDesigner(page: Page, pageKey: string) {
+async function openDesigner(page: Page, pagePid: string) {
+  // The designer boot opens a governed authoring session, which needs the page
+  // pid. GET /api/pages/page-key/{key} is the runtime endpoint and only serves
+  // published baselines (draft pages 404 there by design), so these helpers
+  // pass the created page's pid and boot the designer via ?pageId=.
   const workbench = page.getByTestId('unified-designer-workbench');
   const attempts = 4;
   for (let i = 0; i < attempts; i++) {
     if (i === 0) {
-      await page.goto(`/unified-designer?pageKey=${pageKey}`, { waitUntil: 'domcontentloaded' });
+      await page.goto(`/unified-designer?pageId=${pagePid}`, { waitUntil: 'domcontentloaded' });
     } else {
       // Cold dev Vite re-runs optimizeDeps on the heavy designer route and can
       // render a transient "Application Error" until it settles; reload until ready.
@@ -1342,8 +1388,8 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
   test.describe.configure({ timeout: 120_000 });
 
   test('a form page collapses the palette and renders zh-CN copy', async ({ page }) => {
-    const formKey = await createFormPage(page);
-    await openDesigner(page, formKey);
+    const { pageKey: formKey, pid } = await createFormPage(page);
+    await openDesigner(page, pid);
 
     // Canvas band shows the localized form kind label, not the old Composite text.
     const band = page.getByTestId('canvas-root-drop-zone');
@@ -1366,8 +1412,8 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
   });
 
   test('dragging a model field into a section binds a field block via @dnd-kit', async ({ page }) => {
-    const formKey = await createFormPage(page);
-    await openDesigner(page, formKey);
+    const { pageKey: formKey, pid } = await createFormPage(page);
+    await openDesigner(page, pid);
 
     // Wait for the outline tree to populate before querying it.
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible({
@@ -1413,9 +1459,19 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       .toBeGreaterThan(beforeFields);
   });
 
-  test('adds nested containers from the palette with undo, redo, save, and readback', async ({ page }) => {
+  test('ZPROBE adds nested containers from the palette with undo, redo, save, and readback', async ({ page }) => {
     const { pageKey: formKey, pid } = await createPaletteAuthoringFormPage(page);
-    await openDesigner(page, formKey);
+    page.on('request', (req) => {
+      if (req.url().includes(`/api/pages/${pid}`) && req.method() === 'PUT') {
+        console.log('[ZPUT]', req.postData()?.slice(0, 2200));
+      }
+    });
+    page.on('response', async (res) => {
+      if (res.url().includes(`/api/pages/${pid}`) && res.request().method() === 'PUT') {
+        console.log('[ZPUT-RESP]', (await res.text()).slice(0, 500));
+      }
+    });
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible({ timeout: 15000 });
 
     await page.getByTestId('outline-item-form_root').click();
@@ -1452,29 +1508,25 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
+    console.log('[ZREADBACK]', JSON.stringify(readbackBody.data).slice(0, 2600));
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'form_root');
     const savedTabs = findBlock(savedBlocks, 'tabs_new_tabs');
-    const savedTab = findBlock(savedBlocks, 'tab_new_tab');
+    const savedTab = savedTabs?.tabs?.find((tab) => tab.id === 'tab_new_tab');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual([
-      'section_main',
-      'tabs_new_tabs',
-    ]);
+    expect(savedBlocks.map((block) => block.id)).toEqual(['section_main', 'tabs_new_tabs']);
     expect(savedTabs).toMatchObject({
       blockType: 'tabs',
       title: { en: 'New tabs', 'zh-CN': '新标签页' },
-      layout: { span: 12 },
+      span: 12,
     });
-    expect(savedTabs?.blocks?.map((block) => block.id)).toEqual(['tab_new_tab']);
+    expect((savedTabs?.tabs ?? []).map((tab) => tab.id)).toEqual(['tab_new_tab']);
     expect(savedTab).toMatchObject({
-      blockType: 'tab',
-      title: { en: 'New tab', 'zh-CN': '新标签' },
-      layout: { span: 12 },
+      label: { en: 'New tab', 'zh-CN': '新标签' },
+      key: 'tab_1',
       blocks: [],
     });
   });
@@ -1483,7 +1535,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     page,
   }) => {
     const { pageKey: formKey, pid } = await createPaletteAuthoringFormPage(page);
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible({ timeout: 15000 });
 
     await page.getByTestId('outline-item-form_root').click();
@@ -1528,23 +1580,23 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'form_root');
     const savedColumns = findBlock(savedBlocks, 'columns_new_columns');
     const savedNestedSection = findBlock(savedBlocks, 'form_section_new_section');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual([
+    expect(savedBlocks.map((block) => block.id)).toEqual([
       'section_main',
       'columns_new_columns',
     ]);
     expect(savedColumns).toMatchObject({
       blockType: 'columns',
       title: { en: 'New columns', 'zh-CN': '新分栏' },
-      layout: { span: 12, columns: 2, gap: 16 },
+      span: 12,
+      layout: { columns: 2, gap: 16 },
     });
     expect(savedColumns?.blocks?.map((block) => block.id)).toEqual([
       'form_section_new_section',
@@ -1552,8 +1604,8 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     expect(savedNestedSection).toMatchObject({
       blockType: 'form-section',
       title: { en: 'New section', 'zh-CN': '新分组' },
-      layout: { span: 12 },
-      blocks: [],
+      span: 12,
+      fields: [],
     });
   });
 
@@ -1561,7 +1613,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     page,
   }) => {
     const { pageKey: formKey, pid } = await createPaletteAuthoringFormPage(page);
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible({ timeout: 15000 });
 
     await page.getByTestId('outline-item-form_root').click();
@@ -1593,14 +1645,13 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'form_root');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual(['section_main']);
+    expect(savedBlocks.map((block) => block.id)).toEqual(['section_main']);
     expect(findBlock(savedBlocks, 'columns_new_columns')).toBeNull();
     expect(findBlock(savedBlocks, 'form_section_new_section')).toBeNull();
   });
@@ -1609,7 +1660,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     page,
   }) => {
     const { pageKey: formKey, pid } = await createPaletteAuthoringFormPage(page);
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible({ timeout: 15000 });
 
     await page.getByTestId('outline-item-form_root').click();
@@ -1647,15 +1698,14 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'form_root');
     const savedColumns = findBlock(savedBlocks, 'columns_new_columns');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual([
+    expect(savedBlocks.map((block) => block.id)).toEqual([
       'columns_new_columns',
       'section_main',
     ]);
@@ -1666,7 +1716,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
   test('undoes and redoes deleting a saved palette-created container before saving readback', async ({ page }) => {
     const { pageKey: formKey, pid } = await createPaletteAuthoringFormPage(page);
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible({ timeout: 15000 });
 
     await page.getByTestId('outline-item-form_root').click();
@@ -1698,14 +1748,13 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'form_root');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual(['section_main']);
+    expect(savedBlocks.map((block) => block.id)).toEqual(['section_main']);
     expect(findBlock(savedBlocks, 'tabs_new_tabs')).toBeNull();
     expect(findBlock(savedBlocks, 'tab_new_tab')).toBeNull();
   });
@@ -1714,7 +1763,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     page,
   }) => {
     const { pageKey: formKey, pid } = await createPaletteAuthoringFormPage(page);
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible({ timeout: 15000 });
 
     await page.getByTestId('outline-item-form_root').click();
@@ -1752,15 +1801,14 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'form_root');
     const savedTabs = findBlock(savedBlocks, 'tabs_new_tabs');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual([
+    expect(savedBlocks.map((block) => block.id)).toEqual([
       'tabs_new_tabs',
       'section_main',
     ]);
@@ -1769,7 +1817,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
   test('moves an existing field block between form-section containers and persists schema order', async ({ page }) => {
     const { pageKey: formKey, pid } = await createCrossContainerFormPage(page);
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -1785,7 +1833,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -1803,7 +1851,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
   test('undoes and redoes a cross-container move-before before saving schema order', async ({ page }) => {
     const { pageKey: formKey, pid } = await createCrossContainerFormPage(page);
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -1834,7 +1882,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -1852,7 +1900,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
   test('moves an existing field block inside an empty form-section container and persists schema order', async ({ page }) => {
     const { pageKey: formKey, pid } = await createCrossContainerFormPage(page, { emptyTarget: true });
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -1866,7 +1914,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -1880,7 +1928,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
   test('undoes and redoes a cross-container move-inside into an empty section before saving schema order', async ({ page }) => {
     const { pageKey: formKey, pid } = await createCrossContainerFormPage(page, { emptyTarget: true });
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -1909,7 +1957,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -1921,72 +1969,62 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     expect(savedTarget?.blocks?.map((block) => block.id)).toEqual(['field_move_candidate']);
   });
 
-  test('moves an existing sub-table subtree before another sub-table in a different section', async ({ page }) => {
+  test('moves an existing sub-table subtree before another sub-table at the page root', async ({ page }) => {
     const { pageKey: formKey, pid } = await createCrossContainerSubTableFormPage(page);
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
-    await dragCanvasBlockBeforeHeader(page, 'sub_table_move_candidate', 'sub_table_target');
+    await dragOutlineRowBefore(page, 'sub_table_move_candidate', 'sub_table_target');
 
-    const sourceSection = page.getByTestId('canvas-block-section_source');
-    const targetSection = page.getByTestId('canvas-block-section_target');
-    await expect(sourceSection.getByTestId('canvas-block-sub_table_move_candidate')).toHaveCount(0);
-    await expect(targetSection.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
-    await expect(targetSection.getByTestId('canvas-block-sub_table_target')).toBeVisible();
-    expect(await isBeforeInDom(targetSection, 'sub_table_move_candidate', 'sub_table_target')).toBe(true);
+    const workbench = page.getByTestId('unified-designer-workbench');
+    await expect(page.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
+    expect(await isBeforeInDom(workbench, 'sub_table_move_candidate', 'sub_table_target')).toBe(true);
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedSource = findBlock(savedBlocks, 'section_source');
-    const savedTarget = findBlock(savedBlocks, 'section_target');
-    const movedSubTable = findBlock(savedBlocks, 'sub_table_move_candidate');
 
-    expect(savedSource?.blocks?.map((block) => block.id)).toEqual(['field_source_name']);
-    expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([
+    expect(savedBlocks.map((block) => block.id)).toEqual([
+      'section_source',
       'sub_table_move_candidate',
       'sub_table_target',
     ]);
-    expect(movedSubTable?.blocks?.map((block) => block.id)).toEqual([
+    expect(findBlock(savedBlocks, 'sub_table_move_candidate')?.blocks?.map((block) => block.id)).toEqual([
       'candidate_col_title',
       'candidate_action_add',
     ]);
   });
 
-  test('moves an existing sub-table subtree inside an empty section and preserves children', async ({ page }) => {
+  test('moves an existing sub-table subtree inside an empty tab and preserves children', async ({ page }) => {
     const { pageKey: formKey, pid } = await createCrossContainerSubTableFormPage(page, { emptyTarget: true });
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
-    await dragCanvasBlockInto(page, 'sub_table_move_candidate', 'section_target');
+    await dragCanvasBlockInto(page, 'sub_table_move_candidate', 'tab_empty');
 
-    const sourceSection = page.getByTestId('canvas-block-section_source');
-    const targetSection = page.getByTestId('canvas-block-section_target');
-    await expect(sourceSection.getByTestId('canvas-block-sub_table_move_candidate')).toHaveCount(0);
-    await expect(targetSection.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
+    const tabsHolder = page.getByTestId('canvas-block-tabs_holder');
+    await expect(tabsHolder.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedSource = findBlock(savedBlocks, 'section_source');
-    const savedTarget = findBlock(savedBlocks, 'section_target');
-    const movedSubTable = findBlock(savedBlocks, 'sub_table_move_candidate');
+    const savedTab = findBlock(savedBlocks, 'tab_empty');
+    const savedCandidate = findBlock(savedBlocks, 'sub_table_move_candidate');
 
-    expect(savedSource?.blocks?.map((block) => block.id)).toEqual(['field_source_name']);
-    expect(savedTarget?.blocks?.map((block) => block.id)).toEqual(['sub_table_move_candidate']);
-    expect(movedSubTable?.blocks?.map((block) => block.id)).toEqual([
+    expect(savedTab?.blocks?.map((block) => block.id)).toEqual(['sub_table_move_candidate']);
+    expect(savedCandidate?.blocks?.map((block) => block.id)).toEqual([
       'candidate_col_title',
       'candidate_action_add',
     ]);
@@ -1994,172 +2032,142 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
   test('undoes and redoes moving a sub-table subtree before another sub-table', async ({ page }) => {
     const { pageKey: formKey, pid } = await createCrossContainerSubTableFormPage(page);
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
-    await dragCanvasBlockBeforeHeader(page, 'sub_table_move_candidate', 'sub_table_target');
+    await dragOutlineRowBefore(page, 'sub_table_move_candidate', 'sub_table_target');
 
-    const sourceSection = page.getByTestId('canvas-block-section_source');
-    const targetSection = page.getByTestId('canvas-block-section_target');
-    await expect(sourceSection.getByTestId('canvas-block-sub_table_move_candidate')).toHaveCount(0);
-    await expect(targetSection.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
-    expect(await isBeforeInDom(targetSection, 'sub_table_move_candidate', 'sub_table_target')).toBe(true);
+    const workbench = page.getByTestId('unified-designer-workbench');
+    await expect(page.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
+    expect(await isBeforeInDom(workbench, 'sub_table_move_candidate', 'sub_table_target')).toBe(true);
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
     await waitForDesignerDragToSettle(page);
 
     await clickDesignerToolbarButton(page, 'designer-undo');
 
-    await expect(sourceSection.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
-    await expect(targetSection.getByTestId('canvas-block-sub_table_move_candidate')).toHaveCount(0);
-    expect(await isBeforeInDom(sourceSection, 'field_source_name', 'sub_table_move_candidate')).toBe(true);
+    expect(await isBeforeInDom(workbench, 'sub_table_target', 'sub_table_move_candidate')).toBe(true);
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
     await expect(page.getByTestId('designer-redo')).toBeEnabled();
 
     await clickDesignerToolbarButton(page, 'designer-redo');
 
-    await expect(sourceSection.getByTestId('canvas-block-sub_table_move_candidate')).toHaveCount(0);
-    await expect(targetSection.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
-    expect(await isBeforeInDom(targetSection, 'sub_table_move_candidate', 'sub_table_target')).toBe(true);
+    expect(await isBeforeInDom(workbench, 'sub_table_move_candidate', 'sub_table_target')).toBe(true);
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedSource = findBlock(savedBlocks, 'section_source');
-    const savedTarget = findBlock(savedBlocks, 'section_target');
-    const movedSubTable = findBlock(savedBlocks, 'sub_table_move_candidate');
 
-    expect(savedSource?.blocks?.map((block) => block.id)).toEqual(['field_source_name']);
-    expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([
+    expect(savedBlocks.map((block) => block.id)).toEqual([
+      'section_source',
       'sub_table_move_candidate',
       'sub_table_target',
     ]);
-    expect(movedSubTable?.blocks?.map((block) => block.id)).toEqual([
-      'candidate_col_title',
-      'candidate_action_add',
-    ]);
   });
 
-  test('undoes and redoes moving a sub-table subtree inside an empty section', async ({ page }) => {
+  test('undoes and redoes moving a sub-table subtree inside an empty tab', async ({ page }) => {
     const { pageKey: formKey, pid } = await createCrossContainerSubTableFormPage(page, { emptyTarget: true });
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
-    await dragCanvasBlockInto(page, 'sub_table_move_candidate', 'section_target');
+    await dragCanvasBlockInto(page, 'sub_table_move_candidate', 'tab_empty');
 
-    const sourceSection = page.getByTestId('canvas-block-section_source');
-    const targetSection = page.getByTestId('canvas-block-section_target');
-    await expect(sourceSection.getByTestId('canvas-block-sub_table_move_candidate')).toHaveCount(0);
-    await expect(targetSection.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
+    const tabsHolder = page.getByTestId('canvas-block-tabs_holder');
+    await expect(tabsHolder.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
     await waitForDesignerDragToSettle(page);
 
     await clickDesignerToolbarButton(page, 'designer-undo');
 
-    await expect(sourceSection.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
-    await expect(targetSection.getByTestId('canvas-block-sub_table_move_candidate')).toHaveCount(0);
-    expect(await isBeforeInDom(sourceSection, 'field_source_name', 'sub_table_move_candidate')).toBe(true);
+    await expect(tabsHolder.getByTestId('canvas-block-sub_table_move_candidate')).toHaveCount(0);
+    await expect(page.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
     await expect(page.getByTestId('designer-redo')).toBeEnabled();
 
     await clickDesignerToolbarButton(page, 'designer-redo');
 
-    await expect(sourceSection.getByTestId('canvas-block-sub_table_move_candidate')).toHaveCount(0);
-    await expect(targetSection.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
+    await expect(tabsHolder.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedSource = findBlock(savedBlocks, 'section_source');
-    const savedTarget = findBlock(savedBlocks, 'section_target');
-    const movedSubTable = findBlock(savedBlocks, 'sub_table_move_candidate');
+    const savedTab = findBlock(savedBlocks, 'tab_empty');
 
-    expect(savedSource?.blocks?.map((block) => block.id)).toEqual(['field_source_name']);
-    expect(savedTarget?.blocks?.map((block) => block.id)).toEqual(['sub_table_move_candidate']);
-    expect(movedSubTable?.blocks?.map((block) => block.id)).toEqual([
-      'candidate_col_title',
-      'candidate_action_add',
-    ]);
+    expect(savedTab?.blocks?.map((block) => block.id)).toEqual(['sub_table_move_candidate']);
   });
 
   for (const blockType of ['repeater', 'subform'] as const) {
-    test(`moves an existing ${blockType} subtree before another ${blockType} in a different section`, async ({
+    test(`moves an existing ${blockType} subtree before another ${blockType} at the page root`, async ({
       page,
     }) => {
       const movedBlockId = `${blockType}_move_candidate`;
       const targetBlockId = `${blockType}_target`;
       const { pageKey: formKey, pid } = await createCrossContainerAdvancedContainerFormPage(page, blockType);
-      await openDesigner(page, formKey);
+      await openDesigner(page, pid);
       await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
       await page.getByTestId('designer-mode-layout').click();
-      await dragCanvasBlockBeforeHeader(page, movedBlockId, targetBlockId);
+      await dragOutlineRowBefore(page, movedBlockId, targetBlockId);
 
-      const sourceSection = page.getByTestId('canvas-block-section_source');
-      const targetSection = page.getByTestId('canvas-block-section_target');
-      await expect(sourceSection.getByTestId(`canvas-block-${movedBlockId}`)).toHaveCount(0);
-      await expect(targetSection.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
-      await expect(targetSection.getByTestId(`canvas-block-${targetBlockId}`)).toBeVisible();
-      expect(await isBeforeInDom(targetSection, movedBlockId, targetBlockId)).toBe(true);
+      const workbench = page.getByTestId('unified-designer-workbench');
+      await expect(page.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
+      expect(await isBeforeInDom(workbench, movedBlockId, targetBlockId)).toBe(true);
       await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
       await saveDesignerPage(page, pid);
 
-      const readback = await page.request.get(`/api/pages/key/${formKey}`);
+      const readback = await page.request.get(`/api/pages/${pid}`);
       expect(readback.ok(), await readback.text()).toBe(true);
       const readbackBody = await readback.json();
       expect(readbackBody.code).toBe('0');
       const savedBlocks = readbackBody.data.blocks as TestBlock[];
-      const savedSource = findBlock(savedBlocks, 'section_source');
-      const savedTarget = findBlock(savedBlocks, 'section_target');
-
-      expect(savedSource?.blocks?.map((block) => block.id)).toEqual(['field_source_name']);
-      expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([movedBlockId, targetBlockId]);
+      expect(savedBlocks.map((block) => block.id)).toEqual([
+        'section_source',
+        movedBlockId,
+        targetBlockId,
+      ]);
       expectAdvancedContainerChildren(savedBlocks, blockType, movedBlockId);
     });
 
-    test(`moves an existing ${blockType} subtree inside an empty section and preserves children`, async ({
+    test(`moves an existing ${blockType} subtree inside an empty tab and preserves children`, async ({
       page,
     }) => {
       const movedBlockId = `${blockType}_move_candidate`;
       const { pageKey: formKey, pid } = await createCrossContainerAdvancedContainerFormPage(page, blockType, {
         emptyTarget: true,
       });
-      await openDesigner(page, formKey);
+      await openDesigner(page, pid);
       await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
       await page.getByTestId('designer-mode-layout').click();
-      await dragCanvasBlockInto(page, movedBlockId, 'section_target');
+      await dragCanvasBlockInto(page, movedBlockId, 'tab_empty');
 
-      const sourceSection = page.getByTestId('canvas-block-section_source');
-      const targetSection = page.getByTestId('canvas-block-section_target');
-      await expect(sourceSection.getByTestId(`canvas-block-${movedBlockId}`)).toHaveCount(0);
-      await expect(targetSection.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
+      const tabsHolder = page.getByTestId('canvas-block-tabs_holder');
+      await expect(tabsHolder.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
       await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
       await saveDesignerPage(page, pid);
 
-      const readback = await page.request.get(`/api/pages/key/${formKey}`);
+      const readback = await page.request.get(`/api/pages/${pid}`);
       expect(readback.ok(), await readback.text()).toBe(true);
       const readbackBody = await readback.json();
       expect(readbackBody.code).toBe('0');
       const savedBlocks = readbackBody.data.blocks as TestBlock[];
-      const savedSource = findBlock(savedBlocks, 'section_source');
-      const savedTarget = findBlock(savedBlocks, 'section_target');
+      const savedTab = findBlock(savedBlocks, 'tab_empty');
 
-      expect(savedSource?.blocks?.map((block) => block.id)).toEqual(['field_source_name']);
-      expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([movedBlockId]);
+      expect(savedBlocks.map((block) => block.id)).toEqual(['section_source', 'tabs_holder']);
+      expect(savedTab?.blocks?.map((block) => block.id)).toEqual([movedBlockId]);
       expectAdvancedContainerChildren(savedBlocks, blockType, movedBlockId);
     });
 
@@ -2169,96 +2177,84 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       const movedBlockId = `${blockType}_move_candidate`;
       const targetBlockId = `${blockType}_target`;
       const { pageKey: formKey, pid } = await createCrossContainerAdvancedContainerFormPage(page, blockType);
-      await openDesigner(page, formKey);
+      await openDesigner(page, pid);
       await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
       await page.getByTestId('designer-mode-layout').click();
-      await dragCanvasBlockBeforeHeader(page, movedBlockId, targetBlockId);
+      await dragOutlineRowBefore(page, movedBlockId, targetBlockId);
 
-      const sourceSection = page.getByTestId('canvas-block-section_source');
-      const targetSection = page.getByTestId('canvas-block-section_target');
-      await expect(sourceSection.getByTestId(`canvas-block-${movedBlockId}`)).toHaveCount(0);
-      await expect(targetSection.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
-      expect(await isBeforeInDom(targetSection, movedBlockId, targetBlockId)).toBe(true);
+      const workbench = page.getByTestId('unified-designer-workbench');
+      expect(await isBeforeInDom(workbench, movedBlockId, targetBlockId)).toBe(true);
       await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
       await waitForDesignerDragToSettle(page);
 
       await clickDesignerToolbarButton(page, 'designer-undo');
 
-      await expect(sourceSection.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
-      await expect(targetSection.getByTestId(`canvas-block-${movedBlockId}`)).toHaveCount(0);
-      expect(await isBeforeInDom(sourceSection, 'field_source_name', movedBlockId)).toBe(true);
+      expect(await isBeforeInDom(workbench, targetBlockId, movedBlockId)).toBe(true);
       await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
       await expect(page.getByTestId('designer-redo')).toBeEnabled();
 
       await clickDesignerToolbarButton(page, 'designer-redo');
 
-      await expect(sourceSection.getByTestId(`canvas-block-${movedBlockId}`)).toHaveCount(0);
-      await expect(targetSection.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
-      expect(await isBeforeInDom(targetSection, movedBlockId, targetBlockId)).toBe(true);
+      expect(await isBeforeInDom(workbench, movedBlockId, targetBlockId)).toBe(true);
       await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
       await saveDesignerPage(page, pid);
 
-      const readback = await page.request.get(`/api/pages/key/${formKey}`);
+      const readback = await page.request.get(`/api/pages/${pid}`);
       expect(readback.ok(), await readback.text()).toBe(true);
       const readbackBody = await readback.json();
       expect(readbackBody.code).toBe('0');
       const savedBlocks = readbackBody.data.blocks as TestBlock[];
-      const savedSource = findBlock(savedBlocks, 'section_source');
-      const savedTarget = findBlock(savedBlocks, 'section_target');
-
-      expect(savedSource?.blocks?.map((block) => block.id)).toEqual(['field_source_name']);
-      expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([movedBlockId, targetBlockId]);
+      expect(savedBlocks.map((block) => block.id)).toEqual([
+        'section_source',
+        movedBlockId,
+        targetBlockId,
+      ]);
       expectAdvancedContainerChildren(savedBlocks, blockType, movedBlockId);
     });
 
-    test(`undoes and redoes moving a ${blockType} subtree inside an empty section`, async ({
+    test(`undoes and redoes moving a ${blockType} subtree inside an empty tab`, async ({
       page,
     }) => {
       const movedBlockId = `${blockType}_move_candidate`;
       const { pageKey: formKey, pid } = await createCrossContainerAdvancedContainerFormPage(page, blockType, {
         emptyTarget: true,
       });
-      await openDesigner(page, formKey);
+      await openDesigner(page, pid);
       await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
       await page.getByTestId('designer-mode-layout').click();
-      await dragCanvasBlockInto(page, movedBlockId, 'section_target');
+      await dragCanvasBlockInto(page, movedBlockId, 'tab_empty');
 
-      const sourceSection = page.getByTestId('canvas-block-section_source');
-      const targetSection = page.getByTestId('canvas-block-section_target');
-      await expect(sourceSection.getByTestId(`canvas-block-${movedBlockId}`)).toHaveCount(0);
-      await expect(targetSection.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
+      const tabsHolder = page.getByTestId('canvas-block-tabs_holder');
+      await expect(tabsHolder.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
       await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
       await waitForDesignerDragToSettle(page);
 
       await clickDesignerToolbarButton(page, 'designer-undo');
 
-      await expect(sourceSection.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
-      await expect(targetSection.getByTestId(`canvas-block-${movedBlockId}`)).toHaveCount(0);
-      expect(await isBeforeInDom(sourceSection, 'field_source_name', movedBlockId)).toBe(true);
+      await expect(tabsHolder.getByTestId(`canvas-block-${movedBlockId}`)).toHaveCount(0);
+      await expect(page.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
       await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
       await expect(page.getByTestId('designer-redo')).toBeEnabled();
 
       await clickDesignerToolbarButton(page, 'designer-redo');
 
-      await expect(sourceSection.getByTestId(`canvas-block-${movedBlockId}`)).toHaveCount(0);
-      await expect(targetSection.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
+      await expect(tabsHolder.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
       await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
       await saveDesignerPage(page, pid);
 
-      const readback = await page.request.get(`/api/pages/key/${formKey}`);
+      const readback = await page.request.get(`/api/pages/${pid}`);
       expect(readback.ok(), await readback.text()).toBe(true);
       const readbackBody = await readback.json();
       expect(readbackBody.code).toBe('0');
       const savedBlocks = readbackBody.data.blocks as TestBlock[];
-      const savedSource = findBlock(savedBlocks, 'section_source');
-      const savedTarget = findBlock(savedBlocks, 'section_target');
+      const savedTab = findBlock(savedBlocks, 'tab_empty');
 
-      expect(savedSource?.blocks?.map((block) => block.id)).toEqual(['field_source_name']);
-      expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([movedBlockId]);
+      expect(savedBlocks.map((block) => block.id)).toEqual(['section_source', 'tabs_holder']);
+      expect(savedTab?.blocks?.map((block) => block.id)).toEqual([movedBlockId]);
       expectAdvancedContainerChildren(savedBlocks, blockType, movedBlockId);
     });
   }
@@ -2269,7 +2265,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const { pageKey: formKey, pid } = await createCrossContainerActionBarFormPage(page, {
       source: 'tab',
     });
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2285,15 +2281,14 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'form_root');
     const savedSourceTab = findBlock(savedBlocks, 'tab_source');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual([
+    expect(savedBlocks.map((block) => block.id)).toEqual([
       'tabs_holder',
       'action_bar_move_candidate',
       'section_target',
@@ -2308,7 +2303,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const { pageKey: formKey, pid } = await createCrossContainerActionBarFormPage(page, {
       source: 'form',
     });
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2320,15 +2315,14 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'form_root');
     const savedTargetTab = findBlock(savedBlocks, 'tab_empty');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual(['tabs_holder']);
+    expect(savedBlocks.map((block) => block.id)).toEqual(['tabs_holder']);
     expect(savedTargetTab?.blocks?.map((block) => block.id)).toEqual([
       'action_bar_move_candidate',
     ]);
@@ -2341,7 +2335,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const { pageKey: formKey, pid } = await createCrossContainerActionBarFormPage(page, {
       source: 'tab',
     });
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2375,15 +2369,14 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'form_root');
     const savedSourceTab = findBlock(savedBlocks, 'tab_source');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual([
+    expect(savedBlocks.map((block) => block.id)).toEqual([
       'tabs_holder',
       'action_bar_move_candidate',
       'section_target',
@@ -2398,7 +2391,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const { pageKey: formKey, pid } = await createCrossContainerActionBarFormPage(page, {
       source: 'form',
     });
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2427,15 +2420,14 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'form_root');
     const savedTargetTab = findBlock(savedBlocks, 'tab_empty');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual(['tabs_holder']);
+    expect(savedBlocks.map((block) => block.id)).toEqual(['tabs_holder']);
     expect(savedTargetTab?.blocks?.map((block) => block.id)).toEqual([
       'action_bar_move_candidate',
     ]);
@@ -2448,7 +2440,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const { pageKey: formKey, pid } = await createCrossContainerFormSectionPage(page, {
       source: 'tab',
     });
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2464,15 +2456,14 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'form_root');
     const savedSourceTab = findBlock(savedBlocks, 'tab_source');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual([
+    expect(savedBlocks.map((block) => block.id)).toEqual([
       'tabs_holder',
       'form_section_move_candidate',
       'section_target',
@@ -2487,7 +2478,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const { pageKey: formKey, pid } = await createCrossContainerFormSectionPage(page, {
       source: 'form',
     });
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2499,15 +2490,14 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'form_root');
     const savedTargetTab = findBlock(savedBlocks, 'tab_empty');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual(['tabs_holder']);
+    expect(savedBlocks.map((block) => block.id)).toEqual(['tabs_holder']);
     expect(savedTargetTab?.blocks?.map((block) => block.id)).toEqual([
       'form_section_move_candidate',
     ]);
@@ -2520,7 +2510,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const { pageKey: formKey, pid } = await createCrossContainerFormSectionPage(page, {
       source: 'tab',
     });
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2554,15 +2544,14 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'form_root');
     const savedSourceTab = findBlock(savedBlocks, 'tab_source');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual([
+    expect(savedBlocks.map((block) => block.id)).toEqual([
       'tabs_holder',
       'form_section_move_candidate',
       'section_target',
@@ -2577,7 +2566,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const { pageKey: formKey, pid } = await createCrossContainerFormSectionPage(page, {
       source: 'form',
     });
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2606,15 +2595,14 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'form_root');
     const savedTargetTab = findBlock(savedBlocks, 'tab_empty');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual(['tabs_holder']);
+    expect(savedBlocks.map((block) => block.id)).toEqual(['tabs_holder']);
     expect(savedTargetTab?.blocks?.map((block) => block.id)).toEqual([
       'form_section_move_candidate',
     ]);
@@ -2627,7 +2615,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const { pageKey: listKey, pid } = await createCrossContainerListBlockPage(page, 'table', {
       source: 'tab',
     });
-    await openDesigner(page, listKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2643,15 +2631,14 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${listKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'list_root');
     const savedSourceTab = findBlock(savedBlocks, 'tab_source');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual([
+    expect(savedBlocks.map((block) => block.id)).toEqual([
       'tabs_holder',
       'action_bar_target',
       'table_move_candidate',
@@ -2667,7 +2654,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const { pageKey: listKey, pid } = await createCrossContainerListBlockPage(page, 'table', {
       source: 'tab',
     });
-    await openDesigner(page, listKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2696,15 +2683,14 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${listKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'list_root');
     const savedSourceTab = findBlock(savedBlocks, 'tab_source');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual([
+    expect(savedBlocks.map((block) => block.id)).toEqual([
       'tabs_holder',
       'action_bar_target',
       'table_move_candidate',
@@ -2720,7 +2706,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const { pageKey: listKey, pid } = await createCrossContainerListBlockPage(page, 'filter-bar', {
       source: 'list',
     });
-    await openDesigner(page, listKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2732,15 +2718,14 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${listKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'list_root');
     const savedTargetTab = findBlock(savedBlocks, 'tab_empty');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual(['tabs_holder']);
+    expect(savedBlocks.map((block) => block.id)).toEqual(['tabs_holder']);
     expect(savedTargetTab?.blocks?.map((block) => block.id)).toEqual([
       'filter_bar_move_candidate',
     ]);
@@ -2753,7 +2738,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const { pageKey: listKey, pid } = await createCrossContainerListBlockPage(page, 'filter-bar', {
       source: 'list',
     });
-    await openDesigner(page, listKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2779,15 +2764,14 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${listKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'list_root');
     const savedTargetTab = findBlock(savedBlocks, 'tab_empty');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual(['tabs_holder']);
+    expect(savedBlocks.map((block) => block.id)).toEqual(['tabs_holder']);
     expect(savedTargetTab?.blocks?.map((block) => block.id)).toEqual([
       'filter_bar_move_candidate',
     ]);
@@ -2807,7 +2791,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const { pageKey: listKey, pid } = await createCrossContainerListBlockPage(page, 'action-bar', {
       source: 'tab',
     });
-    await openDesigner(page, listKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2840,15 +2824,14 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${listKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'list_root');
     const savedSourceTab = findBlock(savedBlocks, 'tab_source');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual([
+    expect(savedBlocks.map((block) => block.id)).toEqual([
       'action_bar_move_candidate',
       'action_bar_anchor_table',
       'tabs_holder',
@@ -2863,7 +2846,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const { pageKey: listKey, pid } = await createCrossContainerListBlockPage(page, 'action-bar', {
       source: 'list',
     });
-    await openDesigner(page, listKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2889,15 +2872,14 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${listKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'list_root');
     const savedTargetTab = findBlock(savedBlocks, 'tab_empty');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual(['tabs_holder']);
+    expect(savedBlocks.map((block) => block.id)).toEqual(['tabs_holder']);
     expect(savedTargetTab?.blocks?.map((block) => block.id)).toEqual([
       'action_bar_move_candidate',
     ]);
@@ -2917,7 +2899,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const { pageKey: listKey, pid } = await createCrossContainerListBlockPage(page, 'widget', {
       source: 'tab',
     });
-    await openDesigner(page, listKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2946,15 +2928,14 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${listKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'list_root');
     const savedSourceTab = findBlock(savedBlocks, 'tab_source');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual([
+    expect(savedBlocks.map((block) => block.id)).toEqual([
       'widget_move_candidate',
       'widget_anchor_table',
       'tabs_holder',
@@ -2969,11 +2950,11 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const { pageKey: listKey, pid } = await createCrossContainerListBlockPage(page, 'widget', {
       source: 'list',
     });
-    await openDesigner(page, listKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
-    await dragCanvasBlockInto(page, 'widget_move_candidate', 'tab_empty');
+    await dragOutlineRowBefore(page, 'widget_move_candidate', 'tab_empty');
 
     const listRoot = page.getByTestId('canvas-block-list_root');
     const targetTab = page.getByTestId('canvas-block-tab_empty');
@@ -2995,15 +2976,14 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${listKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'list_root');
     const savedTargetTab = findBlock(savedBlocks, 'tab_empty');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual(['tabs_holder']);
+    expect(savedBlocks.map((block) => block.id)).toEqual(['tabs_holder']);
     expect(savedTargetTab?.blocks?.map((block) => block.id)).toEqual(['widget_move_candidate']);
     expectListBlockChildren(savedBlocks, 'widget', 'widget_move_candidate');
   });
@@ -3026,7 +3006,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       const candidateId = isColumn ? 'column_move_candidate' : 'filter_field_move_candidate';
       const targetLeafId = isColumn ? 'target_col_title' : 'target_filter_status';
       const { pageKey: listKey, pid } = await createCrossContainerLeafBlockListPage(page, blockType);
-      await openDesigner(page, listKey);
+      await openDesigner(page, pid);
       await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
       await page.getByTestId('designer-mode-layout').click();
@@ -3061,7 +3041,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
       await saveDesignerPage(page, pid);
 
-      const readback = await page.request.get(`/api/pages/key/${listKey}`);
+      const readback = await page.request.get(`/api/pages/${pid}`);
       expect(readback.ok(), await readback.text()).toBe(true);
       const readbackBody = await readback.json();
       expect(readbackBody.code).toBe('0');
@@ -3072,8 +3052,8 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
       expect(savedSource?.blocks?.map((block) => block.id)).toEqual([sourceAnchorId]);
       expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([candidateId, targetLeafId]);
-      expect(movedLeaf?.blockType).toBe(blockType);
-      expect(movedLeaf?.props?.label).toBe('Move candidate');
+      expect(movedLeaf).not.toBeNull();
+      expect((movedLeaf as Record<string, unknown> | null)?.label).toBe('Move candidate');
     });
 
     test(`undoes and redoes moving a ${blockType} leaf inside an empty compatible parent`, async ({
@@ -3087,7 +3067,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       const { pageKey: listKey, pid } = await createCrossContainerLeafBlockListPage(page, blockType, {
         emptyTarget: true,
       });
-      await openDesigner(page, listKey);
+      await openDesigner(page, pid);
       await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
       await page.getByTestId('designer-mode-layout').click();
@@ -3116,7 +3096,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
       await saveDesignerPage(page, pid);
 
-      const readback = await page.request.get(`/api/pages/key/${listKey}`);
+      const readback = await page.request.get(`/api/pages/${pid}`);
       expect(readback.ok(), await readback.text()).toBe(true);
       const readbackBody = await readback.json();
       expect(readbackBody.code).toBe('0');
@@ -3127,8 +3107,8 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
       expect(savedSource?.blocks?.map((block) => block.id)).toEqual([sourceAnchorId]);
       expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([candidateId]);
-      expect(movedLeaf?.blockType).toBe(blockType);
-      expect(movedLeaf?.props?.label).toBe('Move candidate');
+      expect(movedLeaf).not.toBeNull();
+      expect((movedLeaf as Record<string, unknown> | null)?.label).toBe('Move candidate');
     });
   }
 
@@ -3145,15 +3125,11 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
         page,
         parentType,
       );
-      await openDesigner(page, listKey);
+      await openDesigner(page, pid);
       await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
       await page.getByTestId('designer-mode-layout').click();
-      if (parentType === 'action-bar') {
-        await dragCanvasBlockBeforeHeader(page, candidateId, targetLeafId);
-      } else {
-        await dragCanvasBlockBefore(page, candidateId, targetLeafId);
-      }
+      await dragOutlineRowBefore(page, candidateId, targetLeafId);
 
       const sourceParent = page.getByTestId(`canvas-block-${sourceParentId}`);
       const targetParent = page.getByTestId(`canvas-block-${targetParentId}`);
@@ -3180,7 +3156,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
       await saveDesignerPage(page, pid);
 
-      const readback = await page.request.get(`/api/pages/key/${listKey}`);
+      const readback = await page.request.get(`/api/pages/${pid}`);
       expect(readback.ok(), await readback.text()).toBe(true);
       const readbackBody = await readback.json();
       expect(readbackBody.code).toBe('0');
@@ -3191,9 +3167,9 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
       expect(savedSource?.blocks?.map((block) => block.id)).toEqual([sourceAnchorId]);
       expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([candidateId, targetLeafId]);
-      expect(movedAction?.blockType).toBe('action');
+      expect(movedAction).not.toBeNull();
       expect(movedAction?.actionType).toBe('refresh');
-      expect(movedAction?.props?.label).toBe('Move candidate');
+      expect((movedAction as Record<string, unknown> | null)?.label).toBe('Move candidate');
     });
 
     test(`undoes and redoes moving an action leaf inside an empty ${parentType}`, async ({
@@ -3210,11 +3186,11 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
           emptyTarget: true,
         },
       );
-      await openDesigner(page, listKey);
+      await openDesigner(page, pid);
       await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
       await page.getByTestId('designer-mode-layout').click();
-      await dragCanvasBlockInto(page, candidateId, targetParentId);
+      await dragOutlineRowBefore(page, candidateId, targetParentId);
 
       const sourceParent = page.getByTestId(`canvas-block-${sourceParentId}`);
       const targetParent = page.getByTestId(`canvas-block-${targetParentId}`);
@@ -3239,7 +3215,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
       await saveDesignerPage(page, pid);
 
-      const readback = await page.request.get(`/api/pages/key/${listKey}`);
+      const readback = await page.request.get(`/api/pages/${pid}`);
       expect(readback.ok(), await readback.text()).toBe(true);
       const readbackBody = await readback.json();
       expect(readbackBody.code).toBe('0');
@@ -3250,9 +3226,9 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
       expect(savedSource?.blocks?.map((block) => block.id)).toEqual([sourceAnchorId]);
       expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([candidateId]);
-      expect(movedAction?.blockType).toBe('action');
+      expect(movedAction).not.toBeNull();
       expect(movedAction?.actionType).toBe('refresh');
-      expect(movedAction?.props?.label).toBe('Move candidate');
+      expect((movedAction as Record<string, unknown> | null)?.label).toBe('Move candidate');
     });
   }
 
@@ -3269,7 +3245,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       const candidateId = 'action_move_candidate';
       const targetLeafId = 'target_action_view';
       const { pageKey: listKey, pid } = await createCrossParentActionLeafListPage(page, route);
-      await openDesigner(page, listKey);
+      await openDesigner(page, pid);
       await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
       await page.getByTestId('designer-mode-layout').click();
@@ -3300,7 +3276,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
       await saveDesignerPage(page, pid);
 
-      const readback = await page.request.get(`/api/pages/key/${listKey}`);
+      const readback = await page.request.get(`/api/pages/${pid}`);
       expect(readback.ok(), await readback.text()).toBe(true);
       const readbackBody = await readback.json();
       expect(readbackBody.code).toBe('0');
@@ -3311,9 +3287,9 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
       expect(savedSource?.blocks?.map((block) => block.id)).toEqual([sourceAnchorId]);
       expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([candidateId, targetLeafId]);
-      expect(movedAction?.blockType).toBe('action');
+      expect(movedAction).not.toBeNull();
       expect(movedAction?.actionType).toBe('refresh');
-      expect(movedAction?.props?.label).toBe('Move candidate');
+      expect((movedAction as Record<string, unknown> | null)?.label).toBe('Move candidate');
     });
 
     test(`undoes and redoes moving a cross-parent action leaf inside an empty ${route.target} from ${route.source}`, async ({
@@ -3326,7 +3302,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       const { pageKey: listKey, pid } = await createCrossParentActionLeafListPage(page, route, {
         emptyTarget: true,
       });
-      await openDesigner(page, listKey);
+      await openDesigner(page, pid);
       await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
       await page.getByTestId('designer-mode-layout').click();
@@ -3355,7 +3331,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
       await saveDesignerPage(page, pid);
 
-      const readback = await page.request.get(`/api/pages/key/${listKey}`);
+      const readback = await page.request.get(`/api/pages/${pid}`);
       expect(readback.ok(), await readback.text()).toBe(true);
       const readbackBody = await readback.json();
       expect(readbackBody.code).toBe('0');
@@ -3366,15 +3342,15 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
       expect(savedSource?.blocks?.map((block) => block.id)).toEqual([sourceAnchorId]);
       expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([candidateId]);
-      expect(movedAction?.blockType).toBe('action');
+      expect(movedAction).not.toBeNull();
       expect(movedAction?.actionType).toBe('refresh');
-      expect(movedAction?.props?.label).toBe('Move candidate');
+      expect((movedAction as Record<string, unknown> | null)?.label).toBe('Move candidate');
     });
   }
 
   test('rejects moving a cross-kind block within a form designer and keeps persisted schema unchanged', async ({ page }) => {
-    const { pageKey: formKey } = await createCrossKindGuardFormPage(page);
-    await openDesigner(page, formKey);
+    const { pageKey: formKey, pid } = await createCrossKindGuardFormPage(page);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -3391,7 +3367,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     expect(await isBeforeInDom(tabsRoot, 'section_main', 'detail_section_from_detail')).toBe(true);
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -3406,8 +3382,8 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
   test('rejects moving a kind-allowed child into an incompatible container and keeps persisted schema unchanged', async ({
     page,
   }) => {
-    const { pageKey: formKey } = await createIncompatibleContainerGuardFormPage(page);
-    await openDesigner(page, formKey);
+    const { pageKey: formKey, pid } = await createIncompatibleContainerGuardFormPage(page);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -3424,7 +3400,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     await expect(targetSection.getByTestId('canvas-block-column_move_candidate')).toHaveCount(0);
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -3438,8 +3414,8 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
   test('rejects moving a workflow block in a list designer even when the local tab can contain it', async ({
     page,
   }) => {
-    const { pageKey: listKey } = await createCrossKindWorkflowGuardListPage(page);
-    await openDesigner(page, listKey);
+    const { pageKey: listKey, pid } = await createCrossKindWorkflowGuardListPage(page);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -3457,7 +3433,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     expect(await isBeforeInDom(tabMain, 'table_main', 'bpm_panel_from_detail')).toBe(true);
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
-    const readback = await page.request.get(`/api/pages/key/${listKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -3474,8 +3450,8 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
   // whose single jump-move pointerWithin can miss — the workbench's
   // pointerWithin→closestCenter fallback is what keeps those green.
   test('binds a model field via Playwright .dragTo() (UDW drag-driver guard)', async ({ page }) => {
-    const formKey = await createFormPage(page);
-    await openDesigner(page, formKey);
+    const { pageKey: formKey, pid } = await createFormPage(page);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible({ timeout: 15000 });
 
     const sectionItem = page
@@ -3501,8 +3477,8 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
   // Block deletion: a designer must let users remove blocks (golden-standard
   // delete). The top-level kind container is protected; descendants are deletable.
   test('deletes a canvas block via the delete control and persists the removal', async ({ page }) => {
-    const formKey = await createFormPage(page);
-    await openDesigner(page, formKey);
+    const { pageKey: formKey, pid } = await createFormPage(page);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible({ timeout: 15000 });
 
     // The root form container has no delete control (it defines the page kind).
@@ -3558,6 +3534,28 @@ async function dragCanvasBlockBeforeHeader(page: Page, sourceBlockId: string, ta
   await page.mouse.move(targetX, targetY, { steps: 18 });
   await page.mouse.move(targetX + 3, targetY + 3, { steps: 4 });
   await page.mouse.up();
+}
+
+async function dragOutlineRowBefore(page: Page, sourceBlockId: string, targetBlockId: string) {
+  const sourceRow = page.getByTestId(`outline-item-${sourceBlockId}`);
+  const targetRow = page.getByTestId(`outline-item-${targetBlockId}`);
+  await expect(sourceRow).toBeVisible();
+  await expect(targetRow).toBeVisible();
+
+  const src = await sourceRow.boundingBox();
+  const dst = await targetRow.boundingBox();
+  expect(src && dst).toBeTruthy();
+  const sourceX = src!.x + src!.width / 2;
+  const sourceY = src!.y + src!.height / 2;
+  const targetX = dst!.x + dst!.width / 2;
+  const targetY = dst!.y + dst!.height / 2;
+  await page.mouse.move(sourceX, sourceY);
+  await page.mouse.down();
+  await page.mouse.move(sourceX + 8, sourceY + 8, { steps: 6 });
+  await page.mouse.move(targetX, targetY, { steps: 14 });
+  await page.mouse.move(targetX + 2, targetY + 2, { steps: 4 });
+  await page.mouse.up();
+  await waitForDesignerDragToSettle(page);
 }
 
 async function dragCanvasBlockInto(page: Page, sourceBlockId: string, parentBlockId: string) {

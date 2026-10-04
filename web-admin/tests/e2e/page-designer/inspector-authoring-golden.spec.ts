@@ -32,7 +32,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../fixtures';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
-import { loginViaUI } from '../../helpers/auth-fixtures';
+import { loginViaUI, ensureBusinessSpace } from '../../helpers/auth-fixtures';
 import { uniqueId } from '../helpers';
 
 // ab_announcement is a published platform meta-model present in every OSS stack.
@@ -233,6 +233,9 @@ test.describe.serial('Unified Designer inspector authoring golden', () => {
 
   test.beforeEach(async ({ page }) => {
     await loginViaUI(page, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
+    // A fresh UI login can land in the System space on a newly provisioned
+    // stack; select the business space so page-seeding has the permissions.
+    await ensureBusinessSpace(page);
   });
 
   test('A2: bpm-panel inspector — status/assignee/dueAt + actions JSON persist and reload', async ({

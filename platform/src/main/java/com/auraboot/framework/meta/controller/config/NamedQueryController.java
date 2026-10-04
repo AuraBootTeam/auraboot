@@ -269,19 +269,13 @@ public class NamedQueryController {
             return;
         }
 
-        String fileKey = exportTaskService.getFileKey(taskPid);
-        if (fileKey == null) {
+        ExportTaskService.ExportArtifactDownload artifact = exportTaskService.openArtifact(taskPid);
+        if (artifact == null) {
             response.sendError(HttpServletResponse.SC_NOT_FOUND, "File not found");
             return;
         }
 
-        java.nio.file.Path filePath = java.nio.file.Paths.get(fileKey);
-        if (!java.nio.file.Files.exists(filePath)) {
-            response.sendError(HttpServletResponse.SC_NOT_FOUND, "File expired or deleted");
-            return;
-        }
-
-        String extension = fileKey.substring(fileKey.lastIndexOf('.'));
+        String extension = artifact.extension();
         String contentType = switch (extension) {
             case ".xlsx" -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
             case ".csv" -> "text/csv; charset=UTF-8";
@@ -292,10 +286,10 @@ public class NamedQueryController {
         String fileName = task.getQueryCode() + "_export" + extension;
         response.setHeader("Cache-Control", "no-store");
         response.setContentType(contentType);
-        response.setContentLengthLong(java.nio.file.Files.size(filePath));
+        response.setContentLengthLong(artifact.size());
         response.setHeader("Content-Disposition", "attachment; filename=\"" + fileName + "\"");
 
-        try (java.io.InputStream is = java.nio.file.Files.newInputStream(filePath);
+        try (java.io.InputStream is = artifact.content();
              java.io.OutputStream os = response.getOutputStream()) {
             is.transferTo(os);
         }

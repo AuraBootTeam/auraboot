@@ -576,7 +576,11 @@ aura_reset_register_process "web" "$WEB_PID" "$VITE_PORT" "$WEB_ADMIN_DIR" "pnpm
 # SPRING_BOOT_URL is mandatory in slot mode: bff.server.ts otherwise falls back
 # to AURA_BE_BASE (exported above) and finally the :6443 host-mode default,
 # which leaves the BFF proxying to a dead port on any non-default BE_PORT.
-BFF_PID="$(aura_reset_spawn_detached "$WEB_ADMIN_DIR" "$BFF_LOG" env SPRING_BOOT_URL="$AURA_BE_BASE" pnpm dev:bff)"
+# BFF_ALLOWED_PORTS is likewise mandatory on non-default ports: bff.server.ts
+# origin-checks dev requests against {3000,3500,5173,5174,6443} unless the
+# slot's web/bff ports are allow-listed, turning /api/auth/session-renew etc.
+# into 403s that look like product regressions.
+BFF_PID="$(aura_reset_spawn_detached "$WEB_ADMIN_DIR" "$BFF_LOG" env SPRING_BOOT_URL="$AURA_BE_BASE" BFF_ALLOWED_PORTS="${BFF_ALLOWED_PORTS:-$VITE_PORT,$BFF_PORT}" pnpm dev:bff)"
 aura_reset_register_process "bff" "$BFF_PID" "$BFF_PORT" "$WEB_ADMIN_DIR" "pnpm dev:bff"
 
 echo "   Frontend starting (web PID: $WEB_PID, bff PID: $BFF_PID)..."

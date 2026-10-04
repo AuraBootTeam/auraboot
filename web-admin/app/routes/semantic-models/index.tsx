@@ -15,11 +15,17 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
+import {
+  saveExploration,
+  loadExploration,
+  qualifiedDimension,
+} from './explore-storage';
 import { Link } from 'react-router';
 import { toast } from 'sonner';
 import { useI18n } from '~/contexts/I18nContext';
 import {
   fetchSemanticMeta,
+  fetchUsageSummary,
   validateSemanticYaml,
   publishSemanticYaml,
   runSemanticQuery,
@@ -28,9 +34,20 @@ import {
   type MetricMeta,
   type DimensionMeta,
   type SemanticQueryResult,
+  type UsageSummary,
 } from '~/plugins/core-semantic/api/semanticApi';
 
 type Tab = 'browse' | 'author';
+
+/**
+ * Module-level cache for the usage strip (R1): the explore panel remounts on
+ * model switches, and an async refetch would flash the strip away between
+ * mounts. A 60-second cache keeps the strip stable across remounts while
+ * staying fresh enough for a dog-food surface.
+ */
+let usageCache: UsageSummary | null = null;
+let usageCacheAt = 0;
+const USAGE_CACHE_TTL_MS = 60_000;
 
 function localize(
   label: Record<string, string> | undefined,
@@ -219,14 +236,51 @@ function BrowsePanel({
 }) {
   const [pickedMetrics, setPickedMetrics] = useState<string[]>([]);
   const [pickedDims, setPickedDims] = useState<string[]>([]);
+  const [grains, setGrains] = useState<Record<string, string>>({});
+  const [limit, setLimit] = useState(100);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<SemanticQueryResult | null>(null);
   const [queryError, setQueryError] = useState<string | null>(null);
+  const [usage, setUsage] = useState<UsageSummary | null>(null);
 
-  // Reset picks when the model changes.
+  // R1 dog-food surface: the governed pipeline's own usage rollup for the
+  // last 7 days, shown where BI authors work. Hidden silently if the
+  // endpoint is unavailable (older backends). The module-level cache keeps
+  // the strip stable across explore-panel remounts.
   useEffect(() => {
-    setPickedMetrics(model?.metrics?.[0] ? [model.metrics[0].code] : []);
-    setPickedDims([]);
+    let cancelled = false;
+    if (usageCache && Date.now() - usageCacheAt < USAGE_CACHE_TTL_MS) {
+      setUsage(usageCache);
+      return;
+    }
+    fetchUsageSummary(7)
+      .then((u) => {
+        usageCache = u;
+        usageCacheAt = Date.now();
+        if (!cancelled) setUsage(u);
+      })
+      .catch(() => {
+        /* endpoint unavailable — the strip stays hidden */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  // Reset picks when the model changes; restore this model's saved exploration
+  // (R4) when one exists instead of the default first metric.
+  useEffect(() => {
+    const saved = model?.code ? loadExploration(model.code) : null;
+    if (saved) {
+      setPickedMetrics(saved.metrics);
+      setPickedDims(saved.dimensions);
+      setGrains(saved.grains);
+      setLimit(saved.limit);
+    } else {
+      setPickedMetrics(model?.metrics?.[0] ? [model.metrics[0].code] : []);
+      setPickedDims([]);
+      setGrains({});
+      setLimit(100);
+    }
     setResult(null);
     setQueryError(null);
   }, [model?.code]);
@@ -257,10 +311,29 @@ function BrowsePanel({
     try {
       const q = await runSemanticQuery({
         metrics: pickedMetrics.map((c) => `${model!.code}.${c}`),
-        dimensions: pickedDims.map((c) => `${model!.code}.${c}`),
-        limit: 100,
+        dimensions: pickedDims.map((c) => qualifiedDimension(model!.code, c, grains[c])),
+        limit,
       });
       setResult(q);
+      saveExploration({
+        modelCode: model!.code,
+        metrics: pickedMetrics,
+        dimensions: pickedDims,
+        grains,
+        limit,
+      });
+      // R1: refresh the usage strip so the just-executed query is counted
+      // immediately instead of waiting for the next panel mount.
+      usageCache = null;
+      fetchUsageSummary(7)
+        .then((u) => {
+          usageCache = u;
+          usageCacheAt = Date.now();
+          setUsage(u);
+        })
+        .catch(() => {
+          /* strip keeps its previous values on refresh failure */
+        });
     } catch (e) {
       setQueryError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -278,6 +351,36 @@ function BrowsePanel({
           <span className="ml-2 text-xs font-normal text-gray-400">{model.code}</span>
         </h2>
       </div>
+
+
+      {/* R1 usage strip: governed-query rollup, last 7 days */}
+      {usage && (
+        <div
+          data-testid="semantic-usage-strip"
+          className="mb-4 grid grid-cols-2 gap-2 rounded-lg border border-gray-100 bg-gray-50/60 p-3 text-center dark:border-gray-800 dark:bg-gray-900/60 sm:grid-cols-4"
+        >
+          <div>
+            <div className="text-lg font-semibold text-gray-800 dark:text-gray-100">{usage.totalQueries}</div>
+            <div className="text-[11px] text-gray-500">{t('semantic.usage.queries7d', undefined, '7日查询')}</div>
+          </div>
+          <div>
+            <div className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+              {usage.p95DurationMs == null ? '—' : `${Math.round(usage.p95DurationMs)} ms`}
+            </div>
+            <div className="text-[11px] text-gray-500">{t('semantic.usage.p95', undefined, 'P95 耗时')}</div>
+          </div>
+          <div>
+            <div className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+              {usage.cacheHitRate == null ? '—' : `${Math.round(usage.cacheHitRate * 100)}%`}
+            </div>
+            <div className="text-[11px] text-gray-500">{t('semantic.usage.cache', undefined, '缓存命中')}</div>
+          </div>
+          <div>
+            <div className="text-lg font-semibold text-gray-800 dark:text-gray-100">{usage.activeUsers}</div>
+            <div className="text-[11px] text-gray-500">{t('semantic.usage.users7d', undefined, '7日用户')}</div>
+          </div>
+        </div>
+      )}
 
       {/* Metrics */}
       <div>
@@ -343,6 +446,47 @@ function BrowsePanel({
             </span>
           )}
         </div>
+        {/* R4: time-grain selector for picked time dimensions — the compiler
+            understands the __grain suffix (DATE_TRUNC). */}
+        {pickedDims
+          .map((code) => (model.dimensions || []).find((d: DimensionMeta) => d.code === code))
+          .filter((d): d is DimensionMeta => !!d && String(d.type || '').toLowerCase() === 'time')
+          .map((d) => (
+            <div key={d.code} className="mt-2 flex items-center gap-2">
+              <span className="text-xs text-gray-500">
+                {localize(d.label, d.code, locale)} {t('semantic.models.grain', undefined, '粒度')}
+              </span>
+              <select
+                data-testid={`semantic-grain-${d.code}`}
+                className="rounded border border-gray-300 bg-white px-1 py-0.5 text-xs dark:border-gray-700 dark:bg-gray-900"
+                value={grains[d.code] || 'day'}
+                onChange={(e) =>
+                  setGrains((g) => ({ ...g, [d.code]: e.target.value }))
+                }
+              >
+                {['day', 'week', 'month', 'quarter', 'year'].map((grain) => (
+                  <option key={grain} value={grain}>{grain}</option>
+                ))}
+              </select>
+            </div>
+          ))}
+      </div>
+
+      {/* R4: TopN limit selector */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-gray-500">
+          {t('semantic.models.topn', undefined, 'TopN')}
+        </span>
+        <select
+          data-testid="semantic-limit"
+          className="rounded border border-gray-300 bg-white px-1 py-0.5 text-xs dark:border-gray-700 dark:bg-gray-900"
+          value={limit}
+          onChange={(e) => setLimit(Number(e.target.value))}
+        >
+          {[10, 50, 100, 200, 500].map((n) => (
+            <option key={n} value={n}>{n}</option>
+          ))}
+        </select>
       </div>
 
       <button

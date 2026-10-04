@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.service.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.mapper.IdempotentKeyMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,13 +27,17 @@ public class IdempotentKeyCleanupTask {
      */
     @Scheduled(fixedRate = 3600000) // 1 hour
     public void cleanupExpiredKeys() {
-        try {
-            int deleted = idempotentKeyMapper.deleteExpired();
-            if (deleted > 0) {
-                log.info("Cleaned up {} expired idempotent keys", deleted);
+        // Scheduled cleanup scans across all tenants — explicit scope instead of a
+        // blanket table exemption (tenant-exemption cleanup W3).
+        MetaContext.runWithoutTenantFilter(() -> {
+            try {
+                int deleted = idempotentKeyMapper.deleteExpired();
+                if (deleted > 0) {
+                    log.info("Cleaned up {} expired idempotent keys", deleted);
+                }
+            } catch (Exception e) {
+                log.warn("Failed to cleanup expired idempotent keys: {}", e.getMessage());
             }
-        } catch (Exception e) {
-            log.warn("Failed to cleanup expired idempotent keys: {}", e.getMessage());
-        }
+        });
     }
 }

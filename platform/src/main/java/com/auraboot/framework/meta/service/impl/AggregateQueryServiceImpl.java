@@ -57,6 +57,13 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
     @org.springframework.beans.factory.annotation.Autowired
     private NamedQueryFieldProtection fieldProtection;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog applicationRuntimeDefinitionCatalog;
+    @org.springframework.beans.factory.annotation.Value("${aura.application.default-code:}")
+    private String defaultApplicationCode;
+    @org.springframework.beans.factory.annotation.Value("${aura.application.definition-read.runtime-primary-enabled:false}")
+    private boolean applicationRuntimePrimaryEnabled;
+
     /**
      * Optional — when present and the request carries a {@code semanticModelCode},
      * delegate to the semantic layer (PRD 16 §6 W4 D4). Wired via field injection
@@ -196,7 +203,13 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
         Long tenantId = getCurrentTenantId();
 
         // 1. Load Named Query definition
-        NamedQuery query = namedQueryMapper.findByCode(queryCode);
+        // Select the definition and whitelist from the same immutable binding.
+        // Unbound queries retain their existing authoring lookup and access checks.
+        var bound = applicationRuntimePrimaryEnabled && MetaContext.exists()
+                && tenantId != null && org.springframework.util.StringUtils.hasText(defaultApplicationCode)
+                ? applicationRuntimeDefinitionCatalog.findNamedQuery(tenantId, defaultApplicationCode.trim(), queryCode)
+                : java.util.Optional.<com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.BoundNamedQuery>empty();
+        NamedQuery query = bound.isPresent() ? bound.get().query() : namedQueryMapper.findByCode(queryCode);
         if (query == null) {
             throw new MetaServiceException("Named query not found: " + queryCode);
         }
@@ -207,7 +220,7 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
         // 2. Load field whitelist using MyBatis Plus built-in method (ensures typeHandler for operators JSONB)
         QueryWrapper<NamedQueryField> fieldQuery = new QueryWrapper<>();
         fieldQuery.eq("tenant_id", tenantId).eq("query_code", queryCode).orderByAsc("field_code");
-        List<NamedQueryField> fields = namedQueryFieldMapper.selectList(fieldQuery);
+        List<NamedQueryField> fields = bound.isPresent() ? bound.get().fields() : namedQueryFieldMapper.selectList(fieldQuery);
         validatePublicOutputAliases(fields);
         Map<String, NamedQueryField> fieldMap = fields.stream()
                 .collect(Collectors.toMap(NamedQueryField::getFieldCode, f -> f));

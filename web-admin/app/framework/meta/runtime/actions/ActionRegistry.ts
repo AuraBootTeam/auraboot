@@ -446,7 +446,7 @@ actionRegistry.register(
       const endpoint = `${buildApiEndpoint(tableName)}/export`;
       const result = await fetchResult(endpoint, {
         method: 'post',
-        params: { filters },
+        params: { scope: 'filtered', conditions: filters },
         token: token || undefined,
       });
 

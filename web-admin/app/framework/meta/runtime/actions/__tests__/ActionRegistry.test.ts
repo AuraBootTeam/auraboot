@@ -760,6 +760,26 @@ describe('ActionRegistry registry API', () => {
   });
 });
 
+describe('ActionRegistry controlled export', () => {
+  it('declares filtered scope and sends normalized conditions', async () => {
+    const fetchResult = vi.fn().mockResolvedValue({ code: '35000', message: 'fixture stop' });
+    const filters = [{ field: 'status', operator: 'EQ', value: 'active' }];
+
+    await actionRegistry.execute('export', {
+      tableName: 'customer',
+      filters,
+      fetchResult,
+      buildApiEndpoint: (tableName) => `/api/dynamic/${tableName}`,
+    });
+
+    expect(fetchResult).toHaveBeenCalledWith('/api/dynamic/customer/export', {
+      method: 'post',
+      params: { scope: 'filtered', conditions: filters },
+      token: undefined,
+    });
+  });
+});
+
 describe('ActionRegistry router.back / cancel handlers', () => {
   it('router.back and cancel both navigate back by -1', async () => {
     const navigate = vi.fn();

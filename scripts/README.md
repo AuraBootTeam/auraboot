@@ -24,6 +24,8 @@
 | script | refs | updated | purpose |
 |---|--:|---|---|
 | `check-agent-eval-boundary.mjs` | 2 | 2026-06-21 | OSS agent/RAG boundary gate. |
+| `check-batch4-gates.mjs` | 0 | 2026-10-02 | Existing batch-four gate collection. |
+| `check-oss-scope-consistency.mjs` | 0 | 2026-10-02 | Existing OSS scope-consistency gate. |
 | `check-cache-eviction.mjs` | 3 | 2026-07-14 | check-cache-eviction — every @Cacheable cache must have *someone* who evicts it. |
 | `check-capability-codes.mjs` | 0 | 2026-06-21 | Permission v2 capability-code drift gate. |
 | `check-command-permissions.mjs` | 0 | 2026-07-23 | A command whose handler stage does real work must declare the permission that authorizes it. |
@@ -49,6 +51,7 @@
 | `check-hand-written-page-matrix.mjs` | 0 | 2026-07-24 | Gate: no new hand-written page-coverage matrices — the denominator is generated. |
 | `check-i18n-hardcoded.mjs` | 0 | 2026-06-20 | check-i18n-hardcoded.mjs — i18n hardcoded-Chinese gate (ratchet). |
 | `check-jsonb-typehandler.sh` | 3 | 2026-06-11 | check-jsonb-typehandler.sh — guard against the recurring "varchar→jsonb on insert/update" bug. |
+| `check-package-distribution.py` | 2 | 2026-10-02 | Pack all public OSS packages plus the private QR client; verify licenses, exports, README and clean consumers. Requires --enterprise-root and a fresh --out directory. Never publishes. |
 | `check-license-boundary.sh` | 2 | 2026-09-27 | Fail when known copyleft dependency coordinates re-enter default distribution build files. |
 | `check-no-secret-echo.mjs` | 1 | 2026-07-14 | check-no-secret-echo — refuse shell scripts that print a secret to stdout/stderr. |
 | `check-no-secret-echo.sh` | 0 | 2026-07-14 | Wrapper so this gate shows up in `ls scripts/check-*.sh` — the repo's local-gate inventory. |
@@ -147,6 +150,7 @@
 | `lib/runtime-process-owner.sh` | 4 | 2026-08-19 | Runtime-scoped process ownership and exact cleanup safeguards. |
 | `lib/test-multi-worktree-guard.sh` | 1 | 2026-05-22 | Sanity tests for scripts/lib/multi-worktree-guard.sh |
 | `lib/test-runtime-process-owner.sh` | 1 | 2026-08-19 | Fixture integration tests for runtime process ownership. |
+| `lib/web-admin-node-modules.sh` | 2 | 2026-09-29 | Validate a reusable Web Admin dependency tree, including native-module ABI compatibility. |
 | `application/application-contract.mjs` | 2 | 2026-09-12 | Shared manifest, lock, artifact identity, and checksum contract implementation. |
 | `application/oci-layout.mjs` | 1 | 2026-09-12 | Build a digest-addressed Linux OCI layout with Docker on the admitted CI builder. |
 
@@ -233,3 +237,11 @@
 ## test (20)
 
 Co-located `*.test.mjs`; run via the repo test task. Not listed individually.
+
+## Package distribution self-tests
+
+`pnpm test:package-distribution` runs `test-package-distribution.py`: rejects missing or competing license text, retired v1.3 text, metadata/identity/privacy drift, missing exports and README mismatch. The pack gate also executes `fixtures/open-platform-consumer/consumer.test.mjs` and typechecks `fixtures/open-platform-consumer/consumer-ts-check.ts` against a freshly installed tarball outside the repositories. These contract tests use a loopback fixture server; they do not certify a staging deployment.
+
+| script | refs | updated | purpose |
+|---|---|---|---|
+| `fixtures/open-platform-consumer/consumer.test.mjs` | 1 | 2026-10-02 | Nine consumer contract cases driven by the distribution gate from a fresh out-of-repo installation. |

@@ -47,4 +47,16 @@ public interface ImportJobMapper extends BaseMapper<ImportJob> {
             """)
     int clearErrorReport(@Param("id") Long id,
                          @Param("updatedAt") LocalDateTime updatedAt);
+
+    @Select("""
+            SELECT * FROM ab_import_job
+            WHERE tenant_id = #{tenantId}
+              AND created_by = #{userId}
+              AND deleted_flag = FALSE
+            ORDER BY created_at DESC
+            LIMIT #{limit}
+            """)
+    List<ImportJob> findRecentForOwner(@Param("tenantId") Long tenantId,
+                                       @Param("userId") Long userId,
+                                       @Param("limit") int limit);
 }

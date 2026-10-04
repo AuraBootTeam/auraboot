@@ -1,0 +1,128 @@
+[
+  {
+    "pageKey": "exchange_job_center",
+    "name:zh-CN": "数据交换任务",
+    "name:en": "Data Exchange Jobs",
+    "kind": "detail",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "stack"
+    },
+    "extension": {
+      "showBack": false,
+      "showShare": false,
+      "showReport": false,
+      "showPrint": false,
+      "showPdfExport": false,
+      "showEdit": false,
+      "skipFieldMeta": true,
+      "skipDynamicFieldMeta": true
+    },
+    "dataSources": {
+      "jobs": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/exchange/jobs?limit=50",
+        "adaptor": "table"
+      }
+    },
+    "blocks": [
+      {
+        "id": "job_actions",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "refresh_jobs",
+            "variant": "primary",
+            "icon": "RefreshCw",
+            "label": {
+              "zh-CN": "刷新任务",
+              "en": "Refresh jobs"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "reloadDataSource",
+                  "args": {
+                    "dataSourceId": "jobs"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "job_table",
+        "blockType": "table",
+        "dataSource": "jobs",
+        "columns": [
+          {
+            "field": "type",
+            "label": { "zh-CN": "任务类型", "en": "Type" },
+            "dictCode": "exchange_job_type",
+            "width": 140
+          },
+          {
+            "field": "status",
+            "label": { "zh-CN": "状态", "en": "Status" },
+            "dictCode": "exchange_job_status",
+            "renderType": "status-pill",
+            "width": 100
+          },
+          {
+            "field": "progress",
+            "label": { "zh-CN": "进度", "en": "Progress" },
+            "valueType": "progress",
+            "width": 120
+          },
+          {
+            "field": "summary",
+            "label": { "zh-CN": "处理结果", "en": "Result" },
+            "width": 220,
+            "ellipsis": true
+          },
+          {
+            "field": "createdAt",
+            "label": { "zh-CN": "创建时间", "en": "Created" },
+            "valueType": "datetime",
+            "width": 145
+          },
+          {
+            "field": "completedAt",
+            "label": { "zh-CN": "完成时间", "en": "Completed" },
+            "valueType": "datetime",
+            "width": 145
+          },
+          {
+            "field": "downloadUrl",
+            "label": { "zh-CN": "产物", "en": "Artifact" },
+            "valueType": "link",
+            "width": 90,
+            "render": {
+              "text": { "zh-CN": "下载", "en": "Download" }
+            }
+          }
+        ],
+        "mobileCard": {
+          "enabled": true,
+          "titleField": "summary",
+          "eyebrowField": "type",
+          "statusField": "status",
+          "fields": ["progress", "createdAt", "downloadUrl"]
+        },
+        "empty": {
+          "title": {
+            "zh-CN": "还没有数据交换任务",
+            "en": "No data exchange jobs yet"
+          },
+          "description": {
+            "zh-CN": "从业务列表导入或导出数据，或从单据页生成正式文档后，可在这里查看进度并领取产物。",
+            "en": "Import or export business data, or generate a document, then return here to track progress and collect artifacts."
+          }
+        }
+      }
+    ]
+  }
+]

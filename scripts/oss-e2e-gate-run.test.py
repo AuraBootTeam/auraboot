@@ -18,11 +18,26 @@ class GateContracts(unittest.TestCase):
         for d in ['scripts', 'web-admin', 'bin']:
             (self.repo / d).mkdir(parents=True)
         shutil.copy(SOURCE, self.repo / 'scripts/oss-e2e-gate-run.sh')
+        shutil.copytree(SOURCE.parent / 'lib', self.repo / 'scripts/lib')
+        subprocess.run(['git', 'init', '-q', str(self.root)], check=True)
+        (self.root / 'runtime.yaml').write_text('repos: {}\n')
         self.env = {**os.environ, 'AURA_WORKSPACE_ROOT': str(self.root),
                     'PATH': str(self.repo / 'bin') + os.pathsep + os.environ['PATH'],
                     'CALLS': str(self.root / 'calls'), 'AURA_EVIDENCE_ROOT': str(self.root / 'evidence')}
         self.executable(self.root / 'dev.sh', '#!/bin/bash\nexit 0\n')
-        self.executable(self.root / 'aura', '#!/bin/bash\nif [ "$2" = list ]; then printf "name repo slot\\n%s" "${EXISTING_RUNTIME:-}"; else echo "runtime ensure"; fi\n')
+        self.executable(self.root / 'aura', '''#!/usr/bin/env node
+const fs = require('node:fs');
+const path = require('node:path');
+const args = process.argv.slice(2);
+if (args[0] === 'control') process.exit(0);
+if (process.env.RECORD_AURA === '1') fs.appendFileSync(process.env.CALLS, args.join(' ') + '\\n');
+if (args[1] === 'list') console.log('name repo slot\\n' + (process.env.EXISTING_RUNTIME || ''));
+else if (args[1] === 'evidence' && args[2] === 'begin') {
+  const dir = path.join(process.env.AURA_WORKSPACE_ROOT, '.workspace/evidence/fixture-round');
+  fs.mkdirSync(dir, { recursive: true });
+  console.log(dir);
+} else console.log('runtime ensure');
+''')
         self.executable(self.repo / 'bin/lsof', '#!/bin/bash\nexit 1\n')
         self.executable(self.repo / 'bin/pnpm', """#!/bin/bash
 printf '%s\\n' "$*" >> "$CALLS"
@@ -117,10 +132,9 @@ esac
         p = self.root / '.workspace/env/owned-new.env'
         p.parent.mkdir(parents=True)
         p.write_text('SERVER_PORT=1\nVITE_PORT=2\nBFF_PORT=3\nPOSTGRES_DB=auraboot_239\nREDIS_DATABASE=1\nPOSTGRES_HOST=127.0.0.1\nPOSTGRES_PORT=5432\nPOSTGRES_USER=fixture\nPOSTGRES_PASSWORD=fixture\n')
-        self.executable(self.root / 'aura', '#!/bin/bash\nprintf "%s\\n" "$*" >> "$CALLS"\nif [ "$1" = runtime ] && [ $# = 1 ]; then echo "runtime ensure"; fi\n')
         self.executable(self.repo / 'bin/psql', '#!/bin/bash\nprintf "%s\\n" "$*" >> "$CALLS"\nprintf 1\n')
         r = subprocess.run(['bash', str(self.repo / 'scripts/real-stack.sh'), 'up', 'owned-new', '--slot', '239', '--require-new-db'],
-                           env=self.env, capture_output=True, text=True, timeout=10)
+                           env={**self.env, 'RECORD_AURA': '1'}, capture_output=True, text=True, timeout=10)
         self.assertEqual(r.returncode, 1, r.stderr)
         self.assertIn('already exists', r.stderr)
         self.assertNotIn('infra ensure', self.calls())

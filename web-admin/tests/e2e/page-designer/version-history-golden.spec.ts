@@ -96,8 +96,10 @@ async function openDesigner(page: Page, pid: string): Promise<void> {
 }
 
 function detailDoc(pageKey: string, sectionId: string, sectionTitle: string) {
+  // v4 flat dialect: top-level blocks, kind root implied (designerRootId in
+  // extension keeps the editor outline ids stable across save/reload).
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     kind: 'detail',
     id: pageKey,
     pageKey,
@@ -105,20 +107,11 @@ function detailDoc(pageKey: string, sectionId: string, sectionTitle: string) {
     title: `Version golden ${pageKey}`,
     blocks: [
       {
-        id: ROOT_BLOCK,
-        blockType: 'detail',
-        title: 'Version golden root',
-        dataSource: { model: MODEL_CODE },
-        layout: { span: 12 },
-        blocks: [
-          {
-            id: sectionId,
-            blockType: 'detail-section',
-            title: sectionTitle,
-            layout: { columns: 12 },
-            blocks: [],
-          },
-        ],
+        id: sectionId,
+        blockType: 'detail-section',
+        title: sectionTitle,
+        columns: 12,
+        fields: [],
       },
     ],
   };
@@ -135,9 +128,13 @@ async function seedDraftPage(page: Page, uid: string): Promise<{ pid: string; pa
       modelCode: MODEL_CODE,
       // The unified designer loads/saves a V3 document; its client validator
       // requires schemaVersion 3. A v4 seed loads but fails save validation.
-      schemaVersion: 3,
+      schemaVersion: 4,
       blocks: detailDoc(pageKey, SECTION_BLOCK, 'Original section').blocks,
-      extension: { e2e: true, scenario: 'version-history-golden' },
+      extension: {
+        e2e: true,
+        scenario: 'version-history-golden',
+        designerRootId: ROOT_BLOCK,
+      },
     },
   });
   expect(resp.ok(), `seed page failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();
@@ -156,6 +153,22 @@ test.describe.serial('Unified Designer version-history golden', () => {
 
   test.beforeEach(async ({ page }) => {
     await loginViaUI(page, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
+    // A fresh UI login can land in the System space (platform_admin only),
+    // which lacks page.page.manage — explicitly select the business space so
+    // page-seeding and the designer session share the business context.
+    const spaces = await page.request.get('/api/tenant-selection/my-spaces');
+    const spacesBody = (await spaces.json().catch(() => ({}))) as {
+      data?: Array<Record<string, unknown>>;
+    };
+    const business = (spacesBody?.data ?? []).find((sp) => sp.spaceType === 'business');
+    if (business && typeof business.tenantId === 'string') {
+      // Go through the BFF switch-space route so the session cookie is
+      // re-minted for the business space (a direct backend call rotates the
+      // credentials out from under the browser session → 401 re-login).
+      await page.request.post('/api/switch-space', {
+        form: { tenantId: String(business.tenantId), redirectTo: '/' },
+      });
+    }
   });
 
   test('C3: create snapshot grows the list; rollback restores the canvas + backend blocks', async ({

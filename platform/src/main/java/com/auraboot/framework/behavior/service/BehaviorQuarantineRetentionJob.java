@@ -1,6 +1,7 @@
 package com.auraboot.framework.behavior.service;
 
 import com.auraboot.framework.behavior.config.BehaviorQuarantineRetentionProperties;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.behavior.mapper.BehaviorQuarantineMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,15 +26,18 @@ public class BehaviorQuarantineRetentionJob {
     )
     @Transactional
     public int cleanupExpired() {
-        if (!properties.isEnabled()) {
-            return 0;
-        }
-        Instant cutoff = Instant.now().minus(Duration.ofDays(properties.effectiveDays()));
-        int deleted = mapper.deleteOlderThan(cutoff, properties.effectiveBatchSize());
-        if (deleted > 0) {
-            log.info("Cleaned up {} expired behavior quarantine rows older than {} days",
-                    deleted, properties.effectiveDays());
-        }
-        return deleted;
+        // @Scheduled thread: explicit scope (tenant-exemption W3).
+        return MetaContext.runWithoutTenantFilter(() -> {
+            if (!properties.isEnabled()) {
+                return 0;
+            }
+            Instant cutoff = Instant.now().minus(Duration.ofDays(properties.effectiveDays()));
+            int deleted = mapper.deleteOlderThan(cutoff, properties.effectiveBatchSize());
+            if (deleted > 0) {
+                log.info("Cleaned up {} expired behavior quarantine rows older than {} days",
+                        deleted, properties.effectiveDays());
+            }
+            return deleted;
+        });
     }
 }

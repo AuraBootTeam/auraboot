@@ -9,6 +9,7 @@ import istanbul from 'vite-plugin-istanbul';
 
 const e2eCoverageEnabled = process.env.E2E_COVERAGE === '1';
 const bffProxyTarget = `http://127.0.0.1:${process.env.BFF_PORT || '3500'}`;
+const apiDocsProxyTarget = process.env.PROXY_TARGET || process.env.SPRING_BOOT_URL || 'http://127.0.0.1:6443';
 const allowedHosts = process.env.VITE_ALLOWED_HOSTS
   ?.split(',')
   .map((host) => host.trim())
@@ -186,6 +187,16 @@ export default defineConfig({
       ],
     },
     proxy: {
+      // API reference opens at the browser origin. Forward both Swagger assets
+      // and its OpenAPI documents to this runtime instead of the React wildcard.
+      '/swagger-ui': {
+        target: apiDocsProxyTarget,
+        changeOrigin: true,
+      },
+      '/v3/api-docs': {
+        target: apiDocsProxyTarget,
+        changeOrigin: true,
+      },
       '/api/notifications/stream': {
         target: bffProxyTarget,
         changeOrigin: true,

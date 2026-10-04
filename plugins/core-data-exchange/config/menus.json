@@ -1,0 +1,19 @@
+[
+  {
+    "code": "data_exchange_center",
+    "parentCode": null,
+    "name:zh-CN": "数据任务",
+    "name:en": "Data Jobs",
+    "path": "/p/c/exchange_job_center",
+    "pageKey": "exchange_job_center",
+    "component": null,
+    "icon": "ArrowLeftRight",
+    "type": 1,
+    "permissionCode": null,
+    "orderNo": 930,
+    "visible": true,
+    "extension": {
+      "platforms": ["web"]
+    }
+  }
+]

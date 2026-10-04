@@ -628,13 +628,19 @@ test.describe('Page Designer standard block runtime', () => {
     });
     await expect(page.getByTestId('table-row-0')).toBeVisible({ timeout: 15_000 });
     await page.getByTestId('row-checkbox-0').check();
-    await expect(page.getByRole('button', { name: 'Edit' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Delete' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Clear selection' })).toBeVisible();
+    await expect(page.getByTestId('bulk-edit-btn')).toBeVisible();
+    // Delete lives in the More-actions overflow menu (main moved it out of
+    // the primary toolbar); open the menu to assert it, then Escape closes it
+    // WITHOUT deleting — this test only verifies the bulk toolbar surface.
+    await page.getByTestId('bulk-more-actions-btn').click();
+    await expect(page.getByRole('menuitem', { name: 'Delete' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('menuitem', { name: 'Delete' })).toHaveCount(0);
+    await expect(page.getByTestId('bulk-edit-btn')).toBeVisible();
 
-    await page.getByRole('button', { name: 'Edit' }).click();
+    await page.getByTestId('bulk-edit-btn').click();
     await expect(page.getByRole('heading', { name: 'Bulk Edit' })).toBeVisible();
-    await expect(page.getByText('Update 1 selected records')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Update 1 records' })).toBeVisible();
     await expect(page.getByRole('combobox')).toBeVisible();
     await page.getByRole('button', { name: 'Cancel' }).click();
     await expect(page.getByRole('heading', { name: 'Bulk Edit' })).toHaveCount(0);
@@ -662,8 +668,8 @@ test.describe('Page Designer standard block runtime', () => {
       { timeout: 15_000 },
     );
     await page.getByRole('button', { name: 'Edit' }).click();
-    await page.getByRole('combobox').selectOption('name');
-    await page.getByPlaceholder('Enter new value...').fill(editedName);
+    await page.getByTestId('bulk-edit-field').selectOption('name');
+await page.getByTestId('bulk-edit-value').fill(editedName);
     await page.getByRole('button', { name: 'Update 1 Records' }).click();
     expect((await bulkEditResponse).ok(), 'bulk edit response').toBeTruthy();
 
@@ -690,7 +696,9 @@ test.describe('Page Designer standard block runtime', () => {
         response.request().method() === 'DELETE',
       { timeout: 15_000 },
     );
-    await page.getByRole('button', { name: 'Delete' }).click();
+    // Delete lives in the More-actions overflow menu.
+    await page.getByTestId('bulk-more-actions-btn').click();
+    await page.getByRole('menuitem', { name: 'Delete' }).click();
     await page.getByRole('button', { name: /Confirm|确认/ }).click();
     expect((await bulkDeleteResponse).ok(), 'bulk delete response').toBeTruthy();
 

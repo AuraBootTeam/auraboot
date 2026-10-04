@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.meta.entity.InvariantDefinition;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.mapper.InvariantDefinitionMapper;
 import com.auraboot.framework.meta.service.InvariantEngine;
 import lombok.RequiredArgsConstructor;
@@ -31,7 +32,10 @@ public class InvariantAlarmWorker {
      * Scheduled via DatabaseSchedulerEngine (sys-invariant-alarm, interval 5min).
      */
     public void checkAlwaysInvariants() {
-        try {
+        // Scans across all tenants — explicit scope instead of a blanket table
+        // exemption (tenant-exemption cleanup W3).
+        MetaContext.runWithoutTenantFilter(() -> {
+            try {
             List<InvariantDefinition> alwaysInvariants = invariantMapper.findAllPublishedAlways();
             if (alwaysInvariants == null || alwaysInvariants.isEmpty()) {
                 return;
@@ -55,5 +59,6 @@ public class InvariantAlarmWorker {
         } catch (Exception e) {
             log.error("ALWAYS invariant worker failed: {}", e.getMessage());
         }
+        });
     }
 }

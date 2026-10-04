@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.service.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.StatusConstants;
 import com.auraboot.framework.exception.ConflictException;
 import com.auraboot.framework.exception.RequestIntentConflictException;
@@ -203,19 +204,23 @@ public class IdempotencyServiceImpl implements IdempotencyService {
 
     /**
      * Scheduled via DatabaseSchedulerEngine (sys-idempotency-cleanup, interval 1h).
+     * Scans across all tenants — explicit scope instead of a blanket table
+     * exemption (tenant-exemption cleanup W3).
      */
     @Override
     public int cleanupExpired() {
-        try {
-            int deleted = idempotencyRecordMapper.deleteExpired();
-            if (deleted > 0) {
-                log.info("Cleaned up {} expired idempotency records", deleted);
+        return MetaContext.runWithoutTenantFilter(() -> {
+            try {
+                int deleted = idempotencyRecordMapper.deleteExpired();
+                if (deleted > 0) {
+                    log.info("Cleaned up {} expired idempotency records", deleted);
+                }
+                return deleted;
+            } catch (Exception e) {
+                log.warn("Failed to cleanup expired idempotency records: {}", e.getMessage());
+                return 0;
             }
-            return deleted;
-        } catch (Exception e) {
-            log.warn("Failed to cleanup expired idempotency records: {}", e.getMessage());
-            return 0;
-        }
+        });
     }
 
     // ==================== Private Helpers ====================

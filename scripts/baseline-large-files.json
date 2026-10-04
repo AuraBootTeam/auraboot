@@ -1,0 +1,18 @@
+{
+  "rule": "no java source file may exceed 3000 lines",
+  "threshold": 3000,
+  "grandfathered": [
+    {
+      "path": "platform/src/main/java/com/auraboot/framework/plugin/service/impl/PluginImportServiceImpl.java",
+      "lines": 4206
+    },
+    {
+      "path": "platform/src/main/java/com/auraboot/framework/meta/service/impl/DynamicDataServiceImpl.java",
+      "lines": 4130
+    },
+    {
+      "path": "platform/src/main/java/com/auraboot/framework/meta/service/impl/MetaModelServiceImpl.java",
+      "lines": 4102
+    }
+  ]
+}

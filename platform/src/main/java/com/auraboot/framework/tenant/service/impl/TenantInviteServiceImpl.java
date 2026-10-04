@@ -211,7 +211,10 @@ public class TenantInviteServiceImpl  extends ServiceImpl<InvitationMapper, Invi
 
     @Override
     public Invitation findByInvitationCode(String invitationCode) {
-        return invitationMapper.findByInviteCode(invitationCode);
+        // Pre-context acceptance lookup by globally-unique code — explicit scope
+        // instead of a blanket table exemption (tenant-exemption cleanup W2d).
+        return MetaContext.runWithoutTenantFilter(
+                () -> invitationMapper.findByInviteCode(invitationCode));
     }
 
 

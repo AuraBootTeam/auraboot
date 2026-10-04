@@ -34,6 +34,24 @@ class ApplicationRuntimeDefinitionCatalogTest {
     }
 
     @Test
+    void exposesImmutableExactReleaseSourceIdentities() {
+        var sources = catalog.modelSources(42L, "aura-edu").orElseThrow();
+        assertThat(sources).contains(new ApplicationRuntimeDefinitionCatalog.BoundModelSource("xy_student", "mt_xy_student"));
+        org.junit.jupiter.api.Assertions.assertThrows(UnsupportedOperationException.class, () -> sources.clear());
+        bound.status = "shadow";
+        assertThat(catalog.modelSources(42L, "aura-edu")).isEmpty();
+    }
+
+    @Test
+    void deniesDuplicateReleaseSourceModelKeys() {
+        var source = release("active");
+        var model = source.components().getFirst().manifest().getModels().getFirst();
+        source.components().getFirst().manifest().setModels(List.of(model, model));
+        when(resolver.boundRelease(42L, "aura-edu")).thenReturn(source);
+        org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class, () -> catalog.modelSources(42L, "aura-edu"));
+    }
+
+    @Test
     void materializesModelFieldsFromTheExactActiveRelease() {
         var model = catalog.findModel(42L, "aura-edu", "xy_student").orElseThrow();
 
@@ -53,10 +71,101 @@ class ApplicationRuntimeDefinitionCatalogTest {
     }
 
     @Test
+    void suppliesRenderingMetadataWithoutTenantLocalModelOrFieldIds() {
+        var fields = catalog.findFieldMetadata(42L, "aura-edu", "xy_student").orElseThrow();
+        var name = fields.stream().filter(field -> "xy_stu_name".equals(field.getCode())).findFirst().orElseThrow();
+        assertThat(name.getId()).isNull();
+        assertThat(name.getPid()).isNull();
+        assertThat(name.getDisplayName()).isEqualTo("学生姓名");
+        assertThat(name.getRequired()).isTrue();
+        assertThat(name.getFieldOrder()).isEqualTo(1);
+        assertThat(name.getDataType()).isEqualTo("string");
+        assertThat(catalog.findFieldMetadata(42L, "aura-edu", "platform_user")).isEmpty();
+    }
+
+    @Test
+    void materializesReleaseDictionaryWithoutTenantLocalIds() {
+        var source = release("active");
+        source.components().getFirst().manifest().setDicts(List.of(
+                com.auraboot.framework.plugin.dto.imports.DictDefinitionDTO.builder().code("xy_subject")
+                        .nameZhCN("学科").items(List.of(
+                                com.auraboot.framework.plugin.dto.imports.DictDefinitionDTO.DictItemDTO.builder()
+                                        .value("math").labelZhCN("数学").labelEn("Mathematics").sortNo(1).build())).build()));
+        when(resolver.boundRelease(42L, "aura-edu")).thenReturn(source);
+        var dict = catalog.findDict(42L, "aura-edu", "xy_subject").orElseThrow();
+        assertThat(dict.getId()).isNull();
+        assertThat(dict.getPid()).isNull();
+        assertThat(dict.getItems()).hasSize(1);
+        assertThat(dict.getItems().getFirst().getLabel()).isEqualTo("数学");
+        assertThat(dict.getItems().getFirst().getExtra()).containsKey("labels");
+        assertThat(dict.getExtendedProps().get("releaseId").asText()).isEqualTo(bound.releaseId);
+        assertThat(catalog.findDict(42L, "aura-edu", "platform_status")).isEmpty();
+    }
+
+    @Test
     void keepsShadowAndUnboundTenantsOnTheirExistingReadPath() {
         bound.status = "shadow";
         assertThat(catalog.findModel(42L, "aura-edu", "xy_student")).isEmpty();
         verify(resolver, never()).boundRelease(42L, "aura-edu");
+    }
+
+    @Test
+    void projectsReleaseDashboardsWithoutInventingPersistentIds() {
+        var source = release("active");
+        source.components().getFirst().manifest().setDashboards(List.of(
+                com.auraboot.framework.plugin.dto.imports.DashboardDefinitionDTO.builder()
+                        .code("class_overview").title("Class overview").widgets(List.of(Map.of("id", "count")))
+                        .extension(Map.of("workbenchContribution", Map.of("enabled", true))).build()));
+        when(resolver.boundRelease(42L, "aura-edu")).thenReturn(source);
+        var dashboard = catalog.dashboards(42L, "aura-edu").orElseThrow().getFirst();
+        assertThat(dashboard.getTenantId()).isEqualTo(42L);
+        assertThat(dashboard.getId()).isNull();
+        assertThat(dashboard.getPid()).isNull();
+        assertThat(dashboard.getCode()).isEqualTo("class_overview");
+        assertThat(dashboard.getWidgets().get(0).get("id").asText()).isEqualTo("count");
+        assertThat(dashboard.getExtension().get("releaseId").asText()).isEqualTo(bound.releaseId);
+        assertThat(dashboard.getLayoutConfig().get("columns").asInt()).isEqualTo(12);
+    }
+
+    @Test
+    void rejectsAmbiguousAndNonGlobalReleaseDashboards() {
+        var source = release("active");
+        var dashboard = com.auraboot.framework.plugin.dto.imports.DashboardDefinitionDTO.builder()
+                .code("count").title("Count").widgets(List.of(Map.of("id", "count"))).build();
+        source.components().getFirst().manifest().setDashboards(List.of(dashboard, dashboard));
+        when(resolver.boundRelease(42L, "aura-edu")).thenReturn(source);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> catalog.dashboards(42L, "aura-edu"))
+                .hasMessageContaining("unique");
+        source.components().getFirst().manifest().setDashboards(List.of(dashboard));
+        dashboard.setScope("personal");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> catalog.dashboards(42L, "aura-edu"))
+                .hasMessageContaining("global scope");
+    }
+
+    @Test
+    void projectsQueryAndWhitelistFromOneBindingAndRejectsMissingFields() {
+        var source = release("active");
+        var field = new com.auraboot.framework.meta.dto.NamedQueryFieldRequest();
+        field.setFieldCode("studentCount");
+        field.setColumnExpr("student_count");
+        field.setDataType("number");
+        field.setOperators(List.of("eq", "gt"));
+        var query = com.auraboot.framework.plugin.dto.imports.NamedQueryDefinitionDTO.builder()
+                .code("class_count").titleZhCN("学生人数").fromSql("mt_xy_student")
+                .resourceCode("xy_student").actionCode("read").status("published").fields(List.of(field)).build();
+        source.components().getFirst().manifest().setNamedQueries(List.of(query));
+        when(resolver.boundRelease(42L, "aura-edu")).thenReturn(source);
+        var definition = catalog.findNamedQuery(42L, "aura-edu", "class_count").orElseThrow();
+        assertThat(definition.query().getId()).isNull();
+        assertThat(definition.query().getPid()).isNull();
+        assertThat(definition.query().getTitle()).isEqualTo("学生人数");
+        assertThat(definition.query().getResourceCode()).isEqualTo("xy_student");
+        assertThat(definition.fields()).hasSize(1);
+        assertThat(definition.fields().getFirst().getOperatorList()).containsExactly("eq", "gt");
+        assertThat(definition.fields().getFirst().getId()).isNull();
+        query.setFields(List.of());
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> catalog.findNamedQuery(42L, "aura-edu", "class_count"))
+                .hasMessageContaining("explicit field whitelist");
     }
 
     @Test

@@ -3272,15 +3272,41 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                         "Configurable field masking failed for export: " + modelCode, e);
             }
 
+            // Export is another read surface. Apply the same field-level visibility contract as
+            // list/detail before choosing columns so a hidden field cannot leak as either a value
+            // or a header merely because the client requested its code.
+            data = applyFieldPermissionFilter(modelCode, data);
+
             // Resolve reference display names so the export shows names, not pids (same as list/detail).
             enrichReferenceDisplayFields(modelCode, data);
 
             // Determine export fields
             List<String> exportFields = exportRequest.getFields();
+            Set<String> allowedExportFields = model.getFields().stream()
+                    .map(FieldDefinition::getCode)
+                    .filter(Objects::nonNull)
+                    .filter(field -> !Set.of("id", "tenant_id", "row_version", "deleted", "deleted_flag")
+                            .contains(field))
+                    .collect(Collectors.toCollection(LinkedHashSet::new));
+            FieldPermissionSet exportFieldPermissions = fieldPermissionService.getFieldPermissions(
+                    currentMemberIdForFieldPermissions(), modelCode);
+            allowedExportFields.removeAll(exportFieldPermissions.hiddenFields());
             if (exportFields == null || exportFields.isEmpty()) {
-                exportFields = model.getFields().stream()
-                        .map(FieldDefinition::getCode)
-                        .collect(Collectors.toList());
+                // A normal roster/export starts with business columns. Explicit
+                // authorized audit exports can still request these fields.
+                exportFields = allowedExportFields.stream()
+                        .filter(field -> !Set.of("pid", "created_at", "updated_at", "created_by", "updated_by").contains(field))
+                        .toList();
+            } else {
+                List<String> forbiddenFields = exportFields.stream()
+                        .filter(field -> !allowedExportFields.contains(field))
+                        .distinct()
+                        .toList();
+                if (!forbiddenFields.isEmpty()) {
+                    throw new MetaServiceException("Export fields are not allowed: "
+                            + String.join(",", forbiddenFields));
+                }
+                exportFields = exportFields.stream().distinct().toList();
             }
 
             Set<String> requestedExportFields = new LinkedHashSet<>(exportFields);
@@ -3322,6 +3348,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                     .recordCount((long) data.size())
                     .fileSize(fileSize)
                     .format(format.name())
+                    .rowSetDigest(NamedQueryRowSetDigest.digest(data, exportFields))
                     .exportTime(startTime)
                     .build();
 

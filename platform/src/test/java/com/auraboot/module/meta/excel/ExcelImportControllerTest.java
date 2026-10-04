@@ -23,7 +23,8 @@ class ExcelImportControllerTest {
             mock(ExcelValidationEngine.class),
             mock(ExcelImportPolicyResolver.class),
             mock(ExcelImportErrorReportService.class),
-            mock(I18nLocaleResolver.class));
+            mock(I18nLocaleResolver.class),
+            mock(DocumentImportService.class));
 
     @Test
     void cancelImport_delegatesModelAndPublicTaskIdentifier() {

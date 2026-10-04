@@ -185,7 +185,7 @@ describe('ComputedFieldEngine', () => {
     it('calls onError callback on expression failure', () => {
       const onError = vi.fn();
       const eng = new ComputedFieldEngine({ onError });
-      eng.register([def('f', 'null.boom', ['x'])]);
+      eng.register([def('f', 'unknownVar.boom', ['x'])]);
       eng.evaluateAll(ctx({ x: 1 }));
       expect(onError).toHaveBeenCalledWith('f', expect.any(Error));
     });

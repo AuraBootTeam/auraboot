@@ -126,18 +126,13 @@ test.describe.serial('Unified Designer inspector model-select golden', () => {
         title: `Model select ${uid}`,
         kind: 'form',
         modelCode: SEED_MODEL,
-        schemaVersion: 3,
-        blocks: [
-          {
-            id: FORM_ROOT,
-            blockType: 'form',
-            title: 'Model select root',
-            dataSource: { model: SEED_MODEL },
-            layout: { span: 12 },
-            blocks: [],
-          },
-        ],
-        extension: { e2e: true, scenario: 'inspector-model-select-golden' },
+        schemaVersion: 4,
+        blocks: [],
+        extension: {
+          e2e: true,
+          scenario: 'inspector-model-select-golden',
+          designerRootId: FORM_ROOT,
+        },
       },
     });
     expect(resp.ok(), `seed page failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();
@@ -189,6 +184,16 @@ test.describe.serial('Unified Designer inspector model-select golden', () => {
     const modelSelect = page.getByTestId('inspector-field-dataSource.model');
     await expect(modelSelect).toBeVisible({ timeout: 10_000 });
 
+    // The dropdown options are populated by an async GET /api/meta/models;
+    // poll until the seeded model is actually selected (an eager toHaveValue
+    // would race the fetch and read the placeholder option).
+    await expect
+      .poll(
+        () => modelSelect.evaluate((el) => (el as HTMLSelectElement).value),
+        { timeout: 15_000 },
+      )
+      .toBe(SEED_MODEL);
+
     // Seed-agnostic: pick a real published model option from the dropdown that
     // is NOT the seeded model and NOT the empty-unset option, instead of a
     // hard-coded code (e2et_order) that only the full e2e-fixtures seed carries.
@@ -233,7 +238,11 @@ test.describe.serial('Unified Designer inspector model-select golden', () => {
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 30_000 });
     await selectBlock(page, FORM_ROOT);
-    await expect(page.getByTestId('inspector-field-dataSource.model')).toHaveValue(targetModel!);
+    // The reloaded select re-fetches its options asynchronously; poll the
+    // value instead of asserting eagerly (same race as the first load).
+    await expect
+      .poll(() => modelSelect.inputValue(), { timeout: 15_000 })
+      .toBe(targetModel!);
     await testInfo.attach('d1-model-reloaded', {
       body: await page.screenshot(),
       contentType: 'image/png',

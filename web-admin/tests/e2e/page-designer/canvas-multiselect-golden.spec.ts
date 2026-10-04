@@ -212,10 +212,13 @@ test.describe('Unified Designer canvas multi-select + batch delete golden', () =
     // Save and prove the delete persisted via a GET readback.
     await saveDesigner(page, pid);
     const persisted = await readPage(page, pid);
-    expect(findBlockById(persisted.blocks, SECTION_A), 'A removed from persisted schema').toBeNull();
-    expect(findBlockById(persisted.blocks, SECTION_B), 'B removed from persisted schema').toBeNull();
-    expect(findBlockById(persisted.blocks, SECTION_C), 'C removed from persisted schema').toBeNull();
-    expect(findBlockById(persisted.blocks, ROOT_BLOCK), 'root container preserved').not.toBeNull();
+    // v4 flat storage: the kind root is implied, so deleting every child
+    // persists an EMPTY top-level block list; the root's identity survives in
+    // extension.designerRootId instead of as a stored block.
+    expect(persisted.blocks, 'all three sections removed from persisted schema').toEqual([]);
+    expect(
+        ((persisted as unknown as { extension?: Record<string, unknown> }).extension as Record<string, unknown> | undefined)?.designerRootId,
+        'root identity preserved in extension').toBe(ROOT_BLOCK);
 
     // Undo restores all three in a single step (one history entry).
     await page.getByTestId('designer-undo').click();
@@ -279,7 +282,11 @@ test.describe('Unified Designer canvas multi-select + batch delete golden', () =
     await saveDesigner(page, pid);
     const persisted = await readPage(page, pid);
     expect(findBlockById(persisted.blocks, SECTION_A), 'A deleted').toBeNull();
-    expect(findBlockById(persisted.blocks, ROOT_BLOCK), 'root kept').not.toBeNull();
+    // v4 flat storage: the undeletable kind root is implied, not stored — its
+    // identity survives in extension.designerRootId.
+    expect(
+        ((persisted as unknown as { extension?: Record<string, unknown> }).extension as Record<string, unknown> | undefined)?.designerRootId,
+        'root kept').toBe(ROOT_BLOCK);
     expect(findBlockById(persisted.blocks, SECTION_B), 'B kept (not selected)').not.toBeNull();
   });
 

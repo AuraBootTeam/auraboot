@@ -84,6 +84,20 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
+    void appearanceAssetsAreAnonymousButManagementAndSiblingPathsRequireJwt() throws Exception {
+        for (String path : List.of("/api/auth/appearance", "/api/auth/appearance/assets/abc.png")) {
+            MockHttpServletRequest request = new MockHttpServletRequest("GET", path);
+            request.setServletPath(path);
+            assertTrue(filter.shouldNotFilter(request), path);
+        }
+        for (String path : List.of("/api/auth/appearance/assets-other/abc.png", "/api/admin/auth-appearance", "/api/admin/auth-appearance/assets")) {
+            MockHttpServletRequest request = new MockHttpServletRequest("GET", path);
+            request.setServletPath(path);
+            assertFalse(filter.shouldNotFilter(request), path);
+        }
+    }
+
+    @Test
     void missingAuthorizationHeader_returns401AndDoesNotChain() throws Exception {
         MockHttpServletRequest req = req();
         MockHttpServletResponse resp = new MockHttpServletResponse();

@@ -7,6 +7,8 @@ import com.auraboot.framework.organization.service.OrganizationService;
 import com.auraboot.framework.permission.engine.model.DataScopeCondition;
 import com.auraboot.framework.permission.entity.RoleDataScope;
 import com.auraboot.framework.permission.enums.DataScopeType;
+import com.auraboot.framework.exception.RootUnCheckedException;
+import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.permission.mapper.RoleDataScopeMapper;
 import com.auraboot.framework.permission.service.DataScopeService;
 import com.auraboot.framework.rbac.mapper.UserRoleMapper;
@@ -32,7 +34,7 @@ import java.util.stream.Collectors;
  *
  * <p>Merge logic:
  * <ul>
- *   <li>Each scope type has a priority: NONE(1) &lt; SELF(2) &lt; DEPT(3) &lt; DEPT_AND_SUB(4) &lt; ALL(5)</li>
+ *   <li>Each scope type has a priority: NONE(1) &lt; SELF(2) &lt; DEPT(3) &lt; TEAM(4) &lt; DEPT_AND_SUB(5) &lt; ALL(6)</li>
  *   <li>Default merge strategy is MAX (most permissive wins)</li>
  *   <li>If any role sets merge_strategy='MIN', the least permissive scope is used</li>
  * </ul>
@@ -55,6 +57,9 @@ public class DataScopeServiceImpl implements DataScopeService {
 
     @Autowired @Lazy
     private MetaModelService metaModelService;
+
+    @Autowired @Lazy
+    private com.auraboot.framework.organization.service.TeamMemberService teamMemberService;
 
     @Override
     @Cacheable(value = "dataScopeCondition",
@@ -122,6 +127,14 @@ public class DataScopeServiceImpl implements DataScopeService {
     @CacheEvict(value = "dataScopeCondition", cacheManager = "permissionCacheManager", allEntries = true)
     public void setScope(Long tenantId, Long roleId, String resourceCode, String actionCode,
                          String scopeType, String mergeStrategy) {
+        try {
+            DataScopeType.fromCode(scopeType);
+        } catch (IllegalArgumentException e) {
+            throw new RootUnCheckedException(ResponseCode.BadParam, "Invalid data scope type", e);
+        }
+        if (mergeStrategy != null && !"MAX".equals(mergeStrategy) && !"MIN".equals(mergeStrategy)) {
+            throw new RootUnCheckedException(ResponseCode.BadParam, "Invalid data scope merge strategy");
+        }
         LambdaQueryWrapper<RoleDataScope> query = new LambdaQueryWrapper<RoleDataScope>()
                 .eq(RoleDataScope::getTenantId, tenantId)
                 .eq(RoleDataScope::getRoleId, roleId)
@@ -207,6 +220,8 @@ public class DataScopeServiceImpl implements DataScopeService {
                 return buildSelfCondition(resourceCode);
             case DEPT:
                 return buildDeptCondition(memberId, false, resourceCode, strict);
+            case TEAM:
+                return buildTeamCondition(memberId, resourceCode, strict);
             case DEPT_AND_SUB:
                 return buildDeptCondition(memberId, true, resourceCode, strict);
             default:
@@ -321,6 +336,43 @@ public class DataScopeServiceImpl implements DataScopeService {
         );
     }
 
+    /**
+     * TEAM scope (minimal approved口径): the member sees records associated with the
+     * teams they belong to. TEAM is an explicit member group layered on the existing
+     * DEPT system — no cross-team implicit merged views, so a record matches only when
+     * its team field names one of the caller's teams. Models opt in by declaring
+     * {@code extension.dataScope.teamField}; without it the scope fails closed (deny +
+     * warn) rather than guessing a column. Falls back to SELF when the member belongs
+     * to no team, mirroring the DEPT fallback.
+     */
+    private DataScopeCondition buildTeamCondition(Long memberId, String resourceCode, boolean strict) {
+        String teamField = getDataScopeTeamField(resourceCode);
+        if (teamField == null) {
+            log.warn("TEAM data scope on {} has no extension.dataScope.teamField; denying", resourceCode);
+            return DataScopeCondition.none();
+        }
+        TenantMember member = tenantMemberMapper.selectById(memberId);
+        if (member == null || member.getUserId() == null) {
+            log.warn("Member {} not found, team inputs unavailable", memberId);
+            return strict ? DataScopeCondition.none() : buildSelfCondition(resourceCode);
+        }
+        List<String> teamPids = teamMemberService.getTeamPidsByUserId(
+                member.getUserId(), member.getTenantId());
+        if (teamPids == null || teamPids.isEmpty()) {
+            log.warn("Member {} belongs to no team, team inputs unavailable", memberId);
+            return strict ? DataScopeCondition.none() : buildSelfCondition(resourceCode);
+        }
+        String ownerField = getDataScopeOwnerField(resourceCode);
+        return new DataScopeCondition(
+                DataScopeType.TEAM.code(),
+                ownerField,
+                resolveOwnerValue(resourceCode, ownerField),
+                teamField,
+                teamPids,
+                Collections.emptyList()
+        );
+    }
+
     // ========================================================================
     // Model dataScope config helpers
     // ========================================================================
@@ -367,6 +419,19 @@ public class DataScopeServiceImpl implements DataScopeService {
         }
         Object deptField = dataScopeConfig.get("departmentField");
         return deptField != null ? deptField.toString() : DEFAULT_DEPT_FIELD;
+    }
+
+    /**
+     * Read the team field from model extension.dataScope config.
+     * Returns null when unset — TEAM scope is opt-in per model (no default column).
+     */
+    private String getDataScopeTeamField(String resourceCode) {
+        Map<String, Object> dataScopeConfig = getDataScopeConfig(resourceCode);
+        if (dataScopeConfig == null) {
+            return null;
+        }
+        Object field = dataScopeConfig.get("teamField");
+        return field != null && !field.toString().isBlank() ? field.toString() : null;
     }
 
     /**

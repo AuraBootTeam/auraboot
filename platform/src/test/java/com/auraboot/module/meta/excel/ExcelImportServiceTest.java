@@ -14,6 +14,7 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -68,6 +69,7 @@ class ExcelImportServiceTest {
 
     @BeforeEach
     void setUp() {
+        MetaContext.setContext(7L, 42L, "test-user", "tester");
         importService = new ExcelImportService(
                 dynamicDataService, metaModelService, importJobMapper, policyResolver,
                 commandExecutor, referenceResolver, new TypeSystemManager(), errorReportService,
@@ -77,11 +79,19 @@ class ExcelImportServiceTest {
                 .enabled(true)
                 .modes(java.util.Set.of("insert", "update"))
                 .updateKeys(List.of("code"))
+                .profileCode("test_model:default-import")
+                .createCommand("test:create")
+                .updateCommand("test:update")
                 .createFields(java.util.Set.of(
                         "name", "code", "pe_so_code", "pe_so_name", "pe_so_qty",
                         "pe_so_total", "pe_total", "pe_name"))
                 .updateFields(java.util.Set.of("name", "code"))
                 .build());
+    }
+
+    @AfterEach
+    void tearDown() {
+        MetaContext.clear();
     }
 
     /**
@@ -317,15 +327,10 @@ class ExcelImportServiceTest {
         ByteArrayInputStream stream = createExcel(headers, data);
         when(metaModelService.getModelFields("test_model")).thenReturn(List.of());
 
-        // batchCreate fails → falls back to per-row create
-        when(dynamicDataService.batchCreate(eq("test_model"), anyList()))
-                .thenThrow(new RuntimeException("Batch error"));
-
-        // Row 2 (index 1) throws an exception in per-row fallback
-        when(dynamicDataService.create(eq("test_model"), anyMap()))
-                .thenReturn(Map.of("id", "1"))                          // row 1 succeeds
-                .thenThrow(new BusinessException("Duplicate code"))     // row 2 fails
-                .thenReturn(Map.of("id", "3"));                         // row 3 succeeds
+        when(commandExecutor.execute(eq("test:create"), any(CommandExecuteRequest.class)))
+                .thenReturn(null)
+                .thenThrow(new BusinessException("Duplicate code"))
+                .thenReturn(null);
 
         ImportOptions options = new ImportOptions();
         options.setSkipErrors(true);
@@ -351,12 +356,8 @@ class ExcelImportServiceTest {
         ByteArrayInputStream stream = createExcel(headers, data);
         when(metaModelService.getModelFields("test_model")).thenReturn(List.of());
 
-        // batchCreate fails → falls back to per-row create
-        when(dynamicDataService.batchCreate(eq("test_model"), anyList()))
-                .thenThrow(new RuntimeException("Batch error"));
-
-        when(dynamicDataService.create(eq("test_model"), anyMap()))
-                .thenReturn(Map.of("id", "1"))
+        when(commandExecutor.execute(eq("test:create"), any(CommandExecuteRequest.class)))
+                .thenReturn(null)
                 .thenThrow(new RuntimeException("Validation failed"));
 
         ImportOptions options = new ImportOptions();
@@ -368,7 +369,7 @@ class ExcelImportServiceTest {
         assertEquals(1, result.getSuccessCount());
         assertEquals(1, result.getErrorCount());
         // Row 3 should never be attempted
-        verify(dynamicDataService, times(2)).create(anyString(), anyMap());
+        verify(commandExecutor, times(2)).execute(eq("test:create"), any(CommandExecuteRequest.class));
     }
 
     // ==================== resolveHeaderMapping tests ====================
@@ -775,41 +776,29 @@ class ExcelImportServiceTest {
         );
         when(metaModelService.getModelFields("test_model")).thenReturn(fields);
 
-        // batchCreate succeeds (batch path)
-        when(dynamicDataService.batchCreate(eq("test_model"), anyList()))
-                .thenReturn(new com.auraboot.framework.meta.dto.DynamicBatchResponse());
-
         ImportOptions options = new ImportOptions();
         ExcelImportResult result = importService.importExcel("test_model", stream, options);
 
         assertEquals(1, result.getSuccessCount());
-        // Verify batchCreate was called with mapped field codes
-        verify(dynamicDataService).batchCreate(eq("test_model"), argThat(list ->
-                list.size() == 1
-                        && list.get(0).containsKey("pe_so_code")
-                        && list.get(0).containsKey("pe_so_total")
-                        && "SO-001".equals(list.get(0).get("pe_so_code"))
-                        && "1000.00".equals(list.get(0).get("pe_so_total"))
-        ));
+        ArgumentCaptor<CommandExecuteRequest> request = ArgumentCaptor.forClass(CommandExecuteRequest.class);
+        verify(commandExecutor).execute(eq("test:create"), request.capture());
+        assertEquals("SO-001", request.getValue().getPayload().get("pe_so_code"));
+        assertEquals("1000.00", request.getValue().getPayload().get("pe_so_total"));
     }
 
     @Test
-    void testBatchInsert_happyPath() throws IOException {
+    void testCommandInsert_happyPath() throws IOException {
         String[] headers = {"name"};
         String[][] data = {{"A"}, {"B"}, {"C"}};
 
         ByteArrayInputStream stream = createExcel(headers, data);
         when(metaModelService.getModelFields("test_model")).thenReturn(List.of());
 
-        // batchCreate succeeds
-        when(dynamicDataService.batchCreate(eq("test_model"), anyList()))
-                .thenReturn(new com.auraboot.framework.meta.dto.DynamicBatchResponse());
-
         ExcelImportResult result = importService.importExcel("test_model", stream, new ImportOptions());
 
         assertEquals(3, result.getSuccessCount());
         assertEquals(0, result.getErrorCount());
-        // create should NOT be called when batch succeeds
+        verify(commandExecutor, times(3)).execute(eq("test:create"), any(CommandExecuteRequest.class));
         verify(dynamicDataService, never()).create(anyString(), anyMap());
     }
 
@@ -850,9 +839,6 @@ class ExcelImportServiceTest {
         when(dynamicDataService.list(eq("test_model"), any()))
                 .thenReturn(new com.auraboot.framework.meta.dto.PaginationResult<>(
                         List.of(Map.of("pid", "existing-pid-123")), 1L, 1, 1));
-        when(dynamicDataService.update(eq("test_model"), eq("existing-pid-123"), anyMap()))
-                .thenReturn(Map.of("pid", "existing-pid-123"));
-
         ImportOptions options = new ImportOptions();
         options.setImportMode("update");
         options.setMatchKey("code");
@@ -862,7 +848,9 @@ class ExcelImportServiceTest {
         assertEquals(1, result.getSuccessCount());
         assertEquals(0, result.getCreatedCount());
         assertEquals(1, result.getUpdatedCount());
-        verify(dynamicDataService).update(eq("test_model"), eq("existing-pid-123"), anyMap());
+        ArgumentCaptor<CommandExecuteRequest> request = ArgumentCaptor.forClass(CommandExecuteRequest.class);
+        verify(commandExecutor).execute(eq("test:update"), request.capture());
+        assertEquals("existing-pid-123", request.getValue().getTargetRecordPid());
         verify(dynamicDataService, never()).create(anyString(), anyMap());
     }
 }

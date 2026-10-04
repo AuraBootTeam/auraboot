@@ -77,6 +77,7 @@ const quoteOpsCurrentSpecNames = [
   'quote-process-fee-review',
   'quote-record-sharing-golden',
   'quote-gerber-runtime',
+  'team-data-scope-runtime',
   'quote-excel-download',
   'quote-bulk-import-price-cache-golden',
   // Per-role suites (DDR-2026-06-29 §8). These were listed on the gate script's
@@ -442,6 +443,10 @@ export default defineConfig({
             use: {
               ...devices['Desktop Chrome'],
               storageState: adminStorageState,
+              // page.request/APIRequestContext does not add browser navigation
+              // metadata. Cookie-authenticated writes must still prove they
+              // originate from this application.
+              extraHTTPHeaders: { Referer: `${baseURL}/` },
             },
           },
         ]

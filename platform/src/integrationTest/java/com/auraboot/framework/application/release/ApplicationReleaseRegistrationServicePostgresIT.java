@@ -199,7 +199,8 @@ class ApplicationReleaseRegistrationServicePostgresIT {
             assertNotNull(migration); jdbc.execute(new String(migration.readAllBytes(), StandardCharsets.UTF_8));
         }
         var store = new TenantApplicationShadowBindingStore(jdbc);
-        var control = new ApplicationReleaseControlService(jdbc);
+        var control = new ApplicationReleaseControlService(jdbc,
+                org.mockito.Mockito.mock(com.auraboot.framework.application.release.ApplicationBindingCapabilityVerifier.class));
         java.util.function.Function<String, String> digest = release -> jdbc.queryForObject(
                 "SELECT digest FROM ab_application_release WHERE release_id=?", String.class, release);
         var firstAudit = bindingAudit();
@@ -930,7 +931,8 @@ class ApplicationReleaseRegistrationServicePostgresIT {
         var summarizer = org.mockito.Mockito.mock(com.auraboot.framework.application.security.RequestBodySummarizer.class);
         var interceptor = new com.auraboot.framework.application.security.AdminRoleInterceptor(roles, mapper, audit, summarizer, null);
         var mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders
-                .standaloneSetup(new ApplicationReleaseController(service, new ApplicationReleaseControlService(jdbc),
+                .standaloneSetup(new ApplicationReleaseController(service, new ApplicationReleaseControlService(jdbc,
+                        org.mockito.Mockito.mock(com.auraboot.framework.application.release.ApplicationBindingCapabilityVerifier.class)),
                         org.mockito.Mockito.mock(DefinitionShadowComparisonService.class),
                         org.mockito.Mockito.mock(TenantApplicationShadowBindingService.class)))
                 .addInterceptors(interceptor).build();

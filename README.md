@@ -4,7 +4,7 @@
 </p>
 
 <p align="center">
-  <a href="LICENSE.txt"><img src="https://img.shields.io/badge/License-AuraBoot_v1.3-blue.svg" alt="License"></a>
+  <a href="LICENSE.txt"><img src="https://img.shields.io/badge/License-Apache_2.0_with_AuraBoot_supplements-blue.svg" alt="License"></a>
   <a href="#"><img src="https://img.shields.io/badge/Java-21-orange.svg" alt="Java 21"></a>
   <a href="#"><img src="https://img.shields.io/badge/Spring_Boot-3.5-green.svg" alt="Spring Boot 3.5"></a>
   <a href="#"><img src="https://img.shields.io/badge/React-19-blue.svg" alt="React 19"></a>
@@ -96,6 +96,8 @@ Row-level tenant isolation, role-based access control at resource/operation/data
 Multi-channel notifications (email, in-app, webhook), event bus for cross-module communication, and webhook dispatch for external integrations.
 
 ## Quick Start
+
+> **Mainland-China users:** start with the Docker path below and pull the prebuilt images from the Tencent TCR mirror (see [DEPLOY.md](DEPLOY.md#pull-only-deployment-no-source-checkout-no-build)) — a plain `git clone` of this repository is unreliable from mainland networks, and the Manual Setup path additionally downloads the Gradle distribution and Maven dependencies from endpoints that are blocked there (the Gradle wrapper does not honor `http_proxy`). The Manual Setup path below expects open network access to the Gradle and Maven endpoints.
 
 ### Docker (recommended)
 
@@ -301,7 +303,7 @@ For enterprise licensing, use the [AuraBoot contact form](https://auraboot.com/c
 
 ## Community
 
-- [Website feedback form](https://auraboot.com/contact?interest=feedback) — Product feedback, beta issues, licensing questions, and private notes
+- [Website feedback form](https://auraboot.com/contact?interest=feedback) — Product feedback, bug reports, licensing questions, and private notes
 - [GitHub Discussions](https://github.com/AuraBootTeam/auraboot/discussions) — Ask questions and share ideas
 - [GitHub Issues](https://github.com/AuraBootTeam/auraboot/issues) — Report bugs or request features
 - [Discord](https://discord.gg/p2fW5A2MW6) — Community chat only; use the website form for feedback that needs follow-up

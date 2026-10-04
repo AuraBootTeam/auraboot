@@ -5,7 +5,6 @@ import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.CommandDefinitionDTO;
 import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.dto.ModelDefinition;
-import com.auraboot.framework.meta.constant.SystemFieldConstants;
 import com.auraboot.framework.meta.service.CommandService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -36,6 +35,15 @@ public class ExcelImportPolicyResolver {
         Map<String, Object> extension = model.getExtension();
         Map<String, Object> raw = extension == null ? null : asMap(extension.get("importPolicy"));
         boolean enabled = raw != null && Boolean.TRUE.equals(raw.get("enabled"));
+        String profileCode = stringValue(raw == null ? null : raw.get("code"), modelCode + ":default-import");
+        String atomicUnit = stringValue(raw == null ? null : raw.get("atomicUnit"), "row")
+                .toLowerCase(Locale.ROOT);
+        if (!Set.of("row", "document").contains(atomicUnit)) {
+            throw new BusinessException("Unsupported import atomic unit configured for model: " + modelCode);
+        }
+        if (enabled && "document".equals(atomicUnit)) {
+            throw new BusinessException("Document import profiles require the document import runner: " + profileCode);
+        }
 
         Set<String> modes = normalizedStrings(raw == null ? null : raw.get("modes"));
         if (modes.isEmpty()) {
@@ -62,24 +70,18 @@ public class ExcelImportPolicyResolver {
         Map<String, String> crud = commandService.resolveCrudCommands(modelCode);
         String createCommand = crud.get("create");
         String updateCommand = crud.get("update");
-        if (model.isCommandOnlyCreate() && createCommand == null) {
-            throw new BusinessException("Import policy requires a create command for command-only model: " + modelCode);
+        if (enabled && modes.contains("insert") && createCommand == null) {
+            throw new BusinessException("Enabled INSERT import requires a create command: " + modelCode);
         }
-        if (modes.contains("update") && createCommand != null && updateCommand == null) {
-            throw new BusinessException("UPDATE import requires an update command: " + modelCode);
+        if (enabled && modes.contains("update") && updateCommand == null) {
+            throw new BusinessException("Enabled UPDATE import requires an update command: " + modelCode);
         }
 
         Set<String> createFields = commandFields(createCommand, "inputFields");
         Set<String> createAutoSetFields = commandMapKeys(createCommand, "autoSetFields");
         Set<String> updateFields = commandFields(updateCommand, "inputFields");
-        if (createCommand == null) {
-            createFields = importableModelFields(modelCode);
-        }
-        if (updateCommand == null) {
-            updateFields = importableModelFields(modelCode);
-        }
-
         return ExcelImportPolicy.builder()
+                .profileCode(profileCode)
                 .modelCode(modelCode)
                 .enabled(enabled)
                 .modes(modes)
@@ -89,6 +91,7 @@ public class ExcelImportPolicyResolver {
                 .createFields(createFields)
                 .createAutoSetFields(createAutoSetFields)
                 .updateFields(updateFields)
+                .atomicUnit(atomicUnit)
                 .build();
     }
 
@@ -135,19 +138,6 @@ public class ExcelImportPolicyResolver {
         return values == null ? Set.of() : normalizedStrings(values.keySet());
     }
 
-    private Set<String> importableModelFields(String modelCode) {
-        LinkedHashSet<String> fields = new LinkedHashSet<>();
-        for (FieldDefinition field : safeFields(modelCode)) {
-            if (!SystemFieldConstants.ALL_INFRASTRUCTURE.contains(field.getCode())
-                    && !field.isPrimaryKey()
-                    && !field.isComputedReadonly()
-                    && !field.isVirtual()) {
-                fields.add(field.getCode());
-            }
-        }
-        return fields;
-    }
-
     private List<FieldDefinition> safeFields(String modelCode) {
         List<FieldDefinition> fields = metaModelService.getModelFields(modelCode);
         return fields == null ? List.of() : fields;
@@ -163,6 +153,10 @@ public class ExcelImportPolicyResolver {
             }
         }
         return result;
+    }
+
+    private static String stringValue(Object value, String fallback) {
+        return value == null || value.toString().isBlank() ? fallback : value.toString().trim();
     }
 
     @SuppressWarnings("unchecked")

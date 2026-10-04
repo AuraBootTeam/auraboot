@@ -1,3 +1,5 @@
+import { resolveAuthAppearance, type AuthAppearance } from './auth-appearance';
+
 export interface BrandingConfig {
   mode: 'community' | 'commercial';
   productName: string;
@@ -41,6 +43,7 @@ export interface BrandingConfig {
    * vertical product say "school" while the platform default remains
    * organization/workspace neutral.
    */
+  authAppearance?: AuthAppearance;
   tenantOnboarding?: TenantOnboardingBranding;
 }
 
@@ -94,6 +97,7 @@ export interface DeploymentBrandingDocument {
    * admin login route. Branding-level flag — applies when commercial branding resolves.
    */
   loginWechatOnly?: boolean;
+  authAppearance?: AuthAppearance;
   tenantOnboarding?: TenantOnboardingDocument;
 }
 
@@ -153,6 +157,7 @@ const DEPLOYMENT_KEYS = new Set<keyof DeploymentBrandingDocument>([
   'loginFeatures',
   'loginWechatOnly',
   'tenantOnboarding',
+  'authAppearance',
 ]);
 
 const TENANT_ONBOARDING_KEYS = new Set<keyof TenantOnboardingDocument>([
@@ -320,6 +325,7 @@ export function resolveCommercialBranding(
     loginFeatures: optionalTextList(document.loginFeatures, 'loginFeatures'),
     loginWechatOnly:
       document.loginWechatOnly === undefined ? undefined : Boolean(document.loginWechatOnly),
+    authAppearance: resolveAuthAppearance(document.authAppearance),
     tenantOnboarding: resolveTenantOnboarding(document.tenantOnboarding),
   };
 }

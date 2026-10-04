@@ -30,6 +30,7 @@ import {
   SmartTableChart,
   SmartGaugeChart,
   SmartProgress,
+  SmartFilterBar,
   SmartHeatmapChart,
   SmartTreemapChart,
   SmartMapChart,
@@ -220,6 +221,13 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
         return (
           <SmartGaugeChart
             {...(commonProps as React.ComponentProps<typeof SmartGaugeChart>)}
+            className="h-full"
+          />
+        );
+      case 'smart-filter-bar':
+        return (
+          <SmartFilterBar
+            {...(commonProps as React.ComponentProps<typeof SmartFilterBar>)}
             className="h-full"
           />
         );

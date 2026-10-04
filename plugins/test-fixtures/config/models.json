@@ -11,9 +11,31 @@
       "subtitleField": "e2et_order_no",
       "importPolicy": {
         "enabled": true,
+        "code": "e2et-order-standard-document",
+        "atomicUnit": "document",
         "modes": [
           "insert"
-        ]
+        ],
+        "document": {
+          "command": "e2eto:create_e2et_order",
+          "headerSheet": "Orders",
+          "lineSheet": "Lines",
+          "groupBy": "e2et_order_title",
+          "lineGroupField": "e2et_item_spec",
+          "lineModelCode": "e2et_order_item",
+          "linesPayloadField": "lines",
+          "headerFields": [
+            "e2et_order_title",
+            "e2et_order_desc"
+          ],
+          "lineFields": [
+            "e2et_item_spec",
+            "e2et_item_name",
+            "e2et_item_qty",
+            "e2et_item_price"
+          ],
+          "requireLines": true
+        }
       },
       "rules": [
         {
@@ -205,5 +227,27 @@
     "domain_category": "platform",
     "data_sensitivity": "internal",
     "lifecycle_description": "Stage field advances discovery → qualification → proposal → negotiation → closed_won (or terminal closed_lost)."
+  },
+  {
+    "code": "e2et_crm_opp",
+    "displayName:zh-CN": "商机演示",
+    "displayName:en": "Opportunity Demo",
+    "description": "Minimal stage-rail fixture opportunity carrying the verbatim CRM pipeline-stage block so golden scenes exercise real CRM stage config without importing the CRM plugin. Backs the e2et_crm_opp create/update commands.",
+    "modelType": "entity",
+    "modelCategory": "document",
+    "extension": {
+      "titleField": "e2et_crm_opp_name",
+      "importPolicy": {
+        "enabled": true,
+        "modes": [
+          "insert"
+        ]
+      },
+      "commandOnlyCreate": false
+    },
+    "semantic_description": "Stage-rail fixture opportunity for golden scenes; create/update via the e2et_crm_opp commands.",
+    "domain_category": "platform",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "Stage rail: new → qualified → proposal → negotiation → won/lost (persisted on stage transition)"
   }
 ]

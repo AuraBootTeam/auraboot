@@ -496,7 +496,7 @@ test.describe('Data Tools Deep — Export API', () => {
    */
   test('DT-015: export order list as XLSX', async ({ page }) => {
     const resp = await page.request.post(`/api/dynamic/${ORDER_PAGE_KEY}/export`, {
-      data: { format: 'excel' },
+      data: { format: 'excel', scope: 'filtered', conditions: [] },
     });
 
     if (resp.status() === 404 || resp.status() === 405) {
@@ -518,7 +518,7 @@ test.describe('Data Tools Deep — Export API', () => {
    */
   test('DT-016: export customer list as XLSX', async ({ page }) => {
     const resp = await page.request.post(`/api/dynamic/${CUSTOMER_PAGE_KEY}/export`, {
-      data: { format: 'excel' },
+      data: { format: 'excel', scope: 'filtered', conditions: [] },
     });
 
     if (resp.status() === 404 || resp.status() === 405) {

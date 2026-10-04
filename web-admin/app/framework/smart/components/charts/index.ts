@@ -37,6 +37,8 @@ export { SmartGaugeChart } from './SmartGaugeChart';
 export type { SmartGaugeChartProps } from './SmartGaugeChart';
 
 export { SmartProgress } from './SmartProgress';
+export { SmartFilterBar } from './SmartFilterBar';
+export type { SmartFilterBarProps, SmartFilterFieldConfig } from './SmartFilterBar';
 export type { SmartProgressProps } from './SmartProgress';
 
 export { SmartHeatmapChart } from './SmartHeatmapChart';

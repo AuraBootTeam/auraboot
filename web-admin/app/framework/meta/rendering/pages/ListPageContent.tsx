@@ -4288,14 +4288,18 @@ function ListPageContentInner(props: PageContentProps) {
     async (
       format: 'xlsx' | 'csv',
       conditions: Array<{ field: string; operator: string; value: unknown }> | undefined,
+      scope: 'selected' | 'filtered',
+      selectedPids?: string[],
     ) => {
       try {
         const res = await fetch(`/api/dynamic/${modelCode}/export`, {
           method: 'post',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            scope,
             format: format === 'xlsx' ? 'excel' : 'csv',
             conditions,
+            selectedPids,
             keyword: keywordRef.current.trim() || undefined,
           }),
         });
@@ -4321,7 +4325,7 @@ function ListPageContentInner(props: PageContentProps) {
   // Handle export from toolbar — exports the full/filtered result set.
   const handleExport = useCallback(
     async (format: 'xlsx' | 'csv') => {
-      await runExport(format, exportFilterConditions);
+      await runExport(format, exportFilterConditions, 'filtered');
     },
     [runExport, exportFilterConditions],
   );
@@ -4340,15 +4344,11 @@ function ListPageContentInner(props: PageContentProps) {
             ? [{ field: 'pid', operator: 'NOT_IN', value: allMatchingExcludedIds }]
             : []),
         ];
-        await runExport(format, conditions.length > 0 ? conditions : undefined);
+        await runExport(format, conditions.length > 0 ? conditions : undefined, 'filtered');
         return;
       }
       if (explicitSelectedIds.length === 0) return;
-      const conditions = [
-        ...(exportFilterConditions ?? []),
-        { field: 'pid', operator: 'IN', value: explicitSelectedIds },
-      ];
-      await runExport(format, conditions);
+      await runExport(format, exportFilterConditions, 'selected', explicitSelectedIds);
     },
     [
       allMatchingExcludedIds,

@@ -36,6 +36,9 @@ class ExportTaskServiceTenantAuthzTest {
     @Mock
     private com.auraboot.framework.meta.service.NamedQueryService namedQueryService;
 
+    @Mock
+    private com.auraboot.framework.infrastructure.storage.StorageProvider storageProvider;
+
     @org.mockito.Spy
     private com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
 

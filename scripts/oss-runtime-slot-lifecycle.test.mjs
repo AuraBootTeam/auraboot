@@ -28,8 +28,8 @@ test('golden stack uses idempotent runtime identity with source worktree metadat
   const source = readFileSync(stackPath, 'utf8');
   assert.match(source, /runtime ensure auraboot "\$name"/u);
   assert.match(source, /--source-root "\$REPO_ROOT"/u);
-  assert.match(source, /runtime allocate auraboot "\$name"/u);
-  assert.match(source, /legacy dispatcher/u);
+  assert.match(source, /runtime evidence begin/u);
+  assert.doesNotMatch(source, /runtime allocate auraboot/u);
   assert.match(source, /--mode "\$runtime_mode"/u);
 });
 

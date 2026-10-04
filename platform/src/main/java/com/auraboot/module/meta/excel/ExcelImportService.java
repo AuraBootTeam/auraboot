@@ -46,14 +46,14 @@ import jakarta.annotation.PreDestroy;
 
 /**
  * Reusable Excel import service that parses .xlsx files, validates rows,
- * and inserts data via DynamicDataService.
+ * and writes each business row through the model's declared Command policy.
  *
  * <p>Usage flow:
  * <ol>
  *   <li>Parse Excel stream into raw row maps (header row = column names)</li>
  *   <li>Validate rows (extensible; currently checks for empty rows)</li>
  *   <li>If dryRun, return validation results without persisting</li>
- *   <li>Insert each row via DynamicDataService.create()</li>
+ *   <li>Execute the declared create/update Command for each accepted row</li>
  * </ol>
  *
  * @author AuraBoot Team
@@ -226,7 +226,7 @@ public class ExcelImportService {
                     }
                 }
             }
-        } else if (policy.getCreateCommand() != null) {
+        } else {
             for (int i = 0; i < mappedRows.size(); i++) {
                 try {
                     executeCreate(policy, modelCode, convertRowValues(fieldDefs, mappedRows.get(i)),
@@ -241,49 +241,6 @@ public class ExcelImportService {
                     errors.add(new ImportValidationError(i + 2, null, safeMessage(e)));
                     if (!options.isSkipErrors()) {
                         break;
-                    }
-                }
-            }
-        } else {
-            // Pure CRUD models without a command keep the existing batch fast path.
-            for (int batchStart = 0; batchStart < mappedRows.size(); batchStart += BATCH_SIZE) {
-                int batchEnd = Math.min(batchStart + BATCH_SIZE, mappedRows.size());
-                List<Map<String, String>> batch = mappedRows.subList(batchStart, batchEnd);
-
-                try {
-                    List<Map<String, Object>> batchData = new ArrayList<>();
-                    for (Map<String, String> row : batch) {
-                        batchData.add(allowedPayload(convertRowValues(fieldDefs, row),
-                                policy.getCreateFields()));
-                    }
-                    dynamicDataService.batchCreate(modelCode, batchData);
-                    success += batch.size();
-                    createdCount += batch.size();
-                } catch (Exception batchError) {
-                    // Batch failed — fall back to per-row for error isolation
-                    log.warn("Batch insert failed for model {}; falling back to per-row",
-                            modelCode, batchError);
-                    for (int i = 0; i < batch.size(); i++) {
-                        try {
-                            dynamicDataService.create(modelCode,
-                                    allowedPayload(convertRowValues(fieldDefs, batch.get(i)),
-                                            policy.getCreateFields()));
-                            success++;
-                            createdCount++;
-                        } catch (Exception e) {
-                            // CATCH: per-row fallback isolates a bad row after the batch failed.
-                            log.warn("Excel CRUD row failed: model={}, row={}",
-                                    modelCode, batchStart + i + 2, e);
-                            errorCount++;
-                            errors.add(new ImportValidationError(batchStart + i + 2, null, safeMessage(e)));
-                            if (!options.isSkipErrors()) {
-                                return ExcelImportResult.builder()
-                                        .totalRows(success + errorCount)
-                                        .successCount(success).errorCount(errorCount)
-                                        .createdCount(createdCount).updatedCount(updatedCount)
-                                        .errors(errors).hasErrors(errorCount > 0).build();
-                            }
-                        }
                     }
                 }
             }
@@ -711,8 +668,7 @@ public class ExcelImportService {
                                Map<String, Object> rowData, int rowNumber, String importRunId) {
         Map<String, Object> payload = allowedPayload(rowData, policy.getCreateFields());
         if (policy.getCreateCommand() == null) {
-            dynamicDataService.create(modelCode, payload);
-            return;
+            throw new BusinessException("Import profile has no create command: " + policy.getProfileCode());
         }
         CommandExecuteRequest request = new CommandExecuteRequest();
         request.setPayload(payload);
@@ -726,8 +682,7 @@ public class ExcelImportService {
                                Map<String, Object> rowData, int rowNumber, String importRunId) {
         Map<String, Object> payload = allowedPayload(rowData, policy.getUpdateFields());
         if (policy.getUpdateCommand() == null) {
-            dynamicDataService.update(modelCode, recordPid, payload);
-            return;
+            throw new BusinessException("Import profile has no update command: " + policy.getProfileCode());
         }
         CommandExecuteRequest request = new CommandExecuteRequest();
         request.setPayload(payload);
@@ -1061,190 +1016,6 @@ public class ExcelImportService {
 
         log.info("Generated import template for model {} with {} fields", modelCode, importableFields.size());
         return tempFile;
-    }
-
-    // ==================== Chain Import ====================
-
-    /**
-     * Chain import: import parent records from Sheet1, then child records from Sheet2
-     * with automatic foreign key resolution.
-     *
-     * @param parentModelCode parent model code (Sheet1)
-     * @param childModelCode  child model code (Sheet2)
-     * @param parentKeyField  unique field on parent used to match child FK values
-     * @param childFkField    field on child that references the parent
-     * @param excelStream     multi-sheet .xlsx file
-     * @return combined import result
-     */
-    public ExcelImportResult chainImport(String parentModelCode, String childModelCode,
-                                          String parentKeyField, String childFkField,
-                                          InputStream excelStream) throws IOException {
-        List<ImportValidationError> errors = new ArrayList<>();
-        int parentSuccess = 0;
-        int childSuccess = 0;
-        int parentErrors = 0;
-        int childErrors = 0;
-
-        try (Workbook workbook = new XSSFWorkbook(excelStream)) {
-            if (workbook.getNumberOfSheets() < 2) {
-                return ExcelImportResult.withErrors(
-                        List.of(new ImportValidationError(0, null,
-                                "Chain import requires at least 2 sheets (parent + child)")), 0);
-            }
-
-            // 1. Parse parent rows from Sheet1
-            Sheet parentSheet = workbook.getSheetAt(0);
-            List<Map<String, String>> parentRawRows = parseSheet(parentSheet, "yyyy-MM-dd");
-            if (parentRawRows.isEmpty()) {
-                return ExcelImportResult.withErrors(
-                        List.of(new ImportValidationError(0, null, "Sheet1 (parent) has no data rows")), 0);
-            }
-
-            // Resolve parent headers
-            List<FieldDefinition> parentFields = metaModelService.getModelFields(parentModelCode);
-            Map<String, String> parentHeaderMapping = resolveHeaderMapping(
-                    new ArrayList<>(parentRawRows.get(0).keySet()), parentFields);
-            List<Map<String, String>> parentMapped = remapRows(parentRawRows, parentHeaderMapping);
-
-            // 2. Import parent rows and collect generated IDs keyed by parentKeyField value
-            Map<String, String> parentKeyToId = new LinkedHashMap<>();
-            for (int i = 0; i < parentMapped.size(); i++) {
-                try {
-                    Map<String, Object> rowData = new HashMap<>(parentMapped.get(i));
-                    String keyValue = parentMapped.get(i).get(parentKeyField);
-                    Map<String, Object> created = dynamicDataService.create(parentModelCode, rowData);
-                    if (keyValue != null && created != null) {
-                        Object pid = created.get("pid");
-                        if (pid == null) pid = created.get("id");
-                        if (pid != null) {
-                            parentKeyToId.put(keyValue, pid.toString());
-                        }
-                    }
-                    parentSuccess++;
-                } catch (Exception e) {
-                    parentErrors++;
-                    errors.add(new ImportValidationError(i + 2, null,
-                            "[Parent] " + e.getMessage()));
-                }
-            }
-
-            // 3. Parse child rows from Sheet2
-            Sheet childSheet = workbook.getSheetAt(1);
-            List<Map<String, String>> childRawRows = parseSheet(childSheet, "yyyy-MM-dd");
-            if (childRawRows.isEmpty()) {
-                return ExcelImportResult.builder()
-                        .totalRows(parentSuccess + parentErrors)
-                        .successCount(parentSuccess).errorCount(parentErrors)
-                        .createdCount(parentSuccess)
-                        .errors(errors).hasErrors(parentErrors > 0).build();
-            }
-
-            // Resolve child headers
-            List<FieldDefinition> childFields = metaModelService.getModelFields(childModelCode);
-            Map<String, String> childHeaderMapping = resolveHeaderMapping(
-                    new ArrayList<>(childRawRows.get(0).keySet()), childFields);
-            List<Map<String, String>> childMapped = remapRows(childRawRows, childHeaderMapping);
-
-            // 4. Import child rows with resolved FK
-            for (int i = 0; i < childMapped.size(); i++) {
-                try {
-                    Map<String, Object> rowData = new HashMap<>(childMapped.get(i));
-                    // Resolve FK: the child's FK field value should match a parent key value
-                    Object fkValue = rowData.get(childFkField);
-                    if (fkValue != null && parentKeyToId.containsKey(fkValue.toString())) {
-                        rowData.put(childFkField, parentKeyToId.get(fkValue.toString()));
-                    }
-                    dynamicDataService.create(childModelCode, rowData);
-                    childSuccess++;
-                } catch (Exception e) {
-                    childErrors++;
-                    errors.add(new ImportValidationError(i + 2, null,
-                            "[Child] " + e.getMessage()));
-                }
-            }
-        }
-
-        int totalSuccess = parentSuccess + childSuccess;
-        int totalErrors = parentErrors + childErrors;
-
-        return ExcelImportResult.builder()
-                .totalRows(totalSuccess + totalErrors)
-                .successCount(totalSuccess).errorCount(totalErrors)
-                .createdCount(totalSuccess)
-                .errors(errors).hasErrors(totalErrors > 0).build();
-    }
-
-    /**
-     * Parse a specific sheet into row maps.
-     */
-    private List<Map<String, String>> parseSheet(Sheet sheet, String dateFormat) {
-        List<Map<String, String>> rows = new ArrayList<>();
-        if (sheet == null || sheet.getPhysicalNumberOfRows() < 2) {
-            return rows;
-        }
-
-        DataFormatter dataFormatter = new DataFormatter();
-        DateTimeFormatter dtf = DateTimeFormatter.ofPattern(dateFormat != null ? dateFormat : "yyyy-MM-dd");
-
-        Row headerRow = sheet.getRow(0);
-        if (headerRow == null) return rows;
-
-        List<String> headers = new ArrayList<>();
-        for (int c = 0; c < headerRow.getLastCellNum(); c++) {
-            Cell cell = headerRow.getCell(c);
-            headers.add(cell != null ? dataFormatter.formatCellValue(cell).trim() : "");
-        }
-
-        for (int r = 1; r <= sheet.getLastRowNum(); r++) {
-            Row row = sheet.getRow(r);
-            if (row == null) continue;
-
-            Map<String, String> rowMap = new LinkedHashMap<>();
-            boolean hasData = false;
-
-            for (int c = 0; c < headers.size(); c++) {
-                String header = headers.get(c);
-                if (header.isEmpty()) continue;
-
-                Cell cell = row.getCell(c);
-                String value = "";
-                if (cell != null) {
-                    if (cell.getCellType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) {
-                        value = cell.getDateCellValue().toInstant()
-                                .atZone(ZoneId.systemDefault()).toLocalDate().format(dtf);
-                    } else {
-                        value = dataFormatter.formatCellValue(cell).trim();
-                    }
-                }
-
-                rowMap.put(header, value);
-                if (!value.isEmpty()) {
-                    hasData = true;
-                }
-            }
-
-            if (hasData) {
-                rows.add(rowMap);
-            }
-        }
-
-        return rows;
-    }
-
-    /**
-     * Remap row keys using a header mapping.
-     */
-    private List<Map<String, String>> remapRows(List<Map<String, String>> rows, Map<String, String> headerMapping) {
-        List<Map<String, String>> mapped = new ArrayList<>();
-        for (Map<String, String> row : rows) {
-            Map<String, String> m = new LinkedHashMap<>();
-            for (var entry : row.entrySet()) {
-                String key = headerMapping.getOrDefault(entry.getKey(), entry.getKey());
-                m.put(key, entry.getValue());
-            }
-            mapped.add(m);
-        }
-        return mapped;
     }
 
     // ==================== SSE Progress ====================

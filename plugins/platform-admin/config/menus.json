@@ -385,5 +385,24 @@
         "web"
       ]
     }
+  },
+  {
+    "code": "auth_appearance",
+    "parentCode": "system_management",
+    "name:zh-CN": "品牌与登录外观",
+    "name:en": "Brand and Authentication Appearance",
+    "path": "/p/c/auth_appearance",
+    "pageKey": "auth_appearance",
+    "component": null,
+    "icon": "palette",
+    "type": 1,
+    "permissionCode": "system_management",
+    "orderNo": 58,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
   }
 ]

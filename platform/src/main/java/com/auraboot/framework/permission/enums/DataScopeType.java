@@ -10,8 +10,10 @@ public enum DataScopeType {
     NONE("none", 1),
     SELF("self", 2),
     DEPT("dept", 3),
-    DEPT_AND_SUB("dept_and_sub", 4),
-    ALL("all", 5);
+    /** Explicit member-group scope (ab_team/ab_team_member) layered on the DEPT system. */
+    TEAM("team", 4),
+    DEPT_AND_SUB("dept_and_sub", 5),
+    ALL("all", 6);
 
     private final String code;
     private final int priority;
@@ -33,17 +35,15 @@ public enum DataScopeType {
      * Parse from database value (lowercase).
      *
      * @param code the scope type code from DB
-     * @return the matching enum, or ALL if unknown
+     * @return the matching enum
+     * @throws IllegalArgumentException when the stored value is missing or unknown
      */
     public static DataScopeType fromCode(String code) {
-        if (code == null) {
-            return ALL;
-        }
         for (DataScopeType type : values()) {
             if (type.code.equals(code)) {
                 return type;
             }
         }
-        return ALL;
+        throw new IllegalArgumentException("Invalid data scope type");
     }
 }

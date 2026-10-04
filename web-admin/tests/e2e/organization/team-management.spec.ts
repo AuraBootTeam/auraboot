@@ -93,7 +93,7 @@ test.describe('Team Management', () => {
       .first()
       .fill(code);
     await page
-      .locator('[data-testid="form-field-name"] input, input[name="name"]')
+      .locator('[data-testid="form-field-name"] input, [data-testid="form-field-name"] textarea, input[name="name"], textarea[name="name"]')
       .first()
       .fill(name);
     const descField = page
@@ -168,7 +168,7 @@ test.describe('Team Management', () => {
 
     const updatedName = `Updated Team ${uniqueId('U')}`;
     await page
-      .locator('[data-testid="form-field-name"] input, input[name="name"]')
+      .locator('[data-testid="form-field-name"] input, [data-testid="form-field-name"] textarea, input[name="name"], textarea[name="name"]')
       .first()
       .fill(updatedName);
 

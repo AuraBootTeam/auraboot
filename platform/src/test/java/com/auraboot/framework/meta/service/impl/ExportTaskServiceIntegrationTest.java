@@ -304,10 +304,13 @@ class ExportTaskServiceIntegrationTest {
         ExportTaskDTO dto = awaitTerminal(initial.getPid(), 10_000);
         assertEquals(ExportTask.STATUS_COMPLETED, dto.getStatus());
 
-        String fileKey = exportTaskService.getFileKey(dto.getPid());
-        assertNotNull(fileKey, "completed export must have a file");
-        // exportAsCsv writes with the platform default charset — read symmetrically
-        String csv = new String(java.nio.file.Files.readAllBytes(java.nio.file.Path.of(fileKey)));
+        ExportTaskService.ExportArtifactDownload artifact = exportTaskService.openArtifact(dto.getPid());
+        assertNotNull(artifact, "completed export must have a file");
+        String csv;
+        try (java.io.InputStream content = artifact.content()) {
+            // exportAsCsv writes with the platform default charset — read symmetrically
+            csv = new String(content.readAllBytes());
+        }
         String[] lines = csv.lines().toArray(String[]::new);
         assertTrue(lines.length >= 2, "header plus at least one data row expected: " + csv);
         assertEquals("rowCode,rowTitle", lines[0], "header must use declared field codes");
@@ -426,7 +429,7 @@ class ExportTaskServiceIntegrationTest {
     // ==================== getFileKey ====================
 
     @Test
-    @DisplayName("getFileKey returns the file path for a completed task")
+    @DisplayName("getFileKey returns the private storage key for a completed task")
     void getFileKey_completed() throws InterruptedException {
         String code = uniqueCode("filekey");
         insertNamedQuery(code);

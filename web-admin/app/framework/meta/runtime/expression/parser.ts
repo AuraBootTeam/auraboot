@@ -10,6 +10,7 @@
  */
 
 import jsep from 'jsep';
+import jsepObject, { type ObjectExpression } from '@jsep-plugin/object';
 import MessageFormat from '@messageformat/core';
 import type { ExpressionContext } from '~/framework/meta/runtime/expression/context';
 import { BUSINESS_FUNCTION_NAMES } from './business-functions';
@@ -287,6 +288,8 @@ export class ExpressionParser {
     jsep.addBinaryOp('===', 9);
     jsep.addBinaryOp('!==', 9);
     jsep.addBinaryOp('??', 3); // 空值合并操作符
+
+    jsep.plugins.register(jsepObject);
 
     // 注意：可选链操作符 ?. 需要在 evaluateMemberExpression 中特殊处理
     // jsep 本身不直接支持 ?. 操作符，我们将在成员表达式求值时处理
@@ -587,6 +590,8 @@ export class ExpressionParser {
 
       case 'ArrayExpression':
         return this.evaluateArrayExpression(node as jsep.ArrayExpression);
+      case 'ObjectExpression':
+        return this.evaluateObjectExpression(node as ObjectExpression);
 
       default:
         throw new Error(`不支持的节点类型: ${node.type}`);
@@ -955,6 +960,32 @@ export class ExpressionParser {
     return node.elements.map((element: jsep.Expression | null) =>
       element ? this.evaluateNode(element) : null,
     );
+  }
+
+  /**
+   * 对象字面量求值（数据构造）：键为字面量字符串，值仍经 evaluateNode
+   * 白名单遍历——对象是数据，不引入任何绕过 FORBIDDEN_GLOBALS 的通道。
+   */
+  private evaluateObjectExpression(node: ObjectExpression): Record<string, any> {
+    const result: Record<string, any> = {};
+    for (const prop of node.properties) {
+      if (prop.type !== 'Property') {
+        throw new Error(`不支持的对象属性类型: ${prop.type}`);
+      }
+      if (!prop.value) {
+        throw new Error('Object property value is missing');
+      }
+      const keyNode = prop.key;
+      const key =
+        keyNode.type === 'Identifier'
+          ? keyNode.name
+          : keyNode.type === 'Literal'
+            ? String(keyNode.value)
+            : this.evaluateNode(keyNode);
+      if (!prop.value) throw new Error("对象属性必须显式提供值");
+      result[String(key)] = this.evaluateNode(prop.value);
+    }
+    return result;
   }
 }
 
