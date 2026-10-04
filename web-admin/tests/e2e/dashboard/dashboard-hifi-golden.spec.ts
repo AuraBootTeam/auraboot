@@ -427,5 +427,6 @@ async function saveDashboard(page: import('@playwright/test').Page, widgets: num
   expect(String(body.code), JSON.stringify(body)).toBe('0');
   expect(body.data.pid).toBeTruthy();
   await dp.waitUntilSaved();
+  await expect(page).toHaveURL(new RegExp(`/dashboard-designer/${body.data.pid}$`));
   return body.data.pid;
 }

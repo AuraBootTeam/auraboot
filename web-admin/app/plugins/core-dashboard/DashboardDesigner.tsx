@@ -36,7 +36,7 @@ interface DashboardDesignerProps {
   /** Initial title for new dashboard */
   initialTitle?: string;
   /** Callback when save is completed */
-  onSaveComplete?: () => void;
+  onSaveComplete?: (dashboardPid: string) => void;
   /** Callback when close is requested */
   onClose?: () => void;
 }
@@ -145,6 +145,12 @@ export const DashboardDesigner: React.FC<DashboardDesignerProps> = ({
     };
   }, []);
 
+  const notifySaveComplete = useCallback(() => {
+    const savedPid = useDashboardStore.getState().dashboard?.pid;
+    if (!savedPid) throw new Error(t('dashboard.designer.saveFailedRetry'));
+    onSaveComplete?.(savedPid);
+  }, [onSaveComplete, t]);
+
   // Auto-save when dirty (debounced) — with mutual exclusion against manual save
   useEffect(() => {
     if (!isDirty || isSaving) {
@@ -165,6 +171,7 @@ export const DashboardDesigner: React.FC<DashboardDesignerProps> = ({
         await saveDashboard();
         lastSaveTimeRef.current = Date.now();
         showInfoToast(t('dashboard.designer.autoSaveSuccess'));
+        notifySaveComplete();
       } catch (error) {
         console.error('Auto-save failed:', error);
       }
@@ -176,7 +183,7 @@ export const DashboardDesigner: React.FC<DashboardDesignerProps> = ({
         autoSaveTimerRef.current = null;
       }
     };
-  }, [isDirty, isSaving, saveDashboard, showInfoToast, t]);
+  }, [isDirty, isSaving, saveDashboard, showInfoToast, t, notifySaveComplete]);
 
   const handleSave = useCallback(async () => {
     // Validate before saving
@@ -201,7 +208,7 @@ export const DashboardDesigner: React.FC<DashboardDesignerProps> = ({
       lastSaveTimeRef.current = Date.now();
       showSuccessToast(t('common.saveSuccess'));
       refreshVersions();
-      onSaveComplete?.();
+      notifySaveComplete();
     } catch (error) {
       console.error('Save failed:', error);
       const message =
@@ -214,7 +221,7 @@ export const DashboardDesigner: React.FC<DashboardDesignerProps> = ({
     showSuccessToast,
     showErrorToast,
     showWarningToast,
-    onSaveComplete,
+    notifySaveComplete,
     refreshVersions,
     t,
   ]);
