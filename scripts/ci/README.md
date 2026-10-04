@@ -55,3 +55,34 @@ checks again. No product source is modified for the mutation.
 These checks validate the tools. They do not run browser E2E, OAuth against a deployed platform,
 or the twelve deployed-target canary contracts. Release-image execution remains a separate
 Linux release validation using its actual source and artifact identity.
+
+## Deployed-target protocol slice
+
+`open_platform_canary.py` executes the first nine protocol contracts against a real TLS target.
+It requires a private JSON fixture file and private password files for two real accounts in
+distinct tenants. Both tenants must already contain the approved Asset/Inventory models;
+the runner does not install templates or use `/api/test/seed`. It creates fresh, run-named
+applications, credentials and records through management APIs and retains them as evidence.
+Revocation and installation disabling affect only the installation created by this run.
+
+Fixture fields are `schemaVersion: 1`, a fresh `runId` (8–48 lowercase letters/digits/hyphens),
+`origin` (HTTPS origin), `auth` and `foreign` (each has `identifier`, `passwordFile`, `tenantId`),
+and `targetIdentityEvidence` (path to the controlled deployment identity evidence).
+The identity file is hashed as an input; this slice does not independently attest its truth.
+
+```sh
+python3 scripts/ci/open_platform_canary.py \
+  --fixture /private/canary/fixture.json --out /private/canary/protocol-receipt.json
+```
+
+The output is reserved with exclusive creation **before any target writes**. Credentials are
+redacted; requests carry run-bound request IDs. HTTP budgets, no redirects, no automatic retries
+and stop-on-429 are inherited from the shared transport. An assertion or transport failure exits 1.
+Successful execution of this slice exits **2**, records `PARTIAL`, and retains all twelve rows:
+event/Automation, complete webhook lifecycle and cross-system trace remain untested. No caller
+may translate exit 2, nine passed rows, an input identity hash or these safety self-tests into full
+canary acceptance. Browser E2E is not executed.
+
+The same self-test entry additionally runs eight hermetic runner safety checks, injects a false
+completion verdict that must fail, and verifies restoration. They test tooling safety and reporting,
+not the deployed business paths; those require actual target execution and final full-scope evidence.
