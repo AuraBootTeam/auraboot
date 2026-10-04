@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Enforces model-level append-only invariants at runtime write boundaries.
+ * Enforces model mutation invariants at runtime write boundaries.
  */
 public final class ModelMutationGuard {
 
@@ -29,10 +29,33 @@ public final class ModelMutationGuard {
         if (operationType == null) {
             return;
         }
+        if ("delete".equalsIgnoreCase(operationType)) {
+            assertDeleteAllowed(model);
+            return;
+        }
         if ("update".equalsIgnoreCase(operationType)
-                || "delete".equalsIgnoreCase(operationType)
                 || "state_transition".equalsIgnoreCase(operationType)) {
             assertMutable(model, operationType.toLowerCase(java.util.Locale.ROOT));
+        }
+    }
+
+    /** Require command authorization for deletes without preventing review or revocation updates. */
+    public static void assertDeleteAllowed(ModelDefinition model) {
+        assertMutable(model, "deleted");
+        if (model == null || model.getExtension() == null) {
+            return;
+        }
+        Object policy = model.getExtension().get("commandOnlyDelete");
+        if (policy == null) {
+            return;
+        }
+        if (!(policy instanceof Boolean)) {
+            throw new MetaServiceException("Model '" + model.getCode()
+                    + "' has invalid commandOnlyDelete policy; expected a boolean");
+        }
+        if (Boolean.TRUE.equals(policy) && !MetaContext.hasCommandPermitScope()) {
+            throw new MetaServiceException("Model '" + model.getCode()
+                    + "' can only be deleted through an authorized command");
         }
     }
 

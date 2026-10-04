@@ -4,7 +4,7 @@
  */
 
 import React, { useCallback, useRef, useMemo, useState } from 'react';
-import GridLayout from 'react-grid-layout';
+import GridLayout from 'react-grid-layout/legacy';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 import { DesignerEmptyState, DESIGNER_I18N } from '~/shared/designer';
@@ -95,7 +95,7 @@ export const DesignerCanvas: React.FC<DesignerCanvasProps> = ({ className = '' }
    * Handle layout changes from drag/resize
    */
   const handleLayoutChange = useCallback(
-    (newLayout: Layout[]) => {
+    (newLayout: readonly Layout[]) => {
       const updatedWidgets = widgets.map((widget) => {
         const layoutItem = newLayout.find((l) => l.i === widget.id);
         if (!layoutItem) return widget;
@@ -264,25 +264,20 @@ export const DesignerCanvas: React.FC<DesignerCanvasProps> = ({ className = '' }
           testId="dashboard-canvas-empty"
         />
       ) : (
-        // Type assertion needed because our Layout interface is structurally compatible
-        // with react-grid-layout's Layout, but TypeScript doesn't recognize this
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         <GridLayout
-          {...({
-            className: 'layout',
-            layout,
-            cols: layoutConfig.columns,
-            rowHeight: layoutConfig.rowHeight,
-            width: containerWidth,
-            margin: [layoutConfig.gap, layoutConfig.gap] as [number, number],
-            containerPadding: [0, 0] as [number, number],
-            onLayoutChange: handleLayoutChange,
-            isDraggable: true,
-            isResizable: true,
-            compactType: layoutConfig.compactType || 'vertical',
-            preventCollision: false,
-            useCSSTransforms: true,
-          } as any)}
+          className="layout"
+          layout={layout}
+          cols={layoutConfig.columns}
+          rowHeight={layoutConfig.rowHeight}
+          width={containerWidth}
+          margin={[layoutConfig.gap, layoutConfig.gap]}
+          containerPadding={[0, 0]}
+          onLayoutChange={handleLayoutChange}
+          isDraggable
+          isResizable
+          compactType={layoutConfig.compactType ?? 'vertical'}
+          preventCollision={false}
+          useCSSTransforms
         >
           {widgets.map((widget) => (
             <div key={widget.id}>{renderCanvasWidget(widget)}</div>

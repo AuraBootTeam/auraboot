@@ -181,20 +181,9 @@ public class I18nResourceServiceImpl implements I18nResourceService {
             return new ArrayList<>(merged.values());
         }
 
-        // When tenantId is 0 (unauthenticated request like /api/i18n/{locale}),
-        // also load all tenant-level translations since i18n data is non-sensitive
-        // and the endpoint is public (WhiteList). Without this, plugin-imported
-        // translations (stored under real tenant IDs) would never appear.
-        List<I18nResource> allTenantResources = i18nResourceMapper.selectAllByLangAllTenants(lang);
-        Map<String, I18nResource> merged = new LinkedHashMap<>();
-        for (I18nResource resource : tenantResources) {
-            merged.put(resource.getI18nKey(), resource);
-        }
-        // Tenant-level translations override system-level for same key
-        for (I18nResource resource : allTenantResources) {
-            merged.put(resource.getI18nKey(), resource);
-        }
-        return new ArrayList<>(merged.values());
+        // Public locale responses are cached under tenant 0. Tenant-authored overrides
+        // belong only to authenticated tenant responses, never this shared cache.
+        return tenantResources;
     }
 
     @Override

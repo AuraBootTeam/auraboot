@@ -32,6 +32,34 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class TenantAwareTaskDecoratorTest {
 
+    @Test
+    void decorate_preservesCallerContextWhenExecutorRunsInline() {
+        MetaContext.setContext(7L, 42L, "p", "u");
+        MetaContext.runWithCommandPermitScope("ALL", () -> {
+            Runnable decorated = new TenantAwareTaskDecorator().decorate(() -> {
+                assertThat(MetaContext.getCurrentTenantId()).isEqualTo(7L);
+                assertThat(MetaContext.hasCommandPermitScope()).isFalse();
+            });
+            decorated.run(); // CallerRunsPolicy executes the decorated task on this thread.
+            assertThat(MetaContext.getCurrentTenantId()).isEqualTo(7L);
+            assertThat(MetaContext.hasCommandPermitScope()).isTrue();
+            return null;
+        });
+    }
+
+    @Test
+    void decorate_restoresCallerContextEvenWhenInlineTaskThrows() {
+        MetaContext.setContext(7L, 42L, "p", "u");
+        Runnable decorated = new TenantAwareTaskDecorator().decorate(() -> {
+            MetaContext.setContext(99L, 1L, "nested", "nested");
+            throw new IllegalStateException("task failed");
+        });
+        org.assertj.core.api.Assertions.assertThatThrownBy(decorated::run)
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(MetaContext.getCurrentTenantId()).isEqualTo(7L);
+        assertThat(MetaContext.getCurrentUserId()).isEqualTo(42L);
+    }
+
     @AfterEach
     void tearDown() {
         ExecutionPrincipalContext.clear();

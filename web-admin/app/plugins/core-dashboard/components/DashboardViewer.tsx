@@ -5,7 +5,7 @@
  */
 
 import React, { useCallback, useRef, useMemo, useState, useEffect } from 'react';
-import GridLayout from 'react-grid-layout';
+import GridLayout from 'react-grid-layout/legacy';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 import { renderWidget } from './WidgetRenderer';
@@ -83,24 +83,30 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
     return () => resizeObserver.disconnect();
   }, []);
 
-  const layout = useMemo(
-    () =>
-      widgets.map(
-        (widget): Layout => ({
-          i: widget.id,
-          x: widget.x,
-          y: widget.y,
-          w: widget.w,
-          h: widget.h,
-          minW: widget.minW,
-          minH: widget.minH,
-          maxW: widget.maxW,
-          maxH: widget.maxH,
-          static: true,
-        }),
-      ),
-    [widgets],
-  );
+  // Keep authored desktop geometry; stack narrow viewers in reading order.
+  const singleColumn = containerWidth < 640;
+  const layout = useMemo(() => {
+    const ordered = singleColumn
+      ? [...widgets].sort((a, b) => a.y - b.y || a.x - b.x)
+      : widgets;
+    let nextY = 0;
+    return ordered.map((widget): Layout => {
+      const row: Layout = {
+        i: widget.id,
+        x: singleColumn ? 0 : widget.x,
+        y: singleColumn ? nextY : widget.y,
+        w: singleColumn ? layoutConfig.columns : widget.w,
+        h: widget.h,
+        minW: singleColumn ? undefined : widget.minW,
+        minH: widget.minH,
+        maxW: singleColumn ? undefined : widget.maxW,
+        maxH: widget.maxH,
+        static: true,
+      };
+      nextY += widget.h;
+      return row;
+    });
+  }, [widgets, singleColumn, layoutConfig.columns]);
 
   const renderViewerWidget = (widget: Widget) => {
     const linkageConfig = widget.config.linkage;
@@ -192,21 +198,19 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
           <DashboardExportExcel widgets={widgets} fileName={title} />
         </div>
       )}
-      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
       <GridLayout
-        {...({
-          className: 'layout',
-          layout,
-          cols: layoutConfig.columns,
-          rowHeight: layoutConfig.rowHeight,
-          width: containerWidth,
-          margin: [layoutConfig.gap, layoutConfig.gap] as [number, number],
-          containerPadding: [0, 0] as [number, number],
-          isDraggable: false,
-          isResizable: false,
-          compactType: layoutConfig.compactType || 'vertical',
-          useCSSTransforms: true,
-        } as any)}
+        className="layout"
+        layout={layout}
+        cols={layoutConfig.columns}
+        rowHeight={layoutConfig.rowHeight}
+        width={containerWidth}
+        margin={[layoutConfig.gap, layoutConfig.gap]}
+        containerPadding={[0, 0]}
+        isDraggable={false}
+        isResizable={false}
+        resizeHandles={[]}
+        compactType={layoutConfig.compactType ?? 'vertical'}
+        useCSSTransforms
       >
         {widgets.map((widget) => (
           <div key={widget.id} data-testid={`dashboard-block-${widget.id}`}>
