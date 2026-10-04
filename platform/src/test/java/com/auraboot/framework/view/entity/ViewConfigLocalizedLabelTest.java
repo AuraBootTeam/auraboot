@@ -18,6 +18,19 @@ class ViewConfigLocalizedLabelTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
+    void dictionaryBindingSurvivesSavedViewSerialization() throws Exception {
+        String json = """
+                {"cardFields":[{"field":"inv_in_type","type":"tag","dictCode":"pe_in_type"}]}
+                """;
+        ViewConfig config = objectMapper.readValue(json, ViewConfig.class);
+        var persisted = objectMapper.readTree(objectMapper.writeValueAsString(config));
+        assertEquals("pe_in_type", persisted.path("cardFields").get(0).path("dictCode").asText());
+        ViewConfig restored = objectMapper.treeToValue(persisted, ViewConfig.class);
+        assertEquals("pe_in_type", objectMapper.valueToTree(restored)
+                .path("cardFields").get(0).path("dictCode").asText());
+    }
+
+    @Test
     void mapLabelsSurviveConversionIntoViewConfig() throws Exception {
         String json = """
                 {
