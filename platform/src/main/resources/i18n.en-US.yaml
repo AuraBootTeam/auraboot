@@ -839,6 +839,13 @@ workbench:
     copyTaskDesc: Work items assigned to you that still need action.
     copyMentionTitle: Mentions
     copyMentionDesc: Messages where a teammate @mentioned you.
+    markedRead: Item marked as read
+    markReadFailed: Failed to mark item as read
+    dismissed: Item dismissed
+    dismissFailed: Failed to dismiss item
+    allMarkedRead: All inbox items marked as read
+    markAllReadFailed: Failed to mark all items as read
+    approvalCompleted: Approval action completed
   notificationCenter:
     title: Notifications
     unreadCount: "{count} unread"

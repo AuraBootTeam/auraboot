@@ -37,13 +37,16 @@ export function InboxBadge({ onClick, isOpen, pollInterval = 30_000, className }
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
-      if (detail?.type === 'inbox' && typeof detail?.count === 'number') {
+      if (detail?.type !== 'inbox') return;
+      if (typeof detail.count === 'number') {
         setCount(detail.count);
+      } else {
+        void fetchCount();
       }
     };
     window.addEventListener('aura:inbox-update', handler);
     return () => window.removeEventListener('aura:inbox-update', handler);
-  }, []);
+  }, [fetchCount]);
 
   return (
     <button

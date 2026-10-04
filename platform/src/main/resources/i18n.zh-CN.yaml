@@ -1332,6 +1332,13 @@ workbench:
     copyTaskDesc: 指派给你、仍需处理的工作项。
     copyMentionTitle: 提及
     copyMentionDesc: 同事在消息中 @ 你的内容。
+    markedRead: 待办已标为已读
+    markReadFailed: 待办标为已读失败
+    dismissed: 待办已忽略
+    dismissFailed: 忽略待办失败
+    allMarkedRead: 所有待办已标为已读
+    markAllReadFailed: 全部待办标为已读失败
+    approvalCompleted: 审批操作已完成
   notificationCenter:
     title: 通知中心
     unreadCount: "{count} 条未读通知"
