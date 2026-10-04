@@ -37,10 +37,10 @@
     "overrides": {
       "@hono/node-server": "^1.19.13",
       "brace-expansion": "1.1.13",
-      "dompurify": "^3.4.8",
+      "dompurify": "^3.4.16",
       "esbuild": "^0.27.7",
       "fast-uri": "^3.1.2",
-      "hono": "^4.12.23",
+      "hono": "^4.13.12",
       "postcss": "^8.5.10",
       "qs": "^6.15.2",
       "uuid": "^11.1.1",
