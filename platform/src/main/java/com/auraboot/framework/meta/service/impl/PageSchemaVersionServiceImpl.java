@@ -44,6 +44,9 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private com.auraboot.framework.meta.validator.PageSchemaAuthoringProfileValidator renderProfiles;
+
     // ==================== 版本创建和管理 ====================
 
     @Override
@@ -208,6 +211,7 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
         
         // 从快照恢复数据
         restoreSchemaFromSnapshot(currentSchema, targetHistory.getSnapshot());
+        renderProfiles.validate(currentSchema);
         
         // 更新页面Schema
         pageSchemaMapper.updateById(currentSchema);
@@ -273,6 +277,7 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
         Map<String, Object> targetSnapshot = targetHistory.getSnapshot();
         if (isCurrentVersion(currentSchema, targetSnapshot)) {
             // 直接发布当前版本
+            renderProfiles.validate(currentSchema);
             currentSchema.setStatus(StatusConstants.PUBLISHED);
             currentSchema.setPublishedAt(Instant.now());
             pageSchemaMapper.updateById(currentSchema);
@@ -282,6 +287,7 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
 
             // 重新获取更新后的Schema
             currentSchema = findPageSchemaByPid(pagePid);
+            renderProfiles.validate(currentSchema);
             currentSchema.setStatus(StatusConstants.PUBLISHED);
             currentSchema.setPublishedAt(Instant.now());
             pageSchemaMapper.updateById(currentSchema);
@@ -491,6 +497,8 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
         snapshot.put("title", schema.getTitle());
         snapshot.put("description", schema.getDescription());
         snapshot.put("kind", schema.getKind());
+        snapshot.put("profile", schema.getProfile());
+        snapshot.put("schemaVersion", schema.getSchemaVersion());
 
         // Schema内容
         snapshot.put("blocks", schema.getBlocks());
@@ -528,6 +536,11 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
         schema.setTitle((String) snapshot.get("title"));
         schema.setDescription((String) snapshot.get("description"));
         schema.setKind((String) snapshot.get("kind"));
+        // Legacy snapshots lack these fields; new snapshots restore the full render contract.
+        if (snapshot.containsKey("profile")) schema.setProfile((String) snapshot.get("profile"));
+        if (snapshot.containsKey("schemaVersion")) {
+            schema.setSchemaVersion((Integer) snapshot.get("schemaVersion"));
+        }
 
         // Schema内容
         schema.setBlocks((String) snapshot.get("blocks"));

@@ -51,7 +51,7 @@ import java.util.stream.Collectors;
 @Transactional
 public class PageSchemaServiceImpl implements PageSchemaService {
 
-    private final com.auraboot.framework.plugin.validation.PageSchemaValidator renderProfiles;
+    private final com.auraboot.framework.meta.validator.PageSchemaAuthoringProfileValidator renderProfiles;
     private final PageSchemaMapper pageSchemaMapper;
     private final PageSchemaConverter pageSchemaConverter;
     private final com.auraboot.framework.permission.service.AutoPermissionAssignmentService autoPermissionAssignmentService;
@@ -854,19 +854,7 @@ public class PageSchemaServiceImpl implements PageSchemaService {
      * 验证是否可以发布
      */
     private void validateRenderProfile(PageSchema pageSchema) {
-        List<Object> blocks = null;
-        if (pageSchema.getBlocks() != null) {
-            try {
-                blocks = objectMapper.readValue(pageSchema.getBlocks(), new TypeReference<List<Object>>() { });
-            } catch (com.fasterxml.jackson.core.JsonProcessingException invalid) {
-                throw new ValidationException(ResponseCode.CommonValidationFailed, "Invalid page blocks JSON");
-            }
-        }
-        List<String> errors = renderProfiles.authoringProfileErrors(
-                pageSchema.getKind(), pageSchema.getProfile(), blocks);
-        if (!errors.isEmpty()) {
-            throw new ValidationException(ResponseCode.CommonValidationFailed, String.join("; ", errors));
-        }
+        renderProfiles.validate(pageSchema);
     }
 
     private void validateCanPublish(PageSchema pageSchema) {

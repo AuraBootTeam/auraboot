@@ -60,7 +60,8 @@ class PageSchemaRuntimeContributionTest {
 
     @BeforeEach
     void setUp() {
-        service = new PageSchemaServiceImpl(new com.auraboot.framework.plugin.validation.PageSchemaValidator(), mapper, converter, permissionService, metaModelMapper,
+        service = new PageSchemaServiceImpl(new com.auraboot.framework.meta.validator.PageSchemaAuthoringProfileValidator(
+                new com.auraboot.framework.plugin.validation.PageSchemaValidator(), objectMapper), mapper, converter, permissionService, metaModelMapper,
                 eventPublisher, metaModelService, defaultBlockGenerator, objectMapper, materializer,
                 composer, providerObject, shadowReadService, primaryReadService);
         entity = new PageSchema();
