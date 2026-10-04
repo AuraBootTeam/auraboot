@@ -600,6 +600,34 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
       };
       expect(created.quoteCode, 'quote code assigned').toBeTruthy();
 
+      // The ordinary uploader must read the originals through the actual source tab.
+      // Admin exports later in this journey do not prove the owner's attachment access.
+      step = 'download own uploaded originals';
+      await openQuoteDetailFromList(page, created);
+      await page.getByRole('tab', { name: '资料上传', exact: true }).click();
+      const originalDetailUrl = page.url();
+      for (const [index, fixture] of [workbookPath, gerberFixture, cplFixture].entries()) {
+        const filename = path.basename(fixture);
+        const materialRow = page.getByRole('row').filter({ hasText: filename });
+        await expect(materialRow).toHaveCount(1);
+        await expect(materialRow).toBeVisible();
+        const link = materialRow.getByRole('link', { name: '下载文件', exact: true });
+        const href = await link.getAttribute('href');
+        expect(href).toMatch(/^\/api\/file\/download\/[^/]+$/);
+        const event = page.waitForEvent('download');
+        await link.click();
+        const download = await event;
+        expect(download.url()).toBe(new URL(href!, originalDetailUrl).href);
+        expect(download.suggestedFilename()).toBe(filename);
+        const output = testInfo.outputPath(`ordinary-owner-original-${index}-${filename}`);
+        await download.saveAs(output);
+        const uploadedBytes = fs.readFileSync(fixture);
+        expect(uploadedBytes.byteLength).toBeGreaterThan(0);
+        expect(fs.readFileSync(output)).toEqual(uploadedBytes);
+        expect(page.url()).toBe(originalDetailUrl);
+      }
+      await page.screenshot({ path: testInfo.outputPath('ordinary-sales-upload-original-downloads.png'), fullPage: true });
+
       // 3. Seed deterministic channel evidence through admin setup, then hand only those fixture
       // rows to the quote owner. All user actions below remain real qo_sales browser actions.
       step = 'seed deterministic recent + yunhan evidence';
