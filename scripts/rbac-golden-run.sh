@@ -7,9 +7,9 @@
 # (zero docker, slot-isolated — safe alongside concurrent sessions, never
 # oss-reset-and-init's global pkill), imports the core plugins so menus exist, runs
 # the per-role browser golden (web-admin/tests/e2e/rbac/), prints a PASS/FAIL banner,
-# and tears the stack down. Exit code == golden result (0 = all green).
+# and preserves the stack and evidence. Exit code == golden result (0 = all green).
 #
-# The stack is destroyed-then-recreated each run, so the golden always sees a fresh
+# A new verification runtime is allocated each run, so the golden sees a fresh
 # bootstrap (tenant_admin + tenant_member) — never a stale-DB role model from a prior
 # slot reuse. The golden's own assertions catch any role-model drift.
 #
@@ -22,9 +22,9 @@
 #
 # Usage:
 #   scripts/rbac-golden-run.sh [--slot N] [--name NAME] [--keep] [--repeat K]
-#     --slot N     isolated-stack slot (default: 71). Pick one not used by other runtimes.
-#     --name NAME  runtime name        (default: rbac-golden-nightly)
-#     --keep       leave the stack up after the run (for debugging a failure)
+#     --slot N     isolated-stack slot (default: auto). Pick one not used by other runtimes.
+#     --name NAME  runtime name        (default: date/run-bound name)
+#     --keep       compatibility option; all runs retain their stack and evidence
 #     --repeat K   run the golden K times (flakiness check; default: 1)
 #
 # Crontab example (nightly 02:30):
@@ -36,11 +36,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 GS="$REPO_ROOT/scripts/oss-golden-stack.sh"
 
-NAME="rbac-golden-nightly"
-SLOT="71"
-KEEP=0
+NAME="rbac-golden-nightly-$(TZ=Asia/Shanghai date +%Y%m%d-%H%M%S)"
+SLOT="auto"
+KEEP=1
 REPEAT=1
-RUNTIME_MODE="development"
+RUNTIME_MODE="verification"
 
 die() { echo "[rbac-golden-run] ERROR: $*" >&2; exit 2; }
 
@@ -57,72 +57,25 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -x "$GS" ]] || die "oss-golden-stack.sh not found/executable at $GS"
+[[ "$REPEAT" =~ ^[1-9][0-9]*$ ]] || die "--repeat must be a positive integer"
+[[ "$RUNTIME_MODE" == verification ]] || die "nightly requires a fresh verification runtime"
+if "$GS" env "$NAME" >/dev/null 2>&1; then
+  die "runtime '$NAME' already exists; choose a fresh name instead of reusing prior data"
+fi
+node --test "$SCRIPT_DIR/rbac-golden-result.test.mjs" || die "nightly result contract tests failed"
 
 cleanup() {
-  local rc=$?
-  if [[ "$KEEP" == 1 ]]; then
-    echo "[rbac-golden-run] --keep set; leaving stack '$NAME' up (env: $GS env $NAME)"
-  else
-    echo "[rbac-golden-run] tearing down stack '$NAME'..."
-    "$GS" destroy "$NAME" >/dev/null 2>&1 || true
-  fi
-  return $rc
+  echo "[rbac-golden-run] preserving runtime '$NAME', database and evidence for owner review"
 }
 trap cleanup EXIT
 
 echo "[rbac-golden-run] === RBAC platform-baseline golden — name=$NAME slot=$SLOT mode=$RUNTIME_MODE repeat=$REPEAT ==="
 
-# 0/4 GC — concurrent sessions routinely leave DEAD verification stacks
-# resident (backend process gone, resident entry kept), which exhausts the
-# ephemeral class capacity and blocks allocation. Close any owner whose
-# SERVER_PORT has no listener. Skips live stacks unconditionally.
-gc_dead_owners() {
-  local ws1="$REPO_ROOT/../.workspace/env"
-  local ws2="/Users/ghj/work/auraboot/auraboot-workspace"
-  local R="$SCRIPT_DIR/../../../scripts/dev/runtime.sh"
-  [ -x "$R" ] || R="/Users/ghj/work/auraboot/scripts/dev/runtime.sh"
-  local env_file name port closed=0
-  for env_file in "$ws1"/*.env "$ws2"/*.env; do
-    [ -f "$env_file" ] || continue
-    name="$(basename "$env_file" .env)"
-    [ "$name" = "$NAME" ] && continue
-    port="$(grep -E '^SERVER_PORT=' "$env_file" 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')"
-    [ -n "$port" ] || continue
-    if lsof -tiTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
-      continue  # alive — concurrent session, leave it alone
-    fi
-    echo "[rbac-golden-run] GC: closing dead resident owner '$name' (port $port has no listener)"
-    bash "$R" close "$name" >/dev/null 2>&1 || true
-    closed=$((closed + 1))
-  done
-  echo "[rbac-golden-run] GC: closed $closed dead owner(s)"
-}
-gc_dead_owners
-
-# 1. Fresh isolated stack (destroy any prior instance of this name first so the DB is
-#    always freshly bootstrapped — guards against a stale-slot role model).
-echo "[rbac-golden-run] 1/4 fresh stack (destroy prior + up + import)"
-"$GS" destroy "$NAME" >/dev/null 2>&1 || true
-# --no-warm: the rbac golden self-provisions its member and runs with --no-deps, so it does
-# NOT need the setup/auth/pre-warm step (which runs the full generic setup project).
-# Under multi-session load the ephemeral class can be momentarily saturated
-# by LIVE concurrent gates — retry with backoff before giving up (dead owners
-# are already GC'd by the step-0 sweep).
-up_ok=0
-# 6 attempts x 10 min = ~1h retry window: concurrent iteration gates run for
-# hours at a stretch, and the ephemeral budget (raised 5→7→10) is routinely
-# subscribed by live multi-session workloads.
-for attempt in 1 2 3 4 5 6; do
-  if "$GS" up "$NAME" --slot "$SLOT" --ttl 2h --no-warm --runtime-mode "$RUNTIME_MODE"; then
-    up_ok=1
-    break
-  fi
-  [ "$attempt" = 6 ] || {
-    echo "[rbac-golden-run] bring-up attempt $attempt failed — retrying in 10 min (concurrent ephemeral capacity)"
-    sleep 600
-  }
-done
-[ "$up_ok" = 1 ] || die "stack bring-up failed after 6 attempts (spread over ~1h)"
+# Each invocation owns a new verification namespace. Never close another owner,
+# destroy a prior run, or retry a failed migration/bootstrap for an hour.
+echo "[rbac-golden-run] 1/4 fresh isolated stack (prior evidence retained)"
+"$GS" up "$NAME" --slot "$SLOT" --ttl 2h --no-warm --runtime-mode "$RUNTIME_MODE" \
+  || die "stack bring-up failed; runtime retained, diagnose environment before rerunning"
 "$GS" import "$NAME" || die "plugin import failed"
 
 # 2. Export the Playwright env (PW_SKIP_WEBSERVER + base URL + backend + PG*).
@@ -132,12 +85,21 @@ echo "[rbac-golden-run]     base=$PLAYWRIGHT_BASE_URL backend=$BACKEND_URL"
 
 # 3. Run the golden.
 echo "[rbac-golden-run] 3/4 run per-role browser golden (x$REPEAT)"
+mkdir -p "$PW_REPORT_DIR"
+[ ! -e "$PW_RESULTS_JSON" ] || die "result JSON already exists; refusing stale evidence"
+export PLAYWRIGHT_JSON_OUTPUT_FILE="$PW_RESULTS_JSON"
 cd "$REPO_ROOT/web-admin" || die "web-admin not found"
 set +e
 NO_PROXY=localhost,127.0.0.1 pnpm exec playwright test tests/e2e/rbac/ \
-  --project=chromium --no-deps --repeat-each="$REPEAT" --reporter=line
+  --project=chromium --no-deps --repeat-each="$REPEAT" --reporter=line,json
 GOLDEN_RC=$?
 set -e 2>/dev/null || true
+
+# 4. Reject empty, skipped, retried or missing role execution before publishing PASS.
+if [[ "$GOLDEN_RC" == 0 ]]; then
+  node "$SCRIPT_DIR/rbac-golden-result.mjs" "$PW_RESULTS_JSON" "$REPEAT" "$NAME" "$REPO_ROOT" \
+    || GOLDEN_RC=1
+fi
 
 # 4. Report.
 echo "[rbac-golden-run] 4/4 result"

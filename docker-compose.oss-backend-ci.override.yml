@@ -16,12 +16,6 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   redis:
-    profiles: !override [skills-c2-stack]
-    container_name: ${AURA_OSS_CI_REDIS_CONTAINER:?CI runner must own the Redis container}
-    ports: !override
-      - "${AURA_OSS_CI_REDIS_PORT:?CI runner must allocate a Redis port}:6379"
-
-  redis:
     container_name: "${AURA_OSS_CI_REDIS_CONTAINER:?runtime-owned Redis container required}"
     ports: !override
       - "127.0.0.1:${AURA_OSS_CI_REDIS_PORT:?runtime-owned Redis port required}:6379"

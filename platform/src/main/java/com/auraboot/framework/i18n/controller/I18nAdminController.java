@@ -279,6 +279,7 @@ public class I18nAdminController {
             .build();
 
         I18nResource result = i18nResourceService.upsert(resource);
+        i18nService.clearCache(result.getLang());
         return ApiResponse.success(result);
     }
 
@@ -298,6 +299,7 @@ public class I18nAdminController {
             .toList();
 
         int count = i18nResourceService.batchUpsert(resources);
+        i18nService.clearCache(null);
 
         return ApiResponse.success(Map.of(
             "total", requests.size(),
@@ -313,6 +315,7 @@ public class I18nAdminController {
     @PostMapping("/resources/{pid}/submit-review")
     public ApiResponse<I18nResource> submitReview(@PathVariable String pid) {
         I18nResource resource = i18nResourceService.submitReview(pid);
+        i18nService.clearCache(resource.getLang());
         return ApiResponse.success(resource);
     }
 
@@ -322,6 +325,7 @@ public class I18nAdminController {
     @PostMapping("/resources/{pid}/approve")
     public ApiResponse<I18nResource> approve(@PathVariable String pid) {
         I18nResource resource = i18nResourceService.approve(pid);
+        i18nService.clearCache(resource.getLang());
         return ApiResponse.success(resource);
     }
 
@@ -336,6 +340,7 @@ public class I18nAdminController {
     ) {
         String reason = body.get("reason");
         I18nResource resource = i18nResourceService.reject(pid, reason);
+        i18nService.clearCache(resource.getLang());
         return ApiResponse.success(resource);
     }
 
@@ -350,6 +355,7 @@ public class I18nAdminController {
     ) {
         String status = body.get("status");
         I18nResource resource = i18nResourceService.updateStatus(pid, status);
+        i18nService.clearCache(resource.getLang());
         return ApiResponse.success(resource);
     }
 

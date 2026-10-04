@@ -19,6 +19,39 @@ bootJar {
     archiveClassifier = 'boot'
 }
 
+// Fixture endpoints are a separate opt-in artifact, never production classes.
+// Reuse the six canonical fixture sources without JUnit or integration tests.
+sourceSets {
+    testApi {
+        java {
+            srcDir 'src/test/java'
+            include 'com/auraboot/framework/test/test/controller/*.java'
+            include 'com/auraboot/framework/test/test/dto/*.java'
+        }
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+configurations {
+    testApiImplementation.extendsFrom implementation
+    testApiCompileOnly.extendsFrom compileOnly
+    testApiAnnotationProcessor.extendsFrom annotationProcessor
+}
+
+tasks.named('compileTestApiJava', JavaCompile) {
+    options.encoding = 'UTF-8'
+    options.compilerArgs += ['-parameters']
+}
+
+tasks.register('testApiJar', Jar) {
+    group = 'verification'
+    description = 'Build opt-in test-profile seed/fixture API without production packaging changes'
+    archiveClassifier = 'test-api'
+    from sourceSets.testApi.output
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+
 publishing {
     publications {
         mavenJava(MavenPublication) {
@@ -515,6 +548,24 @@ tasks.withType(Test).configureEach {
         includeSystemOutLog = false
         includeSystemErrLog = false
     }
+    // Frozen architecture rules may remove resolved violations from their store.
+    // Give each task a fresh writable copy, never the versioned source baseline.
+    def architectureBaseline = file('src/test/resources/archunit_store')
+    def architectureStore = layout.buildDirectory.dir("archunit/${name}").get().asFile
+    inputs.dir architectureBaseline
+    systemProperty 'archunit.freeze.store.default.path', architectureStore.absolutePath
+    systemProperty 'archunit.freeze.store.default.allowStoreCreation', 'false'
+    systemProperty 'archunit.freeze.refreeze', 'false'
+    doFirst {
+        if (!new File(architectureBaseline, 'stored.rules').isFile()) {
+            throw new GradleException('Versioned architecture baseline is missing')
+        }
+        project.delete architectureStore
+        project.copy {
+            from architectureBaseline
+            into architectureStore
+        }
+    }
     // See bootRun comment above — needed in tests too.
     jvmArgs '-Djdk.httpclient.allowRestrictedHeaders=host'
 }
@@ -547,18 +598,6 @@ tasks.register('instrumentMainOffline') {
 
 // 配置测试任务使用JUnit Platform
 test {
-    // FreezingArchRule removes resolved violations. Keep those generated updates
-    // outside tracked source files while still checking the committed baseline.
-    def runtimeArchunitStore = file("${buildDir}/test-fixtures/archunit_store")
-    systemProperty 'archunit.freeze.store.default.path', runtimeArchunitStore.absolutePath
-    systemProperty 'archunit.freeze.store.default.allowStoreCreation', 'false'
-    doFirst {
-        delete runtimeArchunitStore
-        copy {
-            from file('src/test/resources/archunit_store')
-            into runtimeArchunitStore
-        }
-    }
     useJUnitPlatform {
         // Real-LLM evals (@Tag("agent-eval-live")) call the explicit
         // AURA_LIVE_LLM_* validation profile. They are

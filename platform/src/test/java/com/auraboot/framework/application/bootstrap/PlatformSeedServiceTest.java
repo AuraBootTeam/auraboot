@@ -11,6 +11,7 @@ import com.auraboot.framework.application.bootstrap.seeder.QueryOperatorSeeder;
 import com.auraboot.framework.application.bootstrap.seeder.SolutionSeeder;
 import com.auraboot.framework.application.bootstrap.seeder.SystemFieldSeeder;
 import com.auraboot.framework.i18n.service.I18nOverrideAuditor;
+import com.auraboot.framework.branding.AuthAppearanceSeeder;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,8 +24,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class PlatformSeedServiceTest {
 
-    @Mock private com.auraboot.framework.branding.AuthAppearanceSeeder authAppearanceSeeder;
-
+    @Mock private AuthAppearanceSeeder authAppearanceSeeder;
     @Mock private SystemFieldSeeder systemFieldSeeder;
     @Mock private QueryOperatorSeeder queryOperatorSeeder;
     @Mock private I18nBaseSeeder i18nBaseSeeder;

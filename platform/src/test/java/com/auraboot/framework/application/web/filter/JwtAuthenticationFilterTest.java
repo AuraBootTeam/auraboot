@@ -77,6 +77,34 @@ class JwtAuthenticationFilterTest {
         MDC.clear();
     }
 
+    @Test
+    void languagePacksAllowAnonymousRequestsButValidateSuppliedCredentials() throws Exception {
+        for (String path : List.of("/api/i18n", "/api/i18n/zh-CN")) {
+            MockHttpServletRequest request = new MockHttpServletRequest("GET", path);
+            request.setServletPath(path);
+            assertTrue(filter.shouldNotFilter(request));
+            request.addHeader("Authorization", "Bearer expired.token");
+            assertFalse(filter.shouldNotFilter(request));
+            when(jwtUtil.extractIdentifier("expired.token")).thenThrow(new ExpiredJwtException(null, null, "expired"));
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            filter.doFilter(request, response, chain);
+            assertEquals(401, response.getStatus());
+            verifyNoInteractions(chain);
+            assertFalse(MetaContext.exists());
+        }
+    }
+
+    @Test
+    void languagePackRejectsMalformedCredentialsInsteadOfReturningAnonymousData() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/i18n/en-US");
+        request.setServletPath("/api/i18n/en-US");
+        request.addHeader("Authorization", "Basic invalid");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        filter.doFilter(request, response, chain);
+        assertEquals(401, response.getStatus());
+        verifyNoInteractions(chain, jwtUtil);
+    }
+
     private MockHttpServletRequest req() {
         MockHttpServletRequest r = new MockHttpServletRequest("GET", "/api/protected");
         r.setServletPath("/api/protected");
@@ -159,7 +187,8 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void validToken_setsAuthentication_andChainsForward() throws Exception {
-        MockHttpServletRequest req = req();
+        MockHttpServletRequest req = new MockHttpServletRequest("GET", "/api/i18n/ja-JP");
+        req.setServletPath("/api/i18n/ja-JP");
         req.addHeader("Authorization", "Bearer valid.token");
 
         CustomUserDetails ud = new CustomUserDetails("alice", "p", 7L, "alice_pid",
@@ -177,6 +206,12 @@ class JwtAuthenticationFilterTest {
         when(userRoleService.getRoleIdsByMemberIdAndTenantId(55L, 100L))
                 .thenReturn(List.of(1L, 2L));
 
+        doAnswer(invocation -> {
+            assertEquals(100L, MetaContext.getCurrentTenantId());
+            assertEquals(55L, MetaContext.getCurrentMemberId());
+            assertNotNull(SecurityContextHolder.getContext().getAuthentication());
+            return null;
+        }).when(chain).doFilter(eq(req), any());
         MockHttpServletResponse resp = new MockHttpServletResponse();
         filter.doFilter(req, resp, chain);
 

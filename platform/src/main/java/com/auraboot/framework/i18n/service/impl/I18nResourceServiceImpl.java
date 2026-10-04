@@ -62,11 +62,14 @@ public class I18nResourceServiceImpl implements I18nResourceService {
             throw new BusinessException(ResponseCode.BadParam, "I18n resource not found: " + pid);
         }
 
-        existing.setValue(resource.getValue());
-        existing.setSource(resource.getSource());
-        existing.setRefType(resource.getRefType());
-        existing.setRefId(resource.getRefId());
-        existing.setStatus(resource.getStatus());
+        if (resource.getStatus() != null) validateStatus(resource.getStatus());
+        if (resource.getValue() != null) existing.setValue(resource.getValue());
+        if (resource.getSource() != null) existing.setSource(resource.getSource());
+        if (resource.getRefType() != null) existing.setRefType(resource.getRefType());
+        if (resource.getRefId() != null) existing.setRefId(resource.getRefId());
+        if (resource.getStatus() != null) {
+            existing.setStatus(resource.getStatus());
+        }
         existing.setUpdatedAt(Instant.now());
         existing.setUpdatedBy(MetaContext.getCurrentUserId());
 
@@ -443,13 +446,7 @@ public class I18nResourceServiceImpl implements I18nResourceService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public I18nResource updateStatus(String pid, String newStatus) {
-        if (!StringUtils.hasText(newStatus)) {
-            throw new BusinessException(ResponseCode.BadParam, "Status is required");
-        }
-        if (!Set.of(I18nResource.STATUS_DRAFT, I18nResource.STATUS_REVIEW,
-                    I18nResource.STATUS_APPROVED, I18nResource.STATUS_DEPRECATED).contains(newStatus)) {
-            throw new BusinessException(ResponseCode.BadParam, "Invalid status: " + newStatus);
-        }
+        validateStatus(newStatus);
         I18nResource resource = findByPid(pid);
         if (resource == null) {
             throw new BusinessException(ResponseCode.BadParam, "I18n resource not found: " + pid);
@@ -459,6 +456,16 @@ public class I18nResourceServiceImpl implements I18nResourceService {
         resource.setUpdatedBy(MetaContext.getCurrentUserId());
         i18nResourceMapper.updateById(resource);
         return resource;
+    }
+
+    private void validateStatus(String newStatus) {
+        if (!StringUtils.hasText(newStatus)) {
+            throw new BusinessException(ResponseCode.BadParam, "Status is required");
+        }
+        if (!Set.of(I18nResource.STATUS_DRAFT, I18nResource.STATUS_REVIEW,
+                    I18nResource.STATUS_APPROVED, I18nResource.STATUS_DEPRECATED).contains(newStatus)) {
+            throw new BusinessException(ResponseCode.BadParam, "Invalid status: " + newStatus);
+        }
     }
 
     // ==================== Helper Methods ====================
