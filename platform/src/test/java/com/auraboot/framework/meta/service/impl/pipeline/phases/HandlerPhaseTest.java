@@ -274,6 +274,24 @@ class HandlerPhaseTest {
     }
 
     @Test
+    void execute_preservesLocalizedPluginBusinessErrorKeyAndCause() {
+        IllegalStateException overQuantity = new IllegalStateException(
+                "$i18n:inventory.error.putaway_quantity_exceeds_remaining");
+        CommandHandlerExtension rejected = new CommandHandlerExtension() {
+            @Override public String getCommandType() { return PLUGIN_HANDLER_CODE; }
+            @Override public Object execute(CommandContext context) { throw overQuantity; }
+        };
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(rejected));
+        CommandPipelineContext ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of(
+                "type", "state_transition", "handler", PLUGIN_HANDLER_CODE));
+        assertThatThrownBy(() -> phase.execute(ctx))
+                .isInstanceOf(com.auraboot.framework.exception.BusinessException.class)
+                .hasMessage("$i18n:inventory.error.putaway_quantity_exceeds_remaining")
+                .hasCause(overQuantity);
+        assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+    }
+
+    @Test
     void execute_preservesPluginAccessDeniedSemantic() {
         CommandHandlerExtension denied = new CommandHandlerExtension() {
             @Override public String getCommandType() { return PLUGIN_HANDLER_CODE; }

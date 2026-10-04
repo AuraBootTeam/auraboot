@@ -64,6 +64,10 @@ export interface KanbanAggregation {
  * Configuration for how a field is displayed on cards
  */
 export interface KanbanCardField {
+  /** Dictionary binding and resolved labels for enum card values. */
+  dictCode?: string;
+  valueLabels?: Record<string, string>;
+  unrecognizedLabel?: string;
   /** Field name from the data */
   field: string;
   /** Display label */
