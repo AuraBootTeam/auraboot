@@ -119,6 +119,20 @@ class SemanticAggregateAdapterTest {
     }
 
     @Test
+    void translateLikePreservesAggregateContainsSemantics() {
+        AggregateQueryRequest req = baseRequest();
+        AggregateQueryRequest.FilterConfig filter = new AggregateQueryRequest.FilterConfig();
+        filter.setField("order_title");
+        filter.setOperator("LIKE");
+        filter.setValue("HiFi-orders-");
+        req.setFilters(List.of(filter));
+        SemanticQueryRequest sem = adapter.translate(req, "sales");
+        assertThat(sem.getFilters().get(0).getOp()).isEqualTo("like");
+        assertThat(sem.getFilters().get(0).getValue()).isEqualTo("%HiFi-orders-%");
+        assertThat(filter.getValue()).isEqualTo("HiFi-orders-");
+    }
+
+    @Test
     void translateFlattensFiltersAndDrillFilters() {
         AggregateQueryRequest req = baseRequest();
         AggregateQueryRequest.FilterConfig f1 = new AggregateQueryRequest.FilterConfig();
