@@ -84,3 +84,9 @@ publishing {
         mavenLocal()
     }
 }
+
+// The jar-loading integration test compiles a fixture plugin against this
+// module's own classes at test time; hand it the resolved classpath.
+tasks.withType(Test).configureEach {
+    systemProperty 'plugin.it.classpath', sourceSets.main.runtimeClasspath.asPath
+}
