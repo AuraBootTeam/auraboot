@@ -82,6 +82,8 @@ services:
       NODE_ENV: production
       BFF_PORT: "3000"
       SPRING_BOOT_URL: http://backend:6443
+      # SSR must use the Compose service address, independent of the published host port.
+      BFF_INTERNAL_URL: http://backend:6443
       CORS_ALLOWED_ORIGINS: http://localhost:${AURABOOT_PORT:-3000}
       SESSION_SECRET: ${SESSION_SECRET:-docker-eval-session-secret-change-in-production-min-32-chars}
     depends_on:
