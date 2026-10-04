@@ -1219,11 +1219,11 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
   page.on('request', trackInvalidBpmReplayRequest);
   await page.getByTestId('model-publish-run-workflow-replay').click();
   await expect(page.getByTestId('model-publish-workflow-sample-error')).toContainText(
-    'BPM 记录数据必须是有效 JSON 对象',
+    '工作流记录数据必须是有效 JSON 对象',
   );
   await expect(
     page.getByTestId('toast-stack').getByRole('alert').filter({
-      hasText: 'BPM 记录数据必须是有效 JSON 对象',
+      hasText: '工作流记录数据必须是有效 JSON 对象',
     }),
   ).toHaveCount(0);
   await expect.poll(() => invalidBpmReplayRequests).toBe(0);
@@ -1431,7 +1431,7 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
   const slaReplayBody = slaReplay.request().postDataJSON() as {
     executeAutomated?: boolean;
     sampleContext?: {
-      bpm?: {
+      workflow?: {
         processInstanceId?: string;
         tenantId?: string;
         taskId?: string;
@@ -1441,10 +1441,10 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
     };
   };
   expect(slaReplayBody.executeAutomated).toBe(true);
-  expect(slaReplayBody.sampleContext?.bpm?.processInstanceId).toBe(slaProcessInstanceId);
-  expect(slaReplayBody.sampleContext?.bpm?.tenantId).toBe(member.tenantId);
-  expect(slaReplayBody.sampleContext?.bpm?.taskId).toBe(slaTaskId);
-  expect(slaReplayBody.sampleContext?.bpm?.processKey).toBe(slaUsage.processKey);
+  expect(slaReplayBody.sampleContext?.workflow?.processInstanceId).toBe(slaProcessInstanceId);
+  expect(slaReplayBody.sampleContext?.workflow?.tenantId).toBe(member.tenantId);
+  expect(slaReplayBody.sampleContext?.workflow?.taskId).toBe(slaTaskId);
+  expect(slaReplayBody.sampleContext?.workflow?.processKey).toBe(slaUsage.processKey);
   expect(slaReplayBody.sampleContext?.record?.data?.[fieldCode]).toBe(2400);
   const slaReplayReport = await readApi<ModelPublishReplayReport>(slaReplay);
   const slaNodeResult = requireSlaNodeReplayResult(
@@ -1512,13 +1512,13 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
   const bpmReplayBody = bpmReplay.request().postDataJSON() as {
     executeAutomated?: boolean;
     sampleContext?: {
-      bpm?: { processInstanceId?: string; processKey?: string };
+      workflow?: { processInstanceId?: string; processKey?: string };
       record?: { pid?: string; data?: Record<string, unknown> };
     };
   };
   expect(bpmReplayBody.executeAutomated).toBe(true);
-  expect(bpmReplayBody.sampleContext?.bpm?.processInstanceId).toBe(workflowProcessInstanceId);
-  expect(bpmReplayBody.sampleContext?.bpm?.processKey).toBe(bpmUsage.processKey);
+  expect(bpmReplayBody.sampleContext?.workflow?.processInstanceId).toBe(workflowProcessInstanceId);
+  expect(bpmReplayBody.sampleContext?.workflow?.processKey).toBe(bpmUsage.processKey);
   expect(bpmReplayBody.sampleContext?.record?.pid).toBe(`bpm-record-${suffix}`);
   expect(bpmReplayBody.sampleContext?.record?.data?.[fieldCode]).toBe(2400);
   const bpmReplayReport = await readApi<ModelPublishReplayReport>(bpmReplay);
@@ -1739,13 +1739,13 @@ test('RC-MODEL-01B: model publish replay executes BPM userTask assignment rule b
   const bpmReplayBody = bpmReplay.request().postDataJSON() as {
     executeAutomated?: boolean;
     sampleContext?: {
-      bpm?: { processInstanceId?: string; processKey?: string };
+      workflow?: { processInstanceId?: string; processKey?: string };
       record?: { pid?: string; data?: Record<string, unknown> };
     };
   };
   expect(bpmReplayBody.executeAutomated).toBe(true);
-  expect(bpmReplayBody.sampleContext?.bpm?.processInstanceId).toBe(processInstanceId);
-  expect(bpmReplayBody.sampleContext?.bpm?.processKey).toBe(bpmUsage.processKey);
+  expect(bpmReplayBody.sampleContext?.workflow?.processInstanceId).toBe(processInstanceId);
+  expect(bpmReplayBody.sampleContext?.workflow?.processKey).toBe(bpmUsage.processKey);
   expect(bpmReplayBody.sampleContext?.record?.pid).toBe(recordPid);
   expect(bpmReplayBody.sampleContext?.record?.data?.[fieldCode]).toBe(2600);
 
@@ -1887,13 +1887,13 @@ test('RC-MODEL-01C: model publish replay shows BPM userTask fail-closed when dec
   const bpmReplayBody = bpmReplay.request().postDataJSON() as {
     executeAutomated?: boolean;
     sampleContext?: {
-      bpm?: { processInstanceId?: string; processKey?: string };
+      workflow?: { processInstanceId?: string; processKey?: string };
       record?: { pid?: string; data?: Record<string, unknown> };
     };
   };
   expect(bpmReplayBody.executeAutomated).toBe(true);
-  expect(bpmReplayBody.sampleContext?.bpm?.processInstanceId).toBe(processInstanceId);
-  expect(bpmReplayBody.sampleContext?.bpm?.processKey).toBe(bpmUsage.processKey);
+  expect(bpmReplayBody.sampleContext?.workflow?.processInstanceId).toBe(processInstanceId);
+  expect(bpmReplayBody.sampleContext?.workflow?.processKey).toBe(bpmUsage.processKey);
   expect(bpmReplayBody.sampleContext?.record?.pid).toBe(recordPid);
   expect(bpmReplayBody.sampleContext?.record?.data?.[fieldCode]).toBe(2600);
 
