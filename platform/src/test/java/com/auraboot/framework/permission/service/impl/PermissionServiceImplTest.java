@@ -115,6 +115,25 @@ class PermissionServiceImplTest {
     }
 
     @Test
+    void findByPidReturnsDTO() {
+        Permission permission = new Permission();
+        PermissionDTO dto = new PermissionDTO();
+        when(permissionMapper.findByPids(List.of("permission-pid"))).thenReturn(List.of(permission));
+        when(permissionConverter.toDTO(permission)).thenReturn(dto);
+
+        assertThat(service.findByPid("permission-pid")).isSameAs(dto);
+        verify(permissionMapper).findByPids(List.of("permission-pid"));
+    }
+
+    @Test
+    void findByPidReturnsNullWhenMissing() {
+        when(permissionMapper.findByPids(List.of("missing"))).thenReturn(List.of());
+
+        assertThat(service.findByPid("missing")).isNull();
+        verify(permissionConverter, never()).toDTO(any(Permission.class));
+    }
+
+    @Test
     void createValidatesEmptyCode() {
         PermissionCreateRequest req = createRequest("");
 

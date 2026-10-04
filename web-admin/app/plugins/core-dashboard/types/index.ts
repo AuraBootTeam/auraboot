@@ -83,7 +83,8 @@ export type AggregationType = 'count' | 'sum' | 'avg' | 'min' | 'max';
  */
 export interface MetricConfig {
   field: string;
-  aggregation: AggregationType;
+  /** The semantic compiler owns aggregation when this is none. */
+  aggregation: AggregationType | 'none';
   alias?: string;
 }
 

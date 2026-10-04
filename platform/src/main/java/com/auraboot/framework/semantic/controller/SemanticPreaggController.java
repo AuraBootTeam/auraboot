@@ -33,7 +33,7 @@ public class SemanticPreaggController {
             @RequestParam String name,
             @RequestParam String semanticModelPid,
             @RequestParam String metricCode,
-            @RequestParam(defaultValue = "") List<String> dimensionCodes,
+            @RequestParam(required = false) List<String> dimensionCodes,
             @RequestParam(defaultValue = "60") int refreshMinutes) {
         return ApiResponse.success(preaggService.create(
                 name, semanticModelPid, metricCode, dimensionCodes, refreshMinutes));

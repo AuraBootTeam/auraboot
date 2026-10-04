@@ -203,7 +203,8 @@ class CapabilityControllerEnforcementIT extends BaseIntegrationTest {
             rp.setTenantId(getTestTenant().getId());
             rp.setCreatedAt(java.time.Instant.now());
             rp.setUpdatedAt(java.time.Instant.now());
-            rolePermissionMapper.insert(rp);
+            // Restore a soft-deleted unique binding through the production upsert.
+            rolePermissionMapper.batchInsert(java.util.List.of(rp));
         }
         userPermissionService.evictPermissionDefinitions(getTestTenant().getId());
         userPermissionService.evictRoleUsers(getTestTenant().getId(), getTestRole().getId());

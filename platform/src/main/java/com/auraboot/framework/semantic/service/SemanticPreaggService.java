@@ -1,6 +1,9 @@
 package com.auraboot.framework.semantic.service;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.common.constant.StatusConstants;
+import com.auraboot.framework.tenant.service.TenantMemberService;
+import org.springframework.security.access.AccessDeniedException;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.semantic.compiler.SemanticQueryRequest;
 import com.auraboot.framework.semantic.compiler.UserContext;
@@ -11,6 +14,7 @@ import com.auraboot.framework.semantic.mapper.AbSemanticPreaggMapper;
 import com.auraboot.framework.semantic.mapper.AbSemanticModelMapper;
 import com.auraboot.framework.semantic.entity.AbSemanticModel;
 import com.auraboot.framework.userattribute.service.UserAttributeService;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +22,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -47,11 +52,19 @@ public class SemanticPreaggService {
     private final UserAttributeService userAttributeService;
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
+    private final PlatformTransactionManager transactionManager;
+    private final TenantMemberService tenantMemberService;
 
     // ==================== CRUD ====================
 
     public AbSemanticPreagg create(String name, String semanticModelPid, String metricCode,
                                    List<String> dimensionCodes, int refreshMinutes) {
+        return new TransactionTemplate(transactionManager).execute(status ->
+                createInTransaction(name, semanticModelPid, metricCode, dimensionCodes, refreshMinutes));
+    }
+
+    private AbSemanticPreagg createInTransaction(String name, String semanticModelPid, String metricCode,
+                                                List<String> dimensionCodes, int refreshMinutes) {
         Long tenantId = MetaContext.get().getTenantId();
         Long userId = MetaContext.get().getUserId();
         if (refreshMinutes < 1) {
@@ -79,7 +92,7 @@ public class SemanticPreaggService {
 
         // Compile + create the materialized view; a preagg without a working
         // MV is not persisted.
-        refresh(preagg);
+        refreshInTransaction(preagg);
         preaggMapper.insert(preagg);
         return preagg;
     }
@@ -89,12 +102,15 @@ public class SemanticPreaggService {
         return preaggMapper.listByTenant(tenantId);
     }
 
-    @Transactional
     public void delete(String pid) {
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> deleteInTransaction(pid));
+    }
+
+    private void deleteInTransaction(String pid) {
         Long tenantId = MetaContext.get().getTenantId();
         AbSemanticPreagg preagg = requirePreagg(tenantId, pid);
-        // updateById omits globally configured logical-delete fields.
-        preaggMapper.markDeleted(tenantId, pid, OffsetDateTime.now(ZoneOffset.UTC));
+        // Keep tenant-scoped logical deletion in the same transaction as the MV drop.
+        preaggMapper.softDelete(tenantId, preagg.getPid(), OffsetDateTime.now());
         jdbc.execute("DROP MATERIALIZED VIEW IF EXISTS " + preagg.getMvName());
     }
 
@@ -110,7 +126,6 @@ public class SemanticPreaggService {
     /** Scheduler sweep: refresh every preagg whose interval has elapsed. */
     @Scheduled(fixedDelay = 60_000)
     public void refreshAllDue() {
-        MetaContext.Snapshot caller = MetaContext.snapshot();
         // Cross-tenant scan on a @Scheduled thread; per-row execution below binds
         // its own tenant context. Explicit scope (tenant-exemption cleanup W3e
         // follow-up; the top thrower in the W5 runtime census — 609 failures).
@@ -122,28 +137,42 @@ public class SemanticPreaggService {
                     .plusMinutes(preagg.getRefreshMinutes() == null ? 60 : preagg.getRefreshMinutes());
             if (due.isAfter(OffsetDateTime.now(ZoneOffset.UTC))) continue;
             try {
-                MetaContext.setContext(preagg.getTenantId(), preagg.getCreatedBy(),
-                        "semantic-preagg", "semantic-preagg-refresher");
                 refresh(preagg);
             } catch (Exception e) {
-                log.warn("Semantic preagg {} refresh failed: {}", preagg.getPid(), e.getMessage(), e);
-            } finally {
-                restoreCaller(caller);
+                // Each preagg is independent; retain the failure without stopping other tenants.
+                log.warn("Semantic preagg {} refresh failed", preagg.getPid(), e);
             }
         }
     }
 
     /** Compile the governed query, inline its params, and rebuild the MV. */
     private long refresh(AbSemanticPreagg preagg) {
-        MetaContext.Snapshot caller = MetaContext.snapshot();
+        // Programmatic boundary covers scheduler/self-invocation as well as API calls.
+        // PostgreSQL DDL and the MyBatis metadata writes must commit or roll back together.
+        return new TransactionTemplate(transactionManager).execute(status -> refreshInTransaction(preagg));
+    }
+
+    private long refreshInTransaction(AbSemanticPreagg preagg) {
         AbSemanticModel model = modelMapper.findByPid(preagg.getTenantId(), preagg.getSemanticModelPid());
         if (model == null) {
             throw new SemanticValidationException("SEMANTIC_PREAGG_MODEL_MISSING",
                     "Semantic model not found: " + preagg.getSemanticModelPid());
         }
-        MetaContext.setContext(preagg.getTenantId(), preagg.getCreatedBy(),
-                "semantic-preagg", "semantic-preagg-refresher");
-        try {
+        long[] refreshedRows = new long[1];
+        // Isolate creator authority, then restore every caller ThreadLocal, including
+        // the lexical command permit, on this same thread.
+        MetaContext.Snapshot creatorIdentity = new MetaContext.Snapshot(
+                preagg.getTenantId(), preagg.getCreatedBy(), "semantic-preagg",
+                "semantic-preagg-refresher", java.util.Set.of(), null, null, null, null);
+        MetaContext.runWithSnapshot(creatorIdentity, () -> {
+            var member = tenantMemberService.findByTenantIdAndUserId(preagg.getTenantId(), preagg.getCreatedBy());
+            if (member == null || !StatusConstants.ACTIVE.equalsIgnoreCase(member.getStatus())
+                    || Boolean.TRUE.equals(member.getDeletedFlag()) || member.getId() == null
+                    || !java.util.Objects.equals(member.getTenantId(), preagg.getTenantId())
+                    || !java.util.Objects.equals(member.getUserId(), preagg.getCreatedBy())) {
+                throw new AccessDeniedException("Semantic preaggregation creator is not an active tenant member");
+            }
+            MetaContext.setMemberId(member.getId());
             SemanticQueryRequest request = new SemanticQueryRequest();
             request.setMetrics(List.of(model.getCode() + "." + preagg.getMetricCode()));
             request.setDimensions(qualifiedDimensions(model, preagg));
@@ -164,19 +193,9 @@ public class SemanticPreaggService {
             if (preaggMapper.findByPid(preagg.getTenantId(), preagg.getPid()) != null) {
                 preaggMapper.updateById(preagg);
             }
-            return preagg.getLastRefreshRows();
-        } finally {
-            restoreCaller(caller);
-        }
-    }
-
-    private static void restoreCaller(MetaContext.Snapshot caller) {
-        if (caller == null) {
-            MetaContext.clear();
-        } else {
-            // Restore identity without clearing the caller's lexical command permit.
-            MetaContext.restore(caller);
-        }
+            refreshedRows[0] = preagg.getLastRefreshRows();
+        });
+        return refreshedRows[0];
     }
 
     private List<String> qualifiedDimensions(AbSemanticModel model, AbSemanticPreagg preagg) {
@@ -216,17 +235,22 @@ public class SemanticPreaggService {
 
     private List<String> fromJson(String json) {
         try {
-            return objectMapper.readValue(json == null ? "[]" : json, new TypeReference<List<String>>() {});
-        } catch (Exception e) {
-            return List.of();
+            List<String> dimensions = objectMapper.readValue(json == null ? "[]" : json,
+                    new TypeReference<List<String>>() {});
+            if (dimensions == null || dimensions.stream().anyMatch(d -> d == null || d.isBlank())) {
+                throw new SemanticValidationException("SEMANTIC_PREAGG_INVALID", "Invalid dimension definitions");
+            }
+            return dimensions;
+        } catch (JsonProcessingException e) {
+            throw new SemanticValidationException("SEMANTIC_PREAGG_INVALID", "Invalid dimension definitions", e);
         }
     }
 
     private String toJson(List<String> codes) {
         try {
             return objectMapper.writeValueAsString(codes == null ? List.of() : codes);
-        } catch (Exception e) {
-            return "[]";
+        } catch (JsonProcessingException e) {
+            throw new SemanticValidationException("SEMANTIC_PREAGG_INVALID", "Cannot encode dimension definitions", e);
         }
     }
 

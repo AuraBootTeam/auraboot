@@ -1,161 +1,198 @@
 package com.auraboot.framework.semantic.service;
 
 import com.auraboot.framework.application.tenant.MetaContext;
-import com.auraboot.framework.semantic.compiler.UserContext;
 import com.auraboot.framework.semantic.dto.SemanticQueryResponse;
 import com.auraboot.framework.semantic.entity.AbSemanticModel;
 import com.auraboot.framework.semantic.entity.AbSemanticPreagg;
+import com.auraboot.framework.semantic.exception.SemanticValidationException;
 import com.auraboot.framework.semantic.mapper.AbSemanticModelMapper;
 import com.auraboot.framework.semantic.mapper.AbSemanticPreaggMapper;
 import com.auraboot.framework.userattribute.service.UserAttributeService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.auraboot.framework.tenant.service.TenantMemberService;
+import com.auraboot.framework.tenant.dao.entity.TenantMember;
+import org.springframework.security.access.AccessDeniedException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
 
 import java.time.OffsetDateTime;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
+/** Hermetic characterization of thread identity; real persistence is covered by SemanticPreaggIT. */
 class SemanticPreaggContextTest {
-    private final AbSemanticPreaggMapper preaggs = mock(AbSemanticPreaggMapper.class);
-    private final AbSemanticModelMapper models = mock(AbSemanticModelMapper.class);
-    private final SemanticQueryService queries = mock(SemanticQueryService.class);
-    private final UserAttributeService attributes = mock(UserAttributeService.class);
-    private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
-    private final SemanticPreaggService service = new SemanticPreaggService(
-            preaggs, models, queries, attributes, jdbc, new ObjectMapper());
+    private AbSemanticPreaggMapper mapper;
+    private SemanticQueryService queries;
+    private SemanticPreaggService service;
+    private AbSemanticPreagg preagg;
+    private MetaContext.Snapshot caller;
+    private PlatformTransactionManager transactions;
+    private TransactionStatus transaction;
+    private JdbcTemplate jdbc;
+    private TenantMemberService members;
 
     @BeforeEach
-    void prepareCompiler() {
-        MetaContext.clear();
+    void setup() {
+        mapper = mock(AbSemanticPreaggMapper.class);
+        AbSemanticModelMapper models = mock(AbSemanticModelMapper.class);
+        queries = mock(SemanticQueryService.class);
+        UserAttributeService attributes = mock(UserAttributeService.class);
+        jdbc = mock(JdbcTemplate.class);
+        transactions = mock(PlatformTransactionManager.class);
+        transaction = mock(TransactionStatus.class);
+        when(transactions.getTransaction(any())).thenReturn(transaction);
+        members = mock(TenantMemberService.class);
+        var member = new TenantMember(); member.setId(12L); member.setTenantId(1L);
+        member.setUserId(2L); member.setStatus("active");
+        when(members.findByTenantIdAndUserId(1L, 2L)).thenReturn(member);
+        service = new SemanticPreaggService(mapper, models, queries, attributes, jdbc, new ObjectMapper(), transactions, members);
         AbSemanticModel model = new AbSemanticModel();
-        model.setPid("model-pid");
-        model.setCode("context_metric");
-        when(models.findByPid(anyLong(), anyString())).thenReturn(model);
-        when(attributes.getAttributes(anyLong(), anyLong())).thenReturn(Map.of());
-        when(queries.explainQuery(any(), any())).thenReturn(explained());
+        model.setCode("orders");
+        when(models.findByPid(1L, "model")).thenReturn(model);
+        when(attributes.getAttributes(1L, 2L)).thenReturn(Map.of());
+        SemanticQueryResponse explained = new SemanticQueryResponse();
+        explained.setSql("SELECT 1 AS count");
+        explained.setParams(List.of());
+        when(queries.explainQuery(any(), any())).thenReturn(explained);
         when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(1L);
+        preagg = new AbSemanticPreagg();
+        preagg.setPid("preagg");
+        preagg.setTenantId(1L);
+        preagg.setCreatedBy(2L);
+        preagg.setSemanticModelPid("model");
+        preagg.setMetricCode("count");
+        preagg.setDimensionCodes("[]");
+        preagg.setMvName("mv_preagg");
+        preagg.setRefreshMinutes(1);
+        preagg.setUpdatedAt(OffsetDateTime.now().minusMinutes(2));
+        when(mapper.findByPid(1L, "preagg")).thenReturn(preagg);
+        when(mapper.listAllAcrossTenants()).thenReturn(List.of(preagg));
+        MetaContext.setContext(1L, 2L, "caller-pid", "caller", Set.of(8L));
+        MetaContext.setMemberId(3L);
+        MetaContext.setEnvironmentId(4L);
+        MetaContext.setOtelTraceId("caller-trace");
+        caller = MetaContext.snapshot();
+    }
+
+    @Test
+    void refreshBindsCreatorMembershipBeforeGovernedQuery() {
+        when(queries.explainQuery(any(), any())).thenAnswer(invocation -> {
+            assertThat(MetaContext.getCurrentMemberId()).isEqualTo(12L);
+            assertThat(MetaContext.getCurrentTenantId()).isEqualTo(1L);
+            assertThat(MetaContext.getCurrentUserId()).isEqualTo(2L);
+            var explained = new SemanticQueryResponse(); explained.setSql("SELECT 1 AS count");
+            explained.setParams(List.of()); return explained;
+        });
+        assertThat(service.refreshNow("preagg")).isEqualTo(1L);
+        assertThat(MetaContext.snapshot()).isEqualTo(caller);
+    }
+
+    @Test
+    void revokedCreatorDeniesRefreshBeforeDdlAndRestoresCaller() {
+        when(members.findByTenantIdAndUserId(1L, 2L)).thenReturn(null);
+        assertThatThrownBy(() -> service.refreshNow("preagg")).isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(queries, jdbc);
+        verify(transactions).rollback(transaction);
+        assertThat(MetaContext.snapshot()).isEqualTo(caller);
+    }
+
+    @Test
+    void createRollsBackWhenMetadataInsertFailsAfterViewCreation() {
+        doThrow(new IllegalStateException("insert failure")).when(mapper).insert(any(AbSemanticPreagg.class));
+        assertThatThrownBy(() -> service.create("Orders", "model", "count", List.of(), 60))
+                .hasMessage("insert failure");
+        verify(jdbc).execute(startsWith("CREATE MATERIALIZED VIEW "));
+        verify(transactions).rollback(transaction);
+        verify(transactions, never()).commit(any());
+        assertThat(MetaContext.snapshot()).isEqualTo(caller);
+    }
+
+    @Test
+    void refreshRollsBackWhenMetadataUpdateFailsAfterViewRebuild() {
+        doThrow(new IllegalStateException("update failure")).when(mapper).updateById(any(AbSemanticPreagg.class));
+        assertThatThrownBy(() -> service.refreshNow("preagg")).hasMessage("update failure");
+        verify(jdbc).execute("DROP MATERIALIZED VIEW IF EXISTS mv_preagg");
+        verify(jdbc).execute(startsWith("CREATE MATERIALIZED VIEW mv_preagg "));
+        verify(transactions).rollback(transaction);
+        verify(transactions, never()).commit(any());
+        assertThat(MetaContext.snapshot()).isEqualTo(caller);
+    }
+
+    @Test
+    void deleteRollsBackMetadataWhenViewDropFails() {
+        doThrow(new IllegalStateException("drop failure")).when(jdbc)
+                .execute("DROP MATERIALIZED VIEW IF EXISTS mv_preagg");
+        assertThatThrownBy(() -> service.delete("preagg")).hasMessage("drop failure");
+        verify(mapper).softDelete(eq(1L), eq("preagg"), any(OffsetDateTime.class));
+        verify(transactions).rollback(transaction);
+        verify(transactions, never()).commit(any());
+    }
+
+    @Test
+    void createCommitsViewAndMetadataInOneTransaction() {
+        service.create("Orders", "model", "count", List.of(), 60);
+        var order = inOrder(transactions, jdbc, mapper);
+        order.verify(transactions).getTransaction(any());
+        order.verify(jdbc).execute(startsWith("DROP MATERIALIZED VIEW IF EXISTS "));
+        order.verify(jdbc).execute(startsWith("CREATE MATERIALIZED VIEW "));
+        order.verify(mapper).insert(any(AbSemanticPreagg.class));
+        order.verify(transactions).commit(transaction);
+        verify(transactions, times(1)).getTransaction(any());
+        verify(transactions, never()).rollback(any());
     }
 
     @AfterEach
-    void clearContext() {
+    void clearContext() { MetaContext.clear(); }
+
+    @Test
+    void createRestoresCompleteCallerIdentity() {
+        service.create("Orders", "model", "count", List.of(), 60);
+        assertThat(MetaContext.snapshot()).isEqualTo(caller);
+        verify(mapper).insert(any(AbSemanticPreagg.class));
+    }
+
+    @Test
+    void refreshRestoresCompleteCallerIdentity() {
+        assertThat(service.refreshNow("preagg")).isEqualTo(1L);
+        assertThat(MetaContext.snapshot()).isEqualTo(caller);
+    }
+
+    @Test
+    void failedRefreshRestoresCompleteCallerIdentity() {
+        when(queries.explainQuery(any(), any())).thenThrow(new IllegalStateException("compile failure"));
+        assertThatThrownBy(() -> service.refreshNow("preagg"))
+                .isInstanceOf(IllegalStateException.class).hasMessage("compile failure");
+        assertThat(MetaContext.snapshot()).isEqualTo(caller);
+    }
+
+    @Test
+    void schedulerRestoresCallerAndLeavesAnUnboundThreadUnbound() {
+        service.refreshAllDue();
+        assertThat(MetaContext.snapshot()).isEqualTo(caller);
+        preagg.setLastRefreshedAt(OffsetDateTime.now().minusMinutes(2));
         MetaContext.clear();
-    }
-
-    @Test
-    void createRetainsTheCallerForTheDefinitionInsert() {
-        MetaContext.setContext(11L, 12L, "caller-pid", "caller", Set.of(77L));
-        MetaContext.setEnvironmentId(8L);
-        MetaContext.setOtelTraceId("preagg-context-test");
-        MetaContext.Snapshot caller = MetaContext.snapshot();
-        when(preaggs.insert(any(AbSemanticPreagg.class))).thenAnswer(invocation -> {
-            assertThat(MetaContext.snapshot()).isEqualTo(caller);
-            return 1;
-        });
-
-        AbSemanticPreagg created = service.create("Context contract", "model-pid", "count", List.of(), 1);
-
-        assertThat(created.getTenantId()).isEqualTo(11L);
-        assertThat(created.getCreatedBy()).isEqualTo(12L);
-        assertThat(MetaContext.snapshot()).isEqualTo(caller);
-    }
-
-    @Test
-    void failedRefreshRestoresCallerIdentityAndCommandPermit() {
-        MetaContext.setContext(11L, 99L, "request-pid", "request", Set.of(77L));
-        MetaContext.Snapshot caller = MetaContext.snapshot();
-        AbSemanticPreagg definition = due("preagg-one", 11L, 12L);
-        when(preaggs.findByPid(11L, definition.getPid())).thenReturn(definition);
-        when(queries.explainQuery(any(), any())).thenThrow(new IllegalStateException("compiler unavailable"));
-
-        MetaContext.runWithCommandPermitScope("DIRECT", () -> {
-            assertThatThrownBy(() -> service.refreshNow(definition.getPid()))
-                    .isInstanceOf(IllegalStateException.class).hasMessage("compiler unavailable");
-            assertThat(MetaContext.snapshot()).isEqualTo(caller);
-            assertThat(MetaContext.getCommandPermitScope()).isEqualTo("DIRECT");
-        });
-    }
-
-    @Test
-    void schedulerWithoutCallerBindsEachTenantAndLeavesNoContext() {
-        AbSemanticPreagg first = due("preagg-one", 11L, 12L);
-        AbSemanticPreagg second = due("preagg-two", 21L, 22L);
-        when(preaggs.listAllAcrossTenants()).thenReturn(List.of(first, second));
-        when(preaggs.findByPid(11L, first.getPid())).thenReturn(first);
-        when(preaggs.findByPid(21L, second.getPid())).thenReturn(second);
-        Set<Long> compiledTenants = new HashSet<>();
-        when(queries.explainQuery(any(), any())).thenAnswer(invocation -> {
-            UserContext creator = invocation.getArgument(1);
-            assertThat(MetaContext.getCurrentTenantId()).isEqualTo(creator.tenantId());
-            assertThat(MetaContext.getCurrentUserId()).isEqualTo(creator.userId());
-            compiledTenants.add(creator.tenantId());
-            return explained();
-        });
-
         service.refreshAllDue();
-
-        assertThat(compiledTenants).containsExactlyInAnyOrder(11L, 21L);
-        verify(preaggs).updateById(first);
-        verify(preaggs).updateById(second);
-        assertThat(MetaContext.exists()).isFalse();
+        assertThat(MetaContext.snapshot()).isNull();
     }
 
     @Test
-    void foregroundSweepRestoresItsCallerAndPermitAfterEachRefresh() {
-        MetaContext.setContext(11L, 99L, "request-pid", "request", Set.of(77L));
-        MetaContext.Snapshot caller = MetaContext.snapshot();
-        AbSemanticPreagg definition = due("preagg-one", 11L, 12L);
-        when(preaggs.listAllAcrossTenants()).thenReturn(List.of(definition));
-        when(preaggs.findByPid(11L, definition.getPid())).thenReturn(definition);
-
-        MetaContext.runWithCommandPermitScope("DIRECT", () -> {
-            service.refreshAllDue();
-            assertThat(MetaContext.snapshot()).isEqualTo(caller);
-            assertThat(MetaContext.getCommandPermitScope()).isEqualTo("DIRECT");
-        });
-    }
-
-    @Test
-    void notDueDefinitionDoesNotCompileOrDisturbCaller() {
-        MetaContext.setContext(11L, 99L, "request-pid", "request");
-        MetaContext.Snapshot caller = MetaContext.snapshot();
-        AbSemanticPreagg definition = due("preagg-one", 11L, 12L);
-        definition.setLastRefreshedAt(OffsetDateTime.now());
-        when(preaggs.listAllAcrossTenants()).thenReturn(List.of(definition));
-
-        service.refreshAllDue();
-
-        verify(queries, never()).explainQuery(any(), any());
+    void corruptDimensionsFailBeforeSqlInsteadOfChangingTheQuery() {
+        preagg.setDimensionCodes("{corrupt");
+        assertThatThrownBy(() -> service.refreshNow("preagg"))
+                .isInstanceOf(SemanticValidationException.class)
+                .extracting("errorCode").isEqualTo("SEMANTIC_PREAGG_INVALID");
+        verifyNoInteractions(queries);
         assertThat(MetaContext.snapshot()).isEqualTo(caller);
-    }
-
-    private static AbSemanticPreagg due(String pid, Long tenant, Long creator) {
-        AbSemanticPreagg definition = new AbSemanticPreagg();
-        definition.setPid(pid);
-        definition.setTenantId(tenant);
-        definition.setCreatedBy(creator);
-        definition.setSemanticModelPid("model-pid");
-        definition.setMetricCode("count");
-        definition.setDimensionCodes("[]");
-        definition.setMvName("mv_" + pid.replace('-', '_'));
-        definition.setRefreshMinutes(1);
-        definition.setLastRefreshedAt(OffsetDateTime.now().minusMinutes(2));
-        return definition;
-    }
-
-    private static SemanticQueryResponse explained() {
-        SemanticQueryResponse response = new SemanticQueryResponse();
-        response.setSql("SELECT ? AS metric");
-        response.setParams(List.of(42));
-        return response;
     }
 }
