@@ -1,4 +1,4 @@
-import { test, expect, type APIResponse, type Page, type Request, type TestInfo } from '@playwright/test';
+import { test, expect, type APIResponse, type Locator, type Page, type Request, type TestInfo } from '@playwright/test';
 import { Client } from 'pg';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { PG_CONN } from '../../helpers/environments';
@@ -8,6 +8,20 @@ import {
   createFieldData,
   createModelData,
 } from '../../model-system/helpers/test-data';
+
+async function captureReplayCard(page: Page, card: Locator, path: string): Promise<void> {
+  const viewport = page.viewportSize();
+  if (!viewport) throw new Error('A fixed viewport is required for replay acceptance evidence');
+  await page.screenshot({ path: path.replace(/\.png$/, '-context.png') });
+  try {
+    await page.setViewportSize({ width: viewport.width, height: Math.max(viewport.height, 1000) });
+    await card.scrollIntoViewIfNeeded();
+    await expect(card).toBeInViewport({ ratio: 1 });
+    await card.screenshot({ path });
+  } finally {
+    await page.setViewportSize(viewport);
+  }
+}
 
 type ApiEnvelope<T> = {
   code?: string | number;
@@ -788,7 +802,7 @@ async function createBpmProcessUsageReferencingField(
   const process = await postApi<BpmProcessRecord>(page, '/api/bpm/process-definitions', {
     processKey,
     processName,
-    description: 'Model publish governance BPM_PROCESS replay fixture',
+    description: 'Model publish governance WORKFLOW_PROCESS replay fixture',
     category: 'approval',
     bpmnContent,
     designerJson: JSON.stringify(designerJson),
@@ -969,7 +983,7 @@ function requireBpmReplayResult(
   const result = (report.results ?? []).find((item) => {
     const outputs = item.outputs ?? {};
     const metadata = item.step?.metadata ?? {};
-    return item.step?.consumerType === 'BPM_PROCESS' && (
+    return item.step?.consumerType === 'WORKFLOW_PROCESS' && (
       item.step?.sourceCode === processKey
       || outputs.processKey === processKey
       || metadata.processKey === processKey
@@ -993,7 +1007,7 @@ function requireBpmAssignmentReplayResult(
   const result = (report.results ?? []).find((item) => {
     const outputs = item.outputs ?? {};
     const metadata = item.step?.metadata ?? {};
-    return item.step?.consumerType === 'BPM_PROCESS' && (
+    return item.step?.consumerType === 'WORKFLOW_PROCESS' && (
       item.step?.sourceCode === processKey
       || outputs.processKey === processKey
       || metadata.processKey === processKey
@@ -1064,7 +1078,7 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
             targetPath: runtimeFieldRef,
           }),
           expect.objectContaining({
-            sourceType: 'BPM_PROCESS',
+            sourceType: 'WORKFLOW_PROCESS',
             sourceCode: bpmUsage.processKey,
             targetPath: runtimeFieldRef,
           }),
@@ -1131,7 +1145,7 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
   await expect(replayReport).toContainText(`目标节点: ${slaUsage.targetKey}`);
   await expect(replayReport).toContainText('动作数: 1');
   await expect(replayReport).toContainText('动作触发: SLA 超时');
-  await expect(replayReport).toContainText('可使用流程实例和业务记录样本执行 BPM 规则复核');
+  await expect(replayReport).toContainText('可使用流程实例和业务记录样本执行 工作流规则复核');
   await expect(replayReport).toContainText('流程标识');
   await expect(replayReport).toContainText(bpmUsage.processKey);
   await expect(replayReport).toContainText('连线 ID');
@@ -1159,7 +1173,7 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
   await expect(page.getByTestId('model-publish-sla-node-sample')).toBeVisible({
     timeout: 10_000,
   });
-  await expect(page.getByTestId('model-publish-bpm-sample')).toBeVisible({
+  await expect(page.getByTestId('model-publish-workflow-sample')).toBeVisible({
     timeout: 10_000,
   });
   let invalidReplayRequests = 0;
@@ -1206,7 +1220,7 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
   await expect.poll(() => invalidSlaReplayRequests).toBe(0);
   page.off('request', trackInvalidSlaReplayRequest);
 
-  await page.getByTestId('model-publish-bpm-record-json').fill('{invalid-json');
+  await page.getByTestId('model-publish-workflow-record-json').fill('{invalid-json');
   let invalidBpmReplayRequests = 0;
   const trackInvalidBpmReplayRequest = (request: Request) => {
     if (
@@ -1217,13 +1231,13 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
     }
   };
   page.on('request', trackInvalidBpmReplayRequest);
-  await page.getByTestId('model-publish-run-bpm-replay').click();
-  await expect(page.getByTestId('model-publish-bpm-sample-error')).toContainText(
-    'BPM 记录数据必须是有效 JSON 对象',
+  await page.getByTestId('model-publish-run-workflow-replay').click();
+  await expect(page.getByTestId('model-publish-workflow-sample-error')).toContainText(
+    '工作流记录数据必须是有效 JSON 对象',
   );
   await expect(
     page.getByTestId('toast-stack').getByRole('alert').filter({
-      hasText: 'BPM 记录数据必须是有效 JSON 对象',
+      hasText: '工作流记录数据必须是有效 JSON 对象',
     }),
   ).toHaveCount(0);
   await expect.poll(() => invalidBpmReplayRequests).toBe(0);
@@ -1325,9 +1339,8 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
   await expect(replayReport).not.toContainText('fieldPermissionChange');
   await expect(page.getByTestId('model-publish-permission-sample-error')).toHaveCount(0);
 
-  await replayReport.screenshot({
-    path: testInfo.outputPath('model-publish-permission-allow-report.png'),
-  });
+  const permissionAllowCard = page.getByTestId('model-publish-replay-result-PERMISSION_POLICY');
+  await captureReplayCard(page, permissionAllowCard, testInfo.outputPath('model-publish-permission-allow-report.png'));
 
   await page.getByTestId('model-publish-permission-record-pid').fill(`record-deny-${suffix}`);
   await page.getByTestId('model-publish-permission-record-json').fill(
@@ -1390,9 +1403,8 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
   await expect(replayReport).not.toContainText('steps:');
   await expect(replayReport).not.toContainText('FIELD_PERMISSION_CHANGE');
 
-  await replayReport.screenshot({
-    path: testInfo.outputPath('model-publish-permission-deny-report.png'),
-  });
+  const permissionDenyCard = page.getByTestId('model-publish-replay-result-PERMISSION_POLICY');
+  await captureReplayCard(page, permissionDenyCard, testInfo.outputPath('model-publish-permission-deny-report.png'));
 
   await expectPermissionReplayTraceLinkOpensDecisionOps(page, {
     traceId: denyPermissionResult.traceId!,
@@ -1431,7 +1443,7 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
   const slaReplayBody = slaReplay.request().postDataJSON() as {
     executeAutomated?: boolean;
     sampleContext?: {
-      bpm?: {
+      workflow?: {
         processInstanceId?: string;
         tenantId?: string;
         taskId?: string;
@@ -1441,10 +1453,10 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
     };
   };
   expect(slaReplayBody.executeAutomated).toBe(true);
-  expect(slaReplayBody.sampleContext?.bpm?.processInstanceId).toBe(slaProcessInstanceId);
-  expect(slaReplayBody.sampleContext?.bpm?.tenantId).toBe(member.tenantId);
-  expect(slaReplayBody.sampleContext?.bpm?.taskId).toBe(slaTaskId);
-  expect(slaReplayBody.sampleContext?.bpm?.processKey).toBe(slaUsage.processKey);
+  expect(slaReplayBody.sampleContext?.workflow?.processInstanceId).toBe(slaProcessInstanceId);
+  expect(slaReplayBody.sampleContext?.workflow?.tenantId).toBe(member.tenantId);
+  expect(slaReplayBody.sampleContext?.workflow?.taskId).toBe(slaTaskId);
+  expect(slaReplayBody.sampleContext?.workflow?.processKey).toBe(slaUsage.processKey);
   expect(slaReplayBody.sampleContext?.record?.data?.[fieldCode]).toBe(2400);
   const slaReplayReport = await readApi<ModelPublishReplayReport>(slaReplay);
   const slaNodeResult = requireSlaNodeReplayResult(
@@ -1488,15 +1500,14 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
   await expect(replayReport).not.toContainText('recordPid');
   await expect(page.getByTestId('model-publish-sla-node-sample-error')).toHaveCount(0);
 
-  await replayReport.screenshot({
-    path: testInfo.outputPath('model-publish-sla-node-report.png'),
-  });
+  const slaReportCard = page.getByTestId('model-publish-replay-result-SLA_RULE');
+  await captureReplayCard(page, slaReportCard, testInfo.outputPath('model-publish-sla-node-report.png'));
 
   const workflowProcessInstanceId = `BPM-${suffix}`;
-  await page.getByTestId('model-publish-bpm-process-instance-id').fill(workflowProcessInstanceId);
-  await page.getByTestId('model-publish-bpm-process-key').fill(bpmUsage.processKey);
-  await page.getByTestId('model-publish-bpm-record-pid').fill(`bpm-record-${suffix}`);
-  await page.getByTestId('model-publish-bpm-record-json').fill(
+  await page.getByTestId('model-publish-workflow-process-instance-id').fill(workflowProcessInstanceId);
+  await page.getByTestId('model-publish-workflow-process-key').fill(bpmUsage.processKey);
+  await page.getByTestId('model-publish-workflow-record-pid').fill(`bpm-record-${suffix}`);
+  await page.getByTestId('model-publish-workflow-record-json').fill(
     JSON.stringify({ [fieldCode]: 2400, amount: 2400 }, null, 2),
   );
 
@@ -1507,18 +1518,18 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
       response.status() === 200,
     { timeout: 15_000 },
   );
-  await page.getByTestId('model-publish-run-bpm-replay').click();
+  await page.getByTestId('model-publish-run-workflow-replay').click();
   const bpmReplay = await bpmReplayResponse;
   const bpmReplayBody = bpmReplay.request().postDataJSON() as {
     executeAutomated?: boolean;
     sampleContext?: {
-      bpm?: { processInstanceId?: string; processKey?: string };
+      workflow?: { processInstanceId?: string; processKey?: string };
       record?: { pid?: string; data?: Record<string, unknown> };
     };
   };
   expect(bpmReplayBody.executeAutomated).toBe(true);
-  expect(bpmReplayBody.sampleContext?.bpm?.processInstanceId).toBe(workflowProcessInstanceId);
-  expect(bpmReplayBody.sampleContext?.bpm?.processKey).toBe(bpmUsage.processKey);
+  expect(bpmReplayBody.sampleContext?.workflow?.processInstanceId).toBe(workflowProcessInstanceId);
+  expect(bpmReplayBody.sampleContext?.workflow?.processKey).toBe(bpmUsage.processKey);
   expect(bpmReplayBody.sampleContext?.record?.pid).toBe(`bpm-record-${suffix}`);
   expect(bpmReplayBody.sampleContext?.record?.data?.[fieldCode]).toBe(2400);
   const bpmReplayReport = await readApi<ModelPublishReplayReport>(bpmReplay);
@@ -1541,9 +1552,9 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
     bindingSurface: 'edge conditionSpec',
     conditionResult: 'TRUE',
   }));
-  await expect(replayReport).toContainText(/BPM 流程|BPM_PROCESS/);
+  await expect(replayReport).toContainText(/BPM 流程|WORKFLOW_PROCESS/);
   await expect(replayReport).toContainText('已执行');
-  await expect(replayReport).toContainText('BPM 规则复核结果：命中');
+  await expect(replayReport).toContainText('工作流规则复核结果：命中');
   await expect(replayReport).toContainText('流程实例');
   await expect(replayReport).toContainText(workflowProcessInstanceId);
   await expect(replayReport).toContainText('流程标识');
@@ -1561,11 +1572,11 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
   await expect(replayReport).not.toContainText('BPM replay evaluated');
   await expect(replayReport).not.toContainText('bindingKind');
   await expect(replayReport).not.toContainText('conditionResult');
-  await expect(page.getByTestId('model-publish-bpm-sample-error')).toHaveCount(0);
+  await expect(page.getByTestId('model-publish-workflow-sample-error')).toHaveCount(0);
 
-  const bpmReportCard = page.getByTestId('model-publish-replay-result-BPM_PROCESS');
+  const bpmReportCard = page.getByTestId('model-publish-replay-result-WORKFLOW_PROCESS');
   await expect(bpmReportCard).toBeVisible({ timeout: 5_000 });
-  await expect(bpmReportCard).toContainText('BPM 规则复核结果：命中');
+  await expect(bpmReportCard).toContainText('工作流规则复核结果：命中');
   await expect(bpmReportCard).toContainText(bpmUsage.processKey);
   await bpmReportCard.scrollIntoViewIfNeeded();
   await bpmReportCard.screenshot({
@@ -1574,11 +1585,20 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
 
   await expect(governance).toContainText('迁移计划');
   await expect(governance).toContainText('历史版本策略');
+  await expect(dialog).toHaveCSS('background-color', /^(?:rgba\(0, 0, 0, 0\.5\)|oklab\(0 0 0 \/ 0\.5\))$/);
+  await expect(governance).toContainText('启用运行时写入前，创建物理表及生成的索引。');
+  await expect(governance).toContainText('首次发布：尚无已发布的历史模型版本。');
+  await expect(governance).not.toContainText('Create the physical table');
+  await expect(governance).not.toContainText('Initial publish:');
+
 
   const confirm = page.getByTestId('model-publish-confirm');
   await expect(confirm).toBeDisabled();
 
-  await governance.screenshot({
+  await page.getByTestId('model-publish-impact-ack').scrollIntoViewIfNeeded();
+  await expect(page.getByTestId('model-publish-impact-ack')).toBeInViewport({ ratio: 1 });
+  await expect(confirm).toBeInViewport({ ratio: 1 });
+  await page.screenshot({
     path: testInfo.outputPath('model-publish-governance-impact-ack.png'),
   });
 
@@ -1650,7 +1670,7 @@ test('RC-MODEL-01B: model publish replay executes BPM userTask assignment rule b
     expect(currentImpact.references ?? []).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          sourceType: 'BPM_PROCESS',
+          sourceType: 'WORKFLOW_PROCESS',
           sourceCode: bpmUsage.processKey,
           targetPath: runtimeFieldRef,
           binding: 'DESIGNER_NODE',
@@ -1686,9 +1706,9 @@ test('RC-MODEL-01B: model publish replay executes BPM userTask assignment rule b
   await expect(governance).toBeVisible({ timeout: 10_000 });
   await expect(governance).toContainText('规则中心影响治理');
   await expect(governance).toContainText(`${modelCode}.${fieldCode}`);
-  await expect(governance).toContainText(/BPM 流程|BPM_PROCESS/);
+  await expect(governance).toContainText(/BPM 流程|WORKFLOW_PROCESS/);
   await expect(governance).toContainText(bpmUsage.processName);
-  await expect(page.getByTestId('model-publish-bpm-sample')).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByTestId('model-publish-workflow-sample')).toBeVisible({ timeout: 10_000 });
 
   const readyResponse = page.waitForResponse(
     (response) =>
@@ -1716,14 +1736,14 @@ test('RC-MODEL-01B: model publish replay executes BPM userTask assignment rule b
   }));
 
   const replayReport = page.getByTestId('model-publish-replay-report');
-  await expect(replayReport).toContainText('可使用流程实例和业务记录样本执行 BPM 规则复核');
+  await expect(replayReport).toContainText('可使用流程实例和业务记录样本执行 工作流规则复核');
 
   const processInstanceId = `BPM-ASSIGN-${suffix}`;
   const recordPid = `bpm-assign-record-${suffix}`;
-  await page.getByTestId('model-publish-bpm-process-instance-id').fill(processInstanceId);
-  await page.getByTestId('model-publish-bpm-process-key').fill(bpmUsage.processKey);
-  await page.getByTestId('model-publish-bpm-record-pid').fill(recordPid);
-  await page.getByTestId('model-publish-bpm-record-json').fill(
+  await page.getByTestId('model-publish-workflow-process-instance-id').fill(processInstanceId);
+  await page.getByTestId('model-publish-workflow-process-key').fill(bpmUsage.processKey);
+  await page.getByTestId('model-publish-workflow-record-pid').fill(recordPid);
+  await page.getByTestId('model-publish-workflow-record-json').fill(
     JSON.stringify({ [fieldCode]: 2600, amount: 2600 }, null, 2),
   );
 
@@ -1734,18 +1754,18 @@ test('RC-MODEL-01B: model publish replay executes BPM userTask assignment rule b
       response.status() === 200,
     { timeout: 15_000 },
   );
-  await page.getByTestId('model-publish-run-bpm-replay').click();
+  await page.getByTestId('model-publish-run-workflow-replay').click();
   const bpmReplay = await bpmReplayResponse;
   const bpmReplayBody = bpmReplay.request().postDataJSON() as {
     executeAutomated?: boolean;
     sampleContext?: {
-      bpm?: { processInstanceId?: string; processKey?: string };
+      workflow?: { processInstanceId?: string; processKey?: string };
       record?: { pid?: string; data?: Record<string, unknown> };
     };
   };
   expect(bpmReplayBody.executeAutomated).toBe(true);
-  expect(bpmReplayBody.sampleContext?.bpm?.processInstanceId).toBe(processInstanceId);
-  expect(bpmReplayBody.sampleContext?.bpm?.processKey).toBe(bpmUsage.processKey);
+  expect(bpmReplayBody.sampleContext?.workflow?.processInstanceId).toBe(processInstanceId);
+  expect(bpmReplayBody.sampleContext?.workflow?.processKey).toBe(bpmUsage.processKey);
   expect(bpmReplayBody.sampleContext?.record?.pid).toBe(recordPid);
   expect(bpmReplayBody.sampleContext?.record?.data?.[fieldCode]).toBe(2600);
 
@@ -1771,7 +1791,7 @@ test('RC-MODEL-01B: model publish replay executes BPM userTask assignment rule b
     candidateGroupIds: expectedGroups,
     failClosed: false,
   }));
-  await expect(replayReport).toContainText('BPM 分派规则复核已执行：已解析候选审批人');
+  await expect(replayReport).toContainText('工作流分派规则复核已执行：已解析候选审批人');
   await expect(replayReport).toContainText('节点类型: 审批任务');
   await expect(replayReport).toContainText(`节点 ID: ${bpmUsage.taskNodeId}`);
   await expect(replayReport).toContainText('绑定位置: 节点规则绑定');
@@ -1785,9 +1805,9 @@ test('RC-MODEL-01B: model publish replay executes BPM userTask assignment rule b
   await expect(replayReport).not.toContainText('BPM replay evaluated');
   await expect(replayReport).not.toContainText('candidateUserIds');
   await expect(replayReport).not.toContainText('candidateGroupIds');
-  await expect(page.getByTestId('model-publish-bpm-sample-error')).toHaveCount(0);
+  await expect(page.getByTestId('model-publish-workflow-sample-error')).toHaveCount(0);
 
-  const bpmReportCard = page.getByTestId('model-publish-replay-result-BPM_PROCESS');
+  const bpmReportCard = page.getByTestId('model-publish-replay-result-WORKFLOW_PROCESS');
   await expect(bpmReportCard).toBeVisible({ timeout: 5_000 });
   await expect(bpmReportCard).toContainText('已解析候选审批人');
   await expect(bpmReportCard).toContainText(expectedUsers[0]);
@@ -1826,7 +1846,7 @@ test('RC-MODEL-01C: model publish replay shows BPM userTask fail-closed when dec
     expect(currentImpact.references ?? []).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          sourceType: 'BPM_PROCESS',
+          sourceType: 'WORKFLOW_PROCESS',
           sourceCode: bpmUsage.processKey,
           targetPath: runtimeFieldRef,
           binding: 'DESIGNER_NODE',
@@ -1862,16 +1882,16 @@ test('RC-MODEL-01C: model publish replay shows BPM userTask fail-closed when dec
   await expect(governance).toBeVisible({ timeout: 10_000 });
   await expect(governance).toContainText('规则中心影响治理');
   await expect(governance).toContainText(`${modelCode}.${fieldCode}`);
-  await expect(governance).toContainText(/BPM 流程|BPM_PROCESS/);
+  await expect(governance).toContainText(/BPM 流程|WORKFLOW_PROCESS/);
   await expect(governance).toContainText(bpmUsage.processName);
-  await expect(page.getByTestId('model-publish-bpm-sample')).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByTestId('model-publish-workflow-sample')).toBeVisible({ timeout: 10_000 });
 
   const processInstanceId = `BPM-FAIL-CLOSED-${suffix}`;
   const recordPid = `bpm-fail-record-${suffix}`;
-  await page.getByTestId('model-publish-bpm-process-instance-id').fill(processInstanceId);
-  await page.getByTestId('model-publish-bpm-process-key').fill(bpmUsage.processKey);
-  await page.getByTestId('model-publish-bpm-record-pid').fill(recordPid);
-  await page.getByTestId('model-publish-bpm-record-json').fill(
+  await page.getByTestId('model-publish-workflow-process-instance-id').fill(processInstanceId);
+  await page.getByTestId('model-publish-workflow-process-key').fill(bpmUsage.processKey);
+  await page.getByTestId('model-publish-workflow-record-pid').fill(recordPid);
+  await page.getByTestId('model-publish-workflow-record-json').fill(
     JSON.stringify({ [fieldCode]: 2600, amount: 2600 }, null, 2),
   );
 
@@ -1882,18 +1902,18 @@ test('RC-MODEL-01C: model publish replay shows BPM userTask fail-closed when dec
       response.status() === 200,
     { timeout: 15_000 },
   );
-  await page.getByTestId('model-publish-run-bpm-replay').click();
+  await page.getByTestId('model-publish-run-workflow-replay').click();
   const bpmReplay = await bpmReplayResponse;
   const bpmReplayBody = bpmReplay.request().postDataJSON() as {
     executeAutomated?: boolean;
     sampleContext?: {
-      bpm?: { processInstanceId?: string; processKey?: string };
+      workflow?: { processInstanceId?: string; processKey?: string };
       record?: { pid?: string; data?: Record<string, unknown> };
     };
   };
   expect(bpmReplayBody.executeAutomated).toBe(true);
-  expect(bpmReplayBody.sampleContext?.bpm?.processInstanceId).toBe(processInstanceId);
-  expect(bpmReplayBody.sampleContext?.bpm?.processKey).toBe(bpmUsage.processKey);
+  expect(bpmReplayBody.sampleContext?.workflow?.processInstanceId).toBe(processInstanceId);
+  expect(bpmReplayBody.sampleContext?.workflow?.processKey).toBe(bpmUsage.processKey);
   expect(bpmReplayBody.sampleContext?.record?.pid).toBe(recordPid);
   expect(bpmReplayBody.sampleContext?.record?.data?.[fieldCode]).toBe(2600);
 
@@ -1924,7 +1944,7 @@ test('RC-MODEL-01C: model publish replay shows BPM userTask fail-closed when dec
   }));
 
   const replayReport = page.getByTestId('model-publish-replay-report');
-  await expect(replayReport).toContainText('BPM 分派规则复核失败：规则执行异常，已失败关闭，未使用静态审批人兜底');
+  await expect(replayReport).toContainText('工作流分派规则复核失败：规则执行异常，已失败关闭，未使用静态审批人兜底');
   await expect(replayReport).toContainText('失败关闭: 是');
   await expect(replayReport).toContainText('已使用兜底: 是');
   await expect(replayReport).toContainText('错误码: 决策执行失败');
@@ -1935,9 +1955,9 @@ test('RC-MODEL-01C: model publish replay shows BPM userTask fail-closed when dec
   await expect(replayReport).not.toContainText('BPM_RULE_BINDING_FAIL_CLOSED');
   await expect(replayReport).not.toContainText('DECISION_EVALUATION_FAILED');
   await expect(replayReport).not.toContainText('candidateUserIds');
-  await expect(page.getByTestId('model-publish-bpm-sample-error')).toHaveCount(0);
+  await expect(page.getByTestId('model-publish-workflow-sample-error')).toHaveCount(0);
 
-  const bpmReportCard = page.getByTestId('model-publish-replay-result-BPM_PROCESS');
+  const bpmReportCard = page.getByTestId('model-publish-replay-result-WORKFLOW_PROCESS');
   await expect(bpmReportCard).toBeVisible({ timeout: 5_000 });
   await expect(bpmReportCard).toContainText('已失败关闭');
   await bpmReportCard.scrollIntoViewIfNeeded();

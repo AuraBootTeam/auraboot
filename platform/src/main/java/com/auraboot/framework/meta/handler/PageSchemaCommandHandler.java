@@ -15,7 +15,6 @@ import org.springframework.stereotype.Component;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -109,15 +108,16 @@ public class PageSchemaCommandHandler implements CommandHandler {
         PageSchemaCreateRequest request = new PageSchemaCreateRequest();
         request.setName(source.getName() + " (Copy)");
         request.setPageKey(source.getPageKey() + "_copy_" + System.currentTimeMillis());
-        request.setKind(source.getKind());
+        PageSchemaCopyContent.apply(source, request);
         request.setTitle(source.getName() + " (Copy)");
         request.setModelCode(source.getModelCode());
         request.setProfile(source.getProfile());
         request.setDescription(source.getDescription());
-        request.setBlocks(source.getBlocks() != null ? source.getBlocks() : List.of());
         request.setLayout(source.getLayout());
         request.setIsTemplate(source.getIsTemplate());
-        request.setExtension(source.getExtension());
+        request.setTemplateCategory(source.getTemplateCategory());
+        request.setMetaInfo(source.getMetaInfo());
+        request.setTags(source.getTags());
 
         PageSchemaDTO copy = pageSchemaService.create(request);
         result.put("pid", copy.getPid());

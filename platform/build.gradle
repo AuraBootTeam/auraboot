@@ -248,6 +248,13 @@ ext {
     mcpSdkVersion = '2.0.1'
     testWorkerNum = project.findProperty('workerNum') ?: '1'
 }
+// Allure 2.12 defaults its agent to 1.9.22.1 independently of dependency management.
+// Keep the weaving agent and the application's AspectJ runtime on one artifact.
+allure {
+    adapter {
+        aspectjVersion.set(project.ext.aspectjVersion.toString())
+    }
+}
 
 dependencyManagement {
     imports {
@@ -571,8 +578,8 @@ tasks.withType(Test).configureEach {
 }
 
 // ─── JaCoCo offline instrumentation of main classes ───
-// Instrument build/classes/java/main at build time into a separate dir. The test task loads
-// these (stable IDs) ahead of the originals so coverage attributes to on-disk classes, which
+// Instrument build/classes/java/main at build time into a separate complete test output. The
+// test task loads these (stable IDs) so coverage attributes to on-disk classes, which
 // is robust across the suite's many CGLIB-proxied Spring contexts (the runtime classdump was
 // not — proxy class IDs diverge per evicted/recreated context, mis-attributing to ~5%).
 def jacocoInstrumentedMain = file("${buildDir}/classes-instrumented-main")
@@ -587,11 +594,16 @@ tasks.register('instrumentMainOffline') {
                     classpath: configurations.jacocoAnt.asPath)
         // CCJSqlParserTokenManager exceeds the JVM method-size limit after instrumentation
         // (same reason the on-the-fly agent excluded it); leave it un-instrumented so the
-        // original loads from build/classes, which stays later on the test classpath.
+        // original is copied into the complete test output below.
         ant.jacocoInstrument(destdir: jacocoInstrumentedMain) {
             fileset(dir: "${buildDir}/classes/java/main") {
                 exclude(name: 'net/sf/jsqlparser/parser/CCJSqlParserTokenManager.class')
             }
+        }
+        copy {
+            from layout.buildDirectory.dir('classes/java/main')
+            into jacocoInstrumentedMain
+            include 'net/sf/jsqlparser/parser/CCJSqlParserTokenManager.class'
         }
     }
 }
@@ -663,8 +675,8 @@ test {
     }
     finalizedBy jacocoTestReport
     // ─── JaCoCo offline instrumentation (replaces the fragile runtime CGLIB classdump) ───
-    // Load offline-instrumented main classes first (stable on-disk IDs), then the original
-    // build/classes (provides the un-instrumented CCJSqlParserTokenManager), plus the jacoco
+    // Load the complete offline main output (including the un-instrumented parser exception)
+    // instead of the original class directories, plus the jacoco
     // runtime so instrumented classes resolve org.jacoco.agent.rt.* at load. The on-the-fly
     // agent is disabled — offline records coverage on the original classes a proxy delegates
     // to, which is stable across the many @SpringBootTest contexts (unlike per-context proxy IDs).
@@ -676,9 +688,13 @@ test {
         if (executionFile.exists() && !executionFile.delete()) {
             throw new GradleException("Cannot clear stale coverage data: ${executionFile}")
         }
-        classpath = files(jacocoInstrumentedMain) + classpath + configurations.jacocoRuntime
+        classpath = files(jacocoInstrumentedMain) +
+            (classpath - sourceSets.main.output.classesDirs) + configurations.jacocoRuntime
     }
     systemProperty 'jacoco-agent.destfile', file("${buildDir}/jacoco/test.exec").absolutePath
+    // The offline runtime otherwise merges coverage from previous test runs and source revisions.
+    // This task uses one JVM; replace its execution data so reports describe only this run.
+    systemProperty 'jacoco-agent.append', 'false'
     jacoco {
         enabled = false
     }
@@ -686,20 +702,21 @@ test {
     jvmArgs "-javaagent:${configurations.mockitoAgent.singleFile}"
 }
 
+def bootstrapDatabaseUrl = providers.environmentVariable('BOOTSTRAP_TEST_DATABASE_URL')
+tasks.register('validateBootstrapDatabase') {
+    doLast {
+        def url = bootstrapDatabaseUrl.orNull
+        if (!url || !(url ==~ /jdbc:postgresql:\/\/[^\/]+\/aura_boot_bootstrap_[A-Za-z0-9_]+(\?.*)?/) ||
+                url == System.getenv('TEST_DATABASE_URL') || url == System.getenv('DATABASE_URL') ||
+                url == System.getenv('SPRING_DATASOURCE_URL')) {
+            throw new GradleException('BOOTSTRAP_TEST_DATABASE_URL must identify a separate freshly migrated aura_boot_bootstrap_* database')
+        }
+    }
+}
+
 tasks.register('bootstrapBillingAccountTest', Test) {
     group = 'verification'
     description = 'Verify full-bootstrap billing in a dedicated freshly migrated database.'
-    def bootstrapDatabaseUrl = providers.environmentVariable('BOOTSTRAP_TEST_DATABASE_URL')
-    doFirst {
-        if (!bootstrapDatabaseUrl.present) {
-            throw new GradleException('BOOTSTRAP_TEST_DATABASE_URL must identify a separate freshly migrated database.')
-        }
-    }
-    if (bootstrapDatabaseUrl.present) {
-        environment 'TEST_DATABASE_URL', bootstrapDatabaseUrl.get()
-        environment 'DATABASE_URL', bootstrapDatabaseUrl.get()
-        environment 'SPRING_DATASOURCE_URL', bootstrapDatabaseUrl.get()
-    }
     useJUnitPlatform {
         includeTags 'destructive-bootstrap'
     }
@@ -720,6 +737,7 @@ tasks.register('bootstrapBillingAccountTest', Test) {
     }
     maxParallelForks = 1
 
+    dependsOn tasks.named('validateBootstrapDatabase')
     def bootstrapTestTmpDir = file("${buildDir}/tmp/bootstrapBillingAccountTest")
     bootstrapTestTmpDir.mkdirs()
     systemProperty 'java.io.tmpdir', bootstrapTestTmpDir.absolutePath
@@ -1151,7 +1169,8 @@ tasks.register('integrationTest', Test) {
         if (executionFile.exists() && !executionFile.delete()) {
             throw new GradleException("Cannot clear stale coverage data: ${executionFile}")
         }
-        classpath = files(jacocoInstrumentedMain) + classpath + configurations.jacocoRuntime
+        classpath = files(jacocoInstrumentedMain) +
+            (classpath - sourceSets.main.output.classesDirs) + configurations.jacocoRuntime
     }
     systemProperty 'jacoco-agent.destfile', file("${buildDir}/jacoco/integrationTest.exec").absolutePath
     jacoco { enabled = false }

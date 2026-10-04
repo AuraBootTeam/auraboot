@@ -1,12 +1,9 @@
 package com.auraboot.framework.meta.ddl;
 
 import com.auraboot.framework.meta.dto.FieldDefinition;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.Locale;
 
 public class PostgresDdlDialect implements DdlDialect {
-
-    private static final Logger log = LoggerFactory.getLogger(PostgresDdlDialect.class);
 
     @Override
     public String getName() {
@@ -17,11 +14,14 @@ public class PostgresDdlDialect implements DdlDialect {
     public String mapDataType(FieldDefinition field) {
         String dataType = field.getDataType();
         if (dataType == null) {
-            return getVarcharType(255);
+            throw new IllegalArgumentException("Missing data type for field: " + field.getCode());
         }
 
-        switch (dataType.toLowerCase()) {
+        switch (dataType.toLowerCase(Locale.ROOT)) {
             case "string":
+            case "enum":
+            case "reference":
+            case "file":
                 Integer maxLength = field.getMaxLength();
                 if (maxLength != null && maxLength > 0) {
                     return getVarcharType(maxLength);
@@ -62,8 +62,7 @@ public class PostgresDdlDialect implements DdlDialect {
             case "array":
                 return "TEXT[]";
             default:
-                log.warn("Unknown data type: {}, using VARCHAR(255)", dataType);
-                return getVarcharType(255);
+                throw new IllegalArgumentException("Unsupported PostgreSQL data type: " + dataType);
         }
     }
 
@@ -76,6 +75,8 @@ public class PostgresDdlDialect implements DdlDialect {
         String value = defaultValue.toString();
 
         if ("string".equalsIgnoreCase(dataType) || "text".equalsIgnoreCase(dataType)
+                || "enum".equalsIgnoreCase(dataType) || "reference".equalsIgnoreCase(dataType)
+                || "file".equalsIgnoreCase(dataType)
                 || "json".equalsIgnoreCase(dataType) || "jsonb".equalsIgnoreCase(dataType)) {
             return "'" + value.replace("'", "''") + "'";
         }

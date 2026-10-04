@@ -4,6 +4,9 @@ import com.auraboot.framework.permission.dto.PermissionDTO;
 import com.auraboot.framework.permission.dto.PermissionGrantRequest;
 import com.auraboot.framework.permission.dto.PermissionMatrixDTO;
 import com.auraboot.framework.permission.entity.RoleDataScope;
+import com.auraboot.framework.permission.entity.Permission;
+import com.auraboot.framework.permission.mapper.PermissionMapper;
+import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.permission.service.DataScopeService;
 import com.auraboot.framework.permission.service.PermissionPolicyService;
 import com.auraboot.framework.permission.service.PermissionService;
@@ -23,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
@@ -39,6 +43,9 @@ class PermissionMatrixServiceImplTest {
     private PermissionService permissionService;
 
     @Mock
+    private PermissionMapper permissionMapper;
+
+    @Mock
     private RolePermissionService rolePermissionService;
 
     @Mock
@@ -52,6 +59,31 @@ class PermissionMatrixServiceImplTest {
 
     @InjectMocks
     private PermissionMatrixServiceImpl service;
+
+    @Test
+    void findPermissionIdByPidUsesThePidQuery() {
+        Permission permission = new Permission();
+        permission.setId(41L);
+        when(permissionMapper.findByPids(List.of("permission-pid"))).thenReturn(List.of(permission));
+        assertThat(service.findPermissionIdByPid("permission-pid")).isEqualTo(41L);
+        verify(permissionMapper).findByPids(List.of("permission-pid"));
+    }
+
+    @Test
+    void findPermissionIdByPidRejectsAbsence() {
+        when(permissionMapper.findByPids(List.of("missing"))).thenReturn(List.of());
+        assertThatThrownBy(() -> service.findPermissionIdByPid("missing"))
+                .isInstanceOf(RootUnCheckedException.class)
+                .hasMessageContaining("Permission not found by PID: missing");
+    }
+
+    @Test
+    void findPermissionIdByPidPropagatesReadFailures() {
+        IllegalStateException failure = new IllegalStateException("permission read failed");
+        when(permissionMapper.findByPids(List.of("permission-pid"))).thenThrow(failure);
+        assertThatThrownBy(() -> service.findPermissionIdByPid("permission-pid"))
+                .isSameAs(failure);
+    }
 
     private PermissionDTO permission(Long id, String code, Integer level, Long parentId,
                                      String resourceType, String resourceCode, String action) {

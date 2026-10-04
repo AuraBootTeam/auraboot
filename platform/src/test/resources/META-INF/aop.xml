@@ -1,0 +1,6 @@
+<aspectj>
+    <!-- Spring AOP manages this bean; Allure LTW must leave its aspect class unchanged. -->
+    <weaver>
+        <exclude within="io.micrometer.observation.aop.ObservedAspect"/>
+    </weaver>
+</aspectj>

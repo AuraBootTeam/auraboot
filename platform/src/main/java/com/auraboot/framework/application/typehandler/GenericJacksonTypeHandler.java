@@ -29,13 +29,17 @@ public abstract class GenericJacksonTypeHandler<T> extends BaseTypeHandler<T> {
         this.type = type;
     }
     
+    protected ObjectMapper getObjectMapper() {
+        return OBJECT_MAPPER;
+    }
+
     @Override
     public void setNonNullParameter(PreparedStatement ps, int i, T parameter, JdbcType jdbcType) 
             throws SQLException {
         try {
             PGobject jsonObject = new PGobject();
             jsonObject.setType("jsonb");
-            jsonObject.setValue(OBJECT_MAPPER.writeValueAsString(parameter));
+            jsonObject.setValue(getObjectMapper().writeValueAsString(parameter));
             ps.setObject(i, jsonObject);
         } catch (JsonProcessingException e) {
             throw new SQLException("Error converting object to JSON: " + e.getMessage(), e);
@@ -63,7 +67,7 @@ public abstract class GenericJacksonTypeHandler<T> extends BaseTypeHandler<T> {
             return null;
         }
         try {
-            return OBJECT_MAPPER.readValue(json, type);
+            return getObjectMapper().readValue(json, type);
         } catch (JsonProcessingException e) {
             throw new SQLException("Error parsing JSON to " + type.getSimpleName() + ": " + e.getMessage(), e);
         }

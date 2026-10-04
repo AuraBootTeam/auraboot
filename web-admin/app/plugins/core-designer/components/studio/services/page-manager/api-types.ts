@@ -33,6 +33,7 @@ export interface PageSchemaDTO {
   modelCode?: string;
   blocks?: any[];
   layout?: Record<string, unknown>;
+  dataSources?: Record<string, unknown>;
   profile?: string;
   schemaVersion?: number;
   metaInfo?: Record<string, unknown>;
@@ -58,6 +59,10 @@ export interface PageSchemaDTO {
  * Matches: PageSchemaCreateRequest.java
  */
 export interface PageSchemaCreateRequest {
+  modelCode?: string;
+  layout?: Record<string, unknown>;
+  profile?: string;
+  dataSources?: Record<string, unknown>;
   name: string;
   pageKey: string; // Required by backend
   title: string;

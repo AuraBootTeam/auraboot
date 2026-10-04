@@ -71,7 +71,7 @@ class BootstrapBillingAccountIT {
                 .as("use the dedicated database provisioned by scripts/oss-backend-unit-ci.sh")
                 .isEqualTo("1");
         assertThat(jdbcTemplate.queryForObject("SELECT current_database()", String.class))
-                .isEqualTo("aura_boot_bootstrap");
+                .startsWith("aura_boot_bootstrap_");
         systemConfigService.evictCache();
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ab_tenant", Integer.class))
                 .as("bootstrap verification requires its own blank migrated database")

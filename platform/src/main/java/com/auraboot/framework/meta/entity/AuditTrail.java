@@ -76,6 +76,9 @@ public class AuditTrail {
     @TableField("previous_hash")
     private String previousHash;
 
+    @TableField("hash_version")
+    private Integer hashVersion;
+
     @TableField("record_hash")
     private String recordHash;
 }

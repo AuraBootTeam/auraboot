@@ -137,7 +137,7 @@ OpenTelemetry is built in. Configure `MANAGEMENT_TRACING_*` and point at your co
 
 Yes — audit retention is enforced by scheduled pruning. Configure the retention window in the audit pruning settings (`application.yml` audit section); past that age rows are pruned by the scheduled job. Don't delete from `meta_audit` directly.
 
-> Note: an earlier answer claimed an `auraboot.audit.retention-days` key and `audit_archive_*` partitions; neither exists in this codebase (corrected 2026-10-01).
+> Audit retention and archival must follow the implemented storage and operations policy; do not assume an undocumented retention setting or automatic partition archival.
 
 ---
 

@@ -37,7 +37,7 @@ import com.auraboot.framework.tenant.service.TenantService;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.service.UserService;
 import lombok.extern.slf4j.Slf4j;
-import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -100,6 +100,7 @@ class DynamicDataServiceImplCoverageIT {
     @Autowired
     private TenantMemberService tenantMemberService;
 
+    private final String runId = java.util.UUID.randomUUID().toString().replace("-", "");
     private String modelCode;
     private String tableName;
     private Model testModel;
@@ -117,7 +118,6 @@ class DynamicDataServiceImplCoverageIT {
         if (!modelInitialized) {
             modelCode = "dyncov_" + Math.abs(System.nanoTime());
             tableName = "mt_" + modelCode.toLowerCase();
-            purgeTestArtifacts(); // clear leftovers from any prior failed run (field codes are tenant-unique)
             createTestModel();
             createTestFields();
             createPhysicalTable();
@@ -129,32 +129,9 @@ class DynamicDataServiceImplCoverageIT {
         }
     }
 
-    @AfterAll
-    void cleanup() {
-        try {
-            purgeTestArtifacts();
-        } finally {
-            MetaContext.clear();
-        }
-    }
-
-    /** Drop the physical table and delete the model/fields/bindings created by this class. */
-    private void purgeTestArtifacts() {
-        if (testTenant == null) {
-            return;
-        }
-        Long tid = testTenant.getId();
-        try {
-            if (tableName != null) {
-                jdbcTemplate.execute("DROP TABLE IF EXISTS " + tableName);
-            }
-            jdbcTemplate.update("DELETE FROM ab_meta_model_field_binding WHERE model_id IN "
-                    + "(SELECT id FROM ab_meta_model WHERE code LIKE 'dyncov%' AND tenant_id = ?)", tid);
-            jdbcTemplate.update("DELETE FROM ab_meta_field WHERE code IN ('pid','name','status') AND tenant_id = ?", tid);
-            jdbcTemplate.update("DELETE FROM ab_meta_model WHERE code LIKE 'dyncov%' AND tenant_id = ?", tid);
-        } catch (Exception e) {
-            log.warn("dyncov purge failed: {}", e.getMessage());
-        }
+    @AfterEach
+    void clearRequestContext() {
+        MetaContext.clear();
     }
 
     // ==================== list: full operator sweep ====================
@@ -401,14 +378,14 @@ class DynamicDataServiceImplCoverageIT {
 
     private void setupTenantContext() {
         if (testUser == null) {
-            String email = "dyncov-test@auraboot.com";
+            String email = "dyncov-" + runId + "@test.auraboot.local";
             testUser = userService.findByEmail(email);
             if (testUser == null) {
                 testUser = userService.signUp(email, "test-password-123");
             }
         }
         if (testTenant == null) {
-            String name = "dyncov-test-tenant";
+            String name = "dyncov-" + runId;
             testTenant = tenantService.findByName(name);
             if (testTenant == null) {
                 Tenant t = new Tenant();

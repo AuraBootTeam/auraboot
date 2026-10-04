@@ -1,5 +1,6 @@
 package com.auraboot.framework.scheduler.service;
 
+import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.scheduler.dto.TaskLogQueryRequest;
@@ -36,18 +37,19 @@ class ScheduledTaskLogServiceIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private ScheduledTaskLogMapper scheduledTaskLogMapper;
 
-    private final String testTaskPid = "test-task-" + System.currentTimeMillis();
-
-    private boolean fixtureInserted;
+    private final String testTaskPid = UniqueIdGenerator.generate();
+    private boolean logsInitialized;
 
     @BeforeEach
     public void insertTestLogs() {
-        // BaseIntegrationTest establishes tenant context in its superclass BeforeEach.
-        if (fixtureInserted) return;
-        // Insert two test log entries via mapper (not going through service creation)
-        insertLog(testTaskPid, "success", 100L, null);
-        insertLog(testTaskPid, "failure", 200L, "DB timeout");
-        fixtureInserted = true;
+        // The inherited BeforeEach establishes MetaContext before this fixture writes.
+        if (logsInitialized) {
+            return;
+        }
+        Instant latestStartedAt = Instant.now();
+        insertLog(testTaskPid, "success", 100L, null, latestStartedAt.minusSeconds(1));
+        insertLog(testTaskPid, "failure", 200L, "DB timeout", latestStartedAt);
+        logsInitialized = true;
         log.info("Inserted test logs for task={}", testTaskPid);
     }
 
@@ -60,7 +62,10 @@ class ScheduledTaskLogServiceIntegrationTest extends BaseIntegrationTest {
         List<ScheduledTaskLog> logs = scheduledTaskLogService.getByTaskPid(testTaskPid, 10);
 
         assertThat(logs).isNotNull().hasSize(2);
-        logs.forEach(l -> assertThat(l.getTaskPid()).isEqualTo(testTaskPid));
+        logs.forEach(l -> {
+            assertThat(l.getTaskPid()).isEqualTo(testTaskPid);
+            assertThat(l.getTenantId()).isEqualTo(getTestTenant().getId());
+        });
     }
 
     @Test
@@ -71,6 +76,10 @@ class ScheduledTaskLogServiceIntegrationTest extends BaseIntegrationTest {
 
         assertThat(latest).isNotNull();
         assertThat(latest.getTaskPid()).isEqualTo(testTaskPid);
+        assertThat(latest.getTenantId()).isEqualTo(getTestTenant().getId());
+        assertThat(latest.getStatus()).isEqualTo("failure");
+        assertThat(latest.getDurationMs()).isEqualTo(200L);
+        assertThat(latest.getErrorMessage()).isEqualTo("DB timeout");
     }
 
     @Test
@@ -116,12 +125,14 @@ class ScheduledTaskLogServiceIntegrationTest extends BaseIntegrationTest {
 
     // ==================== helper ====================
 
-    private void insertLog(String taskPid, String status, long durationMs, String errorMessage) {
+    private void insertLog(String taskPid, String status, long durationMs, String errorMessage,
+                           Instant startedAt) {
         ScheduledTaskLog logEntry = new ScheduledTaskLog();
+        logEntry.setTenantId(getTestTenant().getId());
         logEntry.setTaskPid(taskPid);
         logEntry.setStatus(status);
-        logEntry.setStartedAt(Instant.now().minusMillis(durationMs));
-        logEntry.setFinishedAt(Instant.now());
+        logEntry.setStartedAt(startedAt);
+        logEntry.setFinishedAt(startedAt.plusMillis(durationMs));
         logEntry.setDurationMs(durationMs);
         logEntry.setErrorMessage(errorMessage);
         logEntry.setRetryCount(0);

@@ -14,6 +14,7 @@
 import React, { useCallback, useState } from 'react';
 import { PAGE_STATUS_INFO, type PageMeta } from '../../../services/page-manager';
 import { SaveAsTemplateDialog } from '~/plugins/core-designer/components/studio/components/SaveAsTemplateDialog';
+import { CreateFromTemplateDialog } from '~/plugins/core-designer/components/studio/components/CreateFromTemplateDialog';
 import { AiPageGenerateDialog } from '~/plugins/core-designer/components/studio/components/AiPageGenerateDialog';
 import type { MergeMode } from '~/plugins/core-designer/components/studio/components/ai-page-prompt';
 import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
@@ -48,6 +49,7 @@ export interface DesignerToolbarProps {
   onSave?: () => void;
   onPublish?: () => void;
   onSettings?: () => void;
+  onPageCreated?: (pid: string) => void;
   onShortcutHelp?: () => void;
   onAiGenerated?: (dsl: {
     kind: PageSchema['kind'];
@@ -116,7 +118,7 @@ const ControlGroup: React.FC<{ label: string; children: React.ReactNode }> = ({
   children,
 }) => (
   <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white px-2 py-2">
-    <span className="px-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+    <span className="px-1 text-[11px] font-semibold tracking-[0.16em] text-slate-400 uppercase">
       {label}
     </span>
     <div className="flex flex-wrap items-center gap-2">{children}</div>
@@ -150,6 +152,7 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
   onSave,
   onPublish,
   onSettings,
+  onPageCreated,
   onShortcutHelp,
   onAiGenerated,
   aiPanelOpen = false,
@@ -158,6 +161,7 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
   const [showZoomMenu, setShowZoomMenu] = useState(false);
   const [showDeviceMenu, setShowDeviceMenu] = useState(false);
   const [showSaveAsTemplate, setShowSaveAsTemplate] = useState(false);
+  const [showCreateFromTemplate, setShowCreateFromTemplate] = useState(false);
   const [showAiGenerate, setShowAiGenerate] = useState(false);
 
   const { hasPermission } = usePermissions();
@@ -166,11 +170,8 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
   const canPublish = canManage;
   const canImport = canManage;
   const canExport = canManage;
-  const { locale } = useI18n();
-  const l = useCallback(
-    (zh: string, en: string) => (locale === 'zh-CN' ? zh : en),
-    [locale],
-  );
+  const { locale, t } = useI18n();
+  const l = useCallback((zh: string, en: string) => (locale === 'zh-CN' ? zh : en), [locale]);
 
   const statusInfo = pageMeta?.status ? PAGE_STATUS_INFO[pageMeta.status] : null;
   const statusLabels = {
@@ -188,16 +189,21 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
   ];
   const currentDeviceMeta = devices.find((item) => item.id === currentDevice) ?? devices[0];
 
-  const formatLastSaved = useCallback((dateStr?: string) => {
-    if (!dateStr) return '';
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMin = Math.floor(diffMs / 60000);
-    if (diffMin < 1) return l('刚刚', 'just now');
-    if (diffMin < 60) return l(`${diffMin} 分钟前`, `${diffMin}m ago`);
-    return date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
-  }, [l, locale]);
+  const formatLastSaved = useCallback(
+    (dateStr?: string) => {
+      if (!dateStr) return '';
+      const date = new Date(dateStr);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffMin = Math.floor(diffMs / 60000);
+      if (diffMin < 1) return l('刚刚', 'just now');
+      if (diffMin < 60) return l(`${diffMin} 分钟前`, `${diffMin}m ago`);
+      return date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+    },
+    [l, locale],
+  );
+
+  const savedAt = lastSavedAt ?? pageMeta?.updatedAt;
 
   return (
     <div className="border-b border-slate-200 bg-white px-4 py-3">
@@ -234,20 +240,27 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
                 <span
                   className={`rounded-full px-2.5 py-1 text-xs font-medium ${
                     hasUnsavedChanges
-                      ? 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200'
-                      : 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200'
+                      ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 ring-inset'
+                      : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 ring-inset'
                   }`}
                   data-testid="toolbar-draft-state"
                 >
-                  {hasUnsavedChanges ? l('待保存', 'Unsaved') : l('已同步', 'Synced')}
+                  {hasUnsavedChanges
+                    ? l('待保存', 'Unsaved')
+                    : DESIGNER_I18N.autoSave.synced[locale]}
                 </span>
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-500">
                 <span>{l('页面设计器', 'Page Designer')}</span>
                 <span className="text-slate-300">/</span>
-                <span>{l('当前设备：', 'Device: ')}{currentDeviceMeta.label}</span>
+                <span>
+                  {l('当前设备：', 'Device: ')}
+                  {currentDeviceMeta.label}
+                </span>
                 <span className="text-slate-300">/</span>
-                <span>{l('缩放', 'Zoom')} {zoomLevel}%</span>
+                <span>
+                  {l('缩放', 'Zoom')} {zoomLevel}%
+                </span>
               </div>
             </div>
           </div>
@@ -281,17 +294,17 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
                     </svg>
                     <span className="font-medium text-blue-700">{l('正在保存', 'Saving')}</span>
                   </>
-                ) : lastSavedAt ? (
+                ) : hasUnsavedChanges ? (
+                  <span className="font-medium text-amber-600">
+                    {DESIGNER_I18N.autoSave.currentEdits[locale]}
+                  </span>
+                ) : savedAt ? (
                   <>
                     <span className="h-2 w-2 rounded-full bg-emerald-500" />
                     <span className="text-slate-700">
-                      {l('已保存', 'Saved')} {formatLastSaved(lastSavedAt)}
+                      {DESIGNER_I18N.autoSave.saved[locale]} {formatLastSaved(savedAt)}
                     </span>
                   </>
-                ) : hasUnsavedChanges ? (
-                  <span className="font-medium text-amber-600">
-                    {l('存在未保存修改', 'Unsaved changes')}
-                  </span>
                 ) : (
                   <span className="text-slate-500">{l('等待第一次保存', 'Not saved yet')}</span>
                 )}
@@ -343,7 +356,18 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
                 label={l('模板', 'Template')}
                 title={l('另存为模板', 'Save as template')}
                 onClick={() => setShowSaveAsTemplate(true)}
+                disabled={!canManage}
                 data-testid="toolbar-save-as-template"
+              />
+            )}
+            {onPageCreated && (
+              <ToolbarButton
+                icon={<span aria-hidden="true">+</span>}
+                label={t('designer_template.select')}
+                title={t('designer_template.select')}
+                disabled={!canManage}
+                onClick={() => setShowCreateFromTemplate(true)}
+                data-testid="toolbar-create-from-template"
               />
             )}
             <ToolbarButton
@@ -433,7 +457,7 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3">
-          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+          <div className="text-xs font-semibold tracking-[0.16em] text-slate-400 uppercase">
             {l('工作台', 'Workbench')}
           </div>
 
@@ -709,7 +733,7 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
         </div>
       </div>
 
-      {pageMeta && (
+      {pageMeta && canManage && (
         <SaveAsTemplateDialog
           open={showSaveAsTemplate}
           onClose={() => setShowSaveAsTemplate(false)}
@@ -717,6 +741,17 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
           currentName={pageMeta.title}
           onSuccess={() => {
             setShowSaveAsTemplate(false);
+          }}
+        />
+      )}
+
+      {onPageCreated && canManage && showCreateFromTemplate && (
+        <CreateFromTemplateDialog
+          open={showCreateFromTemplate}
+          onClose={() => setShowCreateFromTemplate(false)}
+          onSuccess={(pid) => {
+            setShowCreateFromTemplate(false);
+            onPageCreated(pid);
           }}
         />
       )}

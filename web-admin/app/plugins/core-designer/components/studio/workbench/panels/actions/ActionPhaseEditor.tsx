@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { PHASE_TYPE_INFO, PHASE_CATEGORIES, type ActionPhase, type ActionPhaseType } from './types';
+import { useI18n } from '~/contexts/I18nContext';
+import { getLocalizedText } from '~/utils/i18n';
+import TEXT from './ActionPhaseEditor.i18n.json';
+import { PHASE_TYPE_INFO, type ActionPhase, type ActionPhaseType } from './types';
 
 interface ActionPhaseEditorProps {
   category: 'pre' | 'validate' | 'execute' | 'post';
@@ -25,7 +28,8 @@ export const ActionPhaseEditor: React.FC<ActionPhaseEditorProps> = ({
   readonly = false,
 }) => {
   const [showAddMenu, setShowAddMenu] = useState(false);
-  const categoryInfo = PHASE_CATEGORIES[category];
+  const { locale } = useI18n();
+  const text = (key: keyof typeof TEXT) => getLocalizedText(TEXT[key], locale);
 
   // Filter phase types that belong to this category
   const availableTypes = Object.entries(PHASE_TYPE_INFO)
@@ -37,15 +41,15 @@ export const ActionPhaseEditor: React.FC<ActionPhaseEditorProps> = ({
       {/* Category header */}
       <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-3 py-2">
         <div>
-          <span className="text-xs font-medium text-gray-700">{categoryInfo.label}</span>
-          <span className="ml-2 text-xs text-gray-400">{categoryInfo.description}</span>
+          <span className="text-xs font-medium text-gray-700">{text(`${category}Label`)}</span>
+          <span className="ml-2 text-xs text-gray-400">{text(`${category}Description`)}</span>
         </div>
         {!readonly && (
           <div className="relative">
             <button
               onClick={() => setShowAddMenu(!showAddMenu)}
               className="rounded p-1 text-gray-400 hover:bg-blue-50 hover:text-blue-600"
-              title="添加步骤"
+              title={text('add')}
             >
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -70,7 +74,7 @@ export const ActionPhaseEditor: React.FC<ActionPhaseEditorProps> = ({
                       className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-gray-50"
                     >
                       <span>{info.icon}</span>
-                      <span>{info.label}</span>
+                      <span>{text(type)}</span>
                     </button>
                   );
                 })}
@@ -96,7 +100,7 @@ export const ActionPhaseEditor: React.FC<ActionPhaseEditorProps> = ({
           />
         ))}
         {phases.length === 0 && (
-          <div className="px-3 py-2 text-center text-xs text-gray-400">无步骤</div>
+          <div className="px-3 py-2 text-center text-xs text-gray-400">{text('empty')}</div>
         )}
       </div>
     </div>
@@ -126,12 +130,15 @@ const PhaseItem: React.FC<PhaseItemProps> = ({
 }) => {
   const [expanded, setExpanded] = useState(false);
   const info = PHASE_TYPE_INFO[phase.type];
+  const { locale } = useI18n();
+  const text = (key: keyof typeof TEXT) => getLocalizedText(TEXT[key], locale);
 
   return (
     <div className={`${phase.enabled === false ? 'opacity-50' : ''}`}>
       <div className="flex items-center justify-between px-3 py-1.5 hover:bg-gray-50">
         <div className="flex items-center gap-2">
           <button
+            aria-label={text(expanded ? 'collapse' : 'expand')}
             onClick={() => setExpanded(!expanded)}
             className="p-0.5 text-gray-400 hover:text-gray-600"
           >
@@ -145,9 +152,9 @@ const PhaseItem: React.FC<PhaseItemProps> = ({
             </svg>
           </button>
           <span className="text-xs">{info.icon}</span>
-          <span className="text-xs text-gray-700">{phase.label || info.label}</span>
+          <span className="text-xs text-gray-700">{phase.label || text(phase.type)}</span>
           {phase.onError === 'stop' && (
-            <span className="text-[10px] text-red-400" title="失败时停止">
+            <span className="text-[10px] text-red-400" title={text('stopOnFailure')}>
               ⛔
             </span>
           )}
@@ -157,6 +164,7 @@ const PhaseItem: React.FC<PhaseItemProps> = ({
           <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 hover:opacity-100">
             {index > 0 && (
               <button
+                aria-label={text('moveUp')}
                 onClick={onMoveUp}
                 className="p-0.5 text-xs text-gray-400 hover:text-gray-600"
               >
@@ -165,13 +173,14 @@ const PhaseItem: React.FC<PhaseItemProps> = ({
             )}
             {index < total - 1 && (
               <button
+                aria-label={text('moveDown')}
                 onClick={onMoveDown}
                 className="p-0.5 text-xs text-gray-400 hover:text-gray-600"
               >
                 ↓
               </button>
             )}
-            <button onClick={onRemove} className="p-0.5 text-xs text-gray-400 hover:text-red-500">
+            <button aria-label={text('remove')} onClick={onRemove} className="p-0.5 text-xs text-gray-400 hover:text-red-500">
               ×
             </button>
           </div>
@@ -193,6 +202,8 @@ const PhaseConfigEditor: React.FC<{
   readonly: boolean;
   onUpdate: (updates: Partial<ActionPhase>) => void;
 }> = ({ phase, readonly, onUpdate }) => {
+  const { locale } = useI18n();
+  const text = (key: keyof typeof TEXT) => getLocalizedText(TEXT[key], locale);
   const handleConfigChange = (key: string, value: any) => {
     onUpdate({ config: { ...phase.config, [key]: value } });
   };
@@ -201,16 +212,16 @@ const PhaseConfigEditor: React.FC<{
     <div className="space-y-1.5">
       {/* Common: onError */}
       <div className="flex items-center gap-2">
-        <label className="w-16 text-[10px] text-gray-500">失败策略</label>
+        <label className="w-16 text-[10px] text-gray-500">{text('errorPolicy')}</label>
         <select
           value={phase.onError || 'stop'}
           onChange={(e) => onUpdate({ onError: e.target.value as any })}
           className="rounded border border-gray-200 px-1.5 py-0.5 text-xs"
           disabled={readonly}
         >
-          <option value="stop">停止</option>
-          <option value="continue">继续</option>
-          <option value="retry">重试</option>
+          <option value="stop">{text('stop')}</option>
+          <option value="continue">{text('continue')}</option>
+          <option value="retry">{text('retry')}</option>
         </select>
       </div>
 
@@ -218,13 +229,13 @@ const PhaseConfigEditor: React.FC<{
       {phase.type === 'clientValidate' && (
         <>
           <ConfigField
-            label="表达式"
+            label={text('expression')}
             value={phase.config.expression}
             onChange={(v) => handleConfigChange('expression', v)}
             readonly={readonly}
           />
           <ConfigField
-            label="错误消息"
+            label={text('errorMessage')}
             value={phase.config.message}
             onChange={(v) => handleConfigChange('message', v)}
             readonly={readonly}
@@ -234,13 +245,13 @@ const PhaseConfigEditor: React.FC<{
       {phase.type === 'apiCall' && (
         <>
           <ConfigField
-            label="端点"
+            label={text('endpoint')}
             value={phase.config.endpoint}
             onChange={(v) => handleConfigChange('endpoint', v)}
             readonly={readonly}
           />
           <ConfigField
-            label="方法"
+            label={text('method')}
             value={phase.config.method}
             onChange={(v) => handleConfigChange('method', v)}
             readonly={readonly}
@@ -249,7 +260,7 @@ const PhaseConfigEditor: React.FC<{
       )}
       {phase.type === 'navigate' && (
         <ConfigField
-          label="路径"
+          label={text('path')}
           value={phase.config.path}
           onChange={(v) => handleConfigChange('path', v)}
           readonly={readonly}
@@ -258,30 +269,30 @@ const PhaseConfigEditor: React.FC<{
       {phase.type === 'notify' && (
         <>
           <ConfigField
-            label="消息"
+            label={text('message')}
             value={phase.config.message}
             onChange={(v) => handleConfigChange('message', v)}
             readonly={readonly}
           />
           <div className="flex items-center gap-2">
-            <label className="w-16 text-[10px] text-gray-500">类型</label>
+            <label className="w-16 text-[10px] text-gray-500">{text('type')}</label>
             <select
               value={phase.config.type || 'success'}
               onChange={(e) => handleConfigChange('type', e.target.value)}
               className="rounded border border-gray-200 px-1.5 py-0.5 text-xs"
               disabled={readonly}
             >
-              <option value="success">成功</option>
-              <option value="info">信息</option>
-              <option value="warning">警告</option>
-              <option value="error">错误</option>
+              <option value="success">{text('success')}</option>
+              <option value="info">{text('info')}</option>
+              <option value="warning">{text('warning')}</option>
+              <option value="error">{text('error')}</option>
             </select>
           </div>
         </>
       )}
       {phase.type === 'refresh' && (
         <ConfigField
-          label="目标"
+          label={text('target')}
           value={phase.config.target}
           onChange={(v) => handleConfigChange('target', v)}
           readonly={readonly}
@@ -289,7 +300,7 @@ const PhaseConfigEditor: React.FC<{
       )}
       {phase.type === 'openModal' && (
         <ConfigField
-          label="弹窗ID"
+          label={text('modalId')}
           value={phase.config.modalId}
           onChange={(v) => handleConfigChange('modalId', v)}
           readonly={readonly}
@@ -297,7 +308,7 @@ const PhaseConfigEditor: React.FC<{
       )}
       {phase.type === 'custom' && (
         <ConfigField
-          label="处理器"
+          label={text('handler')}
           value={phase.config.handler}
           onChange={(v) => handleConfigChange('handler', v)}
           readonly={readonly}
@@ -317,6 +328,7 @@ const ConfigField: React.FC<{
     <label className="w-16 shrink-0 text-[10px] text-gray-500">{label}</label>
     <input
       type="text"
+      aria-label={label}
       value={value || ''}
       onChange={(e) => onChange(e.target.value)}
       className="flex-1 rounded border border-gray-200 px-1.5 py-0.5 text-xs focus:ring-1 focus:ring-blue-300 focus:outline-none"

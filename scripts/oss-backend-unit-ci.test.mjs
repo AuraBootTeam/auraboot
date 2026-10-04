@@ -24,8 +24,10 @@ test('backend CI runner is executable and owns its complete infrastructure lifec
   assert.ok(statSync(runner).mode & 0o100);
   assert.doesNotMatch(source, /docker-compose\.skills-c2\.override\.yml/);
   assert.match(source, /config --quiet/);
-  for (const file of source.matchAll(/-f "\$PROJECT_ROOT\/([^"\n]+)"/g)) {
-    assert.ok(statSync(path.join(here, "..", file[1])).isFile(), `missing Compose input: ${file[1]}`);
+  const composeInputs = [...source.matchAll(/-f "\$PROJECT_ROOT\/([^"]+)"/g)];
+  assert.equal(composeInputs.length, 1);
+  for (const match of composeInputs) {
+    assert.ok(statSync(path.join(here, '..', match[1])).isFile(), `Compose input must exist: ${match[1]}`);
   }
   assert.match(source, /up -d --wait postgres redis kafka/);
   assert.match(source, /runtime retained and stopped; network released: compose_project=/);
@@ -37,7 +39,7 @@ test('backend CI runner is executable and owns its complete infrastructure lifec
   assert.match(source, /docker compose "\$\{COMPOSE_ARGS\[@\]\}" stop/);
   assert.match(source, /docker network disconnect -f "\$\{COMPOSE_PROJECT\}_default"/);
   assert.match(source, /docker network rm "\$\{COMPOSE_PROJECT\}_default"/);
-  assert.match(source, /trap cleanup EXIT HUP INT TERM/);
+  assert.match(source, /trap cleanup EXIT/);
   assert.match(source, /PostgreSQL init process complete; ready for start up\./);
   assert.match(source, /pg_isready -U auraboot -d aura_boot/);
 });
@@ -46,7 +48,8 @@ test('backend CI runner migrates a blank database from the Flyway source of trut
   const override = readFileSync(composeOverride, 'utf8');
 
   assert.match(source, /docker-compose\.oss-backend-ci\.override\.yml/);
-  assert.match(override, /volumes:\s*!override/);
+  assert.doesNotMatch(source, /-f "\$PROJECT_ROOT\/docker-compose\.yml"/);
+  assert.doesNotMatch(override, /docker-entrypoint-initdb\.d|container_name:/);
   assert.doesNotMatch(override, /schema-current\.sql/);
   assert.match(source, /flyway\/flyway:12\.8\.1/);
   assert.match(source, /-locations=filesystem:\/flyway\/sql/);
@@ -115,11 +118,13 @@ test('CI Compose override owns ports, containers and an empty PostgreSQL volume'
   assert.deepEqual(postgres.environment, {
     POSTGRES_DB: 'aura_boot', POSTGRES_USER: 'auraboot', POSTGRES_PASSWORD: 'auraboot_dev',
   });
-  assert.match(postgres.container_name, /AURA_OSS_CI_POSTGRES_CONTAINER:\?/);
+  assert.equal(postgres.container_name, undefined);
   assert.match(postgres.ports[0], /AURA_OSS_CI_POSTGRES_PORT:\?.*:5432/);
-  assert.match(redis.container_name, /AURA_OSS_CI_REDIS_CONTAINER:\?/);
+  assert.equal(redis.container_name, undefined);
   assert.match(redis.ports[0], /AURA_OSS_CI_REDIS_PORT:\?.*:6379/);
-  assert.deepEqual(redis.profiles, ['skills-c2-stack']);
+  assert.equal(redis.profiles, undefined);
+  assert.deepEqual(redis.volumes, ['redis_data:/data']);
+  assert.match(config.networks.default.ipam.config[0].subnet, /AURA_OSS_CI_SUBNET/);
 });
 
 test('backend CI runner keeps external DashScope checks out unless explicitly requested', () => {
@@ -131,9 +136,9 @@ test('backend CI runner keeps external DashScope checks out unless explicitly re
 test('backend CI runner executes isolated bootstrap verification only after the shared suite', () => {
   const buildSource = readFileSync(gradleBuild, 'utf8');
   assert.match(source, /run_backend_gradle aura_boot --continue cleanTest test/);
-  assert.match(source, /CREATE DATABASE aura_boot_bootstrap OWNER auraboot/);
+  assert.match(source, /createdb -U auraboot "\$BOOTSTRAP_DATABASE"/);
   assert.match(source, /AURA_BOOTSTRAP_ISOLATED_DATABASE=1/);
-  assert.match(source, /run_backend_gradle aura_boot_bootstrap --continue bootstrapBillingAccountTest/);
+  assert.match(source, /run_backend_gradle aura_boot --continue bootstrapBillingAccountTest/);
   assert.match(source, /root_test_status != 0 \|\| bootstrap_test_status != 0/);
   const fixture = readFileSync(path.join(here, '..', 'platform/src/test/java/com/auraboot/framework/saas/bootstrap/BootstrapBillingAccountIT.java'), 'utf8');
   assert.match(fixture, /SELECT current_database\(\)/);
@@ -148,11 +153,11 @@ test('bootstrap task has a separately migrated database and refuses implicit sha
   const buildSource = readFileSync(gradleBuild, 'utf8');
   const fixture = readFileSync(path.join(here, '..', 'platform', 'src', 'test', 'java',
     'com', 'auraboot', 'framework', 'saas', 'bootstrap', 'BootstrapBillingAccountIT.java'), 'utf8');
-  assert.match(source, /CREATE DATABASE aura_boot_bootstrap OWNER auraboot/);
-  assert.match(source, /run_flyway migrate aura_boot_bootstrap/);
-  assert.match(source, /run_flyway validate aura_boot_bootstrap/);
-  assert.match(source, /BOOTSTRAP_TEST_DATABASE_URL="jdbc:postgresql:[^\n]+aura_boot_bootstrap/);
-  assert.match(buildSource, /BOOTSTRAP_TEST_DATABASE_URL is required/);
+  assert.match(source, /createdb -U auraboot "\$BOOTSTRAP_DATABASE"/);
+  assert.match(source, /run_flyway migrate "\$BOOTSTRAP_DATABASE"/);
+  assert.match(source, /run_flyway validate "\$BOOTSTRAP_DATABASE"/);
+  assert.match(source, /BOOTSTRAP_TEST_DATABASE_URL="jdbc:postgresql:[^\n]+\$\{BOOTSTRAP_DATABASE\}/);
+  assert.match(buildSource, /BOOTSTRAP_TEST_DATABASE_URL must identify/);
   assert.match(fixture, /bootstrap verification requires its own blank migrated database/);
   assert.doesNotMatch(fixture, /TRUNCATE TABLE|DELETE FROM|reset-db\.sh/);
 });

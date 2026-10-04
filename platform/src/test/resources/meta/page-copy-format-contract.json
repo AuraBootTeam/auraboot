@@ -1,0 +1,925 @@
+[
+  {
+    "name": "list-tree",
+    "source": {
+      "pid": "source",
+      "name": "Orders",
+      "pageKey": "orders",
+      "kind": "list",
+      "schemaVersion": 3,
+      "modelCode": "order",
+      "layout": {
+        "type": "stack"
+      },
+      "dataSources": {
+        "orders": {
+          "model": "order"
+        }
+      },
+      "extension": {
+        "preserved": true
+      },
+      "blocks": [
+        {
+          "id": "root",
+          "blockType": "list",
+          "blocks": [
+            {
+              "id": "filters",
+              "blockType": "filter-bar",
+              "props": {
+                "actions": [
+                  "search"
+                ],
+                "buttons": [
+                  "reset"
+                ],
+                "compact": true
+              },
+              "layout": {
+                "span": 12,
+                "rowSpan": 2,
+                "gap": 8
+              },
+              "dataSource": {
+                "ref": "orders"
+              },
+              "blocks": [
+                {
+                  "id": "filters_name",
+                  "blockType": "filter-field",
+                  "field": "name"
+                },
+                {
+                  "id": "custom_id",
+                  "blockType": "filter-field",
+                  "field": "amount",
+                  "props": {
+                    "label": "Amount",
+                    "required": true
+                  },
+                  "layout": {
+                    "width": 120,
+                    "span": 6
+                  }
+                }
+              ]
+            },
+            {
+              "id": "toolbar",
+              "blockType": "action-bar",
+              "blocks": [
+                {
+                  "id": "toolbar_create",
+                  "blockType": "action",
+                  "actionType": "create"
+                },
+                {
+                  "id": "special",
+                  "blockType": "action",
+                  "actionType": "command",
+                  "title": "Approve",
+                  "props": {
+                    "code": "approve",
+                    "commandCode": "order:approve",
+                    "actionType": "stale"
+                  },
+                  "layout": {
+                    "span": 2
+                  }
+                }
+              ]
+            },
+            {
+              "id": "table",
+              "blockType": "table",
+              "props": {
+                "selection": {
+                  "mode": "multiple"
+                },
+                "rowActions": [
+                  "old"
+                ],
+                "striped": true
+              },
+              "blocks": [
+                {
+                  "id": "table_name",
+                  "blockType": "column",
+                  "field": "name"
+                },
+                {
+                  "id": "wide",
+                  "blockType": "column",
+                  "field": "amount",
+                  "props": {
+                    "label": "Total"
+                  },
+                  "layout": {
+                    "width": 150
+                  }
+                },
+                {
+                  "id": "table_edit",
+                  "blockType": "action",
+                  "actionType": "edit"
+                }
+              ]
+            },
+            {
+              "id": "tabs",
+              "blockType": "tabs",
+              "props": {
+                "keepAlive": true
+              },
+              "blocks": [
+                {
+                  "id": "tabs_history",
+                  "blockType": "tab",
+                  "title": "History",
+                  "props": {
+                    "lazy": true
+                  },
+                  "blocks": [
+                    {
+                      "id": "details",
+                      "blockType": "detail-section",
+                      "props": {
+                        "columns": 2,
+                        "collapsible": true,
+                        "defaultCollapsed": false,
+                        "tone": "quiet"
+                      },
+                      "blocks": [
+                        {
+                          "id": "details_name",
+                          "blockType": "field",
+                          "field": "name"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "manualtab",
+                  "blockType": "tab",
+                  "props": {
+                    "key": "explicit"
+                  },
+                  "blocks": [
+                    {
+                      "id": "custom",
+                      "blockType": "custom",
+                      "props": {
+                        "component": "Foo"
+                      },
+                      "blocks": [
+                        {
+                          "id": "nested_field",
+                          "blockType": "field",
+                          "field": "code",
+                          "props": {
+                            "required": true
+                          }
+                        },
+                        {
+                          "id": "repeat",
+                          "blockType": "repeater",
+                          "blocks": [
+                            {
+                              "id": "nested_column",
+                              "blockType": "column",
+                              "field": "name"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "expected": {
+      "kind": "list",
+      "schemaVersion": 4,
+      "blocks": [
+        {
+          "id": "filters",
+          "blockType": "filters",
+          "fields": [
+            "name",
+            {
+              "label": "Amount",
+              "required": true,
+              "field": "amount",
+              "id": "custom_id",
+              "span": 6,
+              "width": 120
+            }
+          ],
+          "actions": [
+            "search"
+          ],
+          "buttons": [
+            "reset"
+          ],
+          "span": 12,
+          "rowSpan": 2,
+          "dataSource": "orders",
+          "layout": {
+            "gap": 8
+          },
+          "props": {
+            "compact": true
+          }
+        },
+        {
+          "id": "toolbar",
+          "blockType": "toolbar",
+          "buttons": [
+            "create",
+            {
+              "commandCode": "order:approve",
+              "code": "approve",
+              "actionType": "command",
+              "id": "special",
+              "title": "Approve",
+              "span": 2
+            }
+          ]
+        },
+        {
+          "id": "table",
+          "blockType": "table",
+          "columns": [
+            "name",
+            {
+              "label": "Total",
+              "field": "amount",
+              "id": "wide",
+              "width": 150
+            }
+          ],
+          "rowActions": [
+            "edit"
+          ],
+          "selection": {
+            "mode": "multiple"
+          },
+          "props": {
+            "striped": true
+          }
+        },
+        {
+          "id": "tabs",
+          "blockType": "tabs",
+          "tabs": [
+            {
+              "lazy": true,
+              "blocks": [
+                {
+                  "id": "details",
+                  "blockType": "detail-section",
+                  "fields": [
+                    "name"
+                  ],
+                  "columns": 2,
+                  "collapsible": true,
+                  "defaultCollapsed": false,
+                  "props": {
+                    "tone": "quiet"
+                  }
+                }
+              ],
+              "label": "History",
+              "key": "history",
+              "id": "tabs_history"
+            },
+            {
+              "key": "explicit",
+              "blocks": [
+                {
+                  "id": "custom",
+                  "blockType": "custom",
+                  "props": {
+                    "component": "Foo"
+                  },
+                  "blocks": [
+                    {
+                      "id": "nested_field",
+                      "blockType": "field",
+                      "field": "code",
+                      "props": {
+                        "required": true
+                      }
+                    },
+                    {
+                      "id": "repeat",
+                      "blockType": "repeater",
+                      "blocks": [
+                        {
+                          "id": "nested_column",
+                          "blockType": "column",
+                          "field": "name"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "id": "manualtab"
+            }
+          ]
+        }
+      ],
+      "dataSources": {
+        "orders": {
+          "model": "order"
+        }
+      },
+      "extension": {
+        "preserved": true,
+        "designerRootId": "root"
+      }
+    }
+  },
+  {
+    "name": "form-tree",
+    "source": {
+      "pid": "source",
+      "name": "Orders",
+      "pageKey": "orders",
+      "kind": "form",
+      "schemaVersion": 3,
+      "modelCode": "order",
+      "layout": {
+        "type": "stack"
+      },
+      "dataSources": {
+        "orders": {
+          "model": "order"
+        }
+      },
+      "extension": {
+        "preserved": true
+      },
+      "blocks": [
+        {
+          "id": "root",
+          "blockType": "form",
+          "blocks": [
+            {
+              "id": "section",
+              "blockType": "form-section",
+              "title": "Order",
+              "region": "main",
+              "props": {
+                "columns": 2
+              },
+              "blocks": [
+                {
+                  "id": "section_name",
+                  "blockType": "field",
+                  "field": "name"
+                }
+              ]
+            },
+            {
+              "id": "footer",
+              "blockType": "action-bar",
+              "region": "footer",
+              "blocks": [
+                {
+                  "id": "footer_save",
+                  "blockType": "action",
+                  "actionType": "save"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "expected": {
+      "kind": "form",
+      "schemaVersion": 4,
+      "blocks": [
+        {
+          "id": "section",
+          "blockType": "form-section",
+          "fields": [
+            "name"
+          ],
+          "title": "Order",
+          "region": "main",
+          "columns": 2
+        },
+        {
+          "id": "footer",
+          "blockType": "form-buttons",
+          "buttons": [
+            "save"
+          ]
+        }
+      ],
+      "dataSources": {
+        "orders": {
+          "model": "order"
+        }
+      },
+      "extension": {
+        "preserved": true,
+        "designerRootId": "root"
+      }
+    }
+  },
+  {
+    "name": "detail-tree",
+    "source": {
+      "pid": "source",
+      "name": "Orders",
+      "pageKey": "orders",
+      "kind": "detail",
+      "schemaVersion": 3,
+      "modelCode": "order",
+      "layout": {
+        "type": "stack"
+      },
+      "dataSources": {
+        "orders": {
+          "model": "order"
+        }
+      },
+      "extension": {
+        "preserved": true
+      },
+      "blocks": [
+        {
+          "id": "root",
+          "blockType": "detail",
+          "blocks": [
+            {
+              "id": "metric",
+              "blockType": "widget",
+              "widgetType": "number-card",
+              "props": {
+                "valueField": "amount"
+              },
+              "dataSource": {
+                "ref": "orders"
+              }
+            },
+            {
+              "id": "chart",
+              "blockType": "widget",
+              "widgetType": "chart",
+              "layout": {
+                "span": 6
+              },
+              "props": {
+                "chartType": "bar"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "expected": {
+      "kind": "detail",
+      "schemaVersion": 4,
+      "blocks": [
+        {
+          "id": "metric",
+          "blockType": "stat-card",
+          "dataSource": "orders",
+          "props": {
+            "valueField": "amount"
+          }
+        },
+        {
+          "id": "chart",
+          "blockType": "chart",
+          "span": 6,
+          "props": {
+            "chartType": "bar"
+          }
+        }
+      ],
+      "dataSources": {
+        "orders": {
+          "model": "order"
+        }
+      },
+      "extension": {
+        "preserved": true,
+        "designerRootId": "root"
+      }
+    }
+  },
+  {
+    "name": "mislabeled-tree",
+    "source": {
+      "pid": "source",
+      "name": "Orders",
+      "pageKey": "orders",
+      "kind": "list",
+      "schemaVersion": 4,
+      "modelCode": "order",
+      "layout": {
+        "type": "stack"
+      },
+      "dataSources": {
+        "orders": {
+          "model": "order"
+        }
+      },
+      "extension": {
+        "preserved": true
+      },
+      "blocks": [
+        {
+          "id": "root",
+          "blockType": "list",
+          "blocks": [
+            {
+              "id": "filters",
+              "blockType": "filter-bar",
+              "props": {
+                "actions": [
+                  "search"
+                ],
+                "buttons": [
+                  "reset"
+                ],
+                "compact": true
+              },
+              "layout": {
+                "span": 12,
+                "rowSpan": 2,
+                "gap": 8
+              },
+              "dataSource": {
+                "ref": "orders"
+              },
+              "blocks": [
+                {
+                  "id": "filters_name",
+                  "blockType": "filter-field",
+                  "field": "name"
+                },
+                {
+                  "id": "custom_id",
+                  "blockType": "filter-field",
+                  "field": "amount",
+                  "props": {
+                    "label": "Amount",
+                    "required": true
+                  },
+                  "layout": {
+                    "width": 120,
+                    "span": 6
+                  }
+                }
+              ]
+            },
+            {
+              "id": "toolbar",
+              "blockType": "action-bar",
+              "blocks": [
+                {
+                  "id": "toolbar_create",
+                  "blockType": "action",
+                  "actionType": "create"
+                },
+                {
+                  "id": "special",
+                  "blockType": "action",
+                  "actionType": "command",
+                  "title": "Approve",
+                  "props": {
+                    "code": "approve",
+                    "commandCode": "order:approve",
+                    "actionType": "stale"
+                  },
+                  "layout": {
+                    "span": 2
+                  }
+                }
+              ]
+            },
+            {
+              "id": "table",
+              "blockType": "table",
+              "props": {
+                "selection": {
+                  "mode": "multiple"
+                },
+                "rowActions": [
+                  "old"
+                ],
+                "striped": true
+              },
+              "blocks": [
+                {
+                  "id": "table_name",
+                  "blockType": "column",
+                  "field": "name"
+                },
+                {
+                  "id": "wide",
+                  "blockType": "column",
+                  "field": "amount",
+                  "props": {
+                    "label": "Total"
+                  },
+                  "layout": {
+                    "width": 150
+                  }
+                },
+                {
+                  "id": "table_edit",
+                  "blockType": "action",
+                  "actionType": "edit"
+                }
+              ]
+            },
+            {
+              "id": "tabs",
+              "blockType": "tabs",
+              "props": {
+                "keepAlive": true
+              },
+              "blocks": [
+                {
+                  "id": "tabs_history",
+                  "blockType": "tab",
+                  "title": "History",
+                  "props": {
+                    "lazy": true
+                  },
+                  "blocks": [
+                    {
+                      "id": "details",
+                      "blockType": "detail-section",
+                      "props": {
+                        "columns": 2,
+                        "collapsible": true,
+                        "defaultCollapsed": false,
+                        "tone": "quiet"
+                      },
+                      "blocks": [
+                        {
+                          "id": "details_name",
+                          "blockType": "field",
+                          "field": "name"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "manualtab",
+                  "blockType": "tab",
+                  "props": {
+                    "key": "explicit"
+                  },
+                  "blocks": [
+                    {
+                      "id": "custom",
+                      "blockType": "custom",
+                      "props": {
+                        "component": "Foo"
+                      },
+                      "blocks": [
+                        {
+                          "id": "nested_field",
+                          "blockType": "field",
+                          "field": "code",
+                          "props": {
+                            "required": true
+                          }
+                        },
+                        {
+                          "id": "repeat",
+                          "blockType": "repeater",
+                          "blocks": [
+                            {
+                              "id": "nested_column",
+                              "blockType": "column",
+                              "field": "name"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "expected": {
+      "kind": "list",
+      "schemaVersion": 4,
+      "blocks": [
+        {
+          "id": "filters",
+          "blockType": "filters",
+          "fields": [
+            "name",
+            {
+              "label": "Amount",
+              "required": true,
+              "field": "amount",
+              "id": "custom_id",
+              "span": 6,
+              "width": 120
+            }
+          ],
+          "actions": [
+            "search"
+          ],
+          "buttons": [
+            "reset"
+          ],
+          "span": 12,
+          "rowSpan": 2,
+          "dataSource": "orders",
+          "layout": {
+            "gap": 8
+          },
+          "props": {
+            "compact": true
+          }
+        },
+        {
+          "id": "toolbar",
+          "blockType": "toolbar",
+          "buttons": [
+            "create",
+            {
+              "commandCode": "order:approve",
+              "code": "approve",
+              "actionType": "command",
+              "id": "special",
+              "title": "Approve",
+              "span": 2
+            }
+          ]
+        },
+        {
+          "id": "table",
+          "blockType": "table",
+          "columns": [
+            "name",
+            {
+              "label": "Total",
+              "field": "amount",
+              "id": "wide",
+              "width": 150
+            }
+          ],
+          "rowActions": [
+            "edit"
+          ],
+          "selection": {
+            "mode": "multiple"
+          },
+          "props": {
+            "striped": true
+          }
+        },
+        {
+          "id": "tabs",
+          "blockType": "tabs",
+          "tabs": [
+            {
+              "lazy": true,
+              "blocks": [
+                {
+                  "id": "details",
+                  "blockType": "detail-section",
+                  "fields": [
+                    "name"
+                  ],
+                  "columns": 2,
+                  "collapsible": true,
+                  "defaultCollapsed": false,
+                  "props": {
+                    "tone": "quiet"
+                  }
+                }
+              ],
+              "label": "History",
+              "key": "history",
+              "id": "tabs_history"
+            },
+            {
+              "key": "explicit",
+              "blocks": [
+                {
+                  "id": "custom",
+                  "blockType": "custom",
+                  "props": {
+                    "component": "Foo"
+                  },
+                  "blocks": [
+                    {
+                      "id": "nested_field",
+                      "blockType": "field",
+                      "field": "code",
+                      "props": {
+                        "required": true
+                      }
+                    },
+                    {
+                      "id": "repeat",
+                      "blockType": "repeater",
+                      "blocks": [
+                        {
+                          "id": "nested_column",
+                          "blockType": "column",
+                          "field": "name"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "id": "manualtab"
+            }
+          ]
+        }
+      ],
+      "dataSources": {
+        "orders": {
+          "model": "order"
+        }
+      },
+      "extension": {
+        "preserved": true,
+        "designerRootId": "root"
+      }
+    }
+  },
+  {
+    "name": "flat-v4",
+    "source": {
+      "pid": "source",
+      "name": "Orders",
+      "pageKey": "orders",
+      "kind": "list",
+      "schemaVersion": 4,
+      "blocks": [
+        {
+          "id": "table",
+          "blockType": "table",
+          "columns": [
+            "name"
+          ],
+          "rowActions": [
+            "edit"
+          ]
+        }
+      ],
+      "dataSources": {
+        "orders": {
+          "model": "order"
+        }
+      },
+      "extension": {
+        "preserved": true
+      }
+    },
+    "expected": {
+      "kind": "list",
+      "schemaVersion": 4,
+      "blocks": [
+        {
+          "id": "table",
+          "blockType": "table",
+          "columns": [
+            "name"
+          ],
+          "rowActions": [
+            "edit"
+          ]
+        }
+      ],
+      "dataSources": {
+        "orders": {
+          "model": "order"
+        }
+      },
+      "extension": {
+        "preserved": true
+      }
+    }
+  }
+]

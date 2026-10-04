@@ -181,6 +181,8 @@ class ApplicationRuntimeDefinitionCatalogTest {
         assertThat(command.getModelCode()).isEqualTo("xy_student");
         assertThat(command.getType()).isEqualTo("create");
         assertThat(command.getExecutionConfig()).contains("autoSetFields");
+        assertThat(command.getLocalizedDisplayNames()).containsEntry("en-US", "Create student");
+        assertThat(command.getLocalizedDescriptions()).containsEntry("en-US", "Create a student");
         assertThat(catalog.commandsForModel(42L, "aura-edu", "xy_student"))
                 .extracting("code").containsExactly("xy_student_create");
     }
@@ -219,7 +221,8 @@ class ApplicationRuntimeDefinitionCatalogTest {
                 .required(true).displayConfig(Map.of("searchable", true)).build()));
         manifest.setCommands(List.of(com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO.builder()
                 .code("xy_student_create").modelCode("xy_student").type("create")
-                .displayNameZhCN("创建学生")
+                .displayNameZhCN("创建学生").displayNameEn("Create student")
+                .extension(Map.of("localizedDescriptions", Map.of("en-US", "Create a student", "zh-CN", "Create student source")))
                 .autoSetFields(Map.of("xy_stu_code", Map.of("strategy", "AUTO_GENERATE"))).build()));
         manifest.setRoles(List.of(com.auraboot.framework.plugin.dto.imports.RoleDefinitionDTO.builder()
                 .code("xy_school_admin").nameZhCN("学校管理员")
