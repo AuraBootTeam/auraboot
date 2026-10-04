@@ -30,12 +30,14 @@
 #                   startup, recording path + SHA-256 in the runtime state directory.
 #       --extra-plugin-root: repeatable explicit fallback after this checkout's OSS plugins;
 #                            sibling plugin repositories are never guessed implicitly.
+#       --source key=path: explicit owner for each external plugin root; Core binds itself.
 #   ./scripts/oss-golden-stack.sh import <name> [--extra-plugin-root PATH] [--plugin-profile P|--plugin X]
 #   ./scripts/oss-golden-stack.sh warm <name>          # re-run setup→auth→pre-warm (up does this)
 #   ./scripts/oss-golden-stack.sh env  <name>          # print the Playwright env exports
 #   ./scripts/oss-golden-stack.sh status <name>
 #   ./scripts/oss-golden-stack.sh verify-artifacts <name> # real source/JAR/process proof and public manifest
 #   ./scripts/oss-golden-stack.sh down <name>          # stop backend+frontend (keep runtime/DB)
+#   ./aura runtime suspend <name> / resume <name>     # bound lifecycle, retained data
 #   ./scripts/oss-golden-stack.sh destroy <name>       # down + infra cleanup + runtime destroy
 #
 # Then run golden specs (the `up` banner prints this, `env` re-prints it):
@@ -162,12 +164,12 @@ runtime_env() {
 web_admin_node_modules_seed() {
   local candidate
   for candidate in "$CANONICAL/web-admin/node_modules" "$REPO_ROOT/web-admin/node_modules"; do
-    web_admin_node_modules_usable "$candidate" && { echo "$candidate"; return 0; }
+    web_admin_node_modules_matches_checkout "$candidate" "$REPO_ROOT" && { echo "$candidate"; return 0; }
   done
 
   while IFS= read -r candidate; do
     candidate="$candidate/web-admin/node_modules"
-    web_admin_node_modules_usable "$candidate" && { echo "$candidate"; return 0; }
+    web_admin_node_modules_matches_checkout "$candidate" "$REPO_ROOT" && { echo "$candidate"; return 0; }
   done < <(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree /{print substr($0,10)}')
 
   return 1
@@ -338,6 +340,7 @@ PY
 # ---- up ------------------------------------------------------------------------------
 cmd_up() {
   local name="$1"; shift
+  local requested_args=("$@") source_specs=("core=$REPO_ROOT")
   local slot="" ttl="6h" runtime_mode="development" system_mode="single" frontend=1 warm=1 fresh_db=0 require_new_db=0
   local plugin_profile="" import_plugins=() extra_plugin_roots=() product_migration_roots=()
   local parallel_reason=""
@@ -347,6 +350,7 @@ cmd_up() {
     --ttl) ttl="$2"; shift 2;;
     --runtime-mode) runtime_mode="$2"; shift 2;;
     --parallel-reason) parallel_reason="$2"; shift 2;;
+    --source) source_specs+=("${2:?--source requires key=path}"); shift 2;;
     --system-mode) system_mode="${2:-}"; [ $# -ge 2 ] || die "--system-mode requires a value"; shift 2;;
     --no-frontend) frontend=0; shift;;
     --no-warm) warm=0; shift;;
@@ -398,6 +402,8 @@ cmd_up() {
   esac
 
   local sd; sd="$(state_dir "$name")" || return 1
+  node "$SCRIPT_DIR/lib/oss-stack-lifecycle.mjs" validate "$name" "$REPO_ROOT" "$sd" "${requested_args[@]}" \
+    || die "explicit plugin source ownership validation failed"
   # Refuse to overwrite a running jar or reset a database served by a live stack.
   assert_stack_stopped "$name"
 
@@ -407,8 +413,19 @@ cmd_up() {
   log "1/9 allocate runtime '$name' (slot $slot) + ensure infra"
   local allocation_args=(--slot "$slot" --purpose "OSS host-first golden stack" --ttl "$ttl" --source-root "$REPO_ROOT" --mode "$runtime_mode")
   [ -z "$parallel_reason" ] || allocation_args+=(--parallel-reason "$parallel_reason")
-  "$DEV" runtime ensure auraboot "$name" "${allocation_args[@]}" >/dev/null
+  if [ "${AURA_OSS_RESUME_CONTEXT:-0}" = 1 ]; then
+    node "$SCRIPT_DIR/lib/oss-stack-lifecycle.mjs" check-resuming "$name" "$REPO_ROOT" "$sd" \
+      || die "resume context verification failed"
+  else
+    "$DEV" runtime ensure auraboot "$name" "${allocation_args[@]}" >/dev/null
+  fi
+  local binding_args=(runtime lifecycle bind "$name" --handler "$SCRIPT_DIR/oss-golden-stack.sh")
+  local source_spec
+  for source_spec in "${source_specs[@]}"; do binding_args+=(--source "$source_spec"); done
+  "$DEV" "${binding_args[@]}" >/dev/null
   sd="$(prepare_state_dir "$name")" || die "cannot prepare stable stack state"
+  node "$SCRIPT_DIR/lib/oss-stack-lifecycle.mjs" record "$name" "$REPO_ROOT" "$sd" "${requested_args[@]}" \
+    || die "cannot record safe resume plan"
   local evidence_root
   evidence_root="$("$DEV" runtime evidence begin "$name" --purpose "OSS golden stack rebuild")" \
     || die "cannot create a separate evidence round"
@@ -647,7 +664,7 @@ XML
 
   if [ "$frontend" -eq 1 ]; then
     log "7/9 frontend: reuse or provision node_modules + start Vite+BFF"
-    if ! web_admin_node_modules_usable "$REPO_ROOT/web-admin/node_modules"; then
+    if ! web_admin_node_modules_matches_checkout "$REPO_ROOT/web-admin/node_modules" "$REPO_ROOT"; then
       if [ -L "$REPO_ROOT/web-admin/node_modules" ]; then
         rm -f "$REPO_ROOT/web-admin/node_modules"
       elif [ -e "$REPO_ROOT/web-admin/node_modules" ]; then
@@ -673,7 +690,7 @@ XML
             pnpm --filter auraboot-app install --frozen-lockfile --reporter=append-only \
             >"$sd/logs/frontend-dependencies.log" 2>&1 \
           || die "web-admin dependency install failed — see $sd/logs/frontend-dependencies.log"
-        web_admin_node_modules_usable "$REPO_ROOT/web-admin/node_modules" \
+        web_admin_node_modules_matches_checkout "$REPO_ROOT/web-admin/node_modules" "$REPO_ROOT" \
           || die "web-admin dependency install completed without usable runtime packages"
       fi
     fi
@@ -1050,6 +1067,8 @@ case "$sub" in
   status) cmd_status "$name";;
   verify-artifacts) cmd_verify_artifacts "$name";;
   down) cmd_down "$name";;
+  suspend) cmd_down "$name";;
+  resume) node "$SCRIPT_DIR/lib/oss-stack-lifecycle.mjs" resume "$name" "$REPO_ROOT" "$(state_dir "$name")";;
   destroy) cmd_destroy "$name";;
   *) die "unknown subcommand: $sub (up|import|warm|env|status|down|destroy)";;
 esac
