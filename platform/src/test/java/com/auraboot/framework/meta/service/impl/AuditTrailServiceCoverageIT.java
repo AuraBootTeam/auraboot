@@ -13,7 +13,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
@@ -164,7 +163,8 @@ class AuditTrailServiceCoverageIT {
         assertEquals(1, auditTrailService.getAuditByCommand(TENANT_ID, command).size());
     }
 
-    @Configuration
+    // Explicitly registered lite configuration: do not leak fixture beans into
+    // TestApplication's broad component scan for unrelated real-stack suites.
     @EnableTransactionManagement
     static class Stack {
         @Bean DataSource dataSource() {

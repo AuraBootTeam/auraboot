@@ -61,11 +61,13 @@ public class OpenPlatformBearerAuthenticator implements ExternalMachineAuthentic
         if (!scopes.contains(capability.requiredScope())) {
             throw new ExternalMachineAuthException(403, "insufficient_scope");
         }
-        if (rateLimitMapper.consume(token.installationId(), Instant.now().truncatedTo(ChronoUnit.MINUTES),
-                token.rateLimitPerMinute()) == null) {
+        Instant usedAt = Instant.now();
+        // Consume and record token use in one SQL statement; a second round-trip
+        // would keep the shared installation counter locked while touching the token.
+        if (rateLimitMapper.consume(token.installationId(), usedAt.truncatedTo(ChronoUnit.MINUTES),
+                token.rateLimitPerMinute(), token.tokenPid(), usedAt) == null) {
             throw new ExternalMachineAuthException(429, "rate_limit_exceeded");
         }
-        authMapper.touchToken(token.tokenPid(), Instant.now());
         return new MachinePrincipal(token.tenantId(), token.tokenPid(), token.applicationPid(), scopes,
                 token.applicationPid(), token.installationPid(), token.environment(), token.tokenPid());
     }

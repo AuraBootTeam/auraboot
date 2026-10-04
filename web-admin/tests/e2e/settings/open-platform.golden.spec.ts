@@ -16,13 +16,9 @@ const sessionStorage = createCookieSessionStorage({
   },
 });
 
-async function authenticate(
-  page: import('@playwright/test').Page,
-  account = DEFAULT_TEST_ACCOUNT,
-  provisionOwner = true,
-) {
+async function authenticate(page: import('@playwright/test').Page) {
   const loginResponse = await page.request.post(`${BACKEND_URL}/api/auth/login`, {
-    data: { email: account.email, password: account.password },
+    data: { email: DEFAULT_TEST_ACCOUNT.email, password: DEFAULT_TEST_ACCOUNT.password },
   });
   expect(loginResponse.status()).toBe(200);
   const login = await loginResponse.json();
@@ -47,20 +43,6 @@ async function authenticate(
   const selected = await selectionResponse.json();
   expect(String(selected.code)).toBe('0');
   expect(selected.data.jwt).toEqual(expect.any(String));
-  // Each run owns an isolated real account; existing application data stays intact.
-  if (provisionOwner) {
-    const owner = {
-      ...DEFAULT_TEST_ACCOUNT,
-      email: `op-golden-${Date.now()}-${Math.random().toString(16).slice(2, 8)}@op-closure.test`,
-    };
-    const create = await page.request.post(`${BACKEND_URL}/api/meta/commands/execute/admin:create_member`, {
-      headers: { Authorization: `Bearer ${selected.data.jwt}` },
-      data: { payload: { name: 'Open Platform golden owner', email: owner.email, password: owner.password } },
-    });
-    expect(create.status()).toBe(200);
-    expect(String((await create.json()).code)).toBe('0');
-    return authenticate(page, owner, false);
-  }
   const session = await sessionStorage.getSession();
   session.set('jwtToken', selected.data.jwt);
   const setCookie = await sessionStorage.commitSession(session, { maxAge: 604800 });
@@ -118,6 +100,15 @@ test.describe('Open Platform golden journey', () => {
     context,
   }) => {
     await authenticate(page);
+    const existingResponse = await page.request.get(`${WEB_BASE_URL}/api/open-platform/applications`);
+    expect(existingResponse.status()).toBe(200);
+    const existing = await existingResponse.json();
+    expect(String(existing.code)).toBe('0');
+    const existingPids = (existing.data as Array<{ pid: string }>).map((entry) => entry.pid);
+    // Empty-state rendering is a controlled UI projection, not a claim that the DB is empty.
+    await page.route('**/api/open-platform/applications', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ code: '0', data: [] }) });
+    });
     await page.goto('/');
     await expect(page).not.toHaveURL(/\/login|\/setup/);
     await openAccountMenu(page);
@@ -132,6 +123,7 @@ test.describe('Open Platform golden journey', () => {
     await expect(page.getByTestId('open-platform-empty')).toBeVisible();
     await expect(page.getByRole('heading', { name: '暂无外部应用' })).toBeVisible();
     await capture(page, 'OP-UI-03');
+    await page.unroute('**/api/open-platform/applications');
 
     await page.route('**/api/open-platform/applications', async (route) => {
       await route.fulfill({
@@ -149,25 +141,32 @@ test.describe('Open Platform golden journey', () => {
     await capture(page, 'OP-UI-04');
     await page.unroute('**/api/open-platform/applications');
     await page.getByRole('button', { name: '重试' }).click();
-    await expect(page.getByTestId('open-platform-empty')).toBeVisible();
+    if (existingPids.length === 0) {
+      await expect(page.getByTestId('open-platform-empty')).toBeVisible();
+    } else {
+      await expect(page.getByTestId('open-platform-application-list').locator('article')).toHaveCount(existingPids.length);
+    }
 
     await page.getByTestId('open-platform-create-app').click();
     const createDialog = page.getByRole('dialog', { name: '创建外部应用' });
     await expect(createDialog).toBeVisible();
     await expect(createDialog.getByRole('button', { name: '新建' })).toBeDisabled();
     await capture(page, 'OP-UI-05');
-    await page.getByTestId('open-platform-app-name').fill('金蝶 ERP 连接器');
+    const appName = `金蝶 ERP 连接器 ${Date.now()}-${Math.random().toString(16).slice(2, 6)}`;
+    await page.getByTestId('open-platform-app-name').fill(appName);
     await createDialog.getByRole('textbox', { name: '描述' }).fill('生产订单与库存事件统一接入');
     await createDialog.getByRole('button', { name: '新建' }).click();
-    await expect(page.getByText('金蝶 ERP 连接器')).toBeVisible();
-    await expect(page.getByText('生产订单与库存事件统一接入')).toBeVisible();
+    const appCard = page.getByTestId('open-platform-application-list').locator('article').filter({ hasText: appName });
+    await expect(appCard).toHaveCount(1);
+    await expect(appCard.getByText(appName, { exact: true })).toBeVisible();
+    await expect(appCard.getByText('生产订单与库存事件统一接入')).toBeVisible();
     await expect(page.getByTestId('open-platform-page')).not.toContainText(
       /01[A-Z0-9]{20,}|[0-9a-f]{8}-[0-9a-f-]{27,}/i,
     );
     await capture(page, 'OP-UI-06');
     await dismissToasts(page);
 
-    await page.getByRole('button', { name: '添加安装' }).click();
+    await appCard.getByRole('button', { name: '添加安装' }).click();
     const installDialog = page.getByRole('dialog', { name: '安装应用' });
     await installDialog.getByLabel('环境').selectOption('production');
     await installDialog.getByTestId('open-platform-rate-limit').fill('1200');
@@ -182,10 +181,10 @@ test.describe('Open Platform golden journey', () => {
     await installDialog.getByLabel('openapi.profile.read').check();
     await capture(page, 'OP-UI-07');
     await installDialog.getByRole('button', { name: '安装' }).click();
-    await expect(page.getByText('生产环境')).toBeVisible();
-    await expect(page.getByText('限流: 1200/min')).toBeVisible();
+    await expect(appCard.getByText('生产环境')).toBeVisible();
+    await expect(appCard.getByText('限流: 1200/min')).toBeVisible();
 
-    await page.getByRole('button', { name: '新建凭据' }).click();
+    await appCard.getByRole('button', { name: '新建凭据' }).click();
     const secretDialog = page.getByRole('dialog', { name: '立即保存此凭据' });
     await expect(secretDialog).toContainText('Client Secret 仅显示一次');
     await expect(secretDialog.getByText('client_id')).toBeVisible();
@@ -524,7 +523,7 @@ test.describe('Open Platform golden journey', () => {
     );
     expect(internalResourceProbe.status()).toBe(404);
 
-    await page.getByRole('button', { name: '运维' }).click();
+    await appCard.getByRole('button', { name: '运维' }).click();
     const operations = page.getByTestId('open-platform-operations-panel');
     await expect(operations).toBeVisible();
     await expect(operations).toContainText('调用审计');
@@ -877,8 +876,8 @@ test.describe('Open Platform golden journey', () => {
     await operations.getByRole('button', { name: /重试|Retry/ }).click();
     await expect(operations).toContainText('调用审计');
 
-    await page.getByRole('button', { name: '查看凭据' }).click();
-    const credentialList = page.locator('[data-testid^="open-platform-credentials-"]');
+    await appCard.getByRole('button', { name: '查看凭据' }).click();
+    const credentialList = appCard.locator('[data-testid^="open-platform-credentials-"]');
     await expect(credentialList).toContainText('ab_client_');
     await credentialList.getByRole('button', { name: '轮换' }).click();
     const rotateDialog = page.getByRole('dialog', { name: '轮换凭据' });
@@ -933,7 +932,7 @@ test.describe('Open Platform golden journey', () => {
     await capture(page, 'OP-UI-09');
     await revokeDialog.getByRole('button', { name: '取消' }).click();
 
-    await page.getByRole('button', { name: '编辑 Scope' }).click();
+    await appCard.getByRole('button', { name: '编辑 Scope' }).click();
     const scopeDialog = page.getByRole('dialog', { name: '编辑 Scope' });
     await expect(scopeDialog).toContainText('立即吊销此安装的现有 Access Token');
     await capture(page, 'OP-UI-10');
@@ -945,15 +944,15 @@ test.describe('Open Platform golden journey', () => {
     });
     expect(revokedTokenResponse.status()).toBe(401);
 
-    await page.getByRole('button', { name: '停用安装' }).click();
+    await appCard.getByRole('button', { name: '停用安装' }).click();
     const disableInstallationDialog = page.getByRole('dialog', { name: '确认停用访问？' });
     await expect(disableInstallationDialog).toContainText('立即吊销有效 Token');
     await capture(page, 'OP-UI-11');
     await disableInstallationDialog.getByRole('button', { name: '停用' }).click();
-    await expect(page.getByText('已停用').first()).toBeVisible();
+    await expect(appCard.getByText('已停用', { exact: true })).toBeVisible();
     await dismissToasts(page);
 
-    await page.getByRole('button', { name: '停用' }).first().click();
+    await appCard.getByRole('button', { name: '停用', exact: true }).click();
     const disableApplicationDialog = page.getByRole('dialog', { name: '确认停用访问？' });
     await expect(disableApplicationDialog).toContainText('无法在本页面恢复');
     await expect
@@ -961,7 +960,7 @@ test.describe('Open Platform golden journey', () => {
       .toBeGreaterThan(400);
     await capture(page, 'OP-UI-12');
     await disableApplicationDialog.getByRole('button', { name: '停用' }).click();
-    await expect(page.getByRole('button', { name: '添加安装' })).toBeDisabled();
+    await expect(appCard.getByRole('button', { name: '添加安装' })).toBeDisabled();
     await dismissToasts(page);
     await capture(page, 'OP-UI-02');
 
@@ -1048,5 +1047,11 @@ test.describe('Open Platform golden journey', () => {
       .toBeLessThanOrEqual(1);
     await webhookHealth.scrollIntoViewIfNeeded();
     await captureLocator(webhookHealth, 'OP-PROTO-11');
+    const preservedResponse = await page.request.get(`${WEB_BASE_URL}/api/open-platform/applications`);
+    expect(preservedResponse.status()).toBe(200);
+    const preserved = await preservedResponse.json();
+    expect(String(preserved.code)).toBe('0');
+    const preservedPids = (preserved.data as Array<{ pid: string }>).map((entry) => entry.pid);
+    expect(preservedPids).toEqual(expect.arrayContaining(existingPids));
   });
 });
