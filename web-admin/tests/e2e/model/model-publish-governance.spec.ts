@@ -1325,7 +1325,10 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
   await expect(replayReport).not.toContainText('fieldPermissionChange');
   await expect(page.getByTestId('model-publish-permission-sample-error')).toHaveCount(0);
 
-  await replayReport.screenshot({
+  const permissionAllowCard = page.getByTestId('model-publish-replay-result-PERMISSION_POLICY');
+  await permissionAllowCard.scrollIntoViewIfNeeded();
+  await expect(permissionAllowCard).toBeInViewport({ ratio: 1 });
+  await permissionAllowCard.screenshot({
     path: testInfo.outputPath('model-publish-permission-allow-report.png'),
   });
 
@@ -1390,7 +1393,10 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
   await expect(replayReport).not.toContainText('steps:');
   await expect(replayReport).not.toContainText('FIELD_PERMISSION_CHANGE');
 
-  await replayReport.screenshot({
+  const permissionDenyCard = page.getByTestId('model-publish-replay-result-PERMISSION_POLICY');
+  await permissionDenyCard.scrollIntoViewIfNeeded();
+  await expect(permissionDenyCard).toBeInViewport({ ratio: 1 });
+  await permissionDenyCard.screenshot({
     path: testInfo.outputPath('model-publish-permission-deny-report.png'),
   });
 
@@ -1488,7 +1494,10 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
   await expect(replayReport).not.toContainText('recordPid');
   await expect(page.getByTestId('model-publish-sla-node-sample-error')).toHaveCount(0);
 
-  await replayReport.screenshot({
+  const slaReportCard = page.getByTestId('model-publish-replay-result-SLA_RULE');
+  await slaReportCard.scrollIntoViewIfNeeded();
+  await expect(slaReportCard).toBeInViewport({ ratio: 1 });
+  await slaReportCard.screenshot({
     path: testInfo.outputPath('model-publish-sla-node-report.png'),
   });
 
@@ -1578,7 +1587,10 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
   const confirm = page.getByTestId('model-publish-confirm');
   await expect(confirm).toBeDisabled();
 
-  await governance.screenshot({
+  await page.getByTestId('model-publish-impact-ack').scrollIntoViewIfNeeded();
+  await expect(page.getByTestId('model-publish-impact-ack')).toBeInViewport({ ratio: 1 });
+  await expect(confirm).toBeInViewport({ ratio: 1 });
+  await page.screenshot({
     path: testInfo.outputPath('model-publish-governance-impact-ack.png'),
   });
 
