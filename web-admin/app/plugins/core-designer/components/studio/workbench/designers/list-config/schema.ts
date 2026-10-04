@@ -24,6 +24,7 @@ export function buildColumnDetailSchemas(
     },
     {
       key: 'align',
+      defaultValue: 'left',
       label: t('list_editor.align'),
       type: 'select',
       group: t('list_editor.size_group'),
@@ -36,6 +37,7 @@ export function buildColumnDetailSchemas(
     },
     {
       key: 'renderer',
+      defaultValue: 'text',
       label: t('list_editor.renderer'),
       type: 'select',
       group: t('list_editor.display_group'),
@@ -90,6 +92,7 @@ export function buildFilterDetailSchemas(
     },
     {
       key: 'displayMode',
+      defaultValue: 'inline',
       label: t('list_editor.display_mode'),
       type: 'select',
       group: t('list_editor.appearance_group'),

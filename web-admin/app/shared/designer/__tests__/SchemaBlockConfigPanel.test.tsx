@@ -2,8 +2,9 @@ import React from 'react';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { parse } from 'yaml';
+import { buildColumnDetailSchemas, buildFilterDetailSchemas } from '~/plugins/core-designer/components/studio/workbench/designers/list-config/schema';
 import { I18nProvider } from '~/contexts/I18nContext';
-import { render, cleanup } from '@testing-library/react';
+import { render, cleanup, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   SchemaBlockConfigPanel,
@@ -47,6 +48,44 @@ describe('SchemaBlockConfigPanel', () => {
     expect(queryByText('boolean', { exact: true })).not.toBeInTheDocument();
     expect(getByRole('spinbutton')).toHaveValue(3);
     expect(getByRole('switch')).not.toBeChecked();
+  });
+
+  it.each(['en-US', 'zh-CN'])('shows effective list defaults with localized labels in %s', (locale) => {
+    const catalog = parse(readFileSync(path.resolve(process.cwd(), `../platform/src/main/resources/i18n.${locale}.yaml`), 'utf8'));
+    const t = (key: string) => key.split('.').reduce((node, part) => node[part], catalog);
+    const onChange = vi.fn();
+    const { getByTestId } = render(<I18nProvider initialLocale={locale} initialData={catalog}>
+      <SchemaBlockConfigPanel schemas={[
+        ...buildColumnDetailSchemas(t), ...buildFilterDetailSchemas(t),
+      ]} value={Object.freeze({})} onChange={onChange} />
+    </I18nProvider>);
+    for (const [key, label] of [['align', 'left_align'], ['renderer', 'text'], ['displayMode', 'inline']]) {
+      expect(within(getByTestId(`schema-config-field-${key}`)).getByRole('combobox'))
+        .toHaveTextContent(catalog.list_editor[label]);
+    }
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('displays a missing schema default without writing it into the configuration', () => {
+    const value = Object.freeze({ note: 'original' });
+    const onChange = vi.fn();
+    const { getByTestId } = render(<SchemaBlockConfigPanel schemas={[
+      { key: 'mode', label: 'Mode', type: 'select', defaultValue: 'left',
+        options: [{ label: 'Left', value: 'left' }, { label: 'Right', value: 'right' }] },
+      { key: 'note', label: 'Note', type: 'text' },
+    ]} value={value} onChange={onChange} />);
+    expect(within(getByTestId('schema-config-field-mode')).getByRole('combobox')).toHaveTextContent('Left');
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.change(within(getByTestId('schema-config-field-note')).getByRole('textbox'), { target: { value: 'edited' } });
+    expect(onChange).toHaveBeenCalledWith({ note: 'edited' }, 'note');
+    expect(value).toEqual({ note: 'original' });
+  });
+
+  it.each([false, 0, '', null])('preserves explicit values instead of applying a default: %s', (value) => {
+    const { getByRole } = render(<SchemaBlockConfigPanel schemas={[
+      { key: 'note', label: 'Note', type: 'text', defaultValue: 'fallback' },
+    ]} value={{ note: value }} onChange={vi.fn()} />);
+    expect(getByRole('textbox')).toHaveValue(value == null ? '' : String(value));
   });
 
   const schemas: ExtendedPropertySchema<string>[] = [

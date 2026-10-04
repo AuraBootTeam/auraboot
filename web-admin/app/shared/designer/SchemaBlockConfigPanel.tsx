@@ -84,7 +84,7 @@ export function SchemaBlockConfigPanel<T extends Record<string, unknown>>({
             <div className="space-y-3">
               {visible.map((schema) => {
                 const adapter: FieldAdapter<unknown> = {
-                  value: value[schema.key],
+                  value: value[schema.key] === undefined ? schema.defaultValue : value[schema.key],
                   setValue: (v: unknown) => {
                     const next = { ...latestValueRef.current, [schema.key]: v };
                     latestValueRef.current = next;
