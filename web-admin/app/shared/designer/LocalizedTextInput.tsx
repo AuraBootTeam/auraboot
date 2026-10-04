@@ -75,8 +75,8 @@ function buildOutput(zh: string, en: string, expanded: boolean): LocalizedTextVa
   const zhTrim = zh;
   const enTrim = en;
   if (!zhTrim && !enTrim) return undefined;
-  if (!expanded) {
-    // Collapsed mode: always string form (en is ignored).
+  if (!expanded && !enTrim) {
+    // A collapsed single-locale value may stay a string; existing translations survive.
     return zhTrim || undefined;
   }
   // Expanded: emit object form so i18n resolver can pick the right locale.

@@ -231,6 +231,12 @@ function getLocalizedTextFromObject(
     return obj[language] as string;
   }
 
+  // Prefer another regional variant of the requested language before cross-language fallback.
+  const regionalVariant = Object.entries(obj).find(([key, value]) =>
+    key.includes('-') && key.split('-')[0] === language && Boolean(value),
+  );
+  if (regionalVariant) return regionalVariant[1] as string;
+
   // Fall back to Chinese.
   if (obj['zh-CN']) {
     return obj['zh-CN'];

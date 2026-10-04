@@ -4,6 +4,10 @@
  */
 
 import React from 'react';
+import { useI18n } from '~/contexts/I18nContext';
+import { getLocalizedText } from '~/utils/i18n';
+import { LocalizedTextInput } from '~/shared/designer';
+import { widgetText, type WidgetTextKey } from '../widgets/widgetText';
 import { useDashboardStore } from '../store/useDashboardStore';
 import { widgetRegistry } from '../widgets/widgetRegistry';
 import type {
@@ -32,10 +36,21 @@ const PropertyField: React.FC<{
   value: unknown;
   onChange: (value: unknown) => void;
 }> = ({ schema, value, onChange }) => {
+  const { locale, t } = useI18n();
+  const l = (key: WidgetTextKey) => getLocalizedText(widgetText(key), locale, t);
   const fieldTestId = `widget-prop-${schema.key.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
 
   const renderField = () => {
     switch (schema.type) {
+      case 'localizedText': {
+        const text = typeof value === 'string' ? value
+          : value && typeof value === 'object' && !Array.isArray(value)
+            && Object.values(value).every((entry) => typeof entry === 'string')
+            ? value as Record<string, string> : undefined;
+        return <div data-testid={fieldTestId}><LocalizedTextInput value={text} onChange={onChange}
+          placeholder={getLocalizedText(schema.placeholder, locale, t)} testId={fieldTestId} /></div>;
+      }
+
       case 'text':
         return (
           <input
@@ -43,7 +58,7 @@ const PropertyField: React.FC<{
             type="text"
             value={(value as string) || ''}
             onChange={(e) => onChange(e.target.value)}
-            placeholder={schema.placeholder}
+            placeholder={getLocalizedText(schema.placeholder, locale, t)}
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
           />
         );
@@ -55,7 +70,7 @@ const PropertyField: React.FC<{
             type="number"
             value={(value as number) || 0}
             onChange={(e) => onChange(Number(e.target.value))}
-            placeholder={schema.placeholder}
+            placeholder={getLocalizedText(schema.placeholder, locale, t)}
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
           />
         );
@@ -70,7 +85,7 @@ const PropertyField: React.FC<{
               onChange={(e) => onChange(e.target.checked)}
               className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
             />
-            <span className="text-sm text-gray-700">{schema.label}</span>
+            <span className="text-sm text-gray-700">{getLocalizedText(schema.label, locale, t)}</span>
           </label>
         );
 
@@ -82,10 +97,10 @@ const PropertyField: React.FC<{
             onChange={(e) => onChange(e.target.value)}
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
           >
-            <option value="">请选择</option>
+            <option value="">{l('panel.select')}</option>
             {schema.options?.map((opt) => (
               <option key={opt.value} value={opt.value}>
-                {opt.label}
+                {getLocalizedText(opt.label, locale, t)}
               </option>
             ))}
           </select>
@@ -110,7 +125,7 @@ const PropertyField: React.FC<{
             type="text"
             value={(value as string) || ''}
             onChange={(e) => onChange(e.target.value)}
-            placeholder="输入模型编码"
+            placeholder={l('panel.modelCode')}
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
           />
         );
@@ -123,7 +138,7 @@ const PropertyField: React.FC<{
             type="text"
             value={(value as string) || ''}
             onChange={(e) => onChange(e.target.value)}
-            placeholder="输入查询编码"
+            placeholder={l('panel.queryCode')}
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
           />
         );
@@ -166,11 +181,11 @@ const PropertyField: React.FC<{
   return (
     <div className="mb-4">
       <label className="mb-1 block text-sm font-medium text-gray-700">
-        {schema.label}
+        {getLocalizedText(schema.label, locale, t)}
         {schema.required && <span className="ml-1 text-red-500">*</span>}
       </label>
       {renderField()}
-      {schema.description && <p className="mt-1 text-xs text-gray-500">{schema.description}</p>}
+      {schema.description && <p className="mt-1 text-xs text-gray-500">{getLocalizedText(schema.description, locale, t)}</p>}
     </div>
   );
 };
@@ -213,6 +228,8 @@ function setNestedValue(
 }
 
 export const WidgetPropertyPanel: React.FC<WidgetPropertyPanelProps> = ({ className = '' }) => {
+  const { locale, t } = useI18n();
+  const l = (key: WidgetTextKey) => getLocalizedText(widgetText(key), locale, t);
   const { selectedWidgetId, getWidgetById, updateWidgetConfig, deleteWidget, duplicateWidget } =
     useDashboardStore();
 
@@ -226,9 +243,9 @@ export const WidgetPropertyPanel: React.FC<WidgetPropertyPanelProps> = ({ classN
         className={`w-72 border-l border-gray-200 bg-white ${className}`}
       >
         <div className="border-b border-gray-200 p-4">
-          <h2 className="text-sm font-semibold text-gray-700">属性</h2>
+          <h2 className="text-sm font-semibold text-gray-700">{l('panel.properties')}</h2>
         </div>
-        <div className="p-4 text-center text-sm text-gray-500">选择一个组件查看属性</div>
+        <div className="p-4 text-center text-sm text-gray-500">{l('panel.selectWidget')}</div>
       </div>
     );
   }
@@ -243,7 +260,7 @@ export const WidgetPropertyPanel: React.FC<WidgetPropertyPanelProps> = ({ classN
   };
 
   const handleDelete = () => {
-    if (confirm('确定删除此组件？')) {
+    if (confirm(l('panel.confirmDelete'))) {
       deleteWidget(widget.id);
     }
   };
@@ -272,12 +289,12 @@ export const WidgetPropertyPanel: React.FC<WidgetPropertyPanelProps> = ({ classN
     >
       <div className="border-b border-gray-200 p-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-gray-700">{widgetDef.label}</h2>
+          <h2 className="text-sm font-semibold text-gray-700">{getLocalizedText(widgetDef.label, locale, t)}</h2>
           <div className="flex items-center gap-1">
             <button
               onClick={handleDuplicate}
               className="rounded p-1.5 text-gray-500 hover:bg-blue-50 hover:text-blue-600"
-              title="复制"
+              title={l('panel.duplicate')}
             >
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -291,7 +308,7 @@ export const WidgetPropertyPanel: React.FC<WidgetPropertyPanelProps> = ({ classN
             <button
               onClick={handleDelete}
               className="rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600"
-              title="删除"
+              title={l('panel.delete')}
             >
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -305,7 +322,7 @@ export const WidgetPropertyPanel: React.FC<WidgetPropertyPanelProps> = ({ classN
           </div>
         </div>
         {widgetDef.description && (
-          <p className="mt-1 text-xs text-gray-500">{widgetDef.description}</p>
+          <p className="mt-1 text-xs text-gray-500">{getLocalizedText(widgetDef.description, locale, t)}</p>
         )}
       </div>
 
@@ -322,7 +339,7 @@ export const WidgetPropertyPanel: React.FC<WidgetPropertyPanelProps> = ({ classN
         {/* Data Source Configuration */}
         <div className="mt-6 border-t border-gray-200 pt-4">
           <h3 className="mb-3 text-xs font-medium tracking-wider text-gray-500 uppercase">
-            数据源配置
+            {l('panel.dataSource')}
           </h3>
           <DataSourceConfig
             value={
@@ -338,7 +355,7 @@ export const WidgetPropertyPanel: React.FC<WidgetPropertyPanelProps> = ({ classN
         {/* Style Configuration */}
         <div className="mt-6 border-t border-gray-200 pt-4">
           <h3 className="mb-3 text-xs font-medium tracking-wider text-gray-500 uppercase">
-            样式配置
+            {l('panel.style')}
           </h3>
           <StyleConfig
             value={(widget.config.style as StyleSettings) || {}}
@@ -349,7 +366,7 @@ export const WidgetPropertyPanel: React.FC<WidgetPropertyPanelProps> = ({ classN
         {/* Linkage Configuration */}
         <div className="mt-6 border-t border-gray-200 pt-4">
           <h3 className="mb-3 text-xs font-medium tracking-wider text-gray-500 uppercase">
-            图表联动
+            {l('panel.linkage')}
           </h3>
           <LinkageConfig
             value={(widget.config.linkage as LinkageConfigType) || { enabled: false }}
@@ -360,7 +377,7 @@ export const WidgetPropertyPanel: React.FC<WidgetPropertyPanelProps> = ({ classN
         {/* Drilldown Configuration */}
         <div className="mt-6 border-t border-gray-200 pt-4">
           <h3 className="mb-3 text-xs font-medium tracking-wider text-gray-500 uppercase">
-            钻取配置
+            {l('panel.drilldown')}
           </h3>
           <DrilldownConfig
             value={
@@ -373,7 +390,7 @@ export const WidgetPropertyPanel: React.FC<WidgetPropertyPanelProps> = ({ classN
         {/* Refresh Configuration */}
         <div className="mt-6 border-t border-gray-200 pt-4">
           <h3 className="mb-3 text-xs font-medium tracking-wider text-gray-500 uppercase">
-            数据刷新
+            {l('panel.refresh')}
           </h3>
           <RefreshConfig
             value={widget.config.refreshInterval || 0}
@@ -384,7 +401,7 @@ export const WidgetPropertyPanel: React.FC<WidgetPropertyPanelProps> = ({ classN
         {/* Position section */}
         <div className="mt-6 border-t border-gray-200 pt-4">
           <h3 className="mb-3 text-xs font-medium tracking-wider text-gray-500 uppercase">
-            位置和大小
+            {l('panel.positionSize')}
           </h3>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -406,7 +423,7 @@ export const WidgetPropertyPanel: React.FC<WidgetPropertyPanelProps> = ({ classN
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs text-gray-600">宽度</label>
+              <label className="mb-1 block text-xs text-gray-600">{l('panel.width')}</label>
               <input
                 type="number"
                 value={widget.w}
@@ -415,7 +432,7 @@ export const WidgetPropertyPanel: React.FC<WidgetPropertyPanelProps> = ({ classN
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs text-gray-600">高度</label>
+              <label className="mb-1 block text-xs text-gray-600">{l('panel.height')}</label>
               <input
                 type="number"
                 value={widget.h}
