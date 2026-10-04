@@ -45,10 +45,11 @@ function formatValue(value: unknown, format?: string): string {
 function groupData(
   data: Record<string, unknown>[],
   field: string,
+  missingGroupLabel: string,
 ): Map<string, Record<string, unknown>[]> {
   const groups = new Map<string, Record<string, unknown>[]>();
   for (const row of data) {
-    const key = String(row[field] ?? 'Other');
+    const key = String(row[field] ?? missingGroupLabel);
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(row);
   }
@@ -56,8 +57,8 @@ function groupData(
 }
 
 const SAMPLE_GROUPS = [
-  { group: 'Group A', rows: [{ sample: 'Row 1' }, { sample: 'Row 2' }] },
-  { group: 'Group B', rows: [{ sample: 'Row 3' }] },
+  { group: { zh: '分组 A', en: 'Group A' }, rows: [{ sample: 'Row 1' }, { sample: 'Row 2' }] },
+  { group: { zh: '分组 B', en: 'Group B' }, rows: [{ sample: 'Row 3' }] },
 ];
 
 export const ReportGroupedTableBlock: React.FC<ReportGroupedTableBlockProps> = ({
@@ -113,13 +114,13 @@ export const ReportGroupedTableBlock: React.FC<ReportGroupedTableBlockProps> = (
           )}
           <tbody>
             {SAMPLE_GROUPS.map((g) => (
-              <React.Fragment key={g.group}>
+              <React.Fragment key={g.group.en}>
                 <tr>
                   <td
                     colSpan={columns.length}
                     className={`bg-blue-50 px-2 py-1.5 font-semibold text-blue-800 ${cellBorder}`}
                   >
-                    {block.groupByField}: {g.group}
+                    {block.groupByField}: {text(g.group)}
                   </td>
                 </tr>
                 {g.rows.map((_, rowIdx) => (
@@ -130,7 +131,7 @@ export const ReportGroupedTableBlock: React.FC<ReportGroupedTableBlockProps> = (
                         className={`px-2 py-1 text-gray-500 ${cellBorder}`}
                         style={{ textAlign: col.align || 'left' }}
                       >
-                        Sample
+                        {text({ zh: '示例', en: 'Sample' })}
                       </td>
                     ))}
                   </tr>
@@ -172,7 +173,7 @@ export const ReportGroupedTableBlock: React.FC<ReportGroupedTableBlockProps> = (
     );
   }
 
-  const groups = groupData(data, block.groupByField);
+  const groups = groupData(data, block.groupByField, text({ zh: '其它', en: 'Other' }));
 
   return (
     <div>

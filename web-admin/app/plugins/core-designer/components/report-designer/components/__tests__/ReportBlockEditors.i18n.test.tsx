@@ -133,6 +133,25 @@ for (const locale of ['zh-CN', 'en-US']) {
       ])
         expect(screen.getByText(label, { exact: true })).toBeTruthy();
     });
+    it('localizes grouped table samples and missing groups while preserving user values', () => {
+      const block = {
+        id: 'g', blockType: 'grouped-table' as const, dataSource: 'orders',
+        title: 'User Report', groupByField: 'owner',
+        columns: [{ field: 'value', label: 'User Value' }],
+      };
+      const view = render(localized(locale, <ReportGroupedTableBlock block={block} mode="design" />));
+      expect(screen.getByText(zh ? 'owner: 分组 A' : 'owner: Group A')).toBeVisible();
+      expect(screen.getByText(zh ? 'owner: 分组 B' : 'owner: Group B')).toBeVisible();
+      expect(screen.getAllByText(zh ? '示例' : 'Sample')).toHaveLength(3);
+      view.unmount();
+      render(localized(locale, <ReportGroupedTableBlock block={block} mode="runtime"
+        data={[{ value: 'User Entry' }, { owner: 'Group A', value: 'User Sample' }]} />));
+      expect(screen.getByText(zh ? 'owner: 其它 (1)' : 'owner: Other (1)')).toBeVisible();
+      expect(screen.getByText('owner: Group A (1)')).toBeVisible();
+      expect(screen.getByText('User Entry')).toBeVisible();
+      expect(screen.getByText('User Sample')).toBeVisible();
+      expect(screen.getByText('User Value')).toBeVisible();
+    });
     it('initializes the report title in the active language', () => {
       render(localized(locale, <CurrentTitle />));
       expect(screen.getByRole('status').textContent).toBe(zh ? '未命名报表' : 'Untitled Report');
