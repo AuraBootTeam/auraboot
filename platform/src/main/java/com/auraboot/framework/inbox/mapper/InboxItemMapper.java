@@ -45,6 +45,19 @@ public interface InboxItemMapper extends BaseMapper<InboxItem> {
                   @Param("userId") Long userId, @Param("action") String action);
 
     @Update("""
+        UPDATE ab_inbox_item
+        SET status = CASE WHEN status = 'pending' THEN 'acted' ELSE status END,
+            action_taken = #{action}, acted_at = COALESCE(acted_at, NOW())
+        WHERE id = #{id} AND tenant_id = #{tenantId} AND user_id = #{userId}
+          AND source_id = #{taskId} AND source_type IN ('workflow', 'bpm')
+          AND status IN ('pending', 'closed', 'acted')
+          AND (action_taken IS NULL OR action_taken = #{action})
+        """)
+    int recordCompletedWorkflowAction(@Param("id") Long id, @Param("tenantId") Long tenantId,
+                                     @Param("userId") Long userId, @Param("taskId") String taskId,
+                                     @Param("action") String action);
+
+    @Update("""
         UPDATE ab_inbox_item SET status = 'dismissed', acted_at = NOW()
         WHERE id = #{id} AND tenant_id = #{tenantId} AND user_id = #{userId}
           AND status = 'pending'
