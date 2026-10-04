@@ -30,13 +30,32 @@ function run(file, args) {
   }
 }
 function alive(pid) {
-  try { process.kill(pid, 0); return true; } catch (error) {
+  try {
+    process.kill(pid, 0);
+    if (process.platform === 'linux') {
+      try {
+        const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
+        if (['Z', 'X'].includes(stat.slice(stat.lastIndexOf(')') + 2, stat.lastIndexOf(')') + 3))) return false;
+      } catch (error) { if (error.code === 'ENOENT') return false; throw error; }
+    }
+    return true;
+  } catch (error) {
     if (error.code === 'ESRCH') return false;
     throw new Error('Cannot establish owned process liveness');
   }
 }
-function snapshot(pid) {
-  if (!alive(pid)) return null;
+/** A process may exit between liveness and metadata probes during owned shutdown. */
+export function readGoldenProcessSnapshot(pid, readMetadata = processMetadata, isAlive = alive) {
+  if (!isAlive(pid)) return null;
+  try { return readMetadata(pid); }
+  catch (error) {
+    // Never suppress metadata errors for a process that is still alive.
+    if (!isAlive(pid)) return null;
+    throw error;
+  }
+}
+const snapshot = readGoldenProcessSnapshot;
+function processMetadata(pid) {
   const cwd = process.platform === 'linux' ? realpathSync(`/proc/${pid}/cwd`) :
     realpathSync(run('lsof', ['-a', '-p', String(pid), '-d', 'cwd', '-Fn']).split('\n').find(line => line.startsWith('n'))?.slice(1));
   const env = liveEnvironment(pid);
