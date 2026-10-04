@@ -288,7 +288,7 @@ class PermissionServiceImplTest {
     }
 
     @Test
-    void findByPidReturnsNullWhenMissing() {
+    void findByPidReturnsNullForMissingRecord() {
         when(permissionMapper.findByPids(List.of("missing"))).thenReturn(List.of());
 
         assertThat(service.findByPid("missing")).isNull();

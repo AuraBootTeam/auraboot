@@ -182,12 +182,6 @@ public class PermissionServiceImpl implements PermissionService {
         return permissionConverter.toDTO(permission);
     }
 
-    @Override
-    public PermissionDTO findByPid(String pid) {
-        List<Permission> permissions = permissionMapper.findByPids(List.of(pid));
-        return permissions.isEmpty() ? null : permissionConverter.toDTO(permissions.get(0));
-    }
-    
     /** Resolve a public permission identity through the tenant-scoped mapper. */
     @Override
     public PermissionDTO findByPid(String pid) {
