@@ -4,6 +4,6 @@
   "displayName:en": "Position",
   "dataType": "reference",
   "constraints": { "required": true },
-  "refTarget": { "targetModel": "org_position", "targetField": "org_pos_name" },
+  "refTarget": { "targetModel": "org_position", "targetField": "org_pos_name", "displayField": "org_pos_name" },
   "extension": { "placeholder:zh-CN": "请选择岗位" }
 }

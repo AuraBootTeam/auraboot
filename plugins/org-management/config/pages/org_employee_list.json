@@ -30,7 +30,7 @@
         {
           "key": "active",
           "label": {
-            "zh-CN": "Active",
+            "zh-CN": "在职",
             "en": "Active"
           },
           "filter": {

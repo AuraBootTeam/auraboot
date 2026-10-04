@@ -735,13 +735,15 @@ test('independent organization read and member provisioning preserve separate na
   expect(String(directoryBody.code)).toBe('0');
   const directoryMemberPid = directoryBody.data.accounts[0].memberPid as string;
   expect(directoryMemberPid).toBeTruthy();
+  const departmentName = `Department ${stamp}`;
+  const positionName = `Position ${stamp}`;
   const department = await executeCommandViaApi(page, 'org:create_department', {
-    org_dept_name: stamp, org_dept_code: `STAFF-${Date.now()}`,
+    org_dept_name: departmentName, org_dept_code: `STAFF-${Date.now()}`,
   });
   expect(String(department.code)).toBe('0');
   expect(department.recordId).toBeTruthy();
   const position = await executeCommandViaApi(page, 'org:create_position', {
-    org_pos_name: stamp, org_pos_code: `STAFF-P-${Date.now()}`,
+    org_pos_name: positionName, org_pos_code: `STAFF-P-${Date.now()}`,
     org_pos_level: '1', org_pos_dept_id: department.recordId,
   });
   expect(String(position.code)).toBe('0');
@@ -850,6 +852,9 @@ test('independent organization read and member provisioning preserve separate na
     expect((await reader.request.get(unlinkedEndpoint)).status()).toBe(403);
     await expect(reader.getByRole('heading', { name: '员工详情', exact: true })).toBeVisible();
     await expect(reader.getByText(stamp, { exact: true }).first()).toBeVisible();
+    await expect(reader.getByText(departmentName, { exact: true })).toBeVisible();
+    await expect(reader.getByText(positionName, { exact: true })).toBeVisible();
+    await expect(reader.getByText('在职', { exact: true })).toBeVisible();
     await expect(reader.getByText('加载中...', { exact: true })).toHaveCount(0);
     await reader.screenshot({ path: info.outputPath('standalone-staff-read.png'), fullPage: true });
     await selectCapability('org.cap.hr');

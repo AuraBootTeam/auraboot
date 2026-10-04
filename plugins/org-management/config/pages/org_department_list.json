@@ -30,7 +30,7 @@
         {
           "key": "active",
           "label": {
-            "zh-CN": "Active",
+            "zh-CN": "启用",
             "en": "Active"
           },
           "filter": {
