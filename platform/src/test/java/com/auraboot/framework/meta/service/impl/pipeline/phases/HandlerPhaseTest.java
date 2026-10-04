@@ -19,6 +19,7 @@ import com.auraboot.framework.meta.service.impl.pipeline.RecordSnapshotReader;
 import com.auraboot.framework.file.service.FileService;
 import com.auraboot.framework.infrastructure.storage.StorageProvider;
 import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
+import com.auraboot.framework.plugin.extension.PluginCommandRejectionException;
 import com.auraboot.framework.plugin.extension.FileAccessor;
 import com.auraboot.framework.plugin.extension.TenantProjectionAccessor;
 import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
@@ -275,8 +276,9 @@ class HandlerPhaseTest {
 
     @Test
     void execute_preservesLocalizedPluginBusinessErrorKeyAndCause() {
-        IllegalStateException overQuantity = new IllegalStateException(
-                "$i18n:inventory.error.putaway_quantity_exceeds_remaining");
+        PluginCommandRejectionException overQuantity = new PluginCommandRejectionException(
+                PluginCommandRejectionException.Code.INVALID_ARGUMENT,
+                "inventory.error.putaway_quantity_exceeds_remaining");
         CommandHandlerExtension rejected = new CommandHandlerExtension() {
             @Override public String getCommandType() { return PLUGIN_HANDLER_CODE; }
             @Override public Object execute(CommandContext context) { throw overQuantity; }
@@ -289,6 +291,39 @@ class HandlerPhaseTest {
                 .hasMessage("$i18n:inventory.error.putaway_quantity_exceeds_remaining")
                 .hasCause(overQuantity);
         assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+    }
+
+    @Test
+    void execute_mapsTypedBusinessRuleBlockWithoutMessageClassification() {
+        PluginCommandRejectionException blocked = new PluginCommandRejectionException(
+                PluginCommandRejectionException.Code.BUSINESS_RULE_BLOCKED,
+                "inventory.error.quality_hold.issue");
+        CommandHandlerExtension rejected = new CommandHandlerExtension() {
+            @Override public String getCommandType() { return PLUGIN_HANDLER_CODE; }
+            @Override public Object execute(CommandContext context) { throw blocked; }
+        };
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(rejected));
+        CommandPipelineContext ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of(
+                "type", "state_transition", "handler", PLUGIN_HANDLER_CODE));
+        assertThatThrownBy(() -> phase.execute(ctx))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("$i18n:inventory.error.quality_hold.issue")
+                .hasCause(blocked);
+    }
+
+    @Test
+    void execute_doesNotTreatDiagnosticTextAsTypedBusinessRejection() {
+        IllegalStateException diagnostic = new IllegalStateException("$i18n:inventory.error.quality_hold.issue");
+        CommandHandlerExtension rejected = new CommandHandlerExtension() {
+            @Override public String getCommandType() { return PLUGIN_HANDLER_CODE; }
+            @Override public Object execute(CommandContext context) { throw diagnostic; }
+        };
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(rejected));
+        CommandPipelineContext ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of(
+                "type", "state_transition", "handler", PLUGIN_HANDLER_CODE));
+        assertThatThrownBy(() -> phase.execute(ctx))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("Plugin handler execution failed: $i18n:inventory.error.quality_hold.issue");
     }
 
     @Test
