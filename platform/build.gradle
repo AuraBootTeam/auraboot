@@ -215,6 +215,13 @@ ext {
     mcpSdkVersion = '2.0.1'
     testWorkerNum = project.findProperty('workerNum') ?: '1'
 }
+// Allure 2.12 defaults its agent to 1.9.22.1 independently of dependency management.
+// Keep the weaving agent and the application's AspectJ runtime on one artifact.
+allure {
+    adapter {
+        aspectjVersion.set(project.ext.aspectjVersion.toString())
+    }
+}
 
 dependencyManagement {
     imports {
