@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 const gate = fs.readFileSync(new URL('./run-open-platform-release-image-gate.sh', import.meta.url), 'utf8');
 const probe = fs.readFileSync(new URL('./ci/open-platform-release-probe.py', import.meta.url), 'utf8');
@@ -40,3 +43,45 @@ assert.match(probe, /"tinv_si_code": "REL-STOCK-IN-001"/);
 assert.match(probe, /expected=\(412,/);
 assert.match(probe, /cursor \+ 'x'/);
 console.log('open-platform release-image contract: PASS');
+
+// Exercise the actual exit handler without starting a container runtime.
+const exitHandler = gate.slice(gate.indexOf('cleanup() {'), gate.indexOf('trap cleanup EXIT'));
+for (const [status, ownLock] of [[0, true], [1, true], [42, true], [42, false], [130, true], [143, true]]) {
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'open-platform-retention-'));
+  try {
+    const work = path.join(temporary, 'work');
+    const artifacts = path.join(temporary, 'artifacts');
+    const lock = path.join(temporary, 'lock');
+    for (const directory of [work, path.join(artifacts, 'logs'), lock]) fs.mkdirSync(directory, {recursive:true});
+    const database = path.join(work, 'database');
+    fs.writeFileSync(database, 'retained database bytes');
+    fs.writeFileSync(path.join(lock, 'owner'), ownLock ? 'mine' : 'other');
+    const credentials = path.join(artifacts, 'private-credentials');
+    fs.writeFileSync(credentials, 'private-sentinel');
+    const calls = path.join(work, 'docker-calls');
+    const result = spawnSync('bash', ['-c', `set -Eeuo pipefail
+${exitHandler}
+docker() { printf '%s\n' "$*" >> "$CALLS"; }
+trap cleanup EXIT
+exit ${status}
+`], {
+      encoding:'utf8', env:{...process.env, WORK_ROOT:work, ARTIFACTS:artifacts, LOCK_DIR:lock,
+        LOCK_TOKEN:'mine', CREDENTIAL_ARTIFACT:credentials, CALLS:calls, NET:'owned-network',
+        APP:'owned-app', PG:'owned-pg', REDIS:'owned-redis', IMAGE:'owned-image'}
+    });
+    assert.equal(result.status, status, result.stderr);
+    assert.equal(fs.readFileSync(database, 'utf8'), 'retained database bytes');
+    assert.equal(fs.existsSync(credentials), false);
+    assert.equal(fs.existsSync(lock), !ownLock);
+    if (!ownLock) assert.equal(fs.readFileSync(path.join(lock, 'owner'), 'utf8'), 'other');
+    const commands = fs.readFileSync(calls, 'utf8');
+    assert.match(commands, /ps --all/);
+    assert.doesNotMatch(commands, /(?:^|\n)(?:rm|stop|network rm|image rm)(?: |$)/);
+    const receipt = JSON.parse(fs.readFileSync(path.join(artifacts, 'runtime-retention.json'), 'utf8'));
+    assert.equal(receipt.runnerExitCode, status);
+    assert.equal(receipt.runtimeDeleted, false);
+    assert.equal(receipt.databaseDeleted, false);
+    assert.doesNotMatch(JSON.stringify(receipt) + result.stdout + result.stderr, /private-sentinel/);
+  } finally { fs.rmSync(temporary, {recursive:true}); }
+}
+console.log('open-platform runtime retention: 6 executable cases PASS');
