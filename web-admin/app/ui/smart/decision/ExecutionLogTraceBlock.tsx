@@ -234,6 +234,7 @@ function callerLabel(value: unknown, locale = 'zh-CN'): string {
 }
 
 function callerDisplay(log: DecisionLogRecord, locale = 'zh-CN'): string {
+  if (String(log.callerType ?? '').toUpperCase() === 'SLA') return callerLabel(log.callerType, locale);
   return `${callerLabel(log.callerType, locale)} / ${display(log.callerRef)}`;
 }
 
@@ -1289,7 +1290,7 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
             <div className="elta-drawer-head">
               <div>
                 <h3>{traceLabel('ui', 'executionChain', locale)}</h3>
-                <span className="mono">{display(selectedLog.traceId)}</span>
+                <span>{decisionLabel(selectedLog.decisionCode, locale, selectedLog.decisionName)}</span>
               </div>
               <button type="button" data-testid="elta-close-trace" onClick={closeTrace}>
                 关闭
@@ -1394,11 +1395,17 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                     <span>{log.durationMs != null ? `${log.durationMs}ms` : '-'}</span>
                     <span>{formatDate(log.createdAt)}</span>
                   </div>
-                  {(log.runtimeAdapter || (log.decisionCode &&
+                  {(log.traceId || log.callerRef || log.runtimeAdapter || (log.decisionCode &&
                     traceLabel('decision', log.decisionCode, locale) === log.decisionCode)) &&
                     <details className="mt-2 text-xs" data-testid={'elta-chain-technical-' + (log.pid ?? index)}>
                       <summary>{traceLabel('semantic', 'technicalDetails', locale)}</summary>
                       <dl className="mt-1 break-all">
+                        {log.traceId && <>
+                          <dt>{traceLabel('semantic', 'traceIdentifier', locale)}</dt><dd>{log.traceId}</dd>
+                        </>}
+                        {log.callerRef && <>
+                          <dt>{traceLabel('semantic', 'callerIdentifier', locale)}</dt><dd>{log.callerRef}</dd>
+                        </>}
                         {log.decisionCode && traceLabel('decision', log.decisionCode, locale) === log.decisionCode && <>
                           <dt>{traceLabel('semantic', 'decisionCode', locale)}</dt><dd>{log.decisionCode}</dd>
                         </>}
