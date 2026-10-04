@@ -38,7 +38,7 @@ class OpenPlatformBearerAuthenticatorTest {
                 .thenReturn(new OpenPlatformAuthMapper.TokenAuthRecord("tok", 42L, 9L,
                         "[\"openapi.profile.read\"]", Instant.now().plusSeconds(60), "inst",
                         "production", 600, "active", "app", "active"));
-        when(rateLimitMapper.consume(eq(9L), any(Instant.class), eq(600))).thenReturn(1);
+        when(rateLimitMapper.consume(eq(9L), any(Instant.class), eq(600), eq("tok"), any(Instant.class))).thenReturn(1);
         MockHttpServletRequest request = request("GET", "/api/open/v1/whoami");
         request.addHeader("Authorization", "Bearer token");
         request.addHeader("X-Tenant-Id", "999");
@@ -81,7 +81,7 @@ class OpenPlatformBearerAuthenticatorTest {
                 .thenReturn(new OpenPlatformAuthMapper.TokenAuthRecord("tok", 42L, 9L,
                         "[\"openapi.profile.read\"]", Instant.now().plusSeconds(60), "inst",
                         "production", 1, "active", "app", "active"));
-        when(rateLimitMapper.consume(eq(9L), any(Instant.class), eq(1))).thenReturn(null);
+        when(rateLimitMapper.consume(eq(9L), any(Instant.class), eq(1), eq("tok"), any(Instant.class))).thenReturn(null);
         MockHttpServletRequest request = request("GET", "/api/open/v1/whoami");
         request.addHeader("Authorization", "Bearer limited");
 
