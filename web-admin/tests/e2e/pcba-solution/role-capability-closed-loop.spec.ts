@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../fixtures';
-import { uniqueId, ensureSidebarExpanded, clickRowActionByLocator } from '../helpers';
+import { uniqueId, ensureSidebarExpanded, clickRowActionByLocator, executeCommandViaApi } from '../helpers';
 import {
   makeQuoteRoleUser,
   ensureQuoteRoleUser,
@@ -706,4 +706,168 @@ test('a standalone team-view capability reads DSL team membership, denies writes
     path: info.outputPath('team-manager-member-removed.png'),
     fullPage: true,
   });
+});
+
+test('independent organization read and member provisioning preserve separate native employee boundaries', async ({
+  page, browser,
+}, info) => {
+  test.setTimeout(180_000);
+  const stamp = uniqueId('staff-boundary');
+  const roleCode = `e2e_staff_${stamp}`;
+  const roleResponse = await page.request.post('/api/roles', {
+    data: { code: roleCode, name: stamp, type: 'custom' },
+  });
+  expect(roleResponse.status()).toBe(200);
+  const roleBody = await roleResponse.json();
+  expect(String(roleBody.code)).toBe('0');
+  const rolePid = roleBody.data.pid as string;
+  const user = makeQuoteRoleUser('staff-boundary', stamp, [roleCode]);
+  await ensureQuoteRoleUser(page, user);
+  const department = await executeCommandViaApi(page, 'org:create_department', {
+    org_dept_name: stamp, org_dept_code: `STAFF-${Date.now()}`,
+  });
+  expect(String(department.code)).toBe('0');
+  expect(department.recordId).toBeTruthy();
+  const position = await executeCommandViaApi(page, 'org:create_position', {
+    org_pos_name: stamp, org_pos_code: `STAFF-P-${Date.now()}`,
+    org_pos_level: '1', org_pos_dept_id: department.recordId,
+  });
+  expect(String(position.code)).toBe('0');
+  expect(position.recordId).toBeTruthy();
+  const employee = await executeCommandViaApi(page, 'org:create_employee', {
+    org_emp_name: stamp, org_emp_phone: '13912345678',
+    org_emp_dept_id: department.recordId, org_emp_position_id: position.recordId,
+  });
+  expect(String(employee.code)).toBe('0');
+  const employeePid = employee.recordId as string;
+  expect(employeePid).toBeTruthy();
+
+  async function selectCapability(capability: 'org.cap.hr_view' | 'org.cap.member' | null) {
+    await page.goto('/home');
+    await ensureSidebarExpanded(page);
+    await page.getByTestId('sidebar').locator('a[href="/enterprise/permissions"]').click();
+    await page.getByTestId('role-search-input').fill(roleCode);
+    await page.getByTestId(`role-item-${roleCode}`).click();
+    await expect(page.getByTestId('capability-role-editor')).toHaveAttribute('data-role-pid', rolePid);
+    if (capability === 'org.cap.hr_view') {
+      await page.getByTestId('data-scope-modify-btn').click();
+      await page.getByTestId('data-scope-option-all').click();
+      await page.getByTestId('data-scope-apply').click();
+      await expect(page.getByTestId('data-scope-drawer')).toHaveCount(0);
+      const notification = page.getByRole('button', { name: 'Close notification', exact: true });
+      if (await notification.isVisible()) await notification.click();
+    }
+    for (const code of ['org.cap.hr_view', 'org.cap.member']) {
+      await page.getByTestId(`capability-checkbox-${code}`).setChecked(code === capability);
+    }
+    await page.getByTestId('capability-save').click();
+    await expect(page.getByTestId('confirm-dialog')).toBeVisible();
+    const saved = page.waitForResponse(response => response.request().method() === 'PUT'
+      && new URL(response.url()).pathname === '/api/permission/capabilities'
+      && new URL(response.url()).searchParams.get('rolePid') === rolePid);
+    await page.getByTestId('confirm-ok').click();
+    const response = await saved;
+    expect(response.status()).toBe(200);
+    expect(response.request().postDataJSON()).toEqual(capability ? [capability] : []);
+    expect(String((await response.json()).code)).toBe('0');
+    await expect(page.getByTestId('capability-save')).toBeDisabled();
+  }
+  const endpoints = [
+    `/api/org/employees?pageNum=1&pageSize=20&keyword=${encodeURIComponent(stamp)}`,
+    `/api/org/departments/${department.recordId}/employees?pageNum=1&pageSize=20&keyword=${encodeURIComponent(stamp)}`,
+    `/api/dynamic/org_employee/list?pageNum=1&pageSize=20&keyword=${encodeURIComponent(stamp)}`,
+  ];
+  const optionsEndpoint = `/api/org/employees/provision-options?pageNum=1&pageSize=20&keyword=${encodeURIComponent(stamp)}`;
+  const opened = await openQuoteRolePage(browser, user);
+  const reader = opened.page;
+  try {
+    async function expectFullReads(status: 200 | 403) {
+      for (const endpoint of endpoints) {
+        const response = await reader.request.get(endpoint);
+        expect(response.status(), endpoint).toBe(status);
+        if (status === 200) {
+          const body = await response.json();
+          expect(String(body.code)).toBe('0');
+          expect(body.data.records.some((record: { pid: string }) => record.pid === employeePid)).toBe(true);
+        }
+      }
+    }
+    await expectFullReads(403);
+    expect((await reader.request.get(optionsEndpoint)).status()).toBe(403);
+    await selectCapability('org.cap.hr_view');
+    await reader.goto('/home');
+    await ensureSidebarExpanded(reader);
+    const staffLink = reader.getByTestId('sidebar').locator('a[href="/p/org_employee"]');
+    if (!(await staffLink.isVisible())) {
+      await reader.locator('nav button').filter({ hasText: '组织管理' }).first().click();
+    }
+    await expect(staffLink).toBeVisible();
+    await staffLink.click();
+    const search = reader.getByTestId('list-search-input');
+    await expect(search).toBeVisible();
+    await search.fill(stamp);
+    await search.press('Enter');
+    const row = reader.locator('tbody tr').filter({ hasText: stamp });
+    await expect(row).toHaveCount(1);
+    await row.click();
+    await expect(reader).toHaveURL(new RegExp(`/p/org_employee/view/${employeePid}$`));
+    await expect(reader.getByText(stamp, { exact: true }).first()).toBeVisible();
+    await expect(reader.getByTestId('toolbar-btn-edit')).toHaveCount(0);
+    await expectFullReads(200);
+    expect((await reader.request.get(optionsEndpoint)).status()).toBe(403);
+    await reader.screenshot({ path: info.outputPath('standalone-staff-read.png'), fullPage: true });
+    await selectCapability(null);
+    await expectFullReads(403);
+    await reader.goto('/home');
+    await ensureSidebarExpanded(reader);
+    await expect(reader.locator('nav a[href="/p/org_employee"]')).toHaveCount(0);
+    await reader.screenshot({ path: info.outputPath('standalone-staff-read-revoked.png'), fullPage: true });
+
+    await selectCapability('org.cap.member');
+    await expectFullReads(403);
+    const options = await reader.request.get(optionsEndpoint);
+    expect(options.status()).toBe(200);
+    const optionsBody = await options.json();
+    expect(String(optionsBody.code)).toBe('0');
+    expect(optionsBody.data.records).toContainEqual({ pid: employeePid, name: stamp });
+    for (const option of optionsBody.data.records) expect(Object.keys(option).sort()).toEqual(['name', 'pid']);
+    await reader.goto('/home');
+    await ensureSidebarExpanded(reader);
+    const accounts = reader.getByTestId('sidebar').locator('a[href="/p/tenant_member"]');
+    if (!(await accounts.isVisible())) {
+      await reader.locator('nav button').filter({ hasText: '组织管理' }).first().click();
+    }
+    await expect(accounts).toBeVisible();
+    await accounts.click();
+    await reader.getByTestId('toolbar-btn-provision_from_employee').click();
+    await expect(reader.getByTestId('form-dialog')).toBeVisible();
+    await reader.getByTestId('form-dialog-field-employeePid').selectOption(employeePid);
+    await reader.screenshot({ path: info.outputPath('member-provision-identity-selector.png'), fullPage: true });
+    const provisioned = reader.waitForResponse(response => response.request().method() === 'POST'
+      && new URL(response.url()).pathname === '/api/meta/commands/execute/admin:provision_member_from_employee');
+    await reader.getByTestId('form-dialog-submit').click();
+    const response = await provisioned;
+    expect(response.status()).toBe(200);
+    expect(response.request().postDataJSON().payload).toMatchObject({ employeePid });
+    const body = await response.json();
+    expect(String(body.code)).toBe('0');
+    const result = body.data?.data ?? body.data;
+    expect(result.employeePid).toBe(employeePid);
+    expect(result.createdMember).toBe(true);
+    expect(result.memberPid).toBeTruthy();
+    expect(result.userPid).toBeTruthy();
+    await expect(reader.getByRole('heading', { name: '登录凭据已生成' })).toBeVisible();
+    const persisted = await page.request.get(`/api/dynamic/org_employee/${employeePid}`);
+    expect(persisted.status()).toBe(200);
+    const record = (await persisted.json()).data;
+    expect(record.org_emp_member_id).toBe(result.memberPid);
+    expect(record.org_emp_user_id).toBe(result.userPid);
+    await expectFullReads(403);
+    await selectCapability(null);
+    expect((await reader.request.get(optionsEndpoint)).status()).toBe(403);
+    await reader.goto('/home');
+    await ensureSidebarExpanded(reader);
+    await expect(reader.locator('nav a[href="/p/tenant_member"]')).toHaveCount(0);
+    await reader.screenshot({ path: info.outputPath('member-provision-revoked.png'), fullPage: true });
+  } finally { await opened.context.close(); }
 });

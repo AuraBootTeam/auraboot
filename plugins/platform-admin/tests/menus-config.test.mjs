@@ -192,7 +192,7 @@ test('platform-admin exposes account page provisioning from existing employees',
   assert.equal(button.action.command, 'admin:provision_member_from_employee');
   assert.equal(button.action.operationType, 'create');
   assert.equal(inputField?.type, 'select');
-  assert.equal(inputField?.dataSource?.endpoint, '/api/org/employees?pageNum=1&pageSize=500');
+  assert.equal(inputField?.dataSource?.endpoint, '/api/org/employees/provision-options?pageNum=1&pageSize=500');
   assert.equal(inputField?.dataSource?.valueField, 'pid');
   assert.equal(inputField?.dataSource?.labelField, 'name');
   assert.ok(handlerRule, 'admin:provision_member_from_employee must have a handler bindingRule');

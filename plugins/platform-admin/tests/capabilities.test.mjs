@@ -57,7 +57,7 @@ test('member provisioning preserves its selector without broad organization mode
   const button = page.blocks.find(block => block.id === 'toolbar').buttons
     .find(item => item.action?.command === 'admin:provision_member_from_employee');
   const selector = button.action.inputFields.find(field => field.field === 'employeePid');
-  assert.equal(selector.dataSource.endpoint, '/api/org/employees?pageNum=1&pageSize=500');
+  assert.equal(selector.dataSource.endpoint, '/api/org/employees/provision-options?pageNum=1&pageSize=500');
   const service = source('../../../platform/src/main/java/com/auraboot/framework/organization/service/impl/OrganizationServiceImpl.java');
   assert.match(service, /dynamicDataService\.list\(MODEL_EMPLOYEE, request\)/);
   assert.match(service, /dynamicDataService\.getById\(MODEL_DEPARTMENT, deptPid\)/);

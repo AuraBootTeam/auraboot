@@ -182,6 +182,7 @@ public class OrgController {
      * List employees in a department, optionally including sub-departments.
      */
     @GetMapping("/employees")
+    @RequirePermission("model.org_employee.read")
     public ApiResponse<PaginationResult<OrgEmployeeDTO>> getEmployeesByTenant(
             @RequestParam(defaultValue = "1") int pageNum,
             @RequestParam(defaultValue = "20") int pageSize,
@@ -195,6 +196,7 @@ public class OrgController {
      * List employees in a department, optionally including sub-departments.
      */
     @GetMapping("/departments/{pid}/employees")
+    @RequirePermission("model.org_employee.read")
     public ApiResponse<PaginationResult<OrgEmployeeDTO>> getEmployeesByDept(
             @PathVariable String pid,
             @RequestParam(defaultValue = "true") boolean recursive,
@@ -205,6 +207,30 @@ public class OrgController {
             pid, recursive, pageNum, pageSize, keyword);
         return ApiResponse.success(result);
     }
+
+    /** Tenant-scoped identities for the explicitly authorized account-opening operation. */
+    @GetMapping("/employees/provision-options")
+    @RequirePermission("model.tenant_member.provision_member_from_employee")
+    public ApiResponse<PaginationResult<EmployeeProvisionOption>> getEmployeeProvisionOptions(
+            @RequestParam(defaultValue = "1") int pageNum,
+            @RequestParam(defaultValue = "20") int pageSize,
+            @RequestParam(required = false) String keyword) {
+        DynamicQueryRequest request = DynamicQueryRequest.builder()
+            .pageNum(pageNum)
+            .pageSize(pageSize)
+            .keyword(keyword)
+            .build();
+        PaginationResult<Map<String, Object>> result = dynamicDataService.list("org_employee", request);
+        List<EmployeeProvisionOption> options = result.getRecords().stream()
+            .map(record -> new EmployeeProvisionOption(
+                Objects.toString(record.get("pid"), null),
+                Objects.toString(record.get("org_emp_name"), null)))
+            .toList();
+        return ApiResponse.success(PaginationResult.of(
+            options, result.getTotal(), result.getPage(), result.getPageSize()));
+    }
+
+    public record EmployeeProvisionOption(String pid, String name) {}
 
     /**
      * One-stop employee creation: creates user + member + employee with bidirectional linking.

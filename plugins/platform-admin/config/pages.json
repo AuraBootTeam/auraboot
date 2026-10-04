@@ -1057,7 +1057,7 @@
                   },
                   "dataSource": {
                     "type": "api",
-                    "endpoint": "/api/org/employees?pageNum=1&pageSize=500",
+                    "endpoint": "/api/org/employees/provision-options?pageNum=1&pageSize=500",
                     "valueField": "pid",
                     "labelField": "name"
                   }
