@@ -23,8 +23,8 @@ import {
   uniqueId,
   dateOffsetStr,
   waitForDynamicPageLoad,
-  executeCommandViaApi,
   findRowByContent,
+  extractRecordId,
 } from '../helpers/index';
 
 test.describe.configure({ mode: 'serial' });
@@ -99,15 +99,42 @@ async function expectRowStatus(page: Page, title: string, status: RegExp): Promi
 // ---------------------------------------------------------------------------
 
 test('create announcement in draft status', async ({ page }) => {
-  const result = await executeCommandViaApi(page, 'announcement:create_announcement', {
-    title: TITLE,
-    content: CONTENT,
-    announcement_priority: 'normal',
-    pinned: false,
-    expires_at: EXPIRES,
-  });
-  expect(result.recordId).toBeTruthy();
-  recordPid = result.recordId;
+  await navigateToAnnouncementList(page);
+  await page.getByRole('button', { name: '新建公告', exact: true }).click();
+  await expect(page.getByText('公告内容', { exact: true })).toBeVisible();
+  const title = page.getByTestId('form-field-title').locator('input');
+  const content = page.getByTestId('form-field-content').locator('textarea');
+  await expect(title).toHaveAttribute('placeholder', '例如：10 月 12 日系统维护通知');
+  await expect(content).toHaveAttribute('placeholder', '说明适用对象、具体事项和生效时间');
+  await expect(page.getByText('用简明标题说明事项，最多 256 个字符；保存后为草稿，发布后读者才可见。', { exact: true })).toBeVisible();
+  await expect(page.getByText('补充影响范围、时间安排和需要读者采取的行动。', { exact: true })).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath('create-form-guidance.png'), fullPage: true });
+  await title.fill(TITLE);
+  await content.fill(CONTENT);
+  await page.getByTestId('form-field-expires_at').locator('input').fill(EXPIRES.slice(0, 16));
+  const responsePromise = page.waitForResponse((response) =>
+    response.request().method() === 'POST' &&
+    response.url().endsWith('/api/meta/commands/execute/announcement:create_announcement'));
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  const response = await responsePromise;
+  expect(response.ok()).toBe(true);
+  const request = response.request().postDataJSON();
+  expect(request.payload.title).toBe(TITLE);
+  expect(request.payload.content).toBe(CONTENT);
+  const body = await response.json();
+  expect(String(body.code)).toBe('0');
+  recordPid = extractRecordId(body);
+  expect(recordPid).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
+  const saved = await page.request.get(`/api/dynamic/ab_announcement/${recordPid}`);
+  expect(saved.ok()).toBe(true);
+  const savedBody = await saved.json();
+  expect(String(savedBody.code)).toBe('0');
+  expect(savedBody.data.title).toBe(TITLE);
+  expect(savedBody.data.content).toBe(CONTENT);
+  expect(savedBody.data.status).toBe('draft');
+  expect(savedBody.data.announcement_priority).toBe('normal');
+  expect(savedBody.data.pinned).toBe(false);
+  expect(savedBody.data.expires_at).toBeTruthy();
 });
 
 // ---------------------------------------------------------------------------
@@ -124,6 +151,20 @@ test('list page shows created announcement with draft status', async ({ page }) 
   await expect(row).toBeVisible();
 
   await expectRowStatus(page, TITLE, /draft|草稿/i);
+  await page.getByTestId('filters-toggle').click();
+  const filterArea = page.getByTestId('search-area');
+  const titleFilter = filterArea.getByPlaceholder('例如：周末系统维护', { exact: true });
+  await expect(titleFilter).toBeVisible();
+  await expect(filterArea.getByText('按公告标题关键词查找；清除关键词可查看全部公告。', { exact: true })).toBeVisible();
+  await filterArea.screenshot({ path: test.info().outputPath('title-filter-guidance.png') });
+  await titleFilter.fill(`${TITLE}-no-match`);
+  await page.getByTestId('filter-search').click();
+  await expect(page.getByText('没有匹配的公告', { exact: true })).toBeVisible();
+  await expect(page.getByText('选择“新建公告”创建草稿，或清除筛选条件查看已有公告。', { exact: true })).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath('filtered-empty-recovery.png'), fullPage: true });
+  await page.getByTestId('filter-reset').click();
+  await expect(await findRowByContent(page, TITLE)).toBeVisible();
+  await page.getByTestId('filters-toggle').click();
 });
 
 // ---------------------------------------------------------------------------
