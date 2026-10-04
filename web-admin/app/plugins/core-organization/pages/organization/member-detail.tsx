@@ -12,6 +12,7 @@ import { useI18n } from '~/contexts/I18nContext';
 import { get, post, put, del } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { useAuth } from '~/contexts/AuthContext';
+import { authorizationMethodCodes, authorizationMethodLabel, memberStatusLabel } from './member-detail-labels';
 
 // --- Types ---
 
@@ -252,7 +253,7 @@ export default function MemberDetailPage() {
     );
   }
 
-  const statusStyle = STATUS_STYLES[member.status] || STATUS_STYLES.INACTIVE;
+  const statusStyle = STATUS_STYLES[member.status.toLowerCase()] || STATUS_STYLES.inactive;
   const displayName =
     employee?.org_emp_name ||
     member.user?.realName ||
@@ -309,7 +310,7 @@ export default function MemberDetailPage() {
               className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusStyle.bg} ${statusStyle.text}`}
               data-testid="member-status"
             >
-              {member.status}
+              {memberStatusLabel(member.status, l)}
             </span>
           </div>
         </div>
@@ -400,11 +401,9 @@ export default function MemberDetailPage() {
                   defaultValue="offline"
                   className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                 >
-                  <option value="offline">{l('线下授权', 'Offline authorization')}</option>
-                  <option value="phone">{l('电话授权', 'Phone authorization')}</option>
-                  <option value="wechat">{l('微信授权', 'WeChat authorization')}</option>
-                  <option value="email">{l('邮件授权', 'Email authorization')}</option>
-                  <option value="other">{l('其他', 'Other')}</option>
+                  {authorizationMethodCodes.map((method) => (
+                    <option key={method} value={method}>{authorizationMethodLabel(method, l)}</option>
+                  ))}
                 </select>
               </label>
               <label className="block">
@@ -546,7 +545,7 @@ function AccessHistoryTab({
           {records.map((record) => (
             <tr key={record.sessionPid}>
               <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">{record.operatorDisplayName}</td>
-              <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">{record.authorizationMethod}</td>
+              <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">{authorizationMethodLabel(record.authorizationMethod, l)}</td>
               <td className="max-w-sm px-6 py-4 text-sm text-gray-700 dark:text-gray-300">
                 <p>{record.reason}</p>
                 {record.reference && <p className="mt-1 text-xs text-gray-500">{record.reference}</p>}
@@ -603,7 +602,7 @@ function BasicInfoTab({
           <div key={i}>
             <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">{f.label}</dt>
             <dd className="mt-1 text-sm text-gray-900 dark:text-white">
-              {f.isStatus ? <StatusBadge status={f.value || ''} /> : f.value || '-'}
+              {f.isStatus ? <StatusBadge l={l} status={f.value || ''} /> : f.value || '-'}
             </dd>
           </div>
         ))}
@@ -659,7 +658,7 @@ function OrgInfoTab({
           <div key={i}>
             <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">{f.label}</dt>
             <dd className="mt-1 text-sm text-gray-900 dark:text-white">
-              {f.isStatus ? <StatusBadge status={f.value || ''} /> : f.value || '-'}
+              {f.isStatus ? <StatusBadge l={l} status={f.value || ''} /> : f.value || '-'}
             </dd>
           </div>
         ))}
@@ -738,13 +737,13 @@ function TeamsTab({
 
 // --- Shared Components ---
 
-function StatusBadge({ status }: { status: string }) {
-  const style = STATUS_STYLES[status] || STATUS_STYLES.INACTIVE;
+function StatusBadge({ status, l }: { status: string; l: (zh: string, en: string) => string }) {
+  const style = STATUS_STYLES[status.toLowerCase()] || STATUS_STYLES.inactive;
   return (
     <span
       className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${style.bg} ${style.text}`}
     >
-      {status}
+      {memberStatusLabel(status, l)}
     </span>
   );
 }
