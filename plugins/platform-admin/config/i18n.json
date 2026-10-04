@@ -5927,5 +5927,47 @@
     "en-US": "Remove from favorites",
     "source": "import",
     "refType": "ui"
+  },
+  {
+    "key": "workbench.inbox.sourceWorkflow",
+    "zh-CN": "工作流",
+    "en-US": "Workflow",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "workbench.inbox.sourceCommand",
+    "zh-CN": "业务操作",
+    "en-US": "Business action",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "workbench.inbox.sourceChat",
+    "zh-CN": "消息",
+    "en-US": "Messages",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "workbench.inbox.sourceAi",
+    "zh-CN": "智能助手",
+    "en-US": "AI assistant",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "workbench.inbox.sourceNotification",
+    "zh-CN": "通知",
+    "en-US": "Notifications",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "workbench.inbox.sourceOther",
+    "zh-CN": "其他来源",
+    "en-US": "Other source",
+    "source": "import",
+    "refType": "ui"
   }
 ]
