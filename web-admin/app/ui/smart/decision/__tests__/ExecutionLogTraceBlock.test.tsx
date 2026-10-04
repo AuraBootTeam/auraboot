@@ -68,6 +68,10 @@ const recentLog = {
       },
     },
     factMetadata: {
+      'record.data.applicant': {
+        label: '申请人', dataType: 'reference', modelCode: 'wd_leave_request',
+        valueLabels: { 'internal-applicant-pid': 'Aura BPM Admin' },
+      },
       review_status: {
         scope: 'record',
         path: 'data.review_status',
@@ -588,6 +592,12 @@ describe('ExecutionLogTraceBlock', () => {
     expect(facts).toHaveTextContent('annual');
     expect(facts).toHaveTextContent('年假');
     expect(facts).not.toHaveTextContent('tenant_id');
+    const applicant = Array.from((facts as HTMLElement).querySelectorAll<HTMLElement>('article')).find(article => article.querySelector('strong')?.textContent === '申请人')!;
+    expect(applicant.querySelector('.elta-fact-values')).toHaveTextContent('Aura BPM Admin');
+    expect(applicant.querySelector('.elta-fact-values')).not.toHaveTextContent('internal-applicant-pid');
+    const technical = applicant.querySelector('details')!;
+    expect(technical).not.toHaveAttribute('open');
+    expect(technical).toHaveTextContent('internal-applicant-pid');
   });
 
   it('shows virtual source trace evidence in the trace drawer', async () => {

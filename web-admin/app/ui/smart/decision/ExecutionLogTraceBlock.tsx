@@ -1441,12 +1441,22 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                               <div className="elta-fact-values">
                                 {factMetadataValueLabelEntries(row).map(([value, label]) => (
                                   <span key={value}>
-                                    <code>{value}</code>
+                                    {!['reference', 'user'].includes(String(row.metadata.dataType).toLowerCase()) && <code>{value}</code>}
                                     {label}
                                   </span>
                                 ))}
                               </div>
                             ) : null}
+                            {['reference', 'user'].includes(String(row.metadata.dataType).toLowerCase()) && factMetadataValueLabelEntries(row).length > 0 && (
+                              <details className="mt-2 text-xs" data-testid="elta-reference-identifiers">
+                                <summary>{traceLabel('semantic', 'technicalDetails', locale)}</summary>
+                                <dl className="mt-1 break-all">
+                                  {factMetadataValueLabelEntries(row).map(([value, label]) => (
+                                    <div key={value}><dt>{label}</dt><dd>{value}</dd></div>
+                                  ))}
+                                </dl>
+                              </details>
+                            )}
                           </article>
                         ))}
                       </div>
