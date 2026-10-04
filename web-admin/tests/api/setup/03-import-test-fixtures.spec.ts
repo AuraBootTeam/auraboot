@@ -162,7 +162,7 @@ async function ensureFixtureUserRoles(request: APIRequestContext, token: string)
   // admin storageState, so admin needs the fixture's E2ET.* action permissions for the
   // permission-gated toolbar buttons (create/delete/…) to render. The tenant_admin role
   // does not auto-inherit a later-imported plugin's permissions, so grant it explicitly.
-  await assignFixtureRole(request, token, 'admin@auraboot.com', 'e2et_admin');
+  await assignFixtureRole(request, token, DEFAULT_TEST_ACCOUNT.email, 'e2et_admin');
 }
 
 test.describe.configure({ mode: 'serial' });
