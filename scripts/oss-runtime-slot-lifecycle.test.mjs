@@ -18,16 +18,11 @@ test('golden stack rejects invalid or missing system mode before runtime allocat
   }
 });
 
-test('fresh OSS gate keeps the registered slot for the same stable runtime name', () => {
+test('fresh OSS gate refuses an existing runtime instead of destroying evidence', () => {
   const source = readFileSync(gatePath, 'utf8');
   assert.match(source, /registered_slot_for_name\(\)/u);
-  assert.match(source, /SLOT="\$registered_slot"/u);
-  assert.match(source, /reusing prior slot .* before the fresh rebuild/u);
-  assert.ok(
-    source.indexOf('registered_slot="$(registered_slot_for_name)"')
-      < source.indexOf('"$GS" destroy "$NAME"'),
-    'the old allocation must identify the stable slot before the fresh destroy',
-  );
+  assert.match(source, /\[\[ -z "\$registered_slot" \]\] \|\| die_env/u);
+  assert.doesNotMatch(source, /"\$GS" destroy|"\$GS" down/u);
 });
 
 test('OSS gate resolves the workspace in local and sibling-repository CI layouts', () => {
@@ -45,8 +40,8 @@ test('golden stack uses idempotent runtime identity with source worktree metadat
   const source = readFileSync(stackPath, 'utf8');
   assert.match(source, /runtime ensure auraboot "\$name"/u);
   assert.match(source, /--source-root "\$REPO_ROOT"/u);
-  assert.match(source, /runtime allocate auraboot "\$name"/u);
-  assert.match(source, /legacy dispatcher/u);
+  assert.match(source, /runtime evidence begin/u);
+  assert.doesNotMatch(source, /runtime allocate auraboot/u);
   assert.match(source, /--mode "\$runtime_mode"/u);
 });
 

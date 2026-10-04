@@ -215,7 +215,7 @@
 | `import-templates.sh` | 2 | 2026-05-11 |  |
 | `install-agent-git-hooks.mjs` | 2 | 2026-06-24 |  |
 | `migrate-dsl-buttons.mjs` | 0 | 2026-03-26 | Migration script: batch-convert legacy button configs to unified action format. |
-| `oss-golden-stack.sh` | 19 | 2026-07-23 | oss-golden-stack.sh — one-click host-first golden stack for OSS auraboot. |
+| `oss-golden-stack.sh` | 19 | 2026-10-04 | Host-first OSS stack. Stable runtime-owned state; `verify-artifacts` verifies registered sources, staged Core/PF4J bytes, actual listeners, database/Redis and BFF upstream before publishing the public product manifest. |
 | `oss-reset-and-init.sh` | 24 | 2026-08-28 | AuraBoot OSS Environment Reset and Initialization Script. Requires `AURA_RESET_ALLOW_TARGETS="<pg_db>,<be_port>"` (target designation gate; `@any` overrides). |
 | `observability-grafana-browser.mjs` | 0 | 2026-09-12 | Browser verification helper for the observability Grafana surface. |
 | `observability-real-stack-ci.sh` | 0 | 2026-09-12 | CI entrypoint for the real-stack observability gate. |
