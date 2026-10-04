@@ -9,7 +9,6 @@ import com.auraboot.framework.user.mapper.UserMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.util.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -32,8 +31,8 @@ import java.util.stream.Collectors;
  * blockchain-like integrity chain per tenant — any tampering with historical
  * records will break the chain and be detectable via verifyChainIntegrity().
  *
- * Thread safety: concurrent writes are handled via the unique constraint on
- * (tenant_id, sequence_no) with retry on collision.
+ * Concurrent app instances serialize each tenant chain with a PostgreSQL
+ * transaction advisory lock before reading its head and allocating the next sequence.
  *
  * @since 6.1.0
  */
@@ -43,49 +42,24 @@ import java.util.stream.Collectors;
 public class AuditTrailService {
 
     private static final String GENESIS_HASH = "genesis";
-    private static final int MAX_RETRY_ATTEMPTS = 3;
 
     private final AuditTrailMapper auditTrailMapper;
     private final UserMapper userMapper;
 
     /**
-     * Record an audit trail entry with SHA-256 chain hashing.
-     *
-     * Retries on DuplicateKeyException (sequence_no collision from concurrent writes)
-     * up to MAX_RETRY_ATTEMPTS times with exponential backoff.
-     */
-    public AuditTrail recordAudit(AuditTrailEvent event) {
-        DuplicateKeyException lastException = null;
-        for (int attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
-            try {
-                return doRecordAudit(event);
-            } catch (DuplicateKeyException e) {
-                lastException = e;
-                log.warn("Audit trail sequence collision (attempt {}/{}), retrying...",
-                        attempt, MAX_RETRY_ATTEMPTS);
-                if (attempt < MAX_RETRY_ATTEMPTS) {
-                    try {
-                        Thread.sleep(50L * (1L << (attempt - 1)));
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                        throw new RuntimeException("Interrupted during audit trail retry", ie);
-                    }
-                }
-            }
-        }
-        throw new RuntimeException("Failed to record audit trail after " +
-                MAX_RETRY_ATTEMPTS + " attempts due to sequence collisions", lastException);
-    }
-
-    /**
-     * Internal method that performs the actual audit record insertion.
-     * Uses REQUIRES_NEW propagation so each retry attempt gets a fresh transaction.
+     * Append one record in an independent transaction, holding the tenant chain lock
+     * through commit. The annotation is on the externally invoked entry point:
+     * self-invocation would neither start a transaction nor recover an aborted one.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public AuditTrail doRecordAudit(AuditTrailEvent event) {
+    public AuditTrail recordAudit(AuditTrailEvent event) {
         Long tenantId = event.getTenantId();
+        if (tenantId == null) {
+            throw new IllegalArgumentException("Audit event tenantId is required");
+        }
+        auditTrailMapper.lockTenantChain(tenantId);
 
-        // 1. Get current max sequence_no (atomic read under the new transaction)
+        // 1. Read the chain head only after acquiring the transaction-scoped lock.
         Long maxSeq = auditTrailMapper.getMaxSequenceNo(tenantId);
         long nextSeq = (maxSeq == null) ? 1L : maxSeq + 1L;
 
