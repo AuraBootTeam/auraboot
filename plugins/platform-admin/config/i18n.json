@@ -5899,5 +5899,33 @@
     "en-US": "Draft has not been saved",
     "source": "import",
     "refType": "ui"
+  },
+  {
+    "key": "dashboard.favorites.only",
+    "zh-CN": "仅显示收藏",
+    "en-US": "Favorites only",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "dashboard.favorites.all",
+    "zh-CN": "全部",
+    "en-US": "All",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "dashboard.favorites.add",
+    "zh-CN": "添加收藏",
+    "en-US": "Add to favorites",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "dashboard.favorites.remove",
+    "zh-CN": "取消收藏",
+    "en-US": "Remove from favorites",
+    "source": "import",
+    "refType": "ui"
   }
 ]
