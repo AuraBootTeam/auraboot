@@ -81,6 +81,11 @@ public class PageSchemaDTO {
     private Map<String, Object> dataSources;
 
     /**
+     * Field linkage rules consumed by the shared schema runtime.
+     */
+    private List<Object> linkageRules;
+
+    /**
      * Optional override for the edit-mode record-prefill fetch (e.g.
      * {@code {"endpoint": "/api/qr/{recordPid}"}}). Declared as a first-class field so
      * import validation recognizes it instead of rejecting it as

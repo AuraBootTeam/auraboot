@@ -410,7 +410,7 @@ export default function App() {
           skipTenantPreferences={data.skipTenantPreferences}
         >
           <TenantThemeProvider>
-            <ToastProvider>
+            <ToastProvider closeLabel={data.i18n?.['notification.close']}>
               <ConfirmDialogProvider>
                 {bootCoreRuntime ? <AuraBotProvider>{appFrame}</AuraBotProvider> : appFrame}
               </ConfirmDialogProvider>

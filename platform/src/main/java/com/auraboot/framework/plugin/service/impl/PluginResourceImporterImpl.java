@@ -1691,6 +1691,9 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         if (dto.getDataSources() != null && !dto.getDataSources().isEmpty()) {
             extension.put("dataSources", dto.getDataSources());
         }
+        if (dto.getLinkageRules() != null) {
+            extension.put("linkageRules", dto.getLinkageRules());
+        }
         if (dto.getMobileUx() != null && !dto.getMobileUx().isEmpty()) {
             extension.put("mobileUx", dto.getMobileUx());
         }

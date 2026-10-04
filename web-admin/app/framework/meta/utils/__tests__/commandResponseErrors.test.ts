@@ -49,3 +49,20 @@ describe('resolveCommandErrorMessage — string context reason key', () => {
     expect(result).toBe('年假余额未登记');
   });
 });
+
+describe('warehouse shortage feedback', () => {
+  it('localizes the real plugin rejection and removes technical prefix and identifiers', () => {
+    expect(resolveCommandErrorMessage({ context: { detail:
+      'Plugin handler execution failed: Insufficient stock for product [01SECRET-PID] at the line location: required 1000000.00, available 0.00',
+    } }, 'inv:confirm_other_out', undefined, 'zh-CN')).toBe(
+      '所选库位库存不足：需要 1000000.00，可用 0.00。请调整数量或选择其他库位。');
+  });
+  it('preserves the real quantities when translating through the catalog', () => {
+    let params: Record<string, string> | undefined;
+    const result = resolveCommandErrorMessage({ context: { detail:
+      'Insufficient stock for product [Bearing] in source warehouse: required 5.00, available 2.00',
+    } }, 'inv:confirm_stock_transfer', (_key, values) => { params = values; return 'Localized shortage'; }, 'en-US');
+    expect(result).toBe('Localized shortage');
+    expect(params).toEqual({ required: '5.00', available: '2.00' });
+  });
+});

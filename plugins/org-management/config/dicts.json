@@ -1,13 +1,13 @@
 [
   {
     "code": "org_dept_status",
-    "name:zh-CN": "Department Status",
+    "name:zh-CN": "部门状态",
     "name:en": "Department Status",
     "dictType": "static",
     "items": [
       {
         "value": "active",
-        "label:zh-CN": "Active",
+        "label:zh-CN": "启用",
         "label:en": "Active",
         "sortNo": 1,
         "color": "#52c41a",
@@ -17,7 +17,7 @@
       },
       {
         "value": "inactive",
-        "label:zh-CN": "Inactive",
+        "label:zh-CN": "停用",
         "label:en": "Inactive",
         "sortNo": 2,
         "color": "#d9d9d9",
@@ -29,13 +29,13 @@
   },
   {
     "code": "org_pos_status",
-    "name:zh-CN": "Position Status",
+    "name:zh-CN": "岗位状态",
     "name:en": "Position Status",
     "dictType": "static",
     "items": [
       {
         "value": "active",
-        "label:zh-CN": "Active",
+        "label:zh-CN": "启用",
         "label:en": "Active",
         "sortNo": 1,
         "color": "#52c41a",
@@ -45,7 +45,7 @@
       },
       {
         "value": "inactive",
-        "label:zh-CN": "Inactive",
+        "label:zh-CN": "停用",
         "label:en": "Inactive",
         "sortNo": 2,
         "color": "#d9d9d9",
@@ -57,13 +57,13 @@
   },
   {
     "code": "org_position_level",
-    "name:zh-CN": "Position Level",
+    "name:zh-CN": "岗位级别",
     "name:en": "Position Level",
     "dictType": "static",
     "items": [
       {
         "value": "staff",
-        "label:zh-CN": "Staff",
+        "label:zh-CN": "员工",
         "label:en": "Staff",
         "sortNo": 1,
         "color": "#d9d9d9",
@@ -73,7 +73,7 @@
       },
       {
         "value": "supervisor",
-        "label:zh-CN": "Supervisor",
+        "label:zh-CN": "主管",
         "label:en": "Supervisor",
         "sortNo": 2,
         "color": "#1890ff",
@@ -83,7 +83,7 @@
       },
       {
         "value": "manager",
-        "label:zh-CN": "Manager",
+        "label:zh-CN": "经理",
         "label:en": "Manager",
         "sortNo": 3,
         "color": "#722ed1",
@@ -93,7 +93,7 @@
       },
       {
         "value": "director",
-        "label:zh-CN": "Director",
+        "label:zh-CN": "总监",
         "label:en": "Director",
         "sortNo": 4,
         "color": "#fa8c16",
@@ -103,7 +103,7 @@
       },
       {
         "value": "VP",
-        "label:zh-CN": "VP",
+        "label:zh-CN": "副总裁",
         "label:en": "VP",
         "sortNo": 5,
         "color": "#eb2f96",
@@ -113,7 +113,7 @@
       },
       {
         "value": "ceo",
-        "label:zh-CN": "ceo",
+        "label:zh-CN": "首席执行官",
         "label:en": "ceo",
         "sortNo": 6,
         "color": "#f5222d",
@@ -125,13 +125,13 @@
   },
   {
     "code": "org_emp_status",
-    "name:zh-CN": "Employee Status",
+    "name:zh-CN": "员工状态",
     "name:en": "Employee Status",
     "dictType": "static",
     "items": [
       {
         "value": "active",
-        "label:zh-CN": "Active",
+        "label:zh-CN": "启用",
         "label:en": "Active",
         "sortNo": 1,
         "color": "#52c41a",
@@ -141,7 +141,7 @@
       },
       {
         "value": "on_leave",
-        "label:zh-CN": "On Leave",
+        "label:zh-CN": "休假",
         "label:en": "On Leave",
         "sortNo": 2,
         "color": "#fa8c16",
@@ -151,7 +151,7 @@
       },
       {
         "value": "resigned",
-        "label:zh-CN": "Resigned",
+        "label:zh-CN": "离职",
         "label:en": "Resigned",
         "sortNo": 3,
         "color": "#d9d9d9",

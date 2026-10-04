@@ -3939,5 +3939,343 @@
     "en-US": "Invalid source evidence. The form was not changed. Please retry.",
     "ja-JP": "原文の根拠が無効です。フォームは変更されていません。再試行してください。",
     "ko-KR": "원문 근거가 유효하지 않습니다. 양식은 변경되지 않았습니다. 다시 시도해 주세요."
+  },
+  {
+    "key": "search.settings",
+    "zh-CN": "搜索设置",
+    "en-US": "Search settings",
+    "ja-JP": "検索設定",
+    "ko-KR": "검색 설정"
+  },
+  {
+    "key": "search.settingsHint",
+    "zh-CN": "选择并排列参与记录搜索的模型。",
+    "en-US": "Choose and order the record models searched.",
+    "ja-JP": "レコード検索に使用するモデルを選択して並べ替えます。",
+    "ko-KR": "레코드 검색에 사용할 모델을 선택하고 정렬하세요."
+  },
+  {
+    "key": "search.noReadableModels",
+    "zh-CN": "暂无可搜索的模型",
+    "en-US": "No readable search models",
+    "ja-JP": "検索可能なモデルがありません",
+    "ko-KR": "검색 가능한 모델이 없습니다"
+  },
+  {
+    "key": "search.loadModelsFailed",
+    "zh-CN": "无法加载搜索模型",
+    "en-US": "Unable to load search models",
+    "ja-JP": "検索モデルを読み込めません",
+    "ko-KR": "검색 모델을 불러올 수 없습니다"
+  },
+  {
+    "key": "search.saveSettingsFailed",
+    "zh-CN": "无法保存搜索设置",
+    "en-US": "Unable to save search settings",
+    "ja-JP": "検索設定を保存できません",
+    "ko-KR": "검색 설정을 저장할 수 없습니다"
+  },
+  {
+    "key": "search.settingsSaved",
+    "zh-CN": "搜索设置已保存",
+    "en-US": "Search settings saved",
+    "ja-JP": "検索設定を保存しました",
+    "ko-KR": "검색 설정이 저장되었습니다"
+  },
+  {
+    "key": "common.moveUp",
+    "zh-CN": "上移",
+    "en-US": "Move up",
+    "ja-JP": "上へ移動",
+    "ko-KR": "위로 이동"
+  },
+  {
+    "key": "common.moveDown",
+    "zh-CN": "下移",
+    "en-US": "Move down",
+    "ja-JP": "下へ移動",
+    "ko-KR": "아래로 이동"
+  },
+  {
+    "key": "sidebar.expand",
+    "zh-CN": "展开侧栏",
+    "en-US": "Expand sidebar",
+    "ja-JP": "サイドバーを展開",
+    "ko-KR": "사이드바 펼치기"
+  },
+  {
+    "key": "sidebar.collapse",
+    "zh-CN": "收起侧栏",
+    "en-US": "Collapse sidebar",
+    "ja-JP": "サイドバーを折りたたむ",
+    "ko-KR": "사이드바 접기"
+  },
+  {
+    "key": "language.switch",
+    "zh-CN": "切换语言",
+    "en-US": "Switch language",
+    "ja-JP": "言語を切り替え",
+    "ko-KR": "언어 변경"
+  },
+  {
+    "key": "theme.switch",
+    "zh-CN": "切换主题",
+    "en-US": "Switch theme",
+    "ja-JP": "テーマを切り替え",
+    "ko-KR": "테마 변경"
+  },
+  {
+    "key": "table.reorderColumn",
+    "zh-CN": "拖动调整列顺序",
+    "en-US": "Drag to reorder column",
+    "ja-JP": "ドラッグして列を並べ替え",
+    "ko-KR": "드래그하여 열 순서 변경"
+  },
+  {
+    "key": "table.rowHeight",
+    "zh-CN": "行高",
+    "en-US": "Row height",
+    "ja-JP": "行の高さ",
+    "ko-KR": "행 높이"
+  },
+  {
+    "key": "table.statusTabs",
+    "zh-CN": "状态筛选",
+    "en-US": "Status filters",
+    "ja-JP": "状態フィルター",
+    "ko-KR": "상태 필터"
+  },
+  {
+    "key": "inbox.title",
+    "zh-CN": "收件箱",
+    "en-US": "Inbox",
+    "ja-JP": "受信トレイ",
+    "ko-KR": "받은 편지함"
+  },
+  {
+    "key": "inbox.unreadCount",
+    "zh-CN": "{count} 条未读",
+    "en-US": "{count} unread items",
+    "ja-JP": "未読 {count} 件",
+    "ko-KR": "읽지 않은 항목 {count}개"
+  },
+  {
+    "key": "dashboard.designer.title",
+    "zh-CN": "仪表盘设计器",
+    "en-US": "Dashboard Designer"
+  },
+  {
+    "key": "dashboard.designer.presentation",
+    "zh-CN": "演示模式",
+    "en-US": "Presentation Mode"
+  },
+  {
+    "key": "dashboard.designer.history",
+    "zh-CN": "版本历史",
+    "en-US": "Version History"
+  },
+  {
+    "key": "dashboard.designer.validate",
+    "zh-CN": "验证",
+    "en-US": "Validate"
+  },
+  {
+    "key": "dashboard.designer.validationPassed",
+    "zh-CN": "验证通过",
+    "en-US": "Validation passed"
+  },
+  {
+    "key": "dashboard.designer.validationFailed",
+    "zh-CN": "验证失败：{error}",
+    "en-US": "Validation failed: {error}"
+  },
+  {
+    "key": "dashboard.designer.unpublish",
+    "zh-CN": "取消发布",
+    "en-US": "Unpublish"
+  },
+  {
+    "key": "dashboard.designer.publish",
+    "zh-CN": "发布",
+    "en-US": "Publish"
+  },
+  {
+    "key": "dashboard.exportExcel",
+    "zh-CN": "导出 Excel",
+    "en-US": "Export to Excel"
+  },
+  {
+    "key": "member.invite",
+    "zh-CN": "邀请成员",
+    "en-US": "Invite"
+  },
+  {
+    "key": "member.import",
+    "zh-CN": "导入成员",
+    "en-US": "Import Members"
+  },
+  {
+    "key": "permission.role",
+    "zh-CN": "角色",
+    "en-US": "Role"
+  },
+  {
+    "key": "permission.type",
+    "zh-CN": "类型",
+    "en-US": "Type"
+  },
+  {
+    "key": "table.doubleClickEdit",
+    "zh-CN": "双击编辑",
+    "en-US": "Double-click to edit"
+  },
+  {
+    "key": "notification.close",
+    "zh-CN": "关闭通知",
+    "en-US": "Close notification"
+  },
+  {
+    "key": "designer.dragBlock",
+    "zh-CN": "拖动{label}",
+    "en-US": "Drag {label}"
+  },
+  {
+    "key": "designer.resizeBlock",
+    "zh-CN": "调整{label}大小",
+    "en-US": "Resize {label}"
+  },
+  {
+    "key": "designer.blockOrder",
+    "zh-CN": "区块顺序",
+    "en-US": "Block order"
+  },
+  {
+    "key": "designer.moveUp",
+    "zh-CN": "上移区块",
+    "en-US": "Move block up"
+  },
+  {
+    "key": "designer.moveDown",
+    "zh-CN": "下移区块",
+    "en-US": "Move block down"
+  },
+  {
+    "key": "designer.spanPresets",
+    "zh-CN": "宽度预设",
+    "en-US": "Span presets"
+  },
+  {
+    "key": "designer.setSpan",
+    "zh-CN": "设置宽度 {span}",
+    "en-US": "Set span {span}"
+  },
+  {
+    "key": "dashboard.exportEmpty",
+    "zh-CN": "没有可导出的数据",
+    "en-US": "No data to export"
+  },
+  {
+    "key": "dashboard.exportSuccess",
+    "zh-CN": "已导出 {count} 个工作表",
+    "en-US": "Exported {count} sheets"
+  },
+  {
+    "key": "dashboard.exportFailed",
+    "zh-CN": "Excel 导出失败",
+    "en-US": "Excel export failed"
+  },
+  {
+    "key": "dashboard.designer.settings",
+    "zh-CN": "设置",
+    "en-US": "Settings"
+  },
+  {
+    "key": "dashboard.designer.defaultTitle",
+    "zh-CN": "未命名仪表盘",
+    "en-US": "Untitled Dashboard"
+  },
+  {
+    "key": "admin.permission.role.recommendedHint",
+    "zh-CN": "按业务职责分配角色；管理员角色仅授予需要管理权限的人员。",
+    "en-US": "Assign roles by business responsibility; grant administrator roles only to staff who need management access.",
+    "ja-JP": "業務上の責任に応じてロールを割り当て、管理権限が必要な担当者にのみ管理者ロールを付与します。",
+    "ko-KR": "업무 책임에 따라 역할을 배정하고 관리 권한이 필요한 직원에게만 관리자 역할을 부여하세요."
+  },
+  {
+    "key": "role.tenant_admin._meta.description",
+    "zh-CN": "管理本租户的业务配置、成员与权限。",
+    "en-US": "Manage business configuration, members and permissions for this tenant.",
+    "ja-JP": "このテナントの業務設定、メンバー、権限を管理します。",
+    "ko-KR": "이 테넌트의 업무 설정, 구성원 및 권한을 관리합니다."
+  },
+  {
+    "key": "role.tenant_member._meta.description",
+    "zh-CN": "租户成员共有的基础查看能力，由系统统一维护。",
+    "en-US": "Shared basic viewing capabilities for tenant members, maintained by the system.",
+    "ja-JP": "システムが維持する、テナントメンバー共通の基本的な閲覧権限です。",
+    "ko-KR": "시스템이 관리하는 테넌트 구성원의 공통 기본 조회 권한입니다."
+  },
+  {
+    "key": "workbench.exported",
+    "zh-CN": "已导出 {count} 个工作表",
+    "en-US": "Exported {count} sheets",
+    "ja-JP": "{count} 個のシートをエクスポートしました",
+    "ko-KR": "시트 {count}개를 내보냈습니다"
+  },
+  {
+    "key": "workbench.exportNoData",
+    "zh-CN": "暂无可导出的数据",
+    "en-US": "No data to export",
+    "ja-JP": "エクスポートするデータがありません",
+    "ko-KR": "내보낼 데이터가 없습니다"
+  },
+  {
+    "key": "workbench.exportFailed",
+    "zh-CN": "Excel 导出失败，请稍后重试",
+    "en-US": "Excel export failed. Please try again.",
+    "ja-JP": "Excel のエクスポートに失敗しました。もう一度お試しください。",
+    "ko-KR": "Excel 내보내기에 실패했습니다. 다시 시도해 주세요."
+  },
+  {
+    "key": "form.draft.title",
+    "zh-CN": "发现未保存的草稿",
+    "en-US": "Unsaved draft found",
+    "ja-JP": "未保存の下書きがあります",
+    "ko-KR": "저장하지 않은 초안이 있습니다"
+  },
+  {
+    "key": "form.draft.restorePrompt",
+    "zh-CN": "您有一份保存于 {time} 的未提交草稿。",
+    "en-US": "You have unsaved changes from {time}.",
+    "ja-JP": "{time} の未保存の変更があります。",
+    "ko-KR": "{time}에 저장하지 않은 변경 내용이 있습니다."
+  },
+  {
+    "key": "form.draft.restore",
+    "zh-CN": "恢复草稿",
+    "en-US": "Restore",
+    "ja-JP": "復元",
+    "ko-KR": "복원"
+  },
+  {
+    "key": "form.draft.discard",
+    "zh-CN": "放弃草稿",
+    "en-US": "Discard",
+    "ja-JP": "破棄",
+    "ko-KR": "삭제"
+  },
+  {
+    "key": "common.button.back",
+    "zh-CN": "返回",
+    "en-US": "Back",
+    "ja-JP": "戻る",
+    "ko-KR": "뒤로"
+  },
+  {
+    "key": "common.error.insufficientStock",
+    "zh-CN": "所选库位库存不足：需要 {required}，可用 {available}。请调整数量或选择其他库位。",
+    "en-US": "Insufficient stock at the selected location: required {required}, available {available}. Adjust the quantity or select another location.",
+    "ja-JP": "選択した保管場所の在庫が不足しています：必要数 {required}、利用可能数 {available}。数量または保管場所を変更してください。",
+    "ko-KR": "선택한 위치의 재고가 부족합니다: 필요 수량 {required}, 가용 수량 {available}. 수량이나 위치를 변경하세요."
   }
 ]

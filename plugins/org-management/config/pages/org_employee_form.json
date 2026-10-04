@@ -1,6 +1,6 @@
 {
   "pageKey": "org_employee_form",
-  "name:zh-CN": "Employee Form",
+  "name:zh-CN": "员工信息",
   "name:en": "Employee Form",
   "modelCode": "org_employee",
   "description": "Employee create/edit form",
@@ -16,7 +16,7 @@
       "id": "block_emp_basic",
       "blockType": "form-section",
       "title": {
-        "zh-CN": "Basic Information",
+        "zh-CN": "基本信息",
         "en": "Basic Information"
       },
       "layout": {
@@ -78,7 +78,7 @@
       "id": "block_emp_contact",
       "blockType": "form-section",
       "title": {
-        "zh-CN": "Contact Information",
+        "zh-CN": "联系信息",
         "en": "Contact Information"
       },
       "layout": {
@@ -144,7 +144,7 @@
     }
   ],
   "title": {
-    "zh-CN": "Employee Form",
+    "zh-CN": "员工信息",
     "en": "Employee Form"
   }
 }

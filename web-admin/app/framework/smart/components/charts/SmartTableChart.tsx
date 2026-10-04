@@ -270,7 +270,7 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [useModelBranch, modelCode, pageSize, modelFiltersKey, modelSortKey]);
 
-  const data = useChartBranch
+  const data = useMemo(() => useChartBranch
     ? chartData
     : useApiBranch
       ? {
@@ -290,7 +290,7 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
               metrics: [] as string[],
             },
           }
-        : null;
+        : null, [useChartBranch, chartData, useApiBranch, apiRows, useModelBranch, modelRows, tableColumns]);
   const loading = useChartBranch ? chartLoading : useApiBranch ? apiLoading : modelLoading;
   const error = useChartBranch ? chartError : useApiBranch ? apiError : modelError;
 
@@ -453,12 +453,12 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
       style={style}
     >
       {title && (
-        <div className="border-b border-gray-200 px-4 py-3">
+        <div className="shrink-0 border-b border-gray-200 px-4 py-3">
           <h3 className="text-sm font-medium text-gray-700">{title}</h3>
         </div>
       )}
 
-      <div className="flex-1 overflow-auto">
+      <div className="min-h-0 flex-1 overflow-auto">
         <table className="min-w-full divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50">
             <tr>
@@ -526,7 +526,7 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
       </div>
 
       {showPagination && totalPages > 1 && (
-        <div className="flex items-center justify-between border-t border-gray-200 px-4 py-2.5 text-sm text-gray-500">
+        <div className="flex shrink-0 items-center justify-between border-t border-gray-200 px-4 py-2.5 text-sm text-gray-500">
           <span>{l(`共 ${sortedRows.length} 条`, `${sortedRows.length} rows`)}</span>
           <div className="flex items-center gap-2">
             <button

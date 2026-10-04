@@ -84,6 +84,12 @@ public class PageSchemaDTO extends AbstractResponse {
     private Map<String, Object> dataSources;
 
     /**
+     * Field linkage rules consumed by the shared schema runtime.
+     */
+    @JsonProperty("linkageRules")
+    private List<Object> linkageRules;
+
+    /**
      * Optional override for the edit-mode record-prefill fetch (e.g.
      * {@code {"endpoint": "/api/qr/{recordPid}"}}). When set, a form page loads
      * the existing record from this endpoint instead of the default

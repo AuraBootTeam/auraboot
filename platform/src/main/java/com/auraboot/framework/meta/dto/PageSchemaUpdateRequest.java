@@ -82,6 +82,12 @@ public class PageSchemaUpdateRequest extends AbstractUpdateRequest {
     private Map<String, Object> dataSources;
 
     /**
+     * Field linkage rules consumed by the shared schema runtime.
+     */
+    @JsonProperty("linkageRules")
+    private List<Object> linkageRules;
+
+    /**
      * Ordered list of page blocks.
      */
     @JsonProperty("blocks")

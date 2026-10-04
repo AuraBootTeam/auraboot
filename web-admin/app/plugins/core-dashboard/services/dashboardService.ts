@@ -213,6 +213,10 @@ function normalizeWidget(raw: Record<string, unknown>, index: number): Widget {
     'xField',
     'yField',
     'seriesConfig',
+    'metricLabels',
+    'smooth',
+    'areaStyle',
+    'showSymbol',
     'chartOptions',
   ] as const) {
     if (rawConfig[key] !== undefined) {
