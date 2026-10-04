@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync, realpathSync, writeFileSync, renameSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, realpathSync, writeFileSync, renameSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -43,7 +43,10 @@ export function verifyLiveStack(workspace, core, runtime, state) {
   assert.ok([0, 1].includes(probe.status), 'public identity probe unavailable');
   const info = JSON.parse(probe.stdout);
   verifyBinding(info, runtime, core);
-  const allowed = new Set(['PROCESS_IDENTITY_DRIFT']);
+  // A newly spawned listener is initially unknown to the public registry. It is
+  // admitted only through the actual cwd/JAR/environment checks below; publication
+  // then requires public verify to pass with the new descriptors installed.
+  const allowed = new Set(['PROCESS_IDENTITY_DRIFT', 'UNKNOWN_LISTENER']);
   for (const finding of info.findings || []) assert.ok(allowed.has(finding.code), `public identity finding: ${finding.code}`);
   const boot = join(state, 'boot-run.jar');
   const artifacts = [verifyArtifact({ key: 'core', source: join(core, 'platform/build/libs/AuraBoot-1.0.0-boot.jar'), staged: boot, sha256: hashFile(boot) }, info.sources)];
@@ -54,6 +57,9 @@ export function verifyLiveStack(workspace, core, runtime, state) {
     artifacts.push(verifyArtifact({ key, source, staged, sha256 }, info.sources));
   }
   assert.equal(new Set(artifacts.map(a => a.key)).size, artifacts.length, 'duplicate staged plugin');
+  const stagedFiles = readdirSync(join(state, 'pf4j-plugins')).filter(f => f.endsWith('.jar')).sort();
+  const receiptFiles = artifacts.slice(1).map(a => a.staged.split('/').at(-1)).sort();
+  assert.deepEqual(receiptFiles, stagedFiles, 'PF4J receipt does not cover every staged JAR');
   const imported = readFileSync(join(state, 'logs/import.log'), 'utf8');
   assert.match(imported, /Plugin import complete\./, 'plugin import incomplete');
   assert.match(imported, /Plugin activation: OK \(\d+ enabled\)/, 'plugin activation incomplete');

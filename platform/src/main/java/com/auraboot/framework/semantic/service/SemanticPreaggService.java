@@ -119,6 +119,7 @@ public class SemanticPreaggService {
                     : preagg.getLastRefreshedAt())
                     .plusMinutes(preagg.getRefreshMinutes() == null ? 60 : preagg.getRefreshMinutes());
             if (due.isAfter(OffsetDateTime.now(ZoneOffset.UTC))) continue;
+            MetaContext.Snapshot caller = MetaContext.snapshot();
             try {
                 MetaContext.setContext(preagg.getTenantId(), preagg.getCreatedBy(),
                         "semantic-preagg", "semantic-preagg-refresher");
@@ -127,6 +128,7 @@ public class SemanticPreaggService {
                 log.warn("Semantic preagg {} refresh failed: {}", preagg.getPid(), e.getMessage());
             } finally {
                 MetaContext.clear();
+                MetaContext.restore(caller);
             }
         }
     }
@@ -138,6 +140,7 @@ public class SemanticPreaggService {
             throw new SemanticValidationException("SEMANTIC_PREAGG_MODEL_MISSING",
                     "Semantic model not found: " + preagg.getSemanticModelPid());
         }
+        MetaContext.Snapshot caller = MetaContext.snapshot();
         MetaContext.setContext(preagg.getTenantId(), preagg.getCreatedBy(),
                 "semantic-preagg", "semantic-preagg-refresher");
         try {
@@ -164,6 +167,7 @@ public class SemanticPreaggService {
             return preagg.getLastRefreshRows();
         } finally {
             MetaContext.clear();
+            MetaContext.restore(caller);
         }
     }
 
