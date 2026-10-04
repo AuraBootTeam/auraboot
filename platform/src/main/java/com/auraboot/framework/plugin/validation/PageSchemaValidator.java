@@ -78,6 +78,12 @@ public class PageSchemaValidator implements PluginValidator {
         return profile == null ? KNOWN_BLOCK_TYPES : profile.blockTypes();
     }
 
+    /** Envelope validation shares host registrations; profile scoping is checked above. */
+    Set<String> extensionKinds() {
+        return renderProfiles.values().stream().flatMap(profile -> profile.kinds().stream())
+                .collect(Collectors.toUnmodifiableSet());
+    }
+
     @Override
     public String category() {
         return "semantic";
