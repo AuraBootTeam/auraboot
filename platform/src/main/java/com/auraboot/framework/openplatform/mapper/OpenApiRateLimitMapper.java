@@ -23,11 +23,16 @@ public interface OpenApiRateLimitMapper {
                 WHERE t.token_hash = #{tokenHash} AND t.audience = #{audience}
                   AND t.revoked_at IS NULL AND t.expires_at > #{usedAt}
                 LIMIT 1
-            ), consumed AS (
-                INSERT INTO ab_open_api_rate_window (installation_id, window_start, request_count)
-                SELECT installation_id, #{windowStart}, 1 FROM token
+            ), locked AS MATERIALIZED (
+                SELECT installation_id,
+                       pg_advisory_xact_lock(hashtextextended(
+                           'auraboot.open-platform.quota:' || installation_id::text, 0)) AS held
+                FROM token
                 WHERE installation_status = 'active' AND application_status = 'active'
                   AND scopes @> jsonb_build_array(CAST(#{requiredScope} AS text))
+            ), consumed AS (
+                INSERT INTO ab_open_api_rate_window (installation_id, window_start, request_count)
+                SELECT installation_id, #{windowStart}, 1 FROM locked
                 ON CONFLICT (installation_id, window_start) DO UPDATE
                 SET request_count = ab_open_api_rate_window.request_count + 1
                 WHERE ab_open_api_rate_window.request_count <

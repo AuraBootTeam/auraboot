@@ -13,6 +13,7 @@ import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.UpsertApplicatio
 import com.auraboot.framework.openplatform.mapper.OpenPlatformAuthMapper;
 import com.auraboot.framework.openplatform.mapper.OpenApiRateLimitMapper;
 import com.auraboot.framework.openplatform.security.OpenPlatformBearerAuthenticator;
+import com.auraboot.framework.openplatform.security.OpenApiRequestIdFilter;
 import com.auraboot.framework.application.security.ExternalMachineAuthException;
 import org.springframework.mock.web.MockHttpServletRequest;
 import com.auraboot.framework.webhook.dto.WebhookCreateRequest;
@@ -249,7 +250,28 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
                     java.sql.Timestamp.class, record.tokenPid()));
             MockHttpServletRequest allowed = new MockHttpServletRequest("GET", "/api/open/v1/whoami");
             allowed.addHeader("Authorization", "Bearer " + token.accessToken());
-            assertEquals(installation.pid(), authenticator.authenticate(allowed).installationPid());
+            allowed.addHeader("X-Tenant-Id", "99999");
+            allowed.setAttribute(OpenApiRequestIdFilter.REQUEST_ID_ATTRIBUTE, "atomic-auth-trace");
+            assertTrue(authenticator.supports(allowed));
+            assertFalse(authenticator.supports(new MockHttpServletRequest("GET", "/api/internal")));
+            var principal = authenticator.authenticate(allowed);
+            assertEquals(installation.pid(), principal.installationPid());
+            assertEquals(getTestTenant().getId(), principal.tenantId());
+            authenticator.recordCall(principal, allowed, 200, 12);
+            var audit = jdbcTemplate.queryForMap("""
+                    SELECT tenant_id, application_pid, installation_pid, token_pid,
+                           request_id, http_method, request_path, response_status, duration_ms
+                    FROM ab_open_api_call_audit WHERE installation_pid = ?
+                    """, installation.pid());
+            assertEquals(getTestTenant().getId(), audit.get("tenant_id"));
+            assertEquals(application.pid(), audit.get("application_pid"));
+            assertEquals(installation.pid(), audit.get("installation_pid"));
+            assertEquals(record.tokenPid(), audit.get("token_pid"));
+            assertEquals("atomic-auth-trace", audit.get("request_id"));
+            assertEquals("GET", audit.get("http_method"));
+            assertEquals("/api/open/v1/whoami", audit.get("request_path"));
+            assertEquals(200, audit.get("response_status"));
+            assertEquals(12L, audit.get("duration_ms"));
             assertEquals(1, jdbcTemplate.queryForObject(
                     "SELECT SUM(request_count)::int FROM ab_open_api_rate_window WHERE installation_id = ?",
                     Integer.class, record.installationId()));
@@ -284,19 +306,69 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
                     "SELECT last_used_at FROM ab_application_access_token WHERE pid = ?",
                     java.sql.Timestamp.class, record.tokenPid()));
         } finally {
-            jdbcTemplate.update("DELETE FROM ab_open_api_rate_window WHERE installation_id IN "
-                    + "(SELECT id FROM ab_application_installation WHERE application_id = ?)", applicationId);
-            jdbcTemplate.update("DELETE FROM ab_application_access_token WHERE installation_id IN "
-                    + "(SELECT id FROM ab_application_installation WHERE application_id = ?)", applicationId);
-            jdbcTemplate.update("DELETE FROM ab_application_credential WHERE installation_id IN "
-                    + "(SELECT id FROM ab_application_installation WHERE application_id = ?)", applicationId);
-            jdbcTemplate.update("DELETE FROM ab_application_scope_grant WHERE installation_id IN "
-                    + "(SELECT id FROM ab_application_installation WHERE application_id = ?)", applicationId);
-            jdbcTemplate.update("DELETE FROM ab_application_installation WHERE application_id = ?", applicationId);
-            jdbcTemplate.update("DELETE FROM ab_external_application_member_audit WHERE application_id = ?",
-                    applicationId);
-            jdbcTemplate.update("DELETE FROM ab_external_application_member WHERE application_id = ?", applicationId);
-            jdbcTemplate.update("DELETE FROM ab_external_application WHERE id = ?", applicationId);
+            deleteCommittedApplicationFixture(applicationId);
+        }
+    }
+
+    private void deleteCommittedApplicationFixture(Long applicationId) {
+        jdbcTemplate.update("DELETE FROM ab_open_api_call_audit WHERE installation_pid IN "
+            + "(SELECT pid FROM ab_application_installation WHERE application_id = ?)", applicationId);
+        jdbcTemplate.update("DELETE FROM ab_open_api_rate_window WHERE installation_id IN "
+                + "(SELECT id FROM ab_application_installation WHERE application_id = ?)", applicationId);
+        jdbcTemplate.update("DELETE FROM ab_application_access_token WHERE installation_id IN "
+                + "(SELECT id FROM ab_application_installation WHERE application_id = ?)", applicationId);
+        jdbcTemplate.update("DELETE FROM ab_application_credential WHERE installation_id IN "
+                + "(SELECT id FROM ab_application_installation WHERE application_id = ?)", applicationId);
+        jdbcTemplate.update("DELETE FROM ab_application_scope_grant WHERE installation_id IN "
+                + "(SELECT id FROM ab_application_installation WHERE application_id = ?)", applicationId);
+        jdbcTemplate.update("DELETE FROM ab_application_installation WHERE application_id = ?", applicationId);
+        jdbcTemplate.update("DELETE FROM ab_external_application_member_audit WHERE application_id = ?",
+                applicationId);
+        jdbcTemplate.update("DELETE FROM ab_external_application_member WHERE application_id = ?", applicationId);
+        jdbcTemplate.update("DELETE FROM ab_external_application WHERE id = ?", applicationId);
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void installationQuotaIsExactAcrossConcurrentTokens() throws Exception {
+        var application = managementService.createApplication(
+                new CreateApplicationRequest("Concurrent quota", "shared installation token boundary"));
+        Long applicationId = jdbcTemplate.queryForObject(
+                "SELECT id FROM ab_external_application WHERE pid = ?", Long.class, application.pid());
+        try {
+            var installation = managementService.install(application.pid(), new InstallApplicationRequest(
+                    "production", Set.of("openapi.profile.read"), 5));
+            var credential = managementService.createCredential(installation.pid());
+            var first = tokenService.issue("client_credentials", credential.clientId(),
+                    credential.clientSecret(), "openapi.profile.read");
+            var second = tokenService.issue("client_credentials", credential.clientId(),
+                    credential.clientSecret(), "openapi.profile.read");
+            Instant now = Instant.now();
+            Instant window = now.truncatedTo(java.time.temporal.ChronoUnit.MINUTES);
+            var start = new CountDownLatch(1);
+            try (var executor = Executors.newFixedThreadPool(12)) {
+                var futures = new java.util.ArrayList<java.util.concurrent.Future<Boolean>>();
+                for (int index = 0; index < 12; index++) {
+                    String rawToken = index % 2 == 0 ? first.accessToken() : second.accessToken();
+                    futures.add(executor.submit(() -> {
+                        start.await();
+                        return rateLimitMapper.authenticate(secretCodec.sha256(rawToken),
+                                OpenPlatformTokenService.AUDIENCE, now, window,
+                                "openapi.profile.read").consumedCount() != null;
+                    }));
+                }
+                start.countDown();
+                int accepted = 0;
+                for (var future : futures) if (future.get()) accepted++;
+                assertEquals(5, accepted);
+            }
+            assertEquals(5, jdbcTemplate.queryForObject("""
+                    SELECT SUM(rate.request_count)::int FROM ab_open_api_rate_window rate
+                    JOIN ab_application_installation installation ON installation.id = rate.installation_id
+                    WHERE installation.pid = ?
+                    """, Integer.class, installation.pid()));
+        } finally {
+            deleteCommittedApplicationFixture(applicationId);
         }
     }
 
