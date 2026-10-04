@@ -1,7 +1,7 @@
 import { getPublishText, buildPermissionReplayContext, buildSlaNodeReplayContext, buildWorkflowReplayContext } from './modelPublishSampleContext';
 import { getPolicyHeading, getMigrationPlanMessage, getHistoricalPolicyMessage } from './modelPublishPolicyMessages';
 import { useI18n } from '~/contexts/I18nContext';
-import { getReplayStatusLabel, getReplayResultMessage, getReplayErrorMessage } from './modelPublishReplayMessages';
+import { ModelPublishReplayResultCard } from './ModelPublishReplayResultCard';
 /**
  * Model详情页面
  *
@@ -27,7 +27,6 @@ import {
 import {
   modelService,
   type ModelPublishReplayReport,
-  type ModelPublishReplayResult,
   type PublishPreview,
   type RelatedPage,
 } from '~/shared/services/modelService';
@@ -140,218 +139,9 @@ function getRelatedPageTitle(page: RelatedPage | null | undefined): string {
   );
 }
 
-function getReplayStatusClass(status?: string): string {
-  if (status === 'EXECUTED') return 'bg-emerald-50 text-emerald-700';
-  if (status === 'READY') return 'bg-blue-50 text-blue-700';
-  if (status === 'MANUAL_REQUIRED' || status === 'NEEDS_SAMPLE_CONTEXT') {
-    return 'bg-amber-50 text-amber-700';
-  }
-  if (
-    status === 'FAILED' ||
-    status === 'AUTOMATION_UNAVAILABLE' ||
-    status === 'PERMISSION_UNAVAILABLE' ||
-    status === 'WORKFLOW_UNAVAILABLE'
-  ) {
-    return 'bg-red-50 text-red-700';
-  }
-  return 'bg-gray-100 text-gray-700';
-}
-
 function metadataString(metadata: Record<string, unknown> | undefined, key: string): string {
   const value = metadata?.[key];
   return typeof value === 'string' && value.trim() ? value : '';
-}
-
-function formatReplayOutputLabel(key: string): string {
-  const labels: Record<string, string> = {
-    permissionCode: '权限标识',
-    memberId: '成员 ID',
-    granted: '授权结果',
-    resource: '资源',
-    action: '操作',
-    recordPid: '记录 PID',
-    permissionPolicyPid: '权限策略 PID',
-    roleId: '角色 ID',
-    grantType: '授权类型',
-    status: '状态',
-    truth: '条件结果',
-    matched: '命中结果',
-    reason: '原因',
-    stepCount: '步骤数',
-    steps: '评估步骤',
-    fieldRefs: '字段引用',
-    ruleTraceId: '统一 Trace',
-    traceId: '追踪 ID',
-    deadlineMinutes: '截止分钟数',
-    processPid: '流程 PID',
-    slaConfigPid: 'SLA 配置 PID',
-    processInstanceId: '流程实例',
-    taskId: '任务 ID',
-    processKey: '流程标识',
-    processName: '流程名称',
-    processVersion: '流程版本',
-    processStatus: '流程状态',
-    targetType: '目标类型',
-    targetKey: '目标节点',
-    nodeId: '节点 ID',
-    nodeType: '节点类型',
-    edgeId: '连线 ID',
-    edgeSource: '来源节点',
-    edgeTarget: '目标节点',
-    bindingSurface: '绑定位置',
-    bindingKind: '绑定类型',
-    decisionCode: '决策标识',
-    decisionStatus: '决策状态',
-    conditionResult: '条件结果',
-    fallbackApplied: '已使用兜底',
-    durationMs: '耗时',
-    errorCode: '错误码',
-    inputs: '输入快照',
-    outputs: '输出快照',
-    decisionRefs: '决策引用',
-    candidateUserIds: '候选审批人',
-    candidateGroupIds: '候选审批组',
-    failClosed: '失败关闭',
-    slaRecordPid: 'SLA 记录 PID',
-    slaRecordStatus: 'SLA 状态',
-    actionCount: '动作数',
-    actionPolicyTrigger: '动作触发',
-    deadlineMode: '截止方式',
-    deadlineValue: '截止配置',
-    deadlineTime: '截止时间',
-    startTime: '开始时间',
-    enabled: '启用',
-    modelCode: '模型',
-    affectedFieldRef: '影响字段',
-    fieldRiskLevel: '字段风险',
-    fieldRiskSummary: '风险说明',
-    fieldMasked: '脱敏字段',
-    fieldPermissionChange: '字段权限变更',
-    fieldPermission: '字段权限',
-    requiresLowPermissionSample: '需要低权限样本',
-  };
-  return labels[key] || key;
-}
-
-function shouldShowReplayOutput(key: string): boolean {
-  return key !== 'steps';
-}
-
-function permissionReplayTraceHref(result: ModelPublishReplayResult): string | null {
-  if (result.step?.consumerType !== 'PERMISSION_POLICY') {
-    return null;
-  }
-  const traceId = typeof result.traceId === 'string' ? result.traceId.trim() : '';
-  if (!traceId) {
-    return null;
-  }
-  const params = new URLSearchParams({ traceId, callerType: 'PERMISSION' });
-  const callerRef = typeof result.outputs?.permissionCode === 'string'
-    ? result.outputs.permissionCode
-    : result.step?.sourceCode;
-  if (callerRef) {
-    params.set('callerRef', callerRef);
-  }
-  return `/p/decisionops_execution_logs?${params.toString()}`;
-}
-
-function formatReplayOutputValue(key: string, value: unknown): string {
-  if (value === null || value === undefined) return '-';
-  if (typeof value === 'string') {
-    const normalized = value.toLowerCase();
-    if ((key === 'truth' || key === 'matched') && ['true', 'yes', 'matched'].includes(normalized)) {
-      return '是';
-    }
-    if ((key === 'truth' || key === 'matched') && ['false', 'no', 'not_matched'].includes(normalized)) {
-      return '否';
-    }
-    if (key === 'grantType') {
-      if (normalized === 'grant') return '授权';
-      if (normalized === 'deny') return '拒绝';
-    }
-    if (key === 'status') {
-      if (normalized === 'active') return '启用';
-      if (normalized === 'inactive') return '停用';
-      if (normalized === 'disabled') return '禁用';
-      if (normalized === 'pending') return '处理中';
-    }
-    if (key === 'targetType' && normalized === 'node') return '流程节点';
-    if (key === 'targetType' && normalized === 'record') return '业务记录';
-    if (key === 'nodeType' && normalized === 'usertask') return '审批任务';
-    if (key === 'nodeType' && normalized === 'sequenceflow') return '流程连线';
-    if (key === 'nodeType' && normalized === 'exclusivegateway') return '排他网关';
-    if (key === 'nodeType' && normalized === 'inclusivegateway') return '包容网关';
-    if (key === 'bindingSurface' && normalized === 'node rulebinding') return '节点规则绑定';
-    if (key === 'bindingSurface' && normalized === 'edge conditionspec') return '连线条件';
-    if (key === 'bindingKind' && normalized === 'decision_ref') return '决策引用';
-    if (key === 'bindingKind' && normalized === 'condition') return '条件表达式';
-    if (key === 'decisionStatus') {
-      if (normalized === 'matched') return '命中';
-      if (normalized === 'not_matched') return '未命中';
-      if (normalized === 'unknown') return '未知';
-      if (normalized === 'error') return '错误';
-      if (normalized === 'skipped') return '已跳过';
-    }
-    if (key === 'errorCode' && normalized === 'decision_evaluation_failed') {
-      return '决策执行失败';
-    }
-    if (key === 'conditionResult') {
-      if (normalized === 'true') return '满足';
-      if (normalized === 'false') return '不满足';
-      if (normalized === 'unknown') return '未知';
-    }
-    if (key === 'processStatus') {
-      if (normalized === 'deployed') return '已部署';
-      if (normalized === 'draft') return '草稿';
-      if (normalized === 'suspended') return '已挂起';
-      if (normalized === 'archived') return '已归档';
-    }
-    if (key === 'actionPolicyTrigger' && normalized === 'sla_timeout') return 'SLA 超时';
-    if (key === 'actionPolicyTrigger' && normalized === 'sla_warning') return 'SLA 预警';
-    if (key === 'deadlineMode' && normalized === 'fixed') return '固定时长';
-    if (key === 'deadlineMode' && normalized === 'rule') return '规则计算';
-    if (key === 'slaRecordStatus') {
-      if (normalized === 'running') return '运行中';
-      if (normalized === 'completed') return '已完成';
-      if (normalized === 'breached') return '已超时';
-      if (normalized === 'cancelled' || normalized === 'canceled') return '已取消';
-    }
-    if (key === 'reason') {
-      if (normalized === 'granted') return '已授权';
-      if (normalized === 'denied') return '已拒绝';
-      if (normalized === 'rejected') return '已拒绝';
-      if (normalized.includes('condition guard not satisfied')) return '条件未满足';
-    }
-    if (key === 'fieldRiskLevel') {
-      if (normalized === 'field_permission_change') return '字段权限变更';
-      if (normalized === 'field_masked') return '字段脱敏';
-      if (normalized === 'field_governance_review') return '字段治理复核';
-    }
-    if (key === 'fieldRiskSummary') {
-      if (normalized === 'masked_permission_change') {
-        return '字段已脱敏且权限策略已变化，需使用低权限样本复核';
-      }
-      if (normalized === 'permission_change') {
-        return '字段权限策略已变化，需使用低权限样本复核';
-      }
-      if (normalized === 'masked_field') {
-        return '字段已脱敏，复核报告不会展示原始字段值';
-      }
-    }
-    return value;
-  }
-  if (typeof value === 'boolean') return value ? '是' : '否';
-  if (typeof value === 'number') return String(value);
-  if (Array.isArray(value)) {
-    if (key === 'candidateUserIds' || key === 'candidateGroupIds') {
-      return value.length > 0 ? value.map((item) => String(item)).join('、') : '无';
-    }
-    return `${value.length} 项`;
-  }
-  if (typeof value === 'object') {
-    return '已记录';
-  }
-  return String(value);
 }
 
 function normalizePageKind(page: RelatedPage): StandardPageKind | 'custom' {
@@ -2352,70 +2142,12 @@ export default function ModelDetailPage() {
                             </div>
                           </div>
                           <div className="mt-3 space-y-2">
-                            {(publishReplayReport.results || []).map((result, index) => {
-                              const step = result.step;
-                              const source =
-                                step?.sourceName ||
-                                step?.sourceCode ||
-                                step?.sourcePid ||
-                                step?.consumerType ||
-                                getPublishText('unnamedConsumer', locale);
-                              const displayMessage = getReplayResultMessage(result, locale);
-                              const permissionTraceHref = permissionReplayTraceHref(result);
-                              return (
-                                <div
-                                  key={`replay-result-${step?.consumerType || 'consumer'}-${step?.sourcePid || step?.sourceCode || index}`}
-                                  data-testid={`model-publish-replay-result-${step?.consumerType || 'unknown'}`}
-                                  className="rounded border border-blue-100 bg-white p-3"
-                                >
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <span className="rounded bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700">
-                                      {step?.consumerLabel || step?.consumerType || getPublishText('ruleConsumer', locale)}
-                                    </span>
-                                    <span
-                                      className={`rounded px-2 py-1 text-xs font-medium ${getReplayStatusClass(result.status)}`}
-                                    >
-                                      {getReplayStatusLabel(result.status, locale)}
-                                    </span>
-                                    <span className="text-sm font-medium text-gray-900">{source}</span>
-                                    {result.traceId && (
-                                      <span className="font-mono text-xs text-gray-500">
-                                        {result.traceId}
-                                      </span>
-                                    )}
-                                    {permissionTraceHref && (
-                                      <Link
-                                        to={permissionTraceHref}
-                                        data-testid="model-publish-replay-open-permission-trace"
-                                        className="rounded border border-blue-200 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50"
-                                      >
-                                        {getPublishText('openTrace', locale)}</Link>
-                                    )}
-                                  </div>
-                                  {displayMessage && (
-                                    <p className="mt-2 text-sm text-gray-700">{displayMessage}</p>
-                                  )}
-                                  {result.outputs && Object.keys(result.outputs).length > 0 && (
-                                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-600">
-                                      {Object.entries(result.outputs)
-                                        .filter(([key]) => shouldShowReplayOutput(key))
-                                        .map(([key, value]) => (
-                                          <span key={key} className="rounded bg-gray-100 px-2 py-1">
-                                            {formatReplayOutputLabel(key)}: {formatReplayOutputValue(key, value)}
-                                          </span>
-                                        ))}
-                                    </div>
-                                  )}
-                                  {result.errors?.length ? (
-                                    <ul className="mt-2 list-inside list-disc text-sm text-red-700">
-                                      {result.errors.map((error, errorIndex) => (
-                                        <li key={errorIndex}>{getReplayErrorMessage(error, result, locale)}</li>
-                                      ))}
-                                    </ul>
-                                  ) : null}
-                                </div>
-                              );
-                            })}
+                            {(publishReplayReport.results || []).map((result, index) => (
+                              <ModelPublishReplayResultCard
+                                key={'replay-result-' + (result.step?.consumerType || 'consumer') + '-' +
+                                  (result.step?.sourcePid || result.step?.sourceCode || index)}
+                                result={result} locale={locale} />
+                            ))}
                           </div>
                         </div>
                       )}
