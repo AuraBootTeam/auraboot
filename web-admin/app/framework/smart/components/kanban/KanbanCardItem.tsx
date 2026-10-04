@@ -88,7 +88,12 @@ export function resolveKanbanCardFieldValue(card: KanbanCard, field: KanbanCardF
   if (displayValue !== undefined && displayValue !== null && displayValue !== '') {
     return displayValue;
   }
-  return card[field.field];
+  const value = card[field.field];
+  if (field.dictCode) {
+    if (value === undefined || value === null || value === '') return value;
+    return field.valueLabels?.[String(value)] ?? field.unrecognizedLabel ?? '—';
+  }
+  return value;
 }
 
 /**
@@ -192,7 +197,7 @@ export function KanbanCardItem({
 
             return (
               <div key={field.field} className="flex items-center gap-1 text-xs text-gray-600">
-                {label && <span className="text-gray-400">{label}:</span>}
+                {label && <span className="shrink-0 whitespace-nowrap text-gray-400">{label}:</span>}
                 <span>{renderFieldValue(field, value)}</span>
               </div>
             );

@@ -22,6 +22,10 @@ vi.mock('react-router', async (importOriginal) => {
   };
 });
 
+vi.mock('~/contexts/TimezoneContext', () => ({
+  useTimezone: () => ({ timezone: 'Asia/Shanghai', formats: { datetime: 'YYYY-MM-DD HH:mm:ss' } }),
+}));
+
 vi.mock('~/shared/services/ApiService', () => ({
   getApiService: () => http,
 }));
@@ -1302,10 +1306,10 @@ describe('ExecutionLogTraceBlock', () => {
     expect(screen.getByTestId('elta-trace-drawer')).toHaveTextContent('sms_long_leave');
     expect(screen.getByTestId('elta-action-retry-action-log-3')).toHaveTextContent('重试 3/3');
     expect(screen.getByTestId('elta-action-retry-action-log-3')).toHaveTextContent(
-      '上次 2026-06-10 10:02:00',
+      '上次 2026-06-10 18:02:00',
     );
     expect(screen.getByTestId('elta-action-retry-action-log-3')).toHaveTextContent(
-      '死信 2026-06-10 10:02:01',
+      '死信 2026-06-10 18:02:01',
     );
     expect(screen.getByTestId('elta-action-retry-action-log-3')).toHaveTextContent('重试已耗尽');
     expect(screen.getByTestId('elta-action-replay-action-log-3')).toHaveTextContent('重放');
@@ -1382,7 +1386,7 @@ describe('ExecutionLogTraceBlock', () => {
       expect(screen.getByTestId('elta-action-retry-action-log-3')).toHaveTextContent('重试 4/3'),
     );
     expect(screen.getByTestId('elta-action-retry-action-log-3')).toHaveTextContent(
-      '上次 2026-06-10 10:03:00',
+      '上次 2026-06-10 18:03:00',
     );
   });
 

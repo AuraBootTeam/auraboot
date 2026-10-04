@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import { getApiService } from '~/shared/services/ApiService';
 import { useI18n } from '~/contexts/I18nContext';
+import { useTimezone } from '~/contexts/TimezoneContext';
+import { formatInTimezone } from '~/shared/services/dateTimeFormatService';
 import {
   createDecisionApi,
   type DecisionApi,
@@ -213,12 +215,8 @@ function errorMessage(error: unknown): string {
   return '日志加载失败';
 }
 
-function formatDate(value?: string): string {
-  if (!value) return '-';
-  return value
-    .replace('T', ' ')
-    .replace(/\.\d+Z?$/, '')
-    .replace(/Z$/, '');
+function formatDate(value: string | undefined, timezone: string, format: string): string {
+  return formatInTimezone(value, format, timezone) || '-';
 }
 
 function display(value: unknown): string {
@@ -701,7 +699,7 @@ function factMetadataValueLabelEntries(row: FactMetadataRow): Array<[string, str
     .sort(([left], [right]) => left.localeCompare(right));
 }
 
-function actionRetryItems(action: EventPolicyActionLogRecord): string[] {
+function actionRetryItems(action: EventPolicyActionLogRecord, timezone: string, format: string): string[] {
   const parts: string[] = [];
   const attempt = Number(action.attemptCount ?? 0);
   const maxAttempts = Number(action.maxAttempts ?? 0);
@@ -718,9 +716,9 @@ function actionRetryItems(action: EventPolicyActionLogRecord): string[] {
     parts.push(`${attemptLabel} ${attempt}`);
   }
   if (retryState) {
-    if (action.lastRetryAt) parts.push(`上次 ${formatDate(action.lastRetryAt)}`);
-    if (action.nextRetryAt) parts.push(`下次 ${formatDate(action.nextRetryAt)}`);
-    if (action.deadLetteredAt) parts.push(`死信 ${formatDate(action.deadLetteredAt)}`);
+    if (action.lastRetryAt) parts.push(`上次 ${formatDate(action.lastRetryAt, timezone, format)}`);
+    if (action.nextRetryAt) parts.push(`下次 ${formatDate(action.nextRetryAt, timezone, format)}`);
+    if (action.deadLetteredAt) parts.push(`死信 ${formatDate(action.deadLetteredAt, timezone, format)}`);
     if (action.resultPayload?.retryExhausted === true) parts.push('重试已耗尽');
   }
   return parts;
@@ -762,7 +760,8 @@ function ActionLogCard({
   onReplay: (action: EventPolicyActionLogRecord) => void;
 }) {
   const { locale } = useI18n();
-  const retryItems = actionRetryItems(action);
+  const { timezone, formats } = useTimezone();
+  const retryItems = actionRetryItems(action, timezone, formats.datetime);
   const payloadEntries = orderedPayloadEntries(action.resultPayload);
   const key = actionLogKey(action);
   return (
@@ -775,7 +774,7 @@ function ActionLogCard({
       </div>
       <div className="elta-action-sub">
         <span>{actionTypeLabel(action.actionType, locale)}</span>
-        <span>{formatDate(action.executedAt)}</span>
+        <span>{formatDate(action.executedAt, timezone, formats.datetime)}</span>
         <span className="mono" title={idempotencyTitle(action.idempotencyKey)}>
           {idempotencyEvidence(action.idempotencyKey)}
         </span>
@@ -815,6 +814,7 @@ function ActionLogCard({
 
 export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBlockProps) {
   const { t, locale } = useI18n();
+  const { timezone, formats } = useTimezone();
   const api = useMemo(() => createApi(), []);
   const location = useLocation();
   const navigate = useNavigate();
@@ -1235,7 +1235,7 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                   <td>{cellText(callerDisplay(log, locale))}</td>
                   <td>{cellText(rolloutDisplay(log, locale))}</td>
                   <td>{cellText(log.durationMs != null ? `${log.durationMs}ms` : '-')}</td>
-                  <td>{cellText(formatDate(log.createdAt))}</td>
+                  <td>{cellText(formatDate(log.createdAt, timezone, formats.datetime))}</td>
                   <td className="elta-row-actions">
                     <button
                       type="button"
@@ -1393,7 +1393,7 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                     <span>v{display(log.selectedVersion ?? log.decisionVersion)}</span>
                     <span title={log.runtimeAdapter}>{runtimeAdapterLabel(log.runtimeAdapter, locale)}</span>
                     <span>{log.durationMs != null ? `${log.durationMs}ms` : '-'}</span>
-                    <span>{formatDate(log.createdAt)}</span>
+                    <span>{formatDate(log.createdAt, timezone, formats.datetime)}</span>
                   </div>
                   {(log.traceId || log.callerRef || log.runtimeAdapter || (log.decisionCode &&
                     traceLabel('decision', log.decisionCode, locale) === log.decisionCode)) &&

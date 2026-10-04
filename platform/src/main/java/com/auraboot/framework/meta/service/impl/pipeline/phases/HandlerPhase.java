@@ -712,6 +712,10 @@ public class HandlerPhase implements CommandPhase {
             if (e.getMessage() != null && e.getMessage().contains("iot.error.version_conflict")) {
                 throw new com.auraboot.framework.exception.ConflictException(e.getMessage(), e);
             }
+            // Resolve explicit transport-neutral plugin error keys at the host response boundary.
+            if (e.getMessage() != null && e.getMessage().matches("\\$i18n:[A-Za-z0-9_.-]+")) {
+                throw new BusinessException(ResponseCode.BadParam, e.getMessage(), e);
+            }
             throw new BusinessException(ResponseCode.BadParam, "Plugin handler execution failed: " + e.getMessage());
         } finally {
             queryScope.close();
