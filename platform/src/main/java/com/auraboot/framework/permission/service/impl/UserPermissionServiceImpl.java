@@ -220,29 +220,53 @@ public class UserPermissionServiceImpl implements UserPermissionService {
     @Override
     @Observed(name = "permission.check", contextualName = "permission-check")
     public boolean hasPermission(Long userId, String permissionCode) {
-        if (userId == null || permissionCode == null || permissionCode.isEmpty()) {
-            log.warn("Invalid parameters: userId={}, permissionCode={}", userId, permissionCode);
-            return false;
-        }
-
-        log.debug("Checking permission by code: userId={}, permissionCode={}",
-            userId, permissionCode);
-
         if (!MetaContext.exists()) {
             return false;
         }
-        if (releaseReadsEnabled() && getUserPermissionCodes(userId).contains(permissionCode)) {
-            return true;
+        return hasPermission(
+                MetaContext.getCurrentTenantId(),
+                userId,
+                MetaContext.getCurrentMemberId(),
+                permissionCode);
+    }
+
+    @Override
+    public boolean hasPermission(
+            Long tenantId,
+            Long userId,
+            Long memberId,
+            String permissionCode) {
+        if (tenantId == null || userId == null || memberId == null
+                || permissionCode == null || permissionCode.isEmpty()) {
+            log.warn("Invalid explicit permission context: tenantId={}, userId={}, memberId={}, permissionCode={}",
+                    tenantId, userId, memberId, permissionCode);
+            return false;
         }
-        Long permissionId = permissionSnapshotCache.resolvePermissionId(
-                MetaContext.getCurrentTenantId(), permissionCode);
+
+        log.debug("Checking permission by explicit member context: tenantId={}, userId={}, memberId={}, permissionCode={}",
+                tenantId, userId, memberId, permissionCode);
+
+        if (applicationRuntimePrimaryEnabled && defaultApplicationCode != null
+                && !defaultApplicationCode.isBlank()) {
+            Set<String> roles = roleMapper.findByMemberIdAndTenantId(memberId, tenantId).stream()
+                    .map(com.auraboot.framework.rbac.entity.Role::getCode)
+                    .filter(Objects::nonNull).collect(java.util.stream.Collectors.toSet());
+            if (applicationRuntimeDefinitionCatalog.permissionsForRoles(
+                    tenantId, defaultApplicationCode.trim(), roles).contains(permissionCode)
+                    || (roles.contains(RoleCodes.TENANT_ADMIN)
+                        && applicationRuntimeDefinitionCatalog.permissionCodes(
+                            tenantId, defaultApplicationCode.trim()).contains(permissionCode))) {
+                return true;
+            }
+        }
+        Long permissionId = permissionSnapshotCache.resolvePermissionId(tenantId, permissionCode);
         if (permissionId == null) {
             // #2057 made unregistered codes fail closed. A tenant's own admin
             // must stay able to bootstrap: at FIRST deployment the permission
             // table is empty (permissions arrive WITH the plugin import), so
             // tenant_admin + unregistered code = allow. Registered codes keep
             // the strict path; non-admin users keep failing closed.
-            if (adminRoleChecker.hasRole(MetaContext.getCurrentTenantId(), userId, RoleCodes.TENANT_ADMIN)) {
+            if (adminRoleChecker.hasRole(tenantId, userId, RoleCodes.TENANT_ADMIN)) {
                 log.debug("Permission check result: userId={}, permissionCode={}, tenant_admin bootstrap allowance",
                     userId, permissionCode);
                 return true;
@@ -252,7 +276,9 @@ public class UserPermissionServiceImpl implements UserPermissionService {
             return false;
         }
 
-        boolean granted = hasPermission(userId, permissionId);
+        boolean granted = permissionSnapshotCache
+                .getEffectivePermissionIds(tenantId, userId, memberId)
+                .contains(permissionId);
         log.debug("Permission check result: userId={}, permissionCode={}, hasPermission={}",
             userId, permissionCode, granted);
         return granted;

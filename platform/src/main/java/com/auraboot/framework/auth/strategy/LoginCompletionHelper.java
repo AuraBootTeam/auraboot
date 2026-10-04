@@ -194,7 +194,10 @@ public class LoginCompletionHelper {
                             null,
                             tenantId == null ? SessionStage.ONBOARDING : SessionStage.READY,
                             1,
-                            securityVersion));
+                            securityVersion,
+                            false,
+                            null,
+                            null));
         }
 
         // 4. Create session record — non-fatal; login should succeed even if session persistence fails

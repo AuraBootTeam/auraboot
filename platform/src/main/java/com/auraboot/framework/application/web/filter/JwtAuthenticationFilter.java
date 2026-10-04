@@ -11,6 +11,7 @@ import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.saas.config.service.SystemModeService;
 import com.auraboot.framework.party.service.PartyAuthorizationService;
 import com.auraboot.framework.tenant.service.TenantMemberService;
+import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -181,6 +182,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
 
                 Long memberId = jwtUtil.extractMemberId(jwt);
+                if (jwtUtil.extractImpersonation(jwt)) {
+                    Long operatorUserId = jwtUtil.extractOperatorUserId(jwt);
+                    User operator = operatorUserId == null ? null : userService.findByUserId(operatorUserId);
+                    TenantMember effectiveMember = tenantId == null || tenantMemberService == null
+                            ? null
+                            : tenantMemberService.findByTenantIdAndUserId(
+                                    tenantId, userDetails.getUserId());
+                    if (operator == null || !operator.isEnabled() || !operator.isAccountNonLocked()
+                            || !operator.isAccountNonExpired() || !operator.isCredentialsNonExpired()
+                            || Boolean.TRUE.equals(operator.getDeletedFlag())
+                            || memberId == null || effectiveMember == null
+                            || !memberId.equals(effectiveMember.getId())
+                            || Boolean.TRUE.equals(effectiveMember.getDeletedFlag())
+                            || !"active".equalsIgnoreCase(effectiveMember.getStatus())) {
+                        reject(request, response, ApiResponse.errorWithContext(
+                                ResponseCode.Unauthorized, request.getRequestURI()));
+                        return;
+                    }
+                }
                 String executionScope = jwtUtil.extractExecutionScope(jwt);
                 Long actorPartyId = positiveOrNull(jwtUtil.extractActorPartyId(jwt));
                 Long partyMembershipId = positiveOrNull(jwtUtil.extractPartyMembershipId(jwt));
@@ -261,7 +281,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         actorPartyId,
                         partyMembershipId,
                         sessionStage,
-                        contextVersion);
+                        contextVersion,
+                        jwtUtil.extractImpersonation(jwt),
+                        jwtUtil.extractOperatorUserId(jwt),
+                        jwtUtil.extractClientType(jwt));
 
                 // Surface tenant/user in every log line for this request (log pattern reads
                 // %X{tenantId}/%X{userId}). Cleared in the finally below so a pooled thread

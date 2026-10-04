@@ -66,12 +66,12 @@ public class UserProfileServiceImpl implements UserProfileService {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "用户不存在");
         }
         
-        // 验证邮箱唯一性（如果邮箱有变更）
-        if (StringUtils.hasText(request.getEmail()) && !request.getEmail().equals(user.getEmail())) {
-            User existingUser = userService.findByEmail(request.getEmail());
-            if (existingUser != null && !existingUser.getId().equals(userId)) {
-                throw new ValidationException(ResponseCode.CommonValidationFailed, "邮箱已被其他用户使用");
-            }
+        // Email is a login credential. It can only change through the verified
+        // /api/user/email-link flow, never through ordinary profile editing.
+        if (request.getEmail() != null
+                && !request.getEmail().trim().equalsIgnoreCase(user.getEmail() == null ? "" : user.getEmail())) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "请通过关联邮箱功能验证后修改邮箱");
         }
         
         // 验证头像文件是否存在（如果有头像文件ID）

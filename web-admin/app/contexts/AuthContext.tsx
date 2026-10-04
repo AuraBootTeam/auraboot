@@ -2,6 +2,7 @@ import React, { createContext, useContext, useMemo, useEffect } from 'react';
 import { startActiveSessionRenewal } from '~/shared/services/active-session';
 import { useLoaderData } from 'react-router';
 import type { User, UserPermissions, Preferences } from '~/utils/type';
+import type { ImpersonationSessionInfo } from '~/shared/services/session';
 
 /**
  * Permission item from legacy format
@@ -30,6 +31,7 @@ interface AuthLoaderData {
     roles?: RoleItem[];
   } | null;
   preferences?: Preferences | null;
+  impersonation?: ImpersonationSessionInfo | null;
 }
 
 interface AuthContextType {
@@ -42,6 +44,7 @@ interface AuthContextType {
   hasRole: (roleCode: string) => boolean;
   hasAnyPermission: (permissionCodes: string[]) => boolean;
   hasAllPermissions: (permissionCodes: string[]) => boolean;
+  impersonation: ImpersonationSessionInfo | null;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -54,6 +57,7 @@ const AuthContext = createContext<AuthContextType>({
   hasRole: () => false,
   hasAnyPermission: () => false,
   hasAllPermissions: () => false,
+  impersonation: null,
 });
 
 const AdditionalPermissionContext = createContext<ReadonlySet<string>>(new Set());
@@ -87,11 +91,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const data = useLoaderData() as AuthLoaderData | undefined;
 
   useEffect(() => {
-    if (!data?.user) return;
-    return startActiveSessionRenewal(window, document, () => fetch('/api/auth/session-renew', {
-      method: 'POST', credentials: 'same-origin',
-    }));
-  }, [Boolean(data?.user)]);
+    if (!data?.user || data.impersonation) return;
+    return startActiveSessionRenewal(window, document, () =>
+      fetch('/api/auth/session-renew', {
+        method: 'POST',
+        credentials: 'same-origin',
+      }),
+    );
+  }, [Boolean(data?.user), Boolean(data?.impersonation)]);
 
   // Permission check functions
   // Supports two formats:
@@ -158,6 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // project a backend JWT into context, loader data, or component props.
       token: null,
       isAuthenticated: !!data?.user,
+      impersonation: data?.impersonation || null,
       hasPermission,
       hasRole,
       hasAnyPermission,
