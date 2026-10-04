@@ -44,7 +44,7 @@ class SemanticPreaggCallerContextTest {
         when(transactions.getTransaction(any())).thenReturn(
                 mock(org.springframework.transaction.TransactionStatus.class));
         when(members.findByTenantIdAndUserId(anyLong(), anyLong())).thenAnswer(call -> {
-            var member = new com.auraboot.framework.tenant.entity.TenantMember();
+            var member = new com.auraboot.framework.tenant.dao.entity.TenantMember();
             member.setId(1L);
             member.setTenantId(call.getArgument(0));
             member.setUserId(call.getArgument(1));
