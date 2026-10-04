@@ -712,7 +712,7 @@ test('independent organization read and member provisioning preserve separate na
   page, browser,
 }, info) => {
   test.setTimeout(180_000);
-  const stamp = uniqueId('staff-boundary');
+  const stamp = uniqueId('staff');
   const roleCode = `e2e_staff_${stamp}`;
   const roleResponse = await page.request.post('/api/roles', {
     data: { code: roleCode, name: stamp, type: 'custom' },
@@ -721,7 +721,7 @@ test('independent organization read and member provisioning preserve separate na
   const roleBody = await roleResponse.json();
   expect(String(roleBody.code)).toBe('0');
   const rolePid = roleBody.data.pid as string;
-  const user = makeQuoteRoleUser('staff-boundary', stamp, [roleCode]);
+  const user = makeQuoteRoleUser('staff', stamp, [roleCode]);
   await ensureQuoteRoleUser(page, user);
   const department = await executeCommandViaApi(page, 'org:create_department', {
     org_dept_name: stamp, org_dept_code: `STAFF-${Date.now()}`,
