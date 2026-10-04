@@ -16,6 +16,7 @@ import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -132,7 +133,7 @@ public class PageSchemaValidator implements PluginValidator {
                         if (block.get("layout") instanceof Map<?, ?> bl && bl.get("col") instanceof Number colNum) {
                             int col = colNum.intValue();
                             int span = bl.get("colSpan") instanceof Number spanNum ? spanNum.intValue() : 0;
-                            if (col >= cols || (col + span) > cols) {
+                            if (col >= cols || ((long) col + span) > cols) {
                                 messages.add(error("S-PAGE-BLOCK-COL", category(),
                                         path + ".blocks[" + j + "].layout.col",
                                         "Page '" + pageKey + "' block #" + j + " has col=" + col + " colSpan=" + span
@@ -565,6 +566,7 @@ public class PageSchemaValidator implements PluginValidator {
             return Collections.emptySet();
         }
         return manifest.getDicts().stream()
+                .filter(Objects::nonNull)
                 .map(DictDefinitionDTO::getCode)
                 .filter(code -> !isBlank(code))
                 .collect(Collectors.toSet());

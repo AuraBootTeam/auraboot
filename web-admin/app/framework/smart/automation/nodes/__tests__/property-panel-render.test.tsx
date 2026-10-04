@@ -31,6 +31,7 @@ const resourceSelectServiceMocks = vi.hoisted(() => ({
   fetchPageOptions: vi.fn().mockResolvedValue([]),
   fetchDashboardOptions: vi.fn().mockResolvedValue([]),
   fetchProcessOptions: vi.fn().mockResolvedValue([]),
+  fetchWorkflowOptions: vi.fn().mockResolvedValue([]),
   fetchAutomationOptions: vi.fn().mockResolvedValue([]),
   fetchCommandOptions: vi.fn().mockResolvedValue([]),
   fetchModelOptions: vi.fn().mockResolvedValue([]),

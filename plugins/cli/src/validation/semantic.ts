@@ -4,7 +4,11 @@ import type { PluginFiles } from '../utils/plugin-loader.js';
 import { type ValidationResult, createResult, addMessage } from './types.js';
 import { getEnumCodes } from '../utils/dsl-registry-loader.js';
 
-const SCHEMA_DIR = resolve(import.meta.dirname, '../../../../schemas');
+const SCHEMA_DIR = [
+  resolve(import.meta.dirname, '../../../schemas'),
+  resolve(import.meta.dirname, '../../schemas'),
+].find(candidate => existsSync(resolve(candidate, 'dsl-schema.generated.json')))
+  || resolve(import.meta.dirname, '../../../schemas');
 
 let VALID_COMMAND_TYPES: Set<string>;
 let VALID_AUTO_SET_STRATEGIES: Set<string>;
@@ -170,7 +174,7 @@ export function validateSemantic(plugin: PluginFiles): ValidationResult {
 
   // S-PAGE: Page DSL structure
   for (const page of plugin.resourceFiles.get('pages') || []) {
-    const dsl = page.dslSchema || page.dsl_schema;
+    const dsl = page.dslSchema || page.dsl_schema || page;
     if (!dsl) continue;
 
     const kind = dsl.kind;
@@ -217,9 +221,9 @@ export function validateSemantic(plugin: PluginFiles): ValidationResult {
  * Walk all blocks in a DSL schema, invoking visitor on each block.
  */
 function walkBlocks(dsl: any, visitor: (block: any) => void): void {
-  if (!dsl.areas) return;
-  for (const area of Object.values(dsl.areas) as any[]) {
-    if (!area?.blocks) continue;
+  const containers = [dsl, ...Object.values(dsl.areas || {})];
+  for (const area of containers as any[]) {
+    if (!Array.isArray(area?.blocks)) continue;
     for (const block of area.blocks) {
       visitor(block);
       // Also walk sub-table columns
@@ -266,9 +270,10 @@ function validateBlockTypesByPageKind(plugin: PluginFiles, result: ValidationRes
   const recommendedByKind = new Map<string, Set<string>>();
   for (const rule of dslDef.allOf) {
     const kind = rule.if?.properties?.kind?.const;
-    const recommended: string[] | undefined = rule.then?.properties?.areas?.['x-recommended-block-types'];
+    const recommended: string[] | undefined = rule.then?.properties?.blocks?.['x-recommended-block-types']
+      ?? rule.then?.properties?.areas?.['x-recommended-block-types'];
     if (kind && recommended) {
-      recommendedByKind.set(kind, new Set(recommended));
+      recommendedByKind.set(kind.toLowerCase(), new Set(recommended));
     }
   }
 
@@ -276,20 +281,17 @@ function validateBlockTypesByPageKind(plugin: PluginFiles, result: ValidationRes
 
   // Check each page
   for (const page of plugin.resourceFiles.get('pages') || []) {
-    const dsl = page.dslSchema || page.dsl_schema;
-    if (!dsl?.kind || !dsl?.areas) continue;
+    const dsl = page.dslSchema || page.dsl_schema || page;
+    if (!dsl?.kind) continue;
 
-    const recommended = recommendedByKind.get(dsl.kind);
+    const recommended = recommendedByKind.get(dsl.kind.toLowerCase());
     if (!recommended) continue;
 
     // Collect actual block types across all areas
     const actualBlockTypes = new Set<string>();
-    for (const area of Object.values(dsl.areas) as any[]) {
-      if (!area?.blocks) continue;
-      for (const block of area.blocks) {
-        if (block.blockType) actualBlockTypes.add(block.blockType);
-      }
-    }
+    walkBlocks(dsl, block => {
+      if (block.blockType) actualBlockTypes.add(block.blockType);
+    });
 
     // Only warn if page has blocks but none match recommended types
     const hasRecommended = [...recommended].some(bt => actualBlockTypes.has(bt));
@@ -325,14 +327,15 @@ function validateDslSemanticConstraints(plugin: PluginFiles, result: ValidationR
   // Collect model commands by model code → set of command types
   const commandsByModel = new Map<string, Set<string>>();
   for (const cmd of plugin.resourceFiles.get('commands') || []) {
-    if (!cmd.modelCode || !cmd.type) continue;
+    const type = cmd.type || cmd.executionConfig?.type;
+    if (!cmd.modelCode || !type) continue;
     if (!commandsByModel.has(cmd.modelCode)) commandsByModel.set(cmd.modelCode, new Set());
-    commandsByModel.get(cmd.modelCode)!.add(cmd.type);
+    commandsByModel.get(cmd.modelCode)!.add(type);
   }
 
   // Check pages
   for (const page of plugin.resourceFiles.get('pages') || []) {
-    const dsl = page.dslSchema || page.dsl_schema;
+    const dsl = page.dslSchema || page.dsl_schema || page;
     if (!dsl) continue;
     const pageKey = page.pageKey || page.page_key;
     const modelCode = dsl.modelCode || page.modelCode;

@@ -617,6 +617,12 @@ test {
     // to, which is stable across the many @SpringBootTest contexts (unlike per-context proxy IDs).
     dependsOn 'instrumentMainOffline'
     doFirst {
+        // Offline JaCoCo appends by default. A measured run must not inherit
+        // execution data from a different filter or previous source snapshot.
+        def executionFile = file("${buildDir}/jacoco/test.exec")
+        if (executionFile.exists() && !executionFile.delete()) {
+            throw new GradleException("Cannot clear stale coverage data: ${executionFile}")
+        }
         classpath = files(jacocoInstrumentedMain) + classpath + configurations.jacocoRuntime
     }
     systemProperty 'jacoco-agent.destfile', file("${buildDir}/jacoco/test.exec").absolutePath
@@ -835,6 +841,36 @@ jacocoTestReport {
     }
 }
 
+// Full production denominators, separate from the historical curated ratchet.
+// Reports consume explicitly executed tests; they never start a database suite.
+['jacocoUnitFullReport': ['test.exec'],
+ 'jacocoIntegrationFullReport': ['integrationTest.exec'],
+ 'jacocoFullReport': ['test.exec', 'integrationTest.exec']].each { taskName, executionFiles ->
+    tasks.register(taskName, JacocoReport) {
+        group = 'verification'
+        description = 'Report coverage against all production classes without business-package exclusions.'
+        dependsOn tasks.named('classes')
+        mustRunAfter 'test', 'integrationTest'
+        sourceDirectories.setFrom(sourceSets.main.allSource.srcDirs)
+        classDirectories.setFrom(sourceSets.main.output.classesDirs)
+        executionData.setFrom(executionFiles.collect { file("${buildDir}/jacoco/${it}") })
+        // JacocoReport's default onlyIf silently skips missing execution files.
+        // Run our evidence check instead so absence is an explicit failure.
+        setOnlyIf { true }
+        doFirst {
+            def available = executionData.files.findAll { it.isFile() && it.length() > 0 }
+            if (available.isEmpty()) {
+                throw new GradleException("No coverage execution evidence for ${taskName}; run its test layer first")
+            }
+        }
+        reports {
+            xml.required = true
+            csv.required = true
+            html.required = true
+        }
+    }
+}
+
 jacocoTestCoverageVerification {
     dependsOn jacocoTestReport
     // Read the offline-instrumentation exec (same file the report uses).
@@ -1047,6 +1083,16 @@ tasks.register('integrationTest', Test) {
     // Match bootJar: current platform classes must precede the standalone plugin API jar.
     classpath = sourceSets.main.output.classesDirs + sourceSets.integrationTest.runtimeClasspath
     shouldRunAfter test
+    dependsOn 'instrumentMainOffline'
+    doFirst {
+        def executionFile = file("${buildDir}/jacoco/integrationTest.exec")
+        if (executionFile.exists() && !executionFile.delete()) {
+            throw new GradleException("Cannot clear stale coverage data: ${executionFile}")
+        }
+        classpath = files(jacocoInstrumentedMain) + classpath + configurations.jacocoRuntime
+    }
+    systemProperty 'jacoco-agent.destfile', file("${buildDir}/jacoco/integrationTest.exec").absolutePath
+    jacoco { enabled = false }
 
     // Mirror `test` task JVM args so behavior matches.
     jvmArgs "-Djavax.xml.parsers.SAXParserFactory=com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl"

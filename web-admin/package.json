@@ -58,7 +58,7 @@
     "coverage:e2e:clean": "rm -rf test-results/coverage",
     "coverage:e2e:report": "node scripts/e2e-coverage-report.mjs",
     "coverage:e2e": "pnpm coverage:e2e:clean && pnpm test:coverage:e2e && pnpm coverage:e2e:report",
-    "test:unit": "vitest run --retry=2",
+    "test:unit": "vitest run",
     "test:unit:coverage": "vitest run --coverage",
     "test:unit:watch": "vitest",
     "test:unit:ui": "vitest --ui",
@@ -217,8 +217,8 @@
     "@types/react-dom": "^19.0.1",
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",
-    "@vitest/coverage-v8": "^4.1.8",
-    "@vitest/ui": "^4.1.8",
+    "@vitest/coverage-v8": "4.1.11",
+    "@vitest/ui": "4.1.11",
     "adm-zip": "^0.6.1",
     "allure": "3.18.0",
     "allure-playwright": "3.10.2",
@@ -239,6 +239,6 @@
     "vite": "^8.0.16",
     "vite-plugin-istanbul": "^9.0.1",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^4.1.11"
+    "vitest": "4.1.11"
   }
 }
