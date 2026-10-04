@@ -290,7 +290,7 @@
     "displayName:zh-CN": "从人员开通账号",
     "displayName:en": "Provision Member from Employee",
     "type": "custom",
-    "modelCode": "tenant_member",
+    "modelCode": "org_employee",
     "permissions": [
       "model.tenant_member.provision_member_from_employee"
     ],

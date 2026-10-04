@@ -181,7 +181,7 @@ test('platform-admin exposes account page provisioning from existing employees',
   );
 
   assert.ok(command, 'admin:provision_member_from_employee command must exist');
-  assert.equal(command.modelCode, 'tenant_member');
+  assert.equal(command.modelCode, 'org_employee', 'provisioning must retain employee row scope');
   assert.equal(
     command.inputFields,
     undefined,

@@ -93,7 +93,9 @@ test('member commands enforce their action permissions at the command boundary',
   for (const [suffix, action] of Object.entries(actions)) {
     const command = commands.find(item => item.code === `admin:${suffix}`);
     assert.ok(command, `${suffix} must exist`);
-    assert.equal(command.modelCode, 'tenant_member');
+    assert.equal(command.modelCode,
+      suffix === 'provision_member_from_employee' ? 'org_employee' : 'tenant_member',
+      'command row scope must follow the record the handler operates on');
     assert.deepEqual(command.permissions, [`model.tenant_member.${action}`],
       `${command.code} must not rely on endpoint permission or button visibility`);
     assert.equal(includes.includes(command.permissions[0]), !['leave', 'delete'].includes(action),
