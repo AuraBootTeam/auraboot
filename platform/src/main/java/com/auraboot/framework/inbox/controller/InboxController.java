@@ -132,6 +132,19 @@ public class InboxController {
             return ApiResponse.error("Inbox item not found");
         }
 
+        if ("workflow".equals(item.getSourceType()) || "bpm".equals(item.getSourceType())) {
+            if (item.getSourceId() == null || item.getSourceId().isBlank()) {
+                throw new IllegalStateException("Workflow inbox item has no task identity");
+            }
+            Map<String, Object> detail = new java.util.LinkedHashMap<>(workflowCapabilities.execute(
+                    "task.approval-detail", workflowRequest(Map.of("taskId", item.getSourceId(),
+                            "locale", org.springframework.context.i18n.LocaleContextHolder.getLocale().toLanguageTag())))
+                    .payload());
+            detail.put("id", item.getId());
+            detail.put("processName", item.getTitle());
+            return ApiResponse.success(detail);
+        }
+
         // Build approval detail response from InboxItem
         // For items without a real workflow, return a stub with basic approval capabilities
         Map<String, Object> currentStep = Map.of(
