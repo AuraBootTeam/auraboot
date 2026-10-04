@@ -788,7 +788,7 @@ async function createBpmProcessUsageReferencingField(
   const process = await postApi<BpmProcessRecord>(page, '/api/bpm/process-definitions', {
     processKey,
     processName,
-    description: 'Model publish governance BPM_PROCESS replay fixture',
+    description: 'Model publish governance WORKFLOW_PROCESS replay fixture',
     category: 'approval',
     bpmnContent,
     designerJson: JSON.stringify(designerJson),
@@ -969,7 +969,7 @@ function requireBpmReplayResult(
   const result = (report.results ?? []).find((item) => {
     const outputs = item.outputs ?? {};
     const metadata = item.step?.metadata ?? {};
-    return item.step?.consumerType === 'BPM_PROCESS' && (
+    return item.step?.consumerType === 'WORKFLOW_PROCESS' && (
       item.step?.sourceCode === processKey
       || outputs.processKey === processKey
       || metadata.processKey === processKey
@@ -993,7 +993,7 @@ function requireBpmAssignmentReplayResult(
   const result = (report.results ?? []).find((item) => {
     const outputs = item.outputs ?? {};
     const metadata = item.step?.metadata ?? {};
-    return item.step?.consumerType === 'BPM_PROCESS' && (
+    return item.step?.consumerType === 'WORKFLOW_PROCESS' && (
       item.step?.sourceCode === processKey
       || outputs.processKey === processKey
       || metadata.processKey === processKey
@@ -1064,7 +1064,7 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
             targetPath: runtimeFieldRef,
           }),
           expect.objectContaining({
-            sourceType: 'BPM_PROCESS',
+            sourceType: 'WORKFLOW_PROCESS',
             sourceCode: bpmUsage.processKey,
             targetPath: runtimeFieldRef,
           }),
@@ -1541,7 +1541,7 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
     bindingSurface: 'edge conditionSpec',
     conditionResult: 'TRUE',
   }));
-  await expect(replayReport).toContainText(/BPM 流程|BPM_PROCESS/);
+  await expect(replayReport).toContainText(/BPM 流程|WORKFLOW_PROCESS/);
   await expect(replayReport).toContainText('已执行');
   await expect(replayReport).toContainText('BPM 规则复核结果：命中');
   await expect(replayReport).toContainText('流程实例');
@@ -1563,7 +1563,7 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
   await expect(replayReport).not.toContainText('conditionResult');
   await expect(page.getByTestId('model-publish-bpm-sample-error')).toHaveCount(0);
 
-  const bpmReportCard = page.getByTestId('model-publish-replay-result-BPM_PROCESS');
+  const bpmReportCard = page.getByTestId('model-publish-replay-result-WORKFLOW_PROCESS');
   await expect(bpmReportCard).toBeVisible({ timeout: 5_000 });
   await expect(bpmReportCard).toContainText('BPM 规则复核结果：命中');
   await expect(bpmReportCard).toContainText(bpmUsage.processKey);
@@ -1650,7 +1650,7 @@ test('RC-MODEL-01B: model publish replay executes BPM userTask assignment rule b
     expect(currentImpact.references ?? []).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          sourceType: 'BPM_PROCESS',
+          sourceType: 'WORKFLOW_PROCESS',
           sourceCode: bpmUsage.processKey,
           targetPath: runtimeFieldRef,
           binding: 'DESIGNER_NODE',
@@ -1686,7 +1686,7 @@ test('RC-MODEL-01B: model publish replay executes BPM userTask assignment rule b
   await expect(governance).toBeVisible({ timeout: 10_000 });
   await expect(governance).toContainText('规则中心影响治理');
   await expect(governance).toContainText(`${modelCode}.${fieldCode}`);
-  await expect(governance).toContainText(/BPM 流程|BPM_PROCESS/);
+  await expect(governance).toContainText(/BPM 流程|WORKFLOW_PROCESS/);
   await expect(governance).toContainText(bpmUsage.processName);
   await expect(page.getByTestId('model-publish-bpm-sample')).toBeVisible({ timeout: 10_000 });
 
@@ -1787,7 +1787,7 @@ test('RC-MODEL-01B: model publish replay executes BPM userTask assignment rule b
   await expect(replayReport).not.toContainText('candidateGroupIds');
   await expect(page.getByTestId('model-publish-bpm-sample-error')).toHaveCount(0);
 
-  const bpmReportCard = page.getByTestId('model-publish-replay-result-BPM_PROCESS');
+  const bpmReportCard = page.getByTestId('model-publish-replay-result-WORKFLOW_PROCESS');
   await expect(bpmReportCard).toBeVisible({ timeout: 5_000 });
   await expect(bpmReportCard).toContainText('已解析候选审批人');
   await expect(bpmReportCard).toContainText(expectedUsers[0]);
@@ -1826,7 +1826,7 @@ test('RC-MODEL-01C: model publish replay shows BPM userTask fail-closed when dec
     expect(currentImpact.references ?? []).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          sourceType: 'BPM_PROCESS',
+          sourceType: 'WORKFLOW_PROCESS',
           sourceCode: bpmUsage.processKey,
           targetPath: runtimeFieldRef,
           binding: 'DESIGNER_NODE',
@@ -1862,7 +1862,7 @@ test('RC-MODEL-01C: model publish replay shows BPM userTask fail-closed when dec
   await expect(governance).toBeVisible({ timeout: 10_000 });
   await expect(governance).toContainText('规则中心影响治理');
   await expect(governance).toContainText(`${modelCode}.${fieldCode}`);
-  await expect(governance).toContainText(/BPM 流程|BPM_PROCESS/);
+  await expect(governance).toContainText(/BPM 流程|WORKFLOW_PROCESS/);
   await expect(governance).toContainText(bpmUsage.processName);
   await expect(page.getByTestId('model-publish-bpm-sample')).toBeVisible({ timeout: 10_000 });
 
@@ -1937,7 +1937,7 @@ test('RC-MODEL-01C: model publish replay shows BPM userTask fail-closed when dec
   await expect(replayReport).not.toContainText('candidateUserIds');
   await expect(page.getByTestId('model-publish-bpm-sample-error')).toHaveCount(0);
 
-  const bpmReportCard = page.getByTestId('model-publish-replay-result-BPM_PROCESS');
+  const bpmReportCard = page.getByTestId('model-publish-replay-result-WORKFLOW_PROCESS');
   await expect(bpmReportCard).toBeVisible({ timeout: 5_000 });
   await expect(bpmReportCard).toContainText('已失败关闭');
   await bpmReportCard.scrollIntoViewIfNeeded();
