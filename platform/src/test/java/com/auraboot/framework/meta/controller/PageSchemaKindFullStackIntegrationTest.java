@@ -198,6 +198,8 @@ class PageSchemaKindFullStackIntegrationTest extends BaseIntegrationTest {
         mockMvc.perform(put("/api/pages/{pid}", pid).contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of("kind", "plp", "title", "Updated Products"))))
                 .andExpect(status().is2xxSuccessful());
+        assertThat(jdbcTemplate.queryForObject("SELECT title::text FROM ab_page_schema WHERE pid = ?", String.class, pid))
+                .contains("Updated Products");
         String versionResponse = mockMvc.perform(post("/api/pages/{pid}/versions", pid)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of("operation", "update", "description", "Profile snapshot"))))
@@ -211,6 +213,15 @@ class PageSchemaKindFullStackIntegrationTest extends BaseIntegrationTest {
                         .content(objectMapper.writeValueAsString(Map.of("kind", "list", "profile", "admin", "schemaVersion", 3,
                                 "blocks", List.of(Map.of("id", "table", "blockType", "table"))))))
                 .andExpect(status().is2xxSuccessful());
+        assertThat(jdbcTemplate.queryForObject("SELECT profile FROM ab_page_schema WHERE pid = ?", String.class, pid))
+                .isEqualTo("admin");
+        assertThat(jdbcTemplate.queryForObject("SELECT kind FROM ab_page_schema WHERE pid = ?", String.class, pid))
+                .isEqualTo("list");
+        assertThat(jdbcTemplate.queryForObject("SELECT schema_version FROM ab_page_schema WHERE pid = ?", Integer.class, pid))
+                .isEqualTo(3);
+        assertThat(objectMapper.readTree(jdbcTemplate.queryForObject(
+                "SELECT blocks::text FROM ab_page_schema WHERE pid = ?", String.class, pid)))
+                .isEqualTo(objectMapper.valueToTree(List.of(Map.of("id", "table", "blockType", "table"))));
         mockMvc.perform(post("/api/pages/{pid}/rollback/{historyId}", pid, historyId).param("reason", "Restore profile"))
                 .andExpect(status().is2xxSuccessful());
         assertThat(jdbcTemplate.queryForObject("SELECT profile FROM ab_page_schema WHERE pid = ?", String.class, pid))
