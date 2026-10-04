@@ -1,8 +1,14 @@
+---
+type: system-reference
+status: active
+updated: 2026-10-02
+---
+
 # AuraBoot License FAQ
 
 > **声明**:本 FAQ 仅为方便理解 [`LICENSE.txt`](./LICENSE.txt) 而提供的非正式说明,不构成法律意见,不具备法律效力。如本 FAQ 与 `LICENSE.txt` 存在任何不一致,**一律以 `LICENSE.txt` 英文正本为准**。重大商业决策请咨询法律顾问,或通过 https://www.auraboot.com/contact 与我们直接确认。
 >
-> Last updated: 2026-10-01 (LICENSE v2.0)
+> Last updated: 2026-10-02 (LICENSE v2.0)
 
 ---
 
@@ -71,10 +77,8 @@
 
 **核心**:v2.0 的收费边界 = **AuraBoot 商标 + 企业版专有代码**,不再是开源代码的使用领域限制。
 
-### Q11. 我做了一个"垂直行业 SaaS"(比如餐饮 SaaS、教育 SaaS),底层用 AuraBoot,允许吗?
-**允许,即使是多租户。** 因为你卖的是"餐饮/教育业务应用",不是"通用低代码平台"。租户用的是你预配置好的业务功能,而不是来"自己搭应用"。
-
-如果你的产品同时提供"租户自己用低代码改业务流程"的能力,边界开始模糊 — 建议通过 https://www.auraboot.com/contact 确认。
+### Q11. 我可以以自己的品牌提供垂直行业或多租户低代码 SaaS 吗?
+**可以。** Part 1 的 Apache-2.0 授权不限制使用领域,包括租户自行配置业务流程的情形。企业版代码与 AuraBoot 商标使用仍受各自独立协议约束。
 
 ### Q12. 商业 License 能解锁多租户低代码 SaaS 吗?
 先分清两个东西:
@@ -124,7 +128,7 @@ CLA 不要求你放弃版权,只是授予项目长期、不可撤销的使用许
 ## 七、合规与执行
 
 ### Q19. 如果我违反了协议会怎样?
-v2.0 的终止机制完全沿用 Apache-2.0 §9/§10(Part 2 S6):唯一触发终止的情形是**发起专利诉讼**主张 AuraBoot 侵犯专利——此时授权终止。不存在"一般违约 30 天销毁所有副本"的条款。商标侵权按商标法处理(Part 2 S3)。
+Apache-2.0 §3 规定:提起该条所述的专利诉讼时,**针对该作品的专利许可**终止,并非宣告全部版权授权终止。§4 规定再分发条件,§9 规定承担附加责任;协议没有 §10。v2.0 补充条款不增加一般违约终止机制;其中 S6 准确指向 Part 1 §3 规定的专利许可终止。商标问题单独处理。本 FAQ 不修改 LICENSE.txt。
 
 ### Q20. 协议受哪国法律管辖?
 Apache-2.0 不指定管辖法律、法院、仲裁机构或争议解决地。如果双方另行签订 Commercial License 或其他书面协议,可以在该协议中约定管辖法律和争议解决机制。
@@ -157,3 +161,7 @@ Apache-2.0 不指定管辖法律、法院、仲裁机构或争议解决地。如
 - **商业合作 / OEM**:https://www.auraboot.com/contact
 
 本 FAQ 会随社区反馈持续更新。欢迎在 GitHub Issue 中提问,我们会把高频问题补充进来。
+
+## npm 包的许可证
+
+当前 OSS 的八个 workspace 包(`designer-sdk`、`dsl-runtime`、`dsl-types`、`nav-model`、`plugin-sdk`、`open-platform-sdk`、`ui`、`web-testkit`)均声明 Apache-2.0,并随包提供完整的包级 `LICENSE`。不得把已退役的 v1.3 平台包元数据方案套用到 v2.0 代码。Enterprise 的 `@auraboot/auraqr-sdk` 客户端也具有明确的包级 Apache-2.0 许可;此例外不改变其他企业版代码的商业授权。包许可证不授予 AuraBoot 商标权。许可与上架状态分别判断:`auraqr-sdk` 仍为 private,registry 发布状态须另行核实。

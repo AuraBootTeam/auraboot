@@ -3292,7 +3292,11 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                     currentMemberIdForFieldPermissions(), modelCode);
             allowedExportFields.removeAll(exportFieldPermissions.hiddenFields());
             if (exportFields == null || exportFields.isEmpty()) {
-                exportFields = new ArrayList<>(allowedExportFields);
+                // A normal roster/export starts with business columns. Explicit
+                // authorized audit exports can still request these fields.
+                exportFields = allowedExportFields.stream()
+                        .filter(field -> !Set.of("pid", "created_at", "updated_at", "created_by", "updated_by").contains(field))
+                        .toList();
             } else {
                 List<String> forbiddenFields = exportFields.stream()
                         .filter(field -> !allowedExportFields.contains(field))

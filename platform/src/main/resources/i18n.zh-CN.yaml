@@ -1916,6 +1916,34 @@ notification_rule:
   create_rule: 创建规则
 
 openPlatform:
+  eventCatalog: "事件目录"
+  eventCatalogHint: "已安装应用只能订阅明确公开的合作伙伴事件。"
+  noPublishedEvents: "暂无公开的合作伙伴事件"
+  webhookHealth: "Webhook 兼容性与签名"
+  webhookHealthHint: "每 90 天轮换签名密钥，并使用受支持的事件版本。"
+  noInstalledWebhooks: "此安装暂无 Webhook"
+  compatibleVersions: "支持 {versions}"
+  compatible: "兼容"
+  actionRequired: "需要处理"
+  schemaVersion: "事件版本 v{version}"
+  catalogVersion: "目录版本 v{version}"
+  signing: "签名密钥"
+  rotateBy: "轮换截止：{date}"
+  chooseSupportedVersion: "请选择受支持的事件版本。"
+  rotateSigningNow: "请立即轮换签名密钥。"
+  addSigningSecret: "启用投递前请添加签名密钥。"
+  classification:
+    partner: 合作伙伴
+  rotation:
+    healthy: 正常
+    due: 即将到期
+    overdue: 已逾期
+    missing: 未配置
+  delivery:
+    dead_letter: 死信
+    failed: 失败
+    pending: 待投递
+    success: 已投递
   title: 开放平台
   badge: 系统对系统访问
   subtitle: 创建租户级应用，按最小权限授权，轮换凭据，并查看统一的公共 API 契约。
@@ -2034,3 +2062,6 @@ aurabot:
     saving: 保存中…
     saved_as_dashboard: 已存为看板
     save_failed: 存为看板失败
+
+user:
+  logout: 退出登录

@@ -58,6 +58,36 @@ import com.auraboot.framework.common.constant.StatusConstants;
 public class NamedQueryServiceImpl extends BaseMetaService implements NamedQueryService {
 
     @org.springframework.beans.factory.annotation.Autowired
+    private com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog applicationRuntimeDefinitionCatalog;
+    @org.springframework.beans.factory.annotation.Value("${aura.application.default-code:}")
+    private String defaultApplicationCode;
+    @org.springframework.beans.factory.annotation.Value("${aura.application.definition-read.runtime-primary-enabled:false}")
+    private boolean applicationRuntimePrimaryEnabled;
+
+    public boolean releaseReadsEnabled() {
+        return applicationRuntimePrimaryEnabled && MetaContext.exists()
+                && MetaContext.getCurrentTenantId() != null
+                && org.springframework.util.StringUtils.hasText(defaultApplicationCode);
+    }
+
+    private com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.BoundNamedQuery readDefinition(String code) {
+        Long tenantId = getCurrentTenantId();
+        if (releaseReadsEnabled()) {
+            var bound = applicationRuntimeDefinitionCatalog.findNamedQuery(tenantId, defaultApplicationCode.trim(), code);
+            if (bound.isPresent()) return bound.get();
+        }
+        NamedQuery query = namedQueryMapper.findByCode(code);
+        return query == null ? null : new com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.BoundNamedQuery(
+                query, null);
+    }
+
+    private List<NamedQueryField> readFields(
+            com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.BoundNamedQuery definition) {
+        return definition.fields() != null ? definition.fields()
+                : namedQueryFieldMapper.findByQueryCode(definition.query().getTenantId(), definition.query().getCode());
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
     private NamedQueryFieldProtection fieldProtection;
 
     private final NamedQueryMapper namedQueryMapper;
@@ -265,13 +295,17 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
     }
 
     @Override
-    @Cacheable(value = "namedQuery", key = "T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix() + ':code:' + #code")
+    @Cacheable(value = "namedQuery", key = "T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix() + ':code:' + #code", condition = "!#root.target.releaseReadsEnabled()")
     public NamedQueryDTO findByCode(String code) {
-        NamedQuery entity = namedQueryMapper.findByCode(code);
-        if (entity == null) {
+        var definition = readDefinition(code);
+        if (definition == null) {
             throw new MetaServiceException("Named query not found: " + code);
         }
-        return toDTO(entity, true);
+        NamedQueryDTO dto = toDTO(definition.query(), false);
+        var fields = readFields(definition);
+        dto.setFields(fields.stream().map(this::toFieldDTO).toList());
+        dto.setFieldCount(fields.size());
+        return dto;
     }
 
     // ==================== List queries ====================
@@ -414,6 +448,10 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
     @Override
     public List<NamedQueryFieldDTO> getFields(String queryCode) {
         Long tenantId = getCurrentTenantId();
+        if (releaseReadsEnabled()) {
+            var bound = applicationRuntimeDefinitionCatalog.findNamedQuery(tenantId, defaultApplicationCode.trim(), queryCode);
+            if (bound.isPresent()) return bound.get().fields().stream().map(this::toFieldDTO).toList();
+        }
         List<NamedQueryField> fields = namedQueryFieldMapper.findByQueryCode(tenantId, queryCode);
         return fields.stream()
                 .map(this::toFieldDTO)
@@ -641,7 +679,8 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
     @Observed(name = "named_query.execute", contextualName = "named-query-execution")
     public PaginationResult<Map<String, Object>> executeQuery(String code, NamedQueryTestRequest request) {
         // 1. Get query definition
-        NamedQuery query = namedQueryMapper.findByCode(code);
+        var definition = readDefinition(code);
+        NamedQuery query = definition == null ? null : definition.query();
         if (query == null) {
             throw new MetaServiceException("Named query not found: " + code);
         }
@@ -676,7 +715,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         }
 
         // 3. Get field whitelist
-        List<NamedQueryField> fields = namedQueryFieldMapper.findByQueryCode(tenantId, code);
+        List<NamedQueryField> fields = readFields(definition);
         validatePublicOutputAliases(fields);
         Map<String, NamedQueryField> fieldMap = fields.stream()
                 .collect(Collectors.toMap(NamedQueryField::getFieldCode, f -> f));
@@ -908,10 +947,9 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
      * ordering, policy limit and projection execution shared by export rendering and download
      * re-verification so both observe identical authorization semantics.
      */
-    private ExportProjection executeAuthorizedProjection(NamedQuery query, String code,
+    private ExportProjection executeAuthorizedProjection(NamedQuery query, List<NamedQueryField> allFields, String code,
             NamedQueryDataExportRequest request) {
         Long tenantId = getCurrentTenantId();
-        List<NamedQueryField> allFields = namedQueryFieldMapper.findByQueryCode(tenantId, code);
         validatePublicOutputAliases(allFields);
         Map<String, NamedQueryField> fieldMap = allFields.stream()
                 .collect(Collectors.toMap(NamedQueryField::getFieldCode, f -> f));
@@ -1012,14 +1050,15 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
     @Override
     public void authorizeExportDownload(String code, NamedQueryDataExportRequest request, JsonNode definitionSnapshot,
             String rowSetDigest) {
-        NamedQuery query = namedQueryMapper.findByCode(code);
+        var definition = readDefinition(code);
+        NamedQuery query = definition == null ? null : definition.query();
         if (query == null || !query.isExecutable()) {
             throw new AccessDeniedException("Export query is no longer available");
         }
         authorizeDeclaredResource(query);
         // Re-executes the full authorized projection so the root-record ACL, the resolved data
         // scope clause and the field protection all run under the caller's CURRENT permissions.
-        ExportProjection projection = executeAuthorizedProjection(query, code, request);
+        ExportProjection projection = executeAuthorizedProjection(query, readFields(definition), code, request);
         JsonNode currentDefinition = NamedQueryExportDefinition.capture(query, projection.allFields(),
                 projection.scopeClauses(), projection.protection().evidence());
         if (definitionSnapshot == null || !definitionSnapshot.equals(currentDefinition)) {
@@ -1046,7 +1085,8 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         Instant startTime = Instant.now();
 
         // 1. Get query definition
-        NamedQuery query = namedQueryMapper.findByCode(code);
+        var definition = readDefinition(code);
+        NamedQuery query = definition == null ? null : definition.query();
         if (query == null) {
             throw new MetaServiceException("Named query not found: " + code);
         }
@@ -1057,7 +1097,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         authorizeDeclaredResource(query);
 
         try {
-            ExportProjection projection = executeAuthorizedProjection(query, code, request);
+            ExportProjection projection = executeAuthorizedProjection(query, readFields(definition), code, request);
             List<NamedQueryField> allFields = projection.allFields();
             List<String> exportFieldCodes = projection.exportFieldCodes();
             List<Map<String, Object>> data = projection.data();

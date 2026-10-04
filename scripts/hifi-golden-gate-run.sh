@@ -4,7 +4,7 @@
 # for the analytics designers (B118 slice).
 #
 # Same contract as scripts/oss-e2e-gate-run.sh (slot-isolated host-first stack,
-# destroy-on-exit trap, exit code = gate result), but runs the two B118
+# retain-on-exit trap, exit code = gate result), but runs the two B118
 # high-fidelity golden spec files under --project=chromium:
 #
 #   tests/e2e/designer/report-hifi-golden.spec.ts    HIFI-00/01/02
@@ -73,10 +73,13 @@ if [ -z "$WORKSPACE" ] || [ ! -f "$WORKSPACE/dev.sh" ]; then
   [ -n "${main_wt:-}" ] && [ -f "$(dirname "$main_wt")/dev.sh" ] && WORKSPACE="$(dirname "$main_wt")"
 fi
 
+source "$REPO_ROOT/scripts/lib/workspace-control.sh"
+aura_bind_workspace_control "$WORKSPACE" || exit 2
+
 slot_in_use() {
   local s="$1"
   if [ -n "$WORKSPACE" ]; then
-    "$WORKSPACE/dev.sh" runtime list 2>/dev/null | awk 'NR>1{print $3}' | grep -qx "$s" && return 0
+    "$WORKSPACE/aura" runtime list 2>/dev/null | awk 'NR>1{print $3}' | grep -qx "$s" && return 0
   fi
   local be=$((6400 + s)) web=$((5100 + s)) bff=$((6100 + s))
   lsof -nP -iTCP:"$be"  -sTCP:LISTEN -t >/dev/null 2>&1 && return 0
@@ -85,24 +88,23 @@ slot_in_use() {
   return 1
 }
 
-if [[ -z "$SLOT" ]]; then
+registered_slot="$("$WORKSPACE/aura" runtime list | awk -v name="$NAME" 'NR > 1 && $1 == name { print $3; exit }')"
+if [[ -n "$registered_slot" ]]; then
+  [[ -z "$SLOT" || "$SLOT" == "$registered_slot" ]] || die "runtime '$NAME' owns slot $registered_slot"
+  SLOT="$registered_slot"
+  log "reusing slot $SLOT for '$NAME'"
+elif [[ -z "$SLOT" ]]; then
   for cand in 73 74 75 76 77 80 81 82 83 84 85 86 87 90 91 92 93 94 95 96 97; do
     if ! slot_in_use "$cand"; then SLOT="$cand"; break; fi
   done
-  [[ -n "$SLOT" ]] || die "could not auto-pick a free slot in 73..97 — pass --slot N explicitly"
-  log "auto-picked free slot $SLOT"
+  [[ -n "$SLOT" ]] || die "could not auto-pick a free slot — pass --slot N"
 elif slot_in_use "$SLOT"; then
-  die "slot $SLOT is already in use — pick another with --slot"
+  die "slot $SLOT is already in use"
 fi
 
 cleanup() {
   local rc=$?
-  if [[ "$KEEP" == 1 ]]; then
-    log "--keep set; leaving stack '$NAME' up (env: $GS env $NAME; destroy: $GS destroy $NAME)"
-  else
-    log "tearing down stack '$NAME' (trap on exit rc=$rc)..."
-    "$GS" destroy "$NAME" >/dev/null 2>&1 || true
-  fi
+  log "keeping stack '$NAME' and this round's evidence for review (exit rc=$rc)"
   return "$rc"
 }
 trap cleanup EXIT INT TERM
@@ -112,17 +114,17 @@ log "HIFI golden gate — name=$NAME slot=$SLOT repeat=$REPEAT"
 echo "=============================================================="
 
 export AGENT_LLM_STUB_MODE=true
-log "1/5 fresh stack: destroy any prior '$NAME' + up --fresh-db --plugin-profile demo"
-"$GS" destroy "$NAME" >/dev/null 2>&1 || true
+log "1/5 fresh stack: reuse '$NAME' on the same slot; stop before reset + up --fresh-db --plugin-profile demo"
+"$GS" down "$NAME" || die_env "cannot stop the owned stack before rebuilding"
 "$GS" up "$NAME" --slot "$SLOT" --ttl 3h --runtime-mode verification --fresh-db --plugin-profile demo \
-  || die_env "stack bring-up failed — see the golden-stack logs under ${WORKSPACE:-$REPO_ROOT}/.workspace/golden/$NAME/"
+  || die_env "stack bring-up failed — see the golden-stack logs under ${WORKSPACE:-$REPO_ROOT}/.workspace/runtimes/$NAME/oss-stack/"
 
 # The demo profile does not carry the internal test-fixtures plugin; the hifi
 # specs seed orders through the e2et_order model it provides. Import it before
 # anything that references e2et_* or the run fails on phantom missing models.
 log "2/5 import internal test-fixtures plugin (e2et_* models)"
 "$GS" import "$NAME" --plugin-profile none --plugin test-fixtures \
-  || die_env "test-fixtures import failed — see ${WORKSPACE:-$REPO_ROOT}/.workspace/golden/$NAME/import.log"
+  || die_env "test-fixtures import failed — see ${WORKSPACE:-$REPO_ROOT}/.workspace/runtimes/$NAME/oss-stack/import.log"
 
 log "3/5 resolve stack env"
 eval "$("$GS" env "$NAME")" || die_env "could not resolve stack env for '$NAME'"

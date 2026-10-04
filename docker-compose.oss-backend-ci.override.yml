@@ -1,15 +1,25 @@
-# Linux CI only: start the fixed-port PostgreSQL database empty. The backend
+# Linux CI only: start the runtime-owned PostgreSQL database empty. The backend
 # integration runner applies the canonical Flyway migrations after PostgreSQL
 # is healthy so both schema and migration-owned platform seed rows are tested.
 services:
   postgres:
+    container_name: "${AURA_OSS_CI_POSTGRES_CONTAINER:?runtime-owned PostgreSQL container required}"
+    ports: !override
+      - "127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT:?runtime-owned PostgreSQL port required}:5432"
     volumes: !override
       - skills_c2_postgres_data:/var/lib/postgresql/data
+
+  redis:
+    container_name: "${AURA_OSS_CI_REDIS_CONTAINER:?runtime-owned Redis container required}"
+    ports: !override
+      - "127.0.0.1:${AURA_OSS_CI_REDIS_PORT:?runtime-owned Redis port required}:6379"
+    volumes: !override
+      - oss_ci_redis_data:/data
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     ports:
-      - "${AURA_OSS_CI_KAFKA_PORT:-9092}:19092"
+      - "127.0.0.1:${AURA_OSS_CI_KAFKA_PORT:?runtime-owned Kafka port required}:19092"
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -30,3 +40,7 @@ services:
       timeout: 5s
       retries: 30
       start_period: 20s
+
+volumes:
+  skills_c2_postgres_data:
+  oss_ci_redis_data:

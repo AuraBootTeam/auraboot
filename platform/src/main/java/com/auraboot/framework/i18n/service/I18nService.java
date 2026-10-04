@@ -32,6 +32,7 @@ import java.util.Map;
  * 1. Database (via I18nResourceService)
  * 2. Compiled JSON file (i18n.{locale}.json)
  * 3. Legacy YAML file (i18n.{locale}.yaml) - for backward compatibility
+ * 4. Bundled base resources (seed/i18n-base.json)
  *
  * @author AuraBoot
  */
@@ -54,10 +55,7 @@ public class I18nService {
     /**
      * Get i18n data for a locale
      *
-     * Data loading priority:
-     * 1. Try database via I18nResourceService
-     * 2. Fall back to compiled JSON file
-     * 3. Fall back to legacy YAML file
+     * Merge bundled base resources, legacy YAML, compiled JSON, then tenant database overrides.
      *
      * @param locale The locale code (e.g., zh-CN, en-US)
      * @return Flattened map of i18n key -> value
@@ -77,7 +75,7 @@ public class I18nService {
         }
 
         // Load from multiple sources and merge
-        Map<String, Object> result = new LinkedHashMap<>();
+        Map<String, Object> result = new LinkedHashMap<>(loadBundledBase(locale));
 
         // 1. Try legacy YAML file first (base layer)
         Map<String, Object> yamlData = loadFromYaml(locale);
@@ -199,8 +197,31 @@ public class I18nService {
     }
 
     /**
-     * Load i18n data from compiled JSON file.
-     * Package-private so {@link I18nOverrideAuditor} can reuse the same flatten logic.
+     * Read the canonical bundled translations without importing tenant records.
+     */
+    Map<String, Object> loadBundledBase(String locale) {
+        Resource resource = new ClassPathResource("seed/i18n-base.json");
+        try {
+            var rows = jsonMapper.readValue(readResourceAsString(resource),
+                    new TypeReference<java.util.List<Map<String, Object>>>() {});
+            Map<String, Object> result = new LinkedHashMap<>();
+            for (var row : rows) {
+                if (!(row.get("key") instanceof String key) || key.isBlank()) {
+                    throw new IllegalStateException("Bundled i18n entry has no key");
+                }
+                Object value = row.get(locale);
+                if (value instanceof String text && !text.isBlank() && result.putIfAbsent(key, text) != null) {
+                    throw new IllegalStateException("Bundled i18n key is duplicated: " + key);
+                }
+            }
+            return result;
+        } catch (IOException failure) {
+            throw new IllegalStateException("Bundled base i18n resources cannot be read", failure);
+        }
+    }
+
+    /**
+     * Load compiled translations; shared with {@link I18nOverrideAuditor}.
      */
     Map<String, Object> loadFromJson(String locale) {
         String resourcePath = "i18n/i18n." + locale + ".json";

@@ -19,6 +19,12 @@ public class NamedQuerySourceModels {
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
     @Value("${aura.persistence.tenant-bypass-table-prefixes:se_}")
     private String tenantBypassTablePrefixes = "se_";
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog runtimeCatalog;
+    @Value("${aura.application.default-code:}")
+    private String defaultApplicationCode;
+    @Value("${aura.application.definition-read.runtime-primary-enabled:false}")
+    private boolean runtimePrimaryEnabled;
     private static final Pattern IDENTIFIER = Pattern.compile("\"(?:[^\"]|\"\")+\"|[A-Za-z_][A-Za-z0-9_$]*");
 
     /**
@@ -92,10 +98,19 @@ public class NamedQuerySourceModels {
     Sources resolvePlan(Long tenant, String fromSql, List<com.auraboot.framework.meta.entity.NamedQueryField> fields) {
         if (tenant == null || tenant <= 0) throw new AccessDeniedException("Export source requires a tenant");
         Map<String, Set<String>> catalog = new HashMap<>();
-        for (var model : mapper.findCurrentForTenant(tenant)) {
-            String table = "sqlView".equals(model.getSourceType()) ? model.getSourceRef() : model.getTableName();
-            if (table == null || table.isBlank()) table = SystemFieldConstants.generateTableName(model.getCode());
-            catalog.computeIfAbsent(identity(table), ignored -> new HashSet<>()).add(model.getCode());
+        var releaseSources = runtimePrimaryEnabled && runtimeCatalog != null
+                && defaultApplicationCode != null && !defaultApplicationCode.isBlank()
+                ? runtimeCatalog.modelSources(tenant, defaultApplicationCode) : Optional.<List<com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.BoundModelSource>>empty();
+        if (releaseSources.isPresent()) {
+            for (var model : releaseSources.get()) {
+                catalog.computeIfAbsent(identity(model.tableName()), ignored -> new HashSet<>()).add(model.code());
+            }
+        } else {
+            for (var model : mapper.findCurrentForTenant(tenant)) {
+                String table = "sqlView".equals(model.getSourceType()) ? model.getSourceRef() : model.getTableName();
+                if (table == null || table.isBlank()) table = SystemFieldConstants.generateTableName(model.getCode());
+                catalog.computeIfAbsent(identity(table), ignored -> new HashSet<>()).add(model.getCode());
+            }
         }
         String source = fromSql.trim();
         if (NamedQuerySqlSource.isQuery(source)) source = "(" + source + ") _nq";

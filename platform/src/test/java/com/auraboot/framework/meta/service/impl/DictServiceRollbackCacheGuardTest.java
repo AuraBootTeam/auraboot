@@ -59,6 +59,61 @@ class DictServiceRollbackCacheGuardTest {
             TransactionSynchronizationManager.clearSynchronization();
         }
         TransactionSynchronizationManager.setActualTransactionActive(false);
+        com.auraboot.framework.application.tenant.MetaContext.clear();
+    }
+
+    @Test
+    void boundReleaseBypassesResidualTenantDictionaryCache() {
+        var catalog = org.mockito.Mockito.mock(com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "applicationRuntimeDefinitionCatalog", catalog);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "applicationRuntimePrimaryEnabled", true);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "defaultApplicationCode", "aura-edu");
+        com.auraboot.framework.application.tenant.MetaContext.setContext(42L, 100L, "U-100", "tester");
+        var old = new DictDTO(); old.setName("stale local dictionary");
+        cache().put("42:xy_subject", old);
+        var first = new DictDTO(); first.setName("first bound release");
+        var next = new DictDTO(); next.setName("next bound release");
+        when(catalog.findDict(42L, "aura-edu", "xy_subject")).thenReturn(
+                java.util.Optional.of(first), java.util.Optional.of(next));
+        var interceptor = new org.springframework.cache.interceptor.CacheInterceptor();
+        interceptor.setCacheManager(cacheManager);
+        interceptor.setCacheOperationSources(new org.springframework.cache.annotation.AnnotationCacheOperationSource());
+        interceptor.afterPropertiesSet();
+        interceptor.afterSingletonsInstantiated();
+        var factory = new org.springframework.aop.framework.ProxyFactory(service);
+        factory.addAdvice(interceptor);
+        var proxy = (com.auraboot.framework.meta.service.DictService) factory.getProxy();
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "applicationRuntimePrimaryEnabled", false);
+        assertThat(proxy.findByCode("xy_subject")).isSameAs(old);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "applicationRuntimePrimaryEnabled", true);
+        assertThat(proxy.findByCode("xy_subject")).isSameAs(first);
+        assertThat(proxy.findByCode("xy_subject")).isSameAs(next);
+        org.mockito.Mockito.verifyNoInteractions(dictMapper);
+    }
+
+    @Test
+    void boundReleaseLoadsEnabledInlineItemsAndRejectsStandaloneVersionSelection() {
+        var catalog = org.mockito.Mockito.mock(com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "applicationRuntimeDefinitionCatalog", catalog);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "applicationRuntimePrimaryEnabled", true);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "defaultApplicationCode", "aura-edu");
+        com.auraboot.framework.application.tenant.MetaContext.setContext(42L, 100L, "U-100", "tester");
+        var enabled = new com.auraboot.framework.meta.entity.payload.DataSourceItemBean();
+        enabled.setValue("math"); enabled.setLabel("数学"); enabled.setDisabled(false);
+        var disabled = new com.auraboot.framework.meta.entity.payload.DataSourceItemBean();
+        disabled.setValue("old"); disabled.setDisabled(true);
+        var dict = DictDTO.builder().code("xy_subject").name("学科").dictType("static")
+                .items(List.of(enabled, disabled)).extendedProps(new com.fasterxml.jackson.databind.ObjectMapper()
+                        .valueToTree(java.util.Map.of("releaseId", "release-one"))).build();
+        when(catalog.findDict(42L, "aura-edu", "xy_subject")).thenReturn(java.util.Optional.of(dict));
+        var result = service.loadDictData("xy_subject", "latest", null);
+        assertThat(result.getSuccess()).isTrue();
+        assertThat(result.getVersion()).isEqualTo("release-one");
+        assertThat(result.getItemMap()).containsExactly(java.util.Map.entry("math", "数学"));
+        assertThat(result.getItems()).extracting("value").containsExactly("math");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.loadDictData("xy_subject", "pinned", "old"))
+                .isInstanceOf(com.auraboot.framework.exception.ValidationException.class);
+        org.mockito.Mockito.verifyNoInteractions(dictVersionService, dictMapper);
     }
 
     @Test
