@@ -89,7 +89,7 @@ it('narrow viewers flow metric content in reading order without a fixed-height c
     const chartItem = screen.getByTestId('dashboard-block-chart');
     expect(container.querySelector('.react-grid-layout')).toBeNull();
     expect(metric.style.height).toBe('');
-    expect(metric.style.minHeight).toBe('176px');
+    expect(metric.style.minHeight).toBe('');
     expect(metric.querySelector('[data-auto-height="true"]')).not.toBeNull();
     expect(chartItem.style.height).toBe('272px');
     expect(Array.from(metric.parentElement!.children)).toEqual([metric, chartItem]);

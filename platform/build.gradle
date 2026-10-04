@@ -19,6 +19,14 @@ bootJar {
     archiveClassifier = 'boot'
 }
 
+// Runtime identity is content-addressed; repeated builds of one source must agree.
+allprojects {
+    tasks.withType(AbstractArchiveTask).configureEach {
+        preserveFileTimestamps = false
+        reproducibleFileOrder = true
+    }
+}
+
 publishing {
     publications {
         mavenJava(MavenPublication) {
@@ -484,7 +492,9 @@ dependencies {
 
 // Spring Boot应用配置
 springBoot {
-    buildInfo()
+    buildInfo {
+        excludes = ['time']
+    }
     mainClass = 'com.auraboot.framework.application.MetaApplication'
 }
 

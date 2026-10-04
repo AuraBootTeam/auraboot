@@ -15,17 +15,9 @@ import com.auraboot.framework.meta.service.DataDomainService;
 import com.auraboot.framework.meta.service.DataPermissionEngine;
 import com.auraboot.framework.meta.service.MetaModelService;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.auraboot.framework.semantic.service.SemanticQueryService;
 import com.auraboot.framework.userattribute.service.UserAttributeService;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.test.util.ReflectionTestUtils;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -49,8 +41,6 @@ import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 class AggregateQueryServiceImplDataScopeTest {
-
-    private static final Map<String, String> PROVEN = new LinkedHashMap<>();
 
     private static final Long TENANT_ID = 10L;
     private static final Long USER_ID = 20L;
@@ -167,7 +157,6 @@ class AggregateQueryServiceImplDataScopeTest {
                 .hasMessageContaining("SEMANTIC_ADAPTER_UNAVAILABLE");
         verify(dynamicDataMapper, never()).selectByQuery(anyString(), anyMap());
         verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
-        prove("missing-semantic-adapter-no-raw", "semanticRouted_withoutAdapter_failsClosed");
     }
 
     @Test
@@ -189,7 +178,6 @@ class AggregateQueryServiceImplDataScopeTest {
                 .hasMessageContaining("NAMED_QUERY_ROW_SCOPE_REQUIRED");
         verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
         verify(dynamicDataMapper, never()).selectByQuery(anyString(), anyMap());
-        prove("missing-required-row-policy-no-raw", "namedQueryAggregate_requireRowFilterWithoutScope_failsClosed");
     }
 
     @Test
@@ -207,41 +195,6 @@ class AggregateQueryServiceImplDataScopeTest {
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("not on the classpath");
         verify(dynamicDataMapper, never()).selectByQuery(anyString(), anyMap());
         verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
-        prove("missing-semantic-service-no-raw", "semanticRouted_missingSemanticService_cannotFallBackToRaw");
-    }
-
-    @BeforeAll static void clearProof() { PROVEN.clear(); }
-
-    private static void prove(String id, String method) {
-        PROVEN.put(id, AggregateQueryServiceImplDataScopeTest.class.getName() + "#" + method + "()");
-    }
-
-    @AfterAll
-    static void emitSemanticFailClosedReceipt() throws Exception {
-        if (!"AMOS-metrics-semantic-fail-closed-contract".equals(System.getenv("S12_SCENARIO_ID"))
-                || PROVEN.size() != 3) return;
-        ObjectMapper mapper = new ObjectMapper();
-        Path root = Path.of(System.getenv("S12_SCENARIO_EVIDENCE_DIR"));
-        Files.createDirectories(root);
-        List<Map<String, Object>> assertions = new ArrayList<>();
-        for (var entry : PROVEN.entrySet()) {
-            String file = entry.getKey() + ".json";
-            Files.writeString(root.resolve(file), mapper.writeValueAsString(Map.of(
-                    "assertionId", entry.getKey(), "testId", entry.getValue(), "passed", true,
-                    "rawExecutorsInvoked", false)));
-            assertions.add(Map.of("id", entry.getKey(), "testId", entry.getValue(),
-                    "passed", true, "evidence", List.of(file)));
-        }
-        Map<String, Object> receipt = new LinkedHashMap<>();
-        receipt.put("runId", System.getenv("S12_RUN_ID"));
-        receipt.put("scenarioId", System.getenv("S12_SCENARIO_ID"));
-        receipt.put("driver", "unit");
-        receipt.put("sourceCommit", System.getenv("S12_SOURCE_COMMIT"));
-        receipt.put("baseUrl", System.getenv("S12_BASE_URL"));
-        receipt.put("executed", 9); receipt.put("passed", 9);
-        receipt.put("failed", 0); receipt.put("skipped", 0);
-        receipt.put("assertions", assertions);
-        Files.writeString(Path.of(System.getenv("S12_RECEIPT_FILE")), mapper.writeValueAsString(receipt));
     }
 
     private AggregateQueryRequest countRequest() {

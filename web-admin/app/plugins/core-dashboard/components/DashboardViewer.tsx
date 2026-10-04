@@ -209,7 +209,7 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
                 <div
                   key={widget.id}
                   data-testid={`dashboard-block-${widget.id}`}
-                  style={autoHeight ? { minHeight: authoredHeight } : { height: authoredHeight }}
+                  style={autoHeight ? undefined : { height: authoredHeight }}
                 >
                   <div
                     className={`${autoHeight ? 'h-auto' : 'h-full'} overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/92 shadow-[0_12px_34px_rgba(15,23,42,0.08)] backdrop-blur-sm dark:border-gray-700/80 dark:bg-gray-900/92 dark:shadow-[0_12px_34px_rgba(0,0,0,0.35)]`}
