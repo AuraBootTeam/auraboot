@@ -1,17 +1,23 @@
 """Hermetic runner safety tests; not deployed-target product acceptance."""
 
 import importlib.util
+import hashlib
+import hmac
 import io
 import json
 import os
 from pathlib import Path
 import sys
 import tempfile
+import time
+import sqlite3
 import unittest
 from unittest.mock import patch
 
-from open_platform_canary import CONTRACTS, Ledger, ProtocolCanary, main, private_read, redact, validate_fixture
-from open_platform_http import ProtocolError
+from open_platform_canary import CONTRACTS, Ledger, ProtocolCanary, external_outcome, main, private_read, redact, validate_fixture
+from open_platform_http import Client, ProtocolError
+from open_platform_receiver import Receiver
+from open_platform_webhook_evidence import read_delivery, verify_delivery
 
 
 def fixture(root):
@@ -28,6 +34,88 @@ def fixture(root):
 
 
 class RunnerTests(unittest.TestCase):
+    def test_signed_raw_transport_preserves_exact_bytes(self):
+        class Response(io.BytesIO):
+            code = 200
+            headers = {}
+
+        class Opener:
+            def open(self, request, timeout):
+                self.request = request
+                return Response(b'{}')
+
+        opener = Opener()
+        raw = b'{ "id": "event-1", "data": {} }'
+        client = Client('https://example.test', opener=opener)
+        client.request('/webhooks/run', method='POST', raw=raw)
+        self.assertEqual(opener.request.data, raw)
+        with self.assertRaises(ValueError):
+            client.request('/webhooks/run', raw=raw, body={})
+        self.assertEqual(client.request_count, 1)
+
+    def test_receiver_evidence_is_recomputed_not_trusted(self):
+        with tempfile.TemporaryDirectory() as root:
+            secret = b'private-receiver-secret'
+            path = Path(root) / 'receiver.sqlite'
+            receiver = Receiver(path, secret, 'fresh-run')
+            raw = b'{"id":"event-1","type":"assets.assignment.changed","schemaVersion":1,"subject":{"type":"assets","pid":"fresh-asset"},"data":{}}'
+            timestamp = str(int(time.time()))
+            signature = 'sha256=' + hmac.new(secret, timestamp.encode() + b'.' + raw, hashlib.sha256).hexdigest()
+            self.assertEqual(receiver.receive(raw, {'X-Webhook-Timestamp': timestamp,
+                'X-Webhook-Signature': signature, 'X-Webhook-Delivery': 'delivery-1'})[0], 200)
+            receiver.close()
+            rows = read_delivery(path, 'delivery-1', secret=secret, run_id='fresh-run', mode='accept', failures=1)
+            kwargs = {'secret': secret, 'delivery_pid': 'delivery-1', 'event_id': 'event-1',
+                      'subject_pid': 'fresh-asset', 'statuses': [200]}
+            proof = verify_delivery(rows, **kwargs)
+            self.assertEqual(proof['attempts'], 1)
+            rows[0]['signature'] = 'sha256=' + '0' * 64
+            self.assertEqual(rows[0]['signature_valid'], 1)
+            with self.assertRaises(ProtocolError):
+                verify_delivery(rows, **kwargs)
+
+    def test_legacy_receiver_store_is_rejected_without_modification(self):
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root) / 'legacy.sqlite'
+            with sqlite3.connect(path) as db:
+                db.execute('CREATE TABLE deliveries(sequence INTEGER PRIMARY KEY, signature_valid INTEGER)')
+            path.chmod(0o600)
+            before = path.read_bytes()
+            with self.assertRaises(ValueError):
+                Receiver(path, b'secret', 'fresh-run')
+            self.assertEqual(path.read_bytes(), before)
+
+    def test_event_requires_exact_consumer_identity_and_downstream_artifact(self):
+        event = {'id': 'fresh-event', 'type': 'asset.created', 'data': {'runId': 'canary-selftest-001'}}
+        log = {'status': 'success', 'automationId': 'automation-1', 'tenantId': 1,
+               'triggerType': 'external_event', 'triggerRecordPid': event['id'],
+               'triggerPayload': {'eventId': event['id'], 'sourceCode': 'canary-selftest-001',
+                                 'eventType': 'external.canary-selftest-001.asset.created.v1', 'data': event['data']},
+               'actionResults': [{'status': 'success', 'actionType': 'create_record',
+                                  'result': {'success': True, 'modelCode': 'tasset_asset',
+                                             'record': {'pid': 'fresh-output', 'tasset_as_code': 'canary-selftest-001-consumed'}}}]}
+        self.assertEqual(external_outcome(log, event, 'automation-1', 1, 'canary-selftest-001'), 'fresh-output')
+        for change in ({'status': 'failed'}, {'tenantId': 2}, {'triggerRecordPid': 'old-event'},
+                       {'automationId': 'old-automation'}, {'actionResults': []}, {'triggerPayload': {}}):
+            with self.subTest(change=change), self.assertRaises(ProtocolError):
+                external_outcome(dict(log, **change), event, 'automation-1', 1, 'canary-selftest-001')
+        wrong_output = json.loads(json.dumps(log))
+        wrong_output['actionResults'][0]['result']['record']['tasset_as_code'] = 'historical-output'
+        with self.assertRaises(ProtocolError):
+            external_outcome(wrong_output, event, 'automation-1', 1, 'canary-selftest-001')
+
+    def test_event_pass_cannot_close_webhook_trace_or_target_identity(self):
+        ledger = Ledger()
+        for key in (*CONTRACTS[:9], 'CANARY-EVENT'):
+            start = len(ledger.requests)
+            ledger.requests.append({'status': 200})
+            ledger.passed(key, start)
+        result = ledger.receipt()
+        self.assertEqual(result['status'], 'PARTIAL')
+        self.assertFalse(result['targetIdentityVerifiedByRunner'])
+        self.assertEqual([row['id'] for row in result['contracts'] if row['verdict'] == 'untested'],
+                         ['CANARY-WEBHOOK', 'CANARY-TRACE'])
+
     def test_import_has_no_target_effects(self):
         with patch('urllib.request.OpenerDirector.open', side_effect=AssertionError('network at import')):
             spec = importlib.util.spec_from_file_location('isolated_canary', Path(__file__).with_name('open_platform_canary.py'))

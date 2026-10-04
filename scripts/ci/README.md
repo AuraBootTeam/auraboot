@@ -33,9 +33,10 @@ Do not expose the SQLite file, secret, or raw delivery evidence through the prox
 
 It verifies HMAC-SHA256 over `timestamp + '.' + rawBody`, a five-minute timestamp window and
 constant-time comparison. Accepted event IDs are persistently deduplicated; reuse of an event ID
-with different raw bytes returns 409. Raw signed bodies and delivery/request IDs are recorded in
+with different raw bytes returns 409. Raw signed bodies, signature headers, timestamps and delivery/request IDs are recorded in
 a private SQLite store. Invalid requests retain only diagnostic hashes and do not store their bodies.
 Retain the store for review; restarting with a different run ID, secret or failure policy is rejected.
+Legacy stores lacking raw signature columns are rejected without modification; choose a fresh run/store.
 
 The fixed modes are `accept`, `fail-first --failures N` and `fail-all`. For a retry case choose a
 failure count below the platform's actual attempt limit. For successful DLQ replay choose a count
@@ -79,10 +80,39 @@ The output is reserved with exclusive creation **before any target writes**. Cre
 redacted; requests carry run-bound request IDs. HTTP budgets, no redirects, no automatic retries
 and stop-on-429 are inherited from the shared transport. An assertion or transport failure exits 1.
 Successful execution of this slice exits **2**, records `PARTIAL`, and retains all twelve rows:
-event/Automation, complete webhook lifecycle and cross-system trace remain untested. No caller
+optional chains remain untested unless explicitly selected and actually executed; complete
+request-ID propagation remains unverified. No caller
 may translate exit 2, nine passed rows, an input identity hash or these safety self-tests into full
 canary acceptance. Browser E2E is not executed.
 
-The same self-test entry additionally runs eight hermetic runner safety checks, injects a false
+Set fixture `includeExternalEvent: true` to additionally drive real ingress, duplicate/conflict,
+enabled Automation consumption and a fresh downstream Asset artifact. This requires an installed
+workflow product providing `automation.deploy` and `automation.run`; the Core adapter alone does
+not execute Automation. The runner observes the exact event/automation/tenant log and real public
+artifact, then checks the ingress request in installation audit. The durable event ID is labelled
+as expected, not observed. Bounded status polling is observation, not HTTP request replay. Missing
+capability or failed/empty consumer execution cannot pass this row. Independent target identity is still unverified, and the result remains PARTIAL/exit2.
+
+Set `includeWebhook: true` and provide `receivers` with exactly `accept`, `retry`, and `replay`.
+Each has `url`, `secretFile` and `store`. URLs must use TLS and the exact path
+`/webhooks/<runId>-<name>`. Run three independent receivers with the corresponding run IDs:
+`accept`, `fail-first --failures 1`, and `fail-first --failures 3`. Stores must be locally readable
+private files from those processes, not evidence downloaded from the platform. Secret files must
+contain the exact UTF-8 secret; only trailing CR/LF is removed, matching the receiver CLI.
+
+This driver creates three run-scoped subscriptions, triggers one fresh Asset command, observes
+accept/retry/dead-letter queue states, then calls the real replay API. The independent evidence
+reader recomputes HMAC, raw-byte checksum, timestamp window, event/subject identity and exact
+attempt statuses (200; 503/200; 503/503/503/200). It also sends the original bytes to the receiver
+for explicitly labelled deduplication, invalid-signature and expired-timestamp checks. The target
+request budget is 250; receiver checks have a separate budget of three; neither automatically retries.
+
+Selecting both optional chains records a command audit/resource/event/delivery/receiver correlation.
+**CANARY-TRACE remains untested**: the inspected platform dispatcher does not forward the originating
+request ID into its signed delivery. Joining different IDs or supplying a fixed subscription header
+cannot certify request-ID propagation. Fix and verify the actual asynchronous propagation path before
+closing that contract. All twelve rows and PARTIAL/exit2 remain even if every other driver passes.
+
+The same self-test entry additionally runs thirteen hermetic runner safety checks, injects a false
 completion verdict that must fail, and verifies restoration. They test tooling safety and reporting,
 not the deployed business paths; those require actual target execution and final full-scope evidence.

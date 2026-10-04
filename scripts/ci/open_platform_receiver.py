@@ -36,6 +36,11 @@ class Receiver:
         if path.is_symlink() or path.stat().st_mode & 0o077:
             raise ValueError("receiver store must be private and not a symlink")
         self.db = sqlite3.connect(path)
+        if fd is None:
+            columns = {row[1] for row in self.db.execute('PRAGMA table_info(deliveries)')}
+            if not {'timestamp_text', 'signature'}.issubset(columns):
+                self.db.close()
+                raise ValueError('legacy receiver store lacks raw signature evidence; retain it and use a fresh run store')
         self.db.executescript("""
             CREATE TABLE IF NOT EXISTS config (identity TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS events (id TEXT PRIMARY KEY, body_sha TEXT NOT NULL,
@@ -43,7 +48,8 @@ class Receiver:
             CREATE TABLE IF NOT EXISTS deliveries (sequence INTEGER PRIMARY KEY,
                 received_at REAL NOT NULL, delivery_id TEXT, event_id TEXT, body_sha TEXT NOT NULL,
                 raw_body BLOB, signature_valid INTEGER NOT NULL, response_status INTEGER NOT NULL,
-                duplicate INTEGER NOT NULL, request_id TEXT);
+                duplicate INTEGER NOT NULL, request_id TEXT,
+                timestamp_text TEXT, signature TEXT);
         """)
         identity = json.dumps({"runId": run_id, "mode": mode, "failures": failures,
                                "secretSha256": hashlib.sha256(secret).hexdigest()}, sort_keys=True)
@@ -95,10 +101,12 @@ class Receiver:
                         accepted=MAX(events.accepted, excluded.accepted)""",
                         (event_id, body_sha, attempts, int(status == 200)))
             self.db.execute("""INSERT INTO deliveries(received_at, delivery_id, event_id, body_sha,
-                raw_body, signature_valid, response_status, duplicate, request_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                raw_body, signature_valid, response_status, duplicate, request_id,
+                timestamp_text, signature)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (now, headers.get("x-webhook-delivery"), event_id, body_sha,
-                 raw if valid else None, int(valid), status, int(duplicate), headers.get("x-request-id")))
+                 raw if valid else None, int(valid), status, int(duplicate), headers.get("x-request-id"),
+                 timestamp if valid else None, signature if valid else None))
         return status, {"runId": self.run_id, "accepted": status == 200, "duplicate": duplicate}
 
     def close(self):

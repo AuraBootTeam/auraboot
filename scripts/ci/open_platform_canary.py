@@ -1,21 +1,26 @@
 #!/usr/bin/env python3
 """Deployed-target protocol slice. Never seeds or installs plugins at import/run.
 
-The full twelve-contract denominator is retained. This slice deliberately cannot
-certify the event, webhook or cross-system trace contracts and exits nonzero.
+The full twelve-contract denominator is retained. Optional event and webhook
+drivers collect real evidence; target identity and complete request-ID propagation
+remain independently required. This slice always exits nonzero.
 """
 
 import argparse
+from datetime import datetime, timezone
 import hashlib
+import hmac
 import json
 import os
 from pathlib import Path
 import re
 import stat
 import sys
+import time
 import urllib.parse
 
 from open_platform_http import Client, ProtocolError, data
+from open_platform_webhook_evidence import read_delivery, verify_delivery
 
 CONTRACTS = tuple('CANARY-' + name for name in (
     'TOKEN', 'SCOPE', 'TENANT', 'READ', 'CURSOR', 'ETAG', 'IDEMPOTENCY',
@@ -56,6 +61,17 @@ def validate_fixture(value):
     need(foreign.get('identifier') and foreign.get('passwordFile') and foreign.get('tenantId'),
          'another real account/tenant is required to create the foreign fixture')
     need(value.get('targetIdentityEvidence'), 'target identity evidence path required')
+    need(isinstance(value.get('includeExternalEvent', False), bool), 'includeExternalEvent must be boolean')
+    need(isinstance(value.get('includeWebhook', False), bool), 'includeWebhook must be boolean')
+    if value.get('includeWebhook', False):
+        receivers = value.get('receivers', {})
+        need(set(receivers) == {'accept', 'retry', 'replay'}, 'three independent receiver policies required')
+        for name, receiver in receivers.items():
+            parsed = urllib.parse.urlsplit(receiver.get('url', ''))
+            Client(f'{parsed.scheme}://{parsed.netloc}')
+            need(parsed.scheme == 'https' and parsed.path == f'/webhooks/{run_id}-{name}'
+                 and not parsed.query and not parsed.fragment and receiver.get('secretFile') and receiver.get('store'),
+                 'receiver must use its exact run-scoped HTTPS path and private evidence inputs')
     return value
 
 
@@ -94,11 +110,31 @@ class Ledger:
                 'allowedClaim': 'only executed protocol rows; no full canary or release qualification'}
 
 
+def external_outcome(log, event, automation_pid, tenant_id, run_id):
+    need(log.get('status') == 'success' and log.get('automationId') == automation_pid
+         and str(log.get('tenantId')) == str(tenant_id)
+         and log.get('triggerType') == 'external_event' and log.get('triggerRecordPid') == event['id'],
+         'external event consumer log identity/status mismatch')
+    payload = log.get('triggerPayload', {})
+    need(payload.get('eventId') == event['id'] and payload.get('sourceCode') == run_id
+         and payload.get('eventType') == f"external.{run_id}.{event['type']}.v1"
+         and payload.get('data') == event['data'], 'consumer payload does not match fresh ingress')
+    results = log.get('actionResults', [])
+    need(len(results) == 1 and results[0].get('status') == 'success'
+         and results[0].get('actionType') == 'create_record', 'consumer action did not succeed')
+    result = results[0].get('result', {})
+    record = result.get('record', {})
+    need(result.get('success') is True and result.get('modelCode') == 'tasset_asset'
+         and record.get('pid') and record.get('tasset_as_code') == run_id + '-consumed',
+         'consumer did not create the fresh downstream artifact')
+    return record['pid']
+
+
 class ProtocolCanary:
     def __init__(self, fixture, ledger):
         self.fixture = validate_fixture(fixture)
         self.ledger = ledger
-        self.client = Client(fixture['origin'], max_requests=150, timeout=30)
+        self.client = Client(fixture['origin'], max_requests=250, timeout=30)
         self.secrets = []
         self.run_id = fixture['runId']
         self.admin = None
@@ -146,6 +182,175 @@ class ProtocolCanary:
             need(body.get('access_token'), 'empty access token')
             return {'Authorization': 'Bearer ' + body['access_token']}
         return body
+
+    def external_event(self, installation_pid):
+        start = len(self.ledger.requests)
+        event_type = f'external.{self.run_id}.asset.created.v1'
+        automation = self.admin_call('/api/automations', method='POST', body={
+            'name': self.run_id + ' external consumer', 'modelCode': self.run_id,
+            'triggerType': 'external_event', 'triggerConfig': {'eventTypes': [event_type]},
+            'enabled': True, 'actions': [{'type': 'create_record', 'sequence': 0,
+                'continueOnError': False, 'config': {'modelCode': 'tasset_asset', 'fields': {
+                    'tasset_as_code': self.run_id + '-consumed', 'tasset_as_name': self.run_id,
+                    'tasset_as_status': 'available'}}}]})
+        need(automation.get('pid') and automation.get('enabled') is True, 'consumer automation was not enabled')
+        request_id = f'{self.run_id}-{len(self.ledger.requests):03d}'
+        event = {'id': self.run_id + '-external-event', 'type': 'asset.created', 'schemaVersion': 1,
+                 'occurredAt': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
+                 'subject': {'type': 'asset', 'pid': self.run_id + '-external-subject'},
+                 'sequence': 1, 'data': {'runId': self.run_id, 'originatingRequestId': request_id}}
+        route = f'/api/open/v1/event-sources/{self.run_id}/events'
+        event_headers = dict(self.machine, **{'Idempotency-Key': self.run_id + '-external-key'})
+        accepted = self.call(route, method='POST', headers=event_headers, body=event, expected=(202,))[0]
+        need(accepted == {'eventId': event['id'], 'duplicate': False}, 'fresh event was not accepted')
+        duplicate = self.call(route, method='POST', headers=event_headers, body=event, expected=(202,))[0]
+        need(duplicate == {'eventId': event['id'], 'duplicate': True}, 'event replay was not deduplicated')
+        self.call(route, method='POST', headers=event_headers,
+                  body=dict(event, data={'runId': self.run_id, 'conflict': True}), expected=(409,))
+        log = None
+        for attempt in range(15):
+            logs = self.admin_call(f"/api/automations/{automation['pid']}/logs?limit=50")
+            matching = [item for item in logs if item.get('triggerRecordPid') == event['id']]
+            need(len(matching) <= 1, 'event duplicate produced another automation execution')
+            if matching and matching[0].get('status') not in {'pending', 'running'}:
+                log = matching[0]
+                break
+            if attempt < 14:
+                time.sleep(1)
+        need(log is not None, 'bounded event consumer observation expired')
+        artifact_pid = external_outcome(log, event, automation['pid'], self.fixture['auth']['tenantId'], self.run_id)
+        artifact = self.call('/api/open/v1/resources/assets/' + artifact_pid, headers=self.machine)[0]
+        need(artifact.get('assetCode') == self.run_id + '-consumed' and artifact.get('status') == 'available',
+             'consumer artifact is not persisted through the public facade')
+        audit = self.admin_call(f'/api/open-platform/installations/{installation_pid}/audits?requestId={request_id}&limit=50')
+        need(any(item.get('requestId') == request_id and item.get('status') == 202
+                 and item.get('path') == route for item in audit), 'fresh ingress request has no installation audit')
+        self.event_trace = {'requestId': request_id, 'eventId': event['id'],
+                            'expectedDurableEventId': f"ext:{installation_pid}:{event['id']}",
+                            'automationPid': automation['pid'], 'automationLogPid': log['pid'],
+                            'artifactPid': artifact_pid}
+        self.ledger.passed('CANARY-EVENT', start)
+
+    def webhooks(self, installation_pid):
+        start = len(self.ledger.requests)
+        configs = {}
+        for name, source in self.fixture['receivers'].items():
+            secret = private_read(source['secretFile']).rstrip('\r\n').encode()
+            need(secret, 'empty receiver secret')
+            self.secrets.append(secret.decode())
+            config = dict(source, secret=secret, run_id=self.run_id + '-' + name,
+                          mode='accept' if name == 'accept' else 'fail-first', failures=3 if name == 'replay' else 1)
+            # Check the independent store/policy before creating subscriptions.
+            read_delivery(config['store'], 'not-yet-created', secret=secret,
+                          run_id=config['run_id'], mode=config['mode'], failures=config['failures'])
+            configs[name] = config
+        names = {name: self.run_id + '-' + name for name in configs}
+        for name, config in configs.items():
+            subscription = self.admin_call('/api/webhooks', method='POST', body={
+                'name': names[name], 'installationPid': installation_pid, 'targetUrl': config['url'],
+                'eventType': 'assets.assignment.changed', 'eventVersion': 1,
+                'secret': config['secret'].decode(), 'maxRetries': 3, 'timeoutMs': 10000, 'enabled': True})
+            need(subscription.get('pid'), 'webhook subscription identity missing')
+        asset = self.admin_call('/api/dynamic/tasset_asset/create', method='POST', body={
+            'tasset_as_code': self.run_id + '-webhook', 'tasset_as_name': self.run_id,
+            'tasset_as_status': 'available'})
+        _, headers = self.call('/api/open/v1/resources/assets/' + asset['pid'], headers=self.machine)
+        request_id = f'{self.run_id}-{len(self.ledger.requests):03d}'
+        command = '/api/open/v1/commands/assets.assign:execute'
+        assigned = self.call(command, method='POST', body={'targetPid': asset['pid'], 'input': {'assignee': self.run_id}},
+            headers=dict(self.machine, **{'Idempotency-Key': self.run_id + '-webhook-assign', 'If-Match': headers['etag']}))[0]
+        need(assigned.get('idempotentReplay') is False and assigned['resource']['status'] == 'in_use',
+             'webhook source command did not transition fresh fixture')
+        route = f'/api/open-platform/installations/{installation_pid}/webhook-deliveries?limit=50'
+
+        def observe(expected):
+            for attempt in range(45):
+                rows = self.admin_call(route)
+                deliveries = {}
+                for name, subscription_name in names.items():
+                    matches = [row for row in rows if row.get('subscriptionName') == subscription_name]
+                    need(len(matches) <= 1, 'one fresh event produced duplicate queue deliveries')
+                    if matches:
+                        deliveries[name] = matches[0]
+                if len(deliveries) == 3 and all(deliveries[name].get('status') == status for name, status in expected.items()):
+                    return deliveries
+                if attempt < 44:
+                    time.sleep(1)
+            raise ProtocolError('bounded webhook queue observation expired')
+
+        deliveries = observe({'accept': 'success', 'retry': 'success', 'replay': 'dead_letter'})
+        event_ids = {row.get('eventId') for row in deliveries.values()}
+        need(len(event_ids) == 1 and None not in event_ids, 'webhook subscriptions do not share the fresh event')
+        event_id = next(iter(event_ids))
+        proofs = {}
+
+        def verify(name, statuses):
+            config, delivery = configs[name], deliveries[name]
+            rows = read_delivery(config['store'], delivery['pid'], secret=config['secret'],
+                                 run_id=config['run_id'], mode=config['mode'], failures=config['failures'])
+            return verify_delivery(rows, secret=config['secret'], delivery_pid=delivery['pid'],
+                                   event_id=event_id, subject_pid=asset['pid'], statuses=statuses)
+
+        need(deliveries['retry'].get('retryCount') == 1 and deliveries['replay'].get('retryCount') == 3
+             and deliveries['replay'].get('replayable') is True, 'retry/DLQ attempt or replayability mismatch')
+        proofs['accept'] = verify('accept', [200])
+        proofs['retry'] = verify('retry', [503, 200])
+        proofs['deadLetterBeforeReplay'] = verify('replay', [503, 503, 503])
+        self.admin_call(f"/api/open-platform/installations/{installation_pid}/webhook-deliveries/{deliveries['replay']['pid']}/replay",
+                        method='POST', body={})
+        deliveries = observe({'accept': 'success', 'retry': 'success', 'replay': 'success'})
+        need(deliveries['replay'].get('replayCount') == 1 and deliveries['replay'].get('retryCount') == 0,
+             'real DLQ replay state mismatch')
+        proofs['replayed'] = verify('replay', [503, 503, 503, 200])
+        # Independently drive receiver deduplication and signature/time denial
+        # using the original bytes. These are explicitly receiver-path checks.
+        accept = configs['accept']
+        raw_rows = read_delivery(accept['store'], deliveries['accept']['pid'], secret=accept['secret'],
+                                run_id=accept['run_id'], mode=accept['mode'], failures=accept['failures'])
+        raw = raw_rows[0]['raw_body']
+        parsed = urllib.parse.urlsplit(accept['url'])
+        receiver_client = Client(f'{parsed.scheme}://{parsed.netloc}', max_requests=3, timeout=15)
+        for label, timestamp, bad_signature, expected in (
+                ('dedup', str(int(time.time())), False, 200),
+                ('invalid-signature', str(int(time.time())), True, 401),
+                ('expired', str(int(time.time()) - 301), False, 401)):
+            signature = 'sha256=' + hmac.new(accept['secret'], timestamp.encode() + b'.' + raw, hashlib.sha256).hexdigest()
+            if bad_signature:
+                signature = 'sha256=' + '0' * 64
+            delivery_pid = self.run_id + '-' + label
+            status, result, _ = receiver_client.request(parsed.path, method='POST', raw=raw, expected=(expected,),
+                headers={'X-Webhook-Timestamp': timestamp, 'X-Webhook-Signature': signature,
+                         'X-Webhook-Delivery': delivery_pid})
+            self.ledger.requests.append({'origin': receiver_client.base_url, 'path': parsed.path, 'method': 'POST',
+                                         'receiverCase': label, 'status': status, 'response': result,
+                                         'rawBodySha256': hashlib.sha256(raw).hexdigest()})
+            need(result.get('runId') == accept['run_id'] and result.get('accepted') is (expected == 200),
+                 'independent receiver result mismatch')
+            if label == 'dedup':
+                need(result.get('duplicate') is True, 'independent receiver did not deduplicate original event')
+        self.webhook_trace = {'requestId': request_id, 'command': command, 'assetPid': asset['pid'],
+                              'eventId': event_id, 'deliveries': deliveries, 'receiverProofs': proofs,
+                              'receiverRequestCount': receiver_client.request_count,
+                              'receiverNegativeChecks': ['invalid-signature', 'expired']}
+        self.ledger.passed('CANARY-WEBHOOK', start)
+
+    def trace(self, installation_pid):
+        start = len(self.ledger.requests)
+        need(hasattr(self, 'event_trace') and hasattr(self, 'webhook_trace'), 'both real chains required for trace')
+        trace = self.webhook_trace
+        audits = self.admin_call(f"/api/open-platform/installations/{installation_pid}/audits?requestId={trace['requestId']}&limit=50")
+        need(any(row.get('requestId') == trace['requestId'] and row.get('status') == 200
+                 and row.get('path') == trace['command'] for row in audits), 'command requestId is not auditable')
+        resource = self.call('/api/open/v1/resources/assets/' + trace['assetPid'], headers=self.machine)[0]
+        need(resource.get('assetCode') == self.run_id + '-webhook' and resource.get('status') == 'in_use',
+             'request/audit/event/delivery/receiver join does not match fresh persisted resource')
+        # Correlation by resource/event/delivery IDs is useful evidence, but
+        # does not prove that the originating request ID reaches the receiver.
+        self.trace_observation = {'requestId': trace['requestId'],
+                                  'assetPid': trace['assetPid'], 'eventId': trace['eventId'],
+                                  'correlationVerified': True,
+                                  'requestIdPropagationVerified': False,
+                                  'gap': 'originating requestId absent from signed webhook delivery'}
 
     def execute(self):
         auth = self.fixture['auth']
@@ -278,6 +483,12 @@ class ProtocolCanary:
         after, after_headers = self.call(asset_path, headers=self.machine)
         need(after == current and after_headers.get('etag') == assigned['etag'], 'conflict changed resource')
         self.ledger.passed('CANARY-IDEMPOTENCY', start)
+        if self.fixture.get('includeExternalEvent', False):
+            self.external_event(installation['pid'])
+        if self.fixture.get('includeWebhook', False):
+            self.webhooks(installation['pid'])
+        if self.fixture.get('includeExternalEvent', False) and self.fixture.get('includeWebhook', False):
+            self.trace(installation['pid'])
         start = len(self.ledger.requests)
         rotated = self.admin_call(prefix + '/credentials/' + credential['credentialPid'] + '/rotate', method='POST', body={'graceMinutes': 5})
         need(rotated['replacedCredentialPid'] == credential['credentialPid']
@@ -319,8 +530,11 @@ def main():
                    fixtureSha256=hashlib.sha256(fixture_bytes.encode()).hexdigest(),
                    targetIdentityEvidenceSha256=hashlib.sha256(identity).hexdigest(),
                    runnerSha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-                   requestBudget=150, requestCount=runner.client.request_count,
+                   requestBudget=250, requestCount=runner.client.request_count,
                        retry=0, error=error, browserExecuted=0)
+        receipt['eventTrace'] = getattr(runner, 'event_trace', None)
+        receipt['webhookTrace'] = getattr(runner, 'webhook_trace', None)
+        receipt['traceObservation'] = getattr(runner, 'trace_observation', None)
         json.dump(receipt, output, ensure_ascii=False, indent=2)
         output.write('\n')
         output.flush()

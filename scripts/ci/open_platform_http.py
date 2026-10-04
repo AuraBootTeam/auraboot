@@ -34,16 +34,21 @@ class Client:
         self.stopped = False
         self.opener = opener or urllib.request.build_opener(NoRedirect())
 
-    def request(self, path, method="GET", body=None, headers=None, form=None, expected=(200,)):
+    def request(self, path, method="GET", body=None, headers=None, form=None, raw=None, expected=(200,)):
         if not path.startswith("/") or path.startswith("//") or "#" in path:
             raise ValueError("request path must be origin-relative")
         if self.stopped or self.request_count >= self.max_requests:
             raise ProtocolError("request budget exhausted or transport stopped")
-        if body is not None and form is not None:
-            raise ValueError("JSON and form bodies are mutually exclusive")
+        if sum(value is not None for value in (body, form, raw)) > 1:
+            raise ValueError("JSON, form and raw bodies are mutually exclusive")
         payload = None
         merged = dict(headers or {})
-        if form is not None:
+        if raw is not None:
+            if not isinstance(raw, bytes) or len(raw) > 1024 * 1024:
+                raise ValueError("raw body must be bytes within the byte budget")
+            payload = raw
+            merged["Content-Type"] = "application/json"
+        elif form is not None:
             payload = urllib.parse.urlencode(form).encode()
             merged["Content-Type"] = "application/x-www-form-urlencoded"
         elif body is not None:
