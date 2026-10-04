@@ -169,7 +169,7 @@ public class PageSchemaServiceImpl implements PageSchemaService {
         }
 
         // 更新实体
-        // Acceptance mutation: bypass effective profile guard.
+        renderProfiles.validateUpdate(existingSchema, request);
         pageSchemaConverter.updateEntity(existingSchema, request);
         recordBoundModelVersion(existingSchema);
         existingSchema.setUpdatedAt(Instant.now());
