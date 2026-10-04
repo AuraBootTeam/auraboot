@@ -24,6 +24,10 @@ public class Capability {
     /** Localized declaration labels; the legacy label remains available for older clients. */
     @Builder.Default
     private Map<String, String> localizedLabels = Map.of();
+    /** Legacy description plus translations for display; neither affects grants. */
+    private String description;
+    @Builder.Default
+    private Map<String, String> localizedDescriptions = Map.of();
     private boolean sensitive;
     /** Preset tier this capability belongs to (viewer/editor/admin); null for convention-derived. */
     private String tier;

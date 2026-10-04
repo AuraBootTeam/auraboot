@@ -6,6 +6,7 @@
     "name:zh-CN": "系统配置与安全策略",
     "name:en": "System Config & Security Policy",
     "description": "进入系统管理,维护账号安全策略、系统偏好、基础设施状态",
+    "description:en": "Open system administration and manage account security policies, system preferences and infrastructure status",
     "includes": [
       "system_management"
     ],
@@ -19,6 +20,7 @@
     "name:zh-CN": "模型服务配置",
     "name:en": "Model / LLM Provider Config",
     "description": "查看与配置 LLM Provider 与模型服务(AI 中心)",
+    "description:en": "View and configure LLM providers and model services in the AI center",
     "includes": [
       "ai_center"
     ],
@@ -32,6 +34,7 @@
     "name:zh-CN": "登录渠道管理",
     "name:en": "Login Channel Management",
     "description": "管理登录渠道与认证方式",
+    "description:en": "Manage login channels and authentication methods",
     "includes": [
       "login_channel_manage"
     ],
@@ -45,6 +48,7 @@
     "name:zh-CN": "云服务配置",
     "name:en": "Cloud Service Config",
     "description": "管理对象存储、消息等云服务配置",
+    "description:en": "Manage cloud services including object storage and messaging",
     "includes": [
       "cloud_config_manage"
     ],
@@ -58,6 +62,7 @@
     "name:zh-CN": "通知规则管理",
     "name:en": "Notification Rule Management",
     "description": "管理系统通知规则与订阅",
+    "description:en": "Manage system notification rules and subscriptions",
     "includes": [
       "notification_rule_manage"
     ],
@@ -71,6 +76,7 @@
     "name:zh-CN": "自动化查看",
     "name:en": "Automation View",
     "description": "查看自动化规则与执行",
+    "description:en": "View automation rules and executions",
     "includes": [
       "automation.automation.read"
     ],
@@ -84,6 +90,7 @@
     "name:zh-CN": "数据权限策略",
     "name:en": "Data Permission Policy",
     "description": "管理行级/字段级数据权限策略",
+    "description:en": "Manage row-level and field-level data permission policies",
     "includes": [
       "admin_data_permission"
     ],
@@ -97,6 +104,7 @@
     "name:zh-CN": "集成与连接器",
     "name:en": "Integrations & Connectors",
     "description": "管理 Webhook 订阅与 API 连接器",
+    "description:en": "Manage Webhook subscriptions and API connectors",
     "includes": [
       "admin_webhook",
       "admin_api_connector"
@@ -111,6 +119,7 @@
     "name:zh-CN": "插件与应用模板",
     "name:en": "Plugins & App Templates",
     "description": "管理插件安装与应用模板市场",
+    "description:en": "Manage plugin installation and the application template marketplace",
     "includes": [
       "plugin_management",
       "plugin.plugin.manage"
@@ -125,6 +134,7 @@
     "name:zh-CN": "定时任务管理",
     "name:en": "Scheduled Task Management",
     "description": "管理系统定时任务",
+    "description:en": "Manage system scheduled tasks",
     "includes": [
       "admin_scheduled_task"
     ],
@@ -138,6 +148,7 @@
     "name:zh-CN": "成员基础访问",
     "name:en": "Member Base Access",
     "description": "业务成员在平台 UI 的基础读能力:首页仪表盘、列表保存视图、模型元数据、数据源查询。所有非管理员业务角色都应持有,否则每个动态页面都会产生 403(dashboard.saved_view.read / meta.model.read 等)",
+    "description:en": "Basic platform UI read access for business members: home dashboards, saved list views, model metadata and data source queries. Every non-administrator business role should hold this capability; otherwise dynamic pages return 403 errors for permissions such as dashboard.saved_view.read and meta.model.read.",
     "includes": [
       "dashboard.read",
       "dashboard.saved_view.read",

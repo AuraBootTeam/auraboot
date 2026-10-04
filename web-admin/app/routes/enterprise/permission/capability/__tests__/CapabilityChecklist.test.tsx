@@ -93,4 +93,30 @@ describe('CapabilityChecklist', () => {
     expect(screen.getByRole('checkbox', { name: 'Legacy Read' })).not.toBeChecked();
   });
 
+  it('switches a description hint by locale without changing the grant selection', () => {
+    const capability = {
+      ...cap('org.cap.role', true), label: 'Manage Roles',
+      description: 'Source role description',
+      localizedDescriptions: { 'zh-CN': 'Source role description', en: 'View and manage roles' },
+    };
+    const props = { groups: [{ group: 'Organization', capabilities: [capability] }],
+      selected: ['org.cap.role'], onToggle: vi.fn() };
+    const view = render(<CapabilityChecklist {...props} />);
+    expect(screen.getByTestId('capability-org.cap.role')).toHaveAttribute('title', 'Source role description');
+    i18n.locale = 'en-GB';
+    view.rerender(<CapabilityChecklist {...props} />);
+    expect(screen.getByTestId('capability-org.cap.role')).toHaveAttribute('title', 'View and manage roles');
+    expect(screen.getByRole('checkbox', { name: 'Manage Roles' })).toBeChecked();
+    expect(props.onToggle).not.toHaveBeenCalled();
+  });
+
+  it('keeps a legacy description and omits the hint when no description is supplied', () => {
+    i18n.locale = 'en-US';
+    const legacy = { ...cap('legacy.cap.read', false), description: 'Legacy description' };
+    render(<CapabilityChecklist groups={[{ group: 'Legacy', capabilities: [legacy, cap('empty.cap.read', false)] }]}
+      selected={[]} onToggle={vi.fn()} />);
+    expect(screen.getByTestId('capability-legacy.cap.read')).toHaveAttribute('title', 'Legacy description');
+    expect(screen.getByTestId('capability-empty.cap.read')).not.toHaveAttribute('title');
+  });
+
 });

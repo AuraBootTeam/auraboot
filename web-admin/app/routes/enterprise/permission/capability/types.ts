@@ -8,6 +8,8 @@ export interface Capability {
   label: string;
   /** Declaration labels by locale; omitted by older servers and legacy capabilities. */
   localizedLabels?: Record<string, string> | null;
+  description?: string | null;
+  localizedDescriptions?: Record<string, string> | null;
   sensitive: boolean;
   /** Preset tier (viewer/editor/admin); null for convention-derived capabilities. */
   tier?: string | null;

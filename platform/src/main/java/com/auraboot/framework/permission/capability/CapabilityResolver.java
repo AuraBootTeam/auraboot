@@ -74,6 +74,8 @@ public class CapabilityResolver {
                             .group(displayMeta.group())
                             .label(label(d))
                             .localizedLabels(localizedLabels(d))
+                            .description(d.getDescription())
+                            .localizedDescriptions(localizedDescriptions(d))
                             .sensitive(Boolean.TRUE.equals(d.getSensitive()) || displayMeta.sensitive())
                             .tier(d.getTier())
                             .displayGroupOrder(displayMeta.groupOrder())
@@ -234,6 +236,20 @@ public class CapabilityResolver {
             return d.getNameEn();
         }
         return d.getCode();
+    }
+
+    private Map<String, String> localizedDescriptions(CapabilityDefinitionDTO declaration) {
+        // A legacy description has no declared locale. Keep it in the legacy field;
+        // only bilingual declarations associate their source description with zh-CN.
+        if (declaration.getDescriptionEn() == null || declaration.getDescriptionEn().isBlank()) {
+            return Map.of();
+        }
+        Map<String, String> descriptions = new LinkedHashMap<>();
+        descriptions.put("en", declaration.getDescriptionEn());
+        if (declaration.getDescription() != null && !declaration.getDescription().isBlank()) {
+            descriptions.put("zh-CN", declaration.getDescription());
+        }
+        return Map.copyOf(descriptions);
     }
 
     private record DisplayMeta(String group, Integer groupOrder, Integer order, boolean sensitive) {}

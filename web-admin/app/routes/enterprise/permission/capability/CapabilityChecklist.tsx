@@ -45,6 +45,7 @@ export default function CapabilityChecklist({ groups, selected, onToggle }: Capa
                 <label
                   key={cap.code}
                   data-testid={`capability-${cap.code}`}
+                  title={getLocalizedText(cap.localizedDescriptions, locale, t) || cap.description || undefined}
                   className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer"
                 >
                   <input
