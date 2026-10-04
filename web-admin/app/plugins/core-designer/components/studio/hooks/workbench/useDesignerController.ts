@@ -1,3 +1,4 @@
+import { useLocalizedText } from '~/utils/i18n';
 import { useState, useEffect, useCallback } from 'react';
 import type { DragStartEvent, DragEndEvent } from '@dnd-kit/core';
 import type { CanvasSchema, Component, Position } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
@@ -65,6 +66,7 @@ export function useDesignerController(
     onPublish,
   } = options;
 
+  const lt = useLocalizedText();
   const [currentSchema, setCurrentSchema] = useState<CanvasSchema>(initialSchema);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -165,13 +167,13 @@ export function useDesignerController(
       if (componentConfig) {
         setDraggedComponent({
           type: componentConfig.type,
-          name: componentConfig.name,
+          name: lt(componentConfig.name),
           icon: componentConfig.icon,
           isField: false,
         });
       }
     }
-  }, []);
+  }, [lt]);
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
@@ -247,7 +249,7 @@ export function useDesignerController(
           if (registryConfig) {
             componentConfig = {
               type: registryConfig.type,
-              name: registryConfig.name,
+              name: lt(registryConfig.name),
               props: registryConfig.defaultProps || {},
               span: registryConfig.defaultProps?.width || 1,
             };
@@ -279,7 +281,7 @@ export function useDesignerController(
         const newComponent: Component = {
           id: `comp_${Date.now()}`,
           type: componentConfig.type,
-          name: componentConfig.name,
+          name: lt(componentConfig.name),
           props: componentConfig.props || {},
           position: { row, column: adjustedColumn },
           size: {
@@ -302,7 +304,7 @@ export function useDesignerController(
       setActiveId(null);
       setDraggedComponent(null);
     },
-    [currentSchema, selectComponent, handleSchemaChange],
+    [currentSchema, selectComponent, handleSchemaChange, lt],
   );
 
   return {

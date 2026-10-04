@@ -36,7 +36,7 @@ export function useLocalizedText() {
   const { t, locale } = useI18n();
 
   return useCallback(
-    (text: string | null | undefined) => {
+    (text: Parameters<typeof getLocalizedTextImpl>[0]) => {
       return getLocalizedTextImpl(text, locale, t);
     },
     [t, locale],

@@ -1,3 +1,5 @@
+import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
+
 /**
  * 组件注册系统
  * 管理所有Smart组件的注册、查询和配置
@@ -67,12 +69,12 @@ export class ComponentRegistry {
   /**
    * 按标签搜索组件
    */
-  searchComponents(query: string): ComponentConfig[] {
+  searchComponents(query: string, locale: string = 'zh-CN'): ComponentConfig[] {
     const lowerQuery = query.toLowerCase();
     return Array.from(this.components.values()).filter(
       (config) =>
-        config.name.toLowerCase().includes(lowerQuery) ||
-        (config.description || '').toLowerCase().includes(lowerQuery) ||
+        getLocalizedText(config.name, locale).toLowerCase().includes(lowerQuery) ||
+        getLocalizedText(config.description, locale).toLowerCase().includes(lowerQuery) ||
         config.tags?.some((tag: string) => tag.toLowerCase().includes(lowerQuery)),
     );
   }
