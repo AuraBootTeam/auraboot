@@ -86,9 +86,10 @@ class PluginDashboardContractImportIT extends BaseIntegrationTest {
         String deniedKey = code + "_denied";
         page.setPageKey(deniedKey);
         page.setProfile("admin");
-        var denied = importService.executeFromManifest(manifest, new ImportRequest());
-        assertThat(denied.isSuccess()).isFalse();
-        assertThat(denied.getErrorMessage()).contains("S-PAGE-KIND-UNKNOWN");
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                () -> importService.executeFromManifest(manifest, new ImportRequest()))
+                .isInstanceOf(com.auraboot.framework.plugin.exception.PluginException.class)
+                .hasMessageContaining("S-PAGE-KIND-UNKNOWN");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_page_schema WHERE tenant_id=? AND page_key=?",
                 Integer.class, getTestTenant().getId(), deniedKey)).isZero();
         assertThat(pages.findByPageKey(code).getBlocks()).hasSize(4);
