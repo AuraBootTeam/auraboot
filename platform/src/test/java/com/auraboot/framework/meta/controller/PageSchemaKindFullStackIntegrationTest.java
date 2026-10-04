@@ -63,7 +63,7 @@ class PageSchemaKindFullStackIntegrationTest extends BaseIntegrationTest {
     static class StorefrontHost {
         @Bean
         PageSchemaRenderProfile storefrontAuthoringProfile() {
-            return new PageSchemaRenderProfile("storefront", Set.of("plp"),
+            return new PageSchemaRenderProfile("storefront-authoring", Set.of("plp"),
                     Set.of("search-bar", "facet-panel", "product-grid", "pagination"));
         }
     }
@@ -178,7 +178,7 @@ class PageSchemaKindFullStackIntegrationTest extends BaseIntegrationTest {
         String key = "storefront_authoring_" + UUID.randomUUID().toString().replace("-", "");
         List<Object> blocks = List.of(Map.of("id", "products", "blockType", "product-grid"));
         Map<String, Object> payload = Map.of("pageKey", key, "name", key,
-                "title", "Storefront Products", "kind", "plp", "profile", "storefront",
+                "title", "Storefront Products", "kind", "plp", "profile", "storefront-authoring",
                 "schemaVersion", 4, "layout", Map.of("type", "stack"), "blocks", blocks);
         String response = mockMvc.perform(post("/api/pages")
                         .contentType(MediaType.APPLICATION_JSON)
