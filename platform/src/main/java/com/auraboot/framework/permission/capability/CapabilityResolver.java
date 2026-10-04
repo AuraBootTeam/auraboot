@@ -73,6 +73,7 @@ public class CapabilityResolver {
                             .code(d.getCode())
                             .group(displayMeta.group())
                             .label(label(d))
+                            .localizedLabels(localizedLabels(d))
                             .sensitive(Boolean.TRUE.equals(d.getSensitive()) || displayMeta.sensitive())
                             .tier(d.getTier())
                             .displayGroupOrder(displayMeta.groupOrder())
@@ -211,6 +212,18 @@ public class CapabilityResolver {
             }
         }
         return chosen != null ? chosen : rawResource;
+    }
+
+    private Map<String, String> localizedLabels(CapabilityDefinitionDTO declaration) {
+        Map<String, String> labels = new LinkedHashMap<>();
+        if (declaration.getNameZhCN() != null && !declaration.getNameZhCN().isBlank()) {
+            labels.put("zh-CN", declaration.getNameZhCN());
+        }
+        if (declaration.getNameEn() != null && !declaration.getNameEn().isBlank()) {
+            // The declaration uses generic English, so all English region variants can resolve it.
+            labels.put("en", declaration.getNameEn());
+        }
+        return Map.copyOf(labels);
     }
 
     private String label(CapabilityDefinitionDTO d) {
