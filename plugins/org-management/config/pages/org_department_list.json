@@ -1,6 +1,6 @@
 {
   "pageKey": "org_department_list",
-  "name:zh-CN": "Department Management",
+  "name:zh-CN": "部门管理",
   "name:en": "Department Management",
   "modelCode": "org_department",
   "description": "Department list with status tabs and CRUD",
@@ -22,7 +22,7 @@
         {
           "key": "all",
           "label": {
-            "zh-CN": "All",
+            "zh-CN": "全部",
             "en": "All"
           },
           "filter": null
@@ -30,7 +30,7 @@
         {
           "key": "active",
           "label": {
-            "zh-CN": "Active",
+            "zh-CN": "启用",
             "en": "Active"
           },
           "filter": {
@@ -42,7 +42,7 @@
         {
           "key": "inactive",
           "label": {
-            "zh-CN": "Inactive",
+            "zh-CN": "停用",
             "en": "Inactive"
           },
           "filter": {
@@ -160,7 +160,7 @@
     }
   ],
   "title": {
-    "zh-CN": "Department Management",
+    "zh-CN": "部门管理",
     "en": "Department Management"
   }
 }

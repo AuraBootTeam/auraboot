@@ -76,7 +76,7 @@ describe('TenantSelection product onboarding', () => {
         joinCta: '查看小程序入校步骤',
         joinChannel: 'wechat_mini',
         miniProgramName: '蜂耘',
-        joinSteps: ['打开微信小程序并登录', '输入学校教师码加入学校', '绑定已有班级或创建新班级'],
+        joinSteps: ['打开微信小程序并登录', '输入学校教师码加入学校', '绑定 PC 已建班级；新班级请在 PC 端创建'],
       },
     };
   });

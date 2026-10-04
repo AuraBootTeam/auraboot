@@ -7,6 +7,7 @@
  */
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useSmartText } from '~/utils/i18n';
 import type { BaseEditorProps, JsonValidationResult, JsonSchema } from './types';
 
 interface JsonEditorProps extends BaseEditorProps<unknown> {
@@ -27,7 +28,7 @@ interface JsonEditorProps extends BaseEditorProps<unknown> {
 /**
  * Validate JSON against schema (simplified)
  */
-function validateJson(value: unknown, schema?: JsonSchema): JsonValidationResult {
+function validateJson(value: unknown, schema: JsonSchema | undefined, st: ReturnType<typeof useSmartText>): JsonValidationResult {
   if (!schema) {
     return { valid: true };
   }
@@ -38,7 +39,7 @@ function validateJson(value: unknown, schema?: JsonSchema): JsonValidationResult
     if (schema.type !== actualType) {
       return {
         valid: false,
-        error: `期望类型 "${schema.type}"，实际类型 "${actualType}"`,
+        error: st({ i18nKey: 'designer_json_editor.type', params: { expected: schema.type, actual: actualType } }, 'Expected type "{expected}", got "{actual}"'),
       };
     }
   }
@@ -53,7 +54,7 @@ function validateJson(value: unknown, schema?: JsonSchema): JsonValidationResult
         if (!(prop in obj)) {
           return {
             valid: false,
-            error: `缺少必需属性 "${prop}"`,
+            error: st({ i18nKey: 'designer_json_editor.required', params: { property: prop } }, 'Missing required property "{property}"'),
           };
         }
       }
@@ -63,11 +64,11 @@ function validateJson(value: unknown, schema?: JsonSchema): JsonValidationResult
     if (schema.properties) {
       for (const [key, propSchema] of Object.entries(schema.properties)) {
         if (key in obj) {
-          const result = validateJson(obj[key], propSchema);
+          const result = validateJson(obj[key], propSchema, st);
           if (!result.valid) {
             return {
               valid: false,
-              error: `属性 "${key}": ${result.error}`,
+              error: st({ i18nKey: 'designer_json_editor.property', params: { property: key, error: result.error } }, 'Property "{property}": {error}'),
             };
           }
         }
@@ -79,11 +80,11 @@ function validateJson(value: unknown, schema?: JsonSchema): JsonValidationResult
   if (schema.type === 'array' && Array.isArray(value)) {
     if (schema.items) {
       for (let i = 0; i < value.length; i++) {
-        const result = validateJson(value[i], schema.items);
+        const result = validateJson(value[i], schema.items, st);
         if (!result.valid) {
           return {
             valid: false,
-            error: `索引 ${i}: ${result.error}`,
+            error: st({ i18nKey: 'designer_json_editor.index', params: { index: i, error: result.error } }, 'Index {index}: {error}'),
           };
         }
       }
@@ -94,7 +95,7 @@ function validateJson(value: unknown, schema?: JsonSchema): JsonValidationResult
   if (schema.enum && !schema.enum.includes(value)) {
     return {
       valid: false,
-      error: `值必须是以下之一: ${schema.enum.map((v) => JSON.stringify(v)).join(', ')}`,
+      error: st({ i18nKey: 'designer_json_editor.enum', params: { values: schema.enum.map((v) => JSON.stringify(v)).join(', ') } }, 'Value must be one of: {values}'),
     };
   }
 
@@ -210,6 +211,7 @@ export const JsonEditor: React.FC<JsonEditorProps> = ({
   formatOnBlur = true,
   tabSize = 2,
 }) => {
+  const st = useSmartText();
   const [text, setText] = useState(() => {
     try {
       return JSON.stringify(value, null, tabSize);
@@ -218,7 +220,16 @@ export const JsonEditor: React.FC<JsonEditorProps> = ({
     }
   });
   const [parseError, setParseError] = useState<string | null>(null);
-  const [schemaError, setSchemaError] = useState<string | null>(null);
+  const [hasSchemaError, setHasSchemaError] = useState(false);
+  // Derive messages in the current locale, including errors already displayed.
+  const schemaError = useMemo(() => {
+    if (!hasSchemaError) return null;
+    try {
+      return validateJson(JSON.parse(text), schema, st).error ?? null;
+    } catch {
+      return null;
+    }
+  }, [hasSchemaError, text, schema, st]);
   const [isFocused, setIsFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -257,11 +268,11 @@ export const JsonEditor: React.FC<JsonEditorProps> = ({
         setParseError(null);
 
         // Schema validation
-        const schemaResult = validateJson(parsed, schema);
+        const schemaResult = validateJson(parsed, schema, st);
         if (!schemaResult.valid) {
-          setSchemaError(schemaResult.error || '');
+          setHasSchemaError(true);
         } else {
-          setSchemaError(null);
+          setHasSchemaError(false);
           onChange(parsed);
         }
       } catch (err) {
@@ -270,7 +281,7 @@ export const JsonEditor: React.FC<JsonEditorProps> = ({
         }
       }
     },
-    [onChange, schema],
+    [onChange, schema, st],
   );
 
   // Handle blur
@@ -353,7 +364,7 @@ export const JsonEditor: React.FC<JsonEditorProps> = ({
               disabled={disabled || readOnly}
               className="text-xs text-blue-600 hover:text-blue-700 disabled:text-gray-400"
             >
-              格式化
+              {st('$i18n:designer_json_editor.format', 'Format')}
             </button>
             <span className="text-gray-300">|</span>
             <button
@@ -362,7 +373,7 @@ export const JsonEditor: React.FC<JsonEditorProps> = ({
               disabled={disabled || readOnly}
               className="text-xs text-blue-600 hover:text-blue-700 disabled:text-gray-400"
             >
-              压缩
+              {st('$i18n:designer_json_editor.minify', 'Minify')}
             </button>
           </div>
         </div>

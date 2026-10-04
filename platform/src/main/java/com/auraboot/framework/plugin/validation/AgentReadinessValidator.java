@@ -44,7 +44,11 @@ public class AgentReadinessValidator implements PluginValidator {
 
         for (int i = 0; i < commands.size(); i++) {
             CommandDefinitionDTO cmd = commands.get(i);
+            if (cmd == null) continue;
             Map<String, Object> execConfig = cmd.getConsolidatedExecutionConfig();
+            // Missing execution metadata is reported as readiness advice below.
+            // Structural validation owns invalid resource entries.
+            if (execConfig == null) execConfig = Map.of();
             String type = (String) execConfig.get("type");
             String code = cmd.getCode();
             totalCommands++;

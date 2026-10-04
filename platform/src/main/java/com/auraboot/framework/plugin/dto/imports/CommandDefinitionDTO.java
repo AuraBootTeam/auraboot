@@ -242,6 +242,20 @@ public class CommandDefinitionDTO {
         return displayName != null ? displayName : code;
     }
 
+    /** Preserves declared name translations without mutating the imported extension. */
+    @JsonIgnore
+    public Map<String, Object> getEffectiveExtension() {
+        Map<String, Object> result = new HashMap<>();
+        if (extension != null) result.putAll(extension);
+        com.auraboot.framework.meta.dto.CommandDescriptionLocalization.from(result.get("localizedDescriptions"));
+        Map<String, String> names = new HashMap<>(
+                com.auraboot.framework.meta.dto.CommandDescriptionLocalization.displayNamesFrom(result.get("localizedDisplayNames")));
+        if (displayNameZhCN != null && !displayNameZhCN.isBlank()) names.put("zh-CN", displayNameZhCN);
+        if (displayNameEn != null && !displayNameEn.isBlank()) names.put("en-US", displayNameEn);
+        if (!names.isEmpty()) result.put("localizedDisplayNames", Map.copyOf(names));
+        return result;
+    }
+
     /**
      * Build a consolidated executionConfig map from DSL fields.
      * This merges the structured ExecutionConfig with DSL extended fields

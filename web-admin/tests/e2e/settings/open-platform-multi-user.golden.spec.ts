@@ -138,8 +138,8 @@ test.describe.serial('Open Platform four-real-account authority', () => {
     const admin = await apiLogin(await pwRequest.newContext(), ACCOUNTS.admin.email, ACCOUNTS.admin.password);
     const ctx = await pwRequest.newContext();
 
-    // Preserve existing applications; every assertion below targets this run's app PID/card.
-
+    // Applications are persistent lifecycle records: DELETE disables them.
+    // This run uses its own app card and never removes unrelated prior fixtures.
     for (const key of ['maintainer', 'viewer', 'nonmember', 'owner2'] as const) {
       const account = ACCOUNTS[key];
       const create = await ctx.post(`${BACKEND_URL}/api/meta/commands/execute/admin:create_member`, {
@@ -291,6 +291,36 @@ test.describe.serial('Open Platform four-real-account authority', () => {
       { headers: bearer(session), data: { role: 'owner' } },
     );
     expect(denyWrite.status(), 'non-member must not mutate the application').toBe(403);
+  });
+
+  test('missing and disabled applications return 404 for reads and locked member writes', async () => {
+    const ctx = await pwRequest.newContext();
+    const admin = await apiLogin(ctx, ACCOUNTS.admin.email, ACCOUNTS.admin.password);
+    const missing = await ctx.post(`${BACKEND_URL}/api/open-platform/applications/missing-${RUN_TAG}/installations`, {
+      headers: bearer(admin),
+      data: { environment: 'staging', scopes: ['openapi.profile.read'], rateLimitPerMinute: 600 },
+    });
+    expect(missing.status()).toBe(404);
+    expect((await missing.json()).code).toBe('404');
+    const create = await ctx.post(`${BACKEND_URL}/api/open-platform/applications`, {
+      headers: bearer(admin), data: { name: `停用边界验收 ${RUN_TAG}`, description: 'HTTP 404 lifecycle contract' },
+    });
+    expect(create.ok()).toBeTruthy();
+    const pid = (await create.json()).data.pid;
+    const disable = await ctx.delete(`${BACKEND_URL}/api/open-platform/applications/${pid}`, { headers: bearer(admin) });
+    expect(disable.ok()).toBeTruthy();
+    const listed = await ctx.get(`${BACKEND_URL}/api/open-platform/applications`, { headers: bearer(admin) });
+    expect(listed.ok()).toBeTruthy();
+    expect((await listed.json()).data).toEqual(expect.arrayContaining([expect.objectContaining({ pid, status: 'disabled' })]));
+    const repeated = await ctx.delete(`${BACKEND_URL}/api/open-platform/applications/${pid}`, { headers: bearer(admin) });
+    expect(repeated.status()).toBe(404);
+    expect((await repeated.json()).code).toBe('404');
+    const memberWrite = await ctx.put(`${BACKEND_URL}/api/open-platform/applications/${pid}/members/${userPids.viewer}`, {
+      headers: bearer(admin), data: { role: 'viewer' },
+    });
+    expect(memberWrite.status()).toBe(404);
+    expect((await memberWrite.json()).code).toBe('404');
+    await ctx.dispose();
   });
 
   test('sole owner cannot self-remove; concurrent owner deletes keep exactly one owner', async () => {

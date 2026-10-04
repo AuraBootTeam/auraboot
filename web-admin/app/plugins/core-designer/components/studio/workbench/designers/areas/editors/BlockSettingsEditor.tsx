@@ -9,6 +9,14 @@ import React, { useEffect, useState } from 'react';
 import type { DslBlock } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { LocalizedTextInput, type LocalizedTextValue } from '~/shared/designer';
 import { useI18n } from '~/contexts/I18nContext';
+import { getLocalizedText } from '~/utils/i18n';
+import BLOCK_SETTINGS_TEXT from './BlockSettings.i18n.json';
+
+function useBlockSettingsText() {
+  const { locale } = useI18n();
+  return (key: keyof typeof BLOCK_SETTINGS_TEXT, count?: number) =>
+    getLocalizedText(BLOCK_SETTINGS_TEXT[key], locale).replace('{count}', String(count ?? ''));
+}
 
 export interface BlockSettingsEditorProps {
   block: DslBlock;
@@ -140,10 +148,11 @@ const DataSourceReferenceField: React.FC<DataSourceReferenceFieldProps> = ({
   inputTestId,
   placeholder,
 }) => {
+  const text = useBlockSettingsText();
   const value = typeof block.dataSource === 'string' ? block.dataSource : '';
 
   return (
-    <PropertyField label="数据源" testId={fieldTestId}>
+    <PropertyField label={text('dataSource')} testId={fieldTestId}>
       <input
         type="text"
         value={value}
@@ -161,8 +170,7 @@ const DataSourceReferenceField: React.FC<DataSourceReferenceFieldProps> = ({
  * Basic properties (title, id, visibility)
  */
 const BasicProperties: React.FC<PropertyEditorProps> = ({ block, onChange, readonly }) => {
-  const { locale } = useI18n();
-  const l = (zh: string, en: string) => (locale === 'zh-CN' ? zh : en);
+  const text = useBlockSettingsText();
   const showTitle =
     block.blockType === 'form-section' ||
     block.blockType === 'detail-section' ||
@@ -174,19 +182,19 @@ const BasicProperties: React.FC<PropertyEditorProps> = ({ block, onChange, reado
     <div className="space-y-4">
       {/* Title — accepts LocalizedText (zh-CN + en-US) */}
       {showTitle && (
-        <PropertyField label={l('标题', 'Title')} testId="block-title">
+        <PropertyField label={text('title')} testId="block-title">
           <LocalizedTextInput
             value={block.title as LocalizedTextValue}
             onChange={(next) => onChange({ title: (next ?? undefined) as DslBlock['title'] })}
             disabled={readonly}
-            placeholder={l('输入标题', 'Enter title')}
+            placeholder={text('enterTitle')}
             testId="block-title-input"
           />
         </PropertyField>
       )}
 
       {block.blockType === 'custom' && (
-        <PropertyField label="组件" hint="Runtime component alias" testId="custom-component">
+        <PropertyField label={text('component')} hint={text('componentHint')} testId="custom-component">
           <input
             type="text"
             value={block.component || ''}
@@ -201,13 +209,13 @@ const BasicProperties: React.FC<PropertyEditorProps> = ({ block, onChange, reado
 
       {/* Text content */}
       {block.blockType === 'text' && (
-        <PropertyField label={l('内容', 'Content')} testId="text-content">
+        <PropertyField label={text('content')} testId="text-content">
           <textarea
             value={(block.props as any)?.content || ''}
             onChange={(e) => onChange({ props: { ...block.props, content: e.target.value } })}
             disabled={readonly}
             className="property-input min-h-[80px] resize-y"
-            placeholder={l('输入文本内容', 'Enter text content')}
+            placeholder={text('enterContent')}
             data-testid="text-content-input"
           />
         </PropertyField>
@@ -215,8 +223,8 @@ const BasicProperties: React.FC<PropertyEditorProps> = ({ block, onChange, reado
 
       {/* Visibility condition */}
       <PropertyField
-        label={l('显示条件', 'Visibility condition')}
-        hint={l('SpEL 表达式', 'SpEL expression')}
+        label={text('visibility')}
+        hint={text('expressionHint')}
         testId="block-visible"
       >
         <input
@@ -237,12 +245,13 @@ const BasicProperties: React.FC<PropertyEditorProps> = ({ block, onChange, reado
  * Layout properties (span, columns, gap)
  */
 const LayoutProperties: React.FC<PropertyEditorProps> = ({ block, onChange, readonly }) => {
+  const text = useBlockSettingsText();
   const props = (block.props || {}) as Record<string, any>;
 
   return (
     <div className="space-y-4">
       {/* Span */}
-      <PropertyField label="栅格宽度" testId="block-span">
+      <PropertyField label={text('gridWidth')} testId="block-span">
         <select
           value={block.span || ''}
           onChange={(e) => onChange({ span: e.target.value ? Number(e.target.value) : undefined })}
@@ -250,10 +259,10 @@ const LayoutProperties: React.FC<PropertyEditorProps> = ({ block, onChange, read
           className="property-input"
           data-testid="block-span-select"
         >
-          <option value="">自动</option>
+          <option value="">{text('auto')}</option>
           {[1, 2, 3, 4, 6, 8, 12].map((n) => (
             <option key={n} value={n}>
-              {n} 列
+              {text('columns', n)}
             </option>
           ))}
         </select>
@@ -263,7 +272,7 @@ const LayoutProperties: React.FC<PropertyEditorProps> = ({ block, onChange, read
       {(block.blockType === 'form-section' ||
         block.blockType === 'detail-section' ||
         block.blockType === 'filters') && (
-        <PropertyField label="表单列数" testId="block-columns">
+        <PropertyField label={text('formColumns')} testId="block-columns">
           <select
             value={props.columns || 2}
             onChange={(e) => onChange({ props: { ...props, columns: Number(e.target.value) } })}
@@ -271,17 +280,17 @@ const LayoutProperties: React.FC<PropertyEditorProps> = ({ block, onChange, read
             className="property-input"
             data-testid="block-columns-select"
           >
-            <option value={1}>1 列</option>
-            <option value={2}>2 列</option>
-            <option value={3}>3 列</option>
-            <option value={4}>4 列</option>
+            <option value={1}>{text('columns', 1)}</option>
+            <option value={2}>{text('columns', 2)}</option>
+            <option value={3}>{text('columns', 3)}</option>
+            <option value={4}>{text('columns', 4)}</option>
           </select>
         </PropertyField>
       )}
 
       {/* Gutter */}
       {(block.blockType === 'form-section' || block.blockType === 'detail-section') && (
-        <PropertyField label="间距" testId="block-gutter">
+        <PropertyField label={text('gutter')} testId="block-gutter">
           <select
             value={props.gutter || 16}
             onChange={(e) => onChange({ props: { ...props, gutter: Number(e.target.value) } })}
@@ -289,17 +298,17 @@ const LayoutProperties: React.FC<PropertyEditorProps> = ({ block, onChange, read
             className="property-input"
             data-testid="block-gutter-select"
           >
-            <option value={8}>紧凑 (8px)</option>
-            <option value={16}>标准 (16px)</option>
-            <option value={24}>宽松 (24px)</option>
-            <option value={32}>超宽 (32px)</option>
+            <option value={8}>{text('compact8')}</option>
+            <option value={16}>{text('standard16')}</option>
+            <option value={24}>{text('relaxed24')}</option>
+            <option value={32}>{text('wide32')}</option>
           </select>
         </PropertyField>
       )}
 
       {/* Button layout */}
       {(block.blockType === 'toolbar' || block.blockType === 'form-buttons') && (
-        <PropertyField label="按钮对齐" testId="button-align">
+        <PropertyField label={text('buttonAlign')} testId="button-align">
           <select
             value={props.align || 'left'}
             onChange={(e) => onChange({ props: { ...props, align: e.target.value } })}
@@ -307,9 +316,9 @@ const LayoutProperties: React.FC<PropertyEditorProps> = ({ block, onChange, read
             className="property-input"
             data-testid="button-align-select"
           >
-            <option value="left">左对齐</option>
-            <option value="center">居中</option>
-            <option value="right">右对齐</option>
+            <option value="left">{text('left')}</option>
+            <option value="center">{text('center')}</option>
+            <option value="right">{text('right')}</option>
           </select>
         </PropertyField>
       )}
@@ -329,8 +338,9 @@ const CustomPropsJsonEditor: React.FC<CustomPropsJsonEditorProps> = ({
   readonly,
   props,
 }) => {
+  const text = useBlockSettingsText();
   const [draft, setDraft] = useState(() => formatJson(props));
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<'invalidJsonObject' | 'invalidJson' | null>(null);
 
   useEffect(() => {
     setDraft(formatJson(props));
@@ -338,7 +348,7 @@ const CustomPropsJsonEditor: React.FC<CustomPropsJsonEditorProps> = ({
   }, [block.id, props]);
 
   return (
-    <PropertyField label="Props JSON" hint="Must be a JSON object" testId="custom-props-json">
+    <PropertyField label={text('propsJson')} hint={text('propsHint')} testId="custom-props-json">
       <textarea
         value={draft}
         onChange={(event) => {
@@ -347,12 +357,13 @@ const CustomPropsJsonEditor: React.FC<CustomPropsJsonEditorProps> = ({
           try {
             const parsed = next.trim() ? JSON.parse(next) : {};
             if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') {
-              throw new Error('Props JSON must be an object');
+              setError('invalidJsonObject');
+              return;
             }
             setError(null);
             onChange({ props: parsed });
-          } catch (err) {
-            setError(err instanceof Error ? err.message : 'Invalid JSON');
+          } catch {
+            setError('invalidJson');
           }
         }}
         disabled={readonly}
@@ -362,7 +373,7 @@ const CustomPropsJsonEditor: React.FC<CustomPropsJsonEditorProps> = ({
       />
       {error && (
         <div className="mt-1 text-xs text-red-600" data-testid="custom-props-json-error">
-          {error}
+          {text(error)}
         </div>
       )}
     </PropertyField>
@@ -373,6 +384,7 @@ const CustomPropsJsonEditor: React.FC<CustomPropsJsonEditorProps> = ({
  * Data properties (data source, bindings)
  */
 const DataProperties: React.FC<PropertyEditorProps> = ({ block, onChange, readonly }) => {
+  const text = useBlockSettingsText();
   const props = (block.props || {}) as Record<string, any>;
   const blockRefreshInterval =
     block.refreshInterval ??
@@ -392,7 +404,7 @@ const DataProperties: React.FC<PropertyEditorProps> = ({ block, onChange, readon
             placeholder="tableData"
           />
 
-          <PropertyField label="选择绑定" hint="绑定选中行" testId="selection-bind">
+          <PropertyField label={text('selectionBind')} hint={text('selectionHint')} testId="selection-bind">
             <input
               type="text"
               value={(block.selection as any)?.bind || ''}
@@ -408,7 +420,7 @@ const DataProperties: React.FC<PropertyEditorProps> = ({ block, onChange, readon
             />
           </PropertyField>
 
-          <PropertyField label="行键字段" hint="唯一标识字段" testId="row-key">
+          <PropertyField label={text('rowKey')} hint={text('rowKeyHint')} testId="row-key">
             <input
               type="text"
               value={props.rowKey || 'id'}
@@ -434,7 +446,7 @@ const DataProperties: React.FC<PropertyEditorProps> = ({ block, onChange, readon
             placeholder="ds_stats"
           />
 
-          <PropertyField label="数值字段" testId="stat-value-field">
+          <PropertyField label={text('valueField')} testId="stat-value-field">
             <input
               type="text"
               value={props.valueField || ''}
@@ -446,7 +458,7 @@ const DataProperties: React.FC<PropertyEditorProps> = ({ block, onChange, readon
             />
           </PropertyField>
 
-          <PropertyField label="变化率字段" testId="stat-change-field">
+          <PropertyField label={text('changeField')} testId="stat-change-field">
             <input
               type="text"
               value={props.changeField || ''}
@@ -458,7 +470,7 @@ const DataProperties: React.FC<PropertyEditorProps> = ({ block, onChange, readon
             />
           </PropertyField>
 
-          <PropertyField label="刷新间隔(ms)" testId="stat-refresh-interval">
+          <PropertyField label={text('refreshInterval')} testId="stat-refresh-interval">
             <input
               type="number"
               value={blockRefreshInterval ?? ''}
@@ -491,7 +503,7 @@ const DataProperties: React.FC<PropertyEditorProps> = ({ block, onChange, readon
             placeholder="ds_chart"
           />
 
-          <PropertyField label="图表类型" testId="chart-type">
+          <PropertyField label={text('chartType')} testId="chart-type">
             <select
               value={props.chartType || 'bar'}
               onChange={(e) => onChange({ props: { ...props, chartType: e.target.value } })}
@@ -499,14 +511,14 @@ const DataProperties: React.FC<PropertyEditorProps> = ({ block, onChange, readon
               className="property-input"
               data-testid="chart-type-select"
             >
-              <option value="bar">柱状图</option>
-              <option value="line">折线图</option>
-              <option value="pie">饼图</option>
-              <option value="area">面积图</option>
+              <option value="bar">{text('bar')}</option>
+              <option value="line">{text('line')}</option>
+              <option value="pie">{text('pie')}</option>
+              <option value="area">{text('area')}</option>
             </select>
           </PropertyField>
 
-          <PropertyField label="X轴字段" testId="chart-x-field">
+          <PropertyField label={text('xField')} testId="chart-x-field">
             <input
               type="text"
               value={props.xField || ''}
@@ -518,7 +530,7 @@ const DataProperties: React.FC<PropertyEditorProps> = ({ block, onChange, readon
             />
           </PropertyField>
 
-          <PropertyField label="Y轴字段" testId="chart-y-field">
+          <PropertyField label={text('yField')} testId="chart-y-field">
             <input
               type="text"
               value={props.yField || ''}
@@ -530,7 +542,7 @@ const DataProperties: React.FC<PropertyEditorProps> = ({ block, onChange, readon
             />
           </PropertyField>
 
-          <PropertyField label="刷新间隔(ms)" testId="chart-refresh-interval">
+          <PropertyField label={text('refreshInterval')} testId="chart-refresh-interval">
             <input
               type="number"
               value={blockRefreshInterval ?? ''}
@@ -553,7 +565,7 @@ const DataProperties: React.FC<PropertyEditorProps> = ({ block, onChange, readon
 
       {block.blockType === 'custom' && (
         <>
-          <PropertyField label="值字段" hint="Optional runtime value field" testId="custom-value-field">
+          <PropertyField label={text('customValueField')} hint={text('customValueHint')} testId="custom-value-field">
             <input
               type="text"
               value={props.valueField || ''}
@@ -588,6 +600,7 @@ const DataProperties: React.FC<PropertyEditorProps> = ({ block, onChange, readon
  * Appearance properties (style, theme)
  */
 const AppearanceProperties: React.FC<PropertyEditorProps> = ({ block, onChange, readonly }) => {
+  const text = useBlockSettingsText();
   const props = (block.props || {}) as Record<string, any>;
 
   return (
@@ -596,7 +609,7 @@ const AppearanceProperties: React.FC<PropertyEditorProps> = ({ block, onChange, 
       {block.blockType === 'table' && (
         <>
           <PropertySwitch
-            label="显示边框"
+            label={text('bordered')}
             checked={props.bordered ?? true}
             onChange={(checked) => onChange({ props: { ...props, bordered: checked } })}
             disabled={readonly}
@@ -604,7 +617,7 @@ const AppearanceProperties: React.FC<PropertyEditorProps> = ({ block, onChange, 
           />
 
           <PropertySwitch
-            label="斑马纹"
+            label={text('striped')}
             checked={props.striped ?? false}
             onChange={(checked) => onChange({ props: { ...props, striped: checked } })}
             disabled={readonly}
@@ -612,14 +625,14 @@ const AppearanceProperties: React.FC<PropertyEditorProps> = ({ block, onChange, 
           />
 
           <PropertySwitch
-            label="显示序号"
+            label={text('showIndex')}
             checked={props.showIndex ?? false}
             onChange={(checked) => onChange({ props: { ...props, showIndex: checked } })}
             disabled={readonly}
             testId="table-show-index"
           />
 
-          <PropertyField label="表格尺寸" testId="table-size">
+          <PropertyField label={text('tableSize')} testId="table-size">
             <select
               value={props.size || 'middle'}
               onChange={(e) => onChange({ props: { ...props, size: e.target.value } })}
@@ -627,9 +640,9 @@ const AppearanceProperties: React.FC<PropertyEditorProps> = ({ block, onChange, 
               className="property-input"
               data-testid="table-size-select"
             >
-              <option value="small">紧凑</option>
-              <option value="middle">标准</option>
-              <option value="large">宽松</option>
+              <option value="small">{text('compact')}</option>
+              <option value="middle">{text('standard')}</option>
+              <option value="large">{text('relaxed')}</option>
             </select>
           </PropertyField>
         </>
@@ -638,7 +651,7 @@ const AppearanceProperties: React.FC<PropertyEditorProps> = ({ block, onChange, 
       {/* Stat card appearance */}
       {block.blockType === 'stat-card' && (
         <>
-          <PropertyField label="前缀" testId="stat-prefix">
+          <PropertyField label={text('prefix')} testId="stat-prefix">
             <input
               type="text"
               value={props.prefix || ''}
@@ -650,19 +663,19 @@ const AppearanceProperties: React.FC<PropertyEditorProps> = ({ block, onChange, 
             />
           </PropertyField>
 
-          <PropertyField label="后缀" testId="stat-suffix">
+          <PropertyField label={text('suffix')} testId="stat-suffix">
             <input
               type="text"
               value={props.suffix || ''}
               onChange={(e) => onChange({ props: { ...props, suffix: e.target.value } })}
               disabled={readonly}
               className="property-input"
-              placeholder="元"
+              placeholder={text('currencySuffix')}
               data-testid="stat-suffix-input"
             />
           </PropertyField>
 
-          <PropertyField label="主题色" testId="stat-color">
+          <PropertyField label={text('themeColor')} testId="stat-color">
             <select
               value={props.color || 'blue'}
               onChange={(e) => onChange({ props: { ...props, color: e.target.value } })}
@@ -670,11 +683,11 @@ const AppearanceProperties: React.FC<PropertyEditorProps> = ({ block, onChange, 
               className="property-input"
               data-testid="stat-color-select"
             >
-              <option value="blue">蓝色</option>
-              <option value="green">绿色</option>
-              <option value="orange">橙色</option>
-              <option value="red">红色</option>
-              <option value="purple">紫色</option>
+              <option value="blue">{text('blue')}</option>
+              <option value="green">{text('green')}</option>
+              <option value="orange">{text('orange')}</option>
+              <option value="red">{text('red')}</option>
+              <option value="purple">{text('purple')}</option>
             </select>
           </PropertyField>
         </>
@@ -684,7 +697,7 @@ const AppearanceProperties: React.FC<PropertyEditorProps> = ({ block, onChange, 
       {block.blockType === 'chart-card' && (
         <>
           <PropertySwitch
-            label="平滑曲线"
+            label={text('smooth')}
             checked={props.smooth ?? true}
             onChange={(checked) => onChange({ props: { ...props, smooth: checked } })}
             disabled={readonly}
@@ -692,14 +705,14 @@ const AppearanceProperties: React.FC<PropertyEditorProps> = ({ block, onChange, 
           />
 
           <PropertySwitch
-            label="显示图例"
+            label={text('legend')}
             checked={props.showLegend ?? true}
             onChange={(checked) => onChange({ props: { ...props, showLegend: checked } })}
             disabled={readonly}
             testId="chart-legend"
           />
 
-          <PropertyField label="图表高度" testId="chart-height">
+          <PropertyField label={text('chartHeight')} testId="chart-height">
             <input
               type="number"
               value={props.height || 200}
@@ -718,7 +731,7 @@ const AppearanceProperties: React.FC<PropertyEditorProps> = ({ block, onChange, 
       {/* Text appearance */}
       {block.blockType === 'text' && (
         <>
-          <PropertyField label="文字大小" testId="text-size">
+          <PropertyField label={text('textSize')} testId="text-size">
             <select
               value={props.size || 'base'}
               onChange={(e) => onChange({ props: { ...props, size: e.target.value } })}
@@ -726,15 +739,15 @@ const AppearanceProperties: React.FC<PropertyEditorProps> = ({ block, onChange, 
               className="property-input"
               data-testid="text-size-select"
             >
-              <option value="xs">超小</option>
-              <option value="sm">小</option>
-              <option value="base">标准</option>
-              <option value="lg">大</option>
-              <option value="xl">超大</option>
+              <option value="xs">{text('extraSmall')}</option>
+              <option value="sm">{text('small')}</option>
+              <option value="base">{text('standard')}</option>
+              <option value="lg">{text('large')}</option>
+              <option value="xl">{text('extraLarge')}</option>
             </select>
           </PropertyField>
 
-          <PropertyField label="文字颜色" testId="text-color">
+          <PropertyField label={text('textColor')} testId="text-color">
             <select
               value={props.color || 'default'}
               onChange={(e) => onChange({ props: { ...props, color: e.target.value } })}
@@ -742,16 +755,16 @@ const AppearanceProperties: React.FC<PropertyEditorProps> = ({ block, onChange, 
               className="property-input"
               data-testid="text-color-select"
             >
-              <option value="default">默认</option>
-              <option value="secondary">次要</option>
-              <option value="success">成功</option>
-              <option value="warning">警告</option>
-              <option value="danger">危险</option>
+              <option value="default">{text('default')}</option>
+              <option value="secondary">{text('secondary')}</option>
+              <option value="success">{text('success')}</option>
+              <option value="warning">{text('warning')}</option>
+              <option value="danger">{text('danger')}</option>
             </select>
           </PropertyField>
 
           <PropertySwitch
-            label="加粗"
+            label={text('bold')}
             checked={props.bold ?? false}
             onChange={(checked) => onChange({ props: { ...props, bold: checked } })}
             disabled={readonly}
@@ -767,6 +780,7 @@ const AppearanceProperties: React.FC<PropertyEditorProps> = ({ block, onChange, 
  * Behavior properties (interactions, states)
  */
 const BehaviorProperties: React.FC<PropertyEditorProps> = ({ block, onChange, readonly }) => {
+  const text = useBlockSettingsText();
   const props = (block.props || {}) as Record<string, any>;
 
   return (
@@ -775,7 +789,7 @@ const BehaviorProperties: React.FC<PropertyEditorProps> = ({ block, onChange, re
       {(block.blockType === 'form-section' || block.blockType === 'detail-section') && (
         <>
           <PropertySwitch
-            label="可折叠"
+            label={text('collapsible')}
             checked={block.collapsible ?? false}
             onChange={(checked) => onChange({ collapsible: checked })}
             disabled={readonly}
@@ -784,7 +798,7 @@ const BehaviorProperties: React.FC<PropertyEditorProps> = ({ block, onChange, re
 
           {block.collapsible && (
             <PropertySwitch
-              label="默认收起"
+              label={text('defaultCollapsed')}
               checked={block.defaultCollapsed ?? false}
               onChange={(checked) => onChange({ defaultCollapsed: checked })}
               disabled={readonly}
@@ -798,7 +812,7 @@ const BehaviorProperties: React.FC<PropertyEditorProps> = ({ block, onChange, re
       {block.blockType === 'filters' && (
         <>
           <PropertySwitch
-            label="展开高级筛选"
+            label={text('advancedExpanded')}
             checked={props.defaultExpanded ?? false}
             onChange={(checked) => onChange({ props: { ...props, defaultExpanded: checked } })}
             disabled={readonly}
@@ -806,7 +820,7 @@ const BehaviorProperties: React.FC<PropertyEditorProps> = ({ block, onChange, re
           />
 
           <PropertySwitch
-            label="回车搜索"
+            label={text('searchOnEnter')}
             checked={props.searchOnEnter ?? true}
             onChange={(checked) => onChange({ props: { ...props, searchOnEnter: checked } })}
             disabled={readonly}
@@ -819,7 +833,7 @@ const BehaviorProperties: React.FC<PropertyEditorProps> = ({ block, onChange, re
       {block.blockType === 'table' && (
         <>
           <PropertySwitch
-            label="启用分页"
+            label={text('pagination')}
             checked={props.pagination ?? true}
             onChange={(checked) => onChange({ props: { ...props, pagination: checked } })}
             disabled={readonly}
@@ -827,7 +841,7 @@ const BehaviorProperties: React.FC<PropertyEditorProps> = ({ block, onChange, re
           />
 
           {props.pagination !== false && (
-            <PropertyField label="每页条数" testId="table-page-size">
+            <PropertyField label={text('pageSize')} testId="table-page-size">
               <select
                 value={props.pageSize || 10}
                 onChange={(e) =>
@@ -837,16 +851,16 @@ const BehaviorProperties: React.FC<PropertyEditorProps> = ({ block, onChange, re
                 className="property-input"
                 data-testid="table-page-size-select"
               >
-                <option value={10}>10 条</option>
-                <option value={20}>20 条</option>
-                <option value={50}>50 条</option>
-                <option value={100}>100 条</option>
+                <option value={10}>{text('rows', 10)}</option>
+                <option value={20}>{text('rows', 20)}</option>
+                <option value={50}>{text('rows', 50)}</option>
+                <option value={100}>{text('rows', 100)}</option>
               </select>
             </PropertyField>
           )}
 
           <PropertySwitch
-            label="行可选择"
+            label={text('rowSelection')}
             checked={props.rowSelection ?? false}
             onChange={(checked) => onChange({ props: { ...props, rowSelection: checked } })}
             disabled={readonly}
@@ -854,7 +868,7 @@ const BehaviorProperties: React.FC<PropertyEditorProps> = ({ block, onChange, re
           />
 
           {props.rowSelection && (
-            <PropertyField label="选择模式" testId="table-selection-type">
+            <PropertyField label={text('selectionType')} testId="table-selection-type">
               <select
                 value={props.selectionType || 'checkbox'}
                 onChange={(e) => onChange({ props: { ...props, selectionType: e.target.value } })}
@@ -862,14 +876,14 @@ const BehaviorProperties: React.FC<PropertyEditorProps> = ({ block, onChange, re
                 className="property-input"
                 data-testid="table-selection-type-select"
               >
-                <option value="checkbox">多选</option>
-                <option value="radio">单选</option>
+                <option value="checkbox">{text('multiple')}</option>
+                <option value="radio">{text('single')}</option>
               </select>
             </PropertyField>
           )}
 
           <PropertySwitch
-            label="可排序"
+            label={text('sortable')}
             checked={props.sortable ?? false}
             onChange={(checked) => onChange({ props: { ...props, sortable: checked } })}
             disabled={readonly}
@@ -877,7 +891,7 @@ const BehaviorProperties: React.FC<PropertyEditorProps> = ({ block, onChange, re
           />
 
           <PropertySwitch
-            label="可导出"
+            label={text('exportable')}
             checked={props.exportable ?? false}
             onChange={(checked) => onChange({ props: { ...props, exportable: checked } })}
             disabled={readonly}
@@ -935,6 +949,7 @@ const PropertySwitch: React.FC<PropertySwitchProps> = ({
       <button
         type="button"
         role="switch"
+        aria-label={label}
         aria-checked={checked}
         onClick={() => onChange(!checked)}
         disabled={disabled}

@@ -14,6 +14,15 @@ import java.util.List;
 public interface PermissionMatrixService {
 
     /**
+     * Resolve a permission PID for the matrix policy endpoints.
+     *
+     * @param permissionPid Permission PID
+     * @return Permission ID
+     * @throws com.auraboot.framework.exception.RootUnCheckedException if absent
+     */
+    Long findPermissionIdByPid(String permissionPid);
+
+    /**
      * Get the full permission matrix (all permissions, none granted).
      *
      * @param tenantId Tenant ID

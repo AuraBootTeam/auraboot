@@ -1,3 +1,4 @@
+import { useI18n } from '~/contexts/I18nContext';
 /**
  * Dashboard Designer Toolbar
  * Wraps shared DesignerToolbar with dashboard-specific actions:
@@ -36,6 +37,7 @@ export const DesignerToolbar: React.FC<DashboardToolbarProps> = ({
   canvasRef,
   onPresentation,
 }) => {
+  const { t } = useI18n();
   const st = useSmartText();
   const { showSuccessToast, showErrorToast } = useToastContext();
   const { dashboard, isDirty, isSaving, canUndo, canRedo, undo, redo, validate } =
@@ -44,12 +46,12 @@ export const DesignerToolbar: React.FC<DashboardToolbarProps> = ({
   const handleValidate = () => {
     const result = validate();
     if (result.valid) {
-      showSuccessToast(st({ zh: '校验通过', en: 'Validation passed' }));
+      showSuccessToast(t('dashboard.designer.validationPassed'));
     } else {
       const errorMsg = result.errors
         .map((e) => `[${e.type.toUpperCase()}] ${e.message}`)
         .join('; ');
-      showErrorToast(`${st({ zh: '校验', en: 'Validation' })}: ${errorMsg}`);
+      showErrorToast(t('dashboard.designer.validationFailed', { error: errorMsg }));
     }
   };
 
@@ -63,8 +65,8 @@ export const DesignerToolbar: React.FC<DashboardToolbarProps> = ({
   return (
     <SharedDesignerToolbar
       testId="designer-toolbar"
-      title={st({ zh: '仪表盘设计器', en: 'Dashboard Designer' })}
-      subtitle={dashboard?.title || st({ zh: '未命名仪表盘', en: 'Untitled Dashboard' })}
+      title={t('dashboard.designer.title')}
+      subtitle={dashboard?.title || t('dashboard.designer.defaultTitle')}
       status={statusText}
       isDirty={isDirty}
       isSaving={isSaving}
@@ -80,7 +82,7 @@ export const DesignerToolbar: React.FC<DashboardToolbarProps> = ({
         className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
         data-testid="toolbar-btn-validate"
       >
-        {st({ zh: '校验', en: 'Validate' })}
+        {t('dashboard.designer.validate')}
       </button>
 
       {/* Settings */}
@@ -89,14 +91,14 @@ export const DesignerToolbar: React.FC<DashboardToolbarProps> = ({
         className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
         data-testid="toolbar-btn-settings"
       >
-        {st({ zh: '设置', en: 'Settings' })}
+        {t('dashboard.designer.settings')}
       </button>
 
       {/* Presentation Mode */}
       {dashboard?.pid && (
         <button
           onClick={onPresentation}
-          title={st({ zh: '演示模式', en: 'Presentation Mode' })}
+          title={t('dashboard.designer.presentation')}
           className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
           data-testid="toolbar-btn-presentation"
         >
@@ -109,10 +111,10 @@ export const DesignerToolbar: React.FC<DashboardToolbarProps> = ({
         <button
           onClick={onToggleVersionHistory}
           className="flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          title={st({ zh: '历史版本', en: 'Version History' })}
+          title={t('dashboard.designer.history')}
         >
           <Clock className="h-4 w-4" />
-          {st({ zh: '历史版本', en: 'History' })}
+          {t('dashboard.designer.history')}
           {versionCount != null && versionCount > 0 && (
             <span className="text-xs text-gray-400">({versionCount})</span>
           )}
@@ -142,7 +144,7 @@ export const DesignerToolbar: React.FC<DashboardToolbarProps> = ({
           className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
           data-testid="toolbar-btn-publish"
         >
-          {st({ zh: '发布', en: 'Publish' })}
+          {t('dashboard.designer.publish')}
         </button>
       ) : (
         <button
@@ -151,7 +153,7 @@ export const DesignerToolbar: React.FC<DashboardToolbarProps> = ({
           className="rounded-md border border-yellow-300 bg-yellow-100 px-4 py-2 text-sm font-medium text-yellow-700 hover:bg-yellow-200 disabled:cursor-not-allowed disabled:opacity-50"
           data-testid="toolbar-btn-unpublish"
         >
-          {st({ zh: '取消发布', en: 'Unpublish' })}
+          {t('dashboard.designer.unpublish')}
         </button>
       )}
     </SharedDesignerToolbar>

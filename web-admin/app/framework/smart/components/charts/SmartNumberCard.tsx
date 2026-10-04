@@ -15,6 +15,13 @@ import type {
 } from '~/framework/smart/types/chart';
 import { cn } from '~/utils/cn';
 
+function numericValue(raw: unknown): number | null {
+  if (typeof raw !== 'number' && typeof raw !== 'string') return null;
+  if (typeof raw === 'string' && !raw.trim()) return null;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : null;
+}
+
 function hexToRgba(hex: string, alpha: number): string {
   const normalized = hex.replace('#', '').trim();
   const fullHex =
@@ -189,12 +196,12 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
   /**
    * Extract the metric value from the data
    */
-  const getValue = (): number => {
-    if (!data?.rows?.length) return 0;
+  const getValue = (): number | null => {
+    if (!data?.rows?.length) return null;
     const firstRow = data.rows[0];
     const metricKey = metricField || data.meta?.metrics?.[0];
-    if (!metricKey) return 0;
-    return Number(firstRow[metricKey]) || 0;
+    if (!metricKey) return null;
+    return numericValue(firstRow[metricKey]);
   };
 
   /**
@@ -219,7 +226,9 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
     }
   };
 
-  const formattedValue = `${prefix || ''}${formatValue(getValue())}${suffix || ''}`;
+  const metricValue = getValue();
+  const formattedValue =
+    metricValue === null ? '—' : `${prefix || ''}${formatValue(metricValue)}${suffix || ''}`;
   const firstRow = data?.rows?.[0] ?? {};
   // When `metricField` is set the caller targets a single column from a multi-field
   // response (e.g. four KPI cards each reading one field of the same overview query).
@@ -238,7 +247,8 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
     cardPrefix?: string,
     cardSuffix?: string,
   ): string => {
-    const value = Number(raw) || 0;
+    const value = numericValue(raw);
+    if (value === null) return '—';
     const nextPrefix = cardPrefix ?? prefix ?? '';
     const nextSuffix = cardSuffix ?? suffix ?? '';
     if (cardFormat === 'currency') {
@@ -298,7 +308,7 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
     return (
       <div
         className={cn(
-          'flex h-full flex-col items-center justify-center rounded-[22px] border border-dashed border-slate-300 bg-white/90 dark:border-slate-600 dark:bg-gray-900/90 p-4 text-center shadow-sm',
+          'flex h-full flex-col items-center justify-center rounded-[22px] border border-dashed border-slate-300 bg-white/90 p-4 text-center shadow-sm dark:border-slate-600 dark:bg-gray-900/90',
           className,
         )}
         style={style}
@@ -327,8 +337,10 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
           const cardClickable = Boolean(cardDrillDown?.enabled && onDrillDown);
           const cardContent = (
             <>
-              <div className="text-xs font-medium text-slate-500 dark:text-slate-400">{resolveCardLabel(card)}</div>
-              <div className="mt-3 text-2xl font-semibold text-slate-950 dark:text-slate-50 tabular-nums">
+              <div className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                {resolveCardLabel(card)}
+              </div>
+              <div className="mt-3 text-2xl font-semibold text-slate-950 tabular-nums dark:text-slate-50">
                 {loading
                   ? '...'
                   : error
@@ -392,7 +404,7 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
       <div className="flex h-full flex-col p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <span className="block truncate text-[11px] font-semibold tracking-[0.16em] text-slate-500 dark:text-slate-400 uppercase">
+            <span className="block truncate text-[11px] font-semibold tracking-[0.16em] text-slate-500 uppercase dark:text-slate-400">
               {cardLabel}
             </span>
             <span
@@ -419,8 +431,8 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
             </div>
           ) : isEmpty ? (
             <div className="space-y-3">
-              <div className="text-4xl font-semibold tracking-tight text-slate-950 dark:text-slate-50 tabular-nums md:text-[2.65rem]">
-                {prefix || ''}0{suffix || ''}
+              <div className="text-4xl font-semibold tracking-tight text-slate-950 tabular-nums md:text-[2.65rem] dark:text-slate-50">
+                —
               </div>
               <div className="inline-flex items-center rounded-full border border-sky-100 bg-sky-50 px-2.5 py-1 text-[11px] font-medium text-sky-700">
                 Waiting for first record
@@ -432,7 +444,7 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
             </div>
           ) : (
             <>
-              <div className="text-4xl font-semibold tracking-tight text-slate-950 dark:text-slate-50 tabular-nums md:text-[2.65rem]">
+              <div className="text-4xl font-semibold tracking-tight text-slate-950 tabular-nums md:text-[2.65rem] dark:text-slate-50">
                 {formattedValue}
               </div>
               <div className="mt-2 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
@@ -448,7 +460,7 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
         </div>
 
         {trend?.enabled && (
-          <div className="mt-4 inline-flex w-fit items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-500 dark:border-gray-700 dark:bg-gray-800 dark:text-slate-400 dark:text-slate-400">
+          <div className="mt-4 inline-flex w-fit items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-500 dark:border-gray-700 dark:bg-gray-800 dark:text-slate-400">
             {trend.compareType === 'lastDay' && 'vs yesterday'}
             {trend.compareType === 'lastWeek' && 'vs last week'}
             {trend.compareType === 'lastMonth' && 'vs last month'}

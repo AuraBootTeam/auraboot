@@ -259,7 +259,10 @@ public class TenantSelectionController {
                         null,
                         platformSpace ? SessionStage.PLATFORM : SessionStage.READY,
                         1,
-                        securityVersion));
+                        securityVersion,
+                        false,
+                        null,
+                        null));
 
         if (applicationId != null && tenant.getPid() != null) {
             userApplicationPreferenceService.setLastTenant(user.getId(), applicationId, tenant.getPid());

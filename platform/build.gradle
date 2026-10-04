@@ -19,6 +19,39 @@ bootJar {
     archiveClassifier = 'boot'
 }
 
+// Fixture endpoints are a separate opt-in artifact, never production classes.
+// Reuse the six canonical fixture sources without JUnit or integration tests.
+sourceSets {
+    testApi {
+        java {
+            srcDir 'src/test/java'
+            include 'com/auraboot/framework/test/test/controller/*.java'
+            include 'com/auraboot/framework/test/test/dto/*.java'
+        }
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+configurations {
+    testApiImplementation.extendsFrom implementation
+    testApiCompileOnly.extendsFrom compileOnly
+    testApiAnnotationProcessor.extendsFrom annotationProcessor
+}
+
+tasks.named('compileTestApiJava', JavaCompile) {
+    options.encoding = 'UTF-8'
+    options.compilerArgs += ['-parameters']
+}
+
+tasks.register('testApiJar', Jar) {
+    group = 'verification'
+    description = 'Build opt-in test-profile seed/fixture API without production packaging changes'
+    archiveClassifier = 'test-api'
+    from sourceSets.testApi.output
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+
 publishing {
     publications {
         mavenJava(MavenPublication) {
@@ -199,21 +232,28 @@ compileTestJava {
 
 // 版本管理
 ext {
-    jacksonVersion = '2.22.2'
+    jacksonVersion = '2.22.3'
     sentryVersion = '6.34.0'
     jwtVersion = '0.13.0'
     mybatisPlusVersion = '3.5.16'
-    lombokVersion = '1.18.46'
+    lombokVersion = '1.18.48'
     aspectjVersion = '1.9.25.1'
     reflectasmVersion = '1.11.3'
     validationApiVersion = '2.0.1.Final'
     // PF4J Plugin Framework
-    pf4jVersion = '3.15.1'
+    pf4jVersion = '3.16.0'
     pf4jSpringVersion = '0.10.0'
     springKafkaVersion = '3.3.16'
     kafkaClientsVersion = '3.9.2'
     mcpSdkVersion = '2.0.1'
     testWorkerNum = project.findProperty('workerNum') ?: '1'
+}
+// Allure 2.12 defaults its agent to 1.9.22.1 independently of dependency management.
+// Keep the weaving agent and the application's AspectJ runtime on one artifact.
+allure {
+    adapter {
+        aspectjVersion.set(project.ext.aspectjVersion.toString())
+    }
 }
 
 dependencyManagement {
@@ -270,8 +310,10 @@ configurations {
     }
 }
 
+def jacocoToolVersion = '0.8.14'
+
 dependencies {
-    testImplementation 'io.qameta.allure:allure-junit5:2.29.0'
+    testImplementation 'io.qameta.allure:allure-junit5:2.35.5'
     // Plugin API module
     implementation project(':platform-plugin-api')
 
@@ -304,7 +346,7 @@ dependencies {
     // Pulled in transitively only when the iot-tdengine bean profile is
     // active; HikariCP + spring-jdbc come from spring-boot-starter-jdbc
     // already on the classpath.
-    implementation 'com.taosdata.jdbc:taos-jdbcdriver:3.9.0'
+    implementation 'com.taosdata.jdbc:taos-jdbcdriver:3.9.2'
 
     // Micrometer Prometheus registry for metrics export
     implementation 'io.micrometer:micrometer-registry-prometheus'
@@ -331,7 +373,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-aop'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
-    implementation 'com.github.ben-manes.caffeine:caffeine:3.2.4'
+    implementation 'com.github.ben-manes.caffeine:caffeine:3.3.0'
     implementation 'org.springframework.boot:spring-boot-starter-data-jdbc'
     implementation 'org.springframework.boot:spring-boot-starter-mail'
     implementation 'org.springframework.boot:spring-boot-starter-websocket'    // IM WebSocket
@@ -380,7 +422,7 @@ dependencies {
     implementation 'org.jsoup:jsoup:1.23.2'
 
     // Firebase Admin SDK for FCM push notifications (APNs + FCM unified)
-    implementation('com.google.firebase:firebase-admin:9.10.0') {
+    implementation('com.google.firebase:firebase-admin:9.11.0') {
         exclude group: 'com.google.guava', module: 'listenablefuture'
     }
 
@@ -400,7 +442,7 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 
     // Swagger/OpenAPI 3
-    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.9.0'
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.9.1'
 
     // Jakarta注解
     implementation 'jakarta.annotation:jakarta.annotation-api'
@@ -428,11 +470,10 @@ dependencies {
     // approach for CGLIB-proxied Spring beans, which mis-attributes coverage across the many
     // @SpringBootTest contexts in the full suite (proxy class IDs differ per evicted/recreated
     // context, so the dumped proxy no longer matches the exec — the bundle then reads ~5%).
-    // 0.8.12 everywhere: the 0.8.15 offline instrumentation writes exec class IDs that
-    // no jacoco report version matched (bundle read 4.8% with the suite green); the
-    // 78.69% baseline in the verification rules below was measured with this pin.
-    jacocoAnt 'org.jacoco:org.jacoco.ant:0.8.12'
-    jacocoRuntime 'org.jacoco:org.jacoco.agent:0.8.12:runtime'
+    // Keep offline instrumentation, runtime and reports on one version. The historical
+    // 78.69% verification baseline was measured with 0.8.12; its thresholds remain unchanged.
+    jacocoAnt "org.jacoco:org.jacoco.ant:${jacocoToolVersion}"
+    jacocoRuntime "org.jacoco:org.jacoco.agent:${jacocoToolVersion}:runtime"
 
     // PostgreSQL 数据库用于测试
     testImplementation 'org.postgresql:postgresql:42.7.13'
@@ -441,8 +482,14 @@ dependencies {
     testImplementation platform('org.testcontainers:testcontainers-bom:1.21.4')
     testImplementation 'org.testcontainers:testcontainers'
     testImplementation 'org.testcontainers:mysql'
+    // Testcontainers' MySQL integration tests need the JDBC driver; it remains
+    // test-only and is not added to the production runtime archive.
+    testRuntimeOnly 'com.mysql:mysql-connector-j'
     testImplementation 'org.testcontainers:postgresql'
     testImplementation 'org.testcontainers:junit-jupiter'
+    // MySQL container readiness uses MariaDB's compatible driver only in tests.
+    // Production JDBC drivers remain deployer-supplied; the Oracle driver stays excluded.
+    testRuntimeOnly 'org.mariadb.jdbc:mariadb-java-client'
 
     // Awaitility — async assertion polling (used by AdminAuditServiceIntegrationTest)
     testImplementation 'org.awaitility:awaitility:4.3.0'
@@ -459,7 +506,7 @@ dependencies {
     testImplementation 'net.jqwik:jqwik:1.10.1'
 
     // ArchUnit — architecture constraint tests
-    testImplementation 'com.tngtech.archunit:archunit-junit5:1.5.0'
+    testImplementation 'com.tngtech.archunit:archunit-junit5:1.5.1'
 
     // DiffLib for version comparison
     implementation 'io.github.java-diff-utils:java-diff-utils:4.17'
@@ -472,7 +519,7 @@ dependencies {
     implementation "org.pf4j:pf4j-spring:${pf4jSpringVersion}"
 
     // Google OAuth (for ID token verification) + Gmail API
-    implementation 'com.google.api-client:google-api-client:2.9.0'
+    implementation 'com.google.api-client:google-api-client:2.9.1'
     implementation 'com.google.apis:google-api-services-gmail:v1-rev20240520-2.0.0'
     implementation 'com.google.http-client:google-http-client-jackson2:1.47.1'
 
@@ -505,17 +552,39 @@ bootRun {
 }
 
 tasks.withType(Test).configureEach {
+    def retainedAllure = providers.environmentVariable('AURA_ALLURE_RESULTS').orNull
+    if (retainedAllure) {
+        systemProperty 'allure.results.directory', retainedAllure
+    }
     reports.junitXml {
         includeSystemOutLog = false
         includeSystemErrLog = false
+    }
+    // Frozen architecture rules may remove resolved violations from their store.
+    // Give each task a fresh writable copy, never the versioned source baseline.
+    def architectureBaseline = file('src/test/resources/archunit_store')
+    def architectureStore = layout.buildDirectory.dir("archunit/${name}").get().asFile
+    inputs.dir architectureBaseline
+    systemProperty 'archunit.freeze.store.default.path', architectureStore.absolutePath
+    systemProperty 'archunit.freeze.store.default.allowStoreCreation', 'false'
+    systemProperty 'archunit.freeze.refreeze', 'false'
+    doFirst {
+        if (!new File(architectureBaseline, 'stored.rules').isFile()) {
+            throw new GradleException('Versioned architecture baseline is missing')
+        }
+        project.delete architectureStore
+        project.copy {
+            from architectureBaseline
+            into architectureStore
+        }
     }
     // See bootRun comment above — needed in tests too.
     jvmArgs '-Djdk.httpclient.allowRestrictedHeaders=host'
 }
 
 // ─── JaCoCo offline instrumentation of main classes ───
-// Instrument build/classes/java/main at build time into a separate dir. The test task loads
-// these (stable IDs) ahead of the originals so coverage attributes to on-disk classes, which
+// Instrument build/classes/java/main at build time into a separate complete test output. The
+// test task loads these (stable IDs) so coverage attributes to on-disk classes, which
 // is robust across the suite's many CGLIB-proxied Spring contexts (the runtime classdump was
 // not — proxy class IDs diverge per evicted/recreated context, mis-attributing to ~5%).
 def jacocoInstrumentedMain = file("${buildDir}/classes-instrumented-main")
@@ -530,11 +599,16 @@ tasks.register('instrumentMainOffline') {
                     classpath: configurations.jacocoAnt.asPath)
         // CCJSqlParserTokenManager exceeds the JVM method-size limit after instrumentation
         // (same reason the on-the-fly agent excluded it); leave it un-instrumented so the
-        // original loads from build/classes, which stays later on the test classpath.
+        // original is copied into the complete test output below.
         ant.jacocoInstrument(destdir: jacocoInstrumentedMain) {
             fileset(dir: "${buildDir}/classes/java/main") {
                 exclude(name: 'net/sf/jsqlparser/parser/CCJSqlParserTokenManager.class')
             }
+        }
+        copy {
+            from layout.buildDirectory.dir('classes/java/main')
+            into jacocoInstrumentedMain
+            include 'net/sf/jsqlparser/parser/CCJSqlParserTokenManager.class'
         }
     }
 }
@@ -557,8 +631,7 @@ test {
         if (!project.hasProperty('includeLiveEvals')) {
             excludeTags 'agent-eval-live'
         }
-        // Full bootstrap intentionally replaces the platform root data. Keep it in a
-        // terminal, single-test task so it cannot erase fixtures beneath the shared suite.
+        // Full bootstrap needs its own blank migrated database and a separate task.
         excludeTags 'destructive-bootstrap'
     }
     jvmArgs "-Djavax.xml.parsers.SAXParserFactory=com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl"
@@ -607,16 +680,26 @@ test {
     }
     finalizedBy jacocoTestReport
     // ─── JaCoCo offline instrumentation (replaces the fragile runtime CGLIB classdump) ───
-    // Load offline-instrumented main classes first (stable on-disk IDs), then the original
-    // build/classes (provides the un-instrumented CCJSqlParserTokenManager), plus the jacoco
+    // Load the complete offline main output (including the un-instrumented parser exception)
+    // instead of the original class directories, plus the jacoco
     // runtime so instrumented classes resolve org.jacoco.agent.rt.* at load. The on-the-fly
     // agent is disabled — offline records coverage on the original classes a proxy delegates
     // to, which is stable across the many @SpringBootTest contexts (unlike per-context proxy IDs).
     dependsOn 'instrumentMainOffline'
     doFirst {
-        classpath = files(jacocoInstrumentedMain) + classpath + configurations.jacocoRuntime
+        // Offline JaCoCo appends by default. A measured run must not inherit
+        // execution data from a different filter or previous source snapshot.
+        def executionFile = file("${buildDir}/jacoco/test.exec")
+        if (executionFile.exists() && !executionFile.delete()) {
+            throw new GradleException("Cannot clear stale coverage data: ${executionFile}")
+        }
+        classpath = files(jacocoInstrumentedMain) +
+            (classpath - sourceSets.main.output.classesDirs) + configurations.jacocoRuntime
     }
     systemProperty 'jacoco-agent.destfile', file("${buildDir}/jacoco/test.exec").absolutePath
+    // The offline runtime otherwise merges coverage from previous test runs and source revisions.
+    // This task uses one JVM; replace its execution data so reports describe only this run.
+    systemProperty 'jacoco-agent.append', 'false'
     jacoco {
         enabled = false
     }
@@ -624,9 +707,21 @@ test {
     jvmArgs "-javaagent:${configurations.mockitoAgent.singleFile}"
 }
 
+def bootstrapDatabaseUrl = providers.environmentVariable('BOOTSTRAP_TEST_DATABASE_URL')
+tasks.register('validateBootstrapDatabase') {
+    doLast {
+        def url = bootstrapDatabaseUrl.orNull
+        if (!url || !(url ==~ /jdbc:postgresql:\/\/[^\/]+\/aura_boot_bootstrap_[A-Za-z0-9_]+(\?.*)?/) ||
+                url == System.getenv('TEST_DATABASE_URL') || url == System.getenv('DATABASE_URL') ||
+                url == System.getenv('SPRING_DATASOURCE_URL')) {
+            throw new GradleException('BOOTSTRAP_TEST_DATABASE_URL must identify a separate freshly migrated aura_boot_bootstrap_* database')
+        }
+    }
+}
+
 tasks.register('bootstrapBillingAccountTest', Test) {
     group = 'verification'
-    description = 'Run the destructive full-bootstrap billing account integration test last.'
+    description = 'Verify full-bootstrap billing in a dedicated freshly migrated database.'
     useJUnitPlatform {
         includeTags 'destructive-bootstrap'
     }
@@ -636,8 +731,18 @@ tasks.register('bootstrapBillingAccountTest', Test) {
     // The database is recreated outside Gradle, so task outputs cannot prove the external
     // bootstrap contract was re-executed for this run.
     outputs.upToDateWhen { false }
+    doFirst {
+        def isolatedUrl = System.getenv('BOOTSTRAP_TEST_DATABASE_URL')
+        if (!isolatedUrl?.trim()) {
+            throw new GradleException('BOOTSTRAP_TEST_DATABASE_URL is required; retained/shared databases must not be reset')
+        }
+        ['TEST_DATABASE_URL', 'DATABASE_URL', 'SPRING_DATASOURCE_URL'].each {
+            environment it, isolatedUrl
+        }
+    }
     maxParallelForks = 1
 
+    dependsOn tasks.named('validateBootstrapDatabase')
     def bootstrapTestTmpDir = file("${buildDir}/tmp/bootstrapBillingAccountTest")
     bootstrapTestTmpDir.mkdirs()
     systemProperty 'java.io.tmpdir', bootstrapTestTmpDir.absolutePath
@@ -724,12 +829,8 @@ tasks.register('testPlugin', Test) {
 }
 
 jacoco {
-    // Keep in lockstep with the jacocoAnt/jacocoRuntime pair above. Mixed or bumped
-    // installs (0.8.15 via PR #1762) made the report unable to match exec class IDs
-    // recorded by the offline instrumentation — every package read near-zero coverage
-    // while the suite was green. 0.8.12 is the version the ratchet baselines below
-    // were measured with.
-    toolVersion = '0.8.12'
+    // Report the same class IDs that offline instrumentation and the runtime record.
+    toolVersion = jacocoToolVersion
 }
 
 // Classes excluded from coverage measurement:
@@ -818,6 +919,36 @@ jacocoTestReport {
         xml.required = true
         csv.required = false
         html.required = true
+    }
+}
+
+// Full production denominators, separate from the historical curated ratchet.
+// Reports consume explicitly executed tests; they never start a database suite.
+['jacocoUnitFullReport': ['test.exec'],
+ 'jacocoIntegrationFullReport': ['integrationTest.exec'],
+ 'jacocoFullReport': ['test.exec', 'integrationTest.exec']].each { taskName, executionFiles ->
+    tasks.register(taskName, JacocoReport) {
+        group = 'verification'
+        description = 'Report coverage against all production classes without business-package exclusions.'
+        dependsOn tasks.named('classes')
+        mustRunAfter 'test', 'integrationTest'
+        sourceDirectories.setFrom(sourceSets.main.allSource.srcDirs)
+        classDirectories.setFrom(sourceSets.main.output.classesDirs)
+        executionData.setFrom(executionFiles.collect { file("${buildDir}/jacoco/${it}") })
+        // JacocoReport's default onlyIf silently skips missing execution files.
+        // Run our evidence check instead so absence is an explicit failure.
+        setOnlyIf { true }
+        doFirst {
+            def available = executionData.files.findAll { it.isFile() && it.length() > 0 }
+            if (available.isEmpty()) {
+                throw new GradleException("No coverage execution evidence for ${taskName}; run its test layer first")
+            }
+        }
+        reports {
+            xml.required = true
+            csv.required = true
+            html.required = true
+        }
     }
 }
 
@@ -1059,6 +1190,17 @@ tasks.register('integrationTest', Test) {
     // Match bootJar: current platform classes must precede the standalone plugin API jar.
     classpath = sourceSets.main.output.classesDirs + sourceSets.integrationTest.runtimeClasspath
     shouldRunAfter test
+    dependsOn 'instrumentMainOffline'
+    doFirst {
+        def executionFile = file("${buildDir}/jacoco/integrationTest.exec")
+        if (executionFile.exists() && !executionFile.delete()) {
+            throw new GradleException("Cannot clear stale coverage data: ${executionFile}")
+        }
+        classpath = files(jacocoInstrumentedMain) +
+            (classpath - sourceSets.main.output.classesDirs) + configurations.jacocoRuntime
+    }
+    systemProperty 'jacoco-agent.destfile', file("${buildDir}/jacoco/integrationTest.exec").absolutePath
+    jacoco { enabled = false }
 
     // Mirror `test` task JVM args so behavior matches.
     jvmArgs "-Djavax.xml.parsers.SAXParserFactory=com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl"

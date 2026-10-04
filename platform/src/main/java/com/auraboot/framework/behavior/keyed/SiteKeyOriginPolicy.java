@@ -1,16 +1,19 @@
 package com.auraboot.framework.behavior.keyed;
 
-import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.ArrayList;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Enforces a site key's {@code origin_allowlist} for the public keyed-collect path (SP2).
@@ -21,9 +24,9 @@ import java.util.List;
  * cross-tenant read of the active key's allowlist, cached.
  *
  * <p>No self-heal: a configured allowlist that the request origin is not in resolves to a
- * rejection at the caller ({@link KeyedCollectGuard}); this class only answers allowed/not.
+ * rejection at the caller ({@link KeyedCollectGuard}). Malformed configured policies fail closed
+ * without caching an open result; unavailable policy stores propagate their failure.
  */
-@Slf4j
 @Service
 public class SiteKeyOriginPolicy {
 
@@ -71,14 +74,29 @@ public class SiteKeyOriginPolicy {
                     "SELECT origin_allowlist FROM " + TABLE + " WHERE site_key = ? AND status = 'active' LIMIT 1",
                     String.class, siteKey);
             if (json != null && !json.isBlank()) {
-                allow = objectMapper.readValue(json, new TypeReference<List<String>>() {});
+                JsonNode configured = objectMapper.readTree(json);
+                if (configured == null || !configured.isArray()) {
+                    throw invalidPolicy();
+                }
+                List<String> parsed = new ArrayList<>();
+                for (JsonNode entry : configured) {
+                    if (!entry.isTextual()) {
+                        throw invalidPolicy();
+                    }
+                    parsed.add(entry.textValue());
+                }
+                allow = List.copyOf(parsed);
             }
-        } catch (EmptyResultDataAccessException ignored) {
-            // unknown/disabled key — origin check is moot (the registry rejects first); keep open
-        } catch (Exception e) {
-            log.warn("Failed to parse origin_allowlist for a site key: {}", e.getMessage());
+        } catch (EmptyResultDataAccessException missing) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "site_key_invalid");
+        } catch (JsonProcessingException malformed) {
+            throw invalidPolicy();
         }
         allowlistByKey.put(siteKey, allow);
         return allow;
     }
+    private static ResponseStatusException invalidPolicy() {
+        return new ResponseStatusException(HttpStatus.FORBIDDEN, "origin_policy_invalid");
+    }
+
 }

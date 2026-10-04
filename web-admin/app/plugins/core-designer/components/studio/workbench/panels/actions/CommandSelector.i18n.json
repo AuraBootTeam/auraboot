@@ -1,0 +1,22 @@
+{
+  "label": {
+    "zh-CN": "关联命令",
+    "en-US": "Linked command"
+  },
+  "loading": {
+    "zh-CN": "加载中...",
+    "en-US": "Loading..."
+  },
+  "select": {
+    "zh-CN": "选择命令...",
+    "en-US": "Select a command..."
+  },
+  "refresh": {
+    "zh-CN": "刷新命令列表",
+    "en-US": "Refresh command list"
+  },
+  "empty": {
+    "zh-CN": "暂无可用命令",
+    "en-US": "No available commands"
+  }
+}

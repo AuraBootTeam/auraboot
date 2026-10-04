@@ -41,9 +41,7 @@ async function selectCustomer(page: Page, accountId: string, accountName: string
 
   const option = page.locator(`[role="option"][data-value="${accountId}"]`).first();
   if (!(await option.isVisible({ timeout: 1_000 }).catch(() => false))) {
-    const search = page.getByRole('listbox').last().getByRole('textbox', {
-      name: /查询|Search/i,
-    });
+    const search = page.getByTestId('select-search-qo_quote_crm_account_id');
     await expect(search, 'customer reference search').toBeVisible({ timeout: 5_000 });
     await search.fill(accountName);
   }
@@ -61,9 +59,7 @@ async function selectProject(page: Page, projectId: string, projectName: string)
 
   const option = page.locator(`[role="option"][data-value="${projectId}"]`).first();
   if (!(await option.isVisible({ timeout: 1_000 }).catch(() => false))) {
-    const search = page.getByRole('listbox').last().getByRole('textbox', {
-      name: /查询|Search/i,
-    });
+    const search = page.getByTestId('select-search-qo_quote_project_id');
     await expect(search, 'project reference search').toBeVisible({ timeout: 5_000 });
     await search.fill(projectName);
   }

@@ -6,6 +6,7 @@ import com.auraboot.framework.user.dto.UpdateUserProfileRequest;
 import com.auraboot.framework.user.dto.UserProfileResponse;
 import org.mapstruct.Mapper;
 import org.mapstruct.MappingTarget;
+import org.mapstruct.Mapping;
 import org.mapstruct.NullValuePropertyMappingStrategy;
 import org.mapstruct.ReportingPolicy;
 
@@ -35,5 +36,6 @@ public interface UserProfileConverter {
      * @param user 目标用户实体
      * @param request 更新请求DTO
      */
+    @Mapping(target = "email", ignore = true)
     void updateUserFromRequest(@MappingTarget User user, UpdateUserProfileRequest request);
 }

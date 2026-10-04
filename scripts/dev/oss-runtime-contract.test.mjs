@@ -58,7 +58,7 @@ for (const [name, mutate] of [
 });
 
 const reportWith = (tests) => ({ suites: [{ suites: [{ specs: [{ tests }] }] }], errors: [] });
-const passed = { expectedStatus: 'passed', results: [{ status: 'passed' }] };
+const passed = { expectedStatus: 'passed', results: [{ status: 'passed', retry: 0 }] };
 test('structured gate audit counts real results, never collection as execution', () => {
   assert.deepEqual(auditResults(reportWith([passed])).counts, { collected: 1, executed: 1, passed: 1, failed: 0, interrupted: 0, skipped: 0, didNotRun: 0, retried: 0 });
   assert.equal(auditResults(reportWith([passed])).valid, true);
@@ -68,4 +68,8 @@ test('structured gate audit counts real results, never collection as execution',
     { ...reportWith([passed]), errors: [{ message: 'worker crashed' }] }]) {
     assert.equal(auditResults(report).valid, false);
   }
+});
+
+for (const retry of [1, undefined]) test(`a single passed attempt with retry=${retry} cannot satisfy the execution audit`, () => {
+  assert.equal(auditResults(reportWith([{ ...passed, results: [{ status: 'passed', retry }] }])).valid, false);
 });

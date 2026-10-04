@@ -196,7 +196,7 @@ test.describe('AMOS lens freshness + permission journeys', () => {
     // must surface it as STALE (freshness is expressed, never hidden).
     await page.goto('/dashboards/view/amos_inventory_lens', { waitUntil: 'domcontentloaded' });
     await expect(
-      page.getByRole('heading', { name: 'AMOS 库存库龄 · 治理状态' }),
+      page.getByRole('heading', { name: 'AMOS 库存库龄 · 状态镜头' }),
     ).toBeVisible();
     await expect(
       page.getByText('m20_inventory_ageing').first(),
@@ -276,23 +276,29 @@ test.describe('AMOS lens fault/filter/trace journeys', () => {
   const ERROR_PAGES = [
     { code: 'amos_metric_governance', heading: 'AMOS 指标治理' },
     { code: 'amos_data_trust', heading: 'AMOS 数据可信度' },
-    { code: 'amos_inventory_lens', heading: 'AMOS 库存库龄 · 治理状态' },
+    { code: 'amos_inventory_lens', heading: 'AMOS 库存库龄 · 状态镜头' },
   ];
 
   for (const scenario of ERROR_PAGES) {
     test(`query error: ${scenario.code} expresses the failure state`, async ({ page }) => {
       // Fault injection at the transport boundary: the dashboard must render
       // its governed failure state instead of a blank canvas or stale values.
-      await page.route('**/api/meta/chart-data*', (route) => route.fulfill({
-        status: 500,
-        contentType: 'application/json',
-        body: JSON.stringify({ code: '1', message: 'S12 fault injection' }),
-      }));
+      let injectedRequests = 0;
+      await page.route('**/api/meta/chart-data*', (route) => {
+        injectedRequests++;
+        return route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({ code: '1', message: 'S12 fault injection' }),
+        });
+      });
       await page.goto(`/dashboards/view/${scenario.code}`, { waitUntil: 'domcontentloaded' });
       await expect(
         page.getByRole('heading', { name: scenario.heading }),
         `${scenario.code} shell still renders under query failure`,
       ).toBeVisible({ timeout: 20_000 });
+      await expect(page.getByRole('alert').first(), 'the failed query must render an explicit error').toBeVisible();
+      expect(injectedRequests, 'the transport failure must actually be exercised').toBeGreaterThan(0);
       await page.screenshot({ path: `test-results/artifacts/amos-lens-${scenario.code}-query-error.png` });
     });
   }

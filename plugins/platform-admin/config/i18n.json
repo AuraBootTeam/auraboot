@@ -5955,5 +5955,26 @@
     "en-US": "Please fix the highlighted fields before saving",
     "source": "import",
     "refType": "ui"
+  },
+  {
+    "key": "admin.permission.accessDenied.title",
+    "zh-CN": "无权限访问",
+    "en-US": "Access denied",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "admin.permission.accessDenied.message",
+    "zh-CN": "当前账号无权查看角色与权限，请联系管理员。",
+    "en-US": "Your account cannot view roles and permissions. Contact an administrator.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "admin.permission.loadFailed",
+    "zh-CN": "角色加载失败，请稍后重试。",
+    "en-US": "Roles could not be loaded. Please try again later.",
+    "source": "import",
+    "refType": "ui"
   }
 ]

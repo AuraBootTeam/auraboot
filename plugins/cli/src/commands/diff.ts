@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { log } from '../utils/logger.js';
-import { loadPlugin, countResources } from '../utils/plugin-loader.js';
+import { loadPlugin } from '../utils/plugin-loader.js';
 
 interface DiffOptions {
   target: string;
@@ -117,18 +117,14 @@ async function fetchRemoteResources(
   path: string,
   headers: Record<string, string>,
 ): Promise<RemoteResource[]> {
-  try {
-    const resp = await fetch(`${target}${path}?size=1000`, { headers });
-    if (!resp.ok) return [];
-    const json = await resp.json() as any;
-    // Handle paginated responses (data.records or data)
-    const data = json.data;
-    if (Array.isArray(data)) return data;
-    if (data?.records && Array.isArray(data.records)) return data.records;
-    return [];
-  } catch {
-    return [];
-  }
+  const resp = await fetch(`${target}${path}?size=1000`, { headers });
+  if (!resp.ok) throw new Error(`Failed to fetch remote resources (${resp.status}): ${path}`);
+  const json = await resp.json() as any;
+  // A failed or malformed response is not an empty remote collection.
+  const data = json.data;
+  if (Array.isArray(data)) return data;
+  if (data?.records && Array.isArray(data.records)) return data.records;
+  throw new Error(`Invalid remote resource response: ${path}`);
 }
 
 function compareResources(

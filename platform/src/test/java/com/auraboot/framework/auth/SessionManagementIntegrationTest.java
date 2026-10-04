@@ -1,6 +1,10 @@
 package com.auraboot.framework.auth;
 
 import com.auraboot.framework.auth.entity.UserSession;
+import com.auraboot.framework.auth.constant.ExecutionScope;
+import com.auraboot.framework.auth.constant.SessionStage;
+import com.auraboot.framework.auth.dto.CustomUserDetails;
+import com.auraboot.framework.auth.dto.SessionTokenContext;
 import com.auraboot.framework.auth.service.SessionManagementService;
 import com.auraboot.framework.auth.util.JwtUtil;
 import com.auraboot.framework.integration.BaseIntegrationTest;
@@ -191,6 +195,39 @@ class SessionManagementIntegrationTest extends BaseIntegrationTest {
         // Second call within 5 minutes should be silently throttled (no exception)
         assertDoesNotThrow(() -> sessionManagementService.updateLastActive(throttleToken),
                 "Second updateLastActive within throttle window should not throw");
+    }
+
+    @Test
+    @Order(8)
+    @DisplayName("impersonation session persists fixed expiry and dual identity")
+    void impersonationSessionPersistsFixedExpiryAndDualIdentity() {
+        var target = getTestUser();
+        int securityVersion = target.getSecurityVersion() == null ? 0 : target.getSecurityVersion();
+        CustomUserDetails principal = new CustomUserDetails(
+                target.getUserName(), target.getPassword(), target.getId(), target.getPid(),
+                List.of(), true, true, true, true);
+        SessionTokenContext context = new SessionTokenContext(
+                getTestTenant().getId(), getTestTenantMember().getId(), null, null,
+                ExecutionScope.TENANT, null, null, SessionStage.READY, 1,
+                securityVersion, true, target.getId(), "web");
+        String sessionPid = "imp-" + testRunId;
+        String token = jwtUtil.generateImpersonationToken(
+                principal, target.getPid(), context, sessionPid, 1800);
+
+        UserSession created = sessionManagementService.createImpersonationSession(
+                target.getId(), token, "offline", "Integration test", "IT-1",
+                "127.0.0.1", "IntegrationTest/1.0");
+        UserSession persisted = sessionManagementService.findByToken(token);
+
+        assertNotNull(created.getId());
+        assertNotNull(persisted);
+        assertEquals("impersonation", persisted.getSessionKind());
+        assertEquals(target.getId(), persisted.getInitiatedByUserId());
+        assertEquals("offline", persisted.getImpersonationAuthorizationMethod());
+        assertEquals("Integration test", persisted.getImpersonationReason());
+        assertEquals("IT-1", persisted.getImpersonationReference());
+        assertEquals("web", persisted.getClientType());
+        assertTrue(persisted.getImpersonationExpiresAt().isAfter(java.time.Instant.now()));
     }
 
     private String newSessionToken(String suffix) {

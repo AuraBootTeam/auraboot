@@ -24,8 +24,8 @@ dependencies {
     implementation 'com.aliyun.oss:aliyun-sdk-oss:3.18.5'
 
     // Lombok
-    compileOnly 'org.projectlombok:lombok:1.18.46'
-    annotationProcessor 'org.projectlombok:lombok:1.18.46'
+    compileOnly 'org.projectlombok:lombok:1.18.48'
+    annotationProcessor 'org.projectlombok:lombok:1.18.48'
 
     // Spring Boot (conditional annotations, lifecycle interfaces)
     compileOnly 'org.springframework.boot:spring-boot-autoconfigure:3.5.16'
@@ -33,7 +33,7 @@ dependencies {
     compileOnly 'org.springframework:spring-context:6.2.19'
 
     // SLF4J for @Slf4j
-    compileOnly 'org.slf4j:slf4j-api:2.0.18'
+    compileOnly 'org.slf4j:slf4j-api:2.0.20'
 
     // Test — platform classes and Spring needed at test runtime too
     testImplementation(project(':')) {
@@ -43,8 +43,8 @@ dependencies {
 
     testImplementation 'org.junit.jupiter:junit-jupiter:5.14.4'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.14.4'
-    testImplementation 'org.mockito:mockito-core:5.23.0'
-    testImplementation 'org.mockito:mockito-junit-jupiter:5.23.0'
+    testImplementation 'org.mockito:mockito-core:5.24.0'
+    testImplementation 'org.mockito:mockito-junit-jupiter:5.24.0'
 }
 
 compileJava {

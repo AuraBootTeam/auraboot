@@ -41,7 +41,12 @@ export function mergeCatalogReports(catalog, reports) {
   if (!merged.catalogAudit.collected || mismatches.length) {
     merged.errors.push({ message: 'Full catalog execution identities do not match collection' });
   }
-  return { report: merged, ...auditResults(merged) };
+  const execution = auditResults(merged);
+  merged.stats.expected = execution.counts.passed;
+  merged.stats.unexpected = execution.counts.failed + execution.counts.interrupted + execution.counts.didNotRun;
+  merged.stats.skipped = execution.counts.skipped;
+  merged.stats.flaky = execution.counts.retried;
+  return { report: merged, ...execution };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

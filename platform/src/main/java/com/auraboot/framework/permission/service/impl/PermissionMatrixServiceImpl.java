@@ -2,6 +2,11 @@ package com.auraboot.framework.permission.service.impl;
 
 import com.auraboot.framework.permission.dto.*;
 import com.auraboot.framework.permission.entity.RoleDataScope;
+import com.auraboot.framework.permission.entity.Permission;
+import com.auraboot.framework.permission.mapper.PermissionMapper;
+import com.auraboot.framework.exception.RootUnCheckedException;
+
+import static com.auraboot.framework.common.constant.ResponseCode.BadParam;
 import com.auraboot.framework.permission.service.DataScopeService;
 import com.auraboot.framework.permission.service.PermissionMatrixService;
 import com.auraboot.framework.permission.service.PermissionPolicyService;
@@ -32,6 +37,7 @@ import java.util.stream.Collectors;
 public class PermissionMatrixServiceImpl implements PermissionMatrixService {
 
     private final PermissionService permissionService;
+    private final PermissionMapper permissionMapper;
     private final RolePermissionService rolePermissionService;
     private final DataScopeService dataScopeService;
     private final PermissionPolicyService policyService;
@@ -44,6 +50,15 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
     private static final List<String> STANDARD_ACTION_ORDER = List.of(
         "read", "create", "update", "delete", "import", "export"
     );
+
+    @Override
+    public Long findPermissionIdByPid(String permissionPid) {
+        List<Permission> permissions = permissionMapper.findByPids(List.of(permissionPid));
+        if (permissions.isEmpty()) {
+            throw new RootUnCheckedException(BadParam, "Permission not found by PID: " + permissionPid);
+        }
+        return permissions.get(0).getId();
+    }
 
     @Override
     public PermissionMatrixDTO getMatrix(Long tenantId) {

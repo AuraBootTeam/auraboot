@@ -35,6 +35,9 @@ test('product release-image gate is CI-only, Docker-only and evidence-backed', (
   assert.match(productImageGate, /uname -s.*Linux/);
   assert.match(productImageGate, /uname -m.*x86_64/);
   assert.match(productImageGate, /AURA_OCI_BUILDER must be docker/);
+  assert.match(productImageGate, /SPRING_PROFILES_ACTIVE=community/);
+  assert.doesNotMatch(productImageGate, /--aura\.persistence\.tenant-bypass-table-prefixes=\S+/,
+    'production image verification must retain tenant isolation without table-family bypasses');
   assert.match(productImageGate, /docker load --input/);
   assert.match(productImageGate, /ci\/isolated-release-network\.sh/);
   assert.match(productImageGate, /create_isolated_release_network "\$NETWORK" "\$ARTIFACTS\/network-allocation\.tsv"/);

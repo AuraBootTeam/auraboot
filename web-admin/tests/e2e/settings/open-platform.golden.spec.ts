@@ -53,6 +53,7 @@ async function authenticate(page: import('@playwright/test').Page) {
     { name: 'locale', value: 'zh-CN', url: WEB_BASE_URL, sameSite: 'Lax' },
   ]);
   await page.addInitScript(() => localStorage.setItem('locale', 'zh-CN'));
+
 }
 
 async function capture(page: import('@playwright/test').Page, id: string, fullPage = true) {
@@ -114,6 +115,8 @@ test.describe('Open Platform golden journey', () => {
     await openAccountMenu(page);
     const menuEntry = page.getByTestId('open-platform-link');
     await expect(menuEntry).toBeVisible();
+    await expect(page.getByTestId('user-dropdown')).toContainText('退出登录');
+    await expect(page.getByTestId('user-dropdown')).not.toContainText('user.logout');
     await capture(page, 'OP-OPS-01');
     await menuEntry.click();
     await expect(page.getByTestId('open-platform-page')).toBeVisible();
@@ -625,7 +628,7 @@ test.describe('Open Platform golden journey', () => {
     const webhookHealth = operations.getByTestId('open-platform-webhook-health');
     await expect(eventCatalog).toContainText('inventory.stock-in.confirmed');
     await expect(eventCatalog).toContainText('事件目录');
-    await expect(eventCatalog).toContainText('兼容版本');
+    await expect(eventCatalog).toContainText('支持 v1');
     await expect(webhookHealth).toContainText('Webhook 兼容性与签名');
     await expect(webhookHealth.locator('[data-rotation-status="healthy"]')).toHaveCount(2);
     await expect(webhookHealth.locator('[data-rotation-status="due"]')).toHaveCount(1);
@@ -968,8 +971,9 @@ test.describe('Open Platform golden journey', () => {
     await dismissToasts(page);
     await capture(page, 'OP-UI-02');
 
-    // A context-injected Referer overrides noreferrer and Chromium blocks the
-    // popup. Let the browser apply the real navigation policy for this action.
+    // APIRequestContext needs the project's synthetic same-origin Referer for writes.
+    // Chromium rejects that forced header on the real noreferrer popup; browser
+    // navigation must use its native referrer policy, as an ordinary user does.
     await context.setExtraHTTPHeaders({});
     const popupPromise = context.waitForEvent('page');
     await page.getByRole('button', { name: /API 参考/ }).click();
@@ -978,6 +982,7 @@ test.describe('Open Platform golden journey', () => {
     await expect(apiReference).toHaveURL(
       `${WEB_BASE_URL}/swagger-ui/index.html?urls.primaryName=open-platform`,
     );
+    expect(new URL(apiReference.url()).origin).toBe(new URL(WEB_BASE_URL).origin);
     await expect(apiReference.locator('.opblock').first()).toBeVisible({ timeout: 30_000 });
     await expect(apiReference.locator('body')).not.toContainText(
       /Whitelabel Error Page|404 Not Found|Loading page configuration/,
@@ -1046,7 +1051,13 @@ test.describe('Open Platform golden journey', () => {
     }
     await capture(page, 'OP-OPS-16-top', false);
     await expect(operations).toContainText('open-platform-golden-whoami');
-    await operations.scrollIntoViewIfNeeded();
+    const mobileAudit = operations.getByTestId('open-platform-call-audit');
+    await mobileAudit.scrollIntoViewIfNeeded();
+    await expect(mobileAudit.locator('code').first()).toBeInViewport();
+    // Settle the resized scroll container before capturing its painted content.
+    await page.evaluate(() => new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    }));
     await capture(page, 'OP-OPS-16', false);
     await eventCatalog.scrollIntoViewIfNeeded();
     await captureLocator(eventCatalog, 'OP-PROTO-10');

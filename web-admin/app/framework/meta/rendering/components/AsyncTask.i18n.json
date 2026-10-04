@@ -1,0 +1,102 @@
+{
+  "backgroundTask": {
+    "zh-CN": "后台任务",
+    "en-US": "Background task"
+  },
+  "completed": {
+    "zh-CN": "{task}已完成",
+    "en-US": "{task} completed"
+  },
+  "running": {
+    "zh-CN": "{task}进行中…",
+    "en-US": "{task} in progress…"
+  },
+  "close": {
+    "zh-CN": "关闭",
+    "en-US": "Close"
+  },
+  "background": {
+    "zh-CN": "后台运行",
+    "en-US": "Run in background"
+  },
+  "failureRow": {
+    "zh-CN": "第{row}行 — {reason}",
+    "en-US": "Row {row} — {reason}"
+  },
+  "collapseFailures": {
+    "zh-CN": "收起失败明细",
+    "en-US": "Hide failure details"
+  },
+  "showFailures": {
+    "zh-CN": "查看失败明细 ({count})",
+    "en-US": "Show failure details ({count})"
+  },
+  "copy": {
+    "zh-CN": "复制",
+    "en-US": "Copy"
+  },
+  "total": {
+    "zh-CN": "总计",
+    "en-US": "Total"
+  },
+  "processed": {
+    "zh-CN": "已处理",
+    "en-US": "Processed"
+  },
+  "success": {
+    "zh-CN": "成功",
+    "en-US": "Succeeded"
+  },
+  "failed": {
+    "zh-CN": "失败",
+    "en-US": "Failed"
+  },
+  "skipped": {
+    "zh-CN": "跳过",
+    "en-US": "Skipped"
+  },
+  "noRows": {
+    "zh-CN": "未导入任何数据",
+    "en-US": "No rows imported"
+  },
+  "totalRows": {
+    "zh-CN": "总行数",
+    "en-US": "Total rows"
+  },
+  "successMessage": {
+    "zh-CN": "任务已成功完成。",
+    "en-US": "Task completed successfully."
+  },
+  "failureMessage": {
+    "zh-CN": "任务执行失败",
+    "en-US": "Task failed"
+  },
+  "unknownError": {
+    "zh-CN": "未知错误",
+    "en-US": "Unknown error"
+  },
+  "cancelled": {
+    "zh-CN": "任务已取消",
+    "en-US": "Task cancelled"
+  },
+  "cancelledMessage": {
+    "zh-CN": "任务未继续执行，未完成的步骤不会再处理。",
+    "en-US": "The task stopped. Unfinished steps will not be processed."
+  },
+  "yes": {
+    "zh-CN": "是",
+    "en-US": "Yes"
+  },
+  "no": {
+    "zh-CN": "否",
+    "en-US": "No"
+  },
+  "taskFailed": {
+    "zh-CN": "{task}执行失败",
+    "en-US": "{task} failed"
+  },
+  "taskCancelled": {
+    "zh-CN": "{task}已取消",
+    "en-US": "{task} cancelled"
+  }
+}

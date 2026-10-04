@@ -4,7 +4,7 @@ import { ShortcutsWidget } from '../ShortcutsWidget';
 
 const { listFavoritesMock, rootLoaderData, translateMock } = vi.hoisted(() => ({
   listFavoritesMock: vi.fn(),
-  translateMock: (key: string) => key,
+  translateMock: (key: string, _params?: Record<string, unknown>, fallback?: string) => fallback ?? key,
   rootLoaderData: {
     value: {
       menus: [
@@ -82,6 +82,14 @@ describe('ShortcutsWidget — redesign', () => {
       expect.arrayContaining([expect.stringContaining('客户'), expect.stringContaining('报价单')]),
     );
     expect(rows).toHaveLength(2);
+  });
+
+  it('uses the menu name when its translation key has no resource', async () => {
+    Object.assign(rootLoaderData.value.menus[0], { nameKey: 'menu.cls_menu' });
+    const { findAllByTestId } = render(<ShortcutsWidget />);
+    const rows = await findAllByTestId('shortcut-row');
+    expect(rows[0].textContent).toContain('客户');
+    expect(rows[0].textContent).not.toContain('menu.cls_menu');
   });
 
   it('filters favorite shortcuts that are hidden by menu focus', async () => {
@@ -171,6 +179,6 @@ describe('ShortcutsWidget — redesign', () => {
       expect.stringContaining('报价单'),
       expect.stringContaining('客户'),
     ]);
-    expect(await findByText('workbench.shortcuts.edit')).not.toBeNull();
+    expect(await findByText('编辑')).not.toBeNull();
   });
 });

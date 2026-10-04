@@ -63,14 +63,15 @@ class AsyncTaskServiceImplCoverageIT {
         request.setTaskType("lease-fixture");
         request.setTaskName("execution lease integration");
         AsyncTaskDTO submitted = asyncTaskService.submitTask(request, TENANT_ID, USER_ID);
-        org.awaitility.Awaitility.await().atMost(java.time.Duration.ofSeconds(10)).untilAsserted(() -> {
+        MetaContext.Snapshot identity = MetaContext.snapshot();
+        org.awaitility.Awaitility.await().atMost(java.time.Duration.ofSeconds(10)).untilAsserted(() -> MetaContext.runWithSnapshot(identity, () -> {
             AsyncTask task = asyncTaskMapper.findByTaskCode(submitted.getTaskCode());
             assertEquals(AsyncTask.STATUS_COMPLETED, task.getStatus());
             assertEquals(100, task.getProgress());
             assertEquals(42, task.getResultData().get("value").asInt());
             org.junit.jupiter.api.Assertions.assertNull(task.getExecutionToken());
             org.junit.jupiter.api.Assertions.assertNull(task.getLeaseUntil());
-        });
+        }));
     }
 
     private static final long TENANT_ID = 991_000_001L;

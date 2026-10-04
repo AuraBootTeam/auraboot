@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Self-contained Linux CI runner for the complete Gradle `test` task. Some
-# historical tests still use the fixed skills-c2 PostgreSQL/Redis ports, while
+# historical tests use a native PostgreSQL/Redis/Kafka stack, while
 # newer smoke tests use Testcontainers. Provision both paths and retain the
 # dedicated Compose project after returning for owner evidence inspection.
 
@@ -12,6 +12,9 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 ARTIFACTS="${AURA_REGRESSION_ARTIFACTS:-$PROJECT_ROOT/.workspace/oss-backend-unit-ci}"
 RUNTIME_TOKEN="$(printf '%s' "${AURA_REGRESSION_SLOT:-local}-$$" | tr -cd '[:alnum:]-')"
 COMPOSE_PROJECT="aura-ci-oss-backend-$RUNTIME_TOKEN"
+export AURA_CI_JOB_ID="${AURA_CI_JOB_ID:-oss-backend-$RUNTIME_TOKEN}"
+export AURA_OSS_CI_NETWORK="${COMPOSE_PROJECT}_default"
+NETWORK_CREATED=false
 
 free_port() {
   local candidate="$1" limit="$2"
@@ -39,14 +42,9 @@ if [[ -z "${AURA_OSS_CI_KAFKA_PORT:-}" ]]; then
     || { printf '[oss-backend-unit-ci] environment-invalid: no free Kafka CI port\n' >&2; exit 2; }
 fi
 export AURA_OSS_CI_POSTGRES_PORT AURA_OSS_CI_REDIS_PORT AURA_OSS_CI_KAFKA_PORT
-export AURA_OSS_CI_POSTGRES_CONTAINER="auraboot-oss-ci-postgres-$RUNTIME_TOKEN"
-export AURA_OSS_CI_REDIS_CONTAINER="auraboot-oss-ci-redis-$RUNTIME_TOKEN"
 COMPOSE_ARGS=(
-  -f "$PROJECT_ROOT/docker-compose.yml"
-  -f "$PROJECT_ROOT/docker-compose.skills-c2.override.yml"
   -f "$PROJECT_ROOT/docker-compose.oss-backend-ci.override.yml"
   -p "$COMPOSE_PROJECT"
-  --profile skills-c2-stack
 )
 FLYWAY_IMAGE='flyway/flyway:12.8.1@sha256:b8a2d72926b98234c1fb8f45659fd23d8a001af9ee7f450326aa46af14d447bb'
 
@@ -57,29 +55,75 @@ environment_invalid() {
   exit 2
 }
 
+create_isolated_network() {
+  local subnet_index subnet
+  # Avoid retained Docker networks and host routes; Docker arbitrates races.
+  for subnet_index in $(seq 0 255); do
+    subnet="$(node "$SCRIPT_DIR/lib/oss-ci-subnet.mjs")" \
+      || environment_invalid 'no free isolated CI network without overlapping retained networks or host routes'
+    [[ -n "$subnet" ]] || environment_invalid 'CI subnet allocator returned no subnet'
+    if docker network create --subnet "$subnet" \
+        --label "aura.ci.compose-project=$COMPOSE_PROJECT" "$AURA_OSS_CI_NETWORK" \
+        > "$ARTIFACTS/network-create.log" 2>&1; then
+      NETWORK_CREATED=true
+      printf '%s\n' "$subnet" > "$ARTIFACTS/compose-subnet.txt"
+      printf '[oss-backend-unit-ci] isolated network created: name=%s subnet=%s\n' \
+        "$AURA_OSS_CI_NETWORK" "$subnet"
+      return 0
+    fi
+    if ! grep -q 'Pool overlaps' "$ARTIFACTS/network-create.log"; then
+      environment_invalid 'isolated network creation failed; inspect network-create.log'
+    fi
+  done
+  environment_invalid 'no free isolated CI network after bounded allocation attempts'
+}
+
 cleanup() {
-  status=$?
+  local status=$? network_status=not-created stop_status=stopped
+  trap - EXIT HUP INT TERM
+  if ! python3 "$SCRIPT_DIR/cleanup-ci-gradle.py" --job-id "$AURA_CI_JOB_ID" \
+      --source-root "$PROJECT_ROOT" --report "$ARTIFACTS/gradle-process-cleanup.json"; then
+    printf '[oss-backend-unit-ci] environment-invalid: owned Gradle cleanup incomplete\n' >&2
+    [[ "$status" -ne 0 ]] || status=2
+  fi
   docker compose "${COMPOSE_ARGS[@]}" ps --all > "$ARTIFACTS/compose-ps.txt" 2>&1 || true
   docker compose "${COMPOSE_ARGS[@]}" logs --no-color > "$ARTIFACTS/compose.log" 2>&1 || true
-  docker compose "${COMPOSE_ARGS[@]}" stop >/dev/null 2>&1 || true
+  docker compose "${COMPOSE_ARGS[@]}" stop > "$ARTIFACTS/compose-stop.log" 2>&1 || stop_status=stop-failed
   # Retain containers and volumes for evidence, but release the finite Docker
   # address-pool allocation. Stopped containers can be reattached by Compose if
   # an owner later restarts this exact retained project.
-  while IFS= read -r container_id; do
-    [[ -n "$container_id" ]] || continue
-    docker network disconnect -f "${COMPOSE_PROJECT}_default" "$container_id" >/dev/null 2>&1 || true
-  done < <(docker compose "${COMPOSE_ARGS[@]}" ps -aq 2>/dev/null || true)
-  docker network rm "${COMPOSE_PROJECT}_default" >/dev/null 2>&1 || true
-  printf '[oss-backend-unit-ci] runtime retained and stopped; network released: compose_project=%s artifacts=%s\n' \
-    "$COMPOSE_PROJECT" "$ARTIFACTS"
+  if [[ "$NETWORK_CREATED" == true ]]; then
+    while IFS= read -r container_id; do
+      [[ -n "$container_id" ]] || continue
+      docker network disconnect -f "${COMPOSE_PROJECT}_default" "$container_id" >/dev/null 2>&1 || true
+    done < <(docker compose "${COMPOSE_ARGS[@]}" ps -aq 2>/dev/null || true)
+    if docker network rm "${COMPOSE_PROJECT}_default" > "$ARTIFACTS/network-release.log" 2>&1; then
+      network_status=released
+    else
+      network_status=release-failed
+    fi
+  fi
+  printf '[oss-backend-unit-ci] runtime retained: stop_status=%s network_status=%s compose_project=%s artifacts=%s\n' \
+    "$stop_status" "$network_status" "$COMPOSE_PROJECT" "$ARTIFACTS"
   exit "$status"
 }
-trap cleanup EXIT HUP INT TERM
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
+command -v python3 >/dev/null 2>&1 || environment_invalid 'Python 3 is unavailable'
 command -v docker >/dev/null 2>&1 || environment_invalid 'docker is unavailable'
 command -v timeout >/dev/null 2>&1 || environment_invalid 'timeout is unavailable'
 docker compose version >/dev/null 2>&1 || environment_invalid 'docker compose v2 is unavailable'
 docker info >/dev/null 2>&1 || environment_invalid 'Docker daemon is unavailable to the CI account'
+AURA_OSS_CI_SUBNET="$(node "$SCRIPT_DIR/lib/oss-ci-subnet.mjs")" \
+  || environment_invalid 'cannot allocate a private subnet without overlapping retained networks or host routes'
+[[ -n "$AURA_OSS_CI_SUBNET" ]] || environment_invalid 'CI subnet allocator returned no subnet'
+export AURA_OSS_CI_SUBNET
+printf '%s\n' "$AURA_OSS_CI_SUBNET" > "$ARTIFACTS/compose-subnet.txt"
+docker compose "${COMPOSE_ARGS[@]}" config --quiet \
+  || environment_invalid 'submitted PostgreSQL/Redis/Kafka Compose inputs are invalid'
 
 # Pre-pull every image referenced by this test denominator. A pull failure is a
 # machine/network precondition failure, not a product regression.
@@ -123,8 +167,10 @@ if ! PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT=120000 \
   environment_invalid 'cannot install lockfile-pinned Playwright Chromium within 10 minutes'
 fi
 
+create_isolated_network
+
 if ! docker compose "${COMPOSE_ARGS[@]}" up -d --wait postgres redis kafka; then
-  environment_invalid 'skills-c2 PostgreSQL/Redis/Kafka stack did not become healthy'
+  environment_invalid 'CI PostgreSQL/Redis/Kafka stack did not become healthy'
 fi
 
 # The PostgreSQL image reports healthy while its temporary init server may still
@@ -143,11 +189,10 @@ while (( SECONDS < postgres_init_deadline )); do
   sleep 2
 done
 if [[ "$postgres_initialized" != true ]]; then
-  environment_invalid 'skills-c2 PostgreSQL did not finish schema initialization within 5 minutes'
+  environment_invalid 'CI PostgreSQL did not finish schema initialization within 5 minutes'
 fi
 
 FLYWAY_ARGS=(
-  -url=jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/aura_boot
   -user=auraboot
   -password=auraboot_dev
   -locations=filesystem:/flyway/sql
@@ -157,9 +202,10 @@ FLYWAY_ARGS=(
   -cleanDisabled=true
 )
 run_flyway() {
+  local target_database="${2:-aura_boot}"
   docker run --rm --network host \
     -v "$PROJECT_ROOT/platform/src/main/resources/db/migration/core:/flyway/sql:ro" \
-    "$FLYWAY_IMAGE" "${FLYWAY_ARGS[@]}" "$1"
+    "$FLYWAY_IMAGE" "-url=jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/$target_database" "${FLYWAY_ARGS[@]}" "$1"
 }
 
 if ! run_flyway migrate > "$ARTIFACTS/flyway-migrate.log" 2>&1; then
@@ -168,6 +214,18 @@ if ! run_flyway migrate > "$ARTIFACTS/flyway-migrate.log" 2>&1; then
 fi
 if ! run_flyway validate > "$ARTIFACTS/flyway-validate.log" 2>&1; then
   printf '[oss-backend-unit-ci] product-failure: Flyway validate failed\n' >&2
+  exit 1
+fi
+
+# Bootstrap never resets shared-suite fixtures or bypasses immutable binding guards.
+BOOTSTRAP_DATABASE="aura_boot_bootstrap_${RUNTIME_TOKEN//-/_}"
+if ! docker compose "${COMPOSE_ARGS[@]}" exec -T postgres \
+  createdb -U auraboot "$BOOTSTRAP_DATABASE" > "$ARTIFACTS/bootstrap-database-create.log" 2>&1; then
+  environment_invalid 'cannot create isolated bootstrap database'
+fi
+if ! run_flyway migrate "$BOOTSTRAP_DATABASE" > "$ARTIFACTS/bootstrap-flyway-migrate.log" 2>&1 \
+  || ! run_flyway validate "$BOOTSTRAP_DATABASE" > "$ARTIFACTS/bootstrap-flyway-validate.log" 2>&1; then
+  printf '[oss-backend-unit-ci] product-failure: bootstrap database migration failed\n' >&2
   exit 1
 fi
 
@@ -203,13 +261,17 @@ if [[ "${AURA_CI_INCLUDE_DASHSCOPE_LIVE:-0}" != "1" ]]; then
     '[oss-backend-unit-ci] DashScope live checks disabled; set AURA_CI_INCLUDE_DASHSCOPE_LIVE=1 to opt in'
 fi
 
-TEST_DATABASE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/aura_boot?charSet=UTF8" \
+run_backend_gradle() {
+  local database="$1"
+  shift
+TEST_DATABASE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/${database}?charSet=UTF8" \
+BOOTSTRAP_TEST_DATABASE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/${BOOTSTRAP_DATABASE}?charSet=UTF8" \
 TEST_DATABASE_USERNAME='auraboot' \
 TEST_DATABASE_PASSWORD='auraboot_dev' \
-DATABASE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/aura_boot?charSet=UTF8" \
+DATABASE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/${database}?charSet=UTF8" \
 DATABASE_USERNAME='auraboot' \
 DATABASE_PASSWORD='auraboot_dev' \
-SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/aura_boot?charSet=UTF8" \
+SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/${database}?charSet=UTF8" \
 SPRING_DATASOURCE_USERNAME='auraboot' \
 SPRING_DATASOURCE_PASSWORD='auraboot_dev' \
 SPRING_DATA_REDIS_HOST='127.0.0.1' \
@@ -218,15 +280,34 @@ SPRING_DATA_REDIS_URL="redis://127.0.0.1:$AURA_OSS_CI_REDIS_PORT" \
 SPRING_KAFKA_BOOTSTRAP_SERVERS="127.0.0.1:$AURA_OSS_CI_KAFKA_PORT" \
 AURA_CI_REQUIRE_KAFKA='1' \
 AURA_CI_KAFKA_BOOTSTRAP_SERVERS="127.0.0.1:$AURA_OSS_CI_KAFKA_PORT" \
-platform/gradlew -p platform --continue cleanTest test bootstrapBillingAccountTest
+MAVEN_REPO_LOCAL="$ARTIFACTS/m2" \
+GRADLE_OPTS="-Dmaven.repo.local=$ARTIFACTS/m2 ${GRADLE_OPTS:-}" \
+platform/gradlew --no-daemon -p platform "$@"
+}
 
-# The test task remains the sole gate authority.  Allure is an additional
-# evidence format: copy results only after Gradle finishes and never mask its
-# exit status when report generation or copying fails.
-gradle_status=$?
+run_backend_gradle aura_boot --continue cleanTest test
+root_test_status=$?
+printf '%s\n' "$root_test_status" > "$ARTIFACTS/root-test-exit-code.txt"
+printf '%s\n' "$BOOTSTRAP_DATABASE" > "$ARTIFACTS/bootstrap-database.txt"
+AURA_BOOTSTRAP_ISOLATED_DATABASE=1 \
+run_backend_gradle aura_boot --continue bootstrapBillingAccountTest
+bootstrap_test_status=$?
+printf '%s\n' "$bootstrap_test_status" > "$ARTIFACTS/bootstrap-test-exit-code.txt"
+gradle_status=$root_test_status
+if (( gradle_status == 0 )); then gradle_status=$bootstrap_test_status; fi
+
+# Both task exit codes decide the gate; report copying cannot mask a failure.
 if [[ -n "${AURA_ALLURE_RESULTS:-}" && -d "$PROJECT_ROOT/platform/build/allure-results" ]]; then
   mkdir -p "$AURA_ALLURE_RESULTS"
   cp -a "$PROJECT_ROOT/platform/build/allure-results/." "$AURA_ALLURE_RESULTS/" || \
     printf '[oss-backend-unit-ci] warning: unable to copy Allure results\n' >&2
 fi
+# Preserve the original test status while retaining both tasks' JUnit evidence.
+mkdir -p "$ARTIFACTS/junit"
+for task in test bootstrapBillingAccountTest; do
+  if [[ -d "$PROJECT_ROOT/platform/build/test-results/$task" ]]; then
+    cp -a "$PROJECT_ROOT/platform/build/test-results/$task" "$ARTIFACTS/junit/" || \
+      printf '[oss-backend-unit-ci] warning: unable to copy %s JUnit results\n' "$task" >&2
+  fi
+done
 exit "$gradle_status"

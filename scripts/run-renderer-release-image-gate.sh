@@ -109,7 +109,7 @@ json.dump(receipt, open(path, "w"), indent=1, sort_keys=True)
 PY
 }
 
-for image in eclipse-temurin:25-jre node:22-bookworm-slim pgvector/pgvector:pg16 "$FLYWAY_IMAGE"; do
+for image in eclipse-temurin:25-jre node:26-bookworm-slim pgvector/pgvector:pg16 "$FLYWAY_IMAGE"; do
   prefetch_pull "$image"
 done
 

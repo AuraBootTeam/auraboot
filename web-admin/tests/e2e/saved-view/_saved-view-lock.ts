@@ -29,6 +29,8 @@ import { join } from 'path';
 
 const LOCK_PATH = join(tmpdir(), 'aura-e2et-order-savedview.lock');
 const ACQUIRE_TIMEOUT_MS = 25 * 60 * 1000;
+// Coordination has its own budget; callers keep the normal test/action deadlines.
+export const SAVED_VIEW_LOCK_HOOK_TIMEOUT_MS = ACQUIRE_TIMEOUT_MS + 1000;
 const HARD_STALE_MS = 30 * 60 * 1000;
 
 function pidAlive(pid: number): boolean {

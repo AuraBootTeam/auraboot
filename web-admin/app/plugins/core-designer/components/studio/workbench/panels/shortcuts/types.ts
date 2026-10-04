@@ -1,3 +1,5 @@
+import type { LocalizedText } from '~/utils/i18n';
+
 /**
  * Shortcut Panel Types
  *
@@ -24,9 +26,9 @@ export interface ShortcutDefinition {
   /** Unique ID */
   id: string;
   /** Display label */
-  label: string;
+  label: string | LocalizedText;
   /** Description */
-  description?: string;
+  description?: string | LocalizedText;
   /** Key combination */
   keys: ShortcutKey[];
   /** Category */
@@ -62,7 +64,7 @@ export interface CategoryInfo {
   /** Category ID */
   id: ShortcutCategory;
   /** Display name */
-  name: string;
+  name: string | LocalizedText;
   /** Icon path */
   icon: string;
   /** Order for display */

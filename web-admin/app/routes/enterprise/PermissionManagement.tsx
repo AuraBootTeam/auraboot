@@ -13,6 +13,9 @@ import {
 import { useI18n } from '~/contexts/I18nContext';
 import { useToastContext } from '~/contexts/ToastContext';
 import { fetchResult } from '~/shared/services/http-client';
+import { usePermissions } from '~/contexts/AuthContext';
+import { PermissionGuard, RouteAccessDenied } from '~/ui/PermissionGuard';
+import { ResultHelper, ERROR_CODES } from '~/utils/type';
 import { useFormSubmit } from '~/hooks/useFormSubmit';
 import { LoadingSpinner } from '~/ui/LoadingSpinner';
 import ConfirmDialog from '~/ui/ConfirmDialog';
@@ -48,6 +51,28 @@ const TYPE_BADGE: Record<string, string> = {
 // ---------------------------------------------------------------------------
 
 export default function PermissionManagement() {
+  const { hasPermission } = usePermissions();
+  if (!hasPermission('org.role.read')) {
+    return <RoleAccessDenied />;
+  }
+  return <PermissionManagementContent />;
+}
+
+function RoleAccessDenied() {
+  const { t } = useI18n();
+  return (
+    <RouteAccessDenied
+      title={t('admin.permission.accessDenied.title', undefined, 'Access denied')}
+      message={t(
+        'admin.permission.accessDenied.message',
+        undefined,
+        'Your account cannot view roles and permissions. Contact an administrator.',
+      )}
+    />
+  );
+}
+
+function PermissionManagementContent() {
   const { t } = useI18n();
   const { showSuccessToast, showErrorToast } = useToastContext();
   const { handleSubmitResult } = useFormSubmit();
@@ -58,6 +83,7 @@ export default function PermissionManagement() {
   // Role list state
   const [roles, setRoles] = useState<Role[]>([]);
   const [rolesLoading, setRolesLoading] = useState(false);
+  const [rolesError, setRolesError] = useState<'denied' | 'failed' | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRolePid, setSelectedRolePid] = useState<string | null>(null);
 
@@ -80,20 +106,24 @@ export default function PermissionManagement() {
 
   const fetchRoles = useCallback(async () => {
     setRolesLoading(true);
+    setRolesError(null);
     try {
       const result = await fetchResult<{ records: Role[] }>('/api/roles?pageSize=100', {
         method: 'get',
       });
-      handleSubmitResult(result, {
-        onSuccess: (data) => {
-          setRoles(data.records || []);
-        },
-        showToast: false,
-      });
+      if (ResultHelper.isSuccess(result)) {
+        setRoles(result.data?.records || []);
+      } else {
+        setRoles([]);
+        setRolesError(String(result.code) === ERROR_CODES.FORBIDDEN ? 'denied' : 'failed');
+      }
+    } catch {
+      setRoles([]);
+      setRolesError('failed');
     } finally {
       setRolesLoading(false);
     }
-  }, [handleSubmitResult]);
+  }, []);
 
   useEffect(() => {
     fetchRoles();
@@ -108,9 +138,7 @@ export default function PermissionManagement() {
   const filteredRoles = useMemo(() => {
     const q = searchQuery.toLowerCase();
     const matched = searchQuery
-      ? roles.filter(
-          (r) => r.name.toLowerCase().includes(q) || r.code.toLowerCase().includes(q),
-        )
+      ? roles.filter((r) => r.name.toLowerCase().includes(q) || r.code.toLowerCase().includes(q))
       : roles;
     return sortRolesForPermissionSetup(matched);
   }, [roles, searchQuery]);
@@ -158,7 +186,7 @@ export default function PermissionManagement() {
         setEditingRole(null);
         fetchRoles();
       },
-      onError: (error) => showErrorToast(error || 'Failed'),
+      onError: (result) => showErrorToast(result.message || 'Failed'),
       showToast: false,
     });
   };
@@ -177,7 +205,7 @@ export default function PermissionManagement() {
         setConfirmDelete({ open: false, role: null });
         fetchRoles();
       },
-      onError: (error) => showErrorToast(error || 'Delete failed'),
+      onError: (result) => showErrorToast(result.message || 'Delete failed'),
       showToast: false,
     });
   };
@@ -206,7 +234,7 @@ export default function PermissionManagement() {
           prev.map((r) => (r.pid === role.pid ? { ...r, status: nextStatus } : r)),
         );
       },
-      onError: (error) => showErrorToast(error || 'Toggle failed'),
+      onError: (result) => showErrorToast(result.message || 'Toggle failed'),
       showToast: false,
     });
   };
@@ -232,27 +260,32 @@ export default function PermissionManagement() {
                 className="w-full rounded-md border border-gray-300 py-1.5 pr-3 pl-8 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
               />
             </div>
-            <button
-              data-testid="role-create-btn"
-              onClick={() => {
-                setEditingRole(null);
-                setShowRoleForm(true);
-              }}
-              className="flex-shrink-0 rounded-md bg-blue-600 p-1.5 text-white hover:bg-blue-700"
-              title={t('admin.permission.role.create') || 'Create Role'}
-            >
-              <PlusIcon className="h-4 w-4" />
-            </button>
+            <PermissionGuard permission="org.role.update">
+              <button
+                data-testid="role-create-btn"
+                onClick={() => {
+                  setEditingRole(null);
+                  setShowRoleForm(true);
+                }}
+                className="flex-shrink-0 rounded-md bg-blue-600 p-1.5 text-white hover:bg-blue-700"
+                title={t('admin.permission.role.create') || 'Create Role'}
+              >
+                <PlusIcon className="h-4 w-4" />
+              </button>
+            </PermissionGuard>
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto">
           {recommendedRoleCount > 0 && !searchQuery && (
-            <div className="border-b border-gray-100 px-3 py-2 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400">
+            <div
+              className="border-b border-gray-100 px-3 py-2 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400"
+              data-i18n-ui-copy="role-guidance"
+            >
               {t(
                 'admin.permission.role.recommendedHint',
                 undefined,
-                '建议岗位: 管理员 tenant_admin；销售/采购 bom_operator + qo_quoter；工程 bom_operator',
+                '按业务职责分配角色；管理员角色仅授予需要管理权限的人员。',
               )}
             </div>
           )}
@@ -270,9 +303,9 @@ export default function PermissionManagement() {
             <table data-testid="role-table" className="w-full table-fixed">
               <thead className="sr-only">
                 <tr>
-                  <th>Role</th>
-                  <th>Type</th>
-                  <th>Actions</th>
+                  <th>{t('permission.role')}</th>
+                  <th>{t('permission.type')}</th>
+                  <th>{t('common.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -317,27 +350,40 @@ export default function PermissionManagement() {
                           )}
                         </div>
                         {role.description && (
-                          <div className="mt-0.5 truncate text-xs text-gray-500">
-                            {role.description}
+                          <div
+                            className="mt-0.5 truncate text-xs text-gray-500"
+                            data-i18n-ui-copy={
+                              t(
+                                `role.${role.code}._meta.description`,
+                                undefined,
+                                role.description,
+                              ) !== role.description
+                                ? 'role-description'
+                                : undefined
+                            }
+                          >
+                            {t(`role.${role.code}._meta.description`, undefined, role.description)}
                           </div>
                         )}
                       </td>
                       <td className="w-20 px-2 py-2 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                          <button
-                            data-testid={`role-action-edit-${role.code}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingRole(role);
-                              setShowRoleForm(true);
-                            }}
-                            className="rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
-                            title={t('common.edit') || 'Edit'}
-                          >
-                            <PencilIcon className="h-3.5 w-3.5" />
-                          </button>
+                          <PermissionGuard permission="org.role.update">
+                            <button
+                              data-testid={`role-action-edit-${role.code}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingRole(role);
+                                setShowRoleForm(true);
+                              }}
+                              className="rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+                              title={t('common.edit') || 'Edit'}
+                            >
+                              <PencilIcon className="h-3.5 w-3.5" />
+                            </button>
+                          </PermissionGuard>
                           {!role.isSystem && (
-                            <>
+                            <PermissionGuard permission="org.role.update">
                               <button
                                 data-testid={`role-action-toggle-${role.code}`}
                                 onClick={(e) => {
@@ -345,7 +391,7 @@ export default function PermissionManagement() {
                                   handleToggleRole(role);
                                 }}
                                 className="rounded p-1 text-gray-400 hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-900/20"
-                                title={isDisabled ? 'Enable' : 'Disable'}
+                                title={t(isDisabled ? 'action.enable' : 'action.disable')}
                               >
                                 <PowerIcon className="h-3.5 w-3.5" />
                               </button>
@@ -360,7 +406,7 @@ export default function PermissionManagement() {
                               >
                                 <TrashIcon className="h-3.5 w-3.5" />
                               </button>
-                            </>
+                            </PermissionGuard>
                           )}
                         </div>
                       </td>
@@ -432,7 +478,24 @@ export default function PermissionManagement() {
                 {selectedRole.name}
               </h2>
               {selectedRole.description && (
-                <p className="mt-0.5 text-sm text-gray-500">{selectedRole.description}</p>
+                <p
+                  className="mt-0.5 text-sm text-gray-500"
+                  data-i18n-ui-copy={
+                    t(
+                      `role.${selectedRole.code}._meta.description`,
+                      undefined,
+                      selectedRole.description,
+                    ) !== selectedRole.description
+                      ? 'role-description'
+                      : undefined
+                  }
+                >
+                  {t(
+                    `role.${selectedRole.code}._meta.description`,
+                    undefined,
+                    selectedRole.description,
+                  )}
+                </p>
               )}
             </div>
           )}
@@ -441,7 +504,9 @@ export default function PermissionManagement() {
             (selectedRole ? (
               <CapabilityRoleEditor key={selectedRole.pid} rolePid={selectedRole.pid} />
             ) : (
-              <div className="text-sm text-gray-400">{t('admin.permission.selectRole') || 'Select a role'}</div>
+              <div className="text-sm text-gray-400">
+                {t('admin.permission.selectRole') || 'Select a role'}
+              </div>
             ))}
           {activeRightTab === 'members' && <RoleMemberTab rolePid={selectedRolePid} />}
           {activeRightTab === 'audit' && <PermissionAuditTab />}
@@ -453,6 +518,19 @@ export default function PermissionManagement() {
   // -------------------------------------------------------------------------
   // Render
   // -------------------------------------------------------------------------
+
+  if (rolesError === 'denied') return <RoleAccessDenied />;
+  if (rolesError === 'failed') {
+    return (
+      <div role="alert" className="p-6 text-red-700 dark:text-red-300">
+        {t(
+          'admin.permission.loadFailed',
+          undefined,
+          'Roles could not be loaded. Please try again later.',
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full flex-col" data-testid="permission-page">

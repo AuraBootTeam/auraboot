@@ -48,7 +48,7 @@ class CommandTargetVersionLockPhaseTest {
     }
 
     @Test
-    void locksTheTenantScopedPidAndRetainsTheAuthoritativeVersion() {
+    void locksTheTenantScopedPidExclusivelyAndRetainsTheAuthoritativeVersion() {
         givenPhysicalModel();
         when(dynamicDataMapper.selectTargetVersionForUpdate("dq_quote_request", "pid", 41L, "REQ-1"))
                 .thenReturn(List.of(Map.of("row_version", 7L)));
@@ -58,6 +58,7 @@ class CommandTargetVersionLockPhaseTest {
 
         assertThat(ctx.getTargetRecordVersion()).isEqualTo(7L);
         verify(dynamicDataMapper).selectTargetVersionForUpdate("dq_quote_request", "pid", 41L, "REQ-1");
+        verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
     }
 
     @Test

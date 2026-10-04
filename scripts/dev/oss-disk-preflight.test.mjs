@@ -21,5 +21,5 @@ test('gate checks disk before slot lookup or runtime mutation', () => {
   const check = source.indexOf('node "$SCRIPT_DIR/dev/oss-disk-preflight.mjs"');
   assert.ok(check > 0);
   assert.ok(check < source.indexOf('registered_slot="'));
-  assert.ok(check < source.indexOf('STACK_ATTEMPTED=1'));
+  assert.ok(check < source.indexOf('"$GS" up "$NAME"'));
 });

@@ -4129,8 +4129,17 @@ CREATE TABLE public.ab_audit_trail (
     changed_fields text[],
     metadata jsonb,
     previous_hash character varying(64),
-    record_hash character varying(64) NOT NULL
+    record_hash character varying(64) NOT NULL,
+    hash_version integer DEFAULT 1 NOT NULL,
+    CONSTRAINT ck_audit_trail_hash_version CHECK ((hash_version = ANY (ARRAY[1, 2])))
 );
+
+
+--
+-- Name: COLUMN ab_audit_trail.hash_version; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_audit_trail.hash_version IS 'Hash format: 1 legacy JSON text, 2 canonical JSON and persisted timestamp precision';
 
 
 --
@@ -16941,7 +16950,16 @@ CREATE TABLE public.ab_user_session (
     party_membership_id bigint,
     session_stage character varying(30) DEFAULT 'onboarding'::character varying NOT NULL,
     context_version bigint DEFAULT 1 NOT NULL,
+    session_kind character varying(24) DEFAULT 'user'::character varying NOT NULL,
+    initiated_by_user_id bigint,
+    impersonation_expires_at timestamp with time zone,
+    impersonation_authorization_method character varying(24),
+    impersonation_reason character varying(500),
+    impersonation_reference character varying(200),
+    client_type character varying(24),
     CONSTRAINT ck_user_session_execution_scope CHECK (((execution_scope IS NULL) OR ((execution_scope)::text = ANY ((ARRAY['party'::character varying, 'tenant'::character varying, 'platform'::character varying, 'system'::character varying])::text[])))),
+    CONSTRAINT ck_user_session_impersonation_metadata CHECK ((((session_kind)::text <> 'impersonation'::text) OR ((initiated_by_user_id IS NOT NULL) AND (impersonation_expires_at IS NOT NULL) AND (impersonation_authorization_method IS NOT NULL) AND (impersonation_reason IS NOT NULL) AND (client_type IS NOT NULL)))),
+    CONSTRAINT ck_user_session_kind CHECK (((session_kind)::text = ANY ((ARRAY['user'::character varying, 'impersonation'::character varying])::text[]))),
     CONSTRAINT ck_user_session_stage CHECK (((session_stage)::text = ANY ((ARRAY['onboarding'::character varying, 'actor_selection'::character varying, 'ready'::character varying, 'platform'::character varying, 'tenant_admin'::character varying])::text[])))
 );
 
@@ -29127,6 +29145,13 @@ CREATE INDEX idx_user_session_context ON public.ab_user_session USING btree (ten
 
 
 --
+-- Name: idx_user_session_impersonation_operator; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_user_session_impersonation_operator ON public.ab_user_session USING btree (tenant_id, initiated_by_user_id, revoked, impersonation_expires_at) WHERE ((session_kind)::text = 'impersonation'::text);
+
+
+--
 -- Name: idx_user_session_token_unique; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -29992,6 +30017,13 @@ CREATE UNIQUE INDEX uq_tenant_login_channel ON public.ab_tenant_login_channel US
 --
 
 CREATE UNIQUE INDEX uq_tenant_pref_tenant_key ON public.ab_tenant_preference USING btree (tenant_id, preference_key);
+
+
+--
+-- Name: uq_user_email_normalized_active; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_user_email_normalized_active ON public.ab_user USING btree (lower(btrim((email)::text))) WHERE ((deleted_flag = false) AND (email IS NOT NULL) AND (btrim((email)::text) <> ''::text));
 
 
 --
@@ -31628,6 +31660,14 @@ ALTER TABLE ONLY public.ab_user_session
 
 ALTER TABLE ONLY public.ab_user_session
     ADD CONSTRAINT fk_user_session_application FOREIGN KEY (application_id) REFERENCES public.ab_login_application(id);
+
+
+--
+-- Name: ab_user_session fk_user_session_initiated_by; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_user_session
+    ADD CONSTRAINT fk_user_session_initiated_by FOREIGN KEY (initiated_by_user_id) REFERENCES public.ab_user(id);
 
 
 --

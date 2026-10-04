@@ -25,7 +25,7 @@ status=0
 # covered, which is the failure this whole gate exists to prevent. Both directions
 # are pinned in the unit test, so run it before the gates that read its output.
 echo "───── gen-coverage-manifest (unit)"
-if ! node --test scripts/gen-coverage-manifest.test.mjs; then
+if ! node --test scripts/gen-coverage-manifest.test.mjs scripts/oss-backend-nightly-coverage.test.mjs; then
   status=1
 fi
 echo

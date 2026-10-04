@@ -605,6 +605,33 @@ class PageSchemaValidatorTest {
     }
 
     @Test
+    void linkageRulesRemainFirstClassAfterJsonImport() throws Exception {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        ObjectMapper mapper = new ObjectMapper();
+        PageSchemaDTO imported = mapper.readValue("""
+                {
+                  "pageKey": "pe_order_form",
+                  "kind": "form",
+                  "schemaVersion": 4,
+                  "modelCode": "pe_order",
+                  "layout": {"type": "stack"},
+                  "blocks": [{
+                    "id": "order_section",
+                    "blockType": "form-section",
+                    "fields": [{"field": "pe_order_no", "required": true}]
+                  }],
+                  "linkageRules": [{
+                    "id": "clear-number",
+                    "trigger": {"fieldCode": "pe_order_no", "event": "change"},
+                    "actions": [{"type": "setValue", "target": "pe_order_no", "value": "null"}]
+                  }]
+                }
+                """, PageSchemaDTO.class);
+        manifest.setPages(List.of(imported));
+        assertNoError(validate(manifest), "S-PAGE-UNKNOWN-FIELDS");
+    }
+
+    @Test
     void recordSourceTopLevelFieldDoesNotProduceUnknownFieldsError() {
         // Regression guard: a form page that declares a top-level "recordSource" object
         // must NOT be rejected with S-PAGE-UNKNOWN-FIELDS.  Before this fix the field

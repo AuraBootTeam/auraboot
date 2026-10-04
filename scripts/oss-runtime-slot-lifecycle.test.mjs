@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { registerFixtureWorkspace } from './gates/fixtures/workspace-control.mjs';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
@@ -16,9 +17,10 @@ test('a misspelled explicit scope fails before allocating any runtime', () => {
     writeFileSync(join(fixture, 'dev.sh'), '#!/bin/bash\n');
     writeFileSync(join(fixture, 'aura'), '#!/bin/bash\nprintf called >> "$AURA_FIXTURE_CALLS"\nexit 99\n');
     chmodSync(join(fixture, 'aura'), 0o755);
+    registerFixtureWorkspace(fixture, join(fixture, 'product'));
     const result = spawnSync('/bin/bash', [gatePath, '--scope', 'tests/e2e/admin/admin-cross-tenant-grants.spec.ts'], {
       encoding: 'utf8', env: { ...process.env, AURA_WORKSPACE_ROOT: fixture,
-        AURA_WORKSPACE_STATE_DIR: fixture, AURA_FIXTURE_CALLS: calls },
+        AURA_WORKSPACE_STATE_DIR: fixture, AURA_FIXTURE_CALLS: calls, PATH: `${fixture}:${process.env.PATH}` },
     });
     assert.equal(result.status, 2, result.stderr);
     assert.match(result.stderr, /requested test path does not exist/);
@@ -31,7 +33,7 @@ for (const scenario of ['passed', 'skip-setup', 'skip-route']) {
     const fixture = mkdtempSync(join(tmpdir(), 'oss-warm-contract-'));
     try {
       mkdirSync(join(fixture, 'web-admin', 'tests', 'storage'), { recursive: true });
-      mkdirSync(join(fixture, 'state'));
+      mkdirSync(join(fixture, 'state', 'logs'), { recursive: true });
       writeFileSync(join(fixture, 'state', 'ports'), '6473 5173 6173');
       writeFileSync(join(fixture, 'pnpm'), `#!/usr/bin/env node
 const fs=require('fs'),path=require('path');
@@ -39,7 +41,7 @@ const args=process.argv.slice(2),project=args.find(a=>a.startsWith('--project=')
 fs.appendFileSync(path.join(process.env.FIXTURE_ROOT,'calls.jsonl'),JSON.stringify({project,profile:process.env.PW_PROFILE,args})+'\\n');
 const skip=(process.env.SCENARIO==='skip-setup'&&project==='setup')||(process.env.SCENARIO==='skip-route'&&project==='chromium');
 const file=process.env.PLAYWRIGHT_JSON_OUTPUT_FILE;fs.mkdirSync(path.dirname(file),{recursive:true});
-fs.writeFileSync(file,JSON.stringify({suites:[{specs:[{tests:[{expectedStatus:'passed',results:[{status:skip?'skipped':'passed'}]}]}]}],errors:[]}));
+fs.writeFileSync(file,JSON.stringify({suites:[{specs:[{tests:[{expectedStatus:'passed',results:[{status:skip?'skipped':'passed',retry:0}]}]}]}],errors:[]}));
 if(project==='auth')fs.writeFileSync('tests/storage/admin.json',JSON.stringify({cookies:[{name:'__session',value:'fixture-cookie'}]}));
 `);
       chmodSync(join(fixture, 'pnpm'), 0o755);
@@ -93,6 +95,7 @@ if [[ "$1" == */oss-disk-preflight.mjs ]]; then exit 0; fi
 exec '${process.execPath}' "$@"
 `);
     for (const file of ['aura', 'lsof', 'node']) chmodSync(join(fixture, file), 0o755);
+    registerFixtureWorkspace(fixture, join(fixture, 'product'));
     const result = spawnSync('/bin/bash', [gatePath, '--name', 'capacity-fixture', '--slot', '249', ...(keep ? ['--keep'] : [])], { encoding: 'utf8',
       env: { ...process.env, TMPDIR: fixture, PATH: `${fixture}:${process.env.PATH}`, AURA_FIXTURE_CALLS: calls,
         AURA_WORKSPACE_ROOT: fixture, AURA_WORKSPACE_STATE_DIR: join(fixture, 'state') } });
@@ -120,6 +123,7 @@ test('public stack env routes screenshots, downloads and seed logs to managed ev
     chmodSync(join(fixture, 'aura'), 0o755);
     writeFileSync(join(state, 'golden', 'sample', 'ports'), '6473 5173 6173\n');
     writeFileSync(join(state, 'env', 'sample.env'), `AURA_EVIDENCE_ROOT=${evidence}\n`);
+    registerFixtureWorkspace(fixture, join(fixture, 'product'));
     const result = spawnSync('/bin/bash', [stackPath, 'env', 'sample'], { encoding: 'utf8',
       env: { ...process.env, AURA_WORKSPACE_ROOT: fixture, AURA_WORKSPACE_STATE_DIR: state } });
     assert.equal(result.status, 0, result.stderr);
@@ -136,8 +140,8 @@ test('default Bash handles empty source arrays and preserves incomplete-operatio
   const fixture = mkdtempSync(join(tmpdir(), 'oss-bash-contract-'));
   try {
     const prefix = `set -euo pipefail\nREPO_ROOT="$1"\nTMPDIR="$1"\n${lockFunctions}\nacquire_stack_lock\n`;
-    const arrayLoop = source.slice(source.indexOf('  local source_args='), source.indexOf('  "$DEV" runtime migrate'));
-    const normal = spawnSync('/bin/bash', ['-c', `${prefix}\ndeclare -a extra_plugin_roots=() product_migration_roots=()\nWORKSPACE="$1"\nfreeze_sources() {\n${arrayLoop}\n}\nfreeze_sources\nprintf 'freeze-reached'\nSTACK_OPERATION_COMPLETE=1`, 'fixture', fixture], { encoding: 'utf8' });
+    const arrayLoop = source.slice(source.indexOf('  local runtime_source_args='), source.indexOf('  local server_port vite_port bff_port pg_db redis_db pg_host pg_port pg_user pg_pass', source.indexOf('  local runtime_source_args=')));
+    const normal = spawnSync('/bin/bash', ['-c', `${prefix}\ndeclare -a extra_plugin_roots=() product_migration_roots=()\nWORKSPACE="$1"\nname=sample\ngolden_runtime_bind_sources() { :; }\nfreeze_sources() {\n${arrayLoop}\n}\nfreeze_sources\nprintf 'freeze-reached'\nSTACK_OPERATION_COMPLETE=1`, 'fixture', fixture], { encoding: 'utf8' });
     assert.equal(normal.status, 0, normal.stderr);
     assert.equal(normal.stdout, 'freeze-reached');
     const red = spawnSync('/bin/bash', ['-c', `${prefix}\nprintf '%s' "$MISSING_REQUIRED_VALUE"`, 'fixture', fixture], { encoding: 'utf8' });
@@ -147,13 +151,24 @@ test('default Bash handles empty source arrays and preserves incomplete-operatio
   } finally { rmSync(fixture, { recursive: true, force: true }); }
 });
 
-test('fresh OSS gate preserves existing allocations and retains exit evidence', () => {
+test('golden stack rejects invalid or missing system mode before runtime allocation', () => {
+  for (const value of ['invalid', 'single;echo unsafe', null]) {
+    const args = [stackPath, 'up', 'invalid-bootstrap-mode-test', '--slot', '239', '--system-mode'];
+    if (value !== null) args.push(value);
+    const result = spawnSync('bash', args, { encoding: 'utf8' });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /--system-mode (must be|requires)/);
+    assert.doesNotMatch(result.stdout, /allocate runtime|ensure infra/);
+  }
+});
+
+test('fresh OSS gate refuses an existing runtime instead of destroying evidence', () => {
   const source = readFileSync(gatePath, 'utf8');
-  assert.match(source, /already exists; choose a new verification name/u);
-  assert.doesNotMatch(source, /"\$GS" destroy|--fresh-db/u);
-  assert.match(source, /"\$GS" down "\$NAME"/u);
-  assert.match(source, /"\$DEV" runtime close "\$NAME"/u);
-  assert.match(source, /--require-empty-db/u);
+  assert.match(source, /registered_slot_for_name\(\)/u);
+  assert.match(source, /\[\[ -z "\$registered_slot" \]\] \|\| die_env/u);
+  assert.doesNotMatch(source, /"\$GS" destroy|"\$GS" down/u);
+  assert.match(source, /--require-new-db/u);
+  assert.ok(source.indexOf('registered_slot="$(registered_slot_for_name)"') < source.indexOf('"$GS" up "$NAME"'));
 });
 
 test('OSS gate resolves the workspace in local and sibling-repository CI layouts', () => {
@@ -161,9 +176,10 @@ test('OSS gate resolves the workspace in local and sibling-repository CI layouts
   const stack = readFileSync(stackPath, 'utf8');
   assert.match(source, /AURA_WORKSPACE_ROOT/u);
   assert.match(source, /AURA_CI_WORKSPACE_ROOT/u);
-  assert.match(source, /auraboot-workspace\/dev\.sh/u);
+  assert.match(source, /auraboot-workspace\/aura/u);
   assert.match(stack, /AURA_CI_WORKSPACE_ROOT/u);
   assert.match(stack, /auraboot-workspace\/dev\.sh/u);
+  assert.match(stack, /aura_bind_workspace_control/u);
   assert.match(source, /ENVIRONMENT-INVALID:[^]*exit 2/u);
 });
 
@@ -171,8 +187,8 @@ test('golden stack uses idempotent runtime identity with source worktree metadat
   const source = readFileSync(stackPath, 'utf8');
   assert.match(source, /runtime ensure auraboot "\$name"/u);
   assert.match(source, /--source-root "\$REPO_ROOT"/u);
-  assert.match(source, /runtime allocate auraboot "\$name"/u);
-  assert.match(source, /legacy dispatcher/u);
+  assert.match(source, /runtime evidence begin/u);
+  assert.doesNotMatch(source, /runtime allocate auraboot/u);
   assert.match(source, /--mode "\$runtime_mode"/u);
 });
 
@@ -181,6 +197,7 @@ test('fresh gate marks its runtime as verification evidence rather than feature 
   const stack = readFileSync(stackPath, 'utf8');
   assert.match(source, /--runtime-mode verification/u);
   assert.match(source, /PLAYWRIGHT_JSON_OUTPUT_FILE="\$AURA_EVIDENCE_ROOT/u);
+  assert.match(source, /LOG="\$AURA_EVIDENCE_ROOT\/logs\/oss-e2e-gate-/u);
   assert.match(stack, /export PW_ARTIFACT_DIR=\$evidence_root/u);
 });
 

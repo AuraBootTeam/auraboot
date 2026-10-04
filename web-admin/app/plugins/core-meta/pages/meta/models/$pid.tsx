@@ -1,3 +1,7 @@
+import { getPublishText, buildPermissionReplayContext, buildSlaNodeReplayContext, buildWorkflowReplayContext } from './modelPublishSampleContext';
+import { getPolicyHeading, getMigrationPlanMessage, getHistoricalPolicyMessage } from './modelPublishPolicyMessages';
+import { useI18n } from '~/contexts/I18nContext';
+import { ModelPublishReplayResultCard } from './ModelPublishReplayResultCard';
 /**
  * Model详情页面
  *
@@ -23,7 +27,6 @@ import {
 import {
   modelService,
   type ModelPublishReplayReport,
-  type ModelPublishReplayResult,
   type PublishPreview,
   type RelatedPage,
 } from '~/shared/services/modelService';
@@ -136,323 +139,9 @@ function getRelatedPageTitle(page: RelatedPage | null | undefined): string {
   );
 }
 
-function getReplayStatusLabel(status?: string): string {
-  const labels: Record<string, string> = {
-    EXECUTED: '已执行',
-    READY: '可自动执行',
-    MANUAL_REQUIRED: '需人工复核',
-    NEEDS_SAMPLE_CONTEXT: '需样本',
-    AUTOMATION_UNAVAILABLE: '自动化不可用',
-    PERMISSION_UNAVAILABLE: '权限服务不可用',
-    WORKFLOW_UNAVAILABLE: '工作流服务不可用',
-    FAILED: '失败',
-  };
-  return labels[status || ''] || status || '待复核';
-}
-
-function getReplayStatusClass(status?: string): string {
-  if (status === 'EXECUTED') return 'bg-emerald-50 text-emerald-700';
-  if (status === 'READY') return 'bg-blue-50 text-blue-700';
-  if (status === 'MANUAL_REQUIRED' || status === 'NEEDS_SAMPLE_CONTEXT') {
-    return 'bg-amber-50 text-amber-700';
-  }
-  if (
-    status === 'FAILED' ||
-    status === 'AUTOMATION_UNAVAILABLE' ||
-    status === 'PERMISSION_UNAVAILABLE' ||
-    status === 'WORKFLOW_UNAVAILABLE'
-  ) {
-    return 'bg-red-50 text-red-700';
-  }
-  return 'bg-gray-100 text-gray-700';
-}
-
-function getReplayResultMessage(result: ModelPublishReplayResult): string | null {
-  const consumerType = result.step?.consumerType;
-  if (consumerType === 'PERMISSION_POLICY' && result.status === 'NEEDS_SAMPLE_CONTEXT') {
-    return '补充成员 ID 和记录样本后，可执行权限策略复核。';
-  }
-  if (consumerType === 'PERMISSION_POLICY' && result.status === 'READY') {
-    return '可使用代表性成员和记录数据执行权限策略复核。';
-  }
-  if (consumerType === 'PERMISSION_POLICY' && result.status === 'EXECUTED') {
-    if (result.message?.includes('DENY')) {
-      return '权限策略复核结果：拒绝。';
-    }
-    if (result.message?.includes('ALLOW')) {
-      return '权限策略复核结果：允许。';
-    }
-  }
-  if (consumerType === 'DECISION_VERSION' && result.message?.includes('Decision replay executed')) {
-    if (result.message.includes('MATCHED')) {
-      return '决策版本复核结果：命中。';
-    }
-    if (result.message.includes('NOT_MATCHED')) {
-      return '决策版本复核结果：未命中。';
-    }
-    return '决策版本复核已执行。';
-  }
-  if (consumerType === 'WORKFLOW_PROCESS' && result.status === 'READY') {
-    return '可使用流程实例和业务记录样本执行 工作流规则复核。';
-  }
-  if (consumerType === 'WORKFLOW_PROCESS' && result.status === 'NEEDS_SAMPLE_CONTEXT') {
-    return '补充流程样本和记录数据后，可执行 工作流规则复核。';
-  }
-  if (consumerType === 'WORKFLOW_PROCESS' && result.status === 'WORKFLOW_UNAVAILABLE') {
-    return '当前运行态未启用 工作流回放服务。';
-  }
-  if (consumerType === 'WORKFLOW_PROCESS' && result.status === 'FAILED') {
-    if (result.outputs?.failClosed === true || result.outputs?.fallbackApplied === true) {
-      return '工作流分派规则复核失败：规则执行异常，已失败关闭，未使用静态审批人兜底。';
-    }
-    return '工作流规则复核失败，请检查规则绑定、流程样本和决策版本。';
-  }
-  if (consumerType === 'WORKFLOW_PROCESS' && result.status === 'EXECUTED') {
-    const hasAssignment =
-      Array.isArray(result.outputs?.candidateUserIds) ||
-      Array.isArray(result.outputs?.candidateGroupIds);
-    if (hasAssignment) {
-      return result.matched === false
-        ? '工作流分派规则复核已执行：未命中候选人规则。'
-        : '工作流分派规则复核已执行：已解析候选审批人。';
-    }
-    return result.matched === false ? '工作流规则复核结果：未命中。' : '工作流规则复核结果：命中。';
-  }
-  if (consumerType === 'SLA_RULE' && result.status === 'READY') {
-    return '可使用流程实例、租户和任务样本执行 SLA 节点复核。';
-  }
-  if (consumerType === 'SLA_RULE' && result.status === 'NEEDS_SAMPLE_CONTEXT') {
-    return '补充流程实例、租户和任务样本后，可执行 SLA 节点复核。';
-  }
-  if (
-    consumerType === 'SLA_RULE' &&
-    result.status === 'EXECUTED' &&
-    result.message?.includes('SLA NODE replay')
-  ) {
-    return 'SLA 节点复核已执行。';
-  }
-  if (
-    consumerType === 'SLA_RULE' &&
-    result.status === 'EXECUTED' &&
-    result.message?.includes('SLA RECORD replay')
-  ) {
-    return 'SLA 记录复核已执行。';
-  }
-  if (typeof result.message === 'string' && result.message.includes('sampleContext')) {
-    return '需要补充样本上下文后再复核。';
-  }
-  return result.message || null;
-}
-
 function metadataString(metadata: Record<string, unknown> | undefined, key: string): string {
   const value = metadata?.[key];
   return typeof value === 'string' && value.trim() ? value : '';
-}
-
-function formatReplayOutputLabel(key: string): string {
-  const labels: Record<string, string> = {
-    permissionCode: '权限标识',
-    memberId: '成员 ID',
-    granted: '授权结果',
-    resource: '资源',
-    action: '操作',
-    recordPid: '记录 PID',
-    permissionPolicyPid: '权限策略 PID',
-    roleId: '角色 ID',
-    grantType: '授权类型',
-    status: '状态',
-    truth: '条件结果',
-    matched: '命中结果',
-    reason: '原因',
-    stepCount: '步骤数',
-    steps: '评估步骤',
-    fieldRefs: '字段引用',
-    ruleTraceId: '统一 Trace',
-    traceId: '追踪 ID',
-    deadlineMinutes: '截止分钟数',
-    processPid: '流程 PID',
-    slaConfigPid: 'SLA 配置 PID',
-    processInstanceId: '流程实例',
-    taskId: '任务 ID',
-    processKey: '流程标识',
-    processName: '流程名称',
-    processVersion: '流程版本',
-    processStatus: '流程状态',
-    targetType: '目标类型',
-    targetKey: '目标节点',
-    nodeId: '节点 ID',
-    nodeType: '节点类型',
-    edgeId: '连线 ID',
-    edgeSource: '来源节点',
-    edgeTarget: '目标节点',
-    bindingSurface: '绑定位置',
-    bindingKind: '绑定类型',
-    decisionCode: '决策标识',
-    decisionStatus: '决策状态',
-    conditionResult: '条件结果',
-    fallbackApplied: '已使用兜底',
-    durationMs: '耗时',
-    errorCode: '错误码',
-    inputs: '输入快照',
-    outputs: '输出快照',
-    decisionRefs: '决策引用',
-    candidateUserIds: '候选审批人',
-    candidateGroupIds: '候选审批组',
-    failClosed: '失败关闭',
-    slaRecordPid: 'SLA 记录 PID',
-    slaRecordStatus: 'SLA 状态',
-    actionCount: '动作数',
-    actionPolicyTrigger: '动作触发',
-    deadlineMode: '截止方式',
-    deadlineValue: '截止配置',
-    deadlineTime: '截止时间',
-    startTime: '开始时间',
-    enabled: '启用',
-    modelCode: '模型',
-    affectedFieldRef: '影响字段',
-    fieldRiskLevel: '字段风险',
-    fieldRiskSummary: '风险说明',
-    fieldMasked: '脱敏字段',
-    fieldPermissionChange: '字段权限变更',
-    fieldPermission: '字段权限',
-    requiresLowPermissionSample: '需要低权限样本',
-  };
-  return labels[key] || key;
-}
-
-function shouldShowReplayOutput(key: string): boolean {
-  return key !== 'steps';
-}
-
-function permissionReplayTraceHref(result: ModelPublishReplayResult): string | null {
-  if (result.step?.consumerType !== 'PERMISSION_POLICY') {
-    return null;
-  }
-  const traceId = typeof result.traceId === 'string' ? result.traceId.trim() : '';
-  if (!traceId) {
-    return null;
-  }
-  const params = new URLSearchParams({ traceId, callerType: 'PERMISSION' });
-  const callerRef = typeof result.outputs?.permissionCode === 'string'
-    ? result.outputs.permissionCode
-    : result.step?.sourceCode;
-  if (callerRef) {
-    params.set('callerRef', callerRef);
-  }
-  return `/p/decisionops_execution_logs?${params.toString()}`;
-}
-
-function formatReplayOutputValue(key: string, value: unknown): string {
-  if (value === null || value === undefined) return '-';
-  if (typeof value === 'string') {
-    const normalized = value.toLowerCase();
-    if ((key === 'truth' || key === 'matched') && ['true', 'yes', 'matched'].includes(normalized)) {
-      return '是';
-    }
-    if ((key === 'truth' || key === 'matched') && ['false', 'no', 'not_matched'].includes(normalized)) {
-      return '否';
-    }
-    if (key === 'grantType') {
-      if (normalized === 'grant') return '授权';
-      if (normalized === 'deny') return '拒绝';
-    }
-    if (key === 'status') {
-      if (normalized === 'active') return '启用';
-      if (normalized === 'inactive') return '停用';
-      if (normalized === 'disabled') return '禁用';
-      if (normalized === 'pending') return '处理中';
-    }
-    if (key === 'targetType' && normalized === 'node') return '流程节点';
-    if (key === 'targetType' && normalized === 'record') return '业务记录';
-    if (key === 'nodeType' && normalized === 'usertask') return '审批任务';
-    if (key === 'nodeType' && normalized === 'sequenceflow') return '流程连线';
-    if (key === 'nodeType' && normalized === 'exclusivegateway') return '排他网关';
-    if (key === 'nodeType' && normalized === 'inclusivegateway') return '包容网关';
-    if (key === 'bindingSurface' && normalized === 'node rulebinding') return '节点规则绑定';
-    if (key === 'bindingSurface' && normalized === 'edge conditionspec') return '连线条件';
-    if (key === 'bindingKind' && normalized === 'decision_ref') return '决策引用';
-    if (key === 'bindingKind' && normalized === 'condition') return '条件表达式';
-    if (key === 'decisionStatus') {
-      if (normalized === 'matched') return '命中';
-      if (normalized === 'not_matched') return '未命中';
-      if (normalized === 'unknown') return '未知';
-      if (normalized === 'error') return '错误';
-      if (normalized === 'skipped') return '已跳过';
-    }
-    if (key === 'errorCode' && normalized === 'decision_evaluation_failed') {
-      return '决策执行失败';
-    }
-    if (key === 'conditionResult') {
-      if (normalized === 'true') return '满足';
-      if (normalized === 'false') return '不满足';
-      if (normalized === 'unknown') return '未知';
-    }
-    if (key === 'processStatus') {
-      if (normalized === 'deployed') return '已部署';
-      if (normalized === 'draft') return '草稿';
-      if (normalized === 'suspended') return '已挂起';
-      if (normalized === 'archived') return '已归档';
-    }
-    if (key === 'actionPolicyTrigger' && normalized === 'sla_timeout') return 'SLA 超时';
-    if (key === 'actionPolicyTrigger' && normalized === 'sla_warning') return 'SLA 预警';
-    if (key === 'deadlineMode' && normalized === 'fixed') return '固定时长';
-    if (key === 'deadlineMode' && normalized === 'rule') return '规则计算';
-    if (key === 'slaRecordStatus') {
-      if (normalized === 'running') return '运行中';
-      if (normalized === 'completed') return '已完成';
-      if (normalized === 'breached') return '已超时';
-      if (normalized === 'cancelled' || normalized === 'canceled') return '已取消';
-    }
-    if (key === 'reason') {
-      if (normalized === 'granted') return '已授权';
-      if (normalized === 'denied') return '已拒绝';
-      if (normalized === 'rejected') return '已拒绝';
-      if (normalized.includes('condition guard not satisfied')) return '条件未满足';
-    }
-    if (key === 'fieldRiskLevel') {
-      if (normalized === 'field_permission_change') return '字段权限变更';
-      if (normalized === 'field_masked') return '字段脱敏';
-      if (normalized === 'field_governance_review') return '字段治理复核';
-    }
-    if (key === 'fieldRiskSummary') {
-      if (normalized === 'masked_permission_change') {
-        return '字段已脱敏且权限策略已变化，需使用低权限样本复核';
-      }
-      if (normalized === 'permission_change') {
-        return '字段权限策略已变化，需使用低权限样本复核';
-      }
-      if (normalized === 'masked_field') {
-        return '字段已脱敏，复核报告不会展示原始字段值';
-      }
-    }
-    return value;
-  }
-  if (typeof value === 'boolean') return value ? '是' : '否';
-  if (typeof value === 'number') return String(value);
-  if (Array.isArray(value)) {
-    if (key === 'candidateUserIds' || key === 'candidateGroupIds') {
-      return value.length > 0 ? value.map((item) => String(item)).join('、') : '无';
-    }
-    return `${value.length} 项`;
-  }
-  if (typeof value === 'object') {
-    return '已记录';
-  }
-  return String(value);
-}
-
-function formatReplayError(error: string, result: ModelPublishReplayResult): string {
-  const consumerType = result.step?.consumerType;
-  const normalized = error.toLowerCase();
-  if (consumerType === 'WORKFLOW_PROCESS' && result.outputs?.failClosed === true) {
-    if (normalized === 'workflow_rule_binding_fail_closed') {
-      return '规则绑定已失败关闭，未返回候选审批人或候选审批组';
-    }
-    return '决策执行失败，请检查绑定的决策版本、输入映射和兜底策略';
-  }
-  if (normalized === 'decision_evaluation_failed') return '决策执行失败';
-  if (normalized === 'workflow_rule_binding_fail_closed') return '规则绑定已失败关闭';
-  return error;
 }
 
 function normalizePageKind(page: RelatedPage): StandardPageKind | 'custom' {
@@ -502,6 +191,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
  * Model详情页面组件
  */
 export default function ModelDetailPage() {
+  const { locale } = useI18n();
   const navigate = useNavigate();
   const location = useLocation();
   const { pid } = useParams();
@@ -957,147 +647,39 @@ export default function ModelDetailPage() {
       setShowPublishConfirm(true);
     } catch (error) {
       console.error('Failed to preview DDL:', error);
-      showErrorToast('获取DDL预览失败');
+      showErrorToast(getPublishText('previewFailed', locale));
     } finally {
       setPublishLoading(false);
     }
-  }, [pid, showErrorToast]);
+  }, [pid, showErrorToast, locale]);
 
   /**
    * 生成发布后复核报告。没有代表性样本时只收集可自动化/需人工项，不伪装成已执行。
    */
-  const buildPermissionReplaySampleContext = useCallback(() => {
-    const memberId = publishReplaySampleMemberId.trim();
-    if (!/^\d+$/.test(memberId) || /^0+$/.test(memberId)) {
-      throw new Error('请填写有效的权限成员 ID');
-    }
+  const buildPermissionReplaySampleContext = useCallback(() => buildPermissionReplayContext({
+    memberId: publishReplaySampleMemberId,
+    permissionCode: publishReplaySamplePermissionCode,
+    recordPid: publishReplaySampleRecordPid,
+    recordJson: publishReplaySampleRecordJson,
+  }, locale), [publishReplaySampleMemberId, publishReplaySamplePermissionCode,
+    publishReplaySampleRecordPid, publishReplaySampleRecordJson, locale]);
 
-    let recordData: Record<string, unknown> = {};
-    const rawRecordJson = publishReplaySampleRecordJson.trim();
-    if (rawRecordJson) {
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(rawRecordJson) as unknown;
-      } catch {
-        throw new Error('记录数据必须是有效 JSON 对象');
-      }
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        throw new Error('记录数据必须是 JSON 对象');
-      }
-      recordData = parsed as Record<string, unknown>;
-    }
+  const buildSlaNodeReplaySampleContext = useCallback(() => buildSlaNodeReplayContext({
+    processInstanceId: publishReplaySlaProcessInstanceId,
+    tenantId: publishReplaySlaTenantId,
+    taskId: publishReplaySlaTaskId,
+    processKey: publishReplaySlaProcessKey,
+    recordJson: publishReplaySlaRecordJson,
+  }, locale), [publishReplaySlaProcessInstanceId, publishReplaySlaTenantId,
+    publishReplaySlaTaskId, publishReplaySlaProcessKey, publishReplaySlaRecordJson, locale]);
 
-    const permission: Record<string, unknown> = { memberId };
-    const permissionCode = publishReplaySamplePermissionCode.trim();
-    if (permissionCode) {
-      permission.permissionCode = permissionCode;
-    }
-
-    const record: Record<string, unknown> = { data: recordData };
-    const recordPid = publishReplaySampleRecordPid.trim();
-    if (recordPid) {
-      record.pid = recordPid;
-    }
-
-    return { permission, record };
-  }, [
-    publishReplaySampleMemberId,
-    publishReplaySamplePermissionCode,
-    publishReplaySampleRecordJson,
-    publishReplaySampleRecordPid,
-  ]);
-
-  const buildSlaNodeReplaySampleContext = useCallback(() => {
-    const processInstanceId = publishReplaySlaProcessInstanceId.trim();
-    if (!processInstanceId) {
-      throw new Error('请填写流程实例 ID');
-    }
-
-    const tenantId = publishReplaySlaTenantId.trim();
-    if (!/^\d+$/.test(tenantId) || /^0+$/.test(tenantId)) {
-      throw new Error('请填写有效的租户 ID');
-    }
-
-    let recordData: Record<string, unknown> = {};
-    const rawRecordJson = publishReplaySlaRecordJson.trim();
-    if (rawRecordJson) {
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(rawRecordJson) as unknown;
-      } catch {
-        throw new Error('SLA 记录数据必须是有效 JSON 对象');
-      }
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        throw new Error('SLA 记录数据必须是 JSON 对象');
-      }
-      recordData = parsed as Record<string, unknown>;
-    }
-
-    const workflow: Record<string, unknown> = {
-      processInstanceId,
-      tenantId,
-    };
-    const taskId = publishReplaySlaTaskId.trim();
-    if (taskId) {
-      workflow.taskId = taskId;
-    }
-    const processKey = publishReplaySlaProcessKey.trim();
-    if (processKey) {
-      workflow.processKey = processKey;
-    }
-
-    return { workflow, record: { data: recordData } };
-  }, [
-    publishReplaySlaProcessInstanceId,
-    publishReplaySlaProcessKey,
-    publishReplaySlaRecordJson,
-    publishReplaySlaTaskId,
-    publishReplaySlaTenantId,
-  ]);
-
-  const buildWorkflowReplaySampleContext = useCallback(() => {
-    let recordData: Record<string, unknown> = {};
-    const rawRecordJson = publishReplayWorkflowRecordJson.trim();
-    if (rawRecordJson) {
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(rawRecordJson) as unknown;
-      } catch {
-        throw new Error('工作流记录数据必须是有效 JSON 对象');
-      }
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        throw new Error('工作流记录数据必须是 JSON 对象');
-      }
-      recordData = parsed as Record<string, unknown>;
-    }
-
-    const context: Record<string, Record<string, unknown>> = {
-      record: { data: recordData },
-    };
-    const recordPid = publishReplayWorkflowRecordPid.trim();
-    if (recordPid) {
-      context.record.pid = recordPid;
-    }
-
-    const workflow: Record<string, unknown> = {};
-    const processInstanceId = publishReplayWorkflowProcessInstanceId.trim();
-    if (processInstanceId) {
-      workflow.processInstanceId = processInstanceId;
-    }
-    const processKey = publishReplayWorkflowProcessKey.trim();
-    if (processKey) {
-      workflow.processKey = processKey;
-    }
-    if (Object.keys(workflow).length > 0) {
-      context.workflow = workflow;
-    }
-    return context;
-  }, [
-    publishReplayWorkflowProcessInstanceId,
-    publishReplayWorkflowProcessKey,
-    publishReplayWorkflowRecordJson,
-    publishReplayWorkflowRecordPid,
-  ]);
+  const buildWorkflowReplaySampleContext = useCallback(() => buildWorkflowReplayContext({
+    processInstanceId: publishReplayWorkflowProcessInstanceId,
+    processKey: publishReplayWorkflowProcessKey,
+    recordPid: publishReplayWorkflowRecordPid,
+    recordJson: publishReplayWorkflowRecordJson,
+  }, locale), [publishReplayWorkflowProcessInstanceId, publishReplayWorkflowProcessKey,
+    publishReplayWorkflowRecordPid, publishReplayWorkflowRecordJson, locale]);
 
   const handlePublishReplay = useCallback(async (
     replayMode: 'default' | 'permission' | 'sla-node' | 'workflow' = 'default',
@@ -1110,7 +692,7 @@ export default function ModelDetailPage() {
       try {
         sampleContext = buildPermissionReplaySampleContext();
       } catch (error) {
-        const message = error instanceof Error ? error.message : '权限样本无效';
+        const message = error instanceof Error ? error.message : getPublishText('permissionInvalid', locale);
         setPublishReplaySampleError(message);
         return;
       }
@@ -1118,7 +700,7 @@ export default function ModelDetailPage() {
       try {
         sampleContext = buildSlaNodeReplaySampleContext();
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'SLA 节点样本无效';
+        const message = error instanceof Error ? error.message : getPublishText('slaInvalid', locale);
         setPublishReplaySlaSampleError(message);
         return;
       }
@@ -1126,7 +708,7 @@ export default function ModelDetailPage() {
       try {
         sampleContext = buildWorkflowReplaySampleContext();
       } catch (error) {
-        const message = error instanceof Error ? error.message : '工作流样本无效';
+        const message = error instanceof Error ? error.message : getPublishText('workflowInvalid', locale);
         setPublishReplayWorkflowSampleError(message);
         return;
       }
@@ -1149,7 +731,7 @@ export default function ModelDetailPage() {
       setPublishReplayReport(report);
     } catch (error) {
       console.error('Failed to replay model publish impact:', error);
-      const message = error instanceof Error ? error.message : '生成发布后复核报告失败';
+      const message = error instanceof Error ? error.message : getPublishText('reportFailed', locale);
       if (replayMode === 'sla-node') {
         setPublishReplaySlaSampleError(message);
       } else if (replayMode === 'workflow') {
@@ -1168,6 +750,7 @@ export default function ModelDetailPage() {
     model.code,
     pid,
     showErrorToast,
+    locale,
   ]);
 
   /**
@@ -1182,7 +765,7 @@ export default function ModelDetailPage() {
           ? 'Model publish impact acknowledged in model detail publish dialog'
           : undefined,
       });
-      showSuccessToast('模型发布成功');
+      showSuccessToast(getPublishText('publishSuccess', locale));
       setShowPublishConfirm(false);
       setPublishPreview(null);
       setPublishReplayReport(null);
@@ -1207,11 +790,11 @@ export default function ModelDetailPage() {
       window.location.reload();
     } catch (error) {
       console.error('Failed to publish model:', error);
-      showErrorToast('模型发布失败');
+      showErrorToast(getPublishText('publishFailed', locale));
     } finally {
       setPublishLoading(false);
     }
-  }, [pid, publishImpactAcknowledged, publishPreview, showSuccessToast, showErrorToast]);
+  }, [pid, publishImpactAcknowledged, publishPreview, showSuccessToast, showErrorToast, locale]);
 
   /**
    * 取消发布
@@ -2151,12 +1734,12 @@ export default function ModelDetailPage() {
       {showPublishConfirm && publishPreview && (
         <div
           data-testid="model-publish-dialog"
-          className="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
         >
           <div className="mx-4 flex max-h-[80vh] w-full max-w-2xl flex-col rounded-lg bg-white shadow-xl">
             <div className="border-b border-gray-200 px-6 py-4">
-              <h3 className="text-lg font-semibold text-gray-900">确认发布模型</h3>
-              <p className="mt-1 text-sm text-gray-500">发布前请核对表结构变更和规则中心影响。</p>
+              <h3 className="text-lg font-semibold text-gray-900">{getPublishText('dialogTitle', locale)}</h3>
+              <p className="mt-1 text-sm text-gray-500">{getPublishText('dialogHint', locale)}</p>
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 py-4">
@@ -2171,11 +1754,11 @@ export default function ModelDetailPage() {
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <h4 className="text-sm font-semibold text-gray-900">规则中心影响治理</h4>
+                      <h4 className="text-sm font-semibold text-gray-900">{getPublishText('governanceTitle', locale)}</h4>
                       <p className="mt-1 text-sm text-gray-700">
                         {publishPreview.governance.requiresAcknowledgement
-                          ? '检测到已发布规则资产或消费方引用了本模型字段，发布前必须确认影响面。'
-                          : '未检测到需要阻断发布的规则中心影响。'}
+                          ? getPublishText('impactRequired', locale)
+                          : getPublishText('impactClear', locale)}
                       </p>
                     </div>
                     <span
@@ -2185,7 +1768,7 @@ export default function ModelDetailPage() {
                           : 'bg-emerald-100 text-emerald-700'
                       }`}
                     >
-                      {publishPreview.governance.requiresAcknowledgement ? '需确认' : '可发布'}
+                      {publishPreview.governance.requiresAcknowledgement ? getPublishText('ackRequired', locale) : getPublishText('readyToPublish', locale)}
                     </span>
                   </div>
 
@@ -2212,8 +1795,7 @@ export default function ModelDetailPage() {
                           <div className="flex items-center justify-between gap-3">
                             <span className="font-medium text-gray-900">{impact.fieldRef}</span>
                             <span className="text-xs text-gray-500">
-                              {impact.references?.length || 0} 个引用
-                            </span>
+                              {impact.references?.length || 0} {getPublishText('referenceCount', locale)}</span>
                           </div>
                           {impact.risk?.summary && (
                             <p className="mt-1 text-gray-700">{impact.risk.summary}</p>
@@ -2242,10 +1824,9 @@ export default function ModelDetailPage() {
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <p className="text-xs font-semibold text-gray-600">发布后复核计划</p>
+                          <p className="text-xs font-semibold text-gray-600">{getPublishText('planTitle', locale)}</p>
                           <span className="text-xs text-gray-500">
-                            {publishPreview.governance.replayPlan.length} 个消费方
-                          </span>
+                            {publishPreview.governance.replayPlan.length} {getPublishText('consumerCount', locale)}</span>
                         </div>
                         <button
                           type="button"
@@ -2254,7 +1835,7 @@ export default function ModelDetailPage() {
                           className="rounded border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
                           disabled={publishReplayLoading}
                         >
-                          {publishReplayLoading ? '生成中...' : '生成复核报告'}
+                          {publishReplayLoading ? getPublishText('generating', locale) : getPublishText('generateReport', locale)}
                         </button>
                       </div>
                       <div className="mt-3 space-y-2">
@@ -2264,7 +1845,7 @@ export default function ModelDetailPage() {
                             step.sourceCode ||
                             step.sourcePid ||
                             step.consumerType ||
-                            '未命名消费方';
+                            getPublishText('unnamedConsumer', locale);
                           return (
                             <div
                               key={`${step.consumerType || 'consumer'}-${step.sourcePid || step.sourceCode || index}`}
@@ -2272,12 +1853,11 @@ export default function ModelDetailPage() {
                             >
                               <div className="flex flex-wrap items-center gap-2">
                                 <span className="rounded bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
-                                  {step.consumerLabel || step.consumerType || '规则消费方'}
+                                  {step.consumerLabel || step.consumerType || getPublishText('ruleConsumer', locale)}
                                 </span>
                                 {step.required && (
                                   <span className="rounded bg-red-50 px-2 py-1 text-xs font-medium text-red-700">
-                                    必做
-                                  </span>
+                                    {getPublishText('required', locale)}</span>
                                 )}
                                 <span className="text-sm font-medium text-gray-900">{source}</span>
                                 {step.sourceVersion && (
@@ -2286,9 +1866,9 @@ export default function ModelDetailPage() {
                               </div>
                               {(step.fieldRef || step.targetPath || step.binding) && (
                                 <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-600">
-                                  {step.fieldRef && <span>字段 {step.fieldRef}</span>}
-                                  {step.targetPath && <span>路径 {step.targetPath}</span>}
-                                  {step.binding && <span>绑定 {step.binding}</span>}
+                                  {step.fieldRef && <span>{getPublishText('field', locale)}{' '}{step.fieldRef}</span>}
+                                  {step.targetPath && <span>{getPublishText('path', locale)}{' '}{step.targetPath}</span>}
+                                  {step.binding && <span>{getPublishText('binding', locale)}{' '}{step.binding}</span>}
                                 </div>
                               )}
                               {step.recommendedAction && (
@@ -2305,10 +1885,9 @@ export default function ModelDetailPage() {
                         >
                           <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>
-                              <p className="text-xs font-semibold text-amber-900">权限样本复核</p>
+                              <p className="text-xs font-semibold text-amber-900">{getPublishText('permissionTitle', locale)}</p>
                               <p className="mt-1 text-xs text-amber-800">
-                                用代表性成员和记录数据执行权限策略复核。
-                              </p>
+                                {getPublishText('permissionHint', locale)}</p>
                             </div>
                             <button
                               type="button"
@@ -2317,13 +1896,12 @@ export default function ModelDetailPage() {
                               className="rounded border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
                               disabled={publishReplayLoading}
                             >
-                              {publishReplayLoading ? '执行中...' : '带样本执行'}
+                              {publishReplayLoading ? getPublishText('executing', locale) : getPublishText('executeSample', locale)}
                             </button>
                           </div>
                           <div className="mt-3 grid gap-3 md:grid-cols-2">
                             <label className="block text-xs font-medium text-gray-700">
-                              成员 ID
-                              <input
+                              {getPublishText('memberId', locale)}<input
                                 data-testid="model-publish-permission-member-id"
                                 aria-label="permission-replay-member-id"
                                 type="number"
@@ -2336,8 +1914,7 @@ export default function ModelDetailPage() {
                               />
                             </label>
                             <label className="block text-xs font-medium text-gray-700">
-                              权限标识
-                              <input
+                              {getPublishText('permissionCode', locale)}<input
                                 data-testid="model-publish-permission-code"
                                 aria-label="permission-replay-permission-code"
                                 value={publishReplaySamplePermissionCode}
@@ -2353,8 +1930,7 @@ export default function ModelDetailPage() {
                               />
                             </label>
                             <label className="block text-xs font-medium text-gray-700">
-                              记录 PID
-                              <input
+                              {getPublishText('recordPid', locale)}<input
                                 data-testid="model-publish-permission-record-pid"
                                 aria-label="permission-replay-record-pid"
                                 value={publishReplaySampleRecordPid}
@@ -2365,8 +1941,7 @@ export default function ModelDetailPage() {
                               />
                             </label>
                             <label className="block text-xs font-medium text-gray-700 md:col-span-2">
-                              记录数据 JSON
-                              <textarea
+                              {getPublishText('recordJson', locale)}<textarea
                                 data-testid="model-publish-permission-record-json"
                                 aria-label="permission-replay-record-json"
                                 value={publishReplaySampleRecordJson}
@@ -2395,10 +1970,9 @@ export default function ModelDetailPage() {
                         >
                           <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>
-                              <p className="text-xs font-semibold text-cyan-950">工作流样本复核</p>
+                              <p className="text-xs font-semibold text-cyan-950">{getPublishText('workflowTitle', locale)}</p>
                               <p className="mt-1 text-xs text-cyan-900">
-                                用流程实例和业务记录样本复核网关条件、审批人分派等规则绑定。
-                              </p>
+                                {getPublishText('workflowHint', locale)}</p>
                             </div>
                             <button
                               type="button"
@@ -2407,13 +1981,12 @@ export default function ModelDetailPage() {
                               className="rounded border border-cyan-300 bg-white px-3 py-1.5 text-xs font-medium text-cyan-900 hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-60"
                               disabled={publishReplayLoading}
                             >
-                              {publishReplayLoading ? '执行中...' : '带流程样本执行'}
+                              {publishReplayLoading ? getPublishText('executing', locale) : getPublishText('executeWorkflow', locale)}
                             </button>
                           </div>
                           <div className="mt-3 grid gap-3 md:grid-cols-2">
                             <label className="block text-xs font-medium text-gray-700">
-                              流程实例 ID
-                              <input
+                              {getPublishText('instanceId', locale)}<input
                                 data-testid="model-publish-workflow-process-instance-id"
                                 aria-label="workflow-replay-process-instance-id"
                                 value={publishReplayWorkflowProcessInstanceId}
@@ -2424,8 +1997,7 @@ export default function ModelDetailPage() {
                               />
                             </label>
                             <label className="block text-xs font-medium text-gray-700">
-                              流程标识
-                              <input
+                              {getPublishText('processKey', locale)}<input
                                 data-testid="model-publish-workflow-process-key"
                                 aria-label="workflow-replay-process-key"
                                 value={publishReplayWorkflowProcessKey}
@@ -2439,8 +2011,7 @@ export default function ModelDetailPage() {
                               />
                             </label>
                             <label className="block text-xs font-medium text-gray-700">
-                              记录 PID
-                              <input
+                              {getPublishText('recordPid', locale)}<input
                                 data-testid="model-publish-workflow-record-pid"
                                 aria-label="workflow-replay-record-pid"
                                 value={publishReplayWorkflowRecordPid}
@@ -2449,8 +2020,7 @@ export default function ModelDetailPage() {
                               />
                             </label>
                             <label className="block text-xs font-medium text-gray-700 md:col-span-2">
-                              记录数据 JSON
-                              <textarea
+                              {getPublishText('recordJson', locale)}<textarea
                                 data-testid="model-publish-workflow-record-json"
                                 aria-label="workflow-replay-record-json"
                                 value={publishReplayWorkflowRecordJson}
@@ -2477,10 +2047,9 @@ export default function ModelDetailPage() {
                         >
                           <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>
-                              <p className="text-xs font-semibold text-sky-900">SLA 节点样本复核</p>
+                              <p className="text-xs font-semibold text-sky-900">{getPublishText('slaTitle', locale)}</p>
                               <p className="mt-1 text-xs text-sky-800">
-                                用真实流程实例和任务样本触发节点级 SLA 复核。
-                              </p>
+                                {getPublishText('slaHint', locale)}</p>
                             </div>
                             <button
                               type="button"
@@ -2489,13 +2058,12 @@ export default function ModelDetailPage() {
                               className="rounded border border-sky-300 bg-white px-3 py-1.5 text-xs font-medium text-sky-800 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
                               disabled={publishReplayLoading}
                             >
-                              {publishReplayLoading ? '执行中...' : '带流程样本执行'}
+                              {publishReplayLoading ? getPublishText('executing', locale) : getPublishText('executeWorkflow', locale)}
                             </button>
                           </div>
                           <div className="mt-3 grid gap-3 md:grid-cols-2">
                             <label className="block text-xs font-medium text-gray-700">
-                              流程实例 ID
-                              <input
+                              {getPublishText('instanceId', locale)}<input
                                 data-testid="model-publish-sla-process-instance-id"
                                 aria-label="sla-node-replay-process-instance-id"
                                 value={publishReplaySlaProcessInstanceId}
@@ -2506,8 +2074,7 @@ export default function ModelDetailPage() {
                               />
                             </label>
                             <label className="block text-xs font-medium text-gray-700">
-                              租户 ID
-                              <input
+                              {getPublishText('tenantId', locale)}<input
                                 data-testid="model-publish-sla-tenant-id"
                                 aria-label="sla-node-replay-tenant-id"
                                 type="number"
@@ -2518,8 +2085,7 @@ export default function ModelDetailPage() {
                               />
                             </label>
                             <label className="block text-xs font-medium text-gray-700">
-                              任务 ID
-                              <input
+                              {getPublishText('taskId', locale)}<input
                                 data-testid="model-publish-sla-task-id"
                                 aria-label="sla-node-replay-task-id"
                                 value={publishReplaySlaTaskId}
@@ -2528,8 +2094,7 @@ export default function ModelDetailPage() {
                               />
                             </label>
                             <label className="block text-xs font-medium text-gray-700">
-                              流程标识
-                              <input
+                              {getPublishText('processKey', locale)}<input
                                 data-testid="model-publish-sla-process-key"
                                 aria-label="sla-node-replay-process-key"
                                 value={publishReplaySlaProcessKey}
@@ -2542,8 +2107,7 @@ export default function ModelDetailPage() {
                               />
                             </label>
                             <label className="block text-xs font-medium text-gray-700 md:col-span-2">
-                              记录数据 JSON
-                              <textarea
+                              {getPublishText('recordJson', locale)}<textarea
                                 data-testid="model-publish-sla-record-json"
                                 aria-label="sla-node-replay-record-json"
                                 value={publishReplaySlaRecordJson}
@@ -2569,80 +2133,21 @@ export default function ModelDetailPage() {
                           className="mt-4 rounded border border-blue-100 bg-blue-50/70 p-3"
                         >
                           <div className="flex flex-wrap items-center justify-between gap-2">
-                            <p className="text-xs font-semibold text-blue-900">复核报告</p>
+                            <p className="text-xs font-semibold text-blue-900">{getPublishText('reportTitle', locale)}</p>
                             <div className="flex flex-wrap gap-2 text-xs text-blue-800">
-                              <span>总数 {publishReplayReport.totalCount ?? 0}</span>
-                              <span>已执行 {publishReplayReport.executedCount ?? 0}</span>
-                              <span>需人工 {publishReplayReport.manualCount ?? 0}</span>
-                              <span>待样本 {publishReplayReport.needsInputCount ?? 0}</span>
+                              <span>{getPublishText('total', locale)}{' '}{publishReplayReport.totalCount ?? 0}</span>
+                              <span>{getPublishText('executed', locale)}{' '}{publishReplayReport.executedCount ?? 0}</span>
+                              <span>{getPublishText('manual', locale)}{' '}{publishReplayReport.manualCount ?? 0}</span>
+                              <span>{getPublishText('needsSample', locale)}{' '}{publishReplayReport.needsInputCount ?? 0}</span>
                             </div>
                           </div>
                           <div className="mt-3 space-y-2">
-                            {(publishReplayReport.results || []).map((result, index) => {
-                              const step = result.step;
-                              const source =
-                                step?.sourceName ||
-                                step?.sourceCode ||
-                                step?.sourcePid ||
-                                step?.consumerType ||
-                                '未命名消费方';
-                              const displayMessage = getReplayResultMessage(result);
-                              const permissionTraceHref = permissionReplayTraceHref(result);
-                              return (
-                                <div
-                                  key={`replay-result-${step?.consumerType || 'consumer'}-${step?.sourcePid || step?.sourceCode || index}`}
-                                  data-testid={`model-publish-replay-result-${step?.consumerType || 'unknown'}`}
-                                  className="rounded border border-blue-100 bg-white p-3"
-                                >
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <span className="rounded bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700">
-                                      {step?.consumerLabel || step?.consumerType || '规则消费方'}
-                                    </span>
-                                    <span
-                                      className={`rounded px-2 py-1 text-xs font-medium ${getReplayStatusClass(result.status)}`}
-                                    >
-                                      {getReplayStatusLabel(result.status)}
-                                    </span>
-                                    <span className="text-sm font-medium text-gray-900">{source}</span>
-                                    {result.traceId && (
-                                      <span className="font-mono text-xs text-gray-500">
-                                        {result.traceId}
-                                      </span>
-                                    )}
-                                    {permissionTraceHref && (
-                                      <Link
-                                        to={permissionTraceHref}
-                                        data-testid="model-publish-replay-open-permission-trace"
-                                        className="rounded border border-blue-200 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50"
-                                      >
-                                        打开统一 Trace
-                                      </Link>
-                                    )}
-                                  </div>
-                                  {displayMessage && (
-                                    <p className="mt-2 text-sm text-gray-700">{displayMessage}</p>
-                                  )}
-                                  {result.outputs && Object.keys(result.outputs).length > 0 && (
-                                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-600">
-                                      {Object.entries(result.outputs)
-                                        .filter(([key]) => shouldShowReplayOutput(key))
-                                        .map(([key, value]) => (
-                                          <span key={key} className="rounded bg-gray-100 px-2 py-1">
-                                            {formatReplayOutputLabel(key)}: {formatReplayOutputValue(key, value)}
-                                          </span>
-                                        ))}
-                                    </div>
-                                  )}
-                                  {result.errors?.length ? (
-                                    <ul className="mt-2 list-inside list-disc text-sm text-red-700">
-                                      {result.errors.map((error, errorIndex) => (
-                                        <li key={errorIndex}>{formatReplayError(error, result)}</li>
-                                      ))}
-                                    </ul>
-                                  ) : null}
-                                </div>
-                              );
-                            })}
+                            {(publishReplayReport.results || []).map((result, index) => (
+                              <ModelPublishReplayResultCard
+                                key={'replay-result-' + (result.step?.consumerType || 'consumer') + '-' +
+                                  (result.step?.sourcePid || result.step?.sourceCode || index)}
+                                result={result} locale={locale} />
+                            ))}
                           </div>
                         </div>
                       )}
@@ -2651,18 +2156,18 @@ export default function ModelDetailPage() {
 
                   {publishPreview.governance.migrationPlan && (
                     <div className="mt-4">
-                      <p className="text-xs font-semibold text-gray-600">迁移计划</p>
+                      <p className="text-xs font-semibold text-gray-600">{getPolicyHeading('migrationHeading', locale)}</p>
                       <p className="mt-1 text-sm text-gray-700">
-                        {publishPreview.governance.migrationPlan}
+                        {getMigrationPlanMessage(publishPreview.governance, locale)}
                       </p>
                     </div>
                   )}
 
                   {publishPreview.governance.historicalVersionPolicy && (
                     <div className="mt-4">
-                      <p className="text-xs font-semibold text-gray-600">历史版本策略</p>
+                      <p className="text-xs font-semibold text-gray-600">{getPolicyHeading('historyHeading', locale)}</p>
                       <p className="mt-1 text-sm text-gray-700">
-                        {publishPreview.governance.historicalVersionPolicy}
+                        {getHistoricalPolicyMessage(publishPreview.governance, locale)}
                       </p>
                     </div>
                   )}
@@ -2685,7 +2190,7 @@ export default function ModelDetailPage() {
                         checked={publishImpactAcknowledged}
                         onChange={(event) => setPublishImpactAcknowledged(event.target.checked)}
                       />
-                      <span>我已核对受影响的规则资产、迁移计划和历史版本策略。</span>
+                      <span>{getPublishText('acknowledge', locale)}</span>
                     </label>
                   )}
                 </div>
@@ -2702,7 +2207,7 @@ export default function ModelDetailPage() {
                   }`}
                 >
                   <p className="text-sm font-medium">
-                    风险等级: {publishPreview.riskAssessment.level}
+                    {getPublishText('riskLevel', locale)}{' '}{publishPreview.riskAssessment.level}
                   </p>
                   {publishPreview.riskAssessment.description && (
                     <p className="mt-1 text-sm">{publishPreview.riskAssessment.description}</p>
@@ -2719,13 +2224,13 @@ export default function ModelDetailPage() {
 
               <div className="overflow-x-auto rounded-md bg-gray-900 p-4">
                 <pre className="font-mono text-sm whitespace-pre-wrap text-green-400">
-                  {publishPreview.ddlStatements?.join('\n\n') || 'No DDL statements'}
+                  {publishPreview.ddlStatements?.join('\n\n') || getPublishText('noDdl', locale)}
                 </pre>
               </div>
 
               {publishPreview.affectedTables?.length > 0 && (
                 <div className="mt-3 text-sm text-gray-600">
-                  <span className="font-medium">影响的表: </span>
+                  <span className="font-medium">{getPublishText('affectedTables', locale)}{' '}</span>
                   {publishPreview.affectedTables.join(', ')}
                 </div>
               )}
@@ -2758,8 +2263,7 @@ export default function ModelDetailPage() {
                 className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
                 disabled={publishLoading}
               >
-                取消
-              </button>
+                {getPublishText('cancel', locale)}</button>
               <button
                 data-testid="model-publish-confirm"
                 onClick={handlePublishConfirm}
@@ -2770,7 +2274,7 @@ export default function ModelDetailPage() {
                     !publishImpactAcknowledged)
                 }
               >
-                {publishLoading ? '发布中...' : '确认发布'}
+                {publishLoading ? getPublishText('publishing', locale) : getPublishText('confirm', locale)}
               </button>
             </div>
           </div>

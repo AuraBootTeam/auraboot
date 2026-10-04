@@ -24,8 +24,8 @@ import java.util.Map;
  * <p>This phase deliberately runs after every authorization gate and the atomic idempotency claim,
  * but before any mutation or plugin handler. The {@code FOR UPDATE} row lock remains held by the
  * caller's command transaction until commit/rollback, closing the gap between the earlier boundary
- * observation and the write phases. Taking the write lock upfront also prevents two commands
- * from deadlocking while upgrading shared locks on the same target.</p>
+ * observation and the write phases. Take the exclusive lock immediately: two shared
+ * locks upgraded by concurrent writers would deadlock instead of rejecting the stale version.</p>
  */
 @Component
 @Order(535)
@@ -90,10 +90,11 @@ public class CommandTargetVersionLockPhase implements CommandPhase {
         CommandExecutorUtils.validateSqlIdentifier(
                 primaryKeyColumn, "command target version primary key");
 
-        // The fixed lock provider binds tenant and target explicitly and validates identifiers.
-        // Keep locking SQL out of the general SELECT provider's read-only SQL safety boundary.
+        // This dedicated mapper validates identifiers and binds the tenant and target PID.
+        // The general SELECT provider deliberately rejects UPDATE, including FOR UPDATE.
         List<Map<String, Object>> rows = dynamicDataMapper.selectTargetVersionForUpdate(
-                tableName, primaryKeyColumn, ctx.getTenantId(), ctx.getRequest().getTargetRecordId());
+                tableName, primaryKeyColumn, ctx.getTenantId(),
+                ctx.getRequest().getTargetRecordId());
         Long authoritative = resolveVersion(rows);
         Integer requested = ctx.getRequest().getExpectedVersion();
         if (authoritative == null || (!currentStateLock && requested.longValue() != authoritative)) {

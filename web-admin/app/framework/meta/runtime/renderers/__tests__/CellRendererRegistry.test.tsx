@@ -147,3 +147,25 @@ describe('CellRendererRegistry rating renderer', () => {
     expect(container.querySelector('[aria-label="3/5"]')).toBeTruthy();
   });
 });
+
+
+describe('CellRendererRegistry reference privacy', () => {
+  const pid = '01M435AQ7T2VQPQHBYT37EJX6K';
+  it('shows the authorized business label without exposing its identifier in a tooltip', () => {
+    render(<>{cellRendererRegistry.render('reference', {
+      value: pid, record: { classroom_display: '三年级2班' },
+      column: { field: 'classroom' }, locale: 'zh-CN',
+    })}</>);
+    expect(screen.getByText('三年级2班')).toBeVisible();
+    expect(screen.queryByText(pid)).not.toBeInTheDocument();
+    expect(screen.getByText('三年级2班')).not.toHaveAttribute('title');
+  });
+  it('uses a localized unavailable state for a deleted or inaccessible reference', () => {
+    render(<>{cellRendererRegistry.render('reference', {
+      value: pid, record: {}, column: { field: 'classroom' },
+      locale: 'zh-CN', t: key => key,
+    })}</>);
+    expect(screen.getByText('关联记录不存在或无权访问')).toBeVisible();
+    expect(screen.queryByText(pid)).not.toBeInTheDocument();
+  });
+});

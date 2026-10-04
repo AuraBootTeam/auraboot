@@ -1,3 +1,4 @@
+import { useI18n } from '~/contexts/I18nContext';
 /**
  * InboxBadge — header icon showing unified inbox unread count.
  * Replaces ApprovalBadge with unified inbox data source.
@@ -16,6 +17,7 @@ interface InboxBadgeProps {
 }
 
 export function InboxBadge({ onClick, isOpen, pollInterval = 30_000, className }: InboxBadgeProps) {
+  const { t } = useI18n();
   const [count, setCount] = useState(0);
 
   const fetchCount = useCallback(async () => {
@@ -57,7 +59,7 @@ export function InboxBadge({ onClick, isOpen, pollInterval = 30_000, className }
           ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
           : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200'
       } ${className || ''}`}
-      title={count > 0 ? `${count} unread items` : 'Inbox'}
+      title={count > 0 ? t('inbox.unreadCount', { count }) : t('inbox.title')}
     >
       <InboxIcon className="h-5 w-5" />
       {count > 0 && (

@@ -160,13 +160,18 @@ function resolveRuntimeTemplate(value: unknown, runtimeContext: Record<string, u
   );
 }
 
-function resolveCommandTargetRecordId(
+export function resolveCommandTargetRecordId(
   actionDef: Record<string, unknown>,
   runtimeContext: Record<string, unknown>,
   record: Record<string, any> | undefined,
   context: Record<string, any>,
 ): string | undefined {
   const explicitTarget = resolveRuntimeTemplate(actionDef.targetRecordPid, runtimeContext);
+  // CREATE actions may use the current page record as input context, but it is
+  // not the record being created. Keep explicit targets for fail-fast validation.
+  if (toNonBlankString(actionDef.operationType)?.toUpperCase() === 'CREATE') {
+    return toNonBlankString(explicitTarget);
+  }
   return (
     toNonBlankString(explicitTarget) ||
     getLegacyCompatibleRecordPid(record) ||
@@ -605,9 +610,9 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
    * Show confirmation dialog and return user's choice
    */
   const showConfirmDialog = useCallback(
-    async (messageKey: string | Record<string, string>): Promise<boolean> => {
+    async (messageKey: string | Record<string, string>, variant: 'default' | 'danger'): Promise<boolean> => {
       const { title, content } = resolveConfirmDialog(messageKey, t);
-      return confirmDialog({ title, content, variant: 'danger' });
+      return confirmDialog({ title, content, variant });
     },
     [t],
   );
@@ -680,6 +685,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
     async (button: ButtonConfig, record?: Record<string, any>) => {
       const normalizedButton = normalizeButtonProps(button);
       const actionDef = normalizeAction(normalizedButton);
+      const confirmVariant = normalizedButton.danger || normalizedButton.variant === 'danger' ? 'danger' : 'default';
       const confirmKey = (normalizedButton as any).confirm || normalizedButton.confirmMessageKey;
 
       try {
@@ -692,7 +698,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               (actionDef as any).offboardingAction ?? (normalizedButton as any).offboardingAction,
             );
             if (confirmKey && !offboardingAction) {
-              const confirmed = await showConfirmDialog(confirmKey);
+              const confirmed = await showConfirmDialog(confirmKey, confirmVariant);
               if (!confirmed) return;
             }
             const runtimeContext = (runtime?.getContext?.() ?? {}) as Record<string, unknown>;
@@ -804,7 +810,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               }
             }
             if (offboardingAction && inputFields.length === 0 && !transferRequired && confirmKey) {
-              const confirmed = await showConfirmDialog(confirmKey);
+              const confirmed = await showConfirmDialog(confirmKey, confirmVariant);
               if (!confirmed) return;
             }
             if (inputFields.length > 0) {
@@ -1027,7 +1033,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
             // They are DSL commands executed via the command engine, same as type=command,
             // but always require a targetRecordPid and always use operationType=update.
             if (confirmKey) {
-              const confirmed = await showConfirmDialog(confirmKey);
+              const confirmed = await showConfirmDialog(confirmKey, confirmVariant);
               if (!confirmed) return;
             }
             const targetRecordPid = record?.pid || (context.data?.pid as string | undefined);
@@ -1092,7 +1098,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
 
           case 'workflow': {
             if (confirmKey) {
-              const confirmed = await showConfirmDialog(confirmKey);
+              const confirmed = await showConfirmDialog(confirmKey, confirmVariant);
               if (!confirmed) return;
             }
             const { workflowKey, businessKeyField, variables: varMap } = actionDef;
@@ -1151,7 +1157,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
 
           case 'flow': {
             if (confirmKey) {
-              const confirmed = await showConfirmDialog(confirmKey);
+              const confirmed = await showConfirmDialog(confirmKey, confirmVariant);
               if (!confirmed) return;
             }
 
@@ -1221,7 +1227,10 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
           }
         }
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Action execution failed';
+        const errorMessage = resolveCommandErrorMessage(
+          { context: { detail: err instanceof Error ? err.message : 'Action execution failed' } },
+          button.code, t, locale,
+        );
         const errorObject = err instanceof Error ? err : new Error(errorMessage);
         console.error(`[useActionHandler] Action execution failed (${button.code}):`, err);
         setError(errorMessage);

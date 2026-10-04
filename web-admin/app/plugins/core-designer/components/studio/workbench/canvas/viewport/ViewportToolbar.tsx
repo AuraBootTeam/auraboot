@@ -9,6 +9,7 @@
 import React, { useState, useCallback } from 'react';
 import { ZOOM_PRESETS, DEVICE_PRESETS, getZoomLabel } from './devices';
 import type { UseViewportResult } from './types';
+import { useI18n } from '~/contexts/I18nContext';
 
 interface ViewportToolbarProps {
   viewport: UseViewportResult;
@@ -19,6 +20,10 @@ interface ViewportToolbarProps {
  * Viewport Toolbar Component
  */
 export const ViewportToolbar: React.FC<ViewportToolbarProps> = ({ viewport, className = '' }) => {
+  const { t } = useI18n();
+  const deviceLabel = (id: string) => t(`designer_viewport.devices.${id}`);
+  const selectedDevice = DEVICE_PRESETS.find((device) => device.name === viewport.deviceName);
+  const selectedLabel = selectedDevice ? deviceLabel(selectedDevice.id) : viewport.deviceName;
   const [showZoomMenu, setShowZoomMenu] = useState(false);
   const [showDeviceMenu, setShowDeviceMenu] = useState(false);
 
@@ -47,7 +52,7 @@ export const ViewportToolbar: React.FC<ViewportToolbarProps> = ({ viewport, clas
           type="button"
           onClick={viewport.zoomOut}
           className="rounded-l-md px-2 py-1.5 text-gray-600 transition-colors hover:bg-gray-100"
-          title="缩小 (Ctrl + -)"
+          title={t('designer_viewport.zoom_out')}
         >
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
@@ -92,7 +97,7 @@ export const ViewportToolbar: React.FC<ViewportToolbarProps> = ({ viewport, clas
                   }}
                   className="w-full px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-100"
                 >
-                  适应画布
+                  {t('designer_viewport.fit_canvas')}
                 </button>
                 <button
                   type="button"
@@ -102,7 +107,7 @@ export const ViewportToolbar: React.FC<ViewportToolbarProps> = ({ viewport, clas
                   }}
                   className="w-full px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-100"
                 >
-                  重置 (100%)
+                  {t('designer_viewport.reset_zoom')}
                 </button>
               </div>
             </>
@@ -114,7 +119,7 @@ export const ViewportToolbar: React.FC<ViewportToolbarProps> = ({ viewport, clas
           type="button"
           onClick={viewport.zoomIn}
           className="rounded-r-md px-2 py-1.5 text-gray-600 transition-colors hover:bg-gray-100"
-          title="放大 (Ctrl + +)"
+          title={t('designer_viewport.zoom_in')}
         >
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -132,7 +137,7 @@ export const ViewportToolbar: React.FC<ViewportToolbarProps> = ({ viewport, clas
           onClick={() => setShowDeviceMenu(!showDeviceMenu)}
           className="flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
         >
-          <span>{viewport.deviceName ? `${viewport.deviceName}` : '🖥️ 自适应'}</span>
+          <span>{selectedLabel || `🖥️ ${t('designer_viewport.responsive')}`}</span>
           <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
@@ -151,7 +156,7 @@ export const ViewportToolbar: React.FC<ViewportToolbarProps> = ({ viewport, clas
                 }`}
               >
                 <span>🖥️</span>
-                <span>自适应</span>
+                <span>{t('designer_viewport.responsive')}</span>
               </button>
               <div className="my-1 border-t border-gray-100" />
               {DEVICE_PRESETS.map((device) => (
@@ -167,7 +172,7 @@ export const ViewportToolbar: React.FC<ViewportToolbarProps> = ({ viewport, clas
                 >
                   <span className="flex items-center gap-2">
                     <span>{device.icon}</span>
-                    <span>{device.name}</span>
+                    <span>{deviceLabel(device.id)}</span>
                   </span>
                   <span className="text-gray-400">{device.width}px</span>
                 </button>
@@ -188,7 +193,7 @@ export const ViewportToolbar: React.FC<ViewportToolbarProps> = ({ viewport, clas
               d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11"
             />
           </svg>
-          拖动中
+          {t('designer_viewport.panning')}
         </div>
       )}
     </div>

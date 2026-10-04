@@ -142,10 +142,20 @@ class AuraBootHook(BaseHook):
         if idempotency_key:
             headers["X-Idempotency-Key"] = idempotency_key
 
+        payload = {"json": body}
+        conn = self.get_conn()
+        extras = conn.extra_dejson if conn.extra else {}
+        if extras.get("auth_method") == "hmac":
+            # Serialize once with requests, then sign and send those exact bytes.
+            # Signing a separate JSON encoding can invalidate Unicode payloads.
+            wire_body = requests.Request(method=method.upper(), url=url, json=body).prepare().body or b""
+            headers["X-AuraBoot-Signature"] = self.sign_webhook_body(wire_body)
+            payload = {"data": wire_body}
+
         response = requests.request(
             method=method.upper(),
             url=url,
-            json=body,
+            **payload,
             headers=headers,
             timeout=30,
         )

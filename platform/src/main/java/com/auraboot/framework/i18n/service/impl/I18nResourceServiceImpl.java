@@ -62,11 +62,14 @@ public class I18nResourceServiceImpl implements I18nResourceService {
             throw new BusinessException(ResponseCode.BadParam, "I18n resource not found: " + pid);
         }
 
-        existing.setValue(resource.getValue());
-        existing.setSource(resource.getSource());
-        existing.setRefType(resource.getRefType());
-        existing.setRefId(resource.getRefId());
-        existing.setStatus(resource.getStatus());
+        if (resource.getStatus() != null) validateStatus(resource.getStatus());
+        if (resource.getValue() != null) existing.setValue(resource.getValue());
+        if (resource.getSource() != null) existing.setSource(resource.getSource());
+        if (resource.getRefType() != null) existing.setRefType(resource.getRefType());
+        if (resource.getRefId() != null) existing.setRefId(resource.getRefId());
+        if (resource.getStatus() != null) {
+            existing.setStatus(resource.getStatus());
+        }
         existing.setUpdatedAt(Instant.now());
         existing.setUpdatedBy(MetaContext.getCurrentUserId());
 
@@ -165,16 +168,17 @@ public class I18nResourceServiceImpl implements I18nResourceService {
     @Override
     public List<I18nResource> findAllByLang(String lang) {
         Long tenantId = getCurrentTenantId();
-        // These queries already declare their exact tenant scope. The automatic
-        // tenant predicate would otherwise suppress tenant 0 for authenticated
-        // callers, and all rows for the public endpoint's absent context (-1).
-        List<I18nResource> tenantResources = MetaContext.runWithoutTenantFilter(
-                () -> i18nResourceMapper.selectAllByLang(tenantId, lang));
+        // System/public reads declare their narrow scope; authenticated tenant reads
+        // keep the tenant interceptor. An implicit tenant=-1/real tenant would
+        // otherwise conflict with the explicit tenant_id=0 predicate.
+        List<I18nResource> tenantResources = tenantId == 0L
+            ? MetaContext.runWithoutTenantFilter(() -> i18nResourceMapper.selectAllByLang(0L, lang))
+            : i18nResourceMapper.selectAllByLang(tenantId, lang);
 
         // Also include system-level resources (tenant_id = 0)
         if (tenantId != 0L) {
             List<I18nResource> systemResources = MetaContext.runWithoutTenantFilter(
-                    () -> i18nResourceMapper.selectAllByLang(0L, lang));
+                () -> i18nResourceMapper.selectAllByLang(0L, lang));
             // Merge: tenant resources override system resources
             Map<String, I18nResource> merged = new LinkedHashMap<>();
             for (I18nResource resource : systemResources) {
@@ -186,21 +190,9 @@ public class I18nResourceServiceImpl implements I18nResourceService {
             return new ArrayList<>(merged.values());
         }
 
-        // When tenantId is 0 (unauthenticated request like /api/i18n/{locale}),
-        // also load all tenant-level translations since i18n data is non-sensitive
-        // and the endpoint is public (WhiteList). Without this, plugin-imported
-        // translations (stored under real tenant IDs) would never appear.
-        List<I18nResource> allTenantResources = MetaContext.runWithoutTenantFilter(
-                () -> i18nResourceMapper.selectAllByLangAllTenants(lang));
-        Map<String, I18nResource> merged = new LinkedHashMap<>();
-        for (I18nResource resource : tenantResources) {
-            merged.put(resource.getI18nKey(), resource);
-        }
-        // Tenant-level translations override system-level for same key
-        for (I18nResource resource : allTenantResources) {
-            merged.put(resource.getI18nKey(), resource);
-        }
-        return new ArrayList<>(merged.values());
+        // Public locale responses are cached under tenant 0. Tenant-authored overrides
+        // belong only to authenticated tenant responses, never this shared cache.
+        return tenantResources;
     }
 
     @Override
@@ -460,13 +452,7 @@ public class I18nResourceServiceImpl implements I18nResourceService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public I18nResource updateStatus(String pid, String newStatus) {
-        if (!StringUtils.hasText(newStatus)) {
-            throw new BusinessException(ResponseCode.BadParam, "Status is required");
-        }
-        if (!Set.of(I18nResource.STATUS_DRAFT, I18nResource.STATUS_REVIEW,
-                    I18nResource.STATUS_APPROVED, I18nResource.STATUS_DEPRECATED).contains(newStatus)) {
-            throw new BusinessException(ResponseCode.BadParam, "Invalid status: " + newStatus);
-        }
+        validateStatus(newStatus);
         I18nResource resource = findByPid(pid);
         if (resource == null) {
             throw new BusinessException(ResponseCode.BadParam, "I18n resource not found: " + pid);
@@ -476,6 +462,16 @@ public class I18nResourceServiceImpl implements I18nResourceService {
         resource.setUpdatedBy(MetaContext.getCurrentUserId());
         i18nResourceMapper.updateById(resource);
         return resource;
+    }
+
+    private void validateStatus(String newStatus) {
+        if (!StringUtils.hasText(newStatus)) {
+            throw new BusinessException(ResponseCode.BadParam, "Status is required");
+        }
+        if (!Set.of(I18nResource.STATUS_DRAFT, I18nResource.STATUS_REVIEW,
+                    I18nResource.STATUS_APPROVED, I18nResource.STATUS_DEPRECATED).contains(newStatus)) {
+            throw new BusinessException(ResponseCode.BadParam, "Invalid status: " + newStatus);
+        }
     }
 
     // ==================== Helper Methods ====================

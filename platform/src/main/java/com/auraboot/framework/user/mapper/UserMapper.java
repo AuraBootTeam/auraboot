@@ -11,6 +11,15 @@ import java.util.Map;
 
 public interface UserMapper extends BaseMapper<User> {
 
+    @Select("SELECT * FROM ab_user WHERE LOWER(BTRIM(email)) = #{normalizedEmail} " +
+            "AND deleted_flag = FALSE LIMIT 1")
+    User findByNormalizedEmail(@Param("normalizedEmail") String normalizedEmail);
+
+    @Update("UPDATE ab_user SET email = #{normalizedEmail}, email_verified = TRUE, updated_at = NOW() " +
+            "WHERE id = #{userId} AND deleted_flag = FALSE")
+    int bindVerifiedEmail(@Param("userId") Long userId,
+                          @Param("normalizedEmail") String normalizedEmail);
+
     /** Resolve version actors without exposing unrelated users or directory fields. */
     @Select("""
             <script>

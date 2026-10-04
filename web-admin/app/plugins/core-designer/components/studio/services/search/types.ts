@@ -135,6 +135,8 @@ export interface SearchState {
   loading: boolean;
   /** Error message */
   error: string | null;
+  /** Localized fallback when a failure provides no message */
+  errorKey?: 'designer_search.failed' | null;
   /** Selected result ID */
   selectedId: string | null;
   /** Search history */

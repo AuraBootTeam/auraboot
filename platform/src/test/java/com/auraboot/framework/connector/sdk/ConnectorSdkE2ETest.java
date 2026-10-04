@@ -1,5 +1,7 @@
 package com.auraboot.framework.connector.sdk;
 
+import com.auraboot.framework.test.support.MySqlTestContainer;
+
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.crypto.FieldEncryptionService;
 import com.auraboot.framework.connector.jdbc.entity.JdbcConnector;
@@ -43,7 +45,7 @@ import static org.mockito.Mockito.*;
 class ConnectorSdkE2ETest {
 
     @Container
-    static MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.0.39")
+    static MySQLContainer<?> mysql = new MySqlTestContainer("mysql:8.0.39")
             .withDatabaseName("test")
             .withUsername("root")
             .withPassword("test");

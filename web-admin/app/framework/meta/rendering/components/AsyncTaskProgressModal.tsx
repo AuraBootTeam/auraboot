@@ -4,6 +4,19 @@ import {
   type LocalizedText,
 } from '~/framework/meta/runtime/expression/i18n-renderer';
 import { Modal } from '~/ui/smart/ui/Modal';
+import ASYNC_TASK_TEXT from './AsyncTask.i18n.json';
+
+export function asyncTaskText(
+  key: keyof typeof ASYNC_TASK_TEXT,
+  locale: string,
+  params: Record<string, string | number> = {},
+): string {
+  return getLocalizedText(ASYNC_TASK_TEXT[key], locale).replace(
+    /\{(\w+)\}/g,
+    (placeholder, name: string) =>
+      params[name] === undefined ? placeholder : String(params[name]),
+  );
+}
 
 /**
  * Live progress payload carried by an async task's `progressMessage` field.
@@ -112,9 +125,9 @@ function isImportResultData(
   );
 }
 
-function formatMetricValue(value: unknown): string {
+function formatMetricValue(value: unknown, locale: string): string {
   if (typeof value === 'number') return value.toLocaleString();
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'boolean') return asyncTaskText(value ? 'yes' : 'no', locale);
   return value == null || value === '' ? '-' : String(value);
 }
 
@@ -143,9 +156,10 @@ export function AsyncTaskProgressModal({
   const locale = task.locale || 'zh-CN';
   const presentation = task.presentation;
   const presentationTitle = getLocalizedText(presentation?.title, locale);
-  const taskTitle = presentationTitle || task.taskLabel || '后台任务';
+  const taskTitle = presentationTitle || task.taskLabel || asyncTaskText('backgroundTask', locale);
   const completedMessage =
-    getLocalizedText(presentation?.completedMessage, locale) || `${taskTitle}已完成`;
+    getLocalizedText(presentation?.completedMessage, locale) ||
+    asyncTaskText('completed', locale, { task: taskTitle });
   const presentationMetrics = (presentation?.metrics ?? [])
     .map((metric) => ({
       ...metric,
@@ -161,7 +175,7 @@ export function AsyncTaskProgressModal({
         className="rounded-control bg-accent hover:bg-accent-hover px-4 py-2 text-sm font-medium text-white"
         onClick={onClose}
       >
-        关闭
+        {asyncTaskText('close', locale)}
       </button>
     </div>
   ) : (
@@ -171,14 +185,16 @@ export function AsyncTaskProgressModal({
         className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-subtle border px-4 py-2 text-sm font-medium"
         onClick={onBackground}
       >
-        后台运行
+        {asyncTaskText('background', locale)}
       </button>
     </div>
   );
 
   const handleCopyFailures = () => {
     const failures = task.resultData?.failures ?? [];
-    const text = failures.map((f) => `第${f.row}行 — ${f.reason}`).join('\n');
+    const text = failures
+      .map((f) => asyncTaskText('failureRow', locale, { row: f.row, reason: f.reason }))
+      .join('\n');
     void navigator.clipboard?.writeText(text);
   };
 
@@ -191,7 +207,9 @@ export function AsyncTaskProgressModal({
             className="text-sm font-medium text-red-700 hover:underline"
             onClick={() => setExpanded((value) => !value)}
           >
-            {expanded ? '收起失败明细' : `查看失败明细 (${task.resultData.failedRows})`}
+            {expanded
+              ? asyncTaskText('collapseFailures', locale)
+              : asyncTaskText('showFailures', locale, { count: task.resultData.failedRows })}
           </button>
           <button
             type="button"
@@ -199,14 +217,14 @@ export function AsyncTaskProgressModal({
             className="border-status-red bg-panel rounded border px-2 py-1 text-xs text-red-700 hover:bg-red-100"
             onClick={handleCopyFailures}
           >
-            复制
+            {asyncTaskText('copy', locale)}
           </button>
         </div>
         {expanded ? (
           <ul className="max-h-48 space-y-1 overflow-y-auto text-xs text-red-800">
             {(task.resultData.failures ?? []).map((failure, index) => (
               <li key={`${failure.row}-${index}`}>
-                第{failure.row}行 — {failure.reason}
+                {asyncTaskText('failureRow', locale, { row: failure.row, reason: failure.reason })}
               </li>
             ))}
           </ul>
@@ -214,7 +232,7 @@ export function AsyncTaskProgressModal({
           <ul className="space-y-1 text-xs text-red-800">
             {(task.resultData.failures ?? []).slice(0, 1).map((failure, index) => (
               <li key={`${failure.row}-${index}`}>
-                第{failure.row}行 — {failure.reason}
+                {asyncTaskText('failureRow', locale, { row: failure.row, reason: failure.reason })}
               </li>
             ))}
           </ul>
@@ -229,7 +247,7 @@ export function AsyncTaskProgressModal({
         <div className="space-y-4">
           <div>
             <div className="text-text-2 mb-1 flex justify-between text-sm">
-              <span>{task.taskLabel ? `${task.taskLabel}进行中…` : '任务执行中…'}</span>
+              <span>{asyncTaskText('running', locale, { task: taskTitle })}</span>
               <span>{progress}%</span>
             </div>
             <div className="rounded-pill h-2 w-full overflow-hidden bg-gray-200">
@@ -246,19 +264,24 @@ export function AsyncTaskProgressModal({
           {live && (
             <div className="text-text-2 grid grid-cols-2 gap-2 text-sm">
               <div>
-                总计 / Total: <span className="font-medium">{fmt(live.total)}</span>
+                {asyncTaskText('total', locale)}:{' '}
+                <span className="font-medium">{fmt(live.total)}</span>
               </div>
               <div>
-                已处理: <span className="font-medium">{fmt(live.processed)}</span>
+                {asyncTaskText('processed', locale)}:{' '}
+                <span className="font-medium">{fmt(live.processed)}</span>
               </div>
               <div>
-                成功: <span className="text-status-green font-medium">{fmt(live.ok)}</span>
+                {asyncTaskText('success', locale)}:{' '}
+                <span className="text-status-green font-medium">{fmt(live.ok)}</span>
               </div>
               <div>
-                失败: <span className="text-status-red font-medium">{fmt(live.failed)}</span>
+                {asyncTaskText('failed', locale)}:{' '}
+                <span className="text-status-red font-medium">{fmt(live.failed)}</span>
               </div>
               <div>
-                跳过: <span className="text-status-amber font-medium">{fmt(live.skipped)}</span>
+                {asyncTaskText('skipped', locale)}:{' '}
+                <span className="text-status-amber font-medium">{fmt(live.skipped)}</span>
               </div>
             </div>
           )}
@@ -276,7 +299,7 @@ export function AsyncTaskProgressModal({
                   <div key={metric.field}>
                     {metric.resolvedLabel}:{' '}
                     <span className={`font-medium ${metricToneClass(metric.tone)}`}>
-                      {formatMetricValue(metric.value)}
+                      {formatMetricValue(metric.value, locale)}
                     </span>
                   </div>
                 ))}
@@ -285,27 +308,28 @@ export function AsyncTaskProgressModal({
             </>
           ) : isImportResultData(task.resultData) ? (
             task.resultData.totalRows === 0 ? (
-              <div className="text-text-2 text-sm">未导入任何数据 / No rows</div>
+              <div className="text-text-2 text-sm">{asyncTaskText('noRows', locale)}</div>
             ) : (
               <>
                 <div className="text-text-2 grid grid-cols-2 gap-2 text-sm">
                   <div>
-                    总行数: <span className="font-medium">{fmt(task.resultData.totalRows)}</span>
+                    {asyncTaskText('totalRows', locale)}:{' '}
+                    <span className="font-medium">{fmt(task.resultData.totalRows)}</span>
                   </div>
                   <div>
-                    成功:{' '}
+                    {asyncTaskText('success', locale)}:{' '}
                     <span className="text-status-green font-medium">
                       {fmt(task.resultData.importedRows)}
                     </span>
                   </div>
                   <div>
-                    跳过:{' '}
+                    {asyncTaskText('skipped', locale)}:{' '}
                     <span className="text-status-amber font-medium">
                       {fmt(task.resultData.skippedRows)}
                     </span>
                   </div>
                   <div>
-                    失败:{' '}
+                    {asyncTaskText('failed', locale)}:{' '}
                     <span className="text-status-red font-medium">
                       {fmt(task.resultData.failedRows)}
                     </span>
@@ -315,7 +339,7 @@ export function AsyncTaskProgressModal({
               </>
             )
           ) : (
-            <div className="text-text-2 text-sm">任务已成功完成。</div>
+            <div className="text-text-2 text-sm">{asyncTaskText('successMessage', locale)}</div>
           )}
         </div>
       )}
@@ -323,20 +347,24 @@ export function AsyncTaskProgressModal({
       {/* Failed state: error message */}
       {task.status === 'failed' && (
         <div className="space-y-2" data-testid="async-task-modal-failed">
-          <div className="text-base font-semibold text-red-700">任务执行失败 / Failed</div>
+          <div className="text-base font-semibold text-red-700">
+            {asyncTaskText('failureMessage', locale)}
+          </div>
           <div
             className="rounded-control bg-status-red-bg border border-red-200 p-3 text-sm text-red-800"
             data-testid="async-task-modal-error"
           >
-            {task.errorMessage || '未知错误 / Unknown error'}
+            {task.errorMessage || asyncTaskText('unknownError', locale)}
           </div>
         </div>
       )}
 
       {task.status === 'cancelled' && (
         <div className="space-y-2" data-testid="async-task-modal-cancelled">
-          <div className="text-text text-base font-semibold">任务已取消 / Cancelled</div>
-          <div className="text-text-2 text-sm">任务未继续执行，未完成的步骤不会再处理。</div>
+          <div className="text-text text-base font-semibold">
+            {asyncTaskText('cancelled', locale)}
+          </div>
+          <div className="text-text-2 text-sm">{asyncTaskText('cancelledMessage', locale)}</div>
         </div>
       )}
     </Modal>

@@ -45,3 +45,7 @@ See [the platform pivot roadmap](https://github.com/AuraBootTeam/auraboot/blob/m
 ## Stability
 
 Until 1.0, breaking changes happen at minor versions. Pin exact versions in production.
+
+## License
+
+Apache-2.0. See [LICENSE](./LICENSE) for the full text. The package license does not grant AuraBoot trademark rights.

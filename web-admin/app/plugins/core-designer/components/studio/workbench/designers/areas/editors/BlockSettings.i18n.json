@@ -1,0 +1,346 @@
+{
+  "dataSource": {
+    "zh-CN": "数据源",
+    "en-US": "Data source"
+  },
+  "component": {
+    "zh-CN": "组件",
+    "en-US": "Component"
+  },
+  "componentHint": {
+    "zh-CN": "运行时组件别名",
+    "en-US": "Runtime component alias"
+  },
+  "gridWidth": {
+    "zh-CN": "栅格宽度",
+    "en-US": "Column span"
+  },
+  "auto": {
+    "zh-CN": "自动",
+    "en-US": "Auto"
+  },
+  "formColumns": {
+    "zh-CN": "表单列数",
+    "en-US": "Form columns"
+  },
+  "gutter": {
+    "zh-CN": "间距",
+    "en-US": "Spacing"
+  },
+  "compact8": {
+    "zh-CN": "紧凑 (8px)",
+    "en-US": "Compact (8px)"
+  },
+  "standard16": {
+    "zh-CN": "标准 (16px)",
+    "en-US": "Standard (16px)"
+  },
+  "relaxed24": {
+    "zh-CN": "宽松 (24px)",
+    "en-US": "Relaxed (24px)"
+  },
+  "wide32": {
+    "zh-CN": "超宽 (32px)",
+    "en-US": "Extra wide (32px)"
+  },
+  "buttonAlign": {
+    "zh-CN": "按钮对齐",
+    "en-US": "Button alignment"
+  },
+  "left": {
+    "zh-CN": "左对齐",
+    "en-US": "Left"
+  },
+  "center": {
+    "zh-CN": "居中",
+    "en-US": "Center"
+  },
+  "right": {
+    "zh-CN": "右对齐",
+    "en-US": "Right"
+  },
+  "propsJson": {
+    "zh-CN": "属性 JSON",
+    "en-US": "Props JSON"
+  },
+  "propsHint": {
+    "zh-CN": "必须是 JSON 对象",
+    "en-US": "Must be a JSON object"
+  },
+  "selectionBind": {
+    "zh-CN": "选择绑定",
+    "en-US": "Selection binding"
+  },
+  "selectionHint": {
+    "zh-CN": "绑定选中行",
+    "en-US": "Bind selected rows"
+  },
+  "rowKey": {
+    "zh-CN": "行键字段",
+    "en-US": "Row key field"
+  },
+  "rowKeyHint": {
+    "zh-CN": "唯一标识字段",
+    "en-US": "Unique identifier field"
+  },
+  "valueField": {
+    "zh-CN": "数值字段",
+    "en-US": "Value field"
+  },
+  "changeField": {
+    "zh-CN": "变化率字段",
+    "en-US": "Change rate field"
+  },
+  "refreshInterval": {
+    "zh-CN": "刷新间隔(ms)",
+    "en-US": "Refresh interval (ms)"
+  },
+  "chartType": {
+    "zh-CN": "图表类型",
+    "en-US": "Chart type"
+  },
+  "bar": {
+    "zh-CN": "柱状图",
+    "en-US": "Bar"
+  },
+  "line": {
+    "zh-CN": "折线图",
+    "en-US": "Line"
+  },
+  "pie": {
+    "zh-CN": "饼图",
+    "en-US": "Pie"
+  },
+  "area": {
+    "zh-CN": "面积图",
+    "en-US": "Area"
+  },
+  "xField": {
+    "zh-CN": "X轴字段",
+    "en-US": "X-axis field"
+  },
+  "yField": {
+    "zh-CN": "Y轴字段",
+    "en-US": "Y-axis field"
+  },
+  "customValueField": {
+    "zh-CN": "值字段",
+    "en-US": "Value field"
+  },
+  "customValueHint": {
+    "zh-CN": "可选的运行时值字段",
+    "en-US": "Optional runtime value field"
+  },
+  "bordered": {
+    "zh-CN": "显示边框",
+    "en-US": "Show borders"
+  },
+  "striped": {
+    "zh-CN": "斑马纹",
+    "en-US": "Striped rows"
+  },
+  "showIndex": {
+    "zh-CN": "显示序号",
+    "en-US": "Show row numbers"
+  },
+  "tableSize": {
+    "zh-CN": "表格尺寸",
+    "en-US": "Table size"
+  },
+  "compact": {
+    "zh-CN": "紧凑",
+    "en-US": "Compact"
+  },
+  "standard": {
+    "zh-CN": "标准",
+    "en-US": "Standard"
+  },
+  "relaxed": {
+    "zh-CN": "宽松",
+    "en-US": "Relaxed"
+  },
+  "prefix": {
+    "zh-CN": "前缀",
+    "en-US": "Prefix"
+  },
+  "suffix": {
+    "zh-CN": "后缀",
+    "en-US": "Suffix"
+  },
+  "currencySuffix": {
+    "zh-CN": "元",
+    "en-US": "CNY"
+  },
+  "themeColor": {
+    "zh-CN": "主题色",
+    "en-US": "Theme color"
+  },
+  "blue": {
+    "zh-CN": "蓝色",
+    "en-US": "Blue"
+  },
+  "green": {
+    "zh-CN": "绿色",
+    "en-US": "Green"
+  },
+  "orange": {
+    "zh-CN": "橙色",
+    "en-US": "Orange"
+  },
+  "red": {
+    "zh-CN": "红色",
+    "en-US": "Red"
+  },
+  "purple": {
+    "zh-CN": "紫色",
+    "en-US": "Purple"
+  },
+  "smooth": {
+    "zh-CN": "平滑曲线",
+    "en-US": "Smooth curve"
+  },
+  "legend": {
+    "zh-CN": "显示图例",
+    "en-US": "Show legend"
+  },
+  "chartHeight": {
+    "zh-CN": "图表高度",
+    "en-US": "Chart height"
+  },
+  "textSize": {
+    "zh-CN": "文字大小",
+    "en-US": "Text size"
+  },
+  "extraSmall": {
+    "zh-CN": "超小",
+    "en-US": "Extra small"
+  },
+  "small": {
+    "zh-CN": "小",
+    "en-US": "Small"
+  },
+  "large": {
+    "zh-CN": "大",
+    "en-US": "Large"
+  },
+  "extraLarge": {
+    "zh-CN": "超大",
+    "en-US": "Extra large"
+  },
+  "textColor": {
+    "zh-CN": "文字颜色",
+    "en-US": "Text color"
+  },
+  "default": {
+    "zh-CN": "默认",
+    "en-US": "Default"
+  },
+  "secondary": {
+    "zh-CN": "次要",
+    "en-US": "Secondary"
+  },
+  "success": {
+    "zh-CN": "成功",
+    "en-US": "Success"
+  },
+  "warning": {
+    "zh-CN": "警告",
+    "en-US": "Warning"
+  },
+  "danger": {
+    "zh-CN": "危险",
+    "en-US": "Danger"
+  },
+  "bold": {
+    "zh-CN": "加粗",
+    "en-US": "Bold"
+  },
+  "collapsible": {
+    "zh-CN": "可折叠",
+    "en-US": "Collapsible"
+  },
+  "defaultCollapsed": {
+    "zh-CN": "默认收起",
+    "en-US": "Collapsed by default"
+  },
+  "advancedExpanded": {
+    "zh-CN": "展开高级筛选",
+    "en-US": "Expand advanced filters"
+  },
+  "searchOnEnter": {
+    "zh-CN": "回车搜索",
+    "en-US": "Search on Enter"
+  },
+  "pagination": {
+    "zh-CN": "启用分页",
+    "en-US": "Enable pagination"
+  },
+  "pageSize": {
+    "zh-CN": "每页条数",
+    "en-US": "Rows per page"
+  },
+  "rowSelection": {
+    "zh-CN": "行可选择",
+    "en-US": "Selectable rows"
+  },
+  "selectionType": {
+    "zh-CN": "选择模式",
+    "en-US": "Selection mode"
+  },
+  "multiple": {
+    "zh-CN": "多选",
+    "en-US": "Multiple"
+  },
+  "single": {
+    "zh-CN": "单选",
+    "en-US": "Single"
+  },
+  "sortable": {
+    "zh-CN": "可排序",
+    "en-US": "Sortable"
+  },
+  "exportable": {
+    "zh-CN": "可导出",
+    "en-US": "Exportable"
+  },
+  "title": {
+    "zh-CN": "标题",
+    "en-US": "Title"
+  },
+  "enterTitle": {
+    "zh-CN": "输入标题",
+    "en-US": "Enter title"
+  },
+  "content": {
+    "zh-CN": "内容",
+    "en-US": "Content"
+  },
+  "enterContent": {
+    "zh-CN": "输入文本内容",
+    "en-US": "Enter text content"
+  },
+  "visibility": {
+    "zh-CN": "显示条件",
+    "en-US": "Visibility condition"
+  },
+  "expressionHint": {
+    "zh-CN": "SpEL 表达式",
+    "en-US": "SpEL expression"
+  },
+  "columns": {
+    "zh-CN": "{count} 列",
+    "en-US": "{count} columns"
+  },
+  "rows": {
+    "zh-CN": "{count} 条",
+    "en-US": "{count} rows"
+  },
+  "invalidJsonObject": {
+    "zh-CN": "属性 JSON 必须是对象",
+    "en-US": "Props JSON must be an object"
+  },
+  "invalidJson": {
+    "zh-CN": "JSON 格式无效",
+    "en-US": "Invalid JSON"
+  }
+}

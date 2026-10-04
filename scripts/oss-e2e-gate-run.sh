@@ -8,12 +8,15 @@
 #   1. brings up a FRESH, slot-isolated host-first stack (zero docker, safe
 #      alongside concurrent sessions, never oss-reset-and-init's global pkill);
 #   2. imports the OSS demo plugins + the internal test-fixtures plugin;
-#   3. runs the selected OSS project specs with zero retries;
-#   4. exits with the runner result and retains database/artifacts/evidence;
-#   5. stops only registered processes and closes its allocation on exit.
+#   3. runs a meaningful, currently-green Core regression slice under the exact
+#      env contract a real OSS run needs (PW_PROFILE=oss --project=oss);
+#   4. prints a PASS/FAIL banner and EXITS WITH THE GATE RESULT — 0 = green,
+#      nonzero = a real failure. The exit code is the whole point: it is what a
+#      crontab line or a release step checks;
+#   5. retains the runtime and evidence on success, failure, or interruption.
 #
-# Every verification uses a new name and an unused slot. Existing environments
-# are rejected rather than reset. --keep leaves the owned processes running.
+# The stack requires a new database. An occupied name, slot, or database fails
+# closed; owner-reviewed cleanup is a separate operation.
 #
 # ENV CONTRACT (baked in — an OSS survey documented each of these; getting any
 # one wrong roughly doubles the apparent debt with false failures):
@@ -22,7 +25,7 @@
 #   * the backend runs with AGENT_LLM_STUB_MODE=true (deterministic, no key, no
 #     spend) — oss-golden-stack.sh `up` sets it, and this runner exports it
 #     before `up` so it is unambiguous;
-#   * the Playwright run is PW_PROFILE=oss --project=oss --project=oss-deep (NOT --project=chromium:
+#   * the Playwright run is PW_PROFILE=oss --project=oss (NOT --project=chromium:
 #     under chromium the setup project skips the test-fixtures import and ~2x of
 #     the failures are then phantom "Command not found: e2et:*" harness noise).
 #
@@ -32,24 +35,23 @@
 #                                                                  Playwright rc
 #
 # Prerequisites: the workspace native brokers (Postgres/Redis/Kafka) must be up —
-# the same ones `dev.sh runtime` uses. Run from any OSS auraboot checkout/worktree.
+# the same ones `aura runtime` uses. Run from any OSS auraboot checkout/worktree.
 #
 # Usage:
 #   scripts/oss-e2e-gate-run.sh [--slot N] [--name NAME] [--scope slice|full|<dir>...] [--keep] [--repeat K]
 #     --slot N     isolated-stack slot. Default: auto-pick a free one. Pick one
-#                  no other runtime uses (`../dev.sh runtime list`).
-#     --name NAME  runtime name        (default: unique oss-e2e-gate timestamp)
+#                  no other runtime uses (`../aura runtime list`).
+#     --name NAME  runtime name        (default: a unique CI job or timestamp name)
 #     --scope V    which specs the gate runs (default: slice):
-#                    slice  the fixed regression selection
+#                    slice  the curated, currently-green regression areas
 #                           (designer + saved-view + showcase + page-designer +
 #                           automation). Bounded and meaningful — the right
 #                           default for a gate.
-#                    full   the whole OSS `oss` project (long; has its own known
+#                    full   both OSS `oss` and `oss-deep` projects (long; has its own known
 #                           enterprise/deep exclusions). Use for a release sweep.
 #                    <dir>  one or more explicit tests/e2e/<dir>/ paths — repeat
 #                           --scope, or list them after --scope, to override.
-#     --keep       leave the stack up after the run (to debug a failure). By
-#                  default owned processes stop; database and evidence remain.
+#     --keep       compatibility flag; every run retains the stack for inspection.
 #     --repeat K   run the slice K times (flakiness check; default: 1)
 #     --workers N  Playwright worker count (default: Playwright's own, PW_WORKERS
 #                  or 4). Heavy-canvas areas (designer/page-designer) need a low
@@ -66,35 +68,41 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 GS="$REPO_ROOT/scripts/oss-golden-stack.sh"
 
-# Locate the workspace dev.sh (for the slot-auto-pick's `runtime list` read).
+# Locate the workspace aura (for the slot-auto-pick's `runtime list` read).
 # CI keeps repositories as siblings under /opt/aura-ci/repos, while developer
-# worktrees usually find dev.sh by walking their ancestors.
+# worktrees usually find aura by walking their ancestors.
 WORKSPACE="${AURA_WORKSPACE_ROOT:-${AURA_CI_WORKSPACE_ROOT:-}}"
-if [ -z "$WORKSPACE" ] && [ -f "$(dirname "$REPO_ROOT")/auraboot-workspace/dev.sh" ]; then
+if [ -z "$WORKSPACE" ] && [ -f "$(dirname "$REPO_ROOT")/auraboot-workspace/aura" ]; then
   WORKSPACE="$(dirname "$REPO_ROOT")/auraboot-workspace"
 fi
 if [ -z "$WORKSPACE" ]; then
   WORKSPACE="$REPO_ROOT"
 fi
-while [ "$WORKSPACE" != "/" ] && [ ! -f "$WORKSPACE/dev.sh" ]; do WORKSPACE="$(dirname "$WORKSPACE")"; done
-if [ ! -f "$WORKSPACE/dev.sh" ]; then
+while [ "$WORKSPACE" != "/" ] && [ ! -f "$WORKSPACE/aura" ]; do WORKSPACE="$(dirname "$WORKSPACE")"; done
+if [ ! -f "$WORKSPACE/aura" ]; then
   main_wt="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2; exit}')"
-  [ -n "${main_wt:-}" ] && [ -f "$(dirname "$main_wt")/dev.sh" ] && WORKSPACE="$(dirname "$main_wt")"
+  [ -n "${main_wt:-}" ] && [ -f "$(dirname "$main_wt")/aura" ] && WORKSPACE="$(dirname "$main_wt")"
 fi
+source "$SCRIPT_DIR/lib/workspace-control.sh"
+aura_bind_workspace_control "$WORKSPACE" || exit 2
 DEV="$WORKSPACE/aura"
-STATE_ROOT="${AURA_WORKSPACE_STATE_DIR:-$WORKSPACE/.workspace}"
-export AURA_WORKSPACE_ROOT="$WORKSPACE" AURA_WORKSPACE_STATE_DIR="$STATE_ROOT"
 
-NAME="oss-e2e-gate-$(date -u +%Y%m%dT%H%M%SZ)-$$"
-SLOT=""            # empty => auto-pick
+NAME="oss-e2e-${AURA_CI_JOB_ID:-$(date -u +%Y%m%dT%H%M%SZ)-$$}"
+SLOT="${AURA_REGRESSION_SLOT:-}"            # empty => auto-pick
 SCOPE_MODE="slice"
 SCOPE_DIRS=()      # explicit override paths
-KEEP=0
 REPEAT=1
 WORKERS=""         # empty => Playwright base default (PW_WORKERS||4)
 
-# Fixed default selection; each run supplies its own execution evidence.
+# The curated, currently-green regression areas. These are the areas the recent
+# OSS E2E survey work hardened; `slice` runs them minus their *-deep specs (which
+# the `oss` project routes to `oss-deep`, kept out of the gate to stay bounded).
 SLICE_DIRS=(
+  # Curated, deterministically-green specs the recent OSS E2E survey work verified
+  # (each confirmed green across multiple runs this session). The gate stays SMALL and
+  # reliable on purpose — a born-red gate protects nothing. Broaden with
+  # `--scope <dir>...` (see --help); broad areas carry known-flaky / vertical-excluded
+  # specs and are NOT a clean gate.
   tests/e2e/page-designer/form-buttons-refresh-runtime.spec.ts
   tests/e2e/showcase/runtime-rendering-e2e.spec.ts
   tests/e2e/saved-view/saved-view-gantt.spec.ts
@@ -122,7 +130,7 @@ while [[ $# -gt 0 ]]; do
         *)          SCOPE_MODE="dirs"; SCOPE_DIRS+=("$2"); shift 2;;
       esac
       ;;
-    --keep)   KEEP=1; shift;;
+    --keep)   shift;;
     -h|--help) awk 'NR>=2 && /^#/{sub(/^# ?/,""); print; next} NR>=2{exit}' "${BASH_SOURCE[0]}"; exit 0;;
     --) shift; while [[ $# -gt 0 ]]; do SCOPE_MODE="dirs"; SCOPE_DIRS+=("$1"); shift; done;;
     tests/e2e/*) SCOPE_MODE="dirs"; SCOPE_DIRS+=("$1"); shift;;   # bare path after --scope <dir>
@@ -131,36 +139,39 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -x "$GS" ]] || die "oss-golden-stack.sh not found/executable at $GS"
-[[ -x "$DEV" ]] || die "workspace public aura CLI not found above $REPO_ROOT"
-[[ "$NAME" =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]*$ ]] || die "invalid runtime name"
-[[ "$SLOT" =~ ^[0-9]*$ && "$REPEAT" =~ ^[1-9][0-9]*$ ]] || die "invalid slot or repeat count"
+[[ -x "$DEV" ]] || die "workspace aura not found above $REPO_ROOT"
 [[ -z "$WORKERS" || "$WORKERS" =~ ^[1-9][0-9]*$ ]] || die "invalid worker count"
+[[ "$REPEAT" =~ ^[1-9][0-9]*$ ]] || die "repeat must be a positive integer"
+[[ "$NAME" =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]*$ ]] || die "invalid runtime name"
+[[ -z "$SLOT" || "$SLOT" =~ ^[1-9][0-9]*$ ]] || die "slot must be a positive integer"
+STATE="${AURA_WORKSPACE_STATE_DIR:-$WORKSPACE/.workspace}"
+[[ ! -e "$STATE/env/$NAME.env" && ! -e "$STATE/golden/$NAME" ]] || die_env "runtime state already exists for $NAME"
+mkdir -p "$STATE" || die_env "verification state directory is not writable"
+node "$SCRIPT_DIR/dev/oss-disk-preflight.mjs" "$STATE" || die_env "insufficient or unreadable verification storage; no allocation created"
 
-node "$SCRIPT_DIR/dev/oss-disk-preflight.mjs" "$STATE_ROOT" || die_env "insufficient or unreadable verification storage; no allocation created"
-
-# --- resolve the spec paths the gate will run --------------------------------
 RUN_PATHS=()
 case "$SCOPE_MODE" in
   slice) RUN_PATHS=("${SLICE_DIRS[@]}");;
-  full)  RUN_PATHS=();;                       # no positional => both OSS projects
-  dirs)  RUN_PATHS=("${SCOPE_DIRS[@]}");;
+  full) RUN_PATHS=();;
+  dirs) RUN_PATHS=("${SCOPE_DIRS[@]}");;
 esac
-
 if [[ ${#RUN_PATHS[@]} -gt 0 ]]; then
   for spec_path in "${RUN_PATHS[@]}"; do
     [[ "$spec_path" == tests/e2e/* && "$spec_path" != *..* && -e "$REPO_ROOT/web-admin/$spec_path" ]] \
       || die_env "requested test path does not exist or is outside tests/e2e: $spec_path; no allocation created"
   done
 fi
+command -v lsof >/dev/null || die_env "lsof is required for port ownership checks"
+RUNTIME_LIST="$("$DEV" runtime list)" || die_env "cannot inspect runtime allocations"
 
 # --- pick a free slot if the caller did not name one -------------------------
-# A free slot = not claimed by any dev.sh runtime AND whose computed host ports
+# A free slot = not claimed by any aura runtime AND whose computed host ports
 # (backend 6400+slot / web 5100+slot / bff 6100+slot for the auraboot repo) have
 # no listener. oss-golden-stack.sh `up` also verifies port ownership and dies on
 # a foreign listener, so this is a courtesy pre-check, not the only guard.
 slot_in_use() {
   local s="$1"
-  "$DEV" runtime list 2>/dev/null | awk 'NR>1{print $3}' | grep -qx "$s" && return 0
+  printf '%s\n' "$RUNTIME_LIST" | awk 'NR>1{print $3}' | grep -qx "$s" && return 0
   local be=$((6400 + s)) web=$((5100 + s)) bff=$((6100 + s))
   lsof -nP -iTCP:"$be"  -sTCP:LISTEN -t >/dev/null 2>&1 && return 0
   lsof -nP -iTCP:"$web" -sTCP:LISTEN -t >/dev/null 2>&1 && return 0
@@ -168,43 +179,33 @@ slot_in_use() {
   return 1
 }
 registered_slot_for_name() {
-  "$DEV" runtime list 2>/dev/null | awk -v name="$NAME" 'NR > 1 && $1 == name { print $3; exit }'
+  printf '%s\n' "$RUNTIME_LIST" | awk -v name="$NAME" 'NR > 1 && $1 == name { print $3; exit }'
 }
 registered_slot="$(registered_slot_for_name)"
-[[ -z "$registered_slot" ]] || die "runtime '$NAME' already exists; choose a new verification name (existing data preserved)"
+[[ -z "$registered_slot" ]] || die_env "runtime '$NAME' already exists; use a new attempt name and unused slot"
+[[ ! -e "$STATE/golden/$NAME" ]] || die_env "golden state '$NAME' already exists; retained evidence will not be overwritten"
 if [[ -z "$SLOT" ]]; then
   for cand in $(seq 73 249); do
     if ! slot_in_use "$cand"; then SLOT="$cand"; break; fi
   done
-  [[ -n "$SLOT" ]] || die "could not auto-pick a free slot; pass --slot N"
+  [[ -n "$SLOT" ]] || die_env "no free slot; pass --slot N explicitly"
 elif slot_in_use "$SLOT"; then
-  die "slot $SLOT is already in use; choose an unused slot"
+  die_env "slot $SLOT is occupied; no process will be stopped"
 fi
+log "retaining verification runtime '$NAME' and its database on every exit"
 
-STACK_ATTEMPTED=0
-cleanup() {
+retain() {
   local rc=$?
-  trap - EXIT INT TERM
-  if [[ "$STACK_ATTEMPTED" == 1 ]]; then
-    local allocation
-    allocation="$("$DEV" runtime show "$NAME" --json | node -e 'let s="";process.stdin.on("data",x=>s+=x);process.stdin.on("end",()=>{const d=JSON.parse(s);if(d.allocation===null)console.log("absent");else if(d.allocation&&typeof d.allocation==="object")console.log("present");else process.exitCode=1})')" || allocation=unknown
-    if [[ "$allocation" == absent ]]; then
-      log "no allocation registered; startup state and evidence preserved"
-    elif [[ "$allocation" != present ]]; then
-      log "allocation status unavailable; refusing cleanup"
-      [[ "$rc" != 0 ]] || rc=2
-    elif [[ "$KEEP" == 1 ]]; then
-      log "--keep: allocated runtime '$NAME' retained; inspect its manifest for startup status"
-    elif "$GS" down "$NAME"; then
-      "$DEV" runtime close "$NAME" || { [[ "$rc" != 0 ]] || rc=2; }
-    else
-      log "owned stop refused; runtime retained for diagnosis"
-      [[ "$rc" != 0 ]] || rc=2
-    fi
+  local allocation
+  allocation="$("$DEV" runtime show "$NAME" --json)" || allocation=""
+  if printf '%s' "$allocation" | node -e 'let s="";process.stdin.on("data",v=>s+=v);process.stdin.on("end",()=>{try{process.exit(JSON.parse(s).allocation===null?0:1)}catch{process.exit(1)}})'; then
+    log "no allocation registered; startup state and evidence preserved"
+    return "$rc"
   fi
-  exit "$rc"
+  log "keeping startup state; runtime status must be inspected: '$NAME' slot=$SLOT exit=$rc; inspect with: $GS status $NAME"
+  return "$rc"
 }
-trap cleanup EXIT
+trap retain EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
@@ -219,10 +220,11 @@ echo "=============================================================="
 # Backend-side contract set BEFORE the stack starts: exported here so it is plain
 # that the backend booted with it, not asserted after the fact.
 export AGENT_LLM_STUB_MODE=true
-log "1/4 new verification stack; require an empty isolated database"
-STACK_ATTEMPTED=1
-"$GS" up "$NAME" --slot "$SLOT" --ttl 3h --runtime-mode verification --require-empty-db --no-warm --plugin-profile demo \
-  || die_env "stack bring-up failed; inspect $STATE_ROOT/golden/$NAME/"
+log "1/4 new isolated stack: $NAME slot=$SLOT"
+# Warm auth is required by the unchanged OSS slice.
+"$GS" up "$NAME" --slot "$SLOT" --ttl 3h --runtime-mode verification --require-new-db --plugin-profile demo \
+  || die_env "stack bring-up failed — inspect retained golden-stack logs"
+"$DEV" runtime verify "$NAME" || die_env "runtime ownership verification failed"
 
 # The demo profile does not carry the internal test-fixtures plugin, and ~60 OSS
 # specs (incl. saved-view / automation) reference e2et_* models. Import it
@@ -231,15 +233,13 @@ STACK_ATTEMPTED=1
 # PW_PROFILE=oss auto-import — we do it here, deterministically.)
 log "1b/4 import internal test-fixtures plugin (e2et_* models)"
 "$GS" import "$NAME" --plugin-profile none --plugin test-fixtures \
-  || die_env "test-fixtures import failed — see $STATE_ROOT/golden/$NAME/import.log"
-
-"$GS" warm "$NAME" || die_env "canonical setup/auth/route preconditions failed"
-
-"$GS" verify-artifacts "$NAME" || die_env "runtime identity or import receipts invalid"
+  || die_env "test-fixtures import failed — see $WORKSPACE/.workspace/runtimes/$NAME/oss-stack/logs/import.log"
 
 # --- 2. resolve the stack env (base URL + backend + PG*) ---------------------
 log "2/4 resolve stack env"
 eval "$("$GS" env "$NAME")" || die_env "could not resolve stack env for '$NAME'"
+export PW_RESULTS_JSON="$AURA_EVIDENCE_ROOT/results.json"
+export PLAYWRIGHT_JSON_OUTPUT_FILE="$AURA_EVIDENCE_ROOT/results.json"
 mkdir -p "$AURA_EVIDENCE_ROOT/logs"
 LOG="$AURA_EVIDENCE_ROOT/logs/oss-e2e-gate-$(date +%Y%m%d-%H%M%S).log"
 log "    base=$PLAYWRIGHT_BASE_URL backend=$BACKEND_URL bff=$BFF_PORT (AGENT_LLM_STUB_MODE=$AGENT_LLM_STUB_MODE)"
@@ -248,10 +248,18 @@ log "    base=$PLAYWRIGHT_BASE_URL backend=$BACKEND_URL bff=$BFF_PORT (AGENT_LLM
 # aura-bpm and aura-crm release suites own those fixtures and denominators.
 
 # --- 3. run the gate slice under the OSS env contract ------------------------
-log "3/4 run gate: PW_PROFILE=oss --project=oss --project=oss-deep --no-deps (x$REPEAT)"
 cd "$REPO_ROOT/web-admin" || die_env "web-admin not found under $REPO_ROOT"
-mkdir -p "$AURA_EVIDENCE_ROOT/playwright/report"
-export PLAYWRIGHT_JSON_OUTPUT_FILE="$AURA_EVIDENCE_ROOT/playwright/report/results.json"
+if [[ "$SCOPE_MODE" == slice ]]; then
+  PROFILE="$REPO_ROOT/scripts/gates/oss-e2e-gate-profile.json"
+  AUDIT="$REPO_ROOT/scripts/gates/hifi-golden-results.mjs"
+  [[ -f "$PROFILE" && -f "$AUDIT" ]] || die_env "fixed slice contract is missing"
+  PW_PROFILE=oss pnpm exec playwright test "${RUN_PATHS[@]}" --project=oss --no-deps \
+    --repeat-each="$REPEAT" --list --reporter=json >"$AURA_EVIDENCE_ROOT/collection.json" \
+    2>"$AURA_EVIDENCE_ROOT/collection.stderr.log" || exit 1
+  node "$AUDIT" "$PROFILE" "$AURA_EVIDENCE_ROOT/collection.json" collection "$REPEAT" \
+    >"$AURA_EVIDENCE_ROOT/collection-ledger.json" || exit 1
+fi
+log "3/4 run gate: PW_PROFILE=oss --project=oss --project=oss-deep --no-deps (x$REPEAT)"
 PW_ARGS=(--project=oss --project=oss-deep --no-deps --repeat-each="$REPEAT" --retries=0 --reporter=line,json)
 [[ -n "$WORKERS" ]] && PW_ARGS+=(--workers="$WORKERS")
 [[ ${#RUN_PATHS[@]} -gt 0 ]] && PW_ARGS+=("${RUN_PATHS[@]}")
@@ -271,7 +279,7 @@ if [[ "$SCOPE_MODE" == full ]]; then
     pnpm exec playwright test "${PW_ARGS[@]}" --grep-invert 'Open Platform golden journey' 2>&1 | tee -a "$LOG"
   REMAINING_RC=${PIPESTATUS[0]}
   node "$SCRIPT_DIR/dev/oss-gate-catalog-results.mjs" "$REPORT_ROOT/catalog.json" \
-    "$PLAYWRIGHT_JSON_OUTPUT_FILE" "$REPORT_ROOT/pristine.json" "$REPORT_ROOT/remaining.json"
+    "$PW_RESULTS_JSON" "$REPORT_ROOT/pristine.json" "$REPORT_ROOT/remaining.json"
   GATE_RC=$?
   if [[ "$PRISTINE_RC" != 0 || "$REMAINING_RC" != 0 ]]; then GATE_RC=1; fi
 else
@@ -283,11 +291,54 @@ if [[ "$GATE_RC" == 0 ]]; then
 fi
 fi
 
+set -e 2>/dev/null || true
+# Both validators inspect the same original Playwright JSON report.
+if [[ "$GATE_RC" == 0 ]]; then
+  python3 - "$PW_RESULTS_JSON" "$SCOPE_MODE" "$REPEAT" <<'REPORT_PY' || GATE_RC=1
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+if not path.is_file():
+    raise SystemExit("OSS gate failed: Playwright JSON report is missing")
+report = json.loads(path.read_text())
+stats = report.get("stats", {})
+if any(stats.get(key) != 0 for key in ("unexpected", "skipped", "flaky")):
+    raise SystemExit("OSS gate failed: failed, skipped, flaky, or incomplete report")
+if not isinstance(stats.get("expected"), int) or stats["expected"] <= 0 or report.get("errors") != []:
+    raise SystemExit("OSS gate failed: empty execution or global errors")
+projects = report.get("config", {}).get("projects", [])
+if not projects or any(project.get("retries") != 0 for project in projects):
+    raise SystemExit("OSS gate failed: retries must remain zero")
+if sys.argv[2] == "slice" and stats["expected"] != 12 * int(sys.argv[3]):
+    raise SystemExit("OSS gate failed: original slice execution count changed")
+tests = []
+def walk(suites):
+    for suite in suites:
+        for spec in suite.get("specs", []):
+            tests.extend(spec.get("tests", []))
+        walk(suite.get("suites", []))
+walk(report.get("suites", []))
+if len(tests) != stats["expected"]:
+    raise SystemExit("OSS gate failed: test details do not match reported count")
+for test in tests:
+    results = test.get("results", [])
+    if test.get("status") != "expected" or len(results) != 1 or results[0].get("status") != "passed" or results[0].get("retry") != 0:
+        raise SystemExit("OSS gate failed: missing pass, retry, or unexpected test result")
+print(f"OSS JSON evidence verified: {len(tests)} passed, zero skips/retries/flaky/errors")
+REPORT_PY
+fi
+
 # --- 4. report + exit = gate result ------------------------------------------
 log "4/4 result"
-# Informational counts parsed from the reporter line. The runner and structured execution audit determine the result. The runner signal is
+# Informational counts parsed from the reporter line. The AUTHORITATIVE signal is
 # GATE_RC (the process exit code), never the parsed text — a tee pipeline's own
 # exit code would lie, which is why GATE_RC comes from PIPESTATUS above.
+if [[ "$GATE_RC" == 0 && "$SCOPE_MODE" == slice ]]; then
+  node "$AUDIT" "$PROFILE" "$AURA_EVIDENCE_ROOT/results.json" execution "$REPEAT" \
+    >"$AURA_EVIDENCE_ROOT/execution-ledger.json" || exit 1
+fi
 SUMMARY="$(grep -aoE '[0-9]+ (passed|failed|flaky|skipped|did not run)' "$LOG" 2>/dev/null | tail -6 | tr '\n' ' ')"
 echo "=============================================================="
 if [[ "$GATE_RC" == 0 ]]; then
@@ -298,7 +349,7 @@ else
   [[ -n "$SUMMARY" ]] && log "  $SUMMARY"
   log "  full log:    $LOG"
   log "  artifacts:   $AURA_EVIDENCE_ROOT"
-  log "  (re-run with --keep to inspect the live stack)"
+  log "  retained stack: $GS status $NAME"
 fi
 echo "=============================================================="
 exit "$GATE_RC"

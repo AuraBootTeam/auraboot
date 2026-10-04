@@ -56,9 +56,9 @@ public class AccountSecurityPolicyController {
     public ApiResponse<AccountSecurityPolicyResponse> getPolicy() {
         String mode = selfServiceEnabled ? "self_service" : "admin_managed";
         String[] notes = new String[] {
-                "密码复杂度、历史密码、过期时间、登录锁定和重置令牌有效期由部署级配置统一控制。",
+                "密码复杂度、历史密码、过期时间、登录锁定和重置令牌有效期由系统管理员统一配置。",
                 "默认关闭公开注册，成员开通使用管理员受控流程。",
-                "当前页面为只读交付视图，不提供租户级策略编辑。"
+                "此处可查看当前安全策略；如需调整，请联系系统管理员。"
         };
         return ApiResponse.success(AccountSecurityPolicyResponse.builder()
                 .mode(mode)

@@ -53,9 +53,7 @@ export interface ListSortStateOwnership {
  * user edits. Hydration itself never owns a sort: a clean URL must stay clean,
  * while an explicit initial URL sort remains a deep-link override.
  */
-export function resolveListSortState(
-  input: ListSortStateOwnershipInput,
-): ListSortStateOwnership {
+export function resolveListSortState(input: ListSortStateOwnershipInput): ListSortStateOwnership {
   const hasInitialUrlOverride = input.initialUrlSorts.length > 0;
   const applySavedViewSorts = !hasInitialUrlOverride && !input.hasLocalSortChange;
 
@@ -91,8 +89,13 @@ export function decodeSorts(raw: string | null | undefined): SortConfig[] {
 export function encodeFilters(filters: ViewFilterConfig[]): string | null {
   if (!filters || filters.length === 0) return null;
   const json = JSON.stringify(filters);
-  // btoa works in both browser and Node 18+ (Buffer.from fallback not needed)
-  return btoa(json);
+  // Escape non-ASCII UTF-16 code units before base64. JSON parsing restores
+  // Unicode values and existing Latin-1 links remain readable by the decoder.
+  const asciiJson = json.replace(
+    /[^\u0000-\u007f]/g,
+    (character) => '\\u' + character.charCodeAt(0).toString(16).padStart(4, '0'),
+  );
+  return btoa(asciiJson);
 }
 
 export function areFiltersEqual(
@@ -180,4 +183,13 @@ export function useListUrlState(): ListUrlState {
   );
 
   return { sorts, filters, setSorts, setFilters };
+}
+
+export function resolveListFilterState(input: {
+  initialUrlFilters: ViewFilterConfig[];
+  hasLocalFilterChange: boolean;
+}): { applySavedViewFilters: boolean } {
+  return {
+    applySavedViewFilters: input.initialUrlFilters.length === 0 && !input.hasLocalFilterChange,
+  };
 }

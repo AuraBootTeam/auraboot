@@ -45,7 +45,7 @@ public class AdminEventLogServiceImpl implements AdminEventLogService {
                 logEntry.setTenantId(MetaContext.getCurrentTenantId());
             }
             if (logEntry.getActorUserId() == null) {
-                logEntry.setActorUserId(MetaContext.getCurrentUserId());
+                logEntry.setActorUserId(MetaContext.getActualActorUserId());
             }
             if (logEntry.getActorType() == null || logEntry.getActorType().isBlank()) {
                 logEntry.setActorType("user");

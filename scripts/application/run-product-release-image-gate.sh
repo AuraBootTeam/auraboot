@@ -326,7 +326,6 @@ docker run -d --name "$APP_CONTAINER" --network "$NETWORK" -p 127.0.0.1::6443 \
   -e AURA_REGISTRY_REGISTRATION_USERNAME="$REGISTRATION_DB_ROLE" \
   -e AURA_REGISTRY_REGISTRATION_PASSWORD_FILE=/run/secrets/aura-registry-password \
   "$IMAGE_REF" \
-  --aura.persistence.tenant-bypass-table-prefixes=se_ \
   --open-platform.protocol-signing-key="$OPEN_PLATFORM_SIGNING_KEY" \
   "${RUNTIME_ARGS[@]}" >/dev/null || fail 'application image failed to start'
 APP_PORT="$(docker port "$APP_CONTAINER" 6443/tcp | tail -1)"; APP_PORT="${APP_PORT##*:}"

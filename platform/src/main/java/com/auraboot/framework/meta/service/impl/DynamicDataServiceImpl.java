@@ -2,6 +2,7 @@ package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.meta.service.*;
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.event.config.TenantAwareTaskDecorator;
 import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.meta.security.CsvSafetyUtils;
 import com.auraboot.framework.meta.service.DataDomainService;
@@ -43,8 +44,6 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -97,7 +96,6 @@ import java.util.stream.Collectors;
 public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDataService {
     private static final String DEFAULT_LIST_SORT_COLUMN = "updated_at";
     private static final String DEFAULT_LIST_SORT_DIRECTION = "DESC";
-    private static final Set<String> AUDIT_USER_DISPLAY_FIELDS = Set.of("created_by", "updated_by");
 
     private final MetaModelService metadataService;
     private final QueryBuilderService queryBuilderService;
@@ -181,25 +179,16 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
      * non-transactional callers retain immediate dispatch.
      */
     private void triggerAutomationAfterCommit(String description, Runnable trigger) {
+        // Capture before the request scope ends; AFTER_COMMIT can run after identity cleanup.
+        Runnable scopedTrigger = new TenantAwareTaskDecorator().decorate(trigger);
         Runnable safeTrigger = () -> {
             try {
-                trigger.run();
+                scopedTrigger.run();
             } catch (Exception e) {
                 log.error("Failed to trigger {}: {}", description, logSafe(e.getMessage()), e);
             }
         };
-        if (TransactionSynchronizationManager.isActualTransactionActive()
-                && TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(
-                    new TransactionSynchronization() {
-                        @Override
-                        public void afterCommit() {
-                            safeTrigger.run();
-                        }
-                    });
-            return;
-        }
-        safeTrigger.run();
+        AfterCommitDispatchSupport.afterCommitOrNow(safeTrigger);
     }
 
     private PermissionFacade getPermissionFacade() {
@@ -437,502 +426,68 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
      * Apply field-level permission filtering to a list of records.
      * Removes keys that are in the hiddenFields set.
      */
+    private DynamicDataReadSupport readSupport() {
+        return new DynamicDataReadSupport(metadataService, dynamicDataMapper, userMapper, fileService,
+                dataPermissionEngine, fieldPermissionService, this::getPermissionAuditService,
+                this::getPermissionFacade, this::resolveCurrentTenantMemberId);
+    }
+
     private List<Map<String, Object>> applyFieldPermissionFilter(String modelCode, List<Map<String, Object>> records) {
-        if (records == null || records.isEmpty()) {
-            return records;
-        }
-        try {
-            Long memberId = currentMemberIdForFieldPermissions();
-            FieldPermissionSet fieldPerms = fieldPermissionService.getFieldPermissions(memberId, modelCode);
-            if (fieldPerms.hiddenFields().isEmpty()) {
-                return records;
-            }
-            Set<String> hidden = fieldPerms.hiddenFields();
-            for (Map<String, Object> record : records) {
-                hidden.forEach(record::remove);
-            }
-        } catch (Exception e) {
-            // Fail closed for security (matches the sibling row-ACL / field-mask paths in this class):
-            // if field-permission evaluation fails we must NOT return records with their hidden fields
-            // still present, or hidden field values leak to callers who should not see them.
-            // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
-            log.error("Failed to apply field permission filter for model {} — failing closed for security", logSafe(modelCode), e);
-            throw new MetaServiceException("Field permission evaluation failed for model: " + modelCode, e);
-        }
-        return records;
+        return readSupport().applyFieldPermissionFilter(modelCode, records);
     }
 
     private List<Map<String, Object>> enrichAuditUsersBeforeFieldPermissionFilter(
             String modelCode,
             List<Map<String, Object>> records,
             List<String> auditUserDisplayFields) {
-        enrichAuditUserDisplayFields(records, auditUserDisplayFields);
-        return applyFieldPermissionFilter(modelCode, records);
+        return readSupport().enrichAuditUsersBeforeFieldPermissionFilter(modelCode, records, auditUserDisplayFields);
     }
 
-    /**
-     * Apply field-level permission filtering to a single record.
-     */
     private Map<String, Object> applyFieldPermissionFilterSingle(String modelCode, Map<String, Object> record) {
-        if (record == null) {
-            return record;
-        }
-        try {
-            Long memberId = currentMemberIdForFieldPermissions();
-            FieldPermissionSet fieldPerms = fieldPermissionService.getFieldPermissions(memberId, modelCode);
-            if (fieldPerms.hiddenFields().isEmpty()) {
-                return record;
-            }
-            List<String> appliedHiddenFields = fieldPerms.hiddenFields().stream()
-                    .filter(record::containsKey)
-                    .sorted()
-                    .toList();
-            if (!appliedHiddenFields.isEmpty()) {
-                auditHiddenFieldFiltering(modelCode, memberId, record, appliedHiddenFields);
-                appliedHiddenFields.forEach(record::remove);
-            }
-        } catch (Exception e) {
-            // Fail closed for security (matches the sibling row-ACL / field-mask paths in this class).
-            // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
-            log.error("Failed to apply field permission filter for model {} — failing closed for security", logSafe(modelCode), e);
-            throw new MetaServiceException("Field permission evaluation failed for model: " + modelCode, e);
-        }
-        return record;
-    }
-
-    private void auditHiddenFieldFiltering(
-            String modelCode,
-            Long memberId,
-            Map<String, Object> record,
-            List<String> hiddenFields) {
-        if (memberId == null || hiddenFields == null || hiddenFields.isEmpty() || !MetaContext.exists()) {
-            return;
-        }
-        try {
-            Long tenantId = MetaContext.getCurrentTenantId();
-            getPermissionAuditService().logFieldGovernanceFilter(
-                    tenantId,
-                    memberId,
-                    modelCode,
-                    "read",
-                    toLongOrNull(record.get("id")),
-                    toNonBlankString(record.get("pid")),
-                    hiddenFields);
-        } catch (Exception e) {
-            // Audit is for forensics; the filtered response has already removed
-            // hidden fields and must not fail because audit persistence is down.
-            log.warn("Failed to submit field-governance audit for model {}: {}",
-                    logSafe(modelCode), logSafe(e.getMessage()), e);
-        }
-    }
-
-    private Long toLongOrNull(Object value) {
-        if (value instanceof Number number) {
-            return number.longValue();
-        }
-        if (value instanceof String text && !text.isBlank()) {
-            try {
-                return Long.parseLong(text);
-            } catch (NumberFormatException ignored) {
-                return null;
-            }
-        }
-        return null;
-    }
-
-    private String toNonBlankString(Object value) {
-        if (value == null) {
-            return null;
-        }
-        String text = String.valueOf(value);
-        return text.isBlank() ? null : text;
+        return readSupport().applyFieldPermissionFilterSingle(modelCode, record);
     }
 
     private Long currentMemberIdForFieldPermissions() {
-        Long memberId = MetaContext.getCurrentMemberId();
-        return memberId != null ? memberId : resolveCurrentTenantMemberId();
+        return readSupport().currentMemberIdForFieldPermissions();
     }
 
     private List<Map<String, Object>> enrichListRecords(
             String modelCode,
             List<Map<String, Object>> records) {
-        if (records == null || records.isEmpty()) {
-            return records;
-        }
-
-        // Generic REFERENCE field lookup enrichment (GAP-124)
-        enrichReferenceDisplayFields(modelCode, records);
-
-        if (!"tenant_member".equals(modelCode)) {
-            return records;
-        }
-
-        Set<Long> userIds = records.stream()
-                .map(record -> asLong(record.get("user_id")))
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-        if (userIds.isEmpty()) {
-            return records;
-        }
-
-        Map<Long, User> userMap = userMapper.selectBatchIds(userIds).stream()
-                .collect(Collectors.toMap(User::getId, user -> user));
-
-        for (Map<String, Object> record : records) {
-            Long userId = asLong(record.get("user_id"));
-            if (userId == null) {
-                continue;
-            }
-            User user = userMap.get(userId);
-            if (user == null) {
-                continue;
-            }
-
-            String nickName = user.getNickName();
-            String username = user.getUserName();
-            String displayName = (nickName != null && !nickName.isBlank())
-                    ? nickName
-                    : ((username != null && !username.isBlank()) ? username : String.valueOf(userId));
-
-            record.put("user_name", displayName);
-            record.put("user_nick_name", nickName);
-            record.put("user_username", username);
-            record.put("user_email", user.getEmail());
-
-            if (user.getImgId() != null && !user.getImgId().isBlank()) {
-                try {
-                    record.put("user_avatar_url", fileService.getFileDownloadUrl(user.getImgId()));
-                } catch (Exception e) {
-                    log.warn("Failed to resolve avatar URL for userId={}: {}", logSafe(userId), logSafe(e.getMessage()), e);
-                }
-            }
-        }
-        return records;
+        return readSupport().enrichListRecords(modelCode, records);
     }
 
-    /**
-     * Resolve the visible audit actor columns with one tenant-scoped user query.
-     * No query runs when the page does not request an audit field, and unresolved
-     * users stay blank rather than falling back to an internal numeric ID.
-     */
     private void enrichAuditUserDisplayFields(
             List<Map<String, Object>> records,
             List<String> requestedFields) {
-        if (records == null || records.isEmpty() || requestedFields == null || requestedFields.isEmpty()) {
-            return;
-        }
-
-        List<String> fields = requestedFields.stream()
-                .filter(AUDIT_USER_DISPLAY_FIELDS::contains)
-                .distinct()
-                .toList();
-        if (fields.isEmpty()) {
-            return;
-        }
-
-        Set<Long> userIds = new LinkedHashSet<>();
-        for (Map<String, Object> record : records) {
-            for (String field : fields) {
-                Long userId = asLong(record.get(field));
-                if (userId != null) {
-                    userIds.add(userId);
-                }
-            }
-        }
-        if (userIds.isEmpty()) {
-            return;
-        }
-
-        Long tenantId = MetaContext.getCurrentTenantId();
-        Map<Long, String> displayNames = new HashMap<>();
-        for (Map<String, Object> user : userMapper.findDisplayNamesByIdsInTenant(tenantId, userIds)) {
-            Long userId = asLong(user.get("id"));
-            Object displayName = user.get("display_name");
-            if (userId != null && displayName != null && !String.valueOf(displayName).isBlank()) {
-                displayNames.put(userId, String.valueOf(displayName));
-            }
-        }
-
-        for (Map<String, Object> record : records) {
-            for (String field : fields) {
-                String displayName = displayNames.get(asLong(record.get(field)));
-                if (displayName != null) {
-                    record.put(field + "_display", displayName);
-                }
-            }
-        }
+        readSupport().enrichAuditUserDisplayFields(records, requestedFields);
     }
 
-    private Long asLong(Object value) {
-        if (value == null) {
-            return null;
-        }
-        if (value instanceof Number number) {
-            return number.longValue();
-        }
-        try {
-            return Long.parseLong(String.valueOf(value));
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
-
-    /**
-     * Resolve a reference field's target as canonical {@code [targetModelCode, displayField]}, or null.
-     * Import normalizes every writing style to {@code refTarget.targetEntity} (C1), so this reads only
-     * the canonical key — from the typed refTarget, else extraProps.refTarget, else
-     * extraProps.extension.refTarget (the two storage locations the canonical may land in). No
-     * compatibility with the legacy modelCode/targetModel writing styles (collapsed at import).
-     */
-    @SuppressWarnings("unchecked")
-    private String[] resolveCanonicalRefTarget(FieldDefinition field) {
-        if (field == null) return null;
-        if (field.getRefTarget() != null && field.getRefTarget().getTargetEntity() != null
-                && !field.getRefTarget().getTargetEntity().isBlank()) {
-            return new String[] { field.getRefTarget().getTargetEntity(), field.getRefTarget().getDisplayField() };
-        }
-        Map<String, Object> extra = field.getExtraProps();
-        if (extra == null) return null;
-        Object rt = extra.get("refTarget");
-        if (!(rt instanceof Map) && extra.get("extension") instanceof Map<?, ?> ext) {
-            rt = ((Map<String, Object>) ext).get("refTarget");
-        }
-        if (!(rt instanceof Map)) return null;
-        Map<String, Object> m = (Map<String, Object>) rt;
-        String target = m.get("targetEntity") instanceof String s && !s.isBlank() ? s : null;
-        if (target == null) return null;
-        String display = m.get("displayField") instanceof String d && !d.isBlank() ? d : null;
-        return new String[] { target, display };
-    }
-
-    /**
-     * Resolve the display-name enrichment target for a list field, covering both `reference`
-     * fields (via {@link #resolveCanonicalRefTarget}) and renderComponent-driven picker fields
-     * whose visual control implies a target: {@code userselect → sys_user},
-     * {@code organizationselect → org_department}. Returns {@code {targetModelCode, displayField}}
-     * or {@code null} when the field needs no {@code <field>_display} enrichment.
-     *
-     * <p>{@code memberpicker} is intentionally excluded — it stores a multi-value list, not a
-     * single id, so scalar id→name resolution does not apply.
-     */
     private String[] resolveEnrichmentTarget(FieldDefinition field) {
-        if (field == null) return null;
-        String[] canonical = resolveCanonicalRefTarget(field);
-        if (canonical != null) return canonical;
-        Map<String, Object> extra = field.getExtraProps();
-        Object rc = extra == null ? null : extra.get("renderComponent");
-        String renderComponent = rc instanceof String s ? s.trim().toLowerCase() : null;
-        if (renderComponent == null) return null;
-        return switch (renderComponent) {
-            case "userselect" -> new String[] { "sys_user", null };
-            case "organizationselect" -> new String[] { "org_department", "org_dept_name" };
-            default -> null;
-        };
+        return readSupport().resolveEnrichmentTarget(field);
     }
 
-    /** True when {@code displayField} on {@code targetModelCode} is masked for this user (sensitive). */
-    private boolean isDisplayFieldMasked(Long tenantId, Long userId, String targetModelCode, String displayField) {
-        if (tenantId == null || userId == null) return false;
-        try {
-            List<FieldMaskRule> rules = dataPermissionEngine.getFieldMaskRules(tenantId, targetModelCode, userId);
-            if (rules != null) {
-                for (FieldMaskRule rule : rules) {
-                    if (displayField.equals(rule.getFieldCode())) return true;
-                }
-            }
-        } catch (Exception e) {
-            // Fail-safe: if we cannot determine sensitivity, suppress the system-resolved name.
-            log.warn("Reference display mask check failed for {}.{}; suppressing enrich",
-                    logSafe(targetModelCode), logSafe(displayField));
-            return true;
-        }
-        return false;
-    }
-
-    private record ReferenceReadAccess(boolean allowed, String rowFilter) {
-        private static ReferenceReadAccess denied() {
-            return new ReferenceReadAccess(false, "");
-        }
-
-        private static ReferenceReadAccess allowed(String rowFilter) {
-            return new ReferenceReadAccess(true, rowFilter == null ? "" : rowFilter);
-        }
-    }
-
-    /**
-     * Resolve the complete target-side read boundary for a reference lookup.
-     *
-     * <p>Reading the source model is not authority to enumerate or reveal labels from a different
-     * business model. Reference options and display enrichment therefore require target-model
-     * RBAC first, then apply that target's row scope. The small system identity map retains the
-     * platform's existing tenant-scoped user-name resolution contract; it has no dynamic model
-     * permission definition to evaluate.
-     */
-    private ReferenceReadAccess evaluateReferenceReadAccess(
+    private DynamicDataReadSupport.ReferenceReadAccess evaluateReferenceReadAccess(
             Long tenantId, Long userId, String targetModelCode) {
-        if (tenantId == null || userId == null || !hasText(targetModelCode)) {
-            return ReferenceReadAccess.denied();
-        }
-        if (SYSTEM_TABLE_MAP.containsKey(targetModelCode)) {
-            return ReferenceReadAccess.allowed("");
-        }
-        try {
-            Long memberId = currentMemberIdForFieldPermissions();
-            if (memberId == null
-                    || !getPermissionFacade().canAction(memberId, targetModelCode, "read")) {
-                return ReferenceReadAccess.denied();
-            }
-            return ReferenceReadAccess.allowed(
-                    dataPermissionEngine.buildRowFilter(tenantId, targetModelCode, userId));
-        } catch (Exception e) {
-            log.error("Reference target authorization failed for model {}; denying lookup",
-                    logSafe(targetModelCode), e);
-            return ReferenceReadAccess.denied();
-        }
+        return readSupport().evaluateReferenceReadAccess(tenantId, userId, targetModelCode);
     }
 
     private void enrichReferenceDisplayFields(String modelCode, List<Map<String, Object>> records) {
-        Optional<ModelDefinition> modelOpt = metadataService.getModelDefinition(modelCode);
-        if (modelOpt.isEmpty()) return;
-
-        ModelDefinition model = modelOpt.get();
-        // Enrich `reference` fields AND renderComponent-driven picker fields (userselect /
-        // organizationselect) with a resolved `<field>_display` name — see resolveEnrichmentTarget.
-        List<FieldDefinition> refFields = model.getFields().stream()
-                .filter(f -> resolveEnrichmentTarget(f) != null)
-                .toList();
-
-        if (refFields.isEmpty()) return;
-
-        Long tenantId = MetaContext.getCurrentTenantId();
-        Long userId = MetaContext.getCurrentUserId();
-
-        for (FieldDefinition refField : refFields) {
-            String fieldCode = refField.getCode();
-            String columnName = refField.getColumnName() != null ? refField.getColumnName() : fieldCode;
-
-            String[] canonical = resolveEnrichmentTarget(refField);
-            if (canonical == null) continue;
-            String targetModelCode = canonical[0];
-            String displayField = canonical[1];
-            if (targetModelCode == null || targetModelCode.isBlank()) continue;
-
-            // Collect unique reference IDs
-            Set<String> refIds = new java.util.LinkedHashSet<>();
-            for (Map<String, Object> record : records) {
-                Object val = record.get(columnName);
-                if (val != null && !String.valueOf(val).isBlank()) {
-                    refIds.add(String.valueOf(val));
-                }
-            }
-            if (refIds.isEmpty()) continue;
-
-            // An empty reference cannot reveal target data. Short-circuit before target RBAC,
-            // row-scope and masking lookups; otherwise every nullable reference on every write
-            // read-back pays the full authorization query cost despite having nothing to enrich.
-            ReferenceReadAccess targetAccess = evaluateReferenceReadAccess(
-                    tenantId, userId, targetModelCode);
-            if (!targetAccess.allowed()) {
-                continue;
-            }
-
-            // Sensitive reference: if the display field is masked for THIS user on the target model,
-            // do NOT system-resolve a name — leave it to the normal per-user path so masking/field
-            // permission is honored (敏感引用不出名/仍按权限). Names (the usual displayField) are not
-            // masked, so this only suppresses genuinely sensitive display fields.
-            if (displayField != null && isDisplayFieldMasked(tenantId, userId, targetModelCode, displayField)) {
-                continue;
-            }
-
-            // Batch lookup: query target model for display values
-            try {
-                // System aliases are backed by fixed platform tables and deliberately have no
-                // dynamic model definition. Avoid repeating the same known-negative lookup for
-                // every user/organization reference during list enrichment.
-                Optional<ModelDefinition> targetModelOpt = resolveSystemTable(targetModelCode) == null
-                        ? metadataService.getModelDefinition(targetModelCode)
-                        : Optional.empty();
-                String targetTable = targetModelOpt
-                        .map(ModelDefinition::getTableName)
-                        .orElse(resolveSystemTable(targetModelCode));
-                if (targetTable == null) continue;
-
-                String inClause = refIds.stream()
-                        .map(id -> "'" + id.replace("'", "''") + "'")
-                        .collect(java.util.stream.Collectors.joining(","));
-
-                // Resolve the display column expression + alias (system tables → safe COALESCE).
-                String[] displayCol = resolveDisplayColumnExpression(targetModelOpt, targetModelCode, displayField);
-                String displayColumnExpr = displayCol[0];
-                String displayColumnName = displayCol[1];
-
-                String sql = "SELECT pid, " + displayColumnExpr + " AS " + displayColumnName
-                        + " FROM " + targetTable
-                        + " WHERE pid IN (" + inClause + ")"
-                        + buildSoftDeleteClause(targetModelOpt.orElse(null))
-                        + (targetAccess.rowFilter().isBlank() ? "" : " " + targetAccess.rowFilter());
-
-                List<Map<String, Object>> targetRows = dynamicDataMapper.selectByQuery(sql, java.util.Collections.emptyMap());
-                Map<String, String> displayMap = new java.util.HashMap<>();
-                for (Map<String, Object> row : targetRows) {
-                    String pid = String.valueOf(row.get("pid"));
-                    Object dispVal = row.get(displayColumnName);
-                    if (dispVal != null) {
-                        displayMap.put(pid, String.valueOf(dispVal));
-                    }
-                }
-
-                // Populate _display suffix
-                String displayKey = fieldCode + "_display";
-                for (Map<String, Object> record : records) {
-                    Object val = record.get(columnName);
-                    if (val != null) {
-                        String display = displayMap.get(String.valueOf(val));
-                        if (display != null) {
-                            record.put(displayKey, display);
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                logReferenceEnrichmentFailure(fieldCode, modelCode, e);
-            }
-        }
+        readSupport().enrichReferenceDisplayFields(modelCode, records);
     }
-
-    /**
-     * Best-effort reference-display enrichment must never silently mask a real error. When the
-     * enrichment query fails <b>inside an active transaction</b> it also aborts that transaction
-     * (Postgres {@code 25P02}), so the surrounding operation then fails with confusing downstream
-     * {@code current transaction is aborted} errors that bury the true cause. Log at ERROR with
-     * that correlation so the root cause is a one-line find rather than a stack dig. Outside a
-     * transaction the failure is self-contained, so WARN is enough.
-     */
-    private void logReferenceEnrichmentFailure(String fieldCode, String modelCode, Exception e) {
-        // codeql[java/log-injection] Field/model codes are validated metadata identifiers and are logged as structured parameters only.
-        if (TransactionSynchronizationManager.isActualTransactionActive()) {
-            log.error("REFERENCE display enrichment for field {} of model {} failed inside an active "
-                            + "transaction; this aborts the transaction, so any following 'current "
-                            + "transaction is aborted' (25P02) errors are secondary. Root cause: {}",
-                    logSafe(fieldCode), logSafe(modelCode), logSafe(e.getMessage()), e);
-        } else {
-            log.warn("Failed to enrich REFERENCE display for field {} in model {}: {}",
-                    logSafe(fieldCode), logSafe(modelCode), logSafe(e.getMessage()), e);
-        }
-    }
-
-    private static final Map<String, String> SYSTEM_TABLE_MAP = Map.of(
-            "ns_user", "ab_user",
-            "ab_user", "ab_user",
-            // Canonical user model code used across config/frontend (userselect targets,
-            // sc_owner_user refTarget) — physically the ab_user table.
-            "sys_user", "ab_user"
-    );
 
     private String resolveSystemTable(String modelCode) {
-        return SYSTEM_TABLE_MAP.get(modelCode);
+        return readSupport().resolveSystemTable(modelCode);
     }
 
-    // ==================== Atomic counter ====================
+    private String buildSoftDeleteClause(ModelDefinition modelDefinition) {
+        return readSupport().buildSoftDeleteClause(modelDefinition);
+    }
+
+    private String[] resolveDisplayColumnExpression(
+            Optional<ModelDefinition> targetModelOpt, String targetModelCode, String displayField) {
+        return readSupport().resolveDisplayColumnExpression(targetModelOpt, targetModelCode, displayField);
+    }
 
     private static final Set<String> NUMERIC_DATA_TYPES = Set.of(
             "integer", "int", "long", "bigint", "decimal", "numeric", "float", "double");
@@ -967,7 +522,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         ModelDefinition model = getModelDefinition(modelCode);
         ModelMutationGuard.assertMutable(model, "updated");
-        FieldDefinition compareField = findFieldDefinition(model, fieldCode);
+        FieldDefinition compareField = DynamicDataValueMapper.findFieldDefinition(model, fieldCode);
         if (compareField.isPrimaryKey() || compareField.isJsonbVirtual() || compareField.isVirtual()) {
             throw new MetaServiceException(
                     "compareAndSet requires a writable stored field: " + fieldCode);
@@ -985,7 +540,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             throw new MetaServiceException("compareAndSet contains a non-writable field");
         }
         for (String nextFieldCode : data.keySet()) {
-            FieldDefinition nextField = findFieldDefinition(model, nextFieldCode);
+            FieldDefinition nextField = DynamicDataValueMapper.findFieldDefinition(model, nextFieldCode);
             if (nextField.isPrimaryKey() || nextField.isJsonbVirtual() || nextField.isVirtual()
                     || nextField.isImmutable() || nextField.getImmutableWhen() != null) {
                 throw new MetaServiceException(
@@ -1095,83 +650,6 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             return Optional.of(n.longValue());
         }
         return Optional.empty();
-    }
-
-    private String buildSoftDeleteClause(ModelDefinition modelDefinition) {
-        if (modelDefinition != null && modelDefinition.isSoftDelete()) {
-            return " AND (deleted_flag = FALSE OR deleted_flag IS NULL)";
-        }
-        return "";
-    }
-
-    private String resolveReferenceDisplayColumn(ModelDefinition targetModel, String configuredDisplayField) {
-        List<FieldDefinition> fields = targetModel != null && targetModel.getFields() != null
-                ? targetModel.getFields()
-                : java.util.Collections.emptyList();
-
-        if (configuredDisplayField != null && !configuredDisplayField.isBlank()) {
-            for (FieldDefinition field : fields) {
-                String columnName = field.getColumnName() != null ? field.getColumnName() : field.getCode();
-                if (configuredDisplayField.equals(field.getCode()) || configuredDisplayField.equals(columnName)) {
-                    return field.getColumnName() != null ? field.getColumnName() : field.getCode();
-                }
-            }
-        }
-
-        if (targetModel != null) {
-            for (FieldDefinition field : metadataService.getDisplayFields(targetModel.getCode())) {
-                if (!field.isPrimaryKey()) {
-                    return field.getColumnName() != null ? field.getColumnName() : field.getCode();
-                }
-            }
-        }
-
-        for (FieldDefinition field : fields) {
-            String columnName = field.getColumnName() != null ? field.getColumnName() : field.getCode();
-            String normalized = columnName.toLowerCase(java.util.Locale.ROOT);
-            if (normalized.endsWith("_name") || "name".equals(normalized) || normalized.endsWith("_title")
-                    || "title".equals(normalized) || normalized.endsWith("_code") || "code".equals(normalized)) {
-                return columnName;
-            }
-        }
-
-        return "pid";
-    }
-
-    /**
-     * Display column expression mapping for system tables that don't have ModelDefinition registered.
-     * Uses COALESCE to fall back through multiple columns (e.g., nick_name → user_name → email).
-     * Aliased as 'display_value' in the SELECT clause.
-     */
-    private static final Map<String, String> SYSTEM_TABLE_DISPLAY_EXPRESSIONS = Map.of(
-            "ab_user", "COALESCE(NULLIF(nick_name, ''), NULLIF(user_name, ''), email)",
-            "ns_user", "COALESCE(NULLIF(nick_name, ''), NULLIF(user_name, ''), email)",
-            "sys_user", "COALESCE(NULLIF(nick_name, ''), NULLIF(user_name, ''), email)"
-    );
-
-    /**
-     * Choose the display column expression + SELECT alias for a reference-enrichment query,
-     * returned as {@code [expression, alias]}.
-     *
-     * <p>For a <b>system table</b> (no registered {@link ModelDefinition}) we always use the
-     * {@link #SYSTEM_TABLE_DISPLAY_EXPRESSIONS} COALESCE expression, <b>regardless of any
-     * configured {@code displayField}</b>. System tables have no field metadata to validate a
-     * configured display field against, so trusting an arbitrary value would splice it straight
-     * into the SQL as a raw column. A plugin writing e.g. {@code refDisplayField: "username"} for
-     * a {@code sys_user} reference (whose {@code ab_user} table has {@code nick_name / user_name /
-     * email} but no {@code username}) would then produce {@code SELECT pid, username ...} and fail
-     * the whole enrichment query with {@code column "username" does not exist} — which, inside a
-     * command's {@code bpm:run-rule} contextLookup, aborts the transaction and surfaces as an
-     * opaque {@code bpm.rule.execution_failed}. The COALESCE already yields the canonical user
-     * display, so ignoring the raw field here is both safe and the intended behaviour.
-     */
-    private String[] resolveDisplayColumnExpression(
-            Optional<ModelDefinition> targetModelOpt, String targetModelCode, String displayField) {
-        if (targetModelOpt.isEmpty() && SYSTEM_TABLE_DISPLAY_EXPRESSIONS.containsKey(targetModelCode)) {
-            return new String[] { SYSTEM_TABLE_DISPLAY_EXPRESSIONS.get(targetModelCode), "display_value" };
-        }
-        String col = resolveReferenceDisplayColumn(targetModelOpt.orElse(null), displayField);
-        return new String[] { col, col };
     }
 
     @Override
@@ -1666,88 +1144,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
      * 转换单个字段值
      */
     private Object convertFieldValue(FieldDefinition field, Object value) {
-        if (value == null) {
-            return null;
-        }
-
-        String dataType = field.getDataType();
-        if (dataType == null) {
-            return value;
-        }
-
-        switch (dataType.toUpperCase()) {
-            case "DATE":
-                if (value instanceof String) {
-                    try {
-                        return java.sql.Date.valueOf((String) value);
-                    } catch (Exception e) {
-                        throw new MetaServiceException(
-                            "Invalid date value for field '" + field.getCode() + "': " + value, e);
-                    }
-                }
-                return value;
-
-            case "DATETIME":
-            case "TIMESTAMP":
-            case "LOCALDATETIME":
-                if (value instanceof java.time.Instant instant) {
-                    return java.sql.Timestamp.from(instant);
-                }
-                if (value instanceof java.time.LocalDateTime localDateTime) {
-                    return java.sql.Timestamp.valueOf(localDateTime);
-                }
-                if (value instanceof String) {
-                    try {
-                        return java.sql.Timestamp.valueOf((String) value);
-                    } catch (Exception e) {
-                        throw new MetaServiceException(
-                            "Invalid datetime value for field '" + field.getCode() + "': " + value, e);
-                    }
-                }
-                return value;
-
-            case "INTEGER":
-                if (value instanceof String) {
-                    try {
-                        return Integer.valueOf((String) value);
-                    } catch (NumberFormatException e) {
-                        throw new MetaServiceException(
-                            "Invalid integer value for field '" + field.getCode() + "': " + value);
-                    }
-                }
-                return value;
-
-            case "LONG":
-                if (value instanceof String) {
-                    try {
-                        return Long.valueOf((String) value);
-                    } catch (NumberFormatException e) {
-                        throw new MetaServiceException(
-                            "Invalid long value for field '" + field.getCode() + "': " + value);
-                    }
-                }
-                return value;
-
-            case "DECIMAL":
-                if (value instanceof String) {
-                    try {
-                        return new java.math.BigDecimal((String) value);
-                    } catch (NumberFormatException e) {
-                        throw new MetaServiceException(
-                            "Invalid decimal value for field '" + field.getCode() + "': " + value);
-                    }
-                }
-                return value;
-
-            case "BOOLEAN":
-                if (value instanceof String) {
-                    return Boolean.valueOf((String) value);
-                }
-                return value;
-
-            default:
-                return value;
-        }
+        return DynamicDataValueMapper.convertFieldValue(field, value);
     }
 
     /**
@@ -1960,7 +1357,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         logOperation("delete", modelCode, recordId);
 
         ModelDefinition model = getModelDefinition(modelCode);
-        ModelMutationGuard.assertMutable(model, "deleted");
+        ModelMutationGuard.assertDeleteAllowed(model);
 
         // Get record before deletion for change tracking
         Map<String, Object> existingRecord = getById(modelCode, recordId);
@@ -2460,7 +1857,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         logOperation("batchDelete", modelCode, recordIds.size());
 
         ModelDefinition model = getModelDefinition(modelCode);
-        ModelMutationGuard.assertMutable(model, "batch deleted");
+        ModelMutationGuard.assertDeleteAllowed(model);
         FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
         String tableName = SqlSafetyUtils.requireIdentifier(model.getTableName(), "table name");
         String primaryKeyColumn = SqlSafetyUtils.requireIdentifier(
@@ -2615,7 +2012,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         String sql = queryBuilder.getSql();
         if (aggregateRequest.getGroupByFields() != null && !aggregateRequest.getGroupByFields().isEmpty()) {
             List<String> groupColumns = aggregateRequest.getGroupByFields().stream()
-                    .map(f -> resolveColumnName(model, f))
+                    .map(f -> DynamicDataValueMapper.resolveColumnName(model, f))
                     .collect(Collectors.toList());
             sql = sql + " GROUP BY " + String.join(", ", groupColumns);
         }
@@ -2695,276 +2092,42 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         return aggregate(modelCode, aggregateRequest);
     }
 
-    // ==================== Relation Data ====================
+    private DynamicDataRelationSupport relationSupport() {
+        return new DynamicDataRelationSupport(dynamicDataMapper, dataPermissionEngine,
+                dataDomainService, this::getModelDefinition);
+    }
 
     @Override
     @Transactional(readOnly = true)
-    public List<Map<String, Object>> getRelationData(String modelCode, String recordId, String relationName, Map<String, Object> queryParams) {
+    public List<Map<String, Object>> getRelationData(String modelCode, String recordId,
+                                                    String relationName, Map<String, Object> queryParams) {
         validateModelCode(modelCode);
         logOperation("getRelationData", modelCode, relationName);
-
-        ModelDefinition model = getModelDefinition(modelCode);
-        RelationDefinition relation = findRelation(model, relationName);
-
+        RelationDefinition relation = DynamicDataValueMapper.findRelation(getModelDefinition(modelCode), relationName);
         Long tenantId = getCurrentTenantId();
-
-        // Source record visibility gates relation traversal. Target rows are
-        // filtered below; the source must also pass the same single-record scope.
+        // Source visibility must be checked before any relation query.
         getById(modelCode, recordId);
-
-        // Security: validate all relation SQL identifiers to prevent injection
-        java.util.regex.Pattern NAME_PATTERN = java.util.regex.Pattern.compile("^[a-zA-Z_][a-zA-Z0-9_]*$");
-        if (relation.getTargetTable() != null && !NAME_PATTERN.matcher(relation.getTargetTable()).matches()) {
-            throw new com.auraboot.framework.exception.BusinessException("Invalid relation target table: " + relation.getTargetTable());
-        }
-        if (relation.getTargetField() != null && !NAME_PATTERN.matcher(relation.getTargetField()).matches()) {
-            throw new com.auraboot.framework.exception.BusinessException("Invalid relation target field: " + relation.getTargetField());
-        }
-        if (relation.getSourceField() != null && !NAME_PATTERN.matcher(relation.getSourceField()).matches()) {
-            throw new com.auraboot.framework.exception.BusinessException("Invalid relation source field: " + relation.getSourceField());
-        }
-        if (relation.getJoinTable() != null && !NAME_PATTERN.matcher(relation.getJoinTable()).matches()) {
-            throw new com.auraboot.framework.exception.BusinessException("Invalid relation join table: " + relation.getJoinTable());
-        }
-
-        if (relation.getRelationType() == RelationDefinition.RelationType.MANY_TO_MANY) {
-            // Many-to-many: query join table first, then target table
-            String joinSql = "SELECT " + relation.getTargetField() + " FROM " + relation.getJoinTable()
-                    + " WHERE " + relation.getSourceField() + " = #{params.recordId}"
-                    + " AND tenant_id = #{params.tenantId}";
-            Map<String, Object> joinParams = new HashMap<>();
-            joinParams.put("recordId", recordId);
-            joinParams.put("tenantId", tenantId);
-
-            List<Map<String, Object>> joinResults = dynamicDataMapper.selectByQuery(joinSql, joinParams);
-            if (joinResults.isEmpty()) {
-                return Collections.emptyList();
-            }
-
-            // Extract target IDs
-            List<Object> targetIds = joinResults.stream()
-                    .map(row -> row.get(relation.getTargetField()))
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toList());
-
-            if (targetIds.isEmpty()) {
-                return Collections.emptyList();
-            }
-
-            // Query target table — use parameterized IN clause to prevent SQL injection
-            Map<String, Object> targetParams = new HashMap<>();
-            targetParams.put("tenantId", tenantId);
-
-            StringBuilder inPlaceholders = new StringBuilder();
-            for (int i = 0; i < targetIds.size(); i++) {
-                if (i > 0) inPlaceholders.append(",");
-                String paramKey = "id_" + i;
-                inPlaceholders.append("#{params.").append(paramKey).append("}");
-                targetParams.put(paramKey, targetIds.get(i));
-            }
-
-            StringBuilder targetSqlBuilder = new StringBuilder();
-            targetSqlBuilder.append("SELECT * FROM ").append(relation.getTargetTable())
-                    .append(" WHERE id IN (").append(inPlaceholders).append(")")
-                    .append(" AND tenant_id = #{params.tenantId}");
-
-            // Row-level permission filter on target model (fail-secure)
-            String targetModelCode = relation.getTargetModel();
-            Long userId = getCurrentUserId();
-            try {
-                String rowFilter = dataPermissionEngine.buildRowFilter(tenantId, targetModelCode, userId);
-                if (rowFilter != null && !rowFilter.isBlank()) {
-                    targetSqlBuilder.append(" ").append(rowFilter);
-                }
-            } catch (Exception e) {
-                log.error("Failed to apply row-level permission in getRelationData for target: {} — denying access", logSafe(targetModelCode), e);
-                throw new MetaServiceException("Data permission evaluation failed for relation query", e);
-            }
-
-            // Domain isolation filter on target model (fail-secure)
-            try {
-                String domainFilter = dataDomainService.buildDomainFilter(targetModelCode, userId);
-                if (domainFilter != null && !domainFilter.isBlank()) {
-                    targetSqlBuilder.append(" ").append(domainFilter);
-                }
-            } catch (Exception e) {
-                log.error("Failed to apply domain filter in getRelationData for target: {} — denying access", logSafe(targetModelCode), e);
-                throw new MetaServiceException("Data domain filter failed for relation query", e);
-            }
-
-            List<Map<String, Object>> targetResults = dynamicDataMapper.selectByQuery(targetSqlBuilder.toString(), targetParams);
-
-            // Column masking on target model results (fail-secure)
-            try {
-                List<FieldMaskRule> maskRules = dataPermissionEngine.getFieldMaskRules(tenantId, targetModelCode, userId);
-                if (maskRules != null && !maskRules.isEmpty()) {
-                    targetResults = dataPermissionEngine.applyFieldMasking(targetResults, maskRules);
-                }
-            } catch (Exception e) {
-                log.error("Failed to apply field masking in getRelationData for target: {} — denying access", logSafe(targetModelCode), e);
-                throw new MetaServiceException("Field masking failed for relation query", e);
-            }
-
-            // Read-shape contract: json/jsonb fields leave as JSON strings, never PGobject.
-            JsonbFieldHelper.normalizeJsonReadValues(getModelDefinition(targetModelCode), targetResults);
-
-            return targetResults;
-        } else {
-            // One-to-many / Many-to-one: direct query on target table
-            StringBuilder sqlBuilder = new StringBuilder();
-            sqlBuilder.append("SELECT * FROM ").append(relation.getTargetTable())
-                    .append(" WHERE ").append(relation.getTargetField()).append(" = #{params.recordId}")
-                    .append(" AND tenant_id = #{params.tenantId}");
-            Map<String, Object> params = new HashMap<>();
-            params.put("recordId", recordId);
-            params.put("tenantId", tenantId);
-
-            // Row-level permission filter on target model (fail-secure)
-            String targetModelCode = relation.getTargetModel();
-            Long userId = getCurrentUserId();
-            try {
-                String rowFilter = dataPermissionEngine.buildRowFilter(tenantId, targetModelCode, userId);
-                if (rowFilter != null && !rowFilter.isBlank()) {
-                    sqlBuilder.append(" ").append(rowFilter);
-                }
-            } catch (Exception e) {
-                log.error("Failed to apply row-level permission in getRelationData for target: {} — denying access", logSafe(targetModelCode), e);
-                throw new MetaServiceException("Data permission evaluation failed for relation query", e);
-            }
-
-            // Domain isolation filter on target model (fail-secure)
-            try {
-                String domainFilter = dataDomainService.buildDomainFilter(targetModelCode, userId);
-                if (domainFilter != null && !domainFilter.isBlank()) {
-                    sqlBuilder.append(" ").append(domainFilter);
-                }
-            } catch (Exception e) {
-                log.error("Failed to apply domain filter in getRelationData for target: {} — denying access", logSafe(targetModelCode), e);
-                throw new MetaServiceException("Data domain filter failed for relation query", e);
-            }
-
-            // Apply limit from queryParams
-            if (queryParams != null && queryParams.containsKey("limit")) {
-                sqlBuilder.append(" LIMIT ").append(Integer.parseInt(queryParams.get("limit").toString()));
-            }
-
-            List<Map<String, Object>> relationResults = dynamicDataMapper.selectByQuery(sqlBuilder.toString(), params);
-
-            // Column masking on target model results (fail-secure)
-            try {
-                List<FieldMaskRule> maskRules = dataPermissionEngine.getFieldMaskRules(tenantId, targetModelCode, userId);
-                if (maskRules != null && !maskRules.isEmpty()) {
-                    relationResults = dataPermissionEngine.applyFieldMasking(relationResults, maskRules);
-                }
-            } catch (Exception e) {
-                log.error("Failed to apply field masking in getRelationData for target: {} — denying access", logSafe(targetModelCode), e);
-                throw new MetaServiceException("Field masking failed for relation query", e);
-            }
-
-            // Read-shape contract: json/jsonb fields leave as JSON strings, never PGobject.
-            JsonbFieldHelper.normalizeJsonReadValues(getModelDefinition(targetModelCode), relationResults);
-
-            return relationResults;
-        }
+        return relationSupport().getRelationData(relation, recordId, queryParams, tenantId, getCurrentUserId());
     }
-
-    // ==================== Relation CRUD ====================
 
     @Override
     @Transactional
-    public RelationOperationResult createRelations(String modelCode, String recordId, String relationName, List<String> targetRecordIds) {
+    public RelationOperationResult createRelations(String modelCode, String recordId,
+                                                    String relationName, List<String> targetRecordIds) {
         validateModelCode(modelCode);
         logOperation("createRelations", modelCode, relationName);
-
-        ModelDefinition model = getModelDefinition(modelCode);
-        RelationDefinition relation = findRelation(model, relationName);
-
-        if (relation.getRelationType() != RelationDefinition.RelationType.MANY_TO_MANY) {
-            throw new MetaServiceException("createRelations only supports MANY_TO_MANY relations. Use update for other types.");
-        }
-
-        Long tenantId = getCurrentTenantId();
-        List<String> successIds = new ArrayList<>();
-        List<String> failedIds = new ArrayList<>();
-
-        for (String targetId : targetRecordIds) {
-            try {
-                Map<String, Object> data = new HashMap<>();
-                data.put(relation.getSourceField(), recordId);
-                data.put(relation.getTargetField(), targetId);
-                data.put("tenant_id", tenantId);
-                data.put("created_at", java.time.Instant.now());
-
-                dynamicDataMapper.insert(relation.getJoinTable(), data);
-                successIds.add(targetId);
-            } catch (org.springframework.dao.DuplicateKeyException e) {
-                // Relation already exists — treat as success (idempotent)
-                log.debug("Relation already exists for target {}, treating as success", logSafe(targetId));
-                successIds.add(targetId);
-            } catch (Exception e) {
-                log.warn("Failed to create relation for target {}: {}", logSafe(targetId), logSafe(e.getMessage()), e);
-                failedIds.add(targetId);
-            }
-        }
-
-        boolean allSuccess = failedIds.isEmpty();
-        return RelationOperationResult.builder()
-                .success(allSuccess)
-                .operationType(RelationOperationResult.OperationType.CREATE_RELATION)
-                .successCount(successIds.size())
-                .failedCount(failedIds.size())
-                .successRecordIds(successIds)
-                .failedRecordIds(failedIds)
-                .errorMessage(allSuccess ? null : "Some relations failed to create")
-                .build();
+        RelationDefinition relation = DynamicDataValueMapper.findRelation(getModelDefinition(modelCode), relationName);
+        return relationSupport().createRelations(relation, recordId, targetRecordIds, getCurrentTenantId());
     }
 
     @Override
     @Transactional
-    public RelationOperationResult removeRelations(String modelCode, String recordId, String relationName, List<String> targetRecordIds) {
+    public RelationOperationResult removeRelations(String modelCode, String recordId,
+                                                    String relationName, List<String> targetRecordIds) {
         validateModelCode(modelCode);
         logOperation("removeRelations", modelCode, relationName);
-
-        ModelDefinition model = getModelDefinition(modelCode);
-        RelationDefinition relation = findRelation(model, relationName);
-
-        if (relation.getRelationType() != RelationDefinition.RelationType.MANY_TO_MANY) {
-            throw new MetaServiceException("removeRelations only supports MANY_TO_MANY relations.");
-        }
-
-        Long tenantId = getCurrentTenantId();
-        List<String> successIds = new ArrayList<>();
-        List<String> failedIds = new ArrayList<>();
-
-        for (String targetId : targetRecordIds) {
-            try {
-                Map<String, Object> conditions = new HashMap<>();
-                conditions.put(relation.getSourceField(), recordId);
-                conditions.put(relation.getTargetField(), targetId);
-                conditions.put("tenant_id", tenantId);
-
-                int deleted = dynamicDataMapper.delete(relation.getJoinTable(), conditions);
-                if (deleted > 0) {
-                    successIds.add(targetId);
-                } else {
-                    failedIds.add(targetId);
-                }
-            } catch (Exception e) {
-                log.warn("Failed to remove relation for target {}: {}", logSafe(targetId), logSafe(e.getMessage()), e);
-                failedIds.add(targetId);
-            }
-        }
-
-        boolean allSuccess = failedIds.isEmpty();
-        return RelationOperationResult.builder()
-                .success(allSuccess)
-                .operationType(RelationOperationResult.OperationType.REMOVE_RELATION)
-                .successCount(successIds.size())
-                .failedCount(failedIds.size())
-                .successRecordIds(successIds)
-                .failedRecordIds(failedIds)
-                .errorMessage(allSuccess ? null : "Some relations failed to remove")
-                .build();
+        RelationDefinition relation = DynamicDataValueMapper.findRelation(getModelDefinition(modelCode), relationName);
+        return relationSupport().removeRelations(relation, recordId, targetRecordIds, getCurrentTenantId());
     }
 
     // ==================== Validation ====================
@@ -3101,7 +2264,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         logOperation("getFieldOptions", modelCode, fieldCode);
 
         ModelDefinition model = getModelDefinition(modelCode);
-        FieldDefinition fieldDef = findFieldDefinition(model, fieldCode);
+        FieldDefinition fieldDef = DynamicDataValueMapper.findFieldDefinition(model, fieldCode);
         ReferenceOptionTarget target = resolveReferenceOptionTarget(fieldDef);
         if (target == null) {
             return Collections.emptyList();
@@ -3122,7 +2285,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         int limit = optionRequest != null && optionRequest.getLimit() != null ? optionRequest.getLimit() : 50;
         int offset = optionRequest != null && optionRequest.getOffset() != null ? optionRequest.getOffset() : 0;
 
-        ReferenceReadAccess targetAccess = evaluateReferenceReadAccess(
+        DynamicDataReadSupport.ReferenceReadAccess targetAccess = evaluateReferenceReadAccess(
                 tenantId, userId, target.targetModelCode());
         if (!targetAccess.allowed()) {
             throw new BusinessException(
@@ -3292,7 +2455,11 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                     currentMemberIdForFieldPermissions(), modelCode);
             allowedExportFields.removeAll(exportFieldPermissions.hiddenFields());
             if (exportFields == null || exportFields.isEmpty()) {
-                exportFields = new ArrayList<>(allowedExportFields);
+                // A normal roster/export starts with business columns. Explicit
+                // authorized audit exports can still request these fields.
+                exportFields = allowedExportFields.stream()
+                        .filter(field -> !Set.of("pid", "created_at", "updated_at", "created_by", "updated_by").contains(field))
+                        .toList();
             } else {
                 List<String> forbiddenFields = exportFields.stream()
                         .filter(field -> !allowedExportFields.contains(field))
@@ -3584,352 +2751,46 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     private Map<String, Object> toColumnData(ModelDefinition model, Map<String, Object> data) {
-        // Step 1: Merge JSONB virtual fields into host columns
-        Map<String, Object> mergedData = JsonbFieldHelper.mergeJsonbFields(model, data);
-
-        // Step 2: Map field codes to column names (only for non-JSONB-virtual fields)
-        Map<String, Object> columnData = new HashMap<>();
-        Map<String, String> codeToColumn = new HashMap<>();
-        Set<String> hostColumns = JsonbFieldHelper.getJsonbHostColumns(model);
-        for (FieldDefinition field : model.getFields()) {
-            if (!field.isJsonbVirtual()) {
-                codeToColumn.put(field.getCode(), field.getColumnName());
-                codeToColumn.put(field.getColumnName(), field.getColumnName());
-            }
-        }
-
-        for (Map.Entry<String, Object> entry : mergedData.entrySet()) {
-            String key = entry.getKey();
-            if (SYSTEM_COLUMNS.contains(key)) {
-                columnData.put(key, entry.getValue());
-                continue;
-            }
-            String columnName = codeToColumn.get(key);
-            if (columnName != null) {
-                Object value = entry.getValue();
-                // Serialize structured values for JSON/JSONB host columns.
-                if (hostColumns.contains(columnName) && JsonbFieldHelper.shouldSerializeJsonValue(value)) {
-                    columnData.put(columnName, JsonbFieldHelper.toJsonString(value));
-                } else {
-                    columnData.put(columnName, value);
-                }
-                continue;
-            }
-            // Could be a JSONB host column from mergeJsonbFields (key is already a column name)
-            if (hostColumns.contains(key)) {
-                Object value = entry.getValue();
-                columnData.put(key, JsonbFieldHelper.shouldSerializeJsonValue(value) ? JsonbFieldHelper.toJsonString(value) : value);
-                continue;
-            }
-            throw new MetaServiceException("Unknown field for model " + model.getCode() + ": " + key);
-        }
-
-        return columnData;
+        return DynamicDataValueMapper.toColumnData(model, data);
     }
 
-    /**
-     * toColumnData variant for UPDATE that preserves unmodified JSONB keys.
-     */
     private Map<String, Object> toColumnDataForUpdate(ModelDefinition model, Map<String, Object> data, Map<String, Object> existingRecord) {
-        // Step 1: Merge JSONB virtual fields, preserving unmodified keys from existing record
-        Map<String, Object> mergedData = JsonbFieldHelper.mergeJsonbFieldsForUpdate(model, data, existingRecord);
-
-        // Step 2: Same column mapping as toColumnData
-        Map<String, Object> columnData = new HashMap<>();
-        Map<String, String> codeToColumn = new HashMap<>();
-        Set<String> hostColumns = JsonbFieldHelper.getJsonbHostColumns(model);
-        for (FieldDefinition field : model.getFields()) {
-            if (!field.isJsonbVirtual()) {
-                codeToColumn.put(field.getCode(), field.getColumnName());
-                codeToColumn.put(field.getColumnName(), field.getColumnName());
-            }
-        }
-
-        for (Map.Entry<String, Object> entry : mergedData.entrySet()) {
-            String key = entry.getKey();
-            if (SYSTEM_COLUMNS.contains(key)) {
-                columnData.put(key, entry.getValue());
-                continue;
-            }
-            String columnName = codeToColumn.get(key);
-            if (columnName != null) {
-                Object value = entry.getValue();
-                if (hostColumns.contains(columnName) && JsonbFieldHelper.shouldSerializeJsonValue(value)) {
-                    columnData.put(columnName, JsonbFieldHelper.toJsonString(value));
-                } else {
-                    columnData.put(columnName, value);
-                }
-                continue;
-            }
-            if (hostColumns.contains(key)) {
-                Object value = entry.getValue();
-                columnData.put(key, JsonbFieldHelper.shouldSerializeJsonValue(value) ? JsonbFieldHelper.toJsonString(value) : value);
-                continue;
-            }
-            throw new MetaServiceException("Unknown field for model " + model.getCode() + ": " + key);
-        }
-
-        return columnData;
+        return DynamicDataValueMapper.toColumnDataForUpdate(model, data, existingRecord);
     }
 
-    private RelationDefinition findRelation(ModelDefinition model, String relationName) {
-        if (model.getRelations() == null) {
-            throw new MetaServiceException("Model " + model.getCode() + " has no relations defined");
-        }
-        return model.getRelations().stream()
-                .filter(r -> relationName.equals(r.getName()))
-                .findFirst()
-                .orElseThrow(() -> new MetaServiceException(
-                        "Relation '" + relationName + "' not found in model " + model.getCode()));
-    }
-
-    private FieldDefinition findFieldDefinition(ModelDefinition model, String fieldCode) {
-        return model.getFields().stream()
-                .filter(f -> fieldCode.equals(f.getCode()))
-                .findFirst()
-                .orElseThrow(() -> new MetaServiceException(
-                        "Field '" + fieldCode + "' not found in model " + model.getCode()));
-    }
-
-    private String resolveColumnName(ModelDefinition model, String fieldName) {
-        if (SYSTEM_COLUMNS.contains(fieldName) || "*".equals(fieldName)) {
-            return fieldName;
-        }
-        for (FieldDefinition field : model.getFields()) {
-            if (fieldName.equals(field.getCode()) || fieldName.equals(field.getColumnName())) {
-                // JSONB virtual fields use their typed expression for WHERE/ORDER BY
-                if (field.isJsonbVirtual()) {
-                    return field.getJsonbFilterExpression();
-                }
-                return field.getColumnName();
-            }
-        }
-        throw new MetaServiceException("Unknown field for model " + model.getCode() + ": " + fieldName);
+    private DynamicDataFileCodec fileCodec() {
+        return new DynamicDataFileCodec(objectMapper);
     }
 
     private Path exportAsExcel(List<Map<String, Object>> data, List<String> fields,
-                               Map<String, String> fieldLabelMap, String fileName, Boolean includeHeader)
-            throws IOException {
-        Path tempFile = Files.createTempFile(fileName, ".xlsx");
-        try (org.apache.poi.xssf.usermodel.XSSFWorkbook workbook = new org.apache.poi.xssf.usermodel.XSSFWorkbook()) {
-            org.apache.poi.xssf.usermodel.XSSFSheet sheet = workbook.createSheet("Data");
-
-            // Create default font with Chinese support
-            org.apache.poi.xssf.usermodel.XSSFFont defaultFont = workbook.createFont();
-            defaultFont.setFontName("Arial Unicode MS");
-            defaultFont.setFontHeightInPoints((short) 11);
-
-            // Create default cell style
-            org.apache.poi.xssf.usermodel.XSSFCellStyle defaultStyle = workbook.createCellStyle();
-            defaultStyle.setFont(defaultFont);
-
-            int rowNum = 0;
-
-            // Write header
-            if (!Boolean.FALSE.equals(includeHeader)) {
-                org.apache.poi.xssf.usermodel.XSSFRow headerRow = sheet.createRow(rowNum++);
-                // Create header style
-                org.apache.poi.xssf.usermodel.XSSFCellStyle headerStyle = workbook.createCellStyle();
-                org.apache.poi.xssf.usermodel.XSSFFont headerFont = workbook.createFont();
-                headerFont.setFontName("Arial Unicode MS");
-                headerFont.setFontHeightInPoints((short) 11);
-                headerFont.setBold(true);
-                headerStyle.setFont(headerFont);
-                headerStyle.setFillForegroundColor(org.apache.poi.ss.usermodel.IndexedColors.GREY_25_PERCENT.getIndex());
-                headerStyle.setFillPattern(org.apache.poi.ss.usermodel.FillPatternType.SOLID_FOREGROUND);
-
-                for (int i = 0; i < fields.size(); i++) {
-                    org.apache.poi.xssf.usermodel.XSSFCell cell = headerRow.createCell(i);
-                    cell.setCellValue(fieldLabelMap != null
-                            ? fieldLabelMap.getOrDefault(fields.get(i), fields.get(i))
-                            : fields.get(i));
-                    cell.setCellStyle(headerStyle);
-                }
-            }
-
-            // Write data rows
-            for (Map<String, Object> row : data) {
-                org.apache.poi.xssf.usermodel.XSSFRow dataRow = sheet.createRow(rowNum++);
-                for (int i = 0; i < fields.size(); i++) {
-                    org.apache.poi.xssf.usermodel.XSSFCell cell = dataRow.createCell(i);
-                    cell.setCellStyle(defaultStyle);
-                    Object val = row.get(fields.get(i));
-                    if (val != null) {
-                        if (val instanceof Number) {
-                            cell.setCellValue(((Number) val).doubleValue());
-                        } else if (val instanceof Boolean) {
-                            cell.setCellValue((Boolean) val);
-                        } else if (val instanceof java.util.Date) {
-                            cell.setCellValue((java.util.Date) val);
-                        } else if (val instanceof java.time.LocalDateTime) {
-                            cell.setCellValue(val.toString());
-                        } else if (val instanceof java.time.Instant) {
-                            cell.setCellValue(val.toString());
-                        } else {
-                            cell.setCellValue(val.toString());
-                        }
-                    }
-                }
-            }
-
-            // Auto-size columns (with minimum width for Chinese characters)
-            for (int i = 0; i < fields.size(); i++) {
-                sheet.autoSizeColumn(i);
-                // Ensure minimum width for Chinese content
-                int currentWidth = sheet.getColumnWidth(i);
-                if (currentWidth < 3000) {
-                    sheet.setColumnWidth(i, 3000);
-                }
-            }
-
-            // Write to file
-            try (java.io.OutputStream os = Files.newOutputStream(tempFile)) {
-                workbook.write(os);
-            }
-        }
-        return tempFile;
+                              Map<String, String> labels, String name, Boolean header) throws IOException {
+        return fileCodec().exportAsExcel(data, fields, labels, name, header);
     }
 
     private Path exportAsCsv(List<Map<String, Object>> data, List<String> fields,
-                             Map<String, String> fieldLabelMap, String fileName, Boolean includeHeader)
-            throws IOException {
-        Path tempFile = Files.createTempFile(fileName, ".csv");
-        try (BufferedWriter writer = Files.newBufferedWriter(tempFile, StandardCharsets.UTF_8)) {
-            // Write header with display labels
-            if (!Boolean.FALSE.equals(includeHeader)) {
-                List<String> headerLabels = fields.stream()
-                        .map(f -> CsvSafetyUtils.escapeCsvCell(fieldLabelMap != null
-                                ? fieldLabelMap.getOrDefault(f, f) : f))
-                        .collect(Collectors.toList());
-                writer.write(String.join(",", headerLabels));
-                writer.newLine();
-            }
-            // Write data — escape every cell (formula-injection neutralization + RFC-4180)
-            for (Map<String, Object> row : data) {
-                List<String> values = fields.stream()
-                        .map(field -> CsvSafetyUtils.escapeCsvCell(row.get(field)))
-                        .collect(Collectors.toList());
-                writer.write(String.join(",", values));
-                writer.newLine();
-            }
-        }
-        return tempFile;
+                            Map<String, String> labels, String name, Boolean header) throws IOException {
+        return fileCodec().exportAsCsv(data, fields, labels, name, header);
     }
 
     private Path exportAsJson(List<Map<String, Object>> data, List<String> fields,
-                              Map<String, String> fieldLabelMap, String fileName)
-            throws IOException {
-        Path tempFile = Files.createTempFile(fileName, ".json");
-        // Filter to only include specified fields, using display labels as keys
-        List<Map<String, Object>> filtered = data.stream()
-                .map(row -> {
-                    Map<String, Object> filteredRow = new LinkedHashMap<>();
-                    for (String field : fields) {
-                        String key = (fieldLabelMap != null)
-                                ? fieldLabelMap.getOrDefault(field, field) : field;
-                        filteredRow.put(key, row.get(field));
-                    }
-                    return filteredRow;
-                })
-                .collect(Collectors.toList());
-        objectMapper.writerWithDefaultPrettyPrinter().writeValue(tempFile.toFile(), filtered);
-        return tempFile;
+                             Map<String, String> labels, String name) throws IOException {
+        return fileCodec().exportAsJson(data, fields, labels, name);
     }
 
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> parseJsonImport(Path filePath) throws IOException {
-        Object parsed = objectMapper.readValue(filePath.toFile(), Object.class);
-        if (parsed instanceof List) {
-            return (List<Map<String, Object>>) parsed;
-        }
-        throw new MetaServiceException("JSON import file must contain an array of objects");
+    private List<Map<String, Object>> parseJsonImport(Path path) throws IOException {
+        return fileCodec().parseJsonImport(path);
     }
 
-    private List<Map<String, Object>> parseCsvImport(Path filePath, Boolean skipFirstRow) throws IOException {
-        List<String> lines = Files.readAllLines(filePath, StandardCharsets.UTF_8);
-        if (lines.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        // First line is header
-        String[] headers = lines.get(0).split(",", -1);
-        for (int i = 0; i < headers.length; i++) {
-            headers[i] = headers[i].trim().replace("\"", "");
-        }
-
-        int startLine = Boolean.FALSE.equals(skipFirstRow) ? 0 : 1;
-        List<Map<String, Object>> records = new ArrayList<>();
-        for (int i = startLine; i < lines.size(); i++) {
-            String line = lines.get(i).trim();
-            if (line.isEmpty()) continue;
-
-            String[] values = parseCsvLine(line);
-            Map<String, Object> record = new LinkedHashMap<>();
-            for (int j = 0; j < headers.length && j < values.length; j++) {
-                String val = values[j].trim();
-                record.put(headers[j], val.isEmpty() ? null : val);
-            }
-            records.add(record);
-        }
-        return records;
+    private List<Map<String, Object>> parseCsvImport(Path path, Boolean skipFirstRow) throws IOException {
+        return fileCodec().parseCsvImport(path, skipFirstRow);
     }
 
-    private String[] parseCsvLine(String line) {
-        List<String> values = new ArrayList<>();
-        StringBuilder current = new StringBuilder();
-        boolean inQuotes = false;
-        for (int i = 0; i < line.length(); i++) {
-            char c = line.charAt(i);
-            if (c == '"') {
-                if (inQuotes && i + 1 < line.length() && line.charAt(i + 1) == '"') {
-                    current.append('"');
-                    i++;
-                } else {
-                    inQuotes = !inQuotes;
-                }
-            } else if (c == ',' && !inQuotes) {
-                values.add(current.toString());
-                current = new StringBuilder();
-            } else {
-                current.append(c);
-            }
-        }
-        values.add(current.toString());
-        return values.toArray(new String[0]);
-    }
-
-    private Map<String, Object> applyFieldMapping(Map<String, Object> row, Map<String, String> fieldMapping) {
-        Map<String, Object> mapped = new LinkedHashMap<>();
-        for (Map.Entry<String, Object> entry : row.entrySet()) {
-            String targetField = fieldMapping.getOrDefault(entry.getKey(), entry.getKey());
-            mapped.put(targetField, entry.getValue());
-        }
-        return mapped;
+    private Map<String, Object> applyFieldMapping(Map<String, Object> row, Map<String, String> mapping) {
+        return fileCodec().applyFieldMapping(row, mapping);
     }
 
     private List<SortField> mapSortFields(ModelDefinition model, List<SortField> sortFields) {
-        if (sortFields == null || sortFields.isEmpty()) {
-            return Collections.emptyList();
-        }
-        Map<String, String> codeToColumn = new HashMap<>();
-        for (FieldDefinition field : model.getFields()) {
-            codeToColumn.put(field.getCode(), field.getColumnName());
-            codeToColumn.put(field.getColumnName(), field.getColumnName());
-        }
-
-        List<SortField> mappedFields = new ArrayList<>();
-        for (SortField sortField : sortFields) {
-            String columnName = codeToColumn.get(sortField.getFieldName());
-            if (columnName == null && !SYSTEM_COLUMNS.contains(sortField.getFieldName())) {
-                throw new MetaServiceException("Unknown sort field for model " + model.getCode() + ": " + sortField.getFieldName());
-            }
-            mappedFields.add(SortField.builder()
-                    .fieldName(SYSTEM_COLUMNS.contains(sortField.getFieldName()) ? sortField.getFieldName() : columnName)
-                    .direction(sortField.getDirection())
-                    .priority(sortField.getPriority())
-                    .build());
-        }
-        return mappedFields;
+        return DynamicDataValueMapper.mapSortFields(model, sortFields);
     }
 
     // ==================== Joint Sub-Table Save ====================

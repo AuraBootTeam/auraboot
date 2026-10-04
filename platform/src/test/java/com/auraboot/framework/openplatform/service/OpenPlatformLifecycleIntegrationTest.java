@@ -3,6 +3,7 @@ package com.auraboot.framework.openplatform.service;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.CreateApplicationRequest;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.InstallApplicationRequest;
@@ -338,8 +339,21 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
 
         assertNull(authMapper.findToken(secretCodec.sha256(secondToken.accessToken()),
                 OpenPlatformTokenService.AUDIENCE, Instant.now()));
-        assertThrows(IllegalArgumentException.class, () -> managementService.install(application.pid(),
-                new InstallApplicationRequest("production", Set.of("openapi.profile.read"), 600)));
+        BusinessException disabled = assertThrows(BusinessException.class,
+                () -> managementService.install(application.pid(),
+                        new InstallApplicationRequest("production", Set.of("openapi.profile.read"), 600)));
+        assertEquals(ResponseCode.NOT_FOUND, disabled.getResponseCode());
+        BusinessException repeated = assertThrows(BusinessException.class,
+                () -> managementService.disableApplication(application.pid()));
+        assertEquals(ResponseCode.NOT_FOUND, repeated.getResponseCode());
+        BusinessException memberWrite = assertThrows(BusinessException.class,
+                () -> managementService.upsertMember(application.pid(), getTestUser().getPid(),
+                        new UpsertApplicationMemberRequest("viewer")));
+        assertEquals(ResponseCode.NOT_FOUND, memberWrite.getResponseCode());
+        BusinessException missing = assertThrows(BusinessException.class,
+                () -> managementService.install("missing-application",
+                        new InstallApplicationRequest("staging", Set.of("openapi.profile.read"), 600)));
+        assertEquals(ResponseCode.NOT_FOUND, missing.getResponseCode());
     }
 
     @Test
