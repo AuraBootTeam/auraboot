@@ -130,5 +130,9 @@
   "workflowFallback": {
     "zh-CN": "工作流规则复核失败：报告显示使用了兜底，请检查规则配置。",
     "en-US": "Workflow review failed: the report indicates a fallback was used. Check the rule configuration."
+  },
+  "workflowClosedWithFallback": {
+    "zh-CN": "工作流分派规则复核失败：规则执行异常，已失败关闭，未使用静态审批人兜底。决策执行报告显示使用了兜底，请检查决策配置。",
+    "en-US": "Workflow assignment review failed: the rule failed closed; no static approver fallback was used. The decision report indicates a fallback was used. Check the decision configuration."
   }
 }

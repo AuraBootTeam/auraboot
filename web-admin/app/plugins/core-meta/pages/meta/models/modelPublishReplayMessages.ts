@@ -57,10 +57,12 @@ export function getReplayResultMessage(result: ModelPublishReplayResult, locale 
     return text('workflowDisabled', locale);
   }
   if (consumerType === 'WORKFLOW_PROCESS' && result.status === 'FAILED') {
-    if (result.outputs?.fallbackApplied === true) return text('workflowFallback', locale);
     if (result.outputs?.failClosed === true) {
-      return text('workflowClosed', locale);
+      return result.outputs?.fallbackApplied === true
+        ? text('workflowClosedWithFallback', locale)
+        : text('workflowClosed', locale);
     }
+    if (result.outputs?.fallbackApplied === true) return text('workflowFallback', locale);
     return text('workflowFailed', locale);
   }
   if (consumerType === 'WORKFLOW_PROCESS' && result.status === 'EXECUTED') {
