@@ -51,6 +51,7 @@ import java.util.stream.Collectors;
 @Transactional
 public class PageSchemaServiceImpl implements PageSchemaService {
 
+    private final com.auraboot.framework.plugin.validation.PageSchemaValidator renderProfiles;
     private final PageSchemaMapper pageSchemaMapper;
     private final PageSchemaConverter pageSchemaConverter;
     private final com.auraboot.framework.permission.service.AutoPermissionAssignmentService autoPermissionAssignmentService;
@@ -101,6 +102,7 @@ public class PageSchemaServiceImpl implements PageSchemaService {
         
         // 转换实体并设置默认值
         PageSchema pageSchema = pageSchemaConverter.toEntity(request);
+        validateRenderProfile(pageSchema);
         pageSchema.setPid(UniqueIdGenerator.generate());
         pageSchema.setStatus(Status.DRAFT.getCode());
         if (pageSchema.getExtension() == null) {
@@ -168,6 +170,7 @@ public class PageSchemaServiceImpl implements PageSchemaService {
 
         // 更新实体
         pageSchemaConverter.updateEntity(existingSchema, request);
+        validateRenderProfile(existingSchema);
         recordBoundModelVersion(existingSchema);
         existingSchema.setUpdatedAt(Instant.now());
         // Increment row_version for optimistic lock
@@ -850,7 +853,24 @@ public class PageSchemaServiceImpl implements PageSchemaService {
     /**
      * 验证是否可以发布
      */
+    private void validateRenderProfile(PageSchema pageSchema) {
+        List<Object> blocks = null;
+        if (pageSchema.getBlocks() != null) {
+            try {
+                blocks = objectMapper.readValue(pageSchema.getBlocks(), new TypeReference<List<Object>>() { });
+            } catch (com.fasterxml.jackson.core.JsonProcessingException invalid) {
+                throw new ValidationException(ResponseCode.CommonValidationFailed, "Invalid page blocks JSON");
+            }
+        }
+        List<String> errors = renderProfiles.authoringProfileErrors(
+                pageSchema.getKind(), pageSchema.getProfile(), blocks);
+        if (!errors.isEmpty()) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed, String.join("; ", errors));
+        }
+    }
+
     private void validateCanPublish(PageSchema pageSchema) {
+        validateRenderProfile(pageSchema);
         if (Status.PUBLISHED.getCode().equals(pageSchema.getStatus())) {
             throw new ValidationException(ResponseCode.CommonValidationFailed,
                 "页面配置已经发布");
