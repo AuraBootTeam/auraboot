@@ -15,6 +15,7 @@ import org.springframework.util.StringUtils;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Listens for CommandCompletedEvent and records a tamper-proof audit trail entry.
@@ -47,8 +48,10 @@ public class AuditTrailEventListener {
             if (auditEvent.getTenantId() == null || auditEvent.getTenantId() <= 0) {
                 throw new IllegalArgumentException("Audit event requires a positive tenantId");
             }
-            MetaContext.setContext(auditEvent.getTenantId(), auditEvent.getActorId(),
-                    extractString(event.getMetadata(), "actorPid"), auditEvent.getActorName());
+            MetaContext.restore(new MetaContext.Snapshot(
+                    auditEvent.getTenantId(), auditEvent.getActorId(),
+                    extractString(event.getMetadata(), "actorPid"), auditEvent.getActorName(),
+                    Set.of(), null, null, null, null));
             auditTrailService.recordAudit(auditEvent);
         } catch (Exception e) {
             // Audit trail failures must never break the main flow.

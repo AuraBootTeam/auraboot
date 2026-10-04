@@ -170,7 +170,7 @@ export default function PageDesignerEditorImpl() {
         }
         setMeta(result.meta);
         setSchema(result.schema);
-        dslHistory.resetHistory(result.schema);  // reset history so undo cannot reach placeholder
+        dslHistory.resetHistory(result.schema); // reset history so undo cannot reach placeholder
       })
       .catch((err: unknown) => {
         console.error('Failed to load page:', err);
@@ -378,7 +378,7 @@ export default function PageDesignerEditorImpl() {
       setMeta(result.meta);
       setSchema(result.schema);
       latestSchemaRef.current = result.schema;
-      dslHistory.resetHistory(result.schema);  // reset history so undo cannot reach pre-rollback state
+      dslHistory.resetHistory(result.schema); // reset history so undo cannot reach pre-rollback state
     } else {
       setError('回滚后未找到页面');
     }
@@ -386,13 +386,17 @@ export default function PageDesignerEditorImpl() {
 
   // Shared AI merge handler — used by both toolbar (legacy dialog) and AI panel
   const handleAiGenerated = useCallback(
-    (generated: { kind: PageSchema['kind']; blocks: PageSchema['blocks']; layout: PageSchema['layout']; schemaVersion: 2; mergeMode?: MergeMode }) => {
+    (generated: {
+      kind: PageSchema['kind'];
+      blocks: PageSchema['blocks'];
+      layout: PageSchema['layout'];
+      schemaVersion: 2;
+      mergeMode?: MergeMode;
+    }) => {
       const mergeMode: MergeMode = generated.mergeMode || 'replace';
       const existingBlocks = schema?.blocks ?? [];
       const mergedBlocks =
-        mergeMode === 'append'
-          ? [...existingBlocks, ...generated.blocks]
-          : generated.blocks;
+        mergeMode === 'append' ? [...existingBlocks, ...generated.blocks] : generated.blocks;
 
       const aiSchema: PageSchema = {
         ...(schema || {}),
@@ -438,7 +442,10 @@ export default function PageDesignerEditorImpl() {
   // Error state
   if (error) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-50" data-testid="error-state">
+      <div
+        className="flex h-screen items-center justify-center bg-gray-50"
+        data-testid="error-state"
+      >
         <div className="flex max-w-md flex-col items-center gap-4 text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
             <svg
@@ -456,9 +463,7 @@ export default function PageDesignerEditorImpl() {
             </svg>
           </div>
           <h2 className="text-xl font-semibold text-gray-900">{error}</h2>
-          <p className="text-gray-500">
-            目标页面不存在，或当前环境暂时无法完成加载。
-          </p>
+          <p className="text-gray-500">目标页面不存在，或当前环境暂时无法完成加载。</p>
           <button
             onClick={handleBack}
             className="rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
@@ -486,7 +491,10 @@ export default function PageDesignerEditorImpl() {
     : undefined;
 
   return (
-    <div className="flex h-screen flex-col bg-gray-50">
+    <div
+      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-gray-50"
+      data-testid="page-designer-editor"
+    >
       {/* Toolbar */}
       <DesignerToolbar
         pageMeta={localizedMeta}
@@ -515,6 +523,7 @@ export default function PageDesignerEditorImpl() {
         onSave={() => toolbarActions.save()}
         onPublish={() => toolbarActions.publish()}
         onSettings={toolbarActions.toggleSettings}
+        onPageCreated={(pid) => navigate(`/page-designer/${pid}`)}
         onShortcutHelp={toolbarActions.toggleShortcuts}
         aiPanelOpen={aiPanelOpen}
         onToggleAiPanel={() => setAiPanelOpen((prev) => !prev)}
@@ -531,8 +540,8 @@ export default function PageDesignerEditorImpl() {
       />
 
       {/* Designer + AI Panel */}
-      <div className="flex flex-1 overflow-hidden">
-        <div className="flex-1 overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+        <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
           {schema && (
             <DesignerRouter
               schema={schema}

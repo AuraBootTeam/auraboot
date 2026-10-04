@@ -52,8 +52,10 @@ import { getUserInfo } from '~/shared/services/userService';
 import { isPublicRoute } from '~/middleware/sessionMiddlewareFactory';
 import {
   getSessionFromRequest,
+  getImpersonationFromRequest,
   getTokenFromRequest,
   maybeRenewSession,
+  restoreOperatorSession,
   sessionStorage,
 } from '~/shared/services/session';
 import { AuthProvider } from '~/contexts/AuthContext';
@@ -132,7 +134,14 @@ export async function resolveDeploymentBrandingFromBff(
 export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoaderData | Response> {
   const locale = getLocaleFromRequest(request);
   const initialTimezone = getTimezoneFromRequest(request);
-  const { pathname } = new URL(request.url);
+  const requestUrl = new URL(request.url);
+  const { pathname } = requestUrl;
+  const impersonation = await getImpersonationFromRequest(request);
+  if (impersonation && new Date(impersonation.expiresAt).getTime() <= Date.now()) {
+    return redirect(pathname + requestUrl.search, {
+      headers: { 'Set-Cookie': await restoreOperatorSession(request) },
+    });
+  }
   const runtimeProfile = getRuntimeProfileFromPathname(pathname);
   const icpCompliance = resolveIcpComplianceConfig(process.env);
   const branding = await resolveDeploymentBrandingFromBff(process.env);
@@ -181,6 +190,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
       branding,
       buildIdentity,
       accessPolicy,
+      impersonation: null,
     };
     ssrLoaderCache.set(cacheKey, result);
     return result;
@@ -217,6 +227,11 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
   // Transport, timeout and 5xx failures throw instead, preserving the valid session for retry.
   if (!user && !isPublicRoute(pathname)) {
     if (token) {
+      if (impersonation) {
+        return redirect(pathname + requestUrl.search, {
+          headers: { 'Set-Cookie': await restoreOperatorSession(request) },
+        });
+      }
       const session = await getSessionFromRequest(request);
       return redirect(`/login?redirectTo=${encodeURIComponent(pathname)}`, {
         headers: {
@@ -258,6 +273,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
     branding,
     buildIdentity,
     accessPolicy,
+    impersonation,
   };
 
   // Sliding-session renewal: when the access token is inside its renewal window,
@@ -265,7 +281,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
   // cookie is attached to this response so every subsequent request carries the
   // new token; failures are non-fatal (the current token stays valid until its
   // real deadline, then the normal 401 → login redirect applies).
-  if (user) {
+  if (user && !impersonation) {
     const renewal = await maybeRenewSession(request);
     if (renewal.renewed && renewal.setCookie) {
       return new Response(JSON.stringify(rootData), {
@@ -394,7 +410,7 @@ export default function App() {
           skipTenantPreferences={data.skipTenantPreferences}
         >
           <TenantThemeProvider>
-            <ToastProvider>
+            <ToastProvider closeLabel={data.i18n?.['notification.close']}>
               <ConfirmDialogProvider>
                 {bootCoreRuntime ? <AuraBotProvider>{appFrame}</AuraBotProvider> : appFrame}
               </ConfirmDialogProvider>
@@ -413,7 +429,10 @@ export default function App() {
       <ThemeProvider>
         {bootCoreRuntime ? (
           <AuthProvider>
-            <AuthSessionRevalidator enabled={bootCoreRuntime} isAuthenticated={!!data.user} />
+            <AuthSessionRevalidator
+              enabled={bootCoreRuntime && !data.impersonation}
+              isAuthenticated={!!data.user}
+            />
             <EntitlementProvider>
               <CorePluginBootstrap enabled={bootCoreRuntime} />
               <DslRegistryProvider>{sharedProviders}</DslRegistryProvider>
@@ -436,9 +455,10 @@ export function ErrorBoundary({ error }: ErrorBoundaryProps) {
   const { title, detail } = resolveErrorPresentation(view, locale);
   const [errorId, setErrorId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [clientContext, setClientContext] = useState<{ pageUrl: string; occurredAt: string } | null>(
-    null,
-  );
+  const [clientContext, setClientContext] = useState<{
+    pageUrl: string;
+    occurredAt: string;
+  } | null>(null);
   const t = (key: Parameters<typeof rootT>[0]) => rootT(key, locale);
   const errorMessage = error instanceof Error ? error.message : String(error ?? '');
   const stack = error instanceof Error ? error.stack : undefined;
@@ -544,9 +564,7 @@ export function ErrorBoundary({ error }: ErrorBoundaryProps) {
             )}
             <div className="flex justify-between gap-3">
               <dt>{t('pageUrl')}</dt>
-              <dd className="max-w-[15rem] truncate font-mono">
-                {clientContext?.pageUrl ?? '—'}
-              </dd>
+              <dd className="max-w-[15rem] truncate font-mono">{clientContext?.pageUrl ?? '—'}</dd>
             </div>
             <div className="flex justify-between gap-3">
               <dt>{t('occurredAt')}</dt>

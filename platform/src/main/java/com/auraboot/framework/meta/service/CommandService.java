@@ -23,6 +23,11 @@ public interface CommandService {
 
     CommandDefinitionDTO findByPid(String pid);
 
+    /**
+     * Finds the current tenant or active-release command.
+     * @throws com.auraboot.framework.meta.exception.CommandNotFoundException only when absent;
+     *         other lookup failures propagate unchanged
+     */
     CommandDefinitionDTO findByCode(String code);
 
     List<CommandDefinitionDTO> listByModelCode(String modelCode);

@@ -29,6 +29,8 @@ public class UserProfileResponse {
      * 邮箱
      */
     private String email;
+
+    private Boolean emailVerified;
     
     /**
      * 手机号

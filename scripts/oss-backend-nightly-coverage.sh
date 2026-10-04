@@ -65,5 +65,6 @@ console.log(`bundle-line covered=${covered} missed=${missed} ratio=${(covered / 
 } >> "$EVIDENCE/result.txt"
 
 cat "$EVIDENCE/result.txt"
+[[ "$TEST_EXIT" -eq 0 ]] || exit 1
 [[ "$VERIFY_EXIT" -eq 0 ]] || exit 1
 exit 0

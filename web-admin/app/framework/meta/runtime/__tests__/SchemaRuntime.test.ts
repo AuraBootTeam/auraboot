@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
-import { Activity, createElement } from 'react';
+import { Activity, createElement, type ReactNode } from 'react';
 import { useSchemaRuntime } from '~/framework/meta/hooks/useSchemaRuntime';
 import { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
@@ -336,11 +336,11 @@ describe('page runtime manager lifecycle', () => {
     const manager = createManager();
     let mode: 'visible' | 'hidden' = 'visible';
     try {
-      const { result, rerender, unmount } = renderHook(({ status }) => useSchemaRuntime({
+      const { result, rerender, unmount } = renderHook(({ status }: { status: string }) => useSchemaRuntime({
         schema: minimalSchema, dataSourceManager: manager, navigate: vi.fn(), locale: 'en', t: key => key,
         disableAutoFetch: true, skipDataSourceRegistration: true,
         initialContext: { record: { inv_fgpt_status: status } },
-      }), { initialProps: { status: 'pending_pack' }, wrapper: ({ children }) => createElement(Activity, { mode }, children) });
+      }), { initialProps: { status: 'pending_pack' }, wrapper: ({ children }: { children: ReactNode }) => createElement(Activity, { mode, children }) });
       await waitFor(() => expect(result.current?.getContext()).toMatchObject({ record: { inv_fgpt_status: 'pending_pack' } }));
       mode = 'hidden';
       rerender({ status: 'pending_pack' });
@@ -358,7 +358,7 @@ describe('page runtime manager lifecycle', () => {
     const first = createManager();
     const second = createManager();
     second.register('pageOwned', { endpoint: '/api/page-owned', autoFetch: false });
-    const { result, rerender, unmount } = renderHook(({ manager }) => useSchemaRuntime({
+    const { result, rerender, unmount } = renderHook(({ manager }: { manager: DataSourceManager }) => useSchemaRuntime({
       schema: minimalSchema, dataSourceManager: manager, navigate: vi.fn(), locale: 'en', t: key => key,
       disableAutoFetch: true, skipDataSourceRegistration: true,
       initialContext: { record: { pid: 'fixture-task', inv_fgpt_status: 'pending_pack' } },
@@ -378,7 +378,7 @@ describe('page runtime manager lifecycle', () => {
 
   it('synchronizes later record values without recreating a stable manager or losing action state', async () => {
     const manager = createManager();
-    const { result, rerender, unmount } = renderHook(({ status }) => useSchemaRuntime({
+    const { result, rerender, unmount } = renderHook(({ status }: { status: string }) => useSchemaRuntime({
       schema: minimalSchema, dataSourceManager: manager, navigate: vi.fn(), locale: 'en', t: key => key,
       disableAutoFetch: true, skipDataSourceRegistration: true,
       initialContext: { record: { inv_fgpt_status: status } },

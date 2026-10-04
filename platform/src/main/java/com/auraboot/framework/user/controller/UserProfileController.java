@@ -7,6 +7,7 @@ import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.file.dto.FileUploadResponseDTO;
 import com.auraboot.framework.file.service.FileService;
 import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
+import com.auraboot.framework.permission.annotation.DisallowImpersonation;
 import com.auraboot.framework.user.dto.ChangePasswordRequest;
 import com.auraboot.framework.user.dto.UpdateUserProfileRequest;
 import com.auraboot.framework.user.dto.UserProfileResponse;
@@ -65,6 +66,7 @@ public class UserProfileController {
      * Change password for current user.
      */
     @PutMapping("/password")
+    @DisallowImpersonation
     @Operation(summary = "修改密码")
     public ApiResponse<Void> changePassword(
             @CurrentUserId Long userId,

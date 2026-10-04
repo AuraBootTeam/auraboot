@@ -58,6 +58,19 @@ class I18nServiceTest {
     }
 
     @Test
+    void zeroImportTenantsHaveBundledActionLabelsAndDatabaseOverrides() {
+        when(i18nResourceService.getResourceMapByLang("zh-CN")).thenReturn(Map.of());
+        var chinese = service.getI18nData("zh-CN");
+        assertEquals("新建", chinese.get("common.button.create"));
+        assertEquals("操作", chinese.get("table.actions"));
+        assertEquals("打印", chinese.get("action.print"));
+        when(i18nResourceService.getResourceMapByLang("en-US")).thenReturn(Map.of("action.print", "School print"));
+        var english = service.getI18nData("en-US");
+        assertEquals("Create", english.get("common.button.create"));
+        assertEquals("School print", english.get("action.print"));
+    }
+
+    @Test
     void getI18nData_emptyOrNullLocale_usesDefaultLocale() {
         Map<String, String> dbData = Map.of("k", "v");
         when(i18nResourceService.getResourceMapByLang("zh-CN")).thenReturn(dbData);

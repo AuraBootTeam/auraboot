@@ -8,13 +8,22 @@ import tsconfigPaths from 'vite-tsconfig-paths';
 // denominator. Tests stub enterprise contributions as empty via vi.mock.
 const webContributionsStub: Plugin = {
   name: 'auraboot-web-contributions-vitest-stub',
-  resolveId(id) {
+  resolveId(id, importer) {
     if (id === 'virtual:auraboot-web-contributions') {
       return '\0virtual:auraboot-web-contributions';
+    }
+    // The production server bundle is generated only by `build`. Resolve that
+    // artifact during unit transforms so the unexecuted BFF entry stays in the
+    // coverage denominator instead of falling back to parsing raw TypeScript.
+    if (id === '../../build/server/index.js' && importer?.endsWith('/app/server/bff.server.ts')) {
+      return '\0virtual:auraboot-test-server-build';
     }
     return null;
   },
   load(id) {
+    if (id === '\0virtual:auraboot-test-server-build') {
+      return 'export const routes = {}';
+    }
     if (id === '\0virtual:auraboot-web-contributions') {
       // Plain JS — virtual module ids are parsed without a TS transform.
       return 'export const ENTERPRISE_PLUGINS = []';

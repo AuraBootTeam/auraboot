@@ -1,0 +1,50 @@
+{
+  "NO_SCHEMA_MIGRATION": {
+    "en-US": "No physical schema migration is required. Rebuild the Rule Center usage index if field metadata changed without DDL.",
+    "zh-CN": "无需迁移物理表结构。若仅字段元数据发生变化，请重建规则中心使用索引。"
+  },
+  "CREATE_TABLE": {
+    "en-US": "Create the physical table and generated indexes before enabling runtime writes.",
+    "zh-CN": "启用运行时写入前，创建物理表及生成的索引。"
+  },
+  "ADD_COLUMN": {
+    "en-US": "Backfill new columns or define defaults before routing rules to the new field.",
+    "zh-CN": "将规则切换到新字段前，回填新增列或设置默认值。"
+  },
+  "ALTER_COLUMN_TYPE": {
+    "en-US": "Validate data casts and replay affected rules against representative records before promotion.",
+    "zh-CN": "发布前验证数据类型转换，并使用代表性记录回放受影响的规则。"
+  },
+  "DROP_COLUMN": {
+    "en-US": "Retire or migrate every affected rule consumer before removing the column.",
+    "zh-CN": "删除列前，停用或迁移所有受影响的规则消费方。"
+  },
+  "NULLABILITY": {
+    "en-US": "Check existing rows against required/nullability changes before publish.",
+    "zh-CN": "发布前检查已有记录是否满足必填和可空性变更。"
+  },
+  "REPLAY_CONSUMERS": {
+    "en-US": "Confirm Rule Center blast radius and republish or replay affected BPM, SLA, Automation, EventPolicy and decision versions.",
+    "zh-CN": "确认规则中心影响范围，并重新发布或回放受影响的工作流、SLA、自动化、事件策略及决策版本。"
+  },
+  "REVIEW_DDL": {
+    "en-US": "Review generated DDL and run a post-publish schema sync smoke.",
+    "zh-CN": "复核生成的 DDL，并在发布后验证表结构同步。"
+  },
+  "INITIAL_PUBLISH": {
+    "en-US": "Initial publish: no historical published model version exists. Rule consumers should bind to this published schema after publish.",
+    "zh-CN": "首次发布：尚无已发布的历史模型版本。发布后，规则消费方应绑定此版本的表结构。"
+  },
+  "LATEST_COMPATIBLE": {
+    "en-US": "Latest-compatible policy: publishing this draft makes it the current model metadata. Existing published rule, BPM, SLA, Automation and EventPolicy versions keep their own versioned assets, but consumers using latest model fields must be replayed and republished after acknowledgement.",
+    "zh-CN": "采用最新兼容策略：发布当前草稿后，其元数据成为当前模型元数据。已发布的规则、工作流、SLA、自动化和事件策略保留各自的版本资产；使用最新模型字段的消费方须在确认影响后回放并重新发布。"
+  },
+  "migrationHeading": {
+    "en-US": "Migration plan",
+    "zh-CN": "迁移计划"
+  },
+  "historyHeading": {
+    "en-US": "Historical version policy",
+    "zh-CN": "历史版本策略"
+  }
+}

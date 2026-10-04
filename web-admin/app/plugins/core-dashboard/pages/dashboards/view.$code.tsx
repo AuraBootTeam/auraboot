@@ -7,8 +7,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router';
-import { ArrowPathIcon, PencilSquareIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
-import { ChartBarSquareIcon } from '@heroicons/react/24/outline';
+import { ArrowPathIcon, PencilSquareIcon, ArrowLeftIcon, ChartBarSquareIcon } from '@heroicons/react/24/outline';
 import { ExportPdfButton } from '~/framework/smart/components/data-tools/ExportPdfButton';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useI18n } from '~/contexts/I18nContext';
@@ -78,7 +77,7 @@ export default function DashboardViewByCode() {
           <div className="min-w-0">
             <h1 className="break-words text-xl font-semibold text-gray-900">{dashboardTitle}</h1>
             {dashboardDescription && (
-              <p className="mt-1 break-words text-sm leading-relaxed text-gray-500">{dashboardDescription}</p>
+              <p data-testid="dashboard-description" className="mt-1 break-words text-sm leading-relaxed text-gray-500">{dashboardDescription}</p>
             )}
           </div>
         </div>

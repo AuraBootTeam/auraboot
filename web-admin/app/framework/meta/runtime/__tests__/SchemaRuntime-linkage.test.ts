@@ -186,7 +186,7 @@ describe('SchemaRuntime + LinkageEngine integration', () => {
     manager.updateScope(scope, {
       form: { category: 'ncr', subcategory: 'existing-source', reason: 'Keep this note' },
     });
-    expect(manager.getContext(scope).form.subcategory).toBe('existing-source');
+    expect(manager.getContext(scope).form?.subcategory).toBe('existing-source');
     manager.updateField(scope, 'category', 'fqc');
     runtime.triggerFieldLinkage('category', 'change');
     expect(manager.getContext(scope).form).toMatchObject({

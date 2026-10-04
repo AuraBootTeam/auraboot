@@ -62,6 +62,8 @@ export function AuthSessionRevalidator({
     }
 
     const attemptRevalidate = () => {
+      // Offline root-loader failures would dispose page-level reconnect subscriptions.
+      if (window.navigator.onLine === false) return;
       const currentTime = now();
       if (
         !shouldRevalidateAuthSession({
@@ -86,12 +88,14 @@ export function AuthSessionRevalidator({
     };
 
     window.addEventListener('focus', attemptRevalidate);
+    window.addEventListener('online', attemptRevalidate);
     document.addEventListener('visibilitychange', handleVisibilityChange);
     const intervalId =
       intervalMs > 0 ? window.setInterval(attemptRevalidate, intervalMs) : undefined;
 
     return () => {
       window.removeEventListener('focus', attemptRevalidate);
+      window.removeEventListener('online', attemptRevalidate);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (intervalId !== undefined) {
         window.clearInterval(intervalId);

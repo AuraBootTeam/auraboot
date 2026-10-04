@@ -3939,5 +3939,1708 @@
     "en-US": "Invalid source evidence. The form was not changed. Please retry.",
     "ja-JP": "原文の根拠が無効です。フォームは変更されていません。再試行してください。",
     "ko-KR": "원문 근거가 유효하지 않습니다. 양식은 변경되지 않았습니다. 다시 시도해 주세요."
+  },
+  {
+    "key": "search.settings",
+    "zh-CN": "搜索设置",
+    "en-US": "Search settings",
+    "ja-JP": "検索設定",
+    "ko-KR": "검색 설정"
+  },
+  {
+    "key": "search.settingsHint",
+    "zh-CN": "选择并排列参与记录搜索的模型。",
+    "en-US": "Choose and order the record models searched.",
+    "ja-JP": "レコード検索に使用するモデルを選択して並べ替えます。",
+    "ko-KR": "레코드 검색에 사용할 모델을 선택하고 정렬하세요."
+  },
+  {
+    "key": "search.noReadableModels",
+    "zh-CN": "暂无可搜索的模型",
+    "en-US": "No readable search models",
+    "ja-JP": "検索可能なモデルがありません",
+    "ko-KR": "검색 가능한 모델이 없습니다"
+  },
+  {
+    "key": "search.loadModelsFailed",
+    "zh-CN": "无法加载搜索模型",
+    "en-US": "Unable to load search models",
+    "ja-JP": "検索モデルを読み込めません",
+    "ko-KR": "검색 모델을 불러올 수 없습니다"
+  },
+  {
+    "key": "search.saveSettingsFailed",
+    "zh-CN": "无法保存搜索设置",
+    "en-US": "Unable to save search settings",
+    "ja-JP": "検索設定を保存できません",
+    "ko-KR": "검색 설정을 저장할 수 없습니다"
+  },
+  {
+    "key": "search.settingsSaved",
+    "zh-CN": "搜索设置已保存",
+    "en-US": "Search settings saved",
+    "ja-JP": "検索設定を保存しました",
+    "ko-KR": "검색 설정이 저장되었습니다"
+  },
+  {
+    "key": "common.moveUp",
+    "zh-CN": "上移",
+    "en-US": "Move up",
+    "ja-JP": "上へ移動",
+    "ko-KR": "위로 이동"
+  },
+  {
+    "key": "common.moveDown",
+    "zh-CN": "下移",
+    "en-US": "Move down",
+    "ja-JP": "下へ移動",
+    "ko-KR": "아래로 이동"
+  },
+  {
+    "key": "sidebar.expand",
+    "zh-CN": "展开侧栏",
+    "en-US": "Expand sidebar",
+    "ja-JP": "サイドバーを展開",
+    "ko-KR": "사이드바 펼치기"
+  },
+  {
+    "key": "sidebar.collapse",
+    "zh-CN": "收起侧栏",
+    "en-US": "Collapse sidebar",
+    "ja-JP": "サイドバーを折りたたむ",
+    "ko-KR": "사이드바 접기"
+  },
+  {
+    "key": "language.switch",
+    "zh-CN": "切换语言",
+    "en-US": "Switch language",
+    "ja-JP": "言語を切り替え",
+    "ko-KR": "언어 변경"
+  },
+  {
+    "key": "theme.switch",
+    "zh-CN": "切换主题",
+    "en-US": "Switch theme",
+    "ja-JP": "テーマを切り替え",
+    "ko-KR": "테마 변경"
+  },
+  {
+    "key": "table.reorderColumn",
+    "zh-CN": "拖动调整列顺序",
+    "en-US": "Drag to reorder column",
+    "ja-JP": "ドラッグして列を並べ替え",
+    "ko-KR": "드래그하여 열 순서 변경"
+  },
+  {
+    "key": "table.rowHeight",
+    "zh-CN": "行高",
+    "en-US": "Row height",
+    "ja-JP": "行の高さ",
+    "ko-KR": "행 높이"
+  },
+  {
+    "key": "table.statusTabs",
+    "zh-CN": "状态筛选",
+    "en-US": "Status filters",
+    "ja-JP": "状態フィルター",
+    "ko-KR": "상태 필터"
+  },
+  {
+    "key": "inbox.title",
+    "zh-CN": "收件箱",
+    "en-US": "Inbox",
+    "ja-JP": "受信トレイ",
+    "ko-KR": "받은 편지함"
+  },
+  {
+    "key": "inbox.unreadCount",
+    "zh-CN": "{count} 条未读",
+    "en-US": "{count} unread items",
+    "ja-JP": "未読 {count} 件",
+    "ko-KR": "읽지 않은 항목 {count}개"
+  },
+  {
+    "key": "dashboard.designer.title",
+    "zh-CN": "仪表盘设计器",
+    "en-US": "Dashboard Designer"
+  },
+  {
+    "key": "dashboard.designer.presentation",
+    "zh-CN": "演示模式",
+    "en-US": "Presentation Mode"
+  },
+  {
+    "key": "dashboard.designer.history",
+    "zh-CN": "版本历史",
+    "en-US": "Version History"
+  },
+  {
+    "key": "dashboard.designer.validate",
+    "zh-CN": "验证",
+    "en-US": "Validate"
+  },
+  {
+    "key": "dashboard.designer.validationPassed",
+    "zh-CN": "验证通过",
+    "en-US": "Validation passed"
+  },
+  {
+    "key": "dashboard.designer.validationFailed",
+    "zh-CN": "验证失败：{error}",
+    "en-US": "Validation failed: {error}"
+  },
+  {
+    "key": "dashboard.designer.unpublish",
+    "zh-CN": "取消发布",
+    "en-US": "Unpublish"
+  },
+  {
+    "key": "dashboard.designer.publish",
+    "zh-CN": "发布",
+    "en-US": "Publish"
+  },
+  {
+    "key": "dashboard.exportExcel",
+    "zh-CN": "导出 Excel",
+    "en-US": "Export to Excel"
+  },
+  {
+    "key": "member.invite",
+    "zh-CN": "邀请成员",
+    "en-US": "Invite"
+  },
+  {
+    "key": "member.import",
+    "zh-CN": "导入成员",
+    "en-US": "Import Members"
+  },
+  {
+    "key": "permission.role",
+    "zh-CN": "角色",
+    "en-US": "Role"
+  },
+  {
+    "key": "permission.type",
+    "zh-CN": "类型",
+    "en-US": "Type"
+  },
+  {
+    "key": "table.doubleClickEdit",
+    "zh-CN": "双击编辑",
+    "en-US": "Double-click to edit"
+  },
+  {
+    "key": "notification.close",
+    "zh-CN": "关闭通知",
+    "en-US": "Close notification"
+  },
+  {
+    "key": "designer.dragBlock",
+    "zh-CN": "拖动{label}",
+    "en-US": "Drag {label}"
+  },
+  {
+    "key": "designer.resizeBlock",
+    "zh-CN": "调整{label}大小",
+    "en-US": "Resize {label}"
+  },
+  {
+    "key": "designer.blockOrder",
+    "zh-CN": "区块顺序",
+    "en-US": "Block order"
+  },
+  {
+    "key": "designer.moveUp",
+    "zh-CN": "上移区块",
+    "en-US": "Move block up"
+  },
+  {
+    "key": "designer.moveDown",
+    "zh-CN": "下移区块",
+    "en-US": "Move block down"
+  },
+  {
+    "key": "designer.spanPresets",
+    "zh-CN": "宽度预设",
+    "en-US": "Span presets"
+  },
+  {
+    "key": "designer.setSpan",
+    "zh-CN": "设置宽度 {span}",
+    "en-US": "Set span {span}"
+  },
+  {
+    "key": "dashboard.exportEmpty",
+    "zh-CN": "没有可导出的数据",
+    "en-US": "No data to export"
+  },
+  {
+    "key": "dashboard.exportSuccess",
+    "zh-CN": "已导出 {count} 个工作表",
+    "en-US": "Exported {count} sheets"
+  },
+  {
+    "key": "dashboard.exportFailed",
+    "zh-CN": "Excel 导出失败",
+    "en-US": "Excel export failed"
+  },
+  {
+    "key": "dashboard.designer.settings",
+    "zh-CN": "设置",
+    "en-US": "Settings"
+  },
+  {
+    "key": "dashboard.designer.defaultTitle",
+    "zh-CN": "未命名仪表盘",
+    "en-US": "Untitled Dashboard"
+  },
+  {
+    "key": "admin.permission.role.recommendedHint",
+    "zh-CN": "按业务职责分配角色；管理员角色仅授予需要管理权限的人员。",
+    "en-US": "Assign roles by business responsibility; grant administrator roles only to staff who need management access.",
+    "ja-JP": "業務上の責任に応じてロールを割り当て、管理権限が必要な担当者にのみ管理者ロールを付与します。",
+    "ko-KR": "업무 책임에 따라 역할을 배정하고 관리 권한이 필요한 직원에게만 관리자 역할을 부여하세요."
+  },
+  {
+    "key": "role.tenant_admin._meta.description",
+    "zh-CN": "管理本租户的业务配置、成员与权限。",
+    "en-US": "Manage business configuration, members and permissions for this tenant.",
+    "ja-JP": "このテナントの業務設定、メンバー、権限を管理します。",
+    "ko-KR": "이 테넌트의 업무 설정, 구성원 및 권한을 관리합니다."
+  },
+  {
+    "key": "role.tenant_member._meta.description",
+    "zh-CN": "租户成员共有的基础查看能力，由系统统一维护。",
+    "en-US": "Shared basic viewing capabilities for tenant members, maintained by the system.",
+    "ja-JP": "システムが維持する、テナントメンバー共通の基本的な閲覧権限です。",
+    "ko-KR": "시스템이 관리하는 테넌트 구성원의 공통 기본 조회 권한입니다."
+  },
+  {
+    "key": "workbench.exported",
+    "zh-CN": "已导出 {count} 个工作表",
+    "en-US": "Exported {count} sheets",
+    "ja-JP": "{count} 個のシートをエクスポートしました",
+    "ko-KR": "시트 {count}개를 내보냈습니다"
+  },
+  {
+    "key": "workbench.exportNoData",
+    "zh-CN": "暂无可导出的数据",
+    "en-US": "No data to export",
+    "ja-JP": "エクスポートするデータがありません",
+    "ko-KR": "내보낼 데이터가 없습니다"
+  },
+  {
+    "key": "workbench.exportFailed",
+    "zh-CN": "Excel 导出失败，请稍后重试",
+    "en-US": "Excel export failed. Please try again.",
+    "ja-JP": "Excel のエクスポートに失敗しました。もう一度お試しください。",
+    "ko-KR": "Excel 내보내기에 실패했습니다. 다시 시도해 주세요."
+  },
+  {
+    "key": "form.draft.title",
+    "zh-CN": "发现未保存的草稿",
+    "en-US": "Unsaved draft found",
+    "ja-JP": "未保存の下書きがあります",
+    "ko-KR": "저장하지 않은 초안이 있습니다"
+  },
+  {
+    "key": "form.draft.restorePrompt",
+    "zh-CN": "您有一份保存于 {time} 的未提交草稿。",
+    "en-US": "You have unsaved changes from {time}.",
+    "ja-JP": "{time} の未保存の変更があります。",
+    "ko-KR": "{time}에 저장하지 않은 변경 내용이 있습니다."
+  },
+  {
+    "key": "form.draft.restore",
+    "zh-CN": "恢复草稿",
+    "en-US": "Restore",
+    "ja-JP": "復元",
+    "ko-KR": "복원"
+  },
+  {
+    "key": "form.draft.discard",
+    "zh-CN": "放弃草稿",
+    "en-US": "Discard",
+    "ja-JP": "破棄",
+    "ko-KR": "삭제"
+  },
+  {
+    "key": "common.button.back",
+    "zh-CN": "返回",
+    "en-US": "Back",
+    "ja-JP": "戻る",
+    "ko-KR": "뒤로"
+  },
+  {
+    "key": "common.error.insufficientStock",
+    "zh-CN": "所选库位库存不足：需要 {required}，可用 {available}。请调整数量或选择其他库位。",
+    "en-US": "Insufficient stock at the selected location: required {required}, available {available}. Adjust the quantity or select another location.",
+    "ja-JP": "選択した保管場所の在庫が不足しています：必要数 {required}、利用可能数 {available}。数量または保管場所を変更してください。",
+    "ko-KR": "선택한 위치의 재고가 부족합니다: 필요 수량 {required}, 가용 수량 {available}. 수량이나 위치를 변경하세요."
+  },
+  {
+    "key": "list_designer.columns",
+    "zh-CN": "列结构",
+    "en-US": "Columns"
+  },
+  {
+    "key": "list_designer.columns_description",
+    "zh-CN": "决定表格的主信息密度与阅读顺序",
+    "en-US": "Choose the main table information and reading order"
+  },
+  {
+    "key": "list_designer.filters",
+    "zh-CN": "筛选器",
+    "en-US": "Filters"
+  },
+  {
+    "key": "list_designer.filters_description",
+    "zh-CN": "保留高频筛选，避免把查询条件堆满页头",
+    "en-US": "Keep frequent filters without crowding the page header"
+  },
+  {
+    "key": "list_designer.toolbar",
+    "zh-CN": "工具栏",
+    "en-US": "Toolbar"
+  },
+  {
+    "key": "list_designer.toolbar_description",
+    "zh-CN": "整理主操作，突出创建、导出与自定义动作",
+    "en-US": "Organize primary actions, including create, export and custom actions"
+  },
+  {
+    "key": "list_designer.behavior",
+    "zh-CN": "交互行为",
+    "en-US": "Behavior"
+  },
+  {
+    "key": "list_designer.behavior_description",
+    "zh-CN": "控制排序、分页、多视图等列表运行规则",
+    "en-US": "Configure sorting, pagination and multiple views"
+  },
+  {
+    "key": "list_designer.heading",
+    "zh-CN": "列表设计",
+    "en-US": "List designer"
+  },
+  {
+    "key": "list_designer.intro_heading",
+    "zh-CN": "先定义信息层级，再补充筛选与动作",
+    "en-US": "Define information first, then add filters and actions"
+  },
+  {
+    "key": "list_designer.intro_description",
+    "zh-CN": "把列表拆成结构、入口操作和运行行为三个层次。",
+    "en-US": "Configure the list structure, entry actions and runtime behavior."
+  },
+  {
+    "key": "list_designer.selected_columns",
+    "zh-CN": "已选列",
+    "en-US": "Selected columns"
+  },
+  {
+    "key": "list_designer.filter_count",
+    "zh-CN": "筛选项",
+    "en-US": "Filters"
+  },
+  {
+    "key": "list_designer.action_count",
+    "zh-CN": "工具动作",
+    "en-US": "Actions"
+  },
+  {
+    "key": "list_designer.editing",
+    "zh-CN": "当前编辑",
+    "en-US": "Editing"
+  },
+  {
+    "key": "list_designer.stage",
+    "zh-CN": "当前阶段：{label}",
+    "en-US": "Current stage: {label}"
+  },
+  {
+    "key": "list_designer.preview_sync",
+    "zh-CN": "预览同步更新",
+    "en-US": "Preview updates as you edit"
+  },
+  {
+    "key": "list_designer.capability_failure",
+    "zh-CN": "模型能力读取失败",
+    "en-US": "Unable to load model capabilities"
+  },
+  {
+    "key": "list_designer.capability_warning",
+    "zh-CN": "暂时无法读取模型能力，可继续编辑当前页面配置。请检查绑定的模型。",
+    "en-US": "Model capabilities are unavailable. You can continue editing this page configuration. Check the bound model."
+  },
+  {
+    "key": "list_designer.validation",
+    "zh-CN": "配置校验",
+    "en-US": "Configuration validation"
+  },
+  {
+    "key": "list_designer.conflict",
+    "zh-CN": "配置存在冲突",
+    "en-US": "Configuration conflicts"
+  },
+  {
+    "key": "list_designer.validation_hint",
+    "zh-CN": "配置提示",
+    "en-US": "Configuration notes"
+  },
+  {
+    "key": "list_designer.workspace",
+    "zh-CN": "工作区",
+    "en-US": "Workspace"
+  },
+  {
+    "key": "list_designer.workspace_description",
+    "zh-CN": "在这里完成当前阶段配置，预览会同步反映结构变化。",
+    "en-US": "Configure the current stage here. The preview reflects structural changes."
+  },
+  {
+    "key": "list_designer.preview",
+    "zh-CN": "实时预览",
+    "en-US": "Live preview"
+  },
+  {
+    "key": "list_designer.preview_heading",
+    "zh-CN": "列表结构预览",
+    "en-US": "List structure preview"
+  },
+  {
+    "key": "list_designer.preview_description",
+    "zh-CN": "用来检查筛选密度、操作优先级和表格可读性，不必频繁打开整页预览。",
+    "en-US": "Check filter density, action priority and table readability without opening the full-page preview."
+  },
+  {
+    "key": "list_designer.preview_columns",
+    "zh-CN": "列 {count}",
+    "en-US": "Columns {count}"
+  },
+  {
+    "key": "list_designer.preview_filters",
+    "zh-CN": "筛选 {count}",
+    "en-US": "Filters {count}"
+  },
+  {
+    "key": "list_designer.preview_actions",
+    "zh-CN": "动作 {count}",
+    "en-US": "Actions {count}"
+  },
+  {
+    "key": "list_behavior.configuration",
+    "zh-CN": "行为配置",
+    "en-US": "Behavior configuration"
+  },
+  {
+    "key": "list_behavior.loading",
+    "zh-CN": "正在读取排序与筛选能力。",
+    "en-US": "Loading sorting and filtering capabilities."
+  },
+  {
+    "key": "list_behavior.capability_error",
+    "zh-CN": "无法读取排序与筛选能力，当前排序字段已回退为页面中已引用的字段。",
+    "en-US": "Sorting and filtering capabilities are unavailable. Sort fields use the fields already referenced by this page."
+  },
+  {
+    "key": "list_behavior.rules",
+    "zh-CN": "运行规则",
+    "en-US": "Runtime rules"
+  },
+  {
+    "key": "list_behavior.heading",
+    "zh-CN": "定义列表的运行方式",
+    "en-US": "How the list works"
+  },
+  {
+    "key": "list_behavior.description",
+    "zh-CN": "这里决定默认排序、分页、多选和行点击行为，属于列表体验的底层规则，不应和列配置混在一起。",
+    "en-US": "Set default sorting, pagination, selection and row clicks separately from column presentation."
+  },
+  {
+    "key": "list_behavior.default_pagination",
+    "zh-CN": "默认分页",
+    "en-US": "Default page size"
+  },
+  {
+    "key": "list_behavior.row_click",
+    "zh-CN": "行点击",
+    "en-US": "Row click"
+  },
+  {
+    "key": "list_behavior.multi_select",
+    "zh-CN": "多选",
+    "en-US": "Multiple selection"
+  },
+  {
+    "key": "list_behavior.on",
+    "zh-CN": "开",
+    "en-US": "On"
+  },
+  {
+    "key": "list_behavior.off",
+    "zh-CN": "关",
+    "en-US": "Off"
+  },
+  {
+    "key": "list_behavior.sort_tip",
+    "zh-CN": "排序规则影响首屏感知",
+    "en-US": "Sorting shapes the first view"
+  },
+  {
+    "key": "list_behavior.row_tip",
+    "zh-CN": "行点击行为要和详情策略一致",
+    "en-US": "Keep row clicks consistent with detail navigation"
+  },
+  {
+    "key": "list_behavior.pagination_tip",
+    "zh-CN": "分页大小不要牺牲可读性",
+    "en-US": "Keep page size readable"
+  },
+  {
+    "key": "list_behavior.properties",
+    "zh-CN": "属性面板",
+    "en-US": "Properties"
+  },
+  {
+    "key": "list_behavior.properties_heading",
+    "zh-CN": "运行规则属性",
+    "en-US": "Runtime properties"
+  },
+  {
+    "key": "list_behavior.properties_description",
+    "zh-CN": "先用这里统一默认行为，再回头检查右侧预览是否符合预期阅读节奏。",
+    "en-US": "Set defaults here, then check the preview for the intended reading flow."
+  },
+  {
+    "key": "list_behavior.open_detail",
+    "zh-CN": "进入详情",
+    "en-US": "Open details"
+  },
+  {
+    "key": "list_behavior.open_drawer",
+    "zh-CN": "打开抽屉",
+    "en-US": "Open drawer"
+  },
+  {
+    "key": "list_behavior.no_action",
+    "zh-CN": "不响应",
+    "en-US": "No action"
+  },
+  {
+    "key": "list_behavior.sort_field",
+    "zh-CN": "默认排序字段",
+    "en-US": "Default sort field"
+  },
+  {
+    "key": "list_behavior.sorting_group",
+    "zh-CN": "排序",
+    "en-US": "Sorting"
+  },
+  {
+    "key": "list_behavior.sort_description",
+    "zh-CN": "决定用户进入列表时第一眼看到的优先级顺序。",
+    "en-US": "Choose the order in which users first see list records."
+  },
+  {
+    "key": "list_behavior.sort_unset",
+    "zh-CN": "(不设)",
+    "en-US": "(Not set)"
+  },
+  {
+    "key": "list_behavior.sort_order",
+    "zh-CN": "排序方向",
+    "en-US": "Sort direction"
+  },
+  {
+    "key": "list_behavior.sort_order_description",
+    "zh-CN": "新记录优先出现通常用降序，基线数据浏览更适合升序。",
+    "en-US": "Use descending order for recent records first, or ascending order for baseline browsing."
+  },
+  {
+    "key": "list_behavior.descending",
+    "zh-CN": "降序",
+    "en-US": "Descending"
+  },
+  {
+    "key": "list_behavior.ascending",
+    "zh-CN": "升序",
+    "en-US": "Ascending"
+  },
+  {
+    "key": "list_behavior.page_size",
+    "zh-CN": "每页条数",
+    "en-US": "Page size"
+  },
+  {
+    "key": "list_behavior.pagination_group",
+    "zh-CN": "分页",
+    "en-US": "Pagination"
+  },
+  {
+    "key": "list_behavior.page_size_description",
+    "zh-CN": "更大页容量提升效率，但会牺牲首屏扫描压力。",
+    "en-US": "Larger pages show more records, but require more effort to scan."
+  },
+  {
+    "key": "list_behavior.enable_multi_select",
+    "zh-CN": "启用多选",
+    "en-US": "Enable multiple selection"
+  },
+  {
+    "key": "list_behavior.interaction_group",
+    "zh-CN": "交互",
+    "en-US": "Interaction"
+  },
+  {
+    "key": "list_behavior.multi_select_description",
+    "zh-CN": "仅在存在明确批量动作时开启，避免多余的选择态。",
+    "en-US": "Enable selection when the list has a clear bulk action."
+  },
+  {
+    "key": "list_behavior.row_click_action",
+    "zh-CN": "行点击行为",
+    "en-US": "Row click action"
+  },
+  {
+    "key": "list_behavior.row_click_description",
+    "zh-CN": "应与详情页策略一致，避免同一模块出现两套打开方式。",
+    "en-US": "Keep row clicks consistent with the detail page navigation strategy."
+  },
+  {
+    "key": "list_behavior.empty_text",
+    "zh-CN": "空态文案",
+    "en-US": "Empty state message"
+  },
+  {
+    "key": "list_behavior.display_group",
+    "zh-CN": "显示",
+    "en-US": "Display"
+  },
+  {
+    "key": "list_behavior.empty_placeholder",
+    "zh-CN": "暂无数据",
+    "en-US": "No data yet"
+  },
+  {
+    "key": "list_behavior.empty_description",
+    "zh-CN": "空态要说明下一步动作，而不是只提示“没有数据”。",
+    "en-US": "Explain the next action in the empty state, rather than only saying there is no data."
+  },
+  {
+    "key": "schema_config.general",
+    "zh-CN": "常规",
+    "en-US": "General"
+  },
+  {
+    "key": "schema_config.count_hint",
+    "zh-CN": "本组包含 {count} 个可配置项",
+    "en-US": "This group has {count} configurable settings."
+  },
+  {
+    "key": "schema_config.size_hint",
+    "zh-CN": "控制宽度、间距和对齐方式，让表格更易扫读。",
+    "en-US": "Set width, spacing and alignment to make the table easier to scan."
+  },
+  {
+    "key": "schema_config.display_hint",
+    "zh-CN": "决定字段如何被呈现，优先保证识别效率和阅读稳定性。",
+    "en-US": "Choose how fields appear, keeping them recognizable and readable."
+  },
+  {
+    "key": "schema_config.condition_hint",
+    "zh-CN": "定义筛选逻辑、默认值和匹配方式。",
+    "en-US": "Define filter logic, default values and matching rules."
+  },
+  {
+    "key": "schema_config.appearance_hint",
+    "zh-CN": "控制筛选项在页面中的出现位置和占用空间。",
+    "en-US": "Set where filters appear and how much space they use."
+  },
+  {
+    "key": "schema_config.binding_hint",
+    "zh-CN": "把当前配置绑定到明确的动作和交互规则上。",
+    "en-US": "Bind the configuration to explicit actions and interaction rules."
+  },
+  {
+    "key": "schema_config.sort_hint",
+    "zh-CN": "决定用户进入页面后最先看到的排序结果。",
+    "en-US": "Choose which records appear first when the page opens."
+  },
+  {
+    "key": "schema_config.pagination_hint",
+    "zh-CN": "平衡列表密度、浏览成本和首屏压力。",
+    "en-US": "Balance list density, browsing effort and the first view."
+  },
+  {
+    "key": "schema_config.interaction_hint",
+    "zh-CN": "定义用户可以直接在列表面上完成什么操作。",
+    "en-US": "Define the actions users can perform directly in the list."
+  },
+  {
+    "key": "schema_config.basic_hint",
+    "zh-CN": "先定义最核心的信息和文案，再补充附加能力。",
+    "en-US": "Start with essential information and labels, then add other capabilities."
+  },
+  {
+    "key": "list_editor.column_configuration",
+    "zh-CN": "列配置",
+    "en-US": "Column configuration"
+  },
+  {
+    "key": "list_editor.columns_loading",
+    "zh-CN": "正在读取模型字段与列表能力。",
+    "en-US": "Loading model fields and list capabilities."
+  },
+  {
+    "key": "list_editor.field_pool",
+    "zh-CN": "字段池",
+    "en-US": "Field pool"
+  },
+  {
+    "key": "list_editor.columns_heading",
+    "zh-CN": "先选主列，再排阅读顺序",
+    "en-US": "Choose key columns, then order them"
+  },
+  {
+    "key": "list_editor.columns_description",
+    "zh-CN": "列表首屏只保留真正支撑识别和判断的字段，避免把所有模型字段都塞进表格。",
+    "en-US": "Keep fields that help users identify and assess records, rather than every model field."
+  },
+  {
+    "key": "list_editor.selected",
+    "zh-CN": "已选",
+    "en-US": "Selected "
+  },
+  {
+    "key": "list_editor.columns_capability_error",
+    "zh-CN": "无法读取模型字段能力，当前字段池已回退为页面中已使用的字段。",
+    "en-US": "Model fields are unavailable. The field pool uses fields already referenced by this page."
+  },
+  {
+    "key": "list_editor.search",
+    "zh-CN": "搜索",
+    "en-US": "Search"
+  },
+  {
+    "key": "list_editor.columns_search_placeholder",
+    "zh-CN": "按字段名或类型过滤",
+    "en-US": "Filter by field name or type"
+  },
+  {
+    "key": "list_editor.columns_no_fallback",
+    "zh-CN": "当前页面里还没有可回退字段，请先修复模型绑定。",
+    "en-US": "This page has no fallback fields. Fix the model binding first."
+  },
+  {
+    "key": "list_editor.columns_no_match",
+    "zh-CN": "没有匹配字段，换个关键词试试。",
+    "en-US": "No matching fields. Try another search."
+  },
+  {
+    "key": "list_editor.reading_order",
+    "zh-CN": "阅读顺序",
+    "en-US": "Reading order"
+  },
+  {
+    "key": "list_editor.selected_columns",
+    "zh-CN": "已选列",
+    "en-US": "Selected columns"
+  },
+  {
+    "key": "list_editor.column_order_hint",
+    "zh-CN": "顶部列更靠前，更适合高频判断",
+    "en-US": "Put frequently used fields first"
+  },
+  {
+    "key": "list_editor.columns_empty",
+    "zh-CN": "还没有列。先从上方字段池勾选 2 到 6 个关键字段。",
+    "en-US": "No columns yet. Choose two to six key fields from the pool above."
+  },
+  {
+    "key": "list_editor.first_column_hint",
+    "zh-CN": "推荐：第 1 列放识别字段",
+    "en-US": "Use the first column to identify records"
+  },
+  {
+    "key": "list_editor.middle_columns_hint",
+    "zh-CN": "第 2-4 列放判断字段",
+    "en-US": "Use columns two to four to assess records"
+  },
+  {
+    "key": "list_editor.infrequent_column_hint",
+    "zh-CN": "低频字段尽量不进首屏",
+    "en-US": "Keep infrequent fields out of the first view"
+  },
+  {
+    "key": "list_editor.auto_width",
+    "zh-CN": "自动宽度",
+    "en-US": "Automatic width"
+  },
+  {
+    "key": "list_editor.move_up",
+    "zh-CN": "上移",
+    "en-US": "Move up"
+  },
+  {
+    "key": "list_editor.move_down",
+    "zh-CN": "下移",
+    "en-US": "Move down"
+  },
+  {
+    "key": "list_editor.remove_column",
+    "zh-CN": "移除列",
+    "en-US": "Remove column"
+  },
+  {
+    "key": "list_editor.remove",
+    "zh-CN": "移除",
+    "en-US": "Remove"
+  },
+  {
+    "key": "list_editor.renderer_prefix",
+    "zh-CN": "渲染：",
+    "en-US": "Renderer: "
+  },
+  {
+    "key": "list_editor.align_prefix",
+    "zh-CN": "对齐：",
+    "en-US": "Alignment: "
+  },
+  {
+    "key": "list_editor.column_properties",
+    "zh-CN": "列属性",
+    "en-US": "Column properties"
+  },
+  {
+    "key": "list_editor.column_properties_hint",
+    "zh-CN": "只在这里微调宽度、对齐和渲染方式，不要把业务逻辑混进列表列定义。",
+    "en-US": "Adjust width, alignment and rendering here. Keep business logic separate from column definitions."
+  },
+  {
+    "key": "list_editor.column_properties_empty",
+    "zh-CN": "从“已选列”里选择一个字段后，再编辑它的显示细节。",
+    "en-US": "Select a field in Selected columns to edit its display settings."
+  },
+  {
+    "key": "list_editor.badge",
+    "zh-CN": "标签",
+    "en-US": "Badge"
+  },
+  {
+    "key": "list_editor.link",
+    "zh-CN": "链接",
+    "en-US": "Link"
+  },
+  {
+    "key": "list_editor.image",
+    "zh-CN": "图片",
+    "en-US": "Image"
+  },
+  {
+    "key": "list_editor.richtext",
+    "zh-CN": "富文本",
+    "en-US": "Rich text"
+  },
+  {
+    "key": "list_editor.text",
+    "zh-CN": "文本",
+    "en-US": "Text"
+  },
+  {
+    "key": "list_editor.center_align",
+    "zh-CN": "居中",
+    "en-US": "Center"
+  },
+  {
+    "key": "list_editor.right_align",
+    "zh-CN": "右对齐",
+    "en-US": "Right"
+  },
+  {
+    "key": "list_editor.left_align",
+    "zh-CN": "左对齐",
+    "en-US": "Left"
+  },
+  {
+    "key": "list_editor.filter_configuration",
+    "zh-CN": "筛选配置",
+    "en-US": "Filter configuration"
+  },
+  {
+    "key": "list_editor.filters_loading",
+    "zh-CN": "正在读取可筛选字段与能力约束。",
+    "en-US": "Loading filter fields and capability constraints."
+  },
+  {
+    "key": "list_editor.filter_pool",
+    "zh-CN": "筛选池",
+    "en-US": "Filter pool"
+  },
+  {
+    "key": "list_editor.filters_heading",
+    "zh-CN": "只保留高频筛选",
+    "en-US": "Keep frequent filters"
+  },
+  {
+    "key": "list_editor.filters_description",
+    "zh-CN": "列表筛选越多，页头越拥挤。优先保留业务最常用、最能快速缩小范围的条件。",
+    "en-US": "More filters crowd the page header. Keep frequent conditions that quickly narrow results."
+  },
+  {
+    "key": "list_editor.filters_no_fallback",
+    "zh-CN": "模型能力读取失败，当前页也没有可回退的筛选字段。",
+    "en-US": "Model capabilities are unavailable and this page has no fallback filter fields."
+  },
+  {
+    "key": "list_editor.filters_unavailable",
+    "zh-CN": "当前模型没有可筛选字段，无法在列表头部生成筛选器。",
+    "en-US": "This model has no filterable fields, so no header filters can be generated."
+  },
+  {
+    "key": "list_editor.filters_capability_error",
+    "zh-CN": "无法读取筛选白名单，当前已回退为页面内已有字段。",
+    "en-US": "The filter whitelist is unavailable. The pool uses fields already referenced by this page."
+  },
+  {
+    "key": "list_editor.filters_search_placeholder",
+    "zh-CN": "按字段名筛选",
+    "en-US": "Filter by field name"
+  },
+  {
+    "key": "list_editor.filters_no_match",
+    "zh-CN": "没有匹配的筛选字段。",
+    "en-US": "No matching filter fields."
+  },
+  {
+    "key": "list_editor.selected_filters",
+    "zh-CN": "已选筛选",
+    "en-US": "Selected filters"
+  },
+  {
+    "key": "list_editor.selected_filter_items",
+    "zh-CN": "已选筛选项",
+    "en-US": "Selected filter fields"
+  },
+  {
+    "key": "list_editor.filter_settings_hint",
+    "zh-CN": "控制显示模式、默认值和操作符",
+    "en-US": "Set display mode, defaults and operators"
+  },
+  {
+    "key": "list_editor.filters_empty",
+    "zh-CN": "还没有筛选项。建议控制在 3 到 5 个高频条件。",
+    "en-US": "No filters yet. Aim for three to five frequent conditions."
+  },
+  {
+    "key": "list_editor.status_filter_hint",
+    "zh-CN": "优先状态类",
+    "en-US": "Start with status filters"
+  },
+  {
+    "key": "list_editor.time_filter_hint",
+    "zh-CN": "其次时间范围",
+    "en-US": "Then add date ranges"
+  },
+  {
+    "key": "list_editor.infrequent_filter_hint",
+    "zh-CN": "避免低频条件挤占页头",
+    "en-US": "Keep infrequent conditions out of the header"
+  },
+  {
+    "key": "list_editor.default_prefix",
+    "zh-CN": "默认",
+    "en-US": "Default "
+  },
+  {
+    "key": "list_editor.no_default",
+    "zh-CN": "无默认值",
+    "en-US": "No default value"
+  },
+  {
+    "key": "list_editor.remove_filter",
+    "zh-CN": "移除筛选项",
+    "en-US": "Remove filter"
+  },
+  {
+    "key": "list_editor.display_prefix",
+    "zh-CN": "展示：",
+    "en-US": "Display: "
+  },
+  {
+    "key": "list_editor.condition_prefix",
+    "zh-CN": "条件：",
+    "en-US": "Condition: "
+  },
+  {
+    "key": "list_editor.filter_properties",
+    "zh-CN": "筛选属性",
+    "en-US": "Filter properties"
+  },
+  {
+    "key": "list_editor.filter_properties_hint",
+    "zh-CN": "在这里决定默认操作符和展示方式，避免在列表头部生成难以理解的筛选器。",
+    "en-US": "Set default operators and display modes here to keep header filters understandable."
+  },
+  {
+    "key": "list_editor.filter_properties_empty",
+    "zh-CN": "先从“已选筛选项”中选一个条件，再编辑默认值和显示模式。",
+    "en-US": "Select a condition in Selected filter fields to edit its default and display mode."
+  },
+  {
+    "key": "list_editor.not_equal",
+    "zh-CN": "不等于",
+    "en-US": "Not equal"
+  },
+  {
+    "key": "list_editor.contains",
+    "zh-CN": "包含",
+    "en-US": "Contains"
+  },
+  {
+    "key": "list_editor.range",
+    "zh-CN": "区间",
+    "en-US": "Range"
+  },
+  {
+    "key": "list_editor.greater_than",
+    "zh-CN": "大于",
+    "en-US": "Greater than"
+  },
+  {
+    "key": "list_editor.greater_or_equal",
+    "zh-CN": "大于等于",
+    "en-US": "Greater than or equal"
+  },
+  {
+    "key": "list_editor.less_than",
+    "zh-CN": "小于",
+    "en-US": "Less than"
+  },
+  {
+    "key": "list_editor.less_or_equal",
+    "zh-CN": "小于等于",
+    "en-US": "Less than or equal"
+  },
+  {
+    "key": "list_editor.equal",
+    "zh-CN": "等于",
+    "en-US": "Equal"
+  },
+  {
+    "key": "list_editor.drawer",
+    "zh-CN": "抽屉",
+    "en-US": "Drawer"
+  },
+  {
+    "key": "list_editor.top_bar",
+    "zh-CN": "顶部栏",
+    "en-US": "Top bar"
+  },
+  {
+    "key": "list_editor.inline",
+    "zh-CN": "内联",
+    "en-US": "Inline"
+  },
+  {
+    "key": "list_editor.create",
+    "zh-CN": "新增",
+    "en-US": "Create"
+  },
+  {
+    "key": "list_editor.preset_supported",
+    "zh-CN": "当前模型支持该预设动作",
+    "en-US": "The current model supports this preset action"
+  },
+  {
+    "key": "list_editor.refresh",
+    "zh-CN": "刷新",
+    "en-US": "Refresh"
+  },
+  {
+    "key": "list_editor.refresh_description",
+    "zh-CN": "刷新当前列表数据，不依赖模型写入能力",
+    "en-US": "Refresh the current list without requiring model write capabilities"
+  },
+  {
+    "key": "list_editor.export",
+    "zh-CN": "导出",
+    "en-US": "Export"
+  },
+  {
+    "key": "list_editor.bulk_delete",
+    "zh-CN": "批量删除",
+    "en-US": "Bulk delete"
+  },
+  {
+    "key": "list_editor.toolbar_configuration",
+    "zh-CN": "工具栏配置",
+    "en-US": "Toolbar configuration"
+  },
+  {
+    "key": "list_editor.toolbar_loading",
+    "zh-CN": "正在读取模型能力，确定哪些动作可用。",
+    "en-US": "Loading model capabilities to determine available actions."
+  },
+  {
+    "key": "list_editor.preset_actions",
+    "zh-CN": "预设动作",
+    "en-US": "Preset actions"
+  },
+  {
+    "key": "list_editor.toolbar_heading",
+    "zh-CN": "先用预设动作占住主操作",
+    "en-US": "Start with preset actions"
+  },
+  {
+    "key": "list_editor.toolbar_description",
+    "zh-CN": "创建、导出、批量删除是最常见的列表工具栏动作，先确认能力，再决定是否补自定义按钮。",
+    "en-US": "Create, export and bulk delete are common toolbar actions. Check capabilities before adding custom buttons."
+  },
+  {
+    "key": "list_editor.enabled_presets",
+    "zh-CN": "启用预设",
+    "en-US": "Enabled presets"
+  },
+  {
+    "key": "list_editor.custom_buttons",
+    "zh-CN": "自定义按钮",
+    "en-US": "Custom buttons"
+  },
+  {
+    "key": "list_editor.total_actions",
+    "zh-CN": "总动作数",
+    "en-US": "Total actions"
+  },
+  {
+    "key": "list_editor.toolbar_capability_error",
+    "zh-CN": "无法确认模型支持哪些预设动作，预设开关已暂时锁定；自定义按钮仍可继续调整。",
+    "en-US": "Preset capabilities are unavailable, so their toggles are locked. You can still edit custom buttons."
+  },
+  {
+    "key": "list_editor.preset_capability_error",
+    "zh-CN": "当前无法读取模型能力，请修复模型绑定后再切换预设动作",
+    "en-US": "Model capabilities are unavailable. Fix the model binding before changing presets."
+  },
+  {
+    "key": "list_editor.enabled",
+    "zh-CN": "已启用",
+    "en-US": "Enabled"
+  },
+  {
+    "key": "list_editor.disabled",
+    "zh-CN": "未启用",
+    "en-US": "Disabled"
+  },
+  {
+    "key": "list_editor.custom_actions",
+    "zh-CN": "自定义动作",
+    "en-US": "Custom actions"
+  },
+  {
+    "key": "list_editor.custom_actions_hint",
+    "zh-CN": "只添加真正补充业务流程的动作，不要把低频操作全部塞进工具栏。",
+    "en-US": "Add actions that support the workflow. Keep infrequent operations out of the toolbar."
+  },
+  {
+    "key": "list_editor.add_button",
+    "zh-CN": "添加按钮",
+    "en-US": "Add button"
+  },
+  {
+    "key": "list_editor.custom_buttons_empty",
+    "zh-CN": "还没有自定义按钮。优先用预设按钮，确有业务动作再补这里。",
+    "en-US": "No custom buttons yet. Start with presets and add a custom action when needed."
+  },
+  {
+    "key": "list_editor.toolbar_limit_hint",
+    "zh-CN": "主工具栏不要超过 4 个动作",
+    "en-US": "Keep the main toolbar to four actions"
+  },
+  {
+    "key": "list_editor.action_label_hint",
+    "zh-CN": "文案尽量是动词",
+    "en-US": "Use verbs for action labels"
+  },
+  {
+    "key": "list_editor.duplicate_action_hint",
+    "zh-CN": "避免和行内动作重复",
+    "en-US": "Avoid duplicating row actions"
+  },
+  {
+    "key": "list_editor.unnamed",
+    "zh-CN": "(未命名)",
+    "en-US": "(Unnamed)"
+  },
+  {
+    "key": "list_editor.no_data_source",
+    "zh-CN": "未选择数据源",
+    "en-US": "No data source selected"
+  },
+  {
+    "key": "list_editor.command_unbound",
+    "zh-CN": "尚未绑定 command",
+    "en-US": "No command bound"
+  },
+  {
+    "key": "list_editor.no_icon",
+    "zh-CN": "无图标",
+    "en-US": "No icon"
+  },
+  {
+    "key": "list_editor.requires_selection",
+    "zh-CN": "依赖选中行",
+    "en-US": "Requires selected rows"
+  },
+  {
+    "key": "list_editor.page_action",
+    "zh-CN": "页面级动作",
+    "en-US": "Page action"
+  },
+  {
+    "key": "list_editor.delete",
+    "zh-CN": "删除",
+    "en-US": "Delete"
+  },
+  {
+    "key": "list_editor.switch_page_action",
+    "zh-CN": "切到页面级动作",
+    "en-US": "Use as a page action"
+  },
+  {
+    "key": "list_editor.switch_row_action",
+    "zh-CN": "切到依赖选中行",
+    "en-US": "Require selected rows"
+  },
+  {
+    "key": "list_editor.icon_prefix",
+    "zh-CN": "图标：",
+    "en-US": "Icon: "
+  },
+  {
+    "key": "list_editor.none",
+    "zh-CN": "无",
+    "en-US": "None"
+  },
+  {
+    "key": "list_editor.action_properties",
+    "zh-CN": "动作属性",
+    "en-US": "Action properties"
+  },
+  {
+    "key": "list_editor.unnamed_button",
+    "zh-CN": "未命名按钮",
+    "en-US": "Unnamed button"
+  },
+  {
+    "key": "list_editor.button_properties",
+    "zh-CN": "按钮属性",
+    "en-US": "Button properties"
+  },
+  {
+    "key": "list_editor.button_properties_hint",
+    "zh-CN": "在这里定义按钮文案、行为和是否依赖选中行，避免按钮语义含糊。",
+    "en-US": "Define the button label, behavior and selection requirement clearly."
+  },
+  {
+    "key": "list_editor.button_properties_empty",
+    "zh-CN": "先从“自定义按钮”里选一个按钮，再编辑它的行为。",
+    "en-US": "Select a custom button to edit its behavior."
+  },
+  {
+    "key": "list_editor.filters",
+    "zh-CN": "筛选器",
+    "en-US": "Filters"
+  },
+  {
+    "key": "list_editor.columns",
+    "zh-CN": "列",
+    "en-US": "Columns"
+  },
+  {
+    "key": "list_editor.actions",
+    "zh-CN": "动作",
+    "en-US": "Actions"
+  },
+  {
+    "key": "list_editor.page_size",
+    "zh-CN": "每页条数",
+    "en-US": "Page size"
+  },
+  {
+    "key": "list_editor.toolbar",
+    "zh-CN": "工具栏",
+    "en-US": "Toolbar"
+  },
+  {
+    "key": "list_editor.preview_empty",
+    "zh-CN": "先选择列，右侧才会出现表格预览",
+    "en-US": "Choose columns to show a table preview"
+  },
+  {
+    "key": "list_editor.all_records",
+    "zh-CN": "全部记录",
+    "en-US": "All records"
+  },
+  {
+    "key": "list_editor.multi_select",
+    "zh-CN": "支持多选",
+    "en-US": "Multiple selection"
+  },
+  {
+    "key": "list_editor.row_click_prefix",
+    "zh-CN": "行点击 ·",
+    "en-US": "Row click · "
+  },
+  {
+    "key": "list_editor.primary_action",
+    "zh-CN": "主操作",
+    "en-US": "Primary action"
+  },
+  {
+    "key": "list_editor.table_preview",
+    "zh-CN": "表格预览",
+    "en-US": "Table preview"
+  },
+  {
+    "key": "list_editor.table_preview_hint",
+    "zh-CN": "检查列顺序、字段命名和样例值是否易读",
+    "en-US": "Check column order, field labels and sample readability"
+  },
+  {
+    "key": "list_editor.default_sort",
+    "zh-CN": "默认排序",
+    "en-US": "Default sort"
+  },
+  {
+    "key": "list_editor.open",
+    "zh-CN": "打开",
+    "en-US": "Open"
+  },
+  {
+    "key": "list_editor.current_page_prefix",
+    "zh-CN": "当前页",
+    "en-US": "Current page "
+  },
+  {
+    "key": "list_editor.empty_message_prefix",
+    "zh-CN": "空态文案 ·",
+    "en-US": "Empty state · "
+  },
+  {
+    "key": "list_editor.no_data",
+    "zh-CN": "暂无数据",
+    "en-US": "No data yet"
+  },
+  {
+    "key": "list_editor.open_drawer",
+    "zh-CN": "打开抽屉",
+    "en-US": "Open drawer"
+  },
+  {
+    "key": "list_editor.no_action",
+    "zh-CN": "不响应",
+    "en-US": "No action"
+  },
+  {
+    "key": "list_editor.open_detail",
+    "zh-CN": "进入详情",
+    "en-US": "Open details"
+  },
+  {
+    "key": "list_editor.width",
+    "zh-CN": "宽度 (px)",
+    "en-US": "Width (px)"
+  },
+  {
+    "key": "list_editor.size_group",
+    "zh-CN": "尺寸",
+    "en-US": "Size"
+  },
+  {
+    "key": "list_editor.width_hint",
+    "zh-CN": "只为关键列设置固定宽度，其余列尽量保持自适应。",
+    "en-US": "Set fixed widths for key columns and let other columns adapt."
+  },
+  {
+    "key": "list_editor.align",
+    "zh-CN": "对齐",
+    "en-US": "Alignment"
+  },
+  {
+    "key": "list_editor.align_hint",
+    "zh-CN": "数字通常右对齐，文本或标签通常左对齐。",
+    "en-US": "Right-align numbers and left-align text or badges."
+  },
+  {
+    "key": "list_editor.renderer",
+    "zh-CN": "渲染器",
+    "en-US": "Renderer"
+  },
+  {
+    "key": "list_editor.display_group",
+    "zh-CN": "显示",
+    "en-US": "Display"
+  },
+  {
+    "key": "list_editor.renderer_hint",
+    "zh-CN": "优先用最朴素的表现形式，只有语义明确时才升级为标签或链接。",
+    "en-US": "Start with plain display and use badges or links when their meaning is clear."
+  },
+  {
+    "key": "list_editor.format",
+    "zh-CN": "格式化模板",
+    "en-US": "Format template"
+  },
+  {
+    "key": "list_editor.format_placeholder",
+    "zh-CN": "e.g. YYYY-MM-DD / {0}件",
+    "en-US": "e.g. YYYY-MM-DD / {0} items"
+  },
+  {
+    "key": "list_editor.format_hint",
+    "zh-CN": "仅用于提升可读性，不要把复杂业务计算塞进显示模板。",
+    "en-US": "Use formatting for readability. Keep complex business calculations separate."
+  },
+  {
+    "key": "list_editor.operator",
+    "zh-CN": "操作符",
+    "en-US": "Operator"
+  },
+  {
+    "key": "list_editor.condition_group",
+    "zh-CN": "条件",
+    "en-US": "Condition"
+  },
+  {
+    "key": "list_editor.operator_hint",
+    "zh-CN": "让用户一眼就能理解筛选逻辑，避免默认使用过宽泛的条件。",
+    "en-US": "Make filter logic clear and avoid overly broad defaults."
+  },
+  {
+    "key": "list_editor.not_equal_option",
+    "zh-CN": "不等",
+    "en-US": "Not equal"
+  },
+  {
+    "key": "list_editor.between_option",
+    "zh-CN": "介于",
+    "en-US": "Between"
+  },
+  {
+    "key": "list_editor.default_value",
+    "zh-CN": "默认值",
+    "en-US": "Default value"
+  },
+  {
+    "key": "list_editor.default_value_hint",
+    "zh-CN": "只给真正高频的筛选项设置默认值，避免用户一进来就被过度限制。",
+    "en-US": "Set defaults only for frequent filters so the first view is not overly restricted."
+  },
+  {
+    "key": "list_editor.display_mode",
+    "zh-CN": "显示模式",
+    "en-US": "Display mode"
+  },
+  {
+    "key": "list_editor.appearance_group",
+    "zh-CN": "外观",
+    "en-US": "Appearance"
+  },
+  {
+    "key": "list_editor.display_mode_hint",
+    "zh-CN": "高频项适合内联，次要筛选更适合收进抽屉或顶部栏。",
+    "en-US": "Show frequent filters inline and place secondary filters in a drawer or top bar."
+  },
+  {
+    "key": "list_editor.preset_buttons",
+    "zh-CN": "预设按钮",
+    "en-US": "Preset buttons"
+  },
+  {
+    "key": "list_editor.button_label",
+    "zh-CN": "按钮文字",
+    "en-US": "Button label"
+  },
+  {
+    "key": "list_editor.basic_group",
+    "zh-CN": "基础",
+    "en-US": "Basic"
+  },
+  {
+    "key": "list_editor.button_label_hint",
+    "zh-CN": "尽量使用动词短语，例如“批量指派”“导出报表”。",
+    "en-US": "Use verb phrases such as Assign selected or Export report."
+  },
+  {
+    "key": "list_editor.icon",
+    "zh-CN": "图标",
+    "en-US": "Icon"
+  },
+  {
+    "key": "list_editor.icon_hint",
+    "zh-CN": "图标只做辅助识别，不要替代按钮文案。",
+    "en-US": "Use icons to aid recognition, alongside clear button labels."
+  },
+  {
+    "key": "list_editor.button_code",
+    "zh-CN": "按钮编码",
+    "en-US": "Button code"
+  },
+  {
+    "key": "list_editor.button_code_hint",
+    "zh-CN": "用于运行态 testid 和行为识别。刷新类自定义按钮请使用稳定、唯一的编码。",
+    "en-US": "Use a stable, unique code to identify the button and its runtime behavior."
+  },
+  {
+    "key": "list_editor.action_kind",
+    "zh-CN": "动作类型",
+    "en-US": "Action type"
+  },
+  {
+    "key": "list_editor.binding_group",
+    "zh-CN": "绑定",
+    "en-US": "Binding"
+  },
+  {
+    "key": "list_editor.action_kind_hint",
+    "zh-CN": "普通业务动作绑定 Command;数据刷新动作绑定指定 dataSource。",
+    "en-US": "Bind business actions to a command and refresh actions to a specific data source."
+  },
+  {
+    "key": "list_editor.execute_command",
+    "zh-CN": "执行 Command",
+    "en-US": "Execute command"
+  },
+  {
+    "key": "list_editor.refresh_source",
+    "zh-CN": "刷新数据源",
+    "en-US": "Refresh data source"
+  },
+  {
+    "key": "list_editor.command_hint",
+    "zh-CN": "绑定清晰的 command，避免一个按钮承担多个隐式行为。",
+    "en-US": "Bind an explicit command so a button has a clear action."
+  },
+  {
+    "key": "list_editor.target_source",
+    "zh-CN": "目标数据源",
+    "en-US": "Target data source"
+  },
+  {
+    "key": "list_editor.target_source_hint",
+    "zh-CN": "运行态点击按钮时刷新这个 page dataSource。",
+    "en-US": "Refresh this page data source when the button is clicked."
+  },
+  {
+    "key": "list_editor.selection_required",
+    "zh-CN": "需要选中行",
+    "en-US": "Requires selected rows"
+  },
+  {
+    "key": "list_editor.selection_required_hint",
+    "zh-CN": "批量类动作应开启，页面级动作通常不需要。",
+    "en-US": "Require selection for bulk actions. Page actions usually do not need it."
+  },
+  {
+    "key": "list_editor.column_properties_for",
+    "zh-CN": "列属性 · {field}",
+    "en-US": "Column properties · {field}"
+  },
+  {
+    "key": "list_editor.filter_properties_for",
+    "zh-CN": "筛选属性 · {field}",
+    "en-US": "Filter properties · {field}"
+  },
+  {
+    "key": "list_editor.action_unavailable",
+    "zh-CN": "当前模型未启用“{action}”动作",
+    "en-US": "The current model does not enable {action}."
+  },
+  {
+    "key": "list_editor.refresh_target",
+    "zh-CN": "刷新 {source}",
+    "en-US": "Refresh {source}"
+  },
+  {
+    "key": "list_editor.icon_name",
+    "zh-CN": "图标 {icon}",
+    "en-US": "Icon {icon}"
+  },
+  {
+    "key": "list_editor.button_properties_for",
+    "zh-CN": "按钮属性 · {label}",
+    "en-US": "Button properties · {label}"
+  },
+  {
+    "key": "list_editor.filter_default_suffix",
+    "zh-CN": " · 默认 {value}",
+    "en-US": " · Default {value}"
+  },
+  {
+    "key": "list_editor.link_placeholder",
+    "zh-CN": "{label} 链接",
+    "en-US": "{label} link"
+  },
+  {
+    "key": "list_editor.toolbar_actions_count",
+    "zh-CN": "工具栏动作 {count} 个",
+    "en-US": "Toolbar actions {count}"
+  },
+  {
+    "key": "list_editor.select_all_preview",
+    "zh-CN": "选择全部预览行",
+    "en-US": "Select all preview rows"
+  },
+  {
+    "key": "list_editor.select_preview_row",
+    "zh-CN": "选择预览行 {index}",
+    "en-US": "Select preview row {index}"
+  },
+  {
+    "key": "list_editor.unknown_type",
+    "zh-CN": "未知",
+    "en-US": "Unknown"
+  },
+  {
+    "key": "list_editor.auto",
+    "zh-CN": "自动",
+    "en-US": "Auto"
+  },
+  {
+    "key": "list_editor.command",
+    "zh-CN": "命令",
+    "en-US": "Command"
+  },
+  {
+    "key": "list_sample.heading",
+    "zh-CN": "样例数据",
+    "en-US": "Sample data"
+  },
+  {
+    "key": "list_sample.description",
+    "zh-CN": "拉取 3 条真实数据，验证字段命名与列宽是否合理。",
+    "en-US": "Load three real records to check field names and column widths."
+  },
+  {
+    "key": "list_sample.load",
+    "zh-CN": "加载样例数据",
+    "en-US": "Load sample data"
+  },
+  {
+    "key": "list_sample.loading",
+    "zh-CN": "加载中...",
+    "en-US": "Loading..."
+  },
+  {
+    "key": "list_sample.loaded",
+    "zh-CN": "已加载 {count} 条",
+    "en-US": "Loaded {count} records"
+  },
+  {
+    "key": "list_sample.failed",
+    "zh-CN": "样例数据加载失败，请重试。",
+    "en-US": "Could not load sample data. Try again."
   }
 ]

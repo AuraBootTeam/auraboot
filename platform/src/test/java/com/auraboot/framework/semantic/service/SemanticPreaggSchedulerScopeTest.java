@@ -25,9 +25,12 @@ class SemanticPreaggSchedulerScopeTest {
     private final AbSemanticPreaggMapper mapper = mock(AbSemanticPreaggMapper.class);
     private final AbSemanticModelMapper models = mock(AbSemanticModelMapper.class);
     private final SemanticQueryService queries = mock(SemanticQueryService.class);
+    private final com.auraboot.framework.tenant.service.TenantMemberService members =
+            mock(com.auraboot.framework.tenant.service.TenantMemberService.class);
     private final SemanticPreaggService service = new SemanticPreaggService(mapper,
             models, queries,
-            mock(UserAttributeService.class), mock(JdbcTemplate.class), new ObjectMapper());
+            mock(UserAttributeService.class), mock(JdbcTemplate.class), new ObjectMapper(),
+            mock(org.springframework.transaction.PlatformTransactionManager.class), members);
 
     @AfterEach void clearContext() { MetaContext.clear(); }
 
@@ -77,6 +80,9 @@ class SemanticPreaggSchedulerScopeTest {
         AbSemanticModel model = new AbSemanticModel(); model.setCode("governed");
         when(mapper.findByPid(11L, "manual-preagg")).thenReturn(preagg);
         when(models.findByPid(11L, "model")).thenReturn(model);
+        var member = new com.auraboot.framework.tenant.dao.entity.TenantMember();
+        member.setId(44L); member.setTenantId(11L); member.setUserId(88L); member.setStatus("active");
+        when(members.findByTenantIdAndUserId(11L, 88L)).thenReturn(member);
         when(queries.explainQuery(any(), any())).thenThrow(new IllegalStateException("policy unavailable"));
         assertThatThrownBy(() -> service.refreshNow("manual-preagg")).hasMessage("policy unavailable");
         assertThat(MetaContext.snapshot()).isEqualTo(caller);

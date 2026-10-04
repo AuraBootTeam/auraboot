@@ -223,6 +223,18 @@ public class JwtUtil {
         return extractLongClaim(token, "partyMembershipId");
     }
 
+    public boolean extractImpersonation(String token) {
+        return extractClaim(token, claims -> Boolean.TRUE.equals(claims.get("impersonation", Boolean.class)));
+    }
+
+    public Long extractOperatorUserId(String token) {
+        return extractLongClaim(token, "operatorUserId");
+    }
+
+    public String extractClientType(String token) {
+        return extractStringClaim(token, "clientType");
+    }
+
     public String extractExecutionScope(String token) {
         return extractStringClaim(token, "executionScope");
     }
@@ -379,37 +391,54 @@ public class JwtUtil {
             UserDetails userDetails,
             String userPid,
             SessionTokenContext context) {
+        return createToken(claimsForContext(userDetails, context), userPid);
+    }
+
+    /** Mint a non-renewable login token with an explicit short absolute lifetime. */
+    public String generateImpersonationToken(
+            UserDetails userDetails,
+            String userPid,
+            SessionTokenContext context,
+            String sessionPid,
+            long ttlSeconds) {
+        if (!context.impersonation()) {
+            throw new IllegalArgumentException("Impersonation context is required");
+        }
+        if (ttlSeconds <= 0 || ttlSeconds > 3600) {
+            throw new IllegalArgumentException("Impersonation TTL must be between 1 and 3600 seconds");
+        }
+        Instant now = clock.instant();
+        Map<String, Object> claims = claimsForContext(userDetails, context);
+        claims.put("sid", sessionPid);
+        claims.put("auth_time", now.getEpochSecond());
+        claims.put("session_exp", now.plusSeconds(ttlSeconds).getEpochSecond());
+        return createToken(claims, userPid);
+    }
+
+    private Map<String, Object> claimsForContext(UserDetails userDetails, SessionTokenContext context) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("name", userDetails.getUsername());
-        if (context.tenantId() != null) {
-            claims.put("tenantId", context.tenantId());
-        }
-        if (context.memberId() != null) {
-            claims.put("memberId", context.memberId());
-        }
-        if (context.applicationId() != null) {
-            claims.put("applicationId", context.applicationId());
-        }
-        if (context.loginChannelId() != null) {
-            claims.put("loginChannelId", context.loginChannelId());
-        }
-        if (context.executionScope() != null) {
-            claims.put("executionScope", context.executionScope().getCode());
-        }
-        if (context.actorPartyId() != null) {
-            claims.put("actorPartyId", context.actorPartyId());
-        }
-        if (context.partyMembershipId() != null) {
-            claims.put("partyMembershipId", context.partyMembershipId());
-        }
-        if (context.sessionStage() != null) {
-            claims.put("sessionStage", context.sessionStage().getCode());
-        }
+        if (context.tenantId() != null) claims.put("tenantId", context.tenantId());
+        if (context.memberId() != null) claims.put("memberId", context.memberId());
+        if (context.applicationId() != null) claims.put("applicationId", context.applicationId());
+        if (context.loginChannelId() != null) claims.put("loginChannelId", context.loginChannelId());
+        if (context.executionScope() != null) claims.put("executionScope", context.executionScope().getCode());
+        if (context.actorPartyId() != null) claims.put("actorPartyId", context.actorPartyId());
+        if (context.partyMembershipId() != null) claims.put("partyMembershipId", context.partyMembershipId());
+        if (context.sessionStage() != null) claims.put("sessionStage", context.sessionStage().getCode());
         claims.put("cv", Math.max(1, context.contextVersion()));
-        if (context.securityVersion() > 0) {
-            claims.put("sv", context.securityVersion());
+        if (context.securityVersion() > 0) claims.put("sv", context.securityVersion());
+        if (context.impersonation()) {
+            if (context.operatorUserId() == null) {
+                throw new IllegalArgumentException("Impersonation token requires an operator user");
+            }
+            claims.put("impersonation", true);
+            claims.put("operatorUserId", context.operatorUserId());
+            if (context.clientType() != null && !context.clientType().isBlank()) {
+                claims.put("clientType", context.clientType());
+            }
         }
-        return createToken(claims, userPid);
+        return claims;
     }
 
     public Boolean validateToken(String token, UserDetails userDetails) {

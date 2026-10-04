@@ -14,6 +14,15 @@ public interface SessionManagementService {
      */
     UserSession createSession(Long userId, String token, String ipAddress, String userAgent);
 
+    UserSession createImpersonationSession(
+            Long userId,
+            String token,
+            String authorizationMethod,
+            String reason,
+            String reference,
+            String ipAddress,
+            String userAgent);
+
     /**
      * Check if a session is still valid (not revoked).
      */

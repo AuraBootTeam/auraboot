@@ -48,7 +48,8 @@ export function verifyLiveStack(workspace, core, runtime, state) {
   // then requires public verify to pass with the new descriptors installed.
   const allowed = new Set(['PROCESS_IDENTITY_DRIFT', 'UNKNOWN_LISTENER']);
   for (const finding of info.findings || []) assert.ok(allowed.has(finding.code), `public identity finding: ${finding.code}`);
-  const boot = join(state, 'boot-run.jar');
+  const boot = info.artifacts.find(item => item.key === 'backend')?.path;
+  assert.ok(boot, 'registered backend artifact missing');
   const artifacts = [verifyArtifact({ key: 'core', source: join(core, 'platform/build/libs/AuraBoot-1.0.0-boot.jar'), staged: boot, sha256: hashFile(boot) }, info.sources)];
   const receipt = readFileSync(join(state, 'pf4j-staging.tsv'), 'utf8').trim().split('\n');
   assert.equal(receipt.shift(), 'plugin\tplugin_dir\tsource_jar\tstaged_jar\tsha256', 'invalid PF4J staging receipt');
@@ -112,7 +113,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     const file = join(state, 'manifest.json');
     writeFileSync(`${file}.tmp`, `${JSON.stringify(proof, null, 2)}\n`, { mode: 0o600 });
     renameSync(`${file}.tmp`, file);
-    aura(['runtime', 'manifest', 'publish', runtime, '--product', 'oss-golden-stack', '--from', file, '--verified-by', 'oss-golden-stack.sh:verify-artifacts']);
+    aura(['runtime', 'manifest', 'publish', runtime, '--product', 'oss-pf4j-stack', '--from', file, '--verified-by', 'oss-golden-stack.sh:verify-artifacts']);
     aura(['runtime', 'verify', runtime]);
     console.log(`Verified ${proof.artifacts.length} artifacts and ${proof.processes.length} listener identities for ${runtime}`);
   } catch (error) {

@@ -589,7 +589,7 @@ export default function TenantSelection() {
                       {t(
                         'tenant.select.mini.codeHint',
                         undefined,
-                        '学校教师码只在微信小程序内填写，本页面不会收集。教师入校后可绑定已有班级，或创建新班级。',
+                        '学校教师码只在微信小程序内填写，本页面不会收集。入校后在小程序绑定 PC 已建班级；新班级请在 PC 端创建。',
                       )}
                     </div>
                   </div>

@@ -18,12 +18,15 @@ import {
 } from '@heroicons/react/24/outline';
 import { ClipboardDocumentListIcon as ClipboardDocumentListSolidIcon } from '@heroicons/react/24/solid';
 import { useI18n } from '~/contexts/I18nContext';
+import { useTimezone } from '~/contexts/TimezoneContext';
+import { formatInTimezone } from '~/shared/services/dateTimeFormatService';
 
 /**
  * Audit Logs Page
  */
 export default function AuditLogsPage() {
   const { locale } = useI18n();
+  const { timezone, formats } = useTimezone();
   const l = useCallback(
     (zhCN: string, enUS: string) => (locale === 'zh-CN' ? zhCN : enUS),
     [locale],
@@ -119,7 +122,7 @@ export default function AuditLogsPage() {
 
   // Format date
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
+    return formatInTimezone(dateString, formats.datetime, timezone);
   };
 
   // Render change log item

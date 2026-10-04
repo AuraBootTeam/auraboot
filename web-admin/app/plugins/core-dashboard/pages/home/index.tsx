@@ -121,7 +121,7 @@ export default function WorkbenchPage() {
       a.download = `workbench-${new Date().toISOString().slice(0, 10)}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
-      showSuccessToast(t('workbench.exported', undefined, `Exported ${sheetCount} sheets`));
+      showSuccessToast(t('workbench.exported', { count: sheetCount }, `Exported ${sheetCount} sheets`));
     } catch {
       showErrorToast(t('workbench.exportFailed', undefined, 'Excel export failed'));
     } finally {

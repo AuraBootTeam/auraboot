@@ -17,3 +17,21 @@ logging:
   level:
     org.apache.ibatis: DEBUG
     org.mybatis: DEBUG
+
+# QQ Mail SMTP for verification codes. Use the QQ Mail authorization code,
+# never the mailbox login password. Keep application-local.yml untracked.
+# spring:
+#   mail:
+#     host: smtp.qq.com
+#     port: 465
+#     username: your-account@qq.com
+#     password: your-qq-mail-authorization-code
+#     properties:
+#       mail.smtp.auth: true
+#       mail.smtp.ssl.enable: true
+#       mail.smtp.connectiontimeout: 10000
+#       mail.smtp.timeout: 10000
+#       mail.smtp.writetimeout: 10000
+# auraboot:
+#   mail:
+#     from: your-account@qq.com

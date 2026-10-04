@@ -9,6 +9,8 @@ import com.auraboot.framework.meta.constant.Status;
 import com.auraboot.framework.meta.dto.BindingRuleDTO;
 import com.auraboot.framework.meta.dto.CommandDefinitionCreateRequest;
 import com.auraboot.framework.meta.dto.CommandDefinitionDTO;
+import com.auraboot.framework.meta.dto.CommandDescriptionLocalization;
+import com.auraboot.framework.meta.entity.payload.ExtensionBean;
 import com.auraboot.framework.meta.entity.BindingRule;
 import com.auraboot.framework.meta.entity.CommandDefinition;
 import com.auraboot.framework.meta.mapper.BindingRuleMapper;
@@ -76,7 +78,7 @@ public class CommandServiceImpl implements CommandService {
         entity.setCmdRiskLevel(request.getCmdRiskLevel() != null && !request.getCmdRiskLevel().isBlank()
                 ? request.getCmdRiskLevel()
                 : "L1");
-        entity.setExtension(new com.auraboot.framework.meta.entity.payload.ExtensionBean());
+        entity.setExtension(parseCommandExtension(request.getExtension()));
         entity.setVersion(1);
         entity.setIsCurrent(true);
         entity.setRowVersion(1);
@@ -125,6 +127,9 @@ public class CommandServiceImpl implements CommandService {
         if (request.getCmdRiskLevel() != null && !request.getCmdRiskLevel().isBlank()) {
             entity.setCmdRiskLevel(request.getCmdRiskLevel());
         }
+        if (request.getExtension() != null) {
+            entity.setExtension(parseCommandExtension(request.getExtension()));
+        }
         entity.setUpdatedAt(Instant.now());
 
         commandDefinitionMapper.updateById(entity);
@@ -153,7 +158,7 @@ public class CommandServiceImpl implements CommandService {
         // tenant_id is automatically added by TenantLineInnerInterceptor
         CommandDefinition entity = commandDefinitionMapper.findCurrentByCode(code);
         if (entity == null) {
-            throw new BusinessException(ResponseCode.BadParam, "Command not found: " + code);
+            throw new com.auraboot.framework.meta.exception.CommandNotFoundException(code);
         }
         CommandDefinitionDTO dto = toDTO(entity);
         dto.setBindingRules(getBindingRulesInternal(entity.getId()));
@@ -352,6 +357,17 @@ public class CommandServiceImpl implements CommandService {
         return rules.stream().map(this::toRuleDTO).collect(Collectors.toList());
     }
 
+    private ExtensionBean parseCommandExtension(String json) {
+        if (json == null || json.isBlank()) return new ExtensionBean();
+        ExtensionBean extension = JsonUtil.parse(json, ExtensionBean.class);
+        if (extension == null) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed, "Command extension must be an object");
+        }
+        CommandDescriptionLocalization.from(extension.get("localizedDescriptions"));
+        CommandDescriptionLocalization.displayNamesFrom(extension.get("localizedDisplayNames"));
+        return extension;
+    }
+
     private CommandDefinitionDTO toDTO(CommandDefinition entity) {
         CommandDefinitionDTO dto = new CommandDefinitionDTO();
         dto.setId(entity.getId());
@@ -360,6 +376,10 @@ public class CommandServiceImpl implements CommandService {
         dto.setCode(entity.getCode());
         dto.setDisplayName(entity.getDisplayName());
         dto.setDescription(entity.getDescription());
+        dto.setLocalizedDisplayNames(CommandDescriptionLocalization.displayNamesFrom(entity.getExtension() == null
+                ? null : entity.getExtension().get("localizedDisplayNames")));
+        dto.setLocalizedDescriptions(CommandDescriptionLocalization.from(entity.getExtension() == null
+                ? null : entity.getExtension().get("localizedDescriptions")));
         dto.setModelCode(entity.getModelCode());
         dto.setType(extractCommandType(entity.getExecutionConfig()));
         dto.setInputSchema(entity.getInputSchema());

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
 import { get } from '~/shared/services/http-client';
 import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
+import { getBlockLabel } from '../utils/blockLabel';
 import { getByPath } from '../utils/dotPath';
 import type { DslBlockV3, ModelFieldDefinition } from '../types';
 import { getInspectorFields } from './schemas';
@@ -191,7 +192,7 @@ export function SchemaInspector({
   editablePropertyPaths,
   onChange,
 }: SchemaInspectorProps) {
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
   const fields = getInspectorFields(block).filter(
     (field) =>
       editablePropertyPaths === undefined ||
@@ -226,7 +227,7 @@ export function SchemaInspector({
         <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
           {resolveDesignerText(DESIGNER_I18N.unified.inspector, locale)}
         </div>
-        <div className="mt-1 text-sm font-semibold text-slate-900">{getBlockLabel(block, locale)}</div>
+        <div className="mt-1 text-sm font-semibold text-slate-900">{getBlockLabel(block, locale, t)}</div>
         <div className="mt-0.5 font-mono text-xs text-slate-400" data-testid="inspector-selected-id">
           {block.id}
         </div>
@@ -770,18 +771,6 @@ function isLocalizedTextObject(value: unknown): value is Record<string, string> 
     !Array.isArray(value) &&
     Object.values(value as Record<string, unknown>).every((item) => typeof item === 'string')
   );
-}
-
-function getBlockLabel(block: DslBlockV3, locale: string): string {
-  const title = block.title;
-  if (typeof title === 'string') return title;
-  if (title) {
-    const resolved = title[locale] || title['en-US'] || title.en || title['zh-CN'];
-    if (resolved) return resolved;
-  }
-  if (typeof block.props?.label === 'string') return block.props.label;
-  if (typeof block.props?.title === 'string') return block.props.title;
-  return block.field || block.widgetType || block.actionType || block.blockType;
 }
 
 function createModelFieldOptions(

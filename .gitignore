@@ -50,6 +50,10 @@ out/
 platform/data/
 
 venv/
+.venv/
+airflow-provider/.coverage
+airflow-provider/coverage-*.json
+airflow-provider/coverage-*.xml
 __pycache__/
 debug_html/
 evaluation_results/
@@ -118,6 +122,9 @@ AGENTS.md
 
 # Test coverage artifacts (D11 vitest --coverage output)
 plugins/cli/coverage/
+plugins/cli/coverage-*/
+web-admin/coverage/
+web-admin/coverage-*/
 
 # Per-worktree isolated docker stack state (slug-keyed env files written by
 # scripts/dev/start-isolated.sh; transient and worktree-local).

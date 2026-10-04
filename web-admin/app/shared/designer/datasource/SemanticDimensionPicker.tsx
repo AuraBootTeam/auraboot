@@ -8,6 +8,7 @@
 
 import React from 'react';
 import { useSemanticModelMeta } from './useMetaModels';
+import { SemanticMetaFeedback } from './SemanticMetaFeedback';
 import type { SemanticDimensionOption } from './types';
 
 const GRAIN_SEP = '__';
@@ -45,7 +46,7 @@ export const SemanticDimensionPicker: React.FC<SemanticDimensionPickerProps> = (
   label = '语义维度',
   className,
 }) => {
-  const { dimensions, isLoading } = useSemanticModelMeta(semanticModelCode);
+  const { dimensions, isLoading, error, refetch } = useSemanticModelMeta(semanticModelCode);
 
   const renderLabel = () =>
     label && <label className="mb-1 block text-sm font-medium text-gray-700">{label}</label>;
@@ -79,6 +80,15 @@ export const SemanticDimensionPicker: React.FC<SemanticDimensionPickerProps> = (
       <div className={className} data-testid="semantic-dimension-picker">
         {renderLabel()}
         <p className="text-sm text-gray-500">加载维度中…</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={className} data-testid="semantic-dimension-picker">
+        {renderLabel()}
+        <SemanticMetaFeedback error={error} onRetry={refetch} />
       </div>
     );
   }

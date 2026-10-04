@@ -138,7 +138,10 @@ public class MetaContext {
             Long actorPartyId,
             Long partyMembershipId,
             String sessionStage,
-            long contextVersion) {}
+            long contextVersion,
+            boolean impersonation,
+            Long operatorUserId,
+            String clientType) {}
 
     public record Snapshot(Long tenantId, Long userId, String userPid, String username,
                            Set<Long> roleIds, Long memberId, Long envId, String otelTraceId,
@@ -214,6 +217,21 @@ public class MetaContext {
             Long partyMembershipId,
             String sessionStage,
             long contextVersion) {
+        setSessionContext(applicationId, loginChannelId, executionScope, actorPartyId,
+                partyMembershipId, sessionStage, contextVersion, false, null, null);
+    }
+
+    public static void setSessionContext(
+            Long applicationId,
+            Long loginChannelId,
+            String executionScope,
+            Long actorPartyId,
+            Long partyMembershipId,
+            String sessionStage,
+            long contextVersion,
+            boolean impersonation,
+            Long operatorUserId,
+            String clientType) {
         SESSION_CONTEXT.set(new SessionContext(
                 applicationId,
                 loginChannelId,
@@ -221,7 +239,10 @@ public class MetaContext {
                 actorPartyId,
                 partyMembershipId,
                 sessionStage,
-                Math.max(1, contextVersion)));
+                Math.max(1, contextVersion),
+                impersonation,
+                operatorUserId,
+                clientType));
     }
 
     public static SessionContext getSessionContext() {
@@ -251,6 +272,25 @@ public class MetaContext {
     public static Long getCurrentPartyMembershipId() {
         SessionContext context = SESSION_CONTEXT.get();
         return context == null ? null : context.partyMembershipId();
+    }
+
+    public static boolean isImpersonating() {
+        SessionContext context = SESSION_CONTEXT.get();
+        return context != null && context.impersonation();
+    }
+
+    /** The human who initiated this request's effective identity. */
+    public static Long getActualActorUserId() {
+        SessionContext context = SESSION_CONTEXT.get();
+        if (context != null && context.impersonation() && context.operatorUserId() != null) {
+            return context.operatorUserId();
+        }
+        return getCurrentUserId();
+    }
+
+    public static String getCurrentClientType() {
+        SessionContext context = SESSION_CONTEXT.get();
+        return context == null ? null : context.clientType();
     }
 
     /** Snapshotted OTel trace id for the current thread (A-G6 correlation); may be null. */

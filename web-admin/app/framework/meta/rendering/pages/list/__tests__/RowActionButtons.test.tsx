@@ -2,6 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { RowActionButtons } from '../RowActionButtons';
 import type { ButtonConfig } from '~/framework/meta/schemas/types';
+import { I18nProvider } from '~/contexts/I18nContext';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { parse } from 'yaml';
 
 const buttons: ButtonConfig[] = [
   { code: 'view', label: 'View' } as ButtonConfig,
@@ -29,10 +33,29 @@ const setup = (override?: Partial<Parameters<typeof RowActionButtons>[0]>) => {
 describe('RowActionButtons — More actions dropdown', () => {
   beforeEach(() => {
     cleanup();
+    localStorage.clear();
     // jsdom defaults innerWidth/innerHeight to 1024x768; override via Object.defineProperty
     // to keep position math deterministic across the suite.
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1280 });
     Object.defineProperty(window, 'innerHeight', { configurable: true, value: 800 });
+  });
+
+  it.each([
+    ['en-US', 'More actions'],
+    ['zh-CN', '\u66f4\u591a\u64cd\u4f5c'],
+  ])('localizes the %s trigger without changing action dispatch', (locale, label) => {
+    const dictionary = parse(readFileSync(path.resolve(process.cwd(), `../platform/src/main/resources/i18n.${locale}.yaml`), 'utf8'));
+    const handleAction = vi.fn();
+    render(<I18nProvider initialLocale={locale} initialData={dictionary}>
+      <RowActionButtons buttons={buttons} record={record} evaluateVisibleWhen={() => true}
+        resolveButtonLabel={button => String(button.label)} handleAction={handleAction} />
+    </I18nProvider>);
+    const trigger = screen.getByRole('button', { name: label });
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(screen.getByTestId('row-action-delete'));
+    expect(handleAction).toHaveBeenCalledExactlyOnceWith(buttons[2], record);
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
   it('renders the More actions trigger when there are >= 2 visible buttons', () => {

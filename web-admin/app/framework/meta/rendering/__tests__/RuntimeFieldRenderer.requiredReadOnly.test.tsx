@@ -1,5 +1,7 @@
+import { resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
 import React from 'react';
-import { render, waitFor } from '@testing-library/react';
+import { render, waitFor, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 
 /**
@@ -15,8 +17,8 @@ import { describe, it, expect, vi } from 'vitest';
  * mandatory input.
  */
 describe('RuntimeFieldRenderer required vs read-only', () => {
-  const buildRuntime = (fieldMeta: Record<string, unknown> | undefined) => {
-    const context = { locale: 'zh-CN', t: (k: string) => k, state: {}, form: {} };
+  const buildRuntime = (fieldMeta: Record<string, unknown> | undefined, locale = 'zh-CN', translations: Record<string, string> = {}) => {
+    const context = { locale, t: (k: string) => translations[k] ?? k, record: { sc_status: 'active' }, state: {}, form: {} };
     const stateManager = {
       getFieldMeta: () => fieldMeta,
       getFieldValue: () => undefined,
@@ -32,7 +34,7 @@ describe('RuntimeFieldRenderer required vs read-only', () => {
     } as any;
   };
 
-  const renderField = async (field: any, fieldMeta: Record<string, unknown> | undefined) => {
+  const renderField = async (field: any, fieldMeta: Record<string, unknown> | undefined, locale = 'zh-CN', translations: Record<string, string> = {}) => {
     let captured: any;
     vi.resetModules();
     vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
@@ -42,7 +44,7 @@ describe('RuntimeFieldRenderer required vs read-only', () => {
       },
     }));
     const { RuntimeFieldRenderer } = await import('../RuntimeFieldRenderer');
-    render(<RuntimeFieldRenderer field={field} runtime={buildRuntime(fieldMeta)} />);
+    render(<RuntimeFieldRenderer field={field} runtime={buildRuntime(fieldMeta, locale, translations)} />);
     await waitFor(() => expect(captured).toBeTruthy());
     return captured;
   };
@@ -82,4 +84,38 @@ describe('RuntimeFieldRenderer required vs read-only', () => {
     expect(captured.props).not.toHaveProperty('allowedWriterCommands');
     expect(captured.props.placeholder).toBe('Quote code');
   });
+
+  for (const locale of ['zh-CN', 'en-US']) {
+    it(`resolves every Showcase configured placeholder in ${locale} without mutating the page`, async () => {
+      const page = JSON.parse(readFileSync(resolve(import.meta.dirname, '../../../../../../plugins/showcase/config/pages/showcase_all_fields_form.json'), 'utf8'));
+      const catalog = JSON.parse(readFileSync(resolve(import.meta.dirname, '../../../../../../plugins/showcase/config/i18n.json'), 'utf8'));
+      const translations = Object.fromEntries(catalog.map((entry: any) => [entry.key, entry[locale]]));
+      const original = JSON.stringify(page);
+      const fields: any[] = [];
+      const collect = (node: any) => {
+        if (Array.isArray(node)) node.forEach(collect);
+        else if (node && typeof node === 'object') {
+          if (node.field && node.props?.placeholder !== undefined) fields.push(node);
+          Object.values(node).forEach(collect);
+        }
+      };
+      collect(page);
+      expect(fields).toHaveLength(24);
+      const localized = fields.filter((field) => field.props.placeholder.startsWith('$i18n:'));
+      expect(localized).toHaveLength(20);
+      for (const field of fields) {
+        const key = `model.showcase_all_fields.${field.field}.placeholder`;
+        const expected = translations[key] ?? field.props.placeholder;
+        expect(expected).toBeTruthy();
+        expect(expected).not.toMatch(/^\$i18n:/);
+        if (locale === 'en-US') expect(expected).not.toMatch(/[\u4e00-\u9fff]/);
+        const captured = await renderField(field, undefined, locale, translations);
+        expect(captured.props.placeholder).toBe(expected);
+        if (field.readOnly) expect(captured.props.readOnly).toBe(true);
+        cleanup();
+      }
+      expect(JSON.stringify(page)).toBe(original);
+    });
+  }
+
 });

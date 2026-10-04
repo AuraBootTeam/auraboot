@@ -7,7 +7,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -36,35 +35,55 @@ public class SemanticQuestionResolver {
     private final SemanticCatalogService catalogService;
 
     public Optional<SemanticQueryRequest> resolve(String question, UserContext user) {
+        if (question == null || question.isBlank()) return Optional.empty();
         SemanticMetaResponse catalog = catalogService.listCatalog(user.tenantId());
         String needle = question.toLowerCase(Locale.ROOT);
 
         // Best-scoring (metric code, model) across all published models.
-        String bestModelCode = null;
+        SemanticMetaResponse.ModelMeta bestModel = null;
         String bestMetricCode = null;
         int bestScore = 0;
+        boolean ambiguous = false;
 
         for (SemanticMetaResponse.ModelMeta model : catalog.getModels()) {
             for (SemanticMetaResponse.MetricMeta metric : model.getMetrics()) {
-                int score = matchScore(needle, metric);
+                int score = needle.contains((model.getCode() + "." + metric.getCode()).toLowerCase(Locale.ROOT))
+                        ? 4 : matchScore(needle, metric);
                 if (score > bestScore) {
                     bestScore = score;
-                    bestModelCode = model.getCode();
+                    bestModel = model;
                     bestMetricCode = metric.getCode();
+                    ambiguous = false;
+                } else if (score > 0 && score == bestScore) {
+                    ambiguous = true;
                 }
             }
         }
-        if (bestMetricCode == null) return Optional.empty();
+        if (bestMetricCode == null || ambiguous) return Optional.empty();
 
         SemanticQueryRequest request = new SemanticQueryRequest();
-        request.setMetrics(List.of(bestModelCode + "." + bestMetricCode));
+        request.setMetrics(List.of(bestModel.getCode() + "." + bestMetricCode));
 
         // Dimensions whose zh/en label or code appears in the question.
         List<String> dims = new ArrayList<>();
+        List<SemanticMetaResponse.DimensionMeta> ownDimensions = bestModel.getDimensions() == null
+                ? List.of() : bestModel.getDimensions();
+        for (var dim : ownDimensions) {
+            if (mentions(needle, dim.getLabel(), dim.getCode())) {
+                dims.add(bestModel.getCode() + "." + dim.getCode());
+            }
+        }
+        // This resolver produces one-model queries. A recognized dimension that
+        // belongs only to another model is unresolved, never silently dropped or
+        // sent to the compiler as a cross-model dimension.
         for (SemanticMetaResponse.ModelMeta model : catalog.getModels()) {
+            if (model == bestModel) continue;
             for (var dim : model.getDimensions() == null ? List.<SemanticMetaResponse.DimensionMeta>of() : model.getDimensions()) {
-                if (mentions(needle, dim.getLabel(), dim.getCode())) {
-                    dims.add(model.getCode() + "." + dim.getCode());
+                for (String token : mentionedTokens(needle, dim.getLabel(), dim.getCode())) {
+                    boolean understood = ownDimensions.stream().anyMatch(own ->
+                            token.equalsIgnoreCase(own.getCode()) || (own.getLabel() != null
+                                    && own.getLabel().values().stream().anyMatch(token::equalsIgnoreCase)));
+                    if (!understood) return Optional.empty();
                 }
             }
         }
@@ -80,11 +99,17 @@ public class SemanticQuestionResolver {
     }
 
     private boolean mentions(String needle, Map<String, String> label, String code) {
+        return !mentionedTokens(needle, label, code).isEmpty();
+    }
+
+    private List<String> mentionedTokens(String needle, Map<String, String> label, String code) {
+        List<String> matches = new ArrayList<>();
         if (label != null) {
             for (String value : label.values()) {
-                if (value != null && needle.contains(value.toLowerCase(Locale.ROOT))) return true;
+                if (value != null && !value.isBlank() && needle.contains(value.toLowerCase(Locale.ROOT))) matches.add(value);
             }
         }
-        return code != null && needle.contains(code.toLowerCase(Locale.ROOT));
+        if (code != null && !code.isBlank() && needle.contains(code.toLowerCase(Locale.ROOT))) matches.add(code);
+        return matches;
     }
 }

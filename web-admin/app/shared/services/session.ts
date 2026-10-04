@@ -1,7 +1,11 @@
 import { createCookieSessionStorage, redirect } from 'react-router';
 
 import {
+  IMPERSONATION_KEY,
   JWT_TOKEN_KEY,
+  OPERATOR_JWT_TOKEN_KEY,
+  OPERATOR_REMEMBER_KEY,
+  OPERATOR_TOKEN_EXPIRY_KEY,
   REMEMBER_KEY,
   TOKEN_EXPIRY_KEY,
   REFRESH_TOKEN_KEY,
@@ -33,9 +37,7 @@ export function resolveSessionCookieSecure(
   if (override !== undefined && override !== '') {
     if (override === 'true') return true;
     if (override === 'false') return false;
-    throw new Error(
-      `SESSION_COOKIE_SECURE must be "true" or "false", got "${override}"`,
-    );
+    throw new Error(`SESSION_COOKIE_SECURE must be "true" or "false", got "${override}"`);
   }
   return (env?.NODE_ENV ?? 'development') === 'production';
 }
@@ -64,7 +66,8 @@ export function assertSessionCookieDeployment(
 
   const secure = resolveSessionCookieSecure(env);
   const hostname = origin.hostname;
-  const isLoopbackHost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
+  const isLoopbackHost =
+    hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
 
   if (origin.protocol === 'https:' && !secure) {
     throw new Error(
@@ -138,6 +141,7 @@ export async function createUserSession({
 
 export async function commitUserSession(request: Request, token: string, remember: boolean) {
   const session = await getSessionFromRequest(request);
+  clearImpersonationSession(session);
   session.set(JWT_TOKEN_KEY, token);
   const exp = readJwtExp(token);
   if (exp == null) throw new Error('Authentication response has no token expiry');
@@ -145,6 +149,104 @@ export async function commitUserSession(request: Request, token: string, remembe
   session.set(REMEMBER_KEY, remember ? '1' : '0');
   return sessionStorage.commitSession(session, {
     maxAge: remember ? Math.max(0, exp - Math.floor(Date.now() / 1000)) : undefined,
+  });
+}
+
+export interface ImpersonationSessionInfo {
+  sessionPid: string;
+  targetUserPid: string;
+  targetMemberPid: string;
+  targetDisplayName: string;
+  operatorDisplayName: string;
+  expiresAt: string;
+  clientType: string;
+}
+
+type MutableSession = Awaited<ReturnType<typeof getSessionFromRequest>>;
+
+function clearImpersonationSession(session: MutableSession): void {
+  session.unset(IMPERSONATION_KEY);
+  session.unset(OPERATOR_JWT_TOKEN_KEY);
+  session.unset(OPERATOR_TOKEN_EXPIRY_KEY);
+  session.unset(OPERATOR_REMEMBER_KEY);
+}
+
+export async function getImpersonationFromRequest(
+  request: Request,
+): Promise<ImpersonationSessionInfo | null> {
+  const session = await getSessionFromRequest(request);
+  const value = session.get(IMPERSONATION_KEY);
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Partial<ImpersonationSessionInfo>;
+  if (
+    typeof candidate.sessionPid !== 'string' ||
+    typeof candidate.targetUserPid !== 'string' ||
+    typeof candidate.targetMemberPid !== 'string' ||
+    typeof candidate.targetDisplayName !== 'string' ||
+    typeof candidate.operatorDisplayName !== 'string' ||
+    typeof candidate.expiresAt !== 'string' ||
+    typeof candidate.clientType !== 'string'
+  ) {
+    return null;
+  }
+  return candidate as ImpersonationSessionInfo;
+}
+
+export async function commitImpersonationSession(
+  request: Request,
+  token: string,
+  impersonation: ImpersonationSessionInfo,
+): Promise<string> {
+  const session = await getSessionFromRequest(request);
+  if (session.get(IMPERSONATION_KEY)) {
+    throw new Error('Nested impersonation is not allowed');
+  }
+  const operatorToken = session.get(JWT_TOKEN_KEY);
+  if (typeof operatorToken !== 'string' || !operatorToken) {
+    throw new Error('Operator session is missing');
+  }
+  const operatorExpiry = session.get(TOKEN_EXPIRY_KEY) ?? readJwtExp(operatorToken);
+  if (operatorExpiry == null) {
+    throw new Error('Operator session has no token expiry');
+  }
+  const impersonationExpiry = readJwtExp(token);
+  if (impersonationExpiry == null) {
+    throw new Error('Impersonation response has no token expiry');
+  }
+
+  session.set(OPERATOR_JWT_TOKEN_KEY, operatorToken);
+  session.set(OPERATOR_TOKEN_EXPIRY_KEY, String(operatorExpiry));
+  session.set(OPERATOR_REMEMBER_KEY, session.get(REMEMBER_KEY) === '1' ? '1' : '0');
+  session.set(IMPERSONATION_KEY, impersonation);
+  session.set(JWT_TOKEN_KEY, token);
+  session.set(TOKEN_EXPIRY_KEY, String(impersonationExpiry));
+  session.set(REMEMBER_KEY, '0');
+
+  const operatorRemember = session.get(OPERATOR_REMEMBER_KEY) === '1';
+  return sessionStorage.commitSession(session, {
+    maxAge: operatorRemember
+      ? Math.max(0, Number(operatorExpiry) - Math.floor(Date.now() / 1000))
+      : undefined,
+  });
+}
+
+export async function restoreOperatorSession(request: Request): Promise<string> {
+  const session = await getSessionFromRequest(request);
+  const operatorToken = session.get(OPERATOR_JWT_TOKEN_KEY);
+  const operatorExpiry = session.get(OPERATOR_TOKEN_EXPIRY_KEY);
+  const operatorRemember = session.get(OPERATOR_REMEMBER_KEY) === '1';
+  if (typeof operatorToken !== 'string' || !operatorToken || operatorExpiry == null) {
+    throw new Error('Operator session cannot be restored');
+  }
+
+  session.set(JWT_TOKEN_KEY, operatorToken);
+  session.set(TOKEN_EXPIRY_KEY, String(operatorExpiry));
+  session.set(REMEMBER_KEY, operatorRemember ? '1' : '0');
+  clearImpersonationSession(session);
+  return sessionStorage.commitSession(session, {
+    maxAge: operatorRemember
+      ? Math.max(0, Number(operatorExpiry) - Math.floor(Date.now() / 1000))
+      : undefined,
   });
 }
 
@@ -207,7 +309,10 @@ export async function maybeRenewSession(request: Request): Promise<SessionRenewa
   }
   const remember = session.get(REMEMBER_KEY) === '1';
   const setCookie = await sessionStorage.commitSession(session, {
-    maxAge: remember && renewedExp != null ? Math.max(0, renewedExp - Math.floor(Date.now() / 1000)) : undefined,
+    maxAge:
+      remember && renewedExp != null
+        ? Math.max(0, renewedExp - Math.floor(Date.now() / 1000))
+        : undefined,
   });
   return { renewed: true, setCookie };
 }
@@ -219,9 +324,7 @@ export async function logout(request: Request) {
 
   if (token) {
     const backendUrl =
-      typeof process !== 'undefined'
-        ? process.env.SPRING_BOOT_URL || 'http://127.0.0.1:6443'
-        : '';
+      typeof process !== 'undefined' ? process.env.SPRING_BOOT_URL || 'http://127.0.0.1:6443' : '';
     if (backendUrl) {
       try {
         await fetch(`${backendUrl}/api/user/sessions/current`, {
@@ -241,6 +344,7 @@ export async function logout(request: Request) {
   session.unset(REFRESH_TOKEN_KEY);
   session.unset(TOKEN_EXPIRY_KEY);
   session.unset(REMEMBER_KEY);
+  clearImpersonationSession(session);
 
   return redirect('/login', {
     headers: {

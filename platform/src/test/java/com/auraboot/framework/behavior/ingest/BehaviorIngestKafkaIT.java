@@ -84,6 +84,27 @@ class BehaviorIngestKafkaIT {
         eventConsumer.subscribe();
         quarantineConsumer.subscribe();
         harness = new KafkaHarness(mq, publisher, eventGroup, quarantineGroup);
+        // A reachable fresh broker can still be creating/loading __consumer_offsets.
+        // Prove both consumers have assignments before starting the 20-second
+        // business-delivery assertions; a failed bootstrap remains a test failure.
+        try (AdminClient admin = adminClient()) {
+            await().atMost(Duration.ofMinutes(3)).pollInterval(Duration.ofMillis(250))
+                    .untilAsserted(() -> {
+                        Map<String, org.apache.kafka.clients.admin.ConsumerGroupDescription> groups;
+                        try {
+                            groups = admin.describeConsumerGroups(List.of(eventGroup, quarantineGroup))
+                                    .all().get(2, TimeUnit.SECONDS);
+                        } catch (java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException e) {
+                            throw new AssertionError("Kafka consumer groups are not ready", e);
+                        }
+                        for (String group : List.of(eventGroup, quarantineGroup)) {
+                            assertThat(groups.get(group).members()).isNotEmpty();
+                            assertThat(groups.get(group).members().stream()
+                                    .anyMatch(member -> !member.assignment().topicPartitions().isEmpty()))
+                                    .as("Kafka consumer assignment for %s", group).isTrue();
+                        }
+                    });
+        }
     }
 
     @AfterEach
@@ -296,7 +317,13 @@ class BehaviorIngestKafkaIT {
     private static boolean kafkaAvailable() {
         try (AdminClient admin = adminClient()) {
             return !admin.describeCluster().nodes().get(2, TimeUnit.SECONDS).isEmpty();
-        } catch (Exception ignored) {
+        } catch (Exception failure) {
+            if (failure instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            if ("1".equals(System.getenv("AURA_CI_REQUIRE_KAFKA"))) {
+                throw new IllegalStateException("CI Kafka readiness probe failed at " + BOOTSTRAP, failure);
+            }
             return false;
         }
     }

@@ -75,8 +75,8 @@ function listPages(idx: ResourceIndex, modelFilter?: string): ListItem[] {
     : idx.raw.pages;
   return pgs.map(p => ({
     code: p.pageKey,
-    pageType: p.pageType || p.dslSchema?.kind,
-    modelCode: p.modelCode || p.dslSchema?.modelCode,
+    pageType: p.pageType || p.kind || p.dslSchema?.kind || p.dsl_schema?.kind,
+    modelCode: p.modelCode || p.dslSchema?.modelCode || p.dsl_schema?.modelCode,
   }));
 }
 

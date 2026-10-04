@@ -1,11 +1,43 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import React from 'react';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { parse } from 'yaml';
+import { I18nProvider } from '~/contexts/I18nContext';
+import {
+  render as renderRaw,
+  screen,
+  within,
+  waitFor,
+  fireEvent,
+  cleanup,
+} from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ListConfigPanel } from '../ListConfigPanel';
+import { SampleDataLoader } from '../preview/SampleDataLoader';
+import { StructuralPreview } from '../preview/StructuralPreview';
+import { blocksToViewModel } from '../list-config/mapper';
 import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import type {
   ModelCapabilities,
   UseModelCapabilitiesResult,
 } from '~/shared/hooks/useModelCapabilities';
+
+function dictionary(locale: string) {
+  return parse(
+    readFileSync(
+      path.resolve(process.cwd(), `../platform/src/main/resources/i18n.${locale}.yaml`),
+      'utf8',
+    ),
+  );
+}
+function render(element: React.ReactNode) {
+  return renderRaw(
+    <I18nProvider initialLocale="zh-CN" initialData={dictionary('zh-CN')}>
+      {element}
+    </I18nProvider>,
+  );
+}
+afterEach(() => cleanup());
 
 const capabilitiesData = {
   list: true,
@@ -47,6 +79,7 @@ function baseSchema(): PageSchema {
 
 describe('ListConfigPanel', () => {
   beforeEach(() => {
+    localStorage.clear();
     mockedCapabilitiesResult = {
       data: capabilitiesData,
       loading: false,
@@ -54,6 +87,363 @@ describe('ListConfigPanel', () => {
       refetch: vi.fn(),
     };
   });
+
+  it.each(['en-US', 'zh-CN'])(
+    'localizes the columns journey in %s without changing search, order or width serialization',
+    async (locale) => {
+      const english = locale === 'en-US';
+      const onChange = vi.fn();
+      renderRaw(
+        <I18nProvider initialLocale={locale} initialData={dictionary(locale)}>
+          <ListConfigPanel schema={baseSchema()} onSchemaChange={onChange} />
+        </I18nProvider>,
+      );
+      expect(
+        await screen.findByRole('heading', {
+          name: english ? 'Choose key columns, then order them' : '先选主列，再排阅读顺序',
+        }),
+      ).toBeInTheDocument();
+      const search = screen.getByTestId('column-search-input');
+      fireEvent.change(search, { target: { value: 'UNMATCHED_FIELD' } });
+      expect(
+        screen.getByText(
+          english ? 'No matching fields. Try another search.' : '没有匹配字段，换个关键词试试。',
+        ),
+      ).toBeInTheDocument();
+      fireEvent.change(search, { target: { value: '' } });
+      fireEvent.click(screen.getByTestId('column-toggle-name'));
+      fireEvent.click(screen.getByTestId('column-toggle-createdAt'));
+      fireEvent.click(screen.getByTestId('column-item-0'));
+      const width = screen.getByTestId('schema-config-field-width');
+      expect(width).toHaveTextContent(english ? 'Width (px)' : '宽度 (px)');
+      const input = width.querySelector('input');
+      expect(input).toBeTruthy();
+      fireEvent.change(input!, { target: { value: '180' } });
+      const row = screen.getByTestId('column-item-0').closest('li');
+      expect(row).toBeTruthy();
+      fireEvent.click(
+        within(row!).getByRole('button', {
+          name: english ? 'Renderer: Text' : '渲染：文本',
+          exact: true,
+        }),
+      );
+      fireEvent.click(
+        within(row!).getByRole('button', { name: english ? 'Move down' : '下移', exact: true }),
+      );
+      const table = () =>
+        onChange.mock.calls
+          .at(-1)?.[0]
+          .blocks.find((block: { blockType: string }) => block.blockType === 'table');
+      await waitFor(() =>
+        expect(table()?.columns).toEqual([
+          'createdAt',
+          { field: 'name', width: 180, renderer: 'badge' },
+        ]),
+      );
+      expect(screen.getByTestId('preview-table').querySelectorAll('thead th')[0]).toHaveTextContent(
+        'createdAt',
+      );
+    },
+  );
+
+  it.each(['en-US', 'zh-CN'])(
+    'localizes the filters journey in %s while preserving the whitelist and operator payload',
+    async (locale) => {
+      const english = locale === 'en-US';
+      const onChange = vi.fn();
+      renderRaw(
+        <I18nProvider initialLocale={locale} initialData={dictionary(locale)}>
+          <ListConfigPanel schema={baseSchema()} onSchemaChange={onChange} />
+        </I18nProvider>,
+      );
+      fireEvent.click(screen.getByTestId('list-tab-filters'));
+      expect(
+        await screen.findByRole('heading', {
+          name: english ? 'Keep frequent filters' : '只保留高频筛选',
+        }),
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId('filter-toggle-createdAt')).not.toBeInTheDocument();
+      fireEvent.change(screen.getByTestId('filter-search-input'), {
+        target: { value: 'UNMATCHED_FIELD' },
+      });
+      expect(
+        screen.getByText(english ? 'No matching filter fields.' : '没有匹配的筛选字段。'),
+      ).toBeInTheDocument();
+      fireEvent.change(screen.getByTestId('filter-search-input'), { target: { value: '' } });
+      fireEvent.click(screen.getByTestId('filter-toggle-name'));
+      fireEvent.click(screen.getByTestId('filter-item-0'));
+      fireEvent.click(
+        within(screen.getByTestId('schema-config-field-operator')).getByRole('combobox'),
+      );
+      fireEvent.click(
+        await screen.findByRole('option', { name: english ? 'Contains' : '包含', exact: true }),
+      );
+      const input = screen.getByTestId('schema-config-field-defaultValue').querySelector('input');
+      expect(input).toBeTruthy();
+      fireEvent.change(input!, { target: { value: 'Acme' } });
+      fireEvent.click(
+        within(screen.getByTestId('schema-config-field-displayMode')).getByRole('combobox'),
+      );
+      fireEvent.click(
+        await screen.findByRole('option', { name: english ? 'Top bar' : '顶部栏', exact: true }),
+      );
+      await waitFor(() =>
+        expect(
+          onChange.mock.calls
+            .at(-1)?.[0]
+            .blocks.find((block: { blockType: string }) => block.blockType === 'filters')?.fields,
+        ).toEqual([
+          { field: 'name', operator: 'like', defaultValue: 'Acme', displayMode: 'top-bar' },
+        ]),
+      );
+      expect(screen.getByTestId('preview-filter-name')).toHaveTextContent(
+        english ? 'Default Acme' : '默认 Acme',
+      );
+    },
+  );
+
+  it.each(['en-US', 'zh-CN'])(
+    'localizes the toolbar journey in %s without widening capabilities or rewriting refresh actions',
+    async (locale) => {
+      const english = locale === 'en-US';
+      const onChange = vi.fn();
+      renderRaw(
+        <I18nProvider initialLocale={locale} initialData={dictionary(locale)}>
+          <ListConfigPanel schema={baseSchema()} onSchemaChange={onChange} />
+        </I18nProvider>,
+      );
+      fireEvent.click(screen.getByTestId('list-tab-toolbar'));
+      expect(
+        await screen.findByRole('heading', {
+          name: english ? 'Start with preset actions' : '先用预设动作占住主操作',
+        }),
+      ).toBeInTheDocument();
+      expect(screen.getByTestId('toolbar-preset-create')).toBeDisabled();
+      expect(screen.getByTestId('toolbar-preset-bulkDelete')).toBeDisabled();
+      fireEvent.click(screen.getByTestId('toolbar-preset-refresh'));
+      expect(screen.getByTestId('preview-toolbar-refresh')).toHaveTextContent(
+        english ? 'Refresh' : '刷新',
+      );
+      fireEvent.click(screen.getByTestId('toolbar-add-custom-button'));
+      const edit = (key: string, value: string) => {
+        const input = screen.getByTestId(`schema-config-field-${key}`).querySelector('input');
+        expect(input).toBeTruthy();
+        fireEvent.change(input!, { target: { value } });
+      };
+      edit('label', 'Refresh orders');
+      edit('code', 'refresh_orders');
+      fireEvent.click(
+        within(screen.getByTestId('schema-config-field-actionKind')).getByRole('combobox'),
+      );
+      fireEvent.click(
+        await screen.findByRole('option', {
+          name: english ? 'Refresh data source' : '刷新数据源',
+          exact: true,
+        }),
+      );
+      edit('targetDataSource', 'ds_orders');
+      const buttons = () =>
+        onChange.mock.calls
+          .at(-1)?.[0]
+          .blocks.find((block: { blockType: string }) => block.blockType === 'toolbar')?.buttons;
+      await waitFor(() =>
+        expect(buttons()).toEqual([
+          { preset: 'refresh' },
+          {
+            code: 'refresh_orders',
+            label: 'Refresh orders',
+            action: {
+              type: 'flow',
+              steps: [{ action: 'dataSource.reload', args: { target: 'ds_orders' } }],
+            },
+            events: { onClick: { action: 'dataSource.reload', args: { target: 'ds_orders' } } },
+          },
+        ]),
+      );
+      fireEvent.click(screen.getByTestId('toolbar-custom-remove-0'));
+      await waitFor(() => expect(buttons()).toEqual([{ preset: 'refresh' }]));
+    },
+  );
+
+  it.each(['en-US', 'zh-CN'])(
+    'keeps all list editor mutations disabled in readonly %s',
+    async (locale) => {
+      const onChange = vi.fn();
+      renderRaw(
+        <I18nProvider initialLocale={locale} initialData={dictionary(locale)}>
+          <ListConfigPanel readonly schema={baseSchema()} onSchemaChange={onChange} />
+        </I18nProvider>,
+      );
+      expect(onChange).not.toHaveBeenCalled();
+      const calls = 0;
+      for (const [tab, target] of [
+        ['columns', 'column-toggle-name'],
+        ['filters', 'filter-toggle-name'],
+        ['toolbar', 'toolbar-preset-refresh'],
+      ]) {
+        fireEvent.click(screen.getByTestId(`list-tab-${tab}`));
+        const control = await screen.findByTestId(target);
+        expect(control).toBeDisabled();
+        fireEvent.click(control);
+      }
+      expect(screen.getByTestId('toolbar-add-custom-button')).toBeDisabled();
+      fireEvent.click(screen.getByTestId('toolbar-add-custom-button'));
+      expect(onChange).toHaveBeenCalledTimes(calls);
+    },
+  );
+
+  it.each([
+    [
+      'en-US',
+      'How the list works',
+      'Default sort field',
+      'Sort direction',
+      'Page size',
+      'Open drawer',
+      '(Not set)',
+    ],
+    ['zh-CN', '定义列表的运行方式', '默认排序字段', '排序方向', '每页条数', '打开抽屉', '(不设)'],
+  ])(
+    'localizes behavior controls in %s while preserving numeric, enum and unset-sort payloads',
+    async (locale, heading, sortField, sortOrder, pageSize, drawer, unset) => {
+      const onChange = vi.fn();
+      renderRaw(
+        <I18nProvider initialLocale={locale} initialData={dictionary(locale)}>
+          <ListConfigPanel schema={baseSchema()} onSchemaChange={onChange} />
+        </I18nProvider>,
+      );
+      fireEvent.click(screen.getByTestId('list-tab-behavior'));
+      expect(await screen.findByRole('heading', { name: heading })).toBeInTheDocument();
+      const sort = screen.getByTestId('schema-config-field-defaultSortField');
+      expect(sort).toHaveTextContent(sortField);
+      expect(screen.queryByTestId('schema-config-field-defaultSortOrder')).not.toBeInTheDocument();
+      fireEvent.click(within(sort).getByRole('combobox'));
+      fireEvent.click(await screen.findByRole('option', { name: 'name', exact: true }));
+      expect(await screen.findByTestId('schema-config-field-defaultSortOrder')).toHaveTextContent(
+        sortOrder,
+      );
+      const pagination = screen.getByTestId('schema-config-field-pageSize');
+      expect(pagination).toHaveTextContent(pageSize);
+      const input = pagination.querySelector('input');
+      expect(input).toBeTruthy();
+      fireEvent.change(input!, { target: { value: '50' } });
+      fireEvent.click(
+        within(screen.getByTestId('schema-config-field-rowClickAction')).getByRole('combobox'),
+      );
+      fireEvent.click(await screen.findByRole('option', { name: drawer, exact: true }));
+      const tableProps = () =>
+        onChange.mock.calls
+          .at(-1)?.[0]
+          .blocks.find((block: { blockType: string }) => block.blockType === 'table')?.props;
+      await waitFor(() =>
+        expect(tableProps()).toMatchObject({
+          pageSize: 50,
+          defaultSortField: 'name',
+          rowClickAction: 'drawer',
+        }),
+      );
+      fireEvent.click(
+        within(screen.getByTestId('schema-config-field-defaultSortField')).getByRole('combobox'),
+      );
+      fireEvent.click(await screen.findByRole('option', { name: unset, exact: true }));
+      await waitFor(() => expect(tableProps()).not.toHaveProperty('defaultSortField'));
+      expect(tableProps()).toMatchObject({ pageSize: 50, rowClickAction: 'drawer' });
+      expect(screen.queryByTestId('schema-config-field-defaultSortOrder')).not.toBeInTheDocument();
+    },
+  );
+
+  it.each([
+    [
+      'en-US',
+      'List designer',
+      'Live preview',
+      'Columns',
+      'Filters',
+      'Toolbar',
+      'Behavior',
+      'Unable to load model capabilities',
+    ],
+    ['zh-CN', '列表设计', '实时预览', '列结构', '筛选器', '工具栏', '交互行为', '模型能力读取失败'],
+  ])(
+    'localizes the shell and all tab transitions in %s without changing stored block types',
+    async (locale, heading, preview, columns, filters, toolbar, behavior, failure) => {
+      mockedCapabilitiesResult = {
+        data: undefined,
+        loading: false,
+        error: new Error('Unavailable'),
+        refetch: vi.fn(),
+      };
+      const catalog = JSON.parse(
+        readFileSync(
+          path.resolve(process.cwd(), '../platform/src/main/resources/seed/i18n-base.json'),
+          'utf8',
+        ),
+      );
+      const entries = catalog.filter((entry: { key: string }) =>
+        entry.key.startsWith('list_designer.'),
+      );
+      expect(entries.length).toBeGreaterThan(20);
+      for (const entry of entries) {
+        expect(dictionary(locale).list_designer[entry.key.split('.')[1]]).toBe(entry[locale]);
+      }
+      const onChange = vi.fn();
+      renderRaw(
+        <I18nProvider initialLocale={locale} initialData={dictionary(locale)}>
+          <ListConfigPanel schema={baseSchema()} onSchemaChange={onChange} />
+        </I18nProvider>,
+      );
+      expect(screen.getByText(heading)).toBeInTheDocument();
+      expect(screen.getByText(preview)).toBeInTheDocument();
+      expect(screen.getByTestId('capability-fallback-banner')).toHaveTextContent(failure);
+      for (const [id, label] of [
+        ['columns', columns],
+        ['filters', filters],
+        ['toolbar', toolbar],
+        ['behavior', behavior],
+      ]) {
+        const button = screen.getByTestId(`list-tab-${id}`);
+        expect(button).toHaveTextContent(label);
+        fireEvent.click(button);
+        expect(await screen.findByTestId(`${id}-tab`)).toBeInTheDocument();
+        expect(screen.getByTestId('list-designer-summary').querySelector('h1')).toHaveTextContent(
+          label,
+        );
+      }
+      expect(onChange).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([false, true])(
+    'does not rewrite a stored page on mount or tab navigation (readonly=%s)',
+    async (readonly) => {
+      const onChange = vi.fn();
+      const schema = {
+        ...baseSchema(),
+        blocks: [
+          {
+            id: 'persisted_table',
+            blockType: 'table',
+            registryCode: 'platform.table',
+            columns: ['name'],
+            dataSource: 'main',
+            props: { pageSize: 50 },
+            config: { marker: 'preserve' },
+          },
+        ],
+      } as unknown as PageSchema;
+      const original = JSON.stringify(schema);
+      render(
+        <React.StrictMode>
+          <ListConfigPanel readonly={readonly} schema={schema} onSchemaChange={onChange} />
+        </React.StrictMode>,
+      );
+      expect(await screen.findByTestId('column-item-0')).toHaveTextContent('name');
+      for (const tab of ['filters', 'toolbar', 'behavior', 'columns'])
+        fireEvent.click(screen.getByTestId(`list-tab-${tab}`));
+      expect(onChange).not.toHaveBeenCalled();
+      expect(JSON.stringify(schema)).toBe(original);
+    },
+  );
 
   it('renders with an empty schema and shows the columns tab by default', async () => {
     render(<ListConfigPanel schema={baseSchema()} onSchemaChange={() => {}} />);
@@ -166,7 +556,9 @@ describe('ListConfigPanel', () => {
 
     await waitFor(() => {
       const latest = onChange.mock.calls[onChange.mock.calls.length - 1]?.[0];
-      const toolbar = latest?.blocks?.find((block: { blockType: string }) => block.blockType === 'toolbar');
+      const toolbar = latest?.blocks?.find(
+        (block: { blockType: string }) => block.blockType === 'toolbar',
+      );
       expect(toolbar?.buttons?.[0]).toEqual({
         code: 'refresh_orders',
         label: 'Refresh orders',
@@ -187,9 +579,10 @@ describe('ListConfigPanel', () => {
     await waitFor(() => {
       expect(screen.getByTestId('columns-tab')).toBeInTheDocument();
     });
-    // Initial mount pushes the canonical 3-block shape outward.
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('column-toggle-name'));
     await waitFor(() => {
-      expect(onChange).toHaveBeenCalled();
+      expect(onChange).toHaveBeenCalledTimes(1);
     });
     const latest = onChange.mock.calls[onChange.mock.calls.length - 1][0];
     expect(Array.isArray(latest.blocks)).toBe(true);
@@ -241,4 +634,159 @@ describe('ListConfigPanel', () => {
     });
     expect(screen.queryByTestId('filter-toggle-createdAt')).toBeInTheDocument();
   });
+});
+
+describe('List sample preview contract', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it.each(['en-US', 'zh-CN'])(
+    'localizes idle/loading/success without writing the schema in %s',
+    async (locale) => {
+      const catalog = dictionary(locale);
+      let resolveResponse!: (value: Response) => void;
+      const pending = new Promise<Response>((resolve) => {
+        resolveResponse = resolve;
+      });
+      const fetchMock = vi.fn().mockReturnValue(pending);
+      vi.stubGlobal('fetch', fetchMock);
+      const onLoaded = vi.fn();
+      renderRaw(
+        <I18nProvider initialLocale={locale} initialData={catalog}>
+          <SampleDataLoader modelCode="test_model" onLoaded={onLoaded} />
+        </I18nProvider>,
+      );
+      const button = screen.getByTestId('sample-data-load-btn');
+      expect(button).toHaveTextContent(catalog.list_sample.load);
+      expect(screen.getByTestId('sample-data-loader')).toHaveTextContent(
+        catalog.list_sample.heading,
+      );
+      fireEvent.click(button);
+      expect(button).toBeDisabled();
+      expect(button).toHaveTextContent(catalog.list_sample.loading);
+      const rows = [{ name: 'Acme' }, { name: 'Beacon' }];
+      resolveResponse(
+        new Response(JSON.stringify({ code: '0', data: { records: rows } }), { status: 200 }),
+      );
+      await waitFor(() => expect(onLoaded).toHaveBeenCalledExactlyOnceWith(rows));
+      expect(screen.getByTestId('sample-data-count')).toHaveTextContent(
+        catalog.list_sample.loaded.replace('{count}', '2'),
+      );
+      expect(button).toBeEnabled();
+      expect(fetchMock).toHaveBeenCalledExactlyOnceWith(
+        '/api/dynamic/test_model/list?pageNum=1&pageSize=3',
+      );
+    },
+  );
+
+  it.each([
+    { code: '403', message: 'Access forbidden', data: null },
+    { code: '0', data: [] },
+    { code: '0', data: { records: [null] } },
+  ])('rejects business failure and invalid response shape: %j', async (body) => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(body), { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ code: '0', data: { records: [{ name: 'Recovered' }] } }), {
+          status: 200,
+        }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    const onLoaded = vi.fn();
+    render(<SampleDataLoader modelCode="test_model" onLoaded={onLoaded} />);
+    fireEvent.click(screen.getByTestId('sample-data-load-btn'));
+    await screen.findByTestId('sample-data-error');
+    expect(onLoaded).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('sample-data-count')).not.toBeInTheDocument();
+    expect(screen.getByTestId('sample-data-load-btn')).toBeEnabled();
+    fireEvent.click(screen.getByTestId('sample-data-load-btn'));
+    await waitFor(() => expect(onLoaded).toHaveBeenCalledExactlyOnceWith([{ name: 'Recovered' }]));
+    expect(screen.queryByTestId('sample-data-error')).not.toBeInTheDocument();
+  });
+
+  it.each(['en-US', 'zh-CN'])(
+    'accepts a valid empty page and disables an unbound model in %s',
+    async (locale) => {
+      const catalog = dictionary(locale);
+      vi.stubGlobal(
+        'fetch',
+        vi
+          .fn()
+          .mockResolvedValue(
+            new Response(JSON.stringify({ code: '0', data: { records: [] } }), { status: 200 }),
+          ),
+      );
+      const onLoaded = vi.fn();
+      const { rerender } = renderRaw(
+        <I18nProvider initialLocale={locale} initialData={catalog}>
+          <SampleDataLoader onLoaded={onLoaded} />
+        </I18nProvider>,
+      );
+      expect(screen.getByTestId('sample-data-load-btn')).toBeDisabled();
+      rerender(
+        <I18nProvider initialLocale={locale} initialData={catalog}>
+          <SampleDataLoader modelCode="test_model" onLoaded={onLoaded} />
+        </I18nProvider>,
+      );
+      fireEvent.click(screen.getByTestId('sample-data-load-btn'));
+      await waitFor(() => expect(onLoaded).toHaveBeenCalledExactlyOnceWith([]));
+      expect(screen.getByTestId('sample-data-count')).toHaveTextContent(
+        catalog.list_sample.loaded.replace('{count}', '0'),
+      );
+      expect(screen.queryByTestId('sample-data-error')).not.toBeInTheDocument();
+    },
+  );
+});
+
+describe('Real sample preview emptiness', () => {
+  it.each(['en-US', 'zh-CN'])(
+    'does not substitute generated records for an empty real result in %s',
+    (locale) => {
+      const catalog = dictionary(locale);
+      const vm = blocksToViewModel([{ id: 'sample_table', blockType: 'table', columns: ['name'] }]);
+      const { rerender } = renderRaw(
+        <I18nProvider initialLocale={locale} initialData={catalog}>
+          <StructuralPreview vm={vm} />
+        </I18nProvider>,
+      );
+      expect(screen.getByTestId('preview-table').querySelectorAll('tbody tr')).toHaveLength(3);
+      rerender(
+        <I18nProvider initialLocale={locale} initialData={catalog}>
+          <StructuralPreview vm={vm} overrideRows={[]} />
+        </I18nProvider>,
+      );
+      expect(screen.getByTestId('preview-data-empty')).toHaveTextContent(
+        catalog.list_editor.no_data,
+      );
+      expect(screen.getByTestId('preview-table').querySelectorAll('tbody tr')).toHaveLength(0);
+      expect(screen.getByTestId('preview-table')).toHaveTextContent('0 / 20');
+    },
+  );
+});
+
+describe('Sample transport failures', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it.each(['http', 'network', 'json'])(
+    'shows localized failure without publishing rows for %s failure',
+    async (failure) => {
+      const fetchMock = vi.fn();
+      if (failure === 'network') fetchMock.mockRejectedValue(new Error('Connection lost'));
+      else
+        fetchMock.mockResolvedValue(
+          new Response(failure === 'json' ? 'invalid JSON' : '{}', {
+            status: failure === 'http' ? 500 : 200,
+          }),
+        );
+      vi.stubGlobal('fetch', fetchMock);
+      const onLoaded = vi.fn();
+      render(<SampleDataLoader modelCode="test_model" onLoaded={onLoaded} />);
+      fireEvent.click(screen.getByTestId('sample-data-load-btn'));
+      expect(await screen.findByTestId('sample-data-error')).toHaveTextContent(
+        dictionary('zh-CN').list_sample.failed,
+      );
+      expect(screen.queryByTestId('sample-data-count')).not.toBeInTheDocument();
+      expect(onLoaded).not.toHaveBeenCalled();
+      expect(screen.getByTestId('sample-data-load-btn')).toBeEnabled();
+    },
+  );
 });

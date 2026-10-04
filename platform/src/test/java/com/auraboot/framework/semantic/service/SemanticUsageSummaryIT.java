@@ -62,8 +62,8 @@ class SemanticUsageSummaryIT {
     }
 
     @AfterAll
-    void cleanup() {
-        jdbc.update("DELETE FROM ab_semantic_query_log WHERE tenant_id IN (?, ?)", TENANT_ID, OTHER_TENANT_ID);
+    void retainFixturesAndClearContext() {
+        // The isolated CI database is retained for owner inspection.
         MetaContext.clear();
     }
 

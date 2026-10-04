@@ -177,22 +177,24 @@ test.describe('Open Platform collaboration golden states', () => {
         .or(page.getByTestId('open-platform-application-list')),
     ).toBeVisible();
 
-    if ((await page.getByTestId('open-platform-empty').count()) > 0) {
-      await page.getByTestId('open-platform-create-app').click();
-      const dialog = page.getByRole('dialog', { name: '创建外部应用' });
-      await page.getByTestId('open-platform-app-name').fill('开放平台协作验收应用');
-      await dialog.getByRole('textbox', { name: '描述' }).fill('真实后端 owner 与成员管理验收');
-      await dialog.getByRole('button', { name: '新建' }).click();
-    }
-    const application = page.getByTestId('open-platform-application-list');
-    await expect(application).toContainText('开放平台协作验收应用');
+    // Create this scenario's own application even when other specs left disabled
+    // applications visible. DELETE means disable, so it cannot create an empty console.
+    const appName = `开放平台协作验收应用 ${process.env.OP_MULTIUSER_RUN_TAG || 'r1'}`;
+    await page.getByTestId('open-platform-create-app').click();
+    const dialog = page.getByRole('dialog', { name: '创建外部应用' });
+    await page.getByTestId('open-platform-app-name').fill(appName);
+    await dialog.getByRole('textbox', { name: '描述' }).fill('真实后端 owner 与成员管理验收');
+    await dialog.getByRole('button', { name: '新建' }).click();
+    const application = page.getByTestId('open-platform-application-list')
+      .locator('article').filter({ hasText: appName });
+    await expect(application).toHaveCount(1);
     await dismissToasts(page);
     await expect(application).toContainText('所有者');
-    await expect(page.getByRole('button', { name: '管理成员' })).toBeVisible();
-    await expect(page.getByRole('button', { name: '添加安装' })).toBeVisible();
+    await expect(application.getByRole('button', { name: '管理成员' })).toBeVisible();
+    await expect(application.getByRole('button', { name: '添加安装' })).toBeVisible();
     await capture(page, 'OPC-UI-02');
 
-    await page.getByRole('button', { name: '管理成员' }).click();
+    await application.getByRole('button', { name: '管理成员' }).click();
     const memberDialog = page.getByRole('dialog', { name: '管理成员' });
     await expect(memberDialog).toBeVisible();
     await capture(page, 'OPC-UI-03');

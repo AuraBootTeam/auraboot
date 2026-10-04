@@ -90,8 +90,6 @@ class UserPermissionServiceImplTest {
         com.auraboot.framework.rbac.entity.Role role = new com.auraboot.framework.rbac.entity.Role();
         role.setCode("xy_school_admin");
         when(roleMapper.findByMemberIdAndTenantId(5L, 100L)).thenReturn(List.of(role));
-        when(permissionSnapshotCache.getEffectivePermissionIds(100L, 1L, 5L)).thenReturn(Set.of());
-        when(permissionSnapshotCache.resolvePermissionCodes(100L, Set.of())).thenReturn(Set.of());
         when(applicationRuntimeDefinitionCatalog.permissionsForRoles(
                 100L, "aura-edu", Set.of("xy_school_admin"))).thenReturn(Set.of("xy.school.manage"));
         ReflectionTestUtils.setField(service, "defaultApplicationCode", "aura-edu");
@@ -105,8 +103,6 @@ class UserPermissionServiceImplTest {
         com.auraboot.framework.rbac.entity.Role role = new com.auraboot.framework.rbac.entity.Role();
         role.setCode("tenant_admin");
         when(roleMapper.findByMemberIdAndTenantId(5L, 100L)).thenReturn(List.of(role));
-        when(permissionSnapshotCache.getEffectivePermissionIds(100L, 1L, 5L)).thenReturn(Set.of());
-        when(permissionSnapshotCache.resolvePermissionCodes(100L, Set.of())).thenReturn(Set.of());
         when(applicationRuntimeDefinitionCatalog.permissionCodes(100L, "aura-edu"))
                 .thenReturn(Set.of("model.xy_reward_sku.read"));
         ReflectionTestUtils.setField(service, "defaultApplicationCode", "aura-edu");
@@ -116,11 +112,59 @@ class UserPermissionServiceImplTest {
     }
 
     @Test
+    void explicitMemberPermissionCheckDoesNotReuseCurrentActorMember() {
+        when(permissionSnapshotCache.resolvePermissionId(200L, "admin.customer.impersonate"))
+                .thenReturn(70L);
+        when(permissionSnapshotCache.getEffectivePermissionIds(200L, 2L, 9L))
+                .thenReturn(Set.of());
+
+        assertThat(service.hasPermission(200L, 2L, 9L, "admin.customer.impersonate"))
+                .isFalse();
+        verify(permissionSnapshotCache).getEffectivePermissionIds(200L, 2L, 9L);
+        verify(permissionSnapshotCache, never()).getEffectivePermissionIds(200L, 2L, 5L);
+    }
+
+    @Test
+    void explicitReleasePermissionsUseTheTargetMemberAndTenant() {
+        com.auraboot.framework.rbac.entity.Role role = new com.auraboot.framework.rbac.entity.Role();
+        role.setCode("xy_teacher");
+        when(roleMapper.findByMemberIdAndTenantId(9L, 200L)).thenReturn(List.of(role));
+        when(applicationRuntimeDefinitionCatalog.permissionsForRoles(
+                200L, "aura-edu", Set.of("xy_teacher"))).thenReturn(Set.of("xy.score.submit"));
+        ReflectionTestUtils.setField(service, "defaultApplicationCode", "aura-edu");
+        ReflectionTestUtils.setField(service, "applicationRuntimePrimaryEnabled", true);
+
+        assertThat(service.hasPermission(200L, 2L, 9L, "xy.score.submit")).isTrue();
+        verify(roleMapper, never()).findByMemberIdAndTenantId(5L, 100L);
+        verify(permissionSnapshotCache, never()).getEffectivePermissionIds(100L, 1L, 5L);
+    }
+
+    @Test
     void unknownPermissionCodeFailsClosedWithoutLoadingUserSnapshot() {
         when(permissionSnapshotCache.resolvePermissionId(100L, "missing.code")).thenReturn(null);
 
         assertThat(service.hasPermission(1L, "missing.code")).isFalse();
         verify(permissionSnapshotCache, never()).getEffectivePermissionIds(100L, 1L, 5L);
+    }
+
+    @Test
+    void unknownPermissionAllowsTenantAdminBootstrapWithoutLoadingSnapshot() {
+        when(permissionSnapshotCache.resolvePermissionId(100L, "bootstrap.code")).thenReturn(null);
+        when(adminRoleChecker.hasRole(100L, 1L,
+                com.auraboot.framework.permission.enums.RoleCodes.TENANT_ADMIN)).thenReturn(true);
+
+        assertThat(service.hasPermission(1L, "bootstrap.code")).isTrue();
+        verify(permissionSnapshotCache, never()).getEffectivePermissionIds(100L, 1L, 5L);
+    }
+
+    @Test
+    void registeredPermissionRequiresAnEffectiveGrant() {
+        when(permissionSnapshotCache.resolvePermissionId(100L, "registered.code")).thenReturn(50L);
+        when(permissionSnapshotCache.getEffectivePermissionIds(100L, 1L, 5L)).thenReturn(Set.of());
+
+        assertThat(service.hasPermission(1L, "registered.code")).isFalse();
+        verify(adminRoleChecker, never()).hasRole(100L, 1L,
+                com.auraboot.framework.permission.enums.RoleCodes.TENANT_ADMIN);
     }
 
     @Test

@@ -49,3 +49,7 @@ export default definePlugin({
 | `BreadcrumbItem` | Derived breadcrumb item |
 
 The actual `RouteRegistry` implementation lives in the kernel (`framework/routing/registry.ts`); this package only declares the contract.
+
+## License
+
+Apache-2.0. See [LICENSE](./LICENSE) for the full text. The package license does not grant AuraBoot trademark rights.

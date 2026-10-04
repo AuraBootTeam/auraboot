@@ -11,6 +11,7 @@ import {
   paletteDraggableId,
 } from '../dnd/dndShared';
 import type { ActiveDropIntent } from '../canvas/CanvasHost';
+import { getBlockLabel, getBlockTypeLabel } from '../utils/blockLabel';
 import { groupModelFields } from '../utils/fieldGrouping';
 
 /**
@@ -174,6 +175,7 @@ function BlockPalette({
   onAddBlock: (blockType: string) => void;
   locale: string;
 }) {
+  const { t } = useI18n();
   const paletteDefinitions = useMemo(
     () => blockDefinitions.filter((definition) => !FIELD_LIKE_BLOCK_TYPES.has(definition.blockType)),
     [blockDefinitions],
@@ -191,7 +193,7 @@ function BlockPalette({
         </div>
         <div className="mt-1 truncate rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs font-medium text-slate-600">
           {selectedBlock
-            ? getBlockLabel(selectedBlock, locale)
+            ? getBlockLabel(selectedBlock, locale, t)
             : resolveDesignerText(DESIGNER_I18N.unified.pageRoot, locale)}
         </div>
       </div>
@@ -228,6 +230,7 @@ function PaletteBlockButton({
   onAddBlock: (blockType: string) => void;
   locale: string;
 }) {
+  const { t } = useI18n();
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: paletteDraggableId(definition.blockType),
     data: { kind: 'palette-block', blockType: definition.blockType },
@@ -255,7 +258,7 @@ function PaletteBlockButton({
     >
       <span>
         <span className="block font-medium">{localizedToString(definition.label, locale)}</span>
-        <span className="font-mono text-[10px]">{definition.blockType}</span>
+        <span className="font-mono text-[10px]">{getBlockTypeLabel(definition.blockType, locale, t)}</span>
       </span>
       <Plus className="h-3.5 w-3.5" aria-hidden="true" />
     </button>
@@ -532,6 +535,7 @@ function OutlineItem({
   activeDropIntent?: ActiveDropIntent;
   depth?: number;
 }) {
+  const { t } = useI18n();
   const dragAllowed = canReorderBlock ? canReorderBlock(block.id) : true;
   // dnd-kit stamps `aria-disabled` on a disabled draggable, but the row itself
   // stays clickable (selection): a drag-disabled row is not a disabled control,
@@ -584,22 +588,12 @@ function OutlineItem({
           aria-hidden="true"
         />
       ) : null}
-      <span className="min-w-0 flex-1 truncate">{getBlockLabel(block, locale)}</span>
+      <span className="min-w-0 flex-1 truncate">{getBlockLabel(block, locale, t)}</span>
       <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-400">
-        {block.blockType}
+        {getBlockTypeLabel(block.blockType, locale, t)}
       </span>
     </button>
   );
-}
-
-function getBlockLabel(block: DslBlockV3, locale: string): string {
-  if (block.title) {
-    const resolved = localizedToString(block.title, locale);
-    if (resolved) return resolved;
-  }
-  if (typeof block.props?.label === 'string') return block.props.label;
-  if (typeof block.props?.title === 'string') return block.props.title;
-  return block.field || block.widgetType || block.actionType || block.blockType;
 }
 
 function localizedToString(value: LocalizedText, locale: string): string {

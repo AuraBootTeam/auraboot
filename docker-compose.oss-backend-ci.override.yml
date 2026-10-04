@@ -1,35 +1,45 @@
-# Linux CI only: start the runtime-owned PostgreSQL database empty. The backend
-# integration runner applies the canonical Flyway migrations after PostgreSQL
-# is healthy so both schema and migration-owned platform seed rows are tested.
+# Standalone Linux CI infrastructure. The historical override filename is kept
+# for compatibility; no deployment Compose file or developer override is required.
+# Project-scoped volumes start empty; the runner applies canonical Flyway migrations.
 services:
   postgres:
-    container_name: ${AURA_OSS_CI_POSTGRES_CONTAINER:?CI runner must own the PostgreSQL container}
-    ports: !override
-      - "${AURA_OSS_CI_POSTGRES_PORT:?CI runner must allocate a PostgreSQL port}:5432"
+    image: pgvector/pgvector:pg16
+    ports:
+      - "127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT:?CI PostgreSQL port is required}:5432"
     environment:
       POSTGRES_DB: aura_boot
       POSTGRES_USER: auraboot
       POSTGRES_PASSWORD: auraboot_dev
+    volumes:
+      - skills_c2_postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U auraboot -d aura_boot"]
-    volumes: !override
-      - postgres_data:/var/lib/postgresql/data
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
 
   redis:
-    profiles: !override [skills-c2-stack]
-    container_name: ${AURA_OSS_CI_REDIS_CONTAINER:?CI runner must own the Redis container}
-    ports: !override
-      - "${AURA_OSS_CI_REDIS_PORT:?CI runner must allocate a Redis port}:6379"
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:${AURA_OSS_CI_REDIS_PORT:?CI Redis port is required}:6379"
+    volumes:
+      - oss_ci_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     ports:
-      - "${AURA_OSS_CI_KAFKA_PORT:-9092}:19092"
+      - "127.0.0.1:${AURA_OSS_CI_KAFKA_PORT:?CI Kafka port is required}:19092"
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:19092,CONTROLLER://0.0.0.0:29093
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:${AURA_OSS_CI_KAFKA_PORT:-9092}
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:${AURA_OSS_CI_KAFKA_PORT:?CI Kafka port is required}
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
@@ -46,8 +56,12 @@ services:
       retries: 30
       start_period: 20s
 
+volumes:
+  skills_c2_postgres_data:
+  oss_ci_redis_data:
+
+# Created by the runner using the explicit CI subnet pool, never the implicit pool.
 networks:
   default:
-    ipam:
-      config: !override
-        - subnet: ${AURA_OSS_CI_SUBNET:?CI runner must allocate a non-overlapping subnet}
+    external: true
+    name: "${AURA_OSS_CI_NETWORK:?backend CI runner must allocate its own network}"

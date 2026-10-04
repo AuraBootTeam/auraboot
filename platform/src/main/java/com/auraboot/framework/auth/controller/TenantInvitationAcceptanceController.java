@@ -142,7 +142,10 @@ public class TenantInvitationAcceptanceController {
                         null,
                         SessionStage.READY,
                         1,
-                        securityVersion));
+                        securityVersion,
+                        false,
+                        null,
+                        null));
         newJwt = jwtUtil.inheritSessionLifetime(newJwt, token);
         Tenant tenant = tenantService.getById(invite.getTenantId());
         if (applicationId != null && tenant != null && tenant.getPid() != null) {

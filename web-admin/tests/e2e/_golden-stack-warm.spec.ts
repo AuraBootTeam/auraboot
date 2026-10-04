@@ -6,7 +6,7 @@
  * the FIRST real golden run reliable:
  *
  *   - Drives a real authenticated headless navigation to the heavy lazy
- *     designer routes (/report-designer, /dashboard) so the client lazy
+ *     designer and form routes (/report-designer, /dashboard, /p/c/.../edit/...) so the client lazy
  *     chunk + Vite client-dep graph is hot (compiled + cached) before any
  *     golden spec runs. web-admin/vite.config.ts already pre-bundles the
  *     heavy deps via optimizeDeps.include (#947); this is the
@@ -20,6 +20,8 @@
  * part of any golden suite's assertions — it only primes the dev server.
  */
 import { test, expect } from '@playwright/test';
+import { uniqueId } from './helpers';
+import { createEditablePageRecord, createPublishedRefreshFormPage } from './page-designer/form-buttons-runtime-fixtures';
 
 test.describe('@golden-warm host-first golden stack pre-warm', () => {
   test('warm /report-designer (heavy lazy chunk)', async ({ page }) => {
@@ -37,4 +39,18 @@ test.describe('@golden-warm host-first golden stack pre-warm', () => {
     expect(page.url()).not.toContain('/login');
     expect(resp?.ok() ?? true).toBeTruthy();
   });
+
+  test('warm the custom edit form with a fresh published schema and record', async ({ page }) => {
+    const pageKey = await createPublishedRefreshFormPage(page);
+    const recordKey = uniqueId('golden_warm_form_record').replace(/-/g, '_');
+    const name = `Golden warm form ${recordKey}`;
+    const pid = await createEditablePageRecord(page, name, recordKey);
+    await page.goto(`/p/c/${pageKey}/edit/${pid}`, { waitUntil: 'domcontentloaded' });
+    // Readiness has the same 30s preparation bound as the existing designer warm.
+    // Business journeys still create their own records and keep their original 5s assertions.
+    await expect(page.getByTestId('dynamic-form')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByTestId('field-name').locator('input, textarea').first()).toHaveValue(name);
+    await expect(page.getByTestId('form-btn-refresh')).toBeVisible();
+  });
+
 });
