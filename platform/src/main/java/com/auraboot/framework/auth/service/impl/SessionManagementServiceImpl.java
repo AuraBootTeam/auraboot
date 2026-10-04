@@ -260,23 +260,27 @@ public class SessionManagementServiceImpl implements SessionManagementService {
     @Scheduled(fixedDelayString = "${security.impersonation.expiry-scan-ms:60000}")
     @Transactional
     public void expireImpersonationSessions() {
-        for (UserSession session : userSessionMapper.findExpiredImpersonationSessions()) {
-            if (userSessionMapper.revokeExpiredSession(session.getId()) != 1) {
-                continue;
+        // Authentication-plane expiry runs before any request tenant is bound.
+        // Keep this explicit worker scope local; never exempt the session table globally.
+        MetaContext.runWithoutTenantFilter(() -> {
+            for (UserSession session : userSessionMapper.findExpiredImpersonationSessions()) {
+                if (userSessionMapper.revokeExpiredSession(session.getId()) != 1) {
+                    continue;
+                }
+                if (adminEventLogService != null) {
+                    adminEventLogService.record(AdminEventLog.builder()
+                            .tenantId(session.getTenantId())
+                            .actorUserId(session.getInitiatedByUserId())
+                            .actorType("user")
+                            .actionType("impersonation.expired")
+                            .resourceType("user_session")
+                            .resourcePid(session.getPid())
+                            .success(true)
+                            .reason("Delegated customer session reached its fixed expiry")
+                            .build());
+                }
             }
-            if (adminEventLogService != null) {
-                adminEventLogService.record(AdminEventLog.builder()
-                        .tenantId(session.getTenantId())
-                        .actorUserId(session.getInitiatedByUserId())
-                        .actorType("user")
-                        .actionType("impersonation.expired")
-                        .resourceType("user_session")
-                        .resourcePid(session.getPid())
-                        .success(true)
-                        .reason("Delegated customer session reached its fixed expiry")
-                        .build());
-            }
-        }
+        });
     }
 
     private String hashToken(String token) {

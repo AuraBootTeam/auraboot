@@ -19,6 +19,7 @@ public class DrtLogDTO {
     private String traceId;
     private String correlationId;
     private String decisionCode;
+    /** Current tenant catalogue name; canonical code remains available separately. */
     private String decisionName;
     private Integer decisionVersion;
     private Integer selectedVersion;

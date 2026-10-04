@@ -684,6 +684,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         nqRequest.setPage(request.getPageNum());
         nqRequest.setSize(request.getPageSize());
         nqRequest.setExecuteQuery(true);
+        nqRequest.setKeyword(request.getKeyword());
 
         ObjectMapper mapper = new ObjectMapper();
 
