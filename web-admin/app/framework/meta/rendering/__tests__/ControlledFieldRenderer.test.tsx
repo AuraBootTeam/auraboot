@@ -21,7 +21,7 @@ describe('ControlledFieldRenderer', () => {
       const { ControlledFieldRenderer } = await import('../ControlledFieldRenderer');
       render(<ControlledFieldRenderer field={{ field: 'source', component: 'SmartSelect',
         placeholder: { 'zh-CN': '选择来源类型，或留空手工登记', en: 'Choose a source type or leave empty' },
-      } as any} value={null} onChange={vi.fn()} context={{ locale, t: (key: string) => key } as any} />);
+      }} value={null} onChange={vi.fn()} context={{ locale, t: (key: string) => key } as any} />);
       await waitFor(() => expect(capturedPropsSpy).toHaveBeenCalled());
       expect(capturedPropsSpy.mock.calls.at(-1)?.[0]?.props.placeholder).toBe(expected);
     },

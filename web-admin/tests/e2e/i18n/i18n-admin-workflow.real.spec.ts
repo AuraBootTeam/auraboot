@@ -7,7 +7,7 @@ import { openAsRole, makeRoleUser, ensureRoleUser, fetchRoleSnapshot } from '../
 import { ensureSidebarExpanded } from '../helpers';
 
 type Resource = { pid: string; i18nKey: string; value: string; source: string; status: string; rejectReason: string | null; reviewedAt: string | null; reviewedBy?: string | null; refType?: string | null; refId?: string | null };
-async function accepted<T>(response: APIResponse): Promise<T> {
+async function accepted<T>(response: Pick<APIResponse, 'ok' | 'status' | 'url' | 'json'>): Promise<T> {
   expect(response.ok(), `HTTP ${response.status()} from ${response.url()}`).toBe(true);
   const envelope = await response.json();
   expect(envelope.code, JSON.stringify(envelope)).toBe('0');

@@ -1230,7 +1230,15 @@
                     "en-US": "Reason"
                   },
                   "type": "textarea",
-                  "required": true
+                  "required": true,
+                  "placeholder": {
+                    "zh-CN": "例如：成员离职或需要暂停账号使用",
+                    "en-US": "For example: the member has left or account access must be suspended"
+                  },
+                  "helpText": {
+                    "zh-CN": "填写业务原因以便追溯。停用或离职后，该成员的登录会话将失效。",
+                    "en-US": "Provide the business reason for the audit trail. Suspending or offboarding invalidates the member’s sessions."
+                  }
                 }
               ]
             }
@@ -1307,7 +1315,15 @@
                     "en-US": "Reason"
                   },
                   "type": "textarea",
-                  "required": true
+                  "required": true,
+                  "placeholder": {
+                    "zh-CN": "例如：成员离职或需要暂停账号使用",
+                    "en-US": "For example: the member has left or account access must be suspended"
+                  },
+                  "helpText": {
+                    "zh-CN": "填写业务原因以便追溯。停用或离职后，该成员的登录会话将失效。",
+                    "en-US": "Provide the business reason for the audit trail. Suspending or offboarding invalidates the member’s sessions."
+                  }
                 }
               ]
             }
@@ -1336,7 +1352,15 @@
                     "zh-CN": "离职说明",
                     "en-US": "Reason"
                   },
-                  "type": "textarea"
+                  "type": "textarea",
+                  "placeholder": {
+                    "zh-CN": "例如：成员离职或需要暂停账号使用",
+                    "en-US": "For example: the member has left or account access must be suspended"
+                  },
+                  "helpText": {
+                    "zh-CN": "填写业务原因以便追溯。停用或离职后，该成员的登录会话将失效。",
+                    "en-US": "Provide the business reason for the audit trail. Suspending or offboarding invalidates the member’s sessions."
+                  }
                 }
               ]
             }
@@ -1395,6 +1419,16 @@
         "defaultSort": {
           "field": "created_at",
           "order": "desc"
+        },
+        "empty": {
+          "title": {
+            "zh-CN": "暂无符合条件的成员",
+            "en-US": "No matching members"
+          },
+          "description": {
+            "zh-CN": "请调整状态筛选；如尚未开通账号，可从人员开通账号。",
+            "en-US": "Adjust the status filter, or provision an account from an employee."
+          }
         }
       }
     ],

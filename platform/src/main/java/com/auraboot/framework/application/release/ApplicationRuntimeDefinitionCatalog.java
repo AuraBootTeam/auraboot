@@ -198,8 +198,7 @@ public final class ApplicationRuntimeDefinitionCatalog {
                 if (model.getCode() == null || model.getCode().isBlank() || !codes.add(model.getCode())) {
                     throw unavailable("Model key is missing or ambiguous in the active Application Release");
                 }
-                String table = model.getTableName();
-                if (table == null || table.isBlank()) table = SystemFieldConstants.generateTableName(model.getCode());
+                String table = physicalTableName(model);
                 sources.add(new BoundModelSource(model.getCode(), table));
             }
         }
@@ -221,7 +220,8 @@ public final class ApplicationRuntimeDefinitionCatalog {
         if (matches.isEmpty()) return Optional.empty();
 
         ModelDefinitionDTO source = matches.getFirst();
-        List<FieldDefinition> fields = releaseFields(release, modelCode);
+        String tableName = physicalTableName(source);
+        List<FieldDefinition> fields = releaseFields(release, modelCode, tableName);
         Map<String, Object> extension = source.getExtension() == null
                 ? new LinkedHashMap<>() : new LinkedHashMap<>(source.getExtension());
         return Optional.of(ModelDefinition.builder()
@@ -229,8 +229,7 @@ public final class ApplicationRuntimeDefinitionCatalog {
                 .name(source.getCode())
                 .displayName(source.getEffectiveDisplayName())
                 .description(source.getDescription())
-                .tableName(source.getTableName() == null || source.getTableName().isBlank()
-                        ? SystemFieldConstants.generateTableName(source.getCode()) : source.getTableName())
+                .tableName(tableName)
                 .modelType(source.getModelType())
                 .modelCategory(source.getModelCategory())
                 .sourceType("physical")
@@ -239,7 +238,7 @@ public final class ApplicationRuntimeDefinitionCatalog {
                 .status("published")
                 .fields(fields)
                 .relations(List.of())
-                .softDelete(false)
+                .softDelete(Boolean.TRUE.equals(extension.get("softDelete")))
                 .immutable(Boolean.TRUE.equals(source.getImmutable()))
                 .commandOnlyCreate(Boolean.TRUE.equals(source.getCommandOnlyCreate()))
                 .extension(Map.copyOf(extension))
@@ -427,7 +426,7 @@ public final class ApplicationRuntimeDefinitionCatalog {
     }
 
     private List<FieldDefinition> releaseFields(ApplicationDefinitionResolver.ReleaseDefinitions release,
-                                                String modelCode) {
+                                                String modelCode, String tableName) {
         Map<String, FieldDefinitionDTO> fieldsByCode = new LinkedHashMap<>();
         List<ModelFieldBindingDTO> bindings = new ArrayList<>();
         for (var component : release.components()) {
@@ -449,7 +448,7 @@ public final class ApplicationRuntimeDefinitionCatalog {
             if (!used.add(field.getCode())) throw unavailable("Model contains a duplicated Release field: " + field.getCode());
             result.add(toField(field, binding));
         }
-        addSystemFields(result, used);
+        addSystemFields(result, used, tableName);
         result.sort(Comparator.comparing(field -> field.getSortOrder() == null ? 0 : field.getSortOrder()));
         return List.copyOf(result);
     }
@@ -513,7 +512,18 @@ public final class ApplicationRuntimeDefinitionCatalog {
         return release;
     }
 
-    private static void addSystemFields(List<FieldDefinition> target, Set<String> used) {
+    /** Keep legacy config-import physical mappings in immutable Release reads. */
+    private static String physicalTableName(ModelDefinitionDTO model) {
+        String tableName = model.getTableName();
+        if ((tableName == null || tableName.isBlank()) && model.getExtension() != null
+                && model.getExtension().get("tableName") instanceof String legacyTable) {
+            tableName = legacyTable;
+        }
+        return tableName == null || tableName.isBlank()
+                ? SystemFieldConstants.generateTableName(model.getCode()) : tableName;
+    }
+
+    private static void addSystemFields(List<FieldDefinition> target, Set<String> used, String tableName) {
         addSystem(target, used, "id", "long", -1000, false);
         addSystem(target, used, "pid", "string", -999, true);
         addSystem(target, used, "created_at", "datetime", -998, false);
@@ -521,7 +531,9 @@ public final class ApplicationRuntimeDefinitionCatalog {
         addSystem(target, used, "created_by", "long", -996, false);
         addSystem(target, used, "updated_by", "long", -995, false);
         addSystem(target, used, "tenant_id", "long", -994, false);
-        addSystem(target, used, "row_version", "int", -993, false);
+        if (tableName.startsWith(SystemFieldConstants.DYNAMIC_TABLE_PREFIX)) {
+            addSystem(target, used, "row_version", "int", -993, false);
+        }
     }
 
     private static void addSystem(List<FieldDefinition> target, Set<String> used, String code,

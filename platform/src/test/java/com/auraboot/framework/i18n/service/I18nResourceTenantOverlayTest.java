@@ -26,12 +26,15 @@ class I18nResourceTenantOverlayTest {
   assertThat(service.getResourceMapByLang("zh-CN")).containsEntry("action.more", "更多").containsEntry("plugin.label", "仓库");
   assertThat(MetaContext.isTenantFilterBypassed()).isFalse();
   assertThat(MetaContext.getCurrentTenantId()).isEqualTo(42L);
-  verify(mapper, never()).selectAllByLangAllTenants(anyString());
+  verify(mapper).selectAllByLang(42L, "zh-CN");
+  verify(mapper).selectAllByLang(0L, "zh-CN");
+  verifyNoMoreInteractions(mapper);
  }
  @Test void publicPackLoadsDeclaredPublicResourcesWithoutTenantContext() {
   systemResource();
   assertThat(service.getResourceMapByLang("zh-CN")).containsEntry("action.more", "更多").doesNotContainKey("plugin.label");
-  verify(mapper, never()).selectAllByLangAllTenants(anyString());
+  verify(mapper).selectAllByLang(0L, "zh-CN");
+  verifyNoMoreInteractions(mapper);
   assertThat(MetaContext.isTenantFilterBypassed()).isFalse();
  }
  @Test void tenantTranslationsOverrideSystemValues() {
