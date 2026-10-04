@@ -5927,5 +5927,75 @@
     "en-US": "Roles could not be loaded. Please try again later.",
     "source": "import",
     "refType": "ui"
+  },
+  {
+    "key": "dashboard.favorites.only",
+    "zh-CN": "仅显示收藏",
+    "en-US": "Favorites only",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "dashboard.favorites.all",
+    "zh-CN": "全部",
+    "en-US": "All",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "dashboard.favorites.add",
+    "zh-CN": "添加收藏",
+    "en-US": "Add to favorites",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "dashboard.favorites.remove",
+    "zh-CN": "取消收藏",
+    "en-US": "Remove from favorites",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "workbench.inbox.sourceWorkflow",
+    "zh-CN": "工作流",
+    "en-US": "Workflow",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "workbench.inbox.sourceCommand",
+    "zh-CN": "业务操作",
+    "en-US": "Business action",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "workbench.inbox.sourceChat",
+    "zh-CN": "消息",
+    "en-US": "Messages",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "workbench.inbox.sourceAi",
+    "zh-CN": "智能助手",
+    "en-US": "AI assistant",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "workbench.inbox.sourceNotification",
+    "zh-CN": "通知",
+    "en-US": "Notifications",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "workbench.inbox.sourceOther",
+    "zh-CN": "其他来源",
+    "en-US": "Other source",
+    "source": "import",
+    "refType": "ui"
   }
 ]
