@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { ensureSidebarExpanded, navigateToMenuByClick, clickRowActionByLocator } from '../helpers';
+import { ensureSidebarExpanded, navigateToMenuByClick } from '../helpers';
 
 test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json', locale: 'zh-CN' });
 
@@ -213,10 +213,13 @@ async function openReportFromManagement(page: import('@playwright/test').Page) {
   expect(body.data).toEqual(expect.arrayContaining([
     expect.objectContaining({ pid: reportPid, title: `订单运营月报 ${run}` }),
   ]));
-  // The DSL table uses pid as its row key; do not select a historical title match.
-  const row = page.getByTestId(`table-row-${reportPid}`);
+  // Match the current run's exact business title across supported table renderers.
+  const row = page.getByRole('row').filter({
+    has: page.getByRole('cell', { name: `订单运营月报 ${run}`, exact: true }),
+  });
+  await expect(row).toHaveCount(1);
   await expect(row).toContainText(`订单运营月报 ${run}`);
-  await clickRowActionByLocator(page, row, 'open_report');
+  await row.getByRole('button', { name: /^(打开|Open)$/ }).click();
   await expect(page).toHaveURL(new RegExp(`/report-designer/${reportPid}$`));
 }
 

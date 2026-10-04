@@ -254,6 +254,9 @@ export const WidgetPropertyPanel: React.FC<WidgetPropertyPanelProps> = ({ classN
 
   // Check if a property should be visible based on dependsOn
   const isPropertyVisible = (schema: PropertySchema): boolean => {
+    // Semantic sources use the governed picker, not legacy model/query inputs.
+    if ((widget.config.dataSource as ChartDataSource | undefined)?.type === 'semantic'
+      && schema.key.startsWith('dataSource.')) return false;
     if (!schema.dependsOn) return true;
     const dependValue = getNestedValue(
       widget.config as unknown as Record<string, unknown>,

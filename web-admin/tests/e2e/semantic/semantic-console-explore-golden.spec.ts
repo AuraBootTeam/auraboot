@@ -71,8 +71,9 @@ const topnYaml = yaml
 async function openConsole(page: Page) {
   await page.goto('/');
   await ensureSidebarExpanded(page);
-  const catalog = page.waitForResponse(r => r.url().endsWith('/api/semantic/meta'));
-  await navigateToMenuByClick(page, ['语义模型']);
+  const catalog = page.waitForResponse(r => new URL(r.url()).pathname === '/api/semantic/meta'
+    && r.request().method() === 'GET');
+  await navigateToMenuByClick(page, ['元数据管理', '语义模型']);
   const catalogBody = await (await catalog).json();
   expect(String(catalogBody.code)).toBe('0');
   await expect(page).toHaveURL(/\/semantic\/models$/);
