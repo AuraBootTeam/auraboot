@@ -1,13 +1,15 @@
 {
   "code": "org:delete_department",
-  "displayName:zh-CN": "Delete Department",
+  "displayName:zh-CN": "删除部门",
   "displayName:en": "Delete Department",
   "description": "Delete a department",
   "type": "delete",
   "modelCode": "org_department",
-  "permissions": ["ORG.hr.manage"],
+  "permissions": [
+    "ORG.hr.manage"
+  ],
   "extension": {
-    "confirmMessage:zh-CN": "Confirm delete this department?",
+    "confirmMessage:zh-CN": "确认删除这个部门？",
     "confirmMessage:en": "Confirm delete this department?"
   }
 }

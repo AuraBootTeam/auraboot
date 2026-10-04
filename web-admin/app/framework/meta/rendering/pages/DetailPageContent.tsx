@@ -2368,12 +2368,12 @@ function DetailBlockRenderer({
   }
 
   if (block.blockType === 'field-history') {
-    // Audit API expects numeric record ID, not PID
-    const numericId = recordData?.id || recordPid;
+    // Field audit queries are scoped to the public record PID.
+    const auditRecordPid = recordData?.pid || recordPid;
     return (
       <FieldHistoryViewer
         modelCode={modelCode || ''}
-        recordPid={String(numericId)}
+        recordPid={String(auditRecordPid)}
         token={token}
         locale={locale}
         t={t}

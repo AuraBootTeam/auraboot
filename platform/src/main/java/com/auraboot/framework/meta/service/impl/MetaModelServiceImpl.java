@@ -2559,9 +2559,21 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                 continue;
             }
 
-            // Build title JSONB: {"en": "<ModelCode> <Kind>", "zh-CN": "<ModelCode> <Kind>"}
-            String titleLabel = modelCode + " " + spec.kind();
-            String titleJson = "{\"en\":\"" + titleLabel + "\",\"zh-CN\":\"" + titleLabel + "\"}";
+            String modelName = StringUtils.hasText(model.getDisplayName()) ? model.getDisplayName() : modelCode;
+            String kindLabel = switch (spec.kind()) {
+                case "list" -> "列表";
+                case "form" -> "表单";
+                case "detail" -> "详情";
+                default -> throw new IllegalArgumentException("Unsupported default page kind: " + spec.kind());
+            };
+            String pageName = modelName + kindLabel;
+            String titleJson;
+            try {
+                titleJson = objectMapper.writeValueAsString(Map.of(
+                        "zh-CN", pageName, "en", modelName + " " + spec.kind()));
+            } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                throw new IllegalStateException("Failed to serialize default page title", e);
+            }
 
             // Resolve env_id from MetaContext or fall back to tenant default
             Long envId = com.auraboot.framework.application.tenant.MetaContext.getCurrentEnvironmentId();
@@ -2576,7 +2588,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                 "published",                     // status
                 spec.pageKey(),                  // pageKey
                 modelCode,                       // modelCode
-                spec.pageKey(),                  // name (same as pageKey)
+                pageName,                        // localized business name
                 titleJson,                       // title
                 null,                            // description
                 spec.kind(),                     // kind

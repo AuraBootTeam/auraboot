@@ -1,3 +1,4 @@
+import { useI18n } from '~/contexts/I18nContext';
 /**
  * InlineEditCell — inline cell editing for table columns
  *
@@ -47,6 +48,7 @@ export const InlineEditCell: React.FC<InlineEditCellProps> = ({
   dictItems,
   children,
 }) => {
+  const { t } = useI18n();
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(value);
   const [saving, setSaving] = useState(false);
@@ -226,7 +228,7 @@ export const InlineEditCell: React.FC<InlineEditCellProps> = ({
       }}
       onClick={(e) => e.stopPropagation()}
       className="hover:bg-accent-weak -mx-1 block min-h-[24px] max-w-full min-w-0 cursor-text truncate overflow-hidden rounded px-1 whitespace-nowrap transition-colors"
-      title="Double-click to edit"
+      title={t('table.doubleClickEdit')}
       data-testid={`inline-edit-cell-${column.field}`}
     >
       {children}

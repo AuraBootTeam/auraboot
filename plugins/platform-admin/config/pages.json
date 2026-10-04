@@ -1167,17 +1167,17 @@
             "dictCode": "member_status"
           },
           {
+            "field": "created_at",
+            "width": 200,
+            "valueType": "datetime"
+          },
+          {
             "field": "join_date",
             "width": 140
           },
           {
             "field": "leave_date",
             "width": 140
-          },
-          {
-            "field": "created_at",
-            "width": 180,
-            "valueType": "datetime"
           }
         ],
         "selection": {
@@ -2405,12 +2405,12 @@
         "id": "account_security_policy_delivery_notes",
         "blockType": "detail-section",
         "title": {
-          "zh-CN": "交付说明",
-          "en": "Delivery Notes"
+          "zh-CN": "策略说明",
+          "en": "Policy Notes"
         },
         "description": {
-          "zh-CN": "说明当前只读视图的策略来源和交付边界。",
-          "en": "Explains the policy source and delivery boundary of this read-only view."
+          "zh-CN": "查看安全策略的管理方式与调整途径。",
+          "en": "Review how security policies are managed and how to request changes."
         },
         "extension": {
           "displayVariant": "settings-card",

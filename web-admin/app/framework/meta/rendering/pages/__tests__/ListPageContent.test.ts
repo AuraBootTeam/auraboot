@@ -1,6 +1,8 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  areListSortFilterQueriesEqual,
+  isListQuerySettled,
   applyLocalSortUpdate,
   beginLatestListRequest,
   buildListReferenceDisplayCacheKey,
@@ -9,6 +11,8 @@ import {
   buildListColumnSettingsDefinitions,
   buildListFilterFieldMetadata,
   collectListReferenceDisplayConfigs,
+  collectListReferenceValues,
+  resolveListReferenceFilterLabel,
   findPersonalPresetSavedView,
   getListFieldValueWithAlias,
   pruneNoopViewConfigPatch,
@@ -961,5 +965,80 @@ describe('buildViewManageFieldOptions', () => {
         dataType: 'text',
       },
     ]);
+  });
+});
+
+describe('reference filter chip labels', () => {
+  const config = {
+    field: 'warehouse_id',
+    modelCode: 'inv_warehouse',
+    valueField: 'pid',
+    displayField: 'inv_warehouse_name',
+    displayKey: 'warehouse_id_display',
+  };
+  const filter = {
+    fieldCode: 'warehouse_id',
+    operator: 'eq' as const,
+    value: 'warehouse-public-pid',
+  };
+  it('resolves the persisted filter PID to its current business name', () => {
+    const key = buildListReferenceDisplayCacheKey(config);
+    expect(
+      resolveListReferenceFilterLabel(
+        filter,
+        [config],
+        { [key]: { 'warehouse-public-pid': 'GB-电商仓' } },
+        '未知',
+      ),
+    ).toBe('GB-电商仓');
+    expect(filter.value).toBe('warehouse-public-pid');
+  });
+  it('never exposes a raw reference PID while the label is unresolved', () => {
+    expect(resolveListReferenceFilterLabel(filter, [config], {}, '未知')).toBe('未知');
+    expect(
+      resolveListReferenceFilterLabel({ ...filter, fieldCode: 'notes' }, [config], {}, '未知'),
+    ).toBeUndefined();
+  });
+  it('requests labels for restored chips even when the filtered list is empty', () => {
+    expect(collectListReferenceValues(config, [], [filter], {})).toEqual(['warehouse-public-pid']);
+  });
+  it('deduplicates row and multiselect references and reuses cached labels', () => {
+    const values = collectListReferenceValues(
+      config,
+      [{ warehouse_id: 'a' }],
+      [{ ...filter, value: ['a', 'b', 'c'] }],
+      { b: '主仓' },
+    );
+    expect(values).toEqual(['a', 'c']);
+  });
+});
+
+
+describe('list query settlement', () => {
+  const empty = { activeSorts: [], chipFilters: [] };
+  const filtered = {
+    activeSorts: [],
+    chipFilters: [{ fieldCode: 'warehouse', operator: 'eq' as const, value: 'warehouse-one' }],
+  };
+
+  it('stays unsettled while a new filter is waiting for the debounce', () => {
+    expect(isListQuerySettled(filtered, empty, empty)).toBe(false);
+  });
+
+  it('stays unsettled after debounce delivery until the new request is scheduled', () => {
+    expect(isListQuerySettled(filtered, filtered, empty)).toBe(false);
+  });
+
+  it('settles only the query that was actually scheduled', () => {
+    expect(isListQuerySettled(filtered, filtered, filtered)).toBe(true);
+    expect(isListQuerySettled(empty, empty, undefined)).toBe(false);
+  });
+
+  it('recognizes an explicitly loaded view without duplicating its request', () => {
+    expect(areListSortFilterQueriesEqual(structuredClone(filtered), filtered)).toBe(true);
+    expect(areListSortFilterQueriesEqual(empty, filtered)).toBe(false);
+    expect(areListSortFilterQueriesEqual({
+      ...empty, activeSorts: [{ fieldCode: 'qty', direction: 'asc', priority: 0 }],
+    }, empty)).toBe(false);
   });
 });

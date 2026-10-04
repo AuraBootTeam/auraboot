@@ -7,6 +7,7 @@ import {
   encodeFilters,
   decodeFilters,
   resolveListSortState,
+  resolveListFilterState,
 } from '../useListUrlState';
 import type { SortConfig, ViewFilterConfig } from '~/framework/smart/types/savedView';
 
@@ -97,14 +98,10 @@ describe('areSortsEqual', () => {
 });
 
 describe('resolveListSortState', () => {
-  const savedViewSort: SortConfig[] = [
-    { fieldCode: 'updated_at', direction: 'desc', priority: 1 },
-  ];
+  const savedViewSort: SortConfig[] = [{ fieldCode: 'updated_at', direction: 'desc', priority: 1 }];
 
   it('lets SavedView hydration own a clean list URL', () => {
-    expect(
-      resolveListSortState({ initialUrlSorts: [], hasLocalSortChange: false }),
-    ).toEqual({
+    expect(resolveListSortState({ initialUrlSorts: [], hasLocalSortChange: false })).toEqual({
       hasInitialUrlOverride: false,
       applySavedViewSorts: true,
       syncUrlSorts: false,
@@ -151,9 +148,7 @@ describe('resolveListSortState', () => {
 
 describe('encodeFilters', () => {
   it('encodes ViewFilterConfig array to base64', () => {
-    const filters: ViewFilterConfig[] = [
-      { fieldCode: 'status', operator: 'eq', value: 'active' },
-    ];
+    const filters: ViewFilterConfig[] = [{ fieldCode: 'status', operator: 'eq', value: 'active' }];
     const encoded = encodeFilters(filters);
     expect(encoded).toBeTruthy();
     // Verify it is valid base64 that round-trips
@@ -268,5 +263,44 @@ describe('round-trip encode/decode', () => {
 
   it('empty filter round-trip', () => {
     expect(decodeFilters(encodeFilters([]))).toEqual([]);
+  });
+});
+
+describe('Unicode filter URL state', () => {
+  it('round-trips Chinese, accented and supplementary-plane business values', () => {
+    const filters: ViewFilterConfig[] = [
+      { fieldCode: 'product_name', operator: 'eq', value: '瓦楞纸箱 400×300 📦 café' },
+      { fieldCode: 'names', operator: 'in', value: ['轴承', '供应商𠀀'] },
+    ];
+    expect(decodeFilters(encodeFilters(filters))).toEqual(filters);
+    expect(areFiltersEqual(filters, structuredClone(filters))).toBe(true);
+  });
+
+  it('continues to read existing Latin-1 filter links', () => {
+    const filters: ViewFilterConfig[] = [{ fieldCode: 'name', operator: 'eq', value: 'café' }];
+    expect(decodeFilters(btoa(JSON.stringify(filters)))).toEqual(filters);
+  });
+});
+
+describe('filter ownership during SavedView hydration', () => {
+  it('keeps a user-applied filter when a view refreshes', () => {
+    expect(
+      resolveListFilterState({ initialUrlFilters: [], hasLocalFilterChange: true })
+        .applySavedViewFilters,
+    ).toBe(false);
+  });
+  it('keeps a filter from a refreshed deep link', () => {
+    expect(
+      resolveListFilterState({
+        initialUrlFilters: [{ fieldCode: 'product', operator: 'eq', value: '中文商品' }],
+        hasLocalFilterChange: false,
+      }).applySavedViewFilters,
+    ).toBe(false);
+  });
+  it('restores saved filters after an explicit view reset clears overrides', () => {
+    expect(
+      resolveListFilterState({ initialUrlFilters: [], hasLocalFilterChange: false })
+        .applySavedViewFilters,
+    ).toBe(true);
   });
 });

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { RowActionButtons } from '../RowActionButtons';
 import type { ButtonConfig } from '~/framework/meta/schemas/types';
+import { I18nProvider } from '~/contexts/I18nContext';
 
 const buttons: ButtonConfig[] = [
   { code: 'view', label: 'View' } as ButtonConfig,
@@ -33,6 +34,18 @@ describe('RowActionButtons — More actions dropdown', () => {
     // to keep position math deterministic across the suite.
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1280 });
     Object.defineProperty(window, 'innerHeight', { configurable: true, value: 800 });
+  });
+
+  it('localizes the accessible overflow trigger in Chinese', () => {
+    render(
+      <I18nProvider initialData={{ action: { more: '更多' } }} initialLocale="zh-CN">
+        <RowActionButtons buttons={buttons} record={record}
+          evaluateVisibleWhen={() => true} resolveButtonLabel={(button) => button.code}
+          handleAction={vi.fn()} />
+      </I18nProvider>,
+    );
+    expect(screen.getByTestId('row-action-more')).toHaveAccessibleName('更多');
+    expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument();
   });
 
   it('renders the More actions trigger when there are >= 2 visible buttons', () => {
