@@ -17155,7 +17155,8 @@ CREATE TABLE public.ab_webhook_delivery_log (
     installation_pid character varying(26),
     replay_count integer DEFAULT 0 NOT NULL,
     last_replayed_at timestamp with time zone,
-    last_replayed_by_pid character varying(64)
+    last_replayed_by_pid character varying(64),
+    request_id character varying(128)
 );
 
 
@@ -17164,6 +17165,13 @@ CREATE TABLE public.ab_webhook_delivery_log (
 --
 
 COMMENT ON TABLE public.ab_webhook_delivery_log IS 'Webhook delivery attempt logs';
+
+
+--
+-- Name: COLUMN ab_webhook_delivery_log.request_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_webhook_delivery_log.request_id IS 'Originating request ID captured before asynchronous delivery; unchanged by retry/replay';
 
 
 --
