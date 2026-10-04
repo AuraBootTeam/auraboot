@@ -529,8 +529,8 @@ tasks.withType(Test).configureEach {
 }
 
 // ─── JaCoCo offline instrumentation of main classes ───
-// Instrument build/classes/java/main at build time into a separate dir. The test task loads
-// these (stable IDs) ahead of the originals so coverage attributes to on-disk classes, which
+// Instrument build/classes/java/main at build time into a separate complete test output. The
+// test task loads these (stable IDs) so coverage attributes to on-disk classes, which
 // is robust across the suite's many CGLIB-proxied Spring contexts (the runtime classdump was
 // not — proxy class IDs diverge per evicted/recreated context, mis-attributing to ~5%).
 def jacocoInstrumentedMain = file("${buildDir}/classes-instrumented-main")
@@ -545,11 +545,16 @@ tasks.register('instrumentMainOffline') {
                     classpath: configurations.jacocoAnt.asPath)
         // CCJSqlParserTokenManager exceeds the JVM method-size limit after instrumentation
         // (same reason the on-the-fly agent excluded it); leave it un-instrumented so the
-        // original loads from build/classes, which stays later on the test classpath.
+        // original is copied into the complete test output below.
         ant.jacocoInstrument(destdir: jacocoInstrumentedMain) {
             fileset(dir: "${buildDir}/classes/java/main") {
                 exclude(name: 'net/sf/jsqlparser/parser/CCJSqlParserTokenManager.class')
             }
+        }
+        copy {
+            from layout.buildDirectory.dir('classes/java/main')
+            into jacocoInstrumentedMain
+            include 'net/sf/jsqlparser/parser/CCJSqlParserTokenManager.class'
         }
     }
 }
@@ -622,14 +627,15 @@ test {
     }
     finalizedBy jacocoTestReport
     // ─── JaCoCo offline instrumentation (replaces the fragile runtime CGLIB classdump) ───
-    // Load offline-instrumented main classes first (stable on-disk IDs), then the original
-    // build/classes (provides the un-instrumented CCJSqlParserTokenManager), plus the jacoco
+    // Load the complete offline main output (including the un-instrumented parser exception)
+    // instead of the original class directories, plus the jacoco
     // runtime so instrumented classes resolve org.jacoco.agent.rt.* at load. The on-the-fly
     // agent is disabled — offline records coverage on the original classes a proxy delegates
     // to, which is stable across the many @SpringBootTest contexts (unlike per-context proxy IDs).
     dependsOn 'instrumentMainOffline'
     doFirst {
-        classpath = files(jacocoInstrumentedMain) + classpath + configurations.jacocoRuntime
+        classpath = files(jacocoInstrumentedMain) +
+            (classpath - sourceSets.main.output.classesDirs) + configurations.jacocoRuntime
     }
     systemProperty 'jacoco-agent.destfile', file("${buildDir}/jacoco/test.exec").absolutePath
     jacoco {
