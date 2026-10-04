@@ -83,6 +83,8 @@
 | script | refs | updated | purpose |
 |---|--:|---|---|
 | `db/generate-schema-snapshot.sh` | 3 | 2026-06-23 | Generate a deterministic schema-only snapshot from a freshly migrated DB. |
+| `i18n-admin-browser-result.mjs` | 0 | 2026-10-04 | Validate current translation administration browser scenarios and execution provenance. |
+| `i18n-admin-browser-run.sh` | 0 | 2026-10-04 | Run translation administration acceptance in an owned isolated runtime. |
 | `gen-coverage-manifest.mjs` | 2 | 2026-07-23 | Generate a coverage manifest from the DSL and the test tree. |
 | `generate-plugin-routes.mjs` | 5 | 2026-04-26 | scripts/generate-plugin-routes.mjs |
 | `application/generate-product-extraction-inventory.mjs` | 1 | 2026-09-12 | Generate the BPM/CRM extraction owner, dependency, migration, route, and candidate-test denominator. |
@@ -114,6 +116,7 @@
 | `oss-backend-nightly-coverage.sh` | 0 | 2026-09-12 | Linux CI entrypoint for full backend coverage evidence. |
 | `oss-init-env-only.sh` | 0 | 2026-05-11 | AuraBoot Quick Environment Initialization |
 | `quick-filter-chip-golden-run.sh` | 0 | 2026-07-17 | quick-filter-chip-golden-run.sh — self-contained quick-filter view-chip browser golden runner. |
+| `rbac-golden-result.mjs` | 0 | 2026-10-04 | Validate recent real RBAC browser receipts against the expected scenario inventory. |
 | `rbac-golden-run.sh` | 0 | 2026-07-04 | rbac-golden-run.sh — self-contained RBAC platform-baseline browser golden runner. |
 | `release/tag-release.sh` | 2 | 2026-07-25 | Gated OSS release tag entrypoint; runs capability and test-system gates on the exact release commit. |
 | `run-open-platform-slo-gate.sh` | 1 | 2026-09-14 | Run smoke or production-threshold k6 checks for the Open Platform. |
@@ -144,6 +147,7 @@
 | `dev/lib/env-registry.mjs` | 4 | 2026-05-22 |  |
 | `dev/lib/health.sh` | 3 | 2026-05-22 | Sourceable health helpers for per-worktree dev stacks. |
 | `dev/lib/process-manager.sh` | 3 | 2026-05-22 | Sourceable process helpers for per-worktree host dev services. |
+| `lib/oss-ci-subnet.mjs` | 0 | 2026-10-04 | Select a non-overlapping subnet for isolated OSS CI Docker networks. |
 | `lib/multi-worktree-guard.sh` | 5 | 2026-05-22 | Multi-worktree pre-flight guard |
 | `lib/plugin-config.mjs` | 3 | 2026-07-23 | Read a plugin's config regardless of how it is laid out on disk. |
 | `lib/repo-root.mjs` | 5 | 2026-07-23 | Resolve the repo the test-system gates should run against. |
