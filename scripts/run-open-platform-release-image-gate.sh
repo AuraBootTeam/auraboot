@@ -136,7 +136,8 @@ docker run -d --name "$PG" --network "$NET" -e POSTGRES_USER=auraboot \
   -e POSTGRES_PASSWORD=open_platform_ci -e POSTGRES_DB=open_platform_ci pgvector/pgvector:pg16 >/dev/null
 docker run -d --name "$REDIS" --network "$NET" redis:7.4-alpine >/dev/null
 for attempt in $(seq 1 30); do
-  docker exec "$PG" pg_isready -U auraboot -d open_platform_ci >/dev/null 2>&1 && break
+  # The temporary initialization server accepts sockets before the final TCP listener starts.
+  docker exec "$PG" pg_isready -h "$PG" -U auraboot -d open_platform_ci >/dev/null 2>&1 && break
   [[ "$attempt" != 30 ]] || fatal "PostgreSQL did not become ready"
   sleep 1
 done
