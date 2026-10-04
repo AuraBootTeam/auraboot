@@ -18,12 +18,12 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class BehaviorEventAvroCompatibilityTest {
+public class BehaviorEventAvroCompatibilityTest {
 
     private static final Path SCHEMA_DIR = Path.of("src/main/resources/schemas/behavior");
 
     @Test
-    void v2SchemaIsBackwardCompatibleWithV1Payloads() throws Exception {
+    public void v2SchemaIsBackwardCompatibleWithV1Payloads() throws Exception {
         Schema v1 = readSchema("behavior-ingest-envelope-v1.avsc");
         Schema v2 = readSchema("behavior-ingest-envelope-v2.avsc");
 
@@ -39,7 +39,7 @@ class BehaviorEventAvroCompatibilityTest {
     }
 
     @Test
-    void v1ReadersCanIgnoreV2AdditiveFields() throws Exception {
+    public void v1ReadersCanIgnoreV2AdditiveFields() throws Exception {
         Schema v1 = readSchema("behavior-ingest-envelope-v1.avsc");
         Schema v2 = readSchema("behavior-ingest-envelope-v2.avsc");
 

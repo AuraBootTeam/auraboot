@@ -176,6 +176,39 @@ public class MetaContext {
         SESSION_CONTEXT.set(s.sessionContext());
     }
 
+    /**
+     * Run with propagated identity but without the executing thread's command authority.
+     * Restore all prior thread-local state, including authority, on this same thread only.
+     * This also supports saturated executors using CallerRunsPolicy.
+     */
+    public static void runWithSnapshot(Snapshot snapshot, Runnable task) {
+        ThreadLocal<?>[] locals = { HOLDER, MEMBER_ID, ENV_ID, SESSION_CONTEXT, OTEL_TRACE_ID,
+                ENV_FILTER_BYPASSED, TENANT_FILTER_BYPASSED, LOCK_GUARD_BYPASSED,
+                COMMAND_AUTHORITY, EXTERNAL_COMMAND_PERMISSION, AUTHORIZED_COMMAND_CODE,
+                COMMAND_AGGREGATE, COMMAND_PERMIT };
+        Object[] previous = new Object[locals.length];
+        for (int i = 0; i < locals.length; i++) {
+            previous[i] = locals[i].get();
+        }
+        clear();
+        restore(snapshot);
+        try {
+            task.run();
+        } finally {
+            clear();
+            for (int i = 0; i < locals.length; i++) {
+                restoreLocal(locals[i], previous[i]);
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> void restoreLocal(ThreadLocal<T> local, Object value) {
+        if (value != null) {
+            local.set((T) value);
+        }
+    }
+
     public static void setSessionContext(
             Long applicationId,
             Long loginChannelId,
