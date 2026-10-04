@@ -2,6 +2,7 @@ package com.auraboot.framework.meta.validator;
 
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.ValidationException;
+import com.auraboot.framework.meta.dto.PageSchemaUpdateRequest;
 import com.auraboot.framework.meta.entity.PageSchema;
 import com.auraboot.framework.plugin.validation.PageSchemaValidator;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -9,7 +10,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 import java.util.List;
 
-/** Checks the effective page state consistently before authoring persistence and publication. */
+/** Checks effective state without mutating a mapper-cached entity on a denied update. */
 @Component
 public class PageSchemaAuthoringProfileValidator {
     private final PageSchemaValidator profiles;
@@ -21,15 +22,26 @@ public class PageSchemaAuthoringProfileValidator {
     }
 
     public void validate(PageSchema page) {
-        List<Object> blocks = null;
-        if (page.getBlocks() != null) {
-            try {
-                blocks = objectMapper.readValue(page.getBlocks(), new TypeReference<List<Object>>() { });
-            } catch (com.fasterxml.jackson.core.JsonProcessingException invalid) {
-                throw new ValidationException(ResponseCode.CommonValidationFailed, "Invalid page blocks JSON");
-            }
+        validateValues(page.getKind(), page.getProfile(), readBlocks(page.getBlocks()));
+    }
+
+    public void validateUpdate(PageSchema saved, PageSchemaUpdateRequest update) {
+        validateValues(update.getKind() == null ? saved.getKind() : update.getKind(),
+                update.getProfile() == null ? saved.getProfile() : update.getProfile(),
+                update.getBlocks() == null ? readBlocks(saved.getBlocks()) : update.getBlocks());
+    }
+
+    private List<Object> readBlocks(String json) {
+        if (json == null) return null;
+        try {
+            return objectMapper.readValue(json, new TypeReference<List<Object>>() { });
+        } catch (com.fasterxml.jackson.core.JsonProcessingException invalid) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed, "Invalid page blocks JSON");
         }
-        List<String> errors = profiles.authoringProfileErrors(page.getKind(), page.getProfile(), blocks);
+    }
+
+    private void validateValues(String kind, String profile, List<?> blocks) {
+        List<String> errors = profiles.authoringProfileErrors(kind, profile, blocks);
         if (!errors.isEmpty()) {
             throw new ValidationException(ResponseCode.CommonValidationFailed, String.join("; ", errors));
         }

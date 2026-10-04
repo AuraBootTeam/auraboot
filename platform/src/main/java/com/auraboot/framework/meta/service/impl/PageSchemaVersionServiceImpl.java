@@ -204,17 +204,18 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
         // 获取当前页面Schema
         PageSchema currentSchema = findPageSchemaByPid(pagePid);
         
+        PageSchema restoredSchema = new PageSchema();
+        org.springframework.beans.BeanUtils.copyProperties(currentSchema, restoredSchema);
+        restoreSchemaFromSnapshot(restoredSchema, targetHistory.getSnapshot());
+        renderProfiles.validate(restoredSchema);
+
         // 先创建当前版本的备份。
         // op code must fit the ab_page_schema_history.op column (varchar(20));
         // "backup_before_rollback" is 22 chars and overflows → use a 19-char code.
         createVersion(pagePid, "pre_rollback_backup", operatorPid, "回滚前备份");
         
-        // 从快照恢复数据
-        restoreSchemaFromSnapshot(currentSchema, targetHistory.getSnapshot());
-        renderProfiles.validate(currentSchema);
-        
-        // 更新页面Schema
-        pageSchemaMapper.updateById(currentSchema);
+        // Persist only the already validated candidate; denied snapshots cannot poison mapper cache.
+        pageSchemaMapper.updateById(restoredSchema);
         
         // 创建回滚操作的历史记录
         return createVersion(pagePid, "rollback", operatorPid, 
@@ -938,8 +939,11 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
             Map<String, Object> currentSnapshot = createSchemaSnapshot(currentSchema);
             
             // 比较关键字段
-            String[] keyFields = {"name", "title", "kind", "blocks", "version"};
+            String[] keyFields = {"name", "title", "kind", "blocks", "version", "profile", "schemaVersion"};
             for (String field : keyFields) {
+                if ((field.equals("profile") || field.equals("schemaVersion")) && !targetSnapshot.containsKey(field)) {
+                    continue; // Legacy snapshots predate the render contract fields.
+                }
                 if (!Objects.equals(currentSnapshot.get(field), targetSnapshot.get(field))) {
                     return false;
                 }

@@ -221,7 +221,8 @@ class PageSchemaKindFullStackIntegrationTest extends BaseIntegrationTest {
                 "SELECT row_to_json(p)::text FROM ab_page_schema p WHERE pid = ? AND deleted_flag = false", String.class, pid);
         for (Map<String, Object> escape : List.of(Map.<String, Object>of("profile", "admin"),
                 Map.<String, Object>of("profile", "unregistered"),
-                Map.<String, Object>of("blocks", List.of(Map.of("id", "alien", "blockType", "table"))))) {
+                Map.<String, Object>of("blocks", List.of(Map.of("id", "alien", "blockType", "table"))),
+                Map.<String, Object>of("blocks", List.of("not-a-block")))) {
             mockMvc.perform(put("/api/pages/{pid}", pid).contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(escape)))
                     .andExpect(status().is4xxClientError());

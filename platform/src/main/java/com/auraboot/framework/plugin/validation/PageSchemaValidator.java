@@ -113,7 +113,10 @@ public class PageSchemaValidator implements PluginValidator {
     private void validateAuthoringProfileBlocks(List<?> blocks, PageSchemaRenderProfile profile,
                                                List<String> errors) {
         for (Object raw : blocks) {
-            if (!(raw instanceof Map<?, ?> block)) continue;
+            if (!(raw instanceof Map<?, ?> block)) {
+                errors.add("Page blocks must be objects for render profile: " + profile.name());
+                continue;
+            }
             Object type = block.get("blockType");
             if (type == null || !profile.blockTypes().contains(type.toString())) {
                 errors.add("Unsupported block type for render profile: " + profile.name());

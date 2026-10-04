@@ -169,8 +169,8 @@ public class PageSchemaServiceImpl implements PageSchemaService {
         }
 
         // 更新实体
+        renderProfiles.validateUpdate(existingSchema, request);
         pageSchemaConverter.updateEntity(existingSchema, request);
-        validateRenderProfile(existingSchema);
         recordBoundModelVersion(existingSchema);
         existingSchema.setUpdatedAt(Instant.now());
         // Increment row_version for optimistic lock
