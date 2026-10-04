@@ -108,7 +108,10 @@
 | `e2e-report.sh` | 0 | 2026-03-26 | e2e-report.sh — View E2E test run results by testRunId |
 | `e2e-run.sh` | 0 | 2026-03-31 | Unified E2E Test Runner — GAP-169 |
 | `host-e2e-up.sh` | 0 | 2026-06-08 | Host-mode E2E stack bring-up — host parity with docker-ga-e2e-up.sh. |
-| `hifi-golden-gate-run.sh` | 0 | 2026-09-25 | Run the analytics designer high-fidelity browser golden gate. |
+| `hifi-golden-gate-run.sh` | 0 | 2026-10-02 | Run the fixed BI browser profile, reconcile every result, and retain its isolated runtime and evidence. |
+| `gates/hifi-golden-results.mjs` | 1 | 2026-10-02 | Reject missing, duplicate, skipped, retried, or incomplete BI profile results; collection is never execution. |
+| `check-batch4-gates.mjs` | 0 | 2026-10-02 | Enforce the existing large-file and CJK internationalization ratchets. |
+| `check-oss-scope-consistency.mjs` | 0 | 2026-10-02 | Verify the OSS boundary registry against its declared modules and plugin directories. |
 | `kb-ingestion-golden-run.sh` | 0 | 2026-07-13 | kb-ingestion-golden-run.sh — one command, whole knowledge-ingestion golden, exit code = verdict. |
 | `local-pr-gate.sh` | 0 | 2026-07-18 | Local replacement for the required GitHub status checks. |
 | `collab-trio-golden-run.sh` | 0 | 2026-07-25 | collab-trio-golden-run.sh — self-contained browser golden runner for the collaboration trio: Inbox, notification centre, IM/agent mentions. |
@@ -245,6 +248,10 @@
 Co-located `*.test.mjs`; run via the repo test task. Not listed individually.
 
 ## Package distribution self-tests
+
+`pnpm test:open-platform-tools` validates the shared probe transport and independent webhook
+receiver, requires an invalid-signature mutation to fail, and verifies restoration. See
+[`ci/README.md`](ci/README.md) for receiver operation and the explicitly unverified deployed-target scope.
 
 `pnpm test:package-distribution` runs `test-package-distribution.py`: rejects missing or competing license text, retired v1.3 text, metadata/identity/privacy drift, missing exports and README mismatch. The pack gate also executes `fixtures/open-platform-consumer/consumer.test.mjs` and typechecks `fixtures/open-platform-consumer/consumer-ts-check.ts` against a freshly installed tarball outside the repositories. These contract tests use a loopback fixture server; they do not certify a staging deployment.
 

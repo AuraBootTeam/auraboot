@@ -310,6 +310,8 @@ configurations {
     }
 }
 
+def jacocoToolVersion = '0.8.14'
+
 dependencies {
     testImplementation 'io.qameta.allure:allure-junit5:2.35.5'
     // Plugin API module
@@ -468,11 +470,10 @@ dependencies {
     // approach for CGLIB-proxied Spring beans, which mis-attributes coverage across the many
     // @SpringBootTest contexts in the full suite (proxy class IDs differ per evicted/recreated
     // context, so the dumped proxy no longer matches the exec — the bundle then reads ~5%).
-    // 0.8.12 everywhere: the 0.8.15 offline instrumentation writes exec class IDs that
-    // no jacoco report version matched (bundle read 4.8% with the suite green); the
-    // 78.69% baseline in the verification rules below was measured with this pin.
-    jacocoAnt 'org.jacoco:org.jacoco.ant:0.8.12'
-    jacocoRuntime 'org.jacoco:org.jacoco.agent:0.8.12:runtime'
+    // Keep offline instrumentation, runtime and reports on one version. The historical
+    // 78.69% verification baseline was measured with 0.8.12; its thresholds remain unchanged.
+    jacocoAnt "org.jacoco:org.jacoco.ant:${jacocoToolVersion}"
+    jacocoRuntime "org.jacoco:org.jacoco.agent:${jacocoToolVersion}:runtime"
 
     // PostgreSQL 数据库用于测试
     testImplementation 'org.postgresql:postgresql:42.7.13'
@@ -551,6 +552,10 @@ bootRun {
 }
 
 tasks.withType(Test).configureEach {
+    def retainedAllure = providers.environmentVariable('AURA_ALLURE_RESULTS').orNull
+    if (retainedAllure) {
+        systemProperty 'allure.results.directory', retainedAllure
+    }
     reports.junitXml {
         includeSystemOutLog = false
         includeSystemErrLog = false
@@ -824,12 +829,8 @@ tasks.register('testPlugin', Test) {
 }
 
 jacoco {
-    // Keep in lockstep with the jacocoAnt/jacocoRuntime pair above. Mixed or bumped
-    // installs (0.8.15 via PR #1762) made the report unable to match exec class IDs
-    // recorded by the offline instrumentation — every package read near-zero coverage
-    // while the suite was green. 0.8.12 is the version the ratchet baselines below
-    // were measured with.
-    toolVersion = '0.8.12'
+    // Report the same class IDs that offline instrumentation and the runtime record.
+    toolVersion = jacocoToolVersion
 }
 
 // Classes excluded from coverage measurement:

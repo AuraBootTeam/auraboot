@@ -1,0 +1,798 @@
+{
+  "caller": {
+    "ALL": {
+      "zh-CN": "全部",
+      "en": "All"
+    },
+    "API": {
+      "zh-CN": "API",
+      "en": "API"
+    },
+    "AUTOMATION": {
+      "zh-CN": "自动化",
+      "en": "Automation"
+    },
+    "EVENT_POLICY": {
+      "zh-CN": "事件策略",
+      "en": "Event policy"
+    },
+    "PERMISSION": {
+      "zh-CN": "权限",
+      "en": "Permission"
+    },
+    "SLA": {
+      "zh-CN": "SLA",
+      "en": "SLA"
+    },
+    "BPM": {
+      "zh-CN": "BPM",
+      "en": "BPM"
+    },
+    "TEST": {
+      "zh-CN": "测试",
+      "en": "Test"
+    }
+  },
+  "rollout": {
+    "ALL": {
+      "zh-CN": "全部",
+      "en": "All"
+    },
+    "BASELINE": {
+      "zh-CN": "基线",
+      "en": "Baseline"
+    },
+    "CANDIDATE": {
+      "zh-CN": "候选",
+      "en": "Candidate"
+    }
+  },
+  "decision": {
+    "complaint_sla_deadline": {
+      "zh-CN": "请假审批 SLA 截止时间",
+      "en": "Leave approval SLA deadline"
+    },
+    "sla_deadline": {
+      "zh-CN": "SLA 截止时间",
+      "en": "SLA deadline"
+    },
+    "approval_routing": {
+      "zh-CN": "请假审批分派",
+      "en": "Leave approval routing"
+    },
+    "leave_request_automation": {
+      "zh-CN": "请假申请自动化策略",
+      "en": "Leave request automation policy"
+    }
+  },
+  "action": {
+    "NOTIFY": {
+      "zh-CN": "发送站内通知",
+      "en": "Send notification"
+    },
+    "SEND_SMS": {
+      "zh-CN": "发送短信",
+      "en": "Send SMS"
+    },
+    "SEND_IM": {
+      "zh-CN": "发送 IM 消息",
+      "en": "Send IM message"
+    },
+    "START_PROCESS": {
+      "zh-CN": "启动流程",
+      "en": "Start workflow"
+    },
+    "CREATE_TASK": {
+      "zh-CN": "创建任务",
+      "en": "Create task"
+    },
+    "CC_TASK": {
+      "zh-CN": "抄送任务",
+      "en": "Copy task"
+    },
+    "ADD_COMMENT": {
+      "zh-CN": "添加评论",
+      "en": "Add comment"
+    },
+    "UPDATE_RECORD": {
+      "zh-CN": "更新记录",
+      "en": "Update record"
+    },
+    "PATCH_RECORD": {
+      "zh-CN": "更新记录",
+      "en": "Update record"
+    },
+    "WEBHOOK": {
+      "zh-CN": "调用 Webhook",
+      "en": "Call webhook"
+    },
+    "WRITE_AUDIT": {
+      "zh-CN": "写入审计",
+      "en": "Write audit record"
+    }
+  },
+  "payload": {
+    "sentCount": {
+      "zh-CN": "发送数",
+      "en": "Sent count"
+    },
+    "recipientCount": {
+      "zh-CN": "接收人数",
+      "en": "Recipient count"
+    },
+    "channel": {
+      "zh-CN": "通道",
+      "en": "Channel"
+    },
+    "targetPhones": {
+      "zh-CN": "短信号码",
+      "en": "Target phones"
+    },
+    "targetType": {
+      "zh-CN": "接收类型",
+      "en": "Target type"
+    },
+    "target": {
+      "zh-CN": "接收对象",
+      "en": "Target"
+    },
+    "targetUserId": {
+      "zh-CN": "接收用户",
+      "en": "Target user id"
+    },
+    "assigneeUserId": {
+      "zh-CN": "处理人",
+      "en": "Assignee user id"
+    },
+    "invalidTarget": {
+      "zh-CN": "无效接收对象",
+      "en": "Invalid target"
+    },
+    "source": {
+      "zh-CN": "来源",
+      "en": "Source"
+    },
+    "sourceId": {
+      "zh-CN": "来源",
+      "en": "Source"
+    },
+    "title": {
+      "zh-CN": "标题",
+      "en": "Title"
+    },
+    "content": {
+      "zh-CN": "评论内容",
+      "en": "Content"
+    },
+    "mentions": {
+      "zh-CN": "提及对象",
+      "en": "Mentions"
+    },
+    "commentPid": {
+      "zh-CN": "评论",
+      "en": "Comment pid"
+    },
+    "auditPid": {
+      "zh-CN": "审计记录",
+      "en": "Audit pid"
+    },
+    "actionType": {
+      "zh-CN": "动作类型",
+      "en": "Action type"
+    },
+    "tenantId": {
+      "zh-CN": "租户",
+      "en": "Tenant"
+    },
+    "ruleCode": {
+      "zh-CN": "规则",
+      "en": "Rule code"
+    },
+    "message": {
+      "zh-CN": "消息",
+      "en": "Message"
+    },
+    "notificationRef": {
+      "zh-CN": "通知记录",
+      "en": "Notification record"
+    },
+    "recipientType": {
+      "zh-CN": "接收类型",
+      "en": "Recipient type"
+    },
+    "recipientId": {
+      "zh-CN": "接收对象",
+      "en": "Recipient"
+    },
+    "targetUserIds": {
+      "zh-CN": "接收用户",
+      "en": "Recipient users"
+    },
+    "assigneeUserIds": {
+      "zh-CN": "处理人",
+      "en": "Assignees"
+    },
+    "createdCount": {
+      "zh-CN": "创建数",
+      "en": "Created count"
+    },
+    "inboxItemIds": {
+      "zh-CN": "待办记录",
+      "en": "Inbox records"
+    },
+    "itemType": {
+      "zh-CN": "待办类型",
+      "en": "Item type"
+    },
+    "ccCount": {
+      "zh-CN": "抄送数",
+      "en": "Cc count"
+    },
+    "delivery": {
+      "zh-CN": "投递方式",
+      "en": "Delivery"
+    },
+    "taskId": {
+      "zh-CN": "任务 ID",
+      "en": "Task"
+    },
+    "processInstanceId": {
+      "zh-CN": "流程实例",
+      "en": "Process instance id"
+    },
+    "processDefinitionId": {
+      "zh-CN": "流程标识",
+      "en": "Workflow"
+    },
+    "businessKey": {
+      "zh-CN": "业务主键",
+      "en": "Business key"
+    },
+    "modelCode": {
+      "zh-CN": "模型",
+      "en": "Model"
+    },
+    "recordPid": {
+      "zh-CN": "业务记录",
+      "en": "Business record"
+    },
+    "wd_req_type": {
+      "zh-CN": "请假类型",
+      "en": "Leave type"
+    },
+    "leaveType": {
+      "zh-CN": "请假类型",
+      "en": "Leave type"
+    },
+    "leave_type": {
+      "zh-CN": "请假类型",
+      "en": "Leave type"
+    },
+    "reqType": {
+      "zh-CN": "请假类型",
+      "en": "Leave type"
+    },
+    "updatedFields": {
+      "zh-CN": "更新字段",
+      "en": "Updated fields"
+    },
+    "attemptCount": {
+      "zh-CN": "尝试次数",
+      "en": "Attempt count"
+    },
+    "maxAttempts": {
+      "zh-CN": "最大尝试",
+      "en": "Max attempts"
+    },
+    "eventType": {
+      "zh-CN": "事件",
+      "en": "Event type"
+    },
+    "dispatchAccepted": {
+      "zh-CN": "已接收调度",
+      "en": "Dispatch accepted"
+    },
+    "deliveryEventId": {
+      "zh-CN": "投递追踪",
+      "en": "Delivery event id"
+    },
+    "deliveryTraceStatus": {
+      "zh-CN": "投递状态",
+      "en": "Delivery trace status"
+    },
+    "deliveryLogPids": {
+      "zh-CN": "投递日志",
+      "en": "Delivery logs"
+    },
+    "deliveryReceipts": {
+      "zh-CN": "投递回执",
+      "en": "Delivery receipts"
+    },
+    "payloadKeys": {
+      "zh-CN": "Payload 字段",
+      "en": "Payload fields"
+    },
+    "validationError": {
+      "zh-CN": "校验错误",
+      "en": "Validation error"
+    },
+    "field": {
+      "zh-CN": "字段",
+      "en": "Field"
+    },
+    "actualLength": {
+      "zh-CN": "当前长度",
+      "en": "Actual length"
+    },
+    "maxLength": {
+      "zh-CN": "最大长度",
+      "en": "Max length"
+    },
+    "retryExhausted": {
+      "zh-CN": "重试耗尽",
+      "en": "Retry exhausted"
+    },
+    "failureReason": {
+      "zh-CN": "失败原因",
+      "en": "Failure reason"
+    },
+    "errorMessage": {
+      "zh-CN": "错误信息",
+      "en": "Error message"
+    },
+    "requiredContext": {
+      "zh-CN": "必需上下文",
+      "en": "Required context"
+    },
+    "fieldCount": {
+      "zh-CN": "字段数",
+      "en": "Field count"
+    },
+    "resolvedCount": {
+      "zh-CN": "解析人数",
+      "en": "Resolved count"
+    }
+  },
+  "value": {
+    "pending_async_delivery": {
+      "zh-CN": "异步投递中",
+      "en": "Asynchronous delivery pending"
+    },
+    "tracked_delivery_logs": {
+      "zh-CN": "已记录投递日志",
+      "en": "Delivery logs recorded"
+    },
+    "validation_failed": {
+      "zh-CN": "校验失败",
+      "en": "Validation failed"
+    },
+    "dispatch_failed": {
+      "zh-CN": "投递失败",
+      "en": "Dispatch failed"
+    },
+    "inbox": {
+      "zh-CN": "待办",
+      "en": "Inbox"
+    },
+    "task": {
+      "zh-CN": "任务",
+      "en": "Task"
+    },
+    "mention": {
+      "zh-CN": "抄送任务",
+      "en": "Copied task"
+    },
+    "cc_task": {
+      "zh-CN": "抄送任务",
+      "en": "Copied task"
+    },
+    "target_resolved_no_users": {
+      "zh-CN": "目标未匹配到用户",
+      "en": "No users match the target"
+    },
+    "webhook_dispatch_failed": {
+      "zh-CN": "Webhook 投递失败",
+      "en": "Webhook dispatch failed"
+    },
+    "process_definition_missing": {
+      "zh-CN": "缺少流程标识",
+      "en": "Workflow is missing"
+    },
+    "process_start_failed": {
+      "zh-CN": "流程启动失败",
+      "en": "Process start failed"
+    },
+    "record_context_missing": {
+      "zh-CN": "缺少业务记录上下文",
+      "en": "Business record context is missing"
+    },
+    "update_fields_missing": {
+      "zh-CN": "缺少更新字段",
+      "en": "Update fields missing"
+    },
+    "record_update_failed": {
+      "zh-CN": "更新记录失败",
+      "en": "Record update failed"
+    },
+    "comment_context_missing": {
+      "zh-CN": "缺少业务记录上下文",
+      "en": "Business record context is missing"
+    },
+    "comment_content_missing": {
+      "zh-CN": "缺少评论内容",
+      "en": "Comment content missing"
+    },
+    "comment_write_failed": {
+      "zh-CN": "添加评论失败",
+      "en": "Comment write failed"
+    },
+    "audit_tenant_missing": {
+      "zh-CN": "缺少租户上下文",
+      "en": "Tenant context is missing"
+    },
+    "audit_write_failed": {
+      "zh-CN": "写入审计失败",
+      "en": "Audit write failed"
+    },
+    "payload.processDefinitionId": {
+      "zh-CN": "流程标识",
+      "en": "Workflow"
+    },
+    "payload.fields": {
+      "zh-CN": "更新字段",
+      "en": "Updated fields"
+    },
+    "payload.content": {
+      "zh-CN": "评论内容",
+      "en": "Comment content"
+    },
+    "record.entityCode": {
+      "zh-CN": "记录模型",
+      "en": "Record model"
+    },
+    "record.recordPid": {
+      "zh-CN": "业务记录",
+      "en": "Business record"
+    },
+    "tenantId": {
+      "zh-CN": "租户",
+      "en": "Tenant"
+    },
+    "NOTIFY": {
+      "zh-CN": "发送站内通知",
+      "en": "Send notification"
+    },
+    "SEND_SMS": {
+      "zh-CN": "发送短信",
+      "en": "Send SMS"
+    },
+    "SEND_IM": {
+      "zh-CN": "发送 IM 消息",
+      "en": "Send IM message"
+    },
+    "CREATE_TASK": {
+      "zh-CN": "创建任务",
+      "en": "Create task"
+    },
+    "CC_TASK": {
+      "zh-CN": "抄送任务",
+      "en": "Copy task"
+    },
+    "START_PROCESS": {
+      "zh-CN": "启动流程",
+      "en": "Start workflow"
+    },
+    "WEBHOOK": {
+      "zh-CN": "调用 Webhook",
+      "en": "Call webhook"
+    },
+    "UPDATE_RECORD": {
+      "zh-CN": "更新记录",
+      "en": "Update record"
+    },
+    "PATCH_RECORD": {
+      "zh-CN": "更新记录",
+      "en": "Update record"
+    },
+    "ADD_COMMENT": {
+      "zh-CN": "添加评论",
+      "en": "Add comment"
+    },
+    "WRITE_AUDIT": {
+      "zh-CN": "写入审计",
+      "en": "Write audit record"
+    },
+    "ROLE": {
+      "zh-CN": "角色",
+      "en": "Role"
+    },
+    "USER": {
+      "zh-CN": "用户",
+      "en": "User"
+    },
+    "GROUP": {
+      "zh-CN": "群组",
+      "en": "Group"
+    },
+    "TEAM": {
+      "zh-CN": "团队",
+      "en": "Team"
+    },
+    "UNKNOWN": {
+      "zh-CN": "未知",
+      "en": "Unknown"
+    },
+    "modelCode": {
+      "zh-CN": "模型",
+      "en": "Model"
+    },
+    "recordPid": {
+      "zh-CN": "业务记录",
+      "en": "Business record"
+    },
+    "action_target_missing": {
+      "zh-CN": "缺少接收对象",
+      "en": "Recipient is missing"
+    },
+    "payload_content_missing": {
+      "zh-CN": "缺少消息内容",
+      "en": "Message content is missing"
+    },
+    "payload_title_missing": {
+      "zh-CN": "缺少标题",
+      "en": "Title is missing"
+    },
+    "tenant_context_missing": {
+      "zh-CN": "缺少租户上下文",
+      "en": "Tenant context is missing"
+    },
+    "target_invalid": {
+      "zh-CN": "接收对象格式错误",
+      "en": "Invalid recipient format"
+    },
+    "target_role_code_missing": {
+      "zh-CN": "缺少角色编码",
+      "en": "Role code is missing"
+    },
+    "target_value_missing": {
+      "zh-CN": "缺少接收对象值",
+      "en": "Recipient value is missing"
+    },
+    "target_resolved_no_phone_numbers": {
+      "zh-CN": "目标未匹配到手机号",
+      "en": "No phone numbers match the target"
+    },
+    "sms_delivery_failed": {
+      "zh-CN": "短信发送失败",
+      "en": "Sms delivery failed"
+    },
+    "im_delivery_failed": {
+      "zh-CN": "IM 消息发送失败",
+      "en": "Im delivery failed"
+    },
+    "task_write_failed": {
+      "zh-CN": "创建任务失败",
+      "en": "Task write failed"
+    },
+    "cc_task_write_failed": {
+      "zh-CN": "抄送任务失败",
+      "en": "Cc task write failed"
+    },
+    "notify_delivery_failed": {
+      "zh-CN": "站内通知发送失败",
+      "en": "Notify delivery failed"
+    },
+    "action_payload_serialization_failed": {
+      "zh-CN": "动作 Payload 序列化失败",
+      "en": "Action payload serialization failed"
+    },
+    "payload._eventId exceeds max length": {
+      "zh-CN": "投递追踪 ID 超过 64 字符",
+      "en": "Delivery trace exceeds 64 characters"
+    }
+  },
+  "leave": {
+    "annual": {
+      "zh-CN": "年假",
+      "en": "Annual leave"
+    },
+    "sick": {
+      "zh-CN": "病假",
+      "en": "Sick leave"
+    },
+    "personal": {
+      "zh-CN": "事假",
+      "en": "Personal leave"
+    },
+    "marriage": {
+      "zh-CN": "婚假",
+      "en": "Marriage leave"
+    },
+    "maternity": {
+      "zh-CN": "产假",
+      "en": "Maternity leave"
+    },
+    "bereavement": {
+      "zh-CN": "丧假",
+      "en": "Bereavement leave"
+    },
+    "compensatory": {
+      "zh-CN": "调休",
+      "en": "Time off in lieu"
+    }
+  },
+  "semantic": {
+    "matched": {
+      "zh-CN": "命中结果",
+      "en": "Matched"
+    },
+    "truth": {
+      "zh-CN": "条件结果",
+      "en": "Condition result"
+    },
+    "conditionResult": {
+      "zh-CN": "条件结果",
+      "en": "Condition result"
+    },
+    "decisionCode": {
+      "zh-CN": "决策",
+      "en": "Decision"
+    },
+    "yes": {
+      "zh-CN": "是",
+      "en": "Yes"
+    },
+    "no": {
+      "zh-CN": "否",
+      "en": "No"
+    },
+    "matchedTrue": {
+      "zh-CN": "命中",
+      "en": "Matched"
+    },
+    "matchedFalse": {
+      "zh-CN": "未命中",
+      "en": "Not matched"
+    },
+    "truthTrue": {
+      "zh-CN": "满足",
+      "en": "Satisfied"
+    },
+    "truthFalse": {
+      "zh-CN": "不满足",
+      "en": "Not satisfied"
+    },
+    "unknown": {
+      "zh-CN": "未知",
+      "en": "Unknown"
+    },
+    "otherEvaluator": {
+      "zh-CN": "其他评估器",
+      "en": "Other evaluator"
+    },
+    "decisionFallback": {
+      "zh-CN": "决策评估",
+      "en": "Decision evaluation"
+    },
+    "technicalDetails": {
+      "zh-CN": "技术详情",
+      "en": "Technical details"
+    }
+  },
+  "adapter": {
+    "AST_EVALUATOR": {
+      "zh-CN": "条件评估",
+      "en": "Condition evaluation"
+    },
+    "SAFE_SPEL": {
+      "zh-CN": "安全表达式",
+      "en": "Safe expression"
+    },
+    "CROSS_FIELD_ENGINE": {
+      "zh-CN": "跨字段评估",
+      "en": "Cross-field evaluation"
+    },
+    "PLATFORM_DECISION_TABLE": {
+      "zh-CN": "决策表",
+      "en": "Decision table"
+    },
+    "DROOLS_DMN": {
+      "zh-CN": "DMN 决策",
+      "en": "DMN decision"
+    },
+    "DROOLS_DRL": {
+      "zh-CN": "规则引擎",
+      "en": "Rule engine"
+    }
+  },
+  "ui": {
+    "keyword": {
+      "zh-CN": "关键词",
+      "en": "Keyword"
+    },
+    "decisionIdentifier": {
+      "zh-CN": "决策编码",
+      "en": "Decision identifier"
+    },
+    "status": {
+      "zh-CN": "状态",
+      "en": "Status"
+    },
+    "caller": {
+      "zh-CN": "调用方",
+      "en": "Caller"
+    },
+    "matched": {
+      "zh-CN": "命中",
+      "en": "Matched"
+    },
+    "all": {
+      "zh-CN": "全部",
+      "en": "All"
+    },
+    "notMatched": {
+      "zh-CN": "未命中",
+      "en": "Not matched"
+    },
+    "rolloutBranch": {
+      "zh-CN": "灰度分支",
+      "en": "Rollout branch"
+    },
+    "minimumDuration": {
+      "zh-CN": "最小耗时",
+      "en": "Minimum duration"
+    },
+    "maximumDuration": {
+      "zh-CN": "最大耗时",
+      "en": "Maximum duration"
+    },
+    "actionEvidence": {
+      "zh-CN": "动作执行证据",
+      "en": "Action execution evidence"
+    },
+    "noActionRecords": {
+      "zh-CN": "暂无动作执行记录",
+      "en": "No action execution records"
+    },
+    "decision": {
+      "zh-CN": "决策",
+      "en": "Decision"
+    },
+    "version": {
+      "zh-CN": "版本",
+      "en": "Version"
+    },
+    "rollout": {
+      "zh-CN": "灰度",
+      "en": "Rollout"
+    },
+    "duration": {
+      "zh-CN": "耗时",
+      "en": "Duration"
+    },
+    "time": {
+      "zh-CN": "时间",
+      "en": "Time"
+    },
+    "actions": {
+      "zh-CN": "操作",
+      "en": "Actions"
+    },
+    "executionChain": {
+      "zh-CN": "执行链路",
+      "en": "Execution chain"
+    },
+    "factSnapshot": {
+      "zh-CN": "事实快照",
+      "en": "Fact snapshot"
+    },
+    "virtualSources": {
+      "zh-CN": "虚拟源",
+      "en": "Virtual sources"
+    },
+    "unknownReasons": {
+      "zh-CN": "未知原因",
+      "en": "Unknown reasons"
+    }
+  }
+}

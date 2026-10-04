@@ -1,5 +1,6 @@
-# Standalone Linux CI infrastructure. Flyway owns the blank database setup.
-# Every service and volume is scoped by the runner's unique Compose project.
+# Standalone Linux CI infrastructure. The historical override filename is kept
+# for compatibility; no deployment Compose file or developer override is required.
+# Project-scoped volumes start empty; the runner applies canonical Flyway migrations.
 services:
   postgres:
     image: pgvector/pgvector:pg16
@@ -10,12 +11,12 @@ services:
       POSTGRES_USER: auraboot
       POSTGRES_PASSWORD: auraboot_dev
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - skills_c2_postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U auraboot -d aura_boot"]
       interval: 5s
       timeout: 3s
-      retries: 10
+      retries: 30
       start_period: 10s
 
   redis:
@@ -23,13 +24,12 @@ services:
     ports:
       - "127.0.0.1:${AURA_OSS_CI_REDIS_PORT:?CI Redis port is required}:6379"
     volumes:
-      - redis_data:/data
+      - oss_ci_redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
-      retries: 10
-      start_period: 5s
+      retries: 30
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
@@ -57,11 +57,11 @@ services:
       start_period: 20s
 
 volumes:
-  postgres_data:
-  redis_data:
+  skills_c2_postgres_data:
+  oss_ci_redis_data:
 
+# Created by the runner using the explicit CI subnet pool, never the implicit pool.
 networks:
   default:
-    ipam:
-      config:
-        - subnet: ${AURA_OSS_CI_SUBNET:?CI runner must allocate a non-overlapping subnet}
+    external: true
+    name: "${AURA_OSS_CI_NETWORK:?backend CI runner must allocate its own network}"

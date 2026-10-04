@@ -47,6 +47,54 @@ class MetricCompilerTest {
         return new SemanticQueryRequest();
     }
 
+    @Test
+    void expressionMeasuresRetainAllColumnsWithoutLiteralOrFunctionFalsePositives() {
+        MeasureDTO measure = salesModel.getMeasures().stream().filter(m -> "order_amount".equals(m.getCode())).findFirst().orElseThrow();
+        measure.setFieldRef(null);
+        measure.setExpr("CASE WHEN note = 'salary' THEN COALESCE(amount, discount) ELSE unit_cost END");
+        SemanticQueryRequest request = req(); request.setMetrics(List.of("total_sales"));
+        assertThat(compiler.compile(salesModel, request, user).getReferencedColumns())
+                .contains("note", "amount", "discount", "unit_cost", "status")
+                .doesNotContain("salary", "coalesce");
+    }
+
+    @Test
+    void metricFilterRetainsColumnsEvenWhenTheMeasureCountsRows() {
+        MetricDTO metric = salesModel.getMetrics().stream().filter(m -> "total_sales".equals(m.getCode())).findFirst().orElseThrow();
+        metric.setTypeParams(Map.of("measure", "order_count"));
+        metric.setFilter("secret_score > 0 AND note != 'salary'");
+        SemanticQueryRequest request = req(); request.setMetrics(List.of("total_sales"));
+        assertThat(compiler.compile(salesModel, request, user).getReferencedColumns())
+                .contains("secret_score", "note", "tenant_id").doesNotContain("salary", "*");
+    }
+
+    @Test
+    void derivedMetricsRetainDirectExpressionColumnsAndReferencedMetricFilters() {
+        MetricDTO metric = salesModel.getMetrics().stream().filter(m -> "avg_order_value".equals(m.getCode())).findFirst().orElseThrow();
+        metric.setTypeParams(Map.of("expr", "{total_sales} + MAX(secret_cost)"));
+        SemanticQueryRequest request = req(); request.setMetrics(List.of("avg_order_value"));
+        assertThat(compiler.compile(salesModel, request, user).getReferencedColumns())
+                .contains("amount", "status", "secret_cost").doesNotContain("max", "total_sales");
+    }
+
+    @Test
+    void cohortFiltersAndRlsRetainColumnsThatAreNotSelectedDimensions() {
+        cohortConvMetric(Map.of("base_filter", "base_risk > 0", "conversion_filter", "conversion_risk < 10"));
+        AccessPolicyDTO policy = new AccessPolicyDTO(); policy.setAccessGrant("risk.read"); policy.setSqlFilter("risk_level > 0");
+        salesModel.setAccessPolicies(List.of(policy));
+        SemanticQueryRequest request = req(); request.setMetrics(List.of("paid_conv"));
+        assertThat(compiler.compile(salesModel, request, user).getReferencedColumns())
+                .contains("base_risk", "conversion_risk", "risk_level", "tenant_id", "customer_id", "order_date");
+    }
+
+    @Test
+    void rlsRetainsColumnsThatAreNotSelectedOrFilteredByTheRequest() {
+        AccessPolicyDTO policy = new AccessPolicyDTO(); policy.setAccessGrant("risk.read"); policy.setSqlFilter("risk_level > 0");
+        salesModel.setAccessPolicies(List.of(policy));
+        SemanticQueryRequest request = req(); request.setMetrics(List.of("total_sales"));
+        assertThat(compiler.compile(salesModel, request, user).getReferencedColumns()).contains("risk_level", "status", "amount");
+    }
+
     // ---- 1. simple metric + 1 dim --------------------------------------------
 
     @Test

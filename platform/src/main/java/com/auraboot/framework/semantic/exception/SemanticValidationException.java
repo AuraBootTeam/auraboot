@@ -24,6 +24,11 @@ public class SemanticValidationException extends RuntimeException {
         this.errorCode = errorCode;
     }
 
+    public SemanticValidationException(String errorCode, String message, Throwable cause) {
+        super(message, cause);
+        this.errorCode = errorCode;
+    }
+
     public String getErrorCode() {
         return errorCode;
     }

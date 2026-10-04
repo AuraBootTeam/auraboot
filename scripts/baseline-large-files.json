@@ -8,11 +8,11 @@
     },
     {
       "path": "platform/src/main/java/com/auraboot/framework/meta/service/impl/DynamicDataServiceImpl.java",
-      "lines": 2997
+      "lines": 2991
     },
     {
       "path": "platform/src/main/java/com/auraboot/framework/meta/service/impl/MetaModelServiceImpl.java",
-      "lines": 2729
+      "lines": 2656
     }
   ]
 }

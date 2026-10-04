@@ -35,7 +35,9 @@ class I18nSystemDictionaryScopeTest {
             .containsEntry("ai.fill.banner_title", "Fill form from text");
         assertThat(MetaContext.getCurrentTenantId()).isEqualTo(42L);
         assertThat(MetaContext.isTenantFilterBypassed()).isFalse();
-        verify(mapper, never()).selectAllByLangAllTenants(anyString());
+        verify(mapper).selectAllByLang(42L, "en-US");
+        verify(mapper).selectAllByLang(0L, "en-US");
+        verifyNoMoreInteractions(mapper);
     }
 
     @Test
@@ -45,7 +47,8 @@ class I18nSystemDictionaryScopeTest {
             return List.of(resource("action.back", "Back"));
         });
         assertThat(service.getResourceMapByLang("en-US")).containsOnlyKeys("action.back");
-        verify(mapper, never()).selectAllByLangAllTenants(anyString());
+        verify(mapper).selectAllByLang(0L, "en-US");
+        verifyNoMoreInteractions(mapper);
         assertThat(MetaContext.isTenantFilterBypassed()).isFalse();
     }
 

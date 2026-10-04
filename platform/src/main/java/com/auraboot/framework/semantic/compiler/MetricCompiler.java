@@ -155,7 +155,7 @@ public class MetricCompiler {
         for (int i = 0; i < resolvedDims.size(); i++) {
             ResolvedDim rd = resolvedDims.get(i);
             assertIdent(rd.dim.getFieldRef(), "dimension.field_ref");
-            referencedColumns.add(rd.dim.getFieldRef());
+            referencedColumns.add(rd.dim.getFieldRef().toLowerCase(Locale.ROOT));
             String expr = rd.grain == null
                     ? rd.dim.getFieldRef()
                     : "DATE_TRUNC('" + rd.grain + "', " + rd.dim.getFieldRef() + ")";
@@ -196,7 +196,7 @@ public class MetricCompiler {
                 where.append(" AND ").append(tDim.getFieldRef()).append(" BETWEEN ? AND ?");
                 params.add(range.get(0));
                 params.add(range.get(1));
-                referencedColumns.add(tDim.getFieldRef());
+                referencedColumns.add(tDim.getFieldRef().toLowerCase(Locale.ROOT));
             }
         }
 
@@ -207,7 +207,7 @@ public class MetricCompiler {
                         "filter.field not in model dims: " + f.getField());
             }
             assertIdent(d.getFieldRef(), "filter.field_ref");
-            referencedColumns.add(d.getFieldRef());
+            referencedColumns.add(d.getFieldRef().toLowerCase(Locale.ROOT));
             appendFilter(where, d.getFieldRef(), f, params);
         }
 
@@ -219,6 +219,7 @@ public class MetricCompiler {
         List<Object> rlsParams = accessPolicyCompiler.injectRls(
                 where, model.getAccessPolicies(), requestedDimCodes, user);
         params.addAll(rlsParams);
+        referencedColumns.addAll(SemanticExpressionReferences.resolve(where.toString()));
 
         sql.append("\nWHERE ").append(where);
 
@@ -299,6 +300,7 @@ public class MetricCompiler {
         MeasureDTO measure = requireMeasure(measureCode, measures, m.getCode());
         String aggExpr = aggExpr(measure, referencedColumns);
         if (m.getFilter() != null && !m.getFilter().isBlank()) {
+            referencedColumns.addAll(SemanticExpressionReferences.resolve(m.getFilter()));
             // FILTER (WHERE ...) — the filter expression is part of the YAML metric
             // and already validated by SemanticValidator (no user values, no injection
             // tokens). It's inlined as-is.
@@ -328,7 +330,7 @@ public class MetricCompiler {
                     "cumulative metric " + m.getCode() + " requires primary_time dim");
         }
         assertIdent(pt.getFieldRef(), "primary_time.field_ref");
-        referencedColumns.add(pt.getFieldRef());
+        referencedColumns.add(pt.getFieldRef().toLowerCase(Locale.ROOT));
         String baseAgg = aggExpr(measure, referencedColumns);
 
         String partition;
@@ -364,6 +366,9 @@ public class MetricCompiler {
             throw new MetricCompileException("DERIVED_PLACEHOLDER_UNRESOLVED",
                     "derived metric " + m.getCode() + " missing type_params.expr");
         }
+        // Metric/measure placeholders are resolved recursively below; retain direct columns too.
+        referencedColumns.addAll(SemanticExpressionReferences.resolve(
+                expr.replaceAll("\\{[a-z][a-z0-9_]*}", "0")));
         Matcher mt = Pattern.compile("\\{([a-z][a-z0-9_]*)\\}").matcher(expr);
         StringBuilder out = new StringBuilder();
         int last = 0;
@@ -441,10 +446,10 @@ public class MetricCompiler {
 
         LinkedHashSet<String> referencedColumns = new LinkedHashSet<>();
         referencedColumns.add("tenant_id");
-        referencedColumns.add(ptRef);
+        referencedColumns.add(ptRef.toLowerCase(Locale.ROOT));
         for (ResolvedDim rd : resolvedDims) {
             assertIdent(rd.dim.getFieldRef(), "dimension.field_ref");
-            referencedColumns.add(rd.dim.getFieldRef());
+            referencedColumns.add(rd.dim.getFieldRef().toLowerCase(Locale.ROOT));
         }
         CohortSpec spec = cohortSpec(metric, model, measureMap, referencedColumns);
         // Ambiguity guard: a model column EXACTLY named like an internal cohort
@@ -541,6 +546,8 @@ public class MetricCompiler {
         }
         StringBuilder baseRls = new StringBuilder();
         baseParams.addAll(accessPolicyCompiler.injectRls(baseRls, model.getAccessPolicies(), requestedDimCodes, user));
+        referencedColumns.addAll(SemanticExpressionReferences.resolve(baseWhere.toString() + baseRls));
+        referencedColumns.addAll(SemanticExpressionReferences.resolve("TRUE" + convRls));
 
         StringBuilder sql = new StringBuilder();
         sql.append(select)
@@ -624,9 +631,11 @@ public class MetricCompiler {
             throw new MetricCompileException("UNKNOWN_DIMENSION",
                     "metric " + m.getCode() + " conversion entity field_ref invalid: " + entityRef);
         }
-        referencedColumns.add(entityRef);
+        referencedColumns.add(entityRef.toLowerCase(Locale.ROOT));
         String baseFilter = requireCohortFilter(p, "base_filter", m.getCode());
         String convFilter = requireCohortFilter(p, "conversion_filter", m.getCode());
+        referencedColumns.addAll(SemanticExpressionReferences.resolve(baseFilter));
+        referencedColumns.addAll(SemanticExpressionReferences.resolve(convFilter));
         long seconds = windowSeconds(String.valueOf(p.get("window")), m.getCode());
         return new CohortSpec(m.getCode(), entityRef, baseFilter, convFilter, seconds);
     }
@@ -684,10 +693,13 @@ public class MetricCompiler {
         if (measure.getExpr() != null && !measure.getExpr().isBlank()) {
             // YAML-author SQL fragment (validated by SemanticValidator).
             inner = measure.getExpr();
+            if (!("COUNT".equals(agg) && "*".equals(inner.trim()))) {
+                referencedColumns.addAll(SemanticExpressionReferences.resolve(inner));
+            }
         } else if (measure.getFieldRef() != null) {
             assertIdent(measure.getFieldRef(), "measure.field_ref");
             inner = measure.getFieldRef();
-            referencedColumns.add(measure.getFieldRef());
+            referencedColumns.add(measure.getFieldRef().toLowerCase(Locale.ROOT));
         } else {
             throw new MetricCompileException("UNKNOWN_MEASURE",
                     "measure " + measure.getCode() + " missing field_ref and expr");

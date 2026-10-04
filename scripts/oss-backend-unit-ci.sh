@@ -13,6 +13,8 @@ ARTIFACTS="${AURA_REGRESSION_ARTIFACTS:-$PROJECT_ROOT/.workspace/oss-backend-uni
 RUNTIME_TOKEN="$(printf '%s' "${AURA_REGRESSION_SLOT:-local}-$$" | tr -cd '[:alnum:]-')"
 COMPOSE_PROJECT="aura-ci-oss-backend-$RUNTIME_TOKEN"
 export AURA_CI_JOB_ID="${AURA_CI_JOB_ID:-oss-backend-$RUNTIME_TOKEN}"
+export AURA_OSS_CI_NETWORK="${COMPOSE_PROJECT}_default"
+NETWORK_CREATED=false
 
 free_port() {
   local candidate="$1" limit="$2"
@@ -53,8 +55,31 @@ environment_invalid() {
   exit 2
 }
 
+create_isolated_network() {
+  local subnet_index subnet
+  # Avoid retained Docker networks and host routes; Docker arbitrates races.
+  for subnet_index in $(seq 0 255); do
+    subnet="$(node "$SCRIPT_DIR/lib/oss-ci-subnet.mjs")" \
+      || environment_invalid 'no free isolated CI network without overlapping retained networks or host routes'
+    [[ -n "$subnet" ]] || environment_invalid 'CI subnet allocator returned no subnet'
+    if docker network create --subnet "$subnet" \
+        --label "aura.ci.compose-project=$COMPOSE_PROJECT" "$AURA_OSS_CI_NETWORK" \
+        > "$ARTIFACTS/network-create.log" 2>&1; then
+      NETWORK_CREATED=true
+      printf '%s\n' "$subnet" > "$ARTIFACTS/compose-subnet.txt"
+      printf '[oss-backend-unit-ci] isolated network created: name=%s subnet=%s\n' \
+        "$AURA_OSS_CI_NETWORK" "$subnet"
+      return 0
+    fi
+    if ! grep -q 'Pool overlaps' "$ARTIFACTS/network-create.log"; then
+      environment_invalid 'isolated network creation failed; inspect network-create.log'
+    fi
+  done
+  environment_invalid 'no free isolated CI network after bounded allocation attempts'
+}
+
 cleanup() {
-  status=$?
+  local status=$? network_status=not-created stop_status=stopped
   trap - EXIT HUP INT TERM
   if ! python3 "$SCRIPT_DIR/cleanup-ci-gradle.py" --job-id "$AURA_CI_JOB_ID" \
       --source-root "$PROJECT_ROOT" --report "$ARTIFACTS/gradle-process-cleanup.json"; then
@@ -63,17 +88,23 @@ cleanup() {
   fi
   docker compose "${COMPOSE_ARGS[@]}" ps --all > "$ARTIFACTS/compose-ps.txt" 2>&1 || true
   docker compose "${COMPOSE_ARGS[@]}" logs --no-color > "$ARTIFACTS/compose.log" 2>&1 || true
-  docker compose "${COMPOSE_ARGS[@]}" stop >/dev/null 2>&1 || true
+  docker compose "${COMPOSE_ARGS[@]}" stop > "$ARTIFACTS/compose-stop.log" 2>&1 || stop_status=stop-failed
   # Retain containers and volumes for evidence, but release the finite Docker
   # address-pool allocation. Stopped containers can be reattached by Compose if
   # an owner later restarts this exact retained project.
-  while IFS= read -r container_id; do
-    [[ -n "$container_id" ]] || continue
-    docker network disconnect -f "${COMPOSE_PROJECT}_default" "$container_id" >/dev/null 2>&1 || true
-  done < <(docker compose "${COMPOSE_ARGS[@]}" ps -aq 2>/dev/null || true)
-  docker network rm "${COMPOSE_PROJECT}_default" >/dev/null 2>&1 || true
-  printf '[oss-backend-unit-ci] runtime retained and stopped; network released: compose_project=%s artifacts=%s\n' \
-    "$COMPOSE_PROJECT" "$ARTIFACTS"
+  if [[ "$NETWORK_CREATED" == true ]]; then
+    while IFS= read -r container_id; do
+      [[ -n "$container_id" ]] || continue
+      docker network disconnect -f "${COMPOSE_PROJECT}_default" "$container_id" >/dev/null 2>&1 || true
+    done < <(docker compose "${COMPOSE_ARGS[@]}" ps -aq 2>/dev/null || true)
+    if docker network rm "${COMPOSE_PROJECT}_default" > "$ARTIFACTS/network-release.log" 2>&1; then
+      network_status=released
+    else
+      network_status=release-failed
+    fi
+  fi
+  printf '[oss-backend-unit-ci] runtime retained: stop_status=%s network_status=%s compose_project=%s artifacts=%s\n' \
+    "$stop_status" "$network_status" "$COMPOSE_PROJECT" "$ARTIFACTS"
   exit "$status"
 }
 trap cleanup EXIT
@@ -135,6 +166,8 @@ if ! PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT=120000 \
     > "$ARTIFACTS/playwright-install.log" 2>&1; then
   environment_invalid 'cannot install lockfile-pinned Playwright Chromium within 10 minutes'
 fi
+
+create_isolated_network
 
 if ! docker compose "${COMPOSE_ARGS[@]}" up -d --wait postgres redis kafka; then
   environment_invalid 'CI PostgreSQL/Redis/Kafka stack did not become healthy'
@@ -260,10 +293,8 @@ AURA_BOOTSTRAP_ISOLATED_DATABASE=1 \
 run_backend_gradle aura_boot --continue bootstrapBillingAccountTest
 bootstrap_test_status=$?
 printf '%s\n' "$bootstrap_test_status" > "$ARTIFACTS/bootstrap-test-exit-code.txt"
-gradle_status=0
-if (( root_test_status != 0 || bootstrap_test_status != 0 )); then
-  gradle_status=1
-fi
+gradle_status=$root_test_status
+if (( gradle_status == 0 )); then gradle_status=$bootstrap_test_status; fi
 
 # Both task exit codes decide the gate; report copying cannot mask a failure.
 if [[ -n "${AURA_ALLURE_RESULTS:-}" && -d "$PROJECT_ROOT/platform/build/allure-results" ]]; then
@@ -271,4 +302,12 @@ if [[ -n "${AURA_ALLURE_RESULTS:-}" && -d "$PROJECT_ROOT/platform/build/allure-r
   cp -a "$PROJECT_ROOT/platform/build/allure-results/." "$AURA_ALLURE_RESULTS/" || \
     printf '[oss-backend-unit-ci] warning: unable to copy Allure results\n' >&2
 fi
+# Preserve the original test status while retaining both tasks' JUnit evidence.
+mkdir -p "$ARTIFACTS/junit"
+for task in test bootstrapBillingAccountTest; do
+  if [[ -d "$PROJECT_ROOT/platform/build/test-results/$task" ]]; then
+    cp -a "$PROJECT_ROOT/platform/build/test-results/$task" "$ARTIFACTS/junit/" || \
+      printf '[oss-backend-unit-ci] warning: unable to copy %s JUnit results\n' "$task" >&2
+  fi
+done
 exit "$gradle_status"

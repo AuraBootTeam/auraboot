@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "id": "OSS-BASELINE-01",
+      "file": "tests/e2e/page-designer/form-buttons-refresh-runtime.spec.ts",
+      "title": "refresh button bypasses submit validation and reloads the edit form record",
+      "project": "oss"
+    },
+    {
+      "id": "OSS-BASELINE-02",
+      "file": "tests/e2e/page-designer/form-buttons-refresh-runtime.spec.ts",
+      "title": "nested tabs form button executes an update command with persisted side effects",
+      "project": "oss"
+    },
+    {
+      "id": "OSS-BASELINE-03",
+      "file": "tests/e2e/saved-view/saved-view-gantt.spec.ts",
+      "title": "SV-040: GANTT — timeline renders @smoke",
+      "project": "oss"
+    },
+    {
+      "id": "OSS-BASELINE-04",
+      "file": "tests/e2e/saved-view/saved-view-gantt.spec.ts",
+      "title": "SV-041: GANTT — time zoom (day/week/month)",
+      "project": "oss"
+    },
+    {
+      "id": "OSS-BASELINE-05",
+      "file": "tests/e2e/saved-view/saved-view-kanban.spec.ts",
+      "title": "SV-010: KANBAN — board renders with status columns @smoke",
+      "project": "oss"
+    },
+    {
+      "id": "OSS-BASELINE-06",
+      "file": "tests/e2e/saved-view/saved-view-kanban.spec.ts",
+      "title": "SV-011: KANBAN — drag card changes status @smoke",
+      "project": "oss"
+    },
+    {
+      "id": "OSS-BASELINE-07",
+      "file": "tests/e2e/saved-view/saved-view-kanban.spec.ts",
+      "title": "SV-012: KANBAN — click card opens detail",
+      "project": "oss"
+    },
+    {
+      "id": "OSS-BASELINE-08",
+      "file": "tests/e2e/saved-view/saved-view-kanban.spec.ts",
+      "title": "SV-013: KANBAN — empty column shows placeholder",
+      "project": "oss"
+    },
+    {
+      "id": "OSS-BASELINE-09",
+      "file": "tests/e2e/showcase/runtime-rendering-e2e.spec.ts",
+      "title": "P6.1a: list renders rows + sort + filter + paginate from sidebar nav",
+      "project": "oss"
+    },
+    {
+      "id": "OSS-BASELINE-10",
+      "file": "tests/e2e/showcase/runtime-rendering-e2e.spec.ts",
+      "title": "P6.1b: list toolbar create button navigates to /new",
+      "project": "oss"
+    },
+    {
+      "id": "OSS-BASELINE-11",
+      "file": "tests/e2e/showcase/runtime-rendering-e2e.spec.ts",
+      "title": "P6.2: form page renders all sections + fillable widgets + submit",
+      "project": "oss"
+    },
+    {
+      "id": "OSS-BASELINE-12",
+      "file": "tests/e2e/showcase/runtime-rendering-e2e.spec.ts",
+      "title": "P6.3: detail page renders tabs + sections + field values from list-row navigation",
+      "project": "oss"
+    }
+  ]
+}
