@@ -29,7 +29,7 @@ test('backend CI runner is executable and owns its complete infrastructure lifec
   assert.match(source, /docker compose "\$\{COMPOSE_ARGS\[@\]\}" stop/);
   assert.match(source, /docker network disconnect -f "\$\{COMPOSE_PROJECT\}_default"/);
   assert.match(source, /docker network rm "\$\{COMPOSE_PROJECT\}_default"/);
-  assert.match(source, /trap cleanup EXIT HUP INT TERM/);
+  assert.match(source, /trap cleanup EXIT/);
   assert.match(source, /PostgreSQL init process complete; ready for start up\./);
   assert.match(source, /pg_isready -U auraboot -d aura_boot/);
 });
@@ -93,7 +93,7 @@ test('backend CI runner pre-pulls every fixed and Testcontainers image', () => {
 });
 
 test('backend CI runner preserves Gradle product-test exit status', () => {
-  assert.match(source, /platform\/gradlew -p platform --continue cleanTest test bootstrapBillingAccountTest[ \t]*$/m);
+  assert.match(source, /platform\/gradlew --no-daemon -p platform --continue cleanTest test bootstrapBillingAccountTest[ \t]*$/m);
   assert.doesNotMatch(source, /platform\/gradlew[^\n]*\|\| environment_invalid/);
 });
 

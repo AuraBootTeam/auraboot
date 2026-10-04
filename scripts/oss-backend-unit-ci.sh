@@ -163,9 +163,13 @@ FLYWAY_ARGS=(
   -cleanDisabled=true
 )
 run_flyway() {
+  local args=("${FLYWAY_ARGS[@]}")
+  if [[ -n "${2:-}" ]]; then
+    args[0]="-url=jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/$2"
+  fi
   docker run --rm --network host \
     -v "$PROJECT_ROOT/platform/src/main/resources/db/migration/core:/flyway/sql:ro" \
-    "$FLYWAY_IMAGE" "${FLYWAY_ARGS[@]}" "$1"
+    "$FLYWAY_IMAGE" "${args[@]}" "$1"
 }
 
 if ! run_flyway migrate > "$ARTIFACTS/flyway-migrate.log" 2>&1; then
@@ -197,6 +201,19 @@ if [[ "$(printf '%s\n' "$seed_counts" | awk '$1 > 0 { ok++ } END { print ok + 0 
   printf '[oss-backend-unit-ci] product-failure: platform seed verification failed\n' >&2
   exit 1
 fi
+
+# Bootstrap cannot truncate immutable tenant bindings. Provision a separate fresh
+# database inside this runner-owned PostgreSQL instance and retain its final state.
+if ! docker compose "${COMPOSE_ARGS[@]}" exec -T postgres \
+    createdb -U auraboot aura_boot_bootstrap_ci; then
+  environment_invalid 'cannot create the dedicated bootstrap database'
+fi
+if ! run_flyway migrate aura_boot_bootstrap_ci \
+    > "$ARTIFACTS/bootstrap-flyway-migrate.log" 2>&1; then
+  printf '[oss-backend-unit-ci] product-failure: bootstrap Flyway migrate failed\n' >&2
+  exit 1
+fi
+export BOOTSTRAP_TEST_DATABASE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/aura_boot_bootstrap_ci?charSet=UTF8"
 
 cd "$PROJECT_ROOT" || environment_invalid 'cannot enter repository root'
 

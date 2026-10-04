@@ -655,9 +655,21 @@ test {
     jvmArgs "-javaagent:${configurations.mockitoAgent.singleFile}"
 }
 
+def bootstrapDatabaseUrl = providers.environmentVariable('BOOTSTRAP_TEST_DATABASE_URL')
+tasks.register('validateBootstrapDatabase') {
+    doLast {
+        def url = bootstrapDatabaseUrl.orNull
+        if (!url || !(url ==~ /jdbc:postgresql:\/\/[^\/]+\/aura_boot_bootstrap_[A-Za-z0-9_]+(\?.*)?/) ||
+                url == System.getenv('TEST_DATABASE_URL') || url == System.getenv('DATABASE_URL') ||
+                url == System.getenv('SPRING_DATASOURCE_URL')) {
+            throw new GradleException('BOOTSTRAP_TEST_DATABASE_URL must identify a separate freshly migrated aura_boot_bootstrap_* database')
+        }
+    }
+}
+
 tasks.register('bootstrapBillingAccountTest', Test) {
     group = 'verification'
-    description = 'Run the destructive full-bootstrap billing account integration test last.'
+    description = 'Run full-bootstrap billing verification against a dedicated fresh database.'
     useJUnitPlatform {
         includeTags 'destructive-bootstrap'
     }
@@ -668,6 +680,15 @@ tasks.register('bootstrapBillingAccountTest', Test) {
     // bootstrap contract was re-executed for this run.
     outputs.upToDateWhen { false }
     maxParallelForks = 1
+
+    dependsOn tasks.named('validateBootstrapDatabase')
+    doFirst {
+        def url = bootstrapDatabaseUrl.get()
+        // Override every datasource alias in this worker only; shared tests retain their database.
+        ['TEST_DATABASE_URL', 'DATABASE_URL', 'SPRING_DATASOURCE_URL'].each { key ->
+            environment key, url
+        }
+    }
 
     def bootstrapTestTmpDir = file("${buildDir}/tmp/bootstrapBillingAccountTest")
     bootstrapTestTmpDir.mkdirs()
