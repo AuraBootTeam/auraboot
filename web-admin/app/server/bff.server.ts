@@ -482,6 +482,15 @@ app.use(errorLogger);
 app.use((error: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
   const requestId = (req as any).requestId || 'unknown';
   console.error(`[${requestId}] BFF Server Error:`, error);
+  // Express body-parser marks malformed JSON as a client error before proxying.
+  if (error?.type === 'entity.parse.failed' && error?.status === 400) {
+    res.status(400).json({
+      error: 'Bad Request',
+      message: 'Invalid JSON request body',
+      requestId,
+    });
+    return;
+  }
   res.status(500).json({
     error: 'Internal Server Error',
     message:
