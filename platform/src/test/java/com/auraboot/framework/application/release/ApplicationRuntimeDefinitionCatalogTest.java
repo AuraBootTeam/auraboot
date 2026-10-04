@@ -71,6 +71,39 @@ class ApplicationRuntimeDefinitionCatalogTest {
     }
 
     @Test
+    void preservesLegacySystemTableMappingAndSoftDeleteWithoutDynamicVersionColumn() {
+        var release = release("active");
+        var source = release.components().getFirst().manifest().getModels().getFirst();
+        source.setExtension(Map.of("tableName", "ab_tenant_member", "softDelete", true));
+        when(resolver.boundRelease(42L, "aura-edu")).thenReturn(release);
+
+        var model = catalog.findModel(42L, "aura-edu", "xy_student").orElseThrow();
+        assertThat(model.getTableName()).isEqualTo("ab_tenant_member");
+        assertThat(model.isSoftDelete()).isTrue();
+        assertThat(model.getFields()).extracting("code").contains("pid", "tenant_id")
+                .doesNotContain("row_version");
+        assertThat(catalog.modelSources(42L, "aura-edu").orElseThrow()).contains(
+                new ApplicationRuntimeDefinitionCatalog.BoundModelSource("xy_student", "ab_tenant_member"));
+        assertThat(catalog.findFieldMetadata(42L, "aura-edu", "xy_student").orElseThrow())
+                .extracting("code").doesNotContain("row_version");
+    }
+
+    @Test
+    void firstClassPhysicalTableWinsOverLegacyMapping() {
+        var release = release("active");
+        var source = release.components().getFirst().manifest().getModels().getFirst();
+        source.setTableName("mt_actual_student");
+        source.setExtension(Map.of("tableName", "ab_tenant_member"));
+        when(resolver.boundRelease(42L, "aura-edu")).thenReturn(release);
+
+        var model = catalog.findModel(42L, "aura-edu", "xy_student").orElseThrow();
+        assertThat(model.getTableName()).isEqualTo("mt_actual_student");
+        assertThat(model.getFields()).extracting("code").contains("row_version");
+        assertThat(catalog.modelSources(42L, "aura-edu").orElseThrow()).contains(
+                new ApplicationRuntimeDefinitionCatalog.BoundModelSource("xy_student", "mt_actual_student"));
+    }
+
+    @Test
     void suppliesRenderingMetadataWithoutTenantLocalModelOrFieldIds() {
         var fields = catalog.findFieldMetadata(42L, "aura-edu", "xy_student").orElseThrow();
         var name = fields.stream().filter(field -> "xy_stu_name".equals(field.getCode())).findFirst().orElseThrow();
