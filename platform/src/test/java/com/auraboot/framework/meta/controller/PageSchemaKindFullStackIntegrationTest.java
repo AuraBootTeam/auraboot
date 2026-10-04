@@ -11,6 +11,13 @@ import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.Filter;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import com.auraboot.framework.plugin.validation.PageSchemaRenderProfile;
+import org.springframework.jdbc.core.JdbcTemplate;
+import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,6 +35,8 @@ import java.util.List;
 import java.util.Map;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -46,8 +55,21 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * {@code page.page.manage} permission so the interceptor passes, allowing
  * Bean Validation to allow V3 {@code kind=dashboard} pages.
  */
+@Import(PageSchemaKindFullStackIntegrationTest.StorefrontHost.class)
 @DisplayName("PageSchemaController kind validation - Full-stack IT")
 class PageSchemaKindFullStackIntegrationTest extends BaseIntegrationTest {
+
+    @TestConfiguration(proxyBeanMethods = false)
+    static class StorefrontHost {
+        @Bean
+        PageSchemaRenderProfile storefrontAuthoringProfile() {
+            return new PageSchemaRenderProfile("storefront", Set.of("plp"),
+                    Set.of("search-bar", "facet-panel", "product-grid", "pagination"));
+        }
+    }
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private static final String PERMISSION_CODE = "page.page.manage";
 
@@ -149,6 +171,43 @@ class PageSchemaKindFullStackIntegrationTest extends BaseIntegrationTest {
                         .content(objectMapper.writeValueAsString(payload)))
                 .andDo(print())
                 .andExpect(status().is2xxSuccessful());
+    }
+
+    @Test
+    void registeredProfileCreateAndPartialUpdatePreserveCanonicalStorageAndRejectEscape() throws Exception {
+        String key = "storefront_authoring_" + UUID.randomUUID().toString().replace("-", "");
+        List<Object> blocks = List.of(Map.of("id", "products", "blockType", "product-grid"));
+        Map<String, Object> payload = Map.of("pageKey", key, "name", key,
+                "title", "Storefront Products", "kind", "plp", "profile", "storefront",
+                "schemaVersion", 4, "layout", Map.of("type", "stack"), "blocks", blocks);
+        String response = mockMvc.perform(post("/api/pages")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(payload)))
+                .andExpect(status().is2xxSuccessful()).andReturn().getResponse().getContentAsString();
+        String pid = objectMapper.readTree(response).path("data").path("pid").asText();
+        assertThat(pid).isNotBlank();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT kind FROM ab_page_schema WHERE pid = ? AND deleted_flag = false", String.class, pid))
+                .isEqualTo("plp");
+        assertThat(objectMapper.readTree(jdbcTemplate.queryForObject(
+                "SELECT blocks::text FROM ab_page_schema WHERE pid = ? AND deleted_flag = false", String.class, pid)))
+                .isEqualTo(objectMapper.valueToTree(blocks));
+        // Missing profile on a partial update must resolve against the saved profile.
+        mockMvc.perform(put("/api/pages/{pid}", pid).contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("kind", "plp", "title", "Updated Products"))))
+                .andExpect(status().is2xxSuccessful());
+        String before = jdbcTemplate.queryForObject(
+                "SELECT row_to_json(p)::text FROM ab_page_schema p WHERE pid = ? AND deleted_flag = false", String.class, pid);
+        for (Map<String, Object> escape : List.of(Map.<String, Object>of("profile", "admin"),
+                Map.<String, Object>of("profile", "unregistered"),
+                Map.<String, Object>of("blocks", List.of(Map.of("id", "alien", "blockType", "table"))))) {
+            mockMvc.perform(put("/api/pages/{pid}", pid).contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(escape)))
+                    .andExpect(status().is4xxClientError());
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT row_to_json(p)::text FROM ab_page_schema p WHERE pid = ? AND deleted_flag = false", String.class, pid))
+                    .isEqualTo(before);
+        }
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
