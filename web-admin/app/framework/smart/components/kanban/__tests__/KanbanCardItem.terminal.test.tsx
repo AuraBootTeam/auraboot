@@ -26,14 +26,14 @@ describe('KanbanCardItem terminal visual treatment', () => {
   it('renders declared dictionary labels and does not expose an unknown enum code', () => {
     const { getByText, queryByText, rerender } = render(
       <DndContext><SortableContext items={[card.id]}>
-        <KanbanCardItem card={{ ...card, inbound_type: 'purchase_in' }} titleField="name"
+        <KanbanCardItem card={{ ...card, inbound_type: 'purchase_in', inbound_type_display: 'purchase_in' }} titleField="name"
           cardFields={[{ field: 'inbound_type', type: 'tag', dictCode: 'pe_in_type', valueLabels: { purchase_in: '采购入库' }, unrecognizedLabel: '未识别' }]} />
       </SortableContext></DndContext>,
     );
     expect(getByText('采购入库')).toBeInTheDocument();
     expect(queryByText('purchase_in')).toBeNull();
     rerender(<DndContext><SortableContext items={[card.id]}>
-      <KanbanCardItem card={{ ...card, inbound_type: 'legacy_unknown' }} titleField="name"
+      <KanbanCardItem card={{ ...card, inbound_type: 'legacy_unknown', inbound_type_display: 'legacy_unknown' }} titleField="name"
         cardFields={[{ field: 'inbound_type', type: 'tag', dictCode: 'pe_in_type', valueLabels: { purchase_in: '采购入库' }, unrecognizedLabel: '未识别' }]} />
     </SortableContext></DndContext>);
     expect(getByText('未识别')).toBeInTheDocument();
