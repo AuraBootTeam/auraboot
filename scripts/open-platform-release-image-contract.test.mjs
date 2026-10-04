@@ -88,3 +88,31 @@ exit ${status}
   } finally { fs.rmSync(temporary, {recursive:true}); }
 }
 console.log('open-platform runtime retention: 6 executable cases PASS');
+
+// Run the actual readiness loop against a Unix-only initialization phase.
+const readiness = gate.slice(gate.indexOf('for attempt in $(seq 1 30)'),
+  gate.indexOf('docker run --rm --network "$NET"'));
+for (const timeout of [false, true]) {
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'open-platform-readiness-'));
+  try {
+    const calls = path.join(temporary, 'calls');
+    const result = spawnSync('bash', ['-c', `set -Eeuo pipefail
+attempts=0
+docker() {
+  attempts=$((attempts + 1))
+  printf '%s\n' "$*" >> "$CALLS"
+  # The socket succeeds immediately; TCP is unavailable during initialization.
+  [[ "$*" == *"-h owned-pg"* ]] || return 0
+  [[ "$TIMEOUT" == false && "$attempts" -ge 2 ]]
+}
+sleep() { :; }
+fatal() { printf '%s\n' "$*" >&2; exit 2; }
+${readiness}
+`], {encoding:'utf8', env:{...process.env, PG:'owned-pg', CALLS:calls, TIMEOUT:String(timeout)}});
+    assert.equal(result.status, timeout ? 2 : 0, result.stderr);
+    const commands = fs.readFileSync(calls, 'utf8').trim().split('\n');
+    assert.equal(commands.length, timeout ? 30 : 2);
+    assert.ok(commands.every(command => command.includes('pg_isready -h owned-pg')));
+  } finally { fs.rmSync(temporary, {recursive:true}); }
+}
+console.log('open-platform PostgreSQL TCP readiness: 2 executable cases PASS');
