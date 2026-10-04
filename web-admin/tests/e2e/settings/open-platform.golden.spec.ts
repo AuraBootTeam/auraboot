@@ -624,16 +624,19 @@ test.describe('Open Platform golden journey', () => {
     const eventCatalog = operations.getByTestId('open-platform-event-catalog');
     const webhookHealth = operations.getByTestId('open-platform-webhook-health');
     await expect(eventCatalog).toContainText('inventory.stock-in.confirmed');
+    await expect(eventCatalog).toContainText('事件目录');
+    await expect(eventCatalog).toContainText('兼容版本');
+    await expect(webhookHealth).toContainText('Webhook 兼容性与签名');
     await expect(webhookHealth.locator('[data-rotation-status="healthy"]')).toHaveCount(2);
     await expect(webhookHealth.locator('[data-rotation-status="due"]')).toHaveCount(1);
     await expect(webhookHealth.locator('[data-rotation-status="overdue"]')).toContainText(
-      'Rotate the signing secret now.',
+      '请立即轮换签名密钥。',
     );
     await expect(webhookHealth.locator('[data-rotation-status="missing"]')).toContainText(
-      'Add a signing secret before enabling delivery.',
+      '启用投递前请添加签名密钥。',
     );
     await expect(webhookHealth.locator('[data-compatible="false"]')).toContainText(
-      'Choose a supported event version.',
+      '请选择受支持的事件版本。',
     );
     await expect(operations).not.toContainText(
       /super-secret|https:\/\/.*hook|Bearer [A-Za-z0-9._-]+/,
@@ -782,6 +785,7 @@ test.describe('Open Platform golden journey', () => {
     await expect(operations).toContainText('金蝶库存事件');
     await capture(page, 'OP-OPS-06');
     await operations.getByLabel('投递状态').selectOption('dead_letter');
+    await expect(operations.getByLabel('投递状态').locator('option:checked')).toHaveText('死信');
     await expect(operations).toContainText('HTTP 503');
     await expect(operations).not.toContainText('evt-success');
     await expect(operations).not.toContainText('evt-pending');
@@ -1036,6 +1040,10 @@ test.describe('Open Platform golden journey', () => {
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
     expect(overflow).toBeLessThanOrEqual(1);
+    for (const label of ['已停用', '所有者']) {
+      const badge = appCard.getByText(label, { exact: true }).first();
+      await expect(badge).toHaveCSS('white-space', 'nowrap');
+    }
     await capture(page, 'OP-OPS-16-top', false);
     await expect(operations).toContainText('open-platform-golden-whoami');
     await operations.scrollIntoViewIfNeeded();

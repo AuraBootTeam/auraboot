@@ -1715,6 +1715,34 @@ openPlatform:
   replayConfirmTitle: Replay this delivery?
   replayConfirmBody: The original signed payload will be delivered again and may repeat downstream side effects.
   confirmReplay: Confirm replay
+  eventCatalog: Event catalog
+  eventCatalogHint: Only explicitly published partner events can be selected by installed applications.
+  noPublishedEvents: No partner events published
+  supportedVersions: Compatible versions
+  webhookHealth: Webhook compatibility & signing
+  webhookHealthHint: Rotate signing secrets every 90 days and keep subscriptions on a supported schema.
+  noInstalledWebhooks: No webhooks for this installation
+  compatible: Compatible
+  actionRequired: Action required
+  eventSchema: Schema
+  catalogVersion: Catalog
+  signing: Signing
+  rotateBy: Rotate by
+  chooseSupportedEventVersion: Choose a supported event version.
+  rotateSigningSecretNow: Rotate the signing secret now.
+  addSigningSecretBeforeDelivery: Add a signing secret before enabling delivery.
+  deliveryState:
+    dead_letter: Dead letter
+    failed: Failed
+    pending: Pending
+    success: Success
+  signingState:
+    healthy: Healthy
+    due: Due
+    overdue: Overdue
+    missing: Missing
+  eventClassification:
+    partner: Partner
   status:
     active: Active
     disabled: Disabled

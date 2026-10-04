@@ -250,10 +250,10 @@ export default function OpenPlatformOperationsPanel({
                     className="ml-2 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-950"
                   >
                     <option value="">{t('common.all', undefined, 'All')}</option>
-                    <option value="dead_letter">dead_letter</option>
-                    <option value="failed">failed</option>
-                    <option value="pending">pending</option>
-                    <option value="success">success</option>
+                    <option value="dead_letter">{t('openPlatform.deliveryState.dead_letter', undefined, 'Dead letter')}</option>
+                    <option value="failed">{t('openPlatform.deliveryState.failed', undefined, 'Failed')}</option>
+                    <option value="pending">{t('openPlatform.deliveryState.pending', undefined, 'Pending')}</option>
+                    <option value="success">{t('openPlatform.deliveryState.success', undefined, 'Success')}</option>
                   </select>
                 </label>
               </div>
@@ -284,7 +284,7 @@ export default function OpenPlatformOperationsPanel({
                               'Deleted subscription',
                             )}
                         </span>
-                        <code>{delivery.status}</code>
+                        <span>{t(`openPlatform.deliveryState.${delivery.status}`, undefined, delivery.status)}</span>
                       </div>
                       <div className="mt-1 text-gray-400">
                         {delivery.eventId} · {delivery.retryCount}/{delivery.maxRetries}
@@ -349,11 +349,11 @@ export default function OpenPlatformOperationsPanel({
                           {event.type}
                         </code>
                         <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] text-indigo-700">
-                          {event.classification} · v{event.currentVersion}
+                          {t(`openPlatform.eventClassification.${event.classification}`, undefined, event.classification)} · v{event.currentVersion}
                         </span>
                       </div>
                       <p className="mt-1 text-[11px] text-gray-400">
-                        {event.subjectResourceCode} · compatible v
+                        {event.subjectResourceCode} · {t('openPlatform.supportedVersions', undefined, 'Compatible versions')} v
                         {event.supportedVersions.join(', v')}
                       </p>
                     </div>
@@ -439,6 +439,7 @@ export default function OpenPlatformOperationsPanel({
 }
 
 function WebhookHealthCard({ item }: { item: WebhookHealth }) {
+  const { t } = useI18n();
   const warning =
     !item.compatible || item.rotationStatus === 'overdue' || item.rotationStatus === 'missing';
   return (
@@ -453,24 +454,26 @@ function WebhookHealthCard({ item }: { item: WebhookHealth }) {
     >
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
         <span className="min-w-0 font-medium break-words">{item.name}</span>
-        <span className="font-semibold">{item.compatible ? 'Compatible' : 'Action required'}</span>
+        <span className="font-semibold">{item.compatible
+          ? t('openPlatform.compatible', undefined, 'Compatible')
+          : t('openPlatform.actionRequired', undefined, 'Action required')}</span>
       </div>
       <code className="mt-1 block text-[11px] break-all">{item.eventType}</code>
       <p className="mt-1">
-        schema v{item.eventVersion}
-        {item.catalogCurrentVersion ? ` · catalog v${item.catalogCurrentVersion}` : ''}
+        {t('openPlatform.eventSchema', undefined, 'Schema')} v{item.eventVersion}
+        {item.catalogCurrentVersion ? ` · ${t('openPlatform.catalogVersion', undefined, 'Catalog')} v${item.catalogCurrentVersion}` : ''}
         {' · '}
-        signing {item.rotationStatus}
+        {t('openPlatform.signing', undefined, 'Signing')} {t(`openPlatform.signingState.${item.rotationStatus}`, undefined, item.rotationStatus)}
       </p>
       {item.rotationDueAt && (
-        <p className="mt-1 text-[11px] opacity-75">Rotate by {formatTime(item.rotationDueAt)}</p>
+        <p className="mt-1 text-[11px] opacity-75">{t('openPlatform.rotateBy', undefined, 'Rotate by')} {formatTime(item.rotationDueAt)}</p>
       )}
-      {!item.compatible && <p className="mt-1 font-medium">Choose a supported event version.</p>}
+      {!item.compatible && <p className="mt-1 font-medium">{t('openPlatform.chooseSupportedEventVersion', undefined, 'Choose a supported event version.')}</p>}
       {item.rotationStatus === 'overdue' && (
-        <p className="mt-1 font-medium">Rotate the signing secret now.</p>
+        <p className="mt-1 font-medium">{t('openPlatform.rotateSigningSecretNow', undefined, 'Rotate the signing secret now.')}</p>
       )}
       {item.rotationStatus === 'missing' && (
-        <p className="mt-1 font-medium">Add a signing secret before enabling delivery.</p>
+        <p className="mt-1 font-medium">{t('openPlatform.addSigningSecretBeforeDelivery', undefined, 'Add a signing secret before enabling delivery.')}</p>
       )}
     </div>
   );
