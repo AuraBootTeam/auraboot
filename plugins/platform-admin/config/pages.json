@@ -1143,6 +1143,13 @@
       {
         "id": "table",
         "blockType": "table",
+        "empty": {
+          "title": { "zh-CN": "暂无匹配成员", "en-US": "No matching members" },
+          "description": {
+            "zh-CN": "尝试清除筛选条件，或请管理员添加成员。",
+            "en-US": "Clear the filters or ask an administrator to add members."
+          }
+        },
         "columns": [
           {
             "field": "user_id",
@@ -1230,7 +1237,15 @@
                     "en-US": "Reason"
                   },
                   "type": "textarea",
-                  "required": true
+                  "required": true,
+                  "placeholder": {
+                    "zh-CN": "请说明停用原因，例如临时停用账号",
+                    "en-US": "Explain why this account needs to be suspended"
+                  },
+                  "helpText": {
+                    "zh-CN": "暂停后，该成员的所有登录会话将立即失效。",
+                    "en-US": "Suspending the member immediately invalidates all their sign-in sessions."
+                  }
                 }
               ]
             }
@@ -1307,7 +1322,15 @@
                     "en-US": "Reason"
                   },
                   "type": "textarea",
-                  "required": true
+                  "required": true,
+                  "placeholder": {
+                    "zh-CN": "请说明暂停原因，例如临时停用账号",
+                    "en-US": "Explain why this account needs to be suspended"
+                  },
+                  "helpText": {
+                    "zh-CN": "暂停后，该成员的所有登录会话将立即失效。",
+                    "en-US": "Suspending the member immediately invalidates all their sign-in sessions."
+                  }
                 }
               ]
             }
@@ -1336,7 +1359,15 @@
                     "zh-CN": "离职说明",
                     "en-US": "Reason"
                   },
-                  "type": "textarea"
+                  "type": "textarea",
+                  "placeholder": {
+                    "zh-CN": "请填写离职说明，便于管理员了解背景",
+                    "en-US": "Describe the offboarding context for administrators"
+                  },
+                  "helpText": {
+                    "zh-CN": "可补充离职背景；涉及的资源交接将在提交前确认。",
+                    "en-US": "You may add context; resource transfers are confirmed before submission."
+                  }
                 }
               ]
             }

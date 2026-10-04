@@ -390,6 +390,12 @@ test('quote sharing release gate: collaborator full processing, record isolation
   const gerberSurface = memberPage.getByTestId('gerber-viewer');
   const gerberEmpty = memberPage.locator('[data-testid^="runtime-gerber-viewer-empty"]');
   await expect(gerberSurface.or(gerberEmpty).first()).toBeVisible();
+  await expect(memberPage.getByTestId('evidence-panel-section-status')).toContainText('草稿');
+  await expect(memberPage.getByTestId('evidence-panel-section-status')).not.toContainText('draft');
+  for (const notification of await memberPage.getByRole('button', { name: 'Close notification', exact: true }).all()) {
+    await notification.click();
+  }
+  await expect(memberPage.getByRole('button', { name: 'Close notification', exact: true })).toHaveCount(0);
   await memberPage.screenshot({path:testInfo.outputPath('shared-gerber-tab.png'), fullPage:true});
 
   // The grant is record-scoped: another tenant quote stays invisible on API and UI level.

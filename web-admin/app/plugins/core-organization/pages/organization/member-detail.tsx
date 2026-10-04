@@ -196,6 +196,12 @@ export default function MemberDetailPage() {
       label: { 'zh-CN': action === 'suspend' ? '暂停原因' : '离职说明', en: 'Reason' },
       type: 'textarea',
       required: action === 'suspend',
+      placeholder: action === 'suspend'
+        ? { 'zh-CN': '请说明暂停原因，例如临时停用账号', en: 'Explain why this account needs to be suspended' }
+        : { 'zh-CN': '请填写离职说明，便于管理员了解背景', en: 'Describe the offboarding context for administrators' },
+      helpText: action === 'suspend'
+        ? { 'zh-CN': '暂停后，该成员的所有登录会话将立即失效。', en: 'Suspending the member immediately invalidates all their sign-in sessions.' }
+        : { 'zh-CN': '可补充离职背景；涉及的资源交接将在提交前确认。', en: 'You may add context; resource transfers are confirmed before submission.' },
     }] : [];
     actionRefreshTarget.current = action === 'delete' ? 'list' : 'detail';
     try {
