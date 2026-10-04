@@ -11,7 +11,7 @@ const EVIDENCE_DIR = path.join(
   process.env.AURA_EVIDENCE_ROOT || '/tmp',
   'open-platform-multi-user-20260927',
 );
-const RUN_TAG = process.env.OP_MULTIUSER_RUN_TAG || 'r1';
+const RUN_TAG = process.env.OP_MULTIUSER_RUN_TAG || `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 const PASSWORD = 'Closure2026x!';
 const ACCOUNTS = {
   admin: { email: 'admin@auraboot.com', password: 'Test2026x' },
@@ -138,16 +138,7 @@ test.describe.serial('Open Platform four-real-account authority', () => {
     const admin = await apiLogin(await pwRequest.newContext(), ACCOUNTS.admin.email, ACCOUNTS.admin.password);
     const ctx = await pwRequest.newContext();
 
-    // Reset any applications left by earlier runs/smoke calls on this runtime
-    // so the assertions below see exactly one application card.
-    const existing = await ctx.get(`${BACKEND_URL}/api/open-platform/applications`, { headers: bearer(admin) });
-    if (existing.ok()) {
-      for (const entry of ((await existing.json()).data ?? []) as Array<{ pid: string }>) {
-        await ctx.delete(`${BACKEND_URL}/api/open-platform/applications/${entry.pid}`, {
-          headers: bearer(admin),
-        });
-      }
-    }
+    // Preserve existing applications; every assertion below targets this run's app PID/card.
 
     for (const key of ['maintainer', 'viewer', 'nonmember', 'owner2'] as const) {
       const account = ACCOUNTS[key];

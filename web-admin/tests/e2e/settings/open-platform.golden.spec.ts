@@ -16,9 +16,13 @@ const sessionStorage = createCookieSessionStorage({
   },
 });
 
-async function authenticate(page: import('@playwright/test').Page) {
+async function authenticate(
+  page: import('@playwright/test').Page,
+  account = DEFAULT_TEST_ACCOUNT,
+  provisionOwner = true,
+) {
   const loginResponse = await page.request.post(`${BACKEND_URL}/api/auth/login`, {
-    data: { email: DEFAULT_TEST_ACCOUNT.email, password: DEFAULT_TEST_ACCOUNT.password },
+    data: { email: account.email, password: account.password },
   });
   expect(loginResponse.status()).toBe(200);
   const login = await loginResponse.json();
@@ -43,6 +47,20 @@ async function authenticate(page: import('@playwright/test').Page) {
   const selected = await selectionResponse.json();
   expect(String(selected.code)).toBe('0');
   expect(selected.data.jwt).toEqual(expect.any(String));
+  // Each run owns an isolated real account; existing application data stays intact.
+  if (provisionOwner) {
+    const owner = {
+      ...DEFAULT_TEST_ACCOUNT,
+      email: `op-golden-${Date.now()}-${Math.random().toString(16).slice(2, 8)}@op-closure.test`,
+    };
+    const create = await page.request.post(`${BACKEND_URL}/api/meta/commands/execute/admin:create_member`, {
+      headers: { Authorization: `Bearer ${selected.data.jwt}` },
+      data: { payload: { name: 'Open Platform golden owner', email: owner.email, password: owner.password } },
+    });
+    expect(create.status()).toBe(200);
+    expect(String((await create.json()).code)).toBe('0');
+    return authenticate(page, owner, false);
+  }
   const session = await sessionStorage.getSession();
   session.set('jwtToken', selected.data.jwt);
   const setCookie = await sessionStorage.commitSession(session, { maxAge: 604800 });
