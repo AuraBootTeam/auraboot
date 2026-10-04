@@ -36,10 +36,18 @@ export function planGoldenStop({ runtime, repo, token, roots, snapshots, listene
   need(roots.every(pid => Number.isSafeInteger(pid) && pid > 1), 'Invalid owned root PID');
   const byPid = new Map(snapshots.map(item => [item.pid, item]));
   need(byPid.size === snapshots.length, 'Duplicate process snapshot');
+  const inheritedOwnership = new Set();
   for (const item of snapshots) {
     need(Number.isSafeInteger(item.pid) && item.pid > 1 && item.pid !== process.pid,
       'Invalid stop target PID');
-    need(item.runtime === runtime && item.token === token, 'Foreign process runtime ownership');
+    const owned = item.runtime === runtime && item.token === token;
+    // The managed command wrapper can insert a shell before exporting the
+    // runtime environment to its child. It must remain inside the fully
+    // authenticated ancestry, never a launch root or application listener.
+    const shellBridge = item.executable === 'sh' && item.runtime === undefined
+      && item.token === undefined && !roots.includes(item.pid) && !listeners.includes(item.pid);
+    need(owned || shellBridge, 'Foreign process runtime ownership');
+    if (shellBridge) inheritedOwnership.add(item.pid);
     need([join(repo, 'platform'), join(repo, 'web-admin')].includes(item.cwd), 'Foreign process cwd');
     need(Boolean(item.startedAt) && Boolean(item.commandHash), 'Missing process generation identity');
     let current = item.pid;
@@ -55,7 +63,7 @@ export function planGoldenStop({ runtime, repo, token, roots, snapshots, listene
   const order = [...new Set([...roots.filter(pid => byPid.has(pid)), ...snapshots.map(item => item.pid)])];
   return order.map(pid => {
     const { token: _token, ...identity } = byPid.get(pid);
-    return identity;
+    return { ...identity, inheritedOwnership: inheritedOwnership.has(pid) };
   });
 }
 
@@ -70,6 +78,14 @@ export function executeGoldenStop(plan, readSnapshot, signal) {
     need(actual.ownershipVerified === true, 'Process ownership changed before stop');
     signal(expected.pid, 'SIGKILL');
   }
+}
+
+export function verifyGoldenStopOwnership(current, expected, token) {
+  if (!current || !expected) return false;
+  if (expected.inheritedOwnership) {
+    return current.executable === 'sh' && current.runtime === undefined && current.token === undefined;
+  }
+  return current.runtime === expected.runtime && current.token === token;
 }
 
 export function stableGoldenLaunch(current, previous, { runtime, token, cwd, executable }) {
@@ -150,7 +166,8 @@ export function stopGoldenProcesses(name, repo, cli) {
   const plan = planGoldenStop({ runtime: name, repo, token, roots, snapshots, listeners: listenerPids() });
   executeGoldenStop(plan, pid => {
     const current = snapshot(pid);
-    return current && { ...current, ownershipVerified: current.token === token };
+    const expected = plan.find(item => item.pid === pid);
+    return current && { ...current, ownershipVerified: verifyGoldenStopOwnership(current, expected, token) };
   }, (pid, signal) => {
     try { process.kill(pid, signal); } catch (error) { if (error.code !== 'ESRCH') throw new Error('Owned stop signal failed'); }
   });
