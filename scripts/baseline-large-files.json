@@ -4,7 +4,7 @@
   "grandfathered": [
     {
       "path": "platform/src/main/java/com/auraboot/framework/plugin/service/impl/PluginImportServiceImpl.java",
-      "lines": 2976
+      "lines": 2832
     },
     {
       "path": "platform/src/main/java/com/auraboot/framework/meta/service/impl/DynamicDataServiceImpl.java",
