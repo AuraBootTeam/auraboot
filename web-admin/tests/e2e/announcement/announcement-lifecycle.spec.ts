@@ -56,26 +56,29 @@ async function navigateToAnnouncementList(page: Page): Promise<void> {
   await waitForDynamicPageLoad(page);
 }
 
-/** Click a row action from overflow menu, handle optional confirm dialog */
+/** Drive the scoped portaled menu and verify the command's actual response. */
 async function clickRowAction(page: Page, title: string | RegExp, actionLabel: string | RegExp): Promise<void> {
   const row = await findRowByContent(page, title);
-  const moreBtn = row.locator('button:has-text("More"), [data-testid="row-action-more"]').first();
-  await moreBtn.click();
-
-  const actionBtn =
-    typeof actionLabel === 'string'
-      ? page.locator(`button:has-text("${actionLabel}")`).first()
-      : page.getByRole('button', { name: actionLabel }).first();
-  await expect(actionBtn).toBeVisible({ timeout: 3_000 });
-  await actionBtn.click();
-
-  // Handle optional confirmation dialog
-  const dialog = page.locator('[data-testid="confirm-dialog"]');
-  const hasDialog = await dialog.isVisible({ timeout: 2_000 }).catch(() => false);
-  if (hasDialog) {
-    await page.locator('[data-testid="confirm-ok"]').click();
-    await dialog.waitFor({ state: 'hidden', timeout: 5_000 });
-  }
+  await row.getByTestId('row-action-more').click();
+  const menu = page.getByTestId('row-action-dropdown');
+  await expect(menu).toBeVisible();
+  const action = menu.getByRole('menuitem', { name: actionLabel, exact: true });
+  await expect(action).toBeVisible();
+  await menu.screenshot({ path: test.info().outputPath(`menu-${String(actionLabel).replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g, '_')}.png`) });
+  const commandCode = (await action.getAttribute('data-testid'))!.replace('row-action-', '');
+  await action.click();
+  const dialog = page.getByTestId('confirm-dialog');
+  await expect(dialog).toBeVisible();
+  await dialog.screenshot({ path: test.info().outputPath(`confirm-${commandCode.replace(':', '-')}.png`) });
+  const responsePromise = page.waitForResponse((response) =>
+    response.request().method() === 'POST' &&
+    response.url().endsWith(`/api/meta/commands/execute/${commandCode}`));
+  await page.getByTestId('confirm-ok').click();
+  const response = await responsePromise;
+  expect(response.ok()).toBe(true);
+  expect(response.request().postDataJSON().targetRecordPid).toBe(recordPid);
+  expect(String((await response.json()).code)).toBe('0');
+  await expect(dialog).toBeHidden();
 }
 
 /** Wait for a row's status cell to show the expected status */
@@ -93,7 +96,7 @@ test('create announcement in draft status', async ({ page }) => {
   const result = await executeCommandViaApi(page, 'announcement:create_announcement', {
     title: TITLE,
     content: CONTENT,
-    priority: 'normal',
+    announcement_priority: 'normal',
     pinned: false,
     expires_at: EXPIRES,
   });
@@ -135,17 +138,14 @@ test('published record shows archive action, hides edit and publish', async ({ p
   await navigateToAnnouncementList(page);
 
   const row = await findRowByContent(page, TITLE);
-  const moreBtn = row.locator('button:has-text("More"), [data-testid="row-action-more"]').first();
+  const moreBtn = row.getByTestId('row-action-more');
   await moreBtn.click();
 
-  // Archive should be visible for published
-  await expect(page.locator('button:has-text("撤回")').first()).toBeVisible({ timeout: 3_000 });
-
-  // Edit and Publish should NOT be visible for published
-  const menuItems = page.locator('[data-testid="row-action-dropdown"] button, [role="menu"] button');
-  const texts = await menuItems.allTextContents();
-  expect(texts.join('|')).not.toMatch(/edit|编辑/i);
-  expect(texts.join('|')).not.toMatch(/^发布$/);
+  const menu = page.getByTestId('row-action-dropdown');
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: '撤回', exact: true })).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: /^(edit|编辑|发布|publish)$/i })).toHaveCount(0);
+  await menu.screenshot({ path: test.info().outputPath('published-actions.png') });
 });
 
 // ---------------------------------------------------------------------------
@@ -175,12 +175,25 @@ test('republish announcement from archived to published', async ({ page }) => {
 test('reject publish on already-published record via API', async ({ page }) => {
   expect(recordPid).toBeTruthy();
 
-  try {
-    await executeCommandViaApi(page, 'announcement:publish', {}, recordPid);
-    test.fail(true, 'Expected publish to fail on already-published record');
-  } catch {
-    // Expected: API returns error for invalid state transition
-  }
+  const before = await page.request.get(`/api/dynamic/ab_announcement/${recordPid}`);
+  expect(before.ok()).toBe(true);
+  const beforeBody = await before.json();
+  expect(String(beforeBody.code)).toBe('0');
+  expect(beforeBody.data.status).toBe('published');
+  const response = await page.request.post('/api/meta/commands/execute/announcement:publish', {
+    data: { targetRecordPid: recordPid, expectedVersion: beforeBody.data.row_version, payload: {} },
+  });
+  const body = await response.json();
+  expect(response.status()).toBe(422);
+  expect(String(body.code)).not.toBe('0');
+  expect(JSON.stringify(body)).toContain('published');
+  expect(JSON.stringify(body)).toContain('allowed states');
+  const after = await page.request.get(`/api/dynamic/ab_announcement/${recordPid}`);
+  expect(after.ok()).toBe(true);
+  const afterBody = await after.json();
+  expect(String(afterBody.code)).toBe('0');
+  expect(afterBody.data.status).toBe('published');
+  expect(afterBody.data.row_version).toBe(beforeBody.data.row_version);
 });
 
 // ---------------------------------------------------------------------------
@@ -199,4 +212,10 @@ test('archive and delete announcement', async ({ page }) => {
   // Verify record is gone
   const gone = page.locator('table').getByText(TITLE);
   await expect(gone).toHaveCount(0, { timeout: 5_000 });
+  await page.reload();
+  await waitForDynamicPageLoad(page);
+  await expect(page.locator('table').getByText(TITLE)).toHaveCount(0);
+  const deleted = await page.request.get(`/api/dynamic/ab_announcement/${recordPid}`);
+  expect(deleted.status()).toBe(404);
+  await page.screenshot({ path: test.info().outputPath('deleted-after-reload.png'), fullPage: true });
 });
