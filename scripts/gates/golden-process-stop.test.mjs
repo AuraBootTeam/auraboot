@@ -70,6 +70,44 @@ test('never signals a recycled child PID after already stopping its owned superv
   assert.deepEqual(calls, [[supervisor, 'SIGKILL'], [backend, 'SIGKILL']]);
 });
 
+function shellBridgeFixture() {
+  const f = fixture(), bridge = 1000000030;
+  f.snapshots[0].parent = bridge;
+  f.snapshots.push({ pid: bridge, parent: supervisor, cwd: '/owned/oss/web-admin',
+    executable: 'sh', startedAt: 'shell-start', commandHash: 'shell-command' });
+  return { f, bridge };
+}
+test('verifies an unlabelled shell bridge but never signals it', () => {
+  const { f, bridge } = shellBridgeFixture(), calls = [];
+  const plan = planGoldenStop(f);
+  assert.equal(plan.some(item => item.pid === bridge), false);
+  executeGoldenStop(plan, pid => ({ ...f.snapshots.find(item => item.pid === pid),
+    ownershipVerified: pid !== bridge }), (...args) => calls.push(args));
+  assert.deepEqual(calls, [[supervisor, 'SIGKILL'], [backend, 'SIGKILL'], [child, 'SIGKILL']]);
+});
+for (const key of ['parent', 'cwd', 'startedAt', 'commandHash', 'runtime', 'token']) {
+  test(`refuses a changed shell bridge ${key} before any signal`, () => {
+    const { f, bridge } = shellBridgeFixture(), calls = [], plan = planGoldenStop(f);
+    assert.throws(() => executeGoldenStop(plan, pid => {
+      const item = { ...f.snapshots.find(item => item.pid === pid), ownershipVerified: pid !== bridge };
+      if (pid === bridge) item[key] = key === 'parent' ? 999 : 'foreign';
+      return item;
+    }, (...args) => calls.push(args)));
+    assert.deepEqual(calls, []);
+  });
+}
+for (const kind of ['listener', 'root', 'foreign-token', 'foreign-runtime', 'not-shell']) {
+  test(`refuses an unlabelled shell used as ${kind}`, () => {
+    const { f, bridge } = shellBridgeFixture(), shell = f.snapshots.at(-1);
+    if (kind === 'listener') f.listeners.push(bridge);
+    if (kind === 'root') f.roots.push(bridge);
+    if (kind === 'foreign-token') shell.token = 'foreign';
+    if (kind === 'foreign-runtime') shell.runtime = 'foreign';
+    if (kind === 'not-shell') shell.executable = 'node';
+    assert.throws(() => planGoldenStop(f));
+  });
+}
+
 async function processFixture(t, runtime, workdir = 'platform') {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'golden-stop-boundary-'));
   const root = fs.realpathSync(temporary), repo = path.join(root, 'oss'), state = path.join(root, 'state');

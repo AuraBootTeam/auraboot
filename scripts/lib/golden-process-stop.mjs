@@ -36,10 +36,13 @@ export function planGoldenStop({ runtime, repo, token, roots, snapshots, listene
   need(roots.every(pid => Number.isSafeInteger(pid) && pid > 1), 'Invalid owned root PID');
   const byPid = new Map(snapshots.map(item => [item.pid, item]));
   need(byPid.size === snapshots.length, 'Duplicate process snapshot');
+  const bridges = snapshots.filter(item => item.runtime === undefined && item.token === undefined &&
+    item.executable === 'sh' && !roots.includes(item.pid) && !listeners.includes(item.pid));
   for (const item of snapshots) {
     need(Number.isSafeInteger(item.pid) && item.pid > 1 && item.pid !== process.pid,
       'Invalid stop target PID');
-    need(item.runtime === runtime && item.token === token, 'Foreign process runtime ownership');
+    need(bridges.includes(item) || (item.runtime === runtime && item.token === token),
+      'Foreign process runtime ownership');
     need([join(repo, 'platform'), join(repo, 'web-admin')].includes(item.cwd), 'Foreign process cwd');
     need(Boolean(item.startedAt) && Boolean(item.commandHash), 'Missing process generation identity');
     let current = item.pid;
@@ -52,15 +55,27 @@ export function planGoldenStop({ runtime, repo, token, roots, snapshots, listene
   }
   for (const pid of listeners) need(byPid.has(pid), 'Unknown listener: refusing stop');
   // Supervisors first prevents concurrently from respawning children during shutdown.
-  const order = [...new Set([...roots.filter(pid => byPid.has(pid)), ...snapshots.map(item => item.pid)])];
-  return order.map(pid => {
+  const targets = snapshots.filter(item => !bridges.includes(item));
+  const order = [...new Set([...roots.filter(pid => byPid.has(pid)), ...targets.map(item => item.pid)])];
+  const plan = order.map(pid => {
     const { token: _token, ...identity } = byPid.get(pid);
     return identity;
   });
+  // Bridges establish ancestry only. They are never authorized signal targets.
+  Object.defineProperty(plan, 'bridges', { value: bridges.map(item => ({ ...item })) });
+  return plan;
 }
 
 /** Recheck the full process generation immediately before each signal. */
 export function executeGoldenStop(plan, readSnapshot, signal) {
+  // Validate the structural chain before stopping its supervisor changes parentage.
+  for (const bridge of plan.bridges ?? []) {
+    const actual = readSnapshot(bridge.pid);
+    need(actual, 'Shell bridge disappeared before stop');
+    for (const key of ['pid', 'parent', 'cwd', 'commandHash', 'startedAt', 'executable', 'runtime', 'token']) {
+      need(actual[key] === bridge[key], 'Shell bridge identity changed before stop');
+    }
+  }
   for (const expected of plan) {
     const actual = readSnapshot(expected.pid);
     if (!actual) continue;
