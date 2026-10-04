@@ -90,6 +90,7 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
 
     private static final Object MISSING_CONTEXT_VALUE = new Object();
 
+    private final com.auraboot.framework.decision.mapper.DrtDefinitionMapper definitionMapper;
     private final DrtVersionMapper versionMapper;
     private final DrtLogMapper logMapper;
     private final DecisionRuntime decisionRuntime;
@@ -186,15 +187,14 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
     @Override
     public List<DrtLogDTO> findLogsByTraceId(String traceId) {
         Long tid = requireTenant();
-        return logMapper.findByTraceId(tid, traceId).stream()
-                .map(this::toLogDTO)
-                .collect(Collectors.toList());
+        return toLogDTOs(logMapper.findByTraceId(tid, traceId));
     }
 
     @Override
     public DrtLogDTO findLogByPid(String pid) {
         Long tid = requireTenant();
-        return toLogDTO(logMapper.findByPid(tid, pid));
+        DrtLogEntity row = logMapper.findByPid(tid, pid);
+        return row == null ? null : toLogDTOs(List.of(row)).getFirst();
     }
 
     @Override
@@ -256,7 +256,7 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
 
         Page<DrtLogEntity> entityPage = logMapper.selectPage(new Page<>(safePage + 1L, safeSize), wrapper);
         PageResult<DrtLogDTO> result = new PageResult<>();
-        result.setRecords(entityPage.getRecords().stream().map(this::toLogDTO).toList());
+        result.setRecords(toLogDTOs(entityPage.getRecords()));
         result.setTotal(entityPage.getTotal());
         result.setSize(entityPage.getSize());
         result.setCurrent(entityPage.getCurrent());
@@ -705,6 +705,29 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
             throw new ValidationException(ResponseCode.NOT_FOUND, "Tenant context required");
         }
         return tid;
+    }
+
+    private List<DrtLogDTO> toLogDTOs(List<DrtLogEntity> rows) {
+        if (rows.isEmpty()) return List.of();
+        Long tenantId = requireTenant();
+        Set<String> codes = rows.stream().map(DrtLogEntity::getDecisionCode)
+                .filter(StringUtils::hasText).collect(Collectors.toSet());
+        Map<String, String> names = new HashMap<>();
+        if (!codes.isEmpty()) {
+            // One tenant-scoped catalogue lookup for the entire page/trace, never N+1.
+            definitionMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<
+                    com.auraboot.framework.decision.entity.DrtDefinitionEntity>()
+                    .eq("tenant_id", tenantId).in("decision_code", codes)).forEach(definition -> {
+                if (tenantId.equals(definition.getTenantId()) && StringUtils.hasText(definition.getDecisionName())) {
+                    names.put(definition.getDecisionCode(), definition.getDecisionName());
+                }
+            });
+        }
+        return rows.stream().map(row -> {
+            DrtLogDTO dto = toLogDTO(row);
+            dto.setDecisionName(names.get(row.getDecisionCode()));
+            return dto;
+        }).toList();
     }
 
     private DrtLogDTO toLogDTO(DrtLogEntity e) {

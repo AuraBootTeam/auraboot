@@ -207,6 +207,14 @@ describe('ExecutionLogTraceBlock', () => {
     mockLogApi();
   });
 
+  it('shows the actual business decision name supplied by tenant metadata', async () => {
+    http.get.mockResolvedValueOnce({ data: { records: [{ ...recentLog,
+      decisionCode: 'owned_sla_deadline', decisionName: '请假审批 SLA 截止时间',
+    }], total: 1, size: 20, current: 1 } });
+    render(<MemoryRouter><ExecutionLogTraceBlock block={{ props: { mode: 'list' } }} /></MemoryRouter>);
+    await expect(screen.findByText('请假审批 SLA 截止时间')).resolves.toBeVisible();
+  });
+
   it('loads DSL list logs with URL policyCode as keyword and applies advanced filters', async () => {
     render(
       <MemoryRouter initialEntries={['/p/decisionops_execution_logs?policyCode=policy_1']}>
