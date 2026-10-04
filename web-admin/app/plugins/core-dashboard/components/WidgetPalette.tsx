@@ -164,7 +164,7 @@ export const WidgetPalette: React.FC<WidgetPaletteProps> = ({ onDragStart, onWid
   return (
     <div
       data-testid="widget-palette"
-      className="flex w-56 flex-col overflow-hidden border-r border-gray-200 bg-gray-50"
+      className="flex w-56 shrink-0 flex-col overflow-hidden border-r border-gray-200 bg-gray-50"
     >
       <div className="border-b border-gray-200 p-4">
         <h2 className="text-sm font-semibold text-gray-700">

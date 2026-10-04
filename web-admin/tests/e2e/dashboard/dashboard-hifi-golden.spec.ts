@@ -270,7 +270,7 @@ async function exerciseSemanticDataSource(page: import('@playwright/test').Page,
     await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/bi-ui-ds-semantic-loading.png` });
   } finally {
     releaseMetadata();
-    await page.unroute('**/api/semantic/meta', holdMetadata);
+    await page.unrouteAll({ behavior: 'wait' });
   }
   await expect(metric('order_count')).not.toBeChecked();
   await expect(metric('draft_count')).not.toBeChecked();

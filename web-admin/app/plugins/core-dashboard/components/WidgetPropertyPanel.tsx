@@ -271,7 +271,7 @@ export const WidgetPropertyPanel: React.FC<WidgetPropertyPanelProps> = ({ classN
   return (
     <div
       data-testid="widget-property-panel"
-      className={`flex w-72 flex-col border-l border-gray-200 bg-white ${className}`}
+      className={`flex w-72 shrink-0 flex-col border-l border-gray-200 bg-white ${className}`}
     >
       <div className="border-b border-gray-200 p-4">
         <div className="flex items-center justify-between">

@@ -22,6 +22,20 @@ function richText(content = 'Hello'): Omit<RichTextBlock, 'id'> {
 }
 
 describe('ReportDocumentProvider', () => {
+  it('loads persisted page settings without treating default normalization as an edit', () => {
+    const { result } = renderHook(() => useReportDocument(), { wrapper: ReportDocumentProvider });
+    const persisted = { ...createEmptyReport('Persisted'), page: {
+      margin: { left: 14, top: 18, right: 14, bottom: 18 }, orientation: 'portrait', size: 'A4',
+    } } as ReportDsl;
+    act(() => result.current.loadDocument(persisted));
+    expect(result.current.report?.page.margin).toEqual(persisted.page.margin);
+    expect(result.current.isDirty).toBe(false);
+    act(() => result.current.updateTitle('Changed'));
+    expect(result.current.isDirty).toBe(true);
+    act(() => result.current.markSaved());
+    expect(result.current.isDirty).toBe(false);
+  });
+
   it('makes header edits undoable (whole-ReportDsl history scope)', () => {
     const { result } = renderHook(() => useReportDocument(), {
       wrapper: ReportDocumentProvider,
