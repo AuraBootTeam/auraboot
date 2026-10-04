@@ -76,8 +76,9 @@ export async function navigateToMenuByClick(page: Page, labels: string[]): Promi
   for (const label of labels) {
     const nav = page.locator('nav, aside, [role="navigation"]').first();
     const item = nav
-      .getByRole('button', { name: label })
-      .or(nav.getByRole('menuitem', { name: label }))
+      .getByRole('button', { name: label, exact: true })
+      .or(nav.getByRole('link', { name: label, exact: true }))
+      .or(nav.getByRole('menuitem', { name: label, exact: true }))
       .or(nav.locator(`[title="${label}"]`))
       .or(nav.locator(`text="${label}"`))
       .first();
