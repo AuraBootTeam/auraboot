@@ -107,6 +107,7 @@ export default function MemberDetailPage() {
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [showImpersonationDialog, setShowImpersonationDialog] = useState(false);
+  const [reasonRequired, setReasonRequired] = useState(false);
 
   useEffect(() => {
     if (impersonationFetcher.data?.ok) window.location.assign('/');
@@ -333,7 +334,7 @@ export default function MemberDetailPage() {
           <>
             {member.user && hasPermission('admin.customer.impersonate') && (
               <ActionButton
-                onClick={() => setShowImpersonationDialog(true)}
+                onClick={() => { setReasonRequired(false); setShowImpersonationDialog(true); }}
                 disabled={actionLoading}
                 variant="primary"
               >
@@ -388,6 +389,14 @@ export default function MemberDetailPage() {
             <impersonationFetcher.Form
               method="post"
               action="/_action/start-impersonation"
+              onSubmit={(event) => {
+                const reason = event.currentTarget.elements.namedItem('reason');
+                if (reason instanceof HTMLTextAreaElement && !reason.value.trim()) {
+                  event.preventDefault();
+                  setReasonRequired(true);
+                  reason.focus();
+                }
+              }}
               className="mt-5 space-y-4"
             >
               <input type="hidden" name="targetMemberPid" value={member.pid} />
@@ -413,12 +422,27 @@ export default function MemberDetailPage() {
                 <textarea
                   name="reason"
                   required
+                  aria-invalid={reasonRequired || undefined}
+                  aria-describedby={reasonRequired ? 'impersonation-reason-error' : undefined}
+                  onInvalid={(event) => {
+                    event.preventDefault();
+                    setReasonRequired(true);
+                    event.currentTarget.focus();
+                  }}
+                  onChange={(event) => {
+                    if (event.currentTarget.value.trim()) setReasonRequired(false);
+                  }}
                   maxLength={500}
                   rows={3}
                   placeholder={l('例如：协助客户检查订单状态', 'For example: help review an order')}
                   className="mt-1.5 w-full resize-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                 />
               </label>
+              {reasonRequired && (
+                <p id="impersonation-reason-error" role="alert" className="text-sm font-medium text-red-600 dark:text-red-400">
+                  {l('请填写本次代客户登录的操作原因。', 'Enter the reason for accessing this customer account.')}
+                </p>
+              )}
               <label className="block">
                 <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
                   {l('授权凭据说明（选填）', 'Authorization reference (optional)')}

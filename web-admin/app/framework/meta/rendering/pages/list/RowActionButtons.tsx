@@ -122,7 +122,6 @@ export function RowActionButtons({
 }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
-  const { t } = useI18n();
   const menuRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
 
