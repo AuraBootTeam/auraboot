@@ -287,6 +287,17 @@ public class PluginImportController {
         return ResponseEntity.ok(result);
     }
 
+    @PostMapping("/reconcile-directory-role-permissions")
+    @Operation(summary = "Reconcile declared role permissions after batch import")
+    public ResponseEntity<ApiResponse<Integer>> reconcileDirectoryRolePermissions(
+            @RequestBody DirectoryImportRequest request) {
+        if (request.getPath() == null || request.getPath().isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(ApiResponse.success(
+                importService.reconcileDirectoryRolePermissions(request.getPath())));
+    }
+
     /**
      * Request DTO for directory-based import.
      */

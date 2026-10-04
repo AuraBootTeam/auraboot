@@ -98,6 +98,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
@@ -1327,6 +1328,57 @@ public class PluginImportServiceImpl implements PluginImportService {
                 autoPermissionAssignmentService.autoAssignPermissions(modelCode, pluginNamespace, tenantId);
             }
         }
+    }
+
+    @Override
+    @Transactional
+    public int reconcileDirectoryRolePermissions(String directoryPath) {
+        Path directory = Path.of(directoryPath).normalize();
+        if (!directory.isAbsolute() || directory.toString().contains("..")) {
+            throw new PluginException("Role reconciliation requires an absolute plugin directory");
+        }
+        Long tenantId = MetaContext.getCurrentTenantId();
+        if (tenantId == null) {
+            throw new PluginException("Tenant context is required for role reconciliation");
+        }
+        PluginManifestExtended manifest = directoryLoader.loadFromDirectory(directory);
+        PluginRecord installed = pluginRecordMapper.findByTenantAndPluginId(manifest.getPluginId());
+        if (installed == null || !tenantId.equals(installed.getTenantId())
+                || !Objects.equals(installed.getVersion(), manifest.getVersion())) {
+            throw new PluginException("Role reconciliation requires the same installed plugin version");
+        }
+        return reconcileDeclaredRolesStrictly(manifest, tenantId);
+    }
+
+    int reconcileDeclaredRolesStrictly(PluginManifestExtended manifest, Long tenantId) {
+        if (manifest.getRoles() == null || manifest.getRoles().isEmpty()) return 0;
+        Map<String, Role> roles = roleService.findByTenantId(tenantId).stream()
+                .collect(Collectors.toMap(Role::getCode, Function.identity()));
+        int checked = 0;
+        for (RoleDefinitionDTO declaration : manifest.getRoles()) {
+            if (declaration == null || !declaration.isValid()) {
+                throw new PluginException("Invalid role declaration during batch reconciliation");
+            }
+            Role role = roles.get(declaration.getCode());
+            if (role == null) throw new PluginException("Imported role not found: " + declaration.getCode());
+            List<PermissionDTO> permissions = new ArrayList<>();
+            for (String code : Optional.ofNullable(declaration.getPermissions()).orElse(List.of())) {
+                PermissionDTO permission = permissionService.findByCode(code);
+                if (permission == null || permission.getId() == null) {
+                    throw new PluginException("Unresolved declared permission: " + declaration.getCode() + ":" + code);
+                }
+                permissions.add(permission);
+            }
+            resourceImporter.reconcileRolePermissions(declaration, tenantId);
+            for (PermissionDTO permission : permissions) {
+                if (rolePermissionMapper.countByRoleAndPermission(role.getId(), permission.getId(), tenantId) <= 0) {
+                    throw new PluginException("Declared permission remains unbound: "
+                            + declaration.getCode() + ":" + permission.getCode());
+                }
+            }
+            checked++;
+        }
+        return checked;
     }
 
     private void reconcileRolePermissionBindings(PluginManifestExtended manifest, Long tenantId) {

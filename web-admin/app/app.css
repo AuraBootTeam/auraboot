@@ -3972,6 +3972,8 @@
 
 .elta-drawer {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  overflow-wrap: anywhere;
   gap: 12px;
   position: fixed;
   z-index: 81;
@@ -4002,6 +4004,16 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+
+.elta-drawer-head > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.elta-drawer-head button {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .elta-drawer-head h3 {
@@ -4049,8 +4061,15 @@
 }
 
 .elta-chain-main strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: #111827;
   font-size: 14px;
+}
+
+.elta-chain-main .elta-status {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .elta-chain-rules {
