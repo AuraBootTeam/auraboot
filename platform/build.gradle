@@ -431,8 +431,8 @@ dependencies {
     // 0.8.12 everywhere: the 0.8.15 offline instrumentation writes exec class IDs that
     // no jacoco report version matched (bundle read 4.8% with the suite green); the
     // 78.69% baseline in the verification rules below was measured with this pin.
-    jacocoAnt 'org.jacoco:org.jacoco.ant:0.8.12'
-    jacocoRuntime 'org.jacoco:org.jacoco.agent:0.8.12:runtime'
+    jacocoAnt 'org.jacoco:org.jacoco.ant:0.8.14'
+    jacocoRuntime 'org.jacoco:org.jacoco.agent:0.8.14:runtime'
 
     // PostgreSQL 数据库用于测试
     testImplementation 'org.postgresql:postgresql:42.7.13'
