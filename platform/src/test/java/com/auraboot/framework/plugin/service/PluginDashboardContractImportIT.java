@@ -77,6 +77,7 @@ class PluginDashboardContractImportIT extends BaseIntegrationTest {
         assertThat(stored.getProfile()).isEqualTo("storefront");
         assertThat(stored.getSchemaVersion()).isEqualTo(4);
         assertThat(stored.getBlocks()).hasSize(4);
+        assertThat(stored.getBlocks()).containsExactlyElementsOf(page.getBlocks());
         assertThat(jdbc.queryForObject("SELECT current_database()", String.class))
                 .isEqualTo(System.getenv("POSTGRES_DB"));
         assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_page_schema WHERE tenant_id=? AND page_key=? "
