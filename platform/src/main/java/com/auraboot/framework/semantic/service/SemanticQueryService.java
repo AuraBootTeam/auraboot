@@ -67,6 +67,8 @@ public class SemanticQueryService {
     private final AbSemanticQueryLogMapper queryLogMapper;
     private final MetaModelService metaModelService;
     private final UserPermissionService userPermissionService;
+    private final SemanticFieldProtection fieldProtection;
+    private final SemanticQueryProtectionAudit protectionAudit;
     private final ObjectMapper jsonMapper = new ObjectMapper();
 
     /**
@@ -80,7 +82,7 @@ public class SemanticQueryService {
     public SemanticQueryResponse executeQuery(SemanticQueryRequest req,
                                                UserContext user) {
         long t0 = System.nanoTime();
-        Compiled c = compile(req, user);
+        Compiled c = compile(req, user, "QUERY");
         SemanticQueryResponse out = baseResponse(c);
         if (jdbcTemplate == null) {
             throw new IllegalStateException("Semantic query execution requires JdbcTemplate");
@@ -100,7 +102,7 @@ public class SemanticQueryService {
     /** Compile-only (POST /api/semantic/sql) — returns SQL but does NOT execute. */
     public SemanticQueryResponse explainQuery(SemanticQueryRequest req,
                                                UserContext user) {
-        Compiled c = compile(req, user);
+        Compiled c = compile(req, user, "EXPLAIN");
         SemanticQueryResponse out = baseResponse(c);
         out.setSql(c.compiled.getSql());
         out.setParams(c.compiled.getParams());
@@ -109,16 +111,21 @@ public class SemanticQueryService {
 
     /** Validate only — confirms request is compilable. Used by /dry-run. */
     public void validateQuery(SemanticQueryRequest req, UserContext user) {
-        compile(req, user);  // throws on any compile error
+        compile(req, user, "VALIDATE");  // throws on any compile error
     }
 
     // -- helpers -------------------------------------------------------------
 
-    private Compiled compile(SemanticQueryRequest req, UserContext user) {
+    private Compiled compile(SemanticQueryRequest req, UserContext user, String entry) {
         SemanticModelDTO model = resolveModel(req, user.tenantId());
         enforceMetricPermissions(model, req, user);
+        String sourceModelCode = model.getSemanticModel().getModelRef();
+        resolvePhysicalModelRef(model);
         CompiledQuery cq = compiler.compile(model, req, user);
-        return new Compiled(model, cq);
+        String queryId = UlidGenerator.generate();
+        fieldProtection.enforce(sourceModelCode, cq, user, plan -> protectionAudit.record(queryId, entry,
+                model.getSemanticModel().getCode(), cq.getSqlFingerprint(), plan, user));
+        return new Compiled(model, cq, queryId);
     }
 
     /**
@@ -208,7 +215,6 @@ public class SemanticQueryService {
             // Re-parse stored YAML to recover measures (v0.1 has no measure table).
             SemanticModelDTO model = parser.parse(row.getYamlSource());
             validator.validate(model);
-            resolvePhysicalModelRef(model);
             return model;
         } catch (Exception e) {
             if (e instanceof AccessDeniedException denied) throw denied;
@@ -259,7 +265,7 @@ public class SemanticQueryService {
 
     private SemanticQueryResponse baseResponse(Compiled c) {
         SemanticQueryResponse out = new SemanticQueryResponse();
-        out.setQueryId(UlidGenerator.generate());
+        out.setQueryId(c.queryId());
         out.setSqlFingerprint(c.compiled.getSqlFingerprint());
         out.setReferencedColumns(c.compiled.getReferencedColumns());
         return out;
@@ -287,5 +293,5 @@ public class SemanticQueryService {
         }
     }
 
-    private record Compiled(SemanticModelDTO model, CompiledQuery compiled) {}
+    private record Compiled(SemanticModelDTO model, CompiledQuery compiled, String queryId) {}
 }

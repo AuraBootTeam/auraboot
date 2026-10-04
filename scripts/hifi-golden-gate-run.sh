@@ -1,163 +1,118 @@
 #!/usr/bin/env bash
-#
-# hifi-golden-gate-run.sh — self-contained, one-command high-fidelity golden gate
-# for the analytics designers (B118 slice).
-#
-# Same contract as scripts/oss-e2e-gate-run.sh (slot-isolated host-first stack,
-# retain-on-exit trap, exit code = gate result), but runs the two B118
-# high-fidelity golden spec files under --project=chromium:
-#
-#   tests/e2e/designer/report-hifi-golden.spec.ts    HIFI-00/01/02
-#   tests/e2e/dashboard/dashboard-hifi-golden.spec.ts DHIFI-01/02/03
-#   tests/e2e/semantic/semantic-console-explore-golden.spec.ts SC-00/01
-#
-# These specs assert business fidelity, not just contracts: a 48-order CJK seed,
-# a multi-block report (header/stat cards/detail table), real aggregate-bound
-# dashboard widgets, publish badges, presentation-mode chart canvas (the
-# echarts-for-react/echarts-6 blank-paint regression guard), single-line toolbar
-# badges, and the three-scope settings dialog.
-#
-# Exit codes: 0 = green, Playwright's rc = test-failure, 2 = environment-invalid
-# (stack did not come up / plugin import failed). Teardown happens on success,
-# failure, and interrupt alike.
-#
-# Prerequisites: workspace native brokers (Postgres/Redis) up. Run from any OSS
-# auraboot checkout/worktree.
-#
-# Usage:
-#   scripts/hifi-golden-gate-run.sh [--slot N] [--name NAME] [--keep] [--repeat K]
-#     --slot N     isolated-stack slot. Default: auto-pick a free one (73..97).
-#     --name NAME  runtime name        (default: hifi-golden-gate)
-#     --keep       leave the stack up after the run (debug only).
-#     --repeat K   run the specs K times (flakiness check; default: 1)
-
+# Fixed high-fidelity BI gate: isolated fresh stack, exact profile, no retries.
+# Environments and evidence are retained for owner review on every exit path.
+# Usage: scripts/hifi-golden-gate-run.sh [--slot N] [--name NAME] [--keep] [--repeat K]
+# --keep is retained as a compatibility alias; retention is always the default.
+# Exit: 0=exact profile passed, 1=test/report failure, 2=environment-invalid.
 set -euo pipefail
-
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GS="$REPO_ROOT/scripts/oss-golden-stack.sh"
-NAME="hifi-golden-gate"
-SLOT=""
-KEEP=0
+PROFILE="$REPO_ROOT/scripts/gates/hifi-golden-profile.json"
+AUDIT="$REPO_ROOT/scripts/gates/hifi-golden-results.mjs"
+NAME="hifi-golden-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+SLOT="${AURA_REGRESSION_SLOT:-}"
 REPEAT=1
-
-C_OK=$'\033[32m'; C_ERR=$'\033[31m'; C_OFF=$'\033[0m'
 log() { printf '[hifi-golden-gate] %s\n' "$*"; }
-die()  { printf '%s[hifi-golden-gate] FATAL: %s%s\n' "$C_ERR" "$*" "$C_OFF" >&2; exit 2; }
-die_env() { printf '%s[hifi-golden-gate] ENVIRONMENT-INVALID: %s%s\n' "$C_ERR" "$*" "$C_OFF" >&2; exit 2; }
-
+die_env() { log "ENVIRONMENT-INVALID: $*" >&2; exit 2; }
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --slot)   [[ $# -ge 2 ]] || die "--slot requires a value";  SLOT="$2"; shift 2;;
-    --name)   [[ $# -ge 2 ]] || die "--name requires a value";  NAME="$2"; shift 2;;
-    --keep)   KEEP=1; shift;;
-    --repeat) [[ $# -ge 2 ]] || die "--repeat requires a value"; REPEAT="$2"; shift 2;;
-    -h|--help) sed -n '2,40p' "${BASH_SOURCE[0]}"; exit 0;;
-    *) die "unknown arg: $1 (see --help)";;
+    --slot) [[ $# -ge 2 ]] || die_env '--slot requires a value'; SLOT="$2"; shift 2;;
+    --name) [[ $# -ge 2 ]] || die_env '--name requires a value'; NAME="$2"; shift 2;;
+    --keep) shift;;
+    --repeat) [[ $# -ge 2 ]] || die_env '--repeat requires a value'; REPEAT="$2"; shift 2;;
+    -h|--help) sed -n '2,6p' "${BASH_SOURCE[0]}"; exit 0;;
+    *) die_env "unknown arg: $1";;
   esac
 done
-
-[[ -x "$GS" ]] || die "oss-golden-stack.sh not found/executable at $GS"
-
-# Locate the workspace dev.sh for the slot auto-pick's `runtime list` read
-# (same walk as the oss-e2e gate).
-WORKSPACE=""
-main_wt="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | sed -n 's/^worktree //p' | head -1)"
-if [ -f "$(dirname "$REPO_ROOT")/dev.sh" ]; then
-  WORKSPACE="$(dirname "$REPO_ROOT")"
+[[ "$NAME" =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]*$ ]] || die_env 'invalid runtime name'
+[[ "$REPEAT" =~ ^[1-9][0-9]*$ ]] || die_env 'repeat must be a positive integer'
+[[ -z "$SLOT" || "$SLOT" =~ ^[0-9]+$ ]] || die_env 'slot must be an integer'
+WORKSPACE="${AURA_WORKSPACE_ROOT:-${AURA_CI_WORKSPACE_ROOT:-}}"
+if [[ -z "$WORKSPACE" && -x "$(dirname "$REPO_ROOT")/auraboot-workspace/aura" ]]; then
+  WORKSPACE="$(dirname "$REPO_ROOT")/auraboot-workspace"
 fi
-while [ -n "$WORKSPACE" ] && [ "$WORKSPACE" != "/" ] && [ ! -f "$WORKSPACE/dev.sh" ]; do
-  WORKSPACE="$(dirname "$WORKSPACE")"
-done
-if [ -z "$WORKSPACE" ] || [ ! -f "$WORKSPACE/dev.sh" ]; then
-  WORKSPACE=""
-  [ -n "${main_wt:-}" ] && [ -f "$(dirname "$main_wt")/dev.sh" ] && WORKSPACE="$(dirname "$main_wt")"
-fi
-
+WORKSPACE="${WORKSPACE:-$REPO_ROOT}"
+while [[ "$WORKSPACE" != / && ! -x "$WORKSPACE/aura" ]]; do WORKSPACE="$(dirname "$WORKSPACE")"; done
+[[ -x "$WORKSPACE/aura" ]] || die_env 'workspace aura CLI not found'
 source "$REPO_ROOT/scripts/lib/workspace-control.sh"
 aura_bind_workspace_control "$WORKSPACE" || exit 2
-
+WORKSPACE_STATE="${AURA_WORKSPACE_STATE_DIR:-$WORKSPACE/.workspace}"
+[[ -x "$GS" && -f "$PROFILE" && -f "$AUDIT" ]] || die_env 'missing gate dependency'
+command -v pdftotext >/dev/null 2>&1 || die_env 'pdftotext (Poppler) is required to inspect exported PDF contents'
+# A supplied name never grants ownership of an existing runtime or its database.
+[[ ! -e "$WORKSPACE_STATE/env/$NAME.env" && ! -e "$WORKSPACE_STATE/golden/$NAME" ]] \
+  || die_env "runtime name '$NAME' already exists; choose a fresh name"
+RUNTIMES="$("$WORKSPACE/aura" runtime list)" || die_env 'runtime inventory unavailable'
 slot_in_use() {
   local s="$1"
-  if [ -n "$WORKSPACE" ]; then
-    "$WORKSPACE/aura" runtime list 2>/dev/null | awk 'NR>1{print $3}' | grep -qx "$s" && return 0
-  fi
-  local be=$((6400 + s)) web=$((5100 + s)) bff=$((6100 + s))
-  lsof -nP -iTCP:"$be"  -sTCP:LISTEN -t >/dev/null 2>&1 && return 0
-  lsof -nP -iTCP:"$web"  -sTCP:LISTEN -t >/dev/null 2>&1 && return 0
-  lsof -nP -iTCP:"$bff"  -sTCP:LISTEN -t >/dev/null 2>&1 && return 0
+  printf '%s\n' "$RUNTIMES" | awk 'NR>1{print $3}' | grep -qx "$s" && return 0
+  local port
+  for port in "$((6400 + s))" "$((5100 + s))" "$((6100 + s))"; do
+    lsof -nP -iTCP:"$port" -sTCP:LISTEN -t >/dev/null 2>&1 && return 0
+  done
   return 1
 }
-
-registered_slot="$("$WORKSPACE/aura" runtime list | awk -v name="$NAME" 'NR > 1 && $1 == name { print $3; exit }')"
-if [[ -n "$registered_slot" ]]; then
-  [[ -z "$SLOT" || "$SLOT" == "$registered_slot" ]] || die "runtime '$NAME' owns slot $registered_slot"
-  SLOT="$registered_slot"
-  log "reusing slot $SLOT for '$NAME'"
-elif [[ -z "$SLOT" ]]; then
-  for cand in 73 74 75 76 77 80 81 82 83 84 85 86 87 90 91 92 93 94 95 96 97; do
-    if ! slot_in_use "$cand"; then SLOT="$cand"; break; fi
+if [[ -z "$SLOT" ]]; then
+  for candidate in {73..97}; do
+    if ! slot_in_use "$candidate"; then SLOT="$candidate"; break; fi
   done
-  [[ -n "$SLOT" ]] || die "could not auto-pick a free slot — pass --slot N"
-elif slot_in_use "$SLOT"; then
-  die "slot $SLOT is already in use"
-fi
-
-cleanup() {
-  local rc=$?
-  log "keeping stack '$NAME' and this round's evidence for review (exit rc=$rc)"
-  return "$rc"
-}
-trap cleanup EXIT INT TERM
-
-echo "=============================================================="
-log "HIFI golden gate — name=$NAME slot=$SLOT repeat=$REPEAT"
-echo "=============================================================="
-
-export AGENT_LLM_STUB_MODE=true
-log "1/5 fresh stack: reuse '$NAME' on the same slot; stop before reset + up --fresh-db --plugin-profile demo"
-"$GS" down "$NAME" || die_env "cannot stop the owned stack before rebuilding"
-"$GS" up "$NAME" --slot "$SLOT" --ttl 3h --runtime-mode verification --fresh-db --plugin-profile demo \
-  || die_env "stack bring-up failed — see the golden-stack logs under ${WORKSPACE:-$REPO_ROOT}/.workspace/runtimes/$NAME/oss-stack/"
-
-# The demo profile does not carry the internal test-fixtures plugin; the hifi
-# specs seed orders through the e2et_order model it provides. Import it before
-# anything that references e2et_* or the run fails on phantom missing models.
-log "2/5 import internal test-fixtures plugin (e2et_* models)"
-"$GS" import "$NAME" --plugin-profile none --plugin test-fixtures \
-  || die_env "test-fixtures import failed — see ${WORKSPACE:-$REPO_ROOT}/.workspace/runtimes/$NAME/oss-stack/import.log"
-
-log "3/5 resolve stack env"
-eval "$("$GS" env "$NAME")" || die_env "could not resolve stack env for '$NAME'"
-export AURA_EVIDENCE_DIR="${AURA_EVIDENCE_ROOT:-/tmp}/hifi-golden"
-mkdir -p "$AURA_EVIDENCE_DIR"
-LOG="$AURA_EVIDENCE_DIR/hifi-golden-gate-$(date +%Y%m%d-%H%M%S).log"
-log "    base=$PLAYWRIGHT_BASE_URL backend=$BACKEND_URL bff=$BFF_PORT evidence=$AURA_EVIDENCE_DIR"
-
-log "4/5 run gate: --project=chromium --workers=1 --retries=0 (x$REPEAT)"
-cd "$REPO_ROOT/web-admin" || die_env "web-admin not found under $REPO_ROOT"
-set +e
-NO_PROXY=localhost,127.0.0.1 \
-  pnpm exec playwright test \
-    tests/e2e/designer/report-hifi-golden.spec.ts \
-    tests/e2e/dashboard/dashboard-hifi-golden.spec.ts \
-    tests/e2e/semantic/semantic-console-explore-golden.spec.ts \
-    --project=chromium --workers=1 --retries=0 \
-    --repeat-each="$REPEAT" --reporter=line 2>&1 | tee "$LOG"
-GATE_RC=${PIPESTATUS[0]}
-set -e 2>/dev/null || true
-
-log "5/5 result"
-SUMMARY="$(grep -aoE '[0-9]+ (passed|failed|flaky|skipped|did not run)' "$LOG" 2>/dev/null | tail -6 | tr '\n' ' ')"
-echo "=============================================================="
-if [[ "$GATE_RC" == 0 ]]; then
-  printf '%s[hifi-golden-gate] HIFI GOLDEN GATE: PASS%s  (name=%s slot=%s)\n' "$C_OK" "$C_OFF" "$NAME" "$SLOT"
-  [[ -n "$SUMMARY" ]] && log "  $SUMMARY"
-  log "  evidence: $AURA_EVIDENCE_DIR"
+  [[ -n "$SLOT" ]] || die_env 'no free slot in 73..97; pass --slot N'
 else
-  printf '%s[hifi-golden-gate] HIFI GOLDEN GATE: FAIL (test-failure, rc=%s)%s\n' "$C_ERR" "$GATE_RC" "$C_OFF"
-  [[ -n "$SUMMARY" ]] && log "  $SUMMARY"
-  log "  full log:    $LOG"
-  log "  (re-run with --keep to inspect the live stack)"
+  slot_in_use "$SLOT" && die_env "slot $SLOT is already in use"
 fi
-echo "=============================================================="
-exit "$GATE_RC"
+export AURA_EVIDENCE_ROOT="$WORKSPACE_STATE/evidence/$NAME"
+export AURA_EVIDENCE_DIR="$AURA_EVIDENCE_ROOT/hifi-golden"
+mkdir -p "$AURA_EVIDENCE_DIR"
+trap 'log "runtime retained: name=$NAME slot=$SLOT evidence=$AURA_EVIDENCE_ROOT"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+SPEC_FILES=()
+while IFS= read -r file; do SPEC_FILES+=("$file"); done < <(
+  node -e 'const p=require(process.argv[1]);for(const f of new Set(p.tests.map(t=>t.file)))console.log(f)' "$PROFILE"
+)
+[[ ${#SPEC_FILES[@]} -gt 0 ]] || die_env 'empty profile'
+cd "$REPO_ROOT/web-admin"
+log '1/6 collect fixed profile (execution remains zero)'
+pnpm exec playwright test "${SPEC_FILES[@]}" --project=chromium --no-deps \
+  --repeat-each="$REPEAT" --list --reporter=json >"$AURA_EVIDENCE_ROOT/collection.json" \
+  2>"$AURA_EVIDENCE_ROOT/collection.stderr.log" || exit 1
+node "$AUDIT" "$PROFILE" "$AURA_EVIDENCE_ROOT/collection.json" collection "$REPEAT" \
+  >"$AURA_EVIDENCE_ROOT/collection-ledger.json" || exit 1
+export AGENT_LLM_STUB_MODE=true
+log "2/6 fresh stack name=$NAME slot=$SLOT (no existing runtime is destroyed)"
+"$GS" up "$NAME" --slot "$SLOT" --ttl 12h --runtime-mode verification --require-new-db --plugin-profile demo \
+  || die_env 'stack bring-up failed; inspect retained golden-stack logs'
+log '3/6 import test-fixtures'
+"$GS" import "$NAME" --plugin-profile none --plugin test-fixtures || die_env 'test-fixtures import failed'
+log '4/6 verify runtime identity and resolve env'
+"$WORKSPACE/aura" runtime verify "$NAME" >"$AURA_EVIDENCE_ROOT/runtime-verify.log" \
+  || die_env 'runtime ownership verification failed'
+PREFLIGHT_EVIDENCE_ROOT="$AURA_EVIDENCE_ROOT"
+eval "$("$GS" env "$NAME")" || die_env 'stack env unavailable'
+if [[ "$PREFLIGHT_EVIDENCE_ROOT" != "$AURA_EVIDENCE_ROOT" ]]; then
+  mkdir -p "$AURA_EVIDENCE_ROOT" || die_env 'native evidence round unavailable'
+  for evidence_file in collection.json collection.stderr.log collection-ledger.json runtime-verify.log; do
+    [[ ! -e "$AURA_EVIDENCE_ROOT/$evidence_file" && ! -L "$AURA_EVIDENCE_ROOT/$evidence_file" ]] \
+      || die_env "native evidence round already contains $evidence_file; prior bytes retained"
+  done
+  for evidence_file in collection.json collection.stderr.log collection-ledger.json runtime-verify.log; do
+    cp "$PREFLIGHT_EVIDENCE_ROOT/$evidence_file" "$AURA_EVIDENCE_ROOT/$evidence_file" \
+      || die_env "cannot retain $evidence_file in the native evidence round"
+  done
+fi
+# Keep collection, execution and screenshots inside this native evidence round.
+export AURA_EVIDENCE_DIR="$AURA_EVIDENCE_ROOT/hifi-golden"
+mkdir -p "$AURA_EVIDENCE_DIR" || die_env 'golden screenshot directory unavailable'
+log "5/6 run exact profile: base=$PLAYWRIGHT_BASE_URL backend=$BACKEND_URL"
+set +e
+PLAYWRIGHT_JSON_OUTPUT_FILE="$AURA_EVIDENCE_ROOT/results.json" NO_PROXY=localhost,127.0.0.1 \
+  pnpm exec playwright test "${SPEC_FILES[@]}" --project=chromium --no-deps --workers=1 --retries=0 \
+  --repeat-each="$REPEAT" --reporter=line,json 2>&1 | tee "$AURA_EVIDENCE_ROOT/runner.log"
+GATE_RC=${PIPESTATUS[0]}
+set -e
+[[ "$GATE_RC" == 0 ]] || exit "$GATE_RC"
+log '6/6 reconcile collected scope and actual results'
+node "$AUDIT" "$PROFILE" "$AURA_EVIDENCE_ROOT/results.json" execution "$REPEAT" \
+  >"$AURA_EVIDENCE_ROOT/execution-ledger.json" || exit 1
+log "PASS: fixed profile executed with no missing/skipped/retried results; evidence=$AURA_EVIDENCE_ROOT"
+log "Review URLs: web=$PLAYWRIGHT_BASE_URL backend=$BACKEND_URL"

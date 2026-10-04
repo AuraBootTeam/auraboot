@@ -45,6 +45,7 @@ export { TimeGrainPicker, TIME_GRAINS, isDateField, parseGrainDimension } from '
 export type { TimeGrainPickerProps } from './TimeGrainPicker';
 
 export { SemanticMetricPicker } from './SemanticMetricPicker';
+export { SemanticMetaFeedback } from './SemanticMetaFeedback';
 export type { SemanticMetricPickerProps } from './SemanticMetricPicker';
 
 export {

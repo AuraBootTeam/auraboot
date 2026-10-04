@@ -23,6 +23,8 @@ test('fresh OSS gate refuses an existing runtime instead of destroying evidence'
   assert.match(source, /registered_slot_for_name\(\)/u);
   assert.match(source, /\[\[ -z "\$registered_slot" \]\] \|\| die_env/u);
   assert.doesNotMatch(source, /"\$GS" destroy|"\$GS" down/u);
+  assert.match(source, /--require-new-db/u);
+  assert.ok(source.indexOf('registered_slot="$(registered_slot_for_name)"') < source.indexOf('"$GS" up "$NAME"'));
 });
 
 test('OSS gate resolves the workspace in local and sibling-repository CI layouts', () => {
@@ -30,7 +32,7 @@ test('OSS gate resolves the workspace in local and sibling-repository CI layouts
   const stack = readFileSync(stackPath, 'utf8');
   assert.match(source, /AURA_WORKSPACE_ROOT/u);
   assert.match(source, /AURA_CI_WORKSPACE_ROOT/u);
-  assert.match(source, /auraboot-workspace\/dev\.sh/u);
+  assert.match(source, /auraboot-workspace\/aura/u);
   assert.match(stack, /AURA_CI_WORKSPACE_ROOT/u);
   assert.match(stack, /auraboot-workspace\/dev\.sh/u);
   assert.match(source, /ENVIRONMENT-INVALID:[^]*exit 2/u);

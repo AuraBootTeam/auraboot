@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "id": "HIFI-00",
+      "file": "tests/e2e/designer/report-hifi-golden.spec.ts",
+      "title": "HIFI-00 seed realistic dataset and build the multi-block report",
+      "project": "chromium"
+    },
+    {
+      "id": "HIFI-01",
+      "file": "tests/e2e/designer/report-hifi-golden.spec.ts",
+      "title": "HIFI-01 designer renders every block of the high-fidelity report",
+      "project": "chromium"
+    },
+    {
+      "id": "HIFI-02",
+      "file": "tests/e2e/designer/report-hifi-golden.spec.ts",
+      "title": "HIFI-02 view page renders the full business report",
+      "project": "chromium"
+    },
+    {
+      "id": "DHIFI-01",
+      "file": "tests/e2e/dashboard/dashboard-hifi-golden.spec.ts",
+      "title": "DHIFI-01 bind real aggregates, save, verify rendered numbers and chart bars",
+      "project": "chromium"
+    },
+    {
+      "id": "DHIFI-02",
+      "file": "tests/e2e/dashboard/dashboard-hifi-golden.spec.ts",
+      "title": "DHIFI-02 presentation mode shows the data-bound dashboard",
+      "project": "chromium"
+    },
+    {
+      "id": "DHIFI-03",
+      "file": "tests/e2e/dashboard/dashboard-hifi-golden.spec.ts",
+      "title": "DHIFI-03 settings dialog exposes the three scopes",
+      "project": "chromium"
+    },
+    {
+      "id": "SC-00",
+      "file": "tests/e2e/semantic/semantic-console-explore-golden.spec.ts",
+      "title": "SC-00 seed controlled orders and publish through the console",
+      "project": "chromium"
+    },
+    {
+      "id": "SC-01",
+      "file": "tests/e2e/semantic/semantic-console-explore-golden.spec.ts",
+      "title": "SC-01 console exploration: TopN, governed run, time grain, save-restore",
+      "project": "chromium"
+    }
+  ]
+}
