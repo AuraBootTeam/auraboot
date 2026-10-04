@@ -15,6 +15,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -39,6 +40,7 @@ public class OpenPlatformBearerAuthenticator implements ExternalMachineAuthentic
     }
 
     @Override
+    @Transactional
     public MachinePrincipal authenticate(HttpServletRequest request) {
         OpenApiCapabilityRegistry.Capability capability = capabilityRegistry
                 .resolve(request.getMethod(), request.getRequestURI())
@@ -59,11 +61,12 @@ public class OpenPlatformBearerAuthenticator implements ExternalMachineAuthentic
         if (!scopes.contains(capability.requiredScope())) {
             throw new ExternalMachineAuthException(403, "insufficient_scope");
         }
-        if (rateLimitMapper.consume(token.installationId(), Instant.now().truncatedTo(ChronoUnit.MINUTES),
-                token.rateLimitPerMinute()) == null) {
+        Instant usedAt = Instant.now();
+        // Keep quota consumption and token use atomic without a second database round-trip.
+        if (rateLimitMapper.consume(token.installationId(), usedAt.truncatedTo(ChronoUnit.MINUTES),
+                token.rateLimitPerMinute(), token.tokenPid(), usedAt) == null) {
             throw new ExternalMachineAuthException(429, "rate_limit_exceeded");
         }
-        authMapper.touchToken(token.tokenPid(), Instant.now());
         return new MachinePrincipal(token.tenantId(), token.tokenPid(), token.applicationPid(), scopes,
                 token.applicationPid(), token.installationPid(), token.environment(), token.tokenPid());
     }

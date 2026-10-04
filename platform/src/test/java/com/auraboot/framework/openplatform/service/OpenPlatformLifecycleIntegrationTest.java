@@ -11,6 +11,10 @@ import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.UpdateInstallati
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.RotateCredentialRequest;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.UpsertApplicationMemberRequest;
 import com.auraboot.framework.openplatform.mapper.OpenPlatformAuthMapper;
+import com.auraboot.framework.openplatform.mapper.OpenApiRateLimitMapper;
+import com.auraboot.framework.openplatform.security.OpenPlatformBearerAuthenticator;
+import com.auraboot.framework.application.security.ExternalMachineAuthException;
+import org.springframework.mock.web.MockHttpServletRequest;
 import com.auraboot.framework.webhook.dto.WebhookCreateRequest;
 import com.auraboot.framework.webhook.service.WebhookDispatcher;
 import com.auraboot.framework.webhook.service.WebhookService;
@@ -43,6 +47,8 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
     @Autowired private OpenPlatformManagementService managementService;
     @Autowired private OpenPlatformTokenService tokenService;
     @Autowired private OpenPlatformAuthMapper authMapper;
+    @Autowired private OpenApiRateLimitMapper rateLimitMapper;
+    @Autowired private OpenPlatformBearerAuthenticator authenticator;
     @Autowired private OpenPlatformSecretCodec secretCodec;
     @Autowired private JdbcTemplate jdbcTemplate;
     @Autowired private WebhookService webhookService;
@@ -120,6 +126,7 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void platformAdministratorOverridesApplicationMembership() throws Exception {
+        int existingApplications = managementService.listApplications().size();
         var application = managementService.createApplication(
                 new CreateApplicationRequest("Administrator override", "global administration boundary"));
         User replacementOwner = createTenantUser("replacement-owner");
@@ -127,8 +134,10 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
                 new UpsertApplicationMemberRequest("owner"));
         managementService.removeMember(application.pid(), getTestUser().getPid());
 
-        assertEquals(1, managementService.listApplications().size());
-        assertEquals("owner", managementService.listApplications().getFirst().accessRole());
+        assertEquals(existingApplications + 1, managementService.listApplications().size());
+        assertEquals("owner", managementService.listApplications().stream()
+                .filter(candidate -> candidate.pid().equals(application.pid()))
+                .findFirst().orElseThrow().accessRole());
         assertTrue(managementService.getAccess().platformAdmin());
         assertTrue(managementService.getAccess().canCreateApplications());
         assertEquals("production", managementService.install(application.pid(),
@@ -210,6 +219,64 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
     private void switchActor(User user, TenantMember member) {
         MetaContext.setContext(getTestTenant().getId(), user.getId(), user.getPid(), user.getUserName());
         MetaContext.setMemberId(member.getId());
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void authenticationCommitsQuotaAndTokenUseWithoutTouchingDeniedRequests() {
+        var application = managementService.createApplication(
+                new CreateApplicationRequest("Atomic authentication", "committed quota boundary"));
+        Long applicationId = jdbcTemplate.queryForObject(
+                "SELECT id FROM ab_external_application WHERE pid = ?", Long.class, application.pid());
+        try {
+            var installation = managementService.install(application.pid(), new InstallApplicationRequest(
+                    "production", Set.of("openapi.profile.read"), 1));
+            var credential = managementService.createCredential(installation.pid());
+            var token = tokenService.issue("client_credentials", credential.clientId(),
+                    credential.clientSecret(), "openapi.profile.read");
+            var record = authMapper.findToken(secretCodec.sha256(token.accessToken()),
+                    OpenPlatformTokenService.AUDIENCE, Instant.now());
+            MockHttpServletRequest allowed = new MockHttpServletRequest("GET", "/api/open/v1/whoami");
+            allowed.addHeader("Authorization", "Bearer " + token.accessToken());
+            assertEquals(installation.pid(), authenticator.authenticate(allowed).installationPid());
+            assertEquals(1, jdbcTemplate.queryForObject(
+                    "SELECT SUM(request_count)::int FROM ab_open_api_rate_window WHERE installation_id = ?",
+                    Integer.class, record.installationId()));
+            var usedAt = jdbcTemplate.queryForObject(
+                    "SELECT last_used_at FROM ab_application_access_token WHERE pid = ?",
+                    java.sql.Timestamp.class, record.tokenPid());
+            assertTrue(usedAt != null);
+
+            MockHttpServletRequest denied = new MockHttpServletRequest("GET", "/api/open/v1/event-catalog");
+            denied.addHeader("Authorization", "Bearer " + token.accessToken());
+            assertEquals(403, assertThrows(ExternalMachineAuthException.class,
+                    () -> authenticator.authenticate(denied)).status());
+            var window = jdbcTemplate.queryForObject(
+                    "SELECT window_start FROM ab_open_api_rate_window WHERE installation_id = ?",
+                    java.sql.Timestamp.class, record.installationId()).toInstant();
+            assertNull(rateLimitMapper.consume(record.installationId(), window, 1,
+                    record.tokenPid(), usedAt.toInstant().plusSeconds(1)));
+            assertEquals(1, jdbcTemplate.queryForObject(
+                    "SELECT SUM(request_count)::int FROM ab_open_api_rate_window WHERE installation_id = ?",
+                    Integer.class, record.installationId()));
+            assertEquals(usedAt, jdbcTemplate.queryForObject(
+                    "SELECT last_used_at FROM ab_application_access_token WHERE pid = ?",
+                    java.sql.Timestamp.class, record.tokenPid()));
+        } finally {
+            jdbcTemplate.update("DELETE FROM ab_open_api_rate_window WHERE installation_id IN "
+                    + "(SELECT id FROM ab_application_installation WHERE application_id = ?)", applicationId);
+            jdbcTemplate.update("DELETE FROM ab_application_access_token WHERE installation_id IN "
+                    + "(SELECT id FROM ab_application_installation WHERE application_id = ?)", applicationId);
+            jdbcTemplate.update("DELETE FROM ab_application_credential WHERE installation_id IN "
+                    + "(SELECT id FROM ab_application_installation WHERE application_id = ?)", applicationId);
+            jdbcTemplate.update("DELETE FROM ab_application_scope_grant WHERE installation_id IN "
+                    + "(SELECT id FROM ab_application_installation WHERE application_id = ?)", applicationId);
+            jdbcTemplate.update("DELETE FROM ab_application_installation WHERE application_id = ?", applicationId);
+            jdbcTemplate.update("DELETE FROM ab_external_application_member_audit WHERE application_id = ?",
+                    applicationId);
+            jdbcTemplate.update("DELETE FROM ab_external_application_member WHERE application_id = ?", applicationId);
+            jdbcTemplate.update("DELETE FROM ab_external_application WHERE id = ?", applicationId);
+        }
     }
 
     @Test
