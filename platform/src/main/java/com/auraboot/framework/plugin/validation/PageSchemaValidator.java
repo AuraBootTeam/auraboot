@@ -70,12 +70,18 @@ public class PageSchemaValidator implements PluginValidator {
 
     private Set<String> kindsFor(PageSchemaDTO page) {
         PageSchemaRenderProfile profile = page.getProfile() == null ? null : renderProfiles.get(page.getProfile());
-        return profile == null ? VALID_KINDS : profile.kinds();
+        if (profile != null) return profile.kinds();
+        Set<String> globalKinds = new LinkedHashSet<>(VALID_KINDS);
+        globalKinds.addAll(extensionKinds());
+        return globalKinds;
     }
 
     private Set<String> blockTypesFor(PageSchemaDTO page) {
         PageSchemaRenderProfile profile = page.getProfile() == null ? null : renderProfiles.get(page.getProfile());
-        return profile == null ? KNOWN_BLOCK_TYPES : profile.blockTypes();
+        if (profile != null) return profile.blockTypes();
+        Set<String> globalBlocks = new LinkedHashSet<>(KNOWN_BLOCK_TYPES);
+        renderProfiles.values().forEach(registered -> globalBlocks.addAll(registered.blockTypes()));
+        return globalBlocks;
     }
 
     /** Envelope validation shares host registrations; profile scoping is checked above. */
