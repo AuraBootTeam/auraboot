@@ -645,6 +645,9 @@ test {
             (classpath - sourceSets.main.output.classesDirs) + configurations.jacocoRuntime
     }
     systemProperty 'jacoco-agent.destfile', file("${buildDir}/jacoco/test.exec").absolutePath
+    // The offline runtime otherwise merges coverage from previous test runs and source revisions.
+    // This task uses one JVM; replace its execution data so reports describe only this run.
+    systemProperty 'jacoco-agent.append', 'false'
     jacoco {
         enabled = false
     }
