@@ -68,6 +68,17 @@ class UserServiceImplTest {
     }
 
     @Test
+    void findByEmail_mixedCaseAndWhitespaceResolvesCanonicalAccount() {
+        User persisted = new User();
+        persisted.setId(10L);
+        persisted.setEmail("teacher@example.com");
+        when(userMapper.findByNormalizedEmail("teacher@example.com")).thenReturn(persisted);
+
+        assertThat(service.findByEmail("  Teacher@Example.COM  ")).isSameAs(persisted);
+        verify(userMapper).findByNormalizedEmail("teacher@example.com");
+    }
+
+    @Test
     void signUp_missingEmailAndUserNameThrowsBusinessException() {
         assertThatThrownBy(() -> service.signUp(" ", "jjzz@1234", "Display", " "))
                 .isInstanceOf(BusinessException.class)
