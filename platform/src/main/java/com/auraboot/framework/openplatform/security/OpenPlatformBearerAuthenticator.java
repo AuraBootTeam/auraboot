@@ -5,7 +5,6 @@ import com.auraboot.framework.application.security.ExternalMachineAuthException;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.openplatform.entity.OpenApiCallAudit;
 import com.auraboot.framework.openplatform.mapper.OpenApiCallAuditMapper;
-import com.auraboot.framework.openplatform.mapper.OpenPlatformAuthMapper;
 import com.auraboot.framework.openplatform.mapper.OpenApiRateLimitMapper;
 import com.auraboot.framework.openplatform.service.OpenApiCapabilityRegistry;
 import com.auraboot.framework.openplatform.service.OpenPlatformSecretCodec;
@@ -15,6 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -26,7 +26,6 @@ public class OpenPlatformBearerAuthenticator implements ExternalMachineAuthentic
     private static final String PREFIX = "/api/open/v1/";
     private static final String BEARER = "Bearer ";
 
-    private final OpenPlatformAuthMapper authMapper;
     private final OpenApiCallAuditMapper auditMapper;
     private final OpenApiRateLimitMapper rateLimitMapper;
     private final OpenApiCapabilityRegistry capabilityRegistry;
@@ -39,6 +38,7 @@ public class OpenPlatformBearerAuthenticator implements ExternalMachineAuthentic
     }
 
     @Override
+    @Transactional
     public MachinePrincipal authenticate(HttpServletRequest request) {
         OpenApiCapabilityRegistry.Capability capability = capabilityRegistry
                 .resolve(request.getMethod(), request.getRequestURI())
@@ -49,8 +49,10 @@ public class OpenPlatformBearerAuthenticator implements ExternalMachineAuthentic
             throw new ExternalMachineAuthException(401, "invalid_token");
         }
         String rawToken = authorization.substring(BEARER.length()).trim();
-        OpenPlatformAuthMapper.TokenAuthRecord token = authMapper.findToken(
-                secretCodec.sha256(rawToken), OpenPlatformTokenService.AUDIENCE, Instant.now());
+        Instant usedAt = Instant.now();
+        var token = rateLimitMapper.authenticate(secretCodec.sha256(rawToken),
+                OpenPlatformTokenService.AUDIENCE, usedAt,
+                usedAt.truncatedTo(ChronoUnit.MINUTES), capability.requiredScope());
         if (token == null || !"active".equals(token.installationStatus())
                 || !"active".equals(token.applicationStatus())) {
             throw new ExternalMachineAuthException(401, "invalid_token");
@@ -59,11 +61,9 @@ public class OpenPlatformBearerAuthenticator implements ExternalMachineAuthentic
         if (!scopes.contains(capability.requiredScope())) {
             throw new ExternalMachineAuthException(403, "insufficient_scope");
         }
-        if (rateLimitMapper.consume(token.installationId(), Instant.now().truncatedTo(ChronoUnit.MINUTES),
-                token.rateLimitPerMinute()) == null) {
+        if (token.consumedCount() == null) {
             throw new ExternalMachineAuthException(429, "rate_limit_exceeded");
         }
-        authMapper.touchToken(token.tokenPid(), Instant.now());
         return new MachinePrincipal(token.tenantId(), token.tokenPid(), token.applicationPid(), scopes,
                 token.applicationPid(), token.installationPid(), token.environment(), token.tokenPid());
     }
