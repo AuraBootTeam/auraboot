@@ -48,7 +48,32 @@ final class ModelPublishGovernanceSupport {
     private final EventPolicyRuntimeService eventPolicyRuntimeService;
     private final AutomationService automationService;
     private final PermissionEvaluator permissionEvaluator;
+    private final ModelPublishWorkflowReplaySupport workflowReplay;
     private final java.util.function.Function<ExtensionBean, Map<String, Object>> extensionFlattener;
+
+    ModelPublishReplayReportDTO replayReport(Model model, ModelPublishGovernanceDTO governance,
+            MetaModelPublishReplayRequest request) {
+        List<ModelPublishReplayResultDTO> results = governance.getReplayPlan() == null
+                ? List.of()
+                : governance.getReplayPlan().stream()
+                        .map(step -> replayPublishStep(model, step, request))
+                        .toList();
+
+        return ModelPublishReplayReportDTO.builder()
+                .modelCode(model.getCode())
+                .draftVersion(model.getVersion())
+                .latestPublishedVersion(governance.getLatestPublishedVersion())
+                .generatedAt(java.time.Instant.now())
+                .governance(governance)
+                .totalCount(results.size())
+                .automatedCount((int) results.stream().filter(r -> Boolean.TRUE.equals(r.getAutomated())).count())
+                .executedCount((int) results.stream().filter(r -> Boolean.TRUE.equals(r.getExecuted())).count())
+                .manualCount((int) results.stream().filter(r -> "MANUAL_REQUIRED".equals(r.getStatus())).count())
+                .failedCount((int) results.stream().filter(r -> "FAILED".equals(r.getStatus())).count())
+                .needsInputCount((int) results.stream().filter(r -> "NEEDS_SAMPLE_CONTEXT".equals(r.getStatus())).count())
+                .results(results)
+                .build();
+    }
 
     private static String nullToBlank(String value) {
         return value == null ? "" : value;
@@ -461,7 +486,7 @@ final class ModelPublishGovernanceSupport {
     private ModelPublishReplayResultDTO replayBpmStep(
             ModelPublishReplayStepDTO step,
             MetaModelPublishReplayRequest request) {
-        return productOwnedReplay(step, "BPM");
+        return workflowReplay.replay(step, request);
     }
 
     private ModelPublishReplayResultDTO replayPermissionStep(
@@ -571,20 +596,7 @@ final class ModelPublishGovernanceSupport {
     private ModelPublishReplayResultDTO replaySlaStep(
             ModelPublishReplayStepDTO step,
             MetaModelPublishReplayRequest request) {
-        return productOwnedReplay(step, "SLA");
-    }
-
-    private ModelPublishReplayResultDTO productOwnedReplay(
-            ModelPublishReplayStepDTO step, String productArea) {
-        return ModelPublishReplayResultDTO.builder()
-                .step(step)
-                .status("MANUAL_REQUIRED")
-                .automated(false)
-                .executed(false)
-                .message(productArea + " replay is owned by the installed workflow product.")
-                .errors(List.of())
-                .outputs(Map.of("owner", "workflow-capability"))
-                .build();
+        return workflowReplay.replay(step, request);
     }
 
     private ModelPublishReplayResultDTO replayAutomationStep(

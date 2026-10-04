@@ -153,6 +153,9 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     @Lazy
     private PermissionEvaluator permissionEvaluator;
 
+    @Autowired
+    private com.auraboot.framework.plugin.pf4j.WorkflowCapabilityRegistry workflowCapabilities;
+
     @Override
     public Optional<ModelDefinition> getModelDefinition(String modelCode) {
         validateModelCode(modelCode);
@@ -2696,32 +2699,14 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         Model model = findEntityByPid(pid);
         DDLPreviewResult ddlPreview = schemaManagementService.previewModelChanges(model.getCode());
         ModelPublishGovernanceDTO governance = buildPublishGovernance(model, ddlPreview);
-        List<ModelPublishReplayResultDTO> results = governance.getReplayPlan() == null
-                ? List.of()
-                : governance.getReplayPlan().stream()
-                        .map(step -> replayPublishStep(model, step, request))
-                        .toList();
-
-        return ModelPublishReplayReportDTO.builder()
-                .modelCode(model.getCode())
-                .draftVersion(model.getVersion())
-                .latestPublishedVersion(governance.getLatestPublishedVersion())
-                .generatedAt(Instant.now())
-                .governance(governance)
-                .totalCount(results.size())
-                .automatedCount((int) results.stream().filter(r -> Boolean.TRUE.equals(r.getAutomated())).count())
-                .executedCount((int) results.stream().filter(r -> Boolean.TRUE.equals(r.getExecuted())).count())
-                .manualCount((int) results.stream().filter(r -> "MANUAL_REQUIRED".equals(r.getStatus())).count())
-                .failedCount((int) results.stream().filter(r -> "FAILED".equals(r.getStatus())).count())
-                .needsInputCount((int) results.stream().filter(r -> "NEEDS_SAMPLE_CONTEXT".equals(r.getStatus())).count())
-                .results(results)
-                .build();
+        return publishGovernanceSupport().replayReport(model, governance, request);
     }
 
     private ModelPublishGovernanceSupport publishGovernanceSupport() {
         return new ModelPublishGovernanceSupport(metaModelMapper, metaFieldMapper, fieldBindingMapper,
                 decisionImpactService, decisionImpactAckService, decisionEvaluationService,
-                eventPolicyRuntimeService, automationService, permissionEvaluator, this::flattenFieldExtension);
+                eventPolicyRuntimeService, automationService, permissionEvaluator,
+                new ModelPublishWorkflowReplaySupport(workflowCapabilities, objectMapper), this::flattenFieldExtension);
     }
 
     private ModelPublishGovernanceDTO buildPublishGovernance(Model model, DDLPreviewResult ddlPreview) {
