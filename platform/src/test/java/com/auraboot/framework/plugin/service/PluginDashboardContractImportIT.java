@@ -33,7 +33,66 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * Uses real PostgreSQL; extends {@link BaseIntegrationTest} for MetaContext + {@code @Transactional} rollback.
  */
+@org.springframework.context.annotation.Import(PluginDashboardContractImportIT.StorefrontProfileConfiguration.class)
 class PluginDashboardContractImportIT extends BaseIntegrationTest {
+
+    @org.springframework.boot.test.context.TestConfiguration
+    static class StorefrontProfileConfiguration {
+        @org.springframework.context.annotation.Bean
+        com.auraboot.framework.plugin.validation.PageSchemaRenderProfile storefrontProfile() {
+            return new com.auraboot.framework.plugin.validation.PageSchemaRenderProfile("storefront",
+                    java.util.Set.of("plp"),
+                    java.util.Set.of("search-bar", "facet-filter", "product-grid", "pagination"));
+        }
+    }
+
+    @Autowired
+    private PluginImportService importService;
+
+    @Autowired
+    private com.auraboot.framework.meta.service.PageSchemaService pages;
+
+    @Test
+    void registeredStorefrontProfileImportsIntoCanonicalPageStorageAndRejectsProfileEscape() {
+        String code = "commerce_plp_" + com.auraboot.framework.common.util.UniqueIdGenerator.generate().toLowerCase();
+        var page = new com.auraboot.framework.plugin.dto.imports.PageSchemaDTO();
+        page.setPageKey(code);
+        page.setKind("plp");
+        page.setProfile("storefront");
+        page.setSchemaVersion(4);
+        page.setTitle(Map.of("zh-CN", "商品列表", "en", "Products"));
+        page.setLayout(Map.of("type", "stack"));
+        page.setBlocks(List.of(
+                Map.of("id", "search", "blockType", "search-bar"),
+                Map.of("id", "facets", "blockType", "facet-filter"),
+                Map.of("id", "products", "blockType", "product-grid"),
+                Map.of("id", "pages", "blockType", "pagination")));
+        var manifest = PluginManifestExtended.builder().pluginId("it.commerce." + code)
+                .namespace("commerce").version("1.0.0").pages(List.of(page)).build();
+        var imported = importService.executeFromManifest(manifest, new ImportRequest());
+        assertThat(imported.isSuccess()).as("actual import result: %s", imported.getErrorMessage()).isTrue();
+        var stored = pages.findByPageKey(code);
+        assertThat(stored).as("canonical runtime read must resolve the imported page").isNotNull();
+        assertThat(stored.getKind()).isEqualTo("plp");
+        assertThat(stored.getProfile()).isEqualTo("storefront");
+        assertThat(stored.getSchemaVersion()).isEqualTo(4);
+        assertThat(stored.getBlocks()).hasSize(4);
+        assertThat(jdbc.queryForObject("SELECT current_database()", String.class))
+                .isEqualTo(System.getenv("POSTGRES_DB"));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_page_schema WHERE tenant_id=? AND page_key=? "
+                        + "AND kind='plp' AND profile='storefront' AND status='published' AND is_current=true",
+                Integer.class, getTestTenant().getId(), code)).isEqualTo(1);
+
+        String deniedKey = code + "_denied";
+        page.setPageKey(deniedKey);
+        page.setProfile("admin");
+        var denied = importService.executeFromManifest(manifest, new ImportRequest());
+        assertThat(denied.isSuccess()).isFalse();
+        assertThat(denied.getErrorMessage()).contains("S-PAGE-KIND-UNKNOWN");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_page_schema WHERE tenant_id=? AND page_key=?",
+                Integer.class, getTestTenant().getId(), deniedKey)).isZero();
+        assertThat(pages.findByPageKey(code).getBlocks()).hasSize(4);
+    }
 
     @Autowired
     private PluginResourceImporter importer;
