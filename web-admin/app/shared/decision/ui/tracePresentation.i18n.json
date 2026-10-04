@@ -677,6 +677,14 @@
     "technicalDetails": {
       "zh-CN": "技术详情",
       "en": "Technical details"
+    },
+    "traceIdentifier": {
+      "zh-CN": "追踪标识",
+      "en": "Trace identifier"
+    },
+    "callerIdentifier": {
+      "zh-CN": "调用来源标识",
+      "en": "Caller identifier"
     }
   },
   "adapter": {
