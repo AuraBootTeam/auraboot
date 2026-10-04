@@ -54,6 +54,8 @@ class OrgControllerDepartmentAdminTest {
         assertThat(OrgController.class.getMethod("getEmployeeProvisionOptions", int.class, int.class,
             String.class).getAnnotation(RequirePermission.class).value())
             .isEqualTo("model.tenant_member.provision_member_from_employee");
+        assertThat(OrgController.class.getMethod("getUnlinkedMembers", String.class)
+            .getAnnotation(RequirePermission.class).value()).isEqualTo("org.hr.manage");
     }
 
     @Test

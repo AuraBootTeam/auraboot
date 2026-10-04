@@ -742,7 +742,7 @@ test('independent organization read and member provisioning preserve separate na
   const employeePid = employee.recordId as string;
   expect(employeePid).toBeTruthy();
 
-  async function selectCapability(capability: 'org.cap.hr_view' | 'org.cap.member' | null) {
+  async function selectCapability(capability: 'org.cap.hr_view' | 'org.cap.hr' | 'org.cap.member' | null) {
     await page.goto('/home');
     await ensureSidebarExpanded(page);
     await page.getByTestId('sidebar').locator('a[href="/enterprise/permissions"]').click();
@@ -757,7 +757,7 @@ test('independent organization read and member provisioning preserve separate na
       const notification = page.getByRole('button', { name: 'Close notification', exact: true });
       if (await notification.isVisible()) await notification.click();
     }
-    for (const code of ['org.cap.hr_view', 'org.cap.member']) {
+    for (const code of ['org.cap.hr_view', 'org.cap.hr', 'org.cap.member', 'org.cap.member_view']) {
       await page.getByTestId(`capability-checkbox-${code}`).setChecked(code === capability);
     }
     await page.getByTestId('capability-save').click();
@@ -778,6 +778,7 @@ test('independent organization read and member provisioning preserve separate na
     `/api/dynamic/org_employee/list?pageNum=1&pageSize=20&keyword=${encodeURIComponent(stamp)}`,
   ];
   const optionsEndpoint = `/api/org/employees/provision-options?pageNum=1&pageSize=20&keyword=${encodeURIComponent(stamp)}`;
+  const unlinkedEndpoint = `/api/org/members/unlinked?keyword=${encodeURIComponent(user.email)}`;
   const opened = await openQuoteRolePage(browser, user);
   const reader = opened.page;
   try {
@@ -794,6 +795,7 @@ test('independent organization read and member provisioning preserve separate na
     }
     await expectFullReads(403);
     expect((await reader.request.get(optionsEndpoint)).status()).toBe(403);
+    expect((await reader.request.get(unlinkedEndpoint)).status()).toBe(403);
     await selectCapability('org.cap.hr_view');
     await reader.goto('/home');
     await ensureSidebarExpanded(reader);
@@ -810,14 +812,24 @@ test('independent organization read and member provisioning preserve separate na
     const row = reader.locator('tbody tr').filter({ hasText: stamp });
     await expect(row).toHaveCount(1);
     await row.click();
-    await expect(reader).toHaveURL(new RegExp(`/p/org_employee/view/${employeePid}$`));
+    await expect(reader).toHaveURL(url => url.pathname === `/p/org_employee/view/${employeePid}`
+      && url.searchParams.get('keyword') === stamp);
     await expect(reader.getByText(stamp, { exact: true }).first()).toBeVisible();
     await expect(reader.getByTestId('toolbar-btn-edit')).toHaveCount(0);
     await expectFullReads(200);
     expect((await reader.request.get(optionsEndpoint)).status()).toBe(403);
+    expect((await reader.request.get(unlinkedEndpoint)).status()).toBe(403);
     await reader.screenshot({ path: info.outputPath('standalone-staff-read.png'), fullPage: true });
+    await selectCapability('org.cap.hr');
+    const unlinked = await reader.request.get(unlinkedEndpoint);
+    expect(unlinked.status()).toBe(200);
+    const unlinkedBody = await unlinked.json();
+    expect(String(unlinkedBody.code)).toBe('0');
+    expect(unlinkedBody.data).toEqual([expect.objectContaining({ email: user.email, name: user.displayName })]);
+    expect((await reader.request.get(optionsEndpoint)).status()).toBe(403);
     await selectCapability(null);
     await expectFullReads(403);
+    expect((await reader.request.get(unlinkedEndpoint)).status()).toBe(403);
     await reader.goto('/home');
     await ensureSidebarExpanded(reader);
     await expect(reader.locator('nav a[href="/p/org_employee"]')).toHaveCount(0);
@@ -825,6 +837,7 @@ test('independent organization read and member provisioning preserve separate na
 
     await selectCapability('org.cap.member');
     await expectFullReads(403);
+    expect((await reader.request.get(unlinkedEndpoint)).status()).toBe(403);
     const options = await reader.request.get(optionsEndpoint);
     expect(options.status()).toBe(200);
     const optionsBody = await options.json();
@@ -865,6 +878,7 @@ test('independent organization read and member provisioning preserve separate na
     await expectFullReads(403);
     await selectCapability(null);
     expect((await reader.request.get(optionsEndpoint)).status()).toBe(403);
+    expect((await reader.request.get(unlinkedEndpoint)).status()).toBe(403);
     await reader.goto('/home');
     await ensureSidebarExpanded(reader);
     await expect(reader.locator('nav a[href="/p/tenant_member"]')).toHaveCount(0);

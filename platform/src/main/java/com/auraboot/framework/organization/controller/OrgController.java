@@ -296,6 +296,7 @@ public class OrgController {
      * These members can be linked to org employees via the /employees/link endpoint.
      */
     @GetMapping("/members/unlinked")
+    @RequirePermission("org.hr.manage")
     public ApiResponse<List<Map<String, Object>>> getUnlinkedMembers(
             @RequestParam(required = false) String keyword) {
         return ApiResponse.success(orgEmployeeService.getUnlinkedMembers(keyword));
