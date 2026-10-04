@@ -128,7 +128,7 @@ Specific terms are governed by the commercial agreement signed between parties. 
 ## 7. Compliance & Enforcement
 
 ### Q19. What happens if I violate the license?
-Apache-2.0 §3 terminates the **patent licenses for the Work** when the recipient institutes the patent litigation described there; it does not state that all copyright rights terminate. Apache-2.0 §4 states redistribution conditions, while §9 covers accepting additional liability. There is no §10. The v2.0 supplement does not add a general breach-based termination clause; its S6 reference to §9/§10 is a known citation error pending correction of the authoritative text. Trademark misuse is addressed separately. This FAQ does not amend LICENSE.txt.
+Apache-2.0 §3 terminates the **patent licenses for the Work** when the recipient institutes the patent litigation described there; it does not state that all copyright rights terminate. Apache-2.0 §4 states redistribution conditions, while §9 covers accepting additional liability. There is no §10. The v2.0 supplement does not add a general breach-based termination clause; its S6 accurately refers to the patent-license termination specified in Part 1 §3. Trademark misuse is addressed separately. This FAQ does not amend LICENSE.txt.
 
 ### Q20. Which jurisdiction governs?
 Apache-2.0 does not designate an exclusive governing law, court, arbitration institution, or dispute-resolution forum. If the parties sign a Commercial License or another written agreement, that agreement may specify the governing law and dispute-resolution mechanism.
