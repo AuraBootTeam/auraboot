@@ -57,7 +57,7 @@ async function navigateToAnnouncementList(page: Page): Promise<void> {
 }
 
 /** Drive the scoped portaled menu and verify the command's actual response. */
-async function clickRowAction(page: Page, title: string | RegExp, actionLabel: string | RegExp): Promise<void> {
+async function clickRowAction(page: Page, title: string | RegExp, actionLabel: string | RegExp, commandCode: string): Promise<void> {
   const row = await findRowByContent(page, title);
   await row.getByTestId('row-action-more').click();
   const menu = page.getByTestId('row-action-dropdown');
@@ -65,10 +65,16 @@ async function clickRowAction(page: Page, title: string | RegExp, actionLabel: s
   const action = menu.getByRole('menuitem', { name: actionLabel, exact: true });
   await expect(action).toBeVisible();
   await menu.screenshot({ path: test.info().outputPath(`menu-${String(actionLabel).replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g, '_')}.png`) });
-  const commandCode = (await action.getAttribute('data-testid'))!.replace('row-action-', '');
   await action.click();
   const dialog = page.getByTestId('confirm-dialog');
   await expect(dialog).toBeVisible();
+  const confirmationText: Record<string, string> = {
+    'announcement:publish': '发布后该公告将对读者可见，确定发布吗？',
+    'announcement:archive': '撤回后该公告将不再对读者展示，可稍后重新发布。确定撤回吗？',
+    'announcement:republish': '重新发布后该公告将再次对读者可见，确定重新发布吗？',
+    'announcement:delete_announcement': '确定要删除选中的记录吗？此操作不可恢复。',
+  };
+  await expect(dialog).toContainText(confirmationText[commandCode]);
   await dialog.screenshot({ path: test.info().outputPath(`confirm-${commandCode.replace(':', '-')}.png`) });
   const responsePromise = page.waitForResponse((response) =>
     response.request().method() === 'POST' &&
@@ -126,7 +132,7 @@ test('list page shows created announcement with draft status', async ({ page }) 
 
 test('publish announcement from draft to published', async ({ page }) => {
   await navigateToAnnouncementList(page);
-  await clickRowAction(page, TITLE, '发布');
+  await clickRowAction(page, TITLE, '发布', 'announcement:publish');
   await expectRowStatus(page, TITLE, /published|已发布/i);
 });
 
@@ -154,7 +160,7 @@ test('published record shows archive action, hides edit and publish', async ({ p
 
 test('archive announcement from published to archived', async ({ page }) => {
   await navigateToAnnouncementList(page);
-  await clickRowAction(page, TITLE, '撤回');
+  await clickRowAction(page, TITLE, '撤回', 'announcement:archive');
   await expectRowStatus(page, TITLE, /archived|已撤回/i);
 });
 
@@ -164,7 +170,7 @@ test('archive announcement from published to archived', async ({ page }) => {
 
 test('republish announcement from archived to published', async ({ page }) => {
   await navigateToAnnouncementList(page);
-  await clickRowAction(page, TITLE, '重新发布');
+  await clickRowAction(page, TITLE, '重新发布', 'announcement:republish');
   await expectRowStatus(page, TITLE, /published|已发布/i);
 });
 
@@ -203,17 +209,18 @@ test('reject publish on already-published record via API', async ({ page }) => {
 test('archive and delete announcement', async ({ page }) => {
   // Archive first (published → archived) so delete becomes available
   await navigateToAnnouncementList(page);
-  await clickRowAction(page, TITLE, '撤回');
+  await clickRowAction(page, TITLE, '撤回', 'announcement:archive');
   await expectRowStatus(page, TITLE, /archived|已撤回/i);
 
   // Delete
-  await clickRowAction(page, TITLE, /delete|删除/i);
+  await clickRowAction(page, TITLE, /delete|删除/i, 'announcement:delete_announcement');
 
   // Verify record is gone
   const gone = page.locator('table').getByText(TITLE);
   await expect(gone).toHaveCount(0, { timeout: 5_000 });
   await page.reload();
   await waitForDynamicPageLoad(page);
+  await expect(page.getByText(/^(加载中\.\.\.|Loading\.\.\.)$/)).toBeHidden();
   await expect(page.locator('table').getByText(TITLE)).toHaveCount(0);
   const deleted = await page.request.get(`/api/dynamic/ab_announcement/${recordPid}`);
   expect(deleted.status()).toBe(404);
