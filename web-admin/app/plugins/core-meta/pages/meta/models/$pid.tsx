@@ -1,3 +1,4 @@
+import { getPolicyHeading, getMigrationPlanMessage, getHistoricalPolicyMessage } from './modelPublishPolicyMessages';
 import { useI18n } from '~/contexts/I18nContext';
 import { getReplayStatusLabel, getReplayResultMessage, getReplayErrorMessage } from './modelPublishReplayMessages';
 /**
@@ -2049,7 +2050,7 @@ export default function ModelDetailPage() {
       {showPublishConfirm && publishPreview && (
         <div
           data-testid="model-publish-dialog"
-          className="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
         >
           <div className="mx-4 flex max-h-[80vh] w-full max-w-2xl flex-col rounded-lg bg-white shadow-xl">
             <div className="border-b border-gray-200 px-6 py-4">
@@ -2549,18 +2550,18 @@ export default function ModelDetailPage() {
 
                   {publishPreview.governance.migrationPlan && (
                     <div className="mt-4">
-                      <p className="text-xs font-semibold text-gray-600">迁移计划</p>
+                      <p className="text-xs font-semibold text-gray-600">{getPolicyHeading('migrationHeading', locale)}</p>
                       <p className="mt-1 text-sm text-gray-700">
-                        {publishPreview.governance.migrationPlan}
+                        {getMigrationPlanMessage(publishPreview.governance, locale)}
                       </p>
                     </div>
                   )}
 
                   {publishPreview.governance.historicalVersionPolicy && (
                     <div className="mt-4">
-                      <p className="text-xs font-semibold text-gray-600">历史版本策略</p>
+                      <p className="text-xs font-semibold text-gray-600">{getPolicyHeading('historyHeading', locale)}</p>
                       <p className="mt-1 text-sm text-gray-700">
-                        {publishPreview.governance.historicalVersionPolicy}
+                        {getHistoricalPolicyMessage(publishPreview.governance, locale)}
                       </p>
                     </div>
                   )}

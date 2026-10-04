@@ -35,7 +35,11 @@ public class ModelPublishGovernanceDTO {
 
     private String migrationPlan;
 
+    private List<String> migrationPlanSteps;
+
     private String historicalVersionPolicy;
+
+    private String historicalVersionPolicyCode;
 
     private List<String> warnings;
 }

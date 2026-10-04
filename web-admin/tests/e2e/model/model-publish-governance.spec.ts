@@ -1585,6 +1585,12 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
 
   await expect(governance).toContainText('迁移计划');
   await expect(governance).toContainText('历史版本策略');
+  await expect(dialog).toHaveCSS('background-color', 'rgba(0, 0, 0, 0.5)');
+  await expect(governance).toContainText('启用运行时写入前，创建物理表及生成的索引。');
+  await expect(governance).toContainText('首次发布：尚无已发布的历史模型版本。');
+  await expect(governance).not.toContainText('Create the physical table');
+  await expect(governance).not.toContainText('Initial publish:');
+
 
   const confirm = page.getByTestId('model-publish-confirm');
   await expect(confirm).toBeDisabled();

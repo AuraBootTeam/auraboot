@@ -97,10 +97,12 @@ final class ModelPublishGovernanceSupport {
                 .anyMatch(impact -> impact.getRisk() != null && Boolean.TRUE.equals(impact.getRisk().getBlocking()));
         List<ModelPublishReplayStepDTO> replayPlan = buildReplayPlan(fieldImpacts);
 
+        List<String> migrationSteps = ModelPublishPolicySupport.migrationSteps(schemaChangeKinds, fieldImpacts);
+        Integer publishedVersion = latestPublishedVersion(model);
         return ModelPublishGovernanceDTO.builder()
                 .modelCode(model.getCode())
                 .draftVersion(model.getVersion())
-                .latestPublishedVersion(latestPublishedVersion(model))
+                .latestPublishedVersion(publishedVersion)
                 .allowed(!requiresAcknowledgement)
                 .blocked(requiresAcknowledgement)
                 .requiresAcknowledgement(requiresAcknowledgement)
@@ -108,8 +110,10 @@ final class ModelPublishGovernanceSupport {
                 .schemaChangeKinds(schemaChangeKinds)
                 .fieldImpacts(fieldImpacts)
                 .replayPlan(replayPlan)
-                .migrationPlan(buildMigrationPlan(schemaChangeKinds, fieldImpacts))
-                .historicalVersionPolicy(buildHistoricalVersionPolicy(model))
+                .migrationPlan(ModelPublishPolicySupport.migrationText(migrationSteps))
+                .migrationPlanSteps(migrationSteps)
+                .historicalVersionPolicy(ModelPublishPolicySupport.historyText(publishedVersion))
+                .historicalVersionPolicyCode(ModelPublishPolicySupport.historyCode(publishedVersion))
                 .warnings(warnings)
                 .build();
     }
@@ -218,35 +222,6 @@ final class ModelPublishGovernanceSupport {
             }
         }
         return List.copyOf(kinds);
-    }
-
-    private String buildMigrationPlan(List<String> schemaChangeKinds, List<DecisionFieldImpactDTO> fieldImpacts) {
-        if (schemaChangeKinds == null || schemaChangeKinds.isEmpty()) {
-            return "No physical schema migration is required. Rebuild the Rule Center usage index if field metadata changed without DDL.";
-        }
-        List<String> steps = new ArrayList<>();
-        if (schemaChangeKinds.contains("CREATE_TABLE")) {
-            steps.add("Create the physical table and generated indexes before enabling runtime writes.");
-        }
-        if (schemaChangeKinds.contains("ADD_COLUMN")) {
-            steps.add("Backfill new columns or define defaults before routing rules to the new field.");
-        }
-        if (schemaChangeKinds.contains("ALTER_COLUMN_TYPE")) {
-            steps.add("Validate data casts and replay affected rules against representative records before promotion.");
-        }
-        if (schemaChangeKinds.contains("DROP_COLUMN")) {
-            steps.add("Retire or migrate every affected rule consumer before removing the column.");
-        }
-        if (schemaChangeKinds.contains("NULLABILITY")) {
-            steps.add("Check existing rows against required/nullability changes before publish.");
-        }
-        if (fieldImpacts != null && !fieldImpacts.isEmpty()) {
-            steps.add("Confirm Rule Center blast radius and republish or replay affected BPM, SLA, Automation, EventPolicy and decision versions.");
-        }
-        if (steps.isEmpty()) {
-            steps.add("Review generated DDL and run a post-publish schema sync smoke.");
-        }
-        return String.join(" ", steps);
     }
 
     private List<ModelPublishReplayStepDTO> buildReplayPlan(List<DecisionFieldImpactDTO> fieldImpacts) {
@@ -1390,14 +1365,6 @@ final class ModelPublishGovernanceSupport {
             case "NAMED_QUERY" -> "重新校验查询字段、下游可视化和导出消费。";
             default -> "复核字段引用、重新发布或回放该消费方。";
         };
-    }
-
-    private String buildHistoricalVersionPolicy(Model model) {
-        Integer latestPublishedVersion = latestPublishedVersion(model);
-        if (latestPublishedVersion == null) {
-            return "Initial publish: no historical published model version exists. Rule consumers should bind to this published schema after publish.";
-        }
-        return "Latest-compatible policy: publishing this draft makes it the current model metadata. Existing published rule, BPM, SLA, Automation and EventPolicy versions keep their own versioned assets, but consumers using latest model fields must be replayed and republished after acknowledgement.";
     }
 
     private Integer latestPublishedVersion(Model model) {

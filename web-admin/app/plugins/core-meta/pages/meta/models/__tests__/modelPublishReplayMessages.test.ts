@@ -1,3 +1,5 @@
+import { getMigrationPlanMessage, getHistoricalPolicyMessage, getPolicyHeading } from '../modelPublishPolicyMessages';
+import type { ModelPublishGovernance } from '~/shared/services/modelService';
 import { describe, expect, it } from 'vitest';
 import { getReplayResultMessage, getReplayStatusLabel, getReplayErrorMessage } from '../modelPublishReplayMessages';
 import type { ModelPublishReplayResult } from '~/shared/services/modelService';
@@ -76,4 +78,44 @@ describe('model publish replay presentation preserves backend outcomes', () => {
       expect(getReplayResultMessage({}, locale)).toBeNull();
     });
   }
+});
+
+describe('publish policy locale contract', () => {
+  const cases = [["NO_SCHEMA_MIGRATION", "\u65e0\u9700\u8fc1\u79fb\u7269\u7406\u8868\u7ed3\u6784\u3002\u82e5\u4ec5\u5b57\u6bb5\u5143\u6570\u636e\u53d1\u751f\u53d8\u5316\uff0c\u8bf7\u91cd\u5efa\u89c4\u5219\u4e2d\u5fc3\u4f7f\u7528\u7d22\u5f15\u3002", "No physical schema migration is required. Rebuild the Rule Center usage index if field metadata changed without DDL."], ["CREATE_TABLE", "\u542f\u7528\u8fd0\u884c\u65f6\u5199\u5165\u524d\uff0c\u521b\u5efa\u7269\u7406\u8868\u53ca\u751f\u6210\u7684\u7d22\u5f15\u3002", "Create the physical table and generated indexes before enabling runtime writes."], ["ADD_COLUMN", "\u5c06\u89c4\u5219\u5207\u6362\u5230\u65b0\u5b57\u6bb5\u524d\uff0c\u56de\u586b\u65b0\u589e\u5217\u6216\u8bbe\u7f6e\u9ed8\u8ba4\u503c\u3002", "Backfill new columns or define defaults before routing rules to the new field."], ["ALTER_COLUMN_TYPE", "\u53d1\u5e03\u524d\u9a8c\u8bc1\u6570\u636e\u7c7b\u578b\u8f6c\u6362\uff0c\u5e76\u4f7f\u7528\u4ee3\u8868\u6027\u8bb0\u5f55\u56de\u653e\u53d7\u5f71\u54cd\u7684\u89c4\u5219\u3002", "Validate data casts and replay affected rules against representative records before promotion."], ["DROP_COLUMN", "\u5220\u9664\u5217\u524d\uff0c\u505c\u7528\u6216\u8fc1\u79fb\u6240\u6709\u53d7\u5f71\u54cd\u7684\u89c4\u5219\u6d88\u8d39\u65b9\u3002", "Retire or migrate every affected rule consumer before removing the column."], ["NULLABILITY", "\u53d1\u5e03\u524d\u68c0\u67e5\u5df2\u6709\u8bb0\u5f55\u662f\u5426\u6ee1\u8db3\u5fc5\u586b\u548c\u53ef\u7a7a\u6027\u53d8\u66f4\u3002", "Check existing rows against required/nullability changes before publish."], ["REPLAY_CONSUMERS", "\u786e\u8ba4\u89c4\u5219\u4e2d\u5fc3\u5f71\u54cd\u8303\u56f4\uff0c\u5e76\u91cd\u65b0\u53d1\u5e03\u6216\u56de\u653e\u53d7\u5f71\u54cd\u7684\u5de5\u4f5c\u6d41\u3001SLA\u3001\u81ea\u52a8\u5316\u3001\u4e8b\u4ef6\u7b56\u7565\u53ca\u51b3\u7b56\u7248\u672c\u3002", "Confirm Rule Center blast radius and republish or replay affected BPM, SLA, Automation, EventPolicy and decision versions."], ["REVIEW_DDL", "\u590d\u6838\u751f\u6210\u7684 DDL\uff0c\u5e76\u5728\u53d1\u5e03\u540e\u9a8c\u8bc1\u8868\u7ed3\u6784\u540c\u6b65\u3002", "Review generated DDL and run a post-publish schema sync smoke."]] as const;
+  for (const locale of ['zh-CN', 'en-US']) {
+    for (const [code, zh, en] of cases) {
+      it(locale + ' ' + code + ' expresses the server migration step', () => {
+        const value: ModelPublishGovernance = { modelCode: 'sample', migrationPlanSteps: [code], migrationPlan: 'Legacy server text' };
+        const before = JSON.stringify(value);
+        expect(getMigrationPlanMessage(value, locale)).toBe(locale === 'en-US' ? en : zh);
+        expect(JSON.stringify(value)).toBe(before);
+      });
+    }
+    it(locale + ' preserves ordered steps without dropping consumer replay', () => {
+      const value = { modelCode: 'sample', migrationPlanSteps: ['CREATE_TABLE', 'NULLABILITY', 'REPLAY_CONSUMERS'] };
+      const expected = [cases[1], cases[5], cases[6]].map((row) => row[locale === 'en-US' ? 2 : 1]).join(' ');
+      expect(getMigrationPlanMessage(value, locale)).toBe(expected);
+    });
+    it(locale + ' preserves unknown and legacy server descriptions', () => {
+      expect(getMigrationPlanMessage({ modelCode: 'sample', migrationPlanSteps: ['CREATE_TABLE', 'FUTURE_STEP'], migrationPlan: 'Future policy' }, locale)).toBe('Future policy');
+      expect(getMigrationPlanMessage({ modelCode: 'sample', migrationPlan: 'Legacy policy' }, locale)).toBe('Legacy policy');
+      expect(getMigrationPlanMessage({ modelCode: 'sample', migrationPlanSteps: ['FUTURE_STEP'] }, locale)).toBe('FUTURE_STEP');
+      expect(getHistoricalPolicyMessage({ modelCode: 'sample', historicalVersionPolicyCode: 'FUTURE', historicalVersionPolicy: 'Future history' }, locale)).toBe('Future history');
+      expect(getHistoricalPolicyMessage({ modelCode: 'sample', historicalVersionPolicy: 'Legacy history' }, locale)).toBe('Legacy history');
+      expect(getHistoricalPolicyMessage({ modelCode: 'sample' }, locale)).toBe('');
+    });
+    it(locale + ' labels both policy sections', () => {
+      expect(getPolicyHeading('migrationHeading', locale)).toBe(locale === 'en-US' ? 'Migration plan' : '\u8fc1\u79fb\u8ba1\u5212');
+      expect(getPolicyHeading('historyHeading', locale)).toBe(locale === 'en-US' ? 'Historical version policy' : '\u5386\u53f2\u7248\u672c\u7b56\u7565');
+    });
+  }
+  it('distinguishes initial publish from version compatibility in both locales', () => {
+    const initial = { modelCode: 'sample', historicalVersionPolicyCode: 'INITIAL_PUBLISH' };
+    const latest = { modelCode: 'sample', historicalVersionPolicyCode: 'LATEST_COMPATIBLE' };
+    expect(getHistoricalPolicyMessage(initial, 'en-US')).toBe('Initial publish: no historical published model version exists. Rule consumers should bind to this published schema after publish.');
+    expect(getHistoricalPolicyMessage(latest, 'en-US')).toBe('Latest-compatible policy: publishing this draft makes it the current model metadata. Existing published rule, BPM, SLA, Automation and EventPolicy versions keep their own versioned assets, but consumers using latest model fields must be replayed and republished after acknowledgement.');
+    expect(getHistoricalPolicyMessage(initial, 'zh-CN')).toMatch(/^\u9996\u6b21\u53d1\u5e03/);
+    expect(getHistoricalPolicyMessage(latest, 'zh-CN')).toMatch(/^\u91c7\u7528\u6700\u65b0\u517c\u5bb9\u7b56\u7565/);
+    expect(getHistoricalPolicyMessage(latest, 'zh-CN')).toContain('\u56de\u653e\u5e76\u91cd\u65b0\u53d1\u5e03');
+  });
 });
