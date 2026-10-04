@@ -5,6 +5,28 @@
   },
   "suites": [
     {
+      "id": "OSS-AIRFLOW-UNIT-01",
+      "domain": "oss",
+      "name": "Airflow provider unit tests with per-file 90% line and branch coverage",
+      "command": "bash scripts/check-airflow-provider-coverage.sh",
+      "tier": "offline",
+      "coversPaths": [
+        "airflow-provider/src/**",
+        "airflow-provider/tests/**",
+        "airflow-provider/scripts/check_coverage.py",
+        "airflow-provider/pyproject.toml",
+        "scripts/check-airflow-provider-coverage.sh"
+      ],
+      "axes": {
+        "surface": "service",
+        "dependencies": "hermetic",
+        "verdict": "aggregate-floor",
+        "driver": "unit"
+      },
+      "goldenSet": false,
+      "blocking": true
+    },
+    {
       "id": "OSS-META-01",
       "domain": "oss",
       "name": "Catalog schema + generated matrix freshness (methodology gate)",
@@ -37,6 +59,8 @@
         "plugins/**/config/pages/**",
         "docs/coverage/**",
         "scripts/check-test-system.sh",
+        "scripts/oss-backend-nightly-coverage.sh",
+        "scripts/oss-backend-nightly-coverage.test.mjs",
         "scripts/check-e2e-spec-registration.mjs",
         "scripts/check-command-reachability.mjs",
         "scripts/check-coverage-manifest-freshness.mjs",

@@ -328,4 +328,15 @@ describe('validateStructural plugin manifest schema', () => {
       expect(result.errorCount).toBe(0);
     },
   );
+
+  it('keeps fixture opportunity writers protected by the importable permission contract', () => {
+    const plugin = loadPlugin(join(shippedPluginsDir, 'test-fixtures'));
+    const commands = plugin.resourceFiles.get('commands')!;
+    for (const code of ['e2et_crm_opp.create', 'e2et_crm_opp.update']) {
+      const command = commands.find((entry) => entry.code === code);
+      expect(command, `${code} must remain present`).toBeDefined();
+      expect(command.permissions).toEqual(['e2et.order.manage']);
+      expect(command).not.toHaveProperty('execution');
+    }
+  });
 });

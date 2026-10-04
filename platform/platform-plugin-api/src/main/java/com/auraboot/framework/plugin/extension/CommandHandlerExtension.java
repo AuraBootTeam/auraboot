@@ -69,7 +69,8 @@ public interface CommandHandlerExtension extends ExtensionPoint {
      * @return true if this handler can process the command
      */
     default boolean supports(String commandType) {
-        return getCommandType().equals(commandType);
+        String supportedType = getCommandType();
+        return supportedType != null && supportedType.equals(commandType);
     }
 
     /**

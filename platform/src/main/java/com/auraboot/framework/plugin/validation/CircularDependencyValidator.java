@@ -70,9 +70,8 @@ public class CircularDependencyValidator implements PluginValidator {
             // Find the cycle start in path
             String cycleStart = path.get(path.size() - 1);
             int idx = path.indexOf(cycleStart);
-            List<String> cycle = new ArrayList<>(path.subList(idx, path.size()));
-            cycle.add(cycleStart); // Close the cycle
-            return cycle;
+            // DFS already appended the repeated start node when it found the cycle.
+            return new ArrayList<>(path.subList(idx, path.size()));
         }
         return null;
     }

@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -99,7 +100,7 @@ public class NamedQueryFieldValidator implements PluginValidator {
                     messages.add(error("S-NQF-TYPE", category(), fieldPath,
                             "Field '" + fieldCode + "' is missing 'dataType'. "
                                     + "Must be one of: " + VALID_DATA_TYPES));
-                } else if (!VALID_DATA_TYPES.contains(field.getDataType().toLowerCase())) {
+                } else if (!VALID_DATA_TYPES.contains(field.getDataType().toLowerCase(Locale.ROOT))) {
                     messages.add(error("S-NQF-TYPE-VAL", category(), fieldPath,
                             "Field '" + fieldCode + "' has invalid dataType '" + field.getDataType()
                                     + "'. Must be one of: " + VALID_DATA_TYPES));

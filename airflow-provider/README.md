@@ -32,6 +32,8 @@ Create a connection in Airflow with:
 ```
 
 Supported `auth_method` values: `jwt`, `api_key`, `hmac`.
+With `hmac`, `AuraBootHook.run()` signs the exact transmitted body in
+`X-AuraBoot-Signature`; `hmac_secret` is required before sending a request.
 
 ## Quick Start
 
@@ -95,6 +97,23 @@ signature = sign_webhook(body=b'{"event":"done"}', secret="shared-secret")
 ```
 
 The signature format is compatible with the Java `AirflowWebhookService.parseSignature` implementation.
+
+## Unit coverage gate
+
+From this directory, prepare an isolated Python environment and install test
+dependencies, including pandas so DataFrame tests run:
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -e . pytest pytest-cov pytest-mock responses pandas
+bash ../scripts/check-airflow-provider-coverage.sh
+```
+
+The gate uses an isolated Airflow home, rejects empty or skipped test runs,
+and requires at least 90% line and branch coverage for every provider source
+file. It verifies the source inventory and execution counts in the JSON report;
+a missing file or inflated summary fails. These tests use mocked connections
+and HTTP responses. They do not prove backend integration or HMAC acceptance.
 
 ## License
 

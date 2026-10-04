@@ -2471,6 +2471,13 @@
     "refType": "ui"
   },
   {
+    "key": "expression.fieldGroup.bpmContext",
+    "zh-CN": "BPM 上下文",
+    "en-US": "BPM context",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
     "key": "expression.fieldGroup.decisionRuntime",
     "zh-CN": "规则执行",
     "en-US": "Decision runtime",
