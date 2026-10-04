@@ -72,9 +72,8 @@ export default function SemanticModelsPage() {
     try {
       const meta = await fetchSemanticMeta();
       setModels(meta.models || []);
-      if (!selectedCode && meta.models?.length) {
-        setSelectedCode(meta.models[0].code);
-      }
+      // A late initial load must not replace a choice made after another load.
+      setSelectedCode(current => current || meta.models?.[0]?.code || null);
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : String(e));
     } finally {

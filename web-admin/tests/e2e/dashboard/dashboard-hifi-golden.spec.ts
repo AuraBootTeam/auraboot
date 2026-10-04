@@ -413,6 +413,9 @@ async function bindAggregate(page: import('@playwright/test').Page, index: numbe
 }
 
 async function saveDashboard(page: import('@playwright/test').Page, widgets: number): Promise<string> {
+  const isCreateRoute = new URL(page.url()).pathname === '/dashboard-designer';
+  const loaded = isCreateRoute ? page.waitForResponse(r => /^\/api\/dashboards\/[^/]+$/.test(new URL(r.url()).pathname)
+    && r.request().method() === 'GET') : null;
   const responsePromise = page.waitForResponse(r => /\/api\/dashboards(?:\/[^/]+)?$/.test(new URL(r.url()).pathname)
     && ['POST', 'PUT'].includes(r.request().method()));
   await dp.saveButton.click();
@@ -428,5 +431,14 @@ async function saveDashboard(page: import('@playwright/test').Page, widgets: num
   expect(body.data.pid).toBeTruthy();
   await dp.waitUntilSaved();
   await expect(page).toHaveURL(new RegExp(`/dashboard-designer/${body.data.pid}$`));
+  if (loaded) {
+    const restored = await loaded;
+    expect(restored.ok()).toBeTruthy();
+    const restoredBody = await restored.json();
+    expect(String(restoredBody.code)).toBe('0');
+    expect(restoredBody.data.pid).toBe(body.data.pid);
+    expect(restoredBody.data.widgets).toHaveLength(widgets);
+  }
+  await expect(dp.widgets).toHaveCount(widgets);
   return body.data.pid;
 }
