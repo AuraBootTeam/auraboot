@@ -134,5 +134,21 @@
   "workflowClosedWithFallback": {
     "zh-CN": "工作流分派规则复核失败：规则执行异常，已失败关闭，未使用静态审批人兜底。决策执行报告显示使用了兜底，请检查决策配置。",
     "en-US": "Workflow assignment review failed: the rule failed closed; no static approver fallback was used. The decision report indicates a fallback was used. Check the decision configuration."
+  },
+  "bindingClosedDetail": {
+    "zh-CN": "规则绑定已失败关闭，未返回候选审批人或候选审批组",
+    "en-US": "The rule binding failed closed; no candidate approvers or approval groups were returned."
+  },
+  "decisionErrorDetail": {
+    "zh-CN": "决策执行失败，请检查绑定的决策版本、输入映射和兜底策略",
+    "en-US": "Decision execution failed. Check the bound decision version, input mapping and fallback policy."
+  },
+  "decisionError": {
+    "zh-CN": "决策执行失败",
+    "en-US": "Decision execution failed."
+  },
+  "bindingClosed": {
+    "zh-CN": "规则绑定已失败关闭",
+    "en-US": "The rule binding failed closed."
   }
 }

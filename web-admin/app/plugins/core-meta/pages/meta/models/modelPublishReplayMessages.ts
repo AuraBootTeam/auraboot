@@ -101,3 +101,15 @@ export function getReplayResultMessage(result: ModelPublishReplayResult, locale 
   }
   return result.message || null;
 }
+
+export function getReplayErrorMessage(error: string, result: ModelPublishReplayResult, locale = 'zh-CN'): string {
+  const normalized = error.toLowerCase();
+  const bindingFailedClosed = normalized === 'bpm_rule_binding_fail_closed'
+    || normalized === 'workflow_rule_binding_fail_closed';
+  if (result.step?.consumerType === 'WORKFLOW_PROCESS' && result.outputs?.failClosed === true) {
+    return text(bindingFailedClosed ? 'bindingClosedDetail' : 'decisionErrorDetail', locale);
+  }
+  if (normalized === 'decision_evaluation_failed') return text('decisionError', locale);
+  if (bindingFailedClosed) return text('bindingClosed', locale);
+  return error;
+}

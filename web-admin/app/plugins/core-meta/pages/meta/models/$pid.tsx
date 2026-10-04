@@ -1,5 +1,5 @@
 import { useI18n } from '~/contexts/I18nContext';
-import { getReplayStatusLabel, getReplayResultMessage } from './modelPublishReplayMessages';
+import { getReplayStatusLabel, getReplayResultMessage, getReplayErrorMessage } from './modelPublishReplayMessages';
 /**
  * Model详情页面
  *
@@ -350,20 +350,6 @@ function formatReplayOutputValue(key: string, value: unknown): string {
     return '已记录';
   }
   return String(value);
-}
-
-function formatReplayError(error: string, result: ModelPublishReplayResult): string {
-  const consumerType = result.step?.consumerType;
-  const normalized = error.toLowerCase();
-  if (consumerType === 'WORKFLOW_PROCESS' && result.outputs?.failClosed === true) {
-    if (normalized === 'workflow_rule_binding_fail_closed') {
-      return '规则绑定已失败关闭，未返回候选审批人或候选审批组';
-    }
-    return '决策执行失败，请检查绑定的决策版本、输入映射和兜底策略';
-  }
-  if (normalized === 'decision_evaluation_failed') return '决策执行失败';
-  if (normalized === 'workflow_rule_binding_fail_closed') return '规则绑定已失败关闭';
-  return error;
 }
 
 function normalizePageKind(page: RelatedPage): StandardPageKind | 'custom' {
@@ -2548,7 +2534,7 @@ export default function ModelDetailPage() {
                                   {result.errors?.length ? (
                                     <ul className="mt-2 list-inside list-disc text-sm text-red-700">
                                       {result.errors.map((error, errorIndex) => (
-                                        <li key={errorIndex}>{formatReplayError(error, result)}</li>
+                                        <li key={errorIndex}>{getReplayErrorMessage(error, result, locale)}</li>
                                       ))}
                                     </ul>
                                   ) : null}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getReplayResultMessage, getReplayStatusLabel } from '../modelPublishReplayMessages';
+import { getReplayResultMessage, getReplayStatusLabel, getReplayErrorMessage } from '../modelPublishReplayMessages';
 import type { ModelPublishReplayResult } from '~/shared/services/modelService';
 
 function decision(patch: Partial<ModelPublishReplayResult> = {}): ModelPublishReplayResult {
@@ -55,6 +55,14 @@ describe('model publish replay presentation preserves backend outcomes', () => {
         const result: ModelPublishReplayResult = { step: { consumerType }, status, ...patch };
         const before = JSON.stringify(result);
         expect(getReplayResultMessage(result, locale)).toBe(en ? english : zh);
+        expect(JSON.stringify(result)).toBe(before);
+      });
+    }
+    for (const [error, consumerType, failClosed, zh, english] of [["BPM_RULE_BINDING_FAIL_CLOSED", "WORKFLOW_PROCESS", true, "\u89c4\u5219\u7ed1\u5b9a\u5df2\u5931\u8d25\u5173\u95ed\uff0c\u672a\u8fd4\u56de\u5019\u9009\u5ba1\u6279\u4eba\u6216\u5019\u9009\u5ba1\u6279\u7ec4", "The rule binding failed closed; no candidate approvers or approval groups were returned."], ["WORKFLOW_RULE_BINDING_FAIL_CLOSED", "WORKFLOW_PROCESS", true, "\u89c4\u5219\u7ed1\u5b9a\u5df2\u5931\u8d25\u5173\u95ed\uff0c\u672a\u8fd4\u56de\u5019\u9009\u5ba1\u6279\u4eba\u6216\u5019\u9009\u5ba1\u6279\u7ec4", "The rule binding failed closed; no candidate approvers or approval groups were returned."], ["BPM_RULE_BINDING_FAIL_CLOSED", "WORKFLOW_PROCESS", false, "\u89c4\u5219\u7ed1\u5b9a\u5df2\u5931\u8d25\u5173\u95ed", "The rule binding failed closed."], ["DECISION_EVALUATION_FAILED", "DECISION_VERSION", false, "\u51b3\u7b56\u6267\u884c\u5931\u8d25", "Decision execution failed."], ["provider failure", "WORKFLOW_PROCESS", true, "\u51b3\u7b56\u6267\u884c\u5931\u8d25\uff0c\u8bf7\u68c0\u67e5\u7ed1\u5b9a\u7684\u51b3\u7b56\u7248\u672c\u3001\u8f93\u5165\u6620\u5c04\u548c\u515c\u5e95\u7b56\u7565", "Decision execution failed. Check the bound decision version, input mapping and fallback policy."], ["provider failure", "DECISION_VERSION", false, "provider failure", "provider failure"], ["WORKFLOW_RULE_BINDING_FAIL_CLOSED", "WORKFLOW_PROCESS", false, "\u89c4\u5219\u7ed1\u5b9a\u5df2\u5931\u8d25\u5173\u95ed", "The rule binding failed closed."]] as const) {
+      it(`${locale} ${error}/${consumerType}/${failClosed} preserves the error outcome`, () => {
+        const result: ModelPublishReplayResult = { step: { consumerType }, status: 'FAILED', executed: false, outputs: { failClosed }, errors: [error] };
+        const before = JSON.stringify(result);
+        expect(getReplayErrorMessage(error, result, locale)).toBe(en ? english : zh);
         expect(JSON.stringify(result)).toBe(before);
       });
     }
