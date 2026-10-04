@@ -42,6 +42,8 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @MapperScan({
     "com.auraboot.framework.**.mapper",
     "com.auraboot.framework.*.dao",
+    // Release definitions keep their mapper at the package root.
+    "com.auraboot.framework.application.release",
     "com.auraboot.module.*.mapper",
     "com.auraboot.module.meta.excel.mapper"
 })
