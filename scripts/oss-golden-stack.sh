@@ -15,7 +15,9 @@
 # need the full showcase data, run scripts/oss-reset-and-init.sh separately (dormancy-guarded).
 #
 # Usage:
-#   ./scripts/oss-golden-stack.sh up   <name> [--slot N] [--runtime-mode development|verification|control|performance] [--no-frontend] [--no-warm] [--fresh-db] [--ttl 6h] [--product-migration-root PATH] [--extra-plugin-root PATH] [--plugin-profile P|--plugin X]
+#   ./scripts/oss-golden-stack.sh up   <name> [--slot N] [--runtime-mode development|verification|control|performance] [--system-mode single|multi|hybrid] [--no-frontend] [--no-warm] [--fresh-db] [--ttl 6h] [--product-migration-root PATH] [--extra-plugin-root PATH] [--plugin-profile P|--plugin X]
+#       --system-mode: bootstrap mode (default single). An initialized database
+#                      must already have this mode; retained data is never converted.
 #       --no-warm : keep the frontend but skip the setup/auth/pre-warm step — for goldens
 #                   that self-provision accounts and run with --no-deps (no storageState).
 #       --fresh-db: drop + recreate the slot's database before applying the snapshot. `up`
@@ -334,7 +336,7 @@ PY
 # ---- up ------------------------------------------------------------------------------
 cmd_up() {
   local name="$1"; shift
-  local slot="" ttl="6h" runtime_mode="development" frontend=1 warm=1 fresh_db=0 require_new_db=0
+  local slot="" ttl="6h" runtime_mode="development" system_mode="single" frontend=1 warm=1 fresh_db=0 require_new_db=0
   local plugin_profile="" import_plugins=() extra_plugin_roots=() product_migration_roots=()
   local parallel_reason=""
   local extra_root migration_root plugin_item
@@ -343,6 +345,7 @@ cmd_up() {
     --ttl) ttl="$2"; shift 2;;
     --runtime-mode) runtime_mode="$2"; shift 2;;
     --parallel-reason) parallel_reason="$2"; shift 2;;
+    --system-mode) system_mode="${2:-}"; [ $# -ge 2 ] || die "--system-mode requires a value"; shift 2;;
     --no-frontend) frontend=0; shift;;
     --no-warm) warm=0; shift;;
     --fresh-db) fresh_db=1; shift;;
@@ -386,6 +389,10 @@ cmd_up() {
   case "$runtime_mode" in
     development|verification|control|performance) ;;
     *) die "--runtime-mode must be development|verification|control|performance" ;;
+  esac
+  case "$system_mode" in
+    single|multi|hybrid) ;;
+    *) die "--system-mode must be single|multi|hybrid" ;;
   esac
 
   local sd; sd="$(state_dir "$name")" || return 1
@@ -602,9 +609,18 @@ XML
   log "    backend UP (pid $own_pid, port ownership verified)"
 
   log "6/9 bootstrap (minimal admin + tenant; idempotent)"
-  if ! curl --noproxy '*' -s -m 10 "http://127.0.0.1:$server_port/api/bootstrap/status" 2>/dev/null | grep -q '"initialized":true'; then
+  local bootstrap_status
+  bootstrap_status="$(curl --noproxy '*' -fsS -m 10 "http://127.0.0.1:$server_port/api/bootstrap/status")" \
+    || die "cannot read bootstrap status"
+  if printf '%s' "$bootstrap_status" | grep -q '"initialized":true'; then
+    local existing_mode
+    existing_mode="$(printf '%s' "$bootstrap_status" | node -e 'const fs=require("node:fs"); const value=JSON.parse(fs.readFileSync(0,"utf8")); process.stdout.write(String((value.data ?? value).mode ?? ""));')" \
+      || die "invalid bootstrap status"
+    [ "$existing_mode" = "$system_mode" ] \
+      || die "initialized database mode is '$existing_mode', requested '$system_mode'; retained data was not converted"
+  else
     curl --noproxy '*' -s -m 60 -X POST "http://127.0.0.1:$server_port/api/bootstrap/setup" -H 'Content-Type: application/json' \
-      -d "{\"companyName\":\"AuraBoot Dev\",\"adminEmail\":\"$ADMIN_EMAIL\",\"adminPassword\":\"$ADMIN_PASSWORD\",\"adminDisplayName\":\"Admin\",\"systemMode\":\"single\",\"seedDemoData\":false}" \
+      -d "{\"companyName\":\"AuraBoot Dev\",\"adminEmail\":\"$ADMIN_EMAIL\",\"adminPassword\":\"$ADMIN_PASSWORD\",\"adminDisplayName\":\"Admin\",\"systemMode\":\"$system_mode\",\"seedDemoData\":false}" \
       | grep -q '"success":true' || die "bootstrap failed"
   fi
   curl --noproxy '*' -s -m 15 -X POST "http://127.0.0.1:$server_port/api/auth/login" -H 'Content-Type: application/json' \

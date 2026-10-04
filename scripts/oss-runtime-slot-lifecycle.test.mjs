@@ -2,9 +2,21 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
 
 const gatePath = fileURLToPath(new URL('./oss-e2e-gate-run.sh', import.meta.url));
 const stackPath = fileURLToPath(new URL('./oss-golden-stack.sh', import.meta.url));
+
+test('golden stack rejects invalid or missing system mode before runtime allocation', () => {
+  for (const value of ['invalid', 'single;echo unsafe', null]) {
+    const args = [stackPath, 'up', 'invalid-bootstrap-mode-test', '--slot', '239', '--system-mode'];
+    if (value !== null) args.push(value);
+    const result = spawnSync('bash', args, { encoding: 'utf8' });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /--system-mode (must be|requires)/);
+    assert.doesNotMatch(result.stdout, /allocate runtime|ensure infra/);
+  }
+});
 
 test('fresh OSS gate refuses an existing runtime instead of destroying evidence', () => {
   const source = readFileSync(gatePath, 'utf8');
@@ -37,6 +49,6 @@ test('fresh gate marks its runtime as verification evidence rather than feature 
   const source = readFileSync(gatePath, 'utf8');
   const stack = readFileSync(stackPath, 'utf8');
   assert.match(source, /--runtime-mode verification/u);
-  assert.match(source, /LOG="\$AURA_EVIDENCE_ROOT\/logs\//u);
+  assert.match(source, /LOG="\$AURA_EVIDENCE_ROOT\/logs\/oss-e2e-gate-/u);
   assert.match(stack, /export PW_ARTIFACT_DIR=\$evidence_root/u);
 });

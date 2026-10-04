@@ -1,6 +1,7 @@
 package com.auraboot.framework.behavior.service;
 
 import com.auraboot.framework.application.TestApplication;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.behavior.dto.BehaviorQuarantineReplayResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -32,13 +33,19 @@ class BehaviorQuarantineReplayIT {
 
     @BeforeEach
     void setup() {
+        // Direct service invocation still requires the trusted tenant context used by MyBatis.
+        MetaContext.setContext(TENANT, USER, "quarantine-replay-it", "quarantine-replay-it");
         ensureTables();
         cleanup();
     }
 
     @AfterEach
     void tearDown() {
-        cleanup();
+        try {
+            cleanup();
+        } finally {
+            MetaContext.clear();
+        }
     }
 
     @Test
