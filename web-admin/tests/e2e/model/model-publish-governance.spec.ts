@@ -1579,9 +1579,7 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
   await expect(bpmReportCard).toContainText('工作流规则复核结果：命中');
   await expect(bpmReportCard).toContainText(bpmUsage.processKey);
   await bpmReportCard.scrollIntoViewIfNeeded();
-  await bpmReportCard.screenshot({
-    path: testInfo.outputPath('model-publish-bpm-report.png'),
-  });
+  await captureReplayCard(page, bpmReportCard, testInfo.outputPath('model-publish-bpm-report.png'));
 
   await expect(governance).toContainText('迁移计划');
   await expect(governance).toContainText('历史版本策略');
@@ -1812,9 +1810,7 @@ test('RC-MODEL-01B: model publish replay executes BPM userTask assignment rule b
   await expect(bpmReportCard).toContainText('已解析候选审批人');
   await expect(bpmReportCard).toContainText(expectedUsers[0]);
   await bpmReportCard.scrollIntoViewIfNeeded();
-  await bpmReportCard.screenshot({
-    path: testInfo.outputPath('model-publish-bpm-assignment-report.png'),
-  });
+  await captureReplayCard(page, bpmReportCard, testInfo.outputPath('model-publish-bpm-assignment-report.png'));
 });
 
 test('RC-MODEL-01C: model publish replay shows BPM userTask fail-closed when decision binding errors', async ({
@@ -1961,7 +1957,5 @@ test('RC-MODEL-01C: model publish replay shows BPM userTask fail-closed when dec
   await expect(bpmReportCard).toBeVisible({ timeout: 5_000 });
   await expect(bpmReportCard).toContainText('已失败关闭');
   await bpmReportCard.scrollIntoViewIfNeeded();
-  await bpmReportCard.screenshot({
-    path: testInfo.outputPath('model-publish-bpm-assignment-fail-closed-report.png'),
-  });
+  await captureReplayCard(page, bpmReportCard, testInfo.outputPath('model-publish-bpm-assignment-fail-closed-report.png'));
 });
