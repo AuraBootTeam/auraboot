@@ -107,6 +107,19 @@ Redis / MinIO / monitoring are advanced add-ons — for those, use the source
 `docker-compose.yml` profiles (`--profile cache` / `storage` / `monitoring`). Redis is
 not required for single-instance deployments.
 
+## Core-only artifact deployment session
+
+For a Core-only artifact bundle, initialize its database before running the bundled
+`bin/auraboot-core-env.sh publish` or `verify` command. Set `ADMIN_EMAIL` and
+`ADMIN_PASSWORD` to the administrator created in that database.
+
+These commands log in and select the administrator's business space through the
+production APIs. The platform operator space is excluded. When the administrator
+belongs to multiple business spaces, export `AURA_ADMIN_TENANT_ID` with the exact
+business tenant ID to select; an ambiguous or inaccessible selection fails before
+configuration import. Credentials and session tokens are not written to the command's
+output.
+
 ## Infrastructure Only (Local Development)
 
 For local development, start only PostgreSQL and run services locally:
