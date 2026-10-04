@@ -507,7 +507,7 @@ record_share:
   remove: 移除协作成员
   removed: 协作成员已移除
   remove_failed: 移除协作成员失败
-  notification_title: 客户协作权限已更新
+  notification_title: 记录协作权限已更新
   notification_content: 你已获得一条共享记录的{0}权限，请从对应的协作视图查看。
   notification_permission_read: 仅查看
   notification_permission_collaborate: 可协作
