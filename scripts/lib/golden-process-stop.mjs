@@ -17,7 +17,17 @@ const need = (condition, message) => {
 const hash = value => createHash('sha256').update(value).digest('hex');
 function run(file, args) {
   try { return execFileSync(file, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }); }
-  catch { throw new Error('Owned process identity probe failed'); }
+  catch {
+    const error = new Error('Owned process identity probe failed');
+    // Classify the public probe without logging its arguments (which may carry a token).
+    error.goldenStopReason = args[0] === 'runtime'
+      ? ({ show: 'WORKSPACE_RUNTIME_SHOW_FAILED', process: args[2] === 'check'
+          ? 'WORKSPACE_PROCESS_CHECK_FAILED' : 'WORKSPACE_PROCESS_REGISTER_FAILED' }[args[1]]
+          ?? 'WORKSPACE_RUNTIME_PROBE_FAILED')
+      : ({ ps: 'PROCESS_METADATA_PROBE_FAILED', lsof: 'PROCESS_CWD_PROBE_FAILED',
+          node: 'LISTENER_LIVENESS_PROBE_FAILED' }[basename(file)] ?? 'OWNED_IDENTITY_PROBE_FAILED');
+    throw error;
+  }
 }
 function alive(pid) {
   try { process.kill(pid, 0); return true; } catch (error) {
