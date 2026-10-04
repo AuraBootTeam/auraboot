@@ -194,7 +194,14 @@ class IdempotencyServiceImplCoverageIT {
     }
 
     private <T> T inTransaction(Supplier<T> work) {
-        return new TransactionTemplate(transactionManager).execute(status -> work.get());
+        MetaContext.Snapshot previous = MetaContext.snapshot();
+        MetaContext.setContext(TENANT_ID, 991_800_002L, "idem-test-pid", "idem-test-user");
+        try {
+            return new TransactionTemplate(transactionManager).execute(status -> work.get());
+        } finally {
+            MetaContext.clear();
+            MetaContext.restore(previous);
+        }
     }
 
     private void await(CountDownLatch latch) {

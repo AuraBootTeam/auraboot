@@ -4,10 +4,13 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.auraboot.framework.application.bootstrap.PlatformSeedService;
 import com.auraboot.framework.saas.bootstrap.BootstrapEngineService;
 import com.auraboot.framework.saas.bootstrap.dto.BootstrapRequest;
+import com.auraboot.framework.saas.bootstrap.dto.BootstrapProgressResponse;
+import com.auraboot.framework.saas.constant.SystemConfigKeys;
 import com.auraboot.framework.saas.config.service.SystemConfigService;
 import com.auraboot.framework.scheduler.service.SchedulerEngine;
 import com.auraboot.framework.scheduler.service.impl.SystemTaskInitializer;
@@ -17,6 +20,9 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import java.util.Optional;
 
 @ExtendWith(MockitoExtension.class)
 class BootstrapControllerExplicitSeedTest {
@@ -28,6 +34,18 @@ class BootstrapControllerExplicitSeedTest {
     @Mock private SchedulerEngine schedulerEngine;
 
     @InjectMocks private BootstrapController controller;
+
+    @ParameterizedTest
+    @ValueSource(strings = {"single", "multi", "hybrid"})
+    void statusReportsThePersistedDeploymentMode(String mode) {
+        when(systemConfigService.isInitialized()).thenReturn(true);
+        when(systemConfigService.get(SystemConfigKeys.SYSTEM_MODE)).thenReturn(Optional.of(mode));
+        when(bootstrapEngineService.getProgress())
+                .thenReturn(BootstrapProgressResponse.builder().status("completed").build());
+
+        assertEquals(mode, controller.getStatus().getData().getMode());
+        verify(platformSeedService, never()).seed();
+    }
 
     @Test
     void setupSeedsPlatformBeforeRunningBootstrapEngine() {

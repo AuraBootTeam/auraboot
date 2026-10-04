@@ -86,7 +86,10 @@
               "danger": true,
               "permissionCode": "behavior.site_key.manage",
               "label": { "zh-CN": "禁用", "en-US": "Disable" },
-              "confirm": "behavior_site_key.disable.confirm",
+              "confirm": {
+                "zh-CN": "确认禁用所选站点密钥？禁用后将立即停止接收该密钥的匿名遥测，已有数据保留。",
+                "en-US": "Disable the selected site key? Anonymous telemetry collection will stop immediately; existing data will be retained."
+              },
               "action": { "type": "command", "command": "behavior_site_key:disable" }
             }
           ]

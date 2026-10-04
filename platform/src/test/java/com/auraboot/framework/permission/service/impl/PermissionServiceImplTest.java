@@ -79,6 +79,23 @@ class PermissionServiceImplTest {
         MetaContext.clear();
     }
 
+    @Test
+    void findByPidReturnsScopedDto() {
+        Permission permission = new Permission();
+        PermissionDTO dto = new PermissionDTO();
+        when(permissionMapper.findByPids(List.of("permission-pid"))).thenReturn(List.of(permission));
+        when(permissionConverter.toDTO(permission)).thenReturn(dto);
+        assertThat(service.findByPid("permission-pid")).isSameAs(dto);
+        verify(permissionMapper).findByPids(List.of("permission-pid"));
+    }
+
+    @Test
+    void findByPidReturnsNullWhenNotVisible() {
+        when(permissionMapper.findByPids(List.of("foreign-pid"))).thenReturn(List.of());
+        assertThat(service.findByPid("foreign-pid")).isNull();
+        verify(permissionConverter, never()).toDTO(any());
+    }
+
     private PermissionCreateRequest createRequest(String code) {
         PermissionCreateRequest req = new PermissionCreateRequest();
         req.setCode(code);

@@ -2,6 +2,7 @@ package com.auraboot.framework.saas.bootstrap;
 
 import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.saas.bootstrap.dto.BootstrapRequest;
+import com.auraboot.framework.saas.config.service.SystemConfigService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -24,10 +25,17 @@ import static org.assertj.core.api.Assertions.assertThat;
  * the default tenant has a bound {@code billing_account_id} in {@code ab_tenant}
  * and the referenced account is {@code status = active}.
  *
- * <p>Does not extend BaseIntegrationTest because bootstrap controls its own
- * transactions. This task requires a freshly migrated database, separate from
- * the shared integration suite. It never removes tenant bindings or disables
- * their database guards; resulting rows remain available for inspection.
+ * <p>Does NOT extend {@link com.auraboot.framework.integration.BaseIntegrationTest}
+ * because that class wraps each test in a rolled-back transaction, which conflicts
+ * with bootstrap's internal transaction management (bootstrap creates its own
+ * {@code @Transactional} scope for the core pipeline).  Instead, this test
+ * runs bootstrap via {@link TransactionTemplate} with
+ * {@code PROPAGATION_NOT_SUPPORTED} so that bootstrap's own transaction
+ * management is in control. Committed facts remain in the dedicated database.
+ *
+ * <p><b>Isolation:</b> the legacy {@code destructive-bootstrap} tag remains excluded from the shared
+ * {@code test} task. The dedicated task requires BOOTSTRAP_TEST_DATABASE_URL for a separately
+ * migrated blank database. Immutable binding facts are never truncated or deleted for cleanup.
  */
 @SpringBootTest(classes = TestApplication.class)
 @ActiveProfiles("integration-test")
@@ -44,6 +52,9 @@ class BootstrapBillingAccountIT {
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
+    private SystemConfigService systemConfigService;
+
+    @Autowired
     private PlatformTransactionManager transactionManager;
 
     /** Always mocked per project convention — never send real mail in tests. */
@@ -51,14 +62,22 @@ class BootstrapBillingAccountIT {
     @SuppressWarnings("unused")
     private JavaMailSender mailSender;
 
+    // ── lifecycle ─────────────────────────────────────────────────────────────
+
+    /** Fail closed on an initialized or populated database; never reset retained facts. */
     @BeforeEach
-    void requireFreshBootstrapDatabase() {
-        Integer tenantCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ab_tenant", Integer.class);
-        assertThat(tenantCount).as("bootstrap IT requires its own fresh database").isZero();
+    void assertBlankBootstrapDatabase() {
+        systemConfigService.evictCache();
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ab_tenant", Integer.class))
+                .as("bootstrap verification requires its own blank migrated database")
+                .isZero();
         Integer initialized = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM ab_system_config WHERE config_key = 'system.initialized' AND config_value = 'true'",
                 Integer.class);
-        assertThat(initialized).as("bootstrap database must be uninitialized").isZero();
+        assertThat(initialized)
+                .as("system must be uninitialized before this test runs; "
+                        + "provide a newly migrated BOOTSTRAP_TEST_DATABASE_URL")
+                .isZero();
     }
 
     // ── test ─────────────────────────────────────────────────────────────────

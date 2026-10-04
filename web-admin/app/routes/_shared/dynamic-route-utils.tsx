@@ -211,9 +211,16 @@ function findDictItemByValue(
 ): { value: string; label: string; extension?: Record<string, any> } | undefined {
   const exact = items.find((item) => String(item.value) === String(value));
   if (exact) return exact;
-  const normalized = String(value ?? '').trim().toLowerCase();
+  const normalized = String(value ?? '')
+    .trim()
+    .toLowerCase();
   if (!normalized) return undefined;
-  return items.find((item) => String(item.value ?? '').trim().toLowerCase() === normalized);
+  return items.find(
+    (item) =>
+      String(item.value ?? '')
+        .trim()
+        .toLowerCase() === normalized,
+  );
 }
 
 function getReferenceModel(field: FieldConfig): string {
@@ -246,23 +253,12 @@ function getReferenceDisplayField(field: FieldConfig): string | undefined {
   return candidate ? String(candidate) : undefined;
 }
 
-/**
- * Module-level cache of resolved reference labels, keyed by `<model>:<id>`. Reference
- * detail fields are read-only and the referenced record's display name is effectively
- * immutable within a session, so caching avoids re-fetching when the same record is
- * referenced by several fields / rows or across remounts (N+1 avoidance). Inflight
- * promises are deduped so concurrent fields pointing at the same record share one request.
- */
-const referenceLabelCache = new Map<string, string>();
-const referenceLabelInflight = new Map<string, Promise<string>>();
-
 const REFERENCE_DISPLAY_CANDIDATE_FIELDS = ['name', 'title', 'displayName', 'label', 'code'];
 
 function pickReferenceLabel(
   record: Record<string, unknown>,
   displayField: string | undefined,
-  fallbackId: string,
-): string {
+): string | undefined {
   if (displayField && record[displayField] != null && record[displayField] !== '') {
     return String(record[displayField]);
   }
@@ -271,7 +267,7 @@ function pickReferenceLabel(
       return String(record[key]);
     }
   }
-  return fallbackId;
+  return undefined;
 }
 
 function normalizeReadonlyDisplayValue(value: unknown, multiple?: boolean): string | undefined {
@@ -299,108 +295,102 @@ function normalizeReadonlyDisplayValue(value: unknown, multiple?: boolean): stri
   return text || undefined;
 }
 
+type ReferenceLabelResult = { label: string } | { error: 'forbidden' | 'unavailable' | 'unnamed' };
+
 async function resolveReferenceLabel(
   model: string,
   id: string,
   displayField: string | undefined,
-): Promise<string> {
-  const cacheKey = `${model}:${id}`;
-  const cached = referenceLabelCache.get(cacheKey);
-  if (cached !== undefined) return cached;
-
-  const inflight = referenceLabelInflight.get(cacheKey);
-  if (inflight) return inflight;
-
-  const request = (async () => {
-    try {
-      const resp = await fetch(`/api/dynamic/${model}/${encodeURIComponent(id)}`);
-      if (!resp.ok) return id;
-      const body = await resp.json();
-      const record = (body?.data ?? {}) as Record<string, unknown>;
-      const label = pickReferenceLabel(record, displayField, id);
-      referenceLabelCache.set(cacheKey, label);
-      return label;
-    } catch {
-      return id;
-    } finally {
-      referenceLabelInflight.delete(cacheKey);
-    }
-  })();
-
-  referenceLabelInflight.set(cacheKey, request);
-  return request;
+): Promise<ReferenceLabelResult> {
+  // Resolve within the mounted reader; never reuse data from another identity or display field.
+  try {
+    const response = await fetch(`/api/dynamic/${model}/${encodeURIComponent(id)}`);
+    if (!response.ok) return { error: response.status === 403 ? 'forbidden' : 'unavailable' };
+    const body = await response.json();
+    if (String(body?.code) !== '0' || !body?.data) return { error: 'unavailable' };
+    const label = pickReferenceLabel(body.data as Record<string, unknown>, displayField);
+    return label ? { label } : { error: 'unnamed' };
+  } catch {
+    // A failed read stays visible and retryable; it must not expose the internal reference.
+    return { error: 'unavailable' };
+  }
 }
 
-/**
- * Read-only renderer for generic reference fields (a record pointing at another model).
- * Resolves each referenced id to its display name via `/api/dynamic/<model>/<id>` instead of
- * leaking the raw ULID. System pickers (sys_user / org_department) are handled by their own
- * dedicated read-only renderers above; this covers every other `refTarget.targetModel`.
- */
 const ReadonlyReferenceValue: React.FC<{
   value: unknown;
   model: string;
   displayField?: string;
   multiple?: boolean;
-}> = ({ value, model, displayField, multiple = false }) => {
+  locale: string;
+}> = ({ value, model, displayField, multiple = false, locale }) => {
   const ids = React.useMemo(() => parseReadonlyValueList(value, multiple), [value, multiple]);
-  const idsKey = ids.join('|');
-  const [labels, setLabels] = React.useState<string[]>(() =>
-    ids.map((id) => referenceLabelCache.get(`${model}:${id}`) ?? id),
-  );
-  const [resolved, setResolved] = React.useState(() =>
-    ids.every((id) => referenceLabelCache.has(`${model}:${id}`)),
-  );
+  const idsKey = JSON.stringify(ids);
+  const requestKey = JSON.stringify([model, displayField, idsKey]);
+  const [retry, setRetry] = React.useState(0);
+  const [result, setResult] = React.useState<{ key: string; values: ReferenceLabelResult[] }>();
 
   React.useEffect(() => {
     let active = true;
-    if (ids.length === 0) {
-      setLabels([]);
-      setResolved(true);
-      return () => {
-        active = false;
-      };
-    }
-
-    const allCached = ids.every((id) => referenceLabelCache.has(`${model}:${id}`));
-    if (allCached) {
-      setLabels(ids.map((id) => referenceLabelCache.get(`${model}:${id}`) as string));
-      setResolved(true);
-      return () => {
-        active = false;
-      };
-    }
-
-    setResolved(false);
-    Promise.all(ids.map((id) => resolveReferenceLabel(model, id, displayField))).then(
-      (nextLabels) => {
-        if (!active) return;
-        setLabels(nextLabels);
-        setResolved(true);
-      },
-    );
-
+    setResult(undefined);
+    Promise.all(ids.map((id) => resolveReferenceLabel(model, id, displayField))).then((values) => {
+      if (active) setResult({ key: requestKey, values });
+    });
     return () => {
       active = false;
     };
-  }, [idsKey, model, displayField]);
+  }, [ids, idsKey, model, displayField, requestKey, retry]);
 
-  if (ids.length === 0) {
-    return <span className="py-1 text-sm text-gray-400">&mdash;</span>;
-  }
-
-  if (!resolved) {
-    // Loading placeholder — never flash the raw ULID before the display name resolves.
+  if (ids.length === 0) return <span className="py-1 text-sm text-gray-400">&mdash;</span>;
+  if (!result || result.key !== requestKey) {
     return (
-      <div className="py-1" aria-label="Loading" data-testid="reference-readonly-loading">
+      <div
+        className="py-1"
+        aria-label={getLocalizedText({ 'zh-CN': '正在读取来源', en: 'Loading source' }, locale)}
+        data-testid="reference-readonly-loading"
+      >
         <div className="h-4 w-24 animate-pulse rounded bg-gray-200/80" />
       </div>
     );
   }
 
+  const errors = result.values.filter(
+    (item): item is { error: 'forbidden' | 'unavailable' | 'unnamed' } => 'error' in item,
+  );
+  const labels = result.values
+    .filter((item): item is { label: string } => 'label' in item)
+    .map((item) => item.label);
+  const message = errors.some((item) => item.error === 'forbidden')
+    ? {
+        'zh-CN': '无权读取来源，请联系负责人确认访问权限。',
+        en: 'Source access denied. Ask the owner to review your permissions.',
+      }
+    : errors.some((item) => item.error === 'unnamed')
+      ? {
+          'zh-CN': '来源缺少业务名称，请联系负责人补全。',
+          en: 'Source has no business label. Ask the owner to complete it.',
+        }
+      : {
+          'zh-CN': '来源暂时无法读取，请重试或联系负责人。',
+          en: 'Source is unavailable. Retry or contact the owner.',
+        };
   return (
-    <div className="py-1 text-sm text-gray-900" data-testid="reference-readonly">
-      {labels.join('、')}
+    <div
+      className="py-1 text-sm"
+      data-testid={errors.length ? 'reference-readonly-error' : 'reference-readonly'}
+    >
+      {labels.length > 0 && <span className="text-gray-900">{labels.join('、')}</span>}
+      {errors.length > 0 && (
+        <div role="status" className="text-gray-600">
+          <span>{getLocalizedText(message, locale)}</span>
+          <button
+            type="button"
+            className="ml-2 text-blue-600 underline"
+            onClick={() => setRetry((previous) => previous + 1)}
+          >
+            {getLocalizedText({ 'zh-CN': '重试', en: 'Retry' }, locale)}
+          </button>
+        </div>
+      )}
     </div>
   );
 };
@@ -553,6 +543,7 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
             value={value}
             model={referenceModel}
             displayField={getReferenceDisplayField(field)}
+            locale={locale}
             multiple={Boolean(field.props?.multiple)}
           />
         );

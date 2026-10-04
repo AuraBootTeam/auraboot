@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { waitFor } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
+import { Activity, createElement } from 'react';
+import { useSchemaRuntime } from '~/framework/meta/hooks/useSchemaRuntime';
 import { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
 import { createExpressionContext, type GlobalState } from '~/framework/meta/runtime/expression/context';
@@ -320,5 +322,74 @@ describe('SchemaRuntime', () => {
     expect(endpoints).toContain('/api/datasource/list'); // kpi (namedQuery, no deps)
     expect(endpoints).toContain('/api/dynamic/demo_list/list'); // filteredList (deps ready)
     expect(endpoints).not.toContain('/api/dynamic/demo_detail/list'); // rowDetail deferred
+  });
+});
+
+
+vi.mock('~/contexts/ToastContext', () => ({
+  useToastContext: () => ({ showSuccessToast: vi.fn(), showErrorToast: vi.fn(), showWarningToast: vi.fn(), showInfoToast: vi.fn() }),
+}));
+
+describe('page runtime manager lifecycle', () => {
+  it('never synchronizes a destroyed runtime when preserved effects reconnect', async () => {
+    const consoleError = vi.spyOn(console, 'error');
+    const manager = createManager();
+    let mode: 'visible' | 'hidden' = 'visible';
+    try {
+      const { result, rerender, unmount } = renderHook(({ status }) => useSchemaRuntime({
+        schema: minimalSchema, dataSourceManager: manager, navigate: vi.fn(), locale: 'en', t: key => key,
+        disableAutoFetch: true, skipDataSourceRegistration: true,
+        initialContext: { record: { inv_fgpt_status: status } },
+      }), { initialProps: { status: 'pending_pack' }, wrapper: ({ children }) => createElement(Activity, { mode }, children) });
+      await waitFor(() => expect(result.current?.getContext()).toMatchObject({ record: { inv_fgpt_status: 'pending_pack' } }));
+      mode = 'hidden';
+      rerender({ status: 'pending_pack' });
+      mode = 'visible';
+      rerender({ status: 'received' });
+      await waitFor(() => expect(result.current?.getContext()).toMatchObject({ record: { inv_fgpt_status: 'received' } }));
+      unmount();
+      expect(consoleError).not.toHaveBeenCalled();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it('rebinds the same schema to a new data manager instead of retaining a destroyed scope', async () => {
+    const first = createManager();
+    const second = createManager();
+    second.register('pageOwned', { endpoint: '/api/page-owned', autoFetch: false });
+    const { result, rerender, unmount } = renderHook(({ manager }) => useSchemaRuntime({
+      schema: minimalSchema, dataSourceManager: manager, navigate: vi.fn(), locale: 'en', t: key => key,
+      disableAutoFetch: true, skipDataSourceRegistration: true,
+      initialContext: { record: { pid: 'fixture-task', inv_fgpt_status: 'pending_pack' } },
+    }), { initialProps: { manager: first } });
+    await waitFor(() => expect(result.current).not.toBeNull());
+    const previous = result.current!;
+    rerender({ manager: second });
+    await waitFor(() => expect(result.current).not.toBe(previous));
+    const active = result.current!;
+    expect(active.getDataSourceManager()).toBe(second);
+    expect(active.getContext()).toMatchObject({ record: { pid: 'fixture-task', inv_fgpt_status: 'pending_pack' } });
+    expect(previous.getStateManager().getScope(previous.getScopeId())).toBeUndefined();
+    unmount();
+    expect(active.getStateManager().getScope(active.getScopeId())).toBeUndefined();
+    expect(second.getConfig('pageOwned')).toBeDefined();
+  });
+
+  it('synchronizes later record values without recreating a stable manager or losing action state', async () => {
+    const manager = createManager();
+    const { result, rerender, unmount } = renderHook(({ status }) => useSchemaRuntime({
+      schema: minimalSchema, dataSourceManager: manager, navigate: vi.fn(), locale: 'en', t: key => key,
+      disableAutoFetch: true, skipDataSourceRegistration: true,
+      initialContext: { record: { inv_fgpt_status: status } },
+    }), { initialProps: { status: 'pending_pack' } });
+    await waitFor(() => expect(result.current).not.toBeNull());
+    const active = result.current!;
+    active.getStateManager().updateState(active.getScopeId(), 'selectedPackage', 'fixture-package');
+    rerender({ status: 'received' });
+    await waitFor(() => expect(result.current!.getContext()).toMatchObject({ record: { inv_fgpt_status: 'received' } }));
+    expect(result.current).toBe(active);
+    expect(active.getContext().state).toMatchObject({ selectedPackage: 'fixture-package' });
+    unmount();
   });
 });

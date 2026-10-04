@@ -330,6 +330,7 @@ export function buildFormCommandPayload(
   actionRecord: Record<string, any>,
   modelFields: Record<string, Pick<FieldMetaInfo, 'dataType'>>,
   blocks?: any[],
+  explicitlyClearedFields: ReadonlySet<string> = new Set(),
 ): Record<string, any> {
   const submitPayloadFieldTypes = collectSubmitPayloadFieldTypes(blocks);
   const modelFieldEntries = Object.entries(modelFields);
@@ -340,7 +341,9 @@ export function buildFormCommandPayload(
         const dataType = modelFields[key]?.dataType || submitPayloadFieldTypes[key];
         if (!dataType) return [];
         const value = normalizeCommandPayloadValue(rawValue, dataType);
-        if (isEmptySubmittedValue(value)) return [];
+        if (isEmptySubmittedValue(value) && !(value === null && explicitlyClearedFields.has(key))) {
+          return [];
+        }
         return [[key, value]];
       }),
     );
@@ -365,7 +368,9 @@ export function buildFormCommandPayload(
       }
       const dataType = submitPayloadFieldTypes[key];
       const value = dataType ? normalizeCommandPayloadValue(rawValue, dataType) : rawValue;
-      if (isEmptySubmittedValue(value)) return [];
+      if (isEmptySubmittedValue(value) && !(value === null && explicitlyClearedFields.has(key))) {
+        return [];
+      }
       return [[key, value]];
     }),
   );
@@ -1940,6 +1945,7 @@ export function FormPageContent(props: PageContentProps) {
         dispatchActionRecord,
         modelFields,
         schema?.blocks,
+        recordPid ? dirtyFieldsRef.current : undefined,
       );
       // Review metadata is command input rather than model data, so it is intentionally absent
       // from the model-field whitelist used by buildFormCommandPayload.
@@ -2351,8 +2357,25 @@ export function FormPageContent(props: PageContentProps) {
         dirtyFieldsRef.current.add(fieldCode);
         clearFieldError(fieldCode);
         syncRuntimeFieldValue(fieldCode, value);
+        if (runtime) {
+          runtime.triggerFieldLinkage(fieldCode, 'change');
+          const nextForm = runtime.getStateManager().getContext(runtime.getScopeId()).form;
+          const linkedChanges = Object.fromEntries(
+            Object.entries(nextForm).filter(
+              ([key, nextValue]) =>
+                key !== 'pid' && nextValue !== (key === fieldCode ? value : formData[key]),
+            ),
+          );
+          for (const key of Object.keys(linkedChanges)) {
+            dirtyFieldsRef.current.add(key);
+            clearFieldError(key);
+          }
+          if (Object.keys(linkedChanges).length) {
+            setFormData((previous) => ({ ...previous, ...linkedChanges }));
+          }
+        }
       }),
-    [formData, pageContext, fieldErrors, clearFieldError, syncRuntimeFieldValue],
+    [formData, pageContext, fieldErrors, clearFieldError, syncRuntimeFieldValue, runtime],
   );
 
   // Stable runtime context for custom blocks. Memoized so the props

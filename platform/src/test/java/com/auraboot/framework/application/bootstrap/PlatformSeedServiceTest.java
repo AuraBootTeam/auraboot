@@ -23,6 +23,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class PlatformSeedServiceTest {
 
+    @Mock private com.auraboot.framework.branding.AuthAppearanceSeeder authAppearanceSeeder;
+
     @Mock private SystemFieldSeeder systemFieldSeeder;
     @Mock private QueryOperatorSeeder queryOperatorSeeder;
     @Mock private I18nBaseSeeder i18nBaseSeeder;
@@ -47,6 +49,7 @@ class PlatformSeedServiceTest {
         service.seed();
 
         InOrder order = inOrder(
+                authAppearanceSeeder,
                 systemFieldSeeder,
                 queryOperatorSeeder,
                 i18nBaseSeeder,
@@ -55,6 +58,7 @@ class PlatformSeedServiceTest {
                 marketplaceCategorySeeder,
                 agentTemplateSeeder,
                 solutionSeeder);
+        order.verify(authAppearanceSeeder).seed();
         order.verify(systemFieldSeeder).seed();
         order.verify(queryOperatorSeeder).seed();
         order.verify(i18nBaseSeeder).seed();

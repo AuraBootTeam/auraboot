@@ -9,6 +9,44 @@ describe('ControlledFieldRenderer', () => {
     capturedPropsSpy.mockClear();
   });
 
+  it.each([['zh-CN', '选择来源类型，或留空手工登记'], ['en', 'Choose a source type or leave empty']])(
+    'forwards the localized DSL placeholder for %s', async (locale, expected) => {
+      vi.resetModules();
+      vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
+        ComponentLoader: ({ props }: { props: Record<string, unknown> }) => {
+          capturedPropsSpy({ props });
+          return <div data-testid="component-loader">loaded</div>;
+        },
+      }));
+      const { ControlledFieldRenderer } = await import('../ControlledFieldRenderer');
+      render(<ControlledFieldRenderer field={{ field: 'source', component: 'SmartSelect',
+        placeholder: { 'zh-CN': '选择来源类型，或留空手工登记', en: 'Choose a source type or leave empty' },
+      } as any} value={null} onChange={vi.fn()} context={{ locale, t: (key: string) => key } as any} />);
+      await waitFor(() => expect(capturedPropsSpy).toHaveBeenCalled());
+      expect(capturedPropsSpy.mock.calls.at(-1)?.[0]?.props.placeholder).toBe(expected);
+    },
+  );
+
+  it('retains current-field normalization after the controlled input change', async () => {
+    vi.resetModules();
+    vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
+      ComponentLoader: ({ props }: { props: Record<string, any> }) =>
+        <button onClick={() => props.onChange('')}>Clear source</button>,
+    }));
+    const { createFieldRenderer } = await import('~/framework/meta/utils/createFieldRenderer');
+    function Form() {
+      const [data, setData] = React.useState<Record<string, any>>({ source: 'fqc', notes: 'Preserve' });
+      const renderField = createFieldRenderer(data, setData,
+        { locale: 'zh-CN', t: (key: string) => key } as any, {},
+        (field, value) => { if (value === '') setData(previous => ({ ...previous, [field]: null })); });
+      return <>{renderField({ field: 'source', component: 'SmartSelect' } as any)}
+        <output data-testid="state">{JSON.stringify(data)}</output></>;
+    }
+    render(<Form />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Clear source' }));
+    expect(JSON.parse(screen.getByTestId('state').textContent!)).toEqual({ source: null, notes: 'Preserve' });
+  });
+
   it('keeps wrapper-owned controlled state authoritative over metadata props', async () => {
     vi.resetModules();
     vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
@@ -28,6 +66,7 @@ describe('ControlledFieldRenderer', () => {
           {
             field: 'sc_name',
             component: 'SmartInput',
+            placeholder: { 'zh-CN': 'Root guidance', en: 'Root guidance' },
             props: {
               value: '',
               onChange: metadataOnChange,

@@ -6,8 +6,20 @@ services:
     container_name: "${AURA_OSS_CI_POSTGRES_CONTAINER:?runtime-owned PostgreSQL container required}"
     ports: !override
       - "127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT:?runtime-owned PostgreSQL port required}:5432"
+    environment:
+      POSTGRES_DB: aura_boot
+      POSTGRES_USER: auraboot
+      POSTGRES_PASSWORD: auraboot_dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auraboot -d aura_boot"]
     volumes: !override
-      - skills_c2_postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    profiles: !override [skills-c2-stack]
+    container_name: ${AURA_OSS_CI_REDIS_CONTAINER:?CI runner must own the Redis container}
+    ports: !override
+      - "${AURA_OSS_CI_REDIS_PORT:?CI runner must allocate a Redis port}:6379"
 
   redis:
     container_name: "${AURA_OSS_CI_REDIS_CONTAINER:?runtime-owned Redis container required}"
@@ -44,3 +56,8 @@ services:
 volumes:
   skills_c2_postgres_data:
   oss_ci_redis_data:
+networks:
+  default:
+    ipam:
+      config: !override
+        - subnet: ${AURA_OSS_CI_SUBNET:?CI runner must allocate a non-overlapping subnet}
