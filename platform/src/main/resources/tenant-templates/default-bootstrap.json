@@ -5,6 +5,16 @@
   "description": "默认租户初始化模板，包含标准的角色、菜单和权限配置",
   "permissions": [
     {
+      "code": "admin.customer.impersonate",
+      "name": "Customer impersonation",
+      "description": "Create short-lived audited sessions that execute as another active member",
+      "type": "function",
+      "module": "admin",
+      "resource": "admin:customer",
+      "action": "execute",
+      "resourceType": "function"
+    },
+    {
       "code": "party.party.read",
       "name": "业务参与方查看",
       "description": "查看本租户内的业务参与方与可选 Actor",

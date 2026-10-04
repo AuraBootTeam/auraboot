@@ -6,6 +6,7 @@ import com.auraboot.framework.auth.wechat.WechatPcClient;
 import com.auraboot.framework.auth.wechat.WechatPcIdentityService;
 import com.auraboot.framework.auth.wechat.WechatPcProperties;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.DisallowImpersonation;
 import com.auraboot.framework.user.dao.entity.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -77,6 +78,7 @@ public class WechatPcLoginController {
     }
 
     @PostMapping("/wechat/pc/bind")
+    @DisallowImpersonation
     public ApiResponse<Map<String, Object>> bind(@RequestBody Map<String, String> body) {
         Long userId = MetaContext.getCurrentUserId();
         wechatPcIdentityService.bindToUser(body.get("code"), userId);

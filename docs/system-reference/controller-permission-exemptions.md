@@ -1,3 +1,8 @@
+---
+type: system-reference
+status: active
+---
+
 # Controller Permission-Annotation Exemption Registry
 Generated 2026-10-01 (batch4 E4). 232 `@RestController` classes; 132 carry `@RequirePermission`; the 100 below do not and rely on `SecurityConfig` (`anyRequest().authenticated()` / explicit `PermitAll`) plus service-layer scoping.
 Policy: this registry is the year-reviewable record of WHY each controller has no `@RequirePermission`. New controllers default to annotated; removals from annotation need an entry here.

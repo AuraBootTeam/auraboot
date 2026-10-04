@@ -6,6 +6,7 @@ import com.auraboot.framework.auth.dto.DeactivationResponse;
 import com.auraboot.framework.auth.entity.UserDeactivation;
 import com.auraboot.framework.auth.service.UserDeactivationService;
 import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
+import com.auraboot.framework.permission.annotation.DisallowImpersonation;
 import com.auraboot.framework.common.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -28,6 +29,7 @@ public class DeactivationController {
      * Request account deactivation. Starts a 7-day cooling-off period.
      */
     @PostMapping("/request")
+    @DisallowImpersonation
     public ApiResponse<DeactivationResponse> requestDeactivation(
             @RequestBody DeactivationRequest request) {
         Long userId = MetaContext.getCurrentUserId();
@@ -40,6 +42,7 @@ public class DeactivationController {
      * Cancel an active deactivation during the cooling-off period.
      */
     @PostMapping("/cancel")
+    @DisallowImpersonation
     public ApiResponse<Void> cancelDeactivation() {
         Long userId = MetaContext.getCurrentUserId();
         deactivationService.cancelDeactivation(userId);

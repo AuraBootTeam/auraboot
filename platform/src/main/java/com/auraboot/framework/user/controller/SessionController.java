@@ -5,6 +5,7 @@ import com.auraboot.framework.auth.entity.UserSession;
 import com.auraboot.framework.auth.service.SessionManagementService;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
+import com.auraboot.framework.permission.annotation.DisallowImpersonation;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -38,6 +39,7 @@ public class SessionController {
     }
 
     @DeleteMapping("/{sessionPid}")
+    @DisallowImpersonation
     @Operation(summary = "Revoke a specific session")
     public ApiResponse<Void> revokeSession(@CurrentUserId Long userId, @PathVariable String sessionPid) {
         sessionManagementService.revokeSession(userId, sessionPid);
@@ -45,6 +47,7 @@ public class SessionController {
     }
 
     @DeleteMapping("/current")
+    @DisallowImpersonation
     @Operation(summary = "Revoke current session")
     public ApiResponse<Void> revokeCurrentSession(HttpServletRequest request) {
         String header = request.getHeader("Authorization");
@@ -55,6 +58,7 @@ public class SessionController {
     }
 
     @DeleteMapping
+    @DisallowImpersonation
     @Operation(summary = "Revoke all sessions (logout everywhere)")
     public ApiResponse<Void> revokeAllSessions(@CurrentUserId Long userId) {
         sessionManagementService.revokeAllSessions(userId);

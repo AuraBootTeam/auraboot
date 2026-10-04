@@ -60,10 +60,17 @@ public class SmtpEmailSender implements EmailSender {
             helper.setSubject(subject);
             helper.setText(htmlBody, true);
             mailSender.send(message);
-            log.info("Email sent to {} — subject: {}", to, subject);
+            log.info("Email sent to {} — subject: {}", maskAddress(to), subject);
         } catch (MessagingException e) {
-            log.error("Failed to send email to {}: {}", to, e.getMessage(), e);
-            throw new RuntimeException("Failed to send email: " + e.getMessage(), e);
+            log.error("Failed to send email to {}: {}", maskAddress(to), e.getMessage(), e);
+            throw new RuntimeException("Failed to send email", e);
         }
+    }
+
+    private static String maskAddress(String address) {
+        if (address == null || address.isBlank()) return "***";
+        int at = address.indexOf('@');
+        if (at <= 0) return "***";
+        return address.substring(0, Math.min(2, at)) + "***" + address.substring(at);
     }
 }

@@ -44,4 +44,16 @@ class MetaContextRolesTest {
         assertEquals(Set.of(), MetaContext.getCurrentRoleIds(),
                 "Legacy 4-arg setContext must default roleIds to empty set");
     }
+
+    @Test
+    void impersonationExposesActualActorSeparatelyFromEffectiveUser() {
+        MetaContext.setContext(7L, 200L, "customer-pid", "customer");
+        MetaContext.setSessionContext(null, null, "tenant", null, null,
+                "ready", 1, true, 100L, "web");
+
+        assertEquals(200L, MetaContext.getCurrentUserId());
+        assertEquals(100L, MetaContext.getActualActorUserId());
+        assertTrue(MetaContext.isImpersonating());
+        assertEquals("web", MetaContext.getCurrentClientType());
+    }
 }
