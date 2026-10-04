@@ -44,8 +44,6 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -190,18 +188,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 log.error("Failed to trigger {}: {}", description, logSafe(e.getMessage()), e);
             }
         };
-        if (TransactionSynchronizationManager.isActualTransactionActive()
-                && TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(
-                    new TransactionSynchronization() {
-                        @Override
-                        public void afterCommit() {
-                            safeTrigger.run();
-                        }
-                    });
-            return;
-        }
-        safeTrigger.run();
+        AfterCommitDispatchSupport.afterCommitOrNow(safeTrigger);
     }
 
     private PermissionFacade getPermissionFacade() {

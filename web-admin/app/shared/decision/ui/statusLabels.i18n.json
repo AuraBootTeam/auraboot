@@ -1,0 +1,58 @@
+{
+  "SUCCESS": {
+    "zh-CN": "成功",
+    "en": "Success"
+  },
+  "PARTIAL_SUCCESS": {
+    "zh-CN": "部分成功",
+    "en": "Partial success"
+  },
+  "FAILED": {
+    "zh-CN": "失败",
+    "en": "Failed"
+  },
+  "FAILED_RETRYING": {
+    "zh-CN": "失败重试中",
+    "en": "Retrying after failure"
+  },
+  "RETRY_PENDING": {
+    "zh-CN": "等待重试",
+    "en": "Awaiting retry"
+  },
+  "DEAD_LETTER": {
+    "zh-CN": "进入死信",
+    "en": "Dead letter"
+  },
+  "NO_HANDLER": {
+    "zh-CN": "处理器缺失",
+    "en": "Handler missing"
+  },
+  "NOT_EXECUTED": {
+    "zh-CN": "未执行",
+    "en": "Not executed"
+  },
+  "NOT_RUN": {
+    "zh-CN": "未运行",
+    "en": "Not run"
+  },
+  "MATCHED": {
+    "zh-CN": "命中",
+    "en": "Matched"
+  },
+  "NOT_MATCHED": {
+    "zh-CN": "未命中",
+    "en": "Not matched"
+  },
+  "ERROR": {
+    "zh-CN": "错误",
+    "en": "Error"
+  },
+  "SKIPPED": {
+    "zh-CN": "跳过",
+    "en": "Skipped"
+  },
+  "UNKNOWN": {
+    "zh-CN": "未知",
+    "en": "Unknown"
+  }
+}
