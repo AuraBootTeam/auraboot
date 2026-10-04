@@ -262,7 +262,7 @@ class PageSchemaKindFullStackIntegrationTest extends BaseIntegrationTest {
         String response = mockMvc.perform(post("/api/pages").contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of("pageKey", key, "name", key,
                                 "title", "Empty Storefront", "kind", "plp", "profile", "storefront-authoring",
-                                "schemaVersion", 4, "blocks", List.of()))))
+                                "schemaVersion", 4, "layout", Map.of("type", "stack"), "blocks", List.of()))))
                 .andExpect(status().is2xxSuccessful()).andReturn().getResponse().getContentAsString();
         String pid = objectMapper.readTree(response).path("data").path("pid").asText();
         assertThat(pid).isNotBlank();

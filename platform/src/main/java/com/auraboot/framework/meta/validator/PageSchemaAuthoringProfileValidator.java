@@ -25,6 +25,14 @@ public class PageSchemaAuthoringProfileValidator {
         validateValues(page.getKind(), page.getProfile(), readBlocks(page.getBlocks()));
     }
 
+    public void validatePublished(PageSchema page) {
+        List<Object> blocks = readBlocks(page.getBlocks());
+        validateValues(page.getKind(), page.getProfile(), blocks);
+        if (blocks == null || blocks.isEmpty()) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed, "Published pages require non-empty blocks");
+        }
+    }
+
     public void validateUpdate(PageSchema saved, PageSchemaUpdateRequest update) {
         validateValues(update.getKind() == null ? saved.getKind() : update.getKind(),
                 update.getProfile() == null ? saved.getProfile() : update.getProfile(),
