@@ -153,11 +153,6 @@ public class SemanticPreaggService {
     }
 
     private long refreshInTransaction(AbSemanticPreagg preagg) {
-        AbSemanticModel model = modelMapper.findByPid(preagg.getTenantId(), preagg.getSemanticModelPid());
-        if (model == null) {
-            throw new SemanticValidationException("SEMANTIC_PREAGG_MODEL_MISSING",
-                    "Semantic model not found: " + preagg.getSemanticModelPid());
-        }
         long[] refreshedRows = new long[1];
         // Isolate creator authority, then restore every caller ThreadLocal, including
         // the lexical command permit, on this same thread.
@@ -165,6 +160,12 @@ public class SemanticPreaggService {
                 preagg.getTenantId(), preagg.getCreatedBy(), "semantic-preagg",
                 "semantic-preagg-refresher", java.util.Set.of(), null, null, null, null);
         MetaContext.runWithSnapshot(creatorIdentity, () -> {
+            // Tenant-line interception also governs the model lookup on scheduler threads.
+            AbSemanticModel model = modelMapper.findByPid(preagg.getTenantId(), preagg.getSemanticModelPid());
+            if (model == null) {
+                throw new SemanticValidationException("SEMANTIC_PREAGG_MODEL_MISSING",
+                        "Semantic model not found: " + preagg.getSemanticModelPid());
+            }
             var member = tenantMemberService.findByTenantIdAndUserId(preagg.getTenantId(), preagg.getCreatedBy());
             if (member == null || !StatusConstants.ACTIVE.equalsIgnoreCase(member.getStatus())
                     || Boolean.TRUE.equals(member.getDeletedFlag()) || member.getId() == null
