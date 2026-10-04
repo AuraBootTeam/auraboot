@@ -24,12 +24,18 @@ function fixture(t, mode = '') {
   executable(path.join(root, 'aura'), `#!/usr/bin/env bash
 printf 'aura %s\\n' "$*" >> "$CALLS"
 if [[ "$*" == 'runtime list' ]]; then printf 'NAME MODE SLOT\\n'; fi
+if [[ "$*" == 'runtime verify owned-run' && "$FAKE_MODE" == reuse-invalid ]]; then exit 2; fi
 `);
   executable(path.join(repo, 'scripts/oss-golden-stack.sh'), `#!/usr/bin/env bash
 printf 'stack %s\\n' "$*" >> "$CALLS"
 if [[ "$1" == up && "$FAKE_MODE" == up-failure ]]; then exit 2; fi
 if [[ "$1" == env ]]; then
   printf 'export PLAYWRIGHT_BASE_URL=http://localhost:1 BACKEND_URL=http://localhost:2\\n'
+  if [[ "$FAKE_MODE" == reuse-* ]]; then
+    round="$AURA_WORKSPACE_ROOT/.workspace/evidence/owned-run/rounds/native-round"
+    mkdir -p "$round"
+    printf 'export AURA_WORKSPACE_SLOT=900 AURA_EVIDENCE_ROOT=%q\\n' "$round"
+  fi
   if [[ "$FAKE_MODE" == evidence-round || "$FAKE_MODE" == evidence-collision ]]; then
     round="$AURA_WORKSPACE_ROOT/.workspace/evidence/owned-run/rounds/native-round"
     mkdir -p "$round"
@@ -153,4 +159,36 @@ test('evidence migration refuses prior round bytes before browser execution', t 
   const round = path.join(f.root, '.workspace/evidence/owned-run/rounds/native-round');
   assert.equal(fs.readFileSync(path.join(round, 'collection.json'), 'utf8'), 'retain old bytes');
   assert.equal(fs.existsSync(path.join(round, 'results.json')), false);
+});
+
+for (const mode of ['reuse-valid', 'reuse-invalid']) {
+  test(`explicit reuse verifies ownership and preserves existing bytes: ${mode}`, t => {
+    const f = fixture(t, mode);
+    fs.mkdirSync(path.join(f.root, '.workspace/env'), { recursive: true });
+    fs.writeFileSync(path.join(f.root, '.workspace/env/owned-run.env'), 'AURA_WORKSPACE_SLOT=900\n');
+    const round = path.join(f.root, '.workspace/evidence/owned-run/rounds/native-round');
+    fs.mkdirSync(round, { recursive: true });
+    fs.writeFileSync(path.join(round, 'results.json'), 'prior evidence');
+    const result = f.run({}, ['--slot', '900', '--reuse']);
+    assert.equal(result.status, mode === 'reuse-valid' ? 0 : 2, result.stdout + result.stderr);
+    assert.equal(fs.readFileSync(path.join(round, 'results.json'), 'utf8'), 'prior evidence');
+    const calls = fs.readFileSync(f.calls, 'utf8');
+    assert.doesNotMatch(calls, /stack up|runtime (allocate|destroy)|stack (down|destroy)/);
+    if (mode === 'reuse-valid') {
+      const children = fs.readdirSync(round).filter(n => n.startsWith('hifi-reuse-'));
+      assert.equal(children.length, 1);
+      const ledger = JSON.parse(fs.readFileSync(path.join(round, children[0], 'execution-ledger.json')));
+      assert.equal(ledger.passed, 8);
+      assert.ok(calls.indexOf('runtime verify') < calls.indexOf('pnpm'));
+    } else assert.doesNotMatch(calls, /pnpm|stack import/);
+  });
+}
+
+test('reuse rejects a requested slot mismatch before collection', t => {
+  const f = fixture(t, 'reuse-valid');
+  fs.mkdirSync(path.join(f.root, '.workspace/env'), { recursive: true });
+  fs.writeFileSync(path.join(f.root, '.workspace/env/owned-run.env'), 'AURA_WORKSPACE_SLOT=900\n');
+  const result = f.run({}, ['--slot', '901', '--reuse']);
+  assert.equal(result.status, 2, result.stdout + result.stderr);
+  assert.doesNotMatch(fs.readFileSync(f.calls, 'utf8'), /pnpm|stack import|stack up/);
 });
