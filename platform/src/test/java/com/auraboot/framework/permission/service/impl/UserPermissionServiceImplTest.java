@@ -151,6 +151,26 @@ class UserPermissionServiceImplTest {
     }
 
     @Test
+    void unknownPermissionAllowsTenantAdminBootstrapWithoutLoadingSnapshot() {
+        when(permissionSnapshotCache.resolvePermissionId(100L, "bootstrap.code")).thenReturn(null);
+        when(adminRoleChecker.hasRole(100L, 1L,
+                com.auraboot.framework.permission.enums.RoleCodes.TENANT_ADMIN)).thenReturn(true);
+
+        assertThat(service.hasPermission(1L, "bootstrap.code")).isTrue();
+        verify(permissionSnapshotCache, never()).getEffectivePermissionIds(100L, 1L, 5L);
+    }
+
+    @Test
+    void registeredPermissionRequiresAnEffectiveGrant() {
+        when(permissionSnapshotCache.resolvePermissionId(100L, "registered.code")).thenReturn(50L);
+        when(permissionSnapshotCache.getEffectivePermissionIds(100L, 1L, 5L)).thenReturn(Set.of());
+
+        assertThat(service.hasPermission(1L, "registered.code")).isFalse();
+        verify(adminRoleChecker, never()).hasRole(100L, 1L,
+                com.auraboot.framework.permission.enums.RoleCodes.TENANT_ADMIN);
+    }
+
+    @Test
     void permissionChecksHandleInvalidInputs() {
         assertThat(service.hasPermission(null, "code")).isFalse();
         assertThat(service.hasPermission(1L, (String) null)).isFalse();

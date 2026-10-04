@@ -1,0 +1,174 @@
+{
+  "add": {
+    "zh-CN": "添加步骤",
+    "en-US": "Add step"
+  },
+  "empty": {
+    "zh-CN": "无步骤",
+    "en-US": "No steps"
+  },
+  "stopOnFailure": {
+    "zh-CN": "失败时停止",
+    "en-US": "Stop on failure"
+  },
+  "errorPolicy": {
+    "zh-CN": "失败策略",
+    "en-US": "Error policy"
+  },
+  "stop": {
+    "zh-CN": "停止",
+    "en-US": "Stop"
+  },
+  "continue": {
+    "zh-CN": "继续",
+    "en-US": "Continue"
+  },
+  "retry": {
+    "zh-CN": "重试",
+    "en-US": "Retry"
+  },
+  "expression": {
+    "zh-CN": "表达式",
+    "en-US": "Expression"
+  },
+  "errorMessage": {
+    "zh-CN": "错误消息",
+    "en-US": "Error message"
+  },
+  "endpoint": {
+    "zh-CN": "端点",
+    "en-US": "Endpoint"
+  },
+  "method": {
+    "zh-CN": "方法",
+    "en-US": "Method"
+  },
+  "path": {
+    "zh-CN": "路径",
+    "en-US": "Path"
+  },
+  "message": {
+    "zh-CN": "消息",
+    "en-US": "Message"
+  },
+  "type": {
+    "zh-CN": "类型",
+    "en-US": "Type"
+  },
+  "success": {
+    "zh-CN": "成功",
+    "en-US": "Success"
+  },
+  "info": {
+    "zh-CN": "信息",
+    "en-US": "Info"
+  },
+  "warning": {
+    "zh-CN": "警告",
+    "en-US": "Warning"
+  },
+  "error": {
+    "zh-CN": "错误",
+    "en-US": "Error"
+  },
+  "target": {
+    "zh-CN": "目标",
+    "en-US": "Target"
+  },
+  "modalId": {
+    "zh-CN": "弹窗ID",
+    "en-US": "Modal ID"
+  },
+  "handler": {
+    "zh-CN": "处理器",
+    "en-US": "Handler"
+  },
+  "preLabel": {
+    "zh-CN": "前置阶段",
+    "en-US": "Pre phase"
+  },
+  "preDescription": {
+    "zh-CN": "客户端校验、确认弹窗",
+    "en-US": "Client validation and confirmation"
+  },
+  "validateLabel": {
+    "zh-CN": "校验阶段",
+    "en-US": "Validation phase"
+  },
+  "validateDescription": {
+    "zh-CN": "调用后端校验接口",
+    "en-US": "Call the backend validation API"
+  },
+  "executeLabel": {
+    "zh-CN": "执行阶段",
+    "en-US": "Execution phase"
+  },
+  "executeDescription": {
+    "zh-CN": "执行 Command",
+    "en-US": "Execute command"
+  },
+  "postLabel": {
+    "zh-CN": "后置阶段",
+    "en-US": "Post phase"
+  },
+  "postDescription": {
+    "zh-CN": "刷新、跳转、通知",
+    "en-US": "Refresh, navigate and notify"
+  },
+  "clientValidate": {
+    "zh-CN": "客户端校验",
+    "en-US": "Client validation"
+  },
+  "apiValidate": {
+    "zh-CN": "API 校验",
+    "en-US": "API validation"
+  },
+  "apiCall": {
+    "zh-CN": "执行命令",
+    "en-US": "Execute command"
+  },
+  "navigate": {
+    "zh-CN": "页面跳转",
+    "en-US": "Navigate"
+  },
+  "refresh": {
+    "zh-CN": "刷新数据",
+    "en-US": "Refresh data"
+  },
+  "notify": {
+    "zh-CN": "消息通知",
+    "en-US": "Notification"
+  },
+  "setState": {
+    "zh-CN": "设置状态",
+    "en-US": "Set state"
+  },
+  "openModal": {
+    "zh-CN": "打开弹窗",
+    "en-US": "Open modal"
+  },
+  "custom": {
+    "zh-CN": "自定义",
+    "en-US": "Custom"
+  },
+  "moveUp": {
+    "zh-CN": "上移",
+    "en-US": "Move up"
+  },
+  "moveDown": {
+    "zh-CN": "下移",
+    "en-US": "Move down"
+  },
+  "remove": {
+    "zh-CN": "删除步骤",
+    "en-US": "Remove step"
+  },
+  "expand": {
+    "zh-CN": "展开步骤",
+    "en-US": "Expand step"
+  },
+  "collapse": {
+    "zh-CN": "收起步骤",
+    "en-US": "Collapse step"
+  }
+}

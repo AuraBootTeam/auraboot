@@ -9,20 +9,22 @@
  *
  * `useActionHandler` consumes this context when a provider is present (falling
  * back to local state otherwise), and `AsyncTaskModalHost` renders the single
- * modal — or a compact chip when the user chooses 后台运行 — from the shared state.
+ * modal — or a compact chip when the user chooses background mode — from the shared state.
  */
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import {
   AsyncTaskProgressModal,
+  asyncTaskText,
   parseProgressMessage,
   type AsyncTask,
 } from '~/framework/meta/rendering/components/AsyncTaskProgressModal';
+import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 
 export interface AsyncTaskModalSink {
   activeTask: AsyncTask | null;
   setActiveTask: (task: AsyncTask | null) => void;
   clearActiveTask: () => void;
-  /** True when the user chose 后台运行 — render the chip instead of the modal. */
+  /** True when the user chose background mode — render the chip instead of the modal. */
   minimized: boolean;
   setMinimized: (v: boolean) => void;
 }
@@ -64,11 +66,17 @@ export function AsyncTaskModalHost() {
     const terminal =
       task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled';
     const live = parseProgressMessage(task.progressMessage);
-    const taskLabel = task.taskLabel || '后台任务';
+    const locale = task.locale || 'zh-CN';
+    const taskLabel =
+      getLocalizedText(task.presentation?.title, locale) ||
+      task.taskLabel ||
+      asyncTaskText('backgroundTask', locale);
     const label = terminal
       ? task.status === 'completed'
-        ? `${taskLabel}已完成`
-        : `${taskLabel}已结束`
+        ? asyncTaskText('completed', locale, { task: taskLabel })
+        : asyncTaskText(task.status === 'failed' ? 'taskFailed' : 'taskCancelled', locale, {
+            task: taskLabel,
+          })
       : `${taskLabel} ${typeof task.progress === 'number' ? task.progress : 0}%${
           live ? ` · ${live.ok}/${live.total}` : ''
         }`;
@@ -80,7 +88,7 @@ export function AsyncTaskModalHost() {
         className="rounded-pill bg-panel text-accent hover:bg-accent-weak fixed right-4 bottom-4 z-50 flex items-center gap-2 border border-blue-200 px-4 py-2 text-sm font-medium shadow-lg"
       >
         <span
-          className={`inline-block h-2 w-2 rounded-full ${terminal ? 'bg-green-500' : 'animate-pulse bg-blue-500'}`}
+          className={`inline-block h-2 w-2 rounded-full ${task.status === 'failed' ? 'bg-red-500' : task.status === 'cancelled' ? 'bg-gray-500' : terminal ? 'bg-green-500' : 'animate-pulse bg-blue-500'}`}
         />
         {label}
       </button>

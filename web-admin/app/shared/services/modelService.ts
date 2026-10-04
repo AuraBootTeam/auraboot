@@ -101,7 +101,9 @@ export interface ModelPublishGovernance {
   fieldImpacts?: DecisionFieldImpact[];
   replayPlan?: ModelPublishReplayStep[];
   migrationPlan?: string;
+  migrationPlanSteps?: string[];
   historicalVersionPolicy?: string;
+  historicalVersionPolicyCode?: string;
   warnings?: string[];
 }
 

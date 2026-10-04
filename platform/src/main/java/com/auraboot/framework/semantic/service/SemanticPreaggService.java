@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -88,12 +89,12 @@ public class SemanticPreaggService {
         return preaggMapper.listByTenant(tenantId);
     }
 
+    @Transactional
     public void delete(String pid) {
         Long tenantId = MetaContext.get().getTenantId();
         AbSemanticPreagg preagg = requirePreagg(tenantId, pid);
-        preagg.setDeletedFlag(true);
-        preagg.setUpdatedAt(OffsetDateTime.now());
-        preaggMapper.updateById(preagg);
+        // updateById omits globally configured logical-delete fields.
+        preaggMapper.markDeleted(tenantId, pid, OffsetDateTime.now(ZoneOffset.UTC));
         jdbc.execute("DROP MATERIALIZED VIEW IF EXISTS " + preagg.getMvName());
     }
 
@@ -109,6 +110,7 @@ public class SemanticPreaggService {
     /** Scheduler sweep: refresh every preagg whose interval has elapsed. */
     @Scheduled(fixedDelay = 60_000)
     public void refreshAllDue() {
+        MetaContext.Snapshot caller = MetaContext.snapshot();
         // Cross-tenant scan on a @Scheduled thread; per-row execution below binds
         // its own tenant context. Explicit scope (tenant-exemption cleanup W3e
         // follow-up; the top thrower in the W5 runtime census — 609 failures).
@@ -124,15 +126,16 @@ public class SemanticPreaggService {
                         "semantic-preagg", "semantic-preagg-refresher");
                 refresh(preagg);
             } catch (Exception e) {
-                log.warn("Semantic preagg {} refresh failed: {}", preagg.getPid(), e.getMessage());
+                log.warn("Semantic preagg {} refresh failed: {}", preagg.getPid(), e.getMessage(), e);
             } finally {
-                MetaContext.clear();
+                restoreCaller(caller);
             }
         }
     }
 
     /** Compile the governed query, inline its params, and rebuild the MV. */
     private long refresh(AbSemanticPreagg preagg) {
+        MetaContext.Snapshot caller = MetaContext.snapshot();
         AbSemanticModel model = modelMapper.findByPid(preagg.getTenantId(), preagg.getSemanticModelPid());
         if (model == null) {
             throw new SemanticValidationException("SEMANTIC_PREAGG_MODEL_MISSING",
@@ -163,7 +166,16 @@ public class SemanticPreaggService {
             }
             return preagg.getLastRefreshRows();
         } finally {
+            restoreCaller(caller);
+        }
+    }
+
+    private static void restoreCaller(MetaContext.Snapshot caller) {
+        if (caller == null) {
             MetaContext.clear();
+        } else {
+            // Restore identity without clearing the caller's lexical command permit.
+            MetaContext.restore(caller);
         }
     }
 

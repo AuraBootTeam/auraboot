@@ -98,6 +98,7 @@ class PageSchemaCommandHandlerTest {
     void duplicate() {
         PageSchemaDTO src = new PageSchemaDTO();
         src.setName("Orders");
+        src.setSchemaVersion(4);
         src.setPageKey("orders");
         src.setKind("LIST");
         src.setModelCode("order");
@@ -131,6 +132,7 @@ class PageSchemaCommandHandlerTest {
     void duplicateBlocks() {
         PageSchemaDTO src = new PageSchemaDTO();
         src.setName("X");
+        src.setSchemaVersion(4);
         src.setPageKey("x");
         src.setKind("PAGE");
         List<Object> blocks = List.of("blk1", "blk2");
@@ -147,6 +149,84 @@ class PageSchemaCommandHandlerTest {
         ArgumentCaptor<PageSchemaCreateRequest> cap = ArgumentCaptor.forClass(PageSchemaCreateRequest.class);
         verify(pageSchemaService).create(cap.capture());
         assertEquals(blocks, cap.getValue().getBlocks());
+    }
+
+    private PageSchemaCreateRequest duplicateRequest(PageSchemaDTO source) {
+        source.setName("Orders");
+        source.setPageKey("orders");
+        when(pageSchemaService.findByPid("source")).thenReturn(source);
+        PageSchemaDTO copy = new PageSchemaDTO();
+        copy.setPid("copy");
+        when(pageSchemaService.create(any(PageSchemaCreateRequest.class))).thenReturn(copy);
+        handler.execute(ctx("pgm:duplicate_page_schema", "source"));
+        ArgumentCaptor<PageSchemaCreateRequest> cap = ArgumentCaptor.forClass(PageSchemaCreateRequest.class);
+        verify(pageSchemaService).create(cap.capture());
+        return cap.getValue();
+    }
+
+    @Test
+    void flatCopyPreservesVersionAndTopLevelDataSources() {
+        PageSchemaDTO source = new PageSchemaDTO();
+        source.setKind("list");
+        source.setSchemaVersion(4);
+        source.setBlocks(List.of(Map.of("id", "orders", "blockType", "table", "columns", List.of("name"))));
+        source.setDataSources(Map.of("orders", Map.of("model", "order")));
+        source.setExtension(Map.of("customerSetting", true));
+        PageSchemaCreateRequest copy = duplicateRequest(source);
+        assertEquals(4, copy.getSchemaVersion());
+        assertEquals(source.getBlocks(), copy.getBlocks());
+        assertEquals(source.getDataSources(), copy.getDataSources());
+        assertEquals(source.getExtension(), copy.getExtension());
+    }
+
+    @Test
+    void treeCopySerializesFieldsAndRetainsRootIdentity() {
+        PageSchemaDTO source = new PageSchemaDTO();
+        source.setKind("FORM");
+        source.setSchemaVersion(3);
+        source.setBlocks(List.of(Map.of("id", "root", "blockType", "form", "blocks", List.of(
+                Map.of("id", "section", "blockType", "form-section", "props", Map.of("columns", 2),
+                        "blocks", List.of(Map.of("id", "section_name", "blockType", "field", "field", "name")))))));
+        PageSchemaCreateRequest copy = duplicateRequest(source);
+        assertEquals(4, copy.getSchemaVersion());
+        assertEquals("form", copy.getKind());
+        assertEquals(List.of(Map.of("id", "section", "blockType", "form-section", "columns", 2,
+                "fields", List.of("name"))), copy.getBlocks());
+        assertEquals(Map.of("designerRootId", "root"), copy.getExtension());
+        assertEquals(3, source.getSchemaVersion());
+    }
+
+    @Test
+    void mislabeledFlatVersionStillConvertsTreeShape() {
+        PageSchemaDTO source = new PageSchemaDTO();
+        source.setKind("list");
+        source.setSchemaVersion(4);
+        source.setBlocks(List.of(Map.of("id", "root", "blockType", "list", "blocks", List.of(
+                Map.of("id", "table", "blockType", "table", "blocks", List.of(
+                        Map.of("id", "table_name", "blockType", "column", "field", "name")))))));
+        PageSchemaCreateRequest copy = duplicateRequest(source);
+        assertEquals(List.of(Map.of("id", "table", "blockType", "table", "columns", List.of("name"))), copy.getBlocks());
+    }
+
+    @Test
+    void unsupportedTreeContentFailsBeforeCreate() {
+        PageSchemaDTO source = new PageSchemaDTO();
+        source.setKind("list");
+        source.setSchemaVersion(3);
+        source.setBlocks(List.of(Map.of("id", "unknown", "blockType", "designer-only-unknown")));
+        when(pageSchemaService.findByPid("source")).thenReturn(source);
+        assertThrows(BusinessException.class, () -> handler.execute(ctx("pgm:duplicate_page_schema", "source")));
+        verify(pageSchemaService, never()).create(any());
+    }
+
+    @Test
+    void unsupportedStoredVersionFailsBeforeCreate() {
+        PageSchemaDTO source = new PageSchemaDTO();
+        source.setKind("list");
+        source.setSchemaVersion(99);
+        when(pageSchemaService.findByPid("source")).thenReturn(source);
+        assertThrows(BusinessException.class, () -> handler.execute(ctx("pgm:duplicate_page_schema", "source")));
+        verify(pageSchemaService, never()).create(any());
     }
 
     @Test

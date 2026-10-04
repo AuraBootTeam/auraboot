@@ -27,10 +27,10 @@ export interface ActionConfigPanelProps {
 
 // Built-in actions that are always available (not from DSL)
 const BUILTIN_ACTIONS = [
-  { code: '_import', labelKey: 'action.import', fallback: '导入' },
-  { code: '_export_excel', labelKey: 'data_tools.export_excel', fallback: '导出 Excel' },
-  { code: '_export_csv', labelKey: 'data_tools.export_csv', fallback: '导出 CSV' },
-  { code: '_print', labelKey: 'action.print', fallback: '打印' },
+  { code: '_import', labelKey: 'action.import' },
+  { code: '_export_excel', labelKey: 'data_tools.export_excel' },
+  { code: '_export_csv', labelKey: 'data_tools.export_csv' },
+  { code: '_print', labelKey: 'action.print' },
 ];
 
 interface ActionItem {
@@ -58,13 +58,6 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
   const dragItem = useRef<number | null>(null);
   const dragOverItem = useRef<number | null>(null);
   const dragSection = useRef<'pinned' | 'overflow' | null>(null);
-  const translate = useCallback(
-    (key: string, fallback: string) => {
-      const value = translateValue(key, undefined, fallback);
-      return value && value !== key ? value : fallback;
-    },
-    [translateValue],
-  );
 
   // Initialize from currentConfig or build defaults (DSL + built-in actions)
   useEffect(() => {
@@ -91,7 +84,7 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
       const cfg = configMap.get(ba.code);
       return {
         code: ba.code,
-        label: translateValue(ba.labelKey, undefined, ba.fallback),
+        label: translateValue(ba.labelKey),
         visible: cfg?.visible ?? true,
         pinned: cfg?.pinned ?? false,
         isBuiltin: true,
@@ -233,12 +226,12 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
         {item.label}
         {item.isBuiltin && (
           <span className="text-text-3 ml-1.5 text-[10px] font-normal">
-            ({translateValue('action_config.builtin', undefined, '内置')})
+            ({translateValue('action_config.builtin')})
           </span>
         )}
         {item.mandatory && (
           <span className="bg-accent-weak text-accent ml-1.5 rounded px-1.5 py-0.5 text-[10px] font-medium">
-            {translate('common.saved_view_mandatory', 'Required')}
+            {translateValue('common.saved_view_mandatory')}
           </span>
         )}
       </span>
@@ -251,8 +244,8 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
         className="text-text-3 hover:bg-hover hover:text-accent rounded p-1"
         title={
           item.pinned
-            ? translateValue('action_config.move_to_menu', undefined, '移到更多菜单')
-            : translateValue('action_config.pin_to_toolbar', undefined, '固定到工具栏')
+            ? translateValue('action_config.move_to_menu')
+            : translateValue('action_config.pin_to_toolbar')
         }
       >
         {item.pinned ? (
@@ -296,13 +289,10 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
         )}
         title={
           item.mandatory
-            ? translate(
-                'common.saved_view_mandatory_action_reason',
-                'Required actions cannot be hidden in a personal view',
-              )
+            ? translateValue('common.saved_view_mandatory_action_reason')
             : item.visible
-              ? translateValue('action_config.hide_button', undefined, '隐藏按钮')
-              : translateValue('action_config.show_button', undefined, '显示按钮')
+              ? translateValue('action_config.hide_button')
+              : translateValue('action_config.show_button')
         }
       >
         <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -335,12 +325,12 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
         {/* Header */}
         <div className="border-border flex items-center justify-between border-b px-5 py-4">
           <h3 className="text-text text-base font-semibold">
-            {translateValue('action_config.title', undefined, '配置按钮')}
+            {translateValue('action_config.title')}
           </h3>
           <button
             type="button"
             data-testid="action-config-close"
-            aria-label={translateValue('action.close', undefined, '关闭')}
+            aria-label={translateValue('action.close')}
             onClick={onClose}
             className="rounded-control text-text-3 hover:bg-hover hover:text-text-2 p-1"
           >
@@ -359,12 +349,12 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
         <div className="max-h-[60vh] overflow-y-auto px-5 py-4">
           {/* Toolbar (pinned) section */}
           <div className="text-text-2 mb-2 text-xs font-medium tracking-wide uppercase">
-            {translateValue('action_config.toolbar', undefined, '工具栏')}
+            {translateValue('action_config.toolbar')}
           </div>
           <div className="mb-3 space-y-0.5">
             {pinnedItems.length === 0 ? (
               <div className="text-text-3 px-3 py-2 text-sm italic">
-                {translateValue('action_config.no_pinned', undefined, '没有固定按钮')}
+                {translateValue('action_config.no_pinned')}
               </div>
             ) : (
               pinnedItems.map((item, idx) => renderItem(item, idx, 'pinned'))
@@ -374,20 +364,18 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
           {/* Divider */}
           <div className="my-3 flex items-center gap-2">
             <div className="border-border flex-1 border-t" />
-            <span className="text-text-3 text-xs">
-              {translateValue('action_config.divider', undefined, '此线以下显示在 ··· 菜单')}
-            </span>
+            <span className="text-text-3 text-xs">{translateValue('action_config.divider')}</span>
             <div className="border-border flex-1 border-t" />
           </div>
 
           {/* Overflow section */}
           <div className="text-text-2 mb-2 text-xs font-medium tracking-wide uppercase">
-            {translateValue('action_config.more_menu', undefined, '更多菜单')}
+            {translateValue('action_config.more_menu')}
           </div>
           <div className="space-y-0.5">
             {overflowItems.length === 0 ? (
               <div className="text-text-3 px-3 py-2 text-sm italic">
-                {translateValue('action_config.no_overflow', undefined, '没有更多按钮')}
+                {translateValue('action_config.no_overflow')}
               </div>
             ) : (
               overflowItems.map((item, idx) => renderItem(item, idx, 'overflow'))

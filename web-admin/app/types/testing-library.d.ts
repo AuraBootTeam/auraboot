@@ -1,10 +1,19 @@
+interface ScopedRoleQueries {
+  getByRole(
+    role: string,
+    options?: { name?: string | RegExp; exact?: boolean },
+  ): HTMLElement;
+}
+
 declare module '@testing-library/dom' {
+  export function within(container: HTMLElement): ScopedRoleQueries;
   export const screen: any;
   export const waitFor: any;
   export const fireEvent: any;
 }
 
 declare module '@testing-library/react' {
+  export function within(container: HTMLElement): ScopedRoleQueries;
   export const render: any;
   export const renderHook: any;
   export const act: any;

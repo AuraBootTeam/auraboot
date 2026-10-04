@@ -222,6 +222,79 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
+    void authenticatedI18nRequest_exposesVerifiedTenantOnlyInsideTheChain() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/i18n/en-US");
+        request.setServletPath("/api/i18n/en-US");
+        request.addHeader("Authorization", "Bearer i18n.token");
+        CustomUserDetails details = new CustomUserDetails("alice", "p", 7L, "alice_pid",
+                Collections.emptyList(), true, true, true, true);
+        when(jwtUtil.extractIdentifier("i18n.token")).thenReturn("alice_pid");
+        when(userDetailsService.loadUserByUsername("alice_pid")).thenReturn(details);
+        when(jwtUtil.validateToken("i18n.token", details)).thenReturn(true);
+        User user = new User();
+        user.setSecurityVersion(0);
+        when(userService.findByPid("alice_pid")).thenReturn(user);
+        when(sessionManagementService.isSessionValid("i18n.token")).thenReturn(true);
+        when(jwtUtil.extractTenantId("i18n.token")).thenReturn(100L);
+        doAnswer(invocation -> {
+            assertEquals(100L, MetaContext.getCurrentTenantId());
+            assertEquals(7L, MetaContext.getCurrentUserId());
+            assertNotNull(SecurityContextHolder.getContext().getAuthentication());
+            return null;
+        }).when(chain).doFilter(eq(request), any());
+
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        filter.doFilter(request, response, chain);
+
+        assertEquals(200, response.getStatus());
+        verify(chain).doFilter(request, response);
+        verify(jwtUtil).validateToken("i18n.token", details);
+        assertFalse(MetaContext.exists());
+    }
+
+    @Test
+    void anonymousI18nRequests_remainPublicWithoutTenantContext() throws Exception {
+        for (String path : List.of("/api/i18n", "/api/i18n/en-US")) {
+            MockHttpServletRequest request = new MockHttpServletRequest("GET", path);
+            request.setServletPath(path);
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            filter.doFilter(request, response, (req, resp) -> assertFalse(MetaContext.exists()));
+            assertEquals(200, response.getStatus());
+        }
+        verifyNoInteractions(jwtUtil, userDetailsService, userService);
+    }
+
+    @Test
+    void invalidI18nBearer_isRejectedBeforeDictionaryAccess() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/i18n");
+        request.setServletPath("/api/i18n");
+        request.addHeader("Authorization", "Bearer broken.i18n.token");
+        when(jwtUtil.extractIdentifier("broken.i18n.token"))
+                .thenThrow(new RuntimeException("invalid signature"));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, chain);
+
+        assertEquals(401, response.getStatus());
+        verify(chain, never()).doFilter(request, response);
+        assertFalse(MetaContext.exists());
+    }
+
+    @Test
+    void unrelatedPublicHealthRequest_preservesItsAuthenticationBypass() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/health");
+        request.setServletPath("/api/health");
+        request.addHeader("Authorization", "Bearer unrelated.token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, chain);
+
+        assertEquals(200, response.getStatus());
+        verify(chain).doFilter(request, response);
+        verifyNoInteractions(jwtUtil, userDetailsService, userService);
+    }
+
+    @Test
     void partyTokenRevalidatesMembershipAndAddsOnlyPartyScopedRoles() throws Exception {
         MockHttpServletRequest req = req();
         req.addHeader("Authorization", "Bearer party.token");

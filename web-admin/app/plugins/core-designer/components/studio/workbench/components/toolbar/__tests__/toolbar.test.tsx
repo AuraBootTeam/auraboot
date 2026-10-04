@@ -6,6 +6,10 @@ import {
   DesignerToolbar,
 } from '~/plugins/core-designer/components/studio/workbench/components/toolbar/index';
 
+import { DESIGNER_I18N } from '~/shared/designer/designerI18n';
+
+let mockLocale: 'zh-CN' | 'en-US' = 'zh-CN';
+
 const mockManager = {
   canUndo: vi.fn(),
   canRedo: vi.fn(),
@@ -37,7 +41,7 @@ vi.mock('~/contexts/AuthContext', () => ({
 
 vi.mock('~/contexts/I18nContext', () => ({
   useI18n: () => ({
-    locale: 'zh-CN',
+    locale: mockLocale,
   }),
 }));
 
@@ -51,6 +55,7 @@ vi.mock('~/plugins/core-designer/components/studio/components/AiPageGenerateDial
 
 describe('CommandToolbar (studio implementation)', () => {
   beforeEach(() => {
+    mockLocale = 'zh-CN';
     mockManager.canUndo.mockReturnValue(true);
     mockManager.canRedo.mockReturnValue(true);
     mockManager.getHistory.mockReturnValue({ commands: [{}] });
@@ -83,17 +88,57 @@ describe('CommandToolbar (studio implementation)', () => {
     expect(mockManager.redo).toHaveBeenCalled();
   });
 
+  it.each(['zh-CN', 'en-US'] as const)(
+    'shows persisted save metadata after loading in %s',
+    (locale) => {
+      mockLocale = locale;
+      render(
+        <DesignerToolbar
+          pageMeta={{
+            id: 'saved',
+            title: 'Saved page',
+            kind: 'list',
+            status: 'draft',
+            version: '0.1.0',
+            createdAt: '2026-10-01T00:00:00Z',
+            updatedAt: '2026-10-02T00:00:00Z',
+          }}
+        />,
+      );
+      expect(screen.getByTestId('toolbar-draft-state')).toHaveTextContent(
+        DESIGNER_I18N.autoSave.synced[locale],
+      );
+      expect(screen.getByTestId('toolbar-save-status')).toHaveTextContent(
+        DESIGNER_I18N.autoSave.saved[locale],
+      );
+      expect(screen.getByTestId('toolbar-save')).toBeDisabled();
+    },
+  );
+
+  it.each(['zh-CN', 'en-US'] as const)(
+    'shows current edits ahead of an earlier saved timestamp in %s',
+    (locale) => {
+      mockLocale = locale;
+      render(<DesignerToolbar hasUnsavedChanges lastSavedAt="2026-10-02T00:00:00Z" />);
+      expect(screen.getByTestId('toolbar-save-status')).toHaveTextContent(
+        DESIGNER_I18N.autoSave.currentEdits[locale],
+      );
+    },
+  );
+
   it('renders the redesigned page toolbar with grouped workbench controls', () => {
     render(
       <DesignerToolbar
-        pageMeta={{
-          id: 'page-1',
-          title: '请假单',
-          code: 'leave_form',
-          type: 'detail',
-          status: 'draft',
-          updatedAt: new Date().toISOString(),
-        } as any}
+        pageMeta={
+          {
+            id: 'page-1',
+            title: '请假单',
+            code: 'leave_form',
+            type: 'detail',
+            status: 'draft',
+            updatedAt: new Date().toISOString(),
+          } as any
+        }
         hasUnsavedChanges
         canUndo
         canRedo

@@ -6,15 +6,19 @@
  * @since 3.2.0
  */
 
+import { useI18n } from '~/contexts/I18nContext';
+import { getLocalizedText } from '~/utils/i18n';
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   CATEGORIES,
-  SHORTCUTS,
   getShortcutsByCategory,
   searchShortcuts,
   formatKeyCombo,
 } from './shortcuts';
 import type { ShortcutCategory, ShortcutDefinition } from './types';
+
+const SEARCH_TEXT = { 'zh-CN': '搜索快捷键...', 'en-US': 'Search shortcuts...' };
+const CLOSE_TEXT = { 'zh-CN': '关闭', 'en-US': 'Close' };
 
 interface ShortcutHelpPanelProps {
   /** Whether panel is visible */
@@ -33,6 +37,7 @@ export const ShortcutHelpPanel: React.FC<ShortcutHelpPanelProps> = ({
   onClose,
   mode = 'modal',
 }) => {
+  const { locale } = useI18n();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<ShortcutCategory | 'all'>('all');
 
@@ -53,7 +58,7 @@ export const ShortcutHelpPanel: React.FC<ShortcutHelpPanelProps> = ({
   // Filter shortcuts
   const filteredShortcuts = useMemo(() => {
     let shortcuts = searchQuery
-      ? searchShortcuts(searchQuery)
+      ? searchShortcuts(searchQuery, locale)
       : getShortcutsByCategory(selectedCategory);
 
     // Group by category
@@ -65,7 +70,7 @@ export const ShortcutHelpPanel: React.FC<ShortcutHelpPanelProps> = ({
     });
 
     return grouped;
-  }, [searchQuery, selectedCategory]);
+  }, [searchQuery, selectedCategory, locale]);
 
   // Handle search
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -88,9 +93,10 @@ export const ShortcutHelpPanel: React.FC<ShortcutHelpPanelProps> = ({
     <div className="flex h-full max-h-[80vh] flex-col">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
-        <h2 className="text-lg font-semibold text-gray-900">键盘快捷键</h2>
+        <h2 className="text-lg font-semibold text-gray-900">{getLocalizedText({ 'zh-CN': '键盘快捷键', 'en-US': 'Keyboard shortcuts' }, locale)}</h2>
         <button
           type="button"
+          aria-label={getLocalizedText(CLOSE_TEXT, locale)}
           onClick={onClose}
           className="rounded p-1 text-gray-400 hover:text-gray-600"
         >
@@ -125,7 +131,8 @@ export const ShortcutHelpPanel: React.FC<ShortcutHelpPanelProps> = ({
             type="text"
             value={searchQuery}
             onChange={handleSearchChange}
-            placeholder="搜索快捷键..."
+            aria-label={getLocalizedText(SEARCH_TEXT, locale)}
+            placeholder={getLocalizedText(SEARCH_TEXT, locale)}
             className="w-full rounded-md border border-gray-200 py-2 pr-3 pl-9 focus:ring-2 focus:ring-blue-500 focus:outline-none"
             autoFocus
           />
@@ -143,9 +150,9 @@ export const ShortcutHelpPanel: React.FC<ShortcutHelpPanelProps> = ({
               : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
           }`}
         >
-          全部
+          {getLocalizedText({ 'zh-CN': '全部', 'en-US': 'All' }, locale)}
         </button>
-        {CATEGORIES.sort((a, b) => a.order - b.order).map((category) => (
+        {[...CATEGORIES].sort((a, b) => a.order - b.order).map((category) => (
           <button
             key={category.id}
             type="button"
@@ -164,7 +171,7 @@ export const ShortcutHelpPanel: React.FC<ShortcutHelpPanelProps> = ({
                 d={category.icon}
               />
             </svg>
-            {category.name}
+            {getLocalizedText(category.name, locale)}
           </button>
         ))}
       </div>
@@ -172,7 +179,7 @@ export const ShortcutHelpPanel: React.FC<ShortcutHelpPanelProps> = ({
       {/* Shortcuts list */}
       <div className="flex-1 overflow-auto px-4 py-3">
         {filteredShortcuts.size === 0 ? (
-          <div className="py-8 text-center text-gray-500">没有找到匹配的快捷键</div>
+          <div className="py-8 text-center text-gray-500">{getLocalizedText({ 'zh-CN': '没有找到匹配的快捷键', 'en-US': 'No matching shortcuts' }, locale)}</div>
         ) : (
           Array.from(filteredShortcuts.entries())
             .sort(([catA], [catB]) => {
@@ -200,7 +207,7 @@ export const ShortcutHelpPanel: React.FC<ShortcutHelpPanelProps> = ({
                       />
                     </svg>
                     <span className="text-sm font-medium text-gray-700">
-                      {categoryInfo?.name || category}
+                      {getLocalizedText(categoryInfo?.name, locale) || category}
                     </span>
                   </div>
 
@@ -218,7 +225,7 @@ export const ShortcutHelpPanel: React.FC<ShortcutHelpPanelProps> = ({
 
       {/* Footer */}
       <div className="border-t border-gray-100 px-4 py-2 text-center text-xs text-gray-400">
-        按 <kbd className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-600">Esc</kbd> 关闭
+        {getLocalizedText({ 'zh-CN': '按', 'en-US': 'Press' }, locale)} <kbd className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-600">Esc</kbd> {getLocalizedText({ ...CLOSE_TEXT, 'en-US': 'to close' }, locale)}
       </div>
     </div>
   );
@@ -251,14 +258,15 @@ interface ShortcutItemProps {
 }
 
 const ShortcutItem: React.FC<ShortcutItemProps> = ({ shortcut }) => {
-  const keyCombo = formatKeyCombo(shortcut.keys);
+  const { locale } = useI18n();
+  const keyCombo = formatKeyCombo(shortcut.keys, locale);
 
   return (
     <div className="flex items-center justify-between rounded-md px-3 py-2 hover:bg-gray-50">
       <div className="min-w-0 flex-1">
-        <div className="text-sm text-gray-900">{shortcut.label}</div>
+        <div className="text-sm text-gray-900">{getLocalizedText(shortcut.label, locale)}</div>
         {shortcut.description && (
-          <div className="truncate text-xs text-gray-500">{shortcut.description}</div>
+          <div className="truncate text-xs text-gray-500">{getLocalizedText(shortcut.description, locale)}</div>
         )}
       </div>
       <div className="ml-4 flex-shrink-0">
@@ -276,6 +284,7 @@ interface KeyComboProps {
 }
 
 const KeyCombo: React.FC<KeyComboProps> = ({ combo }) => {
+  const { locale } = useI18n();
   // Split by " / " for alternatives
   const alternatives = combo.split(' / ');
 
@@ -283,7 +292,7 @@ const KeyCombo: React.FC<KeyComboProps> = ({ combo }) => {
     <div className="flex items-center gap-1">
       {alternatives.map((alt, altIndex) => (
         <React.Fragment key={altIndex}>
-          {altIndex > 0 && <span className="mx-1 text-xs text-gray-400">或</span>}
+          {altIndex > 0 && <span className="mx-1 text-xs text-gray-400">{getLocalizedText({ 'zh-CN': '或', 'en-US': 'or' }, locale)}</span>}
           <div className="flex items-center gap-0.5">
             {alt
               .split(/(?=[A-Z+⌘⇧⌥⌫␣])/)

@@ -122,6 +122,7 @@ export function RowActionButtons({
 }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
+  const { t } = useI18n();
   const menuRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
 
@@ -200,7 +201,7 @@ export function RowActionButtons({
               setOpen(!open);
             }}
             className="rounded-control text-text-3 hover:bg-hover hover:text-text-2 p-1 transition-colors"
-            aria-label={t('action.more')}
+            aria-label={t('table_actions.more')}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"

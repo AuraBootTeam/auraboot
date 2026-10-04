@@ -1,0 +1,122 @@
+{
+  "title": {
+    "zh-CN": "团队成员",
+    "en-US": "Team members"
+  },
+  "loadFailure": {
+    "zh-CN": "团队成员加载失败",
+    "en-US": "Unable to load team members"
+  },
+  "added": {
+    "zh-CN": "成员已加入团队",
+    "en-US": "Member added to the team"
+  },
+  "addFailure": {
+    "zh-CN": "添加成员失败",
+    "en-US": "Unable to add member"
+  },
+  "removed": {
+    "zh-CN": "成员已移出团队",
+    "en-US": "Member removed from the team"
+  },
+  "removeFailure": {
+    "zh-CN": "移除成员失败",
+    "en-US": "Unable to remove member"
+  },
+  "confirmRemove": {
+    "zh-CN": "确认将 {name} 移出团队？",
+    "en-US": "Remove {name} from the team?"
+  },
+  "missingTeam": {
+    "zh-CN": "未找到团队记录，无法加载成员。",
+    "en-US": "No team record found. Members cannot be loaded."
+  },
+  "subtitle": {
+    "zh-CN": "维护团队成员与团队角色",
+    "en-US": "Manage team members and their roles"
+  },
+  "addMember": {
+    "zh-CN": "添加成员",
+    "en-US": "Add member"
+  },
+  "empty": {
+    "zh-CN": "暂无团队成员",
+    "en-US": "No team members"
+  },
+  "emptyHint": {
+    "zh-CN": "添加成员后，他们会出现在这里。",
+    "en-US": "Members will appear here after you add them."
+  },
+  "user": {
+    "zh-CN": "用户",
+    "en-US": "User"
+  },
+  "email": {
+    "zh-CN": "邮箱",
+    "en-US": "Email"
+  },
+  "role": {
+    "zh-CN": "角色",
+    "en-US": "Role"
+  },
+  "joined": {
+    "zh-CN": "加入时间",
+    "en-US": "Joined"
+  },
+  "actions": {
+    "zh-CN": "操作",
+    "en-US": "Actions"
+  },
+  "removeMember": {
+    "zh-CN": "移除成员",
+    "en-US": "Remove member"
+  },
+  "modalTitle": {
+    "zh-CN": "添加团队成员",
+    "en-US": "Add team member"
+  },
+  "selectUser": {
+    "zh-CN": "选择用户",
+    "en-US": "Select user"
+  },
+  "loading": {
+    "zh-CN": "正在加载成员...",
+    "en-US": "Loading members..."
+  },
+  "noCandidates": {
+    "zh-CN": "暂无可加入的成员。",
+    "en-US": "No available members to add."
+  },
+  "selectPlaceholder": {
+    "zh-CN": "请选择用户",
+    "en-US": "Select a user"
+  },
+  "noEmail": {
+    "zh-CN": "无邮箱",
+    "en-US": "No email"
+  },
+  "cancel": {
+    "zh-CN": "取消",
+    "en-US": "Cancel"
+  },
+  "add": {
+    "zh-CN": "添加",
+    "en-US": "Add"
+  },
+  "leader": {
+    "zh-CN": "负责人",
+    "en-US": "Leader"
+  },
+  "member": {
+    "zh-CN": "成员",
+    "en-US": "Member"
+  },
+  "retry": {
+    "zh-CN": "重试",
+    "en-US": "Retry"
+  },
+  "candidateFailure": {
+    "zh-CN": "可选成员加载失败",
+    "en-US": "Unable to load available members"
+  }
+}

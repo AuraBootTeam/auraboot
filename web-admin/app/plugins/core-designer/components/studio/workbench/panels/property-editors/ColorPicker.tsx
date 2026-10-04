@@ -7,6 +7,7 @@
  */
 
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { useSmartText } from '~/utils/i18n';
 import type { BaseEditorProps, ColorFormat, ColorPreset } from './types';
 
 interface ColorPickerProps extends BaseEditorProps<string> {
@@ -26,18 +27,18 @@ interface ColorPickerProps extends BaseEditorProps<string> {
  * Default color presets
  */
 const DEFAULT_PRESETS: ColorPreset[] = [
-  { name: '黑色', color: '#000000' },
-  { name: '白色', color: '#ffffff' },
-  { name: '灰色', color: '#9ca3af' },
-  { name: '红色', color: '#ef4444' },
-  { name: '橙色', color: '#f97316' },
-  { name: '黄色', color: '#eab308' },
-  { name: '绿色', color: '#22c55e' },
-  { name: '青色', color: '#06b6d4' },
-  { name: '蓝色', color: '#3b82f6' },
-  { name: '紫色', color: '#8b5cf6' },
-  { name: '粉色', color: '#ec4899' },
-  { name: '透明', color: 'transparent' },
+  { name: 'Black', color: '#000000' },
+  { name: 'White', color: '#ffffff' },
+  { name: 'Gray', color: '#9ca3af' },
+  { name: 'Red', color: '#ef4444' },
+  { name: 'Orange', color: '#f97316' },
+  { name: 'Yellow', color: '#eab308' },
+  { name: 'Green', color: '#22c55e' },
+  { name: 'Cyan', color: '#06b6d4' },
+  { name: 'Blue', color: '#3b82f6' },
+  { name: 'Purple', color: '#8b5cf6' },
+  { name: 'Pink', color: '#ec4899' },
+  { name: 'Transparent', color: 'transparent' },
 ];
 
 /**
@@ -192,6 +193,13 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
   inline = false,
   className = '',
 }) => {
+  const st = useSmartText();
+  const visiblePresets = useMemo(() => presets === DEFAULT_PRESETS
+    ? presets.map((preset) => ({
+      ...preset,
+      name: st(`$i18n:designer_color_picker.colors.${preset.name.toLowerCase()}`, preset.name),
+    }))
+    : presets, [presets, st]);
   const [isOpen, setIsOpen] = useState(inline);
   const [hsv, setHsv] = useState(() => parseColor(value));
   const [inputValue, setInputValue] = useState(value);
@@ -341,7 +349,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
 
       {/* Hue slider */}
       <div className="space-y-1">
-        <div className="text-xs text-gray-500">色相</div>
+        <div className="text-xs text-gray-500">{st('$i18n:designer_color_picker.hue', 'Hue')}</div>
         <input
           type="range"
           min="0"
@@ -367,7 +375,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
       {/* Alpha slider */}
       {showAlpha && (
         <div className="space-y-1">
-          <div className="text-xs text-gray-500">透明度</div>
+          <div className="text-xs text-gray-500">{st('$i18n:designer_color_picker.opacity', 'Opacity')}</div>
           <input
             type="range"
             min="0"
@@ -405,9 +413,9 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
       {/* Presets */}
       {presets.length > 0 && (
         <div className="space-y-1">
-          <div className="text-xs text-gray-500">预设颜色</div>
+          <div className="text-xs text-gray-500">{st('$i18n:designer_color_picker.presets', 'Preset colors')}</div>
           <div className="grid grid-cols-6 gap-1">
-            {presets.map((preset) => (
+            {visiblePresets.map((preset) => (
               <button
                 key={preset.name}
                 type="button"
@@ -452,7 +460,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
           style={{ backgroundColor: value || '#000000' }}
         />
         <span className="flex-1 truncate text-left text-sm text-gray-600">
-          {value || '选择颜色'}
+          {value || st('$i18n:designer_color_picker.choose', 'Choose color')}
         </span>
         <svg
           className="h-4 w-4 text-gray-400"

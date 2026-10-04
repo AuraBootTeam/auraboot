@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Self-contained Linux CI runner for the complete Gradle `test` task. Some
-# historical tests still use the fixed skills-c2 PostgreSQL/Redis ports, while
+# historical tests use a native PostgreSQL/Redis/Kafka stack, while
 # newer smoke tests use Testcontainers. Provision both paths and retain the
 # dedicated Compose project after returning for owner evidence inspection.
 
@@ -12,6 +12,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 ARTIFACTS="${AURA_REGRESSION_ARTIFACTS:-$PROJECT_ROOT/.workspace/oss-backend-unit-ci}"
 RUNTIME_TOKEN="$(printf '%s' "${AURA_REGRESSION_SLOT:-local}-$$" | tr -cd '[:alnum:]-')"
 COMPOSE_PROJECT="aura-ci-oss-backend-$RUNTIME_TOKEN"
+export AURA_CI_JOB_ID="${AURA_CI_JOB_ID:-oss-backend-$RUNTIME_TOKEN}"
 
 free_port() {
   local candidate="$1" limit="$2"
@@ -39,13 +40,9 @@ if [[ -z "${AURA_OSS_CI_KAFKA_PORT:-}" ]]; then
     || { printf '[oss-backend-unit-ci] environment-invalid: no free Kafka CI port\n' >&2; exit 2; }
 fi
 export AURA_OSS_CI_POSTGRES_PORT AURA_OSS_CI_REDIS_PORT AURA_OSS_CI_KAFKA_PORT
-export AURA_OSS_CI_POSTGRES_CONTAINER="auraboot-oss-ci-postgres-$RUNTIME_TOKEN"
-export AURA_OSS_CI_REDIS_CONTAINER="auraboot-oss-ci-redis-$RUNTIME_TOKEN"
 COMPOSE_ARGS=(
-  -f "$PROJECT_ROOT/docker-compose.yml"
   -f "$PROJECT_ROOT/docker-compose.oss-backend-ci.override.yml"
   -p "$COMPOSE_PROJECT"
-  --profile cache
 )
 FLYWAY_IMAGE='flyway/flyway:12.8.1@sha256:b8a2d72926b98234c1fb8f45659fd23d8a001af9ee7f450326aa46af14d447bb'
 
@@ -58,6 +55,12 @@ environment_invalid() {
 
 cleanup() {
   status=$?
+  trap - EXIT HUP INT TERM
+  if ! python3 "$SCRIPT_DIR/cleanup-ci-gradle.py" --job-id "$AURA_CI_JOB_ID" \
+      --source-root "$PROJECT_ROOT" --report "$ARTIFACTS/gradle-process-cleanup.json"; then
+    printf '[oss-backend-unit-ci] environment-invalid: owned Gradle cleanup incomplete\n' >&2
+    [[ "$status" -ne 0 ]] || status=2
+  fi
   docker compose "${COMPOSE_ARGS[@]}" ps --all > "$ARTIFACTS/compose-ps.txt" 2>&1 || true
   docker compose "${COMPOSE_ARGS[@]}" logs --no-color > "$ARTIFACTS/compose.log" 2>&1 || true
   docker compose "${COMPOSE_ARGS[@]}" stop >/dev/null 2>&1 || true
@@ -73,8 +76,12 @@ cleanup() {
     "$COMPOSE_PROJECT" "$ARTIFACTS"
   exit "$status"
 }
-trap cleanup EXIT HUP INT TERM
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
+command -v python3 >/dev/null 2>&1 || environment_invalid 'Python 3 is unavailable'
 command -v docker >/dev/null 2>&1 || environment_invalid 'docker is unavailable'
 command -v timeout >/dev/null 2>&1 || environment_invalid 'timeout is unavailable'
 docker compose version >/dev/null 2>&1 || environment_invalid 'docker compose v2 is unavailable'
@@ -130,7 +137,7 @@ if ! PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT=120000 \
 fi
 
 if ! docker compose "${COMPOSE_ARGS[@]}" up -d --wait postgres redis kafka; then
-  environment_invalid 'skills-c2 PostgreSQL/Redis/Kafka stack did not become healthy'
+  environment_invalid 'CI PostgreSQL/Redis/Kafka stack did not become healthy'
 fi
 
 # The PostgreSQL image reports healthy while its temporary init server may still
@@ -149,7 +156,7 @@ while (( SECONDS < postgres_init_deadline )); do
   sleep 2
 done
 if [[ "$postgres_initialized" != true ]]; then
-  environment_invalid 'skills-c2 PostgreSQL did not finish schema initialization within 5 minutes'
+  environment_invalid 'CI PostgreSQL did not finish schema initialization within 5 minutes'
 fi
 
 FLYWAY_ARGS=(
@@ -178,13 +185,13 @@ if ! run_flyway validate > "$ARTIFACTS/flyway-validate.log" 2>&1; then
 fi
 
 # Bootstrap never resets shared-suite fixtures or bypasses immutable binding guards.
+BOOTSTRAP_DATABASE="aura_boot_bootstrap_${RUNTIME_TOKEN//-/_}"
 if ! docker compose "${COMPOSE_ARGS[@]}" exec -T postgres \
-  psql -U auraboot -d postgres -v ON_ERROR_STOP=1 \
-  -c 'CREATE DATABASE aura_boot_bootstrap OWNER auraboot' > "$ARTIFACTS/bootstrap-database-create.log" 2>&1; then
+  createdb -U auraboot "$BOOTSTRAP_DATABASE" > "$ARTIFACTS/bootstrap-database-create.log" 2>&1; then
   environment_invalid 'cannot create isolated bootstrap database'
 fi
-if ! run_flyway migrate aura_boot_bootstrap > "$ARTIFACTS/bootstrap-flyway-migrate.log" 2>&1 \
-  || ! run_flyway validate aura_boot_bootstrap > "$ARTIFACTS/bootstrap-flyway-validate.log" 2>&1; then
+if ! run_flyway migrate "$BOOTSTRAP_DATABASE" > "$ARTIFACTS/bootstrap-flyway-migrate.log" 2>&1 \
+  || ! run_flyway validate "$BOOTSTRAP_DATABASE" > "$ARTIFACTS/bootstrap-flyway-validate.log" 2>&1; then
   printf '[oss-backend-unit-ci] product-failure: bootstrap database migration failed\n' >&2
   exit 1
 fi
@@ -225,7 +232,7 @@ run_backend_gradle() {
   local database="$1"
   shift
 TEST_DATABASE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/${database}?charSet=UTF8" \
-BOOTSTRAP_TEST_DATABASE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/aura_boot_bootstrap?charSet=UTF8" \
+BOOTSTRAP_TEST_DATABASE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/${BOOTSTRAP_DATABASE}?charSet=UTF8" \
 TEST_DATABASE_USERNAME='auraboot' \
 TEST_DATABASE_PASSWORD='auraboot_dev' \
 DATABASE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/${database}?charSet=UTF8" \
@@ -242,15 +249,15 @@ AURA_CI_REQUIRE_KAFKA='1' \
 AURA_CI_KAFKA_BOOTSTRAP_SERVERS="127.0.0.1:$AURA_OSS_CI_KAFKA_PORT" \
 MAVEN_REPO_LOCAL="$ARTIFACTS/m2" \
 GRADLE_OPTS="-Dmaven.repo.local=$ARTIFACTS/m2 ${GRADLE_OPTS:-}" \
-platform/gradlew -p platform "$@"
+platform/gradlew --no-daemon -p platform "$@"
 }
 
 run_backend_gradle aura_boot --continue cleanTest test
 root_test_status=$?
 printf '%s\n' "$root_test_status" > "$ARTIFACTS/root-test-exit-code.txt"
-printf '%s\n' 'aura_boot_bootstrap' > "$ARTIFACTS/bootstrap-database.txt"
+printf '%s\n' "$BOOTSTRAP_DATABASE" > "$ARTIFACTS/bootstrap-database.txt"
 AURA_BOOTSTRAP_ISOLATED_DATABASE=1 \
-run_backend_gradle aura_boot_bootstrap --continue bootstrapBillingAccountTest
+run_backend_gradle aura_boot --continue bootstrapBillingAccountTest
 bootstrap_test_status=$?
 printf '%s\n' "$bootstrap_test_status" > "$ARTIFACTS/bootstrap-test-exit-code.txt"
 gradle_status=0

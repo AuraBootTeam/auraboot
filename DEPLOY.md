@@ -15,6 +15,11 @@ from the distribution. To run against MySQL you must provide the connector
 jar on the backend classpath yourself (e.g. via your own image build or
 `loader.path`).
 
+The backend test runtime includes the MySQL connector for Testcontainers
+readiness checks and JDBC integration tests. This test-only dependency is
+managed by the Spring Boot BOM and does not add the driver to the production
+runtime classpath or distribution.
+
 ```bash
 # Clone the repository
 git clone https://github.com/AuraBootTeam/auraboot.git

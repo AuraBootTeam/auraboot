@@ -4129,8 +4129,17 @@ CREATE TABLE public.ab_audit_trail (
     changed_fields text[],
     metadata jsonb,
     previous_hash character varying(64),
-    record_hash character varying(64) NOT NULL
+    record_hash character varying(64) NOT NULL,
+    hash_version integer DEFAULT 1 NOT NULL,
+    CONSTRAINT ck_audit_trail_hash_version CHECK ((hash_version = ANY (ARRAY[1, 2])))
 );
+
+
+--
+-- Name: COLUMN ab_audit_trail.hash_version; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_audit_trail.hash_version IS 'Hash format: 1 legacy JSON text, 2 canonical JSON and persisted timestamp precision';
 
 
 --
