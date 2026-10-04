@@ -28,6 +28,20 @@ import static org.mockito.Mockito.*;
 /** Verifies import state, conflict handling and service payloads at persistence ports. */
 @ExtendWith(MockitoExtension.class)
 class PluginResourceImporterLifecycleTest {
+    @Mock CommandService commandService;
+    @Mock BindingRuleMapper bindingRuleMapper;
+    @Mock MetaModelService metaModelService;
+    @Mock MetaFieldService metaFieldService;
+    @Mock MetaModelMapper metaModelMapper;
+    @Mock MetaFieldMapper metaFieldMapper;
+    @Mock CommandDefinitionMapper commandDefinitionMapper;
+    @Mock com.auraboot.framework.permission.service.PermissionService permissionService;
+    @Mock com.auraboot.framework.permission.mapper.PermissionMapper permissionMapper;
+    @Mock com.auraboot.framework.menu.service.MenuService menuService;
+    @Mock com.auraboot.framework.menu.mapper.MenuMapper menuMapper;
+    @Mock PageSchemaService pageSchemaService;
+    @Mock PageSchemaMapper pageSchemaMapper;
+    @Mock com.auraboot.framework.rbac.mapper.RoleMapper roleMapper;
     @Mock DashboardService dashboardService;
     @Mock NamedQueryService namedQueryService;
     @Mock NamedQueryMapper namedQueryMapper;
@@ -143,5 +157,73 @@ class PluginResourceImporterLifecycleTest {
         assertThat(capture.getValue().getAllowedOperations()).containsExactly("query", "create", "update", "delete", "transition");
         verify(jdbcTemplate).update("DELETE FROM ab_agent_eval_case WHERE tenant_id = ? AND agent_code = ?", 42L, "invoice_assistant");
         if (existing) assertThat(result.getResourcePid()).isEqualTo("agent-42");
+    }
+
+    @ParameterizedTest @ValueSource(strings={"CREATE","OVERWRITE","SKIP","ERROR"})
+    void bindingConflictIdentityKeepsUnrelatedRulesAndCarriesConfiguration(String policy) {
+        var command=new com.auraboot.framework.meta.dto.CommandDefinitionDTO(); command.setPid("c-42");
+        var input=com.auraboot.framework.plugin.dto.imports.BindingRuleDTO.builder().commandCode("invoice_create").ruleType("VALIDATION")
+                .expression("amount >= 0").targetModel("invoice").targetField("amount").sourceField("value").sequence(3).enabled(false).config(Map.of("strict",true)).build();
+        var matching=new com.auraboot.framework.meta.dto.BindingRuleDTO(); matching.setPid("matching"); matching.setRuleType("VALIDATION"); matching.setSequence(3);
+        matching.setTargetModel(" invoice "); matching.setTargetField("amount"); matching.setSourceField("value"); matching.setHandlerClass(" ");
+        var unrelated=new com.auraboot.framework.meta.dto.BindingRuleDTO(); unrelated.setPid("unrelated"); unrelated.setRuleType("VALIDATION"); unrelated.setSequence(4);
+        when(commandService.findByCode("invoice_create")).thenReturn(command);
+        when(commandService.getBindingRules("c-42")).thenReturn("CREATE".equals(policy) ? List.of(unrelated) : List.of(matching,unrelated));
+        var strategy="CREATE".equals(policy) ? ImportRequest.ConflictStrategy.OVERWRITE : ImportRequest.ConflictStrategy.valueOf(policy);
+        if ("ERROR".equals(policy)) {
+            assertThatThrownBy(() -> importer.importBindingRule(input,"p","i",42L,strategy)).isInstanceOf(PluginException.class);
+            verify(commandService,never()).addBindingRule(anyString(),any()); return;
+        }
+        if ("SKIP".equals(policy)) {
+            assertThat(importer.importBindingRule(input,"p","i",42L,strategy).getActionEnum()).isEqualTo(ResourceAction.SKIP);
+            verify(commandService,never()).addBindingRule(anyString(),any()); return;
+        }
+        var created=new com.auraboot.framework.meta.dto.BindingRuleDTO(); created.setPid("new-rule");
+        when(commandService.addBindingRule(eq("c-42"),any())).thenReturn(created);
+        var result=importer.importBindingRule(input,"p","i",42L,strategy);
+        assertThat(result.getActionEnum()).isEqualTo("CREATE".equals(policy) ? ResourceAction.CREATE : ResourceAction.UPDATE);
+        assertThat(result.getResourceCode()).isEqualTo("invoice_create:VALIDATION:3:invoice:amount:value:-:-");
+        verify(commandService).addBindingRule(eq("c-42"),argThat(q -> q.getExpression().equals("amount >= 0") && q.getConfig().equals("{\"strict\":true}") && !q.getEnabled()));
+        verify(bindingRuleMapper).updatePluginPid("p","new-rule"); verify(commandService,never()).removeBindingRule("unrelated");
+        verify(commandService,times("CREATE".equals(policy) ? 0 : 1)).removeBindingRule("matching");
+    }
+
+    @Test void unknownBindingCommandPreservesFailureCauseAndPreventsPersistence() {
+        when(commandService.findByCode("missing")).thenThrow(new IllegalArgumentException("missing command"));
+        var input=com.auraboot.framework.plugin.dto.imports.BindingRuleDTO.builder().commandCode("missing").ruleType("VALIDATION").build();
+        assertThatThrownBy(() -> importer.importBindingRule(input,"p","i",42L,ImportRequest.ConflictStrategy.OVERWRITE)).isInstanceOf(PluginException.class).hasCauseInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(bindingRuleMapper);
+    }
+
+    @ParameterizedTest @ValueSource(strings={"MODEL","FIELD","COMMAND","PERMISSION","MENU","PAGE","DICT","NAMED_QUERY"})
+    void rollbackArchivesResourceWhenServiceDeletionFails(String type) {
+        var resource=PluginResource.builder().resourceType(type).resourcePid("r-42").resourceId(42L).tenantId(43L).build();
+        switch(type) {
+            case "MODEL" -> doThrow(new IllegalStateException("offline")).when(metaModelService).delete("r-42");
+            case "FIELD" -> doThrow(new IllegalStateException("offline")).when(metaFieldService).delete("r-42");
+            case "COMMAND" -> doThrow(new IllegalStateException("offline")).when(commandService).delete("r-42");
+            case "PERMISSION" -> doThrow(new IllegalStateException("offline")).when(permissionService).delete(42L);
+            case "MENU" -> doThrow(new IllegalStateException("offline")).when(menuService).deleteMenu(42L);
+            case "PAGE" -> doThrow(new IllegalStateException("offline")).when(pageSchemaService).delete("r-42");
+            case "DICT" -> doThrow(new IllegalStateException("offline")).when(dictService).delete("r-42");
+            case "NAMED_QUERY" -> doThrow(new IllegalStateException("offline")).when(namedQueryService).delete("r-42");
+        }
+        importer.rollbackResource(resource);
+        switch(type) {
+            case "MODEL" -> verify(metaModelMapper).archiveByPid("r-42");
+            case "FIELD" -> verify(metaFieldMapper).archiveByPid("r-42");
+            case "COMMAND" -> verify(commandDefinitionMapper).archiveByPid("r-42");
+            case "PERMISSION" -> verify(permissionMapper).softDelete(42L);
+            case "MENU" -> verify(menuMapper).softDeleteById(42L);
+            case "PAGE" -> verify(pageSchemaMapper).archiveByPid("r-42");
+            case "DICT" -> verify(dictMapper).softDeleteByPid("r-42");
+            case "NAMED_QUERY" -> verify(namedQueryMapper).updateStatusByPid("r-42","archived");
+        }
+    }
+    @Test void agentRestoreScopesEvalCasesToTenantAndAgentIdentity() {
+        var resource=PluginResource.builder().resourceType("AGENT_DEFINITION").resourcePid("agent-42").resourceCode("invoice_agent").tenantId(42L).build();
+        importer.restoreResource(resource);
+        verify(jdbcTemplate).update(contains("UPDATE ab_agent_definition"),eq("agent-42"));
+        verify(jdbcTemplate).update(contains("WHERE tenant_id = ? AND agent_code = ?"),eq(42L),eq("invoice_agent"));
     }
 }
