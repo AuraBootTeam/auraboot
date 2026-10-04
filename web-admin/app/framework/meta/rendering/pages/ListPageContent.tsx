@@ -1,3 +1,4 @@
+import { resolveTemporalType } from '~/shared/services/dateTimeFormatService';
 /**
  * ListPageContent — Extracted rendering logic from dynamic.$tableName.tsx
  *
@@ -3224,22 +3225,15 @@ function ListPageContentInner(props: PageContentProps) {
       if (byRenderComponent) {
         return byRenderComponent;
       }
+      const declaredTemporalType = resolveTemporalType(undefined, modelFieldMap.get(field)?.dataType, undefined);
+      if (declaredTemporalType) return declaredTemporalType;
       // REFERENCE field: either ends with _id, or has a {field}_display sibling in the record
       if (field.endsWith('_id') || (record && record[`${field}_display`] !== undefined)) {
         return 'reference';
       }
-      if (field.endsWith('_at')) {
-        return 'datetime';
-      }
-      if (field.endsWith('_date')) {
-        return 'date';
-      }
-      if (field.endsWith('_time')) {
-        return 'time';
-      }
-      if (typeof value === 'string' && /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) {
-        return 'datetime';
-      }
+      const declaredDataType = modelFieldMap.get(field)?.dataType;
+      const temporalType = resolveTemporalType(field, declaredDataType, value);
+      if (temporalType) return temporalType;
       // Detect boolean values (native boolean or string "true"/"false")
       if (typeof value === 'boolean' || value === 'true' || value === 'false') {
         return 'boolean' as any;

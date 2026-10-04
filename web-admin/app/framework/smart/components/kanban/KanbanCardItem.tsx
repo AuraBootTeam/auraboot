@@ -84,14 +84,20 @@ function renderFieldValue(field: KanbanCardField, value: unknown): React.ReactNo
  * customer or owner reference never degrades into an internal public id.
  */
 export function resolveKanbanCardFieldValue(card: KanbanCard, field: KanbanCardField): unknown {
-  const displayValue = card[`${field.field}_display`];
-  if (displayValue !== undefined && displayValue !== null && displayValue !== '') {
-    return displayValue;
-  }
   const value = card[field.field];
+  const displayValue = card[`${field.field}_display`];
   if (field.dictCode) {
     if (value === undefined || value === null || value === '') return value;
-    return field.valueLabels?.[String(value)] ?? field.unrecognizedLabel ?? '—';
+    const dictionaryLabel = field.valueLabels?.[String(value)];
+    if (dictionaryLabel) return dictionaryLabel;
+    // An API fallback identical to the stored enum is not a business label.
+    if (displayValue !== undefined && displayValue !== null && displayValue !== '' && String(displayValue) !== String(value)) {
+      return displayValue;
+    }
+    return field.unrecognizedLabel ?? '—';
+  }
+  if (displayValue !== undefined && displayValue !== null && displayValue !== '') {
+    return displayValue;
   }
   return value;
 }
