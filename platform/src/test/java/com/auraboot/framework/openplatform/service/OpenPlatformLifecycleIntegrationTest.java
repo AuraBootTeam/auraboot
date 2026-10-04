@@ -236,6 +236,17 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
                     credential.clientSecret(), "openapi.profile.read");
             var record = authMapper.findToken(secretCodec.sha256(token.accessToken()),
                     OpenPlatformTokenService.AUDIENCE, Instant.now());
+            Instant deniedAt = Instant.now();
+            assertNull(rateLimitMapper.authenticate(secretCodec.sha256(token.accessToken()),
+                    OpenPlatformTokenService.AUDIENCE, deniedAt,
+                    deniedAt.truncatedTo(java.time.temporal.ChronoUnit.MINUTES),
+                    "openapi.events.read").consumedCount());
+            assertEquals(0, jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM ab_open_api_rate_window WHERE installation_id = ?",
+                    Integer.class, record.installationId()));
+            assertNull(jdbcTemplate.queryForObject(
+                    "SELECT last_used_at FROM ab_application_access_token WHERE pid = ?",
+                    java.sql.Timestamp.class, record.tokenPid()));
             MockHttpServletRequest allowed = new MockHttpServletRequest("GET", "/api/open/v1/whoami");
             allowed.addHeader("Authorization", "Bearer " + token.accessToken());
             assertEquals(installation.pid(), authenticator.authenticate(allowed).installationPid());
@@ -254,8 +265,18 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
             var window = jdbcTemplate.queryForObject(
                     "SELECT window_start FROM ab_open_api_rate_window WHERE installation_id = ?",
                     java.sql.Timestamp.class, record.installationId()).toInstant();
-            assertNull(rateLimitMapper.consume(record.installationId(), window, 1,
-                    record.tokenPid(), usedAt.toInstant().plusSeconds(1)));
+            assertNull(rateLimitMapper.authenticate(secretCodec.sha256(token.accessToken()),
+                    OpenPlatformTokenService.AUDIENCE, usedAt.toInstant().plusSeconds(1), window,
+                    "openapi.profile.read").consumedCount());
+            assertEquals(1, jdbcTemplate.queryForObject(
+                    "SELECT SUM(request_count)::int FROM ab_open_api_rate_window WHERE installation_id = ?",
+                    Integer.class, record.installationId()));
+            assertEquals(usedAt, jdbcTemplate.queryForObject(
+                    "SELECT last_used_at FROM ab_application_access_token WHERE pid = ?",
+                    java.sql.Timestamp.class, record.tokenPid()));
+            managementService.disableInstallation(installation.pid());
+            assertEquals(401, assertThrows(ExternalMachineAuthException.class,
+                    () -> authenticator.authenticate(allowed)).status());
             assertEquals(1, jdbcTemplate.queryForObject(
                     "SELECT SUM(request_count)::int FROM ab_open_api_rate_window WHERE installation_id = ?",
                     Integer.class, record.installationId()));
