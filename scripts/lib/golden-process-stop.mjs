@@ -6,7 +6,14 @@ import { join, basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { liveEnvironment } from './golden-product-identity.mjs';
 
-const need = (condition, message) => { if (!condition) throw new Error(message); };
+const need = (condition, message) => {
+  if (!condition) {
+    const error = new Error(message);
+    // Only our fixed predicate messages become diagnostics; never print process/env payloads.
+    error.goldenStopReason = message.toUpperCase().replace(/[^A-Z0-9]+/g, '_');
+    throw error;
+  }
+};
 const hash = value => createHash('sha256').update(value).digest('hex');
 function run(file, args) {
   try { return execFileSync(file, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }); }
@@ -166,5 +173,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     else if (action === 'register-backend') await registerGoldenLaunch(name, repo, cli, Number(pid), 'backend-launch');
     else if (action === 'stop') console.log(JSON.stringify({ runtime: name, stopped: stopGoldenProcesses(name, repo, cli), retained: ['allocation', 'database', 'evidence'] }));
     else throw new Error('Unknown owned process action');
-  } catch { console.error('Owned golden process operation refused; inspect runtime process identity'); process.exitCode = 1; }
+  } catch (error) {
+    const reason = error.goldenStopReason ??
+      (['ENOENT', 'EACCES', 'ESRCH', 'EPERM'].includes(error.code) ? error.code : 'UNCLASSIFIED_PROBE_FAILURE');
+    console.error(`Owned golden process operation refused; inspect runtime process identity; reason=${reason}`);
+    process.exitCode = 1;
+  }
 }
