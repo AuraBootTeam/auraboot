@@ -155,10 +155,10 @@ test('HIFI-00 seed realistic dataset and build the multi-block report', async ({
 
 test('HIFI-01 designer renders every block of the high-fidelity report', async ({ page }) => {
   await page.goto(`/report-designer/${reportPid}`);
-  await expect(page.getByTestId('report-canvas')).toBeVisible({ timeout: 30000 });
-  await expect(page.getByPlaceholder(/^(报表标题|Report Title)$/)).toHaveValue(`订单运营月报 ${run}`, { timeout: 30000 });
-  await expect(page.getByTestId('report-canvas')).toContainText('订单总数');
-  await expect(page.getByTestId('report-canvas')).toContainText('状态 × 类型 交叉统计');
+  await expect(page.getByRole('main').getByTestId('report-canvas')).toBeVisible({ timeout: 30000 });
+  await expect(page.getByRole('main').getByPlaceholder(/^(报表标题|Report Title)$/)).toHaveValue(`订单运营月报 ${run}`, { timeout: 30000 });
+  await expect(page.getByRole('main').getByTestId('report-canvas')).toContainText('订单总数');
+  await expect(page.getByRole('main').getByTestId('report-canvas')).toContainText('状态 × 类型 交叉统计');
   await page.screenshot({ path: `${EV}/hifi-designer.png`, fullPage: true });
 });
 

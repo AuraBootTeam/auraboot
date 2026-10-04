@@ -68,15 +68,15 @@ function reportOptionName(name: string | RegExp): RegExp {
 }
 
 async function waitForDesignerLoad(page: Page) {
-  await page.waitForLoadState('networkidle').catch(() => {});
-  await page
-    .locator('.animate-spin')
-    .waitFor({ state: 'hidden', timeout: 10000 })
-    .catch(() => {});
-  await page
-    .locator('text=Loading page...')
-    .waitFor({ state: 'hidden', timeout: 10000 })
-    .catch(() => {});
+  await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
+  const main = page.getByRole('main');
+  await expect(main).toHaveCount(1);
+  await expect(main.getByTestId('block-palette')).toHaveCount(1);
+  await expect(main.getByTestId('block-palette')).toBeVisible();
+  await expect(main.getByTestId('report-canvas')).toBeVisible();
+  if (new URL(page.url()).pathname === '/report-designer') {
+    await expect(main.getByTestId('report-designer-toolbar').getByText(/^(未保存|Unsaved)$/)).toBeVisible();
+  }
 }
 
 /**
@@ -87,12 +87,12 @@ async function waitForDesignerLoad(page: Page) {
 async function openReportAndAddBlock(page: Page, blockName: string) {
   await page.goto('/report-designer', { waitUntil: 'domcontentloaded' });
   await waitForDesignerLoad(page);
-  await expect(page.getByTestId('block-palette')).toBeVisible({ timeout: 10000 });
+  await expect(page.getByRole('main').getByTestId('block-palette')).toBeVisible({ timeout: 10000 });
   await page
     .getByRole('button', { name: reportBlockName(blockName) })
     .first()
     .click();
-  await expect(page.getByTestId('block-property-panel')).toBeVisible({ timeout: 5000 });
+  await expect(page.getByRole('main').getByTestId('block-property-panel')).toBeVisible({ timeout: 5000 });
 }
 
 /**
@@ -101,12 +101,12 @@ async function openReportAndAddBlock(page: Page, blockName: string) {
 async function openReportAndAddBand(page: Page, bandType: 'Page Header' | 'Page Footer') {
   await page.goto('/report-designer', { waitUntil: 'domcontentloaded' });
   await waitForDesignerLoad(page);
-  await expect(page.getByTestId('block-palette')).toBeVisible({ timeout: 10000 });
+  await expect(page.getByRole('main').getByTestId('block-palette')).toBeVisible({ timeout: 10000 });
   await page
     .getByRole('button', { name: reportBlockName(bandType) })
     .first()
     .click();
-  const canvas = page.getByTestId('report-canvas');
+  const canvas = page.getByRole('main').getByTestId('report-canvas');
   await expect(
     canvas.getByText(bandType === 'Page Header' ? /^(页眉|Header)$/ : /^(页脚|Footer)$/, {
       exact: true,
@@ -120,7 +120,7 @@ async function openReportAndAddBand(page: Page, bandType: 'Page Header' | 'Page 
   } else {
     await cursorDivs.last().click({ timeout: 5000 });
   }
-  await expect(page.getByTestId('block-property-panel')).toBeVisible({ timeout: 5000 });
+  await expect(page.getByRole('main').getByTestId('block-property-panel')).toBeVisible({ timeout: 5000 });
 }
 
 async function createReportExportPage(page: Page) {
@@ -639,13 +639,13 @@ function pdfMmToPoints(millimeters: number): number {
 test.describe('data-table Block — All Properties', () => {
   test('RPT-DT-01: Add data-table block and verify property panel', async ({ page }) => {
     await openReportAndAddBlock(page, 'Data Table');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     await expect(panel.locator('h2', { hasText: /^(数据表格|Data\ Table)$/ })).toBeVisible();
   });
 
   test('RPT-DT-02: Title input accepts text', async ({ page }) => {
     await openReportAndAddBlock(page, 'Data Table');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     const titleInput = panel.getByPlaceholder(/^(表格标题|Table\ title)$/);
     await expect(titleInput).toBeVisible();
     const title = uniqueId('DT_Title');
@@ -655,7 +655,7 @@ test.describe('data-table Block — All Properties', () => {
 
   test('RPT-DT-03: Data Source select is present', async ({ page }) => {
     await openReportAndAddBlock(page, 'Data Table');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     const label = panel.locator('label', { hasText: /^(数据源|Data\ Source)$/ });
     await expect(label).toBeVisible();
     const select = panel.locator('select').first();
@@ -664,14 +664,14 @@ test.describe('data-table Block — All Properties', () => {
 
   test('RPT-DT-04: Data Source has "Add new" button', async ({ page }) => {
     await openReportAndAddBlock(page, 'Data Table');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     const addBtn = panel.getByText(/添加数据源|Add new data source/i);
     await expect(addBtn).toBeVisible();
   });
 
   test('RPT-DT-05: Show header row checkbox', async ({ page }) => {
     await openReportAndAddBlock(page, 'Data Table');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     const checkbox = panel.getByRole('checkbox', { name: /显示表头|show header row/i });
     await expect(checkbox).toBeVisible();
     const wasChecked = await checkbox.isChecked();
@@ -681,7 +681,7 @@ test.describe('data-table Block — All Properties', () => {
 
   test('RPT-DT-06: Striped rows checkbox', async ({ page }) => {
     await openReportAndAddBlock(page, 'Data Table');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     const checkbox = panel.getByRole('checkbox', { name: /交替行底色|striped rows/i });
     await expect(checkbox).toBeVisible();
     await checkbox.click();
@@ -689,7 +689,7 @@ test.describe('data-table Block — All Properties', () => {
 
   test('RPT-DT-07: Cell borders checkbox', async ({ page }) => {
     await openReportAndAddBlock(page, 'Data Table');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     const checkbox = panel.getByRole('checkbox', { name: /单元格边框|cell borders/i });
     await expect(checkbox).toBeVisible();
     await checkbox.click();
@@ -697,7 +697,7 @@ test.describe('data-table Block — All Properties', () => {
 
   test('RPT-DT-08: Show summary row checkbox reveals summary config', async ({ page }) => {
     await openReportAndAddBlock(page, 'Data Table');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     const summaryCheckbox = panel.getByRole('checkbox', { name: /显示汇总行|show summary row/i });
     await expect(summaryCheckbox).toBeVisible();
     if (!(await summaryCheckbox.isChecked())) {
@@ -709,7 +709,7 @@ test.describe('data-table Block — All Properties', () => {
 
   test('RPT-DT-09: Summary label input editable', async ({ page }) => {
     await openReportAndAddBlock(page, 'Data Table');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     const summaryCheckbox = panel.getByRole('checkbox', { name: /显示汇总行|show summary row/i });
     if (!(await summaryCheckbox.isChecked())) {
       await summaryCheckbox.click();
@@ -722,7 +722,7 @@ test.describe('data-table Block — All Properties', () => {
 
   test('RPT-DT-10: Add column via input + Add button', async ({ page }) => {
     await openReportAndAddBlock(page, 'Data Table');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     const addInput = panel.getByPlaceholder(/^(字段名称|Field\ name)$/).last();
     await expect(addInput).toBeVisible();
     await addInput.fill('test_col');
@@ -736,7 +736,7 @@ test.describe('data-table Block — All Properties', () => {
 
   test('RPT-DT-11: Column field name input editable', async ({ page }) => {
     await openReportAndAddBlock(page, 'Data Table');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     const addInput = panel.getByPlaceholder(/^(字段名称|Field\ name)$/).last();
     await addInput.fill('order_amount');
     await panel
@@ -749,7 +749,7 @@ test.describe('data-table Block — All Properties', () => {
 
   test('RPT-DT-12: Column display label input editable', async ({ page }) => {
     await openReportAndAddBlock(page, 'Data Table');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     const addInput = panel.getByPlaceholder(/^(字段名称|Field\ name)$/).last();
     await addInput.fill('amount');
     await panel
@@ -764,7 +764,7 @@ test.describe('data-table Block — All Properties', () => {
 
   test('RPT-DT-13: Column alignment and format selects', async ({ page }) => {
     await openReportAndAddBlock(page, 'Data Table');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     const addInput = panel.getByPlaceholder(/^(字段名称|Field\ name)$/).last();
     await addInput.fill('col1');
     await panel
@@ -800,7 +800,7 @@ test.describe('grouped-table Block — All Properties', () => {
 
   test('RPT-GT-02: Title input', async ({ page }) => {
     await openReportAndAddBlock(page, 'Grouped Table');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     const titleInput = panel.getByPlaceholder(/^(表格标题|Table\ title)$/);
     await expect(titleInput).toBeVisible();
     const title = uniqueId('GT_Title');
@@ -810,7 +810,7 @@ test.describe('grouped-table Block — All Properties', () => {
 
   test('RPT-GT-03: Group By Field input', async ({ page }) => {
     await openReportAndAddBlock(page, 'Grouped Table');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     const groupByInput = panel.getByPlaceholder(/^(用于分组的字段|Field\ name\ to\ group\ by)$/);
     await expect(groupByInput).toBeVisible();
     await groupByInput.fill('department');
@@ -819,7 +819,7 @@ test.describe('grouped-table Block — All Properties', () => {
 
   test('RPT-GT-04: Group Subtotal checkbox toggles', async ({ page }) => {
     await openReportAndAddBlock(page, 'Grouped Table');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     const subtotalCheckbox = panel.getByRole('checkbox', { name: /分组小计|group subtotal/i });
     await expect(subtotalCheckbox).toBeVisible();
     const wasBefore = await subtotalCheckbox.isChecked();
@@ -829,7 +829,7 @@ test.describe('grouped-table Block — All Properties', () => {
 
   test('RPT-GT-05: Grand Total checkbox toggles', async ({ page }) => {
     await openReportAndAddBlock(page, 'Grouped Table');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     const grandTotalCheckbox = panel.getByRole('checkbox', { name: /总计|grand total/i });
     await expect(grandTotalCheckbox).toBeVisible();
     const wasBefore = await grandTotalCheckbox.isChecked();
@@ -892,7 +892,7 @@ test.describe('stat-card Block — All Properties', () => {
 
   test('RPT-SC-04: Aggregation select has all options', async ({ page }) => {
     await openReportAndAddBlock(page, 'Stat Card');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     await expect(panel.locator('label', { hasText: /^(聚合方式|Aggregation)$/ })).toBeVisible();
     for (const opt of ['sum', 'avg', 'count', 'min', 'max']) {
       await expect(
@@ -903,7 +903,7 @@ test.describe('stat-card Block — All Properties', () => {
 
   test('RPT-SC-05: Format select', async ({ page }) => {
     await openReportAndAddBlock(page, 'Stat Card');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     await expect(panel.locator('label', { hasText: /^(格式|Format)$/ })).toBeVisible();
     for (const fmt of ['Number', 'Currency', 'Percent']) {
       await expect(
@@ -914,7 +914,7 @@ test.describe('stat-card Block — All Properties', () => {
 
   test('RPT-SC-06: Color buttons (6 colors)', async ({ page }) => {
     await openReportAndAddBlock(page, 'Stat Card');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     await expect(panel.locator('label', { hasText: /^(颜色|Color)$/ })).toBeVisible();
     // 6 color buttons (round, w-8 h-8)
     const colorBtns = panel.locator('button.rounded-full');
@@ -930,7 +930,7 @@ test.describe('rich-text Block — All Properties', () => {
   test('RPT-RT-01: Add rich-text block and verify panel', async ({ page }) => {
     await openReportAndAddBlock(page, 'Rich Text');
     await expect(
-      page.getByTestId('block-property-panel').locator('h2', { hasText: /^(富文本|Rich\ Text)$/ }),
+      page.getByRole('main').getByTestId('block-property-panel').locator('h2', { hasText: /^(富文本|Rich\ Text)$/ }),
     ).toBeVisible();
   });
 
@@ -947,7 +947,7 @@ test.describe('rich-text Block — All Properties', () => {
 
   test('RPT-RT-03: Alignment buttons (Left, Center, Right)', async ({ page }) => {
     await openReportAndAddBlock(page, 'Rich Text');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     await expect(panel.locator('label', { hasText: /^(对齐方式|Alignment)$/ })).toBeVisible();
     for (const align of [/^(左对齐|Left)$/, /^(居中|Center)$/, /^(右对齐|Right)$/]) {
       await expect(panel.getByRole('button', { name: align })).toBeVisible();
@@ -957,7 +957,7 @@ test.describe('rich-text Block — All Properties', () => {
 
   test('RPT-RT-04: Font Size input', async ({ page }) => {
     await openReportAndAddBlock(page, 'Rich Text');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     await expect(panel.locator('label', { hasText: /字号|font size/i })).toBeVisible();
     const fontSizeInput = panel.locator('input[type="number"]').first();
     await expect(fontSizeInput).toBeVisible();
@@ -967,7 +967,7 @@ test.describe('rich-text Block — All Properties', () => {
 
   test('RPT-RT-05: Font Weight select', async ({ page }) => {
     await openReportAndAddBlock(page, 'Rich Text');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     // Wait for block editor to render (Rich Text title confirms correct panel)
     await expect(panel.locator('h2', { hasText: /^(富文本|Rich\ Text)$/ })).toBeVisible({
       timeout: 5000,
@@ -982,7 +982,7 @@ test.describe('rich-text Block — All Properties', () => {
 
   test('RPT-RT-06: Color input', async ({ page }) => {
     await openReportAndAddBlock(page, 'Rich Text');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     await expect(panel.locator('h2', { hasText: /^(富文本|Rich\ Text)$/ })).toBeVisible({
       timeout: 5000,
     });
@@ -1000,7 +1000,7 @@ test.describe('cross-tab Block — All Properties', () => {
   test('RPT-CT-01: Add cross-tab block and verify panel', async ({ page }) => {
     await openReportAndAddBlock(page, 'Cross Tab');
     await expect(
-      page.getByTestId('block-property-panel').locator('h2', { hasText: /^(交叉表|Cross\ Tab)$/ }),
+      page.getByRole('main').getByTestId('block-property-panel').locator('h2', { hasText: /^(交叉表|Cross\ Tab)$/ }),
     ).toBeVisible();
   });
 
@@ -1046,7 +1046,7 @@ test.describe('cross-tab Block — All Properties', () => {
 
   test('RPT-CT-06: Aggregation select', async ({ page }) => {
     await openReportAndAddBlock(page, 'Cross Tab');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     for (const opt of ['sum', 'avg', 'count', 'min', 'max']) {
       await expect(
         panel.locator('option', { hasText: reportOptionName(opt) }).first(),
@@ -1056,7 +1056,7 @@ test.describe('cross-tab Block — All Properties', () => {
 
   test('RPT-CT-07: Format select', async ({ page }) => {
     await openReportAndAddBlock(page, 'Cross Tab');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     for (const fmt of ['Number', 'Currency', 'Percent']) {
       await expect(
         panel.locator('option', { hasText: reportOptionName(fmt) }).first(),
@@ -1091,7 +1091,7 @@ test.describe('chart Block — All Properties', () => {
   test('RPT-CH-01: Add chart block and verify panel', async ({ page }) => {
     await openReportAndAddBlock(page, 'Chart');
     await expect(
-      page.getByTestId('block-property-panel').locator('h2', { hasText: /^(图表|Chart)$/ }),
+      page.getByRole('main').getByTestId('block-property-panel').locator('h2', { hasText: /^(图表|Chart)$/ }),
     ).toBeVisible();
   });
 
@@ -1107,7 +1107,7 @@ test.describe('chart Block — All Properties', () => {
 
   test('RPT-CH-03: Chart Type buttons (Bar, H-Bar, Pie)', async ({ page }) => {
     await openReportAndAddBlock(page, 'Chart');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     await expect(panel.locator('label', { hasText: /图表类型|chart type/i })).toBeVisible();
     for (const type of [/^(柱状图|Bar)$/, /^(横向柱状图|H-Bar)$/, /^(饼图|Pie)$/]) {
       await expect(panel.getByRole('button', { name: type, exact: true })).toBeVisible();
@@ -1137,7 +1137,7 @@ test.describe('chart Block — All Properties', () => {
 
   test('RPT-CH-06: Aggregation select', async ({ page }) => {
     await openReportAndAddBlock(page, 'Chart');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     for (const opt of ['sum', 'avg', 'count', 'min', 'max']) {
       await expect(
         panel.locator('option', { hasText: reportOptionName(opt) }).first(),
@@ -1175,13 +1175,13 @@ test.describe('chart Block — All Properties', () => {
 test.describe('page-header/footer — BandEditor', () => {
   test('RPT-BD-01: Add page-header block and verify panel', async ({ page }) => {
     await openReportAndAddBand(page, 'Page Header');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     await expect(panel.locator('h2', { hasText: /^(页眉|Page\ Header)$/ })).toBeVisible();
   });
 
   test('RPT-BD-02: Height input for header', async ({ page }) => {
     await openReportAndAddBand(page, 'Page Header');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     await expect(panel.locator('label', { hasText: /高度|height/i })).toBeVisible();
     const heightInput = panel.locator('input[type="number"][min="5"]');
     await expect(heightInput).toBeVisible();
@@ -1191,7 +1191,7 @@ test.describe('page-header/footer — BandEditor', () => {
 
   test('RPT-BD-03: Add Text element button adds element', async ({ page }) => {
     await openReportAndAddBand(page, 'Page Header');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     const addTextBtn = panel.getByRole('button', { name: /\+ 文本|\+ Text/i });
     await expect(addTextBtn).toBeVisible();
     const textLabels = panel.locator('span.uppercase', { hasText: /文本|text/i });
@@ -1202,7 +1202,7 @@ test.describe('page-header/footer — BandEditor', () => {
 
   test('RPT-BD-04: Add Page # element button', async ({ page }) => {
     await openReportAndAddBand(page, 'Page Header');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     const addPageBtn = panel.getByRole('button', { name: /\+ 页码|\+ Page/i });
     await expect(addPageBtn).toBeVisible();
     await addPageBtn.click();
@@ -1210,7 +1210,7 @@ test.describe('page-header/footer — BandEditor', () => {
 
   test('RPT-BD-05: Add Date element button', async ({ page }) => {
     await openReportAndAddBand(page, 'Page Header');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     const addDateBtn = panel.getByRole('button', { name: /\+ 日期|\+ Date/i });
     await expect(addDateBtn).toBeVisible();
     await addDateBtn.click();
@@ -1218,7 +1218,7 @@ test.describe('page-header/footer — BandEditor', () => {
 
   test('RPT-BD-06: Element alignment select', async ({ page }) => {
     await openReportAndAddBand(page, 'Page Header');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     for (const align of [/^(左对齐|Left)$/, /^(居中|Center)$/, /^(右对齐|Right)$/]) {
       await expect(
         panel.locator('option', { hasText: reportOptionName(align) }).first(),
@@ -1228,14 +1228,14 @@ test.describe('page-header/footer — BandEditor', () => {
 
   test('RPT-BD-07: Element font size input', async ({ page }) => {
     await openReportAndAddBand(page, 'Page Header');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     const fontSizeInput = panel.getByTitle(/字号（磅）|Font size \(pt\)/);
     await expect(fontSizeInput.first()).toBeVisible();
   });
 
   test('RPT-BD-08: Add page-footer block and verify panel', async ({ page }) => {
     await openReportAndAddBand(page, 'Page Footer');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     await expect(panel.locator('h2', { hasText: /^(页脚|Page\ Footer)$/ })).toBeVisible();
     await expect(panel.locator('input[type="number"][min="5"]')).toBeVisible();
   });
@@ -1248,14 +1248,14 @@ test.describe('page-header/footer — BandEditor', () => {
 test.describe('Report Operations', () => {
   test('RPT-OP-01: Move up/down buttons visible in property panel', async ({ page }) => {
     await openReportAndAddBlock(page, 'Rich Text');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     await expect(panel.getByTitle(/^(上移|Move up)$/)).toBeVisible();
     await expect(panel.getByTitle(/^(下移|Move down)$/)).toBeVisible();
   });
 
   test('RPT-OP-02: Delete block button removes block', async ({ page }) => {
     await openReportAndAddBlock(page, 'Rich Text');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     const deleteBtn = panel.getByTitle(/^(删除|Delete)$/);
     await expect(deleteBtn).toBeVisible();
     await deleteBtn.click();
@@ -1267,7 +1267,7 @@ test.describe('Report Operations', () => {
   test('RPT-OP-03: Multiple block types on same canvas', async ({ page }) => {
     await page.goto('/report-designer', { waitUntil: 'domcontentloaded' });
     await waitForDesignerLoad(page);
-    const palette = page.getByTestId('block-palette');
+    const palette = page.getByRole('main').getByTestId('block-palette');
     await expect(palette).toBeVisible({ timeout: 10000 });
     await palette
       .getByRole('button', { name: /数据表格|data table/i })
@@ -1281,7 +1281,7 @@ test.describe('Report Operations', () => {
       .getByRole('button', { name: /富文本|rich text/i })
       .first()
       .click();
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     await expect(panel.locator('h2', { hasText: /^(富文本|Rich\ Text)$/ })).toBeVisible({
       timeout: 3000,
     });
@@ -1290,7 +1290,7 @@ test.describe('Report Operations', () => {
   test('RPT-OP-04: Save button triggers API call', async ({ page }) => {
     await page.goto('/report-designer', { waitUntil: 'domcontentloaded' });
     await waitForDesignerLoad(page);
-    const palette = page.getByTestId('block-palette');
+    const palette = page.getByRole('main').getByTestId('block-palette');
     await expect(palette).toBeVisible({ timeout: 10000 });
     await palette
       .getByRole('button', { name: /数据表格|data table/i })
@@ -1317,14 +1317,14 @@ test.describe('Report Operations', () => {
     expect(record.dsl.body).toHaveLength(1);
     expect(record.dsl.body[0].blockType).toBe('table');
     await page.goto('/report-designer/' + saved.data.pid);
-    await expect(page.getByTestId('report-canvas')).toBeVisible();
-    await expect(page.locator('#report-export-status')).toBeHidden();
+    await expect(page.getByRole('main').getByTestId('report-canvas')).toBeVisible();
+    await expect(page.getByRole('main').locator('#report-export-status')).toBeHidden();
   });
 
   test('RPT-OP-05: Block palette has all 10 block types', async ({ page }) => {
     await page.goto('/report-designer', { waitUntil: 'domcontentloaded' });
     await waitForDesignerLoad(page);
-    const palette = page.getByTestId('block-palette');
+    const palette = page.getByRole('main').getByTestId('block-palette');
     await expect(palette).toBeVisible({ timeout: 10000 });
     for (const blockName of [
       'Data Table',
@@ -1354,7 +1354,7 @@ test.describe('Report Operations', () => {
     try {
       await page.goto(`/report-designer/${pid}`, { waitUntil: 'domcontentloaded' });
       await waitForDesignerLoad(page);
-      await expect(page.getByTestId('report-designer-toolbar')).toBeVisible({ timeout: 10000 });
+      await expect(page.getByRole('main').getByTestId('report-designer-toolbar')).toBeVisible({ timeout: 10000 });
 
       const excelBtn = page.getByRole('button', { name: /导出 Excel|export excel/i });
       await expect(excelBtn).toBeVisible({ timeout: 5000 });
@@ -1411,7 +1411,7 @@ test.describe('Report Operations', () => {
     try {
       await page.goto(`/report-designer/${pid}`, { waitUntil: 'domcontentloaded' });
       await waitForDesignerLoad(page);
-      await expect(page.getByTestId('report-designer-toolbar')).toBeVisible({ timeout: 10000 });
+      await expect(page.getByRole('main').getByTestId('report-designer-toolbar')).toBeVisible({ timeout: 10000 });
 
       const pdfBtn = page.getByRole('button', { name: /导出 PDF|export pdf/i });
       await expect(pdfBtn).toBeVisible({ timeout: 5000 });
@@ -1454,7 +1454,7 @@ test.describe('Report Operations', () => {
     try {
       await page.goto(`/report-designer/${pid}`, { waitUntil: 'domcontentloaded' });
       await waitForDesignerLoad(page);
-      await expect(page.getByTestId('report-designer-toolbar')).toBeVisible({ timeout: 10000 });
+      await expect(page.getByRole('main').getByTestId('report-designer-toolbar')).toBeVisible({ timeout: 10000 });
 
       const excelBtn = page.getByRole('button', { name: /导出 Excel|export excel/i });
       await expect(excelBtn).toBeVisible({ timeout: 5000 });
@@ -1531,7 +1531,7 @@ test.describe('Report Operations', () => {
     try {
       await page.goto(`/report-designer/${pid}`, { waitUntil: 'domcontentloaded' });
       await waitForDesignerLoad(page);
-      await expect(page.getByTestId('report-designer-toolbar')).toBeVisible({ timeout: 10000 });
+      await expect(page.getByRole('main').getByTestId('report-designer-toolbar')).toBeVisible({ timeout: 10000 });
 
       const pdfBtn = page.getByRole('button', { name: /导出 PDF|export pdf/i });
       await expect(pdfBtn).toBeVisible({ timeout: 5000 });
@@ -1581,7 +1581,7 @@ test.describe('Report Operations', () => {
     try {
       await page.goto(`/report-designer/${pid}`, { waitUntil: 'domcontentloaded' });
       await waitForDesignerLoad(page);
-      await expect(page.getByTestId('report-designer-toolbar')).toBeVisible({ timeout: 10000 });
+      await expect(page.getByRole('main').getByTestId('report-designer-toolbar')).toBeVisible({ timeout: 10000 });
 
       const excelBtn = page.getByRole('button', { name: /导出 Excel|export excel/i });
       await expect(excelBtn).toBeVisible({ timeout: 5000 });
@@ -1661,7 +1661,7 @@ test.describe('Report Operations', () => {
     try {
       await page.goto(`/report-designer/${pid}`, { waitUntil: 'domcontentloaded' });
       await waitForDesignerLoad(page);
-      await expect(page.getByTestId('report-designer-toolbar')).toBeVisible({ timeout: 10000 });
+      await expect(page.getByRole('main').getByTestId('report-designer-toolbar')).toBeVisible({ timeout: 10000 });
 
       const jsonBtn = page.getByRole('button', { name: /导出 JSON|export json/i });
       await expect(jsonBtn).toBeVisible({ timeout: 5000 });
@@ -1729,7 +1729,7 @@ test.describe('Report Operations', () => {
     try {
       await page.goto(`/report-designer/${pid}`, { waitUntil: 'domcontentloaded' });
       await waitForDesignerLoad(page);
-      await expect(page.getByTestId('report-designer-toolbar')).toBeVisible({ timeout: 10000 });
+      await expect(page.getByRole('main').getByTestId('report-designer-toolbar')).toBeVisible({ timeout: 10000 });
 
       const pdfBtn = page.getByRole('button', { name: /导出 PDF|export pdf/i });
       await expect(pdfBtn).toBeVisible({ timeout: 5000 });
@@ -1791,13 +1791,13 @@ test.describe('Report Operations', () => {
 test.describe('barcode Block — All Properties', () => {
   test('RPT-BC-01: Add barcode block and verify property panel', async ({ page }) => {
     await openReportAndAddBlock(page, 'Barcode');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     await expect(panel.locator('h2', { hasText: /^(条码|Barcode)$/ })).toBeVisible();
   });
 
   test('RPT-BC-02: Title input accepts text', async ({ page }) => {
     await openReportAndAddBlock(page, 'Barcode');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     const titleInput = panel.getByPlaceholder(/^(条码标题|Barcode\ Title)$/);
     await expect(titleInput).toBeVisible();
     const title = uniqueId('BC_Title');
@@ -1807,7 +1807,7 @@ test.describe('barcode Block — All Properties', () => {
 
   test('RPT-BC-03: Format select has all barcode formats', async ({ page }) => {
     await openReportAndAddBlock(page, 'Barcode');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     await expect(panel.locator('label', { hasText: /^(格式|Format)$/ })).toBeVisible();
     for (const fmt of ['code128', 'code39', 'EAN-13', 'EAN-8', 'upc', 'ITF-14']) {
       await expect(
@@ -1818,7 +1818,7 @@ test.describe('barcode Block — All Properties', () => {
 
   test('RPT-BC-04: Static value input', async ({ page }) => {
     await openReportAndAddBlock(page, 'Barcode');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     const staticInput = panel.getByPlaceholder(/^(例如：ABC\-12345|e\.g\.\ ABC\-12345)$/);
     await expect(staticInput).toBeVisible();
     await staticInput.fill('TEST-67890');
@@ -1827,7 +1827,7 @@ test.describe('barcode Block — All Properties', () => {
 
   test('RPT-BC-05: Bar width and height inputs', async ({ page }) => {
     await openReportAndAddBlock(page, 'Barcode');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     const widthInput = panel.locator('input[type="number"][min="1"][max="4"]');
     await expect(widthInput).toBeVisible();
     await widthInput.fill('3');
@@ -1840,7 +1840,7 @@ test.describe('barcode Block — All Properties', () => {
 
   test('RPT-BC-06: Font size input', async ({ page }) => {
     await openReportAndAddBlock(page, 'Barcode');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     const fontSizeInput = panel.locator('input[type="number"][min="8"][max="24"]');
     await expect(fontSizeInput).toBeVisible();
     await fontSizeInput.fill('12');
@@ -1849,7 +1849,7 @@ test.describe('barcode Block — All Properties', () => {
 
   test('RPT-BC-07: Show value text checkbox', async ({ page }) => {
     await openReportAndAddBlock(page, 'Barcode');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     const checkbox = panel.getByRole('checkbox', { name: /显示条码文字|show value text/i });
     await expect(checkbox).toBeVisible();
     const wasChecked = await checkbox.isChecked();
@@ -1865,13 +1865,13 @@ test.describe('barcode Block — All Properties', () => {
 test.describe('watermark Block — All Properties', () => {
   test('RPT-WM-01: Add watermark block and verify property panel', async ({ page }) => {
     await openReportAndAddBlock(page, 'Watermark');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     await expect(panel.locator('h2', { hasText: /^(水印|Watermark)$/ })).toBeVisible();
   });
 
   test('RPT-WM-02: Text input', async ({ page }) => {
     await openReportAndAddBlock(page, 'Watermark');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     const textInput = panel.getByPlaceholder(/^(例如：机密|e\.g\.\ CONFIDENTIAL)$/);
     await expect(textInput).toBeVisible();
     await textInput.fill('draft');
@@ -1880,7 +1880,7 @@ test.describe('watermark Block — All Properties', () => {
 
   test('RPT-WM-03: Rotation slider', async ({ page }) => {
     await openReportAndAddBlock(page, 'Watermark');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     await expect(panel.locator('label', { hasText: /旋转角度|rotation/i })).toBeVisible();
     const slider = panel.locator('input[type="range"][min="-90"][max="90"]');
     await expect(slider).toBeVisible();
@@ -1888,7 +1888,7 @@ test.describe('watermark Block — All Properties', () => {
 
   test('RPT-WM-04: Opacity slider', async ({ page }) => {
     await openReportAndAddBlock(page, 'Watermark');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     await expect(panel.locator('label', { hasText: /不透明度|opacity/i })).toBeVisible();
     const slider = panel.locator('input[type="range"]').nth(1);
     await expect(slider).toBeVisible();
@@ -1896,7 +1896,7 @@ test.describe('watermark Block — All Properties', () => {
 
   test('RPT-WM-05: Color picker and text input', async ({ page }) => {
     await openReportAndAddBlock(page, 'Watermark');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     await expect(panel.locator('label', { hasText: /^(颜色|Color)$/ })).toBeVisible();
     const colorPicker = panel.locator('input[type="color"]');
     await expect(colorPicker).toBeVisible();
@@ -1908,7 +1908,7 @@ test.describe('watermark Block — All Properties', () => {
 
   test('RPT-WM-06: Repeat pattern checkbox', async ({ page }) => {
     await openReportAndAddBlock(page, 'Watermark');
-    const panel = page.getByTestId('block-property-panel');
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
     const checkbox = panel.getByRole('checkbox', { name: /重复水印|repeat pattern/i });
     await expect(checkbox).toBeVisible();
     const wasChecked = await checkbox.isChecked();

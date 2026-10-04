@@ -58,16 +58,16 @@ test('OPS-01 edit route renders the designer and version rollback flows from the
     if (r.url().includes('report-definitions')) console.log('[net]', r.status(), r.url().slice(0, 140));
   });
   await page.goto(`/report-designer/${reportPid}`);
-  await expect(page.getByTestId('report-canvas')).toBeVisible({ timeout: 30000 });
-  await expect(page.getByTestId('report-designer-toolbar')).toBeVisible({ timeout: 30000 });
-  await expect(page.getByPlaceholder(/^(报表标题|Report Title)$/)).toHaveValue('Ops golden report', { timeout: 30000 });
+  await expect(page.getByRole('main').getByTestId('report-canvas')).toBeVisible({ timeout: 30000 });
+  await expect(page.getByRole('main').getByTestId('report-designer-toolbar')).toBeVisible({ timeout: 30000 });
+  await expect(page.getByRole('main').getByPlaceholder(/^(报表标题|Report Title)$/)).toHaveValue('Ops golden report', { timeout: 30000 });
 
   // Produce a second version so a non-latest row exists for preview.
   await page.getByRole('button', { name: /Rich Text|富文本/ }).click();
   await page.getByTestId('report-designer-toolbar-btn-save').click();
   // After a successful save the document is clean: the export banner hides and a
   // new version appears in the history count.
-  await expect(page.locator('#report-export-status')).toBeHidden();
+  await expect(page.getByRole('main').locator('#report-export-status')).toBeHidden();
 
   await page.locator('button[title="版本历史"]').click();
   const panel = page.getByTestId('version-history-panel');
@@ -108,8 +108,8 @@ test('OPS-02 broken data source surfaces the query alert and recovers after fixi
   const page = session.page;
   try {
     await page.goto(`/report-designer/${reportPid}`);
-    await expect(page.getByTestId('report-reader-toolbar')).toBeVisible({ timeout: 30000 });
-    await expect(page.getByText(marker)).toBeVisible({ timeout: 30000 });
+    await expect(page.getByRole('main').getByTestId('report-reader-toolbar')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByRole('main').getByText(marker)).toBeVisible({ timeout: 30000 });
 
     const modelRead = perms.get('model.e2et_order.read')!;
     expect((await request.put(`/api/permissions/matrix/${rolePid}/batch`, {
@@ -118,14 +118,14 @@ test('OPS-02 broken data source surfaces the query alert and recovers after fixi
     await page.reload();
     await expect(page.getByRole('alert').filter({ hasText: '查询未成功' })).toBeVisible({ timeout: 30000 });
     await expect(page.getByRole('alert')).toContainText('无权读取');
-    await expect(page.getByText(marker)).toHaveCount(0);
+    await expect(page.getByRole('main').getByText(marker)).toHaveCount(0);
 
     expect((await request.put(`/api/permissions/matrix/${rolePid}/batch`, {
       data: [{ permissionId: modelRead, granted: true }],
     })).status()).toBe(200);
     await page.reload();
     await expect(page.getByRole('alert').filter({ hasText: '查询未成功' })).toHaveCount(0);
-    await expect(page.getByText(marker)).toBeVisible({ timeout: 30000 });
+    await expect(page.getByRole('main').getByText(marker)).toBeVisible({ timeout: 30000 });
   } finally {
     await session.context.close();
   }
@@ -134,9 +134,9 @@ test('OPS-02 broken data source surfaces the query alert and recovers after fixi
 test('OPS-03 dirty state gates exports with the status banner and failures toast visibly', async ({ page, request }) => {
   await page.goto(`/report-designer/${reportPid}`);
   // Editing before the persisted document loads would be overwritten by initialization.
-  await expect(page.getByPlaceholder(/^(报表标题|Report Title)$/)).toHaveValue('Ops golden report');
+  await expect(page.getByRole('main').getByPlaceholder(/^(报表标题|Report Title)$/)).toHaveValue('Ops golden report');
   await page.getByRole('button', { name: /Rich Text|富文本/ }).click();
-  const banner = page.locator('#report-export-status');
+  const banner = page.getByRole('main').locator('#report-export-status');
   await expect(banner).toBeVisible();
   await expect(banner).toContainText('请先保存');
   await expect(page.getByRole('button', { name: /导出 PDF|Export PDF/ })).toBeDisabled();
@@ -181,11 +181,11 @@ test('OPS-04 view-only permission renders the reader toolbar without manage acti
   const page = session.page;
   try {
     await page.goto(`/report-designer/${reportPid}`);
-    await expect(page.getByTestId('report-reader-toolbar')).toBeVisible({ timeout: 20000 });
+    await expect(page.getByRole('main').getByTestId('report-reader-toolbar')).toBeVisible({ timeout: 20000 });
     // Screenshot discipline: capture only after the runtime content has settled.
     await expect(page.getByText(/Loading report/)).toBeHidden({ timeout: 30000 });
     await page.waitForTimeout(500);
-  await expect(page.getByTestId('report-designer-toolbar')).toHaveCount(0);
+  await expect(page.getByRole('main').getByTestId('report-designer-toolbar')).toHaveCount(0);
     await expect(page.getByRole('button', { name: /导出 PDF|Export PDF/ })).toBeVisible();
     await expect(page.getByRole('button', { name: /^(保存|Save)$/ })).toHaveCount(0);
     await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/ops-reader-toolbar.png`, fullPage: true });
