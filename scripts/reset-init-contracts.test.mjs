@@ -322,7 +322,8 @@ test('OSS golden stack stages manifest-declared backend jars from explicit roots
 test('OSS golden stack applies explicit product migrations only to a fresh database before backend startup', () => {
   const stack = read('scripts/oss-golden-stack.sh');
 
-  assert.match(stack, /--product-migration-root requires --fresh-db/);
+  assert.match(stack, /--product-migration-root requires a fresh database flag/);
+  assert.match(stack, /"\$fresh_db" = "1" \] \|\| \[ "\$require_new_db" = "1"/);
   assert.match(stack, /find "\$product_root" -maxdepth 1 -type f -name 'V\*\.sql'/);
   assert.match(stack, /psql -v ON_ERROR_STOP=1[\s\S]{0,240}-f "\$migration_file"/);
   assert.match(stack, /product-migrations\.tsv/);
@@ -338,8 +339,11 @@ test('OSS golden stack rejects dependency capsules with dangling required-packag
   assert.match(golden, /source "\$SCRIPT_DIR\/lib\/web-admin-node-modules\.sh"/);
   assert.match(
     golden,
-    /if ! web_admin_node_modules_usable "\$REPO_ROOT\/web-admin\/node_modules"/,
+    /if ! web_admin_node_modules_matches_checkout "\$REPO_ROOT\/web-admin\/node_modules" "\$REPO_ROOT"/,
   );
+  const helper = read('scripts/lib/web-admin-node-modules.sh');
+  assert.match(helper, /web_admin_node_modules_usable "\$candidate" \|\| return 1/);
+  assert.match(helper, /web-admin-lock-contract\.mjs/);
   assert.match(golden, /refusing to replace a real directory/);
 });
 
