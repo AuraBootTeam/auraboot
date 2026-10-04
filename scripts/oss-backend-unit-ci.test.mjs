@@ -13,7 +13,7 @@ const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 test('backend CI runner is executable and owns its complete infrastructure lifecycle', () => {
   assert.ok(statSync(runner).mode & 0o100);
-  assert.match(source, /docker-compose\.skills-c2\.override\.yml/);
+  assert.doesNotMatch(source, /docker-compose\.skills-c2\.override\.yml/);
   assert.match(source, /up -d --wait postgres redis kafka/);
   assert.match(source, /runtime retained and stopped; network released: compose_project=/);
   assert.match(source, /COMPOSE_PROJECT="aura-ci-oss-backend-\$RUNTIME_TOKEN"/);
@@ -87,7 +87,9 @@ test('backend CI runner pre-pulls every fixed and Testcontainers image', () => {
 });
 
 test('backend CI runner preserves Gradle product-test exit status', () => {
-  assert.match(source, /platform\/gradlew -p platform --continue cleanTest test bootstrapBillingAccountTest\s*$/);
+  assert.match(source, /^platform\/gradlew -p platform --continue cleanTest test bootstrapBillingAccountTest$/m);
+  assert.match(source, /^gradle_status=\$\?$/m);
+  assert.match(source, /^exit "\$gradle_status"$/m);
   assert.doesNotMatch(source, /platform\/gradlew[^\n]*\|\| environment_invalid/);
 });
 

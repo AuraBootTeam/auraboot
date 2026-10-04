@@ -158,7 +158,7 @@ export default function PermissionManagement() {
         setEditingRole(null);
         fetchRoles();
       },
-      onError: (error) => showErrorToast(error || 'Failed'),
+      onError: (result) => showErrorToast(result.message || 'Failed'),
       showToast: false,
     });
   };
@@ -177,7 +177,7 @@ export default function PermissionManagement() {
         setConfirmDelete({ open: false, role: null });
         fetchRoles();
       },
-      onError: (error) => showErrorToast(error || 'Delete failed'),
+      onError: (result) => showErrorToast(result.message || 'Delete failed'),
       showToast: false,
     });
   };
@@ -206,7 +206,7 @@ export default function PermissionManagement() {
           prev.map((r) => (r.pid === role.pid ? { ...r, status: nextStatus } : r)),
         );
       },
-      onError: (error) => showErrorToast(error || 'Toggle failed'),
+      onError: (result) => showErrorToast(result.message || 'Toggle failed'),
       showToast: false,
     });
   };

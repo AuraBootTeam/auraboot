@@ -43,10 +43,9 @@ export AURA_OSS_CI_POSTGRES_CONTAINER="auraboot-oss-ci-postgres-$RUNTIME_TOKEN"
 export AURA_OSS_CI_REDIS_CONTAINER="auraboot-oss-ci-redis-$RUNTIME_TOKEN"
 COMPOSE_ARGS=(
   -f "$PROJECT_ROOT/docker-compose.yml"
-  -f "$PROJECT_ROOT/docker-compose.skills-c2.override.yml"
   -f "$PROJECT_ROOT/docker-compose.oss-backend-ci.override.yml"
   -p "$COMPOSE_PROJECT"
-  --profile skills-c2-stack
+  --profile cache
 )
 FLYWAY_IMAGE='flyway/flyway:12.8.1@sha256:b8a2d72926b98234c1fb8f45659fd23d8a001af9ee7f450326aa46af14d447bb'
 
@@ -171,6 +170,20 @@ if ! run_flyway validate > "$ARTIFACTS/flyway-validate.log" 2>&1; then
   exit 1
 fi
 
+# Bootstrap verifies initial installation, so it must never reuse the database
+# populated by the complete integration suite or truncate guarded tenant bindings.
+if ! docker compose "${COMPOSE_ARGS[@]}" exec -T postgres \
+    createdb -U auraboot aura_boot_bootstrap; then
+  environment_invalid 'cannot create the separate fresh bootstrap database'
+fi
+FLYWAY_ARGS[0]="-url=jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/aura_boot_bootstrap"
+if ! run_flyway migrate > "$ARTIFACTS/bootstrap-flyway-migrate.log" 2>&1 \
+    || ! run_flyway validate > "$ARTIFACTS/bootstrap-flyway-validate.log" 2>&1; then
+  printf '[oss-backend-unit-ci] product-failure: bootstrap database migration failed\n' >&2
+  exit 1
+fi
+export BOOTSTRAP_TEST_DATABASE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/aura_boot_bootstrap?charSet=UTF8"
+
 # Tests exercise migration-owned defaults; prove the denominator before Gradle
 # so a missing seed is reported as database bootstrap drift rather than dozens
 # of misleading service-level assertion failures.
@@ -218,6 +231,8 @@ SPRING_DATA_REDIS_URL="redis://127.0.0.1:$AURA_OSS_CI_REDIS_PORT" \
 SPRING_KAFKA_BOOTSTRAP_SERVERS="127.0.0.1:$AURA_OSS_CI_KAFKA_PORT" \
 AURA_CI_REQUIRE_KAFKA='1' \
 AURA_CI_KAFKA_BOOTSTRAP_SERVERS="127.0.0.1:$AURA_OSS_CI_KAFKA_PORT" \
+MAVEN_REPO_LOCAL="$ARTIFACTS/m2" \
+GRADLE_OPTS="-Dmaven.repo.local=$ARTIFACTS/m2 ${GRADLE_OPTS:-}" \
 platform/gradlew -p platform --continue cleanTest test bootstrapBillingAccountTest
 
 # The test task remains the sole gate authority.  Allure is an additional

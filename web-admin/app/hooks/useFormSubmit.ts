@@ -39,19 +39,19 @@ export function useFormSubmit() {
         onValidationError: (result) => {
           // 验证错误不显示toast，而是通过onError回调传递给表单组件处理
           // 表单组件应该在对应字段旁边显示红色错误信息
-          showWarningToast('请检查输入的信息');
+          if (shouldShowToast) showWarningToast('请检查输入的信息');
           onError?.(result);
         },
         onAuthError: (result) => {
-          showErrorToast(result.data as string);
+          if (shouldShowToast) showErrorToast(result.data as string);
           onError?.(result);
         },
         onBusinessError: (result) => {
-          showErrorToast(result.data as string);
+          if (shouldShowToast) showErrorToast(result.data as string);
           onError?.(result);
         },
         onSystemError: (result) => {
-          showErrorToast(result.data as string);
+          if (shouldShowToast) showErrorToast(result.data as string);
           onError?.(result);
         },
       });
