@@ -1,3 +1,4 @@
+import { hasAggregateModel } from '../../utils/aggregateModel';
 /**
  * SmartBarChart Component
  *
@@ -269,7 +270,7 @@ function isDataSourceConfigured(dataSource: ChartDataSource): boolean {
   if (!dataSource) return false;
   switch (dataSource.type) {
     case 'aggregate':
-      return !!(dataSource.modelCode && dataSource.metrics?.length);
+      return hasAggregateModel(dataSource) && !!dataSource.metrics?.length;
     case 'namedQuery':
       return !!dataSource.queryCode;
     case 'static':

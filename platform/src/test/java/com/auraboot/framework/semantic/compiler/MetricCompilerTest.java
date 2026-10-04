@@ -422,12 +422,23 @@ class MetricCompilerTest {
     // ---- 16. time grain suffix on time dim -----------------------------------
 
     @Test
-    void time_grain_suffix_emits_date_trunc() {
+    void time_grain_suffix_preserves_calendar_bucket_as_string() {
         SemanticQueryRequest r = req();
         r.setMetrics(List.of("total_sales"));
         r.setDimensions(List.of("order_date__month"));
         CompiledQuery q = compiler.compile(salesModel, r, user);
-        assertThat(q.getSql()).contains("DATE_TRUNC('month', order_date)");
+        assertThat(q.getSql()).contains("to_char(DATE_TRUNC('month', order_date), 'YYYY-MM-DD\"T\"HH24:MI:SS')");
+        assertThat(q.getSql()).contains("\"sales.order_date__month\"");
+    }
+
+    @Test
+    void cohort_time_grain_preserves_calendar_bucket_as_string() {
+        cohortConvMetric(Map.of());
+        SemanticQueryRequest r = req();
+        r.setMetrics(List.of("paid_conv"));
+        r.setDimensions(List.of("order_date__month"));
+        CompiledQuery q = compiler.compile(salesModel, r, user);
+        assertThat(q.getSql()).contains("to_char(DATE_TRUNC('month', order_date), 'YYYY-MM-DD\"T\"HH24:MI:SS')");
         assertThat(q.getSql()).contains("\"sales.order_date__month\"");
     }
 

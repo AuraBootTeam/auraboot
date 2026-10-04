@@ -148,7 +148,7 @@ test('HIFI-00 seed realistic dataset and build the multi-block report', async ({
   expect(response.request().postDataJSON().reportPid).toBe(reportPid);
   expect(response.ok()).toBeTruthy();
   const download = await jsonDownload;
-  expect(download.suggestedFilename()).toBe(`订单运营月报 ${run}.json`);
+  expect(download.suggestedFilename()).toBe(`订单运营月报 ${run}.report.json`);
   const jsonPath = path.join(EV, 'hifi-report.json');
   await download.saveAs(jsonPath);
   const doc = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
