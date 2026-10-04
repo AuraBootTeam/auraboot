@@ -192,7 +192,27 @@ public class PageSchemaImportGate {
             if (in == null) {
                 throw new IllegalStateException("Missing classpath resource " + SCHEMA_RESOURCE);
             }
-            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            String json = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            if (pageSchemaValidator.extensionKinds().isEmpty()) {
+                return json;
+            }
+            JsonNode schema = objectMapper.readTree(json);
+            JsonNode kindEnum = schema.path("properties").path("kind").path("enum");
+            if (!(kindEnum instanceof com.fasterxml.jackson.databind.node.ArrayNode values)) {
+                throw new IllegalStateException("Page import schema must declare properties.kind.enum");
+            }
+            for (String kind : pageSchemaValidator.extensionKinds().stream().sorted().toList()) {
+                boolean declared = false;
+                for (JsonNode value : values) {
+                    if (kind.equals(value.asText())) {
+                        declared = true;
+                        break;
+                    }
+                }
+                if (!declared) values.add(kind);
+            }
+            // The semantic layer still rejects this kind outside its registered profile.
+            return objectMapper.writeValueAsString(schema);
         } catch (Exception e) {
             throw new IllegalStateException("Failed to load " + SCHEMA_RESOURCE + ": " + e.getMessage(), e);
         }
