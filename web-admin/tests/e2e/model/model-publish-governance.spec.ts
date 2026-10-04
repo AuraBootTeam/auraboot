@@ -1,4 +1,4 @@
-import { test, expect, type APIResponse, type Page, type Request, type TestInfo } from '@playwright/test';
+import { test, expect, type APIResponse, type Locator, type Page, type Request, type TestInfo } from '@playwright/test';
 import { Client } from 'pg';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { PG_CONN } from '../../helpers/environments';
@@ -8,6 +8,20 @@ import {
   createFieldData,
   createModelData,
 } from '../../model-system/helpers/test-data';
+
+async function captureReplayCard(page: Page, card: Locator, path: string): Promise<void> {
+  const viewport = page.viewportSize();
+  if (!viewport) throw new Error('A fixed viewport is required for replay acceptance evidence');
+  await page.screenshot({ path: path.replace(/\.png$/, '-context.png') });
+  try {
+    await page.setViewportSize({ width: viewport.width, height: Math.max(viewport.height, 1000) });
+    await card.scrollIntoViewIfNeeded();
+    await expect(card).toBeInViewport({ ratio: 1 });
+    await card.screenshot({ path });
+  } finally {
+    await page.setViewportSize(viewport);
+  }
+}
 
 type ApiEnvelope<T> = {
   code?: string | number;
@@ -1326,11 +1340,7 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
   await expect(page.getByTestId('model-publish-permission-sample-error')).toHaveCount(0);
 
   const permissionAllowCard = page.getByTestId('model-publish-replay-result-PERMISSION_POLICY');
-  await permissionAllowCard.scrollIntoViewIfNeeded();
-  await expect(permissionAllowCard).toBeInViewport({ ratio: 1 });
-  await permissionAllowCard.screenshot({
-    path: testInfo.outputPath('model-publish-permission-allow-report.png'),
-  });
+  await captureReplayCard(page, permissionAllowCard, testInfo.outputPath('model-publish-permission-allow-report.png'));
 
   await page.getByTestId('model-publish-permission-record-pid').fill(`record-deny-${suffix}`);
   await page.getByTestId('model-publish-permission-record-json').fill(
@@ -1394,11 +1404,7 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
   await expect(replayReport).not.toContainText('FIELD_PERMISSION_CHANGE');
 
   const permissionDenyCard = page.getByTestId('model-publish-replay-result-PERMISSION_POLICY');
-  await permissionDenyCard.scrollIntoViewIfNeeded();
-  await expect(permissionDenyCard).toBeInViewport({ ratio: 1 });
-  await permissionDenyCard.screenshot({
-    path: testInfo.outputPath('model-publish-permission-deny-report.png'),
-  });
+  await captureReplayCard(page, permissionDenyCard, testInfo.outputPath('model-publish-permission-deny-report.png'));
 
   await expectPermissionReplayTraceLinkOpensDecisionOps(page, {
     traceId: denyPermissionResult.traceId!,
@@ -1495,11 +1501,7 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
   await expect(page.getByTestId('model-publish-sla-node-sample-error')).toHaveCount(0);
 
   const slaReportCard = page.getByTestId('model-publish-replay-result-SLA_RULE');
-  await slaReportCard.scrollIntoViewIfNeeded();
-  await expect(slaReportCard).toBeInViewport({ ratio: 1 });
-  await slaReportCard.screenshot({
-    path: testInfo.outputPath('model-publish-sla-node-report.png'),
-  });
+  await captureReplayCard(page, slaReportCard, testInfo.outputPath('model-publish-sla-node-report.png'));
 
   const workflowProcessInstanceId = `BPM-${suffix}`;
   await page.getByTestId('model-publish-workflow-process-instance-id').fill(workflowProcessInstanceId);
