@@ -72,6 +72,9 @@ class PageSchemaKindFullStackIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private com.auraboot.framework.meta.mapper.PageSchemaMapper pageSchemaMapper;
+
     private static final String PERMISSION_CODE = "page.page.manage";
 
     @Autowired
@@ -285,6 +288,15 @@ class PageSchemaKindFullStackIntegrationTest extends BaseIntegrationTest {
                 .andExpect(status().is2xxSuccessful()).andReturn().getResponse().getContentAsString();
         String pid = objectMapper.readTree(response).path("data").path("pid").asText();
         assertThat(pid).isNotBlank();
+        // Reproduce a nullable legacy row through the mapper, scoped to this freshly created fixture.
+        applyTestMetaContext();
+        try {
+            assertThat(pageSchemaMapper.update(null,
+                    new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<com.auraboot.framework.meta.entity.PageSchema>()
+                            .eq("pid", pid).set("profile", null))).isEqualTo(1);
+        } finally {
+            MetaContext.clear();
+        }
         assertThat(jdbcTemplate.queryForObject("SELECT profile FROM ab_page_schema WHERE pid = ?", String.class, pid)).isNull();
         String versionResponse = mockMvc.perform(post("/api/pages/{pid}/versions", pid).contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of("operation", "update", "description", "Default profile snapshot"))))
