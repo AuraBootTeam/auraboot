@@ -118,7 +118,9 @@ def external_outcome(log, event, automation_pid, tenant_id, run_id):
     payload = log.get('triggerPayload', {})
     need(payload.get('eventId') == event['id'] and payload.get('sourceCode') == run_id
          and payload.get('eventType') == f"external.{run_id}.{event['type']}.v1"
-         and payload.get('data') == event['data'], 'consumer payload does not match fresh ingress')
+         and payload.get('data') == event['data']
+         and payload.get('requestId') == event['data']['originatingRequestId'],
+         'consumer payload/trace does not match fresh ingress')
     results = log.get('actionResults', [])
     need(len(results) == 1 and results[0].get('status') == 'success'
          and results[0].get('actionType') == 'create_record', 'consumer action did not succeed')
@@ -289,7 +291,7 @@ class ProtocolCanary:
             rows = read_delivery(config['store'], delivery['pid'], secret=config['secret'],
                                  run_id=config['run_id'], mode=config['mode'], failures=config['failures'])
             return verify_delivery(rows, secret=config['secret'], delivery_pid=delivery['pid'],
-                                   event_id=event_id, subject_pid=asset['pid'], statuses=statuses)
+                                   event_id=event_id, subject_pid=asset['pid'], statuses=statuses, originating_request_id=request_id)
 
         need(deliveries['retry'].get('retryCount') == 1 and deliveries['replay'].get('retryCount') == 3
              and deliveries['replay'].get('replayable') is True, 'retry/DLQ attempt or replayability mismatch')
@@ -344,13 +346,17 @@ class ProtocolCanary:
         resource = self.call('/api/open/v1/resources/assets/' + trace['assetPid'], headers=self.machine)[0]
         need(resource.get('assetCode') == self.run_id + '-webhook' and resource.get('status') == 'in_use',
              'request/audit/event/delivery/receiver join does not match fresh persisted resource')
-        # Correlation by resource/event/delivery IDs is useful evidence, but
-        # does not prove that the originating request ID reaches the receiver.
+        need(all(row.get('requestId') == trace['requestId'] for row in trace['deliveries'].values()),
+             'durable queue requestId does not match the original command')
+        need(all(item.get('requestId') == trace['requestId']
+                 for proof in trace['receiverProofs'].values() for item in proof['rawEvidence']),
+             'receiver did not observe the original command requestId on every attempt')
         self.trace_observation = {'requestId': trace['requestId'],
                                   'assetPid': trace['assetPid'], 'eventId': trace['eventId'],
                                   'correlationVerified': True,
-                                  'requestIdPropagationVerified': False,
-                                  'gap': 'originating requestId absent from signed webhook delivery'}
+                                  'requestIdPropagationVerified': True,
+                                  'eventIngressRequestId': self.event_trace['requestId']}
+        self.ledger.passed('CANARY-TRACE', start)
 
     def execute(self):
         auth = self.fixture['auth']

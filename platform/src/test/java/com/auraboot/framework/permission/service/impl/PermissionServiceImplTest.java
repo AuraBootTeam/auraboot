@@ -288,14 +288,6 @@ class PermissionServiceImplTest {
     }
 
     @Test
-    void findByPidReturnsNullWhenMissing() {
-        when(permissionMapper.findByPids(List.of("missing"))).thenReturn(List.of());
-
-        assertThat(service.findByPid("missing")).isNull();
-        verify(permissionConverter, never()).toDTO(any());
-    }
-
-    @Test
     void findByIdThrowsWhenMissing() {
         when(permissionMapper.selectById(50L)).thenReturn(null);
 
