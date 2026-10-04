@@ -12,6 +12,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 ARTIFACTS="${AURA_REGRESSION_ARTIFACTS:-$PROJECT_ROOT/.workspace/oss-backend-unit-ci}"
 RUNTIME_TOKEN="$(printf '%s' "${AURA_REGRESSION_SLOT:-local}-$$" | tr -cd '[:alnum:]-')"
 COMPOSE_PROJECT="aura-ci-oss-backend-$RUNTIME_TOKEN"
+export AURA_CI_JOB_ID="${AURA_CI_JOB_ID:-oss-backend-$RUNTIME_TOKEN}"
 
 free_port() {
   local candidate="$1" limit="$2"
@@ -54,6 +55,12 @@ environment_invalid() {
 
 cleanup() {
   status=$?
+  trap - EXIT HUP INT TERM
+  if ! python3 "$SCRIPT_DIR/cleanup-ci-gradle.py" --job-id "$AURA_CI_JOB_ID" \
+      --source-root "$PROJECT_ROOT" --report "$ARTIFACTS/gradle-process-cleanup.json"; then
+    printf '[oss-backend-unit-ci] environment-invalid: owned Gradle cleanup incomplete\n' >&2
+    [[ "$status" -ne 0 ]] || status=2
+  fi
   docker compose "${COMPOSE_ARGS[@]}" ps --all > "$ARTIFACTS/compose-ps.txt" 2>&1 || true
   docker compose "${COMPOSE_ARGS[@]}" logs --no-color > "$ARTIFACTS/compose.log" 2>&1 || true
   docker compose "${COMPOSE_ARGS[@]}" stop >/dev/null 2>&1 || true
@@ -69,8 +76,12 @@ cleanup() {
     "$COMPOSE_PROJECT" "$ARTIFACTS"
   exit "$status"
 }
-trap cleanup EXIT HUP INT TERM
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
+command -v python3 >/dev/null 2>&1 || environment_invalid 'Python 3 is unavailable'
 command -v docker >/dev/null 2>&1 || environment_invalid 'docker is unavailable'
 command -v timeout >/dev/null 2>&1 || environment_invalid 'timeout is unavailable'
 docker compose version >/dev/null 2>&1 || environment_invalid 'docker compose v2 is unavailable'
@@ -213,7 +224,7 @@ SPRING_DATA_REDIS_URL="redis://127.0.0.1:$AURA_OSS_CI_REDIS_PORT" \
 SPRING_KAFKA_BOOTSTRAP_SERVERS="127.0.0.1:$AURA_OSS_CI_KAFKA_PORT" \
 AURA_CI_REQUIRE_KAFKA='1' \
 AURA_CI_KAFKA_BOOTSTRAP_SERVERS="127.0.0.1:$AURA_OSS_CI_KAFKA_PORT" \
-platform/gradlew -p platform --continue cleanTest test bootstrapBillingAccountTest
+platform/gradlew --no-daemon -p platform --continue cleanTest test bootstrapBillingAccountTest
 
 # The test task remains the sole gate authority.  Allure is an additional
 # evidence format: copy results only after Gradle finishes and never mask its
