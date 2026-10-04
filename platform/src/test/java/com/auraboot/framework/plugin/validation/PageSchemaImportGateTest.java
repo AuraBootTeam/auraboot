@@ -18,6 +18,44 @@ class PageSchemaImportGateTest {
             new PageSchemaImportGate(new PageSchemaValidator(), new ObjectMapper());
 
     @Test
+    void springRegisteredRenderProfilePassesAllImportLayersWithoutOpeningTheAdminVocabulary() {
+        try (var context = new org.springframework.context.annotation.AnnotationConfigApplicationContext()) {
+            context.registerBean(PageSchemaRenderProfile.class, () -> new PageSchemaRenderProfile(
+                    "storefront", java.util.Set.of("plp"), java.util.Set.of("product-grid")));
+            context.registerBean(PageSchemaValidator.class);
+            context.registerBean(ObjectMapper.class);
+            context.registerBean(PageSchemaImportGate.class);
+            context.refresh();
+            var registeredGate = context.getBean(PageSchemaImportGate.class);
+            var p = validPage();
+            p.setKind("plp");
+            p.setProfile("storefront");
+            p.setBlocks(List.of(Map.of("id", "products", "blockType", "product-grid")));
+            assertDoesNotThrow(() -> registeredGate.enforce(manifestWith(p)));
+            p.setProfile("admin");
+            assertThrows(PageSchemaImportException.class, () -> registeredGate.enforce(manifestWith(p)));
+            p.setProfile("storefront");
+            p.setKind("list");
+            assertThrows(PageSchemaImportException.class, () -> registeredGate.enforce(manifestWith(p)));
+            p.setKind("plp");
+            p.setBlocks(List.of(Map.of("id", "same", "blockType", "product-grid"),
+                    Map.of("id", "same", "blockType", "product-grid")));
+            assertThrows(PageSchemaImportException.class, () -> registeredGate.enforce(manifestWith(p)));
+        }
+    }
+
+    @Test
+    void springWithoutRenderProfileBeansKeepsTheBuiltinImportContract() {
+        try (var context = new org.springframework.context.annotation.AnnotationConfigApplicationContext()) {
+            context.registerBean(PageSchemaValidator.class);
+            context.registerBean(ObjectMapper.class);
+            context.registerBean(PageSchemaImportGate.class);
+            context.refresh();
+            assertDoesNotThrow(() -> context.getBean(PageSchemaImportGate.class).enforce(manifestWith(validPage())));
+        }
+    }
+
+    @Test
     void cleanV4ManifestPasses() {
         assertDoesNotThrow(() -> gate.enforce(manifestWith(validPage())));
     }
