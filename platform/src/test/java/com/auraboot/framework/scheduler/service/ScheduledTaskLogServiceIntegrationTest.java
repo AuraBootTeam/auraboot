@@ -8,8 +8,6 @@ import com.auraboot.framework.scheduler.mapper.ScheduledTaskLogMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
@@ -30,8 +28,6 @@ import static org.assertj.core.api.Assertions.*;
  */
 @Slf4j
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Transactional(propagation = Propagation.NOT_SUPPORTED)
 class ScheduledTaskLogServiceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired

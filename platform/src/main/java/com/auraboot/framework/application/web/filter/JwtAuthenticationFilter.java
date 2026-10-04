@@ -93,6 +93,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
+        if ((request.getServletPath().equals("/api/i18n")
+                || request.getServletPath().startsWith("/api/i18n/"))
+                && !authorizationHeader.startsWith("Bearer ")) {
+            reject(request, response, ApiResponse.errorWithContext(ResponseCode.Unauthorized, request.getRequestURI()));
+            return;
+        }
+
         if (authorizationHeader.startsWith("Bearer ")) {
             jwt = authorizationHeader.substring(7);
             try {
@@ -356,6 +363,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         String requestPath = request.getServletPath();
+        // Anonymous language packs remain public; credentials must establish the tenant context.
+        if ((requestPath.equals("/api/i18n") || requestPath.startsWith("/api/i18n/"))
+                && request.getHeader("Authorization") != null) {
+            return false;
+        }
         // Check both main whitelist and swagger whitelist
         // NOTE: for "/**" patterns, match by path-segment boundary:
         //   "/api/ext/*/public/**" must match product public routes but not authenticated siblings.

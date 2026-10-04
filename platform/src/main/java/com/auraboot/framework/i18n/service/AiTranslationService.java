@@ -4,6 +4,7 @@ import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
+import com.auraboot.framework.agent.provider.StubLlmProvider;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.i18n.dto.AiTranslateRequest;
@@ -166,7 +167,12 @@ public class AiTranslationService {
                     llmProviderFactory.resolveConfig(tenantId, null);
             return config != null
                     && config.getApiKey() != null
-                    && !config.getApiKey().isBlank();
+                    && !config.getApiKey().isBlank()
+                    // The explicit no-op provider is not a real translator.
+                    // Preserve the documented source-placeholder strategy and
+                    // never report its fixed response as paid LLM execution.
+                    && !StubLlmProvider.PROVIDER_CODE.equals(config.getProviderCode())
+                    && !StubLlmProvider.STUB_API_KEY_SENTINEL.equals(config.getApiKey());
         } catch (Exception e) {
             log.debug("LLM availability check failed: {}", e.getMessage());
             return false;

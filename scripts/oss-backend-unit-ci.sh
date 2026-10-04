@@ -221,14 +221,17 @@ if [[ "${AURA_CI_INCLUDE_DASHSCOPE_LIVE:-0}" != "1" ]]; then
     '[oss-backend-unit-ci] DashScope live checks disabled; set AURA_CI_INCLUDE_DASHSCOPE_LIVE=1 to opt in'
 fi
 
-TEST_DATABASE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/aura_boot?charSet=UTF8" \
+run_backend_gradle() {
+  local database="$1"
+  shift
+TEST_DATABASE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/${database}?charSet=UTF8" \
 BOOTSTRAP_TEST_DATABASE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/aura_boot_bootstrap?charSet=UTF8" \
 TEST_DATABASE_USERNAME='auraboot' \
 TEST_DATABASE_PASSWORD='auraboot_dev' \
-DATABASE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/aura_boot?charSet=UTF8" \
+DATABASE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/${database}?charSet=UTF8" \
 DATABASE_USERNAME='auraboot' \
 DATABASE_PASSWORD='auraboot_dev' \
-SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/aura_boot?charSet=UTF8" \
+SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/${database}?charSet=UTF8" \
 SPRING_DATASOURCE_USERNAME='auraboot' \
 SPRING_DATASOURCE_PASSWORD='auraboot_dev' \
 SPRING_DATA_REDIS_HOST='127.0.0.1' \
@@ -239,12 +242,23 @@ AURA_CI_REQUIRE_KAFKA='1' \
 AURA_CI_KAFKA_BOOTSTRAP_SERVERS="127.0.0.1:$AURA_OSS_CI_KAFKA_PORT" \
 MAVEN_REPO_LOCAL="$ARTIFACTS/m2" \
 GRADLE_OPTS="-Dmaven.repo.local=$ARTIFACTS/m2 ${GRADLE_OPTS:-}" \
-platform/gradlew -p platform --continue cleanTest test bootstrapBillingAccountTest
+platform/gradlew -p platform "$@"
+}
 
-# The test task remains the sole gate authority.  Allure is an additional
-# evidence format: copy results only after Gradle finishes and never mask its
-# exit status when report generation or copying fails.
-gradle_status=$?
+run_backend_gradle aura_boot --continue cleanTest test
+root_test_status=$?
+printf '%s\n' "$root_test_status" > "$ARTIFACTS/root-test-exit-code.txt"
+printf '%s\n' 'aura_boot_bootstrap' > "$ARTIFACTS/bootstrap-database.txt"
+AURA_BOOTSTRAP_ISOLATED_DATABASE=1 \
+run_backend_gradle aura_boot_bootstrap --continue bootstrapBillingAccountTest
+bootstrap_test_status=$?
+printf '%s\n' "$bootstrap_test_status" > "$ARTIFACTS/bootstrap-test-exit-code.txt"
+gradle_status=0
+if (( root_test_status != 0 || bootstrap_test_status != 0 )); then
+  gradle_status=1
+fi
+
+# Both task exit codes decide the gate; report copying cannot mask a failure.
 if [[ -n "${AURA_ALLURE_RESULTS:-}" && -d "$PROJECT_ROOT/platform/build/allure-results" ]]; then
   mkdir -p "$AURA_ALLURE_RESULTS"
   cp -a "$PROJECT_ROOT/platform/build/allure-results/." "$AURA_ALLURE_RESULTS/" || \

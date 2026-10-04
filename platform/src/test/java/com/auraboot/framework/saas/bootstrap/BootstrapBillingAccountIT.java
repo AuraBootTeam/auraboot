@@ -67,6 +67,11 @@ class BootstrapBillingAccountIT {
     /** Fail closed on an initialized or populated database; never reset retained facts. */
     @BeforeEach
     void assertBlankBootstrapDatabase() {
+        assertThat(System.getenv("AURA_BOOTSTRAP_ISOLATED_DATABASE"))
+                .as("use the dedicated database provisioned by scripts/oss-backend-unit-ci.sh")
+                .isEqualTo("1");
+        assertThat(jdbcTemplate.queryForObject("SELECT current_database()", String.class))
+                .isEqualTo("aura_boot_bootstrap");
         systemConfigService.evictCache();
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ab_tenant", Integer.class))
                 .as("bootstrap verification requires its own blank migrated database")
@@ -77,6 +82,9 @@ class BootstrapBillingAccountIT {
         assertThat(initialized)
                 .as("system must be uninitialized before this test runs; "
                         + "provide a newly migrated BOOTSTRAP_TEST_DATABASE_URL")
+                .isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ab_bootstrap", Integer.class))
+                .as("bootstrap progress must not be inherited from an earlier run")
                 .isZero();
     }
 

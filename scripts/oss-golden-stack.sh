@@ -70,6 +70,7 @@ source "$SCRIPT_DIR/lib/workspace-control.sh"
 aura_bind_workspace_control "$WORKSPACE" || exit 2
 CANONICAL="$WORKSPACE/auraboot"                      # canonical OSS checkout (for gradle wrapper / node_modules seed)
 DEV="$WORKSPACE/aura"
+WORKSPACE_STATE_DIR="${AURA_WORKSPACE_STATE_DIR:-$WORKSPACE/.workspace}"
 
 ADMIN_EMAIL="admin@auraboot.com"
 ADMIN_PASSWORD="Test2026x"
@@ -115,8 +116,8 @@ acquire_stack_lock() {
 }
 
 state_dir() {
-  local current="$WORKSPACE/.workspace/runtimes/$1/oss-stack"
-  local legacy="$WORKSPACE/.workspace/golden/$1"
+  local current="$WORKSPACE_STATE_DIR/runtimes/$1/oss-stack"
+  local legacy="$WORKSPACE_STATE_DIR/golden/$1"
   if [ -L "$legacy" ]; then
     [ "$(readlink "$legacy")" = "$current" ] || die "legacy state link belongs to another location; review required"
   fi
@@ -129,8 +130,8 @@ state_dir() {
 }
 
 prepare_state_dir() {
-  local name="$1" current="$WORKSPACE/.workspace/runtimes/$1/oss-stack"
-  local legacy="$WORKSPACE/.workspace/golden/$1"
+  local name="$1" current="$WORKSPACE_STATE_DIR/runtimes/$1/oss-stack"
+  local legacy="$WORKSPACE_STATE_DIR/golden/$1"
   # Caller has checked stopped processes and ensured the exact runtime identity.
   assert_stack_stopped "$name" || return 1
   python3 - "$legacy" "$current" <<'PYSTATE' || return 1
@@ -152,7 +153,7 @@ PYSTATE
 
 # Read a key from the runtime env file.
 runtime_env() {
-  local name="$1" key="$2" f="$WORKSPACE/.workspace/env/$1.env"
+  local name="$1" key="$2" f="$WORKSPACE_STATE_DIR/env/$1.env"
   [ -f "$f" ] || die "runtime env not found: $f (run 'up' first / check the name)"
   grep -E "^${key}=" "$f" | head -1 | cut -d= -f2-
 }

@@ -24,6 +24,9 @@ test('backend CI runner is executable and owns its complete infrastructure lifec
   assert.ok(statSync(runner).mode & 0o100);
   assert.doesNotMatch(source, /docker-compose\.skills-c2\.override\.yml/);
   assert.match(source, /config --quiet/);
+  for (const file of source.matchAll(/-f "\$PROJECT_ROOT\/([^"\n]+)"/g)) {
+    assert.ok(statSync(path.join(here, "..", file[1])).isFile(), `missing Compose input: ${file[1]}`);
+  }
   assert.match(source, /up -d --wait postgres redis kafka/);
   assert.match(source, /runtime retained and stopped; network released: compose_project=/);
   assert.match(source, /COMPOSE_PROJECT="aura-ci-oss-backend-\$RUNTIME_TOKEN"/);
@@ -97,9 +100,9 @@ test('backend CI runner pre-pulls every fixed and Testcontainers image', () => {
 });
 
 test('backend CI runner preserves Gradle product-test exit status', () => {
-  assert.match(source, /^platform\/gradlew -p platform --continue cleanTest test bootstrapBillingAccountTest$/m);
-  assert.match(source, /^gradle_status=\$\?$/m);
-  assert.match(source, /^exit "\$gradle_status"$/m);
+  assert.match(source, /root_test_status=\$\?/);
+  assert.match(source, /bootstrap_test_status=\$\?/);
+  assert.match(source, /exit "\$gradle_status"/);
   assert.doesNotMatch(source, /platform\/gradlew[^\n]*\|\| environment_invalid/);
 });
 
@@ -127,7 +130,15 @@ test('backend CI runner keeps external DashScope checks out unless explicitly re
 
 test('backend CI runner executes isolated bootstrap verification only after the shared suite', () => {
   const buildSource = readFileSync(gradleBuild, 'utf8');
-  assert.match(source, /--continue cleanTest test bootstrapBillingAccountTest/);
+  assert.match(source, /run_backend_gradle aura_boot --continue cleanTest test/);
+  assert.match(source, /CREATE DATABASE aura_boot_bootstrap OWNER auraboot/);
+  assert.match(source, /AURA_BOOTSTRAP_ISOLATED_DATABASE=1/);
+  assert.match(source, /run_backend_gradle aura_boot_bootstrap --continue bootstrapBillingAccountTest/);
+  assert.match(source, /root_test_status != 0 \|\| bootstrap_test_status != 0/);
+  const fixture = readFileSync(path.join(here, '..', 'platform/src/test/java/com/auraboot/framework/saas/bootstrap/BootstrapBillingAccountIT.java'), 'utf8');
+  assert.match(fixture, /SELECT current_database\(\)/);
+  assert.match(fixture, /bootstrap progress must not be inherited/);
+  assert.doesNotMatch(fixture, /TRUNCATE TABLE|DELETE FROM|@AfterEach/);
   assert.match(buildSource, /excludeTags 'destructive-bootstrap'/);
   assert.match(buildSource, /mustRunAfter tasks\.named\('test'\)/);
   assert.match(buildSource, /outputs\.upToDateWhen \{ false \}/);
@@ -148,17 +159,17 @@ test('bootstrap task has a separately migrated database and refuses implicit sha
 
 test('ArchUnit uses a copy of the committed store without refreezing new violations', () => {
   const buildSource = readFileSync(gradleBuild, 'utf8');
-  assert.match(buildSource, /test-fixtures\/archunit_store/);
-  assert.match(buildSource, /from file\('src\/test\/resources\/archunit_store'\)/);
+  assert.match(buildSource, /archunit\/\$\{name\}/);
+  assert.match(buildSource, /from architectureBaseline/);
   assert.match(buildSource, /archunit\.freeze\.store\.default\.allowStoreCreation', 'false'/);
-  assert.doesNotMatch(buildSource, /freeze\.refreeze/);
+  assert.match(buildSource, /archunit\.freeze\.refreeze', 'false'/);
 });
 
 test('backend CI runner points fixed-stack tests at runtime-owned host ports', () => {
-  assert.match(source, /TEST_DATABASE_URL="jdbc:postgresql:\/\/127\.0\.0\.1:\$\{AURA_OSS_CI_POSTGRES_PORT\}\/aura_boot/);
+  assert.match(source, /TEST_DATABASE_URL="jdbc:postgresql:\/\/127\.0\.0\.1:\$\{AURA_OSS_CI_POSTGRES_PORT\}\/\$\{database\}/);
   assert.match(source, /TEST_DATABASE_USERNAME='auraboot'/);
   assert.match(source, /TEST_DATABASE_PASSWORD='auraboot_dev'/);
-  assert.match(source, /SPRING_DATASOURCE_URL="jdbc:postgresql:\/\/127\.0\.0\.1:\$\{AURA_OSS_CI_POSTGRES_PORT\}\/aura_boot/);
+  assert.match(source, /SPRING_DATASOURCE_URL="jdbc:postgresql:\/\/127\.0\.0\.1:\$\{AURA_OSS_CI_POSTGRES_PORT\}\/\$\{database\}/);
   assert.match(source, /SPRING_DATASOURCE_USERNAME='auraboot'/);
   assert.match(source, /SPRING_DATASOURCE_PASSWORD='auraboot_dev'/);
   assert.match(source, /SPRING_DATA_REDIS_HOST='127\.0\.0\.1'/);
