@@ -1759,6 +1759,10 @@
             },
             "additionalProperties": false
           }
+        },
+        "crudDefault": {
+          "type": "boolean",
+          "description": "true prefers this command for automatic form CRUD; false excludes auxiliary commands. Omitted retains legacy first-match resolution."
         }
       },
       "additionalProperties": false

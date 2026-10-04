@@ -210,10 +210,13 @@ public class CommandServiceImpl implements CommandService {
     @Override
     public Map<String, String> resolveCrudCommands(String modelCode) {
         Map<String, String> crud = new LinkedHashMap<>();
+        java.util.Set<String> explicitDefaults = new java.util.HashSet<>();
         if (modelCode == null || modelCode.isBlank()) {
             return crud;
         }
-        // First command matching each CRUD operation type wins. A model with no
+        // Explicit defaults take precedence; auxiliary commands can opt out.
+        // Without that declaration, the first matching CRUD operation wins.
+        // A model with no
         // command of a given type simply omits that key, so the runtime falls
         // back to the dynamic CRUD API. Non-CRUD types (query / state_transition)
         // are intentionally ignored — they are not the standard form submit path.
@@ -222,17 +225,42 @@ public class CommandServiceImpl implements CommandService {
             if (type == null) {
                 continue;
             }
+            Boolean crudDefault = extractCrudDefault(cmd.getExecutionConfig());
+            if (Boolean.FALSE.equals(crudDefault)) {
+                continue;
+            }
             switch (type) {
                 case "create":
                 case "update":
                 case "delete":
-                    crud.putIfAbsent(type, cmd.getCode());
+                    if (!crud.containsKey(type)
+                            || (Boolean.TRUE.equals(crudDefault) && !explicitDefaults.contains(type))) {
+                        crud.put(type, cmd.getCode());
+                    }
+                    if (Boolean.TRUE.equals(crudDefault)) {
+                        explicitDefaults.add(type);
+                    }
                     break;
                 default:
                     break;
             }
         }
         return crud;
+    }
+
+    private Boolean extractCrudDefault(String executionConfig) {
+        if (executionConfig == null || executionConfig.isBlank()) {
+            return null;
+        }
+        try {
+            Map<String, Object> config = JsonUtil.parse(
+                    executionConfig, new TypeReference<Map<String, Object>>() {});
+            Object value = config.get("crudDefault");
+            return value instanceof Boolean flag ? flag : null;
+        } catch (Exception e) {
+            log.debug("Failed to parse command executionConfig for CRUD default extraction", e);
+            return null;
+        }
     }
 
     @Override
