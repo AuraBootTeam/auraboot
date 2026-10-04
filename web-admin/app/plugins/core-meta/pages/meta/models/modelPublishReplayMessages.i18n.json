@@ -1,0 +1,134 @@
+{
+  "executed": {
+    "zh-CN": "已执行",
+    "en-US": "Executed"
+  },
+  "ready": {
+    "zh-CN": "可自动执行",
+    "en-US": "Ready for automatic execution"
+  },
+  "manual": {
+    "zh-CN": "需人工复核",
+    "en-US": "Manual review required"
+  },
+  "sample": {
+    "zh-CN": "需样本",
+    "en-US": "Sample required"
+  },
+  "automationUnavailable": {
+    "zh-CN": "自动化不可用",
+    "en-US": "Automation unavailable"
+  },
+  "permissionUnavailable": {
+    "zh-CN": "权限服务不可用",
+    "en-US": "Permission service unavailable"
+  },
+  "workflowUnavailable": {
+    "zh-CN": "工作流服务不可用",
+    "en-US": "Workflow service unavailable"
+  },
+  "failed": {
+    "zh-CN": "失败",
+    "en-US": "Failed"
+  },
+  "pending": {
+    "zh-CN": "待复核",
+    "en-US": "Pending review"
+  },
+  "permissionSample": {
+    "zh-CN": "补充成员 ID 和记录样本后，可执行权限策略复核。",
+    "en-US": "Provide a member ID and record sample to review the permission policy."
+  },
+  "permissionReady": {
+    "zh-CN": "可使用代表性成员和记录数据执行权限策略复核。",
+    "en-US": "Review the permission policy with a representative member and record data."
+  },
+  "permissionDenied": {
+    "zh-CN": "权限策略复核结果：拒绝。",
+    "en-US": "Permission policy review: denied."
+  },
+  "permissionAllowed": {
+    "zh-CN": "权限策略复核结果：允许。",
+    "en-US": "Permission policy review: allowed."
+  },
+  "decisionMatched": {
+    "zh-CN": "决策版本复核结果：命中。",
+    "en-US": "Decision review: matched."
+  },
+  "decisionNotMatched": {
+    "zh-CN": "决策版本复核结果：未命中。",
+    "en-US": "Decision review: not matched."
+  },
+  "decisionExecuted": {
+    "zh-CN": "决策版本复核已执行。",
+    "en-US": "Decision review executed."
+  },
+  "workflowReady": {
+    "zh-CN": "可使用流程实例和业务记录样本执行 工作流规则复核。",
+    "en-US": "Review workflow rules with a process instance and business record sample."
+  },
+  "workflowSample": {
+    "zh-CN": "补充流程样本和记录数据后，可执行 工作流规则复核。",
+    "en-US": "Provide a process sample and record data to review workflow rules."
+  },
+  "workflowDisabled": {
+    "zh-CN": "当前运行态未启用 工作流回放服务。",
+    "en-US": "The workflow replay service is unavailable in this runtime."
+  },
+  "workflowClosed": {
+    "zh-CN": "工作流分派规则复核失败：规则执行异常，已失败关闭，未使用静态审批人兜底。",
+    "en-US": "Workflow assignment review failed: the rule failed closed; no static approver fallback was used."
+  },
+  "workflowFailed": {
+    "zh-CN": "工作流规则复核失败，请检查规则绑定、流程样本和决策版本。",
+    "en-US": "Workflow review failed. Check rule bindings, the process sample and decision version."
+  },
+  "assignmentNotMatched": {
+    "zh-CN": "工作流分派规则复核已执行：未命中候选人规则。",
+    "en-US": "Workflow assignment review executed: no candidate rule matched."
+  },
+  "assignmentMatched": {
+    "zh-CN": "工作流分派规则复核已执行：已解析候选审批人。",
+    "en-US": "Workflow assignment review executed: candidate approvers resolved."
+  },
+  "workflowNotMatched": {
+    "zh-CN": "工作流规则复核结果：未命中。",
+    "en-US": "Workflow rule review: not matched."
+  },
+  "workflowMatched": {
+    "zh-CN": "工作流规则复核结果：命中。",
+    "en-US": "Workflow rule review: matched."
+  },
+  "slaReady": {
+    "zh-CN": "可使用流程实例、租户和任务样本执行 SLA 节点复核。",
+    "en-US": "Review an SLA node with process instance, tenant and task samples."
+  },
+  "slaSample": {
+    "zh-CN": "补充流程实例、租户和任务样本后，可执行 SLA 节点复核。",
+    "en-US": "Provide process instance, tenant and task samples to review an SLA node."
+  },
+  "slaNode": {
+    "zh-CN": "SLA 节点复核已执行。",
+    "en-US": "SLA node review executed."
+  },
+  "slaRecord": {
+    "zh-CN": "SLA 记录复核已执行。",
+    "en-US": "SLA record review executed."
+  },
+  "sampleContext": {
+    "zh-CN": "需要补充样本上下文后再复核。",
+    "en-US": "Provide sample context before reviewing."
+  },
+  "decisionFailed": {
+    "zh-CN": "决策版本复核失败，请检查决策版本与样本上下文。",
+    "en-US": "Decision review failed. Check the decision version and sample context."
+  },
+  "decisionNotExecuted": {
+    "zh-CN": "决策版本复核尚未执行。",
+    "en-US": "Decision review has not executed."
+  },
+  "workflowFallback": {
+    "zh-CN": "工作流规则复核失败：报告显示使用了兜底，请检查规则配置。",
+    "en-US": "Workflow review failed: the report indicates a fallback was used. Check the rule configuration."
+  }
+}

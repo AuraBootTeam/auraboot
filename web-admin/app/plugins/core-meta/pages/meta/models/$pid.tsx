@@ -1,3 +1,5 @@
+import { useI18n } from '~/contexts/I18nContext';
+import { getReplayStatusLabel, getReplayResultMessage } from './modelPublishReplayMessages';
 /**
  * Model详情页面
  *
@@ -136,20 +138,6 @@ function getRelatedPageTitle(page: RelatedPage | null | undefined): string {
   );
 }
 
-function getReplayStatusLabel(status?: string): string {
-  const labels: Record<string, string> = {
-    EXECUTED: '已执行',
-    READY: '可自动执行',
-    MANUAL_REQUIRED: '需人工复核',
-    NEEDS_SAMPLE_CONTEXT: '需样本',
-    AUTOMATION_UNAVAILABLE: '自动化不可用',
-    PERMISSION_UNAVAILABLE: '权限服务不可用',
-    WORKFLOW_UNAVAILABLE: '工作流服务不可用',
-    FAILED: '失败',
-  };
-  return labels[status || ''] || status || '待复核';
-}
-
 function getReplayStatusClass(status?: string): string {
   if (status === 'EXECUTED') return 'bg-emerald-50 text-emerald-700';
   if (status === 'READY') return 'bg-blue-50 text-blue-700';
@@ -165,83 +153,6 @@ function getReplayStatusClass(status?: string): string {
     return 'bg-red-50 text-red-700';
   }
   return 'bg-gray-100 text-gray-700';
-}
-
-function getReplayResultMessage(result: ModelPublishReplayResult): string | null {
-  const consumerType = result.step?.consumerType;
-  if (consumerType === 'PERMISSION_POLICY' && result.status === 'NEEDS_SAMPLE_CONTEXT') {
-    return '补充成员 ID 和记录样本后，可执行权限策略复核。';
-  }
-  if (consumerType === 'PERMISSION_POLICY' && result.status === 'READY') {
-    return '可使用代表性成员和记录数据执行权限策略复核。';
-  }
-  if (consumerType === 'PERMISSION_POLICY' && result.status === 'EXECUTED') {
-    if (result.message?.includes('DENY')) {
-      return '权限策略复核结果：拒绝。';
-    }
-    if (result.message?.includes('ALLOW')) {
-      return '权限策略复核结果：允许。';
-    }
-  }
-  if (consumerType === 'DECISION_VERSION' && result.message?.includes('Decision replay executed')) {
-    if (result.message.includes('MATCHED')) {
-      return '决策版本复核结果：命中。';
-    }
-    if (result.message.includes('NOT_MATCHED')) {
-      return '决策版本复核结果：未命中。';
-    }
-    return '决策版本复核已执行。';
-  }
-  if (consumerType === 'WORKFLOW_PROCESS' && result.status === 'READY') {
-    return '可使用流程实例和业务记录样本执行 工作流规则复核。';
-  }
-  if (consumerType === 'WORKFLOW_PROCESS' && result.status === 'NEEDS_SAMPLE_CONTEXT') {
-    return '补充流程样本和记录数据后，可执行 工作流规则复核。';
-  }
-  if (consumerType === 'WORKFLOW_PROCESS' && result.status === 'WORKFLOW_UNAVAILABLE') {
-    return '当前运行态未启用 工作流回放服务。';
-  }
-  if (consumerType === 'WORKFLOW_PROCESS' && result.status === 'FAILED') {
-    if (result.outputs?.failClosed === true || result.outputs?.fallbackApplied === true) {
-      return '工作流分派规则复核失败：规则执行异常，已失败关闭，未使用静态审批人兜底。';
-    }
-    return '工作流规则复核失败，请检查规则绑定、流程样本和决策版本。';
-  }
-  if (consumerType === 'WORKFLOW_PROCESS' && result.status === 'EXECUTED') {
-    const hasAssignment =
-      Array.isArray(result.outputs?.candidateUserIds) ||
-      Array.isArray(result.outputs?.candidateGroupIds);
-    if (hasAssignment) {
-      return result.matched === false
-        ? '工作流分派规则复核已执行：未命中候选人规则。'
-        : '工作流分派规则复核已执行：已解析候选审批人。';
-    }
-    return result.matched === false ? '工作流规则复核结果：未命中。' : '工作流规则复核结果：命中。';
-  }
-  if (consumerType === 'SLA_RULE' && result.status === 'READY') {
-    return '可使用流程实例、租户和任务样本执行 SLA 节点复核。';
-  }
-  if (consumerType === 'SLA_RULE' && result.status === 'NEEDS_SAMPLE_CONTEXT') {
-    return '补充流程实例、租户和任务样本后，可执行 SLA 节点复核。';
-  }
-  if (
-    consumerType === 'SLA_RULE' &&
-    result.status === 'EXECUTED' &&
-    result.message?.includes('SLA NODE replay')
-  ) {
-    return 'SLA 节点复核已执行。';
-  }
-  if (
-    consumerType === 'SLA_RULE' &&
-    result.status === 'EXECUTED' &&
-    result.message?.includes('SLA RECORD replay')
-  ) {
-    return 'SLA 记录复核已执行。';
-  }
-  if (typeof result.message === 'string' && result.message.includes('sampleContext')) {
-    return '需要补充样本上下文后再复核。';
-  }
-  return result.message || null;
 }
 
 function metadataString(metadata: Record<string, unknown> | undefined, key: string): string {
@@ -502,6 +413,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
  * Model详情页面组件
  */
 export default function ModelDetailPage() {
+  const { locale } = useI18n();
   const navigate = useNavigate();
   const location = useLocation();
   const { pid } = useParams();
@@ -2586,7 +2498,7 @@ export default function ModelDetailPage() {
                                 step?.sourcePid ||
                                 step?.consumerType ||
                                 '未命名消费方';
-                              const displayMessage = getReplayResultMessage(result);
+                              const displayMessage = getReplayResultMessage(result, locale);
                               const permissionTraceHref = permissionReplayTraceHref(result);
                               return (
                                 <div
@@ -2601,7 +2513,7 @@ export default function ModelDetailPage() {
                                     <span
                                       className={`rounded px-2 py-1 text-xs font-medium ${getReplayStatusClass(result.status)}`}
                                     >
-                                      {getReplayStatusLabel(result.status)}
+                                      {getReplayStatusLabel(result.status, locale)}
                                     </span>
                                     <span className="text-sm font-medium text-gray-900">{source}</span>
                                     {result.traceId && (
