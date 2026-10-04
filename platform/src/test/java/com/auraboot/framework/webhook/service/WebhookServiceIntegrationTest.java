@@ -13,6 +13,7 @@ import com.auraboot.framework.webhook.mapper.WebhookDeliveryLogMapper;
 import com.auraboot.framework.webhook.service.impl.WebhookDeliveryWorker;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import org.junit.jupiter.api.*;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.Instant;
@@ -264,10 +265,16 @@ class WebhookServiceIntegrationTest extends BaseIntegrationTest {
         request.setMaxRetries(0);
         WebhookSubscription subscription = webhookService.create(request);
 
-        WebhookDispatchResult result = webhookDispatcher.dispatchTracked(
+        MDC.put("requestId", "persisted-originating-request");
+        WebhookDispatchResult result;
+        try {
+            result = webhookDispatcher.dispatchTracked(
                 subscription.getEventType(),
                 Map.of("_eventId", "evt-tracked-1", "caseId", "CMP-1"),
                 subscription.getTenantId());
+        } finally {
+            MDC.remove("requestId");
+        }
 
         assertEquals(1, result.receipts().size());
         WebhookDispatchResult.Receipt receipt = result.receipts().get(0);
@@ -280,6 +287,7 @@ class WebhookServiceIntegrationTest extends BaseIntegrationTest {
                 .eq("pid", receipt.deliveryLogPid()));
         assertNotNull(logEntry);
         assertEquals("evt-tracked-1", logEntry.getEventId());
+        assertEquals("persisted-originating-request", logEntry.getRequestId());
         assertEquals(subscription.getPid(), logEntry.getSubscriptionPid());
     }
 
