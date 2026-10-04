@@ -19,6 +19,7 @@ import com.auraboot.framework.organization.service.TeamMemberService;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.dto.MemberQueryRequest;
 import com.auraboot.framework.tenant.dto.MemberResponse;
+import com.auraboot.framework.tenant.dto.MemberSearchOption;
 import com.auraboot.framework.tenant.service.TenantMemberApplicationService;
 import com.auraboot.framework.tenant.service.TenantMemberService;
 import com.auraboot.framework.tenant.dto.TenantMemberOffboardingImpactResponse;
@@ -94,7 +95,7 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
     private DynamicDataService dynamicDataService;
     
     @Override
-    public PaginationResult<MemberResponse> searchMembers(MemberQueryRequest request, Long userId) {
+    public PaginationResult<MemberSearchOption> searchMembers(MemberQueryRequest request, Long userId) {
         try {
             // 获取当前用户的租户ID
             Long tenantId = MetaContext.getCurrentTenantId();
@@ -117,12 +118,12 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
             );
             
             // 转换为响应对象
-            List<MemberResponse> memberResponses = page.getRecords().stream()
-                .map(this::convertToMemberResponse)
+            List<MemberSearchOption> memberResponses = page.getRecords().stream()
+                .map(this::toMemberSearchOption)
                 .collect(Collectors.toList());
 
 
-            PaginationResult<MemberResponse> memberResponsePaginationResult = PaginationResult.of(memberResponses, page.getTotal(), request.getPageNum(), request.getPageSize());
+            PaginationResult<MemberSearchOption> memberResponsePaginationResult = PaginationResult.of(memberResponses, page.getTotal(), request.getPageNum(), request.getPageSize());
 
             return memberResponsePaginationResult;
             
@@ -639,6 +640,13 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
     /**
      * 转换为成员响应对象
      */
+    private MemberSearchOption toMemberSearchOption(TenantMember member) {
+        User user = member.getUserId() == null ? null : userService.findByUserId(member.getUserId());
+        MemberSearchOption.UserIdentity identity = user == null ? null : new MemberSearchOption.UserIdentity(
+                user.getPid(), user.getUserName(), user.getEmail(), user.getNickName(), null);
+        return new MemberSearchOption(member.getPid(), member.getStatus(), identity);
+    }
+
     private MemberResponse convertToMemberResponse(TenantMember member) {
         MemberResponse response = new MemberResponse();
         BeanUtils.copyProperties(member, response);

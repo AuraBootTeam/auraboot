@@ -723,6 +723,18 @@ test('independent organization read and member provisioning preserve separate na
   const rolePid = roleBody.data.pid as string;
   const user = makeQuoteRoleUser('staff', stamp, [roleCode]);
   await ensureQuoteRoleUser(page, user);
+  const directoryStamp = uniqueId('directory');
+  const directoryResponse = await page.request.post('/api/admin/users/employee-accounts', {
+    data: { employees: [{
+      name: directoryStamp, userName: directoryStamp, email: `${directoryStamp}@e2e.local`,
+      mobile: '13912345679', roles: [],
+    }] },
+  });
+  expect(directoryResponse.status()).toBe(200);
+  const directoryBody = await directoryResponse.json();
+  expect(String(directoryBody.code)).toBe('0');
+  const directoryMemberPid = directoryBody.data.accounts[0].memberPid as string;
+  expect(directoryMemberPid).toBeTruthy();
   const department = await executeCommandViaApi(page, 'org:create_department', {
     org_dept_name: stamp, org_dept_code: `STAFF-${Date.now()}`,
   });
@@ -793,6 +805,23 @@ test('independent organization read and member provisioning preserve separate na
         }
       }
     }
+    const directorySearch = await reader.request.post('/api/tenant/members/search', {
+      data: { keyword: directoryStamp, status: 'active', pageNum: 1, pageSize: 10 },
+    });
+    expect(directorySearch.status()).toBe(200);
+    const directoryResults = await directorySearch.json();
+    expect(String(directoryResults.code)).toBe('0');
+    expect(directoryResults.data.records).toHaveLength(1);
+    const directoryOption = directoryResults.data.records[0];
+    expect(Object.keys(directoryOption).sort()).toEqual(['pid', 'status', 'user']);
+    expect(Object.keys(directoryOption.user).sort()).toEqual(['avatar', 'email', 'pid', 'realName', 'username']);
+    expect(directoryOption).toMatchObject({
+      pid: directoryMemberPid, status: 'active',
+      user: { username: directoryStamp, realName: directoryStamp, email: `${directoryStamp}@e2e.local` },
+    });
+    expect(directoryOption.user.pid).toBeTruthy();
+    const directoryDetailEndpoint = `/api/tenant/members/${directoryMemberPid}`;
+    expect((await reader.request.get(directoryDetailEndpoint)).status()).toBe(403);
     await expectFullReads(403);
     expect((await reader.request.get(optionsEndpoint)).status()).toBe(403);
     expect((await reader.request.get(unlinkedEndpoint)).status()).toBe(403);
@@ -819,6 +848,9 @@ test('independent organization read and member provisioning preserve separate na
     await expectFullReads(200);
     expect((await reader.request.get(optionsEndpoint)).status()).toBe(403);
     expect((await reader.request.get(unlinkedEndpoint)).status()).toBe(403);
+    await expect(reader.getByRole('heading', { name: '员工详情', exact: true })).toBeVisible();
+    await expect(reader.getByText(stamp, { exact: true }).first()).toBeVisible();
+    await expect(reader.getByText('加载中...', { exact: true })).toHaveCount(0);
     await reader.screenshot({ path: info.outputPath('standalone-staff-read.png'), fullPage: true });
     await selectCapability('org.cap.hr');
     const unlinked = await reader.request.get(unlinkedEndpoint);
@@ -833,9 +865,15 @@ test('independent organization read and member provisioning preserve separate na
     await reader.goto('/home');
     await ensureSidebarExpanded(reader);
     await expect(reader.locator('nav a[href="/p/org_employee"]')).toHaveCount(0);
-    await reader.screenshot({ path: info.outputPath('standalone-staff-read-revoked.png'), fullPage: true });
+    await reader.getByTestId('sidebar').screenshot({ path: info.outputPath('standalone-staff-read-revoked.png') });
 
     await selectCapability('org.cap.member');
+    const directoryDetail = await reader.request.get(directoryDetailEndpoint);
+    expect(directoryDetail.status()).toBe(200);
+    const directoryDetailBody = await directoryDetail.json();
+    expect(String(directoryDetailBody.code)).toBe('0');
+    expect(directoryDetailBody.data.pid).toBe(directoryMemberPid);
+    expect(directoryDetailBody.data.user.phone).toBe('13912345679');
     await expectFullReads(403);
     expect((await reader.request.get(unlinkedEndpoint)).status()).toBe(403);
     const options = await reader.request.get(optionsEndpoint);
@@ -882,6 +920,7 @@ test('independent organization read and member provisioning preserve separate na
     await reader.goto('/home');
     await ensureSidebarExpanded(reader);
     await expect(reader.locator('nav a[href="/p/tenant_member"]')).toHaveCount(0);
-    await reader.screenshot({ path: info.outputPath('member-provision-revoked.png'), fullPage: true });
+    expect((await reader.request.get(directoryDetailEndpoint)).status()).toBe(403);
+    await reader.getByTestId('sidebar').screenshot({ path: info.outputPath('member-provision-revoked.png') });
   } finally { await opened.context.close(); }
 });

@@ -3,6 +3,7 @@ package com.auraboot.framework.tenant.service;
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.tenant.dto.MemberQueryRequest;
 import com.auraboot.framework.tenant.dto.MemberResponse;
+import com.auraboot.framework.tenant.dto.MemberSearchOption;
 import com.auraboot.framework.tenant.dto.TenantMemberCreateRequest;
 import com.auraboot.framework.tenant.dto.TenantMemberCreateResult;
 import com.auraboot.framework.tenant.dto.TenantMemberOffboardingImpactResponse;
@@ -21,7 +22,7 @@ public interface TenantMemberApplicationService {
      * @param userId 当前用户ID
      * @return 分页结果
      */
-    PaginationResult<MemberResponse> searchMembers(MemberQueryRequest request, Long userId);
+    PaginationResult<MemberSearchOption> searchMembers(MemberQueryRequest request, Long userId);
     
     /**
      * 根据ID获取成员信息

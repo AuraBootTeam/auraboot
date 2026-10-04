@@ -14,6 +14,7 @@ import com.auraboot.framework.tenant.controller.request.BatchMemberStatusRequest
 import com.auraboot.framework.tenant.controller.request.MemberLifecycleRequest;
 import com.auraboot.framework.tenant.dto.MemberQueryRequest;
 import com.auraboot.framework.tenant.dto.MemberResponse;
+import com.auraboot.framework.tenant.dto.MemberSearchOption;
 import com.auraboot.framework.tenant.dto.TenantMemberOffboardingImpactResponse;
 import com.auraboot.framework.tenant.dto.TenantMemberOffboardingCandidate;
 import com.auraboot.framework.tenant.service.CurrentUserTeamResolver;
@@ -41,11 +42,11 @@ public class TenantMemberController {
 
     @PostMapping("/search")
     @ResponseBody
-    public ApiResponse<PaginationResult<MemberResponse>> searchMembers(
+    public ApiResponse<PaginationResult<MemberSearchOption>> searchMembers(
             @RequestBody MemberQueryRequest request,
             @CurrentUserId Long userId) {
         
-        PaginationResult<MemberResponse> result = memberApplicationService.searchMembers(request, userId);
+        PaginationResult<MemberSearchOption> result = memberApplicationService.searchMembers(request, userId);
         return ApiResponse.success(result);
     }
 

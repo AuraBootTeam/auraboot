@@ -22,6 +22,7 @@ import com.auraboot.framework.permission.engine.model.PermissionResult;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.service.UserService;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -37,6 +38,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -233,11 +236,17 @@ class TenantMemberApplicationServiceImplTest {
     void searchMembersOk() {
         metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(99L);
         Page<TenantMember> page = new Page<>(1, 10);
-        page.setRecords(List.of(member(1L, 99L, 7L, StatusConstants.ACTIVE)));
+        TenantMember source = member(1L, 99L, 7L, StatusConstants.ACTIVE);
+        source.setJoinDate(Instant.EPOCH);
+        source.setPermissions("{\"privatePermission\":true}");
+        source.setSettings("{\"privateSetting\":true}");
+        page.setRecords(List.of(source));
         page.setTotal(1L);
         when(tenantMemberService.findMembers(anyInt(), anyInt(), eq(99L), any(), any(), any()))
                 .thenReturn(page);
-        when(userService.findByUserId(7L)).thenReturn(u(7L, "u@x.com"));
+        User user = u(7L, "u@x.com");
+        user.setMobile("13912345679");
+        when(userService.findByUserId(7L)).thenReturn(user);
 
         MemberQueryRequest req = new MemberQueryRequest();
         req.setPageNum(1);
@@ -246,7 +255,16 @@ class TenantMemberApplicationServiceImplTest {
         var result = service.searchMembers(req, 7L);
         assertNotNull(result);
         assertEquals(1, result.getRecords().size());
-        assertEquals("用户 7", result.getRecords().get(0).getUser().getRealName());
+        var option = result.getRecords().get(0);
+        assertEquals("用户 7", option.user().realName());
+        assertEquals("u@x.com", option.user().email());
+        assertEquals(source.getPid(), option.pid());
+        assertEquals(StatusConstants.ACTIVE, option.status());
+        var json = new ObjectMapper().valueToTree(option);
+        assertEquals(Set.of("pid", "status", "user"),
+                new ObjectMapper().convertValue(json, Map.class).keySet());
+        assertEquals(Set.of("pid", "username", "email", "realName", "avatar"),
+                new ObjectMapper().convertValue(json.get("user"), Map.class).keySet());
     }
 
     @Test
