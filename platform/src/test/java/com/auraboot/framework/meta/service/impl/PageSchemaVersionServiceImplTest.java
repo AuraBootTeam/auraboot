@@ -44,6 +44,9 @@ class PageSchemaVersionServiceImplTest {
     @Mock
     private ObjectMapper objectMapper;
 
+    @Mock
+    private com.auraboot.framework.meta.validator.PageSchemaAuthoringProfileValidator renderProfiles;
+
     @InjectMocks
     private PageSchemaVersionServiceImpl versionService;
 

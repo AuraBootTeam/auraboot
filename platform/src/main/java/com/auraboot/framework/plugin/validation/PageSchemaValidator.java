@@ -84,6 +84,49 @@ public class PageSchemaValidator implements PluginValidator {
                 .collect(Collectors.toUnmodifiableSet());
     }
 
+    /** Authoring retains designer kinds; registered profiles share the import vocabulary. */
+    public boolean isAuthoringKindAllowed(String kind, String profileName) {
+        PageSchemaRenderProfile profile = renderProfiles.get(profileName == null ? "" : profileName);
+        return kind != null && (profile == null
+                ? Set.of("list", "form", "detail", "dashboard", "composite").contains(kind)
+                : profile.kinds().contains(kind));
+    }
+
+    /** Partial updates resolve profile scoping in the service after merging persisted values. */
+    public boolean isKnownAuthoringKind(String kind) {
+        return isAuthoringKindAllowed(kind, null) || extensionKinds().contains(kind);
+    }
+
+    /** Incremental drafts may be empty; supplied registered-profile blocks cannot escape. */
+    public List<String> authoringProfileErrors(String kind, String profileName, List<?> blocks) {
+        List<String> errors = new ArrayList<>();
+        if (!isAuthoringKindAllowed(kind, profileName)) {
+            errors.add("Unsupported page kind for render profile: " + profileName);
+        }
+        PageSchemaRenderProfile profile = renderProfiles.get(profileName == null ? "" : profileName);
+        if (profile != null && blocks != null) {
+            validateAuthoringProfileBlocks(blocks, profile, errors);
+        }
+        return List.copyOf(errors);
+    }
+
+    private void validateAuthoringProfileBlocks(List<?> blocks, PageSchemaRenderProfile profile,
+                                               List<String> errors) {
+        for (Object raw : blocks) {
+            if (!(raw instanceof Map<?, ?> block)) {
+                errors.add("Page blocks must be objects for render profile: " + profile.name());
+                continue;
+            }
+            Object type = block.get("blockType");
+            if (type == null || !profile.blockTypes().contains(type.toString())) {
+                errors.add("Unsupported block type for render profile: " + profile.name());
+            }
+            if (block.get("blocks") instanceof List<?> children) {
+                validateAuthoringProfileBlocks(children, profile, errors);
+            }
+        }
+    }
+
     @Override
     public String category() {
         return "semantic";

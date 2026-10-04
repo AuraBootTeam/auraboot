@@ -51,6 +51,7 @@ import java.util.stream.Collectors;
 @Transactional
 public class PageSchemaServiceImpl implements PageSchemaService {
 
+    private final com.auraboot.framework.meta.validator.PageSchemaAuthoringProfileValidator renderProfiles;
     private final PageSchemaMapper pageSchemaMapper;
     private final PageSchemaConverter pageSchemaConverter;
     private final com.auraboot.framework.permission.service.AutoPermissionAssignmentService autoPermissionAssignmentService;
@@ -101,6 +102,7 @@ public class PageSchemaServiceImpl implements PageSchemaService {
         
         // 转换实体并设置默认值
         PageSchema pageSchema = pageSchemaConverter.toEntity(request);
+        validateRenderProfile(pageSchema);
         pageSchema.setPid(UniqueIdGenerator.generate());
         pageSchema.setStatus(Status.DRAFT.getCode());
         if (pageSchema.getExtension() == null) {
@@ -167,6 +169,7 @@ public class PageSchemaServiceImpl implements PageSchemaService {
         }
 
         // 更新实体
+        renderProfiles.validateUpdate(existingSchema, request);
         pageSchemaConverter.updateEntity(existingSchema, request);
         recordBoundModelVersion(existingSchema);
         existingSchema.setUpdatedAt(Instant.now());
@@ -850,7 +853,12 @@ public class PageSchemaServiceImpl implements PageSchemaService {
     /**
      * 验证是否可以发布
      */
+    private void validateRenderProfile(PageSchema pageSchema) {
+        renderProfiles.validate(pageSchema);
+    }
+
     private void validateCanPublish(PageSchema pageSchema) {
+        validateRenderProfile(pageSchema);
         if (Status.PUBLISHED.getCode().equals(pageSchema.getStatus())) {
             throw new ValidationException(ResponseCode.CommonValidationFailed,
                 "页面配置已经发布");
