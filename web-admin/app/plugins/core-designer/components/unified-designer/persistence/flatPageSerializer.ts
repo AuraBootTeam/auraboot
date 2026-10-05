@@ -67,6 +67,21 @@ const PASSTHROUGH_BLOCK_TYPES = new Set([
   'custom',
 ]);
 
+/** Keys serializePassthrough manages explicitly; everything else on a passthrough
+ * block is legacy top-level payload and must survive the round trip verbatim. */
+const RESIDUAL_MANAGED_KEYS = new Set([
+  'id',
+  'blockType',
+  'region',
+  'title',
+  'dataSource',
+  'layout',
+  'props',
+  'blocks',
+  'extension',
+  'widgetType',
+]);
+
 /** Leaf block types that live inside passthrough containers and pass through verbatim. */
 const PASSTHROUGH_LEAF_TYPES = new Set(['field', 'column', 'action', 'filter-field']);
 
@@ -321,6 +336,19 @@ function serializePassthrough(block: DslBlockV3, issues: string[]): LegacyDslBlo
   if (block.title !== undefined) flat.title = block.title;
   if (block.dataSource !== undefined) flat.dataSource = unwrapDataSourceRef(block.dataSource);
   applyCommonShape(block, flat, stripNone(block.props));
+  // Legacy top-level block keys (metric-strip variant/metrics, description
+  // content, embedded-list modelCode/parentField, status-banner statusField/
+  // toneMap, workbench-action-bar actions/surface/align, …) live OUTSIDE
+  // `props` on the editor tree. The passthrough contract is "verbatim" —
+  // dropping them silently emptied every legacy-authored display block on the
+  // first save (binding-loss). Carry everything unmanaged straight through;
+  // props still wins for keys the editor itself materialized into props.
+  for (const [key, value] of Object.entries(block)) {
+    if (RESIDUAL_MANAGED_KEYS.has(key) || value === undefined) continue;
+    if (flat[key as keyof LegacyDslBlockV2] === undefined) {
+      (flat as Record<string, unknown>)[key] = value;
+    }
+  }
   const children = block.blocks ?? [];
   if (children.length > 0) {
     // Passthrough containers (repeater / subform / sub-table / columns / …)
