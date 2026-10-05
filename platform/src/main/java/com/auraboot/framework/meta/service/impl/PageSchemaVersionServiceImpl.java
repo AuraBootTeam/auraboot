@@ -215,7 +215,14 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
         createVersion(pagePid, "pre_rollback_backup", operatorPid, "回滚前备份");
         
         // Persist only the already validated candidate; denied snapshots cannot poison mapper cache.
-        pageSchemaMapper.updateById(restoredSchema);
+        if (restoredSchema.getProfile() == null && currentSchema.getProfile() != null) {
+            // Explicitly restore legacy NULL without changing global partial-update field strategies.
+            pageSchemaMapper.update(restoredSchema,
+                    new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<PageSchema>()
+                            .eq(PageSchema::getId, restoredSchema.getId()).set(PageSchema::getProfile, null));
+        } else {
+            pageSchemaMapper.updateById(restoredSchema);
+        }
         
         // 创建回滚操作的历史记录
         return createVersion(pagePid, "rollback", operatorPid, 
@@ -278,7 +285,7 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
         Map<String, Object> targetSnapshot = targetHistory.getSnapshot();
         if (isCurrentVersion(currentSchema, targetSnapshot)) {
             // 直接发布当前版本
-            renderProfiles.validate(currentSchema);
+            renderProfiles.validatePublished(currentSchema);
             currentSchema.setStatus(StatusConstants.PUBLISHED);
             currentSchema.setPublishedAt(Instant.now());
             pageSchemaMapper.updateById(currentSchema);
@@ -288,7 +295,7 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
 
             // 重新获取更新后的Schema
             currentSchema = findPageSchemaByPid(pagePid);
-            renderProfiles.validate(currentSchema);
+            renderProfiles.validatePublished(currentSchema);
             currentSchema.setStatus(StatusConstants.PUBLISHED);
             currentSchema.setPublishedAt(Instant.now());
             pageSchemaMapper.updateById(currentSchema);

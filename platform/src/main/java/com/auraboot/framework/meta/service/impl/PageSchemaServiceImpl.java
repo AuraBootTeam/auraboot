@@ -858,7 +858,7 @@ public class PageSchemaServiceImpl implements PageSchemaService {
     }
 
     private void validateCanPublish(PageSchema pageSchema) {
-        validateRenderProfile(pageSchema);
+        renderProfiles.validatePublished(pageSchema);
         if (Status.PUBLISHED.getCode().equals(pageSchema.getStatus())) {
             throw new ValidationException(ResponseCode.CommonValidationFailed,
                 "页面配置已经发布");
