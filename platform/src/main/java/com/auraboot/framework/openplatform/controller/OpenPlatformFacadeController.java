@@ -5,6 +5,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.dto.CommandExecuteResult;
 import com.auraboot.framework.meta.dto.DynamicQueryRequest;
+import com.auraboot.framework.meta.exception.MetaRecordNotFoundException;
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.service.CommandExecutor;
 import com.auraboot.framework.meta.service.DynamicDataService;
@@ -126,8 +127,15 @@ public class OpenPlatformFacadeController {
                                                             @PathVariable String recordPid) {
         ResourcePublication publication = publications.resource(resourceCode)
                 .orElseThrow(() -> new IllegalArgumentException("Resource is not published"));
-        Map<String, Object> record = MetaContext.runWithCommandPermitScope("ALL",
-                () -> dataService.getById(publication.modelCode(), recordPid));
+        Map<String, Object> record;
+        try {
+            record = MetaContext.runWithCommandPermitScope("ALL",
+                    () -> dataService.getById(publication.modelCode(), recordPid));
+        } catch (MetaRecordNotFoundException ex) {
+            // Tenant interceptor scopes the lookup to the installation's tenant;
+            // a cross-tenant pid must surface as 404, never as a system error.
+            return ResponseEntity.notFound().build();
+        }
         return ResponseEntity.ok()
                 .eTag(tokenCodec.encodeEtag(publication.code(), recordPid, publications.rowVersion(record)))
                 .body(publications.project(publication, record));
