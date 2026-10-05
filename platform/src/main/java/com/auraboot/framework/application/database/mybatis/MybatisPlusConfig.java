@@ -168,6 +168,12 @@ public class MybatisPlusConfig {
         }
     }
 
+    @jakarta.annotation.PostConstruct
+    void logHostOwnershipConfig() {
+        log.info("Platform host ownership config: hostTablePrefixes='{}', hostMapperPackages='{}'",
+                hostTablePrefixes, hostMapperPackages);
+    }
+
     @Bean
     public MybatisPlusInterceptor mybatisPlusInterceptor(DatabaseDialect databaseDialect,
                                                           ApplicationContext applicationContext,
@@ -180,29 +186,8 @@ public class MybatisPlusConfig {
         // before tenant-line / env-line interceptors mutate boundSql.
         interceptor.addInnerInterceptor(new EnvWriteLockGuardInnerInterceptor(applicationContext));
 
-        TenantLineInnerInterceptor tenantInterceptor = new TenantLineInnerInterceptor() {
-            @Override
-            public void beforeQuery(org.apache.ibatis.executor.Executor executor,
-                    org.apache.ibatis.mapping.MappedStatement mappedStatement, Object parameter,
-                    org.apache.ibatis.session.RowBounds rowBounds,
-                    org.apache.ibatis.session.ResultHandler resultHandler,
-                    org.apache.ibatis.mapping.BoundSql boundSql) {
-                if (isHostStatement(mappedStatement.getId())) {
-                    return;
-                }
-                super.beforeQuery(executor, mappedStatement, parameter, rowBounds, resultHandler, boundSql);
-            }
-
-            @Override
-            public void beforePrepare(org.apache.ibatis.executor.statement.StatementHandler statementHandler,
-                    java.sql.Connection connection, Integer transactionTimeout) {
-                if (isHostStatement(com.baomidou.mybatisplus.core.toolkit.PluginUtils
-                        .mpStatementHandler(statementHandler).mappedStatement().getId())) {
-                    return;
-                }
-                super.beforePrepare(statementHandler, connection, transactionTimeout);
-            }
-        };
+        TenantLineInnerInterceptor tenantInterceptor =
+                new HostScopeAwareTenantLineInterceptor(this::isHostStatement);
         tenantInterceptor.setTenantLineHandler(new TenantLineHandler() {
             @Override
             public Expression getTenantId() {
@@ -267,7 +252,10 @@ public class MybatisPlusConfig {
         // env-layering PoC: second tenant-line interceptor reused with column=env_id, applied
         // ONLY to whitelisted @EnvScoped tables (whitelist via blacklist inversion). The
         // TenantLineHandler abstraction has no native whitelist — we invert ignoreTable.
-        TenantLineInnerInterceptor envInterceptor = new TenantLineInnerInterceptor();
+        // The env-layering interceptor shares TenantLineInnerInterceptor's parse-first
+        // behavior, so host statements must skip it too.
+        TenantLineInnerInterceptor envInterceptor =
+                new HostScopeAwareTenantLineInterceptor(this::isHostStatement);
         envInterceptor.setTenantLineHandler(new TenantLineHandler() {
             @Override
             public Expression getTenantId() {
@@ -352,4 +340,42 @@ public class MybatisPlusConfig {
                 active, tenantBypassTablePrefixes);
     }
 
+
+    /**
+     * Tenant/env line interceptor that skips host-owned mapper statements entirely,
+     * before SQL parsing: JSQLParser cannot model vendor syntax some hosts use
+     * (e.g. PostgreSQL array containment in commerce checkout claims), and both the
+     * tenant-line and env-line instances parse every statement before consulting
+     * their handlers' ignoreTable.
+     */
+    static final class HostScopeAwareTenantLineInterceptor extends TenantLineInnerInterceptor {
+
+        private final java.util.function.Predicate<String> hostStatements;
+
+        HostScopeAwareTenantLineInterceptor(java.util.function.Predicate<String> hostStatements) {
+            this.hostStatements = hostStatements;
+        }
+
+        @Override
+        public void beforeQuery(org.apache.ibatis.executor.Executor executor,
+                org.apache.ibatis.mapping.MappedStatement mappedStatement, Object parameter,
+                org.apache.ibatis.session.RowBounds rowBounds,
+                org.apache.ibatis.session.ResultHandler resultHandler,
+                org.apache.ibatis.mapping.BoundSql boundSql) {
+            if (hostStatements.test(mappedStatement.getId())) {
+                return;
+            }
+            super.beforeQuery(executor, mappedStatement, parameter, rowBounds, resultHandler, boundSql);
+        }
+
+        @Override
+        public void beforePrepare(org.apache.ibatis.executor.statement.StatementHandler statementHandler,
+                java.sql.Connection connection, Integer transactionTimeout) {
+            if (hostStatements.test(com.baomidou.mybatisplus.core.toolkit.PluginUtils
+                    .mpStatementHandler(statementHandler).mappedStatement().getId())) {
+                return;
+            }
+            super.beforePrepare(statementHandler, connection, transactionTimeout);
+        }
+    }
 }
