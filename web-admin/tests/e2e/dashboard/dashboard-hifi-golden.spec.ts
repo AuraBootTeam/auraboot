@@ -69,7 +69,7 @@ test.describe('Dashboard designer high-fidelity', () => {
           e2et_order_title: `HiFi看板-${dashRun}-${String(i + 1).padStart(3, '0')}`,
           e2et_order_type: ['normal', 'urgent', 'bulk'][i % 3],
           e2et_order_urgent: i % 4 === 0,
-          e2et_order_status: ['draft', 'confirmed', 'shipped', 'completed'][i % 4],
+          e2et_order_status: ['draft', 'submitted', 'approved', 'completed'][i % 4],
           e2et_order_date: semanticDates[i < 6 ? 0 : 1],
         },
       });
@@ -84,12 +84,17 @@ test.describe('Dashboard designer high-fidelity', () => {
     await addWidgetBySingleClick(page, '柱状图');
     await bindAggregate(page, 1, true, (rows, metric) => {
       expect(rows).toHaveLength(4);
-      expect(rows.map(r => r.e2et_order_status).sort()).toEqual(['completed', 'confirmed', 'draft', 'shipped']);
+      expect(rows.map(r => r.e2et_order_status).sort()).toEqual(['approved', 'completed', 'draft', 'submitted']);
       for (const row of rows) expect(Number(row[metric])).toBe(3);
     });
     expect(await saveDashboard(page, 2)).toBe(dashboardPid);
     await expect(dp.widgets).toHaveCount(2);
     await expect(dp.widgets.nth(0).getByText('12', { exact: true })).toBeVisible({ timeout: 15000 });
+    // The chart must have finished painting before the capture: data-chart-ready
+    // flips true on the EChartsHost `finished` event (see EChartsHost.tsx).
+    await expect(
+      dp.widgets.nth(1).locator('[data-chart-ready="true"]').first(),
+    ).toBeAttached({ timeout: 15000 });
     // Visual guard: the draft status badge must stay a single-line pill — toolbar
     // flex pressure used to squeeze it into a vertical two-character stack.
     const draftBadge = dp.page.getByTestId('designer-toolbar').getByText('草稿', { exact: true });
@@ -130,11 +135,12 @@ test.describe('Dashboard designer high-fidelity', () => {
     await expect(page.getByTestId('big-screen-exit')).toBeVisible({ timeout: 20000 });
     await expect(dp.canvas).toBeVisible();
     await expect(dp.canvas.getByText('12', { exact: true })).toBeVisible({ timeout: 15000 });
-    // Canvas visibility only proves mounting. Screenshot review must establish
-    // that chart bars paint correctly; this assertion does not close that gap.
+    // Canvas visibility only proves mounting. The capture must show painted bars:
+    // wait for the chart's own ready signal (EChartsHost `finished`), which only
+    // flips true after the option data has rendered.
     await expect(
-      page.locator('[data-testid^="dashboard-block-"] canvas').first(),
-    ).toBeVisible({ timeout: 15000 });
+      page.locator('[data-testid^="dashboard-block-"] [data-chart-ready="true"]').first(),
+    ).toBeAttached({ timeout: 15000 });
     await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/dhifi-02-business.png`, fullPage: true });
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('big-screen-exit')).toHaveCount(0);
@@ -179,7 +185,7 @@ async function exerciseSemanticDataSource(page: import('@playwright/test').Page,
       year: ['2026-01-01', '2026-01-01'] };
     const rows = new Map<string, Record<string, unknown>>();
     for (let i = 0; i < 12; i++) {
-      const status = ['draft', 'confirmed', 'shipped', 'completed'][i % 4];
+      const status = ['draft', 'submitted', 'approved', 'completed'][i % 4];
       const dims = Object.fromEntries(dimensions.map(dim => {
         if (dim.endsWith('_status')) return [dim, status];
         const grain = dim.split('__')[1] as keyof typeof buckets;
@@ -339,7 +345,7 @@ async function exerciseSemanticDataSource(page: import('@playwright/test').Page,
   expect(String(rawBody.code)).toBe('0');
   expect(rawBody.data.rows).toHaveLength(4);
   expect(rawBody.data.rows.map((r: Record<string, unknown>) => r.e2et_order_status).sort())
-    .toEqual(['completed', 'confirmed', 'draft', 'shipped']);
+    .toEqual(['approved', 'completed', 'draft', 'submitted']);
   for (const row of rawBody.data.rows) expect(Number(row[rawBody.data.meta.metrics[0]])).toBe(3);
   expect(await saveDashboard(page, 2)).toBe(dashboardPid);
   const persisted = await request.get(`/api/dashboards/${dashboardPid}`);

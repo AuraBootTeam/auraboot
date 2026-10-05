@@ -3,6 +3,7 @@
  */
 
 import React from 'react';
+import { useI18n } from '~/contexts/I18nContext';
 import type { StatCardBlock } from '../types';
 
 interface ReportStatCardBlockProps {
@@ -53,8 +54,10 @@ export const ReportStatCardBlock: React.FC<ReportStatCardBlockProps> = ({
   mode,
   data = [],
 }) => {
+  const { t } = useI18n();
   const colors = COLOR_MAP[block.color || 'blue'] || COLOR_MAP.blue;
-  const value = mode === 'design' ? 12345 : computeValue(data, block.valueField, block.aggregation);
+  const designMode = mode === 'design';
+  const value = designMode ? 12345 : computeValue(data, block.valueField, block.aggregation);
 
   return (
     <div
@@ -63,9 +66,20 @@ export const ReportStatCardBlock: React.FC<ReportStatCardBlockProps> = ({
       <div className="mb-1 text-xs tracking-wider text-gray-500 uppercase">
         {block.label || block.title || 'Metric'}
       </div>
-      <div className={`text-2xl font-bold ${colors.text}`}>{formatValue(value, block.format)}</div>
-      {mode === 'design' && !block.valueField && (
-        <div className="mt-1 text-xs text-amber-500">Configure value field</div>
+      {/* The authoring placeholder must never look like a real business value:
+          render it dimmed with an explicit sample marker. */}
+      <div className={`text-2xl font-bold ${designMode ? 'text-gray-400' : colors.text}`}>
+        {formatValue(value, block.format)}
+      </div>
+      {designMode && (
+        <div className="mt-1 text-xs text-amber-500">
+          {t('report.designer.sample_value', undefined, '示意值 · 预览以真实数据为准')}
+        </div>
+      )}
+      {designMode && !block.valueField && (
+        <div className="mt-1 text-xs text-amber-500">
+          {t('report.designer.configure_value_field', undefined, '请配置取值字段')}
+        </div>
       )}
     </div>
   );

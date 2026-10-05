@@ -9,7 +9,7 @@ const EV = process.env.AURA_EVIDENCE_DIR!;
 const run = randomUUID().replaceAll('-', '').slice(0, 12);
 const model = `console_golden_orders_${run}`;
 const topnModel = `console_golden_topn_${run}`;
-const statuses = ['draft', 'confirmed', 'shipped', 'completed'];
+const statuses = ['draft', 'submitted', 'approved', 'completed'];
 const dates = ['2026-01-15', '2026-02-15'];
 const limits = [10, 50, 100, 200, 500];
 const grains = ['day', 'week', 'month', 'quarter', 'year'] as const;
@@ -82,10 +82,10 @@ async function openConsole(page: Page) {
   await expect(page.getByTestId('semantic-models-error')).toHaveCount(0);
 }
 
-test.beforeAll({ timeout: 180000 }, async ({ request }) => {
-  // Setup only. Authoring/publishing/querying are browser actions below.
-  // 513 creates against a freshly started stack: the first dynamic-entity calls
-  // bootstrap/JIT the server path, so the default 15s hook budget is not enough.
+// 513 creates against a freshly started stack: the first dynamic-entity calls
+// bootstrap/JIT the server path, so the default 15s hook budget is not enough
+// (the hook timeout is the second beforeAll argument in this Playwright version).
+test.beforeAll(async ({ request }) => {
   for (let i = 0; i < 12; i++) {
     const response = await request.post('/api/dynamic/e2et_order/create', { data: {
       e2et_order_title: `SC-${run}-${i}`, e2et_order_type: 'normal',
@@ -111,7 +111,7 @@ test.beforeAll({ timeout: 180000 }, async ({ request }) => {
       expect(String(body.code), JSON.stringify(body)).toBe('0');
     }));
   }
-});
+}, 180000);
 
 test('SC-00 seed controlled orders and publish through the console', async ({ page }) => {
   await openConsole(page);
