@@ -260,6 +260,16 @@ public class SessionManagementServiceImpl implements SessionManagementService {
     @Scheduled(fixedDelayString = "${security.impersonation.expiry-scan-ms:60000}")
     @Transactional
     public void expireImpersonationSessions() {
+        // Cross-tenant system sweep on a scheduler thread: without a caller context the
+        // tenant-line interceptor cannot resolve a tenant (it throws), so this runs under
+        // the explicit bypass like the other pre-context seams in this class.
+        MetaContext.runWithoutTenantFilter(() -> {
+            expireImpersonationSessionsSweep();
+            return null;
+        });
+    }
+
+    private void expireImpersonationSessionsSweep() {
         for (UserSession session : userSessionMapper.findExpiredImpersonationSessions()) {
             if (userSessionMapper.revokeExpiredSession(session.getId()) != 1) {
                 continue;
