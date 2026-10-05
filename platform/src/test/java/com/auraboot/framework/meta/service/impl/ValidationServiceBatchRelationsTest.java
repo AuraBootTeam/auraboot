@@ -21,7 +21,7 @@ import static org.mockito.Mockito.*;
 
 class ValidationServiceBatchRelationsTest {
     private final DynamicDataMapper mapper = mock(DynamicDataMapper.class);
-    private final ValidationServiceImpl validation = new ValidationServiceImpl(mapper, null);
+    private final ValidationServiceImpl validation = new ValidationServiceImpl(mapper, null, null);
     private final ModelDefinition model = ModelDefinition.builder().code("detail")
             .fields(List.of(FieldDefinition.builder().code("name").name("Name")
                     .dataType("string").required(true).build()))
