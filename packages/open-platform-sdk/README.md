@@ -1,5 +1,7 @@
 # AuraBoot Open Platform SDK
 
+Published on npm: `npm install @auraboot/open-platform-sdk`
+
 ```ts
 import { OpenPlatformClient } from "@auraboot/open-platform-sdk";
 
