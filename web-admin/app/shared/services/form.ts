@@ -107,8 +107,8 @@ export async function submitSearchQuery(formData: FormData, request: Request, id
 }
 
 // 添加获取 i18n 数据的方法
-export async function getI18nData(locale: string, request: Request) {
-  const token = await getTokenFromRequest(request);
+export async function getI18nData(locale: string, request: Request, includeSession = true) {
+  const token = includeSession ? await getTokenFromRequest(request) : null;
 
   try {
     // SSR/BFF inherits system proxy env. Ensure localhost requests bypass it.

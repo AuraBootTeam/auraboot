@@ -7,6 +7,7 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
+import { useI18n } from '~/contexts/I18nContext';
 import {
   DEFAULT_SETTINGS,
   SETTINGS_CATEGORY_INFO,
@@ -17,6 +18,11 @@ import {
   type AppearanceSettings,
   type ExportSettings,
 } from './types';
+
+function parseInteger(value: string, fallback: number): number {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isNaN(parsed) ? fallback : parsed;
+}
 
 /**
  * SettingsPanel props
@@ -41,6 +47,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   initialSettings,
   onSettingsChange,
 }) => {
+  const { t } = useI18n();
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>('page');
   const mergeSettings = useCallback((): AllSettings => {
     const base = { ...DEFAULT_SETTINGS };
@@ -108,7 +115,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             data-testid="settings-panel-heading"
             className="mb-4 text-lg font-semibold text-gray-900"
           >
-            设置
+            {t('designer_settings.heading')}
           </h2>
           <nav className="space-y-1">
             {(Object.keys(SETTINGS_CATEGORY_INFO) as SettingsCategory[]).map((category) => {
@@ -136,7 +143,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       d={info.icon}
                     />
                   </svg>
-                  <span>{info.label}</span>
+                  <span>{t(info.labelKey)}</span>
                 </button>
               );
             })}
@@ -149,13 +156,13 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
           <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
             <div>
               <h3 className="text-lg font-medium text-gray-900">
-                {SETTINGS_CATEGORY_INFO[activeCategory].label}
+                {t(SETTINGS_CATEGORY_INFO[activeCategory].labelKey)}
               </h3>
               <p className="text-sm text-gray-500">
-                {SETTINGS_CATEGORY_INFO[activeCategory].description}
+                {t(SETTINGS_CATEGORY_INFO[activeCategory].descriptionKey)}
               </p>
             </div>
-            <button onClick={onClose} className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100">
+            <button aria-label={t('designer_settings.close')} onClick={onClose} className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100">
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
                   strokeLinecap="round"
@@ -201,14 +208,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               onClick={handleReset}
               className="rounded-lg px-4 py-2 text-sm text-gray-700 hover:bg-gray-200"
             >
-              恢复默认
+              {t('designer_settings.reset')}
             </button>
             <div className="flex items-center gap-3">
               <button
                 onClick={onClose}
                 className="rounded-lg px-4 py-2 text-sm text-gray-700 hover:bg-gray-200"
               >
-                取消
+                {t('designer_settings.cancel')}
               </button>
               <button
                 data-testid="settings-panel-save"
@@ -216,7 +223,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 disabled={!isDirty}
                 className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                保存设置
+                {t('designer_settings.save')}
               </button>
             </div>
           </div>
@@ -233,29 +240,30 @@ const PageSettingsForm: React.FC<{
   settings: PageSettings;
   onChange: (updates: Partial<PageSettings>) => void;
 }> = ({ settings, onChange }) => {
+  const { t } = useI18n();
   return (
     <div className="space-y-6">
-      <SettingsField label="页面标题">
+      <SettingsField label={t('designer_settings.title')}>
         <input
           type="text"
           value={settings.title}
           onChange={(e) => onChange({ title: e.target.value })}
-          placeholder="输入页面标题"
+          placeholder={t('designer_settings.title_placeholder')}
           className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
         />
       </SettingsField>
 
-      <SettingsField label="页面说明">
+      <SettingsField label={t('designer_settings.description')}>
         <textarea
           value={settings.description}
           onChange={(e) => onChange({ description: e.target.value })}
-          placeholder="输入页面说明"
+          placeholder={t('designer_settings.description_placeholder')}
           rows={3}
           className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
         />
       </SettingsField>
 
-      <SettingsField label="网格列数" hint="页面采用网格布局时的列数">
+      <SettingsField label={t('designer_settings.grid_columns')} hint={t('designer_settings.grid_columns_hint')}>
         <input
           type="number"
           value={settings.gridColumns}
@@ -266,22 +274,22 @@ const PageSettingsForm: React.FC<{
         />
       </SettingsField>
 
-      <SettingsField label="网格间距" hint="网格项之间的间距（px）">
+      <SettingsField label={t('designer_settings.grid_gap')} hint={t('designer_settings.grid_gap_hint')}>
         <input
           type="number"
           value={settings.gridGap}
-          onChange={(e) => onChange({ gridGap: parseInt(e.target.value) || 16 })}
+          onChange={(e) => onChange({ gridGap: parseInteger(e.target.value, 16) })}
           min={0}
           max={64}
           className="w-24 rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
         />
       </SettingsField>
 
-      <SettingsField label="页面内边距" hint="页面内容区域的留白（px）">
+      <SettingsField label={t('designer_settings.padding')} hint={t('designer_settings.padding_hint')}>
         <input
           type="number"
           value={settings.padding}
-          onChange={(e) => onChange({ padding: parseInt(e.target.value) || 24 })}
+          onChange={(e) => onChange({ padding: parseInteger(e.target.value, 24) })}
           min={0}
           max={96}
           className="w-24 rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
@@ -290,8 +298,8 @@ const PageSettingsForm: React.FC<{
 
       <SettingsToggle
         testId="settings-toggle-enableMultiView"
-        label="多视图支持"
-        description="为列表页启用表格、看板、日历等视图切换"
+        label={t('designer_settings.multi_view')}
+        description={t('designer_settings.multi_view_hint')}
         checked={settings.enableMultiView}
         onChange={(checked) => onChange({ enableMultiView: checked })}
       />
@@ -306,23 +314,24 @@ const EditorSettingsForm: React.FC<{
   settings: EditorSettings;
   onChange: (updates: Partial<EditorSettings>) => void;
 }> = ({ settings, onChange }) => {
+  const { t } = useI18n();
   return (
     <div className="space-y-6">
       <SettingsToggle
-        label="显示网格"
-        description="在画布上显示辅助网格线"
+        label={t('designer_settings.show_grid')}
+        description={t('designer_settings.show_grid_hint')}
         checked={settings.showGrid}
         onChange={(checked) => onChange({ showGrid: checked })}
       />
 
       <SettingsToggle
-        label="吸附到网格"
-        description="拖拽组件时自动对齐到网格"
+        label={t('designer_settings.snap_grid')}
+        description={t('designer_settings.snap_grid_hint')}
         checked={settings.snapToGrid}
         onChange={(checked) => onChange({ snapToGrid: checked })}
       />
 
-      <SettingsField label="网格尺寸" hint="吸附用网格单元大小（px）">
+      <SettingsField label={t('designer_settings.grid_size')} hint={t('designer_settings.grid_size_hint')}>
         <input
           type="number"
           value={settings.gridSize}
@@ -334,37 +343,37 @@ const EditorSettingsForm: React.FC<{
       </SettingsField>
 
       <SettingsToggle
-        label="显示参考线"
-        description="拖拽组件时显示对齐参考线"
+        label={t('designer_settings.show_guides')}
+        description={t('designer_settings.show_guides_hint')}
         checked={settings.showGuides}
         onChange={(checked) => onChange({ showGuides: checked })}
       />
 
       <SettingsToggle
-        label="显示标尺"
-        description="在画布边缘显示标尺"
+        label={t('designer_settings.show_rulers')}
+        description={t('designer_settings.show_rulers_hint')}
         checked={settings.showRulers}
         onChange={(checked) => onChange({ showRulers: checked })}
       />
 
       <SettingsToggle
-        label="显示组件边界"
-        description="高亮组件边界，方便识别布局范围"
+        label={t('designer_settings.show_borders')}
+        description={t('designer_settings.show_borders_hint')}
         checked={settings.showComponentBorders}
         onChange={(checked) => onChange({ showComponentBorders: checked })}
       />
 
       <div className="border-t border-gray-200 pt-6">
-        <h4 className="mb-4 text-sm font-medium text-gray-900">自动保存</h4>
+        <h4 className="mb-4 text-sm font-medium text-gray-900">{t('designer_settings.auto_save')}</h4>
         <div className="space-y-4">
           <SettingsToggle
-            label="启用自动保存"
-            description="定时自动保存当前修改"
+            label={t('designer_settings.enable_auto_save')}
+            description={t('designer_settings.enable_auto_save_hint')}
             checked={settings.enableAutoSave}
             onChange={(checked) => onChange({ enableAutoSave: checked })}
           />
           {settings.enableAutoSave && (
-            <SettingsField label="自动保存间隔" hint="两次自动保存之间的时间（秒）">
+            <SettingsField label={t('designer_settings.save_interval')} hint={t('designer_settings.save_interval_hint')}>
               <input
                 type="number"
                 value={settings.autoSaveInterval}
@@ -378,7 +387,7 @@ const EditorSettingsForm: React.FC<{
         </div>
       </div>
 
-      <SettingsField label="缩放比例" hint="画布缩放百分比">
+      <SettingsField label={t('designer_settings.zoom')} hint={t('designer_settings.zoom_hint')}>
         <div className="flex items-center gap-4">
           <input
             type="range"
@@ -403,9 +412,10 @@ const AppearanceSettingsForm: React.FC<{
   settings: AppearanceSettings;
   onChange: (updates: Partial<AppearanceSettings>) => void;
 }> = ({ settings, onChange }) => {
+  const { t } = useI18n();
   return (
     <div className="space-y-6">
-      <SettingsField label="主题">
+      <SettingsField label={t('designer_settings.theme')}>
         <div className="flex items-center gap-3">
           {(['light', 'dark', 'system'] as const).map((theme) => (
             <button
@@ -417,15 +427,15 @@ const AppearanceSettingsForm: React.FC<{
                   : 'border-gray-300 text-gray-700 hover:bg-gray-50'
               }`}
             >
-              {theme === 'light' && '浅色'}
-              {theme === 'dark' && '深色'}
-              {theme === 'system' && '跟随系统'}
+              {theme === 'light' && t('designer_settings.theme_light')}
+              {theme === 'dark' && t('designer_settings.theme_dark')}
+              {theme === 'system' && t('designer_settings.theme_system')}
             </button>
           ))}
         </div>
       </SettingsField>
 
-      <SettingsField label="主色">
+      <SettingsField label={t('designer_settings.primary_color')}>
         <div className="flex items-center gap-3">
           <input
             type="color"
@@ -442,7 +452,7 @@ const AppearanceSettingsForm: React.FC<{
         </div>
       </SettingsField>
 
-      <SettingsField label="画布背景">
+      <SettingsField label={t('designer_settings.background')}>
         <div className="grid grid-cols-4 gap-2">
           {(['white', 'light', 'dots', 'grid'] as const).map((bg) => (
             <button
@@ -476,17 +486,17 @@ const AppearanceSettingsForm: React.FC<{
                 }}
               />
               <span className="text-xs text-gray-600 capitalize">
-                {bg === 'white' && '白色'}
-                {bg === 'light' && '浅灰'}
-                {bg === 'dots' && '圆点'}
-                {bg === 'grid' && '网格'}
+                {bg === 'white' && t('designer_settings.background_white')}
+                {bg === 'light' && t('designer_settings.background_light')}
+                {bg === 'dots' && t('designer_settings.background_dots')}
+                {bg === 'grid' && t('designer_settings.background_grid')}
               </span>
             </button>
           ))}
         </div>
       </SettingsField>
 
-      <SettingsField label="侧栏位置">
+      <SettingsField label={t('designer_settings.sidebar')}>
         <div className="flex items-center gap-3">
           {(['left', 'right'] as const).map((pos) => (
             <button
@@ -498,13 +508,13 @@ const AppearanceSettingsForm: React.FC<{
                   : 'border-gray-300 text-gray-700 hover:bg-gray-50'
               }`}
             >
-              {pos === 'left' ? '左侧' : '右侧'}
+              {pos === 'left' ? t('designer_settings.sidebar_left') : t('designer_settings.sidebar_right')}
             </button>
           ))}
         </div>
       </SettingsField>
 
-      <SettingsField label="侧栏宽度" hint="两侧面板的宽度（px）">
+      <SettingsField label={t('designer_settings.panel_width')} hint={t('designer_settings.panel_width_hint')}>
         <div className="flex items-center gap-4">
           <input
             type="range"
@@ -529,9 +539,10 @@ const ExportSettingsForm: React.FC<{
   settings: ExportSettings;
   onChange: (updates: Partial<ExportSettings>) => void;
 }> = ({ settings, onChange }) => {
+  const { t } = useI18n();
   return (
     <div className="space-y-6">
-      <SettingsField label="导出格式">
+      <SettingsField label={t('designer_settings.format')}>
         <div className="flex items-center gap-3">
           {(['json', 'yaml'] as const).map((format) => (
             <button
@@ -550,22 +561,22 @@ const ExportSettingsForm: React.FC<{
       </SettingsField>
 
       <SettingsToggle
-        label="包含元数据"
-        description="导出创建时间、作者等附加信息"
+        label={t('designer_settings.metadata')}
+        description={t('designer_settings.metadata_hint')}
         checked={settings.includeMetadata}
         onChange={(checked) => onChange({ includeMetadata: checked })}
       />
 
       <SettingsToggle
-        label="美化输出"
-        description="使用缩进格式化导出内容，提升可读性"
+        label={t('designer_settings.pretty')}
+        description={t('designer_settings.pretty_hint')}
         checked={settings.prettyPrint}
         onChange={(checked) => onChange({ prettyPrint: checked })}
       />
 
       <SettingsToggle
-        label="包含版本历史"
-        description="导出时附带所有历史版本信息"
+        label={t('designer_settings.history')}
+        description={t('designer_settings.history_hint')}
         checked={settings.includeVersionHistory}
         onChange={(checked) => onChange({ includeVersionHistory: checked })}
       />
@@ -582,11 +593,13 @@ const SettingsField: React.FC<{
   children: React.ReactNode;
 }> = ({ label, hint, children }) => {
   return (
-    <div>
-      <label className="mb-1 block text-sm font-medium text-gray-700">{label}</label>
+    <fieldset className="min-w-0">
+      <legend className="mb-1 block text-sm font-medium text-gray-700">{label}</legend>
       {hint && <p className="mb-2 text-xs text-gray-500">{hint}</p>}
-      {children}
-    </div>
+      {React.isValidElement(children) && ['input', 'textarea'].includes(String(children.type))
+        ? React.cloneElement(children as React.ReactElement<{ 'aria-label'?: string }>, { 'aria-label': label })
+        : children}
+    </fieldset>
   );
 };
 
@@ -608,6 +621,9 @@ const SettingsToggle: React.FC<{
       </div>
       <button
         data-testid={testId}
+        role="switch"
+        aria-label={label}
+        aria-checked={checked}
         onClick={() => onChange(!checked)}
         className={`relative h-6 w-11 rounded-full transition-colors ${
           checked ? 'bg-blue-600' : 'bg-gray-200'

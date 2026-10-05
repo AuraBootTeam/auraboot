@@ -1167,17 +1167,17 @@
             "dictCode": "member_status"
           },
           {
+            "field": "created_at",
+            "width": 200,
+            "valueType": "datetime"
+          },
+          {
             "field": "join_date",
             "width": 140
           },
           {
             "field": "leave_date",
             "width": 140
-          },
-          {
-            "field": "created_at",
-            "width": 180,
-            "valueType": "datetime"
           }
         ],
         "selection": {
@@ -1230,7 +1230,15 @@
                     "en-US": "Reason"
                   },
                   "type": "textarea",
-                  "required": true
+                  "required": true,
+                  "placeholder": {
+                    "zh-CN": "例如：成员离职或需要暂停账号使用",
+                    "en-US": "For example: the member has left or account access must be suspended"
+                  },
+                  "helpText": {
+                    "zh-CN": "填写业务原因以便追溯。停用或离职后，该成员的登录会话将失效。",
+                    "en-US": "Provide the business reason for the audit trail. Suspending or offboarding invalidates the member’s sessions."
+                  }
                 }
               ]
             }
@@ -1307,7 +1315,15 @@
                     "en-US": "Reason"
                   },
                   "type": "textarea",
-                  "required": true
+                  "required": true,
+                  "placeholder": {
+                    "zh-CN": "例如：成员离职或需要暂停账号使用",
+                    "en-US": "For example: the member has left or account access must be suspended"
+                  },
+                  "helpText": {
+                    "zh-CN": "填写业务原因以便追溯。停用或离职后，该成员的登录会话将失效。",
+                    "en-US": "Provide the business reason for the audit trail. Suspending or offboarding invalidates the member’s sessions."
+                  }
                 }
               ]
             }
@@ -1336,7 +1352,15 @@
                     "zh-CN": "离职说明",
                     "en-US": "Reason"
                   },
-                  "type": "textarea"
+                  "type": "textarea",
+                  "placeholder": {
+                    "zh-CN": "例如：成员离职或需要暂停账号使用",
+                    "en-US": "For example: the member has left or account access must be suspended"
+                  },
+                  "helpText": {
+                    "zh-CN": "填写业务原因以便追溯。停用或离职后，该成员的登录会话将失效。",
+                    "en-US": "Provide the business reason for the audit trail. Suspending or offboarding invalidates the member’s sessions."
+                  }
                 }
               ]
             }
@@ -1395,6 +1419,16 @@
         "defaultSort": {
           "field": "created_at",
           "order": "desc"
+        },
+        "empty": {
+          "title": {
+            "zh-CN": "暂无符合条件的成员",
+            "en-US": "No matching members"
+          },
+          "description": {
+            "zh-CN": "请调整状态筛选；如尚未开通账号，可从人员开通账号。",
+            "en-US": "Adjust the status filter, or provision an account from an employee."
+          }
         }
       }
     ],
@@ -2405,12 +2439,12 @@
         "id": "account_security_policy_delivery_notes",
         "blockType": "detail-section",
         "title": {
-          "zh-CN": "交付说明",
-          "en": "Delivery Notes"
+          "zh-CN": "策略说明",
+          "en": "Policy Notes"
         },
         "description": {
-          "zh-CN": "说明当前只读视图的策略来源和交付边界。",
-          "en": "Explains the policy source and delivery boundary of this read-only view."
+          "zh-CN": "查看安全策略的管理方式与调整途径。",
+          "en": "Review how security policies are managed and how to request changes."
         },
         "extension": {
           "displayVariant": "settings-card",
@@ -2628,6 +2662,23 @@
             }
           }
         ]
+      }
+    ]
+  },
+  {
+    "pageKey": "auth_appearance",
+    "name:zh-CN": "品牌与登录外观",
+    "name:en": "Brand and Authentication Appearance",
+    "kind": "list",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "auth_appearance_editor",
+        "blockType": "custom",
+        "component": "AuthAppearanceEditor"
       }
     ]
   }

@@ -9,6 +9,7 @@ import istanbul from 'vite-plugin-istanbul';
 
 const e2eCoverageEnabled = process.env.E2E_COVERAGE === '1';
 const bffProxyTarget = `http://127.0.0.1:${process.env.BFF_PORT || '3500'}`;
+const apiDocsProxyTarget = process.env.PROXY_TARGET || process.env.SPRING_BOOT_URL || 'http://127.0.0.1:6443';
 const allowedHosts = process.env.VITE_ALLOWED_HOSTS
   ?.split(',')
   .map((host) => host.trim())
@@ -150,7 +151,7 @@ export default defineConfig({
     alias: [{ find: /^zrender(?=\/|$)/, replacement: normalizePath(zrenderRoot) }],
   },
   server: {
-    host: '0.0.0.0',
+    host: process.env.VITE_HOST || '0.0.0.0',
     port: Number(process.env.VITE_PORT || 5173),
     strictPort: true,
     allowedHosts,
@@ -186,6 +187,16 @@ export default defineConfig({
       ],
     },
     proxy: {
+      // API reference opens at the browser origin. Forward both Swagger assets
+      // and its OpenAPI documents to this runtime instead of the React wildcard.
+      '/swagger-ui': {
+        target: apiDocsProxyTarget,
+        changeOrigin: true,
+      },
+      '/v3/api-docs': {
+        target: apiDocsProxyTarget,
+        changeOrigin: true,
+      },
       '/api/notifications/stream': {
         target: bffProxyTarget,
         changeOrigin: true,
@@ -239,6 +250,7 @@ export default defineConfig({
       'react/jsx-runtime',
       'react/jsx-dev-runtime',
       'react-grid-layout',
+      'react-grid-layout/legacy',
       'react-draggable',
       'react-resizable',
       '@xyflow/react',

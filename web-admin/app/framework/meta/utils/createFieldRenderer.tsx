@@ -44,11 +44,12 @@ export function createFieldRenderer(
       field={field}
       value={data[field.field]}
       onChange={(newValue) => {
-        onFieldChange?.(field.field, newValue);
         setData((prev) => ({
           ...prev,
           [field.field]: newValue,
         }));
+        // Apply linkage after the input update so normalization is retained.
+        onFieldChange?.(field.field, newValue);
       }}
       context={context}
       error={fieldErrors[field.field]}

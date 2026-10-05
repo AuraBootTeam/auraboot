@@ -30,6 +30,8 @@ import { test } from '@playwright/test';
 
 const LOCK_PATH = join(tmpdir(), 'aura-e2et-order-savedview.lock');
 const ACQUIRE_TIMEOUT_MS = 25 * 60 * 1000;
+// Coordination has its own budget; callers keep the normal test/action deadlines.
+export const SAVED_VIEW_LOCK_HOOK_TIMEOUT_MS = ACQUIRE_TIMEOUT_MS + 1000;
 const HARD_STALE_MS = 30 * 60 * 1000;
 // A queued file waits for the holder's remaining runtime (≤ a file's duration).
 // The beforeAll hook itself dies at the per-test timeout (15s) unless raised —

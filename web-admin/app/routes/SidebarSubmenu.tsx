@@ -71,6 +71,7 @@ export default function SidebarSubmenu({
     <div className="space-y-1">
       {/* Parent menu button */}
       <button
+        aria-expanded={isExpanded}
         onClick={() => setIsExpanded(!isExpanded)}
         className="group flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium text-gray-700 transition-all duration-200 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
       >
@@ -94,6 +95,7 @@ export default function SidebarSubmenu({
           expand/collapse to instant removes the race window without
           changing the visible end-states. */}
       <div
+        hidden={!isExpanded}
         className={`overflow-hidden ${isExpanded ? 'max-h-none opacity-100' : 'max-h-0 opacity-0'}`}
       >
         <div className={`${paddingLeft} space-y-1`}>

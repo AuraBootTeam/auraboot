@@ -23,7 +23,7 @@
  * ```
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { NavigateFunction } from 'react-router';
 import { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import type { UnifiedSchema } from '~/framework/meta/schemas/types';
@@ -110,6 +110,7 @@ function buildGlobalState(options: UseSchemaRuntimeOptions) {
  */
 export function useSchemaRuntime(options: UseSchemaRuntimeOptions): SchemaRuntime | null {
   const [runtime, setRuntime] = useState<SchemaRuntime | null>(null);
+  const activeRuntimeRef = useRef<SchemaRuntime | null>(null);
   const { showSuccessToast, showErrorToast, showWarningToast, showInfoToast } = useToastContext();
   const toastHandler = useCallback(
     (message: string, level: RuntimeToastLevel = 'info') => {
@@ -143,28 +144,14 @@ export function useSchemaRuntime(options: UseSchemaRuntimeOptions): SchemaRuntim
     skipDataSourceRegistration = false,
   } = options;
 
-  // 使用 ref 跟踪 schema ID，避免重复创建
-  const schemaIdRef = React.useRef<string | null>(null);
-
   useEffect(() => {
-    // 只有当 schema 存在时才初始化
     if (!schema) {
-      return;
-    }
-
-    // 如果 schema ID 没变，不重新创建 runtime
-    if (schemaIdRef.current === schema.id && runtime) {
-      return;
-    }
-
-    // 如果有旧的 runtime，先销毁
-    if (runtime) {
-      runtime.destroy();
       setRuntime(null);
+      return;
     }
 
-    // 记录当前 schema ID
-    schemaIdRef.current = schema.id;
+    // Each effect owns one instance. A manager change must replace the runtime
+    // even when the schema ID stays the same, because cleanup destroys its scope.
 
     // P0-3: 创建 SchemaRuntime 实例 (dataSourceManager 必需)
     const rt = new SchemaRuntime({
@@ -178,10 +165,12 @@ export function useSchemaRuntime(options: UseSchemaRuntimeOptions): SchemaRuntim
       initialContext: options.initialContext,
     });
 
+    activeRuntimeRef.current = rt;
     setRuntime(rt);
 
-    // 清理: 销毁 runtime (仅在组件卸载时)
+    // Cleanup also runs before a schema or manager replacement.
     return () => {
+      if (activeRuntimeRef.current === rt) activeRuntimeRef.current = null;
       rt.destroy();
     };
     // 只依赖 schema 和 dataSourceManager，避免不必要的重建
@@ -189,7 +178,11 @@ export function useSchemaRuntime(options: UseSchemaRuntimeOptions): SchemaRuntim
   }, [schema?.id, dataSourceManager]);
 
   useEffect(() => {
-    runtime?.syncContext(options.initialContext);
+    // Preserved effects may reconnect before the replacement state renders.
+    // Only synchronize the instance owned by the currently mounted effect.
+    if (runtime && activeRuntimeRef.current === runtime) {
+      runtime.syncContext(options.initialContext);
+    }
   }, [runtime, options.initialContext]);
 
   return runtime;

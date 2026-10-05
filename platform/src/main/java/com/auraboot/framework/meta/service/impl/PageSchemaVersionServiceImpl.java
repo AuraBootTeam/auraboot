@@ -44,6 +44,9 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private com.auraboot.framework.meta.validator.PageSchemaAuthoringProfileValidator renderProfiles;
+
     // ==================== 版本创建和管理 ====================
 
     @Override
@@ -201,16 +204,25 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
         // 获取当前页面Schema
         PageSchema currentSchema = findPageSchemaByPid(pagePid);
         
+        PageSchema restoredSchema = new PageSchema();
+        org.springframework.beans.BeanUtils.copyProperties(currentSchema, restoredSchema);
+        restoreSchemaFromSnapshot(restoredSchema, targetHistory.getSnapshot());
+        renderProfiles.validate(restoredSchema);
+
         // 先创建当前版本的备份。
         // op code must fit the ab_page_schema_history.op column (varchar(20));
         // "backup_before_rollback" is 22 chars and overflows → use a 19-char code.
         createVersion(pagePid, "pre_rollback_backup", operatorPid, "回滚前备份");
         
-        // 从快照恢复数据
-        restoreSchemaFromSnapshot(currentSchema, targetHistory.getSnapshot());
-        
-        // 更新页面Schema
-        pageSchemaMapper.updateById(currentSchema);
+        // Persist only the already validated candidate; denied snapshots cannot poison mapper cache.
+        if (restoredSchema.getProfile() == null && currentSchema.getProfile() != null) {
+            // Explicitly restore legacy NULL without changing global partial-update field strategies.
+            pageSchemaMapper.update(restoredSchema,
+                    new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<PageSchema>()
+                            .eq(PageSchema::getId, restoredSchema.getId()).set(PageSchema::getProfile, null));
+        } else {
+            pageSchemaMapper.updateById(restoredSchema);
+        }
         
         // 创建回滚操作的历史记录
         return createVersion(pagePid, "rollback", operatorPid, 
@@ -273,6 +285,7 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
         Map<String, Object> targetSnapshot = targetHistory.getSnapshot();
         if (isCurrentVersion(currentSchema, targetSnapshot)) {
             // 直接发布当前版本
+            renderProfiles.validatePublished(currentSchema);
             currentSchema.setStatus(StatusConstants.PUBLISHED);
             currentSchema.setPublishedAt(Instant.now());
             pageSchemaMapper.updateById(currentSchema);
@@ -282,6 +295,7 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
 
             // 重新获取更新后的Schema
             currentSchema = findPageSchemaByPid(pagePid);
+            renderProfiles.validatePublished(currentSchema);
             currentSchema.setStatus(StatusConstants.PUBLISHED);
             currentSchema.setPublishedAt(Instant.now());
             pageSchemaMapper.updateById(currentSchema);
@@ -491,6 +505,8 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
         snapshot.put("title", schema.getTitle());
         snapshot.put("description", schema.getDescription());
         snapshot.put("kind", schema.getKind());
+        snapshot.put("profile", schema.getProfile());
+        snapshot.put("schemaVersion", schema.getSchemaVersion());
 
         // Schema内容
         snapshot.put("blocks", schema.getBlocks());
@@ -528,6 +544,11 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
         schema.setTitle((String) snapshot.get("title"));
         schema.setDescription((String) snapshot.get("description"));
         schema.setKind((String) snapshot.get("kind"));
+        // Legacy snapshots lack these fields; new snapshots restore the full render contract.
+        if (snapshot.containsKey("profile")) schema.setProfile((String) snapshot.get("profile"));
+        if (snapshot.containsKey("schemaVersion")) {
+            schema.setSchemaVersion((Integer) snapshot.get("schemaVersion"));
+        }
 
         // Schema内容
         schema.setBlocks((String) snapshot.get("blocks"));
@@ -925,8 +946,11 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
             Map<String, Object> currentSnapshot = createSchemaSnapshot(currentSchema);
             
             // 比较关键字段
-            String[] keyFields = {"name", "title", "kind", "blocks", "version"};
+            String[] keyFields = {"name", "title", "kind", "blocks", "version", "profile", "schemaVersion"};
             for (String field : keyFields) {
+                if ((field.equals("profile") || field.equals("schemaVersion")) && !targetSnapshot.containsKey(field)) {
+                    continue; // Legacy snapshots predate the render contract fields.
+                }
                 if (!Objects.equals(currentSnapshot.get(field), targetSnapshot.get(field))) {
                     return false;
                 }

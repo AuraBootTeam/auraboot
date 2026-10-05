@@ -1,0 +1,258 @@
+{
+  "previewFailed": {
+    "en-US": "Failed to load the DDL preview",
+    "zh-CN": "获取DDL预览失败"
+  },
+  "memberInvalid": {
+    "en-US": "Enter a valid permission member ID",
+    "zh-CN": "请填写有效的权限成员 ID"
+  },
+  "recordJsonInvalid": {
+    "en-US": "Record data must be a valid JSON object",
+    "zh-CN": "记录数据必须是有效 JSON 对象"
+  },
+  "recordObjectRequired": {
+    "en-US": "Record data must be a JSON object",
+    "zh-CN": "记录数据必须是 JSON 对象"
+  },
+  "instanceRequired": {
+    "en-US": "Enter a process instance ID",
+    "zh-CN": "请填写流程实例 ID"
+  },
+  "tenantInvalid": {
+    "en-US": "Enter a valid tenant ID",
+    "zh-CN": "请填写有效的租户 ID"
+  },
+  "slaJsonInvalid": {
+    "en-US": "SLA record data must be a valid JSON object",
+    "zh-CN": "SLA 记录数据必须是有效 JSON 对象"
+  },
+  "slaObjectRequired": {
+    "en-US": "SLA record data must be a JSON object",
+    "zh-CN": "SLA 记录数据必须是 JSON 对象"
+  },
+  "workflowJsonInvalid": {
+    "en-US": "Workflow record data must be a valid JSON object",
+    "zh-CN": "工作流记录数据必须是有效 JSON 对象"
+  },
+  "workflowObjectRequired": {
+    "en-US": "Workflow record data must be a JSON object",
+    "zh-CN": "工作流记录数据必须是 JSON 对象"
+  },
+  "permissionInvalid": {
+    "en-US": "The permission sample is invalid",
+    "zh-CN": "权限样本无效"
+  },
+  "slaInvalid": {
+    "en-US": "The SLA node sample is invalid",
+    "zh-CN": "SLA 节点样本无效"
+  },
+  "workflowInvalid": {
+    "en-US": "The workflow sample is invalid",
+    "zh-CN": "工作流样本无效"
+  },
+  "reportFailed": {
+    "en-US": "Failed to generate the publish review report",
+    "zh-CN": "生成发布后复核报告失败"
+  },
+  "publishSuccess": {
+    "en-US": "Model published successfully",
+    "zh-CN": "模型发布成功"
+  },
+  "publishFailed": {
+    "en-US": "Failed to publish the model",
+    "zh-CN": "模型发布失败"
+  },
+  "dialogTitle": {
+    "en-US": "Confirm model publication",
+    "zh-CN": "确认发布模型"
+  },
+  "dialogHint": {
+    "en-US": "Review schema changes and Rule Center impacts before publishing.",
+    "zh-CN": "发布前请核对表结构变更和规则中心影响。"
+  },
+  "governanceTitle": {
+    "en-US": "Rule Center impact review",
+    "zh-CN": "规则中心影响治理"
+  },
+  "impactRequired": {
+    "en-US": "Published rule assets or consumers reference this model's fields. Acknowledge the impacts before publishing.",
+    "zh-CN": "检测到已发布规则资产或消费方引用了本模型字段，发布前必须确认影响面。"
+  },
+  "impactClear": {
+    "en-US": "No Rule Center impacts that block publication were detected.",
+    "zh-CN": "未检测到需要阻断发布的规则中心影响。"
+  },
+  "ackRequired": {
+    "en-US": "Acknowledgement required",
+    "zh-CN": "需确认"
+  },
+  "readyToPublish": {
+    "en-US": "Ready to publish",
+    "zh-CN": "可发布"
+  },
+  "referenceCount": {
+    "en-US": " references",
+    "zh-CN": "个引用"
+  },
+  "planTitle": {
+    "en-US": "Post-publish review plan",
+    "zh-CN": "发布后复核计划"
+  },
+  "consumerCount": {
+    "en-US": " consumers",
+    "zh-CN": "个消费方"
+  },
+  "generating": {
+    "en-US": "Generating...",
+    "zh-CN": "生成中..."
+  },
+  "generateReport": {
+    "en-US": "Generate review report",
+    "zh-CN": "生成复核报告"
+  },
+  "unnamedConsumer": {
+    "en-US": "Unnamed consumer",
+    "zh-CN": "未命名消费方"
+  },
+  "ruleConsumer": {
+    "en-US": "Rule consumer",
+    "zh-CN": "规则消费方"
+  },
+  "required": {
+    "en-US": "Required",
+    "zh-CN": "必做"
+  },
+  "field": {
+    "en-US": "Field",
+    "zh-CN": "字段"
+  },
+  "path": {
+    "en-US": "Path",
+    "zh-CN": "路径"
+  },
+  "binding": {
+    "en-US": "Binding",
+    "zh-CN": "绑定"
+  },
+  "permissionTitle": {
+    "en-US": "Permission sample review",
+    "zh-CN": "权限样本复核"
+  },
+  "permissionHint": {
+    "en-US": "Review the permission policy using a representative member and record data.",
+    "zh-CN": "用代表性成员和记录数据执行权限策略复核。"
+  },
+  "executing": {
+    "en-US": "Executing...",
+    "zh-CN": "执行中..."
+  },
+  "executeSample": {
+    "en-US": "Execute with sample",
+    "zh-CN": "带样本执行"
+  },
+  "memberId": {
+    "en-US": "Member ID",
+    "zh-CN": "成员 ID"
+  },
+  "permissionCode": {
+    "en-US": "Permission code",
+    "zh-CN": "权限标识"
+  },
+  "recordPid": {
+    "en-US": "Record PID",
+    "zh-CN": "记录 PID"
+  },
+  "recordJson": {
+    "en-US": "Record data JSON",
+    "zh-CN": "记录数据 JSON"
+  },
+  "workflowTitle": {
+    "en-US": "Workflow sample review",
+    "zh-CN": "工作流样本复核"
+  },
+  "workflowHint": {
+    "en-US": "Review gateway conditions, approver assignments and other rule bindings using a process instance and record sample.",
+    "zh-CN": "用流程实例和业务记录样本复核网关条件、审批人分派等规则绑定。"
+  },
+  "executeWorkflow": {
+    "en-US": "Execute with process sample",
+    "zh-CN": "带流程样本执行"
+  },
+  "instanceId": {
+    "en-US": "Process instance ID",
+    "zh-CN": "流程实例 ID"
+  },
+  "processKey": {
+    "en-US": "Process key",
+    "zh-CN": "流程标识"
+  },
+  "slaTitle": {
+    "en-US": "SLA node sample review",
+    "zh-CN": "SLA 节点样本复核"
+  },
+  "slaHint": {
+    "en-US": "Run node-level SLA review using a real process instance and task sample.",
+    "zh-CN": "用真实流程实例和任务样本触发节点级 SLA 复核。"
+  },
+  "tenantId": {
+    "en-US": "Tenant ID",
+    "zh-CN": "租户 ID"
+  },
+  "taskId": {
+    "en-US": "Task ID",
+    "zh-CN": "任务 ID"
+  },
+  "reportTitle": {
+    "en-US": "Review report",
+    "zh-CN": "复核报告"
+  },
+  "total": {
+    "en-US": "Total",
+    "zh-CN": "总数"
+  },
+  "executed": {
+    "en-US": "Executed",
+    "zh-CN": "已执行"
+  },
+  "manual": {
+    "en-US": "Manual review",
+    "zh-CN": "需人工"
+  },
+  "needsSample": {
+    "en-US": "Awaiting sample",
+    "zh-CN": "待样本"
+  },
+  "openTrace": {
+    "en-US": "Open unified trace",
+    "zh-CN": "打开统一 Trace"
+  },
+  "acknowledge": {
+    "en-US": "I have reviewed the affected rule assets, migration plan and historical version policy.",
+    "zh-CN": "我已核对受影响的规则资产、迁移计划和历史版本策略。"
+  },
+  "riskLevel": {
+    "en-US": "Risk level:",
+    "zh-CN": "风险等级:"
+  },
+  "affectedTables": {
+    "en-US": "Affected tables:",
+    "zh-CN": "影响的表:"
+  },
+  "cancel": {
+    "en-US": "Cancel",
+    "zh-CN": "取消"
+  },
+  "publishing": {
+    "en-US": "Publishing...",
+    "zh-CN": "发布中..."
+  },
+  "confirm": {
+    "en-US": "Confirm publication",
+    "zh-CN": "确认发布"
+  },
+  "noDdl": {
+    "en-US": "No DDL statements",
+    "zh-CN": "无 DDL 语句"
+  }
+}

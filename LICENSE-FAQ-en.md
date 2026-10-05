@@ -1,8 +1,14 @@
+---
+type: system-reference
+status: active
+updated: 2026-10-02
+---
+
 # AuraBoot License FAQ
 
 > **Disclaimer:** This FAQ is an informal guide to help you understand [`LICENSE.txt`](./LICENSE.txt). It is **not a legal document** and has no legal effect. If anything in this FAQ conflicts with `LICENSE.txt`, **the English original of `LICENSE.txt` controls**. For binding interpretations or material business decisions, consult a lawyer or contact us through https://www.auraboot.com/contact.
 >
-> Last updated: 2026-10-01 (LICENSE v2.0)
+> Last updated: 2026-10-02 (LICENSE v2.0)
 
 ---
 
@@ -71,10 +77,8 @@ Your modifications, your business code, your plugins — **all may remain closed
 
 **Bottom line:** the v2.0 monetization boundary = the AuraBoot trademark + the proprietary enterprise codebase — not field-of-use restrictions on open code.
 
-### Q11. I'm building a vertical-industry SaaS (e.g., restaurant SaaS, education SaaS) on AuraBoot. Is this allowed, even multi-tenant?
-**Yes, even multi-tenant is allowed.** Because what you sell is "restaurant / education business applications," not a "general low-code platform." Tenants use your pre-configured business features, not low-code authoring.
-
-If your product also exposes "tenants can use low-code to modify their own business workflows," the boundary becomes ambiguous — please contact us through https://www.auraboot.com/contact to confirm.
+### Q11. Can I run a vertical-industry or multi-tenant low-code SaaS under my own brand?
+**Yes.** Part 1 grants Apache-2.0 rights without field-of-use restrictions, including when tenants configure their own workflows. Enterprise code and use of AuraBoot trademarks remain subject to their separate agreements.
 
 ### Q12. Does a commercial license unlock multi-tenant low-code SaaS?
 Two different things are often conflated here:
@@ -124,7 +128,7 @@ Specific terms are governed by the commercial agreement signed between parties. 
 ## 7. Compliance & Enforcement
 
 ### Q19. What happens if I violate the license?
-v2.0 termination follows Apache-2.0 §9/§10 exclusively (Part 2 S6): the grant terminates only if you institute patent litigation claiming the AuraBoot Software infringes a patent. There is no general "30-day cure then destroy all copies" clause. Trademark misuse is handled under trademark law (Part 2 S3).
+Apache-2.0 §3 terminates the **patent licenses for the Work** when the recipient institutes the patent litigation described there; it does not state that all copyright rights terminate. Apache-2.0 §4 states redistribution conditions, while §9 covers accepting additional liability. There is no §10. The v2.0 supplement does not add a general breach-based termination clause; its S6 accurately refers to the patent-license termination specified in Part 1 §3. Trademark misuse is addressed separately. This FAQ does not amend LICENSE.txt.
 
 ### Q20. Which jurisdiction governs?
 Apache-2.0 does not designate an exclusive governing law, court, arbitration institution, or dispute-resolution forum. If the parties sign a Commercial License or another written agreement, that agreement may specify the governing law and dispute-resolution mechanism.
@@ -157,3 +161,7 @@ Yes. For cross-border commercial customers, a commercial contract may specify th
 - **Commercial / OEM partnerships:** https://www.auraboot.com/contact
 
 This FAQ is updated based on community feedback. Open a GitHub Issue if you have a question — frequently asked ones get added here.
+
+## Package licenses
+
+All eight current OSS workspace packages (`designer-sdk`, `dsl-runtime`, `dsl-types`, `nav-model`, `plugin-sdk`, `open-platform-sdk`, `ui`, and `web-testkit`) declare Apache-2.0 and include its full text in a package-level `LICENSE`. Do not apply the retired v1.3 platform-package metadata plan to v2.0 code. The Enterprise `@auraboot/auraqr-sdk` client also has an explicit package-level Apache-2.0 license; that exception does not relicense other Enterprise code. Package licenses grant no AuraBoot trademark rights. Package availability is separate: `auraqr-sdk` remains private, and registry publication must be checked independently.

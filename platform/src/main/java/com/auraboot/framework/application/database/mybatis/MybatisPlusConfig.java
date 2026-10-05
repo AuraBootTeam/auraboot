@@ -13,6 +13,7 @@ import com.baomidou.mybatisplus.extension.plugins.inner.TenantLineInnerIntercept
 import lombok.extern.slf4j.Slf4j;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.LongValue;
+import net.sf.jsqlparser.expression.StringValue;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
@@ -53,7 +54,7 @@ public class MybatisPlusConfig {
      * forbidden.
      */
     public static final Set<String> VERIFIED_GLOBAL_TABLES = Set.of(
-        // schema-verified: no tenant_id column (15)
+        // schema-verified: no tenant_id column (17)
         "ab_user",                          // global identity
         "ab_tenant",                        // the tenant registry itself
         "ab_system_config",                 // platform config
@@ -68,7 +69,9 @@ public class MybatisPlusConfig {
         "ab_verification_code",             // pre-auth OTP
         "ab_auth_identity",                 // WeChat identity lookup before tenant context
         "ab_login_application",             // pre-auth global application registry
-        "ab_login_channel_auth_method"      // parent channel is explicit
+        "ab_login_channel_auth_method",     // parent channel is explicit
+        "ab_auth_appearance_state",         // deployment-level singleton; schema has no tenant_id
+        "ab_auth_appearance_revision"       // deployment-level release audit; schema has no tenant_id
     );
 
     /**
@@ -152,10 +155,14 @@ public class MybatisPlusConfig {
                 // When user has no tenant context (e.g., multi-tenant login before space selection),
                 // return -1 so tenant-filtered queries return empty results instead of throwing.
                 // Tables like ab_user are already in ignoreTable and won't be affected.
-                if (tenantId == null) {
-                    return new LongValue(-1);
+                long scopedTenantId = tenantId == null ? -1L : tenantId;
+                if (databaseDialect.getType() == DatabaseType.POSTGRESQL) {
+                    // A quoted decimal literal is resolved against the column type.
+                    // This filters both BIGINT platform and VARCHAR engine tenants
+                    // without casting columns or exempting any tenant-scoped table.
+                    return new StringValue(Long.toString(scopedTenantId));
                 }
-                return new LongValue(tenantId);
+                return new LongValue(scopedTenantId);
             }
 
             @Override

@@ -50,9 +50,12 @@ public class DeploymentBrandingProvider implements BrandingProvider {
             "loginHeroUrl",
             "loginFeatures",
             "loginWechatOnly",
-            "tenantOnboarding");
+            "tenantOnboarding",
+            "authAppearance");
     private static final Set<String> TENANT_ONBOARDING_FIELDS = Set.of(
             "entityLabel",
+            "industryCode",
+            "postCreateRedirect",
             "selectionTitle",
             "selectionLead",
             "createTitle",
@@ -67,9 +70,17 @@ public class DeploymentBrandingProvider implements BrandingProvider {
             "joinSteps");
 
     private final BrandingIdentity identity;
+    private final boolean commercialBrandingEnabled;
 
     public DeploymentBrandingProvider(Environment environment, ObjectMapper objectMapper) {
         this.identity = resolve(environment, objectMapper);
+        this.commercialBrandingEnabled = COMMERCIAL_EDITIONS.contains(
+                normalized(environment.getProperty("EDITION")))
+                && StringUtils.hasText(environment.getProperty("AURABOOT_BRANDING_CONFIG_PATH"));
+    }
+
+    public boolean isCommercialBrandingEnabled() {
+        return commercialBrandingEnabled;
     }
 
     @Override
@@ -130,6 +141,10 @@ public class DeploymentBrandingProvider implements BrandingProvider {
         if (!unknownFields.isEmpty()) {
             throw new IllegalStateException(
                     "Deployment branding contains unsupported fields: " + unknownFields);
+        }
+
+        if (document.has("authAppearance")) {
+            AuthAppearanceValidator.validate(document.get("authAppearance"));
         }
 
         String orderReference = requiredText(document, "orderReference", 120);
@@ -217,6 +232,21 @@ public class DeploymentBrandingProvider implements BrandingProvider {
         requiredNestedText(onboarding, "joinTitle", 60);
         requiredNestedText(onboarding, "joinDescription", 180);
         requiredNestedText(onboarding, "joinCta", 40);
+
+        if (onboarding.has("industryCode")) {
+            String industryCode = requiredNestedText(onboarding, "industryCode", 40);
+            if (!industryCode.matches("^[a-z][a-z0-9_-]*$")) {
+                throw new IllegalStateException(
+                        "Deployment branding tenantOnboarding.industryCode must be a lowercase code.");
+            }
+        }
+        if (onboarding.has("postCreateRedirect")) {
+            String redirect = requiredNestedText(onboarding, "postCreateRedirect", 160);
+            if (!redirect.matches("^/(?!/)[A-Za-z0-9._~!$&'()*+,;=:@%/?-]*$")) {
+                throw new IllegalStateException(
+                        "Deployment branding tenantOnboarding.postCreateRedirect must be a same-origin path.");
+            }
+        }
 
         String joinChannel = requiredNestedText(onboarding, "joinChannel", 32);
         if (!Set.of("invite_code", "wechat_mini").contains(joinChannel)) {

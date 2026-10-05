@@ -8,7 +8,10 @@
 import { describe, it, expect } from 'vitest';
 import { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
-import { createExpressionContext, type GlobalState } from '~/framework/meta/runtime/expression/context';
+import {
+  createExpressionContext,
+  type GlobalState,
+} from '~/framework/meta/runtime/expression/context';
 import type { UnifiedSchema } from '~/framework/meta/schemas/types';
 
 const createGlobalState = (): GlobalState => ({
@@ -150,6 +153,55 @@ describe('SchemaRuntime + LinkageEngine integration', () => {
     // triggerFieldLinkage should be a no-op (no engine)
     runtime.triggerFieldLinkage('anyField', 'change');
 
+    runtime.destroy();
+  });
+
+  it('clears a dependent reference only on change using persisted extension rules', () => {
+    const schema = buildSchemaWithLinkage();
+    delete schema.linkageRules;
+    schema.extension = {
+      linkageRules: [
+        {
+          id: 'normalize-cleared-type',
+          trigger: { fieldCode: 'category', event: 'change', condition: "form.category === ''" },
+          actions: [{ type: 'setValue', target: 'category', value: 'null' }],
+          enabled: true,
+        },
+        {
+          id: 'reset-source',
+          trigger: { fieldCode: 'category', event: 'change' },
+          actions: [{ type: 'setValue', target: 'subcategory', value: 'null' }],
+          enabled: true,
+        },
+      ],
+    };
+    const runtime = new SchemaRuntime({
+      schema,
+      globalState: createGlobalState(),
+      dataSourceManager: createManager(),
+      disableAutoFetch: true,
+    });
+    const manager = runtime.getStateManager();
+    const scope = runtime.getScopeId();
+    manager.updateScope(scope, {
+      form: { category: 'ncr', subcategory: 'existing-source', reason: 'Keep this note' },
+    });
+    expect(manager.getContext(scope).form?.subcategory).toBe('existing-source');
+    manager.updateField(scope, 'category', 'fqc');
+    runtime.triggerFieldLinkage('category', 'change');
+    expect(manager.getContext(scope).form).toMatchObject({
+      category: 'fqc',
+      subcategory: null,
+      reason: 'Keep this note',
+    });
+    manager.updateField(scope, 'subcategory', 'new-source');
+    manager.updateField(scope, 'category', '');
+    runtime.triggerFieldLinkage('category', 'change');
+    expect(manager.getContext(scope).form).toMatchObject({
+      category: null,
+      subcategory: null,
+      reason: 'Keep this note',
+    });
     runtime.destroy();
   });
 

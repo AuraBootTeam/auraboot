@@ -58,7 +58,7 @@ After 1.0, semver applies strictly: schema breaks only on major version bumps.
 There's no automated importer in the community edition. The general path:
 1. Export your data as CSV from the source platform.
 2. Define equivalent models in AuraBoot's DSL.
-3. Use the bulk-import endpoint (`/api/{model}/import`) per model.
+3. Use the bulk-import endpoint (`/api/meta/excel/import/{modelCode}`) per model.
 
 If you have a substantial migration (>10K records, complex relationships), use https://www.auraboot.com/contact — we offer migration consulting.
 
@@ -107,7 +107,7 @@ No. They're entirely optional. If you don't configure an LLM provider, the AI pa
 
 ### Q. Can I use a local LLM (Ollama, vLLM)?
 
-Yes. Configure `auraboot.ai.provider=openai-compatible` with `base-url=http://ollama.local:11434/v1` and a local adapter API key. AuraBoot speaks the OpenAI-compatible chat-completions API.
+Yes. Point the LLM client at any OpenAI-compatible chat-completions endpoint (e.g. `base-url=http://ollama.local:11434/v1` plus an adapter API key) via the `aura.ai.*` configuration family in `application.yml`. AuraBoot speaks the OpenAI-compatible chat-completions API.
 
 ### Q. Does the RAG knowledge base ingest my files into a vendor cloud?
 
@@ -135,7 +135,9 @@ OpenTelemetry is built in. Configure `MANAGEMENT_TRACING_*` and point at your co
 
 ### Q. The audit log is huge. Can I prune it?
 
-Yes — the platform keeps audit forever by default, but `auraboot.audit.retention-days` can cap it. Past that age, rows move to `audit_archive_*` partitions which you can drop on your own schedule. Don't delete from `meta_audit` directly; use the provided pruning command.
+Yes — audit retention is enforced by scheduled pruning. Configure the retention window in the audit pruning settings (`application.yml` audit section); past that age rows are pruned by the scheduled job. Don't delete from `meta_audit` directly.
+
+> Audit retention and archival must follow the implemented storage and operations policy; do not assume an undocumented retention setting or automatic partition archival.
 
 ---
 

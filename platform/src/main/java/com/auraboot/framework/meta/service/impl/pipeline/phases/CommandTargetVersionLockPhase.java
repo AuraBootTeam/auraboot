@@ -22,9 +22,10 @@ import java.util.Map;
  * Re-checks and transaction-holds the version of the client-named command target.
  *
  * <p>This phase deliberately runs after every authorization gate and the atomic idempotency claim,
- * but before any mutation or plugin handler. The {@code FOR SHARE} row lock remains held by the
+ * but before any mutation or plugin handler. The {@code FOR UPDATE} row lock remains held by the
  * caller's command transaction until commit/rollback, closing the gap between the earlier boundary
- * observation and the write phases.</p>
+ * observation and the write phases. Take the exclusive lock immediately: two shared
+ * locks upgraded by concurrent writers would deadlock instead of rejecting the stale version.</p>
  */
 @Component
 @Order(535)
@@ -89,20 +90,11 @@ public class CommandTargetVersionLockPhase implements CommandPhase {
         CommandExecutorUtils.validateSqlIdentifier(
                 primaryKeyColumn, "command target version primary key");
 
-        // SECURITY: selectByQueryWithoutTenant bypasses the tenant interceptor. This query carries
-        // an explicit tenant_id predicate and binds both tenant and pid; identifiers are resolved
-        // from MetaModelService and independently validated above.
-        String sql = "SELECT row_version FROM " + tableName
-                + " WHERE tenant_id = #{params.tenantId}"
-                + " AND " + primaryKeyColumn + " = #{params.targetRecordPid}"
-                + " FOR SHARE";
-        Map<String, Object> params = Map.of(
-                "tenantId", ctx.getTenantId(),
-                "targetRecordPid", ctx.getRequest().getTargetRecordId());
-        List<Map<String, Object>> rows = currentStateLock
-                ? dynamicDataMapper.selectTargetVersionForUpdate(tableName, primaryKeyColumn,
-                        ctx.getTenantId(), ctx.getRequest().getTargetRecordId())
-                : dynamicDataMapper.selectByQueryWithoutTenant(sql, params);
+        // This dedicated mapper validates identifiers and binds the tenant and target PID.
+        // The general SELECT provider deliberately rejects UPDATE, including FOR UPDATE.
+        List<Map<String, Object>> rows = dynamicDataMapper.selectTargetVersionForUpdate(
+                tableName, primaryKeyColumn, ctx.getTenantId(),
+                ctx.getRequest().getTargetRecordId());
         Long authoritative = resolveVersion(rows);
         Integer requested = ctx.getRequest().getExpectedVersion();
         if (authoritative == null || (!currentStateLock && requested.longValue() != authoritative)) {

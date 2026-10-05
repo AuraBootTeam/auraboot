@@ -50,6 +50,8 @@ import { useAuth } from '~/contexts/AuthContext';
 import { confirmDialog } from '~/utils/confirmDialog';
 import { resolveConfirmDialog } from '~/framework/meta/utils/i18nResolver';
 import { ToolbarBlockRenderer } from './ToolbarBlockRenderer';
+import { Select } from '~/ui/smart/form/Select';
+import type { DataSourceConfig as SelectDataSourceConfig } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
 
 export interface SubTableViewerProps {
   config: SubTableConfig;
@@ -70,11 +72,13 @@ interface ChildFieldMeta {
   dictCode?: string;
   referenceModelCode?: string;
   refTarget?: Record<string, any>;
-  constraints?: { required?: boolean };
+  required?: boolean;
+  feature?: { validation?: { maxLength?: number } };
   extension?: Record<string, any>;
 }
 
 type EnrichedColumnConfig = ColumnConfig & {
+  maxLength?: number;
   dataType?: string;
   refTarget?: Record<string, any>;
   referenceModelCode?: string;
@@ -135,6 +139,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
 
   const shouldLoadChildFieldMeta = useMemo(() => {
     if (!config.childModel) return false;
+    if (config.commands?.create || config.commands?.update) return true;
     return config.columns.some((col) => {
       const anyCol = col as EnrichedColumnConfig;
       return (
@@ -146,7 +151,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
         Boolean(anyCol.refTarget || anyCol.referenceModelCode)
       );
     });
-  }, [config.childModel, config.columns]);
+  }, [config.childModel, config.columns, config.commands?.create, config.commands?.update]);
 
   useEffect(() => {
     if (!shouldLoadChildFieldMeta || !config.childModel) {
@@ -253,7 +258,15 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
           refTarget.targetModel ||
           refTarget.modelCode;
       }
-      if (!enriched.required && meta.constraints?.required) {
+      const maximumLength = Number(
+        meta.feature?.validation?.maxLength ??
+          metaExtension.constraints?.maxLength ??
+          metaExtension.extension?.constraints?.maxLength,
+      );
+      if (enriched.maxLength === undefined && Number.isFinite(maximumLength) && maximumLength > 0) {
+        enriched.maxLength = maximumLength;
+      }
+      if (!enriched.required && meta.required) {
         enriched.required = true;
       }
 
@@ -281,6 +294,27 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
 
   const referenceDisplayByField = useMemo(
     () => new Map(referenceDisplayConfigs.map((entry) => [entry.field, entry])),
+    [referenceDisplayConfigs],
+  );
+
+  const referenceInputSources = useMemo(
+    () =>
+      new Map<string, SelectDataSourceConfig>(
+        referenceDisplayConfigs.map((reference) => [
+          reference.field,
+          {
+            type: 'api',
+            modelCode: reference.modelCode,
+            endpoint: '/api/dynamic/' + reference.modelCode + '/list',
+            method: 'get',
+            params: { pageNum: 1, pageSize: 200 },
+            adaptor: 'optionList',
+            valueField: reference.valueField,
+            labelField: reference.displayField,
+            autoFetch: true,
+          },
+        ]),
+      ),
     [referenceDisplayConfigs],
   );
 
@@ -372,14 +406,18 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
             params,
             token,
           });
-          // Support both paginated (data.records) and direct array (data) responses
-          const rawData = result.data;
-          const resultRecords = Array.isArray(rawData) ? rawData : (rawData?.records ?? []);
-          if (ResultHelper.isSuccess(result) && Array.isArray(resultRecords)) {
-            setRows(resultRecords);
-          } else {
+          if (!ResultHelper.isSuccess(result)) {
             setRows([]);
+            throw new Error(result.message || t('common.loadDataFailed'));
           }
+          // Only a valid empty collection is an empty state; failures are errors.
+          const rawData = result.data;
+          const resultRecords = Array.isArray(rawData) ? rawData : rawData?.records;
+          if (!Array.isArray(resultRecords)) {
+            setRows([]);
+            throw new Error(t('common.loadDataFailed'));
+          }
+          setRows(resultRecords);
           setLoading(false);
           return;
         } else if (config.resolveVia) {
@@ -405,12 +443,16 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
             token,
           });
 
-          const intermediateRecords = intermediateRes.data?.records ?? [];
-          if (
-            !ResultHelper.isSuccess(intermediateRes) ||
-            !Array.isArray(intermediateRecords) ||
-            intermediateRecords.length === 0
-          ) {
+          if (!ResultHelper.isSuccess(intermediateRes)) {
+            setRows([]);
+            throw new Error(intermediateRes.message || t('common.loadDataFailed'));
+          }
+          const intermediateRecords = intermediateRes.data?.records;
+          if (!Array.isArray(intermediateRecords)) {
+            setRows([]);
+            throw new Error(t('common.loadDataFailed'));
+          }
+          if (intermediateRecords.length === 0) {
             setRows([]);
             setLoading(false);
             return;
@@ -445,12 +487,16 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
           token,
         });
 
-        const resultRecords = result.data?.records ?? [];
-        if (ResultHelper.isSuccess(result) && Array.isArray(resultRecords)) {
-          setRows(resultRecords);
-        } else {
+        if (!ResultHelper.isSuccess(result)) {
           setRows([]);
+          throw new Error(result.message || t('common.loadDataFailed'));
         }
+        const resultRecords = result.data?.records;
+        if (!Array.isArray(resultRecords)) {
+          setRows([]);
+          throw new Error(t('common.loadDataFailed'));
+        }
+        setRows(resultRecords);
       } catch (err) {
         console.error('[SubTableViewer] Failed to load data:', err);
         setError(err instanceof Error ? err.message : 'Failed to load data');
@@ -1149,7 +1195,10 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
   );
 
   const configuredRowActions = config.actions ?? config.rowActions ?? [];
-  const configuredToolbarActions = config.toolbarActions ?? [];
+  const configuredToolbarActions = useMemo(
+    () => config.toolbarActions ?? [],
+    [config.toolbarActions],
+  );
   const toolbarBlock = useMemo<BlockConfig | null>(() => {
     if (configuredToolbarActions.length === 0) return null;
     return {
@@ -1245,7 +1294,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
   }
 
   if (error) {
-    return <div className="text-status-red py-4 text-center text-sm">{error}</div>;
+    return <div role="alert" className="text-status-red py-4 text-center text-sm">{error}</div>;
   }
 
   return (
@@ -1377,6 +1426,9 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                           >
                             <InlineEditableCell
                               col={col}
+                              referenceDataSource={referenceInputSources.get(col.field)}
+                              maxLength={col.maxLength}
+                              referenceContext={runtime?.getContext()}
                               value={editable ? editingValues[col.field] : row[col.field]}
                               displayValue={formatCellValue(
                                 row[col.field],
@@ -1548,43 +1600,63 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                       <span className="text-text-3 text-xs">-</span>
                     ) : (
                       <div>
-                        <input
-                          type={isNumericField(col) ? 'number' : 'text'}
-                          value={newRowData[col.field] ?? ''}
-                          onChange={(e) => {
-                            const val =
-                              isNumericField(col) && e.target.value
-                                ? Number(e.target.value)
-                                : e.target.value;
-                            setNewRowData((prev) => ({ ...prev, [col.field]: val }));
-                            if (addErrors[col.field]) {
-                              setAddErrors((prev) => {
-                                const next = { ...prev };
+                        {referenceInputSources.has(col.field) ? (
+                          <Select
+                            name={col.field}
+                            value={newRowData[col.field] ?? ''}
+                            placeholder={resolveColumnLabel(col.field)}
+                            size="small"
+                            dataSource={referenceInputSources.get(col.field)}
+                            context={runtime?.getContext()}
+                            onChange={(value) => {
+                              setNewRowData((previous) => ({ ...previous, [col.field]: value }));
+                              setAddErrors((previous) => {
+                                const next = { ...previous };
                                 delete next[col.field];
                                 return next;
                               });
+                            }}
+                          />
+                        ) : (
+                          <input
+                            type={isNumericField(col) ? 'number' : 'text'}
+                            maxLength={isNumericField(col) ? undefined : col.maxLength}
+                            value={newRowData[col.field] ?? ''}
+                            onChange={(e) => {
+                              const val =
+                                isNumericField(col) && e.target.value
+                                  ? Number(e.target.value)
+                                  : e.target.value;
+                              setNewRowData((prev) => ({ ...prev, [col.field]: val }));
+                              if (addErrors[col.field]) {
+                                setAddErrors((prev) => {
+                                  const next = { ...prev };
+                                  delete next[col.field];
+                                  return next;
+                                });
+                              }
+                            }}
+                            placeholder={
+                              col.required
+                                ? `${resolveColumnLabel(col.field)} *`
+                                : resolveColumnLabel(col.field)
                             }
-                          }}
-                          placeholder={
-                            col.required
-                              ? `${resolveColumnLabel(col.field)} *`
-                              : resolveColumnLabel(col.field)
-                          }
-                          data-testid={`subtable-add-${col.field}`}
-                          className={`w-full rounded border px-2 py-1 text-sm focus:ring-1 focus:outline-none ${
-                            addErrors[col.field]
-                              ? 'border-status-red focus:ring-status-red'
-                              : 'border-border-strong focus:ring-accent'
-                          }`}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleAddRow();
-                            if (e.key === 'Escape') {
-                              setIsAdding(false);
-                              setNewRowData({});
-                              setAddErrors({});
-                            }
-                          }}
-                        />
+                            data-testid={`subtable-add-${col.field}`}
+                            className={`w-full rounded border px-2 py-1 text-sm focus:ring-1 focus:outline-none ${
+                              addErrors[col.field]
+                                ? 'border-status-red focus:ring-status-red'
+                                : 'border-border-strong focus:ring-accent'
+                            }`}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleAddRow();
+                              if (e.key === 'Escape') {
+                                setIsAdding(false);
+                                setNewRowData({});
+                                setAddErrors({});
+                              }
+                            }}
+                          />
+                        )}
                         {addErrors[col.field] && (
                           <p
                             className="text-status-red mt-0.5 text-xs"

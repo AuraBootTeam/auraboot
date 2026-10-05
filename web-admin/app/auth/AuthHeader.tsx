@@ -25,7 +25,11 @@ export default function AuthHeader() {
   // (Login.tsx); the global header de-duplicates by dropping its brand row
   // and the self-pointing auth links there, keeping only the locale/theme
   // tools on a transparent bar.
-  const onLoginCardPage = location.pathname === '/login' || location.pathname === '/admin-login';
+  const onLoginCardPage =
+    location.pathname === '/login' ||
+    location.pathname === '/admin-login' ||
+    (Boolean(branding.authAppearance) &&
+      ['/signup', '/forgot-password', '/reset-password'].includes(location.pathname));
 
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
   const [showLangDropdown, setShowLangDropdown] = useState(false);
@@ -95,7 +99,7 @@ export default function AuthHeader() {
             <button
               onClick={() => setShowLangDropdown(!showLangDropdown)}
               className="rounded-lg p-2 text-gray-500 transition-all duration-200 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700/50 dark:hover:text-gray-200"
-              aria-label="Switch language"
+              aria-label={t('language.switch')}
             >
               <GlobeAltIcon className="h-5 w-5" />
             </button>
@@ -127,7 +131,7 @@ export default function AuthHeader() {
             <button
               onClick={() => setShowThemeDropdown(!showThemeDropdown)}
               className="rounded-lg p-2 text-gray-500 transition-all duration-200 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700/50 dark:hover:text-gray-200"
-              aria-label="Switch theme"
+              aria-label={t('theme.switch')}
             >
               {isHydrated && isDark ? (
                 <MoonIcon className="h-5 w-5" />

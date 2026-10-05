@@ -141,6 +141,7 @@ export async function fetchRoleSnapshot(page: Page): Promise<RoleSnapshot> {
   const meResp = await page.request.get('/api/auth/me', { timeout: 15_000 });
   const meBody = await meResp.json().catch(() => ({}) as Record<string, unknown>);
   expect(meResp.ok(), `/api/auth/me HTTP ${meResp.status()}: ${JSON.stringify(meBody).slice(0, 600)}`).toBe(true);
+  expect(meBody.code, `/api/auth/me business response: ${JSON.stringify(meBody).slice(0, 600)}`).toBe('0');
 
   const permissions = ((meBody as any).data?.permissions ?? {}) as Record<string, unknown>;
   const roles = Array.isArray(permissions.roles) ? permissions.roles : [];
@@ -150,6 +151,7 @@ export async function fetchRoleSnapshot(page: Page): Promise<RoleSnapshot> {
   const menuResp = await page.request.get('/api/menu/user', { timeout: 15_000 });
   const menuBody = await menuResp.json().catch(() => ({}) as Record<string, unknown>);
   expect(menuResp.ok(), `/api/menu/user HTTP ${menuResp.status()}: ${JSON.stringify(menuBody).slice(0, 600)}`).toBe(true);
+  expect(menuBody.code, `/api/menu/user business response: ${JSON.stringify(menuBody).slice(0, 600)}`).toBe('0');
   const menuRoot = Array.isArray((menuBody as any).data) ? (menuBody as any).data : [];
   const menus = flattenMenuData(menuRoot);
 

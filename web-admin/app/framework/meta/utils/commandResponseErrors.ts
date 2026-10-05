@@ -17,8 +17,9 @@ function firstNonBlankString(...values: unknown[]): string | undefined {
 export function resolveCommandErrorMessage(
   result: unknown,
   commandCode: string,
-  translate?: (key: string) => string,
+  translate?: (key: string, params?: Record<string, string>) => string,
   locale?: string,
+  fallbackMessage?: string,
 ): string {
   const body = (result || {}) as Record<string, any>;
   const stableI18nKey =
@@ -69,7 +70,7 @@ export function resolveCommandErrorMessage(
       body.data?.message,
       body.message,
       body.desc,
-    ) || `Command ${commandCode} failed`;
+    ) || fallbackMessage || `Command ${commandCode} failed`;
 
   if (/Record not found: .* in model:/i.test(resolved)) {
     return locale?.toLowerCase().startsWith('zh')
@@ -77,14 +78,35 @@ export function resolveCommandErrorMessage(
       : 'The referenced record is unavailable. Select an accessible record and try again.';
   }
 
+  const shortage = resolved.match(/Insufficient stock for product \[.*?\] (?:at the line location|in source warehouse|at the storage location): required ([0-9.-]+), available ([0-9.-]+)/i);
+  if (shortage) {
+    const key = 'common.error.insufficientStock';
+    const params = { required: shortage[1], available: shortage[2] };
+    const localized = translate?.(key, params);
+    if (localized && localized !== key) return localized;
+    return locale?.toLowerCase().startsWith('zh')
+      ? `所选库位库存不足：需要 ${params.required}，可用 ${params.available}。请调整数量或选择其他库位。`
+      : `Insufficient stock at the selected location: required ${params.required}, available ${params.available}. Adjust the quantity or select another location.`;
+  }
+
   // PF4J/platform wrappers are implementation details, not business feedback. Keep
   // the handler's actionable reason while removing the transport prefix from every
   // DSL command surface (detail, form, workbench and list actions).
-  return resolved
+  const reason = resolved
     .replace(
       /^(?:plugin (?:extension )?handler execution failed|command handler execution failed)\s*:\s*/i,
       '',
     )
     .trim();
-}
 
+  if (/^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+$/i.test(reason)) {
+    const localized = translate?.(reason);
+    if (localized && localized !== reason) {
+      return localized;
+    }
+    return locale?.toLowerCase().startsWith('zh')
+      ? '操作未完成，请检查输入后重试。'
+      : 'The operation could not be completed. Check your input and try again.';
+  }
+  return reason;
+}

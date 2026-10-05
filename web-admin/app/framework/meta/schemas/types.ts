@@ -140,6 +140,8 @@ export interface FlowStep {
 export interface FieldConfig {
   field: string;
   label?: string | LocalizedText;
+  /** Business input guidance localized by the controlled renderer. */
+  placeholder?: string | LocalizedText;
   component?: string; // optional: inferred from dataType
   /** Field data type hint (e.g. 'number', 'text', 'date') */
   type?: string;

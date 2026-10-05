@@ -4129,8 +4129,17 @@ CREATE TABLE public.ab_audit_trail (
     changed_fields text[],
     metadata jsonb,
     previous_hash character varying(64),
-    record_hash character varying(64) NOT NULL
+    record_hash character varying(64) NOT NULL,
+    hash_version integer DEFAULT 1 NOT NULL,
+    CONSTRAINT ck_audit_trail_hash_version CHECK ((hash_version = ANY (ARRAY[1, 2])))
 );
+
+
+--
+-- Name: COLUMN ab_audit_trail.hash_version; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_audit_trail.hash_version IS 'Hash format: 1 legacy JSON text, 2 canonical JSON and persisted timestamp precision';
 
 
 --
@@ -4194,6 +4203,34 @@ COMMENT ON COLUMN public.ab_aurabot_skill_run.status IS 'SkillRunStatus.code() â
 --
 
 COMMENT ON COLUMN public.ab_aurabot_skill_run.risk_level IS 'RiskLevel.code() snapshot at execute time â€” one of low / medium / high / critical.';
+
+
+--
+-- Name: ab_auth_appearance_revision; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_auth_appearance_revision (
+    version bigint NOT NULL,
+    action character varying(32) NOT NULL,
+    snapshot jsonb NOT NULL,
+    actor_id bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT ab_auth_appearance_revision_action_check CHECK (((action)::text = ANY ((ARRAY['save'::character varying, 'publish'::character varying, 'rollback'::character varying])::text[])))
+);
+
+
+--
+-- Name: ab_auth_appearance_state; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_auth_appearance_state (
+    id bigint NOT NULL,
+    version bigint DEFAULT 0 NOT NULL,
+    published_version bigint DEFAULT 0 NOT NULL,
+    draft jsonb,
+    published jsonb,
+    CONSTRAINT ab_auth_appearance_state_id_check CHECK ((id = 1))
+);
 
 
 --
@@ -15865,6 +15902,30 @@ CREATE TABLE public.ab_semantic_metric (
 
 
 --
+-- Name: ab_semantic_metric_alert; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_semantic_metric_alert (
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    name character varying(200) NOT NULL,
+    metric_pid character varying(26) NOT NULL,
+    comparator character varying(10) NOT NULL,
+    threshold numeric NOT NULL,
+    silence_minutes integer DEFAULT 60 NOT NULL,
+    alert_status character varying(20) DEFAULT 'active'::character varying NOT NULL,
+    last_triggered_at timestamp with time zone,
+    last_evaluated_at timestamp with time zone,
+    created_by bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    deleted_flag boolean DEFAULT false NOT NULL,
+    CONSTRAINT chk_semantic_metric_alert_comparator CHECK (((comparator)::text = ANY ((ARRAY['gt'::character varying, 'gte'::character varying, 'lt'::character varying, 'lte'::character varying])::text[]))),
+    CONSTRAINT chk_semantic_metric_alert_status CHECK (((alert_status)::text = ANY ((ARRAY['active'::character varying, 'paused'::character varying])::text[])))
+);
+
+
+--
 -- Name: ab_semantic_model; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -15891,6 +15952,28 @@ CREATE TABLE public.ab_semantic_model (
 
 
 --
+-- Name: ab_semantic_preagg; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_semantic_preagg (
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    name character varying(200) NOT NULL,
+    semantic_model_pid character varying(26) NOT NULL,
+    metric_code character varying(100) NOT NULL,
+    dimension_codes jsonb DEFAULT '[]'::jsonb NOT NULL,
+    refresh_minutes integer DEFAULT 60 NOT NULL,
+    mv_name character varying(100) NOT NULL,
+    last_refreshed_at timestamp with time zone,
+    last_refresh_rows bigint,
+    created_by bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    deleted_flag boolean DEFAULT false NOT NULL
+);
+
+
+--
 -- Name: ab_semantic_query_log; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -15907,7 +15990,8 @@ CREATE TABLE public.ab_semantic_query_log (
     cache_hit boolean DEFAULT false NOT NULL,
     preagg_pid character varying(32),
     sql_fingerprint character varying(64),
-    executed_at timestamp with time zone DEFAULT now() NOT NULL
+    executed_at timestamp with time zone DEFAULT now() NOT NULL,
+    pid character varying(26)
 );
 
 
@@ -16866,7 +16950,16 @@ CREATE TABLE public.ab_user_session (
     party_membership_id bigint,
     session_stage character varying(30) DEFAULT 'onboarding'::character varying NOT NULL,
     context_version bigint DEFAULT 1 NOT NULL,
+    session_kind character varying(24) DEFAULT 'user'::character varying NOT NULL,
+    initiated_by_user_id bigint,
+    impersonation_expires_at timestamp with time zone,
+    impersonation_authorization_method character varying(24),
+    impersonation_reason character varying(500),
+    impersonation_reference character varying(200),
+    client_type character varying(24),
     CONSTRAINT ck_user_session_execution_scope CHECK (((execution_scope IS NULL) OR ((execution_scope)::text = ANY ((ARRAY['party'::character varying, 'tenant'::character varying, 'platform'::character varying, 'system'::character varying])::text[])))),
+    CONSTRAINT ck_user_session_impersonation_metadata CHECK ((((session_kind)::text <> 'impersonation'::text) OR ((initiated_by_user_id IS NOT NULL) AND (impersonation_expires_at IS NOT NULL) AND (impersonation_authorization_method IS NOT NULL) AND (impersonation_reason IS NOT NULL) AND (client_type IS NOT NULL)))),
+    CONSTRAINT ck_user_session_kind CHECK (((session_kind)::text = ANY ((ARRAY['user'::character varying, 'impersonation'::character varying])::text[]))),
     CONSTRAINT ck_user_session_stage CHECK (((session_stage)::text = ANY ((ARRAY['onboarding'::character varying, 'actor_selection'::character varying, 'ready'::character varying, 'platform'::character varying, 'tenant_admin'::character varying])::text[])))
 );
 
@@ -17080,7 +17173,8 @@ CREATE TABLE public.ab_webhook_delivery_log (
     installation_pid character varying(26),
     replay_count integer DEFAULT 0 NOT NULL,
     last_replayed_at timestamp with time zone,
-    last_replayed_by_pid character varying(64)
+    last_replayed_by_pid character varying(64),
+    request_id character varying(128)
 );
 
 
@@ -17089,6 +17183,13 @@ CREATE TABLE public.ab_webhook_delivery_log (
 --
 
 COMMENT ON TABLE public.ab_webhook_delivery_log IS 'Webhook delivery attempt logs';
+
+
+--
+-- Name: COLUMN ab_webhook_delivery_log.request_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_webhook_delivery_log.request_id IS 'Originating request ID captured before asynchronous delivery; unchanged by retry/replay';
 
 
 --
@@ -17412,7 +17513,7 @@ CREATE TABLE public.mt_org_department (
     id bigint NOT NULL,
     pid character varying(26) NOT NULL,
     tenant_id bigint NOT NULL,
-    org_dept_name character varying(200),
+    org_dept_name character varying(200) NOT NULL,
     org_dept_code character varying(100),
     org_dept_parent_id character varying(26),
     org_dept_manager_id character varying(26),
@@ -17454,12 +17555,12 @@ CREATE TABLE public.mt_org_employee (
     id bigint NOT NULL,
     pid character varying(26) NOT NULL,
     tenant_id bigint NOT NULL,
-    org_emp_name character varying(200),
+    org_emp_name character varying(200) NOT NULL,
     org_emp_email character varying(255),
     org_emp_phone character varying(50),
     org_emp_gender character varying(50),
-    org_emp_dept_id character varying(26),
-    org_emp_position_id character varying(26),
+    org_emp_dept_id character varying(26) NOT NULL,
+    org_emp_position_id character varying(26) NOT NULL,
     org_emp_status character varying(50),
     org_emp_type character varying(50),
     org_emp_member_id character varying(26),
@@ -17470,7 +17571,9 @@ CREATE TABLE public.mt_org_employee (
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_by bigint,
     deleted_flag boolean DEFAULT false NOT NULL,
-    row_version integer DEFAULT 1 NOT NULL
+    row_version integer DEFAULT 1 NOT NULL,
+    org_emp_code character varying(50),
+    org_emp_hire_date date
 );
 
 
@@ -17491,6 +17594,47 @@ CREATE SEQUENCE public.mt_org_employee_id_seq
 --
 
 ALTER SEQUENCE public.mt_org_employee_id_seq OWNED BY public.mt_org_employee.id;
+
+
+--
+-- Name: mt_org_position; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.mt_org_position (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    org_pos_code character varying(50),
+    org_pos_name character varying(100) NOT NULL,
+    org_pos_dept_id character varying(26) NOT NULL,
+    org_pos_level character varying(20) NOT NULL,
+    org_pos_status character varying(20) DEFAULT 'active'::character varying,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    created_by bigint,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_by bigint,
+    deleted_flag boolean DEFAULT false NOT NULL,
+    row_version integer DEFAULT 1 NOT NULL
+);
+
+
+--
+-- Name: mt_org_position_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.mt_org_position_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: mt_org_position_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.mt_org_position_id_seq OWNED BY public.mt_org_position.id;
 
 
 --
@@ -18402,6 +18546,13 @@ ALTER TABLE ONLY public.mt_org_department ALTER COLUMN id SET DEFAULT nextval('p
 --
 
 ALTER TABLE ONLY public.mt_org_employee ALTER COLUMN id SET DEFAULT nextval('public.mt_org_employee_id_seq'::regclass);
+
+
+--
+-- Name: mt_org_position id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mt_org_position ALTER COLUMN id SET DEFAULT nextval('public.mt_org_position_id_seq'::regclass);
 
 
 --
@@ -19463,6 +19614,22 @@ ALTER TABLE ONLY public.ab_audit_trail
 
 ALTER TABLE ONLY public.ab_aurabot_skill_run
     ADD CONSTRAINT ab_aurabot_skill_run_pkey PRIMARY KEY (pid);
+
+
+--
+-- Name: ab_auth_appearance_revision ab_auth_appearance_revision_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_auth_appearance_revision
+    ADD CONSTRAINT ab_auth_appearance_revision_pkey PRIMARY KEY (version);
+
+
+--
+-- Name: ab_auth_appearance_state ab_auth_appearance_state_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_auth_appearance_state
+    ADD CONSTRAINT ab_auth_appearance_state_pkey PRIMARY KEY (id);
 
 
 --
@@ -22610,6 +22777,14 @@ ALTER TABLE ONLY public.ab_semantic_lineage_edge
 
 
 --
+-- Name: ab_semantic_metric_alert ab_semantic_metric_alert_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_semantic_metric_alert
+    ADD CONSTRAINT ab_semantic_metric_alert_pkey PRIMARY KEY (pid);
+
+
+--
 -- Name: ab_semantic_metric ab_semantic_metric_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -22623,6 +22798,22 @@ ALTER TABLE ONLY public.ab_semantic_metric
 
 ALTER TABLE ONLY public.ab_semantic_model
     ADD CONSTRAINT ab_semantic_model_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_semantic_preagg ab_semantic_preagg_mv_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_semantic_preagg
+    ADD CONSTRAINT ab_semantic_preagg_mv_name_key UNIQUE (mv_name);
+
+
+--
+-- Name: ab_semantic_preagg ab_semantic_preagg_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_semantic_preagg
+    ADD CONSTRAINT ab_semantic_preagg_pkey PRIMARY KEY (pid);
 
 
 --
@@ -23199,6 +23390,22 @@ ALTER TABLE ONLY public.mt_org_employee
 
 ALTER TABLE ONLY public.mt_org_employee
     ADD CONSTRAINT mt_org_employee_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: mt_org_position mt_org_position_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mt_org_position
+    ADD CONSTRAINT mt_org_position_pid_key UNIQUE (pid);
+
+
+--
+-- Name: mt_org_position mt_org_position_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mt_org_position
+    ADD CONSTRAINT mt_org_position_pkey PRIMARY KEY (id);
 
 
 --
@@ -27871,6 +28078,27 @@ CREATE INDEX idx_mp_version_tenant ON public.ab_marketplace_version USING btree 
 
 
 --
+-- Name: idx_mt_org_employee_org_emp_code_tenant_unique; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_mt_org_employee_org_emp_code_tenant_unique ON public.mt_org_employee USING btree (tenant_id, org_emp_code);
+
+
+--
+-- Name: idx_mt_org_position_org_pos_code_tenant_unique; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_mt_org_position_org_pos_code_tenant_unique ON public.mt_org_position USING btree (tenant_id, org_pos_code);
+
+
+--
+-- Name: idx_mt_org_position_tenant_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_mt_org_position_tenant_id ON public.mt_org_position USING btree (tenant_id);
+
+
+--
 -- Name: idx_mv_plugin; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -28690,6 +28918,13 @@ CREATE INDEX idx_semantic_dimension_model ON public.ab_semantic_dimension USING 
 
 
 --
+-- Name: idx_semantic_metric_alert_tenant_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_semantic_metric_alert_tenant_status ON public.ab_semantic_metric_alert USING btree (tenant_id, alert_status) WHERE (deleted_flag = false);
+
+
+--
 -- Name: idx_semantic_metric_model; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -28701,6 +28936,13 @@ CREATE INDEX idx_semantic_metric_model ON public.ab_semantic_metric USING btree 
 --
 
 CREATE INDEX idx_semantic_model_tenant ON public.ab_semantic_model USING btree (tenant_id, status) WHERE (deleted_flag = false);
+
+
+--
+-- Name: idx_semantic_preagg_tenant; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_semantic_preagg_tenant ON public.ab_semantic_preagg USING btree (tenant_id) WHERE (deleted_flag = false);
 
 
 --
@@ -28995,6 +29237,13 @@ CREATE INDEX idx_user_note_user ON public.ab_user_note USING btree (user_id, ten
 --
 
 CREATE INDEX idx_user_session_context ON public.ab_user_session USING btree (tenant_id, tenant_member_id, revoked, context_version);
+
+
+--
+-- Name: idx_user_session_impersonation_operator; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_user_session_impersonation_operator ON public.ab_user_session USING btree (tenant_id, initiated_by_user_id, revoked, impersonation_expires_at) WHERE ((session_kind)::text = 'impersonation'::text);
 
 
 --
@@ -29863,6 +30112,13 @@ CREATE UNIQUE INDEX uq_tenant_login_channel ON public.ab_tenant_login_channel US
 --
 
 CREATE UNIQUE INDEX uq_tenant_pref_tenant_key ON public.ab_tenant_preference USING btree (tenant_id, preference_key);
+
+
+--
+-- Name: uq_user_email_normalized_active; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_user_email_normalized_active ON public.ab_user USING btree (lower(btrim((email)::text))) WHERE ((deleted_flag = false) AND (email IS NOT NULL) AND (btrim((email)::text) <> ''::text));
 
 
 --
@@ -31499,6 +31755,14 @@ ALTER TABLE ONLY public.ab_user_session
 
 ALTER TABLE ONLY public.ab_user_session
     ADD CONSTRAINT fk_user_session_application FOREIGN KEY (application_id) REFERENCES public.ab_login_application(id);
+
+
+--
+-- Name: ab_user_session fk_user_session_initiated_by; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_user_session
+    ADD CONSTRAINT fk_user_session_initiated_by FOREIGN KEY (initiated_by_user_id) REFERENCES public.ab_user(id);
 
 
 --

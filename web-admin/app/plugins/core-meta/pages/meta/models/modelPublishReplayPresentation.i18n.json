@@ -1,0 +1,518 @@
+{
+  "permissionCode": {
+    "zh-CN": "权限标识",
+    "en": "Permission"
+  },
+  "memberId": {
+    "zh-CN": "成员 ID",
+    "en": "Member"
+  },
+  "granted": {
+    "zh-CN": "授权结果",
+    "en": "Access granted"
+  },
+  "resource": {
+    "zh-CN": "资源",
+    "en": "Resource"
+  },
+  "action": {
+    "zh-CN": "操作",
+    "en": "Action"
+  },
+  "recordPid": {
+    "zh-CN": "记录 PID",
+    "en": "Record"
+  },
+  "permissionPolicyPid": {
+    "zh-CN": "权限策略 PID",
+    "en": "Permission policy"
+  },
+  "roleId": {
+    "zh-CN": "角色 ID",
+    "en": "Role"
+  },
+  "grantType": {
+    "zh-CN": "授权类型",
+    "en": "Grant type"
+  },
+  "status": {
+    "zh-CN": "状态",
+    "en": "Status"
+  },
+  "truth": {
+    "zh-CN": "条件结果",
+    "en": "Condition result"
+  },
+  "matched": {
+    "zh-CN": "命中结果",
+    "en": "Matched"
+  },
+  "reason": {
+    "zh-CN": "原因",
+    "en": "Reason"
+  },
+  "stepCount": {
+    "zh-CN": "步骤数",
+    "en": "Step count"
+  },
+  "steps": {
+    "zh-CN": "评估步骤",
+    "en": "Evaluation steps"
+  },
+  "fieldRefs": {
+    "zh-CN": "字段引用",
+    "en": "Field references"
+  },
+  "ruleTraceId": {
+    "zh-CN": "统一 Trace",
+    "en": "Rule trace"
+  },
+  "traceId": {
+    "zh-CN": "追踪 ID",
+    "en": "Trace"
+  },
+  "deadlineMinutes": {
+    "zh-CN": "截止分钟数",
+    "en": "Deadline in minutes"
+  },
+  "processPid": {
+    "zh-CN": "流程 PID",
+    "en": "Process"
+  },
+  "slaConfigPid": {
+    "zh-CN": "SLA 配置 PID",
+    "en": "SLA configuration"
+  },
+  "processInstanceId": {
+    "zh-CN": "流程实例",
+    "en": "Process instance"
+  },
+  "taskId": {
+    "zh-CN": "任务 ID",
+    "en": "Task"
+  },
+  "processKey": {
+    "zh-CN": "流程标识",
+    "en": "Process key"
+  },
+  "processName": {
+    "zh-CN": "流程名称",
+    "en": "Process name"
+  },
+  "processVersion": {
+    "zh-CN": "流程版本",
+    "en": "Process version"
+  },
+  "processStatus": {
+    "zh-CN": "流程状态",
+    "en": "Process status"
+  },
+  "targetType": {
+    "zh-CN": "目标类型",
+    "en": "Target type"
+  },
+  "targetKey": {
+    "zh-CN": "目标节点",
+    "en": "Target node"
+  },
+  "nodeId": {
+    "zh-CN": "节点 ID",
+    "en": "Node"
+  },
+  "nodeType": {
+    "zh-CN": "节点类型",
+    "en": "Node type"
+  },
+  "edgeId": {
+    "zh-CN": "连线 ID",
+    "en": "Edge"
+  },
+  "edgeSource": {
+    "zh-CN": "来源节点",
+    "en": "Source node"
+  },
+  "edgeTarget": {
+    "zh-CN": "目标节点",
+    "en": "Target node"
+  },
+  "bindingSurface": {
+    "zh-CN": "绑定位置",
+    "en": "Binding location"
+  },
+  "bindingKind": {
+    "zh-CN": "绑定类型",
+    "en": "Binding type"
+  },
+  "decisionCode": {
+    "zh-CN": "决策标识",
+    "en": "Decision"
+  },
+  "decisionStatus": {
+    "zh-CN": "决策状态",
+    "en": "Decision status"
+  },
+  "conditionResult": {
+    "zh-CN": "条件结果",
+    "en": "Condition result"
+  },
+  "fallbackApplied": {
+    "zh-CN": "已使用兜底",
+    "en": "Fallback applied"
+  },
+  "durationMs": {
+    "zh-CN": "耗时",
+    "en": "Duration"
+  },
+  "errorCode": {
+    "zh-CN": "错误码",
+    "en": "Error"
+  },
+  "inputs": {
+    "zh-CN": "输入快照",
+    "en": "Input snapshot"
+  },
+  "outputs": {
+    "zh-CN": "输出快照",
+    "en": "Output snapshot"
+  },
+  "decisionRefs": {
+    "zh-CN": "决策引用",
+    "en": "Decision references"
+  },
+  "candidateUserIds": {
+    "zh-CN": "候选审批人",
+    "en": "Candidate reviewers"
+  },
+  "candidateGroupIds": {
+    "zh-CN": "候选审批组",
+    "en": "Candidate groups"
+  },
+  "failClosed": {
+    "zh-CN": "失败关闭",
+    "en": "Fail closed"
+  },
+  "slaRecordPid": {
+    "zh-CN": "SLA 记录 PID",
+    "en": "SLA record"
+  },
+  "slaRecordStatus": {
+    "zh-CN": "SLA 状态",
+    "en": "SLA status"
+  },
+  "actionCount": {
+    "zh-CN": "动作数",
+    "en": "Action count"
+  },
+  "actionPolicyTrigger": {
+    "zh-CN": "动作触发",
+    "en": "Action trigger"
+  },
+  "deadlineMode": {
+    "zh-CN": "截止方式",
+    "en": "Deadline mode"
+  },
+  "deadlineValue": {
+    "zh-CN": "截止配置",
+    "en": "Deadline value"
+  },
+  "deadlineTime": {
+    "zh-CN": "截止时间",
+    "en": "Deadline time"
+  },
+  "startTime": {
+    "zh-CN": "开始时间",
+    "en": "Start time"
+  },
+  "enabled": {
+    "zh-CN": "启用",
+    "en": "Enabled"
+  },
+  "modelCode": {
+    "zh-CN": "模型",
+    "en": "Model"
+  },
+  "affectedFieldRef": {
+    "zh-CN": "影响字段",
+    "en": "Affected field"
+  },
+  "fieldRiskLevel": {
+    "zh-CN": "字段风险",
+    "en": "Field risk"
+  },
+  "fieldRiskSummary": {
+    "zh-CN": "风险说明",
+    "en": "Risk summary"
+  },
+  "fieldMasked": {
+    "zh-CN": "脱敏字段",
+    "en": "Masked field"
+  },
+  "fieldPermissionChange": {
+    "zh-CN": "字段权限变更",
+    "en": "Field permission change"
+  },
+  "fieldPermission": {
+    "zh-CN": "字段权限",
+    "en": "Field permission"
+  },
+  "requiresLowPermissionSample": {
+    "zh-CN": "需要低权限样本",
+    "en": "Low-permission sample required"
+  },
+  "items": {
+    "zh-CN": "项",
+    "en": "items"
+  },
+  "reviewers": {
+    "zh-CN": "位审批人",
+    "en": "reviewers"
+  },
+  "groups": {
+    "zh-CN": "个审批组",
+    "en": "groups"
+  },
+  "technicalDetails": {
+    "zh-CN": "技术详情",
+    "en": "Technical details"
+  },
+  "otherResult": {
+    "zh-CN": "其他结果",
+    "en": "Other result"
+  },
+  "consumerDecision": {
+    "zh-CN": "决策复核",
+    "en": "Decision review"
+  },
+  "consumerPermission": {
+    "zh-CN": "权限复核",
+    "en": "Permission review"
+  },
+  "consumerWorkflow": {
+    "zh-CN": "工作流复核",
+    "en": "Workflow review"
+  },
+  "consumerSla": {
+    "zh-CN": "SLA 复核",
+    "en": "SLA review"
+  },
+  "consumerAutomation": {
+    "zh-CN": "自动化复核",
+    "en": "Automation review"
+  },
+  "consumerRule": {
+    "zh-CN": "规则复核",
+    "en": "Rule review"
+  },
+  "sourceCode": {
+    "zh-CN": "来源标识",
+    "en": "Source identifier"
+  },
+  "sourcePid": {
+    "zh-CN": "来源记录",
+    "en": "Source record"
+  },
+  "valueYes": {
+    "zh-CN": "是",
+    "en": "Yes"
+  },
+  "valueNo": {
+    "zh-CN": "否",
+    "en": "No"
+  },
+  "valueGrant": {
+    "zh-CN": "授权",
+    "en": "Grant"
+  },
+  "valueDeny": {
+    "zh-CN": "拒绝",
+    "en": "Deny"
+  },
+  "valueActive": {
+    "zh-CN": "启用",
+    "en": "Active"
+  },
+  "valueInactive": {
+    "zh-CN": "停用",
+    "en": "Inactive"
+  },
+  "valueDisabled": {
+    "zh-CN": "禁用",
+    "en": "Disabled"
+  },
+  "valuePending": {
+    "zh-CN": "处理中",
+    "en": "Pending"
+  },
+  "valueWorkflowNode": {
+    "zh-CN": "流程节点",
+    "en": "Workflow node"
+  },
+  "valueBusinessRecord": {
+    "zh-CN": "业务记录",
+    "en": "Business record"
+  },
+  "valueApprovalTask": {
+    "zh-CN": "审批任务",
+    "en": "Approval task"
+  },
+  "valueSequenceFlow": {
+    "zh-CN": "流程连线",
+    "en": "Sequence flow"
+  },
+  "valueExclusiveGateway": {
+    "zh-CN": "排他网关",
+    "en": "Exclusive gateway"
+  },
+  "valueInclusiveGateway": {
+    "zh-CN": "包容网关",
+    "en": "Inclusive gateway"
+  },
+  "valueNodeBinding": {
+    "zh-CN": "节点规则绑定",
+    "en": "Node rule binding"
+  },
+  "valueEdgeCondition": {
+    "zh-CN": "连线条件",
+    "en": "Edge condition"
+  },
+  "valueDecisionReference": {
+    "zh-CN": "决策引用",
+    "en": "Decision reference"
+  },
+  "valueConditionExpression": {
+    "zh-CN": "条件表达式",
+    "en": "Condition expression"
+  },
+  "valueMatched": {
+    "zh-CN": "命中",
+    "en": "Matched"
+  },
+  "valueNotMatched": {
+    "zh-CN": "未命中",
+    "en": "Not matched"
+  },
+  "valueUnknown": {
+    "zh-CN": "未知",
+    "en": "Unknown"
+  },
+  "valueError": {
+    "zh-CN": "错误",
+    "en": "Error"
+  },
+  "valueSkipped": {
+    "zh-CN": "已跳过",
+    "en": "Skipped"
+  },
+  "valueDecisionFailed": {
+    "zh-CN": "决策执行失败",
+    "en": "Decision execution failed"
+  },
+  "valueSatisfied": {
+    "zh-CN": "满足",
+    "en": "Satisfied"
+  },
+  "valueNotSatisfied": {
+    "zh-CN": "不满足",
+    "en": "Not satisfied"
+  },
+  "valueDeployed": {
+    "zh-CN": "已部署",
+    "en": "Deployed"
+  },
+  "valueDraft": {
+    "zh-CN": "草稿",
+    "en": "Draft"
+  },
+  "valueSuspended": {
+    "zh-CN": "已挂起",
+    "en": "Suspended"
+  },
+  "valueArchived": {
+    "zh-CN": "已归档",
+    "en": "Archived"
+  },
+  "valueSlaTimeout": {
+    "zh-CN": "SLA 超时",
+    "en": "SLA timeout"
+  },
+  "valueSlaWarning": {
+    "zh-CN": "SLA 预警",
+    "en": "SLA warning"
+  },
+  "valueFixedDuration": {
+    "zh-CN": "固定时长",
+    "en": "Fixed duration"
+  },
+  "valueRuleCalculation": {
+    "zh-CN": "规则计算",
+    "en": "Rule calculation"
+  },
+  "valueRunning": {
+    "zh-CN": "运行中",
+    "en": "Running"
+  },
+  "valueCompleted": {
+    "zh-CN": "已完成",
+    "en": "Completed"
+  },
+  "valueOverdue": {
+    "zh-CN": "已超时",
+    "en": "Overdue"
+  },
+  "valueCancelled": {
+    "zh-CN": "已取消",
+    "en": "Cancelled"
+  },
+  "valueGranted": {
+    "zh-CN": "已授权",
+    "en": "Granted"
+  },
+  "valueDenied": {
+    "zh-CN": "已拒绝",
+    "en": "Denied"
+  },
+  "valueGuardNotSatisfied": {
+    "zh-CN": "条件未满足",
+    "en": "Condition not satisfied"
+  },
+  "valueFieldPermissionChanged": {
+    "zh-CN": "字段权限变更",
+    "en": "Field permission change"
+  },
+  "valueFieldMasked": {
+    "zh-CN": "字段脱敏",
+    "en": "Field masking"
+  },
+  "valueFieldGovernance": {
+    "zh-CN": "字段治理复核",
+    "en": "Field governance review"
+  },
+  "valueMaskedPermissionChange": {
+    "zh-CN": "字段已脱敏且权限策略已变化，需使用低权限样本复核",
+    "en": "Field masked and permission policy changed; review with a low-permission sample."
+  },
+  "valuePermissionChanged": {
+    "zh-CN": "字段权限策略已变化，需使用低权限样本复核",
+    "en": "Field permission policy changed; review with a low-permission sample."
+  },
+  "valueMaskedFieldSummary": {
+    "zh-CN": "字段已脱敏，复核报告不会展示原始字段值",
+    "en": "Field masked; the review report does not expose the original value."
+  },
+  "valueNone": {
+    "zh-CN": "无",
+    "en": "None"
+  },
+  "valueRecorded": {
+    "zh-CN": "已记录",
+    "en": "Recorded"
+  },
+  "consumerEvent": {
+    "zh-CN": "事件策略",
+    "en": "Event policy"
+  },
+  "consumerQuery": {
+    "zh-CN": "命名查询",
+    "en": "Named query"
+  }
+}

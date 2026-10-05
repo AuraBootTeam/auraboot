@@ -314,7 +314,11 @@ export function CommandPalette() {
         preference?: SearchPreference;
       }>('/api/search/global/candidates', { method: 'get' });
       if (!ResultHelper.isSuccess(resp) || !Array.isArray(resp.data?.models)) {
-        throw new Error(resp?.desc || resp?.message || 'Unable to load search models');
+        throw new Error(
+          resp?.desc ||
+            resp?.message ||
+            t('search.loadModelsFailed', 'Unable to load search models'),
+        );
       }
       const models = resp.data.models;
       const validCodes = new Set(models.map((model) => model.modelCode));
@@ -325,13 +329,17 @@ export function CommandPalette() {
       setCandidateModels(models);
       setSelectedModels(selected);
     } catch (error) {
-      setSettingsMessage(error instanceof Error ? error.message : 'Unable to load search models');
+      setSettingsMessage(
+        error instanceof Error
+          ? error.message
+          : t('search.loadModelsFailed', 'Unable to load search models'),
+      );
       setCandidateModels([]);
       setSelectedModels([]);
     } finally {
       setSettingsLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const openSearchSettings = useCallback(() => {
     setSettingsOpen(true);
@@ -364,15 +372,23 @@ export function CommandPalette() {
         params: { modelCodes: selectedModels },
       });
       if (!ResultHelper.isSuccess(resp)) {
-        throw new Error(resp?.desc || resp?.message || 'Unable to save search settings');
+        throw new Error(
+          resp?.desc ||
+            resp?.message ||
+            t('search.saveSettingsFailed', 'Unable to save search settings'),
+        );
       }
-      setSettingsMessage('Search settings saved');
+      setSettingsMessage(t('search.settingsSaved', 'Search settings saved'));
     } catch (error) {
-      setSettingsMessage(error instanceof Error ? error.message : 'Unable to save search settings');
+      setSettingsMessage(
+        error instanceof Error
+          ? error.message
+          : t('search.saveSettingsFailed', 'Unable to save search settings'),
+      );
     } finally {
       setSettingsSaving(false);
     }
-  }, [selectedModels]);
+  }, [selectedModels, t]);
 
   // ---------------------------------------------------------------------------
   // Build combined results list
@@ -585,12 +601,14 @@ export function CommandPalette() {
                     className="rounded-control border-border bg-panel text-text-2 hover:bg-subtle h-8 border px-3 text-xs"
                     data-testid="command-palette-settings-close"
                   >
-                    {t('common.back', 'Back')}
+                    {t('action.back', 'Back')}
                   </button>
                 </div>
 
                 {settingsLoading ? (
-                  <div className="text-text-3 py-8 text-center text-sm">Loading...</div>
+                  <div className="text-text-3 py-8 text-center text-sm">
+                    {t('common.loading', 'Loading...')}
+                  </div>
                 ) : candidateModels.length === 0 ? (
                   <div className="text-text-3 py-8 text-center text-sm">
                     {t('search.noReadableModels', 'No readable search models')}
@@ -669,7 +687,7 @@ export function CommandPalette() {
                   className="accent-accent rounded-card bg-accent mt-3 h-8 w-full px-3 text-xs font-medium text-white disabled:opacity-60"
                   data-testid="command-palette-settings-save"
                 >
-                  {settingsSaving ? 'Saving...' : t('common.save', 'Save')}
+                  {settingsSaving ? t('common.saving', 'Saving...') : t('common.save', 'Save')}
                 </button>
               </div>
             ) : (

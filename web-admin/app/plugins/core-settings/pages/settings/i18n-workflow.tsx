@@ -9,6 +9,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useToastContext } from '~/contexts/ToastContext';
 import { workspacePageClassName } from '~/shared/layout/WorkspacePageLayout';
+import { readI18nAdminResponse } from '~/shared/services/i18n-admin-response';
 
 type MetaArgs = Record<string, unknown>;
 
@@ -64,7 +65,7 @@ const STATUS_OPTIONS = [
 
 const STATUS_BADGE: Record<string, { bg: string; text: string; label: string }> = {
   draft: { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Draft' },
-  REVIEW: { bg: 'bg-amber-50', text: 'text-amber-700', label: 'Pending Review' },
+  review: { bg: 'bg-amber-50', text: 'text-amber-700', label: 'Pending Review' },
   approved: { bg: 'bg-emerald-50', text: 'text-emerald-700', label: 'Approved' },
   deprecated: { bg: 'bg-red-50', text: 'text-red-600', label: 'Deprecated' },
 };
@@ -180,12 +181,7 @@ function AiTranslateModal({ onClose, onSuccess }: AiTranslateModalProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targetLocale, sourceLocale: 'zh-CN', maxKeys }),
       });
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        throw new Error((json as { message?: string }).message ?? `HTTP ${res.status}`);
-      }
-      const json = await res.json();
-      const data: AiTranslationResult = json.data;
+      const data = await readI18nAdminResponse<AiTranslationResult>(res);
       setResult(data);
       showSuccessToast(
         `AI translation done — generated ${data.generated}, skipped ${data.skipped}`,
@@ -358,9 +354,7 @@ export default function I18nWorkflowPage() {
         if (keyword.trim()) params.set('keyword', keyword.trim());
 
         const res = await fetch(`/api/admin/i18n/resources?${params.toString()}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = await res.json();
-        const paged: PagedResponse = json.data;
+        const paged = await readI18nAdminResponse<PagedResponse>(res);
         setResources(paged.records ?? []);
         setTotal(paged.total ?? 0);
         setPageNum(page);
@@ -386,10 +380,7 @@ export default function I18nWorkflowPage() {
     setActionLoading(pid + ':submit');
     try {
       const res = await fetch(`/api/admin/i18n/resources/${pid}/submit-review`, { method: 'post' });
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        throw new Error(json.message ?? `HTTP ${res.status}`);
-      }
+      await readI18nAdminResponse<I18nResource>(res);
       showSuccessToast('Submitted for review');
       fetchResources(pageNum);
     } catch (err: unknown) {
@@ -403,10 +394,7 @@ export default function I18nWorkflowPage() {
     setActionLoading(pid + ':approve');
     try {
       const res = await fetch(`/api/admin/i18n/resources/${pid}/approve`, { method: 'post' });
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        throw new Error(json.message ?? `HTTP ${res.status}`);
-      }
+      await readI18nAdminResponse<I18nResource>(res);
       showSuccessToast('Translation approved');
       fetchResources(pageNum);
     } catch (err: unknown) {
@@ -426,10 +414,7 @@ export default function I18nWorkflowPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason }),
       });
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        throw new Error(json.message ?? `HTTP ${res.status}`);
-      }
+      await readI18nAdminResponse<I18nResource>(res);
       setRejectTarget(null);
       showSuccessToast('Translation rejected and returned to draft');
       fetchResources(pageNum);

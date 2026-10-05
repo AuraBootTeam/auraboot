@@ -106,6 +106,15 @@ public class DynamicController {
 
     @Autowired
     private com.auraboot.framework.meta.service.ModelFieldBindingService modelFieldBindingService;
+
+    @Autowired
+    private com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog applicationRuntimeDefinitionCatalog;
+
+    @org.springframework.beans.factory.annotation.Value("${aura.application.definition-read.runtime-primary-enabled:false}")
+    private boolean applicationRuntimePrimaryEnabled;
+
+    @org.springframework.beans.factory.annotation.Value("${aura.application.default-code:}")
+    private String defaultApplicationCode;
     /**
      * 分页查询数据
      *
@@ -1188,6 +1197,12 @@ public class DynamicController {
         legacyResult.put("modelName", model.getDisplayName() != null ? model.getDisplayName() : model.getCode());
         legacyResult.put("tableName", model.getTableName());
         legacyResult.put("fields", fields);
+        // Publish only the declared business title field; record values still use the
+        // permission-scoped, sanitized record endpoint.
+        Object titleField = model.getExtension() == null ? null : model.getExtension().get("titleField");
+        if (titleField instanceof String titleCode && fields.stream().anyMatch(field -> titleCode.equals(field.get("code")))) {
+            legacyResult.put("titleField", titleCode);
+        }
 
         return ApiResponse.success(legacyResult);
     }
@@ -1206,6 +1221,16 @@ public class DynamicController {
             @Parameter(description = "Page key") @PathVariable String pageKey) {
         PageSchemaDTO pageSchema = findPageSchemaQuietly(pageKey);
         String modelCode = resolveModelCode(pageKey, pageSchema);
+        Long tenantId = MetaContext.exists() ? MetaContext.getCurrentTenantId() : null;
+        if (applicationRuntimePrimaryEnabled && tenantId != null
+                && defaultApplicationCode != null && !defaultApplicationCode.isBlank()) {
+            var releaseFields = applicationRuntimeDefinitionCatalog.findFieldMetadata(tenantId, defaultApplicationCode.trim(), modelCode);
+            if (releaseFields.isPresent()) {
+                List<com.auraboot.framework.meta.dto.MetaFieldDTO> fields = releaseFields.get();
+                enrichDictOptions(fields);
+                return ApiResponse.success(fields);
+            }
+        }
         com.auraboot.framework.meta.dto.MetaModelDTO model = metaModelService.findByCode(modelCode);
         if (model == null) {
             if (isSchemaOnlyPage(pageSchema)) {

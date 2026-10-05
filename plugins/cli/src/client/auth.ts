@@ -255,21 +255,19 @@ export async function login(
 
   // Step 4: Select space to get JWT with tenantId
   if (selectedSpace) {
-    try {
-      const selectResp = await fetch(`${baseUrl}/api/tenant-selection/process`, {
-        method: 'post',
-        headers: { Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'select', tenantId: selectedSpace.tenantId }),
-      });
-      if (selectResp.ok) {
-        const selectData = (await selectResp.json()) as any;
-        if (selectData.data?.jwt) {
-          jwt = selectData.data.jwt;
-        }
-      }
-    } catch {
-      // Non-critical — use original JWT
+    const selectResp = await fetch(`${baseUrl}/api/tenant-selection/process`, {
+      method: 'post',
+      headers: { Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'select', tenantId: selectedSpace.tenantId }),
+    });
+    if (!selectResp.ok) {
+      throw new Error(`Tenant selection failed (${selectResp.status})`);
     }
+    const selectData = (await selectResp.json()) as any;
+    if (typeof selectData.data?.jwt !== 'string' || !selectData.data.jwt.trim()) {
+      throw new Error('Tenant selection response missing JWT');
+    }
+    jwt = selectData.data.jwt;
   }
 
   saveCredentials({ jwt, email, expiresAt: new Date(Date.now() + 24 * 3600 * 1000).toISOString() }, env);

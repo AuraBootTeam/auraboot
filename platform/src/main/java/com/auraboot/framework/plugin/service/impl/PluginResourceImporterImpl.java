@@ -194,14 +194,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     @Override
     public boolean checkCommandExists(Long tenantId, String code) {
         try {
-            com.auraboot.framework.meta.dto.CommandDefinitionDTO cmd = commandService.findByCode(code);
-            return cmd != null;
-        } catch (Exception e) {
-            // findByCode lacks a NotFoundException type today; any failure is treated as
-            // "does not exist" so a re-import can proceed with create. Logged at debug
-            // so a real DB/connectivity failure is still observable when troubleshooting.
-            log.debug("checkCommandExists treating exception as 'not exists' for code={}: {}",
-                    logSafe(code), logSafe(e.toString()));
+            return commandService.findByCode(code) != null;
+        } catch (com.auraboot.framework.meta.exception.CommandNotFoundException absent) {
             return false;
         }
     }
@@ -987,7 +981,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             String inputSchemaJson = dto.getInputSchema() != null ? toJson(dto.getInputSchema()) : "{}";
             String targetModelsJson = dto.getTargetModels() != null ? toJson(dto.getTargetModels()) : "[]";
             String executionConfigJson = consolidatedConfig != null ? toJson(consolidatedConfig) : "{}";
-            String extensionJson = dto.getExtension() != null ? toJson(dto.getExtension()) : "{}";
+            String extensionJson = toJson(dto.getEffectiveExtension());
             String cmdRiskLevel = resolveCommandRiskLevel(dto, consolidatedConfig);
 
             commandDefinitionMapper.updateForPluginImport(
@@ -1029,7 +1023,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             request.setExecutionConfig(consolidatedConfig != null ? toJson(consolidatedConfig) : null);
             request.setCmdRiskLevel(resolveCommandRiskLevel(dto, consolidatedConfig));
             request.setPluginPid(pluginPid);  // Set plugin_pid via request
-            request.setExtension(dto.getExtension() != null ? toJson(dto.getExtension()) : "{}");
+            request.setExtension(toJson(dto.getEffectiveExtension()));
 
             com.auraboot.framework.meta.dto.CommandDefinitionDTO created = commandService.create(request);
 
@@ -1690,6 +1684,9 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         }
         if (dto.getDataSources() != null && !dto.getDataSources().isEmpty()) {
             extension.put("dataSources", dto.getDataSources());
+        }
+        if (dto.getLinkageRules() != null) {
+            extension.put("linkageRules", dto.getLinkageRules());
         }
         if (dto.getMobileUx() != null && !dto.getMobileUx().isEmpty()) {
             extension.put("mobileUx", dto.getMobileUx());

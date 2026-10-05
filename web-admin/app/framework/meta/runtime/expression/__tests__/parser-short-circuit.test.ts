@@ -67,3 +67,15 @@ describe('ExpressionParser logical short-circuit', () => {
     ).toBe(false);
   });
 });
+
+
+describe('Object expression property contract', () => {
+  it('evaluates an explicit object property using the plugin AST', () => {
+    const parser = new ExpressionParser(createExpressionContext({ state: { count: 3 } } as any));
+    expect(parser.evaluate('${ {count: state.count} }')).toEqual({ count: 3 });
+  });
+  it('preserves shorthand properties whose value is resolved by the plugin', () => {
+    const parser = new ExpressionParser(createExpressionContext({ state: {} } as any));
+    expect(parser.evaluate('${ {state} }')).toEqual({ state: {} });
+  });
+});

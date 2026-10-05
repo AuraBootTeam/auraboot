@@ -143,6 +143,7 @@ class BehaviorIngestMetricsTest {
     private BehaviorEventInput event(String id, String name) {
         BehaviorEventInput input = new BehaviorEventInput();
         input.setEventId(id);
+        input.setSchemaVersion("1");
         input.setEventName(name);
         return input;
     }

@@ -33,7 +33,7 @@ public class AiTranslationResult {
 
     /**
      * Whether a real LLM was used.
-     * {@code false} means the en-US fallback strategy was used instead.
+     * {@code false} means no provider call was made; missing keys use source-locale placeholders.
      */
     private boolean llmUsed;
 }

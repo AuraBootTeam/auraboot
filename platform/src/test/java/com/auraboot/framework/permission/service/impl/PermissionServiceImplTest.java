@@ -16,6 +16,9 @@ import com.auraboot.framework.rbac.entity.RolePermission;
 import com.auraboot.framework.rbac.mapper.RoleMapper;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -71,12 +74,34 @@ class PermissionServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        // Initialize lambda metadata without a database or another test class.
+        MapperBuilderAssistant assistant = new MapperBuilderAssistant(new MybatisConfiguration(), "");
+        assistant.setCurrentNamespace(PermissionMapper.class.getName());
+        TableInfoHelper.initTableInfo(assistant, Permission.class);
         MetaContext.setContext(100L, 1L, "u-pid", "tester");
     }
 
     @AfterEach
     void tearDown() {
         MetaContext.clear();
+        TableInfoHelper.remove(Permission.class);
+    }
+
+    @Test
+    void findByPidReturnsScopedDto() {
+        Permission permission = new Permission();
+        PermissionDTO dto = new PermissionDTO();
+        when(permissionMapper.findByPids(List.of("permission-pid"))).thenReturn(List.of(permission));
+        when(permissionConverter.toDTO(permission)).thenReturn(dto);
+        assertThat(service.findByPid("permission-pid")).isSameAs(dto);
+        verify(permissionMapper).findByPids(List.of("permission-pid"));
+    }
+
+    @Test
+    void findByPidReturnsNullWhenNotVisible() {
+        when(permissionMapper.findByPids(List.of("foreign-pid"))).thenReturn(List.of());
+        assertThat(service.findByPid("foreign-pid")).isNull();
+        verify(permissionConverter, never()).toDTO(any());
     }
 
     private PermissionCreateRequest createRequest(String code) {
@@ -87,6 +112,25 @@ class PermissionServiceImplTest {
         req.setResourceCode("model.user");
         req.setAction("read");
         return req;
+    }
+
+    @Test
+    void findByPidReturnsDTO() {
+        Permission permission = new Permission();
+        PermissionDTO dto = new PermissionDTO();
+        when(permissionMapper.findByPids(List.of("permission-pid"))).thenReturn(List.of(permission));
+        when(permissionConverter.toDTO(permission)).thenReturn(dto);
+
+        assertThat(service.findByPid("permission-pid")).isSameAs(dto);
+        verify(permissionMapper).findByPids(List.of("permission-pid"));
+    }
+
+    @Test
+    void findByPidReturnsNullWhenMissing() {
+        when(permissionMapper.findByPids(List.of("missing"))).thenReturn(List.of());
+
+        assertThat(service.findByPid("missing")).isNull();
+        verify(permissionConverter, never()).toDTO(any(Permission.class));
     }
 
     @Test
@@ -230,6 +274,25 @@ class PermissionServiceImplTest {
         service.delete(50L);
 
         verify(permissionMapper).update(isNull(), any(LambdaUpdateWrapper.class));
+    }
+
+    @Test
+    void findByPidReturnsMappedResult() {
+        Permission permission = new Permission();
+        PermissionDTO dto = new PermissionDTO();
+        when(permissionMapper.findByPids(List.of("permission-pid"))).thenReturn(List.of(permission));
+        when(permissionConverter.toDTO(permission)).thenReturn(dto);
+
+        assertThat(service.findByPid("permission-pid")).isSameAs(dto);
+        verify(permissionMapper).findByPids(List.of("permission-pid"));
+    }
+
+    @Test
+    void findByPidReturnsNullForMissingRecord() {
+        when(permissionMapper.findByPids(List.of("missing"))).thenReturn(List.of());
+
+        assertThat(service.findByPid("missing")).isNull();
+        verify(permissionConverter, never()).toDTO(any());
     }
 
     @Test

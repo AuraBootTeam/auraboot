@@ -180,7 +180,10 @@ public class PartyActorServiceImpl implements PartyActorService {
                 actor.getPartyMembershipId(),
                 SessionStage.READY,
                 nextContextVersion,
-                securityVersion);
+                securityVersion,
+                false,
+                null,
+                null);
         String newToken = jwtUtil.generateTokenWithContext(toUserDetails(user), user.getPid(), tokenContext);
 
         newToken = jwtUtil.inheritSessionLifetime(newToken, currentToken);

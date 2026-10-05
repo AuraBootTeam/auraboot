@@ -142,6 +142,9 @@ public interface PluginImportService {
      */
     ImportExecuteResult executeFromManifest(PluginManifestExtended manifest, ImportRequest request);
 
+    /** Bind only already-imported roles to their declared permissions after a batch import. */
+    int reconcileDirectoryRolePermissions(String directoryPath);
+
     // ==================== Rollback ====================
 
     /**

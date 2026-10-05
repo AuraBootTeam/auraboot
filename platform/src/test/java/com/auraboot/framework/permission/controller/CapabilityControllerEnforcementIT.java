@@ -59,6 +59,10 @@ class CapabilityControllerEnforcementIT extends BaseIntegrationTest {
     @BeforeEach
     void cleanSlate() {
         grantTenantAdminRoleToTestUser();
+        // Unknown codes have a deliberate tenant-admin bootstrap allowance. Register
+        // both definitions before revoking grants so this tests registered-code denial.
+        ensurePermissionDefinition(MetaPermission.ROLE_READ);
+        ensurePermissionDefinition(MetaPermission.ROLE_MANAGE);
         revokeFromTestRole(MetaPermission.ROLE_READ);
         revokeFromTestRole(MetaPermission.ROLE_MANAGE);
         userPermissionService.evictPermissionDefinitions(getTestTenant().getId());
@@ -159,7 +163,7 @@ class CapabilityControllerEnforcementIT extends BaseIntegrationTest {
         adminRoleChecker.invalidateAll();
     }
 
-    private void grantToTestRole(String code) {
+    private Permission ensurePermissionDefinition(String code) {
         Permission permission = permissionMapper.findByCode(code);
         if (permission == null) {
             String[] parts = code.split("\\.");
@@ -178,6 +182,11 @@ class CapabilityControllerEnforcementIT extends BaseIntegrationTest {
             permission.setUpdatedAt(java.time.Instant.now());
             permissionMapper.insert(permission);
         }
+        return permission;
+    }
+
+    private void grantToTestRole(String code) {
+        Permission permission = ensurePermissionDefinition(code);
         boolean notAssigned = rolePermissionMapper.selectList(
                 new LambdaQueryWrapper<RolePermission>()
                         .eq(RolePermission::getRoleId, getTestRole().getId())
@@ -194,7 +203,8 @@ class CapabilityControllerEnforcementIT extends BaseIntegrationTest {
             rp.setTenantId(getTestTenant().getId());
             rp.setCreatedAt(java.time.Instant.now());
             rp.setUpdatedAt(java.time.Instant.now());
-            rolePermissionMapper.insert(rp);
+            // Restore a soft-deleted unique binding through the production upsert.
+            rolePermissionMapper.batchInsert(java.util.List.of(rp));
         }
         userPermissionService.evictPermissionDefinitions(getTestTenant().getId());
         userPermissionService.evictRoleUsers(getTestTenant().getId(), getTestRole().getId());

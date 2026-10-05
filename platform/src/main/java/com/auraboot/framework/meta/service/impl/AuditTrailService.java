@@ -7,6 +7,9 @@ import com.auraboot.framework.meta.entity.AuditTrail;
 import com.auraboot.framework.meta.mapper.AuditTrailMapper;
 import com.auraboot.framework.user.mapper.UserMapper;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -19,6 +22,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -99,8 +104,9 @@ public class AuditTrailService {
         }
 
         // 3. Build the audit trail record
-        Instant now = Instant.now();
+        Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         AuditTrail record = new AuditTrail();
+        record.setHashVersion(2);
         record.setTenantId(tenantId);
         record.setSequenceNo(nextSeq);
         record.setEventType(event.getEventType());
@@ -294,6 +300,13 @@ public class AuditTrailService {
      * Null values are represented as empty strings.
      */
     String buildCanonicalString(AuditTrail record) {
+        int version = record.getHashVersion() == null ? 1 : record.getHashVersion();
+        if (version == 2) {
+            return canonicalJson(versionTwoContent(record));
+        }
+        if (version != 1) {
+            throw new IllegalArgumentException("Unsupported audit hash version: " + version);
+        }
         StringBuilder sb = new StringBuilder();
         sb.append(nullSafe(record.getTenantId()));
         sb.append('|');
@@ -327,6 +340,54 @@ public class AuditTrailService {
         sb.append('|');
         sb.append(jsonToString(record.getMetadata()));
         return sb.toString();
+    }
+
+    private ObjectNode versionTwoContent(AuditTrail record) {
+        ObjectNode content = JsonNodeFactory.instance.objectNode();
+        content.put("hashVersion", 2);
+        content.put("tenantId", record.getTenantId());
+        content.put("sequenceNo", record.getSequenceNo());
+        content.put("eventType", record.getEventType());
+        content.put("entityType", record.getEntityType());
+        content.put("entityId", record.getEntityId());
+        content.put("entityPid", record.getEntityPid());
+        content.put("commandCode", record.getCommandCode());
+        content.put("operationType", record.getOperationType());
+        content.put("actorId", record.getActorId());
+        content.put("actorName", record.getActorName());
+        content.put("actorIp", record.getActorIp());
+        content.put("timestamp", record.getTimestamp() == null ? null : record.getTimestamp().toString());
+        content.set("beforeSnapshot", record.getBeforeSnapshot());
+        content.set("afterSnapshot", record.getAfterSnapshot());
+        content.set("metadata", record.getMetadata());
+        ArrayNode changed = content.putArray("changedFields");
+        if (record.getChangedFields() != null) {
+            for (String field : record.getChangedFields()) changed.add(field);
+        }
+        return content;
+    }
+
+    /** Stable across JSONB key order, numeric notation and nested objects. */
+    private String canonicalJson(JsonNode node) {
+        if (node == null || node.isNull()) return "null";
+        if (node.isObject()) {
+            List<String> names = new ArrayList<>();
+            node.fieldNames().forEachRemaining(names::add);
+            Collections.sort(names);
+            return names.stream()
+                    .map(name -> JsonNodeFactory.instance.textNode(name).toString()
+                            + ":" + canonicalJson(node.get(name)))
+                    .collect(Collectors.joining(",", "{", "}"));
+        }
+        if (node.isArray()) {
+            List<String> values = new ArrayList<>();
+            node.forEach(value -> values.add(canonicalJson(value)));
+            return String.join(",", values).transform(value -> "[" + value + "]");
+        }
+        if (node.isNumber()) {
+            return node.decimalValue().stripTrailingZeros().toPlainString();
+        }
+        return node.toString();
     }
 
     /**

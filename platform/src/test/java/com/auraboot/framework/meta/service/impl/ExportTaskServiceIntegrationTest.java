@@ -38,34 +38,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Real-stack integration test for {@link ExportTaskService}.
- *
- * <p>Part of the OSS coverage initiative #8/#9 (tracker:
- * {@code docs/backlog/2026-06-10-oss-coverage-to-80-tracker.md}).
- * {@code ExportTaskService} was a near-zero class; this test drives the full
- * service against the real shared database (no mocked mappers/bridges, per
- * AGENTS.md §2.2 seam discipline) covering:
- * <ul>
- *   <li>submitExport — creates a task and (via synchronous self-call) processes
- *       the export inline; covers Excel, CSV, and JSON format branches</li>
- *   <li>getTaskStatus — happy path and not-found throws</li>
- *   <li>getFileKey — happy path and null-when-missing</li>
- *   <li>getRecentTasks — listing by query code</li>
- *   <li>processExportAsync — via submitExport (self-call bypasses @Async proxy)
- *       covering the NamedQuery-not-found failure path and empty-fields
- *       (SELECT *) path as well</li>
- *   <li>cleanupExpiredTasks — seeds an expired completed task and asserts status
- *       flips to "expired"</li>
- * </ul>
- *
- * <p>All data lives under a dedicated {@code covexp-test-tenant} and is hard-deleted
- * in {@link #tearDown()} to keep the shared database clean across re-runs.
- *
- * <p><b>@Async note:</b> {@code processExportAsync} is annotated
- * {@code @Async("exportTaskExecutor")} but is called via a direct {@code this.}
- * reference inside {@code submitExport} (line 89), which bypasses the Spring AOP
- * proxy. As a result the processing runs synchronously within {@code submitExport},
- * making the export status deterministic from the caller's perspective in tests.
+ * Real-stack export lifecycle and artifact tests with per-case query ownership.
+ * The real export executor propagates tenant context and processes asynchronously.
+ * Teardown waits for submitted workers before deleting only this case's rows.
  */
 @Slf4j
 @SpringBootTest(classes = TestApplication.class)
@@ -104,13 +79,18 @@ class ExportTaskServiceIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    private static final long COMPLETION_TIMEOUT_MS = 30_000;
     private final AtomicInteger seq = new AtomicInteger();
+    private final List<String> createdQueryCodes = new java.util.ArrayList<>();
+    private final List<String> submittedTaskPids = new java.util.ArrayList<>();
     private User testUser;
     private Tenant testTenant;
 
     /** Returns a per-test unique code. */
     private String uniqueCode(String label) {
-        return CODE_PREFIX + RUN + "_" + seq.incrementAndGet() + "_" + label;
+        String code = CODE_PREFIX + RUN + "_" + seq.incrementAndGet() + "_" + label;
+        createdQueryCodes.add(code);
+        return code;
     }
 
     @BeforeEach
@@ -143,37 +123,28 @@ class ExportTaskServiceIntegrationTest {
         }
 
         MetaContext.setContext(testTenant.getId(), testUser.getId(), testUser.getPid(), testUser.getUserName());
-        wipeTenantData();
     }
 
     @AfterEach
-    void tearDown() {
+    void tearDown() throws InterruptedException {
         try {
+            for (String pid : submittedTaskPids) {
+                awaitTerminal(pid, COMPLETION_TIMEOUT_MS);
+            }
             wipeTenantData();
-        } catch (Exception e) {
-            log.warn("ExportTask cleanup failed: {}", e.getMessage());
         } finally {
             MetaContext.clear();
         }
     }
 
-    /**
-     * Hard-delete all test data for the dedicated tenant.
-     * ExportTask has no @TableLogic, so a plain DELETE is sufficient.
-     * NamedQuery and NamedQueryField are cleaned via the mappers.
-     */
+    /** Delete only this case's query rows after all submitted workers reach a terminal state. */
     private void wipeTenantData() {
         Long tid = testTenant.getId();
-        // Export tasks — no soft-delete flag
-        jdbcTemplate.update("DELETE FROM ab_export_task WHERE tenant_id = ?", tid);
-        // Named query fields — no tenant_id column, keyed by query_code
-        jdbcTemplate.update(
-                "DELETE FROM ab_named_query_field WHERE query_code LIKE ?",
-                CODE_PREFIX + RUN + "%");
-        // Named queries
-        jdbcTemplate.update(
-                "DELETE FROM ab_named_query WHERE tenant_id = ? AND code LIKE ?",
-                tid, CODE_PREFIX + RUN + "%");
+        for (String code : createdQueryCodes) {
+            jdbcTemplate.update("DELETE FROM ab_export_task WHERE tenant_id = ? AND query_code = ?", tid, code);
+            jdbcTemplate.update("DELETE FROM ab_named_query_field WHERE tenant_id = ? AND query_code = ?", tid, code);
+            jdbcTemplate.update("DELETE FROM ab_named_query WHERE tenant_id = ? AND code = ?", tid, code);
+        }
     }
 
     // ==================== Helpers ====================
@@ -221,36 +192,40 @@ class ExportTaskServiceIntegrationTest {
         return req;
     }
 
-    /**
-     * Poll getTaskStatus until the task reaches a terminal state (completed/failed/expired)
-     * or the timeout elapses. Needed because processExportAsync is actually dispatched to
-     * the exportTaskExecutor thread pool via the Spring @Async proxy (the self-call in
-     * submitExport goes via the proxy because ExportTaskService is a Spring-managed bean).
-     */
+    private ExportTaskDTO submitTrackedExport(String code, NamedQueryDataExportRequest request,
+                                              Long tenantId, Long userId) {
+        ExportTaskDTO task = exportTaskService.submitExport(code, request, tenantId, userId);
+        submittedTaskPids.add(task.getPid());
+        return task;
+    }
+
+    /** A non-terminal timeout fails and preserves rows for diagnosis instead of racing the worker. */
     private ExportTaskDTO awaitTerminal(String pid, long timeoutMs) throws InterruptedException {
-        long deadline = System.currentTimeMillis() + timeoutMs;
-        while (System.currentTimeMillis() < deadline) {
-            ExportTaskDTO dto = exportTaskService.getTaskStatus(pid);
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(timeoutMs);
+        ExportTaskDTO dto;
+        do {
+            dto = exportTaskService.getTaskStatus(pid);
             if (ExportTask.STATUS_COMPLETED.equals(dto.getStatus())
                     || ExportTask.STATUS_FAILED.equals(dto.getStatus())
                     || ExportTask.STATUS_EXPIRED.equals(dto.getStatus())) {
                 return dto;
             }
             Thread.sleep(100);
-        }
-        return exportTaskService.getTaskStatus(pid); // return last known state on timeout
+        } while (System.nanoTime() < deadline);
+        return fail("Export did not reach a terminal state: pid=" + pid
+                + ", status=" + dto.getStatus() + ", error=" + dto.getErrorMessage());
     }
 
     // ==================== submitExport (happy paths) ====================
 
     @Test
     @DisplayName("submitExport creates and processes an Excel export (waits for async completion)")
-    void submitExport_excel_happyPath() throws InterruptedException {
+    void submitExport_excel_happyPath() throws Exception {
         String code = uniqueCode("excel");
         insertNamedQuery(code);
         insertFields(code);
 
-        ExportTaskDTO initial = exportTaskService.submitExport(
+        ExportTaskDTO initial = submitTrackedExport(
                 code, exportRequest(DataExportRequest.ExportFormat.EXCEL),
                 testTenant.getId(), testUser.getId());
 
@@ -258,15 +233,33 @@ class ExportTaskServiceIntegrationTest {
         assertEquals(code, initial.getQueryCode());
 
         // processExportAsync runs on the exportTaskExecutor thread pool — poll until terminal
-        ExportTaskDTO dto = awaitTerminal(initial.getPid(), 10_000);
+        ExportTaskDTO dto = awaitTerminal(initial.getPid(), COMPLETION_TIMEOUT_MS);
 
         assertEquals(ExportTask.STATUS_COMPLETED, dto.getStatus(),
-                "status must be COMPLETED after async processing");
+                "status must be COMPLETED after async processing: " + dto.getErrorMessage());
         assertEquals(100, dto.getProgress());
         assertNotNull(dto.getFileSize(), "file size must be set");
         assertTrue(dto.getFileSize() > 0, "file must be non-empty");
         assertNotNull(dto.getDownloadUrl(), "completed task must have download URL");
         assertTrue(dto.getDownloadUrl().contains(dto.getPid()));
+        ExportTaskService.ExportArtifactDownload artifact = exportTaskService.openArtifact(dto.getPid());
+        assertEquals(".xlsx", artifact.extension());
+        assertTrue(artifact.size() > 0);
+        try (java.io.InputStream content = artifact.content();
+             org.apache.poi.xssf.usermodel.XSSFWorkbook workbook = new org.apache.poi.xssf.usermodel.XSSFWorkbook(content)) {
+            org.apache.poi.ss.usermodel.Sheet sheet = workbook.getSheetAt(0);
+            assertEquals("q_code", sheet.getRow(0).getCell(0).getStringCellValue());
+            assertEquals("q_title", sheet.getRow(0).getCell(1).getStringCellValue());
+            boolean found = false;
+            for (org.apache.poi.ss.usermodel.Row row : sheet) {
+                if (row.getRowNum() > 0 && row.getCell(0) != null
+                        && code.equals(row.getCell(0).getStringCellValue())) {
+                    assertEquals("Export Test Query " + code, row.getCell(1).getStringCellValue());
+                    found = true;
+                }
+            }
+            assertTrue(found, "the downloaded workbook must contain this test's exact query row");
+        }
     }
 
     @Test
@@ -276,12 +269,12 @@ class ExportTaskServiceIntegrationTest {
         insertNamedQuery(code);
         insertFields(code);
 
-        ExportTaskDTO initial = exportTaskService.submitExport(
+        ExportTaskDTO initial = submitTrackedExport(
                 code, exportRequest(DataExportRequest.ExportFormat.CSV),
                 testTenant.getId(), testUser.getId());
 
-        ExportTaskDTO dto = awaitTerminal(initial.getPid(), 10_000);
-        assertEquals(ExportTask.STATUS_COMPLETED, dto.getStatus());
+        ExportTaskDTO dto = awaitTerminal(initial.getPid(), COMPLETION_TIMEOUT_MS);
+        assertEquals(ExportTask.STATUS_COMPLETED, dto.getStatus(), dto.getErrorMessage());
         assertEquals("CSV", dto.getFormat());
         assertTrue(dto.getFileSize() > 0);
     }
@@ -298,11 +291,11 @@ class ExportTaskServiceIntegrationTest {
         f2.setSortable(false);
         namedQueryFieldMapper.insert(f2);
 
-        ExportTaskDTO initial = exportTaskService.submitExport(
+        ExportTaskDTO initial = submitTrackedExport(
                 code, exportRequest(DataExportRequest.ExportFormat.CSV),
                 testTenant.getId(), testUser.getId());
-        ExportTaskDTO dto = awaitTerminal(initial.getPid(), 10_000);
-        assertEquals(ExportTask.STATUS_COMPLETED, dto.getStatus());
+        ExportTaskDTO dto = awaitTerminal(initial.getPid(), COMPLETION_TIMEOUT_MS);
+        assertEquals(ExportTask.STATUS_COMPLETED, dto.getStatus(), dto.getErrorMessage());
 
         ExportTaskService.ExportArtifactDownload artifact = exportTaskService.openArtifact(dto.getPid());
         assertNotNull(artifact, "completed export must have a file");
@@ -328,12 +321,12 @@ class ExportTaskServiceIntegrationTest {
         insertNamedQuery(code);
         insertFields(code);
 
-        ExportTaskDTO initial = exportTaskService.submitExport(
+        ExportTaskDTO initial = submitTrackedExport(
                 code, exportRequest(DataExportRequest.ExportFormat.JSON),
                 testTenant.getId(), testUser.getId());
 
-        ExportTaskDTO dto = awaitTerminal(initial.getPid(), 10_000);
-        assertEquals(ExportTask.STATUS_COMPLETED, dto.getStatus());
+        ExportTaskDTO dto = awaitTerminal(initial.getPid(), COMPLETION_TIMEOUT_MS);
+        assertEquals(ExportTask.STATUS_COMPLETED, dto.getStatus(), dto.getErrorMessage());
         assertEquals("JSON", dto.getFormat());
         assertTrue(dto.getFileSize() > 0);
     }
@@ -345,19 +338,19 @@ class ExportTaskServiceIntegrationTest {
         insertNamedQuery(code);
         // intentionally insert no NamedQueryFields → falls into the SELECT * branch
 
-        ExportTaskDTO initial = exportTaskService.submitExport(
+        ExportTaskDTO initial = submitTrackedExport(
                 code, exportRequest(DataExportRequest.ExportFormat.CSV),
                 testTenant.getId(), testUser.getId());
 
-        ExportTaskDTO dto = awaitTerminal(initial.getPid(), 10_000);
-        assertEquals(ExportTask.STATUS_COMPLETED, dto.getStatus());
+        ExportTaskDTO dto = awaitTerminal(initial.getPid(), COMPLETION_TIMEOUT_MS);
+        assertEquals(ExportTask.STATUS_COMPLETED, dto.getStatus(), dto.getErrorMessage());
     }
 
     @Test
     @DisplayName("submitExport throws MetaServiceException when query code is unknown")
     void submitExport_unknownQueryCode_throws() {
         assertThrows(MetaServiceException.class, () ->
-                exportTaskService.submitExport(
+                submitTrackedExport(
                         "no-such-query-code-xyz",
                         exportRequest(DataExportRequest.ExportFormat.EXCEL),
                         testTenant.getId(), testUser.getId()));
@@ -386,12 +379,13 @@ class ExportTaskServiceIntegrationTest {
                 exportRequest(DataExportRequest.ExportFormat.EXCEL)));
         task.setRequestParams(metadata);
         exportTaskMapper.insert(task);
+        submittedTaskPids.add(task.getPid());
 
         // Call processExportAsync directly — it will be dispatched to the thread pool
         exportTaskService.processExportAsync(task.getId(), testTenant.getId());
 
         // Poll until terminal
-        ExportTaskDTO dto = awaitTerminal(task.getPid(), 10_000);
+        ExportTaskDTO dto = awaitTerminal(task.getPid(), COMPLETION_TIMEOUT_MS);
         assertEquals(ExportTask.STATUS_FAILED, dto.getStatus());
         assertNotNull(dto.getErrorMessage());
         assertTrue(dto.getErrorMessage().contains("Named query not found"),
@@ -407,13 +401,13 @@ class ExportTaskServiceIntegrationTest {
         insertNamedQuery(code);
         insertFields(code);
 
-        ExportTaskDTO submitted = exportTaskService.submitExport(
+        ExportTaskDTO submitted = submitTrackedExport(
                 code, exportRequest(DataExportRequest.ExportFormat.EXCEL),
                 testTenant.getId(), testUser.getId());
 
-        ExportTaskDTO fetched = awaitTerminal(submitted.getPid(), 10_000);
+        ExportTaskDTO fetched = awaitTerminal(submitted.getPid(), COMPLETION_TIMEOUT_MS);
         assertEquals(submitted.getPid(), fetched.getPid());
-        assertEquals(ExportTask.STATUS_COMPLETED, fetched.getStatus());
+        assertEquals(ExportTask.STATUS_COMPLETED, fetched.getStatus(), fetched.getErrorMessage());
         assertNotNull(fetched.getCreatedAt());
         assertNotNull(fetched.getCompletedAt());
         assertNotNull(fetched.getExpiresAt());
@@ -435,12 +429,13 @@ class ExportTaskServiceIntegrationTest {
         insertNamedQuery(code);
         insertFields(code);
 
-        ExportTaskDTO initial = exportTaskService.submitExport(
+        ExportTaskDTO initial = submitTrackedExport(
                 code, exportRequest(DataExportRequest.ExportFormat.EXCEL),
                 testTenant.getId(), testUser.getId());
 
         // Wait for processing to complete before reading the file key
-        awaitTerminal(initial.getPid(), 10_000);
+        ExportTaskDTO completed = awaitTerminal(initial.getPid(), COMPLETION_TIMEOUT_MS);
+        assertEquals(ExportTask.STATUS_COMPLETED, completed.getStatus(), completed.getErrorMessage());
 
         String fileKey = exportTaskService.getFileKey(initial.getPid());
         assertNotNull(fileKey, "completed task must have a file key");
@@ -466,9 +461,9 @@ class ExportTaskServiceIntegrationTest {
         insertFields(code);
 
         // Submit two tasks for the same query
-        exportTaskService.submitExport(code, exportRequest(DataExportRequest.ExportFormat.EXCEL),
+        submitTrackedExport(code, exportRequest(DataExportRequest.ExportFormat.EXCEL),
                 testTenant.getId(), testUser.getId());
-        exportTaskService.submitExport(code, exportRequest(DataExportRequest.ExportFormat.CSV),
+        submitTrackedExport(code, exportRequest(DataExportRequest.ExportFormat.CSV),
                 testTenant.getId(), testUser.getId());
 
         List<ExportTaskDTO> tasks = exportTaskService.getRecentTasks(code, 10);
@@ -486,7 +481,7 @@ class ExportTaskServiceIntegrationTest {
         insertFields(code);
 
         for (int i = 0; i < 3; i++) {
-            exportTaskService.submitExport(code, exportRequest(DataExportRequest.ExportFormat.CSV),
+            submitTrackedExport(code, exportRequest(DataExportRequest.ExportFormat.CSV),
                     testTenant.getId(), testUser.getId());
         }
 
@@ -497,9 +492,26 @@ class ExportTaskServiceIntegrationTest {
     @Test
     @DisplayName("getRecentTasks returns empty list for unknown query code")
     void getRecentTasks_unknownCode_empty() {
-        List<ExportTaskDTO> tasks = exportTaskService.getRecentTasks("no-such-query-abc", 10);
-        assertNotNull(tasks);
-        assertTrue(tasks.isEmpty());
+        String ownedCode = uniqueCode("cleanup_scope");
+        insertNamedQuery(ownedCode);
+        String sentinelPid = UniqueIdGenerator.generate();
+        jdbcTemplate.update("INSERT INTO ab_export_task "
+                + "(pid, tenant_id, query_code, status, progress, processed_rows, format, created_by, created_at, expires_at) "
+                + "VALUES (?, ?, ?, 'pending', 0, 0, 'excel', ?, now(), now() + interval '23 hours')",
+                sentinelPid, testTenant.getId(), "foreign_" + RUN, testUser.getId());
+        try {
+            List<ExportTaskDTO> tasks = exportTaskService.getRecentTasks("no-such-query-abc", 10);
+            assertNotNull(tasks);
+            assertTrue(tasks.isEmpty());
+            wipeTenantData();
+            assertEquals(0, jdbcTemplate.queryForObject(
+                    "SELECT count(*) FROM ab_named_query WHERE tenant_id = ? AND code = ?",
+                    Integer.class, testTenant.getId(), ownedCode));
+            assertNotNull(exportTaskMapper.findByPid(sentinelPid), "cleanup must preserve unrelated query rows");
+        } finally {
+            jdbcTemplate.update("DELETE FROM ab_export_task WHERE pid = ? AND tenant_id = ?",
+                    sentinelPid, testTenant.getId());
+        }
     }
 
     // ==================== cleanupExpiredTasks ====================

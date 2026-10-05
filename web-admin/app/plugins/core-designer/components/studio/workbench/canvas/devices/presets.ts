@@ -28,7 +28,7 @@ export const DEVICE_PRESETS: DevicePreset[] = [
   // Desktop
   {
     id: 'desktop-1920',
-    name: '桌面 (1920×1080)',
+    name: 'Desktop (1920×1080)',
     type: 'desktop',
     width: 1920,
     height: 1080,
@@ -37,7 +37,7 @@ export const DEVICE_PRESETS: DevicePreset[] = [
   },
   {
     id: 'desktop-1440',
-    name: '桌面 (1440×900)',
+    name: 'Desktop (1440×900)',
     type: 'desktop',
     width: 1440,
     height: 900,
@@ -45,7 +45,7 @@ export const DEVICE_PRESETS: DevicePreset[] = [
   },
   {
     id: 'desktop-1280',
-    name: '桌面 (1280×720)',
+    name: 'Desktop (1280×720)',
     type: 'desktop',
     width: 1280,
     height: 720,
@@ -55,7 +55,7 @@ export const DEVICE_PRESETS: DevicePreset[] = [
   // Laptop
   {
     id: 'laptop-1366',
-    name: '笔记本 (1366×768)',
+    name: 'Laptop (1366×768)',
     type: 'laptop',
     width: 1366,
     height: 768,
@@ -167,7 +167,7 @@ export const DEVICE_PRESETS: DevicePreset[] = [
   // Custom placeholder
   {
     id: 'custom',
-    name: '自定义尺寸',
+    name: 'Custom dimensions',
     type: 'custom',
     width: 1024,
     height: 768,
@@ -215,11 +215,11 @@ export function getGroupedPresets(): Map<DevicePreset['type'], DevicePreset[]> {
  * Type labels
  */
 export const DEVICE_TYPE_LABELS: Record<DevicePreset['type'], string> = {
-  desktop: '桌面',
-  laptop: '笔记本',
-  tablet: '平板',
-  mobile: '手机',
-  custom: '自定义',
+  desktop: 'Desktop',
+  laptop: 'Laptop',
+  tablet: 'Tablet',
+  mobile: 'Mobile',
+  custom: 'Custom',
 };
 
 export default DEVICE_PRESETS;

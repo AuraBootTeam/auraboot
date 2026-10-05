@@ -15,6 +15,7 @@ import com.auraboot.framework.openplatform.service.OpenApiEventCatalog;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.context.expression.MapAccessor;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.SimpleEvaluationContext;
@@ -114,6 +115,8 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
         delivery.setTenantId(subscription.getTenantId());
         delivery.setSubscriptionPid(subscription.getPid());
         delivery.setInstallationPid(subscription.getInstallationPid());
+        // Capture before the durable worker boundary, never from worker MDC.
+        delivery.setRequestId(MDC.get("requestId"));
         delivery.setRequestUrl(subscription.getTargetUrl());
         delivery.setRetryCount(0);
         delivery.setMaxRetries(subscription.getMaxRetries() != null ? subscription.getMaxRetries() : 3);
@@ -206,6 +209,10 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
                 customHeaders.forEach(requestBuilder::header);
             }
 
+            // A subscription header cannot replace the persisted originating ID.
+            if (delivery.getRequestId() != null && !delivery.getRequestId().isBlank()) {
+                requestBuilder.setHeader("X-Request-Id", delivery.getRequestId());
+            }
             requestBuilder.POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
 
             HttpResponse<String> response = PINNED_HTTP_CLIENT.send(

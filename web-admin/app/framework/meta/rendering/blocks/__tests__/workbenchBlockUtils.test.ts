@@ -421,10 +421,7 @@ describe('workbenchBlockUtils action runner', () => {
     );
     expect(fetchMock).toHaveBeenCalledWith('/api/file/download/export-file-1', {
       method: 'GET',
-      headers: {
-        Authorization: 'Bearer token-1',
-      },
-      credentials: 'include',
+      credentials: 'same-origin',
     });
     expect(createObjectURL).toHaveBeenCalled();
     expect(appendChild).toHaveBeenCalled();

@@ -57,8 +57,8 @@ export function buildResourceIndex(files: PluginFiles): ResourceIndex {
   const rawPermissions = get('permissions');
   const rawMenus = get('menus');
   const rawDicts = get('dicts');
-  const rawBindings = get('bindings') || get('modelFieldBindings');
-  const rawI18n = get('i18n') || get('i18nResources');
+  const rawBindings = files.resourceFiles.get('bindings') ?? get('modelFieldBindings');
+  const rawI18n = files.resourceFiles.get('i18n') ?? get('i18nResources');
 
   // Primary maps
   const models = new Map<string, any>();

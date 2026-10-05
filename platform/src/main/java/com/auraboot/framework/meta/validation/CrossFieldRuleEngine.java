@@ -167,7 +167,7 @@ public class CrossFieldRuleEngine {
         while (matcher.find()) {
             String fieldCode = matcher.group(1);
             Object value = data.get(fieldCode);
-            matcher.appendReplacement(sb, value != null ? value.toString() : fieldCode);
+            matcher.appendReplacement(sb, Matcher.quoteReplacement(value != null ? value.toString() : fieldCode));
         }
         matcher.appendTail(sb);
         return sb.toString();

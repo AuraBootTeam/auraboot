@@ -38,6 +38,10 @@ public class ApplicationFileAccessorImpl implements FileAccessor {
                                            String entityType, String entityId, String fieldName) {
         return delegate().saveAndLink(originalName, contentType, bytes, entityType, entityId, fieldName);
     }
+    @Override public SavedFile saveAndAppendLink(String originalName, String contentType, byte[] bytes,
+                                                 String entityType, String entityId, String fieldName) {
+        return delegate().saveAndAppendLink(originalName, contentType, bytes, entityType, entityId, fieldName);
+    }
     @Override public List<FileMetadata> listLinked(String entityType, String entityId, String fieldName) {
         List<FileEntity> files = fileService.getFilesByEntityAndField(entityType, entityId, fieldName);
         if (files == null) return List.of();

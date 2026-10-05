@@ -51,6 +51,7 @@ class AggregateQueryServiceImplDataScopeTest {
     @Mock private DataPermissionEngine dataPermissionEngine;
     @Mock private DataDomainService dataDomainService;
     @Mock private NamedQueryFieldProtection fieldProtection;
+    @Mock private com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog releaseCatalog;
 
     @InjectMocks
     private AggregateQueryServiceImpl service;
@@ -187,12 +188,75 @@ class AggregateQueryServiceImplDataScopeTest {
         return request;
     }
 
+    @Test
+    void boundReleaseAggregateUsesItsWhitelistAndRetainsDataScope() {
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "applicationRuntimeDefinitionCatalog", releaseCatalog);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "applicationRuntimePrimaryEnabled", true);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "defaultApplicationCode", "aura-edu");
+        when(releaseCatalog.findNamedQuery(TENANT_ID, "aura-edu", "phase_one_summary"))
+                .thenReturn(java.util.Optional.of(new com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.BoundNamedQuery(
+                        namedQuery(), List.of(new NamedQueryField(TENANT_ID, "phase_one_summary", "pid", "pid", "string")))));
+        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, "read", USER_ID)).thenReturn("AND created_by = 20");
+        when(dynamicDataMapper.selectByQueryWithoutTenant(anyString(), anyMap())).thenReturn(List.of(Map.of("total", 3L)));
+
+        assertThat(service.execute(namedQueryCountRequest()).getRows()).containsExactly(Map.of("total", 3L));
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(dynamicDataMapper).selectByQueryWithoutTenant(sql.capture(), anyMap());
+        assertThat(sql.getValue()).contains("created_by = 20");
+        org.mockito.Mockito.verifyNoInteractions(namedQueryMapper, namedQueryFieldMapper);
+    }
+
+    @Test
+    void boundReleaseAggregateRejectsFieldsOutsideItsWhitelistBeforeSql() {
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "applicationRuntimeDefinitionCatalog", releaseCatalog);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "applicationRuntimePrimaryEnabled", true);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "defaultApplicationCode", "aura-edu");
+        when(releaseCatalog.findNamedQuery(TENANT_ID, "aura-edu", "phase_one_summary"))
+                .thenReturn(java.util.Optional.of(new com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.BoundNamedQuery(
+                        namedQuery(), List.of(new NamedQueryField(TENANT_ID, "phase_one_summary", "pid", "pid", "string")))));
+        AggregateQueryRequest request = namedQueryCountRequest();
+        request.setDimensions(List.of("private_phone"));
+        assertThatThrownBy(() -> service.execute(request)).hasMessageContaining("Dimension field not in whitelist: private_phone");
+        org.mockito.Mockito.verifyNoInteractions(namedQueryMapper, namedQueryFieldMapper, dynamicDataMapper);
+    }
+
     private AggregateQueryRequest namedQueryCountRequest() {
         AggregateQueryRequest request = countRequest();
         request.setType("namedQuery");
         request.setModelCode(null);
         request.setQueryCode("phase_one_summary");
         return request;
+    }
+
+    @Test
+    void namedQueryChartInjectsAuthenticatedPublicUserPid() {
+        assertNamedQueryIdentityParameters(Map.of());
+    }
+
+    @Test
+    void namedQueryChartOverridesCallerSuppliedIdentityParameters() {
+        assertNamedQueryIdentityParameters(Map.of(
+                "currentUserPid", "another-user", "currentUserId", "999", "tenantId", 999L));
+    }
+
+    private void assertNamedQueryIdentityParameters(Map<String, Object> callerParameters) {
+        when(namedQueryMapper.findByCode("phase_one_summary")).thenReturn(namedQuery());
+        when(namedQueryFieldMapper.selectList(any())).thenReturn(List.of(
+                new NamedQueryField(TENANT_ID, "phase_one_summary", "pid", "pid", "string")));
+        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, "read", USER_ID))
+                .thenReturn("");
+        when(dynamicDataMapper.selectByQueryWithoutTenant(anyString(), anyMap()))
+                .thenReturn(List.of(Map.of("total", 1L)));
+        AggregateQueryRequest request = namedQueryCountRequest();
+        request.setParameters(callerParameters);
+
+        assertThat(service.execute(request).getRows()).hasSize(1);
+
+        ArgumentCaptor<Map<String, Object>> parameters = ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper).selectByQueryWithoutTenant(anyString(), parameters.capture());
+        assertThat(parameters.getValue()).containsEntry("currentUserPid", "user-pid")
+                .containsEntry("currentUserId", USER_ID.toString())
+                .containsEntry("tenantId", TENANT_ID);
     }
 
     private NamedQuery namedQuery() {

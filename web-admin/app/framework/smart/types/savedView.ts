@@ -115,6 +115,7 @@ export const VIEW_TYPE_CONFIGS: ViewTypeConfig[] = [
  * Kanban card field display configuration
  */
 export interface KanbanCardFieldConfig {
+  dictCode?: string;
   field: string;
   label?: string | Record<string, string>; // localized map resolved via getLocalizedText (WMS-UX-02)
   /** Display type: text, number, date, tag, avatar */

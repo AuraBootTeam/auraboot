@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
+import { useI18n } from '~/contexts/I18nContext';
 import { SchemaBlockConfigPanel } from '~/shared/designer/SchemaBlockConfigPanel';
-import { columnDetailSchemas } from './schema';
+import { buildColumnDetailSchemas } from './schema';
 import type { ListViewModel, ColumnConfig } from './mapper';
 
 export interface ResolvedFieldLite {
@@ -32,6 +33,8 @@ export const ColumnsTab: React.FC<ColumnsTabProps> = ({
   loading,
   capabilityError,
 }) => {
+  const { t } = useI18n();
+  const schemas = useMemo(() => buildColumnDetailSchemas(t), [t]);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [search, setSearch] = useState('');
   const fieldMap = useMemo(
@@ -39,10 +42,7 @@ export const ColumnsTab: React.FC<ColumnsTabProps> = ({
     [fields],
   );
 
-  const selectedCodes = useMemo(
-    () => new Set(vm.columns.map((c) => c.field)),
-    [vm.columns],
-  );
+  const selectedCodes = useMemo(() => new Set(vm.columns.map((c) => c.field)), [vm.columns]);
   const filteredFields = useMemo(() => {
     const keyword = search.trim().toLowerCase();
     if (!keyword) return fields ?? [];
@@ -58,10 +58,10 @@ export const ColumnsTab: React.FC<ColumnsTabProps> = ({
     return (
       <div className="space-y-4" data-testid="columns-tab">
         <div className={sectionCardClasses()}>
-          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-            列配置
+          <div className="text-xs font-semibold tracking-[0.16em] text-slate-400 uppercase">
+            {t('list_editor.column_configuration')}
           </div>
-          <div className="mt-2 text-sm text-slate-500">正在读取模型字段与列表能力。</div>
+          <div className="mt-2 text-sm text-slate-500">{t('list_editor.columns_loading')}</div>
         </div>
       </div>
     );
@@ -102,33 +102,37 @@ export const ColumnsTab: React.FC<ColumnsTabProps> = ({
       <section className={sectionCardClasses()}>
         <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-              字段池
+            <div className="text-xs font-semibold tracking-[0.16em] text-slate-400 uppercase">
+              {t('list_editor.field_pool')}
             </div>
-            <h2 className="mt-2 text-lg font-semibold text-slate-900">先选主列，再排阅读顺序</h2>
+            <h2 className="mt-2 text-lg font-semibold text-slate-900">
+              {t('list_editor.columns_heading')}
+            </h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">
-              列表首屏只保留真正支撑识别和判断的字段，避免把所有模型字段都塞进表格。
+              {t('list_editor.columns_description')}
             </p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
-            已选 <span className="font-semibold text-slate-900">{vm.columns.length}</span> / {availableFields.length}
+            {t('list_editor.selected')}
+            <span className="font-semibold text-slate-900">{vm.columns.length}</span> /{' '}
+            {availableFields.length}
           </div>
         </div>
         {capabilityError && (
           <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800">
-            无法读取模型字段能力，当前字段池已回退为页面中已使用的字段。
+            {t('list_editor.columns_capability_error')}
           </div>
         )}
         <div className="mt-4 max-h-72 overflow-auto rounded-2xl border border-slate-200 bg-white p-3">
           <div className="mb-3 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-              搜索
+            <span className="text-xs font-semibold tracking-[0.16em] text-slate-400 uppercase">
+              {t('list_editor.search')}
             </span>
             <input
               type="text"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="按字段名或类型过滤"
+              placeholder={t('list_editor.columns_search_placeholder')}
               className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
               data-testid="column-search-input"
             />
@@ -153,15 +157,15 @@ export const ColumnsTab: React.FC<ColumnsTabProps> = ({
                   <span className="block text-xs text-slate-400">{f.code}</span>
                 </span>
                 <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] text-slate-500">
-                  {f.dataType ?? 'unknown'}
+                  {f.dataType ?? t('list_editor.unknown_type')}
                 </span>
               </label>
             ))}
             {filteredFields.length === 0 && (
               <div className="rounded-2xl border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-400">
                 {capabilityError
-                  ? '当前页面里还没有可回退字段，请先修复模型绑定。'
-                  : '没有匹配字段，换个关键词试试。'}
+                  ? t('list_editor.columns_no_fallback')
+                  : t('list_editor.columns_no_match')}
               </div>
             )}
           </div>
@@ -171,130 +175,132 @@ export const ColumnsTab: React.FC<ColumnsTabProps> = ({
       <section className={sectionCardClasses()}>
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-              阅读顺序
+            <div className="text-xs font-semibold tracking-[0.16em] text-slate-400 uppercase">
+              {t('list_editor.reading_order')}
             </div>
-            <h3 className="mt-2 text-base font-semibold text-slate-900">已选列</h3>
+            <h3 className="mt-2 text-base font-semibold text-slate-900">
+              {t('list_editor.selected_columns')}
+            </h3>
           </div>
-          <div className="text-sm text-slate-500">顶部列更靠前，更适合高频判断</div>
+          <div className="text-sm text-slate-500">{t('list_editor.column_order_hint')}</div>
         </div>
 
         {vm.columns.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-6 text-sm text-slate-400">
-            还没有列。先从上方字段池勾选 2 到 6 个关键字段。
+            {t('list_editor.columns_empty')}
           </div>
         ) : (
           <div className="space-y-3">
             <div className="flex flex-wrap gap-2">
               <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-500">
-                推荐：第 1 列放识别字段
+                {t('list_editor.first_column_hint')}
               </span>
               <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-500">
-                第 2-4 列放判断字段
+                {t('list_editor.middle_columns_hint')}
               </span>
               <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-500">
-                低频字段尽量不进首屏
+                {t('list_editor.infrequent_column_hint')}
               </span>
             </div>
             <ol className="space-y-2">
-            {vm.columns.map((c, i) => (
-              <li
-                key={`${c.field}-${i}`}
-                className={`rounded-2xl border bg-white px-4 py-4 text-sm transition ${
-                  selectedIdx === i
-                    ? 'border-blue-200 bg-blue-50/70'
-                    : 'border-slate-200'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <button
-                    type="button"
-                    className="flex min-w-0 flex-1 items-start gap-3 text-left"
-                    onClick={() => setSelectedIdx(selectedIdx === i ? null : i)}
-                    data-testid={`column-item-${i}`}
-                  >
-                    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-500">
-                      {i + 1}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-medium text-slate-800">
-                        {fieldMap.get(c.field)?.displayName ?? c.field}
-                      </span>
-                      <span className="mt-1 block text-xs text-slate-400">{c.field}</span>
-                      <span className="mt-3 flex flex-wrap gap-2">
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-600">
-                          {fieldMap.get(c.field)?.dataType ?? 'unknown'}
-                        </span>
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-600">
-                          {c.width ? `${c.width}px` : '自动宽度'}
-                        </span>
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-600">
-                          {rendererLabel(c.renderer)}
-                        </span>
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-600">
-                          {alignLabel(c.align)}
-                        </span>
-                      </span>
-                    </span>
-                  </button>
-                  <div className="ml-3 flex gap-2">
+              {vm.columns.map((c, i) => (
+                <li
+                  key={`${c.field}-${i}`}
+                  className={`rounded-2xl border bg-white px-4 py-4 text-sm transition ${
+                    selectedIdx === i ? 'border-blue-200 bg-blue-50/70' : 'border-slate-200'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
                     <button
                       type="button"
-                      onClick={() => move(i, -1)}
-                      disabled={i === 0 || readonly}
-                      className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs text-slate-600 disabled:opacity-30"
-                      aria-label="上移"
+                      className="flex min-w-0 flex-1 items-start gap-3 text-left"
+                      onClick={() => setSelectedIdx(selectedIdx === i ? null : i)}
+                      data-testid={`column-item-${i}`}
                     >
-                      上移
+                      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-500">
+                        {i + 1}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium text-slate-800">
+                          {fieldMap.get(c.field)?.displayName ?? c.field}
+                        </span>
+                        <span className="mt-1 block text-xs text-slate-400">{c.field}</span>
+                        <span className="mt-3 flex flex-wrap gap-2">
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-600">
+                            {fieldMap.get(c.field)?.dataType ?? t('list_editor.unknown_type')}
+                          </span>
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-600">
+                            {c.width ? `${c.width}px` : t('list_editor.auto_width')}
+                          </span>
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-600">
+                            {rendererLabel(c.renderer, t)}
+                          </span>
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-600">
+                            {alignLabel(c.align, t)}
+                          </span>
+                        </span>
+                      </span>
                     </button>
+                    <div className="ml-3 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => move(i, -1)}
+                        disabled={i === 0 || readonly}
+                        className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs text-slate-600 disabled:opacity-30"
+                        aria-label={t('list_editor.move_up')}
+                      >
+                        {t('list_editor.move_up')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => move(i, 1)}
+                        disabled={i === vm.columns.length - 1 || readonly}
+                        className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs text-slate-600 disabled:opacity-30"
+                        aria-label={t('list_editor.move_down')}
+                      >
+                        {t('list_editor.move_down')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleField(c.field)}
+                        disabled={readonly}
+                        className="rounded-xl border border-red-200 px-3 py-1.5 text-xs text-red-600 disabled:opacity-30"
+                        aria-label={t('list_editor.remove_column')}
+                      >
+                        {t('list_editor.remove')}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
                     <button
                       type="button"
-                      onClick={() => move(i, 1)}
-                      disabled={i === vm.columns.length - 1 || readonly}
-                      className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs text-slate-600 disabled:opacity-30"
-                      aria-label="下移"
-                    >
-                      下移
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => toggleField(c.field)}
+                      onClick={() =>
+                        updateColumn(i, {
+                          renderer: nextRenderer(c.renderer),
+                        })
+                      }
                       disabled={readonly}
-                      className="rounded-xl border border-red-200 px-3 py-1.5 text-xs text-red-600 disabled:opacity-30"
-                      aria-label="移除列"
+                      className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-medium text-slate-600 disabled:opacity-30"
                     >
-                      移除
+                      {t('list_editor.renderer_prefix')}
+                      {rendererLabel(c.renderer, t)}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateColumn(i, {
+                          align: nextAlign(c.align),
+                        })
+                      }
+                      disabled={readonly}
+                      className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-medium text-slate-600 disabled:opacity-30"
+                    >
+                      {t('list_editor.align_prefix')}
+                      {alignLabel(c.align, t)}
                     </button>
                   </div>
-                </div>
-                <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      updateColumn(i, {
-                        renderer: nextRenderer(c.renderer),
-                      })
-                    }
-                    disabled={readonly}
-                    className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-medium text-slate-600 disabled:opacity-30"
-                  >
-                    渲染：{rendererLabel(c.renderer)}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      updateColumn(i, {
-                        align: nextAlign(c.align),
-                      })
-                    }
-                    disabled={readonly}
-                    className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-medium text-slate-600 disabled:opacity-30"
-                  >
-                    对齐：{alignLabel(c.align)}
-                  </button>
-                </div>
-              </li>
-            ))}
+                </li>
+              ))}
             </ol>
           </div>
         )}
@@ -302,28 +308,26 @@ export const ColumnsTab: React.FC<ColumnsTabProps> = ({
 
       <section className={sectionCardClasses()} data-testid="column-detail-editor">
         <div className="mb-4 border-b border-slate-200 pb-4">
-          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-            列属性
+          <div className="text-xs font-semibold tracking-[0.16em] text-slate-400 uppercase">
+            {t('list_editor.column_properties')}
           </div>
           <h3 className="mt-2 text-base font-semibold text-slate-900">
-            {selected ? `列属性 · ${selected.field}` : '列属性'}
+            {selected
+              ? t('list_editor.column_properties_for', { field: selected.field })
+              : t('list_editor.column_properties')}
           </h3>
-          <p className="mt-2 text-sm text-slate-500">
-            只在这里微调宽度、对齐和渲染方式，不要把业务逻辑混进列表列定义。
-          </p>
+          <p className="mt-2 text-sm text-slate-500">{t('list_editor.column_properties_hint')}</p>
         </div>
         {selected && selectedIdx !== null ? (
           <SchemaBlockConfigPanel
-            schemas={columnDetailSchemas}
+            schemas={schemas}
             value={selected as unknown as Record<string, unknown>}
-            onChange={(next) =>
-              updateColumn(selectedIdx, next as Partial<ColumnConfig>)
-            }
+            onChange={(next) => updateColumn(selectedIdx, next as Partial<ColumnConfig>)}
             readonly={readonly}
           />
         ) : (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-6 text-sm text-slate-400">
-            从“已选列”里选择一个字段后，再编辑它的显示细节。
+            {t('list_editor.column_properties_empty')}
           </div>
         )}
       </section>
@@ -331,31 +335,31 @@ export const ColumnsTab: React.FC<ColumnsTabProps> = ({
   );
 };
 
-function rendererLabel(renderer?: string): string {
+function rendererLabel(renderer: string | undefined, t: (key: string) => string): string {
   switch (renderer) {
     case 'badge':
-      return '标签';
+      return t('list_editor.badge');
     case 'link':
-      return '链接';
+      return t('list_editor.link');
     case 'image':
-      return '图片';
+      return t('list_editor.image');
     case 'richtext':
-      return '富文本';
+      return t('list_editor.richtext');
     case 'text':
     default:
-      return '文本';
+      return t('list_editor.text');
   }
 }
 
-function alignLabel(align?: ColumnConfig['align']): string {
+function alignLabel(align: ColumnConfig['align'] | undefined, t: (key: string) => string): string {
   switch (align) {
     case 'center':
-      return '居中';
+      return t('list_editor.center_align');
     case 'right':
-      return '右对齐';
+      return t('list_editor.right_align');
     case 'left':
     default:
-      return '左对齐';
+      return t('list_editor.left_align');
   }
 }
 

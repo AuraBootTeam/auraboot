@@ -69,9 +69,8 @@ public class CommandCascadeDeleteExecutor {
             CommandExecutorUtils.validateSqlIdentifier(parentField, "CASCADE_DELETE parentField");
 
             try {
-                ModelMutationGuard.assertMutable(
-                        metaModelService.getModelDefinition(childModel).orElse(null),
-                        "cascade deleted");
+                ModelMutationGuard.assertDeleteAllowed(
+                        metaModelService.getModelDefinition(childModel).orElse(null));
                 String childTable = metaModelService.getTableName(childModel);
 
                 // Collect child PIDs before deleting (needed for nested cascades)

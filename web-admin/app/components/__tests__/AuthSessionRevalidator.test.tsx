@@ -26,6 +26,7 @@ describe('AuthSessionRevalidator', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.useRealTimers();
   });
 
@@ -138,4 +139,24 @@ describe('AuthSessionRevalidator', () => {
 
     expect(mocks.revalidate).not.toHaveBeenCalled();
   });
+
+  it('keeps the live page during offline polling and revalidates on recovery', () => {
+    const online = vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false);
+    const view = render(
+      <AuthSessionRevalidator enabled isAuthenticated intervalMs={1_000} minIntervalMs={0} />,
+    );
+    act(() => {
+      vi.advanceTimersByTime(3_000);
+      window.dispatchEvent(new Event('focus'));
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    expect(mocks.revalidate).not.toHaveBeenCalled();
+    online.mockReturnValue(true);
+    act(() => { window.dispatchEvent(new Event('online')); });
+    expect(mocks.revalidate).toHaveBeenCalledTimes(1);
+    view.unmount();
+    act(() => { window.dispatchEvent(new Event('online')); });
+    expect(mocks.revalidate).toHaveBeenCalledTimes(1);
+  });
+
 });

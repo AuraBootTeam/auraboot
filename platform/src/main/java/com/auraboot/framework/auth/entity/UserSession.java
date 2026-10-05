@@ -26,6 +26,13 @@ public class UserSession {
     private Long partyMembershipId;
     private String sessionStage;
     private Long contextVersion;
+    private String sessionKind;
+    private Long initiatedByUserId;
+    private Instant impersonationExpiresAt;
+    private String impersonationAuthorizationMethod;
+    private String impersonationReason;
+    private String impersonationReference;
+    private String clientType;
     private String deviceInfo;
     private String ipAddress;
     private String userAgent;

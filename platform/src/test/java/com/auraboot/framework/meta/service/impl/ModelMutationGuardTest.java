@@ -13,6 +13,50 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ModelMutationGuardTest {
 
     @Test
+    void invalidDeletionPolicyFailsClosedInsteadOfSilentlyAllowingDeletion() {
+        ModelDefinition model = ModelDefinition.builder().code("oi_disclosure_package")
+                .extension(Map.of("commandOnlyDelete", "true")).build();
+        assertThatThrownBy(() -> ModelMutationGuard.assertMutableForOperation(model, "delete"))
+                .isInstanceOf(MetaServiceException.class)
+                .hasMessageContaining("invalid commandOnlyDelete policy");
+    }
+
+    @Test
+    void commandAuthorizationCannotOverrideImmutableAuditDeletion() {
+        ModelDefinition model = ModelDefinition.builder().code("oi_disclosure_access_log")
+                .immutable(true).extension(Map.of("commandOnlyDelete", true)).build();
+        try {
+            assertThatThrownBy(() -> MetaContext.runWithCommandPermitPlan(
+                    "ALL", null, "oi_disclosure_access_log", "audit-1",
+                    () -> ModelMutationGuard.assertMutableForOperation(model, "delete")))
+                    .isInstanceOf(MetaServiceException.class).hasMessageContaining("immutable");
+        } finally {
+            MetaContext.clear();
+        }
+    }
+
+    @Test
+    void commandOnlyDeleteRejectsGenericDeleteWithoutBlockingLifecycleUpdates() {
+        ModelDefinition model = ModelDefinition.builder()
+                .code("oi_disclosure_package")
+                .extension(Map.of("commandOnlyDelete", true))
+                .build();
+        try {
+            assertThatThrownBy(() -> ModelMutationGuard.assertMutableForOperation(model, "DELETE"))
+                    .isInstanceOf(MetaServiceException.class)
+                    .hasMessageContaining("authorized command");
+            assertThatCode(() -> ModelMutationGuard.assertMutableForOperation(model, "update"))
+                    .doesNotThrowAnyException();
+            assertThatCode(() -> MetaContext.runWithCommandPermitPlan(
+                    "ALL", null, "oi_disclosure_package", "dp-1",
+                    () -> ModelMutationGuard.assertMutableForOperation(model, "delete")))
+                    .doesNotThrowAnyException();
+        } finally {
+            MetaContext.clear();
+        }
+    }
+
+    @Test
     void mutableModelsKeepExistingUpdateAndDeleteBehavior() {
         ModelDefinition model = ModelDefinition.builder()
                 .code("mutable_master")

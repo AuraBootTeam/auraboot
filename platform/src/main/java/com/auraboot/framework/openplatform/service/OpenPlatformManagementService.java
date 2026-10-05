@@ -262,7 +262,7 @@ public class OpenPlatformManagementService {
         String normalizedStatus = status == null || status.isBlank() ? null : status.trim().toLowerCase();
         return deliveryMapper.findForOperations(tenantId, installationPid, normalizedStatus,
                         Math.max(1, Math.min(limit, 200))).stream()
-                .map(item -> new WebhookDeliveryView(item.pid(), item.subscriptionName(), item.eventId(),
+                .map(item -> new WebhookDeliveryView(item.pid(), item.subscriptionName(), item.eventId(), item.requestId(),
                         item.deliveryStatus(), item.retryCount(), item.maxRetries(), item.responseStatus(),
                         safeFailureReason(item.deliveryStatus(), item.responseStatus()),
                         item.nextRetryAt(), item.lastAttemptAt(), item.deliveredAt(),
@@ -389,7 +389,7 @@ public class OpenPlatformManagementService {
     private ExternalApplication requireApplication(Long tenantId, String pid) {
         ExternalApplication application = applicationMapper.findOwnedByPid(tenantId, pid);
         if (application == null || !"active".equals(application.getStatus())) {
-            throw new IllegalArgumentException("Application not found");
+            throw new BusinessException(ResponseCode.NOT_FOUND, "Application not found");
         }
         return application;
     }
@@ -397,7 +397,7 @@ public class OpenPlatformManagementService {
     private ExternalApplication requireApplicationForUpdate(Long tenantId, String pid) {
         ExternalApplication application = applicationMapper.findOwnedByPidForUpdate(tenantId, pid);
         if (application == null || !"active".equals(application.getStatus())) {
-            throw new IllegalArgumentException("Application not found");
+            throw new BusinessException(ResponseCode.NOT_FOUND, "Application not found");
         }
         return application;
     }
@@ -434,7 +434,7 @@ public class OpenPlatformManagementService {
                                                java.util.function.Predicate<OpenPlatformApplicationRole> allowed) {
         ExternalApplication application = applicationMapper.selectById(installation.getApplicationId());
         if (application == null || !tenantId.equals(application.getOwnerTenantId())) {
-            throw new IllegalArgumentException("Application not found");
+            throw new BusinessException(ResponseCode.NOT_FOUND, "Application not found");
         }
         requireCapability(tenantId, application, allowed);
     }

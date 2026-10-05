@@ -16,15 +16,32 @@ const sessionStorage = createCookieSessionStorage({
 });
 
 async function authenticate(page: import('@playwright/test').Page) {
-  const seedResponse = await page.request.post(
-    `${BACKEND_URL}/api/test/seed?testRunId=open-platform-ui-20260914`,
-    { timeout: 30_000 },
-  );
-  expect(seedResponse.ok()).toBeTruthy();
-  const seed = await seedResponse.json();
-  expect(seed.jwt).toEqual(expect.any(String));
+  // Exercise the production authentication contract. TestSeedController lives in
+  // src/test and is intentionally absent from the real bootJar.
+  const loginResponse = await page.request.post(`${BACKEND_URL}/api/auth/login`, {
+    data: { email: 'admin@auraboot.com', password: 'Test2026x' },
+  });
+  expect(loginResponse.ok(), `login status ${loginResponse.status()}`).toBeTruthy();
+  const login = (await loginResponse.json()).data;
+  let jwt = login.jwt as string;
+  if (!login.tenantId) {
+    const spacesResponse = await page.request.get(`${BACKEND_URL}/api/tenant-selection/my-spaces`, {
+      headers: { Authorization: `Bearer ${jwt}` },
+    });
+    expect(spacesResponse.ok()).toBeTruthy();
+    const spaces = (await spacesResponse.json()).data as Array<{ tenantId: string; spaceType: string }>;
+    const businessTenant = spaces.find((space) => space.spaceType === 'business');
+    expect(businessTenant).toBeTruthy();
+    const selection = await page.request.post(`${BACKEND_URL}/api/tenant-selection/process`, {
+      headers: { Authorization: `Bearer ${jwt}` },
+      data: { action: 'select', tenantId: businessTenant!.tenantId },
+    });
+    expect(selection.ok()).toBeTruthy();
+    jwt = (await selection.json()).data.jwt;
+  }
+  expect(jwt).toEqual(expect.any(String));
   const session = await sessionStorage.getSession();
-  session.set('jwtToken', seed.jwt);
+  session.set('jwtToken', jwt);
   const setCookie = await sessionStorage.commitSession(session, { maxAge: 604800 });
   const value = setCookie.match(/__session=([^;]+)/)?.[1];
   expect(value).toBeTruthy();
@@ -33,6 +50,7 @@ async function authenticate(page: import('@playwright/test').Page) {
     { name: 'locale', value: 'zh-CN', url: WEB_BASE_URL, sameSite: 'Lax' },
   ]);
   await page.addInitScript(() => localStorage.setItem('locale', 'zh-CN'));
+
 }
 
 async function capture(page: import('@playwright/test').Page, id: string, fullPage = true) {
@@ -85,6 +103,8 @@ test.describe('Open Platform golden journey', () => {
     await openAccountMenu(page);
     const menuEntry = page.getByTestId('open-platform-link');
     await expect(menuEntry).toBeVisible();
+    await expect(page.getByTestId('user-dropdown')).toContainText('退出登录');
+    await expect(page.getByTestId('user-dropdown')).not.toContainText('user.logout');
     await capture(page, 'OP-OPS-01');
     await menuEntry.click();
     await expect(page.getByTestId('open-platform-page')).toBeVisible();
@@ -516,16 +536,18 @@ test.describe('Open Platform golden journey', () => {
     const eventCatalog = operations.getByTestId('open-platform-event-catalog');
     const webhookHealth = operations.getByTestId('open-platform-webhook-health');
     await expect(eventCatalog).toContainText('inventory.stock-in.confirmed');
+    await expect(eventCatalog).toContainText('事件目录');
+    await expect(webhookHealth).toContainText('Webhook 兼容性与签名');
     await expect(webhookHealth.locator('[data-rotation-status="healthy"]')).toHaveCount(2);
     await expect(webhookHealth.locator('[data-rotation-status="due"]')).toHaveCount(1);
     await expect(webhookHealth.locator('[data-rotation-status="overdue"]')).toContainText(
-      'Rotate the signing secret now.',
+      '请立即轮换签名密钥。',
     );
     await expect(webhookHealth.locator('[data-rotation-status="missing"]')).toContainText(
-      'Add a signing secret before enabling delivery.',
+      '启用投递前请添加签名密钥。',
     );
     await expect(webhookHealth.locator('[data-compatible="false"]')).toContainText(
-      'Choose a supported event version.',
+      '请选择受支持的事件版本。',
     );
     await expect(operations).not.toContainText(
       /super-secret|https:\/\/.*hook|Bearer [A-Za-z0-9._-]+/,
@@ -856,6 +878,10 @@ test.describe('Open Platform golden journey', () => {
     await dismissToasts(page);
     await capture(page, 'OP-UI-02');
 
+    // APIRequestContext needs the project's synthetic same-origin Referer for writes.
+    // Chromium rejects that forced header on the real noreferrer popup; browser
+    // navigation must use its native referrer policy, as an ordinary user does.
+    await context.setExtraHTTPHeaders({});
     const popupPromise = context.waitForEvent('page');
     await page.getByRole('button', { name: /API 参考/ }).click();
     const apiReference = await popupPromise;
@@ -863,7 +889,7 @@ test.describe('Open Platform golden journey', () => {
     await expect(apiReference).toHaveURL(
       /swagger-ui\/index\.html\?urls\.primaryName=open-platform/,
     );
-    await apiReference.goto(`${BACKEND_URL}/swagger-ui/index.html?urls.primaryName=open-platform`);
+    expect(new URL(apiReference.url()).origin).toBe(new URL(WEB_BASE_URL).origin);
     await expect(apiReference.locator('.opblock').first()).toBeVisible({ timeout: 30_000 });
     await expect(apiReference.locator('body')).not.toContainText(
       /Whitelabel Error Page|404 Not Found|Loading page configuration/,
@@ -927,7 +953,13 @@ test.describe('Open Platform golden journey', () => {
     expect(overflow).toBeLessThanOrEqual(1);
     await capture(page, 'OP-OPS-16-top', false);
     await expect(operations).toContainText('open-platform-golden-whoami');
-    await operations.scrollIntoViewIfNeeded();
+    const mobileAudit = operations.getByTestId('open-platform-call-audit');
+    await mobileAudit.scrollIntoViewIfNeeded();
+    await expect(mobileAudit.locator('code').first()).toBeInViewport();
+    // Settle the resized scroll container before capturing its painted content.
+    await page.evaluate(() => new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    }));
     await capture(page, 'OP-OPS-16', false);
     await eventCatalog.scrollIntoViewIfNeeded();
     await captureLocator(eventCatalog, 'OP-PROTO-10');

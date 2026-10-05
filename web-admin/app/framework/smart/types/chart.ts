@@ -11,8 +11,8 @@
 export interface MetricConfig {
   /** Field name to aggregate */
   field: string;
-  /** Aggregation function */
-  aggregation: 'count' | 'count_distinct' | 'sum' | 'avg' | 'max' | 'min';
+  /** Raw aggregation, or the governed metric's semantic-only placeholder. */
+  aggregation: 'count' | 'count_distinct' | 'sum' | 'avg' | 'max' | 'min' | 'none';
   /** Optional alias for the result column */
   alias?: string;
 }

@@ -133,4 +133,26 @@ class DynamicDataServiceImplExportFailSecureTest {
                 .isInstanceOf(MetaServiceException.class)
                 .hasMessageContaining("Configurable field masking failed for export");
     }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void ordinaryExportOmitsInternalColumnsButExplicitAuthorizedAuditExportRemainsAvailable(boolean explicitAudit) throws Exception {
+        var model = metadataService.getModelDefinition(MODEL_CODE).orElseThrow();
+        model.setFields(List.of(model.getFields().getFirst(),
+                FieldDefinition.builder().code("pid").columnName("pid").displayName("Record identifier").build(),
+                FieldDefinition.builder().code("created_by").columnName("created_by").displayName("Creator").build()));
+        when(fieldMaskService.applyMaskingForExport(eq(MODEL_CODE), anyList(), anyLong()))
+                .thenAnswer(invocation -> invocation.getArgument(1));
+        when(fieldPermissionService.getFieldPermissions(anyLong(), eq(MODEL_CODE)))
+                .thenReturn(com.auraboot.framework.permission.engine.model.FieldPermissionSet.allAllowed(
+                        java.util.Set.of("crm_ct_mobile", "pid", "created_by")));
+        var request = DataExportRequest.builder().format(DataExportRequest.ExportFormat.CSV)
+                .fields(explicitAudit ? List.of("crm_ct_mobile", "pid", "created_by") : null).build();
+        var result = service.exportData(MODEL_CODE, request);
+        org.assertj.core.api.Assertions.assertThat(result.getSuccess()).as(result.getErrorMessage()).isTrue();
+        String csv = java.nio.file.Files.readString(java.nio.file.Path.of(result.getFilePath()));
+        org.assertj.core.api.Assertions.assertThat(csv).contains("Mobile", "13812345678");
+        if (explicitAudit) org.assertj.core.api.Assertions.assertThat(csv).contains("Record identifier", "Creator");
+        else org.assertj.core.api.Assertions.assertThat(csv).doesNotContain("Record identifier", "Creator");
+    }
 }

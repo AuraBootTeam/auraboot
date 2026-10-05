@@ -64,7 +64,7 @@ public class ToolbarActionValidator implements PluginValidator {
         // Build set of page keys defined in this plugin for cross-reference validation
         Set<String> pluginPageKeys = manifest.getPages() != null
                 ? manifest.getPages().stream()
-                        .filter(p -> p.getPageKey() != null)
+                        .filter(p -> p != null && p.getPageKey() != null)
                         .map(PageSchemaDTO::getPageKey)
                         .collect(Collectors.toSet())
                 : Set.of();
@@ -91,7 +91,7 @@ public class ToolbarActionValidator implements PluginValidator {
         if (manifest.getCommands() == null) return index;
 
         for (CommandDefinitionDTO cmd : manifest.getCommands()) {
-            if (cmd.getCode() == null) continue;
+            if (cmd == null || cmd.getCode() == null) continue;
             String effectiveType = resolveCommandType(cmd);
             if (effectiveType != null) {
                 index.put(cmd.getCode(), effectiveType.toLowerCase());

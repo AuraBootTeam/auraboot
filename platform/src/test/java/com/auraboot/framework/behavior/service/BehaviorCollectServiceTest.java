@@ -41,6 +41,7 @@ class BehaviorCollectServiceTest {
     private BehaviorEventInput event(String id) {
         BehaviorEventInput in = new BehaviorEventInput();
         in.setEventId(id);
+        in.setSchemaVersion("1");
         in.setEventName("page_view");
         in.setAnonId("anon-123");
         return in;

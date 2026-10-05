@@ -56,6 +56,28 @@ public class TableMetadataService {
         }
     }
 
+    /** Inspects the PostgreSQL default without requesting table ownership or DDL. */
+    public boolean hasPostgresIntegerDefaultOne(String tableName, String columnName) {
+        String sql = "SELECT pg_get_expr(d.adbin, d.adrelid) FROM pg_attrdef d "
+                + "JOIN pg_attribute a ON a.attrelid = d.adrelid AND a.attnum = d.adnum "
+                + "WHERE d.adrelid = to_regclass(?) AND a.attname = ?";
+        Connection connection = org.springframework.jdbc.datasource.DataSourceUtils.getConnection(dataSource);
+        try (var statement = connection.prepareStatement(sql)) {
+            statement.setString(1, tableName);
+            statement.setString(2, columnName);
+            try (var result = statement.executeQuery()) {
+                if (!result.next()) return false;
+                String expression = result.getString(1);
+                return expression != null && expression.trim()
+                        .matches("(?:1|'1')(?:::(?:integer|bigint|smallint))?");
+            }
+        } catch (java.sql.SQLException e) {
+            throw new IllegalStateException("Failed to inspect column default: " + tableName + "." + columnName, e);
+        } finally {
+            org.springframework.jdbc.datasource.DataSourceUtils.releaseConnection(connection, dataSource);
+        }
+    }
+
     /** Only recognizes PostgreSQL's untruncated, generated single-column UNIQUE constraint. */
     public boolean hasGeneratedSingleColumnUniqueConstraint(String tableName, String columnName) {
         String constraintName = tableName + "_" + columnName + "_key";

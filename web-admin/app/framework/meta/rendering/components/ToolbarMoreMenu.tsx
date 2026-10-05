@@ -33,6 +33,7 @@ export const ToolbarMoreMenu: React.FC<ToolbarMoreMenuProps> = ({
   const [exporting, setExporting] = useState(false);
   const [reportTemplates, setReportTemplates] = useState<ReportTemplateDTO[]>([]);
   const [loadingReports, setLoadingReports] = useState(false);
+  const [reportError, setReportError] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const { showErrorToast, showSuccessToast } = useToastContext();
@@ -77,36 +78,41 @@ export const ToolbarMoreMenu: React.FC<ToolbarMoreMenuProps> = ({
         document.body.removeChild(link);
       } catch (err) {
         console.error('Export failed:', err);
-        showErrorToast(err instanceof Error ? err.message : 'Export failed');
+        showErrorToast(t('toolbar_more.export_failed'));
       } finally {
         setExporting(false);
       }
     },
-    [modelCode, filters, showErrorToast],
+    [modelCode, filters, showErrorToast, t],
   );
 
   // Load report templates when menu opens
   useEffect(() => {
-    if (!open || reportTemplates.length > 0) return;
+    if (!open) return;
     let cancelled = false;
     setLoadingReports(true);
+    setReportError(false);
+    setReportTemplates([]);
     reportTemplateService
       .getPublished()
       .then((resp) => {
         if (cancelled) return;
-        if (ResultHelper.isSuccess(resp) && resp.data) {
-          const filtered = resp.data.filter((tpl) => !tpl.category || tpl.category === modelCode);
-          setReportTemplates(filtered);
+        if (!ResultHelper.isSuccess(resp) || !Array.isArray(resp.data)) {
+          throw new Error('Invalid report template response');
         }
+        const filtered = resp.data.filter((tpl) => !tpl.category || tpl.category === modelCode);
+        setReportTemplates(filtered);
       })
-      .catch(() => {})
+      .catch(() => {
+        if (!cancelled) setReportError(true);
+      })
       .finally(() => {
         if (!cancelled) setLoadingReports(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [open, modelCode, reportTemplates.length]);
+  }, [open, modelCode]);
 
   const handleGenerateReport = useCallback(
     async (template: ReportTemplateDTO) => {
@@ -125,17 +131,17 @@ export const ToolbarMoreMenu: React.FC<ToolbarMoreMenuProps> = ({
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        showSuccessToast(`Report generated: ${template.name}`);
+        showSuccessToast(t('toolbar_more.report_generated', { name: template.name }));
       } catch (err) {
-        showErrorToast(err instanceof Error ? err.message : 'Report generation failed');
+        showErrorToast(t('toolbar_more.report_failed'));
       } finally {
         setGeneratingReport(false);
       }
     },
-    [filters, showSuccessToast, showErrorToast],
+    [filters, showSuccessToast, showErrorToast, t],
   );
 
-  const printLabel = t('action.print') || 'Print';
+  const printLabel = t('toolbar_more.print');
 
   return (
     <div ref={menuRef} className="relative inline-block">
@@ -150,7 +156,9 @@ export const ToolbarMoreMenu: React.FC<ToolbarMoreMenuProps> = ({
           'disabled:cursor-not-allowed disabled:opacity-50',
           'transition-colors duration-150',
         )}
-        title={t('action.more') || 'More actions'}
+        title={t('toolbar_more.more')}
+        aria-label={t('toolbar_more.more')}
+        aria-expanded={open}
       >
         {exporting || generatingReport ? (
           <span className="rounded-pill border-border-strong h-4 w-4 animate-spin border-2 border-t-blue-500" />
@@ -214,7 +222,7 @@ export const ToolbarMoreMenu: React.FC<ToolbarMoreMenuProps> = ({
                 d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
               />
             </svg>
-            Import
+            {t('toolbar_more.import')}
           </button>
 
           {/* Export Excel */}
@@ -237,7 +245,7 @@ export const ToolbarMoreMenu: React.FC<ToolbarMoreMenuProps> = ({
                 d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
               />
             </svg>
-            Export Excel
+            {t('toolbar_more.export_excel')}
           </button>
 
           {/* Export CSV */}
@@ -260,55 +268,63 @@ export const ToolbarMoreMenu: React.FC<ToolbarMoreMenuProps> = ({
                 d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
               />
             </svg>
-            Export CSV
+            {t('toolbar_more.export_csv')}
           </button>
 
           {/* Report Templates */}
-          {(loadingReports || reportTemplates.length > 0) && (
-            <>
-              <div className="mx-2 my-1 h-px bg-gray-100" />
-              {loadingReports ? (
-                <div className="text-text-3 px-3 py-2 text-center text-xs">Loading reports...</div>
-              ) : (
-                reportTemplates.map((tpl) => (
-                  <button
-                    key={tpl.pid}
-                    type="button"
-                    data-testid={`more-menu-report-${tpl.code}`}
-                    onClick={() => handleGenerateReport(tpl)}
-                    className="text-text-2 hover:bg-subtle flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm"
+          <>
+            <div className="mx-2 my-1 h-px bg-gray-100" />
+            {loadingReports ? (
+              <div role="status" className="text-text-3 px-3 py-2 text-center text-xs">
+                {t('toolbar_more.loading_reports')}
+              </div>
+            ) : reportError ? (
+              <div role="alert" className="text-status-red px-3 py-2 text-sm">
+                {t('toolbar_more.load_failed')}
+              </div>
+            ) : reportTemplates.length === 0 ? (
+              <div className="text-text-3 px-3 py-2 text-center text-xs">
+                {t('toolbar_more.no_reports')}
+              </div>
+            ) : (
+              reportTemplates.map((tpl) => (
+                <button
+                  key={tpl.pid}
+                  type="button"
+                  data-testid={`more-menu-report-${tpl.code}`}
+                  onClick={() => handleGenerateReport(tpl)}
+                  className="text-text-2 hover:bg-subtle flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm"
+                >
+                  <svg
+                    className="text-text-3 h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
                   >
-                    <svg
-                      className="text-text-3 h-4 w-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                      />
-                    </svg>
-                    <span className="truncate">{tpl.name}</span>
-                    <span
-                      className={cn(
-                        'ml-auto inline-flex shrink-0 items-center rounded px-1 py-0.5 text-[10px] font-medium',
-                        tpl.outputFormat === 'pdf'
-                          ? 'bg-red-50 text-red-600'
-                          : tpl.outputFormat === 'xlsx'
-                            ? 'bg-green-50 text-green-600'
-                            : 'bg-blue-50 text-blue-600',
-                      )}
-                    >
-                      {tpl.outputFormat}
-                    </span>
-                  </button>
-                ))
-              )}
-            </>
-          )}
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                  <span className="truncate">{tpl.name}</span>
+                  <span
+                    className={cn(
+                      'ml-auto inline-flex shrink-0 items-center rounded px-1 py-0.5 text-[10px] font-medium',
+                      tpl.outputFormat === 'pdf'
+                        ? 'bg-red-50 text-red-600'
+                        : tpl.outputFormat === 'xlsx'
+                          ? 'bg-green-50 text-green-600'
+                          : 'bg-blue-50 text-blue-600',
+                    )}
+                  >
+                    {tpl.outputFormat}
+                  </span>
+                </button>
+              ))
+            )}
+          </>
         </div>
       )}
     </div>

@@ -55,6 +55,7 @@ public abstract class PageSchemaConverter {
     @Mapping(target = "modelCategory", ignore = true) // enriched at query time
     @Mapping(target = "extension", source = "extension", qualifiedByName = "extensionBeanToMap")
     @Mapping(target = "dataSources", ignore = true)
+    @Mapping(target = "linkageRules", ignore = true)
     @Mapping(target = "mobileUx", ignore = true)
     @Mapping(target = "runtime", ignore = true)
     @Mapping(target = "deletedFlag", source = "deletedFlag")
@@ -72,6 +73,10 @@ public abstract class PageSchemaConverter {
             @SuppressWarnings("unchecked")
             Map<String, Object> typed = (Map<String, Object>) map;
             dto.setDataSources(typed);
+        }
+        Object linkageRules = dto.getExtension().get("linkageRules");
+        if (linkageRules instanceof List<?> rules && dto.getLinkageRules() == null) {
+            dto.setLinkageRules(new java.util.ArrayList<>(rules));
         }
         if (dto.getMobileUx() != null) {
             return;
@@ -120,7 +125,8 @@ public abstract class PageSchemaConverter {
     @AfterMapping
     protected void mergeCreateTopLevelExtensionFields(PageSchemaCreateRequest request,
                                                       @MappingTarget PageSchema entity) {
-        if (request == null || request.getDataSources() == null) {
+        if (request == null
+                || (request.getDataSources() == null && request.getLinkageRules() == null)) {
             return;
         }
         Map<String, Object> extension = extensionBeanToMap(entity.getExtension());
@@ -129,7 +135,12 @@ public abstract class PageSchemaConverter {
         } else {
             extension = new HashMap<>(extension);
         }
-        extension.put("dataSources", request.getDataSources());
+        if (request.getDataSources() != null) {
+            extension.put("dataSources", request.getDataSources());
+        }
+        if (request.getLinkageRules() != null) {
+            extension.put("linkageRules", request.getLinkageRules());
+        }
         entity.setExtension(extensionConverter.toBean(extension));
     }
 
@@ -171,7 +182,8 @@ public abstract class PageSchemaConverter {
     @AfterMapping
     protected void mergeUpdateTopLevelExtensionFields(PageSchemaUpdateRequest request,
                                                       @MappingTarget PageSchema entity) {
-        if (request == null || request.getDataSources() == null) {
+        if (request == null
+                || (request.getDataSources() == null && request.getLinkageRules() == null)) {
             return;
         }
         Map<String, Object> extension = extensionBeanToMap(entity.getExtension());
@@ -180,7 +192,12 @@ public abstract class PageSchemaConverter {
         } else {
             extension = new HashMap<>(extension);
         }
-        extension.put("dataSources", request.getDataSources());
+        if (request.getDataSources() != null) {
+            extension.put("dataSources", request.getDataSources());
+        }
+        if (request.getLinkageRules() != null) {
+            extension.put("linkageRules", request.getLinkageRules());
+        }
         entity.setExtension(extensionConverter.toBean(extension));
     }
 

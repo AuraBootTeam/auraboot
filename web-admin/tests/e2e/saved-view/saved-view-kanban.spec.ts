@@ -12,11 +12,14 @@ import { ModelTestHelper } from '../../helpers/model-test-helper';
 import { E2ET_ORDER_CONFIG } from '../../helpers/configs/e2et-order.config';
 import { uniqueId, todayStr, navigateToDynamicPage, selectSavedViewByName } from '../helpers';
 
-import { acquireSavedViewLock, releaseSavedViewLock } from './_saved-view-lock';
+import { acquireSavedViewLock, releaseSavedViewLock, SAVED_VIEW_LOCK_HOOK_TIMEOUT_MS } from './_saved-view-lock';
 
 // Serialize e2et_order saved-view specs — they share the model's per-user view
 // state (active view / created views) under the shared admin storageState.
-test.beforeAll(async () => { await acquireSavedViewLock('saved-view-kanban'); });
+test.beforeAll(async () => {
+  test.setTimeout(SAVED_VIEW_LOCK_HOOK_TIMEOUT_MS);
+  await acquireSavedViewLock('saved-view-kanban');
+});
 test.afterAll(() => { releaseSavedViewLock('saved-view-kanban'); });
 
 const VIEW_NAME = 'E2E Kanban Board';

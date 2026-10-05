@@ -2471,6 +2471,13 @@
     "refType": "ui"
   },
   {
+    "key": "expression.fieldGroup.bpmContext",
+    "zh-CN": "BPM 上下文",
+    "en-US": "BPM context",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
     "key": "expression.fieldGroup.decisionRuntime",
     "zh-CN": "规则执行",
     "en-US": "Decision runtime",
@@ -5136,5 +5143,859 @@
     "en-US": "Backup",
     "source": "import",
     "refType": "label"
+  },
+  {
+    "key": "auth.appearance.invalidConfig",
+    "zh-CN": "配置尚不完整。请检查默认语言文案、图片地址和背景模板所需图片。",
+    "en-US": "Configuration is incomplete. Check default-language copy, image URLs, and the background image required by the background template.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.loading",
+    "zh-CN": "正在读取外观配置…",
+    "en-US": "Loading appearance…",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.reload",
+    "zh-CN": "重新加载",
+    "en-US": "Reload",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.title",
+    "zh-CN": "品牌与登录外观",
+    "en-US": "Brand and authentication appearance",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.deploymentScope",
+    "zh-CN": "此配置影响整个部署的认证页面。登录方式由登录渠道管理维护。",
+    "en-US": "These settings affect authentication across this deployment. Login channels are managed separately.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.save",
+    "zh-CN": "保存草稿",
+    "en-US": "Save draft",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.publish",
+    "zh-CN": "发布",
+    "en-US": "Publish",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.publishedVersion",
+    "zh-CN": "线上版本",
+    "en-US": "Published version",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.unsaved",
+    "zh-CN": "有未保存修改",
+    "en-US": "Unsaved changes",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.savedState",
+    "zh-CN": "草稿已同步",
+    "en-US": "Draft synchronized",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.style",
+    "zh-CN": "模板与风格",
+    "en-US": "Template and style",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.template",
+    "zh-CN": "布局模板",
+    "en-US": "Layout template",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.split",
+    "zh-CN": "品牌分栏",
+    "en-US": "Brand split",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.centered",
+    "zh-CN": "简洁居中",
+    "en-US": "Centered",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.background",
+    "zh-CN": "场景背景",
+    "en-US": "Scene background",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.defaultLanguage",
+    "zh-CN": "默认语言",
+    "en-US": "Default language",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.accent",
+    "zh-CN": "品牌色",
+    "en-US": "Brand color",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.backgroundColor",
+    "zh-CN": "背景色",
+    "en-US": "Background color",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.radius",
+    "zh-CN": "圆角",
+    "en-US": "Corners",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.square",
+    "zh-CN": "小圆角",
+    "en-US": "Compact",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.soft",
+    "zh-CN": "柔和",
+    "en-US": "Soft",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.rounded",
+    "zh-CN": "圆润",
+    "en-US": "Rounded",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.themeMode",
+    "zh-CN": "认证页主题",
+    "en-US": "Authentication theme",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.auto",
+    "zh-CN": "跟随用户主题",
+    "en-US": "Follow user theme",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.light",
+    "zh-CN": "浅色",
+    "en-US": "Light",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.dark",
+    "zh-CN": "深色",
+    "en-US": "Dark",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.brandPosition",
+    "zh-CN": "品牌区位置",
+    "en-US": "Brand position",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.left",
+    "zh-CN": "左侧",
+    "en-US": "Left",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.right",
+    "zh-CN": "右侧",
+    "en-US": "Right",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.cardPosition",
+    "zh-CN": "背景模板卡片位置",
+    "en-US": "Background card position",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.copy",
+    "zh-CN": "品牌与登录文案",
+    "en-US": "Brand and login copy",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.mode",
+    "zh-CN": "展示方式",
+    "en-US": "display mode",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.default",
+    "zh-CN": "使用默认",
+    "en-US": "Use default",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.custom",
+    "zh-CN": "自定义",
+    "en-US": "Custom",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.hidden",
+    "zh-CN": "隐藏",
+    "en-US": "Hidden",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.featureHint",
+    "zh-CN": "每行一条卖点，建议 1–3 条",
+    "en-US": "One feature per line; 1–3 recommended",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.copyHint",
+    "zh-CN": "填写面向用户的简短文案",
+    "en-US": "Enter concise copy for users",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.images",
+    "zh-CN": "图片与帮助",
+    "en-US": "Images and help",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.imageMode",
+    "zh-CN": "图片用途",
+    "en-US": "Image mode",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.none",
+    "zh-CN": "无图片",
+    "en-US": "No image",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.illustration",
+    "zh-CN": "品牌插图",
+    "en-US": "Illustration",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.backgroundImage",
+    "zh-CN": "场景背景",
+    "en-US": "Background",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.anonymousAsset",
+    "zh-CN": "使用无需登录即可访问的图片地址。",
+    "en-US": "Use an image URL accessible without signing in.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.overlay",
+    "zh-CN": "背景遮罩",
+    "en-US": "Background overlay",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.helpUrl",
+    "zh-CN": "帮助链接",
+    "en-US": "Help link",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.device",
+    "zh-CN": "预览设备",
+    "en-US": "Preview device",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.desktop",
+    "zh-CN": "桌面",
+    "en-US": "Desktop",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.mobile",
+    "zh-CN": "手机",
+    "en-US": "Mobile",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.previewTheme",
+    "zh-CN": "预览主题",
+    "en-US": "Preview theme",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.previewPage",
+    "zh-CN": "预览页面",
+    "en-US": "Preview page",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.login",
+    "zh-CN": "登录",
+    "en-US": "Login",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.signup",
+    "zh-CN": "注册",
+    "en-US": "Registration",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.recovery",
+    "zh-CN": "恢复帮助",
+    "en-US": "Recovery help",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.previewNote",
+    "zh-CN": "预览用于查看外观，表单不可提交；登录方式以认证策略为准。",
+    "en-US": "Preview shows appearance only. Forms cannot submit; authentication policy controls login methods.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.preview",
+    "zh-CN": "认证页预览",
+    "en-US": "Authentication preview",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.previewLoginTitle",
+    "zh-CN": "欢迎回来",
+    "en-US": "Welcome back",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.signupTitle",
+    "zh-CN": "创建账号",
+    "en-US": "Create an account",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.resetUnavailable",
+    "zh-CN": "暂不支持自助重置密码",
+    "en-US": "Password reset unavailable",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.resetHelp",
+    "zh-CN": "请联系管理员设置或重置密码。",
+    "en-US": "Contact your tenant administrator to set or reset your password.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.previewLead",
+    "zh-CN": "登录以继续使用工作台",
+    "en-US": "Sign in to continue to your workspace",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.account",
+    "zh-CN": "账号或邮箱",
+    "en-US": "Account or email",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.password",
+    "zh-CN": "密码",
+    "en-US": "Password",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.history",
+    "zh-CN": "发布历史",
+    "en-US": "Release history",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.rollbackHint",
+    "zh-CN": "回滚会恢复该版本外观，并替换当前草稿。",
+    "en-US": "Rollback restores the release and replaces the current draft.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.rollbackTarget",
+    "zh-CN": "回滚目标",
+    "en-US": "Rollback target",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.selectRelease",
+    "zh-CN": "选择历史版本",
+    "en-US": "Select a release",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.rollback",
+    "zh-CN": "回滚",
+    "en-US": "Roll back",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.confirmRelease",
+    "zh-CN": "确认外观发布",
+    "en-US": "Confirm appearance release",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.publishConfirm",
+    "zh-CN": "发布后，整个部署的认证页面将使用当前草稿。",
+    "en-US": "Publishing applies the current draft to authentication across this deployment.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.rollbackConfirm",
+    "zh-CN": "将恢复所选历史版本并替换当前草稿。",
+    "en-US": "Restore the selected release and replace the current draft?",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.confirm",
+    "zh-CN": "确认",
+    "en-US": "Confirm",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.cancel",
+    "zh-CN": "取消",
+    "en-US": "Cancel",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.saved",
+    "zh-CN": "草稿已保存，线上页面未改变。",
+    "en-US": "Draft saved. The live appearance has not changed.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.released",
+    "zh-CN": "已发布。新打开的认证页面将使用此版本。",
+    "en-US": "Published. Newly opened authentication pages will use this version.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.signupLead",
+    "zh-CN": "注册以开始使用 {productName}",
+    "en-US": "Sign up to start using {productName}",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.backToLogin",
+    "zh-CN": "返回登录",
+    "en-US": "Back to Login",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.help",
+    "zh-CN": "获取帮助",
+    "en-US": "Get help",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.draftRequired",
+    "zh-CN": "请先保存外观草稿。",
+    "en-US": "Save an appearance draft first.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.releaseNotFound",
+    "zh-CN": "所选发布版本不存在。",
+    "en-US": "The selected release does not exist.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.commercialRequired",
+    "zh-CN": "请先启用此部署的商业品牌配置。",
+    "en-US": "Enable commercial deployment branding first.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.versionConflict",
+    "zh-CN": "外观配置已由其他管理员更新，请重新加载后再提交。",
+    "en-US": "Another administrator updated the appearance. Reload before submitting.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.badge",
+    "zh-CN": "品牌标签",
+    "en-US": "Badge",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.headline",
+    "zh-CN": "主标题",
+    "en-US": "Headline",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.headlineEm",
+    "zh-CN": "强调文字",
+    "en-US": "Highlighted text",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.lead",
+    "zh-CN": "品牌介绍",
+    "en-US": "Introduction",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.features",
+    "zh-CN": "卖点",
+    "en-US": "Features",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.loginTitle",
+    "zh-CN": "登录标题",
+    "en-US": "Login title",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.loginLead",
+    "zh-CN": "登录说明",
+    "en-US": "Login description",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.mobileLead",
+    "zh-CN": "手机简短介绍",
+    "en-US": "Mobile introduction",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.logoUrl",
+    "zh-CN": "Logo",
+    "en-US": "Logo",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.darkLogoUrl",
+    "zh-CN": "深色 Logo",
+    "en-US": "Dark logo",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.heroUrl",
+    "zh-CN": "插图",
+    "en-US": "Illustration",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.darkHeroUrl",
+    "zh-CN": "深色插图",
+    "en-US": "Dark illustration",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.backgroundUrl",
+    "zh-CN": "背景图片",
+    "en-US": "Background image",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.darkBackgroundUrl",
+    "zh-CN": "深色背景图片",
+    "en-US": "Dark background image",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.focusX",
+    "zh-CN": "桌面水平焦点",
+    "en-US": "Desktop horizontal focus",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.focusY",
+    "zh-CN": "桌面垂直焦点",
+    "en-US": "Desktop vertical focus",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.mobileFocusX",
+    "zh-CN": "手机水平焦点",
+    "en-US": "Mobile horizontal focus",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.mobileFocusY",
+    "zh-CN": "手机垂直焦点",
+    "en-US": "Mobile vertical focus",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.center",
+    "zh-CN": "居中",
+    "en-US": "Center",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.upload",
+    "zh-CN": "上传图片",
+    "en-US": "Upload image",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.uploadHint",
+    "zh-CN": "上传 PNG、JPEG 或 WebP，最大 5 MB。",
+    "en-US": "Upload PNG, JPEG, or WebP, up to 5 MB.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.uploadFailed",
+    "zh-CN": "图片上传失败。",
+    "en-US": "Image upload failed.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.discardConfirm",
+    "zh-CN": "重新加载会丢弃未保存修改。",
+    "en-US": "Reloading discards unsaved changes.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.assetSize",
+    "zh-CN": "图片不能为空，且不得超过 5 MB。",
+    "en-US": "Image must be nonempty and no larger than 5 MB.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.assetType",
+    "zh-CN": "仅支持 PNG、JPEG 和 WebP 图片。",
+    "en-US": "Only PNG, JPEG, and WebP images are supported.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.assetStorageRequired",
+    "zh-CN": "图片存储尚未配置，请联系部署管理员。",
+    "en-US": "Image storage is not configured. Contact the deployment administrator.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.assetMissing",
+    "zh-CN": "已上传图片不存在，请重新上传后发布。",
+    "en-US": "An uploaded image is missing. Upload it again before publishing.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "auth.appearance.initialDraft",
+    "zh-CN": "草稿尚未保存",
+    "en-US": "Draft has not been saved",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "admin.permission.accessDenied.title",
+    "zh-CN": "无权限访问",
+    "en-US": "Access denied",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "admin.permission.accessDenied.message",
+    "zh-CN": "当前账号无权查看角色与权限，请联系管理员。",
+    "en-US": "Your account cannot view roles and permissions. Contact an administrator.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "admin.permission.loadFailed",
+    "zh-CN": "角色加载失败，请稍后重试。",
+    "en-US": "Roles could not be loaded. Please try again later.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "dashboard.favorites.only",
+    "zh-CN": "仅显示收藏",
+    "en-US": "Favorites only",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "dashboard.favorites.all",
+    "zh-CN": "全部",
+    "en-US": "All",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "dashboard.favorites.add",
+    "zh-CN": "添加收藏",
+    "en-US": "Add to favorites",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "dashboard.favorites.remove",
+    "zh-CN": "取消收藏",
+    "en-US": "Remove from favorites",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "workbench.inbox.sourceWorkflow",
+    "zh-CN": "工作流",
+    "en-US": "Workflow",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "workbench.inbox.sourceCommand",
+    "zh-CN": "业务操作",
+    "en-US": "Business action",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "workbench.inbox.sourceChat",
+    "zh-CN": "消息",
+    "en-US": "Messages",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "workbench.inbox.sourceAi",
+    "zh-CN": "智能助手",
+    "en-US": "AI assistant",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "workbench.inbox.sourceNotification",
+    "zh-CN": "通知",
+    "en-US": "Notifications",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "workbench.inbox.sourceOther",
+    "zh-CN": "其他来源",
+    "en-US": "Other source",
+    "source": "import",
+    "refType": "ui"
   }
 ]

@@ -34,6 +34,7 @@ export class SearchService {
     results: [],
     loading: false,
     error: null,
+    errorKey: null,
     selectedId: null,
     history: [],
   };
@@ -136,12 +137,7 @@ export class SearchService {
     const entries: SearchIndexEntry[] = [];
 
     for (const indexer of indexers) {
-      try {
-        const indexerEntries = indexer();
-        entries.push(...indexerEntries);
-      } catch (error) {
-        console.error('Search indexer error:', error);
-      }
+      entries.push(...indexer());
     }
 
     return entries;
@@ -267,7 +263,7 @@ export class SearchService {
 
     // Empty query
     if (!query.trim()) {
-      this.updateState({ query: '', results: [], loading: false });
+      this.updateState({ query: '', results: [], loading: false, error: null, errorKey: null, selectedId: null });
       return [];
     }
 
@@ -275,12 +271,12 @@ export class SearchService {
     const cacheKey = JSON.stringify({ query, scope, caseSensitive, fuzzy });
     const cached = this.cache.get(cacheKey);
     if (cached) {
-      this.updateState({ query, results: cached, loading: false });
+      this.updateState({ query, results: cached, loading: false, error: null, errorKey: null, selectedId: null });
       return cached;
     }
 
     // Start search
-    this.updateState({ query, loading: true, error: null });
+    this.updateState({ query, loading: true, error: null, errorKey: null, selectedId: null });
 
     try {
       // Build index
@@ -324,8 +320,14 @@ export class SearchService {
 
       return results;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '搜索失败';
-      this.updateState({ error: errorMessage, loading: false });
+      const hasMessage = error instanceof Error && Boolean(error.message.trim());
+      this.updateState({
+        error: hasMessage ? error.message : 'Search failed',
+        errorKey: hasMessage ? null : 'designer_search.failed',
+        loading: false,
+        results: [],
+        selectedId: null,
+      });
       return [];
     }
   }
@@ -371,6 +373,7 @@ export class SearchService {
       results: [],
       loading: false,
       error: null,
+      errorKey: null,
       selectedId: null,
     });
   }

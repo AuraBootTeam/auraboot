@@ -51,3 +51,41 @@ describe('AsyncTaskModalHost minimize → chip', () => {
     expect(screen.getByText('同步物料')).toBeTruthy();
   });
 });
+
+function TerminalDriver({ status }: { status: string }) {
+  const sink = useAsyncTaskModalSink()!;
+  const task = {
+    status: 'running',
+    locale: 'en-US',
+    progress: 30,
+    presentation: { title: { 'en-US': 'Sync' } },
+  };
+  return (
+    <>
+      <button onClick={() => sink.setActiveTask(task)}>activate</button>
+      <button onClick={() => sink.setActiveTask({ ...task, status })}>finish</button>
+    </>
+  );
+}
+describe('Localized terminal chips', () => {
+  it.each([
+    ['completed', 'Sync completed', 'bg-green-500'],
+    ['failed', 'Sync failed', 'bg-red-500'],
+    ['cancelled', 'Sync cancelled', 'bg-gray-500'],
+  ])('%s retains its status when minimized', (status, label, tone) => {
+    render(
+      <AsyncTaskModalProvider>
+        <TerminalDriver status={status} />
+        <AsyncTaskModalHost />
+      </AsyncTaskModalProvider>,
+    );
+    fireEvent.click(screen.getByText('activate'));
+    fireEvent.click(screen.getByRole('button', { name: 'Run in background' }));
+    fireEvent.click(screen.getByText('finish'));
+    const chip = screen.getByTestId('async-task-chip');
+    expect(chip.textContent).toBe(label);
+    expect(chip.querySelector('span')?.classList.contains(tone)).toBe(true);
+    fireEvent.click(chip);
+    expect(screen.getByText('Close', { selector: 'button' })).toBeTruthy();
+  });
+});

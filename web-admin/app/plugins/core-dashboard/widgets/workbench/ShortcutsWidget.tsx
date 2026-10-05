@@ -106,7 +106,7 @@ export function ShortcutsWidget({
       .filter((item) => item.path && item.path.startsWith('/p/'))
       .filter((item) => !item.submenu?.length)
       .map((item) => ({
-        label: item.nameKey ? t(item.nameKey) : item.name || item.path || '',
+        label: item.nameKey ? t(item.nameKey, undefined, item.name || item.path || '') : item.name || item.path || '',
         icon: item.icon || '\uD83D\uDCC4',
         path: item.path as string,
         color: 'bg-gray-50',

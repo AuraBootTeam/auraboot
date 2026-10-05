@@ -1,6 +1,8 @@
 package com.auraboot.framework.auth.service.impl;
 
 import com.auraboot.framework.auth.entity.UserSession;
+import com.auraboot.framework.audit.entity.AdminEventLog;
+import com.auraboot.framework.audit.service.AdminEventLogService;
 import com.auraboot.framework.auth.mapper.UserSessionMapper;
 import com.auraboot.framework.auth.util.JwtUtil;
 import com.auraboot.framework.exception.RootUnCheckedException;
@@ -40,6 +42,8 @@ class SessionManagementServiceImplTest {
     private UserSessionMapper userSessionMapper;
     @Mock
     private JwtUtil jwtUtil;
+    @Mock
+    private AdminEventLogService adminEventLogService;
 
     private SessionManagementServiceImpl service;
 
@@ -152,6 +156,41 @@ class SessionManagementServiceImplTest {
     }
 
     @Test
+    @DisplayName("expired impersonation session is invalid even before explicit revocation")
+    void expiredImpersonationSessionIsInvalid() {
+        UserSession expired = new UserSession();
+        expired.setRevoked(false);
+        expired.setSessionKind("impersonation");
+        expired.setImpersonationExpiresAt(Instant.now().minusSeconds(1));
+        when(userSessionMapper.findByTokenHash(any())).thenReturn(expired);
+
+        assertFalse(service.isSessionValid("expired"));
+    }
+
+    @Test
+    @DisplayName("createImpersonationSession persists dual identity and authorization metadata")
+    void createImpersonationSessionPersistsMetadata() {
+        ReflectionTestUtils.setField(service, "jwtUtil", jwtUtil);
+        Instant expiry = Instant.now().plusSeconds(1800);
+        when(jwtUtil.extractImpersonation("imp-token")).thenReturn(true);
+        when(jwtUtil.extractOperatorUserId("imp-token")).thenReturn(77L);
+        when(jwtUtil.extractExpiration("imp-token")).thenReturn(java.util.Date.from(expiry));
+        when(jwtUtil.extractClientType("imp-token")).thenReturn("web");
+        when(jwtUtil.extractSessionId("imp-token")).thenReturn("imp-session");
+
+        UserSession session = service.createImpersonationSession(
+                9L, "imp-token", "offline", "Customer called", "TICKET-1", null, "ua");
+
+        assertEquals("impersonation", session.getSessionKind());
+        assertEquals(77L, session.getInitiatedByUserId());
+        assertEquals(java.util.Date.from(expiry).toInstant(), session.getImpersonationExpiresAt());
+        assertEquals("offline", session.getImpersonationAuthorizationMethod());
+        assertEquals("Customer called", session.getImpersonationReason());
+        assertEquals("TICKET-1", session.getImpersonationReference());
+        assertEquals("web", session.getClientType());
+    }
+
+    @Test
     @DisplayName("revokeSession throws when no matching session")
     void revokeSessionNotFound() {
         when(userSessionMapper.findActiveByUserId(1L)).thenReturn(List.of());
@@ -230,4 +269,35 @@ class SessionManagementServiceImplTest {
         assertFalse(throttle.containsKey("old"));
         assertTrue(throttle.containsKey("fresh"));
     }
+
+    @Test
+    @DisplayName("expired impersonation sessions are revoked and audited once")
+    void expiredImpersonationSessionsAreRevokedAndAudited() {
+        UserSession expired = new UserSession();
+        expired.setId(8L);
+        expired.setPid("expired-session");
+        expired.setTenantId(12L);
+        expired.setInitiatedByUserId(77L);
+        when(userSessionMapper.findExpiredImpersonationSessions()).thenReturn(List.of(expired));
+        when(userSessionMapper.revokeExpiredSession(8L)).thenReturn(1);
+        ReflectionTestUtils.setField(service, "adminEventLogService", adminEventLogService);
+
+        service.expireImpersonationSessions();
+
+        verify(adminEventLogService).record(any(AdminEventLog.class));
+    }
+    @Test
+    @DisplayName("impersonation expiry explicitly scopes auth-plane reads and restores on failure")
+    void expiryScopesAuthPlaneAndRestoresOnFailure() {
+        assertFalse(com.auraboot.framework.application.tenant.MetaContext.isTenantFilterBypassed());
+        when(userSessionMapper.findExpiredImpersonationSessions()).thenAnswer(invocation -> {
+            assertTrue(com.auraboot.framework.application.tenant.MetaContext.isTenantFilterBypassed(),
+                    "Background auth-plane scan must declare its context-free scope");
+            throw new IllegalStateException("controlled expiry lookup failure");
+        });
+        assertThrows(IllegalStateException.class, service::expireImpersonationSessions);
+        assertFalse(com.auraboot.framework.application.tenant.MetaContext.isTenantFilterBypassed(),
+                "Scheduler scope must be restored even after a lookup failure");
+    }
+
 }

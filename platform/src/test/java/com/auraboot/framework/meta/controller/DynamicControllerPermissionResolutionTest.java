@@ -108,6 +108,28 @@ class DynamicControllerPermissionResolutionTest {
         assertThat(response.getData()).isEmpty();
     }
 
+    @Test
+    void getFieldMetaReadsBoundReleaseWithoutLookingUpLocalModelPid() {
+        MetaContext.setContext(42L, 100L, "U-100", "tester");
+        DynamicController controller = new DynamicController();
+        var catalog = org.mockito.Mockito.mock(com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.class);
+        setField(controller, "applicationRuntimeDefinitionCatalog", catalog);
+        setField(controller, "applicationRuntimePrimaryEnabled", true);
+        setField(controller, "defaultApplicationCode", "aura-edu");
+        setField(controller, "pageSchemaService", pageSchemaService);
+        setField(controller, "metaModelService", metaModelService);
+        setField(controller, "modelFieldBindingService", modelFieldBindingService);
+        when(metaModelService.getModelDefinition("xy_classroom")).thenReturn(Optional.empty());
+        var field = com.auraboot.framework.meta.dto.MetaFieldDTO.builder().code("xy_cls_name")
+                .extension(Map.of("displayName", "正式班级名称")).build();
+        when(catalog.findFieldMetadata(42L, "aura-edu", "xy_classroom")).thenReturn(Optional.of(List.of(field)));
+        var response = controller.getFieldMeta("xy_classroom");
+        assertThat(response.isSuccess()).isTrue();
+        assertThat(response.getData()).containsExactly(field);
+        verify(metaModelService, never()).findByCode("xy_classroom");
+        org.mockito.Mockito.verifyNoInteractions(modelFieldBindingService);
+    }
+
     private static PageSchemaDTO apiBackedDecisionDefinitionPage() {
         PageSchemaDTO page = new PageSchemaDTO();
         page.setPageKey("decisionops_definitions_list");

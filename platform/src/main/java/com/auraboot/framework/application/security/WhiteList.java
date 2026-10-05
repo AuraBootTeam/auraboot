@@ -13,6 +13,8 @@ public class WhiteList {
             "/api/auth/login/channels",
             "/api/auth/login/channel-options",
             "/api/auth/access-policy",
+            "/api/auth/appearance",
+            "/api/auth/appearance/assets/**",
             "/api/auth/login/social/**",
             "/api/auth/register",
             "/api/auth/forgot-password",

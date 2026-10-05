@@ -66,15 +66,26 @@ cleanup() {
   if docker inspect "$APP" >/dev/null 2>&1; then
     docker logs "$APP" > "$ARTIFACTS/logs/app.log" 2>&1 || true
   fi
-  docker rm -f "$APP" "$REDIS" "$PG" >/dev/null 2>&1 || true
-  docker network rm "$NET" >/dev/null 2>&1 || true
+  for retained_container in "$PG" "$REDIS"; do
+    docker logs "$retained_container" > "$ARTIFACTS/logs/$retained_container.log" 2>&1 || true
+  done
+  docker ps --all --filter "network=$NET" > "$ARTIFACTS/runtime-containers.txt" 2>&1 || true
+  python3 - "$ARTIFACTS/runtime-retention.json" "$status" "$WORK_ROOT" "$NET" "$APP" "$PG" "$REDIS" "$IMAGE" <<'PYRETENTION'
+import json, sys
+with open(sys.argv[1], "x") as output:
+    json.dump({"schemaVersion": 1, "runnerExitCode": int(sys.argv[2]),
+               "workRoot": sys.argv[3], "network": sys.argv[4],
+               "containers": sys.argv[5:8], "image": sys.argv[8],
+               "runtimeDeleted": False, "databaseDeleted": False}, output, indent=2)
+PYRETENTION
   if [[ -d "$LOCK_DIR" && "$(cat "$LOCK_DIR/owner" 2>/dev/null || true)" == "$LOCK_TOKEN" ]]; then
     rm -rf "$LOCK_DIR"
   fi
-  [[ "$status" -ne 0 ]] || docker image rm "$IMAGE" >/dev/null 2>&1 || true
   exit "$status"
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 for base_image in pgvector/pgvector:pg16 redis:7.4-alpine "$FLYWAY_IMAGE" "$K6_IMAGE" "$PYTHON_IMAGE" \
   "$BUILD_JDK_IMAGE" "$RUNTIME_JRE_IMAGE"; do
@@ -118,12 +129,15 @@ docker build -f "$STAGE/platform/Dockerfile" -t "$IMAGE" "$STAGE" \
   > "$ARTIFACTS/logs/docker-build.log" 2>&1 || fail "image build failed"
 DIGEST="$(docker image inspect "$IMAGE" --format '{{.Id}}')"
 
-docker network create "$NET" >/dev/null
+source "$SCRIPT_DIR/ci/isolated-release-network.sh"
+create_isolated_release_network "$NET" "$ARTIFACTS/network-allocation.tsv" \
+  || fatal "isolated release network unavailable"
 docker run -d --name "$PG" --network "$NET" -e POSTGRES_USER=auraboot \
   -e POSTGRES_PASSWORD=open_platform_ci -e POSTGRES_DB=open_platform_ci pgvector/pgvector:pg16 >/dev/null
 docker run -d --name "$REDIS" --network "$NET" redis:7.4-alpine >/dev/null
 for attempt in $(seq 1 30); do
-  docker exec "$PG" pg_isready -U auraboot -d open_platform_ci >/dev/null 2>&1 && break
+  # The temporary initialization server accepts sockets before the final TCP listener starts.
+  docker exec "$PG" pg_isready -h "$PG" -U auraboot -d open_platform_ci >/dev/null 2>&1 && break
   [[ "$attempt" != 30 ]] || fatal "PostgreSQL did not become ready"
   sleep 1
 done

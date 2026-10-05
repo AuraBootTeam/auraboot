@@ -109,7 +109,7 @@ it('saves an executable report query and links to the persisted report', async (
     dataSource: 'analysis',
     columns: [
       { field: 'region', label: 'region' },
-      { field: 'revenue', label: 'revenue' },
+      { field: 'revenue', label: 'revenue · 合计' },
     ],
   });
   expect(await screen.findByTestId('chatbi-saved-report')).toHaveAttribute(

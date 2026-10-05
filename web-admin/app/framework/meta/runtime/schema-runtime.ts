@@ -161,7 +161,7 @@ export class SchemaRuntime {
    * Initialize the LinkageEngine if schema has linkageRules.
    */
   private initializeLinkageEngine(): void {
-    const rules = this.schema.linkageRules;
+    const rules = this.schema.linkageRules ?? this.schema.extension?.linkageRules;
     if (!rules || rules.length === 0) return;
 
     this.linkageEngine = new LinkageEngine({

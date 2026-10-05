@@ -7,8 +7,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router';
-import { ArrowPathIcon, PencilSquareIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
-import { ChartBarSquareIcon } from '@heroicons/react/24/outline';
+import { ArrowPathIcon, PencilSquareIcon, ArrowLeftIcon, ChartBarSquareIcon } from '@heroicons/react/24/outline';
 import { ExportPdfButton } from '~/framework/smart/components/data-tools/ExportPdfButton';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useI18n } from '~/contexts/I18nContext';
@@ -68,21 +67,22 @@ export default function DashboardViewByCode() {
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4 border-b border-gray-200 bg-white px-6 py-4">
-        <div className="flex min-w-0 items-center">
-          <Link to="/dashboards" className="mr-3 text-gray-400 hover:text-gray-600">
+      <div className="flex flex-col gap-3 border-b border-gray-200 bg-white px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4 sm:px-6">
+        <div className="flex min-w-0 flex-1 items-start">
+          <Link to="/dashboards" aria-label={l('返回仪表盘列表', 'Back to dashboards')}
+            className="mr-3 mt-1 shrink-0 text-gray-400 hover:text-gray-600">
             <ArrowLeftIcon className="h-5 w-5" />
           </Link>
-          <ChartBarSquareIcon className="mr-3 h-7 w-7 text-blue-600" />
+          <ChartBarSquareIcon className="mr-3 h-7 w-7 shrink-0 text-blue-600" />
           <div className="min-w-0">
-            <h1 className="truncate text-xl font-semibold text-gray-900">{dashboardTitle}</h1>
+            <h1 className="break-words text-xl font-semibold text-gray-900">{dashboardTitle}</h1>
             {dashboardDescription && (
-              <p className="truncate text-sm text-gray-500">{dashboardDescription}</p>
+              <p data-testid="dashboard-description" className="mt-1 break-words text-sm leading-relaxed text-gray-500">{dashboardDescription}</p>
             )}
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center space-x-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           <button
             onClick={handleRefresh}
             disabled={loading}

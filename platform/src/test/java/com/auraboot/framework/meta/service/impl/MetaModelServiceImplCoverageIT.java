@@ -12,11 +12,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -29,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * model-data validation, and publish-governance surface (the methods with zero prior
  * test references: validateModelMetadata / validateModelData / previewPublishDDL /
  * replayPublishImpact) plus the existence checks. Single scenario, run-unique model
- * codes with a family purge so re-runs never collide on shared-tenant rows.
+ * codes. Preserve generated artifacts for inspection; never purge prior runs.
  */
 @SpringBootTest(classes = TestApplication.class)
 @ActiveProfiles("integration-test")
@@ -38,15 +36,12 @@ class MetaModelServiceImplCoverageIT extends BaseIntegrationTest {
 
     @Autowired
     private MetaModelService metaModelService;
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
 
     @Test
     @DisplayName("metadata validation, existence checks, DDL preview, replay report, model-data validation")
     void metadataAndGovernanceScenario() {
         setupTenantContext();
         applyTestMetaContext();
-        purgeFamily();
         Long tenantId = getTestTenant().getId();
         long suffix = System.currentTimeMillis();
         String code = "mmsit_" + suffix;
@@ -125,32 +120,7 @@ class MetaModelServiceImplCoverageIT extends BaseIntegrationTest {
             Map<String, Object> badType = Map.of("code", code + "_v3", "displayName", "x", "modelType", "teleport");
             assertTrue(((Map<?, ?>) metaModelService.validateModelData(badType).get("errors")).containsKey("modelType"));
         } finally {
-            try {
-                jdbcTemplate.execute("DROP TABLE IF EXISTS mt_" + code);
-            } catch (Exception ignored) {
-            }
-            purgeFamily();
             MetaContext.clear();
         }
-    }
-
-    private void purgeFamily() {
-        Long tenantId = getTestTenant().getId();
-        List<String> codes = jdbcTemplate.queryForList(
-                "SELECT code FROM ab_meta_model WHERE tenant_id = ? AND code LIKE 'mmsit\\_%'",
-                String.class, tenantId);
-        for (String code : codes) {
-            jdbcTemplate.update("DROP TABLE IF EXISTS mt_" + code);
-        }
-        jdbcTemplate.update(
-                "DELETE FROM ab_meta_model_field_binding WHERE model_id IN "
-                        + "(SELECT id FROM ab_meta_model WHERE tenant_id = ? AND code LIKE 'mmsit\\_%')", tenantId);
-        jdbcTemplate.update(
-                "DELETE FROM ab_meta_field WHERE tenant_id = ? "
-                        + "AND (code LIKE 'mmsit\\_%' OR id NOT IN (SELECT field_id FROM ab_meta_model_field_binding) "
-                        + "OR id IN (SELECT b.field_id FROM ab_meta_model_field_binding b "
-                        + "JOIN ab_meta_model m ON m.id = b.model_id "
-                        + "WHERE m.tenant_id = ? AND m.code LIKE 'mmsit\\_%'))", tenantId, tenantId);
-        jdbcTemplate.update("DELETE FROM ab_meta_model WHERE tenant_id = ? AND code LIKE 'mmsit\\_%'", tenantId);
     }
 }

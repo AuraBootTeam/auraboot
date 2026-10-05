@@ -15,6 +15,7 @@ import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.saas.config.service.SystemModeService;
+import com.auraboot.framework.permission.annotation.DisallowImpersonation;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -148,6 +149,7 @@ public class AuthController {
      * recognizes this WeChat account.
      */
     @PostMapping("/wechat/mini/bind")
+    @DisallowImpersonation
     @ResponseBody
     public ApiResponse<java.util.Map<String, Object>> bindWechatMini(
             @RequestBody AuthStrategyRequest request) {

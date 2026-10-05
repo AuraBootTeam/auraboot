@@ -50,12 +50,47 @@ describe('dashboard chart empty states', () => {
     expect(screen.queryByTestId('echarts-mock')).not.toBeInTheDocument();
   });
 
-  it('renders number cards with zero-value guidance instead of a blank metric area', () => {
+  it('renders missing number cards with guidance instead of a fabricated zero', () => {
     render(<SmartNumberCard title="Accounts" label="Accounts" dataSource={aggregateSource} />);
 
     expect(screen.getByText('Waiting for first record')).toBeInTheDocument();
     expect(screen.getByText(/This KPI is ready\./)).toBeInTheDocument();
-    expect(screen.getByText('0')).toBeInTheDocument();
+    expect(screen.getByText('—')).toBeInTheDocument();
+    expect(screen.queryByText('0')).not.toBeInTheDocument();
+  });
+
+  it.each([null, undefined, '', 'invalid', Infinity])(
+    'preserves unavailable single values (%s)',
+    (value) => {
+      mockUseChartData.mockReturnValue({
+        data: { rows: [{ count: value }], meta: { metrics: ['count'] } },
+        loading: false,
+        error: null,
+      });
+      render(<SmartNumberCard title="Missing" dataSource={aggregateSource} format="percent" />);
+      expect(screen.getByText('—')).toBeInTheDocument();
+      expect(screen.queryByText('0%')).not.toBeInTheDocument();
+    },
+  );
+
+  it('distinguishes missing multi-card values from numeric zero', () => {
+    mockUseChartData.mockReturnValue({
+      data: { rows: [{ missing: null, zero: 0 }], meta: { metrics: [] } },
+      loading: false,
+      error: null,
+    });
+    render(
+      <SmartNumberCard
+        title="Metrics"
+        dataSource={aggregateSource}
+        cards={[
+          { field: 'missing', label: 'Missing', format: 'percent' },
+          { field: 'zero', label: 'Zero', format: 'percent' },
+        ]}
+      />,
+    );
+    expect(screen.getByText('—')).toBeInTheDocument();
+    expect(screen.getByText('0%')).toBeInTheDocument();
   });
 
   it('lets a single configured number card fill the widget grid', () => {

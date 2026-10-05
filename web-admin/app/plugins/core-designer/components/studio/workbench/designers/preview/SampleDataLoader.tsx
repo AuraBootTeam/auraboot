@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useI18n } from '~/contexts/I18nContext';
 
 export interface SampleDataLoaderProps {
   modelCode?: string;
@@ -12,32 +13,34 @@ export interface SampleDataLoaderProps {
  *
  * Part of P3-T7 (virtual model backend plan).
  */
-export const SampleDataLoader: React.FC<SampleDataLoaderProps> = ({
-  modelCode,
-  onLoaded,
-}) => {
+export const SampleDataLoader: React.FC<SampleDataLoaderProps> = ({ modelCode, onLoaded }) => {
+  const { t } = useI18n();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | undefined>();
+  const [error, setError] = useState(false);
   const [count, setCount] = useState<number | undefined>();
 
   const load = async () => {
     if (!modelCode) return;
     setLoading(true);
-    setError(undefined);
+    setError(false);
     try {
       const resp = await fetch(
         `/api/dynamic/${encodeURIComponent(modelCode)}/list?pageNum=1&pageSize=3`,
       );
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const body = await resp.json();
-      const rows = (body?.data?.records ?? body?.data ?? []) as Array<
-        Record<string, unknown>
-      >;
-      const arr = Array.isArray(rows) ? rows : [];
-      setCount(arr.length);
-      onLoaded?.(arr);
-    } catch (e) {
-      setError(String(e instanceof Error ? e.message : e));
+      const rows = body?.data?.records;
+      if (
+        body?.code !== '0' ||
+        !Array.isArray(rows) ||
+        rows.some((row) => row === null || typeof row !== 'object' || Array.isArray(row))
+      ) {
+        throw new Error('Invalid sample-data response');
+      }
+      setCount(rows.length);
+      onLoaded?.(rows);
+    } catch {
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -49,12 +52,10 @@ export const SampleDataLoader: React.FC<SampleDataLoaderProps> = ({
       data-testid="sample-data-loader"
     >
       <div className="mb-3">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-          样例数据
+        <div className="text-[11px] font-semibold tracking-[0.14em] text-slate-400 uppercase">
+          {t('list_sample.heading')}
         </div>
-        <div className="mt-1 text-sm text-slate-600">
-          拉取 3 条真实数据，验证字段命名与列宽是否合理。
-        </div>
+        <div className="mt-1 text-sm text-slate-600">{t('list_sample.description')}</div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <button
@@ -64,17 +65,17 @@ export const SampleDataLoader: React.FC<SampleDataLoaderProps> = ({
           className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
           data-testid="sample-data-load-btn"
         >
-          {loading ? '加载中...' : '加载样例数据'}
+          {t(loading ? 'list_sample.loading' : 'list_sample.load')}
         </button>
         {count !== undefined && !error && (
           <span className="text-emerald-600" data-testid="sample-data-count">
-            已加载 {count} 条
+            {t('list_sample.loaded', { count })}
           </span>
         )}
       </div>
       {error && (
         <div className="mt-2 text-red-600" data-testid="sample-data-error">
-          {error}
+          {t('list_sample.failed')}
         </div>
       )}
     </div>

@@ -10,6 +10,7 @@
 
 import React from 'react';
 import { useSemanticModelMeta } from './useMetaModels';
+import { SemanticMetaFeedback } from './SemanticMetaFeedback';
 
 export interface SemanticMetricPickerProps {
   semanticModelCode: string | undefined;
@@ -29,7 +30,7 @@ export const SemanticMetricPicker: React.FC<SemanticMetricPickerProps> = ({
   required = false,
   className,
 }) => {
-  const { metrics, isLoading } = useSemanticModelMeta(semanticModelCode);
+  const { metrics, isLoading, error, refetch } = useSemanticModelMeta(semanticModelCode);
 
   const renderLabel = () =>
     label && (
@@ -53,6 +54,15 @@ export const SemanticMetricPicker: React.FC<SemanticMetricPickerProps> = ({
       <div className={className} data-testid="semantic-metric-picker">
         {renderLabel()}
         <p className="text-sm text-gray-500">加载指标中…</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={className} data-testid="semantic-metric-picker">
+        {renderLabel()}
+        <SemanticMetaFeedback error={error} onRetry={refetch} />
       </div>
     );
   }

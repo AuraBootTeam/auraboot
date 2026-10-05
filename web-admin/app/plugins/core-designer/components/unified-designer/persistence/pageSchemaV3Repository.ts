@@ -486,7 +486,7 @@ function withDesignerRootId(
   return { ...(extension ?? {}), [DESIGNER_ROOT_ID_EXTENSION_KEY]: rootBlockId };
 }
 
-function hasTopLevelKindRoot(dto: PageSchemaDTO): boolean {
+export function hasTopLevelKindRoot(dto: PageSchemaDTO): boolean {
   return (dto.blocks ?? []).some(
     (block) =>
       block &&

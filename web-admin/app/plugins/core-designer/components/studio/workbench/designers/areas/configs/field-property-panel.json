@@ -3,92 +3,92 @@
     "type": "property-panel",
     "version": "4.0",
     "component": "DslField",
-    "title": "字段属性"
+    "title": { "zh-CN": "字段属性", "en-US": "Field properties" }
   },
   "sections": [
     {
       "code": "basic",
-      "title": "基本属性",
+      "title": { "zh-CN": "基本属性", "en-US": "Basic properties" },
       "layout": { "columns": 1, "gap": "small" },
       "fields": [
         {
           "field": "field",
           "component": "SmartInput",
-          "props": { "label": "字段名", "disabled": true, "size": "small" }
+          "props": { "label": { "zh-CN": "字段名", "en-US": "Field name" }, "disabled": true, "size": "small" }
         },
         {
           "field": "label",
           "component": "LocalizedTextInput",
-          "props": { "label": "标签", "placeholder": "覆盖字段标签", "size": "small" }
+          "props": { "label": { "zh-CN": "标签", "en-US": "Label" }, "placeholder": { "zh-CN": "覆盖字段标签", "en-US": "Override the field label" }, "size": "small" }
         },
         {
           "field": "placeholder",
           "component": "SmartInput",
-          "props": { "label": "占位符", "placeholder": "请输入...", "size": "small" },
-          "visible": "blockType !== 'data-table'"
+          "props": { "label": { "zh-CN": "占位符", "en-US": "Placeholder" }, "placeholder": { "zh-CN": "请输入...", "en-US": "Enter a value..." }, "size": "small" },
+          "visible": "blockType !== 'table'"
         },
         {
           "field": "component",
           "component": "SmartSelect",
           "props": {
-            "label": "组件类型",
+            "label": { "zh-CN": "组件类型", "en-US": "Component type" },
             "size": "small",
             "allowClear": true,
-            "placeholder": "自动选择"
+            "placeholder": { "zh-CN": "自动选择", "en-US": "Automatic selection" }
           },
           "optionsKey": "componentOptions",
-          "visible": "blockType !== 'data-table'"
+          "visible": "blockType !== 'table'"
         }
       ]
     },
     {
       "code": "validation",
-      "title": "验证规则",
+      "title": { "zh-CN": "验证规则", "en-US": "Validation rules" },
       "layout": { "columns": 2, "gap": "small" },
-      "visible": "blockType !== 'data-table'",
+      "visible": "blockType !== 'table'",
       "fields": [
         {
           "field": "required",
           "component": "SmartSwitch",
-          "props": { "label": "必填" }
+          "props": { "label": { "zh-CN": "必填", "en-US": "Required" } }
         },
         {
           "field": "readonly",
           "component": "SmartSwitch",
-          "props": { "label": "只读" }
+          "props": { "label": { "zh-CN": "只读", "en-US": "Read only" } }
         },
         {
           "field": "maxLength",
           "component": "SmartInput",
-          "props": { "label": "最大长度", "type": "number", "min": 1, "size": "small" },
+          "props": { "label": { "zh-CN": "最大长度", "en-US": "Maximum length" }, "type": "number", "min": 1, "size": "small" },
           "visible": "dataType === 'string' || dataType === 'text'",
           "layout": { "colSpan": 1 }
         },
         {
           "field": "minLength",
           "component": "SmartInput",
-          "props": { "label": "最小长度", "type": "number", "min": 0, "size": "small" },
+          "props": { "label": { "zh-CN": "最小长度", "en-US": "Minimum length" }, "type": "number", "min": 0, "size": "small" },
           "visible": "dataType === 'string' || dataType === 'text'",
           "layout": { "colSpan": 1 }
         },
         {
           "field": "pattern",
           "component": "SmartInput",
-          "props": { "label": "正则表达式", "placeholder": "^[A-Z]+$", "size": "small" },
+          "props": { "label": { "zh-CN": "正则表达式", "en-US": "Regular expression" }, "placeholder": "^[A-Z]+$", "size": "small" },
           "visible": "dataType === 'string'",
           "layout": { "colSpan": 2 }
         },
         {
           "field": "minValue",
           "component": "SmartInput",
-          "props": { "label": "最小值", "type": "number", "size": "small" },
+          "props": { "label": { "zh-CN": "最小值", "en-US": "Minimum value" }, "type": "number", "size": "small" },
           "visible": "dataType === 'integer' || dataType === 'decimal'",
           "layout": { "colSpan": 1 }
         },
         {
           "field": "maxValue",
           "component": "SmartInput",
-          "props": { "label": "最大值", "type": "number", "size": "small" },
+          "props": { "label": { "zh-CN": "最大值", "en-US": "Maximum value" }, "type": "number", "size": "small" },
           "visible": "dataType === 'integer' || dataType === 'decimal'",
           "layout": { "colSpan": 1 }
         }
@@ -96,103 +96,103 @@
     },
     {
       "code": "behavior",
-      "title": "行为控制",
+      "title": { "zh-CN": "行为控制", "en-US": "Behavior" },
       "layout": { "columns": 2, "gap": "small" },
       "fields": [
         {
           "field": "visible",
           "component": "SmartInput",
-          "props": { "label": "可见性条件", "placeholder": "{{ ... }}", "size": "small" },
+          "props": { "label": { "zh-CN": "可见性条件", "en-US": "Visibility condition" }, "placeholder": "{{ ... }}", "size": "small" },
           "layout": { "colSpan": 2 }
         },
         {
           "field": "disabled",
           "component": "SmartInput",
-          "props": { "label": "禁用条件", "placeholder": "{{ ... }}", "size": "small" },
+          "props": { "label": { "zh-CN": "禁用条件", "en-US": "Disabled condition" }, "placeholder": "{{ ... }}", "size": "small" },
           "layout": { "colSpan": 2 }
         },
         {
           "field": "advanced",
           "component": "SmartSwitch",
-          "props": { "label": "高级筛选" },
-          "visible": "blockType === 'filter-form'"
+          "props": { "label": { "zh-CN": "高级筛选", "en-US": "Advanced filter" } },
+          "visible": "blockType === 'filters'"
         },
         {
           "field": "sortable",
           "component": "SmartSwitch",
-          "props": { "label": "可排序" },
-          "visible": "blockType === 'data-table'"
+          "props": { "label": { "zh-CN": "可排序", "en-US": "Sortable" } },
+          "visible": "blockType === 'table'"
         },
         {
           "field": "copyable",
           "component": "SmartSwitch",
-          "props": { "label": "可复制" },
-          "visible": "blockType === 'data-table'"
+          "props": { "label": { "zh-CN": "可复制", "en-US": "Copyable" } },
+          "visible": "blockType === 'table'"
         },
         {
           "field": "ellipsis",
           "component": "SmartSwitch",
-          "props": { "label": "省略文本" },
-          "visible": "blockType === 'data-table'"
+          "props": { "label": { "zh-CN": "省略文本", "en-US": "Ellipsis" } },
+          "visible": "blockType === 'table'"
         }
       ]
     },
     {
       "code": "layout",
-      "title": "布局设置",
+      "title": { "zh-CN": "布局设置", "en-US": "Layout" },
       "layout": { "columns": 2, "gap": "small" },
       "fields": [
         {
           "field": "span",
           "component": "SmartSelect",
           "props": {
-            "label": "跨列数",
+            "label": { "zh-CN": "跨列数", "en-US": "Column span" },
             "size": "small",
             "options": [
-              { "label": "1列", "value": 1 },
-              { "label": "2列", "value": 2 },
-              { "label": "3列", "value": 3 },
-              { "label": "4列", "value": 4 }
+              { "label": { "zh-CN": "1列", "en-US": "1 column" }, "value": 1 },
+              { "label": { "zh-CN": "2列", "en-US": "2 columns" }, "value": 2 },
+              { "label": { "zh-CN": "3列", "en-US": "3 columns" }, "value": 3 },
+              { "label": { "zh-CN": "4列", "en-US": "4 columns" }, "value": 4 }
             ]
           },
-          "visible": "blockType !== 'data-table'"
+          "visible": "blockType !== 'table'"
         },
         {
           "field": "width",
           "component": "SmartInput",
-          "props": { "label": "列宽 (px)", "type": "number", "min": 50, "size": "small" },
-          "visible": "blockType === 'data-table'"
+          "props": { "label": { "zh-CN": "列宽 (px)", "en-US": "Column width (px)" }, "type": "number", "min": 50, "size": "small" },
+          "visible": "blockType === 'table'"
         },
         {
           "field": "fixed",
           "component": "SmartSelect",
           "props": {
-            "label": "固定列",
+            "label": { "zh-CN": "固定列", "en-US": "Fixed column" },
             "size": "small",
             "allowClear": true,
             "options": [
-              { "label": "左侧", "value": "left" },
-              { "label": "右侧", "value": "right" }
+              { "label": { "zh-CN": "左侧", "en-US": "Left" }, "value": "left" },
+              { "label": { "zh-CN": "右侧", "en-US": "Right" }, "value": "right" }
             ]
           },
-          "visible": "blockType === 'data-table'"
+          "visible": "blockType === 'table'"
         },
         {
           "field": "render",
           "component": "SmartSelect",
           "props": {
-            "label": "渲染类型",
+            "label": { "zh-CN": "渲染类型", "en-US": "Render type" },
             "size": "small",
             "allowClear": true,
             "options": [
-              { "label": "标签", "value": "tag" },
-              { "label": "日期时间", "value": "datetime" },
-              { "label": "货币", "value": "currency" },
-              { "label": "链接", "value": "link" },
-              { "label": "图片", "value": "image" }
+              { "label": { "zh-CN": "标签", "en-US": "Label" }, "value": "tag" },
+              { "label": { "zh-CN": "日期时间", "en-US": "Date and time" }, "value": "datetime" },
+              { "label": { "zh-CN": "货币", "en-US": "Currency" }, "value": "currency" },
+              { "label": { "zh-CN": "链接", "en-US": "Link" }, "value": "link" },
+              { "label": { "zh-CN": "图片", "en-US": "Image" }, "value": "image" }
             ]
           },
-          "visible": "blockType === 'data-table'"
+          "visible": "blockType === 'table'"
         }
       ]
     }

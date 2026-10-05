@@ -113,6 +113,9 @@ public class CommandDefinitionDTO {
     @JsonAlias("actionType")
     private String type;
 
+    /** true selects the form CRUD default; false keeps an auxiliary command explicit-only. */
+    private Boolean crudDefault;
+
     /**
      * Plugin command handler code.
      * Allows a business command such as "pr:submit_purchase_order" to invoke
@@ -242,6 +245,20 @@ public class CommandDefinitionDTO {
         return displayName != null ? displayName : code;
     }
 
+    /** Preserves declared name translations without mutating the imported extension. */
+    @JsonIgnore
+    public Map<String, Object> getEffectiveExtension() {
+        Map<String, Object> result = new HashMap<>();
+        if (extension != null) result.putAll(extension);
+        com.auraboot.framework.meta.dto.CommandDescriptionLocalization.from(result.get("localizedDescriptions"));
+        Map<String, String> names = new HashMap<>(
+                com.auraboot.framework.meta.dto.CommandDescriptionLocalization.displayNamesFrom(result.get("localizedDisplayNames")));
+        if (displayNameZhCN != null && !displayNameZhCN.isBlank()) names.put("zh-CN", displayNameZhCN);
+        if (displayNameEn != null && !displayNameEn.isBlank()) names.put("en-US", displayNameEn);
+        if (!names.isEmpty()) result.put("localizedDisplayNames", Map.copyOf(names));
+        return result;
+    }
+
     /**
      * Build a consolidated executionConfig map from DSL fields.
      * This merges the structured ExecutionConfig with DSL extended fields
@@ -264,6 +281,7 @@ public class CommandDefinitionDTO {
 
         // Merge DSL extended fields
         if (type != null) config.put("type", type);
+        if (crudDefault != null) config.put("crudDefault", crudDefault);
         if (handler != null) config.put("handler", handler);
         if (handlerParams != null) config.put("handlerParams", handlerParams);
         if (autoSetFields != null) config.put("autoSetFields", autoSetFields);

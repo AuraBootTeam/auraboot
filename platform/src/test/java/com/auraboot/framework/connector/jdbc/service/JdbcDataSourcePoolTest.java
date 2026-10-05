@@ -1,5 +1,7 @@
 package com.auraboot.framework.connector.jdbc.service;
 
+import com.auraboot.framework.test.support.MySqlTestContainer;
+
 import com.auraboot.framework.connector.jdbc.entity.JdbcConnector;
 import com.zaxxer.hikari.HikariDataSource;
 import org.junit.jupiter.api.AfterEach;
@@ -17,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class JdbcDataSourcePoolTest {
 
     @Container
-    static MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.0");
+    static MySQLContainer<?> mysql = new MySqlTestContainer("mysql:8.0");
 
     private final JdbcDataSourcePool pool = new JdbcDataSourcePool();
 

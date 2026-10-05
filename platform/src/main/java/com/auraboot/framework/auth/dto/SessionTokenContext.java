@@ -14,7 +14,10 @@ public record SessionTokenContext(
         Long partyMembershipId,
         SessionStage sessionStage,
         long contextVersion,
-        int securityVersion) {
+        int securityVersion,
+        boolean impersonation,
+        Long operatorUserId,
+        String clientType) {
 
     public static SessionTokenContext tenant(Long tenantId, Long memberId, int securityVersion) {
         return new SessionTokenContext(
@@ -27,6 +30,9 @@ public record SessionTokenContext(
                 null,
                 tenantId == null ? SessionStage.ONBOARDING : SessionStage.READY,
                 1,
-                securityVersion);
+                securityVersion,
+                false,
+                null,
+                null);
     }
 }
