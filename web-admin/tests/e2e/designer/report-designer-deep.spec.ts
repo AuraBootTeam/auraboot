@@ -417,10 +417,10 @@ async function createReportNonStaticDataSourceExportPage(page: Page) {
   const namedQueryTitle = `${uid} NamedQuery`;
   const apiTitle = `${uid} API`;
 
-  for (const [orderTitle, customer] of [
-    [modelTitle, 'Report Model Customer'],
-    [namedQueryTitle, 'Report NamedQuery Customer'],
-    [apiTitle, 'Report API Customer'],
+  for (const [orderTitle, customer, customerCode] of [
+    [modelTitle, 'Report Model Customer', `${uid}-MC`],
+    [namedQueryTitle, 'Report NamedQuery Customer', `${uid}-NC`],
+    [apiTitle, 'Report API Customer', `${uid}-AC`],
   ]) {
     // Referenced customer must exist before the order command (runtime
     // reference existence validation).
@@ -428,7 +428,7 @@ async function createReportNonStaticDataSourceExportPage(page: Page) {
       page,
       'e2et:create_customer',
       {
-        e2et_cust_code: `${orderTitle}-CUST`,
+        e2et_cust_code: customerCode,
         e2et_cust_name: customer,
         e2et_cust_region: 'south',
         e2et_cust_active: true,
