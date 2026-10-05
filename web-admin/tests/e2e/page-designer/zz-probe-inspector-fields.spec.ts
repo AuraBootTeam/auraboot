@@ -57,7 +57,7 @@ test('probe: inspector field testids for display blocks', async ({ page, baseURL
     const testids = await page.evaluate(() =>
       Array.from(document.querySelectorAll('[data-testid]'))
         .map((el) => el.getAttribute('data-testid'))
-        .filter((id) => id?.startsWith('inspector-field-')),
+        .filter((id): id is string => id !== null && id.startsWith('inspector-field-')),
     );
     const dsValue = await page
       .getByTestId('inspector-field-dataSource')
@@ -166,7 +166,7 @@ test('probe: inspector field testids for display blocks', async ({ page, baseURL
   const persisted2 = await page.request.get(`/api/pages/${pid}`);
   const ptext2 = await persisted2.text();
   const fs3 = await import('fs');
-  fs3.appendFileSync('/tmp/pd-probe-fields.log', `DESC_FILLED=${descFilled}\nDESC_PERSISTED=${ptext2.slice(0, 1500)}\n`);
+  fs3.appendFileSync('/tmp/pd-probe-fields.log', `STRIP_RESAVED=${stripFilled}\nSTRIP_PERSISTED=${ptext2.slice(0, 1500)}\n`);
 
 
 });
