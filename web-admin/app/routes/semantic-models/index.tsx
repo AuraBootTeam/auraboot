@@ -284,6 +284,24 @@ function BrowsePanel({
     setQueryError(null);
   }, [model?.code]);
 
+  // Result columns arrive as qualified keys (`model.field`, `model.field__grain`).
+  // Headers show the model's own labels so readers never see raw field codes; an
+  // unknown column falls back to its key.
+  const columnLabels = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!model) return map;
+    for (const m of model.metrics) map.set(`${model.code}.${m.code}`, localize(m.label, m.code, locale));
+    for (const d of model.dimensions) {
+      const label = localize(d.label, d.code, locale);
+      map.set(`${model.code}.${d.code}`, label);
+      for (const grain of ['day', 'week', 'month', 'quarter', 'year']) {
+        map.set(`${model.code}.${d.code}__${grain}`, `${label} · ${grain}`);
+      }
+    }
+    return map;
+  }, [model, locale]);
+  const columnLabel = (column: string) => columnLabels.get(column) ?? column;
+
   if (!model) {
     return (
       <div
@@ -341,24 +359,6 @@ function BrowsePanel({
   }
 
   const columns = result?.rows?.length ? Object.keys(result.rows[0]) : [];
-
-  // Result columns arrive as qualified keys (`model.field`, `model.field__grain`).
-  // Headers show the model's own labels so readers never see raw field codes; an
-  // unknown column falls back to its key.
-  const columnLabels = useMemo(() => {
-    const map = new Map<string, string>();
-    if (!model) return map;
-    for (const m of model.metrics) map.set(`${model.code}.${m.code}`, localize(m.label, m.code, locale));
-    for (const d of model.dimensions) {
-      const label = localize(d.label, d.code, locale);
-      map.set(`${model.code}.${d.code}`, label);
-      for (const grain of ['day', 'week', 'month', 'quarter', 'year']) {
-        map.set(`${model.code}.${d.code}__${grain}`, `${label} · ${grain}`);
-      }
-    }
-    return map;
-  }, [model, locale]);
-  const columnLabel = (column: string) => columnLabels.get(column) ?? column;
 
   return (
     <div className="space-y-4">
