@@ -320,11 +320,11 @@ export function ShortcutsWidget({
 
       {/* Customize hint when showing defaults — clicking opens the modal */}
       {!isFromFavorites && !editing && (!overrideShortcuts || personalizable) && (
-        <div className="px-4 pb-3 text-center">
+        <div className="px-4 pb-3 pt-1 text-center">
           <button
             type="button"
             onClick={() => setModalOpen(true)}
-            className="text-[10px] text-gray-300 transition-colors hover:text-blue-400"
+            className="text-[11px] text-gray-400 transition-colors hover:text-blue-400"
             data-testid="shortcuts-customize-button"
           >
             {t(I18N_KEYS.customize, undefined, '自定义')}
