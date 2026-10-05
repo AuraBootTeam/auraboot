@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ValidationServiceTransientFieldTest {
 
-    private final ValidationServiceImpl validation = new ValidationServiceImpl(null, null);
+    private final ValidationServiceImpl validation = new ValidationServiceImpl(null, null, null);
 
     @Test
     void createDoesNotRequireTransientCommandInputOnThePersistedRecord() {
