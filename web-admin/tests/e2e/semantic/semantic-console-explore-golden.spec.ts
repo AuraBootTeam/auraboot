@@ -82,8 +82,10 @@ async function openConsole(page: Page) {
   await expect(page.getByTestId('semantic-models-error')).toHaveCount(0);
 }
 
-test.beforeAll(async ({ request }) => {
+test.beforeAll({ timeout: 180000 }, async ({ request }) => {
   // Setup only. Authoring/publishing/querying are browser actions below.
+  // 513 creates against a freshly started stack: the first dynamic-entity calls
+  // bootstrap/JIT the server path, so the default 15s hook budget is not enough.
   for (let i = 0; i < 12; i++) {
     const response = await request.post('/api/dynamic/e2et_order/create', { data: {
       e2et_order_title: `SC-${run}-${i}`, e2et_order_type: 'normal',

@@ -224,8 +224,10 @@ async function openReportFromManagement(page: import('@playwright/test').Page) {
 }
 
 async function downloadAndInspectPdf(page: import('@playwright/test').Page, button: RegExp, artifact: string) {
-  const responsePromise = page.waitForResponse(r => r.url().endsWith('/api/reports/export/pdf') && r.request().method() === 'POST');
-  const downloadPromise = page.waitForEvent('download');
+  // The WYSIWYG renderer (DDR-2026-06-21) renders a real Chromium PDF server-side, which
+  // takes seconds; the old 5s default was calibrated on the instant PDFBox fallback.
+  const responsePromise = page.waitForResponse(r => r.url().endsWith('/api/reports/export/pdf') && r.request().method() === 'POST', { timeout: 60000 });
+  const downloadPromise = page.waitForEvent('download', { timeout: 60000 });
   await page.getByRole('button', { name: button }).click();
   const response = await responsePromise;
   expect(response.request().postDataJSON().reportPid).toBe(reportPid);
