@@ -45,6 +45,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import com.auraboot.framework.common.constant.StatusConstants;
@@ -274,7 +275,13 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
             return new ArrayList<>();
         }
         
+        // Match the newest, non-deleted tenant-scoped lookup without one query per template.
+        Map<String, Permission> catalog = new LinkedHashMap<>();
+        for (Permission permission : permissionMapper.findResolvableDefinitions(tenantId)) {
+            catalog.putIfAbsent(permission.getCode().toLowerCase(Locale.ROOT), permission);
+        }
         List<Permission> created = new ArrayList<>();
+        List<Permission> pending = new ArrayList<>();
         
         for (PermissionTemplate template : permissionTemplates) {
             String code = template.getCode() != null ? template.getCode().trim() : null;
@@ -282,7 +289,7 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
                 throw new TemplateValidationException("权限编码不能为空");
             }
             
-            Permission existing = permissionMapper.findByTenantIdAndCode(tenantId, code);
+            Permission existing = catalog.get(code.toLowerCase(Locale.ROOT));
             if (existing != null) {
                 created.add(existing);
                 log.debug("模板Permission已存在,纳入绑定候选: code={}, id={}", logSafe(code), existing.getId());
@@ -307,13 +314,20 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
             permission.setCreatedBy(userId);
             permission.setUpdatedBy(userId);
             
-            permissionMapper.insert(permission);
+            pending.add(permission);
+            catalog.put(code.toLowerCase(Locale.ROOT), permission);
             created.add(permission);
             
             log.debug("创建模板Permission: code={}, id={}, pid={}", 
                 logSafe(permission.getCode()), permission.getId(), logSafe(permission.getPid()));
         }
         
+        if (!pending.isEmpty()) {
+            int inserted = permissionMapper.batchInsert(pending);
+            if (inserted != pending.size() || pending.stream().anyMatch(permission -> permission.getId() == null)) {
+                throw new IllegalStateException("Template permission batch did not persist every generated identity");
+            }
+        }
         return created;
     }
     

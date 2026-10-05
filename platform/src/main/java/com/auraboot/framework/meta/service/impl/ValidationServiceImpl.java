@@ -45,6 +45,11 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
 
     @Override
     public ValidationResult validateData(ModelDefinition modelDefinition, Map<String, Object> data, ValidationContext context) {
+        return validateData(modelDefinition, data, context, false);
+    }
+
+    private ValidationResult validateData(ModelDefinition modelDefinition, Map<String, Object> data,
+                                          ValidationContext context, boolean relationsVerified) {
         if (modelDefinition == null) {
             throw new MetaServiceException("Model definition cannot be null");
         }
@@ -80,9 +85,11 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
         warnings.addAll(uniquenessResult.getWarnings());
 
         // 验证关联关系
-        ValidationResult relationResult = validateRelations(modelDefinition, data, context);
-        errors.addAll(relationResult.getErrors());
-        warnings.addAll(relationResult.getWarnings());
+        if (!relationsVerified) {
+            ValidationResult relationResult = validateRelations(modelDefinition, data, context);
+            errors.addAll(relationResult.getErrors());
+            warnings.addAll(relationResult.getWarnings());
+        }
 
         return ValidationResult.builder()
                 .valid(errors.isEmpty())
@@ -90,6 +97,68 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
                 .warnings(warnings)
                 .validFields(validFields)
                 .build();
+    }
+
+    @Override
+    public void validateBatchAndThrow(ModelDefinition model, List<Map<String, Object>> rows,
+                                      ValidationContext context) {
+        if (model == null || rows == null || rows.isEmpty()) {
+            throw new MetaServiceException("Bulk validation requires a model and rows");
+        }
+        for (Map<String, Object> row : rows) {
+            validateTenantIsolation(row);
+            ValidationResult result = validateData(model, row, context, true);
+            if (!result.getValid()) {
+                throw new com.auraboot.framework.meta.exception.ValidationException(
+                        "Validation failed: " + String.join(", ", result.getErrors()), result);
+            }
+        }
+        if (model.getRelations() == null) return;
+        Long tenantId = MetaContext.getCurrentTenantId();
+        for (RelationDefinition relation : model.getRelations()) {
+            Set<Object> values = new LinkedHashSet<>();
+            for (Map<String, Object> row : rows) {
+                Object value = row.get(relation.getSourceField());
+                if (value == null && relation.isRequired() && context != ValidationContext.UPDATE) {
+                    throw new com.auraboot.framework.meta.exception.ValidationException(
+                            "Required relation '" + relation.getName() + "' is missing");
+                }
+                if (value != null) values.add(value);
+            }
+            if (values.isEmpty() || relation.getTargetTable() == null || relation.getTargetField() == null) continue;
+            SqlSafetyUtils.validateIdentifier(relation.getTargetTable(), "relation targetTable");
+            SqlSafetyUtils.validateIdentifier(relation.getTargetField(), "relation targetField");
+            // Bound equality predicates preserve single-row comparison semantics. Keep
+            // chunks below database projection limits even for very large bulk writes.
+            List<Object> references = new ArrayList<>(values);
+            final int chunkSize = 128;
+            for (int offset = 0; offset < references.size(); offset += chunkSize) {
+                int size = Math.min(chunkSize, references.size() - offset);
+                List<String> queries = new ArrayList<>();
+                Map<String, Object> params = new HashMap<>();
+                params.put("tenantId", tenantId);
+                for (int index = 0; index < size; index++) {
+                    String key = "ref" + index;
+                    params.put(key, references.get(offset + index));
+                    queries.add("(SELECT COUNT(*) FROM " + relation.getTargetTable()
+                            + " WHERE " + relation.getTargetField() + " = #{params." + key
+                            + "} AND tenant_id = #{params.tenantId}) AS cnt" + index);
+                }
+                List<Map<String, Object>> matches = dynamicDataMapper.selectByQuery(
+                        "SELECT " + String.join(", ", queries), params);
+                if (matches.size() != 1) {
+                    throw new com.auraboot.framework.meta.exception.ValidationException(
+                            "Incomplete relation validation for '" + relation.getName() + "'");
+                }
+                for (int position = 0; position < size; position++) {
+                    if (!(matches.get(0).get("cnt" + position) instanceof Number count)
+                            || count.longValue() < 1) {
+                        throw new com.auraboot.framework.meta.exception.ValidationException(
+                                "Related record not found for relation '" + relation.getName() + "'");
+                    }
+                }
+            }
+        }
     }
 
     @Override

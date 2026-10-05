@@ -265,6 +265,7 @@ public interface PermissionMapper extends BaseMapper<Permission> {
         </foreach>
         </script>
         """)
+    @Options(useGeneratedKeys = true, keyProperty = "permissions.id", keyColumn = "id")
     int batchInsert(@Param("permissions") List<Permission> permissions);
 
     /**

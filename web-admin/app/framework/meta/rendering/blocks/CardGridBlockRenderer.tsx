@@ -19,7 +19,7 @@
 
 import React, { useCallback } from 'react';
 import { useNavigate } from 'react-router';
-import type { BlockConfig } from '~/framework/meta/schemas/types';
+import type { BlockConfig, CardImageViewport } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
@@ -48,6 +48,19 @@ function normalizeRows(data: unknown): any[] {
     if (Array.isArray(d.list)) return d.list as any[];
   }
   return [];
+}
+
+/** Invalid or unknown viewport entries retain the existing image behavior. */
+function imageViewport(config: unknown, url: string): CardImageViewport | undefined {
+  if (!config || typeof config !== 'object' || !Object.hasOwn(config, url)) return;
+  const value = (config as Record<string, unknown>)[url] as Partial<CardImageViewport> | null;
+  if (!value || !Array.isArray(value.viewBox) || value.viewBox.length !== 4) return;
+  const { width, height, viewBox } = value;
+  if (![width, height, ...viewBox].every(n => typeof n === 'number' && Number.isFinite(n))) return;
+  if (width! <= 0 || height! <= 0) return;
+  const [x, y, w, h] = viewBox;
+  if (x < 0 || y < 0 || w <= 0 || h <= 0 || x + w > width! || y + h > height!) return;
+  return value as CardImageViewport;
 }
 
 export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ block, runtime }) => {
@@ -190,6 +203,8 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
     const rowKey = row.pid || String(idx);
         const title = getLocalizedText(row[titleField], locale, t);
         const description = descriptionField ? getLocalizedText(row[descriptionField], locale, t) : undefined;
+        const imageUrl = imageField && row[imageField] ? String(row[imageField]) : undefined;
+        const viewport = imageUrl ? imageViewport(cfg.imageViewports, imageUrl) : undefined;
         const category = categoryField ? getLocalizedText(row[categoryField], locale, t) : undefined;
         const rawBadge = badgeField ? row[badgeField] : undefined;
         const badge =
@@ -218,9 +233,25 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
                 data-testid="card-grid-image"
                 className="bg-subtle border-border mb-3 flex h-24 items-center justify-center overflow-hidden rounded-[var(--radius-card)] border"
               >
-                {row[imageField] ? (
+                {imageUrl && viewport ? (
+                  <svg
+                    role="img"
+                    aria-label={title || ''}
+                    viewBox={viewport.viewBox.join(' ')}
+                    preserveAspectRatio="xMidYMid meet"
+                    className="h-full w-24 max-w-full overflow-hidden p-1.5"
+                    data-testid="card-grid-image-viewport"
+                  >
+                    <image
+                      href={imageUrl}
+                      width={viewport.width}
+                      height={viewport.height}
+                      onError={e => { e.currentTarget.style.visibility = 'hidden'; }}
+                    />
+                  </svg>
+                ) : imageUrl ? (
                   <img
-                    src={String(row[imageField])}
+                    src={imageUrl}
                     alt={title || ''}
                     className="h-full w-full object-contain p-1.5"
                     onError={(e) => {
