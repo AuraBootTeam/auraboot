@@ -92,6 +92,7 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
 
     private static final Object MISSING_CONTEXT_VALUE = new Object();
 
+    private final DrtDefinitionMapper definitionMapper;
     private final DrtVersionMapper versionMapper;
     private final DrtLogMapper logMapper;
     private final DecisionRuntime decisionRuntime;
