@@ -1,3 +1,4 @@
+import type { ComponentText, ValidationRule } from '~/framework/meta/registry/components/ComponentConfig';
 /**
  * 属性输入控件组件
  * 根据属性类型动态渲染不同的输入控件
@@ -13,11 +14,11 @@ import { IconPicker } from '~/plugins/core-designer/components/studio/workbench/
 interface PropertySchema {
   key: string;
   type: string;
-  label?: string;
-  description?: string;
+  label?: ComponentText;
+  description?: ComponentText;
   defaultValue?: any;
-  options?: Array<{ label: string; value: any }>;
-  validation?: {
+  options?: Array<{ label: ComponentText; value: any }>;
+  validation?: ValidationRule[] | {
     required?: boolean;
     min?: number;
     max?: number;
@@ -172,7 +173,7 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
             <option value="">{text('select', { label: translatedLabel })}</option>
             {property.options?.map((option) => (
               <option key={option.value} value={option.value}>
-                {option.label}
+                {lt(option.label)}
               </option>
             ))}
           </select>

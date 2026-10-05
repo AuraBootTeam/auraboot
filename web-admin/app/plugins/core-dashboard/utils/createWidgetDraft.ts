@@ -7,10 +7,9 @@ const DEFAULT_AGGREGATE_DATA_SOURCE = {
 
 function resolveDefaultTitle(definition: WidgetDefinition): Widget['config']['title'] {
   const title = definition.defaultConfig.title;
-  if (typeof title === 'string') {
-    return title.trim() ? title : definition.label;
-  }
-  return title || definition.label;
+  const candidate = typeof title === 'string' && !title.trim()
+    ? definition.label : title || definition.label;
+  return typeof candidate === 'object' ? { ...candidate } : candidate;
 }
 
 /**

@@ -4,14 +4,15 @@
  */
 
 import type { WidgetDefinition, PropertySchema } from '../types';
-import { DesignerRegistry } from '~/shared/designer';
+import { widgetText } from './widgetText';
+import { DesignerRegistry } from '~/shared/designer/types';
 import { resolveWidgetTier } from '../registry/widgetManifest';
 
 /**
  * Common property schemas for data source configuration.
  *
  * Semantic-layer routing (PR #377) is configured in the richer DataSourceConfig
- * panel via the "数据源模式: 原始模型 / 语义模型" switch — the single source of
+ * panel via the "Data source mode: raw model / semantic model" switch — the single source of
  * truth for picking a semantic model and its governed metrics/dimensions. The
  * earlier standalone `semantic-model-select` schema field was removed to avoid
  * a second, conflicting model dropdown (PRD 16 W4 D4 switch-style consolidation).
@@ -19,24 +20,24 @@ import { resolveWidgetTier } from '../registry/widgetManifest';
 const dataSourcePropertySchemas: PropertySchema[] = [
   {
     key: 'dataSource.type',
-    label: '数据源类型',
+    label: widgetText('registry.dataSourceType'),
     type: 'select',
     required: true,
     options: [
-      { label: '聚合查询', value: 'aggregate' },
-      { label: '命名查询', value: 'namedQuery' },
+      { label: widgetText('registry.aggregateQuery'), value: 'aggregate' },
+      { label: widgetText('registry.namedQuery'), value: 'namedQuery' },
     ],
     defaultValue: 'aggregate',
   },
   {
     key: 'dataSource.modelCode',
-    label: '模型',
+    label: widgetText('registry.model'),
     type: 'model',
     dependsOn: { field: 'dataSource.type', value: 'aggregate' },
   },
   {
     key: 'dataSource.queryCode',
-    label: '命名查询',
+    label: widgetText('registry.namedQuery'),
     type: 'namedQuery',
     dependsOn: { field: 'dataSource.type', value: 'namedQuery' },
   },
@@ -48,12 +49,13 @@ const dataSourcePropertySchemas: PropertySchema[] = [
 const widgetDefinitions: WidgetDefinition[] = [
   {
     type: 'smart-number-card',
-    label: '数字卡片',
+    label: widgetText('registry.numberCard'),
     icon: 'NumberOutlined',
-    category: '指标',
-    description: '显示单个指标数值',
+    category: widgetText('registry.metrics')['zh-CN'],
+    categoryLabel: widgetText('registry.metrics'),
+    description: widgetText('registry.displayASingleMetricValue'),
     defaultConfig: {
-      title: '数字卡片',
+      title: widgetText('registry.numberCard'),
       dataSource: {
         type: 'aggregate',
         metrics: [{ field: 'id', aggregation: 'count' }],
@@ -70,25 +72,25 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
         required: true,
       },
       {
         key: 'icon',
-        label: '图标',
+        label: widgetText('registry.icon'),
         type: 'icon',
       },
       ...dataSourcePropertySchemas,
       {
         key: 'visualization.suffix',
-        label: '后缀',
+        label: widgetText('registry.suffix'),
         type: 'text',
-        placeholder: '如：件、人',
+        placeholder: widgetText('registry.forExampleItemsPeople'),
       },
       {
         key: 'visualization.showTrend',
-        label: '显示趋势',
+        label: widgetText('registry.showTrend'),
         type: 'boolean',
         defaultValue: false,
       },
@@ -96,12 +98,13 @@ const widgetDefinitions: WidgetDefinition[] = [
   },
   {
     type: 'smart-bar-chart',
-    label: '柱状图',
+    label: widgetText('registry.barChart'),
     icon: 'BarChartOutlined',
-    category: '图表',
-    description: '柱状图/条形图',
+    category: widgetText('registry.charts')['zh-CN'],
+    categoryLabel: widgetText('registry.charts'),
+    description: widgetText('registry.columnOrBarChart'),
     defaultConfig: {
-      title: '柱状图',
+      title: widgetText('registry.barChart'),
       dataSource: {
         type: 'aggregate',
         dimensions: [],
@@ -117,20 +120,20 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
         required: true,
       },
       ...dataSourcePropertySchemas,
       {
         key: 'visualization.horizontal',
-        label: '水平显示',
+        label: widgetText('registry.horizontal'),
         type: 'boolean',
         defaultValue: false,
       },
       {
         key: 'visualization.stacked',
-        label: '堆叠显示',
+        label: widgetText('registry.stacked'),
         type: 'boolean',
         defaultValue: false,
       },
@@ -138,12 +141,13 @@ const widgetDefinitions: WidgetDefinition[] = [
   },
   {
     type: 'smart-line-chart',
-    label: '折线图',
+    label: widgetText('registry.lineChart'),
     icon: 'LineChartOutlined',
-    category: '图表',
-    description: '折线图/趋势图',
+    category: widgetText('registry.charts')['zh-CN'],
+    categoryLabel: widgetText('registry.charts'),
+    description: widgetText('registry.lineOrTrendChart'),
     defaultConfig: {
-      title: '折线图',
+      title: widgetText('registry.lineChart'),
       dataSource: {
         type: 'aggregate',
         dimensions: [],
@@ -159,20 +163,20 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
         required: true,
       },
       ...dataSourcePropertySchemas,
       {
         key: 'visualization.smooth',
-        label: '平滑曲线',
+        label: widgetText('registry.smoothCurve'),
         type: 'boolean',
         defaultValue: true,
       },
       {
         key: 'visualization.showArea',
-        label: '显示面积',
+        label: widgetText('registry.showArea'),
         type: 'boolean',
         defaultValue: false,
       },
@@ -180,12 +184,13 @@ const widgetDefinitions: WidgetDefinition[] = [
   },
   {
     type: 'smart-pie-chart',
-    label: '饼图',
+    label: widgetText('registry.pieChart'),
     icon: 'PieChartOutlined',
-    category: '图表',
-    description: '饼图/环形图',
+    category: widgetText('registry.charts')['zh-CN'],
+    categoryLabel: widgetText('registry.charts'),
+    description: widgetText('registry.pieOrDoughnutChart'),
     defaultConfig: {
-      title: '饼图',
+      title: widgetText('registry.pieChart'),
       dataSource: {
         type: 'aggregate',
         dimensions: [],
@@ -201,20 +206,20 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
         required: true,
       },
       ...dataSourcePropertySchemas,
       {
         key: 'visualization.donut',
-        label: '环形图',
+        label: widgetText('registry.doughnut'),
         type: 'boolean',
         defaultValue: false,
       },
       {
         key: 'visualization.showLabels',
-        label: '显示标签',
+        label: widgetText('registry.showLabels'),
         type: 'boolean',
         defaultValue: true,
       },
@@ -222,12 +227,13 @@ const widgetDefinitions: WidgetDefinition[] = [
   },
   {
     type: 'smart-waterfall-chart',
-    label: '瀑布图',
+    label: widgetText('registry.waterfallChart'),
     icon: 'StockOutlined',
-    category: '图表',
-    description: '瀑布图/增减桥（含合计锚点行）',
+    category: widgetText('registry.charts')['zh-CN'],
+    categoryLabel: widgetText('registry.charts'),
+    description: widgetText('registry.waterfallChartWithIncreaseDecreaseAndTotalAnchorRows'),
     defaultConfig: {
-      title: '瀑布图',
+      title: widgetText('registry.waterfallChart'),
       dataSource: {
         type: 'aggregate',
         dimensions: [],
@@ -244,26 +250,26 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
         required: true,
       },
       ...dataSourcePropertySchemas,
       {
         key: 'visualization.totalField',
-        label: '合计行字段（可选）',
+        label: widgetText('registry.totalRowFieldOptional'),
         type: 'text',
         placeholder: 'bridge_kind',
       },
       {
         key: 'visualization.totalValues',
-        label: '合计行取值（逗号分隔）',
+        label: widgetText('registry.totalRowValuesCommaSeparated'),
         type: 'text',
-        placeholder: 'total,subtotal,合计,小计',
+        placeholder: widgetText('registry.totalSubtotal'),
       },
       {
         key: 'visualization.showLabel',
-        label: '显示标签',
+        label: widgetText('registry.showLabels'),
         type: 'boolean',
         defaultValue: true,
       },
@@ -271,12 +277,13 @@ const widgetDefinitions: WidgetDefinition[] = [
   },
   {
     type: 'smart-pareto-chart',
-    label: '帕累托图',
+    label: widgetText('registry.paretoChart'),
     icon: 'BarChartOutlined',
-    category: '图表',
-    description: '帕累托图（柱状+累计百分比线）',
+    category: widgetText('registry.charts')['zh-CN'],
+    categoryLabel: widgetText('registry.charts'),
+    description: widgetText('registry.barsWithACumulativePercentageLine'),
     defaultConfig: {
-      title: '帕累托图',
+      title: widgetText('registry.paretoChart'),
       dataSource: {
         type: 'aggregate',
         dimensions: [],
@@ -292,8 +299,8 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
         required: true,
       },
       ...dataSourcePropertySchemas,
@@ -301,12 +308,13 @@ const widgetDefinitions: WidgetDefinition[] = [
   },
   {
     type: 'smart-gantt-chart',
-    label: '甘特图',
+    label: widgetText('registry.ganttChart'),
     icon: 'OrderedListOutlined',
-    category: '图表',
-    description: '甘特图（任务起止与进度）',
+    category: widgetText('registry.charts')['zh-CN'],
+    categoryLabel: widgetText('registry.charts'),
+    description: widgetText('registry.taskStartEndAndProgressChart'),
     defaultConfig: {
-      title: '甘特图',
+      title: widgetText('registry.ganttChart'),
       dataSource: {
         type: 'aggregate',
         dimensions: [],
@@ -322,8 +330,8 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
         required: true,
       },
       ...dataSourcePropertySchemas,
@@ -331,12 +339,13 @@ const widgetDefinitions: WidgetDefinition[] = [
   },
   {
     type: 'smart-area-chart',
-    label: '面积图',
+    label: widgetText('registry.areaChart'),
     icon: 'AreaChartOutlined',
-    category: '图表',
-    description: '面积图/堆叠面积图',
+    category: widgetText('registry.charts')['zh-CN'],
+    categoryLabel: widgetText('registry.charts'),
+    description: widgetText('registry.areaOrStackedAreaChart'),
     defaultConfig: {
-      title: '面积图',
+      title: widgetText('registry.areaChart'),
       dataSource: {
         type: 'aggregate',
         dimensions: [],
@@ -353,20 +362,20 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
         required: true,
       },
       ...dataSourcePropertySchemas,
       {
         key: 'visualization.smooth',
-        label: '平滑曲线',
+        label: widgetText('registry.smoothCurve'),
         type: 'boolean',
         defaultValue: true,
       },
       {
         key: 'visualization.fillOpacity',
-        label: '填充透明度',
+        label: widgetText('registry.fillOpacity'),
         type: 'number',
         defaultValue: 0.6,
         placeholder: '0-1',
@@ -375,12 +384,13 @@ const widgetDefinitions: WidgetDefinition[] = [
   },
   {
     type: 'smart-funnel-chart',
-    label: '漏斗图',
+    label: widgetText('registry.funnelChart'),
     icon: 'FunnelPlotOutlined',
-    category: '图表',
-    description: '漏斗图/转化图',
+    category: widgetText('registry.charts')['zh-CN'],
+    categoryLabel: widgetText('registry.charts'),
+    description: widgetText('registry.funnelOrConversionChart'),
     defaultConfig: {
-      title: '漏斗图',
+      title: widgetText('registry.funnelChart'),
       dataSource: {
         type: 'aggregate',
         dimensions: [],
@@ -396,19 +406,19 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
         required: true,
       },
       ...dataSourcePropertySchemas,
       {
         key: 'visualization.sort',
-        label: '排序方式',
+        label: widgetText('registry.sortOrder'),
         type: 'select',
         options: [
-          { label: '降序', value: 'descending' },
-          { label: '升序', value: 'ascending' },
-          { label: '不排序', value: 'none' },
+          { label: widgetText('registry.descending'), value: 'descending' },
+          { label: widgetText('registry.ascending'), value: 'ascending' },
+          { label: widgetText('registry.unsorted'), value: 'none' },
         ],
         defaultValue: 'descending',
       },
@@ -416,12 +426,13 @@ const widgetDefinitions: WidgetDefinition[] = [
   },
   {
     type: 'smart-scatter-chart',
-    label: '散点图',
+    label: widgetText('registry.scatterChart'),
     icon: 'DotChartOutlined',
-    category: '图表',
-    description: '散点图/气泡图',
+    category: widgetText('registry.charts')['zh-CN'],
+    categoryLabel: widgetText('registry.charts'),
+    description: widgetText('registry.scatterOrBubbleChart'),
     defaultConfig: {
-      title: '散点图',
+      title: widgetText('registry.scatterChart'),
       dataSource: {
         type: 'aggregate',
         dimensions: [],
@@ -437,14 +448,14 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
         required: true,
       },
       ...dataSourcePropertySchemas,
       {
         key: 'visualization.bubbleMode',
-        label: '气泡模式',
+        label: widgetText('registry.bubbleMode'),
         type: 'boolean',
         defaultValue: false,
       },
@@ -452,12 +463,13 @@ const widgetDefinitions: WidgetDefinition[] = [
   },
   {
     type: 'smart-radar-chart',
-    label: '雷达图',
+    label: widgetText('registry.radarChart'),
     icon: 'RadarChartOutlined',
-    category: '图表',
-    description: '雷达图/多维对比',
+    category: widgetText('registry.charts')['zh-CN'],
+    categoryLabel: widgetText('registry.charts'),
+    description: widgetText('registry.radarChartForMultidimensionalComparison'),
     defaultConfig: {
-      title: '雷达图',
+      title: widgetText('registry.radarChart'),
       dataSource: {
         type: 'aggregate',
         dimensions: [],
@@ -473,24 +485,24 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
         required: true,
       },
       ...dataSourcePropertySchemas,
       {
         key: 'visualization.shape',
-        label: '形状',
+        label: widgetText('registry.shape'),
         type: 'select',
         options: [
-          { label: '多边形', value: 'polygon' },
-          { label: '圆形', value: 'circle' },
+          { label: widgetText('registry.polygon'), value: 'polygon' },
+          { label: widgetText('registry.circle'), value: 'circle' },
         ],
         defaultValue: 'polygon',
       },
       {
         key: 'visualization.showArea',
-        label: '显示面积',
+        label: widgetText('registry.showArea'),
         type: 'boolean',
         defaultValue: true,
       },
@@ -498,12 +510,13 @@ const widgetDefinitions: WidgetDefinition[] = [
   },
   {
     type: 'smart-table-chart',
-    label: '数据表格',
+    label: widgetText('registry.dataTable'),
     icon: 'TableOutlined',
-    category: '数据',
-    description: '表格数据展示',
+    category: widgetText('registry.data')['zh-CN'],
+    categoryLabel: widgetText('registry.data'),
+    description: widgetText('registry.displayTabularData'),
     defaultConfig: {
-      title: '数据表格',
+      title: widgetText('registry.dataTable'),
       dataSource: {
         type: 'aggregate',
         dimensions: [],
@@ -519,20 +532,20 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
         required: true,
       },
       ...dataSourcePropertySchemas,
       {
         key: 'visualization.pageSize',
-        label: '每页行数',
+        label: widgetText('registry.rowsPerPage'),
         type: 'number',
         defaultValue: 10,
       },
       {
         key: 'visualization.striped',
-        label: '斑马纹',
+        label: widgetText('registry.stripedRows'),
         type: 'boolean',
         defaultValue: true,
       },
@@ -541,12 +554,13 @@ const widgetDefinitions: WidgetDefinition[] = [
   // ==================== New Data Analysis Widgets ====================
   {
     type: 'smart-gauge-chart',
-    label: '仪表盘',
+    label: widgetText('registry.gauge'),
     icon: '🎯',
-    category: '图表',
-    description: '仪表盘/单指标展示',
+    category: widgetText('registry.charts')['zh-CN'],
+    categoryLabel: widgetText('registry.charts'),
+    description: widgetText('registry.gaugeDisplayingASingleMetric'),
     defaultConfig: {
-      title: '仪表盘',
+      title: widgetText('registry.gauge'),
       dataSource: {
         type: 'aggregate',
         metrics: [{ field: 'id', aggregation: 'count' }],
@@ -561,26 +575,26 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
         required: true,
       },
       ...dataSourcePropertySchemas,
       {
         key: 'visualization.min',
-        label: '最小值',
+        label: widgetText('registry.minimum'),
         type: 'number',
         defaultValue: 0,
       },
       {
         key: 'visualization.max',
-        label: '最大值',
+        label: widgetText('registry.maximum'),
         type: 'number',
         defaultValue: 100,
       },
       {
         key: 'visualization.splitNumber',
-        label: '刻度分段数',
+        label: widgetText('registry.scaleSegments'),
         type: 'number',
         defaultValue: 10,
       },
@@ -588,12 +602,13 @@ const widgetDefinitions: WidgetDefinition[] = [
   },
   {
     type: 'smart-filter-bar',
-    label: '筛选栏',
+    label: widgetText('registry.filterBar'),
     icon: '🔎',
-    category: '交互',
-    description: '看板级筛选栏(下拉/多选/日期范围),联动刷新全部接收筛选的 widget',
+    category: widgetText('registry.interaction')['zh-CN'],
+    categoryLabel: widgetText('registry.interaction'),
+    description: widgetText('registry.dashboardFiltersSelectMultiselectAndDateRangeRefreshEveryReceivingWidget'),
     defaultConfig: {
-      title: '筛选',
+      title: widgetText('registry.filters'),
       filterFields: [],
       linkage: { groupId: 'amos-filter', enabled: true },
     },
@@ -604,12 +619,13 @@ const widgetDefinitions: WidgetDefinition[] = [
   },
   {
     type: 'smart-progress',
-    label: '进度条',
+    label: widgetText('registry.progressBar'),
     icon: '📈',
-    category: '指标',
-    description: '进度条/环形进度',
+    category: widgetText('registry.metrics')['zh-CN'],
+    categoryLabel: widgetText('registry.metrics'),
+    description: widgetText('registry.linearOrCircularProgressIndicator'),
     defaultConfig: {
-      title: '进度',
+      title: widgetText('registry.progress'),
       dataSource: {
         type: 'aggregate',
         metrics: [{ field: 'id', aggregation: 'count' }],
@@ -624,34 +640,34 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
         required: true,
       },
       ...dataSourcePropertySchemas,
       {
         key: 'visualization.target',
-        label: '目标值',
+        label: widgetText('registry.targetValue'),
         type: 'number',
         defaultValue: 100,
       },
       {
         key: 'visualization.format',
-        label: '显示格式',
+        label: widgetText('registry.displayFormat'),
         type: 'select',
         options: [
-          { label: '百分比', value: 'percent' },
-          { label: '分数', value: 'fraction' },
+          { label: widgetText('registry.percentage'), value: 'percent' },
+          { label: widgetText('registry.fraction'), value: 'fraction' },
         ],
         defaultValue: 'percent',
       },
       {
         key: 'visualization.shape',
-        label: '形状',
+        label: widgetText('registry.shape'),
         type: 'select',
         options: [
-          { label: '条形', value: 'bar' },
-          { label: '圆形', value: 'circle' },
+          { label: widgetText('registry.bar'), value: 'bar' },
+          { label: widgetText('registry.circle'), value: 'circle' },
         ],
         defaultValue: 'bar',
       },
@@ -659,12 +675,13 @@ const widgetDefinitions: WidgetDefinition[] = [
   },
   {
     type: 'smart-heatmap-chart',
-    label: '热力图',
+    label: widgetText('registry.heatmap'),
     icon: '🗺️',
-    category: '图表',
-    description: '热力图/矩阵图',
+    category: widgetText('registry.charts')['zh-CN'],
+    categoryLabel: widgetText('registry.charts'),
+    description: widgetText('registry.heatmapOrMatrixChart'),
     defaultConfig: {
-      title: '热力图',
+      title: widgetText('registry.heatmap'),
       dataSource: {
         type: 'aggregate',
         dimensions: [],
@@ -680,33 +697,34 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
         required: true,
       },
       ...dataSourcePropertySchemas,
       {
         key: 'visualization.xField',
-        label: 'X轴字段',
+        label: widgetText('registry.xAxisField'),
         type: 'text',
-        placeholder: '留空自动检测',
+        placeholder: widgetText('registry.leaveBlankToDetectAutomatically'),
       },
       {
         key: 'visualization.yField',
-        label: 'Y轴字段',
+        label: widgetText('registry.yAxisField'),
         type: 'text',
-        placeholder: '留空自动检测',
+        placeholder: widgetText('registry.leaveBlankToDetectAutomatically'),
       },
     ],
   },
   {
     type: 'smart-treemap-chart',
-    label: '矩形树图',
+    label: widgetText('registry.treemap'),
     icon: '🌳',
-    category: '图表',
-    description: '矩形树图/层级占比',
+    category: widgetText('registry.charts')['zh-CN'],
+    categoryLabel: widgetText('registry.charts'),
+    description: widgetText('registry.treemapShowingHierarchicalProportions'),
     defaultConfig: {
-      title: '矩形树图',
+      title: widgetText('registry.treemap'),
       dataSource: {
         type: 'aggregate',
         dimensions: [],
@@ -722,33 +740,34 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
         required: true,
       },
       ...dataSourcePropertySchemas,
       {
         key: 'visualization.nameField',
-        label: '名称字段',
+        label: widgetText('registry.nameField'),
         type: 'text',
-        placeholder: '留空自动检测',
+        placeholder: widgetText('registry.leaveBlankToDetectAutomatically'),
       },
       {
         key: 'visualization.valueField',
-        label: '值字段',
+        label: widgetText('registry.valueField'),
         type: 'text',
-        placeholder: '留空自动检测',
+        placeholder: widgetText('registry.leaveBlankToDetectAutomatically'),
       },
     ],
   },
   {
     type: 'smart-map-chart',
-    label: '地图',
+    label: widgetText('registry.map'),
     icon: '🌍',
-    category: '图表',
-    description: '地图可视化（需要地理数据）',
+    category: widgetText('registry.charts')['zh-CN'],
+    categoryLabel: widgetText('registry.charts'),
+    description: widgetText('registry.mapVisualizationRequiringGeographicData'),
     defaultConfig: {
-      title: '地图',
+      title: widgetText('registry.map'),
       dataSource: {
         type: 'aggregate',
         dimensions: [],
@@ -764,18 +783,18 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
         required: true,
       },
       ...dataSourcePropertySchemas,
       {
         key: 'visualization.mapRegion',
-        label: '地图区域',
+        label: widgetText('registry.mapRegion'),
         type: 'select',
         options: [
-          { label: '中国', value: 'china' },
-          { label: '世界', value: 'world' },
+          { label: widgetText('registry.china'), value: 'china' },
+          { label: widgetText('registry.world'), value: 'world' },
         ],
         defaultValue: 'china',
       },
@@ -783,12 +802,13 @@ const widgetDefinitions: WidgetDefinition[] = [
   },
   {
     type: 'smart-leaderboard',
-    label: '排行榜',
+    label: widgetText('registry.ranking'),
     icon: '🏆',
-    category: '数据',
-    description: '排名列表展示',
+    category: widgetText('registry.data')['zh-CN'],
+    categoryLabel: widgetText('registry.data'),
+    description: widgetText('registry.displayARankedList'),
     defaultConfig: {
-      title: '排行榜',
+      title: widgetText('registry.ranking'),
       dataSource: {
         type: 'aggregate',
         dimensions: [],
@@ -804,38 +824,39 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
         required: true,
       },
       ...dataSourcePropertySchemas,
       {
         key: 'visualization.maxItems',
-        label: '最大条目数',
+        label: widgetText('registry.maximumItems'),
         type: 'number',
         defaultValue: 10,
       },
       {
         key: 'visualization.rankField',
-        label: '名称字段',
+        label: widgetText('registry.nameField'),
         type: 'text',
-        placeholder: '留空自动检测',
+        placeholder: widgetText('registry.leaveBlankToDetectAutomatically'),
       },
       {
         key: 'visualization.valueField',
-        label: '值字段',
+        label: widgetText('registry.valueField'),
         type: 'text',
-        placeholder: '留空自动检测',
+        placeholder: widgetText('registry.leaveBlankToDetectAutomatically'),
       },
     ],
   },
   // ==================== Content Widgets ====================
   {
     type: 'smart-rich-text',
-    label: '富文本',
+    label: widgetText('registry.richText'),
     icon: '📝',
-    category: '内容',
-    description: '富文本/HTML内容展示',
+    category: widgetText('registry.content')['zh-CN'],
+    categoryLabel: widgetText('registry.content'),
+    description: widgetText('registry.displayRichTextOrHTMLContent'),
     defaultConfig: {
       title: '',
       dataSource: { type: 'static' },
@@ -849,18 +870,18 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
       },
       {
         key: 'visualization.content',
-        label: '内容',
+        label: widgetText('registry.content'),
         type: 'text',
-        placeholder: '输入HTML或Markdown内容',
+        placeholder: widgetText('registry.enterHTMLOrMarkdownContent'),
       },
       {
         key: 'visualization.format',
-        label: '格式',
+        label: widgetText('registry.format'),
         type: 'select',
         options: [
           { label: 'html', value: 'html' },
@@ -872,10 +893,11 @@ const widgetDefinitions: WidgetDefinition[] = [
   },
   {
     type: 'smart-image',
-    label: '图片',
+    label: widgetText('registry.image'),
     icon: '🖼️',
-    category: '内容',
-    description: '图片展示',
+    category: widgetText('registry.content')['zh-CN'],
+    categoryLabel: widgetText('registry.content'),
+    description: widgetText('registry.displayAnImage'),
     defaultConfig: {
       title: '',
       dataSource: { type: 'static' },
@@ -889,30 +911,30 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
       },
       {
         key: 'visualization.src',
-        label: '图片地址',
+        label: widgetText('registry.imageURL'),
         type: 'text',
         required: true,
         placeholder: 'https://example.com/image.png',
       },
       {
         key: 'visualization.alt',
-        label: '替代文本',
+        label: widgetText('registry.alternativeText'),
         type: 'text',
-        placeholder: '图片描述',
+        placeholder: widgetText('registry.imageDescription'),
       },
       {
         key: 'visualization.objectFit',
-        label: '填充模式',
+        label: widgetText('registry.fitMode'),
         type: 'select',
         options: [
-          { label: '覆盖', value: 'cover' },
-          { label: '包含', value: 'contain' },
-          { label: '拉伸', value: 'fill' },
+          { label: widgetText('registry.cover'), value: 'cover' },
+          { label: widgetText('registry.contain'), value: 'contain' },
+          { label: widgetText('registry.stretch'), value: 'fill' },
         ],
         defaultValue: 'cover',
       },
@@ -920,10 +942,11 @@ const widgetDefinitions: WidgetDefinition[] = [
   },
   {
     type: 'smart-iframe',
-    label: '内嵌页面',
+    label: widgetText('registry.embeddedPage'),
     icon: '🌐',
-    category: '内容',
-    description: '嵌入外部页面',
+    category: widgetText('registry.content')['zh-CN'],
+    categoryLabel: widgetText('registry.content'),
+    description: widgetText('registry.embedAnExternalPage'),
     defaultConfig: {
       title: '',
       dataSource: { type: 'static' },
@@ -937,12 +960,12 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
       },
       {
         key: 'visualization.src',
-        label: '页面地址',
+        label: widgetText('registry.pageURL'),
         type: 'text',
         required: true,
         placeholder: 'https://example.com',
@@ -951,12 +974,13 @@ const widgetDefinitions: WidgetDefinition[] = [
   },
   {
     type: 'smart-countdown',
-    label: '倒计时',
+    label: widgetText('registry.countdown'),
     icon: '⏰',
-    category: '内容',
-    description: '目标日期倒计时',
+    category: widgetText('registry.content')['zh-CN'],
+    categoryLabel: widgetText('registry.content'),
+    description: widgetText('registry.countdownToATargetDate'),
     defaultConfig: {
-      title: '倒计时',
+      title: widgetText('registry.countdown'),
       dataSource: { type: 'static' },
     },
     defaultSize: {
@@ -968,23 +992,23 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
       },
       {
         key: 'visualization.targetDate',
-        label: '目标日期',
+        label: widgetText('registry.targetDate'),
         type: 'text',
         required: true,
         placeholder: '2026-12-31T00:00:00',
       },
       {
         key: 'visualization.format',
-        label: '显示格式',
+        label: widgetText('registry.displayFormat'),
         type: 'select',
         options: [
-          { label: '完整 (天时分秒)', value: 'full' },
-          { label: '仅天数', value: 'days' },
+          { label: widgetText('registry.fullDaysHoursMinutesSeconds'), value: 'full' },
+          { label: widgetText('registry.daysOnly'), value: 'days' },
         ],
         defaultValue: 'full',
       },
@@ -993,12 +1017,13 @@ const widgetDefinitions: WidgetDefinition[] = [
   // ==================== New Chart Widgets ====================
   {
     type: 'smart-wordcloud-chart',
-    label: '词云',
+    label: widgetText('registry.wordCloud'),
     icon: '☁️',
-    category: '图表',
-    description: '按词频大小展示关键词分布',
+    category: widgetText('registry.charts')['zh-CN'],
+    categoryLabel: widgetText('registry.charts'),
+    description: widgetText('registry.displayKeywordsSizedByFrequency'),
     defaultConfig: {
-      title: '词云',
+      title: widgetText('registry.wordCloud'),
       dataSource: {
         type: 'aggregate',
         metrics: [{ field: 'id', aggregation: 'count' }],
@@ -1015,38 +1040,38 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
         required: true,
       },
       ...dataSourcePropertySchemas,
       {
         key: 'visualization.shape',
-        label: '形状',
+        label: widgetText('registry.shape'),
         type: 'select',
         options: [
-          { label: '圆形', value: 'circle' },
-          { label: '矩形', value: 'rect' },
-          { label: '菱形', value: 'diamond' },
-          { label: '三角形', value: 'triangle' },
+          { label: widgetText('registry.circle'), value: 'circle' },
+          { label: widgetText('registry.rectangle'), value: 'rect' },
+          { label: widgetText('registry.diamond'), value: 'diamond' },
+          { label: widgetText('registry.triangle'), value: 'triangle' },
         ],
         defaultValue: 'circle',
       },
       {
         key: 'visualization.colorTheme',
-        label: '颜色主题',
+        label: widgetText('registry.colorTheme'),
         type: 'select',
         options: [
-          { label: '随机', value: 'random' },
-          { label: '暖色', value: 'warm' },
-          { label: '冷色', value: 'cool' },
-          { label: '品牌色', value: 'brand' },
+          { label: widgetText('registry.random'), value: 'random' },
+          { label: widgetText('registry.warm'), value: 'warm' },
+          { label: widgetText('registry.cool'), value: 'cool' },
+          { label: widgetText('registry.brand'), value: 'brand' },
         ],
         defaultValue: 'random',
       },
       {
         key: 'visualization.gridSize',
-        label: '词间距',
+        label: widgetText('registry.wordSpacing'),
         type: 'number',
         defaultValue: 8,
       },
@@ -1054,12 +1079,13 @@ const widgetDefinitions: WidgetDefinition[] = [
   },
   {
     type: 'smart-combo-chart',
-    label: '组合图',
+    label: widgetText('registry.combinationChart'),
     icon: '📈',
-    category: '图表',
-    description: '多系列混合图表，支持柱状+折线+面积+散点+双Y轴',
+    category: widgetText('registry.charts')['zh-CN'],
+    categoryLabel: widgetText('registry.charts'),
+    description: widgetText('registry.mixedSeriesChartWithBarsLinesAreasScatterAndDualYAxes'),
     defaultConfig: {
-      title: '组合图',
+      title: widgetText('registry.combinationChart'),
       dataSource: {
         type: 'aggregate',
         metrics: [
@@ -1078,48 +1104,48 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
         required: true,
       },
       ...dataSourcePropertySchemas,
       {
         key: 'visualization.smooth',
-        label: '平滑曲线',
+        label: widgetText('registry.smoothCurve'),
         type: 'boolean',
         defaultValue: false,
       },
       {
         key: 'visualization.stack',
-        label: '堆叠',
+        label: widgetText('registry.stacking'),
         type: 'boolean',
         defaultValue: false,
       },
       {
         key: 'visualization.showDataZoom',
-        label: '数据缩放',
+        label: widgetText('registry.dataZoom'),
         type: 'boolean',
         defaultValue: false,
       },
       {
         key: 'visualization.yAxisLeft.name',
-        label: '左Y轴名称',
+        label: widgetText('registry.leftYAxisName'),
         type: 'text',
       },
       {
         key: 'visualization.yAxisLeft.formatter',
-        label: '左Y轴格式',
+        label: widgetText('registry.leftYAxisFormat'),
         type: 'text',
-        placeholder: '{value}万',
+        placeholder: widgetText('registry.value10000'),
       },
       {
         key: 'visualization.yAxisRight.name',
-        label: '右Y轴名称',
+        label: widgetText('registry.rightYAxisName'),
         type: 'text',
       },
       {
         key: 'visualization.yAxisRight.formatter',
-        label: '右Y轴格式',
+        label: widgetText('registry.rightYAxisFormat'),
         type: 'text',
         placeholder: '{value}%',
       },
@@ -1127,10 +1153,11 @@ const widgetDefinitions: WidgetDefinition[] = [
   },
   {
     type: 'smart-nps-chart',
-    label: 'NPS 图',
+    label: widgetText('registry.npsChart'),
     icon: '🎯',
-    category: '图表',
-    description: '净推荐值仪表盘，自动将0-10评分分为推荐者/中立者/贬损者',
+    category: widgetText('registry.charts')['zh-CN'],
+    categoryLabel: widgetText('registry.charts'),
+    description: widgetText('registry.netPromoterScoreGaugeGrouping010RatingsIntoPromotersPassivesAndDetractors'),
     defaultConfig: {
       title: 'NPS',
       dataSource: {
@@ -1149,32 +1176,32 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
         required: true,
       },
       ...dataSourcePropertySchemas,
       {
         key: 'visualization.scoreField',
-        label: '评分字段',
+        label: widgetText('registry.ratingField'),
         type: 'text',
-        placeholder: '0-10 数值字段名',
+        placeholder: widgetText('registry.nameOfANumeric010RatingField'),
       },
       {
         key: 'visualization.showPercentage',
-        label: '显示百分比',
+        label: widgetText('registry.showPercentage'),
         type: 'boolean',
         defaultValue: true,
       },
       {
         key: 'visualization.showLegend',
-        label: '显示图例',
+        label: widgetText('registry.showLegend'),
         type: 'boolean',
         defaultValue: true,
       },
       {
         key: 'visualization.ringWidth',
-        label: '环形宽度',
+        label: widgetText('registry.ringWidth'),
         type: 'number',
         defaultValue: 30,
       },
@@ -1182,12 +1209,13 @@ const widgetDefinitions: WidgetDefinition[] = [
   },
   {
     type: 'smart-gallery',
-    label: '画册',
+    label: widgetText('registry.gallery'),
     icon: '🖼️',
-    category: '内容',
-    description: '网格卡片画册，支持静态图片和模型数据动态渲染',
+    category: widgetText('registry.content')['zh-CN'],
+    categoryLabel: widgetText('registry.content'),
+    description: widgetText('registry.gridGallerySupportingStaticImagesAndDynamicModelData'),
     defaultConfig: {
-      title: '画册',
+      title: widgetText('registry.gallery'),
       dataSource: { type: 'static' },
     },
     defaultSize: {
@@ -1201,65 +1229,65 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
       },
       ...dataSourcePropertySchemas,
       {
         key: 'visualization.columns',
-        label: '列数',
+        label: widgetText('registry.columns'),
         type: 'select',
         options: [
-          { label: '2 列', value: '2' },
-          { label: '3 列', value: '3' },
-          { label: '4 列', value: '4' },
+          { label: widgetText('registry.2Columns'), value: '2' },
+          { label: widgetText('registry.3Columns'), value: '3' },
+          { label: widgetText('registry.4Columns'), value: '4' },
         ],
         defaultValue: '3',
       },
       {
         key: 'visualization.imageField',
-        label: '图片字段',
+        label: widgetText('registry.imageField'),
         type: 'text',
-        placeholder: '图片URL字段名',
+        placeholder: widgetText('registry.imageURLFieldName'),
       },
       {
         key: 'visualization.titleField',
-        label: '标题字段',
+        label: widgetText('registry.titleField'),
         type: 'text',
-        placeholder: '标题字段名',
+        placeholder: widgetText('registry.titleFieldName'),
       },
       {
         key: 'visualization.descriptionField',
-        label: '摘要字段',
+        label: widgetText('registry.summaryField'),
         type: 'text',
-        placeholder: '摘要字段名',
+        placeholder: widgetText('registry.summaryFieldName'),
       },
       {
         key: 'visualization.imageHeight',
-        label: '图片高度',
+        label: widgetText('registry.imageHeight'),
         type: 'number',
         defaultValue: 160,
       },
       {
         key: 'visualization.imageFit',
-        label: '图片填充',
+        label: widgetText('registry.imageFit'),
         type: 'select',
         options: [
-          { label: '裁剪填满', value: 'cover' },
-          { label: '完整显示', value: 'contain' },
-          { label: '拉伸', value: 'fill' },
+          { label: widgetText('registry.cropToFill'), value: 'cover' },
+          { label: widgetText('registry.showEntireImage'), value: 'contain' },
+          { label: widgetText('registry.stretch'), value: 'fill' },
         ],
         defaultValue: 'cover',
       },
       {
         key: 'visualization.showLightbox',
-        label: '灯箱预览',
+        label: widgetText('registry.lightboxPreview'),
         type: 'boolean',
         defaultValue: true,
       },
       {
         key: 'visualization.gap',
-        label: '卡片间距',
+        label: widgetText('registry.cardGap'),
         type: 'number',
         defaultValue: 12,
       },
@@ -1267,12 +1295,13 @@ const widgetDefinitions: WidgetDefinition[] = [
   },
   {
     type: 'smart-kanban',
-    label: '看板',
+    label: widgetText('registry.kanban'),
     icon: '📋',
-    category: '视图',
-    description: '按维度字段分列展示数据，纯展示模式',
+    category: widgetText('registry.views')['zh-CN'],
+    categoryLabel: widgetText('registry.views'),
+    description: widgetText('registry.displayDataInDimensionBasedColumnsWithoutEditing'),
     defaultConfig: {
-      title: '看板',
+      title: widgetText('registry.kanban'),
       dataSource: {
         type: 'aggregate',
         metrics: [{ field: 'id', aggregation: 'count' }],
@@ -1289,44 +1318,44 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
       },
       ...dataSourcePropertySchemas,
       {
         key: 'visualization.groupField',
-        label: '分组字段',
+        label: widgetText('registry.groupField'),
         type: 'text',
         required: true,
-        placeholder: '如 status、stage',
+        placeholder: widgetText('registry.forExampleStatusStage'),
       },
       {
         key: 'visualization.titleField',
-        label: '卡片标题字段',
+        label: widgetText('registry.cardTitleField'),
         type: 'text',
-        placeholder: '如 name、title',
+        placeholder: widgetText('registry.forExampleNameTitle'),
       },
       {
         key: 'visualization.descriptionField',
-        label: '卡片描述字段',
+        label: widgetText('registry.cardDescriptionField'),
         type: 'text',
-        placeholder: '如 description',
+        placeholder: widgetText('registry.forExampleDescription'),
       },
       {
         key: 'visualization.maxCardsPerColumn',
-        label: '每列最大卡片数',
+        label: widgetText('registry.maximumCardsPerColumn'),
         type: 'number',
         defaultValue: 10,
       },
       {
         key: 'visualization.showCount',
-        label: '显示数量',
+        label: widgetText('registry.showCount'),
         type: 'boolean',
         defaultValue: true,
       },
       {
         key: 'visualization.cardClickUrl',
-        label: '卡片跳转URL',
+        label: widgetText('registry.cardLinkURL'),
         type: 'text',
         placeholder: '/model/{id}',
       },
@@ -1335,12 +1364,13 @@ const widgetDefinitions: WidgetDefinition[] = [
   // ==================== Workbench Widgets: Stats ====================
   {
     type: 'smart-stats-row',
-    label: '统计概览',
+    label: widgetText('registry.statisticsOverview'),
     icon: '📊',
-    category: '工作台 · 统计',
-    description: '多指标统计行，一行展示关键业务数字',
+    category: widgetText('registry.workbenchStatistics')['zh-CN'],
+    categoryLabel: widgetText('registry.workbenchStatistics'),
+    description: widgetText('registry.displayKeyBusinessMetricsInASingleRow'),
     defaultConfig: {
-      title: '统计概览',
+      title: widgetText('registry.statisticsOverview'),
       dataSource: { type: 'static' },
     },
     defaultSize: {
@@ -1352,20 +1382,21 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
         required: true,
       },
     ],
   },
   {
     type: 'smart-stats-card',
-    label: '统计卡片',
+    label: widgetText('registry.statisticsCard'),
     icon: '🔢',
-    category: '工作台 · 统计',
-    description: '单个指标统计卡片，支持趋势展示',
+    category: widgetText('registry.workbenchStatistics')['zh-CN'],
+    categoryLabel: widgetText('registry.workbenchStatistics'),
+    description: widgetText('registry.singleMetricStatisticsCardWithTrendDisplay'),
     defaultConfig: {
-      title: '统计卡片',
+      title: widgetText('registry.statisticsCard'),
       dataSource: { type: 'static' },
     },
     defaultSize: {
@@ -1379,27 +1410,28 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
         required: true,
       },
       {
         key: 'visualization.statKey',
-        label: '指标键',
+        label: widgetText('registry.metricKey'),
         type: 'text',
-        placeholder: '如：totalLeads, openOpps',
+        placeholder: widgetText('registry.forExampleTotalLeadsOpenOpps'),
       },
     ],
   },
   // ==================== Workbench Widgets: Tasks ====================
   {
     type: 'smart-inbox',
-    label: '待办事项',
+    label: widgetText('registry.tasks'),
     icon: '📋',
-    category: '工作台 · 任务',
-    description: '显示当前用户的待办审批和任务',
+    category: widgetText('registry.workbenchTasks')['zh-CN'],
+    categoryLabel: widgetText('registry.workbenchTasks'),
+    description: widgetText('registry.displayPendingApprovalsAndTasksForTheCurrentUser'),
     defaultConfig: {
-      title: '待办事项',
+      title: widgetText('registry.tasks'),
       dataSource: { type: 'static' },
     },
     defaultSize: {
@@ -1413,32 +1445,33 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
         required: true,
       },
       {
         key: 'visualization.maxItems',
-        label: '最大显示条数',
+        label: widgetText('registry.maximumRows'),
         type: 'number',
         defaultValue: 8,
       },
       {
         key: 'visualization.itemTypes',
-        label: '事项类型筛选',
+        label: widgetText('registry.taskTypeFilter'),
         type: 'text',
-        placeholder: '如：approval,task（留空显示全部）',
+        placeholder: widgetText('registry.forExampleApprovalTaskLeaveBlankToShowAll'),
       },
     ],
   },
   {
     type: 'smart-calendar',
-    label: '日历',
+    label: widgetText('registry.calendar'),
     icon: '📅',
-    category: '工作台 · 任务',
-    description: '日历视图，展示日程和任务',
+    category: widgetText('registry.workbenchTasks')['zh-CN'],
+    categoryLabel: widgetText('registry.workbenchTasks'),
+    description: widgetText('registry.calendarShowingSchedulesAndTasks'),
     defaultConfig: {
-      title: '日历',
+      title: widgetText('registry.calendar'),
       dataSource: { type: 'static' },
     },
     defaultSize: {
@@ -1452,8 +1485,8 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
         required: true,
       },
     ],
@@ -1461,12 +1494,13 @@ const widgetDefinitions: WidgetDefinition[] = [
   // ==================== Workbench Widgets: General ====================
   {
     type: 'smart-shortcuts',
-    label: '快捷入口',
+    label: widgetText('registry.shortcuts'),
     icon: '⚡',
-    category: '工作台 · 通用',
-    description: '常用功能的快捷操作入口',
+    category: widgetText('registry.workbenchGeneral')['zh-CN'],
+    categoryLabel: widgetText('registry.workbenchGeneral'),
+    description: widgetText('registry.quickAccessToFrequentlyUsedActions'),
     defaultConfig: {
-      title: '快捷入口',
+      title: widgetText('registry.shortcuts'),
       dataSource: { type: 'static' },
     },
     defaultSize: {
@@ -1480,19 +1514,19 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
         required: true,
       },
       {
         key: 'visualization.columns',
-        label: '每行列数',
+        label: widgetText('registry.columnsPerRow'),
         type: 'number',
         defaultValue: 3,
       },
       {
         key: 'personalizable',
-        label: '允许用户个性化',
+        label: widgetText('registry.allowPersonalization'),
         type: 'boolean',
         defaultValue: false,
       },
@@ -1500,12 +1534,13 @@ const widgetDefinitions: WidgetDefinition[] = [
   },
   {
     type: 'smart-recent',
-    label: '最近访问',
+    label: widgetText('registry.recentItems'),
     icon: '🕐',
-    category: '工作台 · 通用',
-    description: '显示最近访问的页面和记录',
+    category: widgetText('registry.workbenchGeneral')['zh-CN'],
+    categoryLabel: widgetText('registry.workbenchGeneral'),
+    description: widgetText('registry.displayRecentlyVisitedPagesAndRecords'),
     defaultConfig: {
-      title: '最近访问',
+      title: widgetText('registry.recentItems'),
       dataSource: { type: 'static' },
     },
     defaultSize: {
@@ -1519,13 +1554,13 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
         required: true,
       },
       {
         key: 'visualization.maxItems',
-        label: '最大显示条数',
+        label: widgetText('registry.maximumRows'),
         type: 'number',
         defaultValue: 8,
       },
@@ -1533,12 +1568,13 @@ const widgetDefinitions: WidgetDefinition[] = [
   },
   {
     type: 'smart-announcement',
-    label: '公告',
+    label: widgetText('registry.announcements'),
     icon: '📢',
-    category: '工作台 · 通用',
-    description: '公告和通知展示',
+    category: widgetText('registry.workbenchGeneral')['zh-CN'],
+    categoryLabel: widgetText('registry.workbenchGeneral'),
+    description: widgetText('registry.displayAnnouncementsAndNotifications'),
     defaultConfig: {
-      title: '公告',
+      title: widgetText('registry.announcements'),
       dataSource: { type: 'static' },
     },
     defaultSize: {
@@ -1552,20 +1588,21 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
         required: true,
       },
     ],
   },
   {
     type: 'smart-quick-note',
-    label: '快捷便签',
+    label: widgetText('registry.quickNote'),
     icon: '📝',
-    category: '工作台 · 通用',
-    description: '快速记录笔记和备忘',
+    category: widgetText('registry.workbenchGeneral')['zh-CN'],
+    categoryLabel: widgetText('registry.workbenchGeneral'),
+    description: widgetText('registry.quicklyCaptureNotesAndReminders'),
     defaultConfig: {
-      title: '快捷便签',
+      title: widgetText('registry.quickNote'),
       dataSource: { type: 'static' },
     },
     defaultSize: {
@@ -1579,8 +1616,8 @@ const widgetDefinitions: WidgetDefinition[] = [
     configSchema: [
       {
         key: 'title',
-        label: '标题',
-        type: 'text',
+        label: widgetText('registry.title'),
+        type: 'localizedText',
         required: true,
       },
     ],

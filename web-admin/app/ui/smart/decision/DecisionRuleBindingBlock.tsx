@@ -1,3 +1,6 @@
+import { useI18n } from '~/contexts/I18nContext';
+import { bindingText, type BindingTextKey } from './decisionBindingText';
+import { bindingPresentation } from './decisionBindingPresentation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ConditionBuilder, type FieldOption } from '~/shared/decision/ui/ConditionBuilder';
 import { group, type GroupNode } from '~/shared/decision/ast/conditionAst';
@@ -204,43 +207,16 @@ interface DecisionRuleBindingBlockProps {
   api?: RuleBindingDecisionApi;
 }
 
-const DEFAULT_FIELDS: FieldOption[] = [
-  { scope: 'record', path: 'data.amount', label: '金额', dataType: 'decimal' },
-  {
-    scope: 'record',
-    path: 'data.priority',
-    label: '优先级',
-    dataType: 'enum',
-    options: ['HIGH', 'NORMAL', 'LOW'],
-  },
-  { scope: 'actor', path: 'departmentId', label: '用户部门', dataType: 'department' },
-];
-
-const DEFAULT_DECISIONS: DecisionOption[] = [
-  { code: 'approval_routing', name: '审批路由' },
-  { code: 'sla_deadline', name: 'SLA 截止时间' },
-  {
-    code: 'complaint_sla_deadline',
-    name: '请假审批 SLA 截止时间',
-    outputs: [
-      { id: 'deadlineMinutes', label: '截止分钟', dataType: 'integer' },
-      { id: 'warningBeforeMinutes', label: '提前提醒分钟', dataType: 'integer' },
-      { id: 'escalationLevel', label: '升级等级', dataType: 'string' },
-    ],
-  },
-];
-
-const DECISION_NAME_OVERRIDES: Record<string, string> = {
-  complaint_sla_deadline: '请假审批 SLA 截止时间',
-  approval_routing: '请假审批分派',
-  leave_request_automation: '请假申请自动化策略',
-};
-
 const STALE_DECISION_NAMES = new Set(['投诉 SLA 截止时间', '审批路由', '']);
 
-function mergeDecisionOptions(configured?: DecisionOption[]): DecisionOption[] {
-  if (!configured || configured.length === 0) return DEFAULT_DECISIONS;
-  const byCode = new Map(DEFAULT_DECISIONS.map((decision) => [decision.code, decision]));
+function mergeDecisionOptions(
+  configured?: DecisionOption[],
+  locale: string = 'zh-CN',
+): DecisionOption[] {
+  if (!configured || configured.length === 0) return bindingPresentation(locale).DEFAULT_DECISIONS;
+  const byCode = new Map(
+    bindingPresentation(locale).DEFAULT_DECISIONS.map((decision) => [decision.code, decision]),
+  );
   configured.forEach((decision) => {
     const fallback = byCode.get(decision.code);
     byCode.set(decision.code, {
@@ -295,56 +271,14 @@ const OUTPUT_TARGET_KINDS: OutputTargetKind[] = [
   'PERMISSION_CONTEXT',
 ];
 
-const VERSION_POLICY_LABELS: Record<DecisionVersionPolicy, string> = {
-  LATEST_PUBLISHED: '最新已发布',
-  FIXED_VERSION: '固定版本',
-  VERSION_TAG: '版本标签',
-  ROLLOUT: '灰度发布',
-};
-
-const FALLBACK_MODE_LABELS: Record<DecisionBindingDraft['fallbackMode'], string> = {
-  FAIL_CLOSED: '异常时阻断',
-  FAIL_OPEN: '异常时放行',
-  DEFAULT_VALUE: '使用默认值',
-};
-
-const OUTPUT_TARGET_KIND_LABELS: Record<OutputTargetKind, string> = {
-  ACTION_PARAM: '动作参数',
-  FIELD: '业务字段',
-  PROCESS_VARIABLE: '流程变量',
-  SLA_FIELD: 'SLA 字段',
-  PERMISSION_CONTEXT: '权限上下文',
-};
-
-const RESULT_STATUS_LABELS: Record<string, string> = {
-  MATCHED: '已命中',
-  NOT_MATCHED: '未命中',
-  ERROR: '执行异常',
-  SKIPPED: '已跳过',
-  UNKNOWN: '未知状态',
-};
-
-const FIELD_SCOPE_LABELS: Record<FieldOption['scope'], string> = {
-  meta: '元数据',
-  event: '事件',
-  record: '业务记录',
-  before: '变更前',
-  after: '变更后',
-  process: '流程',
-  task: '任务',
-  sla: 'SLA',
-  actor: '操作者',
-  tenant: '租户',
-  time: '时间',
-  env: '环境',
-};
-
 function fieldKey(field: Pick<FieldOption, 'scope' | 'path'>): string {
   return `${field.scope}:${field.path}`;
 }
 
-function fieldGroupLabel(field: FieldOption): string {
-  return field.modelName || FIELD_SCOPE_LABELS[field.scope] || field.scope;
+function fieldGroupLabel(field: FieldOption, locale: string = 'zh-CN'): string {
+  return (
+    field.modelName || bindingPresentation(locale).FIELD_SCOPE_LABELS[field.scope] || field.scope
+  );
 }
 
 function fieldSearchText(field: FieldOption): string {
@@ -358,13 +292,16 @@ function isVisibleRuleField(field: FieldOption): boolean {
   return field.visible !== false;
 }
 
-function ruleInputDisabledReason(field: FieldOption): string | undefined {
-  if (field.masked === true) return '字段已脱敏';
+function ruleInputDisabledReason(field: FieldOption, locale: string = 'zh-CN'): string | undefined {
+  if (field.masked === true) return bindingText('maskedField', locale);
   return undefined;
 }
 
-function ruleInputOptionNote(field: FieldOption): string | undefined {
-  return ruleInputDisabledReason(field) ?? (field.editable === false ? '只读字段' : undefined);
+function ruleInputOptionNote(field: FieldOption, locale: string = 'zh-CN'): string | undefined {
+  return (
+    ruleInputDisabledReason(field, locale) ??
+    (field.editable === false ? bindingText('readOnlyField', locale) : undefined)
+  );
 }
 
 function isRuleInputSelectable(field: FieldOption): boolean {
@@ -377,10 +314,13 @@ function filterFieldOptions(fields: FieldOption[], query: string): FieldOption[]
   return fields.filter((field) => fieldSearchText(field).includes(normalized));
 }
 
-function groupFieldOptions(fields: FieldOption[]): Array<{ label: string; fields: FieldOption[] }> {
+function groupFieldOptions(
+  fields: FieldOption[],
+  locale: string = 'zh-CN',
+): Array<{ label: string; fields: FieldOption[] }> {
   const grouped = new Map<string, FieldOption[]>();
   fields.forEach((field) => {
-    const label = fieldGroupLabel(field);
+    const label = fieldGroupLabel(field, locale);
     grouped.set(label, [...(grouped.get(label) ?? []), field]);
   });
   return Array.from(grouped, ([label, groupFields]) => ({ label, fields: groupFields }));
@@ -627,9 +567,9 @@ function buildRuleConsumerBinding(
   };
 }
 
-function errorMessage(error: unknown): string {
+function errorMessage(error: unknown, locale: string = 'zh-CN'): string {
   if (error instanceof Error && error.message) return error.message;
-  return '请求失败';
+  return bindingText('requestFailed', locale);
 }
 
 function versionPolicyToEvaluateBinding(
@@ -785,27 +725,38 @@ function impactCount(impact: DecisionImpact | null): number {
   return (impact?.incoming?.length ?? 0) + (impact?.outgoing?.length ?? 0);
 }
 
-function getDecisionName(decisions: DecisionOption[], decisionCode: string): string {
+function getDecisionName(
+  decisions: DecisionOption[],
+  decisionCode: string,
+  locale: string = 'zh-CN',
+): string {
   const decision = decisions.find((candidate) => candidate.code === decisionCode);
-  return decisionDisplayName(decisionCode, decision?.name);
+  return decisionDisplayName(decisionCode, decision?.name, locale);
 }
 
 function getFieldDisplayName(
   fields: FieldOption[],
   scope: FieldOption['scope'],
   path: string,
+  locale: string = 'zh-CN',
 ): string {
   const field = fields.find((candidate) => candidate.scope === scope && candidate.path === path);
-  return field?.label || `${FIELD_SCOPE_LABELS[scope] || scope}字段`;
+  return (
+    field?.label ||
+    bindingText('scopeField', locale, {
+      scope: bindingPresentation(locale).FIELD_SCOPE_LABELS[scope] || scope,
+    })
+  );
 }
 
 function getFieldContextLabel(
   fields: FieldOption[],
   scope: FieldOption['scope'],
   path: string,
+  locale: string = 'zh-CN',
 ): string {
   const field = fields.find((candidate) => candidate.scope === scope && candidate.path === path);
-  return field?.modelName || FIELD_SCOPE_LABELS[scope] || scope;
+  return field?.modelName || bindingPresentation(locale).FIELD_SCOPE_LABELS[scope] || scope;
 }
 
 function bindingPreviewPayload(binding: DecisionBindingDraft) {
@@ -827,18 +778,31 @@ function bindingPreviewPayload(binding: DecisionBindingDraft) {
   };
 }
 
-function decisionDisplayName(decisionCode: string, name?: string): string {
+function decisionDisplayName(
+  decisionCode: string,
+  name?: string,
+  locale: string = 'zh-CN',
+): string {
   const trimmedName = name?.trim() ?? '';
   if (trimmedName && !STALE_DECISION_NAMES.has(trimmedName)) return trimmedName;
-  return DECISION_NAME_OVERRIDES[decisionCode] || trimmedName || decisionCode || '未选择决策';
+  return (
+    bindingPresentation(locale).DECISION_NAME_OVERRIDES[decisionCode] ||
+    trimmedName ||
+    decisionCode ||
+    bindingText('noDecisionSelected', locale)
+  );
 }
 
-function formatInputMapping(mapping: InputMapping, fields: FieldOption[]): string {
-  return `${getFieldContextLabel(fields, mapping.scope, mapping.path)} · ${getFieldDisplayName(fields, mapping.scope, mapping.path)}`;
+function formatInputMapping(
+  mapping: InputMapping,
+  fields: FieldOption[],
+  locale: string = 'zh-CN',
+): string {
+  return `${getFieldContextLabel(fields, mapping.scope, mapping.path, locale)} · ${getFieldDisplayName(fields, mapping.scope, mapping.path, locale)}`;
 }
 
-function formatOutputMapping(mapping: OutputMapping): string {
-  return `${OUTPUT_TARGET_KIND_LABELS[mapping.targetKind]} · ${mapping.targetPath}`;
+function formatOutputMapping(mapping: OutputMapping, locale: string = 'zh-CN'): string {
+  return `${bindingPresentation(locale).OUTPUT_TARGET_KIND_LABELS[mapping.targetKind]} · ${mapping.targetPath}`;
 }
 
 function outputFieldLabel(output: string, outputFields: DecisionOutputSchemaField[]): string {
@@ -875,22 +839,26 @@ function isGeneratedTargetPath(path: string, output: string): boolean {
   );
 }
 
-function versionPolicyLabel(policy: DecisionVersionPolicy): string {
-  return VERSION_POLICY_LABELS[policy] ?? policy;
+function versionPolicyLabel(policy: DecisionVersionPolicy, locale: string = 'zh-CN'): string {
+  return bindingPresentation(locale).VERSION_POLICY_LABELS[policy] ?? policy;
 }
 
-function fallbackModeLabel(mode: DecisionBindingDraft['fallbackMode']): string {
-  return FALLBACK_MODE_LABELS[mode] ?? mode;
+function fallbackModeLabel(
+  mode: DecisionBindingDraft['fallbackMode'],
+  locale: string = 'zh-CN',
+): string {
+  return bindingPresentation(locale).FALLBACK_MODE_LABELS[mode] ?? mode;
 }
 
-function outputTargetKindLabel(kind: OutputTargetKind): string {
-  return OUTPUT_TARGET_KIND_LABELS[kind] ?? kind;
+function outputTargetKindLabel(kind: OutputTargetKind, locale: string = 'zh-CN'): string {
+  return bindingPresentation(locale).OUTPUT_TARGET_KIND_LABELS[kind] ?? kind;
 }
 
-function resultStatusLabel(result: DecisionResult): string {
+function resultStatusLabel(result: DecisionResult, locale: string = 'zh-CN'): string {
   const status = String(result.status ?? '').toUpperCase();
-  if (status && RESULT_STATUS_LABELS[status]) return RESULT_STATUS_LABELS[status];
-  return result.matched ? '已命中' : '未命中';
+  if (status && bindingPresentation(locale).RESULT_STATUS_LABELS[status])
+    return bindingPresentation(locale).RESULT_STATUS_LABELS[status];
+  return result.matched ? bindingText('matched', locale) : bindingText('notMatched', locale);
 }
 
 function formatOutputValue(value: unknown): string {
@@ -925,7 +893,9 @@ function DecisionBindingSummary({
   impactError: string;
   onRefreshImpact: () => void;
 }) {
-  const decisionName = getDecisionName(decisions, binding.decisionCode);
+  const { locale } = useI18n();
+
+  const decisionName = getDecisionName(decisions, binding.decisionCode, locale);
   const inputCount = binding.inputMappings.length;
   const outputCount = binding.outputMappings.length;
 
@@ -933,44 +903,55 @@ function DecisionBindingSummary({
     <div className="decision-rule-binding-summary" data-testid="decision-binding-summary">
       <div className="decision-rule-summary-head">
         <div>
-          <div className="decision-rule-kicker">规则中心绑定</div>
+          <div className="decision-rule-kicker">{bindingText('ruleCenterBinding', locale)}</div>
           <h3>{decisionName}</h3>
-          <p title={binding.decisionCode}>统一策略 · {versionPolicyLabel(binding.versionPolicy)}</p>
+          <p title={binding.decisionCode}>
+            {bindingText('unifiedPolicy', locale)}
+            {versionPolicyLabel(binding.versionPolicy, locale)}
+          </p>
         </div>
         <div className="decision-rule-summary-badges">
-          <span>{versionPolicyLabel(binding.versionPolicy)}</span>
-          <span>{fallbackModeLabel(binding.fallbackMode)}</span>
+          <span>{versionPolicyLabel(binding.versionPolicy, locale)}</span>
+          <span>{fallbackModeLabel(binding.fallbackMode, locale)}</span>
         </div>
       </div>
 
       <div className="decision-rule-summary-grid">
         <div>
-          <span>输入映射</span>
+          <span>{bindingText('inputMappings', locale)}</span>
           <strong>{inputCount}</strong>
         </div>
         <div>
-          <span>输出映射</span>
+          <span>{bindingText('outputMappings', locale)}</span>
           <strong>{outputCount}</strong>
         </div>
         <div>
-          <span>影响引用</span>
+          <span>{bindingText('impactReferences', locale)}</span>
           <strong>{impact ? impactCount(impact) : '—'}</strong>
         </div>
         <div>
-          <span>发布风险</span>
-          <strong>{impact?.risk?.blocking ? '需确认' : impact ? '可继续' : '未加载'}</strong>
+          <span>{bindingText('publicationRisk', locale)}</span>
+          <strong>
+            {impact?.risk?.blocking
+              ? bindingText('confirmationRequired', locale)
+              : impact
+                ? bindingText('readyToContinue', locale)
+                : bindingText('notLoaded', locale)}
+          </strong>
         </div>
       </div>
 
       <div className="decision-rule-summary-columns">
         <div className="decision-rule-summary-panel">
           <div className="decision-rule-summary-panel-head">
-            <strong>输入映射</strong>
-            <span>{inputCount} 条</span>
+            <strong>{bindingText('inputMappings', locale)}</strong>
+            <span>
+              {inputCount} {bindingText('entries', locale)}
+            </span>
           </div>
           {inputCount === 0 ? (
             <div className="decision-rule-empty" data-testid="decision-binding-empty">
-              未配置输入映射
+              {bindingText('noInputMappingsConfigured', locale)}
             </div>
           ) : (
             <ul>
@@ -978,7 +959,7 @@ function DecisionBindingSummary({
                 <li key={`${mapping.input}-${index}`}>
                   <span>{mapping.input}</span>
                   <em title={`${mapping.scope}.${mapping.path}`}>
-                    {formatInputMapping(mapping, fields)}
+                    {formatInputMapping(mapping, fields, locale)}
                   </em>
                 </li>
               ))}
@@ -988,12 +969,14 @@ function DecisionBindingSummary({
 
         <div className="decision-rule-summary-panel">
           <div className="decision-rule-summary-panel-head">
-            <strong>输出映射</strong>
-            <span>{outputCount} 条</span>
+            <strong>{bindingText('outputMappings', locale)}</strong>
+            <span>
+              {outputCount} {bindingText('entries', locale)}
+            </span>
           </div>
           {outputCount === 0 ? (
             <div className="decision-rule-empty" data-testid="decision-output-mapping-empty">
-              未配置输出映射
+              {bindingText('noOutputMappingsConfigured', locale)}
             </div>
           ) : (
             <ul>
@@ -1002,7 +985,7 @@ function DecisionBindingSummary({
                   <span title={mapping.output}>
                     {outputFieldLabel(mapping.output, outputFields)}
                   </span>
-                  <code>{formatOutputMapping(mapping)}</code>
+                  <code>{formatOutputMapping(mapping, locale)}</code>
                 </li>
               ))}
             </ul>
@@ -1013,14 +996,16 @@ function DecisionBindingSummary({
       {showImpactPreview && (
         <div className="decision-rule-summary-impact" data-testid="decision-impact-preview">
           <div className="decision-rule-summary-panel-head">
-            <strong>影响预览</strong>
+            <strong>{bindingText('impactPreview', locale)}</strong>
             <button
               type="button"
               aria-label="refresh-impact"
               disabled={impactLoading}
               onClick={onRefreshImpact}
             >
-              {impactLoading ? '加载中' : '刷新影响'}
+              {impactLoading
+                ? bindingText('loading', locale)
+                : bindingText('refreshImpact', locale)}
             </button>
           </div>
           {impactError ? (
@@ -1029,13 +1014,19 @@ function DecisionBindingSummary({
             </div>
           ) : impact ? (
             <div className="decision-rule-impact-summary" data-testid="decision-impact-summary">
-              <strong>{impact.risk?.summary ?? '无影响摘要'}</strong>
-              <span>{impactCount(impact)} 个引用</span>
-              <span>{impact.risk?.blocking ? '需确认' : '可继续'}</span>
+              <strong>{impact.risk?.summary ?? bindingText('noImpactSummary', locale)}</strong>
+              <span>
+                {impactCount(impact)} {bindingText('references', locale)}
+              </span>
+              <span>
+                {impact.risk?.blocking
+                  ? bindingText('confirmationRequired', locale)
+                  : bindingText('readyToContinue', locale)}
+              </span>
             </div>
           ) : (
             <div className="decision-rule-empty" data-testid="decision-impact-empty">
-              尚未加载影响
+              {bindingText('impactNotLoadedYet', locale)}
             </div>
           )}
         </div>
@@ -1055,7 +1046,9 @@ function DecisionBindingPreviewSummary({
   fields: FieldOption[];
   outputFields: DecisionOutputSchemaField[];
 }) {
-  const decisionName = getDecisionName(decisions, binding.decisionCode);
+  const { locale } = useI18n();
+
+  const decisionName = getDecisionName(decisions, binding.decisionCode, locale);
 
   return (
     <div className="decision-rule-binding-review">
@@ -1064,31 +1057,39 @@ function DecisionBindingPreviewSummary({
           <div>
             <strong title={binding.decisionCode}>{decisionName}</strong>
             <span>
-              {versionPolicyLabel(binding.versionPolicy)} ·{' '}
-              {fallbackModeLabel(binding.fallbackMode)}
+              {versionPolicyLabel(binding.versionPolicy, locale)} ·{' '}
+              {fallbackModeLabel(binding.fallbackMode, locale)}
             </span>
           </div>
           <div className="decision-rule-review-counts">
-            <span>{binding.inputMappings.length} 输入</span>
-            <span>{binding.outputMappings.length} 输出</span>
+            <span>
+              {binding.inputMappings.length} {bindingText('inputs', locale)}
+            </span>
+            <span>
+              {binding.outputMappings.length} {bindingText('outputs', locale)}
+            </span>
           </div>
         </div>
 
         <div className="decision-rule-review-grid">
           <section>
             <div className="decision-rule-summary-panel-head">
-              <strong>输入映射</strong>
-              <span>{binding.inputMappings.length} 条</span>
+              <strong>{bindingText('inputMappings', locale)}</strong>
+              <span>
+                {binding.inputMappings.length} {bindingText('entries', locale)}
+              </span>
             </div>
             {binding.inputMappings.length === 0 ? (
-              <div className="decision-rule-empty">暂未配置输入</div>
+              <div className="decision-rule-empty">
+                {bindingText('noInputsConfiguredYet', locale)}
+              </div>
             ) : (
               <ul>
                 {binding.inputMappings.map((mapping, index) => (
                   <li key={`${mapping.input}-${index}`}>
                     <span>{mapping.input}</span>
                     <em title={`${mapping.scope}.${mapping.path}`}>
-                      {formatInputMapping(mapping, fields)}
+                      {formatInputMapping(mapping, fields, locale)}
                     </em>
                   </li>
                 ))}
@@ -1098,11 +1099,15 @@ function DecisionBindingPreviewSummary({
 
           <section>
             <div className="decision-rule-summary-panel-head">
-              <strong>输出映射</strong>
-              <span>{binding.outputMappings.length} 条</span>
+              <strong>{bindingText('outputMappings', locale)}</strong>
+              <span>
+                {binding.outputMappings.length} {bindingText('entries', locale)}
+              </span>
             </div>
             {binding.outputMappings.length === 0 ? (
-              <div className="decision-rule-empty">暂未配置输出</div>
+              <div className="decision-rule-empty">
+                {bindingText('noOutputsConfiguredYet', locale)}
+              </div>
             ) : (
               <ul>
                 {binding.outputMappings.map((mapping, index) => (
@@ -1110,7 +1115,7 @@ function DecisionBindingPreviewSummary({
                     <span title={mapping.output}>
                       {outputFieldLabel(mapping.output, outputFields)}
                     </span>
-                    <em title={mapping.targetPath}>{formatOutputMapping(mapping)}</em>
+                    <em title={mapping.targetPath}>{formatOutputMapping(mapping, locale)}</em>
                   </li>
                 ))}
               </ul>
@@ -1120,7 +1125,7 @@ function DecisionBindingPreviewSummary({
       </div>
 
       <details className="decision-rule-debug-details">
-        <summary>调试明细</summary>
+        <summary>{bindingText('debugDetails', locale)}</summary>
         <textarea
           aria-label="decision-binding-debug-json"
           readOnly
@@ -1161,6 +1166,8 @@ function DecisionTestResultSummary({
   callerType?: string;
   callerRef?: string;
 }) {
+  const { locale } = useI18n();
+
   const outputs = Object.entries(result.outputs ?? {});
   const unknownReasons = result.unknownReasons ?? [];
   const traceHref = decisionTraceHref({
@@ -1173,14 +1180,14 @@ function DecisionTestResultSummary({
   return (
     <div className="decision-rule-test-result" data-testid="decision-test-result">
       <div className="decision-rule-test-status">
-        <strong>{resultStatusLabel(result)}</strong>
+        <strong>{resultStatusLabel(result, locale)}</strong>
         {traceHref ? (
           <a data-testid="decision-test-open-trace" href={traceHref}>
-            打开统一 Trace
+            {bindingText('openUnifiedTrace', locale)}
             <span>{result.traceId}</span>
           </a>
         ) : (
-          <span>无 Trace</span>
+          <span>{bindingText('noTrace', locale)}</span>
         )}
       </div>
       {outputs.length > 0 ? (
@@ -1193,11 +1200,11 @@ function DecisionTestResultSummary({
           ))}
         </dl>
       ) : (
-        <div className="decision-rule-empty">无输出结果</div>
+        <div className="decision-rule-empty">{bindingText('noOutputs', locale)}</div>
       )}
       {unknownReasons.length > 0 && (
         <div className="decision-rule-test-unknown" data-testid="decision-test-unknown-reasons">
-          <strong>未知原因</strong>
+          <strong>{bindingText('unknownReasons', locale)}</strong>
           <ul>
             {unknownReasons.map((reason) => (
               <li key={reason}>{reason}</li>
@@ -1224,6 +1231,8 @@ function FieldSearchSelect({
   selectAriaLabel: string;
   countTestId: string;
 }) {
+  const { locale } = useI18n();
+
   const [query, setQuery] = useState('');
   const fieldMap = useMemo(() => {
     const map = new Map<string, FieldOption>();
@@ -1235,17 +1244,20 @@ function FieldSearchSelect({
     () => keepSelectedField(matchedFields, fieldMap.get(value)),
     [fieldMap, matchedFields, value],
   );
-  const groupedFields = useMemo(() => groupFieldOptions(visibleFields), [visibleFields]);
+  const groupedFields = useMemo(
+    () => groupFieldOptions(visibleFields, locale),
+    [visibleFields, locale],
+  );
 
   return (
     <div className="decision-rule-field-picker">
       <label>
-        字段搜索
+        {bindingText('fieldSearch', locale)}
         <input
           aria-label={searchAriaLabel}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="搜索字段、模型或路径"
+          placeholder={bindingText('searchFieldsModelsOrPaths', locale)}
         />
       </label>
       <div className="decision-rule-field-picker-row">
@@ -1255,7 +1267,7 @@ function FieldSearchSelect({
           onChange={(event) => onChange(event.target.value)}
         >
           {groupedFields.length === 0 ? (
-            <option value="">无匹配字段</option>
+            <option value="">{bindingText('noMatchingFields', locale)}</option>
           ) : (
             groupedFields.map((fieldGroup) => (
               <optgroup key={fieldGroup.label} label={fieldGroup.label}>
@@ -1263,10 +1275,12 @@ function FieldSearchSelect({
                   <option
                     key={fieldKey(field)}
                     value={fieldKey(field)}
-                    disabled={Boolean(ruleInputDisabledReason(field))}
+                    disabled={Boolean(ruleInputDisabledReason(field, locale))}
                   >
                     {field.label}
-                    {ruleInputOptionNote(field) ? ` · ${ruleInputOptionNote(field)}` : ''}
+                    {ruleInputOptionNote(field, locale)
+                      ? ` · ${ruleInputOptionNote(field, locale)}`
+                      : ''}
                   </option>
                 ))}
               </optgroup>
@@ -1294,6 +1308,8 @@ function OutputTargetFieldSuggestion({
   selectAriaLabel: string;
   countTestId: string;
 }) {
+  const { locale } = useI18n();
+
   const [query, setQuery] = useState('');
   const fieldMap = useMemo(() => {
     const map = new Map<string, FieldOption>();
@@ -1301,17 +1317,20 @@ function OutputTargetFieldSuggestion({
     return map;
   }, [fields]);
   const matchedFields = useMemo(() => filterFieldOptions(fields, query), [fields, query]);
-  const groupedFields = useMemo(() => groupFieldOptions(matchedFields), [matchedFields]);
+  const groupedFields = useMemo(
+    () => groupFieldOptions(matchedFields, locale),
+    [matchedFields, locale],
+  );
 
   return (
     <div className="decision-rule-field-picker decision-rule-target-suggestion">
       <label>
-        目标字段建议
+        {bindingText('targetFieldSuggestions', locale)}
         <input
           aria-label={searchAriaLabel}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="搜索字段后填入目标路径"
+          placeholder={bindingText('searchFieldsToFillTheTargetPath', locale)}
         />
       </label>
       <div className="decision-rule-field-picker-row">
@@ -1323,7 +1342,7 @@ function OutputTargetFieldSuggestion({
             if (field) onPick(field);
           }}
         >
-          <option value="">选择字段填入路径</option>
+          <option value="">{bindingText('selectAFieldToFillThePath', locale)}</option>
           {groupedFields.map((fieldGroup) => (
             <optgroup key={fieldGroup.label} label={fieldGroup.label}>
               {fieldGroup.fields.map((field) => (
@@ -1357,6 +1376,8 @@ function DecisionOutputSchemaPicker({
   selectAriaLabel: string;
   countTestId: string;
 }) {
+  const { locale } = useI18n();
+
   const [query, setQuery] = useState('');
   const outputMap = useMemo(() => {
     const map = new Map<string, DecisionOutputSchemaField>();
@@ -1381,12 +1402,12 @@ function DecisionOutputSchemaPicker({
   return (
     <div className="decision-rule-field-picker decision-rule-output-suggestion">
       <label>
-        规则输出
+        {bindingText('ruleOutputs', locale)}
         <input
           aria-label={searchAriaLabel}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="搜索输出变量"
+          placeholder={bindingText('searchOutputVariables', locale)}
         />
       </label>
       <div className="decision-rule-field-picker-row">
@@ -1398,7 +1419,7 @@ function DecisionOutputSchemaPicker({
             if (output) onPick(output);
           }}
         >
-          <option value="">选择 DMN 输出</option>
+          <option value="">{bindingText('selectADMNOutput', locale)}</option>
           {visibleOutputs.map((output) => (
             <option key={output.id} value={output.id}>
               {output.label}
@@ -1423,18 +1444,25 @@ function TestContextEditor({
   contextJson: string;
   onChange: (nextJson: string) => void;
 }) {
+  const { locale } = useI18n();
+
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const context = useMemo(() => parseContextObject(contextJson), [contextJson]);
   const matchedFields = useMemo(() => filterFieldOptions(fields, query), [fields, query]);
-  const groupedFields = useMemo(() => groupFieldOptions(matchedFields), [matchedFields]);
+  const groupedFields = useMemo(
+    () => groupFieldOptions(matchedFields, locale),
+    [matchedFields, locale],
+  );
 
   return (
     <div className="decision-rule-context-shell">
       <div className="decision-rule-context-summary" data-testid="decision-test-context-summary">
         <div>
-          <strong>测试上下文</strong>
-          <span>{fields.length} 个字段</span>
+          <strong>{bindingText('testContext', locale)}</strong>
+          <span>
+            {fields.length} {bindingText('fields', locale)}
+          </span>
         </div>
         <button
           type="button"
@@ -1442,7 +1470,7 @@ function TestContextEditor({
           aria-expanded={open}
           onClick={() => setOpen((current) => !current)}
         >
-          {open ? '收起上下文' : '编辑上下文'}
+          {open ? bindingText('collapseContext', locale) : bindingText('editContext', locale)}
         </button>
       </div>
 
@@ -1450,12 +1478,12 @@ function TestContextEditor({
         <div className="decision-rule-context-drawer" data-testid="decision-test-context-drawer">
           <div className="decision-rule-context-tools">
             <label>
-              字段搜索
+              {bindingText('fieldSearch', locale)}
               <input
                 aria-label="test-context-field-search"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="搜索字段、模型或路径"
+                placeholder={bindingText('searchFieldsModelsOrPaths', locale)}
               />
             </label>
             <span data-testid="test-context-field-count">
@@ -1464,7 +1492,9 @@ function TestContextEditor({
           </div>
 
           {matchedFields.length === 0 ? (
-            <div className="decision-rule-empty">无匹配上下文字段</div>
+            <div className="decision-rule-empty">
+              {bindingText('noMatchingContextFields', locale)}
+            </div>
           ) : (
             <div className="decision-rule-context-field-groups">
               {groupedFields.map((fieldGroup) => (
@@ -1498,9 +1528,9 @@ function TestContextEditor({
       )}
 
       <details className="decision-rule-context-advanced">
-        <summary>高级 JSON</summary>
+        <summary>{bindingText('advancedJSON', locale)}</summary>
         <label className="decision-rule-context-editor">
-          测试上下文 JSON
+          {bindingText('testContextJSON', locale)}
           <textarea
             aria-label="test-run-context"
             value={contextJson}
@@ -1519,6 +1549,8 @@ export function DecisionRuleBindingBlock({
   onChange,
   api,
 }: DecisionRuleBindingBlockProps) {
+  const { locale } = useI18n();
+
   const props = block?.props ?? {};
   const mode = props.mode ?? 'combined';
   const configuredFields = props.fields && props.fields.length > 0 ? props.fields : undefined;
@@ -1530,14 +1562,16 @@ export function DecisionRuleBindingBlock({
   );
   const [catalogFields, setCatalogFields] = useState<FieldOption[]>([]);
   const [definitionDecisionOptions, setDefinitionDecisionOptions] = useState<DecisionOption[]>([]);
-  const fallbackFields = configuredFields ?? (fieldCatalogModelCode ? [] : DEFAULT_FIELDS);
+  const fallbackFields =
+    configuredFields ?? (fieldCatalogModelCode ? [] : bindingPresentation(locale).DEFAULT_FIELDS);
   const baseFields =
     fieldCatalogMode === 'merge'
       ? mergeFieldOptions(catalogFields, fallbackFields)
-      : (configuredFields ?? mergeFieldOptions(catalogFields, DEFAULT_FIELDS));
+      : (configuredFields ??
+        mergeFieldOptions(catalogFields, bindingPresentation(locale).DEFAULT_FIELDS));
   const decisions = useMemo(
-    () => mergeDecisionOptions([...(props.decisions ?? []), ...definitionDecisionOptions]),
-    [definitionDecisionOptions, props.decisions],
+    () => mergeDecisionOptions([...(props.decisions ?? []), ...definitionDecisionOptions], locale),
+    [definitionDecisionOptions, props.decisions, locale],
   );
   const defaultApiRef = useRef<RuleBindingDecisionApi | null>(null);
   const incomingRawBindingValue =
@@ -1559,13 +1593,28 @@ export function DecisionRuleBindingBlock({
   );
   const [impact, setImpact] = useState<DecisionImpact | null>(null);
   const [impactLoading, setImpactLoading] = useState(false);
-  const [impactError, setImpactError] = useState('');
+  const [impactFailure, setImpactFailure] = useState<{
+    key?: BindingTextKey;
+    cause?: unknown;
+  } | null>(null);
+  const impactError = impactFailure
+    ? impactFailure.key
+      ? bindingText(impactFailure.key, locale)
+      : errorMessage(impactFailure.cause, locale)
+    : '';
   const [contextJson, setContextJson] = useState(() =>
     buildInitialContextJson(runtime, props.initialContextJson),
   );
   const [testResult, setTestResult] = useState<DecisionResult | null>(null);
   const [testRunning, setTestRunning] = useState(false);
-  const [testError, setTestError] = useState('');
+  const [testFailure, setTestFailure] = useState<{ key?: BindingTextKey; cause?: unknown } | null>(
+    null,
+  );
+  const testError = testFailure
+    ? testFailure.key
+      ? bindingText(testFailure.key, locale)
+      : errorMessage(testFailure.cause, locale)
+    : '';
   const initialValueWrittenRef = useRef(false);
   const syncedBindingFingerprintRef = useRef(bindingValueFingerprint(incomingRawBindingValue));
 
@@ -1600,29 +1649,37 @@ export function DecisionRuleBindingBlock({
   if (showCondition) {
     workspaceTabs.push({
       key: 'condition',
-      label: '条件',
-      meta: `${condition.children.length} 条`,
+      label: bindingText('condition', locale),
+      meta: bindingText('entryCount', locale, { count: condition.children.length }),
     });
   }
   if (showDecision) {
     workspaceTabs.push({
       key: 'decision',
-      label: readOnly ? '摘要' : '决策',
-      meta: versionPolicyLabel(binding.versionPolicy),
+      label: readOnly ? bindingText('summary', locale) : bindingText('decision', locale),
+      meta: versionPolicyLabel(binding.versionPolicy, locale),
     });
   }
   if (showStandaloneImpactPreview) {
     workspaceTabs.push({
       key: 'impact',
-      label: '影响',
-      meta: impactError ? '异常' : impact ? `${impactCount(impact)} 引用` : '待刷新',
+      label: bindingText('impact', locale),
+      meta: impactError
+        ? bindingText('error', locale)
+        : impact
+          ? bindingText('referenceCount', locale, { count: impactCount(impact) })
+          : bindingText('refreshPending', locale),
     });
   }
   if (showStandaloneTestRunner) {
     workspaceTabs.push({
       key: 'test',
-      label: '测试',
-      meta: testError ? '异常' : testResult ? resultStatusLabel(testResult) : '未运行',
+      label: bindingText('test', locale),
+      meta: testError
+        ? bindingText('error', locale)
+        : testResult
+          ? resultStatusLabel(testResult, locale)
+          : bindingText('notRun', locale),
     });
   }
   const workspacePanelKeys = workspaceTabs.map((tab) => tab.key).join('|');
@@ -1788,7 +1845,7 @@ export function DecisionRuleBindingBlock({
 
   const updateMappingField = (index: number, key: string) => {
     const field = fieldByKey.get(key);
-    if (!field || ruleInputDisabledReason(field)) return;
+    if (!field || ruleInputDisabledReason(field, locale)) return;
     updateMapping(index, { scope: field.scope, path: field.path });
   };
 
@@ -1872,15 +1929,15 @@ export function DecisionRuleBindingBlock({
 
   const refreshImpact = async () => {
     if (!binding.decisionCode) {
-      setImpactError('请选择决策');
+      setImpactFailure({ key: 'selectADecision' });
       return;
     }
     setImpactLoading(true);
-    setImpactError('');
+    setImpactFailure(null);
     try {
       setImpact(await getDecisionApi().getDecisionImpact(binding.decisionCode));
     } catch (error) {
-      setImpactError(errorMessage(error));
+      setImpactFailure({ cause: error });
     } finally {
       setImpactLoading(false);
     }
@@ -1888,11 +1945,11 @@ export function DecisionRuleBindingBlock({
 
   const runDecisionTest = async () => {
     if (!binding.decisionCode) {
-      setTestError('请选择决策');
+      setTestFailure({ key: 'selectADecision' });
       return;
     }
     setTestRunning(true);
-    setTestError('');
+    setTestFailure(null);
     setTestResult(null);
     try {
       const result = await getDecisionApi().evaluate({
@@ -1904,7 +1961,7 @@ export function DecisionRuleBindingBlock({
       });
       setTestResult(result);
     } catch (error) {
-      setTestError(errorMessage(error));
+      setTestFailure({ cause: error });
     } finally {
       setTestRunning(false);
     }
@@ -1940,8 +1997,10 @@ export function DecisionRuleBindingBlock({
         <div {...panelAttrs('condition')}>
           <div className="decision-rule-binding-section">
             <div className="decision-rule-binding-heading">
-              <strong>条件</strong>
-              <span>{condition.children.length} 条</span>
+              <strong>{bindingText('condition', locale)}</strong>
+              <span>
+                {condition.children.length} {bindingText('entries', locale)}
+              </span>
             </div>
             <ConditionBuilder
               value={condition}
@@ -1971,13 +2030,13 @@ export function DecisionRuleBindingBlock({
           <div {...panelAttrs('decision')}>
             <div className="decision-rule-binding-section" data-testid="decision-binding-editor">
               <div className="decision-rule-binding-heading">
-                <strong>引用规则中心</strong>
-                <span>{versionPolicyLabel(binding.versionPolicy)}</span>
+                <strong>{bindingText('referenceRuleCenter', locale)}</strong>
+                <span>{versionPolicyLabel(binding.versionPolicy, locale)}</span>
               </div>
 
               <div className="decision-rule-binding-grid">
                 <label>
-                  决策
+                  {bindingText('decision', locale)}
                   <select
                     aria-label="decision-code"
                     value={binding.decisionCode}
@@ -1994,14 +2053,14 @@ export function DecisionRuleBindingBlock({
                   >
                     {decisions.map((decision) => (
                       <option key={decision.code} value={decision.code} title={decision.code}>
-                        {decisionDisplayName(decision.code, decision.name)}
+                        {decisionDisplayName(decision.code, decision.name, locale)}
                       </option>
                     ))}
                   </select>
                 </label>
 
                 <label>
-                  版本策略
+                  {bindingText('versionPolicy', locale)}
                   <select
                     aria-label="version-policy"
                     value={binding.versionPolicy}
@@ -2018,14 +2077,14 @@ export function DecisionRuleBindingBlock({
                   >
                     {VERSION_POLICIES.map((policy) => (
                       <option key={policy} value={policy}>
-                        {versionPolicyLabel(policy)}
+                        {versionPolicyLabel(policy, locale)}
                       </option>
                     ))}
                   </select>
                 </label>
 
                 <label>
-                  失败策略
+                  {bindingText('failurePolicy', locale)}
                   <select
                     aria-label="fallback-mode"
                     value={binding.fallbackMode}
@@ -2040,28 +2099,34 @@ export function DecisionRuleBindingBlock({
                       })
                     }
                   >
-                    <option value="FAIL_CLOSED">{fallbackModeLabel('FAIL_CLOSED')}</option>
-                    <option value="FAIL_OPEN">{fallbackModeLabel('FAIL_OPEN')}</option>
-                    <option value="DEFAULT_VALUE">{fallbackModeLabel('DEFAULT_VALUE')}</option>
+                    <option value="FAIL_CLOSED">{fallbackModeLabel('FAIL_CLOSED', locale)}</option>
+                    <option value="FAIL_OPEN">{fallbackModeLabel('FAIL_OPEN', locale)}</option>
+                    <option value="DEFAULT_VALUE">
+                      {fallbackModeLabel('DEFAULT_VALUE', locale)}
+                    </option>
                   </select>
                 </label>
               </div>
 
               <div className="decision-rule-mapping-header">
-                <strong>输入映射</strong>
+                <strong>{bindingText('inputMappings', locale)}</strong>
                 <button
                   type="button"
                   onClick={addInputMapping}
                   disabled={!canAddInputMapping}
-                  title={canAddInputMapping ? undefined : '暂无可映射输入字段'}
+                  title={
+                    canAddInputMapping ? undefined : bindingText('noMappableInputFields', locale)
+                  }
                 >
-                  添加映射
+                  {bindingText('addMapping', locale)}
                 </button>
               </div>
 
               {binding.inputMappings.length === 0 && (
                 <div className="decision-rule-empty" data-testid="decision-binding-empty">
-                  {canAddInputMapping ? '暂无输入映射' : '暂无可映射输入字段'}
+                  {canAddInputMapping
+                    ? bindingText('noInputMappingsYet', locale)
+                    : bindingText('noMappableInputFields', locale)}
                 </div>
               )}
 
@@ -2089,21 +2154,21 @@ export function DecisionRuleBindingBlock({
                     aria-label={`mapping-remove-${index}`}
                     onClick={() => removeMapping(index)}
                   >
-                    删除
+                    {bindingText('delete', locale)}
                   </button>
                 </div>
               ))}
 
               <div className="decision-rule-mapping-header">
-                <strong>输出映射</strong>
+                <strong>{bindingText('outputMappings', locale)}</strong>
                 <button type="button" onClick={addOutputMapping}>
-                  添加输出
+                  {bindingText('addOutput', locale)}
                 </button>
               </div>
 
               {binding.outputMappings.length === 0 && (
                 <div className="decision-rule-empty" data-testid="decision-output-mapping-empty">
-                  暂无输出映射
+                  {bindingText('noOutputMappingsYet', locale)}
                 </div>
               )}
 
@@ -2137,7 +2202,7 @@ export function DecisionRuleBindingBlock({
                   >
                     {OUTPUT_TARGET_KINDS.map((kind) => (
                       <option key={kind} value={kind}>
-                        {outputTargetKindLabel(kind)}
+                        {outputTargetKindLabel(kind, locale)}
                       </option>
                     ))}
                   </select>
@@ -2153,7 +2218,7 @@ export function DecisionRuleBindingBlock({
                     aria-label={`output-mapping-remove-${index}`}
                     onClick={() => removeOutputMapping(index)}
                   >
-                    删除
+                    {bindingText('delete', locale)}
                   </button>
                   <OutputTargetFieldSuggestion
                     fields={fields}
@@ -2178,14 +2243,16 @@ export function DecisionRuleBindingBlock({
             <div {...panelAttrs('impact')}>
               <div className="decision-rule-binding-section" data-testid="decision-impact-preview">
                 <div className="decision-rule-binding-heading">
-                  <strong>影响预览</strong>
+                  <strong>{bindingText('impactPreview', locale)}</strong>
                   <button
                     type="button"
                     aria-label="refresh-impact"
                     disabled={impactLoading}
                     onClick={refreshImpact}
                   >
-                    {impactLoading ? '加载中' : '刷新'}
+                    {impactLoading
+                      ? bindingText('loading', locale)
+                      : bindingText('refresh', locale)}
                   </button>
                 </div>
                 {impactError ? (
@@ -2197,13 +2264,21 @@ export function DecisionRuleBindingBlock({
                     className="decision-rule-impact-summary"
                     data-testid="decision-impact-summary"
                   >
-                    <strong>{impact.risk?.summary ?? '无影响摘要'}</strong>
-                    <span>{impactCount(impact)} 个引用</span>
-                    <span>{impact.risk?.blocking ? '需确认' : '可继续'}</span>
+                    <strong>
+                      {impact.risk?.summary ?? bindingText('noImpactSummary', locale)}
+                    </strong>
+                    <span>
+                      {impactCount(impact)} {bindingText('references', locale)}
+                    </span>
+                    <span>
+                      {impact.risk?.blocking
+                        ? bindingText('confirmationRequired', locale)
+                        : bindingText('readyToContinue', locale)}
+                    </span>
                   </div>
                 ) : (
                   <div className="decision-rule-empty" data-testid="decision-impact-empty">
-                    尚未加载影响
+                    {bindingText('impactNotLoadedYet', locale)}
                   </div>
                 )}
               </div>
@@ -2214,14 +2289,14 @@ export function DecisionRuleBindingBlock({
             <div {...panelAttrs('test')}>
               <div className="decision-rule-binding-section" data-testid="decision-test-runner">
                 <div className="decision-rule-binding-heading">
-                  <strong>测试运行</strong>
+                  <strong>{bindingText('testRun', locale)}</strong>
                   <button
                     type="button"
                     aria-label="run-decision-test"
                     disabled={testRunning}
                     onClick={runDecisionTest}
                   >
-                    {testRunning ? '运行中' : '运行'}
+                    {testRunning ? bindingText('running', locale) : bindingText('run', locale)}
                   </button>
                 </div>
                 <TestContextEditor
@@ -2242,7 +2317,7 @@ export function DecisionRuleBindingBlock({
                   />
                 ) : (
                   <div className="decision-rule-empty" data-testid="decision-test-empty">
-                    尚未运行
+                    {bindingText('notRunYet', locale)}
                   </div>
                 )}
               </div>

@@ -1,3 +1,5 @@
+import { getLocalizedText } from '~/utils/i18n';
+import messages from './actionAvailability.i18n.json';
 import type {
   DecisionAction,
   DecisionActionConsumerAvailability,
@@ -35,38 +37,62 @@ function providerDependencies(
 function blockingProviderDependency(
   dependencies: DecisionActionProviderDependency[],
 ): DecisionActionProviderDependency | undefined {
-  return dependencies.find((item) => item.required && item.available === false)
-    ?? dependencies.find((item) => item.available === false || item.availabilityStatus === 'UNAVAILABLE');
+  return (
+    dependencies.find((item) => item.required && item.available === false) ??
+    dependencies.find(
+      (item) => item.available === false || item.availabilityStatus === 'UNAVAILABLE',
+    )
+  );
 }
 
-function statusLabel(dependency: DecisionActionProviderDependency): string {
+function statusLabel(dependency: DecisionActionProviderDependency, locale: string): string {
   const reason = dependency.availabilityReason?.trim();
-  if (reason?.includes('未配置')) return '未配置';
-  if (reason?.includes('不可用')) return '不可用';
-  if (dependency.availabilityStatus === 'UNAVAILABLE' || dependency.available === false) return '不可用';
-  return '可用';
+  if (reason?.includes('未配置')) return getLocalizedText(messages.unconfigured, locale);
+  if (reason?.includes('不可用')) return getLocalizedText(messages.unavailable, locale);
+  if (dependency.availabilityStatus === 'UNAVAILABLE' || dependency.available === false)
+    return getLocalizedText(messages.unavailable, locale);
+  return getLocalizedText(messages.available, locale);
 }
 
-function providerSummary(dependency: DecisionActionProviderDependency | undefined): string {
+function providerSummary(
+  dependency: DecisionActionProviderDependency | undefined,
+  locale: string,
+): string {
   if (!dependency) return '';
-  const label = dependency.label?.trim() || dependency.providerType?.trim() || '外部 provider';
+  const label =
+    dependency.label?.trim() ||
+    dependency.providerType?.trim() ||
+    getLocalizedText(messages.externalProvider, locale);
   const codes = Array.isArray(dependency.providerCodes)
-    ? dependency.providerCodes.filter((code): code is string => typeof code === 'string' && code.trim().length > 0)
+    ? dependency.providerCodes.filter(
+        (code): code is string => typeof code === 'string' && code.trim().length > 0,
+      )
     : [];
   const provider = codes.length > 0 ? `${label} (${codes.join(', ')})` : label;
-  return `依赖：${provider} · ${statusLabel(dependency)}`;
+  return getLocalizedText(messages.dependency, locale)
+    .replace('{provider}', () => provider)
+    .replace('{status}', () => statusLabel(dependency, locale));
 }
 
-function providerReason(dependency: DecisionActionProviderDependency | undefined): string {
+function providerReason(
+  dependency: DecisionActionProviderDependency | undefined,
+  locale: string,
+): string {
   if (!dependency) return '';
-  const label = dependency.label?.trim() || dependency.providerType?.trim() || '外部 provider';
+  const label =
+    dependency.label?.trim() ||
+    dependency.providerType?.trim() ||
+    getLocalizedText(messages.externalProvider, locale);
   const reason = dependency.availabilityReason?.trim();
-  return reason ? `${label}不可用: ${reason}` : `${label}不可用`;
+  return getLocalizedText(reason ? messages.providerReason : messages.providerUnavailable, locale)
+    .replace('{label}', () => label)
+    .replace('{reason}', () => reason ?? '');
 }
 
 export function resolveDecisionActionAvailability(
   action: DecisionAction | undefined,
   consumerType?: string,
+  locale: string = 'zh-CN',
 ): DecisionActionAvailabilityView {
   const consumer = consumerAvailability(action, consumerType);
   const availabilityStatus = consumer?.availabilityStatus ?? action?.availabilityStatus;
@@ -77,10 +103,10 @@ export function resolveDecisionActionAvailability(
   return {
     unavailable,
     reason: unavailable
-      ? availabilityReason?.trim() || providerReason(blockingDependency) || '动作处理器当前不可用'
+      ? availabilityReason?.trim() ||
+        providerReason(blockingDependency, locale) ||
+        getLocalizedText(messages.handlerUnavailable, locale)
       : '',
-    providerSummary: unavailable
-      ? providerSummary(blockingDependency)
-      : '',
+    providerSummary: unavailable ? providerSummary(blockingDependency, locale) : '',
   };
 }
