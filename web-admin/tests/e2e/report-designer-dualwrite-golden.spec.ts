@@ -168,6 +168,20 @@ test('report menu previews and exports the same filtered model rows', async ({ p
   const { executeCommandViaApi } = await import('./helpers');
   const title = `ReportData${Date.now()}`;
   const orderTitle = `${title} Order`;
+  // The order references its customer by name; the referenced row must exist
+  // before the order command (runtime reference existence validation).
+  await executeCommandViaApi(
+    page,
+    'e2et:create_customer',
+    {
+      e2et_cust_code: `${title}-CUST`,
+      e2et_cust_name: 'Report Export Customer',
+      e2et_cust_region: 'south',
+      e2et_cust_active: true,
+    },
+    undefined,
+    'create',
+  );
   const createdOrder = await executeCommandViaApi(
     page,
     'e2et:create_order',
@@ -294,6 +308,20 @@ test('report export API applies declared model parameters and rejects missing re
   const { executeCommandViaApi } = await import('./helpers');
   const title = `ReportParams${Date.now()}`;
   for (const suffix of ['A', 'B']) {
+    // Referenced customer must exist before the order command (runtime
+    // reference existence validation).
+    await executeCommandViaApi(
+      page,
+      'e2et:create_customer',
+      {
+        e2et_cust_code: `${title}-CUST-${suffix}`,
+        e2et_cust_name: `Customer ${suffix}`,
+        e2et_cust_region: 'south',
+        e2et_cust_active: true,
+      },
+      undefined,
+      'create',
+    );
     const created = await executeCommandViaApi(
       page,
       'e2et:create_order',
@@ -442,6 +470,20 @@ test('report exports all 201 matching records and rejects an undersized export l
   const { executeCommandViaApi } = await import('./helpers');
   const title = `ReportRows${Date.now()}`;
   const titles = Array.from({ length: 201 }, (_, i) => `${title}-${String(i).padStart(3, '0')}`);
+  // All 201 orders reference the same customer by name; create it first
+  // (runtime reference existence validation).
+  await executeCommandViaApi(
+    page,
+    'e2et:create_customer',
+    {
+      e2et_cust_code: `${title}-CUST`,
+      e2et_cust_name: title,
+      e2et_cust_region: 'south',
+      e2et_cust_active: true,
+    },
+    undefined,
+    'create',
+  );
   for (let offset = 0; offset < titles.length; offset += 4) {
     await Promise.all(
       titles.slice(offset, offset + 4).map(async (orderTitle) => {

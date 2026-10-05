@@ -3,6 +3,7 @@ package com.auraboot.framework.meta.service.impl;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.security.SqlSafetyUtils;
+import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.ValidationService;
 import com.auraboot.framework.meta.service.base.BaseMetaService;
 import com.auraboot.framework.meta.constant.SystemFieldConstants;
@@ -37,6 +38,7 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
 
     private final DynamicDataMapper dynamicDataMapper;
     private final UserService userService;
+    private final MetaModelService metaModelService;
     private final SpelExpressionParser spelParser = new SpelExpressionParser();
     private static final com.fasterxml.jackson.databind.ObjectMapper JSON =
             new com.fasterxml.jackson.databind.ObjectMapper();
@@ -126,6 +128,12 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
         // through the active tenant-member projection before any write path.
         validateSystemUserReference(fieldDefinition, value, errors);
 
+        // Business references (extension.referenceModel) must point at an existing
+        // record in the target model, exactly like model-level relations do. Without
+        // this check a command accepts a dangling pid and persists a row that can
+        // never be joined (P2 finding: sc_monthly_metric.sc_showcase_pid).
+        validateBusinessReference(fieldDefinition, value, errors);
+
         // 长度验证
         validateLength(fieldDefinition, value, errors, warnings);
 
@@ -171,6 +179,68 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
                 errors.add("Field '" + fieldDefinition.getName()
                         + "' must reference an active user in the current tenant");
                 return;
+            }
+        }
+    }
+
+    /**
+     * Field-level business references (extension.referenceModel) must resolve to an
+     * existing record in the target model. Model-level relations are already covered
+     * by {@link #validateRelations}; this closes the same gap for plain reference
+     * fields whose only declaration is the field's refTarget. Table resolution:
+     * explicit refTarget.targetTable first, else the referenced model's registered
+     * table. A missing referenced model degrades to a log warning (config-time
+     * validation owns that failure), mirroring the relation validator.
+     */
+    private void validateBusinessReference(FieldDefinition fieldDefinition, Object value, List<String> errors) {
+        FieldDefinition.RefTarget refTarget = fieldDefinition.getRefTarget();
+        if (refTarget == null) {
+            return;
+        }
+        String targetEntity = refTarget.getTargetEntity();
+        if (targetEntity == null || targetEntity.isBlank() || "sys_user".equalsIgnoreCase(targetEntity)) {
+            return;
+        }
+        if (!(value instanceof String rawValue) || rawValue.isBlank()) {
+            return;
+        }
+        String targetTable = refTarget.getTargetTable();
+        if (targetTable == null || targetTable.isBlank()) {
+            MetaModelDTO targetModel = metaModelService.findByCode(targetEntity);
+            if (targetModel == null || targetModel.getTableName() == null
+                    || targetModel.getTableName().isBlank()) {
+                log.warn("Reference field '{}' points at model '{}' without a resolvable table; "
+                        + "skipping existence check", fieldDefinition.getCode(), targetEntity);
+                return;
+            }
+            targetTable = targetModel.getTableName();
+        }
+        String valueField = (refTarget.getValueField() != null && !refTarget.getValueField().isBlank())
+                ? refTarget.getValueField()
+                : (refTarget.getTargetField() != null && !refTarget.getTargetField().isBlank())
+                        ? refTarget.getTargetField()
+                        : "pid";
+        SqlSafetyUtils.validateIdentifier(targetTable, "reference targetTable");
+        SqlSafetyUtils.validateIdentifier(valueField, "reference valueField");
+        Long tenantId = MetaContext.getCurrentTenantId();
+        for (String candidate : parseReferenceValues(rawValue)) {
+            String sql = "SELECT COUNT(*) as cnt FROM " + targetTable
+                    + " WHERE " + valueField + " = #{params.refValue}"
+                    + " AND tenant_id = #{params.tenantId}";
+            Map<String, Object> params = new HashMap<>();
+            params.put("refValue", candidate);
+            params.put("tenantId", tenantId);
+            try {
+                List<Map<String, Object>> results = dynamicDataMapper.selectByQuery(sql, params);
+                if (!results.isEmpty()) {
+                    long count = ((Number) results.get(0).get("cnt")).longValue();
+                    if (count == 0) {
+                        errors.add("Referenced record not found for field '" + fieldDefinition.getName()
+                                + "': " + targetTable + "." + valueField + " = " + candidate);
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Reference existence check failed for {}: {}", fieldDefinition.getCode(), e.getMessage());
             }
         }
     }
