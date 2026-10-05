@@ -79,6 +79,11 @@ public class CloudConfigServiceImpl implements CloudConfigService {
             }
 
             existing.setConfigLevel(configLevel);
+            // Keep tenant_id consistent when the level changes: a row updated
+            // platform↔tenant without resetting tenant_id becomes invisible to
+            // BOTH listByLevel branches (orphan) and blocks re-creation via the
+            // uq_cloud_config unique key.
+            existing.setTenantId("platform".equals(configLevel) ? null : MetaContext.getCurrentTenantId());
             existing.setServiceType(serviceType);
             existing.setProviderCode(request.getProviderCode());
             existing.setConfig(encryptedConfig);

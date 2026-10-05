@@ -20,6 +20,7 @@ import java.util.List;
  * @since 6.3.0
  */
 @Mapper
+@InterceptorIgnore(tenantLine = "true")
 public interface CloudConfigMapper extends BaseMapper<CloudConfig> {
 
     /**
