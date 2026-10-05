@@ -1,0 +1,850 @@
+{
+  "registry.dataSourceType": {
+    "zh-CN": "数据源类型",
+    "en-US": "Data Source Type"
+  },
+  "registry.aggregateQuery": {
+    "zh-CN": "聚合查询",
+    "en-US": "Aggregate Query"
+  },
+  "registry.namedQuery": {
+    "zh-CN": "命名查询",
+    "en-US": "Named Query"
+  },
+  "registry.model": {
+    "zh-CN": "模型",
+    "en-US": "Model"
+  },
+  "registry.numberCard": {
+    "zh-CN": "数字卡片",
+    "en-US": "Number Card"
+  },
+  "registry.metrics": {
+    "zh-CN": "指标",
+    "en-US": "Metrics"
+  },
+  "registry.displayASingleMetricValue": {
+    "zh-CN": "显示单个指标数值",
+    "en-US": "Display a single metric value"
+  },
+  "registry.title": {
+    "zh-CN": "标题",
+    "en-US": "Title"
+  },
+  "registry.icon": {
+    "zh-CN": "图标",
+    "en-US": "Icon"
+  },
+  "registry.suffix": {
+    "zh-CN": "后缀",
+    "en-US": "Suffix"
+  },
+  "registry.forExampleItemsPeople": {
+    "zh-CN": "如：件、人",
+    "en-US": "For example: items, people"
+  },
+  "registry.showTrend": {
+    "zh-CN": "显示趋势",
+    "en-US": "Show Trend"
+  },
+  "registry.barChart": {
+    "zh-CN": "柱状图",
+    "en-US": "Bar Chart"
+  },
+  "registry.charts": {
+    "zh-CN": "图表",
+    "en-US": "Charts"
+  },
+  "registry.columnOrBarChart": {
+    "zh-CN": "柱状图/条形图",
+    "en-US": "Column or bar chart"
+  },
+  "registry.horizontal": {
+    "zh-CN": "水平显示",
+    "en-US": "Horizontal"
+  },
+  "registry.stacked": {
+    "zh-CN": "堆叠显示",
+    "en-US": "Stacked"
+  },
+  "registry.lineChart": {
+    "zh-CN": "折线图",
+    "en-US": "Line Chart"
+  },
+  "registry.lineOrTrendChart": {
+    "zh-CN": "折线图/趋势图",
+    "en-US": "Line or trend chart"
+  },
+  "registry.smoothCurve": {
+    "zh-CN": "平滑曲线",
+    "en-US": "Smooth Curve"
+  },
+  "registry.showArea": {
+    "zh-CN": "显示面积",
+    "en-US": "Show Area"
+  },
+  "registry.pieChart": {
+    "zh-CN": "饼图",
+    "en-US": "Pie Chart"
+  },
+  "registry.pieOrDoughnutChart": {
+    "zh-CN": "饼图/环形图",
+    "en-US": "Pie or doughnut chart"
+  },
+  "registry.doughnut": {
+    "zh-CN": "环形图",
+    "en-US": "Doughnut"
+  },
+  "registry.showLabels": {
+    "zh-CN": "显示标签",
+    "en-US": "Show Labels"
+  },
+  "registry.waterfallChart": {
+    "zh-CN": "瀑布图",
+    "en-US": "Waterfall Chart"
+  },
+  "registry.waterfallChartWithIncreaseDecreaseAndTotalAnchorRows": {
+    "zh-CN": "瀑布图/增减桥（含合计锚点行）",
+    "en-US": "Waterfall chart with increase, decrease and total anchor rows"
+  },
+  "registry.totalRowFieldOptional": {
+    "zh-CN": "合计行字段（可选）",
+    "en-US": "Total Row Field (Optional)"
+  },
+  "registry.totalRowValuesCommaSeparated": {
+    "zh-CN": "合计行取值（逗号分隔）",
+    "en-US": "Total Row Values (Comma Separated)"
+  },
+  "registry.totalSubtotal": {
+    "zh-CN": "total,subtotal,合计,小计",
+    "en-US": "total,subtotal"
+  },
+  "registry.paretoChart": {
+    "zh-CN": "帕累托图",
+    "en-US": "Pareto Chart"
+  },
+  "registry.barsWithACumulativePercentageLine": {
+    "zh-CN": "帕累托图（柱状+累计百分比线）",
+    "en-US": "Bars with a cumulative percentage line"
+  },
+  "registry.ganttChart": {
+    "zh-CN": "甘特图",
+    "en-US": "Gantt Chart"
+  },
+  "registry.taskStartEndAndProgressChart": {
+    "zh-CN": "甘特图（任务起止与进度）",
+    "en-US": "Task start, end and progress chart"
+  },
+  "registry.areaChart": {
+    "zh-CN": "面积图",
+    "en-US": "Area Chart"
+  },
+  "registry.areaOrStackedAreaChart": {
+    "zh-CN": "面积图/堆叠面积图",
+    "en-US": "Area or stacked area chart"
+  },
+  "registry.fillOpacity": {
+    "zh-CN": "填充透明度",
+    "en-US": "Fill Opacity"
+  },
+  "registry.funnelChart": {
+    "zh-CN": "漏斗图",
+    "en-US": "Funnel Chart"
+  },
+  "registry.funnelOrConversionChart": {
+    "zh-CN": "漏斗图/转化图",
+    "en-US": "Funnel or conversion chart"
+  },
+  "registry.sortOrder": {
+    "zh-CN": "排序方式",
+    "en-US": "Sort Order"
+  },
+  "registry.descending": {
+    "zh-CN": "降序",
+    "en-US": "Descending"
+  },
+  "registry.ascending": {
+    "zh-CN": "升序",
+    "en-US": "Ascending"
+  },
+  "registry.unsorted": {
+    "zh-CN": "不排序",
+    "en-US": "Unsorted"
+  },
+  "registry.scatterChart": {
+    "zh-CN": "散点图",
+    "en-US": "Scatter Chart"
+  },
+  "registry.scatterOrBubbleChart": {
+    "zh-CN": "散点图/气泡图",
+    "en-US": "Scatter or bubble chart"
+  },
+  "registry.bubbleMode": {
+    "zh-CN": "气泡模式",
+    "en-US": "Bubble Mode"
+  },
+  "registry.radarChart": {
+    "zh-CN": "雷达图",
+    "en-US": "Radar Chart"
+  },
+  "registry.radarChartForMultidimensionalComparison": {
+    "zh-CN": "雷达图/多维对比",
+    "en-US": "Radar chart for multidimensional comparison"
+  },
+  "registry.shape": {
+    "zh-CN": "形状",
+    "en-US": "Shape"
+  },
+  "registry.polygon": {
+    "zh-CN": "多边形",
+    "en-US": "Polygon"
+  },
+  "registry.circle": {
+    "zh-CN": "圆形",
+    "en-US": "Circle"
+  },
+  "registry.dataTable": {
+    "zh-CN": "数据表格",
+    "en-US": "Data Table"
+  },
+  "registry.data": {
+    "zh-CN": "数据",
+    "en-US": "Data"
+  },
+  "registry.displayTabularData": {
+    "zh-CN": "表格数据展示",
+    "en-US": "Display tabular data"
+  },
+  "registry.rowsPerPage": {
+    "zh-CN": "每页行数",
+    "en-US": "Rows per Page"
+  },
+  "registry.stripedRows": {
+    "zh-CN": "斑马纹",
+    "en-US": "Striped Rows"
+  },
+  "registry.gauge": {
+    "zh-CN": "仪表盘",
+    "en-US": "Gauge"
+  },
+  "registry.gaugeDisplayingASingleMetric": {
+    "zh-CN": "仪表盘/单指标展示",
+    "en-US": "Gauge displaying a single metric"
+  },
+  "registry.minimum": {
+    "zh-CN": "最小值",
+    "en-US": "Minimum"
+  },
+  "registry.maximum": {
+    "zh-CN": "最大值",
+    "en-US": "Maximum"
+  },
+  "registry.scaleSegments": {
+    "zh-CN": "刻度分段数",
+    "en-US": "Scale Segments"
+  },
+  "registry.filterBar": {
+    "zh-CN": "筛选栏",
+    "en-US": "Filter Bar"
+  },
+  "registry.interaction": {
+    "zh-CN": "交互",
+    "en-US": "Interaction"
+  },
+  "registry.dashboardFiltersSelectMultiselectAndDateRangeRefreshEveryReceivingWidget": {
+    "zh-CN": "看板级筛选栏(下拉/多选/日期范围),联动刷新全部接收筛选的 widget",
+    "en-US": "Dashboard filters (select, multiselect and date range) refresh every receiving widget"
+  },
+  "registry.filters": {
+    "zh-CN": "筛选",
+    "en-US": "Filters"
+  },
+  "registry.progressBar": {
+    "zh-CN": "进度条",
+    "en-US": "Progress Bar"
+  },
+  "registry.linearOrCircularProgressIndicator": {
+    "zh-CN": "进度条/环形进度",
+    "en-US": "Linear or circular progress indicator"
+  },
+  "registry.progress": {
+    "zh-CN": "进度",
+    "en-US": "Progress"
+  },
+  "registry.targetValue": {
+    "zh-CN": "目标值",
+    "en-US": "Target Value"
+  },
+  "registry.displayFormat": {
+    "zh-CN": "显示格式",
+    "en-US": "Display Format"
+  },
+  "registry.percentage": {
+    "zh-CN": "百分比",
+    "en-US": "Percentage"
+  },
+  "registry.fraction": {
+    "zh-CN": "分数",
+    "en-US": "Fraction"
+  },
+  "registry.bar": {
+    "zh-CN": "条形",
+    "en-US": "Bar"
+  },
+  "registry.heatmap": {
+    "zh-CN": "热力图",
+    "en-US": "Heatmap"
+  },
+  "registry.heatmapOrMatrixChart": {
+    "zh-CN": "热力图/矩阵图",
+    "en-US": "Heatmap or matrix chart"
+  },
+  "registry.xAxisField": {
+    "zh-CN": "X轴字段",
+    "en-US": "X Axis Field"
+  },
+  "registry.leaveBlankToDetectAutomatically": {
+    "zh-CN": "留空自动检测",
+    "en-US": "Leave blank to detect automatically"
+  },
+  "registry.yAxisField": {
+    "zh-CN": "Y轴字段",
+    "en-US": "Y Axis Field"
+  },
+  "registry.treemap": {
+    "zh-CN": "矩形树图",
+    "en-US": "Treemap"
+  },
+  "registry.treemapShowingHierarchicalProportions": {
+    "zh-CN": "矩形树图/层级占比",
+    "en-US": "Treemap showing hierarchical proportions"
+  },
+  "registry.nameField": {
+    "zh-CN": "名称字段",
+    "en-US": "Name Field"
+  },
+  "registry.valueField": {
+    "zh-CN": "值字段",
+    "en-US": "Value Field"
+  },
+  "registry.map": {
+    "zh-CN": "地图",
+    "en-US": "Map"
+  },
+  "registry.mapVisualizationRequiringGeographicData": {
+    "zh-CN": "地图可视化（需要地理数据）",
+    "en-US": "Map visualization requiring geographic data"
+  },
+  "registry.mapRegion": {
+    "zh-CN": "地图区域",
+    "en-US": "Map Region"
+  },
+  "registry.china": {
+    "zh-CN": "中国",
+    "en-US": "China"
+  },
+  "registry.world": {
+    "zh-CN": "世界",
+    "en-US": "World"
+  },
+  "registry.ranking": {
+    "zh-CN": "排行榜",
+    "en-US": "Ranking"
+  },
+  "registry.displayARankedList": {
+    "zh-CN": "排名列表展示",
+    "en-US": "Display a ranked list"
+  },
+  "registry.maximumItems": {
+    "zh-CN": "最大条目数",
+    "en-US": "Maximum Items"
+  },
+  "registry.richText": {
+    "zh-CN": "富文本",
+    "en-US": "Rich Text"
+  },
+  "registry.content": {
+    "zh-CN": "内容",
+    "en-US": "Content"
+  },
+  "registry.displayRichTextOrHTMLContent": {
+    "zh-CN": "富文本/HTML内容展示",
+    "en-US": "Display rich text or HTML content"
+  },
+  "registry.enterHTMLOrMarkdownContent": {
+    "zh-CN": "输入HTML或Markdown内容",
+    "en-US": "Enter HTML or Markdown content"
+  },
+  "registry.format": {
+    "zh-CN": "格式",
+    "en-US": "Format"
+  },
+  "registry.image": {
+    "zh-CN": "图片",
+    "en-US": "Image"
+  },
+  "registry.displayAnImage": {
+    "zh-CN": "图片展示",
+    "en-US": "Display an image"
+  },
+  "registry.imageURL": {
+    "zh-CN": "图片地址",
+    "en-US": "Image URL"
+  },
+  "registry.alternativeText": {
+    "zh-CN": "替代文本",
+    "en-US": "Alternative Text"
+  },
+  "registry.imageDescription": {
+    "zh-CN": "图片描述",
+    "en-US": "Image description"
+  },
+  "registry.fitMode": {
+    "zh-CN": "填充模式",
+    "en-US": "Fit Mode"
+  },
+  "registry.cover": {
+    "zh-CN": "覆盖",
+    "en-US": "Cover"
+  },
+  "registry.contain": {
+    "zh-CN": "包含",
+    "en-US": "Contain"
+  },
+  "registry.stretch": {
+    "zh-CN": "拉伸",
+    "en-US": "Stretch"
+  },
+  "registry.embeddedPage": {
+    "zh-CN": "内嵌页面",
+    "en-US": "Embedded Page"
+  },
+  "registry.embedAnExternalPage": {
+    "zh-CN": "嵌入外部页面",
+    "en-US": "Embed an external page"
+  },
+  "registry.pageURL": {
+    "zh-CN": "页面地址",
+    "en-US": "Page URL"
+  },
+  "registry.countdown": {
+    "zh-CN": "倒计时",
+    "en-US": "Countdown"
+  },
+  "registry.countdownToATargetDate": {
+    "zh-CN": "目标日期倒计时",
+    "en-US": "Countdown to a target date"
+  },
+  "registry.targetDate": {
+    "zh-CN": "目标日期",
+    "en-US": "Target Date"
+  },
+  "registry.fullDaysHoursMinutesSeconds": {
+    "zh-CN": "完整 (天时分秒)",
+    "en-US": "Full (Days, Hours, Minutes, Seconds)"
+  },
+  "registry.daysOnly": {
+    "zh-CN": "仅天数",
+    "en-US": "Days Only"
+  },
+  "registry.wordCloud": {
+    "zh-CN": "词云",
+    "en-US": "Word Cloud"
+  },
+  "registry.displayKeywordsSizedByFrequency": {
+    "zh-CN": "按词频大小展示关键词分布",
+    "en-US": "Display keywords sized by frequency"
+  },
+  "registry.rectangle": {
+    "zh-CN": "矩形",
+    "en-US": "Rectangle"
+  },
+  "registry.diamond": {
+    "zh-CN": "菱形",
+    "en-US": "Diamond"
+  },
+  "registry.triangle": {
+    "zh-CN": "三角形",
+    "en-US": "Triangle"
+  },
+  "registry.colorTheme": {
+    "zh-CN": "颜色主题",
+    "en-US": "Color Theme"
+  },
+  "registry.random": {
+    "zh-CN": "随机",
+    "en-US": "Random"
+  },
+  "registry.warm": {
+    "zh-CN": "暖色",
+    "en-US": "Warm"
+  },
+  "registry.cool": {
+    "zh-CN": "冷色",
+    "en-US": "Cool"
+  },
+  "registry.brand": {
+    "zh-CN": "品牌色",
+    "en-US": "Brand"
+  },
+  "registry.wordSpacing": {
+    "zh-CN": "词间距",
+    "en-US": "Word Spacing"
+  },
+  "registry.combinationChart": {
+    "zh-CN": "组合图",
+    "en-US": "Combination Chart"
+  },
+  "registry.mixedSeriesChartWithBarsLinesAreasScatterAndDualYAxes": {
+    "zh-CN": "多系列混合图表，支持柱状+折线+面积+散点+双Y轴",
+    "en-US": "Mixed-series chart with bars, lines, areas, scatter and dual Y axes"
+  },
+  "registry.stacking": {
+    "zh-CN": "堆叠",
+    "en-US": "Stacking"
+  },
+  "registry.dataZoom": {
+    "zh-CN": "数据缩放",
+    "en-US": "Data Zoom"
+  },
+  "registry.leftYAxisName": {
+    "zh-CN": "左Y轴名称",
+    "en-US": "Left Y Axis Name"
+  },
+  "registry.leftYAxisFormat": {
+    "zh-CN": "左Y轴格式",
+    "en-US": "Left Y Axis Format"
+  },
+  "registry.value10000": {
+    "zh-CN": "{value}万",
+    "en-US": "{value} × 10000"
+  },
+  "registry.rightYAxisName": {
+    "zh-CN": "右Y轴名称",
+    "en-US": "Right Y Axis Name"
+  },
+  "registry.rightYAxisFormat": {
+    "zh-CN": "右Y轴格式",
+    "en-US": "Right Y Axis Format"
+  },
+  "registry.npsChart": {
+    "zh-CN": "NPS 图",
+    "en-US": "NPS Chart"
+  },
+  "registry.netPromoterScoreGaugeGrouping010RatingsIntoPromotersPassivesAndDetractors": {
+    "zh-CN": "净推荐值仪表盘，自动将0-10评分分为推荐者/中立者/贬损者",
+    "en-US": "Net Promoter Score gauge grouping 0–10 ratings into promoters, passives and detractors"
+  },
+  "registry.ratingField": {
+    "zh-CN": "评分字段",
+    "en-US": "Rating Field"
+  },
+  "registry.nameOfANumeric010RatingField": {
+    "zh-CN": "0-10 数值字段名",
+    "en-US": "Name of a numeric 0–10 rating field"
+  },
+  "registry.showPercentage": {
+    "zh-CN": "显示百分比",
+    "en-US": "Show Percentage"
+  },
+  "registry.showLegend": {
+    "zh-CN": "显示图例",
+    "en-US": "Show Legend"
+  },
+  "registry.ringWidth": {
+    "zh-CN": "环形宽度",
+    "en-US": "Ring Width"
+  },
+  "registry.gallery": {
+    "zh-CN": "画册",
+    "en-US": "Gallery"
+  },
+  "registry.gridGallerySupportingStaticImagesAndDynamicModelData": {
+    "zh-CN": "网格卡片画册，支持静态图片和模型数据动态渲染",
+    "en-US": "Grid gallery supporting static images and dynamic model data"
+  },
+  "registry.columns": {
+    "zh-CN": "列数",
+    "en-US": "Columns"
+  },
+  "registry.2Columns": {
+    "zh-CN": "2 列",
+    "en-US": "2 Columns"
+  },
+  "registry.3Columns": {
+    "zh-CN": "3 列",
+    "en-US": "3 Columns"
+  },
+  "registry.4Columns": {
+    "zh-CN": "4 列",
+    "en-US": "4 Columns"
+  },
+  "registry.imageField": {
+    "zh-CN": "图片字段",
+    "en-US": "Image Field"
+  },
+  "registry.imageURLFieldName": {
+    "zh-CN": "图片URL字段名",
+    "en-US": "Image URL field name"
+  },
+  "registry.titleField": {
+    "zh-CN": "标题字段",
+    "en-US": "Title Field"
+  },
+  "registry.titleFieldName": {
+    "zh-CN": "标题字段名",
+    "en-US": "Title field name"
+  },
+  "registry.summaryField": {
+    "zh-CN": "摘要字段",
+    "en-US": "Summary Field"
+  },
+  "registry.summaryFieldName": {
+    "zh-CN": "摘要字段名",
+    "en-US": "Summary field name"
+  },
+  "registry.imageHeight": {
+    "zh-CN": "图片高度",
+    "en-US": "Image Height"
+  },
+  "registry.imageFit": {
+    "zh-CN": "图片填充",
+    "en-US": "Image Fit"
+  },
+  "registry.cropToFill": {
+    "zh-CN": "裁剪填满",
+    "en-US": "Crop to Fill"
+  },
+  "registry.showEntireImage": {
+    "zh-CN": "完整显示",
+    "en-US": "Show Entire Image"
+  },
+  "registry.lightboxPreview": {
+    "zh-CN": "灯箱预览",
+    "en-US": "Lightbox Preview"
+  },
+  "registry.cardGap": {
+    "zh-CN": "卡片间距",
+    "en-US": "Card Gap"
+  },
+  "registry.kanban": {
+    "zh-CN": "看板",
+    "en-US": "Kanban"
+  },
+  "registry.views": {
+    "zh-CN": "视图",
+    "en-US": "Views"
+  },
+  "registry.displayDataInDimensionBasedColumnsWithoutEditing": {
+    "zh-CN": "按维度字段分列展示数据，纯展示模式",
+    "en-US": "Display data in dimension-based columns, without editing"
+  },
+  "registry.groupField": {
+    "zh-CN": "分组字段",
+    "en-US": "Group Field"
+  },
+  "registry.forExampleStatusStage": {
+    "zh-CN": "如 status、stage",
+    "en-US": "For example: status, stage"
+  },
+  "registry.cardTitleField": {
+    "zh-CN": "卡片标题字段",
+    "en-US": "Card Title Field"
+  },
+  "registry.forExampleNameTitle": {
+    "zh-CN": "如 name、title",
+    "en-US": "For example: name, title"
+  },
+  "registry.cardDescriptionField": {
+    "zh-CN": "卡片描述字段",
+    "en-US": "Card Description Field"
+  },
+  "registry.forExampleDescription": {
+    "zh-CN": "如 description",
+    "en-US": "For example: description"
+  },
+  "registry.maximumCardsPerColumn": {
+    "zh-CN": "每列最大卡片数",
+    "en-US": "Maximum Cards per Column"
+  },
+  "registry.showCount": {
+    "zh-CN": "显示数量",
+    "en-US": "Show Count"
+  },
+  "registry.cardLinkURL": {
+    "zh-CN": "卡片跳转URL",
+    "en-US": "Card Link URL"
+  },
+  "registry.statisticsOverview": {
+    "zh-CN": "统计概览",
+    "en-US": "Statistics Overview"
+  },
+  "registry.workbenchStatistics": {
+    "zh-CN": "工作台 · 统计",
+    "en-US": "Workbench · Statistics"
+  },
+  "registry.displayKeyBusinessMetricsInASingleRow": {
+    "zh-CN": "多指标统计行，一行展示关键业务数字",
+    "en-US": "Display key business metrics in a single row"
+  },
+  "registry.statisticsCard": {
+    "zh-CN": "统计卡片",
+    "en-US": "Statistics Card"
+  },
+  "registry.singleMetricStatisticsCardWithTrendDisplay": {
+    "zh-CN": "单个指标统计卡片，支持趋势展示",
+    "en-US": "Single-metric statistics card with trend display"
+  },
+  "registry.metricKey": {
+    "zh-CN": "指标键",
+    "en-US": "Metric Key"
+  },
+  "registry.forExampleTotalLeadsOpenOpps": {
+    "zh-CN": "如：totalLeads, openOpps",
+    "en-US": "For example: totalLeads, openOpps"
+  },
+  "registry.tasks": {
+    "zh-CN": "待办事项",
+    "en-US": "Tasks"
+  },
+  "registry.workbenchTasks": {
+    "zh-CN": "工作台 · 任务",
+    "en-US": "Workbench · Tasks"
+  },
+  "registry.displayPendingApprovalsAndTasksForTheCurrentUser": {
+    "zh-CN": "显示当前用户的待办审批和任务",
+    "en-US": "Display pending approvals and tasks for the current user"
+  },
+  "registry.maximumRows": {
+    "zh-CN": "最大显示条数",
+    "en-US": "Maximum Rows"
+  },
+  "registry.taskTypeFilter": {
+    "zh-CN": "事项类型筛选",
+    "en-US": "Task Type Filter"
+  },
+  "registry.forExampleApprovalTaskLeaveBlankToShowAll": {
+    "zh-CN": "如：approval,task（留空显示全部）",
+    "en-US": "For example: approval,task (leave blank to show all)"
+  },
+  "registry.calendar": {
+    "zh-CN": "日历",
+    "en-US": "Calendar"
+  },
+  "registry.calendarShowingSchedulesAndTasks": {
+    "zh-CN": "日历视图，展示日程和任务",
+    "en-US": "Calendar showing schedules and tasks"
+  },
+  "registry.shortcuts": {
+    "zh-CN": "快捷入口",
+    "en-US": "Shortcuts"
+  },
+  "registry.workbenchGeneral": {
+    "zh-CN": "工作台 · 通用",
+    "en-US": "Workbench · General"
+  },
+  "registry.quickAccessToFrequentlyUsedActions": {
+    "zh-CN": "常用功能的快捷操作入口",
+    "en-US": "Quick access to frequently used actions"
+  },
+  "registry.columnsPerRow": {
+    "zh-CN": "每行列数",
+    "en-US": "Columns per Row"
+  },
+  "registry.allowPersonalization": {
+    "zh-CN": "允许用户个性化",
+    "en-US": "Allow Personalization"
+  },
+  "registry.recentItems": {
+    "zh-CN": "最近访问",
+    "en-US": "Recent Items"
+  },
+  "registry.displayRecentlyVisitedPagesAndRecords": {
+    "zh-CN": "显示最近访问的页面和记录",
+    "en-US": "Display recently visited pages and records"
+  },
+  "registry.announcements": {
+    "zh-CN": "公告",
+    "en-US": "Announcements"
+  },
+  "registry.displayAnnouncementsAndNotifications": {
+    "zh-CN": "公告和通知展示",
+    "en-US": "Display announcements and notifications"
+  },
+  "registry.quickNote": {
+    "zh-CN": "快捷便签",
+    "en-US": "Quick Note"
+  },
+  "registry.quicklyCaptureNotesAndReminders": {
+    "zh-CN": "快速记录笔记和备忘",
+    "en-US": "Quickly capture notes and reminders"
+  },
+  "panel.select": {
+    "zh-CN": "请选择",
+    "en-US": "Select an option"
+  },
+  "panel.modelCode": {
+    "zh-CN": "输入模型编码",
+    "en-US": "Enter a model code"
+  },
+  "panel.queryCode": {
+    "zh-CN": "输入查询编码",
+    "en-US": "Enter a query code"
+  },
+  "panel.properties": {
+    "zh-CN": "属性",
+    "en-US": "Properties"
+  },
+  "panel.selectWidget": {
+    "zh-CN": "选择一个组件查看属性",
+    "en-US": "Select a widget to inspect its properties"
+  },
+  "panel.confirmDelete": {
+    "zh-CN": "确定删除此组件？",
+    "en-US": "Delete this widget?"
+  },
+  "panel.duplicate": {
+    "zh-CN": "复制",
+    "en-US": "Duplicate"
+  },
+  "panel.delete": {
+    "zh-CN": "删除",
+    "en-US": "Delete"
+  },
+  "panel.dataSource": {
+    "zh-CN": "数据源配置",
+    "en-US": "Data Source"
+  },
+  "panel.style": {
+    "zh-CN": "样式配置",
+    "en-US": "Style"
+  },
+  "panel.linkage": {
+    "zh-CN": "图表联动",
+    "en-US": "Chart Linkage"
+  },
+  "panel.drilldown": {
+    "zh-CN": "钻取配置",
+    "en-US": "Drilldown"
+  },
+  "panel.refresh": {
+    "zh-CN": "数据刷新",
+    "en-US": "Data Refresh"
+  },
+  "panel.positionSize": {
+    "zh-CN": "位置和大小",
+    "en-US": "Position and Size"
+  },
+  "panel.width": {
+    "zh-CN": "宽度",
+    "en-US": "Width"
+  },
+  "panel.height": {
+    "zh-CN": "高度",
+    "en-US": "Height"
+  },
+  "panel.copySuffix": {
+    "zh-CN": "副本",
+    "en-US": "Copy"
+  }
+}

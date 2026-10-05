@@ -25,16 +25,18 @@ import { uniqueId, executeCommandViaApi } from '../helpers/index';
 // ---------------------------------------------------------------------------
 
 async function navigateToCrmPageViaMenu(page: Page, modelCode: string): Promise<void> {
-  await page.goto('/dashboards');
+  await page.goto('/');
   await page.waitForLoadState('domcontentloaded');
 
   const nav = page.locator('nav');
 
-  // Expand CRM root menu
-  const crmBtn = nav.getByRole('button', { name: /crm/i }).first();
-  await crmBtn.waitFor({ state: 'visible', timeout: 10_000 });
-  await crmBtn.evaluate((el: HTMLElement) => el.click());
-  await page.waitForResponse(() => true, { timeout: 1_500 }).catch(() => null);
+  // Expand the E2E fixtures group when it is collapsible (leaf entries also
+  // render at top level, so a missing group button is fine).
+  const groupBtn = nav.getByRole('button', { name: /E2E测试|E2E Test/i }).first();
+  if (await groupBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
+    await groupBtn.evaluate((el: HTMLElement) => el.click());
+    await page.waitForResponse(() => true, { timeout: 1_500 }).catch(() => null);
+  }
 
   // Click leaf link
   const hrefPath = `/p/${modelCode}`;
@@ -71,7 +73,7 @@ async function navigateToPluginPageViaMenu(
 }
 
 // ---------------------------------------------------------------------------
-// Test setup: ensure CRM data exists for meaningful list display
+// Test setup: ensure e2et data exists for meaningful list display
 // ---------------------------------------------------------------------------
 
 const UID = uniqueId('uls'); // uls = ux-loading-states
@@ -85,7 +87,7 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
   test.describe.configure({ mode: 'serial' });
   test.setTimeout(90_000);
 
-  // Seed at least one lead so the list shows real data after loading
+  // Seed at least one order so the list shows real data after loading
   test.beforeAll(async ({ browser }) => {
     if (setupDone) return;
     setupDone = true;
@@ -95,12 +97,11 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
     try {
       await executeCommandViaApi(
         page,
-        'crm:create_lead',
+        'e2et:create_order',
         {
-          crm_lead_company: `ULS Lead ${UID}`,
-          crm_lead_contact_name: `ULS Contact ${UID}`,
-          crm_lead_source: 'website',
-          crm_lead_status: 'new',
+          e2et_order_title: `ULS Order ${UID}`,
+          e2et_order_customer: `ULS Customer ${UID}`,
+          e2et_order_type: 'normal',
         },
         undefined,
         'create',
@@ -113,16 +114,16 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
   });
 
   // -------------------------------------------------------------------------
-  // ULS-001: CRM Lead list shows skeleton THEN real data rows
+  // ULS-001: e2et order list shows skeleton THEN real data rows
   // -------------------------------------------------------------------------
 
-  test('ULS-001: CRM Lead list — skeleton visible during load, data visible after', async ({
+  test('ULS-001: e2et order list — skeleton visible during load, data visible after', async ({
     page,
   }) => {
     // Intercept the list API so we can control timing observations
     let listCallCount = 0;
     page.on('response', (resp) => {
-      if (resp.url().includes('/api/dynamic/crm_lead_common') && resp.url().includes('/list')) {
+      if (resp.url().includes('/api/dynamic/e2et_order') && resp.url().includes('/list')) {
         listCallCount++;
       }
     });
@@ -130,12 +131,12 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
     // Set up the response promise BEFORE navigating so we don't miss it
     const listApiPromise = page.waitForResponse(
       (r) =>
-        (r.url().includes('/api/dynamic/crm_lead_common') || r.url().includes('/api/dynamic/crm_lead_common')) &&
+        (r.url().includes('/api/dynamic/e2et_order') || r.url().includes('/api/dynamic/e2et_order')) &&
         r.status() === 200,
       { timeout: 25_000 },
     );
 
-    await navigateToCrmPageViaMenu(page, 'crm_lead_common');
+    await navigateToCrmPageViaMenu(page, 'e2et_order');
 
     // Layer 1 (Render): immediately check for skeleton OR loading spinner
     // The skeleton appears briefly — we check as early as possible
@@ -177,17 +178,17 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
 
   test('ULS-002: List page — loading indicator inside table while fetching', async ({ page }) => {
     // Navigate to CRM Lead page
-    await navigateToCrmPageViaMenu(page, 'crm_lead_common');
+    await navigateToCrmPageViaMenu(page, 'e2et_order');
 
     // Wait for the page URL to settle
-    await page.waitForURL(/\/p\/crm[_-]lead/, { timeout: 15_000 });
+    await page.waitForURL(/\/p\/e2et_order/, { timeout: 15_000 });
 
     // Wait for first load to complete
     await page
       .waitForResponse(
         (r) =>
-          (r.url().includes('/api/dynamic/crm_lead_common') ||
-            r.url().includes('/api/dynamic/crm_lead_common')) &&
+          (r.url().includes('/api/dynamic/e2et_order') ||
+            r.url().includes('/api/dynamic/e2et_order')) &&
           r.status() === 200,
         { timeout: 15_000 },
       )
@@ -219,12 +220,12 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
     // Fresh page load to ensure we go through the full loading cycle
     const listResponsePromise = page.waitForResponse(
       (r) =>
-        (r.url().includes('/api/dynamic/crm_lead_common') || r.url().includes('/api/dynamic/crm_lead_common')) &&
+        (r.url().includes('/api/dynamic/e2et_order') || r.url().includes('/api/dynamic/e2et_order')) &&
         r.status() === 200,
       { timeout: 20_000 },
     );
 
-    await navigateToCrmPageViaMenu(page, 'crm_lead_common');
+    await navigateToCrmPageViaMenu(page, 'e2et_order');
     await listResponsePromise;
 
     // Wait for data to stabilize
@@ -252,14 +253,14 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
   // -------------------------------------------------------------------------
 
   test('ULS-004: Applying search keyword shows loading then updated results', async ({ page }) => {
-    await navigateToCrmPageViaMenu(page, 'crm_lead_common');
+    await navigateToCrmPageViaMenu(page, 'e2et_order');
 
     // Wait for initial load
     await page
       .waitForResponse(
         (r) =>
-          (r.url().includes('/api/dynamic/crm_lead_common') ||
-            r.url().includes('/api/dynamic/crm_lead_common')) &&
+          (r.url().includes('/api/dynamic/e2et_order') ||
+            r.url().includes('/api/dynamic/e2et_order')) &&
           r.status() === 200,
         { timeout: 15_000 },
       )
@@ -278,14 +279,14 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
 
     const hasSearch = await searchInput.isVisible({ timeout: 5_000 }).catch(() => false);
     if (!hasSearch) {
-      test.skip(true, 'ULS-004: no search input found on crm_lead_common list — skipping');
+      test.skip(true, 'ULS-004: no search input found on e2et_order list — skipping');
       return;
     }
 
     // Intercept next list API call
     const searchResponsePromise = page.waitForResponse(
       (r) =>
-        (r.url().includes('/api/dynamic/crm_lead_common') || r.url().includes('/api/dynamic/crm_lead_common')) &&
+        (r.url().includes('/api/dynamic/e2et_order') || r.url().includes('/api/dynamic/e2et_order')) &&
         r.status() === 200,
       { timeout: 10_000 },
     );
@@ -308,8 +309,8 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
     await page
       .waitForResponse(
         (r) =>
-          (r.url().includes('/api/dynamic/crm_lead_common') ||
-            r.url().includes('/api/dynamic/crm_lead_common')) &&
+          (r.url().includes('/api/dynamic/e2et_order') ||
+            r.url().includes('/api/dynamic/e2et_order')) &&
           r.status() === 200,
         { timeout: 10_000 },
       )
@@ -327,7 +328,7 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
     // not the generic LoadingSpinner
 
     // Go to a non-dynamic page first
-    await page.goto('/dashboards');
+    await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
 
     // Set up skeleton capture before navigating
@@ -335,14 +336,15 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
       .waitForSelector('[data-testid="list-page-skeleton"], .loading-spinner', { timeout: 5_000 })
       .catch(() => null);
 
-    // Navigate to CRM lead list
+    // Navigate to the e2et order list
     const nav = page.locator('nav');
-    const crmBtn = nav.getByRole('button', { name: /crm/i }).first();
-    await crmBtn.waitFor({ state: 'visible', timeout: 10_000 });
-    await crmBtn.evaluate((el: HTMLElement) => el.click());
-    await page.waitForResponse(() => true, { timeout: 1_500 }).catch(() => null);
+    const groupBtn = nav.getByRole('button', { name: /E2E测试|E2E Test/i }).first();
+    if (await groupBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      await groupBtn.evaluate((el: HTMLElement) => el.click());
+      await page.waitForResponse(() => true, { timeout: 1_500 }).catch(() => null);
+    }
 
-    const hrefPath = '/p/crm_lead_common';
+    const hrefPath = '/p/e2et_order';
     const leafLink = nav.locator(`a[href="${hrefPath}"]`).first();
     await leafLink.waitFor({ state: 'attached', timeout: 8_000 });
     await leafLink.evaluate((el: HTMLElement) => el.click());
@@ -354,8 +356,8 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
     await page
       .waitForResponse(
         (r) =>
-          (r.url().includes('/api/dynamic/crm_lead_common') ||
-            r.url().includes('/api/dynamic/crm_lead_common')) &&
+          (r.url().includes('/api/dynamic/e2et_order') ||
+            r.url().includes('/api/dynamic/e2et_order')) &&
           r.status() === 200,
         { timeout: 20_000 },
       )

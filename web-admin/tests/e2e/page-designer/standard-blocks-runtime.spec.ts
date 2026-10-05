@@ -633,19 +633,19 @@ test.describe('Page Designer standard block runtime', () => {
     // the primary toolbar); open the menu to assert it, then Escape closes it
     // WITHOUT deleting — this test only verifies the bulk toolbar surface.
     await page.getByTestId('bulk-more-actions-btn').click();
-    await expect(page.getByRole('menuitem', { name: 'Delete' })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: /删除|Delete/i })).toBeVisible();
     await page.keyboard.press('Escape');
-    await expect(page.getByRole('menuitem', { name: 'Delete' })).toHaveCount(0);
+    await expect(page.getByRole('menuitem', { name: /删除|Delete/i })).toHaveCount(0);
     await expect(page.getByTestId('bulk-edit-btn')).toBeVisible();
 
     await page.getByTestId('bulk-edit-btn').click();
-    await expect(page.getByRole('heading', { name: 'Bulk Edit' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Update 1 records' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /批量编辑|Bulk Edit/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /更新 1 条记录|Update 1 records/i })).toBeVisible();
     await expect(page.getByRole('combobox')).toBeVisible();
-    await page.getByRole('button', { name: 'Cancel' }).click();
-    await expect(page.getByRole('heading', { name: 'Bulk Edit' })).toHaveCount(0);
+    await page.getByRole('button', { name: /取消|Cancel/i }).click();
+    await expect(page.getByRole('heading', { name: /批量编辑|Bulk Edit/i })).toHaveCount(0);
 
-    await page.getByRole('button', { name: 'Clear selection' }).click();
+    await page.getByRole('button', { name: /清除选择|Clear selection/i }).click();
     await expect(page.getByRole('button', { name: 'Edit' })).toHaveCount(0);
   });
 
@@ -667,10 +667,13 @@ test.describe('Page Designer standard block runtime', () => {
         response.request().method() === 'PUT',
       { timeout: 15_000 },
     );
-    await page.getByRole('button', { name: 'Edit' }).click();
+    await page.getByTestId('bulk-edit-btn').click();
     await page.getByTestId('bulk-edit-field').selectOption('name');
 await page.getByTestId('bulk-edit-value').fill(editedName);
-    await page.getByRole('button', { name: 'Update 1 Records' }).click();
+    // Locale-dependent copy: 更新 1 条记录 (zh) / Update 1 records (en)
+    await page
+      .getByRole('button', { name: /更新 1 条记录|Update 1 records/i })
+      .click();
     expect((await bulkEditResponse).ok(), 'bulk edit response').toBeTruthy();
 
     await expect
@@ -678,7 +681,7 @@ await page.getByTestId('bulk-edit-value').fill(editedName);
         timeout: 10_000,
       })
       .toBe(editedName);
-    await expect(page.getByRole('heading', { name: 'Bulk Edit' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: /批量编辑|Bulk Edit/i })).toHaveCount(0);
     await expect(page.getByTestId('table-cell-0-name')).toContainText(editedName, {
       timeout: 15_000,
     });
@@ -698,7 +701,7 @@ await page.getByTestId('bulk-edit-value').fill(editedName);
     );
     // Delete lives in the More-actions overflow menu.
     await page.getByTestId('bulk-more-actions-btn').click();
-    await page.getByRole('menuitem', { name: 'Delete' }).click();
+    await page.getByRole('menuitem', { name: /删除|Delete/i }).click();
     await page.getByRole('button', { name: /Confirm|确认/ }).click();
     expect((await bulkDeleteResponse).ok(), 'bulk delete response').toBeTruthy();
 

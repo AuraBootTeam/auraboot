@@ -79,13 +79,13 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void languagePacksAllowAnonymousRequestsButValidateSuppliedCredentials() throws Exception {
+        when(jwtUtil.extractIdentifier("expired.token")).thenThrow(new ExpiredJwtException(null, null, "expired"));
         for (String path : List.of("/api/i18n", "/api/i18n/zh-CN")) {
             MockHttpServletRequest request = new MockHttpServletRequest("GET", path);
             request.setServletPath(path);
             assertTrue(filter.shouldNotFilter(request));
             request.addHeader("Authorization", "Bearer expired.token");
             assertFalse(filter.shouldNotFilter(request));
-            when(jwtUtil.extractIdentifier("expired.token")).thenThrow(new ExpiredJwtException(null, null, "expired"));
             MockHttpServletResponse response = new MockHttpServletResponse();
             filter.doFilter(request, response, chain);
             assertEquals(401, response.getStatus());

@@ -48,6 +48,49 @@ class CapabilityResolverTest {
     }
 
     @Test
+    void preservesBothDeclarationLabelsInTheApiPayloadWithoutChangingGrantIdentity() throws Exception {
+        CapabilityDefinitionDTO declaration = CapabilityDefinitionDTO.builder()
+                .code("org.cap.role").group("Organization").nameZhCN("管理角色")
+                .nameEn("Manage Roles").includes(List.of("org.role.read", "org.role.update")).build();
+        Capability resolved = resolver.resolve(List.of(declaration), declaration.getIncludes(),
+                Set.of("org.role.read")).get(0).getCapabilities().get(0);
+
+        assertThat(resolved.getLabel()).isEqualTo("管理角色");
+        assertThat(resolved.getLocalizedLabels()).containsExactlyInAnyOrderEntriesOf(
+                Map.of("zh-CN", "管理角色", "en", "Manage Roles"));
+        assertThat(resolved.getCode()).isEqualTo("org.cap.role");
+        assertThat(resolved.getIncludes()).containsExactly("org.role.read", "org.role.update");
+        assertThat(resolved.isGranted()).isFalse();
+        var json = new com.fasterxml.jackson.databind.ObjectMapper().valueToTree(resolved);
+        assertThat(json.path("localizedLabels").path("en").asText()).isEqualTo("Manage Roles");
+        assertThat(json.path("code").asText()).isEqualTo("org.cap.role");
+    }
+
+    @Test
+    void excludesBlankTranslationsAndPreservesEnglishOnlyDeclarations() {
+        CapabilityDefinitionDTO declaration = CapabilityDefinitionDTO.builder()
+                .code("org.cap.role").group("Organization").nameZhCN("  ")
+                .nameEn("Manage Roles").includes(List.of("org.role.read")).build();
+        Capability resolved = resolver.resolve(List.of(declaration), declaration.getIncludes(),
+                Set.of("org.role.read")).get(0).getCapabilities().get(0);
+
+        assertThat(resolved.getLocalizedLabels()).containsExactlyEntriesOf(Map.of("en", "Manage Roles"));
+        assertThat(resolved.getLabel()).isEqualTo("Manage Roles");
+        assertThat(resolved.isGranted()).isTrue();
+    }
+
+    @Test
+    void legacyAndConventionDerivedLabelsDoNotInventTranslations() {
+        CapabilityDefinitionDTO declaration = CapabilityDefinitionDTO.builder()
+                .code("org.cap.role").group("Organization").includes(List.of("org.role.read")).build();
+        List<CapabilityGroup> groups = resolver.resolve(List.of(declaration),
+                List.of("org.role.read", "crm.account.read"), Set.of());
+        assertThat(cap(group(groups, "Organization"), "org.cap.role").getLocalizedLabels()).isEmpty();
+        assertThat(cap(group(groups, "Organization"), "org.cap.role").getLabel()).isEqualTo("org.cap.role");
+        assertThat(cap(group(groups, "crm"), "crm.account").getLocalizedLabels()).isEmpty();
+    }
+
+    @Test
     void declarationDisplayGroupOrderControlsGroupSorting() {
         // R5-fix: a declared capability whose includes carry NO permission-extension group order
         // (e.g. org/admin codes) can still control where its group sorts via the declaration's own

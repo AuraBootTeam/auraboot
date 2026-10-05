@@ -1,0 +1,450 @@
+{
+  "amount": {
+    "zh-CN": "金额",
+    "en": "Amount"
+  },
+  "priority": {
+    "zh-CN": "优先级",
+    "en": "Priority"
+  },
+  "userDepartment": {
+    "zh-CN": "用户部门",
+    "en": "User department"
+  },
+  "approvalRouting": {
+    "zh-CN": "审批路由",
+    "en": "Approval routing"
+  },
+  "sLADeadline": {
+    "zh-CN": "SLA 截止时间",
+    "en": "SLA deadline"
+  },
+  "leaveApprovalSLADeadline": {
+    "zh-CN": "请假审批 SLA 截止时间",
+    "en": "Leave approval SLA deadline"
+  },
+  "deadlineMinutes": {
+    "zh-CN": "截止分钟",
+    "en": "Deadline minutes"
+  },
+  "warningMinutesBeforeDeadline": {
+    "zh-CN": "提前提醒分钟",
+    "en": "Warning minutes before deadline"
+  },
+  "escalationLevel": {
+    "zh-CN": "升级等级",
+    "en": "Escalation level"
+  },
+  "leaveApprovalAssignment": {
+    "zh-CN": "请假审批分派",
+    "en": "Leave approval assignment"
+  },
+  "leaveRequestAutomationPolicy": {
+    "zh-CN": "请假申请自动化策略",
+    "en": "Leave request automation policy"
+  },
+  "latestPublished": {
+    "zh-CN": "最新已发布",
+    "en": "Latest published"
+  },
+  "fixedVersion": {
+    "zh-CN": "固定版本",
+    "en": "Fixed version"
+  },
+  "versionTag": {
+    "zh-CN": "版本标签",
+    "en": "Version tag"
+  },
+  "rollout": {
+    "zh-CN": "灰度发布",
+    "en": "Rollout"
+  },
+  "blockOnError": {
+    "zh-CN": "异常时阻断",
+    "en": "Block on error"
+  },
+  "allowOnError": {
+    "zh-CN": "异常时放行",
+    "en": "Allow on error"
+  },
+  "useDefaultValue": {
+    "zh-CN": "使用默认值",
+    "en": "Use default value"
+  },
+  "actionParameter": {
+    "zh-CN": "动作参数",
+    "en": "Action parameter"
+  },
+  "businessField": {
+    "zh-CN": "业务字段",
+    "en": "Business field"
+  },
+  "processVariable": {
+    "zh-CN": "流程变量",
+    "en": "Process variable"
+  },
+  "sLAField": {
+    "zh-CN": "SLA 字段",
+    "en": "SLA field"
+  },
+  "permissionContext": {
+    "zh-CN": "权限上下文",
+    "en": "Permission context"
+  },
+  "matched": {
+    "zh-CN": "已命中",
+    "en": "Matched"
+  },
+  "notMatched": {
+    "zh-CN": "未命中",
+    "en": "Not matched"
+  },
+  "executionError": {
+    "zh-CN": "执行异常",
+    "en": "Execution error"
+  },
+  "skipped": {
+    "zh-CN": "已跳过",
+    "en": "Skipped"
+  },
+  "unknownStatus": {
+    "zh-CN": "未知状态",
+    "en": "Unknown status"
+  },
+  "metadata": {
+    "zh-CN": "元数据",
+    "en": "Metadata"
+  },
+  "event": {
+    "zh-CN": "事件",
+    "en": "Event"
+  },
+  "businessRecord": {
+    "zh-CN": "业务记录",
+    "en": "Business record"
+  },
+  "beforeChange": {
+    "zh-CN": "变更前",
+    "en": "Before change"
+  },
+  "afterChange": {
+    "zh-CN": "变更后",
+    "en": "After change"
+  },
+  "process": {
+    "zh-CN": "流程",
+    "en": "Process"
+  },
+  "task": {
+    "zh-CN": "任务",
+    "en": "Task"
+  },
+  "actor": {
+    "zh-CN": "操作者",
+    "en": "Actor"
+  },
+  "tenant": {
+    "zh-CN": "租户",
+    "en": "Tenant"
+  },
+  "time": {
+    "zh-CN": "时间",
+    "en": "Time"
+  },
+  "environment": {
+    "zh-CN": "环境",
+    "en": "Environment"
+  },
+  "maskedField": {
+    "zh-CN": "字段已脱敏",
+    "en": "Masked field"
+  },
+  "readOnlyField": {
+    "zh-CN": "只读字段",
+    "en": "Read-only field"
+  },
+  "requestFailed": {
+    "zh-CN": "请求失败",
+    "en": "Request failed"
+  },
+  "noDecisionSelected": {
+    "zh-CN": "未选择决策",
+    "en": "No decision selected"
+  },
+  "ruleCenterBinding": {
+    "zh-CN": "规则中心绑定",
+    "en": "Rule center binding"
+  },
+  "unifiedPolicy": {
+    "zh-CN": "统一策略 ·",
+    "en": "Unified policy ·"
+  },
+  "inputMappings": {
+    "zh-CN": "输入映射",
+    "en": "Input mappings"
+  },
+  "outputMappings": {
+    "zh-CN": "输出映射",
+    "en": "Output mappings"
+  },
+  "impactReferences": {
+    "zh-CN": "影响引用",
+    "en": "Impact references"
+  },
+  "publicationRisk": {
+    "zh-CN": "发布风险",
+    "en": "Publication risk"
+  },
+  "confirmationRequired": {
+    "zh-CN": "需确认",
+    "en": "Confirmation required"
+  },
+  "readyToContinue": {
+    "zh-CN": "可继续",
+    "en": "Ready to continue"
+  },
+  "notLoaded": {
+    "zh-CN": "未加载",
+    "en": "Not loaded"
+  },
+  "entries": {
+    "zh-CN": "条",
+    "en": " entries"
+  },
+  "noInputMappingsConfigured": {
+    "zh-CN": "未配置输入映射",
+    "en": "No input mappings configured"
+  },
+  "noOutputMappingsConfigured": {
+    "zh-CN": "未配置输出映射",
+    "en": "No output mappings configured"
+  },
+  "impactPreview": {
+    "zh-CN": "影响预览",
+    "en": "Impact preview"
+  },
+  "loading": {
+    "zh-CN": "加载中",
+    "en": "Loading"
+  },
+  "refreshImpact": {
+    "zh-CN": "刷新影响",
+    "en": "Refresh impact"
+  },
+  "noImpactSummary": {
+    "zh-CN": "无影响摘要",
+    "en": "No impact summary"
+  },
+  "references": {
+    "zh-CN": "个引用",
+    "en": " references"
+  },
+  "impactNotLoadedYet": {
+    "zh-CN": "尚未加载影响",
+    "en": "Impact not loaded yet"
+  },
+  "inputs": {
+    "zh-CN": "输入",
+    "en": " inputs"
+  },
+  "outputs": {
+    "zh-CN": "输出",
+    "en": " outputs"
+  },
+  "noInputsConfiguredYet": {
+    "zh-CN": "暂未配置输入",
+    "en": "No inputs configured yet"
+  },
+  "noOutputsConfiguredYet": {
+    "zh-CN": "暂未配置输出",
+    "en": "No outputs configured yet"
+  },
+  "debugDetails": {
+    "zh-CN": "调试明细",
+    "en": "Debug details"
+  },
+  "openUnifiedTrace": {
+    "zh-CN": "打开统一 Trace",
+    "en": "Open unified Trace"
+  },
+  "noTrace": {
+    "zh-CN": "无 Trace",
+    "en": "No Trace"
+  },
+  "noOutputs": {
+    "zh-CN": "无输出结果",
+    "en": "No outputs"
+  },
+  "unknownReasons": {
+    "zh-CN": "未知原因",
+    "en": "Unknown reasons"
+  },
+  "fieldSearch": {
+    "zh-CN": "字段搜索",
+    "en": "Field search"
+  },
+  "searchFieldsModelsOrPaths": {
+    "zh-CN": "搜索字段、模型或路径",
+    "en": "Search fields, models or paths"
+  },
+  "noMatchingFields": {
+    "zh-CN": "无匹配字段",
+    "en": "No matching fields"
+  },
+  "targetFieldSuggestions": {
+    "zh-CN": "目标字段建议",
+    "en": "Target field suggestions"
+  },
+  "searchFieldsToFillTheTargetPath": {
+    "zh-CN": "搜索字段后填入目标路径",
+    "en": "Search fields to fill the target path"
+  },
+  "selectAFieldToFillThePath": {
+    "zh-CN": "选择字段填入路径",
+    "en": "Select a field to fill the path"
+  },
+  "ruleOutputs": {
+    "zh-CN": "规则输出",
+    "en": "Rule outputs"
+  },
+  "searchOutputVariables": {
+    "zh-CN": "搜索输出变量",
+    "en": "Search output variables"
+  },
+  "selectADMNOutput": {
+    "zh-CN": "选择 DMN 输出",
+    "en": "Select a DMN output"
+  },
+  "testContext": {
+    "zh-CN": "测试上下文",
+    "en": "Test context"
+  },
+  "fields": {
+    "zh-CN": "个字段",
+    "en": " fields"
+  },
+  "collapseContext": {
+    "zh-CN": "收起上下文",
+    "en": "Collapse context"
+  },
+  "editContext": {
+    "zh-CN": "编辑上下文",
+    "en": "Edit context"
+  },
+  "noMatchingContextFields": {
+    "zh-CN": "无匹配上下文字段",
+    "en": "No matching context fields"
+  },
+  "advancedJSON": {
+    "zh-CN": "高级 JSON",
+    "en": "Advanced JSON"
+  },
+  "testContextJSON": {
+    "zh-CN": "测试上下文 JSON",
+    "en": "Test context JSON"
+  },
+  "condition": {
+    "zh-CN": "条件",
+    "en": "Condition"
+  },
+  "summary": {
+    "zh-CN": "摘要",
+    "en": "Summary"
+  },
+  "decision": {
+    "zh-CN": "决策",
+    "en": "Decision"
+  },
+  "impact": {
+    "zh-CN": "影响",
+    "en": "Impact"
+  },
+  "error": {
+    "zh-CN": "异常",
+    "en": "Error"
+  },
+  "refreshPending": {
+    "zh-CN": "待刷新",
+    "en": "Refresh pending"
+  },
+  "test": {
+    "zh-CN": "测试",
+    "en": "Test"
+  },
+  "notRun": {
+    "zh-CN": "未运行",
+    "en": "Not run"
+  },
+  "selectADecision": {
+    "zh-CN": "请选择决策",
+    "en": "Select a decision"
+  },
+  "referenceRuleCenter": {
+    "zh-CN": "引用规则中心",
+    "en": "Reference rule center"
+  },
+  "versionPolicy": {
+    "zh-CN": "版本策略",
+    "en": "Version policy"
+  },
+  "failurePolicy": {
+    "zh-CN": "失败策略",
+    "en": "Failure policy"
+  },
+  "noMappableInputFields": {
+    "zh-CN": "暂无可映射输入字段",
+    "en": "No mappable input fields"
+  },
+  "addMapping": {
+    "zh-CN": "添加映射",
+    "en": "Add mapping"
+  },
+  "noInputMappingsYet": {
+    "zh-CN": "暂无输入映射",
+    "en": "No input mappings yet"
+  },
+  "delete": {
+    "zh-CN": "删除",
+    "en": "Delete"
+  },
+  "addOutput": {
+    "zh-CN": "添加输出",
+    "en": "Add output"
+  },
+  "noOutputMappingsYet": {
+    "zh-CN": "暂无输出映射",
+    "en": "No output mappings yet"
+  },
+  "refresh": {
+    "zh-CN": "刷新",
+    "en": "Refresh"
+  },
+  "testRun": {
+    "zh-CN": "测试运行",
+    "en": "Test run"
+  },
+  "running": {
+    "zh-CN": "运行中",
+    "en": "Running"
+  },
+  "run": {
+    "zh-CN": "运行",
+    "en": "Run"
+  },
+  "notRunYet": {
+    "zh-CN": "尚未运行",
+    "en": "Not run yet"
+  },
+  "scopeField": {
+    "zh-CN": "{scope}字段",
+    "en": "{scope} field"
+  },
+  "entryCount": {
+    "zh-CN": "{count} 条",
+    "en": "{count} entries"
+  },
+  "referenceCount": {
+    "zh-CN": "{count} 引用",
+    "en": "{count} references"
+  }
+}

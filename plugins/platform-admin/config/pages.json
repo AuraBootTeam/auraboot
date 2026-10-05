@@ -1988,7 +1988,12 @@
   },
   {
     "pageKey": "enterprise_info_detail",
-    "name": "企业信息",
+    "name:zh-CN": "企业信息",
+    "name:en": "Enterprise Profile",
+    "title": {
+      "zh-CN": "企业信息",
+      "en": "Enterprise Profile"
+    },
     "kind": "detail",
     "schemaVersion": 4,
     "layout": {
@@ -2136,7 +2141,12 @@
   },
   {
     "pageKey": "enterprise_info_form",
-    "name": "编辑企业信息",
+    "name:zh-CN": "编辑企业信息",
+    "name:en": "Edit Enterprise Profile",
+    "title": {
+      "zh-CN": "编辑企业信息",
+      "en": "Edit Enterprise Profile"
+    },
     "kind": "form",
     "schemaVersion": 4,
     "layout": {
