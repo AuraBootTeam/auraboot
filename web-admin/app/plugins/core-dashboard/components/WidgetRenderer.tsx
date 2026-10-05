@@ -145,8 +145,8 @@ function RenderedWidget({
     >
       <Suspense
         fallback={
-          <div className="flex h-full items-center justify-center text-sm text-gray-400">
-            Loading...
+          <div role="status" aria-live="polite" data-testid="dashboard-widget-loading" className="flex h-full items-center justify-center text-sm text-gray-400">
+            {getLocalizedText({ zh: '加载中…', en: 'Loading…' }, locale, t)}
           </div>
         }
       >

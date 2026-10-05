@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { validateStructure } from '../../validation/DslValidator';
 import { canonicalizePageSchemaDto, type PageSchemaDTO } from '../canonicalizePageDsl';
+import workflowFixture from './fixtures/workflow-pages.json';
 
 function collectPluginPageFiles(dir: string): string[] {
   if (!existsSync(dir)) return [];
@@ -29,6 +30,13 @@ function readPages(file: string): PageSchemaDTO[] {
 }
 
 describe('canonicalizePageSchemaDto', () => {
+  it('keeps workflow product pages outside the OSS platform plugin', () => {
+    const pages = readPages(resolve(process.cwd(), '../plugins/platform-admin/config/pages.json'));
+    const keys = new Set(pages.map((page) => page.pageKey));
+    for (const page of workflowFixture.pages) expect(keys.has(page.pageKey)).toBe(false);
+    expect(workflowFixture.source.commit).toMatch(/^[0-9a-f]{40}$/);
+  });
+
   it('builds a structurally valid canonical schema from a backend PageSchemaDTO', () => {
     const schema = canonicalizePageSchemaDto({
       pid: 'page-001',
@@ -566,6 +574,203 @@ describe('canonicalizePageSchemaDto', () => {
         mode: 'detail',
         rolloutUrl:
           '/p/decisionops_rollouts?decisionCode={decisionCode}&baselineVersion={baselineVersion}&candidateVersion={candidateVersion}',
+      },
+    });
+  });
+
+  it('canonicalizes the product-owned workflow SLA rule binding pages', () => {
+    const pages = workflowFixture.pages as PageSchemaDTO[];
+    const formPage = pages.find((candidate) => candidate.pageKey === 'sla_config_form');
+    const detailPage = pages.find((candidate) => candidate.pageKey === 'sla_config_detail');
+
+    expect(formPage).toBeDefined();
+    expect(detailPage).toBeDefined();
+
+    const schema = canonicalizePageSchemaDto(formPage!);
+    expect(validateStructure(schema)).toEqual([]);
+    const ruleBlock = schema.blocks.find((block: any) => block.id === 'sla_rule_binding') as any;
+
+    expect(ruleBlock).toMatchObject({
+      blockType: 'custom',
+      component: 'DecisionRuleBindingBlock',
+      props: {
+        mode: 'decision',
+        valueField: 'rule_binding',
+        consumerType: 'SLA',
+        initialDecisionCode: 'wd_sla_deadline',
+        fieldCatalogMode: 'merge',
+      },
+    });
+    expect(schema.blocks.find((block: any) => block.id === 'sla_action_policy')).toMatchObject({
+      blockType: 'custom',
+      component: 'DecisionActionPlanBlock',
+      props: {
+        valueField: 'action_policy',
+        title: '超时后动作',
+        triggerLabel: 'SLA 超时',
+        fieldCatalogModelCodeField: 'model_code',
+      },
+    });
+
+    const detailSchema = canonicalizePageSchemaDto(detailPage!);
+    expect(validateStructure(detailSchema)).toEqual([]);
+    expect(detailSchema.kind).toBe('detail');
+    expect(detailSchema.extension).toMatchObject({
+      dataSource: {
+        type: 'api',
+        endpoint: '/api/bpm/sla-configs/{pid}',
+        method: 'get',
+      },
+    });
+    expect(detailSchema.extension).toMatchObject({
+      showShare: false,
+      showReport: false,
+      showPrint: false,
+    });
+    expect(detailSchema.blocks.find((block: any) => block.id === 'actions')).toMatchObject({
+      blockType: 'toolbar',
+      buttons: [
+        expect.objectContaining({
+          code: 'edit',
+          primary: true,
+          action: {
+            type: 'navigate',
+            to: 'sla_config_form',
+            command: 'admin:update_sla_config',
+          },
+        }),
+      ],
+    });
+    expect(detailSchema.blocks.find((block: any) => block.id === 'basic')).toMatchObject({
+      blockType: 'form-section',
+      readOnly: true,
+    });
+    expect(detailSchema.blocks.find((block: any) => block.id === 'timer_policy')).toMatchObject({
+      blockType: 'form-section',
+      readOnly: true,
+    });
+    expect(detailSchema.blocks.find((block: any) => block.id === 'sla_rule_binding')).toMatchObject(
+      {
+        blockType: 'custom',
+        component: 'DecisionRuleBindingBlock',
+        props: {
+          mode: 'decision',
+          valueField: 'rule_binding',
+          consumerType: 'SLA',
+          readOnly: true,
+          variant: 'summary',
+          showTestRunner: false,
+        },
+      },
+    );
+    expect(
+      detailSchema.blocks.find((block: any) => block.id === 'sla_action_policy'),
+    ).toMatchObject({
+      blockType: 'custom',
+      component: 'DecisionActionPlanBlock',
+      props: {
+        valueField: 'action_policy',
+        readOnly: true,
+        logsUrl: '/p/decisionops_execution_logs?callerType=SLA&callerRef={pid}',
+      },
+    });
+
+    const fields = workflowFixture.fields;
+    expect(fields.find((field: any) => field.code === 'action_policy')).toMatchObject({
+      code: 'action_policy',
+      dataType: 'jsonb',
+    });
+
+    const commands = workflowFixture.commands;
+    expect(
+      commands.find((command: any) => command.code === 'admin:create_sla_config')?.inputFields,
+    ).toContain('action_policy');
+    expect(
+      commands.find((command: any) => command.code === 'admin:update_sla_config')?.inputFields,
+    ).toContain('action_policy');
+  });
+
+  it('preserves product workflow list fields and API routing', () => {
+    const pages = workflowFixture.pages as PageSchemaDTO[];
+    const listPage = pages.find((candidate) => candidate.pageKey === 'bpm_process_management_list');
+
+    expect(listPage).toBeDefined();
+
+    const schema = canonicalizePageSchemaDto(listPage!);
+    expect(schema.dataSource).toMatchObject({
+      type: 'api',
+      endpoint: '/api/bpm/process-definitions',
+      method: 'get',
+    });
+    const tableBlock = schema.blocks.find((block: any) => block.blockType === 'table') as any;
+    const columns = tableBlock.table?.columns ?? tableBlock.columns;
+    const fields = columns.map((column: any) => column.field);
+
+    expect(fields).toEqual(expect.arrayContaining(['process_key', 'process_name', 'deployed_at']));
+    expect(fields).not.toEqual(expect.arrayContaining(['processKey', 'processName', 'deployedAt']));
+    expect(columns.find((column: any) => column.field === 'status')).toMatchObject({
+      dictCode: 'bpm_process_status',
+    });
+    expect(tableBlock.detailUrl).toBe('/p/bpm_process_management/edit/{pid}');
+    expect(tableBlock.rowActions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'configure_rules',
+          action: {
+            type: 'navigate',
+            to: '/p/bpm_process_management/edit/{pid}',
+          },
+        }),
+        expect.objectContaining({
+          code: 'open_bpmn_designer',
+          action: {
+            type: 'navigate',
+            to: '/bpm/designer?pid={pid}',
+          },
+        }),
+      ]),
+    );
+  });
+
+  it('preserves the product workflow status dictionary', () => {
+    const pages = workflowFixture.pages as PageSchemaDTO[];
+    const formPage = pages.find((candidate) => candidate.pageKey === 'bpm_process_management_form');
+    const schema = canonicalizePageSchemaDto(formPage!);
+    const formSection = schema.blocks.find((block: any) => block.id === 'process_identity') as any;
+    const statusField = formSection.fields.find((field: any) => field.field === 'status');
+
+    expect(statusField).toMatchObject({
+      dictCode: 'bpm_process_status',
+      readonly: true,
+    });
+  });
+
+  it('preserves the product workflow configuration and designer routes', () => {
+    const pages = workflowFixture.pages as PageSchemaDTO[];
+    const formPage = pages.find((candidate) => candidate.pageKey === 'bpm_process_management_form');
+
+    expect(formPage).toBeDefined();
+
+    const schema = canonicalizePageSchemaDto(formPage!);
+    const customBlock = schema.blocks.find((block: any) => block.blockType === 'custom') as any;
+    const toolbarBlock = schema.blocks.find((block: any) => block.blockType === 'toolbar') as any;
+
+    expect(customBlock).toMatchObject({
+      component: 'DecisionRuleBindingBlock',
+      props: {
+        consumerType: 'BPM',
+        initialDecisionCode: 'approval_routing',
+        showImpactPreview: true,
+        showTestRunner: true,
+        fieldCatalogMode: 'fallback',
+      },
+    });
+    expect(
+      toolbarBlock.buttons.find((button: any) => button.code === 'open_bpmn_designer'),
+    ).toMatchObject({
+      action: {
+        type: 'navigate',
+        to: '/bpm/designer?pid={pid}',
       },
     });
   });

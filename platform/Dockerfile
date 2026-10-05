@@ -17,7 +17,9 @@
 #     dockerfile: platform/Dockerfile
 
 # ── Stage 1: Build ──────────────────────────────────────────
-FROM eclipse-temurin:21-jdk AS builder
+ARG BUILD_JDK_IMAGE=eclipse-temurin:21-jdk
+ARG RUNTIME_JRE_IMAGE=eclipse-temurin:21-jre-alpine
+FROM ${BUILD_JDK_IMAGE} AS builder
 
 WORKDIR /app
 
@@ -60,7 +62,7 @@ RUN --mount=type=cache,target=/root/.gradle/wrapper \
     ./gradlew :platform-plugin-api:publishToMavenLocal bootJar --no-daemon -x test
 
 # ── Stage 2: Runtime ────────────────────────────────────────
-FROM eclipse-temurin:21-jre-alpine
+FROM ${RUNTIME_JRE_IMAGE}
 
 WORKDIR /app
 

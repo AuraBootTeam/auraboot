@@ -3,6 +3,7 @@
  */
 
 import React, { useState } from 'react';
+import { useSmartText } from '~/utils/i18n';
 import { useReportDocument } from '../state/ReportDocumentProvider';
 import type {
   GroupedTableBlock,
@@ -24,6 +25,7 @@ const SummaryEditor: React.FC<{
   label: string;
   onChange: (config: SummaryConfig) => void;
 }> = ({ config, columns, label, onChange }) => {
+  const text = useSmartText();
   const enabled = config?.enabled ?? false;
 
   const handleToggle = (checked: boolean) => {
@@ -72,11 +74,11 @@ const SummaryEditor: React.FC<{
                 }
                 className="rounded border border-gray-300 px-1 py-0.5 text-xs"
               >
-                <option value="sum">SUM</option>
-                <option value="avg">AVG</option>
-                <option value="count">COUNT</option>
-                <option value="min">MIN</option>
-                <option value="max">MAX</option>
+                <option value="sum">{text({ zh: '求和', en: 'SUM' })}</option>
+                <option value="avg">{text({ zh: '平均值', en: 'AVG' })}</option>
+                <option value="count">{text({ zh: '计数', en: 'COUNT' })}</option>
+                <option value="min">{text({ zh: '最小值', en: 'MIN' })}</option>
+                <option value="max">{text({ zh: '最大值', en: 'MAX' })}</option>
               </select>
               <button
                 onClick={() => handleRemoveCol(sc.field)}
@@ -102,7 +104,7 @@ const SummaryEditor: React.FC<{
               }}
               className="w-full rounded border border-gray-300 px-2 py-1 text-xs"
             >
-              <option value="">+ Add column</option>
+              <option value="">{text({ zh: '+ 添加列', en: '+ Add column' })}</option>
               {columns
                 .filter((c) => !(config?.columns || []).find((sc) => sc.field === c.field))
                 .map((c) => (
@@ -123,6 +125,7 @@ export const GroupedTableBlockEditor: React.FC<GroupedTableBlockEditorProps> = (
   dataSources,
   onChange,
 }) => {
+  const text = useSmartText();
   const { addDataSource } = useReportDocument();
   const [newDsKey, setNewDsKey] = useState('');
   const [newDsType, setNewDsType] = useState<'model' | 'namedQuery' | 'api'>('model');
@@ -149,25 +152,29 @@ export const GroupedTableBlockEditor: React.FC<GroupedTableBlockEditorProps> = (
     <div className="space-y-5">
       {/* Title */}
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Title</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          {text({ zh: '标题', en: 'Title' })}
+        </label>
         <input
           type="text"
           value={block.title || ''}
           onChange={(e) => onChange({ title: e.target.value })}
           className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-          placeholder="Table title"
+          placeholder={text({ zh: '表格标题', en: 'Table title' })}
         />
       </div>
 
       {/* Data Source */}
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Data Source</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          {text({ zh: '数据源', en: 'Data Source' })}
+        </label>
         <select
           value={block.dataSource}
           onChange={(e) => onChange({ dataSource: e.target.value })}
           className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
         >
-          <option value="">Select data source</option>
+          <option value="">{text({ zh: '选择数据源', en: 'Select data source' })}</option>
           {dsKeys.map((key) => (
             <option key={key} value={key}>
               {key} ({dataSources[key].type})
@@ -179,7 +186,7 @@ export const GroupedTableBlockEditor: React.FC<GroupedTableBlockEditorProps> = (
             onClick={() => setShowAddDs(true)}
             className="mt-2 text-xs text-blue-600 hover:text-blue-700"
           >
-            + Add new data source
+            {text({ zh: '+ 添加数据源', en: '+ Add new data source' })}
           </button>
         ) : (
           <div className="mt-2 space-y-2 rounded-md bg-gray-50 p-3">
@@ -187,7 +194,7 @@ export const GroupedTableBlockEditor: React.FC<GroupedTableBlockEditorProps> = (
               type="text"
               value={newDsKey}
               onChange={(e) => setNewDsKey(e.target.value)}
-              placeholder="Key"
+              placeholder={text({ zh: '数据源标识', en: 'Key' })}
               className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
             />
             <select
@@ -195,9 +202,9 @@ export const GroupedTableBlockEditor: React.FC<GroupedTableBlockEditorProps> = (
               onChange={(e) => setNewDsType(e.target.value as any)}
               className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
             >
-              <option value="model">Model</option>
-              <option value="namedQuery">Named Query</option>
-              <option value="api">API</option>
+              <option value="model">{text({ zh: '模型', en: 'Model' })}</option>
+              <option value="namedQuery">{text({ zh: '命名查询', en: 'Named Query' })}</option>
+              <option value="api">{text({ zh: 'API', en: 'API' })}</option>
             </select>
             <input
               type="text"
@@ -205,10 +212,10 @@ export const GroupedTableBlockEditor: React.FC<GroupedTableBlockEditorProps> = (
               onChange={(e) => setNewDsValue(e.target.value)}
               placeholder={
                 newDsType === 'model'
-                  ? 'Model code'
+                  ? text({ zh: '模型代码', en: 'Model code' })
                   : newDsType === 'namedQuery'
-                    ? 'Query code'
-                    : 'API URL'
+                    ? text({ zh: '查询代码', en: 'Query code' })
+                    : text({ zh: 'API 地址', en: 'API URL' })
               }
               className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
             />
@@ -229,13 +236,13 @@ export const GroupedTableBlockEditor: React.FC<GroupedTableBlockEditorProps> = (
                 }}
                 className="rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-700"
               >
-                Add
+                {text({ zh: '添加', en: 'Add' })}
               </button>
               <button
                 onClick={() => setShowAddDs(false)}
                 className="rounded border border-gray-300 bg-white px-3 py-1 text-xs text-gray-600 hover:bg-gray-50"
               >
-                Cancel
+                {text({ zh: '取消', en: 'Cancel' })}
               </button>
             </div>
           </div>
@@ -244,19 +251,23 @@ export const GroupedTableBlockEditor: React.FC<GroupedTableBlockEditorProps> = (
 
       {/* Group By Field */}
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Group By Field</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          {text({ zh: '分组字段', en: 'Group By Field' })}
+        </label>
         <input
           type="text"
           value={block.groupByField || ''}
           onChange={(e) => onChange({ groupByField: e.target.value })}
           className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-          placeholder="Field name to group by"
+          placeholder={text({ zh: '用于分组的字段', en: 'Field name to group by' })}
         />
       </div>
 
       {/* Columns */}
       <div>
-        <label className="mb-2 block text-sm font-medium text-gray-700">Columns</label>
+        <label className="mb-2 block text-sm font-medium text-gray-700">
+          {text({ zh: '列', en: 'Columns' })}
+        </label>
         <div className="space-y-1">
           {block.columns.map((col, idx) => (
             <div key={idx} className="flex items-center gap-2 rounded bg-gray-50 px-2 py-1">
@@ -285,38 +296,42 @@ export const GroupedTableBlockEditor: React.FC<GroupedTableBlockEditorProps> = (
             onKeyDown={(e) => {
               if (e.key === 'Enter') handleAddColumn();
             }}
-            placeholder="Field name"
+            placeholder={text({ zh: '字段名称', en: 'Field name' })}
             className="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
           />
           <button
             onClick={handleAddColumn}
             className="rounded-md bg-blue-50 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-100"
           >
-            Add
+            {text({ zh: '添加', en: 'Add' })}
           </button>
         </div>
       </div>
 
       {/* Subtotals */}
       <div className="space-y-3 border-t border-gray-200 pt-4">
-        <h3 className="text-xs font-medium tracking-wider text-gray-500 uppercase">Subtotals</h3>
+        <h3 className="text-xs font-medium tracking-wider text-gray-500 uppercase">
+          {text({ zh: '汇总', en: 'Subtotals' })}
+        </h3>
         <SummaryEditor
           config={block.groupSubtotal}
           columns={block.columns}
-          label="Group Subtotal"
+          label={text({ zh: '分组小计', en: 'Group Subtotal' })}
           onChange={(c) => onChange({ groupSubtotal: c })}
         />
         <SummaryEditor
           config={block.grandTotal}
           columns={block.columns}
-          label="Grand Total"
+          label={text({ zh: '总计', en: 'Grand Total' })}
           onChange={(c) => onChange({ grandTotal: c })}
         />
       </div>
 
       {/* Style */}
       <div className="space-y-2 border-t border-gray-200 pt-4">
-        <h3 className="text-xs font-medium tracking-wider text-gray-500 uppercase">Style</h3>
+        <h3 className="text-xs font-medium tracking-wider text-gray-500 uppercase">
+          {text({ zh: '样式', en: 'Style' })}
+        </h3>
         <label className="flex cursor-pointer items-center gap-2">
           <input
             type="checkbox"
@@ -324,7 +339,9 @@ export const GroupedTableBlockEditor: React.FC<GroupedTableBlockEditorProps> = (
             onChange={(e) => onChange({ showHeader: e.target.checked })}
             className="h-4 w-4 rounded border-gray-300 text-blue-600"
           />
-          <span className="text-sm text-gray-700">Show header row</span>
+          <span className="text-sm text-gray-700">
+            {text({ zh: '显示表头', en: 'Show header row' })}
+          </span>
         </label>
         <label className="flex cursor-pointer items-center gap-2">
           <input
@@ -333,7 +350,9 @@ export const GroupedTableBlockEditor: React.FC<GroupedTableBlockEditorProps> = (
             onChange={(e) => onChange({ border: e.target.checked })}
             className="h-4 w-4 rounded border-gray-300 text-blue-600"
           />
-          <span className="text-sm text-gray-700">Cell borders</span>
+          <span className="text-sm text-gray-700">
+            {text({ zh: '单元格边框', en: 'Cell borders' })}
+          </span>
         </label>
       </div>
     </div>

@@ -16,7 +16,11 @@ import { usePermission } from '~/contexts/AuthContext';
 
 import React, { useCallback, useEffect, useRef } from 'react';
 import { useReportStore } from './store/useReportStore';
-import { ReportDocumentProvider, useReportDocument, ensurePageConfig } from './state/ReportDocumentProvider';
+import {
+  ReportDocumentProvider,
+  useReportDocument,
+  ensurePageConfig,
+} from './state/ReportDocumentProvider';
 import { ReportToolbar } from './components/ReportToolbar';
 import { BlockPalette } from './components/BlockPalette';
 import { ReportTableBlock } from './blocks/ReportTableBlock';
@@ -47,10 +51,12 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
   const text = useSmartText();
   const { showErrorToast } = useToastContext();
   const notifyExportFailure = useCallback(() => {
-    showErrorToast(text({
-      zh: '导出未完成。请检查数据源和访问权限后重试。',
-      en: 'Export could not be completed. Check the data source and access permissions, then retry.',
-    }));
+    showErrorToast(
+      text({
+        zh: '导出未完成。请检查数据源和访问权限后重试。',
+        en: 'Export could not be completed. Check the data source and access permissions, then retry.',
+      }),
+    );
   }, [text, showErrorToast]);
   const canManage = usePermission('report.definition.manage');
   const canExport = usePermission('report.export.execute');
@@ -134,7 +140,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
     if (reportId) {
       loadReportById(reportId);
     } else {
-      createReport(initialTitle || 'Untitled Report');
+      createReport(initialTitle || text({ zh: '未命名报表', en: 'Untitled Report' }));
     }
 
     return () => {
@@ -397,7 +403,10 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
         </div>
         <div className="flex-1 overflow-auto pr-80">
           {historical ? (
-            <PreviewContent key={versioning.viewingVersionPid} report={normalizedHistorical as ReportDsl} />
+            <PreviewContent
+              key={versioning.viewingVersionPid}
+              report={normalizedHistorical as ReportDsl}
+            />
           ) : (
             <p role="alert" className="p-6">
               {text({
@@ -484,7 +493,7 @@ const PreviewContent: React.FC<{ report: ReportDsl; query?: ReportQuery }> = ({
   return (
     <div className="mx-auto my-8 max-w-4xl rounded-lg bg-white p-8 shadow-sm">
       <ReportQueryControls report={report} query={query} />
-      {Object.values(report.dataSources).some(source => source.type === 'aggregate') && (
+      {Object.values(report.dataSources).some((source) => source.type === 'aggregate') && (
         <p className="mb-4 text-sm text-gray-500" data-testid="report-aggregate-limit-hint">
           {text({
             zh: '聚合数据按查询定义的范围和条数上限计算，预览与导出使用相同查询。',
@@ -492,7 +501,9 @@ const PreviewContent: React.FC<{ report: ReportDsl; query?: ReportQuery }> = ({
           })}
         </p>
       )}
-      {Object.values(report.dataSources).some(source => source.type === 'model' || source.type === 'namedQuery') && (
+      {Object.values(report.dataSources).some(
+        (source) => source.type === 'model' || source.type === 'namedQuery',
+      ) && (
         <p className="mb-4 text-sm text-gray-500">
           {text({
             zh: '模型和命名查询预览最多 500 行，同步导出最多 1000 行；超过时请缩小筛选范围。',

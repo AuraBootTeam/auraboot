@@ -16,6 +16,16 @@ function fixture(t, mode = '') {
     fs.copyFileSync(new URL(file, import.meta.url), path.join(repo, 'scripts/gates', file));
   }
   fs.mkdirSync(path.join(repo, 'web-admin'));
+  fs.mkdirSync(path.join(repo, 'scripts/dev'));
+  fs.copyFileSync(new URL('../dev/oss-disk-preflight.mjs', import.meta.url), path.join(repo, 'scripts/dev/oss-disk-preflight.mjs'));
+  fs.copyFileSync(new URL('../dev/oss-gate-results.mjs', import.meta.url), path.join(repo, 'scripts/dev/oss-gate-results.mjs'));
+  const scope = JSON.parse(fs.readFileSync(new URL('./oss-e2e-gate-profile.json', import.meta.url), 'utf8'));
+  for (const file of new Set(scope.tests.map(test => test.file))) {
+    const target = path.join(repo, 'web-admin', file);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, '// Hermetic collection fixture; no browser acceptance claim.\n');
+  }
+
   fs.mkdirSync(path.join(root, 'bin'));
   fs.copyFileSync(new URL('../oss-e2e-gate-run.sh', import.meta.url), path.join(repo, 'scripts/oss-e2e-gate-run.sh'));
   const calls = path.join(root, 'calls');
@@ -79,7 +89,7 @@ for (const [mode, status] of [['', 0], ['up-failure', 2], ['verify-failure', 2],
   test(`retains runtime and propagates ${mode || 'success'}`, t => {
     const f = fixture(t, mode); const r = f.run();
     assert.equal(r.status, status, r.stdout + r.stderr);
-    assert.match(r.stdout, /retained runtime/);
+    assert.match(r.stdout, /runtime status must be inspected/);
     const calls = fs.readFileSync(f.calls, 'utf8');
     assert.doesNotMatch(calls, /destroy|down|stop|--fresh-db/);
     assert.match(calls, /stack up owned-run --slot 900 .*--require-new-db/);

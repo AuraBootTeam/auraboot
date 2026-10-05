@@ -67,7 +67,7 @@ export function FlowPropertyPanel({ readOnly, className }: FlowPropertyPanelProp
 
   if (!selectedNode && !selectedEdge) {
     return (
-      <div className={cn('w-96 border-l border-gray-200 bg-white p-4', className)}>
+      <div className={cn('h-full w-96 border-l border-gray-200 bg-white p-4', className)}>
         <div className="mt-8 text-center text-gray-500">
           {st('$i18n:flow.panel.selectNode') || 'Select a node to configure'}
         </div>
@@ -124,7 +124,7 @@ export function FlowPropertyPanel({ readOnly, className }: FlowPropertyPanelProp
   };
 
   return (
-    <div className={cn('w-96 overflow-y-auto border-l border-gray-200 bg-white', className)}>
+    <div className={cn('h-full w-96 overflow-y-auto border-l border-gray-200 bg-white', className)}>
       <div className="p-4">
         {/* Header */}
         <div className="mb-4 flex items-center gap-2 border-b border-gray-200 pb-4">
@@ -321,7 +321,7 @@ function EdgeInspector({
   const data: EdgeData = edge.data || {};
 
   return (
-    <div className={cn('w-96 overflow-y-auto border-l border-gray-200 bg-white', className)}>
+    <div className={cn('h-full w-96 overflow-y-auto border-l border-gray-200 bg-white', className)}>
       <div className="p-4">
         <div className="mb-4 border-b border-gray-200 pb-4">
           <h3 className="font-medium text-gray-900">

@@ -6,6 +6,8 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
+import org.apache.ibatis.annotations.Options;
+import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 
 import java.util.List;
 
@@ -14,6 +16,13 @@ import java.util.List;
  */
 @Mapper
 public interface EnvironmentMapper extends BaseMapper<Environment> {
+
+    // The tenant row exists before its first environment. Lock it rather than
+    // recovering a unique violation inside an already-aborted transaction.
+    @Select("SELECT id FROM ab_tenant WHERE id = #{tenantId} AND deleted_flag = FALSE FOR UPDATE")
+    @Options(useCache = false, flushCache = Options.FlushCachePolicy.TRUE)
+    @InterceptorIgnore(tenantLine = "true")
+    Long lockTenantForDefaultCreation(@Param("tenantId") Long tenantId);
 
     @Select("SELECT * FROM ab_environment WHERE tenant_id = #{tenantId} AND code = #{code} AND deleted_flag = FALSE")
     Environment findByTenantAndCode(@Param("tenantId") Long tenantId, @Param("code") String code);

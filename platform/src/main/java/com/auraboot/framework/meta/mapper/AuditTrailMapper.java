@@ -20,6 +20,11 @@ import java.util.List;
 @Mapper
 public interface AuditTrailMapper extends BaseMapper<AuditTrail> {
 
+    /** Serialize the entire tenant chain append, including an empty chain. */
+    @Select("SELECT 1 FROM pg_advisory_xact_lock(" +
+            "hashtextextended('ab_audit_trail:' || CAST(#{tenantId} AS text), 0))")
+    Integer lockTenantChain(@Param("tenantId") Long tenantId);
+
     /**
      * Get the maximum sequence number for a given tenant.
      * Returns null if no records exist yet (genesis case).

@@ -59,6 +59,26 @@ function fakeRes() {
 }
 
 describe('BffProxyService snowflake id precision', () => {
+  it('preserves form-encoded OAuth credentials on the actual upstream wire', async () => {
+    const backend = await startBodyRecorder();
+    const service = new BffProxyService({ target: `http://127.0.0.1:${backend.port}` });
+    const rawBody = Buffer.from('grant_type=client_credentials&client_secret=fixture%2Bvalue%26part');
+    try {
+      await service.handleApiRequest({
+        method: 'POST',
+        originalUrl: '/oauth2/token',
+        url: '/oauth2/token',
+        headers: { authorization: 'Basic Zml4dHVyZTpwYXNz', 'content-type': 'application/x-www-form-urlencoded' },
+        body: { grant_type: 'client_credentials', client_secret: 'fixture+value&part' },
+        rawBody,
+        ip: '127.0.0.1',
+        connection: { remoteAddress: '127.0.0.1' },
+      } as never, fakeRes() as never);
+      expect(await backend.received).toBe(rawBody.toString());
+    } finally {
+      backend.close();
+    }
+  });
   it('forwards an 18-digit id byte-for-byte instead of re-serialising it', async () => {
     const backend = await startBodyRecorder();
     const service = new BffProxyService({ target: `http://127.0.0.1:${backend.port}` });

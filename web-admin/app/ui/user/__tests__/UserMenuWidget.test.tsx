@@ -67,6 +67,9 @@ describe('UserMenuWidget', () => {
     expect(screen.getByText('Admin User')).toBeInTheDocument();
     expect(screen.getByText('admin@auraboot.com')).toBeInTheDocument();
     expect(screen.getByTestId('open-platform-link')).toHaveAttribute('href', '/settings/api-docs');
+    expect(screen.getByTestId('profile-link')).toHaveAttribute('href', '/personal/profile');
+    fireEvent.click(screen.getByTestId('profile-link'));
+    expect(screen.queryByTestId('user-dropdown')).toBeNull();
   });
 
   it('exposes Open Platform to authenticated collaborators without a global admin grant', () => {

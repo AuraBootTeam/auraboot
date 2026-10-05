@@ -148,9 +148,8 @@ init_core() {
 }
 login_jwt() {
   [[ -n "$ADMIN_PASSWORD" ]] || { echo 'ADMIN_PASSWORD is required for publish' >&2; exit 2; }
-  curl -fsS -X POST "$BASE_URL/api/auth/login" -H 'Content-Type: application/json' \
-    -d "{\"email\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASSWORD\"}" |
-    python3 -c "import json,sys; print(json.load(sys.stdin).get('data',{}).get('jwt',''))"
+  AURA_CORE_BASE_URL="$BASE_URL" ADMIN_EMAIL="$ADMIN_EMAIL" ADMIN_PASSWORD="$ADMIN_PASSWORD" \
+    python3 "$ARTIFACT_ROOT/bin/application/core-admin-session.py"
 }
 publish() {
   wait_ready
