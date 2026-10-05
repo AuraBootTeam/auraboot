@@ -84,10 +84,12 @@ async function openConsole(page: Page) {
   await expect(page.getByTestId('semantic-models-error')).toHaveCount(0);
 }
 
-// 513 creates against a freshly started stack: the first dynamic-entity calls
-// bootstrap/JIT the server path, so the default 15s hook budget is not enough
-// (the hook timeout is the second beforeAll argument in this Playwright version).
 test.beforeAll(async ({ request }) => {
+  // 513 creates against a freshly started stack: the first dynamic-entity calls
+  // bootstrap/JIT the server path, so the default 15s hook budget is not enough.
+  // playwright 1.60 has no beforeAll(fn, timeout) overload; setTimeout inside
+  // the hook extends the hook's own budget.
+  test.setTimeout(180000);
   for (let i = 0; i < 12; i++) {
     const response = await request.post('/api/dynamic/e2et_order/create', { data: {
       e2et_order_title: `SC-${run}-${i}`, e2et_order_type: 'normal',
@@ -113,7 +115,7 @@ test.beforeAll(async ({ request }) => {
       expect(String(body.code), JSON.stringify(body)).toBe('0');
     }));
   }
-}, 180000);
+});
 
 test('SC-00 seed controlled orders and publish through the console', async ({ page }) => {
   await openConsole(page);
