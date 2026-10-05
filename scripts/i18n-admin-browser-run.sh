@@ -17,7 +17,12 @@ fi
 trap 'echo "[i18n-browser] retained runtime and evidence: $NAME"' EXIT
 # Exercise the documented placeholder strategy without paid provider calls.
 export AGENT_LLM_STUB_MODE=true
-"$GS" up "$NAME" --slot auto --ttl 2h --no-warm --runtime-mode verification --system-mode multi || exit 2
+# The runtime registry enforces one non-parallel task runtime per source identity. The
+# retained rbac-golden-nightly qualification stack shares this checkout root, and every
+# acceptance run owns a unique runtime name, so declare the genuinely parallel purpose
+# instead of failing allocation.
+"$GS" up "$NAME" --slot auto --ttl 2h --no-warm --runtime-mode verification --system-mode multi \
+  --parallel-reason "ios i18n admin acceptance alongside retained rbac-golden-nightly stack" || exit 2
 "$GS" import "$NAME" || exit 2
 eval "$("$GS" env "$NAME")"
 mkdir -p "$PW_REPORT_DIR"
