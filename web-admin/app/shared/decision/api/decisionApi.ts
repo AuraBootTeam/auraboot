@@ -92,6 +92,7 @@ export interface DecisionLogRecord {
   traceId?: string;
   correlationId?: string;
   decisionCode?: string;
+  decisionName?: string;
   decisionVersion?: number;
   selectedVersion?: number;
   rolloutPolicyPid?: string;
