@@ -61,7 +61,7 @@ case "$PUBLISH_REGISTRY" in
   0|1) ;;
   *) fatal 'AURA_RELEASE_PUBLISH_REGISTRY must be 0 or 1' ;;
 esac
-PLAYWRIGHT_IMAGE="${AURA_CI_PLAYWRIGHT_IMAGE:-mcr.microsoft.com/playwright@sha256:9bd26ad900bb5e0f4dee75839e957a89ae89c2b7ab1e76050e559790e946b948}"
+PLAYWRIGHT_IMAGE="${AURA_CI_PLAYWRIGHT_IMAGE:-mcr.microsoft.com/playwright@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27}"
 [[ "$PLAYWRIGHT_IMAGE" =~ ^mcr.microsoft.com/playwright@sha256:[0-9a-f]{64}$ ]] || fatal 'Playwright image must be pinned to an official digest'
 if [[ "$PUBLISH_REGISTRY" == 1 ]]; then
   : "${AURA_RELEASE_REGISTRY:?AURA_RELEASE_REGISTRY is required when remote publication is enabled}"
@@ -454,7 +454,8 @@ docker pull "$PLAYWRIGHT_IMAGE" >"$ARTIFACTS/logs/playwright-image.log" 2>&1 \
 PLAYWRIGHT_PACKAGE="$(cd "$PRODUCT_ROOT" && node -p "require.resolve('playwright/package.json', {paths:[require.resolve('@playwright/test')]})")"
 PLAYWRIGHT_VERSION="$(node -p "require(process.argv[1]).version" "$PLAYWRIGHT_PACKAGE")"
 PLAYWRIGHT_IMAGE_VERSION="$(docker run --rm --entrypoint node "$PLAYWRIGHT_IMAGE" -p "JSON.parse(require('fs').readFileSync('/ms-playwright/.docker-info','utf8')).driverVersion")"
-[[ "$PLAYWRIGHT_VERSION" == "$PLAYWRIGHT_IMAGE_VERSION" ]] || fatal 'locked Playwright and image versions differ'
+printf 'driver=%s\nimageDriver=%s\nimage=%s\n' "$PLAYWRIGHT_VERSION" "$PLAYWRIGHT_IMAGE_VERSION" "$PLAYWRIGHT_IMAGE" >"$ARTIFACTS/logs/playwright-version.log"
+[[ "$PLAYWRIGHT_VERSION" == "$PLAYWRIGHT_IMAGE_VERSION" ]] || fatal "locked Playwright and image versions differ: driver=$PLAYWRIGHT_VERSION image=$PLAYWRIGHT_IMAGE_VERSION"
 PLAYWRIGHT_PORT="$(node -e "const s=require('net').createServer();s.listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})")"
 docker run -d --name "$PLAYWRIGHT_CONTAINER" --label "aura.ci.job=$AURA_CI_JOB_ID" --init --network "$NETWORK" --shm-size=2g \
   -p "127.0.0.1:$PLAYWRIGHT_PORT:$PLAYWRIGHT_PORT" \
