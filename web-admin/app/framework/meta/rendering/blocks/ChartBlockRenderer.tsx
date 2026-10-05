@@ -168,6 +168,10 @@ export const ChartBlockRenderer: React.FC<ChartBlockRendererProps> = ({ block, r
         params: { ...(resolvedDataSource as any).params, ...windowParams },
       };
     }
+    // Explicit block height becomes the container style: Smart charts size to 100% of
+    // their parent, so an unconfigured height collapses ECharts to its fallback height.
+    const blockHeight = (props.height as number | undefined)
+      ?? ((block as any).chartConfig?.height as number | undefined);
     return {
       title: block.title ? getLocalizedText(block.title, locale) : undefined,
       // Visualization props (new unified format)
@@ -177,6 +181,7 @@ export const ChartBlockRenderer: React.FC<ChartBlockRendererProps> = ({ block, r
       // Resolved dataSource MUST come after ...config, which otherwise re-injects the raw
       // (unresolved) config.dataSource and drops the per-record parameters.
       dataSource: resolvedDataSource || { type: 'static' as const, staticData: [] },
+      ...(blockHeight ? { style: { ...((visualization as any).style ?? {}), height: blockHeight } } : {}),
       // Advanced features (previously Dashboard-only, now available in DSL)
       linkage: (block as any).linkage,
       drillDown: (block as any).drillDown,
