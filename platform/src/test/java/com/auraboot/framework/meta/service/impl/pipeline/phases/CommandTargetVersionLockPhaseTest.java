@@ -22,6 +22,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
@@ -91,7 +92,8 @@ class CommandTargetVersionLockPhaseTest {
         assertThatThrownBy(() -> phase.execute(context(7)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("active transaction");
-        verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
+        verify(dynamicDataMapper, never()).selectTargetVersionForUpdate(
+                anyString(), anyString(), anyLong(), anyString());
     }
 
     @Test
@@ -99,7 +101,8 @@ class CommandTargetVersionLockPhaseTest {
         CommandPipelineContext ctx = context(null);
 
         assertThat(phase.shouldSkip(ctx)).isTrue();
-        verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
+        verify(dynamicDataMapper, never()).selectTargetVersionForUpdate(
+                anyString(), anyString(), anyLong(), anyString());
     }
 
     @Test
@@ -110,7 +113,8 @@ class CommandTargetVersionLockPhaseTest {
         ctx.getRequest().setOperationType("UPDATE");
 
         assertThat(phase.shouldSkip(ctx)).isTrue();
-        verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
+        verify(dynamicDataMapper, never()).selectTargetVersionForUpdate(
+                anyString(), anyString(), anyLong(), anyString());
     }
 
     @Test
@@ -127,7 +131,8 @@ class CommandTargetVersionLockPhaseTest {
                         .isInstanceOf(CasVersionRequiredException.class)
                         .extracting(item -> ((CasVersionRequiredException) item).getConflictCode())
                         .isEqualTo(ConflictException.ConflictCodes.CAS_VERSION_REQUIRED));
-        verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
+        verify(dynamicDataMapper, never()).selectTargetVersionForUpdate(
+                anyString(), anyString(), anyLong(), anyString());
     }
 
     @Test
@@ -182,7 +187,8 @@ class CommandTargetVersionLockPhaseTest {
         assertThatThrownBy(() -> phase.execute(ctx))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("state_transition");
-        verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
+        verify(dynamicDataMapper, never()).selectTargetVersionForUpdate(
+                anyString(), anyString(), anyLong(), anyString());
     }
 
     @Test
@@ -194,7 +200,8 @@ class CommandTargetVersionLockPhaseTest {
         assertThatThrownBy(() -> phase.execute(ctx))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("fromStates");
-        verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
+        verify(dynamicDataMapper, never()).selectTargetVersionForUpdate(
+                anyString(), anyString(), anyLong(), anyString());
     }
 
     private CommandPipelineContext currentStateContext(Integer expectedVersion) {

@@ -47,7 +47,7 @@
 #                           (designer + saved-view + showcase + page-designer +
 #                           automation). Bounded and meaningful — the right
 #                           default for a gate.
-#                    full   the whole OSS `oss` project (long; has its own known
+#                    full   both OSS `oss` and `oss-deep` projects (long; has its own known
 #                           enterprise/deep exclusions). Use for a release sweep.
 #                    <dir>  one or more explicit tests/e2e/<dir>/ paths — repeat
 #                           --scope, or list them after --scope, to override.
@@ -140,21 +140,29 @@ done
 
 [[ -x "$GS" ]] || die "oss-golden-stack.sh not found/executable at $GS"
 [[ -x "$DEV" ]] || die "workspace aura not found above $REPO_ROOT"
+[[ -z "$WORKERS" || "$WORKERS" =~ ^[1-9][0-9]*$ ]] || die "invalid worker count"
 [[ "$REPEAT" =~ ^[1-9][0-9]*$ ]] || die "repeat must be a positive integer"
 [[ "$NAME" =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]*$ ]] || die "invalid runtime name"
 [[ -z "$SLOT" || "$SLOT" =~ ^[1-9][0-9]*$ ]] || die "slot must be a positive integer"
 STATE="${AURA_WORKSPACE_STATE_DIR:-$WORKSPACE/.workspace}"
 [[ ! -e "$STATE/env/$NAME.env" && ! -e "$STATE/golden/$NAME" ]] || die_env "runtime state already exists for $NAME"
-command -v lsof >/dev/null || die_env "lsof is required for port ownership checks"
-RUNTIME_LIST="$("$DEV" runtime list)" || die_env "cannot inspect runtime allocations"
+mkdir -p "$STATE" || die_env "verification state directory is not writable"
+node "$SCRIPT_DIR/dev/oss-disk-preflight.mjs" "$STATE" || die_env "insufficient or unreadable verification storage; no allocation created"
 
-# --- resolve the spec paths the gate will run --------------------------------
 RUN_PATHS=()
 case "$SCOPE_MODE" in
   slice) RUN_PATHS=("${SLICE_DIRS[@]}");;
-  full)  RUN_PATHS=();;                       # no positional => whole `oss` project
-  dirs)  RUN_PATHS=("${SCOPE_DIRS[@]}");;
+  full) RUN_PATHS=();;
+  dirs) RUN_PATHS=("${SCOPE_DIRS[@]}");;
 esac
+if [[ ${#RUN_PATHS[@]} -gt 0 ]]; then
+  for spec_path in "${RUN_PATHS[@]}"; do
+    [[ "$spec_path" == tests/e2e/* && "$spec_path" != *..* && -e "$REPO_ROOT/web-admin/$spec_path" ]] \
+      || die_env "requested test path does not exist or is outside tests/e2e: $spec_path; no allocation created"
+  done
+fi
+command -v lsof >/dev/null || die_env "lsof is required for port ownership checks"
+RUNTIME_LIST="$("$DEV" runtime list)" || die_env "cannot inspect runtime allocations"
 
 # --- pick a free slot if the caller did not name one -------------------------
 # A free slot = not claimed by any aura runtime AND whose computed host ports
@@ -175,9 +183,9 @@ registered_slot_for_name() {
 }
 registered_slot="$(registered_slot_for_name)"
 [[ -z "$registered_slot" ]] || die_env "runtime '$NAME' already exists; use a new attempt name and unused slot"
-[[ ! -e "$WORKSPACE/.workspace/golden/$NAME" ]] || die_env "golden state '$NAME' already exists; retained evidence will not be overwritten"
+[[ ! -e "$STATE/golden/$NAME" ]] || die_env "golden state '$NAME' already exists; retained evidence will not be overwritten"
 if [[ -z "$SLOT" ]]; then
-  for cand in 73 74 75 76 77 80 81 82 83 84 85 86 87 90 91 92 93 94 95 96 97; do
+  for cand in $(seq 73 249); do
     if ! slot_in_use "$cand"; then SLOT="$cand"; break; fi
   done
   [[ -n "$SLOT" ]] || die_env "no free slot; pass --slot N explicitly"
@@ -188,7 +196,13 @@ log "retaining verification runtime '$NAME' and its database on every exit"
 
 retain() {
   local rc=$?
-  log "keeping stack; retained runtime '$NAME' slot=$SLOT exit=$rc; inspect with: $GS status $NAME"
+  local allocation
+  allocation="$("$DEV" runtime show "$NAME" --json)" || allocation=""
+  if printf '%s' "$allocation" | node -e 'let s="";process.stdin.on("data",v=>s+=v);process.stdin.on("end",()=>{try{process.exit(JSON.parse(s).allocation===null?0:1)}catch{process.exit(1)}})'; then
+    log "no allocation registered; startup state and evidence preserved"
+    return "$rc"
+  fi
+  log "keeping startup state; runtime status must be inspected: '$NAME' slot=$SLOT exit=$rc; inspect with: $GS status $NAME"
   return "$rc"
 }
 trap retain EXIT
@@ -219,12 +233,13 @@ log "1/4 new isolated stack: $NAME slot=$SLOT"
 # PW_PROFILE=oss auto-import — we do it here, deterministically.)
 log "1b/4 import internal test-fixtures plugin (e2et_* models)"
 "$GS" import "$NAME" --plugin-profile none --plugin test-fixtures \
-  || die_env "test-fixtures import failed — see $WORKSPACE/.workspace/runtimes/$NAME/oss-stack/import.log"
+  || die_env "test-fixtures import failed — see $WORKSPACE/.workspace/runtimes/$NAME/oss-stack/logs/import.log"
 
 # --- 2. resolve the stack env (base URL + backend + PG*) ---------------------
 log "2/4 resolve stack env"
 eval "$("$GS" env "$NAME")" || die_env "could not resolve stack env for '$NAME'"
 export PW_RESULTS_JSON="$AURA_EVIDENCE_ROOT/results.json"
+export PLAYWRIGHT_JSON_OUTPUT_FILE="$AURA_EVIDENCE_ROOT/results.json"
 mkdir -p "$AURA_EVIDENCE_ROOT/logs"
 LOG="$AURA_EVIDENCE_ROOT/logs/oss-e2e-gate-$(date +%Y%m%d-%H%M%S).log"
 log "    base=$PLAYWRIGHT_BASE_URL backend=$BACKEND_URL bff=$BFF_PORT (AGENT_LLM_STUB_MODE=$AGENT_LLM_STUB_MODE)"
@@ -244,14 +259,38 @@ if [[ "$SCOPE_MODE" == slice ]]; then
   node "$AUDIT" "$PROFILE" "$AURA_EVIDENCE_ROOT/collection.json" collection "$REPEAT" \
     >"$AURA_EVIDENCE_ROOT/collection-ledger.json" || exit 1
 fi
-log "3/4 run gate: PW_PROFILE=oss --project=oss --no-deps (x$REPEAT)"
-PW_ARGS=(--project=oss --no-deps --repeat-each="$REPEAT" --retries=0 --reporter=line,json)
+log "3/4 run gate: PW_PROFILE=oss --project=oss --project=oss-deep --no-deps (x$REPEAT)"
+PW_ARGS=(--project=oss --project=oss-deep --no-deps --repeat-each="$REPEAT" --retries=0 --reporter=line,json)
 [[ -n "$WORKERS" ]] && PW_ARGS+=(--workers="$WORKERS")
 [[ ${#RUN_PATHS[@]} -gt 0 ]] && PW_ARGS+=("${RUN_PATHS[@]}")
 set +e
-PLAYWRIGHT_JSON_OUTPUT_FILE="$AURA_EVIDENCE_ROOT/results.json" PW_PROFILE=oss NO_PROXY=localhost,127.0.0.1 \
+if [[ "$SCOPE_MODE" == full ]]; then
+  # The empty-application journey needs the pristine bootstrap tenant. Run it
+  # before shared-tenant fixtures, retaining every test in the full catalog.
+  REPORT_ROOT="$AURA_EVIDENCE_ROOT/playwright/report"
+  PLAYWRIGHT_JSON_OUTPUT_FILE="$REPORT_ROOT/catalog.json" PW_PROFILE=oss NO_PROXY=localhost,127.0.0.1 \
+    pnpm exec playwright test "${PW_ARGS[@]}" --list --reporter=json > "$REPORT_ROOT/collection.log" 2>&1
+  COLLECTION_RC=$?
+  [[ "$COLLECTION_RC" == 0 ]] || die_env "full catalog collection failed; see $REPORT_ROOT/collection.log"
+  PLAYWRIGHT_JSON_OUTPUT_FILE="$REPORT_ROOT/pristine.json" PW_PROFILE=oss NO_PROXY=localhost,127.0.0.1 \
+    pnpm exec playwright test "${PW_ARGS[@]}" tests/e2e/settings/open-platform.golden.spec.ts 2>&1 | tee "$LOG"
+  PRISTINE_RC=${PIPESTATUS[0]}
+  PLAYWRIGHT_JSON_OUTPUT_FILE="$REPORT_ROOT/remaining.json" PW_PROFILE=oss NO_PROXY=localhost,127.0.0.1 \
+    pnpm exec playwright test "${PW_ARGS[@]}" --grep-invert 'Open Platform golden journey' 2>&1 | tee -a "$LOG"
+  REMAINING_RC=${PIPESTATUS[0]}
+  node "$SCRIPT_DIR/dev/oss-gate-catalog-results.mjs" "$REPORT_ROOT/catalog.json" \
+    "$PW_RESULTS_JSON" "$REPORT_ROOT/pristine.json" "$REPORT_ROOT/remaining.json"
+  GATE_RC=$?
+  if [[ "$PRISTINE_RC" != 0 || "$REMAINING_RC" != 0 ]]; then GATE_RC=1; fi
+else
+PW_PROFILE=oss NO_PROXY=localhost,127.0.0.1 \
   pnpm exec playwright test "${PW_ARGS[@]}" 2>&1 | tee "$LOG"
 GATE_RC=${PIPESTATUS[0]}
+if [[ "$GATE_RC" == 0 ]]; then
+  node "$SCRIPT_DIR/dev/oss-gate-results.mjs" "$PLAYWRIGHT_JSON_OUTPUT_FILE" || GATE_RC=1
+fi
+fi
+
 set -e 2>/dev/null || true
 # Both validators inspect the same original Playwright JSON report.
 if [[ "$GATE_RC" == 0 ]]; then

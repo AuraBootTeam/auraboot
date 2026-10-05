@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
 import net from 'node:net';
-import { planGoldenStop, executeGoldenStop, stopGoldenProcesses, stableGoldenLaunch, registerGoldenSupervisor, readGoldenProcessSnapshot } from '../lib/golden-process-stop.mjs';
+import { planGoldenStop, executeGoldenStop, stopGoldenProcesses, stableGoldenLaunch, registerGoldenSupervisor, verifyGoldenStopOwnership, readGoldenProcessSnapshot } from '../lib/golden-process-stop.mjs';
 
 // Workspace API is mocked; OS fixtures belong only to this test, with no product runtime.
 const supervisor = 1000000010, backend = 1000000020, child = 1000000011;
@@ -83,6 +83,27 @@ test('does not signal a disappeared process', () => {
   const calls = [];
   executeGoldenStop(planGoldenStop(fixture()), () => null, (...args) => calls.push(args));
   assert.deepEqual(calls, []);
+});
+test('admits an unmarked intermediate shell only through complete owned ancestry', () => {
+  const f = fixture();
+  f.snapshots[0] = { ...f.snapshots[0], runtime: undefined, token: undefined, executable: 'sh' };
+  f.listeners = [backend];
+  const plan = planGoldenStop(f);
+  assert.equal(plan.find(item => item.pid === child).inheritedOwnership, true);
+  for (const change of [
+    { runtime: 'foreign' }, { token: 'foreign' }, { executable: 'node' },
+    { parent: 999 }, { cwd: '/foreign' },
+  ]) {
+    const altered = { ...f, snapshots: f.snapshots.map(item => item.pid === child ? { ...item, ...change } : item) };
+    assert.throws(() => planGoldenStop(altered));
+  }
+  assert.throws(() => planGoldenStop({ ...f, roots: [child, backend] }));
+  assert.throws(() => planGoldenStop({ ...f, listeners: [child, backend] }));
+  const expected = plan.find(item => item.pid === child);
+  assert.equal(verifyGoldenStopOwnership(f.snapshots[0], expected, f.token), true);
+  for (const change of [{ runtime: 'foreign' }, { token: 'foreign' }, { token: f.token }, { executable: 'node' }]) {
+    assert.equal(verifyGoldenStopOwnership({ ...f.snapshots[0], ...change }, expected, f.token), false);
+  }
 });
 test('never signals a recycled child PID after already stopping its owned supervisor', () => {
   const f = fixture(); const calls = []; const plan = planGoldenStop(f);

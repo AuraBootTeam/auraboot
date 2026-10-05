@@ -506,7 +506,9 @@ describe('UnifiedDesignerPage', () => {
     render(<UnifiedDesignerPage />);
 
     expect(await screen.findByTestId('studio-handoff-context')).toHaveTextContent('修订 r6');
-    window.dispatchEvent(new Event('focus'));
+    // The context shell precedes writer authority and its foreground heartbeat effect.
+    await screen.findByTestId('studio-handoff-editable-reason');
+    fireEvent(window, new Event('focus'));
     await waitFor(
       () => expect(renewAuthoringWriterLease).toHaveBeenCalledWith('session_1'),
       { timeout: 5_000 },

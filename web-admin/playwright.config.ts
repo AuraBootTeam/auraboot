@@ -123,6 +123,8 @@ const quoteOpsCurrentGatePattern = new RegExp(
 );
 
 const enterpriseScopeDirs = [
+  // Independent AMOS cockpit requires product plugins and governed projections.
+  'amos-lenses',
   'annual-plan',
   'asset-management',
   'construction-process',

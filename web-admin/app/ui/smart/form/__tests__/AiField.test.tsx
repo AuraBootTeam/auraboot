@@ -79,7 +79,7 @@ describe('AiField — F.3 vision input', () => {
     });
 
     // Click main AI button.
-    const aiButton = screen.getByRole('button', { name: /AI Generate/i });
+    const aiButton = screen.getByRole('button', { name: /AI (生成|Generate)/ });
     fireEvent.click(aiButton);
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
@@ -117,7 +117,7 @@ describe('AiField — F.3 vision input', () => {
       expect(screen.queryByTestId('aifield-attachments-preview')).toBeNull(),
     );
 
-    const aiButton = screen.getByRole('button', { name: /AI Generate/i });
+    const aiButton = screen.getByRole('button', { name: /AI (生成|Generate)/ });
     fireEvent.click(aiButton);
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
@@ -130,7 +130,7 @@ describe('AiField — F.3 vision input', () => {
     global.fetch = fetchMock;
 
     render(<AiField />);
-    const aiButton = screen.getByRole('button', { name: /AI Generate/i });
+    const aiButton = screen.getByRole('button', { name: /AI (生成|Generate)/ });
     fireEvent.click(aiButton);
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));

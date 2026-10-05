@@ -197,18 +197,19 @@ final class DynamicDataBatchSupport extends BaseMetaService {
 
         List<Map<String, Object>> columnDataList = new ArrayList<>(dataList.size());
         List<Map<String, Object>> createdRecords = new ArrayList<>(dataList.size());
+        List<Map<String, Object>> validationRows = new ArrayList<>(dataList.size());
 
         for (Map<String, Object> input : dataList) {
             if (input == null || input.isEmpty()) {
                 throw new MetaServiceException("Data cannot be null or empty");
             }
-            // Per-row prefix identical to create(): strip → normalize → validate → enrich → PK →
-            // convert types → filter virtual → toColumnData. Work on a copy so caller maps stay intact.
+            // Preserve the create() normalization and conversion on copies of caller maps.
+            // Validate the complete batch before the first write to share relation lookups.
             Map<String, Object> data = new HashMap<>(input);
             FieldWriterGuard.assertCreateAllowed(model, data);
             stripNonWritableFields(modelCode, data);
             payloadTemporalNormalizer.normalize(data, model);
-            validationService.validateAndThrow(model, data, ValidationContext.CREATE);
+            validationRows.add(data);
 
             Map<String, Object> enrichedData = new HashMap<>(data);
             enrichedData.put("created_at", now);
@@ -227,6 +228,8 @@ final class DynamicDataBatchSupport extends BaseMetaService {
             columnDataList.add(toColumnData(model, enrichedData));
             createdRecords.add(enrichedData); // carries generated PK, in input order
         }
+
+        validationService.validateBatchAndThrow(model, validationRows, ValidationContext.CREATE);
 
         int inserted = jsonbColumns.isEmpty()
                 ? dynamicDataMapper.batchInsert(model.getTableName(), columnDataList)

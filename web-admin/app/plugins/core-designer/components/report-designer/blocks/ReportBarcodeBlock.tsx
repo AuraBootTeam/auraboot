@@ -3,6 +3,7 @@
  * Supports CODE128, CODE39, EAN13, EAN8, UPC, ITF14 formats
  */
 
+import { useSmartText } from '~/utils/i18n';
 import React, { useRef, useEffect } from 'react';
 import JsBarcode from 'jsbarcode';
 import type { BarcodeBlock } from '../types';
@@ -27,6 +28,7 @@ export const ReportBarcodeBlock: React.FC<ReportBarcodeBlockProps> = ({
   mode,
   data = [],
 }) => {
+  const text = useSmartText();
   const svgRef = useRef<SVGSVGElement>(null);
 
   // Resolve the barcode value
@@ -64,8 +66,13 @@ export const ReportBarcodeBlock: React.FC<ReportBarcodeBlockProps> = ({
   if (!displayValue) {
     return (
       <div className="rounded border border-dashed border-gray-300 p-4 text-center text-sm text-gray-400">
-        <div className="mb-1 font-medium">{block.title || 'Barcode'}</div>
-        <div>Set a static value or bind to a data source field</div>
+        <div className="mb-1 font-medium">{block.title || text({ zh: '条码', en: 'Barcode' })}</div>
+        <div>
+          {text({
+            zh: '请设置固定值或绑定数据源字段',
+            en: 'Set a static value or bind to a data source field',
+          })}
+        </div>
       </div>
     );
   }
@@ -77,7 +84,9 @@ export const ReportBarcodeBlock: React.FC<ReportBarcodeBlockProps> = ({
         <svg ref={svgRef} />
       </div>
       {mode === 'design' && !value && (
-        <div className="mt-1 text-center text-xs text-gray-400">Sample preview</div>
+        <div className="mt-1 text-center text-xs text-gray-400">
+          {text({ zh: '示例预览', en: 'Sample preview' })}
+        </div>
       )}
     </div>
   );

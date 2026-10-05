@@ -26,6 +26,13 @@ export interface LayoutConfig {
   gap?: number; // Stack gap in px (only for type='stack')
 }
 
+/** Visible artwork bounds in the original image's pixel coordinate system. */
+export interface CardImageViewport {
+  width: number;
+  height: number;
+  viewBox: [number, number, number, number];
+}
+
 // Block 配置 (新 DSL)
 export interface BlockConfig {
   id: string;
@@ -34,6 +41,8 @@ export interface BlockConfig {
   layout?: BlockLayoutConfig;
   visibleWhen?: string;
   className?: string;
+  imageField?: string;
+  imageViewports?: Record<string, CardImageViewport>;
 
   // 表单相关
   fields?: FieldConfig[];

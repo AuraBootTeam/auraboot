@@ -8,7 +8,7 @@
  */
 
 import { fetchResult } from '~/shared/services/http-client';
-import { ResultHelper } from '~/utils/type';
+import { ResultHelper, type Result } from '~/utils/type';
 
 export interface InboxItem {
   id: number;
@@ -51,6 +51,27 @@ export interface UnreadSummary {
 
 const BASE = '/api/inbox';
 
+function requireSuccess<T>(result: Result<T>): T | null {
+  if (!ResultHelper.isSuccess(result)) {
+    throw new Error(result.message || 'Inbox request failed');
+  }
+  return result.data;
+}
+
+function requireData<T>(result: Result<T>): T {
+  const data = requireSuccess(result);
+  if (data == null) throw new Error('Inbox response is missing data');
+  return data;
+}
+
+function notifyInboxChanged(count?: number): void {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('aura:inbox-update', {
+      detail: { type: 'inbox', ...(count == null ? {} : { count }) },
+    }));
+  }
+}
+
 /**
  * List inbox items with optional filters.
  */
@@ -64,10 +85,7 @@ export async function listInboxItems(params: {
     method: 'get',
     params,
   });
-  if (ResultHelper.isSuccess(result) && result.data) {
-    return result.data;
-  }
-  return { records: [], total: 0, current: 1, size: 20, pages: 0 };
+  return requireData(result);
 }
 
 /**
@@ -77,10 +95,7 @@ export async function getUnreadSummary(): Promise<UnreadSummary> {
   const result = await fetchResult<UnreadSummary>(`${BASE}/unread-summary`, {
     method: 'get',
   });
-  if (ResultHelper.isSuccess(result) && result.data) {
-    return result.data;
-  }
-  return {};
+  return requireData(result);
 }
 
 /**
@@ -90,10 +105,11 @@ export async function getUnreadCount(): Promise<number> {
   const result = await fetchResult<number>(`${BASE}/unread-count`, {
     method: 'get',
   });
-  if (ResultHelper.isSuccess(result) && result.data != null) {
-    return typeof result.data === 'number' ? result.data : 0;
+  const count = requireData(result);
+  if (typeof count !== 'number' || !Number.isInteger(count) || count < 0) {
+    throw new Error('Inbox unread count is invalid');
   }
-  return 0;
+  return count;
 }
 
 /**
@@ -103,10 +119,7 @@ export async function getInboxItem(id: number): Promise<InboxItem | null> {
   const result = await fetchResult<InboxItem>(`${BASE}/${id}`, {
     method: 'get',
   });
-  if (ResultHelper.isSuccess(result) && result.data) {
-    return result.data;
-  }
-  return null;
+  return requireSuccess(result);
 }
 
 /**
@@ -116,38 +129,46 @@ export async function getApprovalDetail(id: number): Promise<any> {
   const result = await fetchResult<any>(`${BASE}/${id}/approval-detail`, {
     method: 'get',
   });
-  return ResultHelper.isSuccess(result) ? result.data : null;
+  return requireSuccess(result);
 }
 
 /**
  * Mark a single item as read.
  */
 export async function markRead(id: number): Promise<void> {
-  await fetchResult(`${BASE}/${id}/read`, { method: 'put' });
+  const result = await fetchResult(`${BASE}/${id}/read`, { method: 'put' });
+  requireSuccess(result);
+  notifyInboxChanged();
 }
 
 /**
  * Mark all items as read.
  */
 export async function markAllRead(): Promise<void> {
-  await fetchResult(`${BASE}/read-all`, { method: 'put' });
+  const result = await fetchResult(`${BASE}/read-all`, { method: 'put' });
+  requireSuccess(result);
+  notifyInboxChanged(0);
 }
 
 /**
  * Mark item as acted with an action.
  */
 export async function markActed(id: number, action: string, comment?: string): Promise<void> {
-  await fetchResult(`${BASE}/${id}/act`, {
+  const result = await fetchResult(`${BASE}/${id}/act`, {
     method: 'put',
     params: { action, ...(comment != null ? { comment } : {}) },
   });
+  requireSuccess(result);
+  notifyInboxChanged();
 }
 
 /**
  * Dismiss an item.
  */
 export async function dismissItem(id: number): Promise<void> {
-  await fetchResult(`${BASE}/${id}/dismiss`, { method: 'put' });
+  const result = await fetchResult(`${BASE}/${id}/dismiss`, { method: 'put' });
+  requireSuccess(result);
+  notifyInboxChanged();
 }
 
 /**
@@ -158,29 +179,37 @@ export async function submitApprovalAction(
   action: string,
   comment?: string,
 ): Promise<void> {
-  await fetchResult(`${BASE}/${id}/approval-action`, {
+  const result = await fetchResult(`${BASE}/${id}/approval-action`, {
     method: 'post',
     params: { action, ...(comment != null ? { comment } : {}) },
   });
+  requireSuccess(result);
+  notifyInboxChanged();
 }
 
 /**
  * Batch approve items.
  */
 export async function batchApprove(ids: number[]): Promise<void> {
-  await fetchResult(`${BASE}/batch/approve`, { method: 'post', params: { ids } });
+  const result = await fetchResult(`${BASE}/batch/approve`, { method: 'post', params: { ids } });
+  requireSuccess(result);
+  notifyInboxChanged();
 }
 
 /**
  * Batch reject items.
  */
 export async function batchReject(ids: number[], comment: string): Promise<void> {
-  await fetchResult(`${BASE}/batch/reject`, { method: 'post', params: { ids, comment } });
+  const result = await fetchResult(`${BASE}/batch/reject`, { method: 'post', params: { ids, comment } });
+  requireSuccess(result);
+  notifyInboxChanged();
 }
 
 /**
  * Batch mark items as read.
  */
 export async function batchMarkRead(ids: number[]): Promise<void> {
-  await fetchResult(`${BASE}/batch/read`, { method: 'put', params: { ids } });
+  const result = await fetchResult(`${BASE}/batch/read`, { method: 'put', params: { ids } });
+  requireSuccess(result);
+  notifyInboxChanged();
 }

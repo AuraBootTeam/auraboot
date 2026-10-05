@@ -34,11 +34,11 @@ import {
 } from '../inboxService';
 
 function ok<T>(data: T) {
-  return { code: '0', desc: '', data };
+  return { code: '0', message: '', data };
 }
 
-function fail(desc = 'Server error') {
-  return { code: '1', desc, data: null };
+function fail(message = 'Server error') {
+  return { code: '1', message, data: null };
 }
 
 const ITEM = {
@@ -82,20 +82,16 @@ describe('inboxService', () => {
       expect(result.total).toBe(1);
     });
 
-    it('returns empty page on failure', async () => {
+    it('rejects business failure', async () => {
       fetchResultMock.mockResolvedValue(fail('Unauthorized'));
 
-      const result = await listInboxItems({});
-
-      expect(result).toEqual({ records: [], total: 0, current: 1, size: 20, pages: 0 });
+      await expect(listInboxItems({})).rejects.toThrow('Unauthorized');
     });
 
-    it('returns empty page when data is null', async () => {
+    it('rejects missing page', async () => {
       fetchResultMock.mockResolvedValue({ code: '0', data: null });
 
-      const result = await listInboxItems({});
-
-      expect(result.records).toEqual([]);
+      await expect(listInboxItems({})).rejects.toThrow('missing data');
     });
   });
 
@@ -114,12 +110,10 @@ describe('inboxService', () => {
       expect(result).toEqual(summary);
     });
 
-    it('returns empty object on failure', async () => {
+    it('rejects failed summary', async () => {
       fetchResultMock.mockResolvedValue(fail('Error'));
 
-      const result = await getUnreadSummary();
-
-      expect(result).toEqual({});
+      await expect(getUnreadSummary()).rejects.toThrow('Error');
     });
   });
 
@@ -135,20 +129,16 @@ describe('inboxService', () => {
       expect(result).toBe(7);
     });
 
-    it('returns 0 on failure', async () => {
+    it('rejects failed count', async () => {
       fetchResultMock.mockResolvedValue(fail('Error'));
 
-      const result = await getUnreadCount();
-
-      expect(result).toBe(0);
+      await expect(getUnreadCount()).rejects.toThrow('Error');
     });
 
-    it('returns 0 when data is null', async () => {
+    it('rejects when unread data is null', async () => {
       fetchResultMock.mockResolvedValue({ code: '0', data: null });
 
-      const result = await getUnreadCount();
-
-      expect(result).toBe(0);
+      await expect(getUnreadCount()).rejects.toThrow('missing data');
     });
   });
 
@@ -164,12 +154,10 @@ describe('inboxService', () => {
       expect(result).toEqual(ITEM);
     });
 
-    it('returns null on failure', async () => {
+    it('rejects business failure', async () => {
       fetchResultMock.mockResolvedValue(fail('Not found'));
 
-      const result = await getInboxItem(999);
-
-      expect(result).toBeNull();
+      await expect(getInboxItem(999)).rejects.toThrow('Not found');
     });
 
     it('returns null when data is null', async () => {
@@ -196,12 +184,10 @@ describe('inboxService', () => {
       expect(result).toEqual(detail);
     });
 
-    it('returns null on failure', async () => {
+    it('rejects business failure', async () => {
       fetchResultMock.mockResolvedValue(fail('No detail'));
 
-      const result = await getApprovalDetail(1);
-
-      expect(result).toBeNull();
+      await expect(getApprovalDetail(1)).rejects.toThrow('No detail');
     });
   });
 
@@ -333,5 +319,49 @@ describe('inboxService', () => {
         params: { ids: [5, 6, 7] },
       });
     });
+  });
+});
+
+
+describe('inbox mutation failure boundaries', () => {
+  beforeEach(() => fetchResultMock.mockReset());
+  const mutations = [
+    ['read', () => markRead(1)], ['read-all', () => markAllRead()],
+    ['act', () => markActed(1, 'approve')], ['dismiss', () => dismissItem(1)],
+    ['approval', () => submitApprovalAction(1, 'approve')],
+    ['batch approve', () => batchApprove([1])],
+    ['batch reject', () => batchReject([1], 'reason')],
+    ['batch read', () => batchMarkRead([1])],
+  ] as const;
+  it.each(mutations)('%s rejects business errors without refreshing badges', async (_name, invoke) => {
+    const listener = vi.fn();
+    window.addEventListener('aura:inbox-update', listener);
+    try {
+      fetchResultMock.mockResolvedValue(fail('Permission denied'));
+      await expect(invoke()).rejects.toThrow('Permission denied');
+      expect(listener).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener('aura:inbox-update', listener);
+    }
+  });
+  it('publishes zero unread only after successful read-all', async () => {
+    const listener = vi.fn();
+    window.addEventListener('aura:inbox-update', listener);
+    try {
+      fetchResultMock.mockResolvedValue(ok(null));
+      await markAllRead();
+      expect(listener).toHaveBeenCalledOnce();
+      expect(listener.mock.calls[0][0].detail).toEqual({ type: 'inbox', count: 0 });
+    } finally {
+      window.removeEventListener('aura:inbox-update', listener);
+    }
+  });
+  it.each([-1, '7', NaN, 0.5])('rejects invalid unread count %s', async (value) => {
+    fetchResultMock.mockResolvedValue(ok(value));
+    await expect(getUnreadCount()).rejects.toThrow('invalid');
+  });
+  it('preserves a valid zero unread count', async () => {
+    fetchResultMock.mockResolvedValue(ok(0));
+    await expect(getUnreadCount()).resolves.toBe(0);
   });
 });

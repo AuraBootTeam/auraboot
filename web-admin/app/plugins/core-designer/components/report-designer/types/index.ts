@@ -1,4 +1,5 @@
 import type { AggregateQueryRequest } from '~/framework/smart/types/chart';
+import type { LocalizedText } from '~/utils/i18n';
 /**
  * ReportDSL Types — independent from PageSchema
  *
@@ -229,9 +230,9 @@ export interface ReportColumn {
 
 export interface BlockDefinition {
   type: string;
-  label: string;
+  label: LocalizedText;
   icon: string;
-  description: string;
+  description: LocalizedText;
 }
 
 // ==================== Defaults ====================

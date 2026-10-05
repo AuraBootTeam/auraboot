@@ -10,6 +10,8 @@ import { useChartData } from '~/framework/smart/hooks/useChartData';
 import type { ChartDataSource, FilterConfig } from '~/framework/smart/types/chart';
 
 interface ChartWidgetWrapperProps {
+  /** Intrinsic metric height for the narrow read-only dashboard flow. */
+  autoHeight?: boolean;
   /** Chart title for export filename */
   title?: string;
   /** Data source config for fetching export data */
@@ -27,6 +29,7 @@ export const ChartWidgetWrapper: React.FC<ChartWidgetWrapperProps> = ({
   dataSource,
   linkageFilters,
   enableExport = true,
+  autoHeight = false,
   children,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -99,7 +102,7 @@ export const ChartWidgetWrapper: React.FC<ChartWidgetWrapperProps> = ({
   }
 
   return (
-    <div className="relative h-full">
+    <div className={autoHeight ? 'relative h-auto' : 'relative h-full'}>
       {/* Action button */}
       <div className="absolute top-1 right-1 z-10" ref={menuRef}>
         <button

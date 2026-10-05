@@ -41,8 +41,8 @@ test('product release-image gate is CI-only, Docker-only and evidence-backed', (
   assert.doesNotMatch(productImageGate, /--aura\.persistence\.tenant-bypass-table-prefixes=\S+/,
     'production image verification must retain tenant isolation without table-family bypasses');
   assert.match(productImageGate, /docker load --input/);
-  assert.match(productImageGate, /docker network create --subnet "10\.247\.\$\{subnet_index\}\.0\/24"/);
-  assert.match(productImageGate, /no free isolated release-image network in 10\.247\.0\.0\/16/);
+  assert.match(productImageGate, /ci\/isolated-release-network\.sh/);
+  assert.match(productImageGate, /create_isolated_release_network "\$NETWORK" "\$ARTIFACTS\/network-allocation\.tsv"/);
   assert.match(productImageGate, /AURA_RELEASE_PUBLISH_REGISTRY:-0/);
   assert.match(productImageGate, /AURA_RELEASE_PUBLISH_REGISTRY must be 0 or 1/);
   assert.match(productImageGate, /required when remote publication is enabled/);

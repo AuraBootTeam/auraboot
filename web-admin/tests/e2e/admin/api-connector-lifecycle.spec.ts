@@ -39,6 +39,24 @@ async function clickCreateButton(page: Page) {
   await createBtn.click();
 }
 
+
+// The api_connector create form renders inside a modal whose inputs carry no
+// form-field-* testid and no name attribute — fall back to the localized
+// label when the code-based locators miss.
+const FIELD_LABEL_FALLBACK: Record<string, RegExp> = {
+  name: /页面名称|连接名称|名称|Name/i,
+  base_url: /基础 ?URL|Base URL/i,
+  auth_type: /认证类型|Auth/i,
+  timeout_ms: /超时时间|Timeout/i,
+  default_headers: /默认请求头|Default Headers/i,
+  retry_policy: /重试策略|Retry/i,
+};
+
+function labelFallback(page: Page, fieldCode: string) {
+  const pattern = FIELD_LABEL_FALLBACK[fieldCode];
+  return pattern ? page.getByLabel(pattern).first() : null;
+}
+
 async function fillTextField(page: Page, fieldCode: string, value: string) {
   const input = page
     .locator(
@@ -49,32 +67,53 @@ async function fillTextField(page: Page, fieldCode: string, value: string) {
       ].join(', '),
     )
     .first();
+  if (await input.isVisible({ timeout: 3_000 }).catch(() => false)) {
+    await fillControlledInput(input, value);
+    return;
+  }
+  const byLabel = labelFallback(page, fieldCode);
+  if (byLabel && (await byLabel.isVisible({ timeout: 5_000 }).catch(() => false))) {
+    await fillControlledInput(byLabel, value);
+    return;
+  }
+  await input.waitFor({ state: 'visible', timeout: 5_000 });
   await fillControlledInput(input, value);
 }
 
 async function fillTextarea(page: Page, fieldCode: string, value: string) {
-  const textarea = page
+  let control = page
     .locator(
       [
         `[data-testid="form-field-${fieldCode}"] textarea:visible`,
         `[data-field="${fieldCode}"] textarea:visible`,
         `textarea[name="${fieldCode}"]:visible`,
+        `[data-testid="form-field-${fieldCode}"] input:visible`,
+        `input[name="${fieldCode}"]:visible`,
       ].join(', '),
     )
     .first();
+  if (!(await control.isVisible({ timeout: 3_000 }).catch(() => false))) {
+    const byLabel = labelFallback(page, fieldCode);
+    if (!byLabel || !(await byLabel.isVisible({ timeout: 5_000 }).catch(() => false))) {
+      await control.waitFor({ state: 'visible', timeout: 5_000 });
+    } else {
+      control = byLabel;
+    }
+  }
   // These connector fields (default_headers / retry_policy) render a JSON editor
   // that (a) auto-closes brackets — so char-by-char typing produces garbage — and
-  // (b) pretty-prints valid JSON on input, so the textarea value will NOT match
+  // (b) pretty-prints valid JSON on input, so the control value will NOT match
   // the compact input string byte-for-byte. Set the value via the native setter +
   // dispatch input/change (the proven path — mirrors fillControlledInput's
   // fallback) so the editor's onChange runs and reformats, then verify the PARSED
   // (semantic) content is equal instead of an exact string round-trip.
-  await textarea.waitFor({ state: 'visible', timeout: 5000 });
-  await textarea.scrollIntoViewIfNeeded();
-  await textarea.click();
-  await textarea.evaluate((node, nextValue) => {
+  await control.waitFor({ state: 'visible', timeout: 5000 });
+  await control.scrollIntoViewIfNeeded();
+  await control.click();
+  await control.evaluate((node, nextValue) => {
     const el = node as HTMLTextAreaElement;
-    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+    const proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement : HTMLInputElement;
+    const setter = Object.getOwnPropertyDescriptor(proto.prototype, 'value')?.set;
     setter?.call(el, nextValue);
     el.dispatchEvent(
       new InputEvent('input', { bubbles: true, inputType: 'insertText', data: nextValue }),
@@ -85,7 +124,7 @@ async function fillTextarea(page: Page, fieldCode: string, value: string) {
   await expect
     .poll(
       async () => {
-        const raw = await textarea.inputValue().catch(() => '');
+        const raw = await control.inputValue().catch(() => '');
         try {
           return JSON.stringify(JSON.parse(raw));
         } catch {

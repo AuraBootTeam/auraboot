@@ -26,6 +26,12 @@ import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
 const noProxyHttpAgent = new http.Agent({ keepAlive: false });
 const noProxyHttpsAgent = new https.Agent({ keepAlive: false });
 
+/** Parse only routes owned by the transport proxy; leave Router action streams intact. */
+export function shouldParseProxyBody(pathname: string, contentType: string): boolean {
+  return (pathname === '/api' || pathname.startsWith('/api/') || pathname === '/oauth2/token')
+    && !contentType.includes('multipart/form-data');
+}
+
 /**
  * Whether the backend operation is expected to outlive the default 60-second
  * interactive proxy budget.
@@ -657,7 +663,7 @@ export class BffProxyService {
     }
 
     // 如果前端没有发送Authorization header，则从session中提取token
-    if (!hasAuthHeader) {
+    if (!hasAuthHeader && path.split('?')[0] !== '/oauth2/token') {
       const token = await this.extractToken(req);
       if (token) {
         sanitized['Authorization'] = `Bearer ${token}`;

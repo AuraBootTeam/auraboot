@@ -162,6 +162,34 @@ class DynamicDataAnalyticsCoverageIT extends BaseIntegrationTest {
     }
 
     @Test
+    @org.springframework.transaction.annotation.Transactional(
+            propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    @DisplayName("CAS batch commits every row or rolls back a partial PostgreSQL match")
+    void compareAndSetBatchCommitsAndRollsBack() {
+        applyTestMetaContext();
+        grantCommittedPermissionToTestRole("model." + MODEL + ".update", "model", MODEL, "update", "DD batch CAS update");
+        String first = createRecord("CAS-BATCH-A", 41, 100);
+        String second = createRecord("CAS-BATCH-B", 42, 200);
+        var a = new com.auraboot.framework.plugin.extension.CompareAndSetUpdate(first, 41,
+                Map.of("ddan_counter", 51, "ddan_cap", 150));
+        var b = new com.auraboot.framework.plugin.extension.CompareAndSetUpdate(second, 42,
+                Map.of("ddan_counter", 52, "ddan_cap", 250));
+        dynamicDataService.compareAndSetBatch(MODEL, "ddan_counter", List.of(a, b));
+        assertEquals(51, jdbcTemplate.queryForObject("SELECT ddan_counter FROM mt_" + MODEL + " WHERE pid = ?", Integer.class, first));
+        assertEquals(52, jdbcTemplate.queryForObject("SELECT ddan_counter FROM mt_" + MODEL + " WHERE pid = ?", Integer.class, second));
+        assertEquals(150, jdbcTemplate.queryForObject("SELECT ddan_cap FROM mt_" + MODEL + " WHERE pid = ?", Integer.class, first));
+        Long version = jdbcTemplate.queryForObject("SELECT row_version FROM mt_" + MODEL + " WHERE pid = ?", Long.class, first);
+        var nextA = new com.auraboot.framework.plugin.extension.CompareAndSetUpdate(first, 51, Map.of("ddan_counter", 61));
+        var staleB = new com.auraboot.framework.plugin.extension.CompareAndSetUpdate(second, -999, Map.of("ddan_counter", 62));
+        assertThrows(com.auraboot.framework.meta.exception.MetaServiceException.class,
+                () -> dynamicDataService.compareAndSetBatch(MODEL, "ddan_counter", List.of(nextA, staleB)));
+        // The first row matched the UPDATE. Its unchanged value and version prove real rollback.
+        assertEquals(51, jdbcTemplate.queryForObject("SELECT ddan_counter FROM mt_" + MODEL + " WHERE pid = ?", Integer.class, first));
+        assertEquals(version, jdbcTemplate.queryForObject("SELECT row_version FROM mt_" + MODEL + " WHERE pid = ?", Long.class, first));
+        assertEquals(52, jdbcTemplate.queryForObject("SELECT ddan_counter FROM mt_" + MODEL + " WHERE pid = ?", Integer.class, second));
+    }
+
+    @Test
     @DisplayName("exportData runs the filter+mask pipeline and reports the row count")
     void exportRows() {
         DataExportRequest request = new DataExportRequest();

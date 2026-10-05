@@ -1,13 +1,14 @@
 /**
  * S2/M2 — Knowledge ingestion golden: add a page by URL.
  *
- * The backend really fetches over HTTP here. The spec stands up a throwaway HTTP server on loopback
+ * The backend really fetches over HTTP here. The spec stands up a throwaway HTTP server
  * and pastes its URL into the UI, so the whole seam runs for real: SSRF validation → pinned fetch →
  * Jsoup content extraction → chunk + index → retrieval.
  *
  * Why the loopback server needs an allowlist: SsrfValidator rejects loopback outright — that is the
  * point of it. The golden stack is therefore started with
- * `AURA_SSRF_ALLOWED_PRIVATE_HOSTS=127.0.0.1`, which is the operator-facing escape hatch that exists
+ * `AURA_SSRF_ALLOWED_PRIVATE_HOSTS=127.0.0.1`, or an exact LAN fixture host selected with
+ * `AURA_KNOWLEDGE_URL_FIXTURE_HOST`, which is the operator-facing escape hatch that exists
  * for exactly this. The refusal test below deliberately uses 169.254.169.254, which is *not* on that
  * allowlist, so the negative case stays honest: it proves the guard is live in the same process that
  * just accepted the loopback fetch.
@@ -52,15 +53,18 @@ const CLOUD_METADATA_URL = 'http://169.254.169.254/latest/meta-data/';
 const KB_NAME = `S2 URL ${uniqueId('KB')}`;
 
 /**
- * Fetching the loopback fixture server only works on a stack that has opted 127.0.0.1 into
+ * Fetching the fixture server only works on a stack that has opted its exact host into
  * SsrfValidator's allowlist — which the standard OSS stack deliberately does not. Gate the fetch
  * tests on that, or they would sit red in every routine suite run for a reason that is not a bug.
  *
  * The refusal tests below are NOT gated: they need no allowlist, and they are the ones worth
  * running on every stack, every time.
  */
-const LOOPBACK_FETCH_ENABLED =
-  process.env.AURA_SSRF_ALLOWED_PRIVATE_HOSTS?.includes('127.0.0.1') ?? false;
+const FIXTURE_HOST = process.env.AURA_KNOWLEDGE_URL_FIXTURE_HOST ?? '127.0.0.1';
+const FIXTURE_FETCH_ENABLED = (process.env.AURA_SSRF_ALLOWED_PRIVATE_HOSTS ?? '')
+  .split(',')
+  .map((host) => host.trim())
+  .includes(FIXTURE_HOST);
 
 let server: Server;
 let pageUrl: string;
@@ -74,9 +78,8 @@ test.describe('S2 knowledge ingestion — URL fetch', () => {
   test.setTimeout(120_000);
 
   test.skip(
-    !LOOPBACK_FETCH_ENABLED,
-    'needs AURA_SSRF_ALLOWED_PRIVATE_HOSTS=127.0.0.1 on the backend — SsrfValidator refuses ' +
-      'loopback otherwise, which is exactly what it is supposed to do',
+    !FIXTURE_FETCH_ENABLED,
+    `needs exact fixture host ${FIXTURE_HOST} in AURA_SSRF_ALLOWED_PRIVATE_HOSTS on the backend`,
   );
 
   test.beforeAll(async () => {
@@ -90,9 +93,9 @@ test.describe('S2 knowledge ingestion — URL fetch', () => {
       res.end('not found');
     });
 
-    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    await new Promise<void>((resolve) => server.listen(0, FIXTURE_HOST, resolve));
     const { port } = server.address() as AddressInfo;
-    pageUrl = `http://127.0.0.1:${port}/refund-policy`;
+    pageUrl = `http://${FIXTURE_HOST}:${port}/refund-policy`;
   });
 
   test.afterAll(async () => {

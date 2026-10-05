@@ -60,6 +60,11 @@ publishing {
         mavenJava(MavenPublication) {
             from components.java
             artifactId = 'platform-storage-s3'
+            // Publish the concrete AWS SDK version selected by the producer's BOM.
+            versionMapping {
+                usage('java-api') { fromResolutionOf('runtimeClasspath') }
+                usage('java-runtime') { fromResolutionResult() }
+            }
         }
     }
 

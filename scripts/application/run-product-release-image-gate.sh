@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)/ci/isolated-release-network.sh"
 
 fatal() { printf 'product-release-image-gate: %s\n' "$*" >&2; exit 2; }
 fail() { printf 'product-release-image-gate: %s\n' "$*" >&2; exit 1; }
@@ -7,18 +8,8 @@ info() { printf '==> %s\n' "$*"; }
 need() { command -v "$1" >/dev/null 2>&1 || fatal "missing dependency: $1"; }
 
 create_isolated_network() {
-  local subnet_index
-  # Docker's default address pools are shared with every CI Compose project on
-  # the host and can be exhausted by retained evidence environments. Allocate
-  # release-image networks explicitly from a dedicated /16, one /24 at a time.
-  # `docker network create` is the concurrency-safe arbiter for overlapping
-  # candidates, so parallel gates simply advance to the next subnet.
-  for subnet_index in $(seq 0 255); do
-    if docker network create --subnet "10.247.${subnet_index}.0/24" "$NETWORK" >/dev/null 2>&1; then
-      return 0
-    fi
-  done
-  fatal 'no free isolated release-image network in 10.247.0.0/16'
+  create_isolated_release_network "$NETWORK" "$ARTIFACTS/network-allocation.tsv" \
+    || fatal 'isolated release network unavailable'
 }
 
 wait_for_final_postgres() {
@@ -463,7 +454,8 @@ docker pull "$PLAYWRIGHT_IMAGE" >"$ARTIFACTS/logs/playwright-image.log" 2>&1 \
 PLAYWRIGHT_PACKAGE="$(cd "$PRODUCT_ROOT" && node -p "require.resolve('playwright/package.json', {paths:[require.resolve('@playwright/test')]})")"
 PLAYWRIGHT_VERSION="$(node -p "require(process.argv[1]).version" "$PLAYWRIGHT_PACKAGE")"
 PLAYWRIGHT_IMAGE_VERSION="$(docker run --rm --entrypoint node "$PLAYWRIGHT_IMAGE" -p "JSON.parse(require('fs').readFileSync('/ms-playwright/.docker-info','utf8')).driverVersion")"
-[[ "$PLAYWRIGHT_VERSION" == "$PLAYWRIGHT_IMAGE_VERSION" ]] || fatal 'locked Playwright and image versions differ'
+printf 'driver=%s\nimageDriver=%s\nimage=%s\n' "$PLAYWRIGHT_VERSION" "$PLAYWRIGHT_IMAGE_VERSION" "$PLAYWRIGHT_IMAGE" >"$ARTIFACTS/logs/playwright-version.log"
+[[ "$PLAYWRIGHT_VERSION" == "$PLAYWRIGHT_IMAGE_VERSION" ]] || fatal "locked Playwright and image versions differ: driver=$PLAYWRIGHT_VERSION image=$PLAYWRIGHT_IMAGE_VERSION"
 PLAYWRIGHT_PORT="$(node -e "const s=require('net').createServer();s.listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})")"
 docker run -d --name "$PLAYWRIGHT_CONTAINER" --label "aura.ci.job=$AURA_CI_JOB_ID" --init --network "$NETWORK" --shm-size=2g \
   -p "127.0.0.1:$PLAYWRIGHT_PORT:$PLAYWRIGHT_PORT" \

@@ -3,6 +3,7 @@
  * Rows = rowField values, Columns = columnField values, Cells = aggregated valueField
  */
 
+import { useSmartText } from '~/utils/i18n';
 import React from 'react';
 import type { CrossTabBlock } from '../types';
 
@@ -66,13 +67,18 @@ export const ReportCrossTabBlock: React.FC<ReportCrossTabBlockProps> = ({
   mode,
   data = [],
 }) => {
+  const text = useSmartText();
   // Design mode placeholder
   if (mode === 'design') {
     if (!block.rowField || !block.columnField || !block.valueField) {
       return (
         <div className="rounded border border-dashed border-gray-300 p-4 text-center text-sm text-gray-400">
-          <div className="mb-1 font-medium">{block.title || 'Cross Tab'}</div>
-          <div>Configure row, column, and value fields</div>
+          <div className="mb-1 font-medium">
+            {block.title || text({ zh: '交叉表', en: 'Cross Tab' })}
+          </div>
+          <div>
+            {text({ zh: '请配置行、列和数值字段', en: 'Configure row, column, and value fields' })}
+          </div>
         </div>
       );
     }
@@ -89,16 +95,24 @@ export const ReportCrossTabBlock: React.FC<ReportCrossTabBlockProps> = ({
               <th className="border border-gray-300 bg-gray-200 px-2 py-1 text-left">
                 {block.rowField} \ {block.columnField}
               </th>
-              <th className="border border-gray-300 bg-blue-50 px-2 py-1">Col A</th>
-              <th className="border border-gray-300 bg-blue-50 px-2 py-1">Col B</th>
+              <th className="border border-gray-300 bg-blue-50 px-2 py-1">
+                {text({ zh: '列 A', en: 'Col A' })}
+              </th>
+              <th className="border border-gray-300 bg-blue-50 px-2 py-1">
+                {text({ zh: '列 B', en: 'Col B' })}
+              </th>
               {block.showRowTotal && (
-                <th className="border border-gray-300 bg-gray-100 px-2 py-1">Total</th>
+                <th className="border border-gray-300 bg-gray-100 px-2 py-1">
+                  {text({ zh: '合计', en: 'Total' })}
+                </th>
               )}
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td className="border border-gray-300 bg-gray-50 px-2 py-1 font-medium">Row 1</td>
+              <td className="border border-gray-300 bg-gray-50 px-2 py-1 font-medium">
+                {text({ zh: '行 1', en: 'Row 1' })}
+              </td>
               <td className="border border-gray-300 px-2 py-1 text-right text-gray-500">123</td>
               <td className="border border-gray-300 px-2 py-1 text-right text-gray-500">456</td>
               {block.showRowTotal && (
@@ -108,7 +122,9 @@ export const ReportCrossTabBlock: React.FC<ReportCrossTabBlockProps> = ({
               )}
             </tr>
             <tr>
-              <td className="border border-gray-300 bg-gray-50 px-2 py-1 font-medium">Row 2</td>
+              <td className="border border-gray-300 bg-gray-50 px-2 py-1 font-medium">
+                {text({ zh: '行 2', en: 'Row 2' })}
+              </td>
               <td className="border border-gray-300 px-2 py-1 text-right text-gray-500">789</td>
               <td className="border border-gray-300 px-2 py-1 text-right text-gray-500">101</td>
               {block.showRowTotal && (
@@ -119,7 +135,9 @@ export const ReportCrossTabBlock: React.FC<ReportCrossTabBlockProps> = ({
             </tr>
             {block.showColumnTotal && (
               <tr>
-                <td className="border border-gray-300 bg-gray-100 px-2 py-1 font-bold">Total</td>
+                <td className="border border-gray-300 bg-gray-100 px-2 py-1 font-bold">
+                  {text({ zh: '合计', en: 'Total' })}
+                </td>
                 <td className="border border-gray-300 bg-gray-100 px-2 py-1 text-right font-bold text-gray-600">
                   912
                 </td>
@@ -141,7 +159,11 @@ export const ReportCrossTabBlock: React.FC<ReportCrossTabBlockProps> = ({
 
   // Runtime
   if (!block.rowField || !block.columnField || !block.valueField || data.length === 0) {
-    return <div className="py-4 text-center text-sm text-gray-500">No data available</div>;
+    return (
+      <div className="py-4 text-center text-sm text-gray-500">
+        {text({ zh: '暂无数据', en: 'No data available' })}
+      </div>
+    );
   }
 
   const { rowKeys, colKeys, cells } = buildPivot(data, block);
@@ -185,7 +207,7 @@ export const ReportCrossTabBlock: React.FC<ReportCrossTabBlockProps> = ({
             ))}
             {block.showRowTotal && (
               <th className="border border-gray-300 bg-gray-100 px-3 py-2 text-right font-bold">
-                Total
+                {text({ zh: '合计', en: 'Total' })}
               </th>
             )}
           </tr>
@@ -208,7 +230,9 @@ export const ReportCrossTabBlock: React.FC<ReportCrossTabBlockProps> = ({
           ))}
           {block.showColumnTotal && (
             <tr>
-              <td className="border border-gray-300 bg-gray-100 px-3 py-2 font-bold">Total</td>
+              <td className="border border-gray-300 bg-gray-100 px-3 py-2 font-bold">
+                {text({ zh: '合计', en: 'Total' })}
+              </td>
               {colKeys.map((ck) => (
                 <td
                   key={ck}

@@ -51,28 +51,25 @@ export function AutomationList({
   }, [initialAutomations]);
 
   const handleToggleEnabled = async (automation: Automation) => {
+    const errorMessage = st('$i18n:automation.list.toggleFailed', 'Failed to change automation status. Please retry.');
     try {
       const response = await fetch(`/api/automations/${automation.pid}/toggle`, {
         method: 'post',
         headers: authHeaders,
       });
-      if (!response.ok) {
-        throw new Error('Failed to toggle automation');
-      }
-      const result = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(errorMessage);
+      const result = await response.json();
       const updated = result?.data as Automation | undefined;
-      setAutomations((current) =>
-        current.map((item) =>
-          item.pid === automation.pid
-            ? updated?.pid === automation.pid
-              ? { ...item, ...updated }
-              : { ...item, enabled: !item.enabled }
-            : item,
-        ),
-      );
+      if (String(result?.code) !== '0' || updated?.pid !== automation.pid
+        || typeof updated.enabled !== 'boolean') {
+        throw new Error(errorMessage);
+      }
+      setAutomations((current) => current.map((item) =>
+        item.pid === automation.pid ? { ...item, ...updated } : item,
+      ));
       revalidator.revalidate();
-    } catch (err) {
-      showErrorToast(err instanceof Error ? err.message : 'Failed to toggle');
+    } catch {
+      showErrorToast(errorMessage);
     }
   };
 

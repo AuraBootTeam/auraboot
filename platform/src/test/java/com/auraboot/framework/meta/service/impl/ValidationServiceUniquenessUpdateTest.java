@@ -34,7 +34,7 @@ class ValidationServiceUniquenessUpdateTest {
 
     @BeforeEach
     void setUp() {
-        validation = new ValidationServiceImpl(mapper, null);
+        validation = new ValidationServiceImpl(mapper, null, null);
         model = ModelDefinition.builder()
                 .code("inv_kitting_result")
                 .tableName("mt_inv_kitting_result")

@@ -71,21 +71,18 @@ test.describe('Quick-filter team pin (M3)', () => {
     const adminPid: string = me.user?.pid;
     expect(adminPid, 'admin pid from /api/auth/me').toBeTruthy();
 
-    // Seed a team and make the admin a leader-member of it.
+    // Seed a team with the admin as its leader. Leader assignment is owned by
+    // the team governance layer: createTeam takes leaderId, and member-add with
+    // role 'leader' is rejected with "Assign the team leader through the team
+    // governance endpoint".
     const stamp = Date.now();
     const team = await jsonData(
       await page.request.post('/api/org/teams', {
-        data: { code: `vc_team_${stamp}`, name: `VC Team ${stamp}` },
+        data: { code: `vc_team_${stamp}`, name: `VC Team ${stamp}`, leaderId: adminPid },
       }),
     );
     teamPid = team.pid ?? team.teamPid;
     expect(teamPid, 'created team pid').toBeTruthy();
-
-    await jsonData(
-      await page.request.post(`/api/org/teams/${teamPid}/members`, {
-        data: { userPid: adminPid, role: 'leader' },
-      }),
-    );
 
     // Create a team-scoped view for that team. A `{ meta: {...} }` object config
     // is never reused (=== identity), so this always creates a fresh view.
