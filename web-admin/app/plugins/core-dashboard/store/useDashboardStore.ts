@@ -530,9 +530,15 @@ export const useDashboardStore = create<DashboardStore>()(
       },
 
       reset: () => {
-        // The generation must only move forward: a fetch that started before the
-        // reset belongs to a discarded dashboard and must land as stale.
-        set((state) => ({ ...initialState, mutationGeneration: state.mutationGeneration + 1 }));
+        // Mutate the draft instead of returning a replacement object: under the
+        // immer middleware a returned value diverges from the set(initialState)
+        // semantics and broke palette adds after an unmount reset (verified by
+        // bisect). The generation must only move forward so a fetch that started
+        // before the reset lands as stale.
+        set((state) => {
+          Object.assign(state, initialState);
+          state.mutationGeneration = state.mutationGeneration + 1;
+        });
       },
 
       // ==================== Utilities ====================
