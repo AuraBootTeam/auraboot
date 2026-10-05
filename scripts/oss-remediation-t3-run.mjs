@@ -21,6 +21,10 @@ if (!database.startsWith('jdbc:postgresql://') || /[?&](password|user)=/i.test(d
     throw new Error('Require explicit PostgreSQL JDBC URL without embedded credentials');
 }
 if (fs.existsSync(output)) throw new Error('Evidence output must be a fresh directory');
+// DB-identity assertions (e.g. SELECT current_database() = POSTGRES_DB) must see the
+// pinned IT database, not the runtime slot allocation injected by the managed executor.
+const databaseName = database.replace(/^jdbc:postgresql:\/\/[^/]+\/([^/?]+).*$/, '$1');
+if (!databaseName || databaseName === database) throw new Error(`Cannot derive database name from ${database}`);
 const catalog = JSON.parse(fs.readFileSync(path.join(root, 'scripts/oss-remediation-t3-catalog.json'), 'utf8'));
 const git = (...command) => {
     const result = spawnSync('git', command, { cwd: root, encoding: 'utf8' });
@@ -34,7 +38,7 @@ const productionBefore = Object.fromEntries(catalog.classes.map(file => [file, h
 fs.mkdirSync(output, { recursive: true });
 const command = ['run', runtime, '--workdir', path.join(root, 'platform'), '--', 'env',
     `TEST_DATABASE_URL=${database}`, `SPRING_DATASOURCE_URL=${database}`, `DATABASE_URL=${database}`,
-    `TEST_DATABASE_USERNAME=${user}`, `SPRING_DATASOURCE_USERNAME=${user}`,
+    `TEST_DATABASE_USERNAME=${user}`, `SPRING_DATASOURCE_USERNAME=${user}`, `POSTGRES_DB=${databaseName}`,
     './gradlew', ':test', '--rerun', ...catalog.testSelectors.flatMap(selector => ['--tests', selector]),
     'jacocoUnitFullReport', '--no-daemon'];
 fs.writeFileSync(path.join(output, 'command.json'), JSON.stringify({ source, executor, command, productionBefore }, null, 2) + '\n');
