@@ -13,6 +13,7 @@ import com.baomidou.mybatisplus.extension.plugins.inner.TenantLineInnerIntercept
 import lombok.extern.slf4j.Slf4j;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.LongValue;
+import net.sf.jsqlparser.expression.StringValue;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
@@ -154,10 +155,14 @@ public class MybatisPlusConfig {
                 // When user has no tenant context (e.g., multi-tenant login before space selection),
                 // return -1 so tenant-filtered queries return empty results instead of throwing.
                 // Tables like ab_user are already in ignoreTable and won't be affected.
-                if (tenantId == null) {
-                    return new LongValue(-1);
+                long scopedTenantId = tenantId == null ? -1L : tenantId;
+                if (databaseDialect.getType() == DatabaseType.POSTGRESQL) {
+                    // A quoted decimal literal is resolved against the column type.
+                    // This filters both BIGINT platform and VARCHAR engine tenants
+                    // without casting columns or exempting any tenant-scoped table.
+                    return new StringValue(Long.toString(scopedTenantId));
                 }
-                return new LongValue(tenantId);
+                return new LongValue(scopedTenantId);
             }
 
             @Override

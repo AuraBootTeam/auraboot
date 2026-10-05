@@ -367,6 +367,20 @@ class DynamicControllerPublicRecordSanitizerTest {
         assertPublicRecord(relationResponse.getData().get(0), "p9");
     }
 
+    @Test
+    void pageMetadataPublishesOnlyDeclaredBusinessTitleField() {
+        var definition = model("wd_leave_request");
+        var field = new com.auraboot.framework.meta.dto.FieldDefinition();
+        field.setCode("wd_req_code");
+        definition.setFields(List.of(field));
+        definition.setExtension(Map.of("titleField", "wd_req_code", "privateConfig", "hidden"));
+        when(metaModelService.getModelDefinition("wd_leave_request")).thenReturn(Optional.of(definition));
+        var metadata = controller().getPageMetadata("wd_leave_request").getData();
+        assertThat(metadata).containsEntry("titleField", "wd_req_code").doesNotContainKey("privateConfig");
+        definition.setExtension(Map.of("titleField", "undeclared_secret"));
+        assertThat(controller().getPageMetadata("wd_leave_request").getData()).doesNotContainKey("titleField");
+    }
+
     private DynamicController controller() {
         DynamicController controller = new DynamicController();
         ReflectionTestUtils.setField(controller, "dynamicDataService", dynamicDataService);

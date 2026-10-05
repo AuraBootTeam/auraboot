@@ -772,6 +772,10 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         boolean aggregateRootGrant = collaboratorGrant || rootRecordGrant;
 
         NamedQueryFieldProtection.Plan protection = fieldProtection.prepare(query, fields, "list", aggregateRootGrant);
+        // Masked values must not be inferable through keyword matching or result counts.
+        Set<String> maskedAliases = protection.protections().stream()
+                .flatMap(group -> group.aliases().keySet().stream()).collect(Collectors.toSet());
+        NamedQueryKeywordFilter.append(request.getKeyword(), fields, whereClauses, params, maskedAliases);
         // The declared aggregate-root PID is already an exact row boundary after the normal
         // record ACL (owner/self, data scope, or collaborator share) succeeds. Requiring raw
         // model reads or applying unrelated surface scopes to joined implementation tables

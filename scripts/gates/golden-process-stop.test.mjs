@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
 import net from 'node:net';
-import { planGoldenStop, executeGoldenStop, stopGoldenProcesses, stableGoldenLaunch, registerGoldenSupervisor, verifyGoldenStopOwnership } from '../lib/golden-process-stop.mjs';
+import { planGoldenStop, executeGoldenStop, stopGoldenProcesses, stableGoldenLaunch, registerGoldenSupervisor, verifyGoldenStopOwnership, readGoldenProcessSnapshot } from '../lib/golden-process-stop.mjs';
 
 // Workspace API is mocked; OS fixtures belong only to this test, with no product runtime.
 const supervisor = 1000000010, backend = 1000000020, child = 1000000011;
@@ -57,6 +57,28 @@ for (const key of ['pid', 'cwd', 'commandHash', 'startedAt', 'runtime', 'ownersh
     assert.deepEqual(calls, []);
   });
 }
+test('ignores a metadata probe failure only after the target has actually exited', () => {
+  let live = true;
+  const result = readGoldenProcessSnapshot(child, () => {
+    live = false;
+    throw new Error('ps exited while the owned child was disappearing');
+  }, () => live);
+  assert.equal(result, null);
+});
+test('retains a live process when its metadata probe fails', () => {
+  const calls = [];
+  const failure = new Error('live ps permission failure');
+  assert.throws(() => executeGoldenStop(planGoldenStop(fixture()),
+    pid => readGoldenProcessSnapshot(pid, () => { throw failure; }, () => true),
+    (...args) => calls.push(args)), error => error === failure);
+  assert.deepEqual(calls, []);
+});
+test('never probes or signals an already exited target', () => {
+  let probes = 0;
+  assert.equal(readGoldenProcessSnapshot(child, () => { probes++; }, () => false), null);
+  assert.equal(probes, 0);
+});
+
 test('does not signal a disappeared process', () => {
   const calls = [];
   executeGoldenStop(planGoldenStop(fixture()), () => null, (...args) => calls.push(args));

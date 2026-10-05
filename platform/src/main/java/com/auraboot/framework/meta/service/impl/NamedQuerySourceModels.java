@@ -17,6 +17,7 @@ public class NamedQuerySourceModels {
     private final MetaModelMapper mapper;
     private final SecureSqlRewriter sql;
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+    private final com.auraboot.framework.plugin.pf4j.AuraPluginManager plugins;
     @Value("${aura.persistence.tenant-bypass-table-prefixes:se_}")
     private String tenantBypassTablePrefixes = "se_";
     @org.springframework.beans.factory.annotation.Autowired
@@ -61,6 +62,7 @@ public class NamedQuerySourceModels {
     public static final String PLATFORM_REFERENCE_MARKER = "platform.reference";
     /** Marker prefix for engine tables under the tenant-bypass prefixes (own tenant_id column). */
     public static final String ENGINE_SOURCE_MARKER_PREFIX = "engine.";
+    public static final String NATIVE_SOURCE_MARKER_PREFIX = "native.";
 
     static String platformReferenceMarker(String key) {
         return PLATFORM_REFERENCE_MARKER;
@@ -152,6 +154,28 @@ public class NamedQuerySourceModels {
             // runtime maintains their tenant_id column and NQ SQL on them carries explicit
             // tenant filters, so they cannot back meta-model source resolution.
             result.put(key, engineSourceMarker(key));
+            return;
+        }
+        var nativeSources = plugins.getExtensionsOfType(
+                        com.auraboot.framework.plugin.extension.NamedQueryNativeSourceExtension.class).stream()
+                .flatMap(extension -> extension.sources().stream())
+                .filter(source -> identity(source.qualifiedTable()).equals(key)).toList();
+        if (!nativeSources.isEmpty()) {
+            if (nativeSources.size() != 1)
+                throw new AccessDeniedException("Ambiguous native named query source: " + key);
+            String resource = nativeSources.getFirst().readResourceCode();
+            if (resource == null || !resource.matches("[A-Za-z][A-Za-z0-9_.:-]*"))
+                throw new AccessDeniedException("Native named query source requires a read resource");
+            Map<String, Object> relation = jdbc.queryForMap("""
+                    SELECT c.relkind::text AS kind,
+                        EXISTS(SELECT 1 FROM pg_catalog.pg_attribute a WHERE a.attrelid=c.oid
+                            AND a.attname='tenant_id' AND a.attnum>0 AND NOT a.attisdropped) AS tenant_column
+                    FROM pg_catalog.pg_class c WHERE c.oid=pg_catalog.to_regclass(?)
+                    """, key);
+            if (!Boolean.TRUE.equals(relation.get("tenant_column"))
+                    || !Set.of("r", "p").contains(String.valueOf(relation.get("kind"))))
+                throw new AccessDeniedException("Native named query source requires a tenant-scoped physical table");
+            result.put(key, NATIVE_SOURCE_MARKER_PREFIX + resource);
             return;
         }
         Set<String> candidates = catalog.getOrDefault(key, Set.of());

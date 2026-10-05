@@ -366,4 +366,18 @@ class SessionManagementServiceImplTest {
 
         verify(adminEventLogService).record(any(AdminEventLog.class));
     }
+    @Test
+    @DisplayName("impersonation expiry explicitly scopes auth-plane reads and restores on failure")
+    void expiryScopesAuthPlaneAndRestoresOnFailure() {
+        assertFalse(com.auraboot.framework.application.tenant.MetaContext.isTenantFilterBypassed());
+        when(userSessionMapper.findExpiredImpersonationSessions()).thenAnswer(invocation -> {
+            assertTrue(com.auraboot.framework.application.tenant.MetaContext.isTenantFilterBypassed(),
+                    "Background auth-plane scan must declare its context-free scope");
+            throw new IllegalStateException("controlled expiry lookup failure");
+        });
+        assertThrows(IllegalStateException.class, service::expireImpersonationSessions);
+        assertFalse(com.auraboot.framework.application.tenant.MetaContext.isTenantFilterBypassed(),
+                "Scheduler scope must be restored even after a lookup failure");
+    }
+
 }

@@ -36,7 +36,7 @@ def read_delivery(store, delivery_pid, *, secret, run_id, mode, failures):
             'SELECT * FROM deliveries WHERE delivery_id=? ORDER BY sequence', (delivery_pid,))]
 
 
-def verify_delivery(rows, *, secret, delivery_pid, event_id, subject_pid, statuses):
+def verify_delivery(rows, *, secret, delivery_pid, event_id, subject_pid, statuses, originating_request_id=None):
     require(len(rows) == len(statuses) and bool(rows), 'receiver attempt denominator mismatch')
     bodies, proofs = [], []
     for row, status in zip(rows, statuses):
@@ -58,6 +58,9 @@ def verify_delivery(rows, *, secret, delivery_pid, event_id, subject_pid, status
         require(row.get('signature_valid') == 1 and row.get('delivery_id') == delivery_pid
                 and row.get('event_id') == event_id and row.get('response_status') == status,
                 'receiver delivery identity/status mismatch')
+        if originating_request_id is not None:
+            require(row.get('request_id') == originating_request_id,
+                    'originating requestId did not survive platform delivery/retry/replay')
         body_sha = hashlib.sha256(raw).hexdigest()
         require(row.get('body_sha') == body_sha, 'raw delivery checksum mismatch')
         payload = json.loads(raw)
@@ -68,6 +71,7 @@ def verify_delivery(rows, *, secret, delivery_pid, event_id, subject_pid, status
         bodies.append(raw)
         proofs.append({'sequence': row['sequence'], 'receivedAt': received_at,
                        'timestamp': timestamp, 'signature': signature, 'responseStatus': status,
+                       'requestId': row.get('request_id'),
                        'duplicate': bool(row['duplicate']), 'rawBodyBase64': base64.b64encode(raw).decode(),
                        'bodySha256': body_sha})
     require(len(set(bodies)) == 1, 'retry/replay changed raw event bytes')

@@ -14,7 +14,8 @@ class NamedQuerySourceModelsTest {
     private final MetaModelMapper mapper = mock(MetaModelMapper.class);
     private final SecureSqlRewriter sql = mock(SecureSqlRewriter.class);
     private final org.springframework.jdbc.core.JdbcTemplate jdbc = mock(org.springframework.jdbc.core.JdbcTemplate.class);
-    private final NamedQuerySourceModels resolver = new NamedQuerySourceModels(mapper, sql, jdbc);
+    private final com.auraboot.framework.plugin.pf4j.AuraPluginManager plugins = mock(com.auraboot.framework.plugin.pf4j.AuraPluginManager.class);
+    private final NamedQuerySourceModels resolver = new NamedQuerySourceModels(mapper, sql, jdbc, plugins);
     @org.junit.jupiter.api.BeforeEach void tenantMetadata() {
         when(jdbc.queryForMap(anyString(), anyString())).thenReturn(Map.of("kind", "r", "tenant_column", true, "definition", ""));
     }
@@ -217,4 +218,27 @@ class NamedQuerySourceModelsTest {
         Map<String, String> resolved = resolve("public.product_engine_job");
         assertEquals("engine.product_engine_job", resolved.get("\"public\".\"product_engine_job\""));
     }
+    @Test void activePluginNativeSourceRequiresAnExactIdentityAndTenantColumn() {
+        when(plugins.getExtensionsOfType(com.auraboot.framework.plugin.extension.NamedQueryNativeSourceExtension.class))
+                .thenReturn(List.of(() -> List.of(new com.auraboot.framework.plugin.extension.NamedQueryNativeSourceExtension.Source("public.product_audit", "product.audit"))));
+        assertEquals("native.product.audit", resolve("public.product_audit").get(identity("product_audit")));
+        assertThrows(AccessDeniedException.class, () -> resolve("private.product_audit"));
+        assertThrows(AccessDeniedException.class, () -> resolve("public.product_audit_shadow"));
+        when(jdbc.queryForMap(anyString(), anyString())).thenReturn(Map.of("kind", "r", "tenant_column", false));
+        assertThrows(AccessDeniedException.class, () -> resolve("public.product_audit"));
+    }
+    @Test void ambiguousNativeRegistrationFailsClosed() {
+        com.auraboot.framework.plugin.extension.NamedQueryNativeSourceExtension owner =
+                () -> List.of(new com.auraboot.framework.plugin.extension.NamedQueryNativeSourceExtension.Source("public.product_audit", "product.audit"));
+        when(plugins.getExtensionsOfType(com.auraboot.framework.plugin.extension.NamedQueryNativeSourceExtension.class)).thenReturn(List.of(owner, owner));
+        assertThrows(AccessDeniedException.class, () -> resolve("public.product_audit"));
+    }
+    @Test void stoppedPluginCannotLeaveAnAdmittedNativeSource() {
+        when(plugins.getExtensionsOfType(com.auraboot.framework.plugin.extension.NamedQueryNativeSourceExtension.class))
+                .thenReturn(List.of(() -> List.of(new com.auraboot.framework.plugin.extension.NamedQueryNativeSourceExtension.Source("public.product_audit", "product.audit"))))
+                .thenReturn(List.of());
+        assertEquals("native.product.audit", resolve("product_audit").get(identity("product_audit")));
+        assertThrows(AccessDeniedException.class, () -> resolve("product_audit"));
+    }
+
 }

@@ -260,6 +260,8 @@ public class SessionManagementServiceImpl implements SessionManagementService {
     @Scheduled(fixedDelayString = "${security.impersonation.expiry-scan-ms:60000}")
     @Transactional
     public void expireImpersonationSessions() {
+        // Authentication-plane expiry runs before any request tenant is bound.
+        // Keep this explicit worker scope local; never exempt the session table globally.
         MetaContext.runWithoutTenantFilter(() -> {
             for (UserSession session : userSessionMapper.findExpiredImpersonationSessions()) {
                 if (userSessionMapper.revokeExpiredSession(session.getId()) != 1) {

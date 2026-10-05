@@ -323,7 +323,7 @@ test('OSS golden stack applies explicit product migrations only to a fresh datab
   const stack = read('scripts/oss-golden-stack.sh');
 
   assert.match(stack, /--product-migration-root requires a fresh database flag/);
-  assert.match(stack, /"\$fresh_db" = "1" \] \|\| \[ "\$require_new_db" = "1"/);
+  assert.match(stack, /\[ "\$\{#product_migration_roots\[@\]\}" -eq 0 \] \|\| \[ "\$fresh_db" = "1" \] \|\| \[ "\$require_new_db" = "1" \]/);
   assert.match(stack, /find "\$product_root" -maxdepth 1 -type f -name 'V\*\.sql'/);
   assert.match(stack, /psql -v ON_ERROR_STOP=1[\s\S]{0,240}-f "\$migration_file"/);
   assert.match(stack, /product-migrations\.tsv/);
@@ -570,8 +570,8 @@ test('plugin import seeds BOM defaults when bom-standardization is imported', ()
     'BOM defaults must be seeded after cross-plugin references are verified',
   );
   assert.ok(
-    tail.indexOf('seed_bom_defaults_if_imported') < tail.indexOf('verify_latest_import_statuses'),
-    'BOM defaults must not be blocked by the post-import history audit',
+    tail.indexOf('seed_bom_defaults_if_imported') < tail.lastIndexOf('verify_latest_import_statuses'),
+    'BOM defaults must precede the final post-import history audit',
   );
 });
 

@@ -37,6 +37,13 @@ describe('SidebarSubmenu navigation', () => {
       </MemoryRouter>,
     );
 
+    const directory = screen.getByRole('button', { name: 'CRM' });
+    expect(directory.getAttribute('aria-expanded')).toBe('true');
+    fireEvent.click(directory);
+    expect(directory.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByRole('link', { name: '客户公海' })).toBeNull();
+    fireEvent.click(directory);
+    expect(directory.getAttribute('aria-expanded')).toBe('true');
     fireEvent.click(screen.getByRole('link', { name: '客户公海' }));
 
     expect(onNavigate).toHaveBeenCalledOnce();

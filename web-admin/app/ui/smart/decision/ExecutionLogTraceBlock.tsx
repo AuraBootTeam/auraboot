@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import { getApiService } from '~/shared/services/ApiService';
 import { useI18n } from '~/contexts/I18nContext';
+import { useTimezone } from '~/contexts/TimezoneContext';
+import { formatInTimezone } from '~/shared/services/dateTimeFormatService';
 import {
   createDecisionApi,
   type DecisionApi,
@@ -213,12 +215,8 @@ function errorMessage(error: unknown): string {
   return '日志加载失败';
 }
 
-function formatDate(value?: string): string {
-  if (!value) return '-';
-  return value
-    .replace('T', ' ')
-    .replace(/\.\d+Z?$/, '')
-    .replace(/Z$/, '');
+function formatDate(value: string | undefined, timezone: string, format: string): string {
+  return formatInTimezone(value, format, timezone) || '-';
 }
 
 function display(value: unknown): string {
@@ -234,6 +232,7 @@ function callerLabel(value: unknown, locale = 'zh-CN'): string {
 }
 
 function callerDisplay(log: DecisionLogRecord, locale = 'zh-CN'): string {
+  if (String(log.callerType ?? '').toUpperCase() === 'SLA') return callerLabel(log.callerType, locale);
   return `${callerLabel(log.callerType, locale)} / ${display(log.callerRef)}`;
 }
 
@@ -311,23 +310,18 @@ function rolloutDisplay(log: DecisionLogRecord, locale = 'zh-CN'): string {
   return `${rolloutLabel(log.rolloutArm, locale)}${log.rolloutBucket != null ? ` #${log.rolloutBucket}` : ''}`;
 }
 
-function decisionLabel(value: unknown, locale = 'zh-CN'): string {
-  const code = display(value);
-  if (code === '-') return code;
-  const label = traceLabel('decision', code, locale);
-  return label === code ? traceLabel('semantic', 'decisionFallback', locale) : label;
+function decisionLabel(log: DecisionLogRecord, locale = 'zh-CN'): string {
+  return log.decisionName?.trim() || traceLabel('semantic', 'decisionFallback', locale);
 }
 
-function decisionTitle(value: unknown): string {
-  const code = display(value);
-  const label = decisionLabel(value);
-  return label === code ? code : `${label} (${code})`;
+function decisionTitle(log: DecisionLogRecord): string {
+  return decisionLabel(log);
 }
 
-function decisionCell(value: unknown, locale = 'zh-CN') {
+function decisionCell(log: DecisionLogRecord, locale = 'zh-CN') {
   return (
-    <div className="elta-cell-text" title={decisionTitle(value)}>
-      {decisionLabel(value, locale)}
+    <div className="elta-cell-text" title={decisionTitle(log)}>
+      {decisionLabel(log, locale)}
     </div>
   );
 }
@@ -699,7 +693,7 @@ function factMetadataValueLabelEntries(row: FactMetadataRow): Array<[string, str
     .sort(([left], [right]) => left.localeCompare(right));
 }
 
-function actionRetryItems(action: EventPolicyActionLogRecord): string[] {
+function actionRetryItems(action: EventPolicyActionLogRecord, timezone: string, format: string): string[] {
   const parts: string[] = [];
   const attempt = Number(action.attemptCount ?? 0);
   const maxAttempts = Number(action.maxAttempts ?? 0);
@@ -716,9 +710,9 @@ function actionRetryItems(action: EventPolicyActionLogRecord): string[] {
     parts.push(`${attemptLabel} ${attempt}`);
   }
   if (retryState) {
-    if (action.lastRetryAt) parts.push(`上次 ${formatDate(action.lastRetryAt)}`);
-    if (action.nextRetryAt) parts.push(`下次 ${formatDate(action.nextRetryAt)}`);
-    if (action.deadLetteredAt) parts.push(`死信 ${formatDate(action.deadLetteredAt)}`);
+    if (action.lastRetryAt) parts.push(`上次 ${formatDate(action.lastRetryAt, timezone, format)}`);
+    if (action.nextRetryAt) parts.push(`下次 ${formatDate(action.nextRetryAt, timezone, format)}`);
+    if (action.deadLetteredAt) parts.push(`死信 ${formatDate(action.deadLetteredAt, timezone, format)}`);
     if (action.resultPayload?.retryExhausted === true) parts.push('重试已耗尽');
   }
   return parts;
@@ -760,7 +754,8 @@ function ActionLogCard({
   onReplay: (action: EventPolicyActionLogRecord) => void;
 }) {
   const { locale } = useI18n();
-  const retryItems = actionRetryItems(action);
+  const { timezone, formats } = useTimezone();
+  const retryItems = actionRetryItems(action, timezone, formats.datetime);
   const payloadEntries = orderedPayloadEntries(action.resultPayload);
   const key = actionLogKey(action);
   return (
@@ -773,7 +768,7 @@ function ActionLogCard({
       </div>
       <div className="elta-action-sub">
         <span>{actionTypeLabel(action.actionType, locale)}</span>
-        <span>{formatDate(action.executedAt)}</span>
+        <span>{formatDate(action.executedAt, timezone, formats.datetime)}</span>
         <span className="mono" title={idempotencyTitle(action.idempotencyKey)}>
           {idempotencyEvidence(action.idempotencyKey)}
         </span>
@@ -813,6 +808,7 @@ function ActionLogCard({
 
 export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBlockProps) {
   const { t, locale } = useI18n();
+  const { timezone, formats } = useTimezone();
   const api = useMemo(() => createApi(), []);
   const location = useLocation();
   const navigate = useNavigate();
@@ -1220,7 +1216,7 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
               {records.map((log) => (
                 <tr key={log.pid ?? log.traceId} data-testid={`elta-row-${log.pid ?? log.traceId}`}>
                   <td className="mono">{cellText(log.traceId, 'mono')}</td>
-                  <td>{decisionCell(log.decisionCode, locale)}</td>
+                  <td>{decisionCell(log, locale)}</td>
                   <td>{cellText(log.selectedVersion ?? log.decisionVersion)}</td>
                   <td>
                     <span
@@ -1233,7 +1229,7 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                   <td>{cellText(callerDisplay(log, locale))}</td>
                   <td>{cellText(rolloutDisplay(log, locale))}</td>
                   <td>{cellText(log.durationMs != null ? `${log.durationMs}ms` : '-')}</td>
-                  <td>{cellText(formatDate(log.createdAt))}</td>
+                  <td>{cellText(formatDate(log.createdAt, timezone, formats.datetime))}</td>
                   <td className="elta-row-actions">
                     <button
                       type="button"
@@ -1288,15 +1284,15 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
             <div className="elta-drawer-head">
               <div>
                 <h3>{traceLabel('ui', 'executionChain', locale)}</h3>
-                <span className="mono">{display(selectedLog.traceId)}</span>
+                <span>{decisionLabel(selectedLog.decisionCode, locale, selectedLog.decisionName)}</span>
               </div>
               <button type="button" data-testid="elta-close-trace" onClick={closeTrace}>
                 关闭
               </button>
             </div>
             <div className="elta-drawer-meta">
-              <span title={decisionTitle(selectedLog.decisionCode)}>
-                决策 {decisionLabel(selectedLog.decisionCode, locale)}
+              <span title={decisionTitle(selectedLog)}>
+                决策 {decisionLabel(selectedLog, locale)}
               </span>
               <span title={display(selectedLog.status)}>
                 状态 {decisionStatusLabel(selectedLog.status, locale)}
@@ -1370,8 +1366,8 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                   data-testid={`elta-chain-node-${log.pid ?? index}`}
                 >
                   <div className="elta-chain-main">
-                    <strong title={decisionTitle(log.decisionCode)}>
-                      {decisionLabel(log.decisionCode, locale)}
+                    <strong title={decisionTitle(log)}>
+                      {decisionLabel(log, locale)}
                     </strong>
                     <span
                       className={`elta-status elta-status-${log.status ?? 'UNKNOWN'}`}
@@ -1391,13 +1387,19 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                     <span>v{display(log.selectedVersion ?? log.decisionVersion)}</span>
                     <span title={log.runtimeAdapter}>{runtimeAdapterLabel(log.runtimeAdapter, locale)}</span>
                     <span>{log.durationMs != null ? `${log.durationMs}ms` : '-'}</span>
-                    <span>{formatDate(log.createdAt)}</span>
+                    <span>{formatDate(log.createdAt, timezone, formats.datetime)}</span>
                   </div>
-                  {(log.runtimeAdapter || (log.decisionCode &&
+                  {(log.traceId || log.callerRef || log.runtimeAdapter || (log.decisionCode &&
                     traceLabel('decision', log.decisionCode, locale) === log.decisionCode)) &&
                     <details className="mt-2 text-xs" data-testid={'elta-chain-technical-' + (log.pid ?? index)}>
                       <summary>{traceLabel('semantic', 'technicalDetails', locale)}</summary>
                       <dl className="mt-1 break-all">
+                        {log.traceId && <>
+                          <dt>{traceLabel('semantic', 'traceIdentifier', locale)}</dt><dd>{log.traceId}</dd>
+                        </>}
+                        {log.callerRef && <>
+                          <dt>{traceLabel('semantic', 'callerIdentifier', locale)}</dt><dd>{log.callerRef}</dd>
+                        </>}
                         {log.decisionCode && traceLabel('decision', log.decisionCode, locale) === log.decisionCode && <>
                           <dt>{traceLabel('semantic', 'decisionCode', locale)}</dt><dd>{log.decisionCode}</dd>
                         </>}
@@ -1433,12 +1435,22 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                               <div className="elta-fact-values">
                                 {factMetadataValueLabelEntries(row).map(([value, label]) => (
                                   <span key={value}>
-                                    <code>{value}</code>
+                                    {!['reference', 'user'].includes(String(row.metadata.dataType).toLowerCase()) && <code>{value}</code>}
                                     {label}
                                   </span>
                                 ))}
                               </div>
                             ) : null}
+                            {['reference', 'user'].includes(String(row.metadata.dataType).toLowerCase()) && factMetadataValueLabelEntries(row).length > 0 && (
+                              <details className="mt-2 text-xs" data-testid="elta-reference-identifiers">
+                                <summary>{traceLabel('semantic', 'technicalDetails', locale)}</summary>
+                                <dl className="mt-1 break-all">
+                                  {factMetadataValueLabelEntries(row).map(([value, label]) => (
+                                    <div key={value}><dt>{label}</dt><dd>{value}</dd></div>
+                                  ))}
+                                </dl>
+                              </details>
+                            )}
                           </article>
                         ))}
                       </div>

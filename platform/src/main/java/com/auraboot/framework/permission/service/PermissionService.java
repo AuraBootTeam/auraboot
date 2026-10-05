@@ -17,8 +17,6 @@ import java.util.List;
  * @since 2025-01-07
  */
 public interface PermissionService {
-    /** Find a permission by its public PID, or return null when it does not exist. */
-    PermissionDTO findByPid(String pid);
     
     /**
      * Create permission (through Git-first workflow)
@@ -51,6 +49,9 @@ public interface PermissionService {
      * @return Permission DTO or null
      */
     PermissionDTO findById(Long id);
+
+    /** Resolve a permission by its public identity within the current tenant. */
+    PermissionDTO findByPid(String pid);
 
     
     /**

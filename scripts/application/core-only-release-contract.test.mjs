@@ -31,6 +31,8 @@ test('core release stages a compiled Web shell and a self-contained deployment d
 });
 
 test('product release-image gate is CI-only, Docker-only and evidence-backed', () => {
+  assert.match(productImageGate, /SPRING_PROFILES_ACTIVE=community/);
+  assert.doesNotMatch(productImageGate, /--aura\.persistence\.tenant-bypass-table-prefixes=/);
   assert.match(productImageGate, /AURA_CI_JOB_ID/);
   assert.match(productImageGate, /uname -s.*Linux/);
   assert.match(productImageGate, /uname -m.*x86_64/);
@@ -57,7 +59,10 @@ test('product release-image gate is CI-only, Docker-only and evidence-backed', (
   assert.match(productImageGate, /registry-role-policy\.mjs/);
   assert.match(productImageGate, /RUNTIME_DB_ROLE=aura_runtime_ci/);
   assert.match(productImageGate, /REGISTRATION_DB_ROLE=aura_registry_ci/);
-  assert.match(productImageGate, /SPRING_DATASOURCE_USERNAME="\$RUNTIME_DB_ROLE"/);
+  assert.match(productImageGate, /SPRING_DATASOURCE_USERNAME="\$db_role"/);
+  assert.match(productImageGate, /start_application_phase "\$PUBLISH_CONTAINER" "\$PUBLISH_DB_ROLE" "\$PUBLISH_DB_PASSWORD" publication/);
+  assert.match(productImageGate, /start_application_phase "\$APP_CONTAINER" "\$RUNTIME_DB_ROLE" "\$RUNTIME_DB_PASSWORD" runtime/);
+  assert.match(productImageGate, /publication\/runtime database authority separation failed/);
   assert.match(productImageGate, /AURA_REGISTRY_REGISTRATION_USERNAME="\$REGISTRATION_DB_ROLE"/);
   assert.match(productImageGate, /CI=1 pnpm --dir "\$CORE_ROOT" install --frozen-lockfile --ignore-scripts/);
   assert.match(productImageGate, /core-pnpm-install\.log/);
@@ -74,8 +79,10 @@ test('product release-image gate is CI-only, Docker-only and evidence-backed', (
   assert.match(productImageGate, /docker rm -f "\$BUILD_PG_CONTAINER"/);
   assert.match(productImageGate, /docker logs "\$APP_CONTAINER" >"\$ARTIFACTS\/logs\/application-final\.log"/);
   assert.match(productImageGate, /playwright test --config playwright\.release\.config\.ts/);
-  assert.match(productImageGate, /PLAYWRIGHT_DOWNLOAD_HOST="\$PLAYWRIGHT_DOWNLOAD_HOST" pnpm --dir "\$PRODUCT_ROOT" exec playwright install chromium/);
-  assert.match(productImageGate, /AURA_PLAYWRIGHT_DOWNLOAD_HOST must use HTTPS/);
+  assert.match(productImageGate, /docker pull "\$PLAYWRIGHT_IMAGE"/);
+  assert.match(productImageGate, /\[\[ "\$PLAYWRIGHT_VERSION" == "\$PLAYWRIGHT_IMAGE_VERSION" \]\]/);
+  assert.match(productImageGate, /locked Playwright and image versions differ/);
+  assert.match(productImageGate, /PW_TEST_CONNECT_WS_ENDPOINT/);
   assert.match(productImageGate, /release-image-receipt\.json/);
   assert.match(productImageGate, /release-control-receipt\.json/);
   assert.match(productImageGate, /"activeBindingCount": int\(binding_count\)/);

@@ -262,7 +262,7 @@ public class OpenPlatformManagementService {
         String normalizedStatus = status == null || status.isBlank() ? null : status.trim().toLowerCase();
         return deliveryMapper.findForOperations(tenantId, installationPid, normalizedStatus,
                         Math.max(1, Math.min(limit, 200))).stream()
-                .map(item -> new WebhookDeliveryView(item.pid(), item.subscriptionName(), item.eventId(),
+                .map(item -> new WebhookDeliveryView(item.pid(), item.subscriptionName(), item.eventId(), item.requestId(),
                         item.deliveryStatus(), item.retryCount(), item.maxRetries(), item.responseStatus(),
                         safeFailureReason(item.deliveryStatus(), item.responseStatus()),
                         item.nextRetryAt(), item.lastAttemptAt(), item.deliveredAt(),

@@ -186,6 +186,14 @@ public class InboxServiceImpl implements InboxService {
 
     @Override
     @Transactional
+    public void recordCompletedWorkflowAction(Long id, Long userId, Long tenantId, String taskId, String action) {
+        if (inboxItemMapper.recordCompletedWorkflowAction(id, tenantId, userId, taskId, action) != 1) {
+            throw new IllegalStateException("Completed workflow decision could not be recorded for its inbox item");
+        }
+    }
+
+    @Override
+    @Transactional
     public void dismiss(Long id, Long userId, Long tenantId) {
         int rows = inboxItemMapper.dismiss(id, tenantId, userId);
         if (rows == 0) {

@@ -25,7 +25,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class PluginExtensionRegistryBridgeTest {
 
-    @Mock private AuraPluginManager pluginManager;
+    @Mock private ExtensionRegistry extensionRegistry;
     @Mock private CommandHandlerRegistry commandHandlerRegistry;
 
     @InjectMocks private PluginExtensionRegistryBridge bridge;
@@ -46,7 +46,7 @@ class PluginExtensionRegistryBridgeTest {
     @Test
     void registers_extension_with_unique_command_type() {
         CommandHandlerExtension ext = stubExtension("plugin.demo.run");
-        when(pluginManager.getExtensionsOfType(CommandHandlerExtension.class)).thenReturn(List.of(ext));
+        when(extensionRegistry.getAllCommandHandlers()).thenReturn(List.of(ext));
         when(commandHandlerRegistry.isRegistered("plugin.demo.run")).thenReturn(false);
 
         PluginExtensionRegistryBridge.BridgeResult result = bridge.bridgePluginCommandHandlers();
@@ -65,7 +65,7 @@ class PluginExtensionRegistryBridgeTest {
     void skips_extension_with_blank_command_type() {
         CommandHandlerExtension blank = stubExtension("");
         CommandHandlerExtension nullCode = stubExtension(null);
-        when(pluginManager.getExtensionsOfType(CommandHandlerExtension.class))
+        when(extensionRegistry.getAllCommandHandlers())
                 .thenReturn(List.of(blank, nullCode));
 
         bridge.bridge();
@@ -76,7 +76,7 @@ class PluginExtensionRegistryBridgeTest {
     @Test
     void skips_when_code_already_registered() {
         CommandHandlerExtension ext = stubExtension("builtin.update");
-        when(pluginManager.getExtensionsOfType(CommandHandlerExtension.class)).thenReturn(List.of(ext));
+        when(extensionRegistry.getAllCommandHandlers()).thenReturn(List.of(ext));
         when(commandHandlerRegistry.isRegistered("builtin.update")).thenReturn(true);
 
         bridge.bridge();
@@ -89,7 +89,7 @@ class PluginExtensionRegistryBridgeTest {
         CommandHandlerExtension already = stubExtension("first.handler");
         CommandHandlerExtension fresh = stubExtension("second.handler");
         CommandHandlerExtension blank = stubExtension("   ");
-        when(pluginManager.getExtensionsOfType(CommandHandlerExtension.class))
+        when(extensionRegistry.getAllCommandHandlers())
                 .thenReturn(List.of(already, fresh, blank));
         when(commandHandlerRegistry.isRegistered("first.handler")).thenReturn(true);
         when(commandHandlerRegistry.isRegistered("second.handler")).thenReturn(false);
@@ -104,7 +104,7 @@ class PluginExtensionRegistryBridgeTest {
         CommandHandlerExtension ext = stubExtension(
                 "pe:allocate_inventory",
                 Set.of("pe:allocate_inventory", "pe:hold_inventory"));
-        when(pluginManager.getExtensionsOfType(CommandHandlerExtension.class)).thenReturn(List.of(ext));
+        when(extensionRegistry.getAllCommandHandlers()).thenReturn(List.of(ext));
         when(commandHandlerRegistry.isRegistered("pe:allocate_inventory")).thenReturn(false);
         when(commandHandlerRegistry.isRegistered("pe:hold_inventory")).thenReturn(false);
 
@@ -122,7 +122,7 @@ class PluginExtensionRegistryBridgeTest {
 
     @Test
     void no_extensions_results_in_no_registrations() {
-        when(pluginManager.getExtensionsOfType(CommandHandlerExtension.class)).thenReturn(List.of());
+        when(extensionRegistry.getAllCommandHandlers()).thenReturn(List.of());
 
         bridge.bridge();
 

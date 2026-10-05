@@ -8,6 +8,8 @@ import com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvel
 import com.auraboot.framework.plugin.extension.integration.ReliableIntegrationAccessor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
+import org.slf4j.MDC;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -47,11 +49,15 @@ class ExternalEventIngressServiceTest {
         when(installationMapper.findByTenantAndPid(42L, "inst")).thenReturn(installation);
     }
 
+    @AfterEach
+    void clearTrace() { MDC.remove("requestId"); }
+
     @Test
     void claimsIdempotencyAndEnqueuesTenantBoundReliableEnvelope() {
         when(idempotencyMapper.claim(eq(42L), eq(9L), eq("external-event:erp"),
                 eq("idempotency-0001"), anyString(), any())).thenReturn(1);
 
+        MDC.put("requestId", "fresh-ingress-request");
         var result = service.accept(principal, "erp", "idempotency-0001", body("evt-1"));
 
         assertFalse(result.duplicate());
@@ -61,6 +67,9 @@ class ExternalEventIngressServiceTest {
         assertEquals("external.erp.order.created.v1", envelope.getValue().eventType());
         assertEquals("ext:inst:evt-1", envelope.getValue().eventId());
         assertEquals("inst", envelope.getValue().headers().get("installationPid"));
+        assertEquals("fresh-ingress-request", envelope.getValue().correlationId());
+        assertEquals("fresh-ingress-request", envelope.getValue().headers().get("requestId"));
+        assertEquals(java.util.Map.of("amount", 10), envelope.getValue().payload());
     }
 
     @Test

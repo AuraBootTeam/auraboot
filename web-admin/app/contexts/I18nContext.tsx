@@ -101,12 +101,15 @@ export function I18nProvider({ children, initialData = {}, initialLocale }: I18n
     }
 
     const savedLocale = getInitialLocale();
+    const requestLocale = initialLocale || savedLocale;
+    // BFF gives the locale cookie priority over browser Accept-Language. Publish
+    // the displayed language even when it is the default and no preference changed.
+    document.cookie = `locale=${requestLocale};path=/;max-age=${365 * 24 * 3600};SameSite=Lax`;
     if (initialLocale && savedLocale !== initialLocale) {
       // Server locale (from cookie) takes precedence — sync localStorage
       localStorage.setItem(LOCALE_STORAGE_KEY, initialLocale);
     } else if (!initialLocale && savedLocale !== DEFAULT_LOCALE) {
       // No server locale but localStorage has a preference — set cookie for next SSR
-      document.cookie = `locale=${savedLocale};path=/;max-age=${365 * 24 * 3600};SameSite=Lax`;
       setLocaleState(savedLocale);
     }
     // SSR already fetched correct locale data via initialData, no need to re-fetch

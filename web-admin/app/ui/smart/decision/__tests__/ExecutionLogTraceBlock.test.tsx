@@ -22,6 +22,10 @@ vi.mock('react-router', async (importOriginal) => {
   };
 });
 
+vi.mock('~/contexts/TimezoneContext', () => ({
+  useTimezone: () => ({ timezone: 'Asia/Shanghai', formats: { datetime: 'YYYY-MM-DD HH:mm:ss' } }),
+}));
+
 vi.mock('~/shared/services/ApiService', () => ({
   getApiService: () => http,
 }));
@@ -38,6 +42,7 @@ const recentLog = {
   pid: 'log-1',
   traceId: 'trace-1',
   decisionCode: 'sla_deadline',
+  decisionName: 'SLA 截止时间',
   selectedVersion: 2,
   status: 'MATCHED',
   callerType: 'AUTOMATION',
@@ -68,6 +73,10 @@ const recentLog = {
       },
     },
     factMetadata: {
+      'record.data.applicant': {
+        label: '申请人', dataType: 'reference', modelCode: 'wd_leave_request',
+        valueLabels: { 'internal-applicant-pid': 'Aura BPM Admin' },
+      },
       review_status: {
         scope: 'record',
         path: 'data.review_status',
@@ -116,6 +125,7 @@ const eventPolicyLog = {
   traceId: 'trace-ep-1',
   correlationId: 'policy-run-1',
   decisionCode: 'leave_request_automation',
+  decisionName: '请假申请自动化策略',
   callerType: 'EVENT_POLICY',
   callerRef: 'leave_request_event_policy',
   matchedRulesJson: [{ ruleId: 'notify_long_leave' }],
@@ -127,6 +137,7 @@ const bpmLog = {
   traceId: 'trace-bpm-1',
   correlationId: 'bpm-01BPMINSTANCE-approve',
   decisionCode: 'approval_routing',
+  decisionName: '请假审批分派',
   callerType: 'BPM',
   callerRef: 'wd_leave_approval',
 };
@@ -151,6 +162,7 @@ function mockLogApi() {
             ...recentLog,
             pid: 'log-0',
             decisionCode: 'eligibility_gate',
+            decisionName: '资格审批条件',
             status: 'NOT_MATCHED',
             createdAt: '2026-06-10T09:59:00Z',
           },
@@ -205,6 +217,36 @@ describe('ExecutionLogTraceBlock', () => {
       value: scrollIntoViewMock,
     });
     mockLogApi();
+  });
+
+  it('uses an arbitrary tenant definition name in the row and trace chain', async () => {
+    const log = { ...recentLog, decisionCode: 'new_tenant_decision', decisionName: '费用审批期限' };
+    http.get.mockImplementation((endpoint: string) => Promise.resolve({ data:
+      endpoint === '/decision/logs/recent' ? { records: [log], total: 1 } : [log],
+    }));
+    render(<MemoryRouter><ExecutionLogTraceBlock /></MemoryRouter>);
+    const row = await screen.findByTestId('elta-row-log-1');
+    expect(row).toHaveTextContent('费用审批期限');
+    expect(row).not.toHaveTextContent('new_tenant_decision');
+    fireEvent.click(row.querySelector('button')!);
+    expect(await screen.findByTestId('elta-trace-chain')).toHaveTextContent('费用审批期限');
+  });
+
+  it('does not substitute a fixture label or raw code for a missing name', async () => {
+    const log = { ...recentLog, decisionName: undefined };
+    http.get.mockImplementation(() => Promise.resolve({ data: { records: [log], total: 1 } }));
+    render(<MemoryRouter><ExecutionLogTraceBlock /></MemoryRouter>);
+    const row = await screen.findByTestId('elta-row-log-1');
+    expect(row).not.toHaveTextContent('SLA 截止时间');
+    expect(row).not.toHaveTextContent('sla_deadline');
+  });
+
+  it('shows the actual business decision name supplied by tenant metadata', async () => {
+    http.get.mockResolvedValueOnce({ data: { records: [{ ...recentLog,
+      decisionCode: 'owned_sla_deadline', decisionName: '请假审批 SLA 截止时间',
+    }], total: 1, size: 20, current: 1 } });
+    render(<MemoryRouter><ExecutionLogTraceBlock block={{ props: { mode: 'list' } }} /></MemoryRouter>);
+    await expect(screen.findByText('请假审批 SLA 截止时间')).resolves.toBeVisible();
   });
 
   it('loads DSL list logs with URL policyCode as keyword and applies advanced filters', async () => {
@@ -338,8 +380,10 @@ describe('ExecutionLogTraceBlock', () => {
     const link = await screen.findByTestId('elta-open-product-trace');
     expect(link).toHaveAttribute('href', '/p/sla_config/view/01SLA_CONFIG');
     expect(await screen.findByTestId('elta-chain-caller-sla-log-1')).toHaveTextContent(
-      'SLA / 01SLA_CONFIG',
+      'SLA',
     );
+    expect(screen.getByTestId('elta-chain-caller-sla-log-1')).not.toHaveTextContent('01SLA_CONFIG');
+    expect(screen.getByTestId('elta-chain-technical-sla-log-1')).toHaveTextContent('01SLA_CONFIG');
     expect(screen.queryByTestId('elta-open-permission-audit')).not.toBeInTheDocument();
   });
 
@@ -578,6 +622,12 @@ describe('ExecutionLogTraceBlock', () => {
     expect(facts).toHaveTextContent('annual');
     expect(facts).toHaveTextContent('年假');
     expect(facts).not.toHaveTextContent('tenant_id');
+    const applicant = Array.from((facts as HTMLElement).querySelectorAll<HTMLElement>('article')).find(article => article.querySelector('strong')?.textContent === '申请人')!;
+    expect(applicant.querySelector('.elta-fact-values')).toHaveTextContent('Aura BPM Admin');
+    expect(applicant.querySelector('.elta-fact-values')).not.toHaveTextContent('internal-applicant-pid');
+    const technical = applicant.querySelector('details')!;
+    expect(technical).not.toHaveAttribute('open');
+    expect(technical).toHaveTextContent('internal-applicant-pid');
   });
 
   it('shows virtual source trace evidence in the trace drawer', async () => {
@@ -781,7 +831,7 @@ describe('ExecutionLogTraceBlock', () => {
       expect(http.get).toHaveBeenCalledWith('/decision/logs', { traceId: 'trace-1' }),
     );
     const drawer = await screen.findByTestId('elta-trace-drawer');
-    await waitFor(() => expect(drawer).toHaveTextContent('eligibility_gate'));
+    await waitFor(() => expect(drawer).toHaveTextContent('资格审批条件'));
     expect(drawer).toHaveTextContent('执行链路');
     expect(drawer).not.toHaveTextContent('Trace Chain');
     await waitFor(() => expect(drawer).toHaveTextContent('R-101'));
@@ -1282,10 +1332,10 @@ describe('ExecutionLogTraceBlock', () => {
     expect(screen.getByTestId('elta-trace-drawer')).toHaveTextContent('sms_long_leave');
     expect(screen.getByTestId('elta-action-retry-action-log-3')).toHaveTextContent('重试 3/3');
     expect(screen.getByTestId('elta-action-retry-action-log-3')).toHaveTextContent(
-      '上次 2026-06-10 10:02:00',
+      '上次 2026-06-10 18:02:00',
     );
     expect(screen.getByTestId('elta-action-retry-action-log-3')).toHaveTextContent(
-      '死信 2026-06-10 10:02:01',
+      '死信 2026-06-10 18:02:01',
     );
     expect(screen.getByTestId('elta-action-retry-action-log-3')).toHaveTextContent('重试已耗尽');
     expect(screen.getByTestId('elta-action-replay-action-log-3')).toHaveTextContent('重放');
@@ -1362,7 +1412,7 @@ describe('ExecutionLogTraceBlock', () => {
       expect(screen.getByTestId('elta-action-retry-action-log-3')).toHaveTextContent('重试 4/3'),
     );
     expect(screen.getByTestId('elta-action-retry-action-log-3')).toHaveTextContent(
-      '上次 2026-06-10 10:03:00',
+      '上次 2026-06-10 18:03:00',
     );
   });
 

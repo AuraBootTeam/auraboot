@@ -10,6 +10,7 @@ import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerIntercept
 import com.baomidou.mybatisplus.extension.plugins.inner.TenantLineInnerInterceptor;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.LongValue;
+import net.sf.jsqlparser.expression.StringValue;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -161,8 +162,8 @@ public class MybatisPlusConfigTest {
 
             // Then
             assertNotNull(tenantIdExpr, "租户ID表达式不应为null");
-            assertTrue(tenantIdExpr instanceof LongValue, "租户ID应该是LongValue类型");
-            assertEquals(expectedTenantId, ((LongValue) tenantIdExpr).getValue(),
+            assertTrue(tenantIdExpr instanceof StringValue, "PostgreSQL tenant literals must resolve against the column type");
+            assertEquals(expectedTenantId.toString(), ((StringValue) tenantIdExpr).getValue(),
                     "租户ID应该匹配上下文中的值");
         } catch (Exception e) {
             fail("Failed to test getTenantId: " + e.getMessage());
@@ -477,4 +478,30 @@ public class MybatisPlusConfigTest {
         assertTrue(interceptors.get(paginationIdx) instanceof PaginationInnerInterceptor,
                 "第二个拦截器应该是PaginationInnerInterceptor");
     }
+
+    @Test
+    @DisplayName("PostgreSQL filters an engine text tenant column without numeric comparison")
+    void postgresUpdateRetainsQuotedTenantPredicate() {
+        MetaContext.setSystemTenantContext(364557612706041856L);
+        TenantLineInnerInterceptor tenant = findTenantInterceptor(
+                config.mybatisPlusInterceptor(mockDialect, null, envMock));
+        String sql = tenant.parserSingle(
+                "UPDATE se_execution_instance SET active = 0 WHERE id = ? AND tenant_id = ?", null);
+        assertTrue(sql.contains("tenant_id = '364557612706041856'"), sql);
+        assertTrue(sql.contains("tenant_id = ?"), "The engine's explicit tenant guard must remain");
+        assertFalse(tenant.getTenantLineHandler().ignoreTable("se_execution_instance"));
+    }
+
+    @Test
+    @DisplayName("MySQL preserves the existing numeric tenant expression")
+    void mysqlRetainsNumericTenantLiteral() {
+        when(mockDialect.getType()).thenReturn(DatabaseType.MYSQL);
+        MetaContext.setSystemTenantContext(12345L);
+        TenantLineInnerInterceptor tenant = findTenantInterceptor(
+                config.mybatisPlusInterceptor(mockDialect, null, envMock));
+        Expression expression = tenant.getTenantLineHandler().getTenantId();
+        assertInstanceOf(LongValue.class, expression);
+        assertEquals(12345L, ((LongValue) expression).getValue());
+    }
+
 }

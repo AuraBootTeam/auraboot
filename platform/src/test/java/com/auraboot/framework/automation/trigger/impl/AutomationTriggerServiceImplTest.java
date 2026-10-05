@@ -67,6 +67,7 @@ class AutomationTriggerServiceImplTest {
     @AfterEach
     void tearDown() {
         com.auraboot.framework.application.tenant.MetaContext.clear();
+        org.slf4j.MDC.remove("requestId");
     }
 
     // =========================================================
@@ -551,6 +552,21 @@ class AutomationTriggerServiceImplTest {
                 .containsEntry("processKey", "e2et_payment_approval:1")
                 .containsEntry("instanceId", "pi-001")
                 .containsEntry("taskInstanceId", "task-001");
+    }
+
+    @Test
+    void onExternalEventPersistsOriginatingTraceInWorkflowPayload() {
+        Automation automation = buildAutomation("external-trace", "erp", null, null, List.of());
+        automation.setTriggerType("external_event");
+        when(automationMapper.findEnabledByModelCodeAndTriggerType("erp", "external_event"))
+                .thenReturn(List.of(automation));
+        org.slf4j.MDC.put("requestId", "actual-ingress-request");
+        service.onExternalEvent("erp", "external.erp.asset.created.v1", "fresh-event", "asset/one", Map.of("amount", 10));
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> payload = ArgumentCaptor.forClass(Map.class);
+        verify(automationProcessRuntime).run(eq(automation), eq("fresh-event"), payload.capture(), any());
+        assertThat(payload.getValue()).containsEntry("requestId", "actual-ingress-request")
+                .containsEntry("eventId", "fresh-event").containsEntry("data", Map.of("amount", 10));
     }
 
     // =========================================================

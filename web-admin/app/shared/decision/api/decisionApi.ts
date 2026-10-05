@@ -87,10 +87,12 @@ export interface DecisionTraceSnapshot {
 }
 
 export interface DecisionLogRecord {
+  decisionName?: string;
   pid?: string;
   traceId?: string;
   correlationId?: string;
   decisionCode?: string;
+  decisionName?: string;
   decisionVersion?: number;
   selectedVersion?: number;
   rolloutPolicyPid?: string;
