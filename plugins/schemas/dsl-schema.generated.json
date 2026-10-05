@@ -422,6 +422,15 @@
         "className": {
           "type": "string"
         },
+        "imageField": {
+          "type": "string"
+        },
+        "imageViewports": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/CardImageViewport"
+          }
+        },
         "fields": {
           "type": "array",
           "items": {
@@ -619,6 +628,32 @@
       },
       "additionalProperties": false
     },
+    "CardImageViewport": {
+      "type": "object",
+      "properties": {
+        "width": {
+          "type": "number"
+        },
+        "height": {
+          "type": "number"
+        },
+        "viewBox": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 4,
+          "maxItems": 4
+        }
+      },
+      "required": [
+        "width",
+        "height",
+        "viewBox"
+      ],
+      "additionalProperties": false,
+      "description": "Visible artwork bounds in the original image's pixel coordinate system."
+    },
     "FieldConfig": {
       "type": "object",
       "properties": {
@@ -634,6 +669,17 @@
               "$ref": "#/definitions/LocalizedText"
             }
           ]
+        },
+        "placeholder": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/LocalizedText"
+            }
+          ],
+          "description": "Business input guidance localized by the controlled renderer."
         },
         "component": {
           "type": "string"
@@ -1108,6 +1154,18 @@
             },
             "command": {
               "type": "string"
+            },
+            "download": {
+              "type": "object",
+              "properties": {
+                "fileIdField": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "fileIdField"
+              ],
+              "additionalProperties": false
             }
           },
           "required": [
@@ -1380,11 +1438,11 @@
           "properties": {
             "type": {
               "type": "string",
-              "const": "bpm"
+              "const": "workflow"
             },
-            "processDefinitionKey": {
+            "workflowKey": {
               "type": "string",
-              "description": "BPMN process definition key (matches <process id=\"...\"> in the .bpmn file)"
+              "description": "Provider-owned workflow definition key."
             },
             "businessKeyField": {
               "type": "string",
@@ -1395,12 +1453,12 @@
               "additionalProperties": {
                 "type": "string"
               },
-              "description": "Variable name → expression mapping. Expression grammar:\n- \"$.field\" / \"$.parent.child\" — JSONPath-style record lookup (dot paths only)\n- Any non-\"$\"-prefixed value — treated as literal Bracket syntax (\"$.list[0]\") is rejected at runtime to match backend BpmActionExecutor."
+              "description": "Variable name → expression mapping. Expression grammar:\n- \"$.field\" / \"$.parent.child\" — JSONPath-style record lookup (dot paths only)\n- Any non-\"$\"-prefixed value — treated as literal Bracket syntax (\"$.list[0]\") is rejected by the platform dispatcher."
             }
           },
           "required": [
             "type",
-            "processDefinitionKey",
+            "workflowKey",
             "businessKeyField"
           ],
           "additionalProperties": false
@@ -2217,6 +2275,10 @@
         "layout": {
           "$ref": "#/definitions/LayoutConfig"
         },
+        "permissionCode": {
+          "type": "string",
+          "description": "Permission required to render this tab. Absent means the tab is not permission-gated."
+        },
         "system": {
           "type": "boolean"
         },
@@ -2260,11 +2322,19 @@
             "$ref": "#/definitions/ColumnConfig"
           }
         },
+        "toolbarActions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ButtonConfig"
+          },
+          "description": "Parent-record actions rendered above the child collection, including when it is empty."
+        },
         "actions": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/ButtonConfig"
-          }
+          },
+          "description": "Row-scoped actions. Their command target is the selected child record."
         },
         "rowActions": {
           "type": "array",

@@ -149,6 +149,15 @@ public interface DataAccessor {
     }
 
     /**
+     * Apply an entire control-state batch atomically, or throw without committing any row.
+     * Implementations must retain tenant, field, row-scope and optimistic-version guards.
+     * There is deliberately no read/update or per-row fallback for this atomic contract.
+     */
+    default void compareAndSetBatch(String modelCode, String fieldCode, List<CompareAndSetUpdate> updates) {
+        throw new UnsupportedOperationException("Atomic compare-and-set batch is not supported");
+    }
+
+    /**
      * Batch create multiple records.
      *
      * @param modelCode the model code

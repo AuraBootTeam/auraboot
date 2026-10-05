@@ -4,7 +4,6 @@ import com.auraboot.framework.permission.entity.Permission;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -16,6 +15,10 @@ import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.lenient;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
@@ -33,11 +36,16 @@ class SystemPermissionInitializerTest {
         when(permissionMapper.findResolvableDefinitions(123L)).thenReturn(List.of());
 
         AtomicLong nextId = new AtomicLong(1000);
-        doAnswer(invocation -> {
+        lenient().doAnswer(invocation -> {
             Permission permission = invocation.getArgument(0);
             permission.setId(nextId.getAndIncrement());
             return 1;
         }).when(permissionMapper).insert(any(Permission.class));
+        lenient().doAnswer(invocation -> {
+            List<Permission> batch = invocation.getArgument(0);
+            batch.forEach(permission -> permission.setId(nextId.getAndIncrement()));
+            return batch.size();
+        }).when(permissionMapper).batchInsert(anyList());
 
         SystemPermissionInitializer initializer = new SystemPermissionInitializer(permissionMapper);
         var permissions = initializer.initializeSystemPermissions(123L);
@@ -53,22 +61,25 @@ class SystemPermissionInitializerTest {
             }
         });
 
-        ArgumentCaptor<Permission> captor = ArgumentCaptor.forClass(Permission.class);
-        verify(permissionMapper, org.mockito.Mockito.atLeastOnce()).insert(captor.capture());
-        assertThat(captor.getAllValues())
-                .extracting(Permission::getDeletedFlag)
-                .containsOnly(false);
+        verify(permissionMapper, never()).insert(any(Permission.class));
+        verify(permissionMapper, times(3)).batchInsert(anyList());
+        assertThat(permissions).extracting(Permission::getDeletedFlag).containsOnly(false);
     }
 
     @Test
     void reentryPreservesIdsAndAvoidsIndividualLookupsOrWrites() {
         when(permissionMapper.findResolvableDefinitions(123L)).thenReturn(List.of());
         AtomicLong nextId = new AtomicLong(1000);
-        doAnswer(invocation -> {
+        lenient().doAnswer(invocation -> {
             Permission permission = invocation.getArgument(0);
             permission.setId(nextId.getAndIncrement());
             return 1;
         }).when(permissionMapper).insert(any(Permission.class));
+        lenient().doAnswer(invocation -> {
+            List<Permission> batch = invocation.getArgument(0);
+            batch.forEach(permission -> permission.setId(nextId.getAndIncrement()));
+            return batch.size();
+        }).when(permissionMapper).batchInsert(anyList());
         var initializer = new SystemPermissionInitializer(permissionMapper);
         var created = initializer.initializeSystemPermissions(123L);
         when(permissionMapper.findResolvableDefinitions(123L)).thenReturn(created);
@@ -78,6 +89,7 @@ class SystemPermissionInitializerTest {
         verify(permissionMapper).findResolvableDefinitions(123L);
         verify(permissionMapper, never()).findByTenantIdAndCode(any(), any());
         verify(permissionMapper, never()).insert(any(Permission.class));
+        verify(permissionMapper, never()).batchInsert(anyList());
     }
 
     @Test
@@ -88,11 +100,16 @@ class SystemPermissionInitializerTest {
         older.setId(41L); older.setTenantId(123L); older.setCode("module.platform"); older.setLevel(1);
         when(permissionMapper.findResolvableDefinitions(123L)).thenReturn(List.of(current, older));
         AtomicLong nextId = new AtomicLong(1000);
-        doAnswer(invocation -> {
+        lenient().doAnswer(invocation -> {
             Permission permission = invocation.getArgument(0);
             permission.setId(nextId.getAndIncrement());
             return 1;
         }).when(permissionMapper).insert(any(Permission.class));
+        lenient().doAnswer(invocation -> {
+            List<Permission> batch = invocation.getArgument(0);
+            batch.forEach(permission -> permission.setId(nextId.getAndIncrement()));
+            return batch.size();
+        }).when(permissionMapper).batchInsert(anyList());
         var permissions = new SystemPermissionInitializer(permissionMapper).initializeSystemPermissions(123L);
         assertThat(permissions).contains(current).doesNotContain(older);
         assertThat(permissions.stream().filter(p -> "system.model".equals(p.getCode())).findFirst().orElseThrow().getParentId())
@@ -100,5 +117,29 @@ class SystemPermissionInitializerTest {
         assertThat(permissions.stream().filter(p -> "model.sys_user".equals(p.getCode())).findFirst().orElseThrow().getParentId())
                 .isEqualTo(42L);
         verify(permissionMapper, never()).findByTenantIdAndCode(any(), any());
+    }
+    @Test
+    void missingGeneratedIdsAbortBeforeChildBatches() {
+        when(permissionMapper.findResolvableDefinitions(123L)).thenReturn(List.of());
+        when(permissionMapper.batchInsert(anyList())).thenAnswer(invocation -> {
+            List<Permission> batch = invocation.getArgument(0);
+            return batch.size();
+        });
+        assertThatThrownBy(() -> new SystemPermissionInitializer(permissionMapper).initializeSystemPermissions(123L))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("generated IDs");
+        verify(permissionMapper, times(1)).batchInsert(anyList());
+        verify(permissionMapper, never()).insert(any(Permission.class));
+    }
+
+    @Test
+    void partialWriteCountAbortsBeforeChildBatches() {
+        when(permissionMapper.findResolvableDefinitions(123L)).thenReturn(List.of());
+        when(permissionMapper.batchInsert(anyList())).thenAnswer(invocation -> {
+            List<Permission> batch = invocation.getArgument(0);
+            return batch.size() - 1;
+        });
+        assertThatThrownBy(() -> new SystemPermissionInitializer(permissionMapper).initializeSystemPermissions(123L))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("row count");
+        verify(permissionMapper, times(1)).batchInsert(anyList());
     }
 }

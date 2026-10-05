@@ -226,86 +226,75 @@ public class SystemPermissionInitializer {
     public List<Permission> initializeSystemPermissions(Long tenantId) {
         log.info("Initializing system permissions with hierarchy: tenantId={}", tenantId);
 
-        // Match the existing tenant-scoped lookup: newest non-deleted code wins,
-        // case-insensitively. Keep this catalog local to one initialization.
+        // Newest non-deleted code wins, case-insensitively, within this tenant.
         Map<String, Permission> catalog = new LinkedHashMap<>();
         for (Permission permission : permissionMapper.findResolvableDefinitions(tenantId)) {
             catalog.putIfAbsent(permission.getCode().toLowerCase(Locale.ROOT), permission);
         }
         List<Permission> allPermissions = new ArrayList<>();
+        Map<Integer, List<Permission>> pendingByLevel = new LinkedHashMap<>();
+        Map<String, String> parentCodes = new HashMap<>();
         int[] counts = {0, 0}; // [created, skipped]
 
         for (Map.Entry<String, List<ResourceDef>> entry : MODULE_GROUPS.entrySet()) {
             String moduleKey = entry.getKey();
-            List<ResourceDef> resources = entry.getValue();
+            String moduleCode = buildCode("module", moduleKey, null);
+            createOrSkipPermission(tenantId, "module", moduleKey, null,
+                capitalize(moduleKey) + " Module", "Module group: " + moduleKey,
+                LEVEL_MODULE, null, catalog, allPermissions, counts, pendingByLevel, parentCodes);
 
-            // Level 1: Module node
-            Permission moduleNode = createOrSkipPermission(
-                tenantId, "module", moduleKey, null,
-                capitalize(moduleKey) + " Module",
-                "Module group: " + moduleKey,
-                LEVEL_MODULE, null,
-                catalog, allPermissions, counts
-            );
-            Long moduleId = moduleNode != null ? moduleNode.getId() : resolveExistingId(catalog, "module", moduleKey, null);
-
-            // Level 2 + 3: Resource and Action nodes
-            for (ResourceDef rd : resources) {
+            for (ResourceDef rd : entry.getValue()) {
                 String resourceCode = buildResourceCode(rd.resourceType(), rd.resourceCode());
-
-                Permission resourceNode = createOrSkipPermission(
-                    tenantId, "system", resourceCode, null,
-                    rd.displayName(),
-                    "System resource: " + rd.displayName(),
-                    LEVEL_RESOURCE, moduleId,
-                    catalog, allPermissions, counts
-                );
-                Long resourceId = resourceNode != null ? resourceNode.getId() : resolveExistingId(catalog, "system", resourceCode, null);
-
-                // Level 3: Action nodes
+                String resourcePermissionCode = buildCode("system", resourceCode, null);
+                createOrSkipPermission(tenantId, "system", resourceCode, null,
+                    rd.displayName(), "System resource: " + rd.displayName(),
+                    LEVEL_RESOURCE, moduleCode, catalog, allPermissions, counts, pendingByLevel, parentCodes);
                 for (String action : rd.actions()) {
-                    createOrSkipPermission(
-                        tenantId, "system", resourceCode, action,
-                        rd.displayName() + " " + capitalize(action),
-                        getActionDescription(rd.displayName(), action),
-                        LEVEL_ACTION, resourceId,
-                        catalog, allPermissions, counts
-                    );
+                    createOrSkipPermission(tenantId, "system", resourceCode, action,
+                        rd.displayName() + " " + capitalize(action), getActionDescription(rd.displayName(), action),
+                        LEVEL_ACTION, resourcePermissionCode, catalog, allPermissions, counts, pendingByLevel, parentCodes);
                 }
             }
         }
 
-        // Internal system model permissions (model.sys_user.read, …) — parented
-        // under the existing "platform" module so the tree remains navigable.
-        Long platformModuleId = resolveExistingId(catalog, "module", "platform", null);
-        for (InternalSystemModel m : INTERNAL_SYSTEM_MODELS) {
-            // Level 2: model.{code} resource node
-            Permission resourceNode = createOrSkipPermission(
-                tenantId, "model", m.code(), null,
-                m.displayName(),
-                "Internal system model: " + m.displayName(),
-                LEVEL_RESOURCE, platformModuleId,
-                catalog, allPermissions, counts
-            );
-            Long resourceId = resourceNode != null
-                ? resourceNode.getId()
-                : resolveExistingId(catalog, "model", m.code(), null);
+        String platformModuleCode = buildCode("module", "platform", null);
+        for (InternalSystemModel model : INTERNAL_SYSTEM_MODELS) {
+            String resourcePermissionCode = buildCode("model", model.code(), null);
+            createOrSkipPermission(tenantId, "model", model.code(), null,
+                model.displayName(), "Internal system model: " + model.displayName(),
+                LEVEL_RESOURCE, platformModuleCode, catalog, allPermissions, counts, pendingByLevel, parentCodes);
+            for (String action : model.actions()) {
+                createOrSkipPermission(tenantId, "model", model.code(), action,
+                    model.displayName() + " " + capitalize(action), getActionDescription(model.displayName(), action),
+                    LEVEL_ACTION, resourcePermissionCode, catalog, allPermissions, counts, pendingByLevel, parentCodes);
+            }
+        }
 
-            // Level 3: action nodes
-            for (String action : m.actions()) {
-                createOrSkipPermission(
-                    tenantId, "model", m.code(), action,
-                    m.displayName() + " " + capitalize(action),
-                    getActionDescription(m.displayName(), action),
-                    LEVEL_ACTION, resourceId,
-                    catalog, allPermissions, counts
-                );
+        // Flush parents first so every child references a database-generated ID.
+        // The enclosing transaction rolls back all levels on any incomplete write.
+        for (int level = LEVEL_MODULE; level <= LEVEL_ACTION; level++) {
+            List<Permission> pending = pendingByLevel.getOrDefault(level, List.of());
+            if (pending.isEmpty()) continue;
+            for (Permission permission : pending) {
+                String parentCode = parentCodes.get(permission.getCode());
+                if (parentCode == null) continue;
+                Permission parent = catalog.get(parentCode.toLowerCase(Locale.ROOT));
+                if (parent == null || parent.getId() == null || parent.getId() <= 0) {
+                    throw new IllegalStateException("System permission parent has no generated ID: " + parentCode);
+                }
+                permission.setParentId(parent.getId());
+            }
+            int inserted = permissionMapper.batchInsert(pending);
+            if (inserted != pending.size()) {
+                throw new IllegalStateException("System permission batch row count mismatch at level " + level);
+            }
+            if (pending.stream().anyMatch(permission -> permission.getId() == null || permission.getId() <= 0)) {
+                throw new IllegalStateException("System permission batch did not return generated IDs at level " + level);
             }
         }
 
         log.info("System permission initialization complete: tenantId={}, created={}, skipped={}, total={}",
             tenantId, counts[0], counts[1], allPermissions.size());
-
         return allPermissions;
     }
 
@@ -356,8 +345,9 @@ public class SystemPermissionInitializer {
     private Permission createOrSkipPermission(
             Long tenantId, String resourceType, String resourceCode, String action,
             String name, String description,
-            int level, Long parentId,
-            Map<String, Permission> catalog, List<Permission> collector, int[] counts) {
+            int level, String parentCode,
+            Map<String, Permission> catalog, List<Permission> collector, int[] counts,
+            Map<Integer, List<Permission>> pendingByLevel, Map<String, String> parentCodes) {
 
         String code = buildCode(resourceType, resourceCode, action);
 
@@ -381,16 +371,16 @@ public class SystemPermissionInitializer {
         permission.setAction(action);
         permission.setSource(SOURCE_SYSTEM);
         permission.setLevel(level);
-        permission.setParentId(parentId);
         permission.setStatus(StatusConstants.ACTIVE);
         permission.setDeletedFlag(false);
         permission.setCreatedAt(Instant.now());
         permission.setUpdatedAt(Instant.now());
 
-        permissionMapper.insert(permission);
+        pendingByLevel.computeIfAbsent(level, ignored -> new ArrayList<>()).add(permission);
+        if (parentCode != null) parentCodes.put(code, parentCode);
         catalog.put(code.toLowerCase(Locale.ROOT), permission);
 
-        log.debug("Created system permission: code={}, level={}, parentId={}", code, level, parentId);
+        log.debug("Queued system permission: code={}, level={}, parentCode={}", code, level, parentCode);
 
         collector.add(permission);
         counts[0]++;
@@ -406,15 +396,6 @@ public class SystemPermissionInitializer {
             return resourceType + "." + resourceCode;
         }
         return PermissionCodeValidator.build(resourceType, resourceCode, action, null);
-    }
-
-    /**
-     * Resolve the ID of an existing permission by code (for parent references).
-     */
-    private Long resolveExistingId(Map<String, Permission> catalog, String resourceType, String resourceCode, String action) {
-        String code = buildCode(resourceType, resourceCode, action);
-        Permission existing = catalog.get(code.toLowerCase(Locale.ROOT));
-        return existing != null ? existing.getId() : null;
     }
 
     /**

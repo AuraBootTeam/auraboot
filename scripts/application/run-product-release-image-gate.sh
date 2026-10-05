@@ -454,7 +454,8 @@ docker pull "$PLAYWRIGHT_IMAGE" >"$ARTIFACTS/logs/playwright-image.log" 2>&1 \
 PLAYWRIGHT_PACKAGE="$(cd "$PRODUCT_ROOT" && node -p "require.resolve('playwright/package.json', {paths:[require.resolve('@playwright/test')]})")"
 PLAYWRIGHT_VERSION="$(node -p "require(process.argv[1]).version" "$PLAYWRIGHT_PACKAGE")"
 PLAYWRIGHT_IMAGE_VERSION="$(docker run --rm --entrypoint node "$PLAYWRIGHT_IMAGE" -p "JSON.parse(require('fs').readFileSync('/ms-playwright/.docker-info','utf8')).driverVersion")"
-[[ "$PLAYWRIGHT_VERSION" == "$PLAYWRIGHT_IMAGE_VERSION" ]] || fatal 'locked Playwright and image versions differ'
+printf 'driver=%s\nimageDriver=%s\nimage=%s\n' "$PLAYWRIGHT_VERSION" "$PLAYWRIGHT_IMAGE_VERSION" "$PLAYWRIGHT_IMAGE" >"$ARTIFACTS/logs/playwright-version.log"
+[[ "$PLAYWRIGHT_VERSION" == "$PLAYWRIGHT_IMAGE_VERSION" ]] || fatal "locked Playwright and image versions differ: driver=$PLAYWRIGHT_VERSION image=$PLAYWRIGHT_IMAGE_VERSION"
 PLAYWRIGHT_PORT="$(node -e "const s=require('net').createServer();s.listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})")"
 docker run -d --name "$PLAYWRIGHT_CONTAINER" --label "aura.ci.job=$AURA_CI_JOB_ID" --init --network "$NETWORK" --shm-size=2g \
   -p "127.0.0.1:$PLAYWRIGHT_PORT:$PLAYWRIGHT_PORT" \
