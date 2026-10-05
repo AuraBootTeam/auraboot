@@ -92,7 +92,7 @@ public interface WebhookDeliveryLogMapper extends BaseMapper<WebhookDeliveryLog>
 
     @Select("""
             SELECT d.pid, d.subscription_pid, s.name AS subscription_name,
-                   d.event_id, d.delivery_status, d.retry_count, d.max_retries,
+                   d.event_id, d.request_id, d.delivery_status, d.retry_count, d.max_retries,
                    d.response_status, d.next_retry_at, d.last_attempt_at, d.delivered_at,
                    d.replay_count, d.last_replayed_at, d.created_at
             FROM ab_webhook_delivery_log d
@@ -132,7 +132,7 @@ public interface WebhookDeliveryLogMapper extends BaseMapper<WebhookDeliveryLog>
                               @Param("actorPid") String actorPid);
 
     record OperationsDelivery(String pid, String subscriptionPid, String subscriptionName,
-                              String eventId, String deliveryStatus, Integer retryCount,
+                              String eventId, String requestId, String deliveryStatus, Integer retryCount,
                               Integer maxRetries, Integer responseStatus, Instant nextRetryAt,
                               Instant lastAttemptAt, Instant deliveredAt,
                               Integer replayCount, Instant lastReplayedAt, Instant createdAt) { }

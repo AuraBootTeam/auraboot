@@ -50,8 +50,9 @@ public interface PermissionService {
      */
     PermissionDTO findById(Long id);
 
-    /** Resolve a public PID under the current tenant scope; null when absent. */
+    /** Resolve a permission by its public identity within the current tenant. */
     PermissionDTO findByPid(String pid);
+
     
     /**
      * Find permission by code

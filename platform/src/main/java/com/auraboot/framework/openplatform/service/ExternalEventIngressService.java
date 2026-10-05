@@ -8,6 +8,7 @@ import com.auraboot.framework.plugin.extension.integration.ReliableIntegrationAc
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -60,16 +61,22 @@ public class ExternalEventIngressService {
 
         String durableEventId = "ext:" + principal.installationPid() + ":" + event.id();
         String publicEventType = "external." + sourceCode + "." + event.type() + ".v" + event.schemaVersion();
+        String requestId = MDC.get("requestId");
+        Map<String, String> traceHeaders = new LinkedHashMap<>(Map.of(
+                "applicationPid", principal.applicationPid(),
+                "installationPid", principal.installationPid(),
+                "sourceCode", sourceCode,
+                "externalEventId", event.id()));
+        if (requestId != null && !requestId.isBlank()) {
+            traceHeaders.put("requestId", requestId);
+        }
         integrationAccessor.enqueue(new IntegrationEventEnvelope(
                 "1.0", durableEventId, publicEventType,
                 "open-platform/" + principal.installationPid() + "/" + sourceCode,
                 event.subjectType() + "/" + event.subjectPid(), event.occurredAt(), principal.tenantId(),
-                durableEventId, null, event.subjectType() + "/" + event.subjectPid(),
-                event.sequence(), event.data(), Map.of(
-                        "applicationPid", principal.applicationPid(),
-                        "installationPid", principal.installationPid(),
-                        "sourceCode", sourceCode,
-                        "externalEventId", event.id())));
+                requestId == null || requestId.isBlank() ? durableEventId : requestId,
+                null, event.subjectType() + "/" + event.subjectPid(),
+                event.sequence(), event.data(), traceHeaders));
         try {
             idempotencyMapper.complete(principal.tenantId(), installation.getId(), routeCode,
                     idempotencyKey, requestHash,

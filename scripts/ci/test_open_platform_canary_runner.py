@@ -69,6 +69,10 @@ class RunnerTests(unittest.TestCase):
                       'subject_pid': 'fresh-asset', 'statuses': [200]}
             proof = verify_delivery(rows, **kwargs)
             self.assertEqual(proof['attempts'], 1)
+            with self.assertRaises(ProtocolError):
+                verify_delivery(rows, **kwargs, originating_request_id='original-request')
+            rows[0]['request_id'] = 'original-request'
+            self.assertEqual(verify_delivery(rows, **kwargs, originating_request_id='original-request')['attempts'], 1)
             rows[0]['signature'] = 'sha256=' + '0' * 64
             self.assertEqual(rows[0]['signature_valid'], 1)
             with self.assertRaises(ProtocolError):
@@ -86,11 +90,11 @@ class RunnerTests(unittest.TestCase):
             self.assertEqual(path.read_bytes(), before)
 
     def test_event_requires_exact_consumer_identity_and_downstream_artifact(self):
-        event = {'id': 'fresh-event', 'type': 'asset.created', 'data': {'runId': 'canary-selftest-001'}}
+        event = {'id': 'fresh-event', 'type': 'asset.created', 'data': {'runId': 'canary-selftest-001', 'originatingRequestId': 'fresh-request'}}
         log = {'status': 'success', 'automationId': 'automation-1', 'tenantId': 1,
                'triggerType': 'external_event', 'triggerRecordPid': event['id'],
                'triggerPayload': {'eventId': event['id'], 'sourceCode': 'canary-selftest-001',
-                                 'eventType': 'external.canary-selftest-001.asset.created.v1', 'data': event['data']},
+                                 'eventType': 'external.canary-selftest-001.asset.created.v1', 'data': event['data'], 'requestId': 'fresh-request'},
                'actionResults': [{'status': 'success', 'actionType': 'create_record',
                                   'result': {'success': True, 'modelCode': 'tasset_asset',
                                              'record': {'pid': 'fresh-output', 'tasset_as_code': 'canary-selftest-001-consumed'}}}]}

@@ -4,6 +4,7 @@ import com.auraboot.framework.automation.trigger.AutomationTriggerService;
 import com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelope;
 import com.auraboot.framework.plugin.extension.integration.ReliableEventConsumerExtension;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
 
 import java.util.Set;
@@ -32,7 +33,22 @@ public class ExternalEventAutomationConsumer implements ReliableEventConsumerExt
     public void consume(IntegrationEventEnvelope envelope) {
         String sourceCode = envelope.headers().get("sourceCode");
         String externalEventId = envelope.headers().get("externalEventId");
-        automationTriggerService.onExternalEvent(sourceCode, envelope.eventType(),
-                externalEventId, envelope.subject(), envelope.payload());
+        String previousRequestId = MDC.get("requestId");
+        String requestId = envelope.headers().get("requestId");
+        if (requestId == null || requestId.isBlank()) {
+            MDC.remove("requestId");
+        } else {
+            MDC.put("requestId", requestId);
+        }
+        try {
+            automationTriggerService.onExternalEvent(sourceCode, envelope.eventType(),
+                    externalEventId, envelope.subject(), envelope.payload());
+        } finally {
+            if (previousRequestId == null) {
+                MDC.remove("requestId");
+            } else {
+                MDC.put("requestId", previousRequestId);
+            }
+        }
     }
 }

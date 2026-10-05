@@ -322,7 +322,8 @@ test('OSS golden stack stages manifest-declared backend jars from explicit roots
 test('OSS golden stack applies explicit product migrations only to a fresh database before backend startup', () => {
   const stack = read('scripts/oss-golden-stack.sh');
 
-  assert.match(stack, /--product-migration-root requires --fresh-db/);
+  assert.match(stack, /--product-migration-root requires a fresh database flag/);
+  assert.match(stack, /\[ "\$\{#product_migration_roots\[@\]\}" -eq 0 \] \|\| \[ "\$fresh_db" = "1" \] \|\| \[ "\$require_new_db" = "1" \]/);
   assert.match(stack, /find "\$product_root" -maxdepth 1 -type f -name 'V\*\.sql'/);
   assert.match(stack, /psql -v ON_ERROR_STOP=1[\s\S]{0,240}-f "\$migration_file"/);
   assert.match(stack, /product-migrations\.tsv/);
