@@ -1,7 +1,9 @@
 package com.auraboot.framework.plugin.service.impl;
 
 import com.auraboot.framework.plugin.dto.imports.*;
+import com.auraboot.framework.plugin.entity.PluginRecord;
 import com.auraboot.framework.plugin.entity.PluginResource;
+import com.auraboot.framework.plugin.mapper.PluginRecordMapper;
 
 /**
  * Interface for importing specific resource types.
@@ -55,6 +57,17 @@ public interface PluginResourceImporter {
      * @return true if at least one new binding was created
      */
     boolean reconcileRolePermissions(RoleDefinitionDTO dto, Long tenantId);
+
+    /**
+     * Reconcile declared role permissions for an installed plugin directory: validate
+     * the directory and installed version, then strictly check every declared role and
+     * permission resolves and is bound for the current tenant.
+     *
+     * @return number of role declarations checked
+     */
+    int reconcileDirectoryRolePermissions(String directoryPath,
+                                          PluginDirectoryLoader directoryLoader,
+                                          PluginRecordMapper pluginRecordMapper);
 
     PluginResource importMenu(MenuDefinitionDTO dto, String pluginPid, String importId,
                               Long tenantId, ImportRequest.ConflictStrategy conflictStrategy);

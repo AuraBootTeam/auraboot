@@ -12,14 +12,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 import java.util.List;
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 class PluginImportRoleReconciliationTest {
-    private final PluginImportServiceImpl service = mock(PluginImportServiceImpl.class, CALLS_REAL_METHODS);
+    private final PluginResourceImporterImpl service = mock(PluginResourceImporterImpl.class, CALLS_REAL_METHODS);
     private final RoleService roles = mock(RoleService.class);
     private final PermissionService permissions = mock(PermissionService.class);
     private final RolePermissionMapper bindings = mock(RolePermissionMapper.class);
-    private final PluginResourceImporter importer = mock(PluginResourceImporter.class);
     private final PluginManifestExtended manifest = new PluginManifestExtended();
     private final RoleDefinitionDTO declaration = RoleDefinitionDTO.builder()
             .code("warehouse_operator").permissions(List.of("model.work_order.read")).build();
@@ -28,10 +29,12 @@ class PluginImportRoleReconciliationTest {
         ReflectionTestUtils.setField(service, "roleService", roles);
         ReflectionTestUtils.setField(service, "permissionService", permissions);
         ReflectionTestUtils.setField(service, "rolePermissionMapper", bindings);
-        ReflectionTestUtils.setField(service, "resourceImporter", importer);
         manifest.setRoles(List.of(declaration));
         Role role = new Role(); role.setId(3L); role.setCode(declaration.getCode());
         when(roles.findByTenantId(7L)).thenReturn(List.of(role));
+        // The binding step delegates to the service's own reconcileRolePermissions; stub it
+        // so the strict-check logic under test stays isolated from the binding internals.
+        doReturn(false).when(service).reconcileRolePermissions(any(), anyLong());
     }
 
     private PermissionDTO permission() {
@@ -44,13 +47,12 @@ class PluginImportRoleReconciliationTest {
         permission();
         when(bindings.countByRoleAndPermission(3L, 9L, 7L)).thenReturn(1);
         assertThat(service.reconcileDeclaredRolesStrictly(manifest, 7L)).isEqualTo(1);
-        verify(importer).reconcileRolePermissions(declaration, 7L);
-        verifyNoMoreInteractions(importer);
+        verify(service).reconcileRolePermissions(declaration, 7L);
     }
     @Test void unresolvedPermissionFailsBeforeBinding() {
         assertThatThrownBy(() -> service.reconcileDeclaredRolesStrictly(manifest, 7L))
                 .isInstanceOf(PluginException.class).hasMessageContaining("Unresolved declared permission");
-        verifyNoInteractions(importer);
+        verify(service, never()).reconcileRolePermissions(any(), anyLong());
     }
     @Test void swallowedBindingFailureCannotProduceGreen() {
         permission();
@@ -62,11 +64,13 @@ class PluginImportRoleReconciliationTest {
         when(roles.findByTenantId(7L)).thenReturn(List.of());
         assertThatThrownBy(() -> service.reconcileDeclaredRolesStrictly(manifest, 7L))
                 .isInstanceOf(PluginException.class).hasMessageContaining("Imported role not found");
-        verifyNoInteractions(importer, permissions);
+        verify(service, never()).reconcileRolePermissions(any(), anyLong());
+        verifyNoInteractions(permissions);
     }
     @Test void rolelessPluginIsAnExplicitNoop() {
         manifest.setRoles(List.of());
         assertThat(service.reconcileDeclaredRolesStrictly(manifest, 7L)).isZero();
-        verifyNoInteractions(importer, roles, permissions, bindings);
+        verify(service, never()).reconcileRolePermissions(any(), anyLong());
+        verifyNoInteractions(roles, permissions, bindings);
     }
 }
