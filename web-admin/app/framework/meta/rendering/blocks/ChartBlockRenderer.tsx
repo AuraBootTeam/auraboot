@@ -78,6 +78,37 @@ export function resolveRecordParams(
   return out;
 }
 
+/**
+ * Interpolate `${state.<key>}` placeholders in a named-query params object against the
+ * page state store. Returns a new object; a placeholder whose state value is unset
+ * resolves to an absent key so optional named-query parameters stay absent instead of
+ * arriving as empty strings. Exported for unit testing.
+ *
+ * Mirrors resolveRecordParams so workbench chart blocks consume the same filter state
+ * (bindState keys written by a filters block) that table and metric-strip data sources
+ * already evaluate.
+ */
+export function resolveStateParams(
+  params: Record<string, unknown> | undefined,
+  state: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+  if (!params || typeof params !== 'object') return params;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(params)) {
+    if (typeof value !== 'string') {
+      out[key] = value;
+      continue;
+    }
+    const resolved = value.replace(/\$\{state\.(\w+)\}/g, (_m, f: string) => {
+      const v = state?.[f];
+      return v === undefined || v === null ? '' : String(v);
+    });
+    if (resolved === '') continue;
+    out[key] = resolved;
+  }
+  return out;
+}
+
 export const ChartBlockRenderer: React.FC<ChartBlockRendererProps> = ({ block, runtime }) => {
   const { locale } = useI18n();
   const props = (block as any).props || {};
@@ -85,6 +116,11 @@ export const ChartBlockRenderer: React.FC<ChartBlockRendererProps> = ({ block, r
   const ChartComponent = getChartComponent(chartType);
   const paramsStateKey = (block as any).chartConfig?.paramsStateKey as string | undefined;
   const store = runtime.getStateManager().getStore(runtime.getScopeId());
+  const stateSnapshot = useSyncExternalStore(
+    store.subscribe,
+    () => store.getState().state as Record<string, unknown> | undefined,
+    () => undefined,
+  );
   const windowParams = useSyncExternalStore(
     store.subscribe,
     () => (paramsStateKey ? store.getState().state?.[paramsStateKey] : undefined),
@@ -108,10 +144,22 @@ export const ChartBlockRenderer: React.FC<ChartBlockRendererProps> = ({ block, r
 
     // Normalize legacy `params` → `parameters` (the key useChartData/the backend read).
     // Record-scoped `${record.*}`/`${recordPid}` templates are resolved upstream by the page
-    // renderer (DetailBlockRenderer), where the current record is available.
+    // renderer (DetailBlockRenderer), where the current record is available. State-scoped
+    // `${state.*}` templates resolve here so chart blocks honor the same filter state that
+    // table and metric-strip data sources evaluate.
     let resolvedDataSource = dataSource;
-    if (dataSource && (dataSource as any).params && !(dataSource as any).parameters) {
-      resolvedDataSource = { ...dataSource, parameters: (dataSource as any).params };
+    if (dataSource) {
+      const withState: Record<string, unknown> = { ...dataSource };
+      if ((dataSource as any).params) {
+        withState.params = resolveStateParams((dataSource as any).params, stateSnapshot);
+      }
+      if ((dataSource as any).parameters) {
+        withState.parameters = resolveStateParams((dataSource as any).parameters, stateSnapshot);
+      }
+      resolvedDataSource = withState;
+    }
+    if (dataSource && (dataSource as any).params && !(resolvedDataSource as any).parameters) {
+      resolvedDataSource = { ...resolvedDataSource, parameters: (resolvedDataSource as any).params };
     }
 
     if (paramsStateKey && windowParams && resolvedDataSource) {
@@ -146,6 +194,7 @@ export const ChartBlockRenderer: React.FC<ChartBlockRendererProps> = ({ block, r
     locale,
     paramsStateKey,
     windowParams,
+    stateSnapshot,
   ]);
 
   if (paramsStateKey && !windowParams) return <ChartLoadingFallback />;
