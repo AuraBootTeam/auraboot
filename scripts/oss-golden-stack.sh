@@ -37,6 +37,11 @@
 #                   runtime. Required for re-uping a runtime whose source-set was bound
 #                   this way; rejected checkouts (missing, non-git, dirty, or the control
 #                   root itself) fail closed before any registration changes.
+#       --report-renderer: wire the WYSIWYG PDF report renderer (DDR-2026-06-21) into the
+#                   backend via a registered receipt (report-renderer.env in the runtime
+#                   state dir; suspend/resume replays it). Fails closed when tsx, cli.ts
+#                   or a resolvable @playwright/test are absent; without it PDF export
+#                   uses the legacy PDFBox text fallback.
 #   ./scripts/oss-golden-stack.sh import <name> [--extra-plugin-root PATH] [--plugin-profile P|--plugin X]
 #   ./scripts/oss-golden-stack.sh warm <name>          # re-run setup→auth→pre-warm (up does this)
 #   ./scripts/oss-golden-stack.sh env  <name>          # print the Playwright env exports
@@ -357,6 +362,7 @@ cmd_up() {
   local plugin_profile="" import_plugins=() extra_plugin_roots=() product_migration_roots=()
   local parallel_reason=""
   local workspace_source_root=""
+  local report_renderer=0 renderer_env_args=()
   local extra_root migration_root plugin_item
   while [ $# -gt 0 ]; do case "$1" in
     --slot) slot="$2"; shift 2;;
@@ -398,6 +404,10 @@ cmd_up() {
     --workspace-source-root=*)
       workspace_source_root="${1#--workspace-source-root=}"
       [ -n "$workspace_source_root" ] || die "--workspace-source-root requires a path"
+      shift
+      ;;
+    --report-renderer)
+      report_renderer=1
       shift
       ;;
     --plugin-profile) plugin_profile="$2"; shift 2;;
@@ -471,6 +481,13 @@ for name in ("backend.log", "frontend.log", "bootjar.log", "import.log", "warm.l
             shutil.move(old, os.path.join(archive, name))
     os.symlink(os.path.join("logs", name), old)
 PYLOG
+
+  if [ "$report_renderer" = "1" ]; then
+    web_admin_report_renderer_receipt "$REPO_ROOT/web-admin" >"$sd/report-renderer.env" \
+      || die "report renderer requirements not met (see diagnostic above)"
+    while IFS= read -r line; do renderer_env_args+=("$line"); done <"$sd/report-renderer.env"
+    log "    WYSIWYG report renderer wired (${#renderer_env_args[@]} env keys; receipt $sd/report-renderer.env)"
+  fi
 
   local runtime_source_args=("$name" "$REPO_ROOT" "${workspace_source_root:-$WORKSPACE}")
   if [ -n "$workspace_source_root" ]; then
@@ -642,6 +659,7 @@ XML
       LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_OBSERVABILITY_MAPPER="${AURA_GOLDEN_MAPPER_LOG_LEVEL:-INFO}" \
       AURA_BUILTIN_PLUGINS_DIR="$REPO_ROOT/plugins" \
       AGENT_LLM_STUB_MODE="${AGENT_LLM_STUB_MODE:-true}" \
+      ${renderer_env_args[@]+"${renderer_env_args[@]}"} \
       java -jar "$run_jar"
   node "$SCRIPT_DIR/lib/golden-process-stop.mjs" register-backend "$name" "$REPO_ROOT" "$DEV" "$(cat "$sd/backend.pid")" \
     || die "backend launch process registration failed"
@@ -1049,6 +1067,12 @@ cmd_resume_retained() {
   pg_db="$(runtime_env "$name" POSTGRES_DB)"
   redis_db="$(runtime_env "$name" REDIS_DATABASE)"
   runtime_token="$("$DEV" runtime process token "$name")" || die "runtime ownership token unavailable"
+  # The renderer receipt is written by 'up --report-renderer'; resume replays the same
+  # registered wiring instead of silently dropping the WYSIWYG export path.
+  local renderer_env_args=()
+  if [ -f "$sd/report-renderer.env" ]; then
+    while IFS= read -r line; do renderer_env_args+=("$line"); done <"$sd/report-renderer.env"
+  fi
   spawn_detached "$sd/backend.pid" "$REPO_ROOT/platform" "$sd/backend.log" \
     env "${logging_args[@]}" AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" SERVER_PORT="$server_port" SERVER_ADDRESS=127.0.0.1 \
       SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:5432/${pg_db}?charSet=UTF8" \
@@ -1064,6 +1088,7 @@ cmd_resume_retained() {
       LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_OBSERVABILITY_MAPPER=DEBUG \
       AURA_BUILTIN_PLUGINS_DIR="$REPO_ROOT/plugins" \
       AGENT_LLM_STUB_MODE="$llm_stub_mode" \
+      ${renderer_env_args[@]+"${renderer_env_args[@]}"} \
       java -jar "$run_jar"
   node "$SCRIPT_DIR/lib/golden-process-stop.mjs" register-backend "$name" "$REPO_ROOT" "$DEV" "$(cat "$sd/backend.pid")" \
     || die "backend launch process registration failed"

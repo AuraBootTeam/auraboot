@@ -110,8 +110,11 @@ else
   # same binding; the checkout is validated fail-closed by the stack launcher.
   workspace_source_args=()
   [[ -z "${AURA_GOLDEN_WORKSPACE_SOURCE_ROOT:-}" ]] || workspace_source_args=(--workspace-source-root "$AURA_GOLDEN_WORKSPACE_SOURCE_ROOT")
+  # AURA_GOLDEN_REPORT_RENDERER=1 wires the WYSIWYG PDF renderer into the fresh stack.
+  renderer_args=()
+  [[ -z "${AURA_GOLDEN_REPORT_RENDERER:-}" ]] || renderer_args=(--report-renderer)
   "$GS" up "$NAME" --slot "$SLOT" --ttl 12h --runtime-mode verification --require-new-db --plugin-profile demo \
-    "${workspace_source_args[@]}" \
+    "${workspace_source_args[@]}" "${renderer_args[@]}" \
     || die_env 'stack bring-up failed; inspect retained golden-stack logs'
 fi
 log '3/6 import test-fixtures'
