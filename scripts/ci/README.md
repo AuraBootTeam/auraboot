@@ -107,11 +107,12 @@ attempt statuses (200; 503/200; 503/503/503/200). It also sends the original byt
 for explicitly labelled deduplication, invalid-signature and expired-timestamp checks. The target
 request budget is 250; receiver checks have a separate budget of three; neither automatically retries.
 
-Selecting both optional chains records a command audit/resource/event/delivery/receiver correlation.
-**CANARY-TRACE remains untested**: the inspected platform dispatcher does not forward the originating
-request ID into its signed delivery. Joining different IDs or supplying a fixed subscription header
-cannot certify request-ID propagation. Fix and verify the actual asynchronous propagation path before
-closing that contract. All twelve rows and PARTIAL/exit2 remain even if every other driver passes.
+Selecting both optional chains requires the originating command request ID in the durable queue
+and every independent receiver attempt, including retry and replay; event consumption must persist
+its actual ingress request ID in the Automation trigger log. Audit/resource/event/delivery joins
+alone cannot pass CANARY-TRACE. Older images missing the new durable request-ID field or header
+fail the assertion. Subscription custom headers cannot replace the persisted platform ID.
+Even twelve protocol passes do not attest deployed source/image identity: the result stays PARTIAL/exit2.
 
 The same self-test entry additionally runs thirteen hermetic runner safety checks, injects a false
 completion verdict that must fail, and verifies restoration. They test tooling safety and reporting,

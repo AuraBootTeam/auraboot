@@ -228,6 +228,37 @@ class AggregateQueryServiceImplDataScopeTest {
         return request;
     }
 
+    @Test
+    void namedQueryChartInjectsAuthenticatedPublicUserPid() {
+        assertNamedQueryIdentityParameters(Map.of());
+    }
+
+    @Test
+    void namedQueryChartOverridesCallerSuppliedIdentityParameters() {
+        assertNamedQueryIdentityParameters(Map.of(
+                "currentUserPid", "another-user", "currentUserId", "999", "tenantId", 999L));
+    }
+
+    private void assertNamedQueryIdentityParameters(Map<String, Object> callerParameters) {
+        when(namedQueryMapper.findByCode("phase_one_summary")).thenReturn(namedQuery());
+        when(namedQueryFieldMapper.selectList(any())).thenReturn(List.of(
+                new NamedQueryField(TENANT_ID, "phase_one_summary", "pid", "pid", "string")));
+        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, "read", USER_ID))
+                .thenReturn("");
+        when(dynamicDataMapper.selectByQueryWithoutTenant(anyString(), anyMap()))
+                .thenReturn(List.of(Map.of("total", 1L)));
+        AggregateQueryRequest request = namedQueryCountRequest();
+        request.setParameters(callerParameters);
+
+        assertThat(service.execute(request).getRows()).hasSize(1);
+
+        ArgumentCaptor<Map<String, Object>> parameters = ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper).selectByQueryWithoutTenant(anyString(), parameters.capture());
+        assertThat(parameters.getValue()).containsEntry("currentUserPid", "user-pid")
+                .containsEntry("currentUserId", USER_ID.toString())
+                .containsEntry("tenantId", TENANT_ID);
+    }
+
     private NamedQuery namedQuery() {
         NamedQuery query = new NamedQuery();
         query.setTenantId(TENANT_ID);

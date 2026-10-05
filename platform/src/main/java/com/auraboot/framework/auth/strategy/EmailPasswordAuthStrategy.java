@@ -2,19 +2,15 @@ package com.auraboot.framework.auth.strategy;
 
 import com.auraboot.framework.auth.dto.AuthStrategyRequest;
 import com.auraboot.framework.auth.dto.AuthenticationResponse;
-import com.auraboot.framework.auth.dto.CustomUserDetails;
 import com.auraboot.framework.auth.service.PasswordManagementService;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.user.dao.entity.User;
-import com.auraboot.framework.user.mapper.UserMapper;
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.auraboot.framework.user.service.UserService;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 
 /**
@@ -26,7 +22,6 @@ import org.springframework.stereotype.Component;
  *
  * @since 7.0.0
  */
-@Slf4j
 @Component
 @RequiredArgsConstructor
 public class EmailPasswordAuthStrategy implements AuthStrategy {
@@ -34,7 +29,7 @@ public class EmailPasswordAuthStrategy implements AuthStrategy {
     private final AuthenticationManager authenticationManager;
     private final PasswordManagementService passwordManagementService;
     private final LoginCompletionHelper loginCompletionHelper;
-    private final UserMapper userMapper;
+    private final UserService userService;
 
     @Override
     public String getChannelCode() {
@@ -54,21 +49,17 @@ public class EmailPasswordAuthStrategy implements AuthStrategy {
         }
 
         try {
-            Authentication authentication = authenticationManager.authenticate(
+            authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(identifier, password)
             );
 
-            CustomUserDetails userDetail = (CustomUserDetails) authentication.getPrincipal();
-
-            // Reset login failures on successful authentication
-            if (user != null) {
-                passwordManagementService.resetLoginFailures(user);
-            }
-
-            // Reload user entity to ensure we have full data for JWT
             if (user == null) {
                 user = findUserByIdentifier(identifier);
             }
+            if (user == null) {
+                throw new BadCredentialsException("Authenticated user could not be resolved");
+            }
+            passwordManagementService.resetLoginFailures(user);
 
             return loginCompletionHelper.completeLogin(user, request.getIpAddress(), request.getUserAgent());
 
@@ -85,18 +76,8 @@ public class EmailPasswordAuthStrategy implements AuthStrategy {
         if (identifier == null || identifier.isBlank()) {
             return null;
         }
-        try {
-            User byEmail = selectOne("email", identifier);
-            return byEmail != null ? byEmail : selectOne("user_name", identifier);
-        } catch (Exception e) {
-            log.warn("Failed to lookup user by login identifier: {}", e.getMessage());
-            return null;
-        }
-    }
-
-    private User selectOne(String column, String value) {
-        QueryWrapper<User> qw = new QueryWrapper<>();
-        qw.eq(column, value);
-        return userMapper.selectOne(qw);
+        // Use the same normalized email lookup as Spring Security and account creation.
+        User byEmail = userService.findByEmail(identifier.trim());
+        return byEmail != null ? byEmail : userService.findByUserName(identifier.trim());
     }
 }
