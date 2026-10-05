@@ -1292,7 +1292,7 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
             <div className="elta-drawer-head">
               <div>
                 <h3>{traceLabel('ui', 'executionChain', locale)}</h3>
-                <span>{decisionLabel(selectedLog.decisionCode, locale, selectedLog.decisionName)}</span>
+                <span>{selectedLog ? decisionLabel(selectedLog.decisionCode, locale, selectedLog.decisionName) : '-'}</span>
               </div>
               <button type="button" data-testid="elta-close-trace" onClick={closeTrace}>
                 关闭
