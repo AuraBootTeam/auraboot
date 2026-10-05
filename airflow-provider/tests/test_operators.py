@@ -214,7 +214,6 @@ class TestAuraBootSemanticQueryOperator:
                 op.execute(_CONTEXT)
 
     def test_execute_to_df_converts_rows(self):
-        pytest.importorskip("pandas")
         import pandas as pd
 
         op = AuraBootSemanticQueryOperator(

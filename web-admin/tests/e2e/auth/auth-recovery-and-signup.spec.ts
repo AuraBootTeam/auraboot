@@ -15,9 +15,11 @@ async function waitForAuthHydration(page: import('@playwright/test').Page): Prom
 }
 
 test.describe('Auth Recovery & Signup Deep', () => {
-  test.use({ storageState: { cookies: [], origins: [] } });
+  test.use({ locale: 'zh-CN', storageState: { cookies: [], origins: [] } });
 
-  test('ARS-001: signup redirects to login when public registration is disabled', async ({ page }) => {
+  test('ARS-001: signup redirects to login when public registration is disabled', async ({
+    page,
+  }) => {
     await page.goto('/signup', { waitUntil: 'domcontentloaded' });
 
     await expect(page).toHaveURL(/\/login/, { timeout: 10000 });
@@ -35,8 +37,10 @@ test.describe('Auth Recovery & Signup Deep', () => {
     await waitForAuthHydration(page);
 
     await expect(page.locator('[data-testid="forgot-password-disabled"]')).toBeVisible();
-    await expect(page.getByText(/tenant administrator/i)).toBeVisible();
+    await expect(page.getByText('请联系管理员设置或重置密码。', { exact: true })).toBeVisible();
+    await expect(page.locator('input[type="password"]')).toHaveCount(0);
     await expect(page).toHaveURL(/\/forgot-password/);
+    await page.screenshot({ path: test.info().outputPath('ARS-003.png'), fullPage: true });
   });
 
   test('ARS-004: reset-password shows admin-managed password policy', async ({ page }) => {
@@ -44,6 +48,8 @@ test.describe('Auth Recovery & Signup Deep', () => {
     await waitForAuthHydration(page);
 
     await expect(page.locator('[data-testid="reset-password-disabled"]')).toBeVisible();
-    await expect(page.getByText(/tenant administrator/i)).toBeVisible();
+    await expect(page.getByText('请联系管理员设置或重置密码。', { exact: true })).toBeVisible();
+    await expect(page.locator('input[type="password"]')).toHaveCount(0);
+    await page.screenshot({ path: test.info().outputPath('ARS-004.png'), fullPage: true });
   });
 });

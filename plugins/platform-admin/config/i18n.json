@@ -2471,13 +2471,6 @@
     "refType": "ui"
   },
   {
-    "key": "expression.fieldGroup.bpmContext",
-    "zh-CN": "BPM 上下文",
-    "en-US": "BPM context",
-    "source": "import",
-    "refType": "ui"
-  },
-  {
     "key": "expression.fieldGroup.decisionRuntime",
     "zh-CN": "规则执行",
     "en-US": "Decision runtime",
@@ -5904,6 +5897,62 @@
     "key": "auth.appearance.initialDraft",
     "zh-CN": "草稿尚未保存",
     "en-US": "Draft has not been saved",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "expression.fieldGroup.bpmContext",
+    "zh-CN": "流程上下文",
+    "en-US": "Workflow context",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "automation.list.import",
+    "zh-CN": "导入",
+    "en-US": "Import",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "automation.list.newFromTemplate",
+    "zh-CN": "从模板创建",
+    "en-US": "New from Template",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "automation.list.export",
+    "zh-CN": "导出",
+    "en-US": "Export",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "automation.list.duplicate",
+    "zh-CN": "复制",
+    "en-US": "Duplicate",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "automation.list.toggleFailed",
+    "zh-CN": "切换自动化状态失败，请重试",
+    "en-US": "Failed to change automation status. Please retry.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "flow.validation.required",
+    "zh-CN": "此字段必填",
+    "en-US": "This field is required",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "flow.validation.saveBlocked",
+    "zh-CN": "请先修正标记的字段再保存",
+    "en-US": "Please fix the highlighted fields before saving",
     "source": "import",
     "refType": "ui"
   },

@@ -45,7 +45,7 @@ export const ParametersBar: React.FC<ParametersBarProps> = ({
                 onChange={(e) => handleChange(param.name, e.target.value)}
                 className="rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
               >
-                <option value="">All</option>
+                <option value="">{text({ zh: '全部', en: 'All' })}</option>
                 {param.options?.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
@@ -64,15 +64,15 @@ export const ParametersBar: React.FC<ParametersBarProps> = ({
               <div className="flex items-center gap-1">
                 <input
                   type="date"
-                  aria-label={`${param.label} start`}
+                  aria-label={`${param.label} ${text({ zh: '开始', en: 'start' })}`}
                   value={values[`${param.name}_start`] || ''}
                   onChange={(e) => handleChange(`${param.name}_start`, e.target.value)}
                   className="rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
-                <span className="text-xs text-gray-400">to</span>
+                <span className="text-xs text-gray-400">{text({ zh: '至', en: 'to' })}</span>
                 <input
                   type="date"
-                  aria-label={`${param.label} end`}
+                  aria-label={`${param.label} ${text({ zh: '结束', en: 'end' })}`}
                   value={values[`${param.name}_end`] || ''}
                   onChange={(e) => handleChange(`${param.name}_end`, e.target.value)}
                   className="rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"

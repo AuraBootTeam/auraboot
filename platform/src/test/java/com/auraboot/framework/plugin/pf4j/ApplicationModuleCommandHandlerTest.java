@@ -44,7 +44,7 @@ class ApplicationModuleCommandHandlerTest {
             host.refresh();
             ApplicationModuleRegistry modules = new ApplicationModuleRegistry(host, manager,
                     mock(PluginRequestMappingHandlerMapping.class), mock(WorkflowCapabilityRegistry.class),
-                    mock(DecisionUsageSourceRegistry.class));
+                    mock(DecisionUsageSourceRegistry.class), mock(ExtensionRegistry.class));
             host.getBeanFactory().registerSingleton("applicationModules", modules);
             ExtensionRegistry commands = new ExtensionRegistry(manager,
                     host.getBeanProvider(CommandHandlerExtension.class),

@@ -10,7 +10,36 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
-import { uniqueId } from './helpers';
+
+// Match the product's localized accessible names without changing its locale.
+const DATA_TABLE = /Data Table|数据表格/;
+const STAT_CARD = /Stat Card|指标卡片/;
+const RICH_TEXT = /Rich Text|富文本/;
+const MOVE_UP = /^(Move up|上移)$/;
+const MOVE_DOWN = /^(Move down|下移)$/;
+const DELETE = /^(Delete|删除)$/;
+
+// SSR markup alone is not proof that the interactive designer is ready.
+async function openDesigner(page: Page, route: string) {
+  await page.goto(route, { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
+  const rootId = route === '/bpm/designer' ? 'bpmn-designer-workspace'
+    : route === '/dashboard-designer' ? 'designer-canvas' : 'report-canvas';
+  await expect(page.getByTestId('route-loading-fallback')).toHaveCount(0);
+  // React Suspense can park a second hidden tree outside the active main landmark.
+  const root = page.getByRole('main').getByTestId(rootId);
+  await expect(root).toHaveCount(1);
+  await expect(root).toBeVisible();
+}
+
+test.afterEach(async ({ page }, testInfo) => {
+  if (testInfo.status === testInfo.expectedStatus) {
+    await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
+    await expect(page.getByTestId('route-loading-fallback')).toHaveCount(0);
+    await expect(page.getByRole('main').getByTestId('dashboard-widget-loading')).toHaveCount(0);
+  }
+  await page.screenshot({ path: testInfo.outputPath('designer-ux-terminal.png'), fullPage: true });
+});
 
 // ============================================================================
 // #1: Report Designer Block Drag Reorder
@@ -18,28 +47,28 @@ import { uniqueId } from './helpers';
 
 test.describe('Report Designer — Block Drag Reorder (#1)', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/report-designer', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByTestId('block-palette')).toBeVisible();
-    await expect(page.getByTestId('report-canvas')).toBeVisible();
+    await openDesigner(page, '/report-designer');
+    await expect(page.getByRole('main').getByTestId('block-palette')).toBeVisible();
+    await expect(page.getByRole('main').getByTestId('report-canvas')).toBeVisible();
   });
 
   test('should show empty state with DesignerEmptyState component', async ({ page }) => {
     // The unified empty state should render when no blocks exist
-    await expect(page.getByTestId('report-canvas-empty')).toBeVisible();
+    await expect(page.getByRole('main').getByTestId('report-canvas-empty')).toBeVisible();
   });
 
   test('should show drag handles on block hover', async ({ page }) => {
     // Add a block via palette click
-    const palette = page.getByTestId('block-palette');
-    await palette.getByRole('button', { name: /Data Table/ }).click();
+    const palette = page.getByRole('main').getByTestId('block-palette');
+    await palette.getByRole('button', { name: DATA_TABLE }).click();
 
     // Wait for a draggable block to appear in canvas
-    const canvas = page.getByTestId('report-canvas');
+    const canvas = page.getByRole('main').getByTestId('report-canvas');
     const blocks = canvas.locator('[draggable="true"]');
     await expect(blocks.first()).toBeVisible({ timeout: 10000 });
 
     // Empty state should disappear
-    await expect(page.getByTestId('report-canvas-empty')).not.toBeVisible();
+    await expect(page.getByRole('main').getByTestId('report-canvas-empty')).not.toBeVisible();
 
     // Drag handle should exist
     const dragHandle = canvas.locator('[data-testid^="drag-handle-"]').first();
@@ -47,19 +76,23 @@ test.describe('Report Designer — Block Drag Reorder (#1)', () => {
   });
 
   test('should reorder blocks via drag and drop', async ({ page }) => {
-    const palette = page.getByTestId('block-palette');
-    const canvas = page.getByTestId('report-canvas');
+    const palette = page.getByRole('main').getByTestId('block-palette');
+    const canvas = page.getByRole('main').getByTestId('report-canvas');
     const blocks = canvas.locator('[draggable="true"]');
 
     // Add three blocks in order
-    await palette.getByRole('button', { name: /Data Table/ }).click();
+    await palette.getByRole('button', { name: DATA_TABLE }).click();
     await expect(blocks).toHaveCount(1, { timeout: 10000 });
 
-    await palette.getByRole('button', { name: /Stat Card/ }).click();
+    await palette.getByRole('button', { name: STAT_CARD }).click();
     await expect(blocks).toHaveCount(2, { timeout: 10000 });
 
-    await palette.getByRole('button', { name: /Rich Text/ }).click();
+    await palette.getByRole('button', { name: RICH_TEXT }).click();
     await expect(blocks).toHaveCount(3, { timeout: 10000 });
+
+    const handles = canvas.locator('[data-testid^="drag-handle-"]');
+    const originalOrder = await handles.evaluateAll((items) => items.map((item) => item.getAttribute('data-testid')));
+    expect(originalOrder).toHaveLength(3);
 
     // Drag the third block to the first position
     const thirdBlock = blocks.nth(2);
@@ -67,20 +100,22 @@ test.describe('Report Designer — Block Drag Reorder (#1)', () => {
 
     await thirdBlock.dragTo(firstBlock, { targetPosition: { x: 10, y: 5 } });
 
-    // Verify blocks still exist after reorder
     await expect(blocks).toHaveCount(3);
+    // The operation must change order, not merely leave three blocks attached.
+    await expect.poll(() => handles.evaluateAll((items) => items.map((item) => item.getAttribute('data-testid'))))
+      .toEqual([originalOrder[2], originalOrder[0], originalOrder[1]]);
   });
 
   test('should have draggable blocks after adding multiple', async ({ page }) => {
-    const palette = page.getByTestId('block-palette');
-    const canvas = page.getByTestId('report-canvas');
+    const palette = page.getByRole('main').getByTestId('block-palette');
+    const canvas = page.getByRole('main').getByTestId('report-canvas');
     const blocks = canvas.locator('[draggable="true"]');
 
     // Add two blocks
-    await palette.getByRole('button', { name: /Data Table/ }).click();
+    await palette.getByRole('button', { name: DATA_TABLE }).click();
     await expect(blocks).toHaveCount(1, { timeout: 10000 });
 
-    await palette.getByRole('button', { name: /Stat Card/ }).click();
+    await palette.getByRole('button', { name: STAT_CARD }).click();
     await expect(blocks).toHaveCount(2, { timeout: 10000 });
 
     // Both blocks should be draggable
@@ -95,11 +130,14 @@ test.describe('Report Designer — Block Drag Reorder (#1)', () => {
 
 test.describe('Designer i18n (#2)', () => {
   test('report designer empty state renders localized text', async ({ page }) => {
-    await page.goto('/report-designer', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByTestId('report-canvas')).toBeVisible();
+    await openDesigner(page, '/report-designer');
+    // Navigation may briefly retain the previous route tree during hydration.
+    // Keep uniqueness as an assertion rather than silently selecting one canvas.
+    await expect(page.getByRole('main').getByTestId('report-canvas')).toHaveCount(1);
+    await expect(page.getByRole('main').getByTestId('report-canvas')).toBeVisible();
 
     // Empty state should show localized text (not raw i18n keys)
-    const emptyState = page.getByTestId('report-canvas-empty');
+    const emptyState = page.getByRole('main').getByTestId('report-canvas-empty');
     await expect(emptyState).toBeVisible();
     // Should have meaningful text content (not empty, not a raw key)
     const text = await emptyState.textContent();
@@ -110,15 +148,14 @@ test.describe('Designer i18n (#2)', () => {
   });
 
   test('dashboard designer empty state renders localized text', async ({ page }) => {
-    await page.goto('/dashboard-designer', { waitUntil: 'domcontentloaded' });
+    await openDesigner(page, '/dashboard-designer');
     // Wait for the canvas
-    await expect(page.getByTestId('designer-canvas')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('main').getByTestId('designer-canvas')).toBeVisible({ timeout: 15000 });
 
     // Check the empty state component
-    const emptyState = page.getByTestId('dashboard-canvas-empty');
-    // Dashboard may or may not have widgets — only check if empty
-    const isEmpty = await emptyState.isVisible().catch(() => false);
-    if (isEmpty) {
+    const emptyState = page.getByRole('main').getByTestId('dashboard-canvas-empty');
+    await expect(emptyState).toBeVisible();
+    {
       const text = await emptyState.textContent();
       expect(text?.length).toBeGreaterThan(5);
       expect(text).not.toContain('designer.');
@@ -126,11 +163,11 @@ test.describe('Designer i18n (#2)', () => {
   });
 
   test('dashboard widget palette shows localized text', async ({ page }) => {
-    await page.goto('/dashboard-designer', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByTestId('widget-palette')).toBeVisible({ timeout: 15000 });
+    await openDesigner(page, '/dashboard-designer');
+    await expect(page.getByRole('main').getByTestId('widget-palette')).toBeVisible({ timeout: 15000 });
 
     // Header should show localized text, not hardcoded Chinese or raw keys
-    const paletteHeader = page.getByTestId('widget-palette').locator('h2').first();
+    const paletteHeader = page.getByRole('main').getByTestId('widget-palette').locator('h2').first();
     const headerText = await paletteHeader.textContent();
     expect(headerText?.length).toBeGreaterThan(0);
     expect(headerText).not.toContain('$i18n:');
@@ -143,43 +180,45 @@ test.describe('Designer i18n (#2)', () => {
 
 test.describe('Dashboard Designer — Drag Preview (#3)', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/dashboard-designer', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByTestId('widget-palette')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-canvas')).toBeVisible();
+    await openDesigner(page, '/dashboard-designer');
+    await expect(page.getByRole('main').getByTestId('widget-palette')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('main').getByTestId('designer-canvas')).toBeVisible();
   });
 
   test('should show drop preview when dragging widget over canvas', async ({ page }) => {
     // Find a widget in the palette to drag
-    const palette = page.getByTestId('widget-palette');
+    const palette = page.getByRole('main').getByTestId('widget-palette');
     const firstWidget = palette.locator('[draggable="true"]').first();
     await expect(firstWidget).toBeVisible();
 
-    const canvas = page.getByTestId('designer-canvas');
+    const canvas = page.getByRole('main').getByTestId('designer-canvas');
 
     // Start drag from palette widget to canvas
     // Use manual drag sequence to check for preview element
     const widgetBox = await firstWidget.boundingBox();
     const canvasBox = await canvas.boundingBox();
 
-    if (widgetBox && canvasBox) {
-      await page.mouse.move(widgetBox.x + widgetBox.width / 2, widgetBox.y + widgetBox.height / 2);
-      await page.mouse.down();
-      await page.mouse.move(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2, {
-        steps: 5,
-      });
+    expect(widgetBox).not.toBeNull();
+    expect(canvasBox).not.toBeNull();
+    if (!widgetBox || !canvasBox) throw new Error('Visible drag source and canvas need bounds');
+    const widgets = canvas.locator('[data-widget-id]');
+    const beforeCount = await widgets.count();
+    await page.mouse.move(widgetBox.x + widgetBox.width / 2, widgetBox.y + widgetBox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2, { steps: 5 });
+    // HTML dragover requires movement after entering the destination.
+    await page.mouse.move(canvasBox.x + canvasBox.width / 2 + 1, canvasBox.y + canvasBox.height / 2 + 1);
+    await expect(canvas).toHaveClass(/ring-blue-300/);
+    await expect(page.getByRole('main').getByTestId('drop-preview')).toBeVisible();
+    await page.mouse.up();
+    await expect(widgets).toHaveCount(beforeCount + 1);
+    await expect(page.getByRole('main').getByTestId('drop-preview')).toHaveCount(0);
 
-      // The canvas should have the drag-over styling (ring-2 ring-blue-300)
-      // Check that canvas is in drag-over state via class
-      const canvasClasses = await canvas.getAttribute('class');
-      // Drop preview element may or may not be visible depending on timing
-      // But the canvas should at minimum accept the drag
-      await page.mouse.up();
-    }
   });
 
   test('widget palette items should have pre-rendered drag preview refs', async ({ page }) => {
     // The drag preview divs should be pre-rendered in the DOM (hidden offscreen)
-    const palette = page.getByTestId('widget-palette');
+    const palette = page.getByRole('main').getByTestId('widget-palette');
     const previewElements = palette.locator('[aria-hidden="true"]');
     const count = await previewElements.count();
     // Each widget item should have a hidden drag preview
@@ -193,10 +232,13 @@ test.describe('Dashboard Designer — Drag Preview (#3)', () => {
 
 test.describe('Unified Empty State (#4)', () => {
   test('report designer shows dashed variant empty state', async ({ page }) => {
-    await page.goto('/report-designer', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByTestId('report-canvas')).toBeVisible();
+    await openDesigner(page, '/report-designer');
+    // Navigation may briefly retain the previous route tree during hydration.
+    // Keep uniqueness as an assertion rather than silently selecting one canvas.
+    await expect(page.getByRole('main').getByTestId('report-canvas')).toHaveCount(1);
+    await expect(page.getByRole('main').getByTestId('report-canvas')).toBeVisible();
 
-    const emptyState = page.getByTestId('report-canvas-empty');
+    const emptyState = page.getByRole('main').getByTestId('report-canvas-empty');
     await expect(emptyState).toBeVisible();
 
     // Should have the dashed border style (border-dashed class)
@@ -205,12 +247,12 @@ test.describe('Unified Empty State (#4)', () => {
   });
 
   test('dashboard designer shows subtle variant empty state', async ({ page }) => {
-    await page.goto('/dashboard-designer', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByTestId('designer-canvas')).toBeVisible({ timeout: 15000 });
+    await openDesigner(page, '/dashboard-designer');
+    await expect(page.getByRole('main').getByTestId('designer-canvas')).toBeVisible({ timeout: 15000 });
 
-    const emptyState = page.getByTestId('dashboard-canvas-empty');
-    const isEmpty = await emptyState.isVisible().catch(() => false);
-    if (isEmpty) {
+    const emptyState = page.getByRole('main').getByTestId('dashboard-canvas-empty');
+    await expect(emptyState).toBeVisible();
+    {
       // Subtle variant should NOT have border-dashed
       const classes = await emptyState.getAttribute('class');
       expect(classes).not.toContain('border-dashed');
@@ -218,19 +260,19 @@ test.describe('Unified Empty State (#4)', () => {
   });
 
   test('empty state disappears when blocks are added', async ({ page }) => {
-    await page.goto('/report-designer', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByTestId('report-canvas-empty')).toBeVisible();
+    await openDesigner(page, '/report-designer');
+    await expect(page.getByRole('main').getByTestId('report-canvas-empty')).toBeVisible();
 
     // Add a block
     await page
       .getByTestId('block-palette')
-      .getByRole('button', { name: /Data Table/ })
+      .getByRole('button', { name: DATA_TABLE })
       .click();
-    const blocks = page.getByTestId('report-canvas').locator('[draggable="true"]');
+    const blocks = page.getByRole('main').getByTestId('report-canvas').locator('[draggable="true"]');
     await expect(blocks).toHaveCount(1, { timeout: 10000 });
 
     // Empty state should be gone
-    await expect(page.getByTestId('report-canvas-empty')).not.toBeVisible();
+    await expect(page.getByRole('main').getByTestId('report-canvas-empty')).not.toBeVisible();
   });
 });
 
@@ -241,7 +283,7 @@ test.describe('Unified Empty State (#4)', () => {
 test.describe('BPMN Designer — Drag Feedback (#5)', () => {
   test.beforeEach(async ({ page }) => {
     // Navigate to BPMN designer — may need to go through menu or direct URL
-    await page.goto('/bpmn-designer', { waitUntil: 'domcontentloaded' });
+    await openDesigner(page, '/bpm/designer');
     await expect(page.locator('.react-flow')).toBeVisible({ timeout: 15000 });
   });
 
@@ -265,75 +307,75 @@ test.describe('BPMN Designer — Drag Feedback (#5)', () => {
 
 test.describe('Report Designer — BlockActionBar (#1 refactoring)', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/report-designer');
-    await expect(page.getByTestId('block-palette')).toBeVisible();
-    await expect(page.getByTestId('report-canvas')).toBeVisible();
+    await openDesigner(page, '/report-designer');
+    await expect(page.getByRole('main').getByTestId('block-palette')).toBeVisible();
+    await expect(page.getByRole('main').getByTestId('report-canvas')).toBeVisible();
   });
 
   test('should show move up/down/delete buttons in property panel', async ({ page }) => {
-    const palette = page.getByTestId('block-palette');
-    const canvas = page.getByTestId('report-canvas');
+    const palette = page.getByRole('main').getByTestId('block-palette');
+    const canvas = page.getByRole('main').getByTestId('report-canvas');
     const blocks = canvas.locator('[draggable="true"]');
 
     // Add a data-table block
-    await palette.getByRole('button', { name: /Data Table/ }).click();
+    await palette.getByRole('button', { name: DATA_TABLE }).click();
     await expect(blocks).toHaveCount(1, { timeout: 10000 });
 
     // Select the block by clicking it
     await blocks.first().click();
 
     // Property panel should show the block action buttons
-    const panel = page.getByTestId('block-property-panel');
-    await expect(panel.getByText('Data Table', { exact: true })).toBeVisible();
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
+    await expect(panel.getByText(/^(Data Table|数据表格)$/)).toBeVisible();
 
-    await expect(panel.getByTitle('Move up')).toBeVisible();
-    await expect(panel.getByTitle('Move down')).toBeVisible();
-    await expect(panel.getByTitle('Delete')).toBeVisible();
+    await expect(panel.getByTitle(MOVE_UP)).toBeVisible();
+    await expect(panel.getByTitle(MOVE_DOWN)).toBeVisible();
+    await expect(panel.getByTitle(DELETE)).toBeVisible();
   });
 
   test('should enable move down when multiple blocks exist', async ({ page }) => {
-    const palette = page.getByTestId('block-palette');
-    const canvas = page.getByTestId('report-canvas');
+    const palette = page.getByRole('main').getByTestId('block-palette');
+    const canvas = page.getByRole('main').getByTestId('report-canvas');
     const blocks = canvas.locator('[draggable="true"]');
 
     // Add two blocks
-    await palette.getByRole('button', { name: /Data Table/ }).click();
+    await palette.getByRole('button', { name: DATA_TABLE }).click();
     await expect(blocks).toHaveCount(1, { timeout: 10000 });
 
-    await palette.getByRole('button', { name: /Stat Card/ }).click();
+    await palette.getByRole('button', { name: STAT_CARD }).click();
     await expect(blocks).toHaveCount(2, { timeout: 10000 });
 
     // Select the first block
     await blocks.first().click();
 
-    const panel = page.getByTestId('block-property-panel');
-    await expect(panel.getByText('Data Table', { exact: true })).toBeVisible();
+    const panel = page.getByRole('main').getByTestId('block-property-panel');
+    await expect(panel.getByText(/^(Data Table|数据表格)$/)).toBeVisible();
 
     // Move down should be enabled for the first block
-    const moveDown = panel.getByTitle('Move down');
+    const moveDown = panel.getByTitle(MOVE_DOWN);
     await expect(moveDown).toBeVisible();
     await expect(moveDown).toBeEnabled();
 
     // Move up should be disabled for the first block
-    const moveUp = panel.getByTitle('Move up');
+    const moveUp = panel.getByTitle(MOVE_UP);
     await expect(moveUp).toBeVisible();
     await expect(moveUp).toBeDisabled();
   });
 
   test('should delete block via property panel button', async ({ page }) => {
-    const palette = page.getByTestId('block-palette');
-    const canvas = page.getByTestId('report-canvas');
+    const palette = page.getByRole('main').getByTestId('block-palette');
+    const canvas = page.getByRole('main').getByTestId('report-canvas');
     const blocks = canvas.locator('[draggable="true"]');
 
     // Add a block
-    await palette.getByRole('button', { name: /Rich Text/ }).click();
+    await palette.getByRole('button', { name: RICH_TEXT }).click();
     await expect(blocks).toHaveCount(1, { timeout: 10000 });
 
     // Select and delete
     await blocks.first().click();
-    await page.getByTestId('block-property-panel').getByTitle('Delete').click();
+    await page.getByRole('main').getByTestId('block-property-panel').getByTitle(DELETE).click();
 
     // Block should be removed, empty state should return
-    await expect(page.getByTestId('report-canvas-empty')).toBeVisible();
+    await expect(page.getByRole('main').getByTestId('report-canvas-empty')).toBeVisible();
   });
 });

@@ -5,6 +5,7 @@ import com.auraboot.framework.automation.entity.AutomationLog;
 import com.auraboot.framework.automation.entity.TriggerConfig;
 import com.auraboot.framework.automation.mapper.AutomationMapper;
 import com.auraboot.framework.automation.trigger.AutomationTriggerService;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,6 +18,7 @@ import java.util.HexFormat;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -318,5 +320,39 @@ class AutomationWebhookControllerTest {
         mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
         byte[] hash = mac.doFinal(body.getBytes(StandardCharsets.UTF_8));
         return HexFormat.of().formatHex(hash);
+    }
+    @Test
+    void preAuthLookupIsScopedAndExecutionDoesNotInheritTenantBypass() {
+        MetaContext.clear();
+        when(automationMapper.findByPid(AUTOMATION_PID)).thenAnswer(invocation -> {
+            assertThat(MetaContext.isTenantFilterBypassed()).isTrue();
+            return webhookAutomation("token");
+        });
+        when(automationTriggerService.executeAutomation(any(), isNull(), any())).thenAnswer(invocation -> {
+            assertThat(MetaContext.isTenantFilterBypassed()).isFalse();
+            assertThat(MetaContext.exists()).isFalse();
+            AutomationLog log = new AutomationLog();
+            log.setPid("LOG-PID-001");
+            log.setStatus("SUCCESS");
+            return log;
+        });
+
+        assertThat(controller.receiveWebhook(AUTOMATION_PID, "{}", null, SECRET).isSuccess()).isTrue();
+        assertThat(MetaContext.isTenantFilterBypassed()).isFalse();
+        assertThat(MetaContext.exists()).isFalse();
+    }
+
+    @Test
+    void preAuthLookupFailureRestoresTenantFiltering() {
+        MetaContext.clear();
+        when(automationMapper.findByPid(AUTOMATION_PID)).thenAnswer(invocation -> {
+            assertThat(MetaContext.isTenantFilterBypassed()).isTrue();
+            throw new IllegalStateException("lookup failed");
+        });
+
+        assertThatThrownBy(() -> controller.receiveWebhook(AUTOMATION_PID, "{}", null, SECRET))
+                .isInstanceOf(IllegalStateException.class).hasMessage("lookup failed");
+        assertThat(MetaContext.isTenantFilterBypassed()).isFalse();
+        verify(automationTriggerService, never()).executeAutomation(any(), any(), any());
     }
 }

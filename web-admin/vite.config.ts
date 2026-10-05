@@ -187,15 +187,15 @@ export default defineConfig({
       ],
     },
     proxy: {
-      // API reference opens at the browser origin. Forward both Swagger assets
-      // and its OpenAPI documents to this runtime instead of the React wildcard.
-      '/swagger-ui': {
+      '^/(swagger-ui(?:/|$)|v3/api-docs(?:/|$))': {
         target: apiDocsProxyTarget,
         changeOrigin: true,
       },
-      '/v3/api-docs': {
-        target: apiDocsProxyTarget,
+      '^/oauth2/token$': {
+        target: bffProxyTarget,
         changeOrigin: true,
+        xfwd: true,
+        secure: false,
       },
       '/api/notifications/stream': {
         target: bffProxyTarget,

@@ -1129,6 +1129,32 @@ tasks.register('codeQuality') {
 //   platform/src/integrationTest/java       — *IT.java sources
 //   platform/src/integrationTest/resources  — IT-only application-*.yml etc.
 //
+// Compile only the existing HTTP fixtures into an opt-in test-support artifact.
+// This source set is deliberately absent from main, bootJar and publication.
+sourceSets {
+    e2eFixtures {
+        java {
+            srcDir 'src/test/java'
+            include 'com/auraboot/framework/test/test/**'
+        }
+        compileClasspath += sourceSets.main.output
+    }
+}
+configurations {
+    e2eFixturesImplementation.extendsFrom implementation
+    e2eFixturesCompileOnly.extendsFrom compileOnly
+    e2eFixturesAnnotationProcessor.extendsFrom annotationProcessor
+}
+tasks.named('compileE2eFixturesJava').configure {
+    options.annotationProcessorPath = configurations.e2eFixturesAnnotationProcessor
+}
+tasks.register('e2eFixtureSupportJar', Jar) {
+    group = 'verification'
+    description = 'Package opt-in HTTP fixtures for an explicitly enabled local E2E stack.'
+    archiveClassifier = 'e2e-fixture-support'
+    from sourceSets.e2eFixtures.output
+}
+
 // Existing IT under src/test/java continue to run via the default `test` task —
 // this source set is purely additive. New ITs (BootstrapEngineServiceIT,
 // future BootstrapRepairServiceIT, etc.) belong here.

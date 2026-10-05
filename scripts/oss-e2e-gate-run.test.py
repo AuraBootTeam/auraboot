@@ -19,6 +19,14 @@ class GateContracts(unittest.TestCase):
             (self.repo / d).mkdir(parents=True)
         shutil.copy(SOURCE, self.repo / 'scripts/oss-e2e-gate-run.sh')
         shutil.copytree(SOURCE.parent / 'lib', self.repo / 'scripts/lib')
+        shutil.copytree(SOURCE.parent / 'dev', self.repo / 'scripts/dev')
+        shutil.copytree(SOURCE.parent / 'gates', self.repo / 'scripts/gates')
+        import json
+        profile = json.loads((SOURCE.parent / 'gates/oss-e2e-gate-profile.json').read_text())
+        for row in profile['tests']:
+            target = self.repo / 'web-admin' / row['file']
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text('// Hermetic collection fixture.\n')
         subprocess.run(['git', 'init', '-q', str(self.root)], check=True)
         (self.root / 'runtime.yaml').write_text('repos: {}\n')
         self.env = {**os.environ, 'AURA_WORKSPACE_ROOT': str(self.root),
@@ -41,16 +49,23 @@ else if (args[1] === 'evidence' && args[2] === 'begin') {
         self.executable(self.repo / 'bin/lsof', '#!/bin/bash\nexit 1\n')
         self.executable(self.repo / 'bin/pnpm', """#!/bin/bash
 printf '%s\\n' "$*" >> "$CALLS"
+PW_FIXTURE_COLLECTION=0
+[[ " $* " != *' --list '* ]] || PW_FIXTURE_COLLECTION=1
+export PW_FIXTURE_COLLECTION
 python3 - <<'REPORT_FIXTURE'
 import json,os
 from pathlib import Path
-p=Path(os.environ['PW_RESULTS_JSON']);p.parent.mkdir(parents=True,exist_ok=True)
-if os.environ.get('REPORT_MISSING')!='1':
- n=int(os.environ.get('REPORT_COUNT','12'))
- tests=[{'status':'expected','results':[{'status':'passed','retry':int(os.environ.get('REPORT_RETRY','0'))}]} for _ in range(n)]
- p.write_text(json.dumps({'stats':{'expected':n,'unexpected':0,'skipped':int(os.environ.get('REPORT_SKIPPED','0')),'flaky':0},'errors':[], 'config':{'projects':[{'name':'oss','retries':0}]},'suites':[{'specs':[{'tests':tests}]}]}))
+profile=json.loads(Path('../scripts/gates/oss-e2e-gate-profile.json').read_text())
+collection=os.environ['PW_FIXTURE_COLLECTION']=='1'
+n=len(profile['tests']) if collection else int(os.environ.get('REPORT_COUNT','12'))
+rows=profile['tests'][:n]
+tests=[{'file':row['file'],'title':row['title'],'tests':[{'projectName':row['project'],'expectedStatus':'passed','status':'expected','results':[] if collection else [{'status':'passed','retry':int(os.environ.get('REPORT_RETRY','0'))}]}]} for row in rows]
+report={'stats':{'expected':n,'unexpected':0,'skipped':int(os.environ.get('REPORT_SKIPPED','0')),'flaky':0},'errors':[],'config':{'projects':[{'name':'oss','retries':0}]},'suites':[{'specs':tests}]}
+if collection: print(json.dumps(report))
+elif os.environ.get('REPORT_MISSING')!='1':
+ p=Path(os.environ['PLAYWRIGHT_JSON_OUTPUT_FILE']);p.parent.mkdir(parents=True,exist_ok=True);p.write_text(json.dumps(report))
 REPORT_FIXTURE
-printf '12 passed\\n'
+[[ "$PW_FIXTURE_COLLECTION" == 1 ]] || printf '12 passed\\n'
 exit "${PW_EXIT:-0}"
 """)
         self.executable(self.repo / 'scripts/oss-golden-stack.sh', '''#!/bin/bash
@@ -85,9 +100,10 @@ esac
         self.assertNotIn('down', calls)
         self.assertIn('--require-new-db', calls)
         self.assertNotIn('--fresh-db', calls)
-        self.assertIn('--project=oss --no-deps --repeat-each=1', calls)
-        self.assertEqual(calls.count('.spec.ts'), 4)
-        self.assertNotIn('--reporter=', calls)
+        self.assertIn('--project=oss --project=oss-deep --no-deps --repeat-each=1 --retries=0', calls)
+        self.assertEqual(calls.count('.spec.ts'), 8)
+        self.assertIn('--list --reporter=json', calls)
+        self.assertIn('--reporter=line,json', calls)
 
     def test_missing_json_rejects_process_green(self):
         self.assertEqual(self.run_gate(REPORT_MISSING='1').returncode, 1)
@@ -136,7 +152,7 @@ esac
         r = subprocess.run(['bash', str(self.repo / 'scripts/real-stack.sh'), 'up', 'owned-new', '--slot', '239', '--require-new-db'],
                            env={**self.env, 'RECORD_AURA': '1'}, capture_output=True, text=True, timeout=10)
         self.assertEqual(r.returncode, 1, r.stderr)
-        self.assertIn('already exists', r.stderr)
+        self.assertIn('database freshness could not be established', r.stderr)
         self.assertNotIn('infra ensure', self.calls())
         self.assertNotIn('DROP DATABASE', self.calls())
         self.assertNotIn('CREATE DATABASE', self.calls())

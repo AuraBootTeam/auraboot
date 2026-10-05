@@ -435,7 +435,8 @@ export default function UnifiedInboxPage() {
         });
         fetchSummary();
       } catch {
-        showErrorToast('Failed to mark item as read');
+        showErrorToast(tx('markReadFailed', 'Failed to mark item as read'));
+        return;
       }
     }
 
@@ -456,7 +457,7 @@ export default function UnifiedInboxPage() {
       return;
     }
 
-    showSuccessToast('Item marked as read');
+    showSuccessToast(tx('markedRead', 'Item marked as read'));
   };
 
   const handleDismiss = async (item: InboxItem) => {
@@ -471,9 +472,9 @@ export default function UnifiedInboxPage() {
         };
       });
       fetchSummary();
-      showSuccessToast('Item dismissed');
+      showSuccessToast(tx('dismissed', 'Item dismissed'));
     } catch {
-      showErrorToast('Failed to dismiss item');
+      showErrorToast(tx('dismissFailed', 'Failed to dismiss item'));
     }
   };
 
@@ -488,9 +489,9 @@ export default function UnifiedInboxPage() {
         };
       });
       setSummary({});
-      showSuccessToast('All visible items marked as read');
+      showSuccessToast(tx('allMarkedRead', 'All inbox items marked as read'));
     } catch {
-      showErrorToast('Failed to mark all items as read');
+      showErrorToast(tx('markAllReadFailed', 'Failed to mark all items as read'));
     }
   };
 
@@ -498,7 +499,7 @@ export default function UnifiedInboxPage() {
     setDrawerTaskId(null);
     updateSearchParams({ type: activeTab, status: statusFilter, page: currentPage, task: null });
     fetchData('refresh');
-    showSuccessToast('Approval action completed');
+    showSuccessToast(tx('approvalCompleted', 'Approval action completed'));
   };
 
   const baseItems = useMemo(() => page?.records || [], [page]);

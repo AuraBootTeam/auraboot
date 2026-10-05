@@ -614,4 +614,78 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
                 """, tenantId, pid, name, eventType, eventVersion, secret,
                 rotatedAt == null ? null : java.sql.Timestamp.from(rotatedAt), installationPid);
     }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void concurrentRateConsumptionNeverExceedsTheLimitAndCommitsTokenUsage() throws Exception {
+        var app = managementService.createApplication(
+                new CreateApplicationRequest("Concurrent atomic rate accounting", "preserved PostgreSQL fixture"));
+        Long applicationId = jdbcTemplate.queryForObject(
+                "SELECT id FROM ab_external_application WHERE pid = ?", Long.class, app.pid());
+        try {
+            var installation = managementService.install(app.pid(), new InstallApplicationRequest(
+                    "production", Set.of("openapi.profile.read"), 5));
+            var credential = managementService.createCredential(installation.pid());
+            var issued = tokenService.issue("client_credentials", credential.clientId(),
+                    credential.clientSecret(), "openapi.profile.read");
+            var token = authMapper.findToken(secretCodec.sha256(issued.accessToken()),
+                    OpenPlatformTokenService.AUDIENCE, Instant.now());
+            Instant stamp = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+            Instant window = stamp.truncatedTo(java.time.temporal.ChronoUnit.MINUTES);
+            CountDownLatch start = new CountDownLatch(1);
+            try (var pool = Executors.newFixedThreadPool(8)) {
+                var futures = new java.util.ArrayList<java.util.concurrent.Future<Instant>>();
+                for (int i = 0; i < 24; i++) {
+                    Instant use = stamp.plusMillis(i);
+                    futures.add(pool.submit(() -> {
+                        start.await();
+                        return rateLimitMapper.authenticate(secretCodec.sha256(issued.accessToken()), OpenPlatformTokenService.AUDIENCE, use, window, "openapi.profile.read").consumedCount()
+                                == null ? null : use;
+                    }));
+                }
+                start.countDown();
+                var accepted = new java.util.ArrayList<Instant>();
+                for (var future : futures) {
+                    Instant use = future.get(30, java.util.concurrent.TimeUnit.SECONDS);
+                    if (use != null) accepted.add(use);
+                }
+                assertEquals(5, accepted.size());
+                assertEquals(5, jdbcTemplate.queryForObject(
+                        "SELECT request_count FROM ab_open_api_rate_window WHERE installation_id = ? AND window_start = ?",
+                        Integer.class, token.installationId(), java.sql.Timestamp.from(window)));
+                assertEquals(accepted.stream().max(Instant::compareTo).orElseThrow(), jdbcTemplate.queryForObject(
+                        "SELECT last_used_at FROM ab_application_access_token WHERE pid = ?",
+                        (rs, row) -> rs.getTimestamp(1) == null ? null : rs.getTimestamp(1).toInstant(), token.tokenPid()));
+            }
+        } finally {
+            deleteCommittedApplicationFixture(applicationId);
+        }
+    }
+
+    @Test
+    void rateConsumptionTouchesOnlyAcceptedRequestsAndKeepsUsageMonotonic() {
+        var app = managementService.createApplication(
+                new CreateApplicationRequest("Atomic rate accounting", "real PostgreSQL counter/token fixture"));
+        var installation = managementService.install(app.pid(), new InstallApplicationRequest(
+                "production", Set.of("openapi.profile.read"), 2));
+        var credential = managementService.createCredential(installation.pid());
+        var issued = tokenService.issue("client_credentials", credential.clientId(),
+                credential.clientSecret(), "openapi.profile.read");
+        var token = authMapper.findToken(secretCodec.sha256(issued.accessToken()),
+                OpenPlatformTokenService.AUDIENCE, Instant.now());
+        Instant window = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MINUTES);
+        Instant newer = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        assertEquals(1, rateLimitMapper.authenticate(secretCodec.sha256(issued.accessToken()), OpenPlatformTokenService.AUDIENCE, newer, window, "openapi.profile.read").consumedCount());
+        assertEquals(2, rateLimitMapper.authenticate(secretCodec.sha256(issued.accessToken()), OpenPlatformTokenService.AUDIENCE, newer.minusSeconds(1), window, "openapi.profile.read").consumedCount());
+        assertEquals(newer, jdbcTemplate.queryForObject(
+                "SELECT last_used_at FROM ab_application_access_token WHERE pid = ?",
+                (rs, row) -> rs.getTimestamp(1) == null ? null : rs.getTimestamp(1).toInstant(), token.tokenPid()));
+        assertNull(rateLimitMapper.authenticate(secretCodec.sha256(issued.accessToken()), OpenPlatformTokenService.AUDIENCE, newer.plusSeconds(1), window, "openapi.profile.read").consumedCount());
+        assertEquals(2, jdbcTemplate.queryForObject(
+                "SELECT request_count FROM ab_open_api_rate_window WHERE installation_id = ? AND window_start = ?",
+                Integer.class, token.installationId(), java.sql.Timestamp.from(window)));
+        assertEquals(newer, jdbcTemplate.queryForObject(
+                "SELECT last_used_at FROM ab_application_access_token WHERE pid = ?",
+                (rs, row) -> rs.getTimestamp(1) == null ? null : rs.getTimestamp(1).toInstant(), token.tokenPid()));
+    }
 }

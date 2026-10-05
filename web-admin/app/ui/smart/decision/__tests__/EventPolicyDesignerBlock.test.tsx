@@ -262,6 +262,7 @@ describe('EventPolicyDesignerBlock', () => {
     await screen.findByTestId('epd-workflow');
     fireEvent.click(screen.getByTestId('epd-step-test'));
     expect(screen.getByTestId('condition-testrun')).toHaveTextContent('5天长假申请');
+    await waitFor(() => expect(screen.getByTestId('trp-context')).toHaveTextContent('01ADMINUSERPID'));
     fireEvent.click(screen.getByTestId('epd-run-published'));
 
     await waitFor(() => expect(post).toHaveBeenCalledWith('/event-policy/run-and-execute', expect.objectContaining({
