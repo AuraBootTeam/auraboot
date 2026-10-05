@@ -422,6 +422,20 @@ async function createReportNonStaticDataSourceExportPage(page: Page) {
     [namedQueryTitle, 'Report NamedQuery Customer'],
     [apiTitle, 'Report API Customer'],
   ]) {
+    // Referenced customer must exist before the order command (runtime
+    // reference existence validation).
+    await executeCommandViaApi(
+      page,
+      'e2et:create_customer',
+      {
+        e2et_cust_code: `${orderTitle}-CUST`,
+        e2et_cust_name: customer,
+        e2et_cust_region: 'south',
+        e2et_cust_active: true,
+      },
+      undefined,
+      'create',
+    );
     const created = await executeCommandViaApi(
       page,
       'e2et:create_order',
