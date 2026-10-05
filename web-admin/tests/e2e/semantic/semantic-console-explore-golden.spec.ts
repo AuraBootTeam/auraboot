@@ -77,7 +77,9 @@ async function openConsole(page: Page) {
   const catalogBody = await (await catalog).json();
   expect(String(catalogBody.code)).toBe('0');
   await expect(page).toHaveURL(/\/semantic\/models$/);
-  await expect(page.getByTestId('semantic-models-page')).toBeVisible();
+  // First navigation to this route compiles its dev-server chunk graph on a freshly
+  // started stack; the default 5s visibility budget does not cover that cold path.
+  await expect(page.getByTestId('semantic-models-page')).toBeVisible({ timeout: 30000 });
   await expect(page.getByTestId('semantic-models-loading')).toHaveCount(0);
   await expect(page.getByTestId('semantic-models-error')).toHaveCount(0);
 }
