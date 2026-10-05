@@ -419,7 +419,10 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
   // A $i18n placeholder key missing from the served dictionary must degrade to
   // no placeholder — the component's own localized default then applies —
   // instead of surfacing the raw key (P2 raw-key leak, team-members picker).
-  const rawPlaceholder = field.placeholder;
+  // The key may arrive on the metadata field or in the page DSL's field props;
+  // either way the raw string never reaches component props unguarded.
+  const { placeholder: dslPlaceholder, ...restDslProps } = (field.props || {}) as Record<string, any>;
+  const rawPlaceholder = dslPlaceholder !== undefined ? dslPlaceholder : field.placeholder;
   let resolvedPlaceholder: string | undefined;
   if (typeof rawPlaceholder === 'string' && rawPlaceholder.startsWith('$i18n:')) {
     const placeholderKey = rawPlaceholder.slice(6);
@@ -435,8 +438,8 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
     ...(componentLower === 'smartdatepicker' && fieldKind === 'datetime'
       ? { dateType: 'datetime-local' }
       : {}),
+    ...restDslProps,
     ...(resolvedPlaceholder ? { placeholder: resolvedPlaceholder } : {}),
-    ...field.props,
     // Controlled identity, state, and governance resolved by this wrapper are authoritative and
     // must never be shadowed by metadata extension keys.
     name: field.field,
