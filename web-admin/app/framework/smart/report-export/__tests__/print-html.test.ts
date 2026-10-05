@@ -188,6 +188,7 @@ describe('renderReportToPrintDocument — stat-card / grouped-table / cross-tab'
             dataSource: 'ops',
             groupByField: 'owner',
             columns: [
+              { field: 'owner', label: 'Owner' },
               { field: 'region', label: 'Region' },
               { field: 'cases', label: 'Cases' },
             ],
@@ -196,8 +197,10 @@ describe('renderReportToPrintDocument — stat-card / grouped-table / cross-tab'
       },
       { ops },
     );
-    expect(html).toContain('owner: Ops-A (2)');
-    expect(html).toContain('owner: Ops-B (1)');
+    // Labeled group field: the label replaces the raw field key (no code leak).
+    expect(html).toContain('Owner: Ops-A (2)');
+    expect(html).toContain('Owner: Ops-B (1)');
+    expect(html).not.toContain('owner:');
     expect(html).toContain('group-header');
   });
 
@@ -214,12 +217,19 @@ describe('renderReportToPrintDocument — stat-card / grouped-table / cross-tab'
             aggregation: 'sum',
             showRowTotal: true,
             showColumnTotal: true,
+            columns: [
+              { field: 'region', label: '区域' },
+              { field: 'status', label: '状态' },
+            ],
           },
         ],
       },
       { ops },
     );
-    expect(html).toContain('region \\ status');
+    // Axis labels come from the block column defs; unlabeled axes render an empty corner
+    // instead of leaking raw field keys.
+    expect(html).toContain('区域 \\ 状态');
+    expect(html).not.toContain('region \\');
     const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
     expect(text).toContain('North 3 12 15'); // Closed, Open, row total
     expect(text).toContain('South 0 9 9');
