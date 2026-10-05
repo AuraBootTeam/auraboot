@@ -76,6 +76,10 @@ public interface DynamicDataService {
                           Object expectedValue,
                           Map<String, Object> nextValues);
 
+    /** Atomic control-state batch; a partial match raises an exception and rolls back. */
+    void compareAndSetBatch(String modelCode, String fieldCode,
+            List<com.auraboot.framework.plugin.extension.CompareAndSetUpdate> updates);
+
     /**
      * 删除数据
      * @param modelCode 模型编码

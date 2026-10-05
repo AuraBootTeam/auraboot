@@ -388,6 +388,55 @@ class DynamicDataServiceImplDataScopeRuntimeCoverageTest {
     }
 
     @Test
+    void compareAndSetBatch_keepsEveryRowGuardAndUsesOneWrite() {
+        ModelDefinition model = batchCasModel();
+        wireModel(model);
+        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, USER_ID)).thenReturn("AND created_by = 20");
+        when(dataDomainService.buildDomainFilter(MODEL_CODE, USER_ID)).thenReturn("AND domain_id = 7");
+        when(dynamicDataMapper.updateByQuery(anyString(), anyMap())).thenReturn(2);
+        service.compareAndSetBatch(MODEL_CODE, "status", batchCasUpdates());
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Map<String, Object>> params = ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper).updateByQuery(sql.capture(), params.capture());
+        assertThat(sql.getValue()).contains("status = CASE pid", "tenant_id = #{params.tenantId}",
+                "status IS NOT DISTINCT FROM #{params.expected0}", "status IS NOT DISTINCT FROM #{params.expected1}",
+                "row_version = row_version + 1", "created_by = 20", "domain_id = 7");
+        assertThat(params.getValue()).containsEntry("id0", "row-a").containsEntry("id1", "row-b")
+                .containsEntry("expected0", "accepted").containsEntry("expected1", "pending");
+        verify(dynamicDataMapper, never()).selectByQuery(anyString(), anyMap());
+    }
+
+    @Test
+    void compareAndSetBatch_partialMatchThrowsInsteadOfReturningSuccess() {
+        wireModel(batchCasModel());
+        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, USER_ID)).thenReturn("");
+        when(dataDomainService.buildDomainFilter(MODEL_CODE, USER_ID)).thenReturn("");
+        when(dynamicDataMapper.updateByQuery(anyString(), anyMap())).thenReturn(1);
+        org.junit.jupiter.api.Assertions.assertThrows(com.auraboot.framework.meta.exception.MetaServiceException.class,
+                () -> service.compareAndSetBatch(MODEL_CODE, "status", batchCasUpdates()));
+    }
+
+    @Test
+    void compareAndSetBatch_duplicateIdsNeverReachWrite() {
+        wireModel(batchCasModel());
+        var row = batchCasUpdates().get(0);
+        org.junit.jupiter.api.Assertions.assertThrows(com.auraboot.framework.meta.exception.MetaServiceException.class,
+                () -> service.compareAndSetBatch(MODEL_CODE, "status", List.of(row, row)));
+        verify(dynamicDataMapper, never()).updateByQuery(anyString(), anyMap());
+    }
+
+    private ModelDefinition batchCasModel() {
+        return ModelDefinition.builder().code(MODEL_CODE).tableName("mt_phase_one_model").sourceType("physical")
+                .fields(List.of(primaryKey(), FieldDefinition.builder().code("status").columnName("status")
+                        .dataType("string").build())).build();
+    }
+
+    private List<com.auraboot.framework.plugin.extension.CompareAndSetUpdate> batchCasUpdates() {
+        return List.of(new com.auraboot.framework.plugin.extension.CompareAndSetUpdate("row-a", "accepted", Map.of("status", "done")),
+                new com.auraboot.framework.plugin.extension.CompareAndSetUpdate("row-b", "pending", Map.of("status", "done")));
+    }
+
+    @Test
     @DisplayName("delete write SQL keeps tenant and DataScope guards")
     void delete_appliesScopedSqlGuardsToWrite() {
         ModelDefinition model = physicalModel(MODEL_CODE, "mt_phase_one_model");

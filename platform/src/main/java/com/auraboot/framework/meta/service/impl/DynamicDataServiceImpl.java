@@ -385,6 +385,120 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         return updated == 1;
     }
 
+    @Override
+    @Transactional
+    public void compareAndSetBatch(String modelCode, String fieldCode,
+            List<com.auraboot.framework.plugin.extension.CompareAndSetUpdate> updates) {
+        validateModelCode(modelCode);
+        assertWritable(modelCode);
+        if (updates == null || updates.isEmpty() || fieldCode == null || fieldCode.isBlank()) {
+            throw new MetaServiceException("CAS batch and compare field cannot be empty");
+        }
+        ModelDefinition model = getModelDefinition(modelCode);
+        ModelMutationGuard.assertMutable(model, "updated");
+        FieldDefinition compareField = DynamicDataValueMapper.findFieldDefinition(model, fieldCode);
+        assertBatchCasField(compareField, fieldCode);
+        Set<String> ids = new HashSet<>();
+        List<Map<String, Object>> rows = new ArrayList<>();
+        List<Object> expectedValues = new ArrayList<>();
+        List<Long> versions = new ArrayList<>();
+        Set<String> columns = null;
+        java.sql.Timestamp now = java.sql.Timestamp.from(Instant.now());
+        for (var update : updates) {
+            if (update == null || !ids.add(update.recordId())) {
+                throw new MetaServiceException("CAS batch contains a null or duplicate record");
+            }
+            Map<String, Object> data = new LinkedHashMap<>(update.nextValues());
+            stripNonWritableFields(modelCode, data);
+            if (data.size() != update.nextValues().size()) {
+                throw new MetaServiceException("CAS batch contains a non-writable field");
+            }
+            for (String code : data.keySet()) {
+                assertBatchCasField(DynamicDataValueMapper.findFieldDefinition(model, code), code);
+            }
+            FieldWriterGuard.assertFieldsAllowed(model, new ArrayList<>(data.keySet()));
+            payloadTemporalNormalizer.normalize(data, model);
+            validationService.validateAndThrow(model, data, ValidationContext.UPDATE);
+            data = convertDataTypes(model, data);
+            data.put("updated_at", now);
+            data.put("updated_by", getCurrentUserId());
+            filterVirtualFields(model, data);
+            Map<String, Object> physical = toColumnData(model, data);
+            if (columns == null) columns = new LinkedHashSet<>(physical.keySet());
+            else if (!columns.equals(physical.keySet())) {
+                throw new MetaServiceException("CAS batch requires identical stored field sets");
+            }
+            rows.add(physical);
+            Map<String, Object> expected = new LinkedHashMap<>();
+            expected.put(fieldCode, update.expectedValue());
+            payloadTemporalNormalizer.normalize(expected, model);
+            expectedValues.add(convertDataTypes(model, expected).get(fieldCode));
+            versions.add(MetaContext.getCommandExpectedVersion(modelCode, update.recordId()));
+        }
+        FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
+        String pk = SqlSafetyUtils.requireIdentifier(primaryKey.getColumnName() != null
+                ? primaryKey.getColumnName() : primaryKey.getCode(), "primary key column");
+        String compare = SqlSafetyUtils.requireIdentifier(compareField.getColumnName() != null
+                ? compareField.getColumnName() : compareField.getCode(), "compare column");
+        String table = SqlSafetyUtils.requireIdentifier(model.getTableName(), "table name");
+        Set<String> jsonbColumns = JsonbFieldHelper.getJsonbHostColumns(model);
+        Map<String, Object> params = new LinkedHashMap<>();
+        StringBuilder sql = new StringBuilder("UPDATE ").append(table).append(" SET ");
+        int columnIndex = 0;
+        for (String rawColumn : columns) {
+            String column = SqlSafetyUtils.requireIdentifier(rawColumn, "column name");
+            if (columnIndex > 0) sql.append(", ");
+            sql.append(column).append(" = CASE ").append(pk);
+            for (int i = 0; i < updates.size(); i++) {
+                String valueKey = "value" + columnIndex + "_" + i;
+                sql.append(" WHEN #{params.id").append(i).append("} THEN #{params.").append(valueKey);
+                Object value = rows.get(i).get(column);
+                if (jsonbColumns.contains(column)) {
+                    sql.append(",jdbcType=OTHER,typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler}::jsonb");
+                    if (value != null && !(value instanceof String)) value = JsonbFieldHelper.toJsonString(value);
+                } else sql.append("}");
+                params.put(valueKey, value);
+            }
+            sql.append(" ELSE ").append(column).append(" END");
+            columnIndex++;
+        }
+        if (table.startsWith(SystemFieldConstants.DYNAMIC_TABLE_PREFIX)) {
+            sql.append(", row_version = row_version + 1");
+        }
+        Long tenantId = getCurrentTenantId();
+        params.put("tenantId", tenantId);
+        sql.append(" WHERE tenant_id = #{params.tenantId} AND (");
+        for (int i = 0; i < updates.size(); i++) {
+            if (i > 0) sql.append(" OR ");
+            params.put("id" + i, updates.get(i).recordId());
+            params.put("expected" + i, expectedValues.get(i));
+            sql.append("(").append(pk).append(" = #{params.id").append(i).append("} AND ")
+                    .append(compare).append(" IS NOT DISTINCT FROM #{params.expected").append(i).append("}");
+            if (versions.get(i) != null) {
+                params.put("version" + i, versions.get(i));
+                sql.append(" AND row_version = #{params.version").append(i).append("}");
+            }
+            sql.append(")");
+        }
+        sql.append(")");
+        appendAggregateBindingGuard(sql, params, model);
+        appendScopedWriteGuards(sql, tenantId, modelCode, getCurrentUserId(), "update");
+        int affected = dynamicDataMapper.updateByQuery(sql.toString(), params);
+        if (affected != updates.size()) {
+            throw new MetaServiceException("CAS batch conflict: no partial batch may commit");
+        }
+        for (int i = 0; i < updates.size(); i++) {
+            if (versions.get(i) != null) MetaContext.advanceCommandExpectedVersion(modelCode, updates.get(i).recordId());
+        }
+    }
+
+    private static void assertBatchCasField(FieldDefinition field, String code) {
+        if (field.isPrimaryKey() || field.isJsonbVirtual() || field.isVirtual()
+                || field.isImmutable() || field.getImmutableWhen() != null) {
+            throw new MetaServiceException("CAS batch requires writable mutable stored fields: " + code);
+        }
+    }
+
     /**
      * Resolve a field code to its physical column name, asserting it is numeric.
      * Throws {@link IllegalArgumentException} (NOT {@link MetaServiceException}) so the
