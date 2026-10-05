@@ -280,6 +280,7 @@ public class PluginImportController {
                 .autoPublishCommands(request.getAutoPublishCommands())
                 .autoPublishPages(request.getAutoPublishPages())
                 .createResourcePermissions(request.getCreateResourcePermissions())
+                .identifierMappingPath(request.getIdentifierMappingPath())
                 .build();
 
         ImportExecuteResult result = importService.execute(preview.getImportId(), importRequest);
@@ -320,6 +321,9 @@ public class PluginImportController {
         // Used by batch cold-reset of cyclic plugin sets (e.g. crm↔sales). See
         // PluginImportService.verifyImportReferenceIntegrity().
         private Boolean deferReferenceValidation;
+        // Plugin rename upgrade contract: optional identifier-mapping JSON consumed by
+        // IdentifierMappingDataMigrator after the imported models are published.
+        private String identifierMappingPath;
     }
 
     // ==================== Preview ====================

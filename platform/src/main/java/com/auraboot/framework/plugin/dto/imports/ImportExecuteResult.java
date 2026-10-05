@@ -105,6 +105,34 @@ public class ImportExecuteResult {
     private List<String> deployedProcesses = new ArrayList<>();
 
     /**
+     * Identifier-mapping data migration receipts (plugin rename upgrade
+     * contract). Populated only when the import request carried
+     * {@code identifierMappingPath} and at least one mapped model pair was
+     * migrated from its legacy physical table into the newly imported one.
+     */
+    @Builder.Default
+    private List<IdentifierDataMigration> dataMigrations = new ArrayList<>();
+
+    /**
+     * One migrated model pair of the identifier-mapping upgrade contract.
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class IdentifierDataMigration {
+        private String fromModel;
+        private String toModel;
+        private String sourceTable;
+        private String targetTable;
+        private long rowsMigrated;
+        private long rowsAlreadyPresent;
+        private int columnsRenamed;
+        private List<String> droppedSourceColumns;
+        private List<String> unmappedNewColumns;
+    }
+
+    /**
      * Create a success result.
      */
     public static ImportExecuteResult success(String importId, String pluginPid, String pluginId,

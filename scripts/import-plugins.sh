@@ -21,6 +21,7 @@ ENTERPRISE_PLUGIN_ROOT="${ENTERPRISE_PLUGIN_ROOT:-${ENTERPRISE_PLUGINS_DIR:-}}"
 EXTRA_PLUGIN_ROOTS_RAW="${EXTRA_PLUGIN_ROOTS:-${EXTRA_PLUGINS_DIRS:-}}"
 EXTRA_PLUGIN_ROOTS=()
 PLUGINS=()
+IDENTIFIER_MAPPING_PATH="${IDENTIFIER_MAPPING_PATH:-}"
 
 usage() {
     cat <<USAGE
@@ -42,6 +43,12 @@ Options:
                                    container path in --slug Docker mode.
   --extra-plugin-root=<path>       Additional plugin root. Can be passed multiple times.
                                    Host path in host mode; container path in --slug Docker mode.
+  --identifier-mapping=<path>      Identifier-mapping JSON (plugin rename upgrade).
+                                   Passed to every import-directory-sync call as
+                                   identifierMappingPath; the backend migrates
+                                   legacy-identifier physical-table rows into the
+                                   freshly imported identifiers. Can also be set
+                                   via the IDENTIFIER_MAPPING_PATH environment variable.
 
 Environment:
   ADMIN_EMAIL        default: admin@auraboot.com
@@ -49,6 +56,7 @@ Environment:
   IMPORT_ATTEMPTS    default: 2
   SKIP_BOM_DEFAULT_SEED set to 1 to skip bom:seed_defaults after BOM plugin import
   EXTRA_PLUGIN_ROOTS colon-separated additional plugin roots
+  IDENTIFIER_MAPPING_PATH  same as --identifier-mapping=<path>
 USAGE
 }
 
@@ -61,6 +69,7 @@ for arg in "$@"; do
         --plugin-root=*) PLUGIN_ROOT="${arg#--plugin-root=}" ;;
         --enterprise-plugin-root=*) ENTERPRISE_PLUGIN_ROOT="${arg#--enterprise-plugin-root=}" ;;
         --extra-plugin-root=*) EXTRA_PLUGIN_ROOTS+=("${arg#--extra-plugin-root=}") ;;
+        --identifier-mapping=*) IDENTIFIER_MAPPING_PATH="${arg#--identifier-mapping=}" ;;
         --help|-h) usage; exit 0 ;;
         --*) echo "ERROR: unknown argument: $arg" >&2; usage; exit 2 ;;
         *) PLUGINS+=("$arg") ;;
@@ -300,11 +309,15 @@ container_plugin_path() {
 import_plugin_once() {
     local path="$1"
     local resp result
+    local mapping_json=""
+    if [ -n "$IDENTIFIER_MAPPING_PATH" ]; then
+        mapping_json=",\"identifierMappingPath\":\"$IDENTIFIER_MAPPING_PATH\""
+    fi
 
     resp="$(NO_PROXY=localhost curl -s -X POST "$BACKEND_URL/api/plugins/import/import-directory-sync" \
         -H "Authorization: Bearer $jwt" \
         -H "Content-Type: application/json" \
-        -d "{\"path\":\"$path\",\"conflictStrategy\":\"OVERWRITE\",\"autoPublishModels\":true,\"autoPublishFields\":true,\"autoPublishCommands\":true,\"autoPublishPages\":true,\"deferReferenceValidation\":true}")"
+        -d "{\"path\":\"$path\",\"conflictStrategy\":\"OVERWRITE\",\"autoPublishModels\":true,\"autoPublishFields\":true,\"autoPublishCommands\":true,\"autoPublishPages\":true,\"deferReferenceValidation\":true${mapping_json}}")"
     result="$(printf '%s' "$resp" | python3 -c "
 import sys,json
 try:
@@ -316,7 +329,12 @@ if d.get('success') is True or d.get('code') == '0':
     plugin_id = d.get('pluginId') or d.get('data', {}).get('pluginId') or ''
     plugin_pid = d.get('pluginPid') or d.get('data', {}).get('pluginPid') or ''
     if plugin_id and plugin_pid:
-        print('ok\\t' + plugin_id + '\\t' + plugin_pid)
+        migrations = d.get('dataMigrations') or (d.get('data') or {}).get('dataMigrations') or []
+        migrated_rows = sum(int(m.get('rowsMigrated') or 0) for m in migrations)
+        suffix = ''
+        if migrations:
+            suffix = '\\tdataMigrations:%d models:%d rows' % (len(migrations), migrated_rows)
+        print('ok\\t' + plugin_id + '\\t' + plugin_pid + suffix)
     elif plugin_id:
         print('missing pluginPid in import response')
     else:
@@ -349,10 +367,13 @@ for plugin in "${PLUGINS[@]}"; do
 
         result="$(import_plugin_once "$path")"
         if [[ "$result" == ok$'\t'* ]]; then
-            IFS=$'\t' read -r _ imported_plugin_id imported_plugin_pid <<< "$result"
+            IFS=$'\t' read -r _ imported_plugin_id imported_plugin_pid imported_plugin_migrations <<< "$result"
             successful_plugin_ids+=("$imported_plugin_id")
             successful_plugin_pids+=("$imported_plugin_pid")
             successful_plugin_paths+=("$path")
+            if [ -n "${imported_plugin_migrations:-}" ]; then
+                echo "  $imported_plugin_migrations"
+            fi
             imported=1
             echo "OK ($path)"
             break
