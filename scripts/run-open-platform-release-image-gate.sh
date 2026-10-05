@@ -4,6 +4,7 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 PLATFORM_DIR="$REPO_ROOT/platform"
+source "$SCRIPT_DIR/ci/isolated-release-network.sh"
 
 fatal() { printf 'open-platform-release-image-gate: %s\n' "$*" >&2; exit 2; }
 fail() { printf 'open-platform-release-image-gate: %s\n' "$*" >&2; exit 1; }
@@ -60,8 +61,15 @@ GRADLE_DISTRIBUTION_HASH="690y85m0j9nfaub7xoiayko8a"
 GRADLE_WRAPPER_HOME="${AURA_CI_GRADLE_WRAPPER_HOME:-${GRADLE_USER_HOME:-$HOME/.gradle}/wrapper}"
 GRADLE_DISTRIBUTION_DIR="$GRADLE_WRAPPER_HOME/dists/gradle-${GRADLE_VERSION}-bin/$GRADLE_DISTRIBUTION_HASH"
 
+DB_SAMPLE_PID=""
+DB_SAMPLE_STOP="$ARTIFACTS/db-sampling.stop"
+
 cleanup() {
   local status=$?
+  if [[ -n "$DB_SAMPLE_PID" ]]; then
+    : > "$DB_SAMPLE_STOP"
+    wait "$DB_SAMPLE_PID" || true
+  fi
   rm -f "$CREDENTIAL_ARTIFACT"
   if docker inspect "$APP" >/dev/null 2>&1; then
     docker logs "$APP" > "$ARTIFACTS/logs/app.log" 2>&1 || true
@@ -87,11 +95,32 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-for base_image in pgvector/pgvector:pg16 redis:7.4-alpine "$FLYWAY_IMAGE" "$K6_IMAGE" "$PYTHON_IMAGE" \
-  "$BUILD_JDK_IMAGE" "$RUNTIME_JRE_IMAGE"; do
-  timeout "$PULL_TIMEOUT" docker pull "$base_image" >/dev/null 2>&1 \
+BASE_IMAGE_MANIFEST="$ARTIFACTS/base-images.json"
+# The admitted host prewarms these images. Freeze only digests belonging to each
+# configured source repository; public mirror aliases are never source authority.
+python3 "$SCRIPT_DIR/ci/freeze-release-base-images.py" "$BASE_IMAGE_MANIFEST" \
+  pgvector/pgvector:pg16 redis:7.4-alpine "$FLYWAY_IMAGE" "$K6_IMAGE" "$PYTHON_IMAGE" \
+  "$BUILD_JDK_IMAGE" "$RUNTIME_JRE_IMAGE" \
+  || fatal "unable to freeze prewarmed base image identities"
+base_ref() {
+  python3 -c 'import json,sys; rows=json.load(open(sys.argv[1]))["images"]; print(next(row["reference"] for row in rows if row["tag"]==sys.argv[2]))' \
+    "$BASE_IMAGE_MANIFEST" "$1"
+}
+PINNED_BASES="$(python3 -c 'import json,sys; rows=json.load(open(sys.argv[1]))["images"]; print("\n".join(row["reference"]+"\t"+row["imageId"] for row in rows))' "$BASE_IMAGE_MANIFEST")" \
+  || fatal "invalid frozen base image manifest"
+while IFS=$'\t' read -r base_image expected_image_id; do
+  timeout "$PULL_TIMEOUT" docker pull "$base_image" > "$ARTIFACTS/logs/base-pull-${expected_image_id#sha256:}.log" 2>&1 \
     || fatal "bounded pull failed for $base_image; mirror it by immutable digest in the controlled registry"
-done
+  [[ "$(docker image inspect "$base_image" --format '{{.Id}}')" == "$expected_image_id" ]] \
+    || fatal "pulled image identity differs from frozen manifest: $base_image"
+done <<< "$PINNED_BASES"
+PGVECTOR_IMAGE="$(base_ref pgvector/pgvector:pg16)"
+REDIS_IMAGE="$(base_ref redis:7.4-alpine)"
+FLYWAY_IMAGE="$(base_ref "$FLYWAY_IMAGE")"
+K6_IMAGE="$(base_ref "$K6_IMAGE")"
+PYTHON_IMAGE="$(base_ref "$PYTHON_IMAGE")"
+BUILD_JDK_IMAGE="$(base_ref "$BUILD_JDK_IMAGE")"
+RUNTIME_JRE_IMAGE="$(base_ref "$RUNTIME_JRE_IMAGE")"
 
 # The admitted host installer prewarms this distribution from the configured transport mirror and
 # verifies it against Gradle's fixed official SHA-256. Seed the BuildKit cache from that verified
@@ -125,7 +154,8 @@ git -C "$REPO_ROOT" archive --format=tar HEAD | tar -x -C "$STAGE"
 # mount without running as root or changing permissions in the source checkout.
 chmod -R a+rX "$STAGE/plugins"
 info "building exact-ref image $IMAGE"
-docker build -f "$STAGE/platform/Dockerfile" -t "$IMAGE" "$STAGE" \
+docker build -f "$STAGE/platform/Dockerfile" -t "$IMAGE" \
+  --build-arg "BUILD_JDK_IMAGE=$BUILD_JDK_IMAGE" --build-arg "RUNTIME_JRE_IMAGE=$RUNTIME_JRE_IMAGE" "$STAGE" \
   > "$ARTIFACTS/logs/docker-build.log" 2>&1 || fail "image build failed"
 DIGEST="$(docker image inspect "$IMAGE" --format '{{.Id}}')"
 
@@ -133,8 +163,10 @@ source "$SCRIPT_DIR/ci/isolated-release-network.sh"
 create_isolated_release_network "$NET" "$ARTIFACTS/network-allocation.tsv" \
   || fatal "isolated release network unavailable"
 docker run -d --name "$PG" --network "$NET" -e POSTGRES_USER=auraboot \
-  -e POSTGRES_PASSWORD=open_platform_ci -e POSTGRES_DB=open_platform_ci pgvector/pgvector:pg16 >/dev/null
-docker run -d --name "$REDIS" --network "$NET" redis:7.4-alpine >/dev/null
+  -e POSTGRES_PASSWORD=open_platform_ci -e POSTGRES_DB=open_platform_ci "$PGVECTOR_IMAGE" \
+  -c shared_preload_libraries=pg_stat_statements \
+  -c track_io_timing=on -c track_wal_io_timing=on >/dev/null
+docker run -d --name "$REDIS" --network "$NET" "$REDIS_IMAGE" >/dev/null
 for attempt in $(seq 1 30); do
   # The temporary initialization server accepts sockets before the final TCP listener starts.
   docker exec "$PG" pg_isready -h "$PG" -U auraboot -d open_platform_ci >/dev/null 2>&1 && break
@@ -148,6 +180,7 @@ docker run --rm --network "$NET" -v "$STAGE/platform/src/main/resources/db/migra
   > "$ARTIFACTS/logs/flyway.log" 2>&1 || fail "Flyway migration failed"
 
 PROTOCOL_KEY="$(openssl rand -base64 48 | tr -d '\n')"
+JWT_KEY="$(openssl rand -base64 64 | tr -d '\n')"
 # AURA_PLUGINS_DIR is the PF4J jar-plugin root and must NOT share
 # AURA_BUILTIN_PLUGINS_DIR: the baked /app/plugins tree holds the DSL
 # builtin-import plugins (plugin.json + config/, no PF4J descriptor), and
@@ -155,7 +188,8 @@ PROTOCOL_KEY="$(openssl rand -base64 48 | tr -d '\n')"
 # skipping them. The image pre-creates the empty jar root /app/pf4j-plugins.
 docker run -d --name "$APP" --network "$NET" \
   -v "$STAGE/plugins":/plugins:ro \
-  -e SERVER_PORT=6443 -e SPRING_PROFILES_ACTIVE=test \
+  -e SERVER_PORT=6443 -e SPRING_PROFILES_ACTIVE=community \
+  -e JWT_SECRET="$JWT_KEY" \
   -e DATABASE_URL="jdbc:postgresql://$PG:5432/open_platform_ci" \
   -e SPRING_DATASOURCE_USERNAME=auraboot -e SPRING_DATASOURCE_PASSWORD=open_platform_ci \
   -e REDIS_HOST="$REDIS" -e REDIS_PORT=6379 \
@@ -183,13 +217,44 @@ docker run --rm --user "$RUNNER_UID:$RUNNER_GID" --network "$NET" \
 CLIENT_ID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["clientId"])' "$CREDENTIAL_ARTIFACT")"
 CLIENT_SECRET="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["clientSecret"])' "$CREDENTIAL_ARTIFACT")"
 
+# This job owns a fresh isolated database. Reset telemetry after bootstrap/protocol
+# so the captured SQL counts describe only the production SLO workload.
+docker exec "$PG" psql -U auraboot -d open_platform_ci -v ON_ERROR_STOP=1 -c \
+  "CREATE EXTENSION IF NOT EXISTS pg_stat_statements; SELECT pg_stat_statements_reset();" \
+  > "$ARTIFACTS/logs/sql-profile-init.log" 2>&1 || fatal "SQL profiling initialization failed"
+docker exec -i "$PG" psql -U auraboot -d open_platform_ci -At -v ON_ERROR_STOP=1 \
+  < "$SCRIPT_DIR/ci/open-platform-db-io.sql" > "$ARTIFACTS/db-io-before.json" \
+  2> "$ARTIFACTS/logs/db-io-before.log" || fatal "initial database I/O diagnostics failed"
+bash "$SCRIPT_DIR/ci/sample-open-platform-db.sh" "$PG" "$DB_SAMPLE_STOP" \
+  > "$ARTIFACTS/db-waits.jsonl" 2> "$ARTIFACTS/logs/db-waits.log" &
+DB_SAMPLE_PID=$!
+cat /proc/loadavg > "$ARTIFACTS/host-load-before.txt"
+
 info "running production-threshold k6 profile inside the CI network"
+SLO_RC=0
 docker run --rm --user "$RUNNER_UID:$RUNNER_GID" --network "$NET" \
   -v "$STAGE/tests/load/k6":/scripts:ro \
   -v "$ARTIFACTS":/artifacts -e PROFILE=production -e BASE_URL="http://$APP:6443" \
-  -e CLIENT_ID="$CLIENT_ID" -e CLIENT_SECRET="$CLIENT_SECRET" "$K6_IMAGE" run \
-  --summary-export /artifacts/slo-summary.json /scripts/open-platform-slo.js \
-  > "$ARTIFACTS/logs/k6.log" 2>&1 || fail "Open Platform production SLO thresholds failed"
+  -e CLIENT_ID="$CLIENT_ID" -e CLIENT_SECRET="$CLIENT_SECRET" \
+  -e SUMMARY_PATH=/artifacts/slo-summary.json "$K6_IMAGE" run /scripts/open-platform-slo.js \
+  > "$ARTIFACTS/logs/k6.log" 2>&1 || SLO_RC=$?
+# Preserve normalized statements (no bound credential values) on both red and
+# green exits. Diagnostic collection must not hide an already-failed SLO.
+PROFILE_RC=0
+: > "$DB_SAMPLE_STOP"
+wait "$DB_SAMPLE_PID" || PROFILE_RC=$?
+DB_SAMPLE_PID=""
+docker exec -i "$PG" psql -U auraboot -d open_platform_ci -At -v ON_ERROR_STOP=1 \
+  < "$SCRIPT_DIR/ci/open-platform-db-io.sql" > "$ARTIFACTS/db-io-after.json" \
+  2> "$ARTIFACTS/logs/db-io-after.log" || PROFILE_RC=$?
+docker exec -i "$PG" psql -U auraboot -d open_platform_ci -v ON_ERROR_STOP=1 -At \
+  < "$SCRIPT_DIR/ci/open-platform-sql-profile.sql" \
+  > "$ARTIFACTS/sql-profile.json" 2> "$ARTIFACTS/logs/sql-profile.log" || PROFILE_RC=$?
+cat /proc/loadavg > "$ARTIFACTS/host-load-after.txt"
+docker stats --no-stream --format '{{json .}}' "$APP" "$PG" "$REDIS" \
+  > "$ARTIFACTS/container-resources.jsonl" 2> "$ARTIFACTS/logs/container-resources.log" || true
+[[ "$SLO_RC" == 0 ]] || fail "Open Platform production SLO thresholds failed (k6 exit=$SLO_RC, SQL profile exit=$PROFILE_RC)"
+[[ "$PROFILE_RC" == 0 ]] || fatal "SQL profile could not be collected"
 rm -f "$CREDENTIAL_ARTIFACT"
 
 info "waiting for Webhook queue drain"

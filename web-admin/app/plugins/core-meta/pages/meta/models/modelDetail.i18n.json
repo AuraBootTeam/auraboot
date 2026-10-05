@@ -1,0 +1,530 @@
+{
+  "capabilityList": {
+    "zh-CN": "可列表",
+    "en": "Listable"
+  },
+  "capabilityDetail": {
+    "zh-CN": "可详情",
+    "en": "Detailable"
+  },
+  "capabilitySort": {
+    "zh-CN": "可排序",
+    "en": "Sortable"
+  },
+  "capabilityFilter": {
+    "zh-CN": "可过滤",
+    "en": "Filterable"
+  },
+  "capabilityCreate": {
+    "zh-CN": "可新建",
+    "en": "Creatable"
+  },
+  "capabilityUpdate": {
+    "zh-CN": "可更新",
+    "en": "Updatable"
+  },
+  "capabilityDelete": {
+    "zh-CN": "可删除",
+    "en": "Deletable"
+  },
+  "capabilityExport": {
+    "zh-CN": "可导出",
+    "en": "Exportable"
+  },
+  "capabilitySearch": {
+    "zh-CN": "可搜索",
+    "en": "Searchable"
+  },
+  "capabilityPaginate": {
+    "zh-CN": "可分页",
+    "en": "Paginatable"
+  },
+  "statusPublished": {
+    "zh-CN": "已发布",
+    "en": "Published"
+  },
+  "statusDraft": {
+    "zh-CN": "草稿",
+    "en": "Draft"
+  },
+  "statusArchived": {
+    "zh-CN": "已归档",
+    "en": "Archived"
+  },
+  "statusUnmarked": {
+    "zh-CN": "未标记",
+    "en": "Unmarked"
+  },
+  "statusNotCreated": {
+    "zh-CN": "未创建",
+    "en": "Not created"
+  },
+  "statusCreated": {
+    "zh-CN": "已创建",
+    "en": "Created"
+  },
+  "pageEmpty": {
+    "zh-CN": "暂无页面",
+    "en": "No pages yet"
+  },
+  "pageUnnamed": {
+    "zh-CN": "未命名页面",
+    "en": "Unnamed page"
+  },
+  "redetectUnsupported": {
+    "zh-CN": "暂未支持自动重新检测,P1 backend 未实现该 endpoint",
+    "en": "Automatic re-detection is not supported yet; the P1 backend has not implemented this endpoint"
+  },
+  "redetectTriggered": {
+    "zh-CN": "重新检测已触发",
+    "en": "Re-detection triggered"
+  },
+  "connectivityOk": {
+    "zh-CN": "数据源连通正常",
+    "en": "Data source connectivity is healthy"
+  },
+  "connectivityFailed": {
+    "zh-CN": "连通性检查失败: {message}",
+    "en": "Connectivity check failed: {message}"
+  },
+  "sampleLoadFailed": {
+    "zh-CN": "加载样本失败: {message}",
+    "en": "Failed to load samples: {message}"
+  },
+  "fieldOrderUpdated": {
+    "zh-CN": "字段顺序已更新",
+    "en": "Field order updated"
+  },
+  "fieldOrderUpdateFailed": {
+    "zh-CN": "更新字段顺序失败",
+    "en": "Failed to update field order"
+  },
+  "fieldConfigUpdated": {
+    "zh-CN": "字段配置已更新",
+    "en": "Field configuration updated"
+  },
+  "fieldConfigUpdateFailed": {
+    "zh-CN": "更新字段配置失败",
+    "en": "Failed to update field configuration"
+  },
+  "dictBindSuccess": {
+    "zh-CN": "字典绑定成功",
+    "en": "Dictionary bound"
+  },
+  "dictUnbindSuccess": {
+    "zh-CN": "字典解绑成功",
+    "en": "Dictionary unbound"
+  },
+  "dictConfigUpdateFailed": {
+    "zh-CN": "更新字典配置失败",
+    "en": "Failed to update dictionary configuration"
+  },
+  "unbindFieldConfirm": {
+    "zh-CN": "确定要从模型中移除字段 \"{name}\" 吗？",
+    "en": "Remove field \"{name}\" from the model?"
+  },
+  "fieldRemoved": {
+    "zh-CN": "字段已移除",
+    "en": "Field removed"
+  },
+  "fieldRemoveFailed": {
+    "zh-CN": "移除字段失败",
+    "en": "Failed to remove the field"
+  },
+  "fieldBoundSuccess": {
+    "zh-CN": "字段绑定成功",
+    "en": "Field bound"
+  },
+  "deleteModelConfirm": {
+    "zh-CN": "确定要删除模型 \"{name}\" 吗？此操作不可恢复。",
+    "en": "Delete model \"{name}\"? This action cannot be undone."
+  },
+  "deleteModelSuccess": {
+    "zh-CN": "删除Model成功",
+    "en": "Model deleted"
+  },
+  "deleteModelFailed": {
+    "zh-CN": "删除Model失败",
+    "en": "Failed to delete the model"
+  },
+  "refreshCacheSuccess": {
+    "zh-CN": "刷新缓存成功",
+    "en": "Cache refreshed"
+  },
+  "refreshCacheFailed": {
+    "zh-CN": "刷新缓存失败",
+    "en": "Failed to refresh the cache"
+  },
+  "unpublishConfirm": {
+    "zh-CN": "确定要取消发布此模型吗？数据库表将保留，但模型状态会变为 deprecated。",
+    "en": "Unpublish this model? The database table will be kept, but the model status becomes deprecated."
+  },
+  "unpublishSuccess": {
+    "zh-CN": "模型已取消发布",
+    "en": "Model unpublished"
+  },
+  "unpublishFailed": {
+    "zh-CN": "取消发布失败",
+    "en": "Failed to unpublish"
+  },
+  "noPreviewablePage": {
+    "zh-CN": "暂无可预览页面，先生成或创建页面",
+    "en": "No page available to preview; generate or create a page first"
+  },
+  "crudPagesGenerated": {
+    "zh-CN": "CRUD页面生成成功",
+    "en": "CRUD pages generated"
+  },
+  "viewVersionWip": {
+    "zh-CN": "查看版本 {version} 功能开发中",
+    "en": "View version {version} is under development"
+  },
+  "rollbackConfirm": {
+    "zh-CN": "确定要回滚到版本 {version} 吗？",
+    "en": "Roll back to version {version}?"
+  },
+  "rollbackSuccess": {
+    "zh-CN": "回滚到版本 {version} 成功",
+    "en": "Rolled back to version {version}"
+  },
+  "rollbackFailed": {
+    "zh-CN": "版本回滚失败",
+    "en": "Version rollback failed"
+  },
+  "modelCodePrefix": {
+    "zh-CN": "模型编码:",
+    "en": "Model code:"
+  },
+  "statFields": {
+    "zh-CN": "字段",
+    "en": "Fields"
+  },
+  "statPages": {
+    "zh-CN": "页面",
+    "en": "Pages"
+  },
+  "statVersions": {
+    "zh-CN": "版本",
+    "en": "Versions"
+  },
+  "statLastUpdated": {
+    "zh-CN": "最近更新",
+    "en": "Last updated"
+  },
+  "actionOpenPageDesign": {
+    "zh-CN": "打开页面设计",
+    "en": "Open page designer"
+  },
+  "actionGenerateCrud": {
+    "zh-CN": "生成基础 CRUD",
+    "en": "Generate basic CRUD"
+  },
+  "actionPreviewMainPage": {
+    "zh-CN": "预览主页面",
+    "en": "Preview main page"
+  },
+  "actionEditModel": {
+    "zh-CN": "编辑模型",
+    "en": "Edit model"
+  },
+  "moreActions": {
+    "zh-CN": "更多",
+    "en": "More"
+  },
+  "loading": {
+    "zh-CN": "加载中...",
+    "en": "Loading..."
+  },
+  "actionPublishModel": {
+    "zh-CN": "发布模型",
+    "en": "Publish model"
+  },
+  "actionUnpublish": {
+    "zh-CN": "取消发布",
+    "en": "Unpublish"
+  },
+  "actionRefreshCache": {
+    "zh-CN": "刷新缓存",
+    "en": "Refresh cache"
+  },
+  "actionRedetect": {
+    "zh-CN": "重新检测",
+    "en": "Re-detect"
+  },
+  "actionDeleteModel": {
+    "zh-CN": "删除模型",
+    "en": "Delete model"
+  },
+  "tabOverview": {
+    "zh-CN": "概览",
+    "en": "Overview"
+  },
+  "tabFieldsWithCount": {
+    "zh-CN": "字段 ({count})",
+    "en": "Fields ({count})"
+  },
+  "tabPagesWithCount": {
+    "zh-CN": "页面 ({count})",
+    "en": "Pages ({count})"
+  },
+  "tabVersionsWithCount": {
+    "zh-CN": "版本 ({count})",
+    "en": "Versions ({count})"
+  },
+  "tabRuntime": {
+    "zh-CN": "运行时验证",
+    "en": "Runtime verification"
+  },
+  "tabAdvanced": {
+    "zh-CN": "高级",
+    "en": "Advanced"
+  },
+  "sectionModelInfo": {
+    "zh-CN": "模型信息",
+    "en": "Model information"
+  },
+  "labelModelCode": {
+    "zh-CN": "模型编码",
+    "en": "Model code"
+  },
+  "labelDisplayName": {
+    "zh-CN": "显示名称",
+    "en": "Display name"
+  },
+  "labelStatus": {
+    "zh-CN": "状态",
+    "en": "Status"
+  },
+  "labelSource": {
+    "zh-CN": "来源",
+    "en": "Source"
+  },
+  "labelNamespace": {
+    "zh-CN": "命名空间",
+    "en": "Namespace"
+  },
+  "labelEnv": {
+    "zh-CN": "环境",
+    "en": "Environment"
+  },
+  "labelDescription": {
+    "zh-CN": "描述",
+    "en": "Description"
+  },
+  "labelUpdatedAt": {
+    "zh-CN": "更新时间",
+    "en": "Updated at"
+  },
+  "labelUpdatedBy": {
+    "zh-CN": "更新人",
+    "en": "Updated by"
+  },
+  "sectionDesignSummary": {
+    "zh-CN": "设计联动摘要",
+    "en": "Design linkage summary"
+  },
+  "labelPageCoverage": {
+    "zh-CN": "页面覆盖情况",
+    "en": "Page coverage"
+  },
+  "pageKindList": {
+    "zh-CN": "列表页",
+    "en": "List page"
+  },
+  "pageKindDetail": {
+    "zh-CN": "详情页",
+    "en": "Detail page"
+  },
+  "pageKindForm": {
+    "zh-CN": "表单页",
+    "en": "Form page"
+  },
+  "labelLatestEditedPage": {
+    "zh-CN": "最近编辑页面",
+    "en": "Recently edited page"
+  },
+  "actionViewPageWorkbench": {
+    "zh-CN": "查看页面工作台",
+    "en": "View page workbench"
+  },
+  "fieldsPageImpactNotice": {
+    "zh-CN": "此模型已有 {count} 个关联页面，字段变更可能影响页面配置。",
+    "en": "This model already has {count} related page(s); field changes may affect page configuration."
+  },
+  "actionViewRelatedPages": {
+    "zh-CN": "查看关联页面",
+    "en": "View related pages"
+  },
+  "virtualFieldsReadonly": {
+    "zh-CN": "🔒 虚拟 Model 的字段名 / 类型只读(来自 detection 快照)。仅允许改 label / sortable / filterable。",
+    "en": "🔒 Field names / types of a virtual model are read-only (from the detection snapshot). Only label / sortable / filterable can be changed."
+  },
+  "noVersionHistory": {
+    "zh-CN": "暂无版本历史",
+    "en": "No version history yet"
+  },
+  "versionLabel": {
+    "zh-CN": "版本 {version}",
+    "en": "Version {version}"
+  },
+  "currentVersionBadge": {
+    "zh-CN": "当前版本",
+    "en": "Current"
+  },
+  "noVersionNote": {
+    "zh-CN": "无说明",
+    "en": "No notes"
+  },
+  "actionView": {
+    "zh-CN": "查看",
+    "en": "View"
+  },
+  "actionRollback": {
+    "zh-CN": "回滚",
+    "en": "Roll back"
+  },
+  "pageTitleWorkbench": {
+    "zh-CN": "页面工作台",
+    "en": "Page workbench"
+  },
+  "pagesWorkbenchHint": {
+    "zh-CN": "先补齐页面，再直接进入设计器调整细节。",
+    "en": "Complete the pages first, then fine-tune details directly in the designer."
+  },
+  "noStandardPagesTitle": {
+    "zh-CN": "还没有标准页面",
+    "en": "No standard pages yet"
+  },
+  "noStandardPagesHint": {
+    "zh-CN": "可以一键生成基础 CRUD 页面，或按页面类型逐个创建。",
+    "en": "Generate basic CRUD pages in one click, or create pages one by one by type."
+  },
+  "actionGenerateCrudOneClick": {
+    "zh-CN": "一键生成 CRUD",
+    "en": "Generate CRUD in one click"
+  },
+  "actionPickPageManually": {
+    "zh-CN": "手动选择页面",
+    "en": "Pick a page manually"
+  },
+  "updatedAtIndex": {
+    "zh-CN": "更新于 {date}",
+    "en": "Updated {date}"
+  },
+  "noSuchStandardPage": {
+    "zh-CN": "还没有此类标准页面",
+    "en": "No standard page of this type yet"
+  },
+  "actionEditDesign": {
+    "zh-CN": "编辑设计",
+    "en": "Edit design"
+  },
+  "actionPreview": {
+    "zh-CN": "预览",
+    "en": "Preview"
+  },
+  "actionCreate": {
+    "zh-CN": "创建",
+    "en": "Create"
+  },
+  "sectionOtherPages": {
+    "zh-CN": "其他页面",
+    "en": "Other pages"
+  },
+  "actionOpenPageSchemaList": {
+    "zh-CN": "打开 Page Schema 列表",
+    "en": "Open Page Schema list"
+  },
+  "noCustomPages": {
+    "zh-CN": "暂无其他自定义页面",
+    "en": "No other custom pages yet"
+  },
+  "actionOpen": {
+    "zh-CN": "打开",
+    "en": "Open"
+  },
+  "runtimeCheckTitle": {
+    "zh-CN": "虚拟 Model 运行时检查",
+    "en": "Virtual model runtime check"
+  },
+  "labelDataSourceConnectivity": {
+    "zh-CN": "数据源连通性",
+    "en": "Data source connectivity"
+  },
+  "runtimeStatusOk": {
+    "zh-CN": "✅ 正常",
+    "en": "✅ Healthy"
+  },
+  "runtimeStatusFail": {
+    "zh-CN": "❌ {message}",
+    "en": "❌ {message}"
+  },
+  "runtimeStatusFailDefault": {
+    "zh-CN": "失败",
+    "en": "Failed"
+  },
+  "actionCheck": {
+    "zh-CN": "检查",
+    "en": "Check"
+  },
+  "labelSamplePreview": {
+    "zh-CN": "样本数据预览",
+    "en": "Sample data preview"
+  },
+  "actionLoadSamples": {
+    "zh-CN": "加载 3 条样本",
+    "en": "Load 3 samples"
+  },
+  "sectionPermissions": {
+    "zh-CN": "权限点",
+    "en": "Permission points"
+  },
+  "noPermissions": {
+    "zh-CN": "暂无权限点",
+    "en": "No permission points yet"
+  },
+  "actionViewReferences": {
+    "zh-CN": "查看引用",
+    "en": "View references"
+  },
+  "sectionTechMetadata": {
+    "zh-CN": "技术元数据",
+    "en": "Technical metadata"
+  },
+  "labelModelType": {
+    "zh-CN": "模型类型",
+    "en": "Model type"
+  },
+  "modelTypeEntity": {
+    "zh-CN": "实体",
+    "en": "Entity"
+  },
+  "modelTypeView": {
+    "zh-CN": "视图",
+    "en": "View"
+  },
+  "modelTypeAggregate": {
+    "zh-CN": "聚合",
+    "en": "Aggregate"
+  },
+  "labelIsCurrent": {
+    "zh-CN": "是否当前版本",
+    "en": "Is current version"
+  },
+  "yesLabel": {
+    "zh-CN": "是",
+    "en": "Yes"
+  },
+  "noLabel": {
+    "zh-CN": "否",
+    "en": "No"
+  },
+  "labelCreatedAt": {
+    "zh-CN": "创建时间",
+    "en": "Created at"
+  },
+  "labelCreatedBy": {
+    "zh-CN": "创建人",
+    "en": "Created by"
+  }
+}

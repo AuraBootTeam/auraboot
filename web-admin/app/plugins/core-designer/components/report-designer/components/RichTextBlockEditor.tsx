@@ -3,6 +3,7 @@
  */
 
 import React from 'react';
+import { useSmartText } from '~/utils/i18n';
 import type { RichTextBlock } from '../types';
 
 interface RichTextBlockEditorProps {
@@ -11,21 +12,22 @@ interface RichTextBlockEditorProps {
 }
 
 export const RichTextBlockEditor: React.FC<RichTextBlockEditorProps> = ({ block, onChange }) => {
+  const text = useSmartText();
   return (
     <div className="space-y-4">
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Content</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">{text({ zh: '内容', en: 'Content' })}</label>
         <textarea
           value={block.content || ''}
           onChange={(e) => onChange({ content: e.target.value })}
           className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
           rows={6}
-          placeholder="Enter text content..."
+          placeholder={text({ zh: '输入文本内容…', en: 'Enter text content...' })}
         />
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Alignment</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">{text({ zh: '对齐方式', en: 'Alignment' })}</label>
         <div className="flex gap-1">
           {(['left', 'center', 'right'] as const).map((align) => (
             <button
@@ -37,14 +39,14 @@ export const RichTextBlockEditor: React.FC<RichTextBlockEditorProps> = ({ block,
                   : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
               }`}
             >
-              {align.charAt(0).toUpperCase() + align.slice(1)}
+              {text({ left: { zh: '左对齐', en: 'Left' }, center: { zh: '居中', en: 'Center' }, right: { zh: '右对齐', en: 'Right' } }[align])}
             </button>
           ))}
         </div>
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Font Size (pt)</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">{text({ zh: '字号（磅）', en: 'Font Size (pt)' })}</label>
         <input
           type="number"
           value={block.style?.fontSize || 10}
@@ -58,7 +60,7 @@ export const RichTextBlockEditor: React.FC<RichTextBlockEditorProps> = ({ block,
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Font Weight</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">{text({ zh: '字重', en: 'Font Weight' })}</label>
         <select
           value={block.style?.fontWeight || 'normal'}
           onChange={(e) =>
@@ -66,13 +68,13 @@ export const RichTextBlockEditor: React.FC<RichTextBlockEditorProps> = ({ block,
           }
           className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
         >
-          <option value="normal">Normal</option>
-          <option value="bold">Bold</option>
+          <option value="normal">{text({ zh: '常规', en: 'Normal' })}</option>
+          <option value="bold">{text({ zh: '粗体', en: 'Bold' })}</option>
         </select>
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Color</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">{text({ zh: '颜色', en: 'Color' })}</label>
         <input
           type="color"
           value={block.style?.color || '#333333'}

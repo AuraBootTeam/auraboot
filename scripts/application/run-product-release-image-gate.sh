@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)/ci/isolated-release-network.sh"
 
 fatal() { printf 'product-release-image-gate: %s\n' "$*" >&2; exit 2; }
 fail() { printf 'product-release-image-gate: %s\n' "$*" >&2; exit 1; }
@@ -7,18 +8,8 @@ info() { printf '==> %s\n' "$*"; }
 need() { command -v "$1" >/dev/null 2>&1 || fatal "missing dependency: $1"; }
 
 create_isolated_network() {
-  local subnet_index
-  # Docker's default address pools are shared with every CI Compose project on
-  # the host and can be exhausted by retained evidence environments. Allocate
-  # release-image networks explicitly from a dedicated /16, one /24 at a time.
-  # `docker network create` is the concurrency-safe arbiter for overlapping
-  # candidates, so parallel gates simply advance to the next subnet.
-  for subnet_index in $(seq 0 255); do
-    if docker network create --subnet "10.247.${subnet_index}.0/24" "$NETWORK" >/dev/null 2>&1; then
-      return 0
-    fi
-  done
-  fatal 'no free isolated release-image network in 10.247.0.0/16'
+  create_isolated_release_network "$NETWORK" "$ARTIFACTS/network-allocation.tsv" \
+    || fatal 'isolated release network unavailable'
 }
 
 wait_for_final_postgres() {

@@ -1,6 +1,7 @@
 package com.auraboot.framework.i18n.service;
 
 import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.i18n.entity.I18nResource;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -369,6 +370,45 @@ class I18nResourceServiceIntegrationTest extends BaseIntegrationTest {
         assertThat(counts).isNotNull().isNotEmpty();
         assertThat(counts).containsKey("system");
         assertThat(counts.get("system")).isGreaterThan(0);
+    }
+
+    @Test
+    @Order(16)
+    @DisplayName("IR-16: platform translations survive tenant filtering and tenant overrides retain priority")
+    void IR_16_platformResourcesRemainVisibleWithAndWithoutTenantContext() {
+        MetaContext.Snapshot original = MetaContext.snapshot();
+        assertThat(original).isNotNull();
+        assertThat(original.tenantId()).isPositive();
+        assertThat(MetaContext.isTenantFilterBypassed()).isFalse();
+        String sharedKey = pfx + ".platform.shared";
+        String platformOnlyKey = pfx + ".platform.only";
+        try {
+            MetaContext.setContext(0L, original.userId(), original.userPid(), original.username());
+            MetaContext.runWithoutTenantFilter(() -> {
+                i18nResourceService.create(buildResource(sharedKey, "zh-CN", "Platform shared", "system"));
+                i18nResourceService.create(buildResource(platformOnlyKey, "zh-CN", "Platform only", "system"));
+            });
+            MetaContext.restore(original);
+            assertThat(i18nResourceService.getResourceMapByLang("zh-CN"))
+                    .containsEntry(sharedKey, "Platform shared")
+                    .containsEntry(platformOnlyKey, "Platform only");
+
+            i18nResourceService.create(buildResource(sharedKey, "zh-CN", "Tenant override", "test"));
+            assertThat(i18nResourceService.getResourceMapByLang("zh-CN"))
+                    .containsEntry(sharedKey, "Tenant override")
+                    .containsEntry(platformOnlyKey, "Platform only");
+            assertThat(MetaContext.getCurrentTenantId()).isEqualTo(original.tenantId());
+            assertThat(MetaContext.isTenantFilterBypassed()).isFalse();
+
+            MetaContext.clear();
+            assertThat(i18nResourceService.getResourceMapByLang("zh-CN"))
+                    .containsEntry(platformOnlyKey, "Platform only");
+            assertThat(MetaContext.exists()).isFalse();
+            assertThat(MetaContext.isTenantFilterBypassed()).isFalse();
+        } finally {
+            MetaContext.clear();
+            MetaContext.restore(original);
+        }
     }
 
     // ==================== helpers ====================

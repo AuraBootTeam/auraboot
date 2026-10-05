@@ -4,11 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.decision.entity.*;
 import com.auraboot.framework.decision.mapper.*;
 import com.auraboot.framework.decision.service.impl.DecisionEvaluationServiceImpl;
-import com.baomidou.mybatisplus.core.MybatisConfiguration;
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
-import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
@@ -23,9 +19,10 @@ class DecisionLogBusinessNameTest {
     @Mock DrtLogMapper logs;
     @Mock DrtDefinitionMapper definitions;
     @InjectMocks DecisionEvaluationServiceImpl service;
-    @BeforeAll static void metadata() {
-        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""),
-                DrtDefinitionEntity.class);
+    @BeforeAll static void initializeDefinitionMapping() {
+        com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(
+                new org.apache.ibatis.builder.MapperBuilderAssistant(
+                        new com.baomidou.mybatisplus.core.MybatisConfiguration(), ""), DrtDefinitionEntity.class);
     }
     @BeforeEach void context() { MetaContext.setContext(123L,456L,"user","owner"); }
     @AfterEach void clear() { MetaContext.clear(); }
@@ -51,11 +48,9 @@ class DecisionLogBusinessNameTest {
     @Test void foreignTenantOrMissingCatalogueNeverSuppliesDisplayNames() {
         when(logs.findByTraceId(123L,"trace")).thenReturn(List.of(log("one")));
         when(definitions.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(definition(999L,"Foreign secret")),List.of());
-        // A foreign row inside a tenant-scoped catalogue response is tampering: the
-        // lookup fails closed instead of leaking the foreign display name.
         assertThatThrownBy(() -> service.findLogsByTraceId("trace"))
-                .isInstanceOf(IllegalStateException.class);
-        // Missing catalogue entries leave the business name empty rather than a code.
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("identity is invalid");
         assertThat(service.findLogsByTraceId("trace").getFirst().getDecisionName()).isNull();
     }
 }

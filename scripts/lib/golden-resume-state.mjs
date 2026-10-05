@@ -40,7 +40,7 @@ export function verifyResumeState({ report, repo, plan, planHash, manifest, depe
     'Resume plan is not bound to the published product manifest');
   need(manifest.sourceCommit === plan.sourceCommit && manifest.backendArtifact.path === plan.backend.path &&
     manifest.backendArtifact.hash === plan.backend.hash, 'Product manifest launch identity mismatch');
-  const source = report.sources.find(item => item.key === 'auraboot');
+  const source = report.sources.find(item => ['auraboot', 'core'].includes(item.key));
   const artifact = report.artifacts.find(item => item.key === 'backend');
   need(source?.status === 'ok' && source.expected.root === repo && source.expected.commit === plan.sourceCommit,
     'Resume source identity mismatch');

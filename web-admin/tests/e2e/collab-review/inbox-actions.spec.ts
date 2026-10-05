@@ -1,136 +1,110 @@
-import { test, expect } from '@playwright/test';
-import fs from 'node:fs';
-import path from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { test, expect, type Page } from '../../fixtures';
 
-/**
- * Inbox — real action-point verification.
- *
- * Each test drives a real affordance and asserts the resulting state change,
- * not the mere presence of a control.
- */
-
-const SHOTS = process.env.PROBE_SHOT_DIR || '/tmp/collab-probe';
-fs.mkdirSync(SHOTS, { recursive: true });
+async function bodyOK(response: any) {
+  expect(response.ok()).toBe(true);
+  const body = await response.json();
+  expect(String(body.code)).toBe('0');
+  return body.data;
+}
+async function seed(page: Page, name: string) {
+  const me = await bodyOK(await page.request.get('/api/auth/me'));
+  expect(me.user.id).toBeTruthy();
+  expect(me.user.tenantId).toBeTruthy();
+  const response = await page.request.post('/api/test/fixture', {
+    data: { name, testRunId: `COLLAB_${randomUUID()}`, params: { count: 2, userId: String(me.user.id), tenantId: String(me.user.tenantId) } },
+  });
+  expect(response.ok(), 'fixture HTTP admission must succeed').toBe(true);
+  const body = await response.json();
+  expect(body.success, 'fixture must create real records').toBe(true);
+  expect(body.testRunId).toMatch(/\S+/);
+  expect(body.recordsCreated).toBe(2);
+  expect(body.recordPids).toHaveLength(2);
+  for (const id of body.recordPids) {
+    expect(id).toMatch(/^\d+$/);
+    const saved = await bodyOK(await page.request.get(`/api/inbox/${id}`));
+    expect(String(saved.id)).toBe(id);
+    expect(saved.status).toBe('pending');
+    expect(saved.isRead).toBe(false);
+    expect(saved.title).toContain(body.testRunId);
+  }
+  return body.recordPids as string[];
+}
+async function openInbox(page: Page) {
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('header[data-hydrated]')).toHaveAttribute('data-hydrated', 'true');
+  await page.getByTestId('inbox-badge').click();
+  await expect(page.getByTestId('inbox-dropdown')).toBeVisible();
+  const response = page.waitForResponse(r => r.request().method() === 'GET' && new URL(r.url()).pathname === '/api/inbox');
+  await page.getByTestId('inbox-view-all').click();
+  await bodyOK(await response);
+  await expect(page.getByTestId('unified-inbox-page')).toBeVisible();
+  await expect(page.getByTestId('inbox-loading-skeleton')).toHaveCount(0);
+  await expect(page.getByTestId('inbox-error-state')).toHaveCount(0);
+}
 
 test.describe('inbox actions', () => {
-  test('IB-1: the "All" tab shows the real unread total, not a double-count', async ({ page }) => {
-    // Seed unread items of several types so the double-count bug has something to
-    // double: with zero unread, "total" and "2 x total" are the same number and the
-    // assertion would pass no matter what the page rendered.
-    const me = await (await page.request.get('/api/auth/me')).json();
-    const user = me.data.user;
-    for (const fixture of ['inbox_items', 'inbox_alert', 'inbox_assignment']) {
-      await page.request.post('/api/test/fixture', {
-        data: {
-          name: fixture,
-          params: { count: 2, userId: String(user.id), tenantId: String(user.tenantId) },
-        },
-      });
-    }
+test('IB-1: the "All" tab shows the real unread total, not a double-count', async ({ page }) => {
+  const ids = (await Promise.all(['inbox_items', 'inbox_alert', 'inbox_assignment'].map(name => seed(page, name)))).flat();
+  await openInbox(page);
+  for (const id of ids) await expect(page.getByTestId(`inbox-item-${id}`)).toBeVisible();
+  const summary = await bodyOK(await page.request.get('/api/inbox/unread-summary'));
+  expect(summary.total).toBeGreaterThanOrEqual(ids.length);
+  const sum = Object.entries(summary).filter(([key]) => key !== 'total').reduce((n, [, value]) => n + Number(value), 0);
+  expect(sum).toBe(summary.total);
+  await expect(page.getByTestId('inbox-tab-count-all')).toHaveText(String(summary.total));
+  expect(Number(await page.getByTestId('inbox-tab-count-all').innerText())).not.toBe(summary.total + sum);
+  await page.screenshot({ path: test.info().outputPath('20-inbox-counts.png'), fullPage: true });
+});
 
-    await page.goto('/inbox', { waitUntil: 'domcontentloaded' });
-    // Wait on the page's testid, not its title: the heading is localised, so asserting
-    // on English text made these break the moment the page learned to speak Chinese.
-    await expect(page.locator('[data-testid="unified-inbox-page"]')).toBeVisible({ timeout: 15000 });
-    await page.waitForTimeout(1500);
+test('IB-2: dismiss removes the item from the list and from the backend', async ({ page }) => {
+  const [id] = await seed(page, 'inbox_alert');
+  await openInbox(page);
+  await expect(page.getByTestId(`inbox-item-${id}`)).toBeVisible();
+  const response = page.waitForResponse(r => r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/inbox/${id}/dismiss`);
+  await page.getByTestId(`inbox-dismiss-${id}`).click();
+  await bodyOK(await response);
+  await expect(page.getByTestId(`inbox-item-${id}`)).toHaveCount(0);
+  const saved = await bodyOK(await page.request.get(`/api/inbox/${id}`));
+  expect(saved.status).toBe('dismissed');
+  const loaded = page.waitForResponse(r => r.request().method() === 'GET' && new URL(r.url()).pathname === '/api/inbox');
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await bodyOK(await loaded);
+  await expect(page.getByTestId('inbox-loading-skeleton')).toHaveCount(0);
+  await expect(page.getByTestId(`inbox-item-${id}`)).toHaveCount(0);
+  await page.screenshot({ path: test.info().outputPath('21-inbox-after-dismiss.png'), fullPage: true });
+});
 
-    // Source of truth: the same endpoint the page reads.
-    const summaryResp = await page.request.get('/api/inbox/unread-summary');
-    const summaryBody = await summaryResp.json();
-    const serverTotal: number = summaryBody.data.total;
-    const perTypeSum = Object.entries(summaryBody.data)
-      .filter(([k]) => k !== 'total')
-      .reduce((acc, [, v]) => acc + (v as number), 0);
+test('IB-3: mark all read drives the unread count to zero', async ({ page }) => {
+  const ids = await seed(page, 'inbox_alert');
+  await openInbox(page);
+  const before = await bodyOK(await page.request.get('/api/inbox/unread-count'));
+  expect(before).toBeGreaterThanOrEqual(ids.length);
+  for (const id of ids) await expect(page.getByTestId(`inbox-item-${id}`)).toBeVisible();
+  const response = page.waitForResponse(r => r.request().method() === 'PUT' && new URL(r.url()).pathname === '/api/inbox/read-all');
+  await page.getByTestId('unified-inbox-page').getByTestId('inbox-mark-all-read').click();
+  await bodyOK(await response);
+  expect(await bodyOK(await page.request.get('/api/inbox/unread-count'))).toBe(0);
+  for (const id of ids) expect((await bodyOK(await page.request.get(`/api/inbox/${id}`))).isRead).toBe(true);
+  await expect(page.getByTestId('inbox-tab-count-all')).toHaveText('0');
+  await expect(page.getByTestId('inbox-badge').locator('span')).toHaveCount(0);
+  await expect(page.getByTestId('toast-stack')).toContainText('所有待办已标为已读');
+  await page.screenshot({ path: test.info().outputPath('22-inbox-mark-all-read.png'), fullPage: true });
+});
 
-    const allTabCount = (
-      await page.locator('[data-testid="inbox-tab-count-all"]').innerText()
-    ).trim();
-    const rows = await page.locator('[data-testid^="inbox-item-"]').count();
+test('IB-4: type tab filters the list to that type only', async ({ page }) => {
+  const ids = await seed(page, 'inbox_alert');
+  const other = await seed(page, 'inbox_assignment');
+  await openInbox(page);
+  for (const id of [...ids, ...other]) await expect(page.getByTestId(`inbox-item-${id}`)).toBeVisible();
+  const response = page.waitForResponse(r => r.request().method() === 'GET' && new URL(r.url()).pathname === '/api/inbox' && new URL(r.url()).searchParams.get('itemType') === 'alert');
+  await page.getByTestId('inbox-tab-alert').click();
+  const data = await bodyOK(await response);
+  expect(data.records.length).toBeGreaterThanOrEqual(ids.length);
+  for (const row of data.records) expect(row.itemType).toBe('alert');
+  for (const id of ids) await expect(page.getByTestId(`inbox-item-${id}`)).toBeVisible();
+  for (const id of other) await expect(page.getByTestId(`inbox-item-${id}`)).toHaveCount(0);
+  await page.screenshot({ path: test.info().outputPath('23-inbox-tab-alert.png'), fullPage: true });
+});
 
-    fs.writeFileSync(
-      path.join(SHOTS, 'inbox-count-evidence.json'),
-      JSON.stringify(
-        { allTabCount, renderedRows: rows, serverTotal, perTypeSum, summary: summaryBody.data },
-        null,
-        2,
-      ),
-    );
-    await page.screenshot({ path: path.join(SHOTS, '20-inbox-counts.png'), fullPage: true });
-
-    // The badge must equal the server's unread total. The bug this guards against
-    // summed every value of the summary map — including its own `total` key — so the
-    // badge read serverTotal + perTypeSum (exactly double) instead of serverTotal.
-    expect(
-      Number(allTabCount),
-      `tab shows ${allTabCount}; server says total=${serverTotal} (per-type sum=${perTypeSum})`,
-    ).toBe(serverTotal);
-    expect(serverTotal, 'seeding should have produced unread items').toBeGreaterThan(0);
-    expect(
-      Number(allTabCount),
-      'badge must not be the double-counted total',
-    ).not.toBe(serverTotal + perTypeSum);
-  });
-
-  test('IB-2: dismiss removes the item from the list and from the backend', async ({ page }) => {
-    await page.goto('/inbox', { waitUntil: 'domcontentloaded' });
-    // Wait on the page's testid, not its title: the heading is localised, so asserting
-    // on English text made these break the moment the page learned to speak Chinese.
-    await expect(page.locator('[data-testid="unified-inbox-page"]')).toBeVisible({ timeout: 15000 });
-    await page.waitForTimeout(1500);
-
-    const before = await page.locator('[data-testid^="inbox-item-"]').count();
-    expect(before, 'need at least one item to dismiss').toBeGreaterThan(0);
-
-    const firstDismiss = page.locator('[data-testid^="inbox-dismiss-"]').first();
-    await firstDismiss.click();
-    await page.waitForTimeout(2500);
-    await page.screenshot({ path: path.join(SHOTS, '21-inbox-after-dismiss.png'), fullPage: true });
-
-    const after = await page.locator('[data-testid^="inbox-item-"]').count();
-    expect(after, 'dismiss must remove the row from the list').toBe(before - 1);
-  });
-
-  test('IB-3: mark all read drives the unread count to zero', async ({ page }) => {
-    await page.goto('/inbox', { waitUntil: 'domcontentloaded' });
-    // Wait on the page's testid, not its title: the heading is localised, so asserting
-    // on English text made these break the moment the page learned to speak Chinese.
-    await expect(page.locator('[data-testid="unified-inbox-page"]')).toBeVisible({ timeout: 15000 });
-    await page.waitForTimeout(1500);
-
-    await page.locator('[data-testid="inbox-mark-all-read"]').click();
-    await page.waitForTimeout(2500);
-    await page.screenshot({ path: path.join(SHOTS, '22-inbox-mark-all-read.png'), fullPage: true });
-
-    // Outcome: backend unread count is 0.
-    const resp = await page.request.get('/api/inbox/unread-count');
-    const body = await resp.json();
-    fs.writeFileSync(
-      path.join(SHOTS, 'inbox-unread-after-markall.json'),
-      JSON.stringify(body, null, 2),
-    );
-    expect(body.data, 'unread count must be 0 after mark-all-read').toBe(0);
-  });
-
-  test('IB-4: type tab filters the list to that type only', async ({ page }) => {
-    await page.goto('/inbox', { waitUntil: 'domcontentloaded' });
-    // Wait on the page's testid, not its title: the heading is localised, so asserting
-    // on English text made these break the moment the page learned to speak Chinese.
-    await expect(page.locator('[data-testid="unified-inbox-page"]')).toBeVisible({ timeout: 15000 });
-    await page.waitForTimeout(1500);
-
-    await page.locator('[data-testid="inbox-tab-alert"]').click();
-    await page.waitForTimeout(2000);
-    await page.screenshot({ path: path.join(SHOTS, '23-inbox-tab-alert.png'), fullPage: true });
-
-    const rowTexts = await page.locator('[data-testid^="inbox-item-"]').allInnerTexts();
-    fs.writeFileSync(
-      path.join(SHOTS, 'inbox-tab-filter-evidence.json'),
-      JSON.stringify({ rowTexts }, null, 2),
-    );
-    // Every listed row must be an Alert row.
-    for (const t of rowTexts) {
-      expect(t, `non-alert row leaked into the Alert tab: ${t}`).toMatch(/Alert/i);
-    }
-    expect(rowTexts.length, 'Alert tab should list the seeded alert items').toBeGreaterThan(0);
-  });
 });

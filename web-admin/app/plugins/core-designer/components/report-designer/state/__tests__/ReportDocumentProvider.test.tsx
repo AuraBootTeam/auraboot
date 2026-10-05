@@ -22,6 +22,24 @@ function richText(content = 'Hello'): Omit<RichTextBlock, 'id'> {
 }
 
 describe('ReportDocumentProvider', () => {
+  it.each([
+    { ...createEmptyReport('Stored report'), page: undefined },
+    { ...createEmptyReport('Stored report'), page: { size: 'A4' } },
+    { ...createEmptyReport('Stored report'), page: { margin: { left: 15, right: 15, top: 20, bottom: 20 }, orientation: 'portrait', size: 'A4' } },
+  ])('keeps loaded page defaults clean until a user edits them (%j)', (stored) => {
+    const { result } = renderHook(() => useReportDocument(), { wrapper: ReportDocumentProvider });
+    const original = JSON.stringify(stored);
+    act(() => result.current.loadDocument(stored as ReportDsl));
+    expect(JSON.stringify(stored)).toBe(original);
+    expect(result.current.report?.page.size).toBe('A4');
+    expect(result.current.isDirty).toBe(false);
+    act(() => result.current.updateTitle('Edited report'));
+    expect(result.current.isDirty).toBe(true);
+    act(() => result.current.undo());
+    // Title changes deliberately do not create undo entries.
+    expect(result.current.report?.title).toBe('Edited report');
+  });
+
   it('makes header edits undoable (whole-ReportDsl history scope)', () => {
     const { result } = renderHook(() => useReportDocument(), {
       wrapper: ReportDocumentProvider,
@@ -77,6 +95,26 @@ describe('ReportDocumentProvider', () => {
     act(() => result.current.redo());
     expect(result.current.report?.body).toHaveLength(1);
     expect(result.current.report?.body[0].id).toBe(addedId);
+  });
+
+  it('retains report title and description through saved block undo and redo', () => {
+    const { result } = renderHook(() => useReportDocument(), { wrapper: ReportDocumentProvider });
+    act(() => result.current.loadDocument(createEmptyReport('Original')));
+    act(() => result.current.updateTitle('This run report'));
+    act(() => result.current.updateDescription('This run description'));
+    act(() => result.current.addBlock(richText('This run block')));
+    act(() => result.current.markSaved());
+    expect(result.current.isDirty).toBe(false);
+    act(() => result.current.undo());
+    expect(result.current.report?.body).toHaveLength(0);
+    expect(result.current.report?.title).toBe('This run report');
+    expect(result.current.report?.description).toBe('This run description');
+    expect(result.current.isDirty).toBe(true);
+    act(() => result.current.redo());
+    expect(result.current.report?.body).toHaveLength(1);
+    expect(result.current.report?.title).toBe('This run report');
+    expect(result.current.report?.description).toBe('This run description');
+    expect(result.current.isDirty).toBe(false);
   });
 
   it('selectBlock sets selectedBlockId', () => {

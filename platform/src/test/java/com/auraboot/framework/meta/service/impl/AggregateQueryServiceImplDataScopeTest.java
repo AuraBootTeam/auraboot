@@ -15,6 +15,9 @@ import com.auraboot.framework.meta.service.DataDomainService;
 import com.auraboot.framework.meta.service.DataPermissionEngine;
 import com.auraboot.framework.meta.service.MetaModelService;
 import org.junit.jupiter.api.AfterEach;
+import com.auraboot.framework.semantic.service.SemanticQueryService;
+import com.auraboot.framework.userattribute.service.UserAttributeService;
+import org.springframework.beans.factory.ObjectProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -154,6 +157,7 @@ class AggregateQueryServiceImplDataScopeTest {
                 .isInstanceOf(MetaServiceException.class)
                 .hasMessageContaining("SEMANTIC_ADAPTER_UNAVAILABLE");
         verify(dynamicDataMapper, never()).selectByQuery(anyString(), anyMap());
+        verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
     }
 
     @Test
@@ -173,6 +177,24 @@ class AggregateQueryServiceImplDataScopeTest {
         assertThatThrownBy(() -> service.execute(namedQueryCountRequest()))
                 .isInstanceOf(MetaServiceException.class)
                 .hasMessageContaining("NAMED_QUERY_ROW_SCOPE_REQUIRED");
+        verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
+        verify(dynamicDataMapper, never()).selectByQuery(anyString(), anyMap());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void semanticRouted_missingSemanticService_cannotFallBackToRaw() {
+        ObjectProvider<SemanticQueryService> queries =
+                org.mockito.Mockito.mock(ObjectProvider.class);
+        ObjectProvider<UserAttributeService> attributes =
+                org.mockito.Mockito.mock(ObjectProvider.class);
+        SemanticAggregateAdapter missing = new SemanticAggregateAdapter(queries, attributes);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "semanticAggregateAdapter", missing);
+        AggregateQueryRequest request = countRequest();
+        request.setSemanticModelCode("crm");
+        assertThatThrownBy(() -> service.execute(request))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("not on the classpath");
+        verify(dynamicDataMapper, never()).selectByQuery(anyString(), anyMap());
         verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
     }
 

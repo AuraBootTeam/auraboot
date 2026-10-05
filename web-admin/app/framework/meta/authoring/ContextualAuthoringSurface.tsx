@@ -86,6 +86,7 @@ import {
   type PageSchemaDTO,
 } from '~/framework/meta/utils/canonicalizePageDsl';
 import { useModalFocusTrap } from './useModalFocusTrap';
+import { authoringSurfaceText, type AuthoringSurfaceTextKey } from './authoringSurfaceText';
 
 type HandoffIntent = 'PAGE_STRUCTURE' | 'NEW_PAGE' | 'MENU_STRUCTURE';
 
@@ -179,7 +180,10 @@ export function ContextualAuthoringSurface({
   const permissionLossObservedRef = useRef(false);
   const recoveryActorId = user?.id == null ? null : String(user.id);
 
-  const rootNode = useMemo(() => buildAuthoringTree(workingSchema, t), [workingSchema, t]);
+  const rootNode = useMemo(
+    () => buildAuthoringTree(workingSchema, t, locale),
+    [workingSchema, t, locale],
+  );
   const runtimeSchema = useMemo(() => schemaForRuntimePreview(workingSchema), [workingSchema]);
   const nodeIndex = useMemo(() => indexTree(rootNode), [rootNode]);
   const selectedNode = nodeIndex.byId.get(selectedId) ?? rootNode;
@@ -222,7 +226,10 @@ export function ContextualAuthoringSurface({
     try {
       return applyRecoveryPolicy(await loadAuthoringRecoveryPolicy());
     } catch (policyError) {
-      const message = policyError instanceof Error ? policyError.message : '无法读取企业恢复策略';
+      const message =
+        policyError instanceof Error
+          ? policyError.message
+          : authoringSurfaceText('recoveryPolicyReadFailed', locale);
       setRecoveryPolicyError(message);
       throw new Error(message);
     }
@@ -238,7 +245,9 @@ export function ContextualAuthoringSurface({
         if (!cancelled) {
           setRecoveryPolicy(null);
           setRecoveryPolicyError(
-            policyError instanceof Error ? policyError.message : '无法读取企业恢复策略',
+            policyError instanceof Error
+              ? policyError.message
+              : authoringSurfaceText('recoveryPolicyReadFailed', locale),
           );
         }
       });
@@ -334,7 +343,7 @@ export function ContextualAuthoringSurface({
     // the address bar, browser history or a copied business URL.
     clearAuthoringReturnParams();
     if (!canConfigure) {
-      setError('当前账号无权恢复配置会话');
+      setError(authoringSurfaceText('resumeNoPermission', locale));
       return;
     }
 
@@ -352,7 +361,7 @@ export function ContextualAuthoringSurface({
         if (cancelled) return;
         const sourceSchema = latestSchemaRef.current;
         const restoredSchema = schemaFromSnapshot(sourceSchema, restored.snapshot);
-        const restoredTree = buildAuthoringTree(restoredSchema, t);
+        const restoredTree = buildAuthoringTree(restoredSchema, t, locale);
         const restoredIndex = indexTree(restoredTree);
         const contextSelection = contextSelectionId(restored.interactionContext);
         const selected = [resume.focusBlockId, contextSelection, schema.id].find(
@@ -386,7 +395,11 @@ export function ContextualAuthoringSurface({
       })
       .catch((resumeError) => {
         if (!cancelled) {
-          setError(resumeError instanceof Error ? resumeError.message : '无法恢复返回的配置会话');
+          setError(
+            resumeError instanceof Error
+              ? resumeError.message
+              : authoringSurfaceText('resumeRestoreFailed', locale),
+          );
         }
       })
       .finally(() => {
@@ -475,7 +488,10 @@ export function ContextualAuthoringSurface({
         );
         setSaveReconciliationFeedback({
           tone: 'warning',
-          message: `已恢复页面中断前的 ${remaining.size} 项本地变更；其中 ${conflictCount} 项与权威草稿冲突，需先完成 Base / Mine / Latest 裁决。`,
+          message: authoringSurfaceText('recoveryRestoredWithConflicts', locale, {
+            remaining: remaining.size,
+            conflicts: conflictCount,
+          }),
         });
       } else if (remaining.size > 0) {
         setContextualConflict(null);
@@ -483,20 +499,27 @@ export function ContextualAuthoringSurface({
           tone: 'warning',
           message:
             committedCount > 0
-              ? `页面中断后已由权威草稿确认 ${committedCount} 项保存成功，并恢复 ${remaining.size} 项未落服变更；请复核后重试。`
-              : `已恢复页面中断前的 ${remaining.size} 项本地变更，并确认尚未写入权威草稿；请复核后重试。`,
+              ? authoringSurfaceText('recoveryPartiallyCommitted', locale, {
+                  committed: committedCount,
+                  remaining: remaining.size,
+                })
+              : authoringSurfaceText('recoveryRestoredPendingReview', locale, {
+                  remaining: remaining.size,
+                }),
         });
       } else {
         setContextualConflict(null);
         setWorkingSchema(restoredSchema);
         setSaveReconciliationFeedback({
           tone: 'success',
-          message: `页面中断前的 ${committedCount} 项变更已由权威草稿确认保存成功，未重复写入。`,
+          message: authoringSurfaceText('recoveryAllCommitted', locale, {
+            committed: committedCount,
+          }),
         });
       }
       persistInlineRecovery(restored, remaining, 'DIRTY');
     } catch {
-      setError('权威草稿暂不可读；本地恢复数据仍保留，请联网后重新对账');
+      setError(authoringSurfaceText('recoveryDraftUnreadable', locale));
     } finally {
       setLocalRecoveryPending(false);
       setOpening(false);
@@ -513,7 +536,7 @@ export function ContextualAuthoringSurface({
 
   const discardLocalRecovery = useCallback(() => {
     if (!recoveryActorId || !recoveryPolicy) return;
-    if (!window.confirm('确定放弃此页面中断前保留的本地未保存变更吗？此操作无法撤销。')) {
+    if (!window.confirm(authoringSurfaceText('discardRecoveryConfirm', locale))) {
       return;
     }
     clearInlineAuthoringRecovery(recoveryActorId, schema.id, localRecoveryCandidate?.sessionPid);
@@ -554,7 +577,11 @@ export function ContextualAuthoringSurface({
       setCapabilities(registry);
       setSelectedId(schema.id);
     } catch (enterError) {
-      setError(enterError instanceof Error ? enterError.message : '无法进入配置模式');
+      setError(
+        enterError instanceof Error
+          ? enterError.message
+          : authoringSurfaceText('enterAuthoringFailed', locale),
+      );
     } finally {
       setOpening(false);
     }
@@ -568,7 +595,7 @@ export function ContextualAuthoringSurface({
     if (
       pendingEdits.size > 0 &&
       localRecoveryStorageFailed &&
-      !window.confirm('浏览器无法保留恢复副本，退出会丢失当前未保存变更。仍要退出吗？')
+      !window.confirm(authoringSurfaceText('exitWithoutRecoveryConfirm', locale))
     ) {
       return;
     }
@@ -811,7 +838,11 @@ export function ContextualAuthoringSurface({
       );
       navigate(`${handoff.targetRoute}?contextId=${encodeURIComponent(handoff.contextId)}`);
     } catch (handoffError) {
-      setError(handoffError instanceof Error ? handoffError.message : '无法移交到应用设计中心');
+      setError(
+        handoffError instanceof Error
+          ? handoffError.message
+          : authoringSurfaceText('handoffFailed', locale),
+      );
       setExplain(null);
     } finally {
       setHandoffPending(false);
@@ -823,7 +854,7 @@ export function ContextualAuthoringSurface({
       if (contextualConflict || !isAuthoringSessionWritable(session, authoringWriteAllowed)) return;
       const manifestChecksum = manifestByType.get(node.blockType)?.checksum;
       if (!manifestChecksum) {
-        setError(`未找到 ${node.blockType} 的能力清单，无法保存该变更`);
+        setError(authoringSurfaceText('manifestMissing', locale, { blockType: node.blockType }));
         return;
       }
       const previousValue = readSnapshotProperty(
@@ -957,6 +988,7 @@ export function ContextualAuthoringSurface({
                 message: savePermissionChangedMessage(
                   pendingCountAtSaveStart - remaining.size,
                   remaining.size,
+                  locale,
                 ),
               });
               setStale(true);
@@ -986,8 +1018,9 @@ export function ContextualAuthoringSurface({
                   ? savePermissionChangedMessage(
                       pendingCountAtSaveStart - remaining.size,
                       remaining.size,
+                      locale,
                     )
-                  : saveAuthorityChangedMessage(latestSession, 0, remaining.size),
+                  : saveAuthorityChangedMessage(latestSession, 0, remaining.size, locale),
               });
               setStale(true);
               setError(null);
@@ -1032,8 +1065,14 @@ export function ContextualAuthoringSurface({
                 ? savePermissionChangedMessage(
                     pendingCountAtSaveStart - remaining.size,
                     remaining.size,
+                    locale,
                   )
-                : saveAuthorityChangedMessage(latestSession, committedCount, remaining.size),
+                : saveAuthorityChangedMessage(
+                    latestSession,
+                    committedCount,
+                    remaining.size,
+                    locale,
+                  ),
             });
             setStale(true);
             setError(null);
@@ -1048,8 +1087,10 @@ export function ContextualAuthoringSurface({
               tone: 'warning',
               message:
                 committedCount > 0
-                  ? `网络响应中断；已确认 ${committedCount} 项保存成功，剩余变更需要冲突裁决。`
-                  : '网络响应中断；权威草稿包含并发变更，剩余变更需要冲突裁决。',
+                  ? authoringSurfaceText('saveInterruptedWithConflictsCommitted', locale, {
+                      committed: committedCount,
+                    })
+                  : authoringSurfaceText('saveInterruptedWithConflicts', locale),
             });
             setContextualConflict(
               createContextualConflictState(
@@ -1067,8 +1108,11 @@ export function ContextualAuthoringSurface({
               tone: 'success',
               message:
                 remaining.size === 0
-                  ? '保存已在服务端完成；响应虽中断，当前页面已按权威草稿恢复，未重复写入。'
-                  : `响应中断后已确认 ${committedCount} 项保存成功；正在从最新修订继续保存剩余 ${remaining.size} 项。`,
+                  ? authoringSurfaceText('saveCompletedAfterInterrupt', locale)
+                  : authoringSurfaceText('saveResumingAfterInterrupt', locale, {
+                      committed: committedCount,
+                      remaining: remaining.size,
+                    }),
             });
           }
         }
@@ -1082,9 +1126,17 @@ export function ContextualAuthoringSurface({
           message:
             remaining.size === 0
               ? pendingCountAtSaveStart > reconciledCommittedCount
-                ? `保存已在服务端完成：响应中断的 ${reconciledCommittedCount} 项已由权威草稿确认，其余 ${pendingCountAtSaveStart - reconciledCommittedCount} 项已从最新修订继续保存，未重复写入。`
-                : `保存已在服务端完成：网络响应中断后已确认 ${reconciledCommittedCount} 项成功；当前页面已按最新修订恢复，未重复写入。`
-              : `已确认 ${reconciledCommittedCount} 项在服务端保存成功；${remaining.size} 项仍保留在本地。`,
+                ? authoringSurfaceText('saveReconciledPartial', locale, {
+                    reconciled: reconciledCommittedCount,
+                    others: pendingCountAtSaveStart - reconciledCommittedCount,
+                  })
+                : authoringSurfaceText('saveReconciledAll', locale, {
+                    count: reconciledCommittedCount,
+                  })
+              : authoringSurfaceText('saveReconciledRemaining', locale, {
+                  count: reconciledCommittedCount,
+                  remaining: remaining.size,
+                }),
         });
       }
     } catch (saveFailure) {
@@ -1095,8 +1147,8 @@ export function ContextualAuthoringSurface({
       persistInlineRecovery(currentSession, remaining, 'UNKNOWN_OUTCOME');
       setError(
         saveFailure instanceof Error
-          ? `${saveFailure.message}；本地未保存变更已保留`
-          : '保存失败；本地未保存变更已保留',
+          ? authoringSurfaceText('saveFailedKeepLocal', locale, { message: saveFailure.message })
+          : authoringSurfaceText('saveFailedKeepLocalGeneric', locale),
       );
     } finally {
       setSaving(false);
@@ -1135,7 +1187,11 @@ export function ContextualAuthoringSurface({
       setWorkingSchema(materializePendingSchema(schema, latest.snapshot, pendingEdits));
       setStale(false);
     } catch (refreshFailure) {
-      setError(refreshFailure instanceof Error ? refreshFailure.message : '无法刷新配置草稿');
+      setError(
+        refreshFailure instanceof Error
+          ? refreshFailure.message
+          : authoringSurfaceText('refreshDraftFailed', locale),
+      );
     }
   }, [authoringWriteAllowed, contextualConflict, pendingEdits, schema, session]);
 
@@ -1162,7 +1218,11 @@ export function ContextualAuthoringSurface({
       setSession(latest);
       setWorkingSchema(schemaFromSnapshot(schema, latest.snapshot));
     } catch (submitFailure) {
-      setError(submitFailure instanceof Error ? submitFailure.message : '无法提交评审');
+      setError(
+        submitFailure instanceof Error
+          ? submitFailure.message
+          : authoringSurfaceText('submitReviewFailed', locale),
+      );
       try {
         const latest = await loadAuthoringSession(session.sessionPid);
         setSession(latest);
@@ -1190,7 +1250,7 @@ export function ContextualAuthoringSurface({
         setGovernanceError(
           governanceFailure instanceof Error
             ? governanceFailure.message
-            : '无法恢复 ChangeSet 编辑',
+            : authoringSurfaceText('governanceResumeFailed', locale),
         );
       } finally {
         setGovernancePending(null);
@@ -1249,12 +1309,12 @@ export function ContextualAuthoringSurface({
         if (reconciliation === 'COMMITTED_HERE') {
           setLeaseTakeoverFeedback({
             tone: 'success',
-            message: '接管已在服务端完成，当前页面已恢复编辑；本地内容未被覆盖。',
+            message: authoringSurfaceText('leaseTakeoverCompleted', locale),
           });
         } else if (reconciliation === 'COMMITTED_ELSEWHERE') {
           setLeaseTakeoverFeedback({
             tone: 'warning',
-            message: '编辑权刚被另一会话取得，已刷新为只读；当前页面未被覆盖。',
+            message: authoringSurfaceText('leaseTakeoverLost', locale),
           });
         } else {
           setError(describeWriterLeaseTakeoverFailure(takeoverFailure, authoritativeReloaded));
@@ -1285,32 +1345,12 @@ export function ContextualAuthoringSurface({
               >
                 <FilePenLine className="h-4 w-4" aria-hidden="true" />
                 {opening
-                  ? t(
-                      'authoring.entering',
-                      undefined,
-                      locale.startsWith('zh') ? '正在进入配置模式…' : 'Opening configuration…',
-                    )
+                  ? authoringSurfaceText('enteringConfiguration', locale)
                   : recoveryPolicyError
-                    ? t(
-                        'authoring.retryPolicy',
-                        undefined,
-                        locale.startsWith('zh')
-                          ? '重试安全策略并配置'
-                          : 'Retry configuration policy',
-                      )
+                    ? authoringSurfaceText('retryPolicyAndConfigure', locale)
                     : recoveryPolicy
-                      ? t(
-                          'authoring.configurePage',
-                          undefined,
-                          locale.startsWith('zh') ? '配置此页' : 'Configure page',
-                        )
-                      : t(
-                          'authoring.loadingPolicy',
-                          undefined,
-                          locale.startsWith('zh')
-                            ? '正在读取恢复策略…'
-                            : 'Loading recovery policy…',
-                        )}
+                      ? authoringSurfaceText('configurePage', locale)
+                      : authoringSurfaceText('loadingRecoveryPolicy', locale)}
               </button>,
               headerActions,
             )
@@ -1324,14 +1364,17 @@ export function ContextualAuthoringSurface({
             <div className="flex items-start gap-2">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <div>
-                <div className="font-semibold">发现页面中断前保留的本地变更</div>
+                <div className="font-semibold">
+                  {authoringSurfaceText('localRecoveryFoundTitle', locale)}
+                </div>
                 <p className="mt-1 leading-5">
-                  先读取权威草稿并对账，再决定继续保存；恢复过程不会自动重放写请求。
+                  {authoringSurfaceText('localRecoveryFoundBody', locale)}
                 </p>
                 {localRecoveryCandidateCount > 1 ? (
                   <p className="mt-1 leading-5">
-                    本设备发现 {localRecoveryCandidateCount}{' '}
-                    个独立会话候选；当前只处理最新一项，绝不自动合并或覆盖其他会话。
+                    {authoringSurfaceText('localRecoveryMultipleCandidates', locale, {
+                      count: localRecoveryCandidateCount,
+                    })}
                   </p>
                 ) : null}
                 {error ? (
@@ -1350,7 +1393,9 @@ export function ContextualAuthoringSurface({
                     className="bg-primary text-primary-foreground rounded-md px-3 py-1.5 font-medium disabled:cursor-not-allowed disabled:opacity-60"
                     data-testid="authoring-local-recovery-resume"
                   >
-                    {localRecoveryPending ? '正在读取权威草稿…' : '恢复并对账'}
+                    {localRecoveryPending
+                      ? authoringSurfaceText('restoringDraft', locale)
+                      : authoringSurfaceText('restoreAndReconcile', locale)}
                   </button>
                   <button
                     type="button"
@@ -1359,7 +1404,7 @@ export function ContextualAuthoringSurface({
                     className="border-border-strong bg-panel text-text rounded-md border px-3 py-1.5 font-medium disabled:cursor-not-allowed disabled:opacity-60"
                     data-testid="authoring-local-recovery-discard"
                   >
-                    放弃本地恢复
+                    {authoringSurfaceText('discardLocalRecovery', locale)}
                   </button>
                 </div>
               </div>
@@ -1379,7 +1424,9 @@ export function ContextualAuthoringSurface({
             role="alert"
             className="border-status-red bg-status-red-bg fixed right-6 bottom-20 z-30 max-w-sm rounded-lg border px-4 py-3 text-sm text-red-800 shadow-lg"
           >
-            {recoveryPolicyError}；在策略可确认前不会保存任何恢复副本，也不会进入配置模式。
+            {authoringSurfaceText('recoveryPolicyPendingNotice', locale, {
+              message: recoveryPolicyError ?? '',
+            })}
           </div>
         ) : null}
       </div>
@@ -1405,8 +1452,8 @@ export function ContextualAuthoringSurface({
         onNewPage={() =>
           setExplain({
             intent: 'NEW_PAGE',
-            title: '在应用设计中心创建页面',
-            reason: '新页面会改变页面树、路由和发布资源，不属于当前页面的局部展示调整。',
+            title: authoringSurfaceText('newPageExplainTitle', locale),
+            reason: authoringSurfaceText('newPageExplainReason', locale),
           })
         }
         onExit={exit}
@@ -1419,7 +1466,7 @@ export function ContextualAuthoringSurface({
           data-testid="authoring-write-blocked"
         >
           <LockKeyhole className="h-4 w-4" />
-          已拦截真实业务写入；交互预览只保留本地状态。
+          {authoringSurfaceText('writeBlockedNotice', locale)}
         </div>
       ) : null}
       {localRecoveryStorageFailed ? (
@@ -1438,9 +1485,7 @@ export function ContextualAuthoringSurface({
           data-testid="authoring-permission-revoked"
         >
           <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>
-            配置权限已收回，当前会话已即时转为只读。浏览器中的未保存差异仍会保留，但不会保存、提交或移交；可退出配置模式，或在权限恢复后继续。
-          </span>
+          <span>{authoringSurfaceText('permissionRevokedNotice', locale)}</span>
         </div>
       ) : null}
       <div className="mx-3 mt-2">
@@ -1503,11 +1548,15 @@ export function ContextualAuthoringSurface({
           <div className="flex min-w-0 items-start gap-2">
             <GitCompare className="mt-0.5 h-4 w-4 shrink-0" />
             <div>
-              <div className="font-semibold">并发变更必须在应用设计中心裁决</div>
+              <div className="font-semibold">
+                {authoringSurfaceText('conflictMustAdjudicateTitle', locale)}
+              </div>
               <div className="mt-1 text-xs">
-                Base r{contextualConflict.baseRevision} / Latest r
-                {contextualConflict.latestSession.revision}；已保留{' '}
-                {contextualConflict.pendingCount} 项 Mine。原地配置不会刷新后直接覆盖 Latest。
+                {authoringSurfaceText('conflictDetail', locale, {
+                  baseRevision: contextualConflict.baseRevision,
+                  latestRevision: contextualConflict.latestSession.revision,
+                  pendingCount: contextualConflict.pendingCount,
+                })}
               </div>
             </div>
           </div>
@@ -1517,7 +1566,7 @@ export function ContextualAuthoringSurface({
             className="min-h-9 rounded-md bg-amber-700 px-3 text-sm font-semibold text-white hover:bg-amber-800"
             data-testid="contextual-authoring-conflict-studio"
           >
-            查看 Base / Mine / Latest
+            {authoringSurfaceText('viewConflictResolution', locale)}
           </button>
         </div>
       ) : null}
@@ -1548,7 +1597,7 @@ export function ContextualAuthoringSurface({
         {(outlineOpen || inspectorOpen) && (
           <button
             type="button"
-            aria-label="关闭侧栏"
+            aria-label={authoringSurfaceText('closeSidePanels', locale)}
             onClick={() => {
               setOutlineOpen(false);
               setInspectorOpen(false);
@@ -1608,8 +1657,8 @@ export function ContextualAuthoringSurface({
           onHandoff={(property) =>
             setExplain({
               intent: 'PAGE_STRUCTURE',
-              title: '进入应用设计中心',
-              reason: explainHandoffReason(selectedNode, property),
+              title: authoringSurfaceText('enterStudioTitle', locale),
+              reason: explainHandoffReason(selectedNode, property, locale),
               propertyPath: property?.propertyPath,
             })
           }
@@ -1628,6 +1677,7 @@ export function ContextualAuthoringSurface({
           session,
           authoringWriteAllowed,
           Boolean(contextualConflict),
+          locale,
         )}
         onDiff={() => setDiffOpen(true)}
         onSave={saveChanges}
@@ -1667,14 +1717,17 @@ function AuthoringToolbar({
   onNewPage: () => void;
   onExit: () => void;
 }) {
+  const { locale } = useI18n();
   return (
     <header className="border-border bg-panel sticky top-0 z-20 flex min-h-14 flex-wrap items-center gap-2 border-b px-3 py-2">
       <div className="mr-auto flex min-w-0 items-center gap-2">
         <ShieldCheck className="h-5 w-5 shrink-0 text-blue-600" />
         <div className="min-w-0">
-          <div className="truncate text-sm font-semibold text-slate-900">配置模式</div>
+          <div className="truncate text-sm font-semibold text-slate-900">
+            {authoringSurfaceText('configurationMode', locale)}
+          </div>
           <div className="truncate text-xs text-emerald-700">
-            安全编辑写入隔离 ChangeSet；不会写入业务数据
+            {authoringSurfaceText('isolatedChangeSetSubtitle', locale)}
           </div>
         </div>
       </div>
@@ -1685,29 +1738,33 @@ function AuthoringToolbar({
         data-testid="authoring-outline-open"
       >
         <PanelLeft className="h-4 w-4" />
-        大纲
+        {authoringSurfaceText('outline', locale)}
       </button>
       <div
         className="border-border flex rounded-md border bg-slate-50 p-0.5"
         role="group"
-        aria-label="配置模式"
+        aria-label={authoringSurfaceText('configurationMode', locale)}
       >
         <ModeButton active={mode === 'select'} onClick={() => onModeChange('select')}>
           <MousePointer2 className="h-4 w-4" />
-          选择
+          {authoringSurfaceText('modeSelect', locale)}
         </ModeButton>
         <ModeButton active={mode === 'interact'} onClick={() => onModeChange('interact')}>
           <Eye className="h-4 w-4" />
-          交互预览
+          {authoringSurfaceText('modeInteractPreview', locale)}
         </ModeButton>
       </div>
-      {temporaryMode ? <span className="text-xs text-blue-700">Alt 临时切换</span> : null}
+      {temporaryMode ? (
+        <span className="text-xs text-blue-700">
+          {authoringSurfaceText('altTemporarySwitch', locale)}
+        </span>
+      ) : null}
       <select
-        aria-label="角色结构预览"
+        aria-label={authoringSurfaceText('roleStructurePreview', locale)}
         className="border-border bg-panel rounded-md border px-2 py-1.5 text-sm text-slate-700"
         defaultValue="current"
       >
-        <option value="current">当前角色结构</option>
+        <option value="current">{authoringSurfaceText('currentRoleStructure', locale)}</option>
       </select>
       <button
         type="button"
@@ -1715,7 +1772,7 @@ function AuthoringToolbar({
         onClick={onNewPage}
       >
         <Plus className="h-4 w-4" />
-        新页面 / 菜单
+        {authoringSurfaceText('newPageMenu', locale)}
       </button>
       <button
         type="button"
@@ -1724,7 +1781,7 @@ function AuthoringToolbar({
         data-testid="authoring-inspector-open"
       >
         <PanelRight className="h-4 w-4" />
-        属性
+        {authoringSurfaceText('properties', locale)}
       </button>
       <button
         type="button"
@@ -1732,7 +1789,7 @@ function AuthoringToolbar({
         onClick={onExit}
       >
         <X className="h-4 w-4" />
-        退出
+        {authoringSurfaceText('exit', locale)}
       </button>
     </header>
   );
@@ -1777,6 +1834,7 @@ function OutlinePanel({
   onSelect: (id: string) => void;
 }) {
   const panelRef = useRef<HTMLElement>(null);
+  const { locale } = useI18n();
   useModalFocusTrap(open, panelRef, onClose);
   return (
     <aside
@@ -1784,12 +1842,12 @@ function OutlinePanel({
       className={`border-border bg-panel z-40 w-64 shrink-0 overflow-auto border-r max-md:fixed max-md:inset-0 max-md:w-screen 2xl:relative 2xl:block ${
         open ? 'absolute inset-y-0 left-0 block shadow-2xl' : 'hidden'
       }`}
-      aria-label="页面大纲"
+      aria-label={authoringSurfaceText('pageOutline', locale)}
       aria-modal={open || undefined}
       role={open ? 'dialog' : undefined}
       data-testid="authoring-outline"
     >
-      <PanelHeader title="页面大纲" onClose={onClose} />
+      <PanelHeader title={authoringSurfaceText('pageOutline', locale)} onClose={onClose} />
       <div className="p-2">
         <OutlineNode node={root} selectedId={selectedId} onSelect={onSelect} />
       </div>
@@ -1859,6 +1917,7 @@ function InspectorPanel({
   ) => void;
 }) {
   const panelRef = useRef<HTMLElement>(null);
+  const { locale } = useI18n();
   useModalFocusTrap(open, panelRef, onClose);
   const properties = Object.values(manifest?.properties ?? {}).sort((left, right) =>
     left.propertyPath.localeCompare(right.propertyPath),
@@ -1869,32 +1928,46 @@ function InspectorPanel({
       className={`border-border bg-panel z-40 w-80 max-w-[calc(100vw-2rem)] shrink-0 overflow-auto border-l max-md:fixed max-md:inset-0 max-md:w-screen max-md:max-w-none 2xl:relative 2xl:block ${
         open ? 'absolute inset-y-0 right-0 block shadow-2xl' : 'hidden'
       }`}
-      aria-label="属性检查器"
+      aria-label={authoringSurfaceText('propertyInspector', locale)}
       aria-modal={open || undefined}
       role={open ? 'dialog' : undefined}
       data-testid="authoring-inspector"
     >
-      <PanelHeader title="属性检查器" onClose={onClose} />
+      <PanelHeader title={authoringSurfaceText('propertyInspector', locale)} onClose={onClose} />
       <div className="space-y-4 p-4">
         <div>
           <div className="text-xs font-semibold tracking-wide text-slate-400 uppercase">
-            当前对象
+            {authoringSurfaceText('currentObject', locale)}
           </div>
           <div className="mt-1 text-base font-semibold text-slate-900">{node.label}</div>
-          <div className="mt-1 text-xs text-slate-500">{objectTypeLabel(node.blockType)}</div>
+          <div className="mt-1 text-xs text-slate-500">
+            {objectTypeLabel(node.blockType, locale)}
+          </div>
         </div>
         <div className="grid grid-cols-2 gap-2 text-xs">
-          <StatusCell label="风险" value={session.riskLevel} />
-          <StatusCell label="发布" value={publishLabel(session.publishPolicy)} />
-          <StatusCell label="校验" value={session.validationState} />
-          <StatusCell label="修订" value={`r${session.revision}`} />
+          <StatusCell
+            label={authoringSurfaceText('statusRisk', locale)}
+            value={session.riskLevel}
+          />
+          <StatusCell
+            label={authoringSurfaceText('statusPublish', locale)}
+            value={publishLabel(session.publishPolicy, locale)}
+          />
+          <StatusCell
+            label={authoringSurfaceText('statusValidation', locale)}
+            value={session.validationState}
+          />
+          <StatusCell
+            label={authoringSurfaceText('statusRevision', locale)}
+            value={`r${session.revision}`}
+          />
         </div>
         <div className="border-status-amber bg-status-amber-bg rounded-md border p-3 text-xs text-amber-900">
-          下列能力来自服务端可信清单；就地修改先保存在浏览器，点击“保存”后仅写入隔离 ChangeSet。
+          {authoringSurfaceText('capabilityListNotice', locale)}
         </div>
         <div>
           <div className="mb-2 text-xs font-semibold tracking-wide text-slate-400 uppercase">
-            可配置属性
+            {authoringSurfaceText('configurableProperties', locale)}
           </div>
           {properties.length ? (
             <div className="space-y-2">
@@ -1911,7 +1984,7 @@ function InspectorPanel({
             </div>
           ) : (
             <div className="rounded-md border border-dashed border-slate-300 p-3 text-xs text-slate-500">
-              此对象未声明现场配置能力，默认进入应用设计中心。
+              {authoringSurfaceText('noInlineCapabilityNotice', locale)}
             </div>
           )}
         </div>
@@ -1922,7 +1995,7 @@ function InspectorPanel({
           className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
         >
           <Settings2 className="h-4 w-4" />
-          高级设置
+          {authoringSurfaceText('advancedSettings', locale)}
         </button>
       </div>
     </aside>
@@ -1948,6 +2021,7 @@ function PropertyEditor({
   onHandoff: () => void;
 }) {
   const value = readPointer(node.source, property.propertyPath);
+  const { locale } = useI18n();
   const editable = property.route === 'INLINE' || property.route === 'GUIDED_INLINE';
   const kind = propertyEditorKind(property.propertyPath, value);
   const fieldId = `authoring-property-${node.id}-${property.propertyPath}`.replace(
@@ -1969,9 +2043,11 @@ function PropertyEditor({
       >
         <PropertyHeader property={property} />
         <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500">
-          <span>{routeLabel(property.route)}</span>
+          <span>{routeLabel(property.route, locale)}</span>
           {property.route === 'HANDOFF_STUDIO' ? (
-            <span className="text-blue-700">高级设置 ↗</span>
+            <span className="text-blue-700">
+              {authoringSurfaceText('advancedSettingsArrow', locale)}
+            </span>
           ) : null}
         </div>
       </button>
@@ -1986,8 +2062,8 @@ function PropertyEditor({
       <label htmlFor={fieldId} className="block">
         <PropertyHeader property={property} />
         <span className="mt-1 block text-[11px] text-slate-500">
-          {routeLabel(property.route)}
-          {property.rolePreviewRequired ? ' · 保存后需角色复核' : ''}
+          {routeLabel(property.route, locale)}
+          {property.rolePreviewRequired ? authoringSurfaceText('roleReviewSuffix', locale) : ''}
         </span>
       </label>
       <div className="mt-2 flex items-start gap-2">
@@ -2002,9 +2078,9 @@ function PropertyEditor({
             }}
             className="border-border min-h-9 min-w-0 flex-1 rounded-md border bg-white px-2 text-sm"
           >
-            <option value="">未设置</option>
-            <option value="true">显示 / 是</option>
-            <option value="false">隐藏 / 否</option>
+            <option value="">{authoringSurfaceText('notSet', locale)}</option>
+            <option value="true">{authoringSurfaceText('booleanTrue', locale)}</option>
+            <option value="false">{authoringSurfaceText('booleanFalse', locale)}</option>
           </select>
         ) : kind === 'number' ? (
           <input
@@ -2047,12 +2123,12 @@ function PropertyEditor({
           onClick={() => onEdit(node, property, undefined, true)}
           className="border-border min-h-9 rounded-md border px-2 text-xs text-slate-500 hover:bg-slate-50 disabled:opacity-40"
         >
-          重置
+          {authoringSurfaceText('reset', locale)}
         </button>
       </div>
       {kind === 'json' ? (
         <p id={`${fieldId}-hint`} className="mt-1 text-[11px] text-slate-500">
-          JSON 格式；无效输入不会进入待保存变更。
+          {authoringSurfaceText('jsonFormatHint', locale)}
         </p>
       ) : null}
     </div>
@@ -2060,10 +2136,11 @@ function PropertyEditor({
 }
 
 function PropertyHeader({ property }: { property: PropertyCapability }) {
+  const { locale } = useI18n();
   return (
     <span className="flex items-center gap-2">
       <code className="min-w-0 flex-1 truncate text-xs text-slate-700">
-        {propertyLabel(property.propertyPath)}
+        {propertyLabel(property.propertyPath, locale)}
       </code>
       <RiskBadge risk={property.risk} />
     </span>
@@ -2095,21 +2172,28 @@ function ChangeDock({
   onRefresh: () => void;
   onSubmit: () => void;
 }) {
+  const { locale } = useI18n();
   const validationErrors =
     session.validationState === 'INVALID' ? (session.validation?.errorCount ?? 1) : 0;
   const prepared = session.validationState === 'VALID' && session.impactState === 'KNOWN';
   const submitLabel = prepared
-    ? '提交评审'
+    ? authoringSurfaceText('submitForReview', locale)
     : session.impactState === 'FAILED'
-      ? '重试影响分析'
-      : '校验与影响分析';
+      ? authoringSurfaceText('retryImpactAnalysis', locale)
+      : authoringSurfaceText('validationAndImpact', locale);
   return (
     <footer className="border-border bg-panel sticky bottom-0 z-20 flex min-h-14 flex-wrap items-center gap-3 border-t px-3 py-2 text-sm">
       <div className="mr-auto flex flex-wrap items-center gap-3">
-        <strong className="text-slate-900">{edits.length} 项未保存</strong>
-        <span className="text-slate-600">{Math.max(0, session.revision - 1)} 项草稿变更</span>
+        <strong className="text-slate-900">
+          {authoringSurfaceText('unsavedCount', locale, { count: edits.length })}
+        </strong>
+        <span className="text-slate-600">
+          {authoringSurfaceText('draftChangesCount', locale, {
+            count: Math.max(0, session.revision - 1),
+          })}
+        </span>
         <span className={validationErrors ? 'text-red-700' : 'text-slate-600'}>
-          {validationErrors} 个校验错误
+          {authoringSurfaceText('validationErrorCount', locale, { count: validationErrors })}
         </span>
         {readOnly ? (
           <span className="rounded bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
@@ -2124,24 +2208,36 @@ function ChangeDock({
           disabled={readOnly}
           className="border-status-amber text-status-amber inline-flex min-h-9 items-center gap-1.5 rounded-md border px-3 text-sm"
         >
-          刷新基线并保留本地变更
+          {authoringSurfaceText('refreshBaselineKeepLocal', locale)}
         </button>
       ) : null}
       <DockButton
         icon={<GitCompare className="h-4 w-4" />}
-        label="差异"
+        label={authoringSurfaceText('diff', locale)}
         disabled={edits.length === 0}
         onClick={onDiff}
       />
       <DockButton
         icon={saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-        label={saving ? '保存中…' : '保存'}
+        label={
+          saving ? authoringSurfaceText('saving', locale) : authoringSurfaceText('save', locale)
+        }
         disabled={readOnly || saving || edits.length === 0}
         onClick={onSave}
       />
-      <DockButton icon={<Eye className="h-4 w-4" />} label="实时预览" disabled />
       <DockButton
-        label={submitting ? (prepared ? '提交中…' : '分析中…') : submitLabel}
+        icon={<Eye className="h-4 w-4" />}
+        label={authoringSurfaceText('livePreview', locale)}
+        disabled
+      />
+      <DockButton
+        label={
+          submitting
+            ? prepared
+              ? authoringSurfaceText('submitting', locale)
+              : authoringSurfaceText('analyzing', locale)
+            : submitLabel
+        }
         disabled={
           readOnly ||
           submitting ||
@@ -2171,12 +2267,15 @@ function authoringReadOnlyLabel(
   session: AuthoringSession,
   canConfigure: boolean,
   hasConflict: boolean,
+  locale: string,
 ): string {
-  if (!canConfigure) return '权限已收回，当前只读';
-  if (hasConflict) return '并发冲突待专业裁决';
-  if (session.writerLease?.status === 'EXPIRED') return '编辑租约已过期';
-  if (session.writerLease && session.writerLease.status !== 'OWNED') return '编辑权由其他会话持有';
-  if (session.state === 'READ_ONLY') return '已冻结，当前只读';
+  if (!canConfigure) return authoringSurfaceText('readOnlyPermissionRevoked', locale);
+  if (hasConflict) return authoringSurfaceText('readOnlyConflictPending', locale);
+  if (session.writerLease?.status === 'EXPIRED')
+    return authoringSurfaceText('leaseExpired', locale);
+  if (session.writerLease && session.writerLease.status !== 'OWNED')
+    return authoringSurfaceText('readOnlyLeaseHeldElsewhere', locale);
+  if (session.state === 'READ_ONLY') return authoringSurfaceText('readOnlyFrozen', locale);
   return session.state;
 }
 
@@ -2206,6 +2305,7 @@ function DockButton({
 
 function DiffDialog({ edits, onClose }: { edits: PendingAuthoringEdit[]; onClose: () => void }) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const { locale } = useI18n();
   useModalFocusTrap(true, dialogRef, onClose);
   return (
     <div
@@ -2219,16 +2319,16 @@ function DiffDialog({ edits, onClose }: { edits: PendingAuthoringEdit[]; onClose
         <div className="flex items-center justify-between border-b border-slate-200 p-4">
           <div>
             <h2 id="authoring-diff-title" className="font-semibold text-slate-900">
-              待保存差异
+              {authoringSurfaceText('pendingDiffTitle', locale)}
             </h2>
             <p className="mt-1 text-xs text-slate-500">
-              仅展示当前浏览器尚未写入 ChangeSet 的变更。
+              {authoringSurfaceText('pendingDiffSubtitle', locale)}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="关闭差异"
+            aria-label={authoringSurfaceText('closeDiff', locale)}
             className="rounded p-2 hover:bg-slate-100"
           >
             <X className="h-4 w-4" />
@@ -2246,9 +2346,13 @@ function DiffDialog({ edits, onClose }: { edits: PendingAuthoringEdit[]; onClose
                     <span className="ml-auto text-xs text-slate-500">{edit.operation}</span>
                   </div>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    <DiffValue label="之前" value={edit.previousValue} tone="old" />
                     <DiffValue
-                      label="之后"
+                      label={authoringSurfaceText('beforeLabel', locale)}
+                      value={edit.previousValue}
+                      tone="old"
+                    />
+                    <DiffValue
+                      label={authoringSurfaceText('afterLabel', locale)}
                       value={edit.operation === 'REMOVE' ? undefined : edit.value}
                       tone="new"
                     />
@@ -2258,7 +2362,7 @@ function DiffDialog({ edits, onClose }: { edits: PendingAuthoringEdit[]; onClose
             </div>
           ) : (
             <div className="rounded-md border border-dashed p-6 text-center text-sm text-slate-500">
-              没有待保存变更
+              {authoringSurfaceText('noPendingChanges', locale)}
             </div>
           )}
         </div>
@@ -2268,7 +2372,7 @@ function DiffDialog({ edits, onClose }: { edits: PendingAuthoringEdit[]; onClose
             onClick={onClose}
             className="border-border min-h-10 rounded-md border px-4 text-sm"
           >
-            返回配置
+            {authoringSurfaceText('backToConfiguration', locale)}
           </button>
         </div>
       </div>
@@ -2277,11 +2381,12 @@ function DiffDialog({ edits, onClose }: { edits: PendingAuthoringEdit[]; onClose
 }
 
 function DiffValue({ label, value, tone }: { label: string; value: unknown; tone: 'old' | 'new' }) {
+  const { locale } = useI18n();
   return (
     <div className={tone === 'old' ? 'rounded bg-red-50 p-2' : 'rounded bg-emerald-50 p-2'}>
       <div className="text-[11px] font-semibold text-slate-500 uppercase">{label}</div>
       <pre className="mt-1 text-xs break-all whitespace-pre-wrap text-slate-700">
-        {formatDiffValue(value)}
+        {formatDiffValue(value, locale)}
       </pre>
     </div>
   );
@@ -2301,6 +2406,7 @@ function ExplainDialog({
   onContinue: () => void;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const { locale } = useI18n();
   useModalFocusTrap(true, dialogRef, onCancel);
   return (
     <div
@@ -2325,20 +2431,21 @@ function ExplainDialog({
         <div className="space-y-3 p-5 text-sm">
           <div className="rounded-md bg-slate-50 p-3">
             <div>
-              <span className="text-slate-500">目标对象：</span>
+              <span className="text-slate-500">{authoringSurfaceText('targetObject', locale)}</span>
               {node.label}
             </div>
             <div className="mt-1">
-              <span className="text-slate-500">携带内容：</span>当前 ChangeSet、选择对象、返回位置
+              <span className="text-slate-500">
+                {authoringSurfaceText('carriedContent', locale)}
+              </span>
+              {authoringSurfaceText('carriedContentValue', locale)}
             </div>
             <div className="mt-1">
-              <span className="text-slate-500">安全方式：</span>10
-              分钟、本人/本租户/本环境绑定、一次性 contextId
+              <span className="text-slate-500">{authoringSurfaceText('safetyMethod', locale)}</span>
+              {authoringSurfaceText('safetyMethodValue', locale)}
             </div>
           </div>
-          <p className="text-xs text-slate-500">
-            URL 不包含 pagePid、recordPid 或业务筛选；应用设计中心会重新检查权限。
-          </p>
+          <p className="text-xs text-slate-500">{authoringSurfaceText('urlPrivacyNote', locale)}</p>
         </div>
         <div className="flex justify-end gap-2 border-t border-slate-200 p-4">
           <button
@@ -2346,7 +2453,7 @@ function ExplainDialog({
             onClick={onCancel}
             className="border-border min-h-10 rounded-md border px-4 text-sm text-slate-700 hover:bg-slate-50"
           >
-            取消
+            {authoringSurfaceText('cancel', locale)}
           </button>
           <button
             type="button"
@@ -2354,7 +2461,9 @@ function ExplainDialog({
             disabled={pending}
             className="min-h-10 rounded-md bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
           >
-            {pending ? '正在建立安全上下文…' : '继续到应用设计中心'}
+            {pending
+              ? authoringSurfaceText('establishingContext', locale)
+              : authoringSurfaceText('continueToStudio', locale)}
           </button>
         </div>
       </div>
@@ -2363,6 +2472,7 @@ function ExplainDialog({
 }
 
 function PanelHeader({ title, onClose }: { title: string; onClose: () => void }) {
+  const { locale } = useI18n();
   return (
     <div className="border-border flex min-h-12 items-center justify-between border-b px-4">
       <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
@@ -2370,7 +2480,7 @@ function PanelHeader({ title, onClose }: { title: string; onClose: () => void })
         type="button"
         onClick={onClose}
         className="rounded p-1 text-slate-500 hover:bg-slate-100 2xl:hidden"
-        aria-label={`关闭${title}`}
+        aria-label={authoringSurfaceText('closePanelTitle', locale, { title })}
       >
         <X className="h-4 w-4" />
       </button>
@@ -2387,19 +2497,22 @@ function StatusCell({ label, value }: { label: string; value: string }) {
   );
 }
 
-function objectTypeLabel(blockType: string): string {
-  return (
+function objectTypeLabel(blockType: string, locale: string): string {
+  const key = (
     {
-      page: '页面',
-      list: '列表',
-      table: '表格',
-      form: '表单',
-      detail: '详情',
-      column: '字段列',
-      field: '字段',
-      action: '动作',
-    }[blockType] ?? '页面对象'
-  );
+      page: 'objectTypePage',
+      list: 'objectTypeList',
+      table: 'objectTypeTable',
+      form: 'objectTypeForm',
+      detail: 'objectTypeDetail',
+      column: 'objectTypeColumn',
+      field: 'objectTypeField',
+      action: 'objectTypeAction',
+    } as Record<string, AuthoringSurfaceTextKey>
+  )[blockType];
+  return key
+    ? authoringSurfaceText(key, locale)
+    : authoringSurfaceText('objectTypeDefault', locale);
 }
 
 function RiskBadge({ risk }: { risk: string }) {
@@ -2574,20 +2687,32 @@ function finiteNumber(value: unknown): number {
 function buildAuthoringTree(
   schema: ContextualAuthoringSurfaceProps['schema'],
   translate?: (key: string) => string,
+  locale: string = 'zh-CN',
 ): AuthoringNode {
   const page: AuthoringNode = {
     id: schema.id,
     sourceId: schema.id,
     kind: 'page',
     blockType: 'page',
-    label: localizedLabel(schema.title, schema.pageKey || '页面', translate),
+    label: localizedLabel(
+      schema.title,
+      schema.pageKey || authoringSurfaceText('defaultPageLabel', locale),
+      translate,
+    ),
     parentId: null,
     depth: 0,
     source: schema as unknown as Record<string, unknown>,
     children: [],
   };
   page.children = (schema.blocks || []).map((block, index) =>
-    buildBlockNode(block as Record<string, unknown>, page.id, 1, `block-${index}`, translate),
+    buildBlockNode(
+      block as Record<string, unknown>,
+      page.id,
+      1,
+      `block-${index}`,
+      translate,
+      locale,
+    ),
   );
   return page;
 }
@@ -2598,6 +2723,7 @@ function buildBlockNode(
   depth: number,
   fallback: string,
   translate?: (key: string) => string,
+  locale: string = 'zh-CN',
 ): AuthoringNode {
   const sourceId = String(block.id || `${parentId}/${fallback}`);
   const blockType = String(block.blockType || 'block');
@@ -2606,7 +2732,7 @@ function buildBlockNode(
     sourceId,
     kind: 'block',
     blockType,
-    label: localizedLabel(block.title, blockTypeLabel(blockType), translate),
+    label: localizedLabel(block.title, blockTypeLabel(blockType, locale), translate),
     parentId,
     depth,
     source: block,
@@ -2616,7 +2742,14 @@ function buildBlockNode(
   nestedBlocks.forEach((child, index) => {
     if (child && typeof child === 'object') {
       node.children.push(
-        buildBlockNode(child as Record<string, unknown>, node.id, depth + 1, `block-${index}`, translate),
+        buildBlockNode(
+          child as Record<string, unknown>,
+          node.id,
+          depth + 1,
+          `block-${index}`,
+          translate,
+          locale,
+        ),
       );
     }
   });
@@ -2636,7 +2769,14 @@ function buildBlockNode(
   listValues(block.tabs).forEach((tab, tabIndex) => {
     listValues(tab.blocks).forEach((child, childIndex) => {
       node.children.push(
-        buildBlockNode(child, node.id, depth + 1, `tab-${tabIndex}-${childIndex}`, translate),
+        buildBlockNode(
+          child,
+          node.id,
+          depth + 1,
+          `tab-${tabIndex}-${childIndex}`,
+          translate,
+          locale,
+        ),
       );
     });
   });
@@ -2697,7 +2837,11 @@ function ancestorChain(node: AuthoringNode, index: Map<string, AuthoringNode>): 
   return chain;
 }
 
-function localizedLabel(value: unknown, fallback: string, translate?: (key: string) => string): string {
+function localizedLabel(
+  value: unknown,
+  fallback: string,
+  translate?: (key: string) => string,
+): string {
   if (typeof value === 'string' && value.trim()) {
     // `$i18n:<key>` labels must resolve (or degrade to a readable key segment),
     // never leak the raw token into the structure tree.
@@ -2721,21 +2865,23 @@ function localizedLabel(value: unknown, fallback: string, translate?: (key: stri
   return fallback;
 }
 
-function blockTypeLabel(blockType: string): string {
-  const labels: Record<string, string> = {
-    table: '表格',
-    list: '列表',
-    filters: '筛选区',
-    toolbar: '操作栏',
-    form: '表单',
-    'form-section': '表单分组',
-    'detail-section': '详情分组',
-    chart: '图表',
-    tabs: '标签页',
-    description: '说明',
-    'rich-text': '富文本',
-  };
-  return labels[blockType] || blockType;
+function blockTypeLabel(blockType: string, locale: string): string {
+  const key = (
+    {
+      table: 'blockTypeTable',
+      list: 'blockTypeList',
+      filters: 'blockTypeFilters',
+      toolbar: 'blockTypeToolbar',
+      form: 'blockTypeForm',
+      'form-section': 'blockTypeFormSection',
+      'detail-section': 'blockTypeDetailSection',
+      chart: 'blockTypeChart',
+      tabs: 'blockTypeTabs',
+      description: 'blockTypeDescription',
+      'rich-text': 'blockTypeRichText',
+    } as Record<string, AuthoringSurfaceTextKey>
+  )[blockType];
+  return key ? authoringSurfaceText(key, locale) : blockType;
 }
 
 function isSafePreviewInteraction(target: HTMLElement): boolean {
@@ -2752,39 +2898,46 @@ function isSafePreviewInteraction(target: HTMLElement): boolean {
   );
 }
 
-function explainHandoffReason(node: AuthoringNode, property?: PropertyCapability): string {
+function explainHandoffReason(
+  node: AuthoringNode,
+  property?: PropertyCapability,
+  locale: string = 'zh-CN',
+): string {
   if (property?.route === 'HANDOFF_STUDIO') {
-    return `属性 ${property.propertyPath} 涉及 ${property.effectTags.join('、') || '业务语义'}，需要依赖分析和专业发布治理。`;
+    return authoringSurfaceText('handoffPropertyReason', locale, {
+      propertyPath: property.propertyPath,
+      effectTags:
+        property.effectTags.join('、') ||
+        authoringSurfaceText('effectTagsBusinessSemantics', locale),
+    });
   }
-  if (node.kind === 'page') return '页面级结构、路由和资源关系需要在应用设计中心统一治理。';
-  return '此对象未声明可安全就地写入的属性，系统不会猜测影响范围。';
+  if (node.kind === 'page') return authoringSurfaceText('handoffPageReason', locale);
+  return authoringSurfaceText('handoffNoInlineReason', locale);
 }
 
-function routeLabel(route: string): string {
-  return (
-    (
-      {
-        INLINE: '可就地配置',
-        GUIDED_INLINE: '引导式配置',
-        HANDOFF_STUDIO: '应用设计中心',
-        DENY: '禁止',
-      } as Record<string, string>
-    )[route] || route
-  );
+function routeLabel(route: string, locale: string): string {
+  const key = (
+    {
+      INLINE: 'routeInline',
+      GUIDED_INLINE: 'routeGuidedInline',
+      HANDOFF_STUDIO: 'routeHandoffStudio',
+      DENY: 'routeDeny',
+    } as Record<string, AuthoringSurfaceTextKey>
+  )[route];
+  return key ? authoringSurfaceText(key, locale) : route;
 }
 
-function publishLabel(policy: string): string {
-  return (
-    (
-      {
-        DIRECT_ALLOWED: '可直发',
-        DEFAULT_REVIEW: '默认评审',
-        REQUIRED_REVIEW: '必须评审',
-        STUDIO_APPROVAL: '专项审批',
-        DENIED: '禁止',
-      } as Record<string, string>
-    )[policy] || policy
-  );
+function publishLabel(policy: string, locale: string): string {
+  const key = (
+    {
+      DIRECT_ALLOWED: 'publishDirectAllowed',
+      DEFAULT_REVIEW: 'publishDefaultReview',
+      REQUIRED_REVIEW: 'publishRequiredReview',
+      STUDIO_APPROVAL: 'publishStudioApproval',
+      DENIED: 'publishDenied',
+    } as Record<string, AuthoringSurfaceTextKey>
+  )[policy];
+  return key ? authoringSurfaceText(key, locale) : policy;
 }
 
 function schemaFromSnapshot(
@@ -2978,28 +3131,40 @@ function saveAuthorityChangedMessage(
   latestSession: AuthoringSession,
   committedCount: number,
   remainingCount: number,
+  locale: string,
 ): string {
   const authority =
     latestSession.state !== 'ACTIVE'
-      ? `ChangeSet 已进入 ${latestSession.state} 状态`
+      ? authoringSurfaceText('authorityChangeSetState', locale, { state: latestSession.state })
       : latestSession.writerLease?.status === 'EXPIRED'
-        ? '编辑租约已过期'
-        : '编辑权已转移到其他会话';
+        ? authoringSurfaceText('leaseExpired', locale)
+        : authoringSurfaceText('authorityLeaseTransferred', locale);
   if (committedCount > 0) {
     return remainingCount > 0
-      ? `响应中断后已确认 ${committedCount} 项保存成功；${authority}，剩余 ${remainingCount} 项保留在本地且未重放。`
-      : `保存已在服务端完成；${authority}，当前页面已按权威草稿恢复为只读。`;
+      ? authoringSurfaceText('authorityChangedPartial', locale, {
+          committed: committedCount,
+          authority,
+          remaining: remainingCount,
+        })
+      : authoringSurfaceText('authorityChangedCompleted', locale, { authority });
   }
-  return `保存未完成；${authority}，本地未保存变更已保留且未重放。`;
+  return authoringSurfaceText('authorityChangedIncomplete', locale, { authority });
 }
 
-function savePermissionChangedMessage(savedCount: number, remainingCount: number): string {
+function savePermissionChangedMessage(
+  savedCount: number,
+  remainingCount: number,
+  locale: string,
+): string {
   if (savedCount > 0) {
     return remainingCount > 0
-      ? `配置权限已收回；已确认 ${savedCount} 项保存成功，剩余 ${remainingCount} 项保留在本地且未重放。`
-      : `保存已在服务端完成；配置权限已收回，当前页面已按权威草稿恢复为只读。`;
+      ? authoringSurfaceText('permissionRevokedPartial', locale, {
+          saved: savedCount,
+          remaining: remainingCount,
+        })
+      : authoringSurfaceText('permissionRevokedCompleted', locale);
   }
-  return '保存未完成；配置权限已收回，本地未保存变更已保留且未重放。权限恢复后可继续对账，或先退出配置模式。';
+  return authoringSurfaceText('permissionRevokedIncomplete', locale);
 }
 
 function propertyEditorKind(
@@ -3017,23 +3182,25 @@ function propertyEditorKind(
   return 'text';
 }
 
-function propertyLabel(propertyPath: string): string {
-  const labels: Record<string, string> = {
-    '/title': '标题',
-    '/layout/span': '布局跨度',
-    '/props/label': '显示名称',
-    '/props/visible': '是否显示',
-    '/props/icon': '图标',
-    '/props/variant': '按钮样式',
-    '/props/density': '表格密度',
-    '/props/pageSize': '每页条数',
-    '/props/defaultSort': '默认排序',
-    '/props/defaultFilter': '默认筛选',
-    '/props/content': '内容',
-    '/props/height': '高度',
-    '/props/defaultTab': '默认标签页',
-  };
-  return labels[propertyPath] || propertyPath;
+function propertyLabel(propertyPath: string, locale: string): string {
+  const key = (
+    {
+      '/title': 'propTitle',
+      '/layout/span': 'propLayoutSpan',
+      '/props/label': 'propDisplayName',
+      '/props/visible': 'propVisible',
+      '/props/icon': 'propIcon',
+      '/props/variant': 'propVariant',
+      '/props/density': 'propDensity',
+      '/props/pageSize': 'propPageSize',
+      '/props/defaultSort': 'propDefaultSort',
+      '/props/defaultFilter': 'propDefaultFilter',
+      '/props/content': 'propContent',
+      '/props/height': 'propHeight',
+      '/props/defaultTab': 'propDefaultTab',
+    } as Record<string, AuthoringSurfaceTextKey>
+  )[propertyPath];
+  return key ? authoringSurfaceText(key, locale) : propertyPath;
 }
 
 function formatEditorValue(value: unknown): string {
@@ -3051,9 +3218,10 @@ function parseEditorJson(value: string): { ok: true; value: unknown } | { ok: fa
   }
 }
 
-function formatDiffValue(value: unknown): string {
-  if (value === undefined) return '（未设置）';
-  if (typeof value === 'string') return value || '（空字符串）';
+function formatDiffValue(value: unknown, locale: string): string {
+  if (value === undefined) return authoringSurfaceText('diffValueUnset', locale);
+  if (typeof value === 'string')
+    return value || authoringSurfaceText('diffValueEmptyString', locale);
   return JSON.stringify(value, null, 2);
 }
 

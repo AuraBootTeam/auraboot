@@ -23,6 +23,7 @@ import { uniqueId } from '../helpers';
 
 // Report designer is a heavy page — increase per-test timeout
 test.setTimeout(60_000);
+test.use({ locale: 'zh-CN' });
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -30,12 +31,64 @@ test.setTimeout(60_000);
 
 async function openReportDesigner(page: import('@playwright/test').Page) {
   await page.goto('/report-designer', { waitUntil: 'domcontentloaded' });
+  // SSR already contains the default title; wait for actual client event binding.
+  await expect(page.locator('header[data-hydrated="true"]')).toBeVisible({ timeout: 30000 });
   // Wait for block palette to appear (may be SSR-rendered or client-rendered)
   await expect(page.getByTestId('block-palette')).toBeVisible({ timeout: 30000 });
-  // Wait for React hydration + store initialization: the title input gets a value
-  // only after the useEffect runs createReport(), which happens after hydration.
+  // Confirm the initialized localized document before editing.
   const titleInput = page.getByPlaceholder(/^(报表标题|Report Title)$/);
-  await expect(titleInput).toHaveValue('Untitled Report', { timeout: 15000 });
+  await expect(titleInput).toHaveValue('未命名报表', { timeout: 15000 });
+}
+
+async function waitForVersionPanelPosition(page: import('@playwright/test').Page, open: boolean) {
+  const panel = page.getByTestId('version-history-panel');
+  await expect
+    .poll(async () => {
+      const box = await panel.boundingBox();
+      const viewport = page.viewportSize();
+      if (!box || !viewport) return false;
+      return open ? Math.abs(box.x + box.width - viewport.width) <= 1 : box.x >= viewport.width - 1;
+    })
+    .toBe(true);
+}
+
+async function saveAndVerifyReport(page: import('@playwright/test').Page, title: string) {
+  const saveResponse = page.waitForResponse(
+    (response) =>
+      /^\/api\/report-definitions(?:\/[^/]+)?$/.test(new URL(response.url()).pathname) &&
+      ['POST', 'PUT'].includes(response.request().method()),
+  );
+  await page.getByTestId('report-designer-toolbar-btn-save').click();
+  const response = await saveResponse;
+  expect(response.status()).toBe(200);
+  const saved = await response.json();
+  expect(Number(saved.code)).toBe(0);
+  expect(saved.data.pid).toBeTruthy();
+  const persistedResponse = await page.request.get(`/api/report-definitions/${saved.data.pid}`);
+  expect(persistedResponse.status()).toBe(200);
+  const persisted = await persistedResponse.json();
+  expect(Number(persisted.code)).toBe(0);
+  expect(persisted.data.title).toBe(title);
+  expect(persisted.data.dsl.title).toBe(title);
+  return saved.data.pid as string;
+}
+
+async function openSavedVersionHistory(page: import('@playwright/test').Page, pid: string) {
+  const historyResponse = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === `/api/report-definitions/${pid}/versions`,
+  );
+  await page.getByTitle(/^(版本历史|Version History)$/).click();
+  const response = await historyResponse;
+  expect(response.status()).toBe(200);
+  const history = await response.json();
+  expect(Number(history.code)).toBe(0);
+  expect(Array.isArray(history.data)).toBe(true);
+  expect(history.data.length).toBeGreaterThan(0);
+  const panel = page.getByTestId('version-history-panel');
+  await expect(panel.getByRole('heading', { name: '版本历史', exact: true })).toBeVisible();
+  await expect(panel.getByText(`v${history.data[0].version}`, { exact: true })).toBeVisible();
+  await expect(panel.getByText(`${history.data.length} 个可用版本`, { exact: true })).toBeVisible();
+  await waitForVersionPanelPosition(page, true);
 }
 
 // =========================================================================
@@ -57,6 +110,7 @@ test.describe('GAP 1: Report Toolbar Undo/Redo', () => {
     await expect(undoBtn).toBeDisabled();
     await expect(redoBtn).toBeVisible();
     await expect(redoBtn).toBeDisabled();
+    await page.screenshot({ path: test.info().outputPath('DUA-01.png'), fullPage: true });
   });
 
   test('DUA-02: Undo enabled after adding block, undo/redo cycle works', async ({ page }) => {
@@ -82,6 +136,7 @@ test.describe('GAP 1: Report Toolbar Undo/Redo', () => {
     await expect(redoBtn).toBeEnabled();
     await redoBtn.click();
     await expect(canvas.getByText('12,345')).toBeVisible({ timeout: 5000 });
+    await page.screenshot({ path: test.info().outputPath('DUA-02.png'), fullPage: true });
   });
 
   test('DUA-03: Keyboard shortcuts work alongside toolbar buttons', async ({ page }) => {
@@ -91,15 +146,22 @@ test.describe('GAP 1: Report Toolbar Undo/Redo', () => {
     // Add a block via palette testId
     const palette = page.getByTestId('block-palette');
     await palette.getByTestId('block-palette-item-rich-text').click();
-    await expect(canvas.getByText('Click to add text content')).toBeVisible({ timeout: 10000 });
+    await expect(canvas.getByText('点击添加文本内容', { exact: true })).toBeVisible({
+      timeout: 10000,
+    });
 
     // Ctrl+Z undoes
     await page.keyboard.press('ControlOrMeta+z');
-    await expect(canvas.getByText('Click to add text content')).not.toBeVisible({ timeout: 5000 });
+    await expect(canvas.getByText('点击添加文本内容', { exact: true })).not.toBeVisible({
+      timeout: 5000,
+    });
 
     // Ctrl+Y redoes
     await page.keyboard.press('ControlOrMeta+y');
-    await expect(canvas.getByText('Click to add text content')).toBeVisible({ timeout: 5000 });
+    await expect(canvas.getByText('点击添加文本内容', { exact: true })).toBeVisible({
+      timeout: 5000,
+    });
+    await page.screenshot({ path: test.info().outputPath('DUA-03.png'), fullPage: true });
   });
 });
 
@@ -117,25 +179,40 @@ test.describe('GAP 2: Report Version History', () => {
 
     // Click opens panel
     await historyBtn.click();
-    await expect(page.getByText(/^(版本历史|Version History)$/)).toBeVisible({ timeout: 5000 });
-    await expect(page.getByText('No versions yet')).toBeVisible({ timeout: 5000 });
-    await expect(page.getByText('Save to create the first version')).toBeVisible();
+    await expect(
+      page
+        .getByTestId('version-history-panel')
+        .getByRole('heading', { name: '版本历史', exact: true }),
+    ).toBeVisible({ timeout: 5000 });
+    await expect(
+      page.getByTestId('version-history-panel').getByText('暂无版本记录', { exact: true }),
+    ).toBeVisible({ timeout: 5000 });
+    await expect(
+      page
+        .getByTestId('version-history-panel')
+        .getByText('保存后会生成第一个版本', { exact: true }),
+    ).toBeVisible();
+    await waitForVersionPanelPosition(page, true);
+    await page.screenshot({ path: test.info().outputPath('DUA-06.png'), fullPage: true });
   });
 
   test('DUA-07: Version panel opens with ESC close', async ({ page }) => {
     await openReportDesigner(page);
-    const panel = page.locator('.fixed.right-0.z-40');
+    const panel = page.getByTestId('version-history-panel');
 
     // Open panel
     await page.getByTitle(/^(版本历史|Version History)$/).click();
     await expect(panel).toHaveClass(/translate-x-0/, { timeout: 5000 });
+    await waitForVersionPanelPosition(page, true);
 
     // Verify close button exists in panel header
-    await expect(page.locator('button[aria-label="Close version panel"]')).toBeVisible();
+    await expect(panel.getByRole('button', { name: '关闭版本面板', exact: true })).toBeVisible();
 
     // Close with ESC
     await page.keyboard.press('Escape');
     await expect(panel).toHaveClass(/translate-x-full/, { timeout: 5000 });
+    await waitForVersionPanelPosition(page, false);
+    await page.screenshot({ path: test.info().outputPath('DUA-07.png'), fullPage: true });
   });
 
   test('DUA-09: Save report then check version panel loads', async ({ page }) => {
@@ -149,43 +226,11 @@ test.describe('GAP 2: Report Version History', () => {
     const saveBtn = page.getByTestId('report-designer-toolbar-btn-save');
     await expect(saveBtn).toBeEnabled();
 
-    const saveResponse = page.waitForResponse(
-      (resp) =>
-        resp.url().includes('/api/pages') &&
-        (resp.request().method() === 'POST' || resp.request().method() === 'PUT'),
-      { timeout: 15000 },
-    );
-    await saveBtn.click();
-    const resp = await saveResponse;
-    expect(resp.status()).toBeLessThan(400);
+    const pid = await saveAndVerifyReport(page, title);
+    await expect(saveBtn).toBeDisabled();
+    await openSavedVersionHistory(page, pid);
 
-    // Wait for save to complete
-    await page
-      .getByText('Saving...')
-      .waitFor({ state: 'hidden', timeout: 15000 })
-      .catch(() => {});
-    await expect(saveBtn).toBeDisabled({ timeout: 5000 });
-
-    // Open version history — should trigger API call
-    await page.getByTitle(/^(版本历史|Version History)$/).click();
-    await expect(page.getByText(/^(版本历史|Version History)$/)).toBeVisible({ timeout: 5000 });
-
-    // Wait for version list to load (API call)
-    const versionApi = page
-      .waitForResponse((resp) => resp.url().includes('/versions') && resp.status() === 200, {
-        timeout: 15000,
-      })
-      .catch(() => null);
-    await versionApi;
-
-    await page
-      .getByText('Loading versions...')
-      .waitFor({ state: 'hidden', timeout: 10000 })
-      .catch(() => {});
-
-    // Panel footer shows version count text
-    const panelFooter = page.locator('.fixed.right-0.z-40');
-    await expect(panelFooter).toBeVisible();
+    await page.screenshot({ path: test.info().outputPath('DUA-09.png'), fullPage: true });
   });
 });
 
@@ -198,113 +243,174 @@ test.describe('GAP 3: Report DataSource — Shared Pickers', () => {
     await openReportDesigner(page);
 
     // Add data-table block and select it
-    await page.getByRole('button', { name: /Data Table|数据表/i }).first().click();
+    await page.getByTestId('block-palette-item-table').click();
     await expect(
-      page.getByTestId('report-canvas').getByText('Configure columns in the property panel'),
+      page.getByTestId('report-canvas').getByText('请在属性面板中配置列', { exact: true }),
     ).toBeVisible({ timeout: 10000 });
     await page
       .getByTestId('report-canvas')
-      .getByText('Configure columns in the property panel')
+      .getByText('请在属性面板中配置列', { exact: true })
       .click();
 
     const panel = page.getByTestId('block-property-panel');
-    await panel.getByText('+ Add new data source').click();
+    await panel.getByRole('button', { name: '+ 添加数据源', exact: true }).click();
 
     // The DS type selector is the FIRST select in the add-source form (appears right after "Key" input)
     // It has options: Model, Named Query, API
-    const addDsForm = panel.locator('.bg-gray-50'); // add-ds form has gray bg
-    const typeSelect = addDsForm.locator('select').first();
+    const addDsForm = panel.getByPlaceholder('名称（例如 main）', { exact: true }).locator('..'); // add-ds form has gray bg
+    const typeSelect = addDsForm
+      .locator('select')
+      .filter({ has: page.locator('option[value="namedQuery"]') });
     await expect(typeSelect).toBeVisible();
     const options = await typeSelect.locator('option').allTextContents();
-    expect(options).toContain('Model');
-    expect(options).toContain('Named Query');
+    expect(options).toContain('模型');
+    expect(options).toContain('命名查询');
     expect(options).toContain('API');
+    await expect(
+      addDsForm
+        .locator('select')
+        .filter({ has: page.locator('option[value=""]', { hasText: '选择模型' }) }),
+    ).toBeEnabled();
+    await page.screenshot({ path: test.info().outputPath('DUA-11.png'), fullPage: true });
   });
 
   test('DUA-12: Model type loads shared ModelPicker with API data', async ({ page }) => {
     await openReportDesigner(page);
 
-    await page.getByRole('button', { name: /Data Table|数据表/i }).first().click();
+    await page.getByTestId('block-palette-item-table').click();
     await expect(
-      page.getByTestId('report-canvas').getByText('Configure columns in the property panel'),
+      page.getByTestId('report-canvas').getByText('请在属性面板中配置列', { exact: true }),
     ).toBeVisible({ timeout: 10000 });
     await page
       .getByTestId('report-canvas')
-      .getByText('Configure columns in the property panel')
+      .getByText('请在属性面板中配置列', { exact: true })
       .click();
 
     const panel = page.getByTestId('block-property-panel');
-    await panel.getByText('+ Add new data source').click();
-
-    // Wait for models API (ModelPicker auto-fetches)
-    await page.waitForResponse(
-      (resp) => resp.url().includes('/api/meta/models') && resp.status() === 200,
-      { timeout: 15000 },
+    const modelsResponse = page.waitForResponse(
+      (resp) => new URL(resp.url()).pathname === '/api/meta/models',
     );
+    await panel.getByRole('button', { name: '+ 添加数据源', exact: true }).click();
+
+    const response = await modelsResponse;
+    expect(response.status()).toBe(200);
+    const payload = await response.json();
+    expect(Number(payload.code)).toBe(0);
+    const models = Array.isArray(payload.data) ? payload.data : payload.data.records;
+    expect(models.length).toBeGreaterThan(0);
 
     // ModelPicker renders as a select with "Select model" placeholder
-    const modelSelect = panel.locator('select').filter({ hasText: /Select model/i });
+    const modelSelect = panel
+      .locator('select')
+      .filter({ has: page.locator('option[value=""]', { hasText: '选择模型' }) });
     await expect(modelSelect).toBeVisible();
     const optionCount = await modelSelect.locator('option').count();
     expect(optionCount).toBeGreaterThan(1);
+    await modelSelect.selectOption(models[0].code);
+    await expect(modelSelect).toHaveValue(models[0].code);
+    await page.screenshot({ path: test.info().outputPath('DUA-12.png'), fullPage: true });
   });
 
   test('DUA-13: NamedQuery type shows shared NamedQueryPicker', async ({ page }) => {
+    const queryCode = uniqueId('dua_nq');
+    const created = await page.request.post('/api/meta/named-queries', {
+      data: {
+        code: queryCode,
+        title: `DUA ${queryCode}`,
+        status: 'published',
+        resourceCode: 'e2et_order',
+        actionCode: 'read',
+        fromSql: 'SELECT pid FROM mt_e2et_order',
+        fields: [
+          { fieldCode: 'record_key', columnExpr: 'pid', dataType: 'string', operators: ['eq'] },
+        ],
+      },
+    });
+    expect(created.status()).toBe(200);
+    expect(Number((await created.json()).code)).toBe(0);
     await openReportDesigner(page);
 
-    await page.getByRole('button', { name: /Data Table|数据表/i }).first().click();
+    await page.getByTestId('block-palette-item-table').click();
     await expect(
-      page.getByTestId('report-canvas').getByText('Configure columns in the property panel'),
+      page.getByTestId('report-canvas').getByText('请在属性面板中配置列', { exact: true }),
     ).toBeVisible({ timeout: 10000 });
     await page
       .getByTestId('report-canvas')
-      .getByText('Configure columns in the property panel')
+      .getByText('请在属性面板中配置列', { exact: true })
       .click();
 
     const panel = page.getByTestId('block-property-panel');
-    await panel.getByText('+ Add new data source').click();
+    await panel.getByRole('button', { name: '+ 添加数据源', exact: true }).click();
 
     // Switch to namedQuery using the DS type selector (first select in the add-form)
-    const addDsForm = panel.locator('.bg-gray-50');
-    const typeSelect = addDsForm.locator('select').first();
+    const addDsForm = panel.getByPlaceholder('名称（例如 main）', { exact: true }).locator('..');
+    const typeSelect = addDsForm
+      .locator('select')
+      .filter({ has: page.locator('option[value="namedQuery"]') });
+    const queriesResponse = page.waitForResponse(
+      (resp) => new URL(resp.url()).pathname === '/api/meta/named-queries/enabled',
+    );
     await typeSelect.selectOption('namedQuery');
 
-    // Wait for NQ API
-    await page.waitForResponse(
-      (resp) => resp.url().includes('/api/meta/named-queries') && resp.status() === 200,
-      { timeout: 15000 },
-    );
+    const response = await queriesResponse;
+    expect(response.status()).toBe(200);
+    const payload = await response.json();
+    expect(Number(payload.code)).toBe(0);
+    expect(Array.isArray(payload.data)).toBe(true);
+    expect(payload.data.some((q: { code: string }) => q.code === queryCode)).toBe(true);
 
     // NamedQueryPicker visible
-    const nqSelect = panel.locator('select').filter({ hasText: /Select named query/i });
+    const nqSelect = panel
+      .locator('select')
+      .filter({ has: page.locator('option[value=""]', { hasText: '选择命名查询' }) });
     await expect(nqSelect).toBeVisible();
+    await nqSelect.selectOption(queryCode);
+    await expect(nqSelect).toHaveValue(queryCode);
+    await page.screenshot({ path: test.info().outputPath('DUA-13-picker.png'), fullPage: true });
+    await addDsForm.getByPlaceholder('名称（例如 main）', { exact: true }).fill('main');
+    await addDsForm.getByRole('button', { name: '添加', exact: true }).click();
+    await expect(
+      panel.locator('select').filter({ has: page.locator('option[value="main"]') }),
+    ).toHaveValue('main');
+    const title = `Named query ${queryCode}`;
+    await page.getByPlaceholder(/^(报表标题|Report Title)$/).fill(title);
+    const reportPid = await saveAndVerifyReport(page, title);
+    const persisted = await page.request.get(`/api/report-definitions/${reportPid}`);
+    expect(persisted.status()).toBe(200);
+    const saved = await persisted.json();
+    expect(Number(saved.code)).toBe(0);
+    expect(saved.data.dsl.dataSources.main).toEqual({ type: 'namedQuery', queryCode });
+    await page.screenshot({ path: test.info().outputPath('DUA-13.png'), fullPage: true });
   });
 
   test('DUA-14: API type shows URL text input', async ({ page }) => {
     await openReportDesigner(page);
 
-    await page.getByRole('button', { name: /Data Table|数据表/i }).first().click();
+    await page.getByTestId('block-palette-item-table').click();
     await expect(
-      page.getByTestId('report-canvas').getByText('Configure columns in the property panel'),
+      page.getByTestId('report-canvas').getByText('请在属性面板中配置列', { exact: true }),
     ).toBeVisible({ timeout: 10000 });
     await page
       .getByTestId('report-canvas')
-      .getByText('Configure columns in the property panel')
+      .getByText('请在属性面板中配置列', { exact: true })
       .click();
 
     const panel = page.getByTestId('block-property-panel');
-    await panel.getByText('+ Add new data source').click();
+    await panel.getByRole('button', { name: '+ 添加数据源', exact: true }).click();
 
     // Switch to API using the DS type selector
-    const addDsForm = panel.locator('.bg-gray-50');
-    const typeSelect = addDsForm.locator('select').first();
+    const addDsForm = panel.getByPlaceholder('名称（例如 main）', { exact: true }).locator('..');
+    const typeSelect = addDsForm
+      .locator('select')
+      .filter({ has: page.locator('option[value="namedQuery"]') });
     await typeSelect.selectOption('api');
 
     // URL input visible
-    const urlInput = panel.locator('input[placeholder="API URL"]');
+    const urlInput = panel.getByPlaceholder('API 地址', { exact: true });
     await expect(urlInput).toBeVisible();
     await urlInput.fill('/api/custom/data');
     await expect(urlInput).toHaveValue('/api/custom/data');
+    await page.screenshot({ path: test.info().outputPath('DUA-14.png'), fullPage: true });
   });
 });
 
@@ -326,35 +432,33 @@ test.describe('Integration', () => {
 
     // 2. Add block via palette testId
     await page.getByTestId('block-palette-item-rich-text').click();
-    await expect(canvas.getByText('Click to add text content')).toBeVisible({ timeout: 10000 });
+    await expect(canvas.getByText('点击添加文本内容', { exact: true })).toBeVisible({
+      timeout: 10000,
+    });
     await expect(undoBtn).toBeEnabled();
 
     // 3. Save
-    const saveResponse = page.waitForResponse(
-      (resp) =>
-        resp.url().includes('/api/pages') &&
-        (resp.request().method() === 'POST' || resp.request().method() === 'PUT'),
-      { timeout: 15000 },
-    );
-    await saveBtn.click();
-    const resp = await saveResponse;
-    expect(resp.status()).toBeLessThan(400);
-    await page
-      .getByText('Saving...')
-      .waitFor({ state: 'hidden', timeout: 15000 })
-      .catch(() => {});
-    await expect(saveBtn).toBeDisabled({ timeout: 5000 });
+    const pid = await saveAndVerifyReport(page, title);
+    await expect(saveBtn).toBeDisabled();
 
-    // 4. Open/close version history
-    await page.getByTitle(/^(版本历史|Version History)$/).click();
-    await expect(page.getByText(/^(版本历史|Version History)$/)).toBeVisible({ timeout: 5000 });
+    // 4. Verify the saved report's real version history, then close it.
+    await openSavedVersionHistory(page, pid);
     await page.keyboard.press('Escape');
+    await expect(page.getByTestId('version-history-panel')).toHaveClass(/translate-x-full/);
+    await waitForVersionPanelPosition(page, false);
 
     // 5. Undo block addition
     await undoBtn.click();
-    await expect(canvas.getByText('Click to add text content')).not.toBeVisible({ timeout: 5000 });
+    await expect(canvas.getByText('点击添加文本内容', { exact: true })).not.toBeVisible({
+      timeout: 5000,
+    });
+
+    await expect(page.getByPlaceholder(/^(报表标题|Report Title)$/)).toHaveValue(title);
 
     // 6. Unsaved indicator visible (undid after save)
-    await expect(page.getByText('Unsaved')).toBeVisible({ timeout: 3000 });
+    await expect(
+      page.getByTestId('report-designer-toolbar').getByText('未保存', { exact: true }),
+    ).toBeVisible({ timeout: 3000 });
+    await page.screenshot({ path: test.info().outputPath('DUA-15.png'), fullPage: true });
   });
 });

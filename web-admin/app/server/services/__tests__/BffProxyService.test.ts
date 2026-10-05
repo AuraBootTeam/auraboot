@@ -72,6 +72,27 @@ describe('isLongRunningProxyPath', () => {
 });
 
 describe('BffProxyService', () => {
+  it('does not inject a browser session into OAuth client authentication', async () => {
+    const service = new BffProxyService({ target: 'http://127.0.0.1:6443' });
+    const extract = vi.spyOn(service as any, 'extractToken').mockResolvedValue('session-fixture');
+    try {
+      const headers = await (service as any).sanitizeHeaders({
+        originalUrl: '/oauth2/token',
+        url: '/oauth2/token',
+        headers: { cookie: '__session=fixture', 'content-type': 'application/x-www-form-urlencoded' },
+      });
+      expect(extract).not.toHaveBeenCalled();
+      expect(Object.keys(headers).some((key) => key.toLowerCase() === 'authorization')).toBe(false);
+      const explicit = await (service as any).sanitizeHeaders({
+        originalUrl: '/oauth2/token',
+        headers: { authorization: 'Basic Zml4dHVyZTpwYXNz' },
+      });
+      expect(explicit.authorization).toBe('Basic Zml4dHVyZTpwYXNz');
+      expect(extract).not.toHaveBeenCalled();
+    } finally {
+      extract.mockRestore();
+    }
+  });
   it('bounds diagnostic previews without truncating the actual response bytes', () => {
     vi.stubEnv('BFF_VERBOSE_LOGGING', 'true');
     const service = new BffProxyService({ target: 'http://127.0.0.1:6443' });
@@ -111,7 +132,7 @@ describe('BffProxyService', () => {
     vi.stubEnv('BFF_VERBOSE_LOGGING', 'true');
     const service = new BffProxyService({ target: 'http://127.0.0.1:6443' });
     const { response } = createResponseRecorder();
-    const token = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiJ9.signature';
+    const token = 'test-session-token-'.repeat(100);
     const payload = Buffer.from(JSON.stringify({ data: { jwt: token, refreshToken: token } }));
     const log = vi.spyOn(logger, 'info').mockImplementation(() => undefined as never);
 

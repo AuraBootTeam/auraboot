@@ -60,3 +60,10 @@ const mutations = {
 for (const [label, mutate] of Object.entries(mutations)) test(`rejects ${label} before publishing evidence`, () => {
   const f = fixture(); mutate(f); assert.throws(() => verifyGoldenProduct(f));
 });
+
+test('preserves the registered Core source key for an existing retained stack', () => {
+  const f = fixture(); f.report.sources[0].key = 'core';
+  assert.equal(verifyGoldenProduct(f).sourceRoots[0].key, 'core');
+  f.report.sources[0].expected.root = '/foreign';
+  assert.throws(() => verifyGoldenProduct(f), /source identity mismatch/);
+});

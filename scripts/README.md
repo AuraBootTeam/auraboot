@@ -23,6 +23,7 @@
 
 | script | refs | updated | purpose |
 |---|--:|---|---|
+| `check-batch4-gates.mjs` | 0 | 2026-10-02 | Large-file and i18n CJK structural ratchets. |
 | `check-agent-eval-boundary.mjs` | 2 | 2026-06-21 | OSS agent/RAG boundary gate. |
 | `check-oss-remediation-t3.mjs` | 1 | 2026-10-05 | Enforce complete T3 family 80% line coverage, nested classes and parent size limits. |
 | `check-batch4-gates.mjs` | 0 | 2026-10-03 | Check the large-file and i18n CJK structural ratchets. |
@@ -56,6 +57,7 @@
 | `check-license-boundary.sh` | 2 | 2026-09-27 | Fail when known copyleft dependency coordinates re-enter default distribution build files. |
 | `check-no-secret-echo.mjs` | 1 | 2026-07-14 | check-no-secret-echo — refuse shell scripts that print a secret to stdout/stderr. |
 | `check-no-secret-echo.sh` | 0 | 2026-07-14 | Wrapper so this gate shows up in `ls scripts/check-*.sh` — the repo's local-gate inventory. |
+| `check-oss-scope-consistency.mjs` | 0 | 2026-10-02 | Verify OSS scope declarations against code anchors and plugin directories. |
 | `check-oss-boundary.sh` | 3 | 2026-06-18 | OSS / Enterprise boundary check. |
 | `check-oss-no-internal-docs.sh` | 1 | 2026-07-02 | Fail if internal-process docs are tracked in the public OSS repo. |
 | `check-oss-scope-consistency.mjs` | 0 | 2026-10-03 | Verify OSS scope modules, plugin directories, and registry disjointness. |
@@ -233,7 +235,7 @@
 | `import-templates.sh` | 2 | 2026-05-11 |  |
 | `install-agent-git-hooks.mjs` | 2 | 2026-06-24 |  |
 | `migrate-dsl-buttons.mjs` | 0 | 2026-03-26 | Migration script: batch-convert legacy button configs to unified action format. |
-| `oss-golden-stack.sh` | 19 | 2026-07-23 | oss-golden-stack.sh — one-click host-first golden stack for OSS auraboot. |
+| `oss-golden-stack.sh` | 19 | 2026-10-04 | Host-first OSS stack. Stable runtime-owned state; `verify-artifacts` verifies registered sources, staged Core/PF4J bytes, actual listeners, database/Redis and BFF upstream before publishing the public product manifest. |
 | `oss-reset-and-init.sh` | 24 | 2026-08-28 | AuraBoot OSS Environment Reset and Initialization Script. Requires `AURA_RESET_ALLOW_TARGETS="<pg_db>,<be_port>"` (target designation gate; `@any` overrides). |
 | `observability-grafana-browser.mjs` | 0 | 2026-09-12 | Browser verification helper for the observability Grafana surface. |
 | `observability-real-stack-ci.sh` | 0 | 2026-09-12 | CI entrypoint for the real-stack observability gate. |

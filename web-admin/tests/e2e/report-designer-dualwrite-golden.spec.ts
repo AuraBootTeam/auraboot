@@ -1,6 +1,6 @@
 /** Report definition save/read integration; replaces the retired dual-write contract. */
 import { readFile, writeFile } from 'node:fs/promises';
-import { expect, test } from '../../tests/fixtures';
+import { expect, test } from '../fixtures';
 
 test.use({
   storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
@@ -20,7 +20,7 @@ test('report menu supports save, reopen, version rollback and canonical JSON dow
   await expect(entry).toBeVisible();
   await entry.click();
   await page.getByRole('button', { name: /新建报表|New report/ }).click();
-  await expect(page.getByTestId('report-canvas')).toBeVisible();
+  await expect(page.getByRole('main').getByTestId('report-canvas')).toBeVisible();
   const title = `Analytics report ${Date.now()}`;
   await page.getByPlaceholder('报表标题').fill(title);
   await expect(page.getByPlaceholder('报表标题')).toHaveValue(title);
@@ -37,9 +37,9 @@ test('report menu supports save, reopen, version rollback and canonical JSON dow
   await page.getByRole('button', { name: '取消', exact: true }).click();
   await expect(page.getByRole('heading', { name: '页面设置' })).toHaveCount(0);
 
-  await page.getByRole('button', { name: /Rich Text/ }).click();
-  await page.getByPlaceholder('Enter text content...').fill('Original analysis conclusion');
-  await expect(page.getByTestId('report-canvas')).toContainText('Original analysis conclusion');
+  await page.getByRole('button', { name: /富文本|Rich Text/ }).click();
+  await page.getByPlaceholder(/^(输入文本内容…|Enter text content\.\.\.)$/).fill('Original analysis conclusion');
+  await expect(page.getByRole('main').getByTestId('report-canvas')).toContainText('Original analysis conclusion');
   const pageWrites: string[] = [];
   page.on('request', (request) => {
     if (
@@ -84,7 +84,7 @@ test('report menu supports save, reopen, version rollback and canonical JSON dow
     .getByTestId('report-canvas')
     .getByText('Original analysis conclusion', { exact: true })
     .click();
-  await page.getByPlaceholder('Enter text content...').fill('Revised analysis conclusion');
+  await page.getByPlaceholder(/^(输入文本内容…|Enter text content\.\.\.)$/).fill('Revised analysis conclusion');
   const updatedResponse = page.waitForResponse(
     (r) =>
       r.request().method() === 'PUT' &&
@@ -130,7 +130,7 @@ test('report menu supports save, reopen, version rollback and canonical JSON dow
   });
   await page.getByRole('button', { name: '返回当前报表', exact: true }).click();
   await expect(page.getByPlaceholder('报表标题')).toHaveValue(`${title} unsaved`);
-  await expect(page.getByTestId('report-canvas')).toContainText('Revised analysis conclusion');
+  await expect(page.getByRole('main').getByTestId('report-canvas')).toContainText('Revised analysis conclusion');
   await page.getByRole('button', { name: /^v1\b/ }).click();
   await page.getByRole('button', { name: /^(回滚|Rollback)$/ }).click();
   const rollbackResponse = page.waitForResponse(

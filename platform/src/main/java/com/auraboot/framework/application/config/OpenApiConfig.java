@@ -9,6 +9,7 @@ import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.security.OAuthFlow;
 import io.swagger.v3.oas.models.security.OAuthFlows;
+import io.swagger.v3.oas.models.servers.Server;
 import org.springdoc.core.models.GroupedOpenApi;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -51,6 +52,7 @@ public class OpenApiConfig {
                 .group("open-platform")
                 .pathsToMatch("/oauth2/token", "/api/open/v1/**")
                 .addOpenApiCustomizer(api -> {
+                    api.setServers(java.util.List.of(new Server().url("/")));
                     api.setInfo(new Info()
                             .title("AuraBoot Open Platform API")
                             .version("v1")

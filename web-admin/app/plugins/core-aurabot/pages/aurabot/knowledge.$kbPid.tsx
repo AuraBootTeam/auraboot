@@ -564,7 +564,7 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
                 type="button"
                 disabled={release.state === 'active' || release.state === 'failed'}
                 onClick={() => activateRelease(release)}
-                title={release.error_message || release.pid}
+                title={release.error_message || undefined}
                 className={`rounded-lg border px-3 py-2 text-left text-xs ${
                   release.state === 'active'
                     ? 'border-green-300 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300'
@@ -708,8 +708,8 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
                   <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
                     {doc.docName}
                     {doc.activeVersionPid && (
-                      <p className="mt-0.5 font-mono text-[11px] font-normal text-gray-400">
-                        v{doc.versionNo ?? 1} · {doc.activeVersionPid}
+                      <p className="mt-0.5 text-xs font-normal text-gray-400">
+                        v{doc.versionNo ?? 1}
                       </p>
                     )}
                   </td>

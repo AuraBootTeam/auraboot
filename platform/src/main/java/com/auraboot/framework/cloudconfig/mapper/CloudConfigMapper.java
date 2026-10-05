@@ -6,8 +6,11 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.ResultMap;
+import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
+import java.time.Instant;
 
 /**
  * Mapper for CloudConfig entity.
@@ -45,6 +48,7 @@ public interface CloudConfigMapper extends BaseMapper<CloudConfig> {
         LIMIT 1
         """)
     @InterceptorIgnore(tenantLine = "true")
+    @ResultMap("mybatis-plus_CloudConfig")
     CloudConfig getEffectiveConfig(@Param("tenantId") Long tenantId,
                                    @Param("serviceType") String serviceType,
                                    @Param("providerCode") String providerCode);
@@ -66,19 +70,49 @@ public interface CloudConfigMapper extends BaseMapper<CloudConfig> {
         ORDER BY CASE WHEN config_level = 'tenant' THEN 0 ELSE 1 END, priority ASC
         """)
     @InterceptorIgnore(tenantLine = "true")
+    @ResultMap("mybatis-plus_CloudConfig")
     List<CloudConfig> getEnabledProviders(@Param("tenantId") Long tenantId,
                                           @Param("serviceType") String serviceType);
 
     /**
-     * Find a config by its PID. Ignores tenant interceptor to allow PLATFORM-level lookups.
+     * Find a visible config by PID, including shared platform defaults.
      */
     @Select("""
         SELECT * FROM ab_cloud_config
         WHERE pid = #{pid}
           AND deleted_flag = FALSE
+          AND ((config_level = 'platform' AND tenant_id IS NULL)
+               OR (config_level = 'tenant' AND tenant_id = #{tenantId}))
         """)
     @InterceptorIgnore(tenantLine = "true")
-    CloudConfig findByPid(@Param("pid") String pid);
+    @ResultMap("mybatis-plus_CloudConfig")
+    CloudConfig findByPid(@Param("pid") String pid, @Param("tenantId") Long tenantId);
+
+    /** Platform rows require NULL scope; tenant rows require the caller's tenant. */
+    @Update("""
+        UPDATE ab_cloud_config
+        SET service_type = #{config.serviceType}, provider_code = #{config.providerCode},
+            config = CAST(#{config.config} AS jsonb), enabled = #{config.enabled},
+            priority = #{config.priority}, updated_at = #{config.updatedAt},
+            updated_by = #{config.updatedBy}
+        WHERE pid = #{config.pid} AND config_level = #{config.configLevel}
+          AND deleted_flag = FALSE
+          AND ((config_level = 'platform' AND tenant_id IS NULL)
+               OR (config_level = 'tenant' AND tenant_id = #{tenantId}))
+        """)
+    @InterceptorIgnore(tenantLine = "true")
+    int updateScoped(@Param("config") CloudConfig config, @Param("tenantId") Long tenantId);
+
+    @Update("""
+        UPDATE ab_cloud_config
+        SET deleted_flag = TRUE, updated_at = #{updatedAt}, updated_by = #{updatedBy}
+        WHERE pid = #{pid} AND deleted_flag = FALSE
+          AND ((config_level = 'platform' AND tenant_id IS NULL)
+               OR (config_level = 'tenant' AND tenant_id = #{tenantId}))
+        """)
+    @InterceptorIgnore(tenantLine = "true")
+    int softDeleteScoped(@Param("pid") String pid, @Param("tenantId") Long tenantId,
+                         @Param("updatedAt") Instant updatedAt, @Param("updatedBy") String updatedBy);
 
     /**
      * List all configs at a given level.
@@ -96,6 +130,7 @@ public interface CloudConfigMapper extends BaseMapper<CloudConfig> {
         ORDER BY priority ASC
         """)
     @InterceptorIgnore(tenantLine = "true")
+    @ResultMap("mybatis-plus_CloudConfig")
     List<CloudConfig> getAllByServiceType(@Param("serviceType") String serviceType);
 
     @Select("""
@@ -113,6 +148,7 @@ public interface CloudConfigMapper extends BaseMapper<CloudConfig> {
         </script>
         """)
     @InterceptorIgnore(tenantLine = "true")
+    @ResultMap("mybatis-plus_CloudConfig")
     List<CloudConfig> listByLevel(@Param("configLevel") String configLevel,
                                   @Param("tenantId") Long tenantId);
 }
