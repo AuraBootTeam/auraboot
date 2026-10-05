@@ -73,7 +73,9 @@ echo "[rbac-golden-run] === RBAC platform-baseline golden — name=$NAME slot=$S
 echo "[rbac-golden-run] 1/4 ensure stable stack + import (no reset or automatic retry)"
 # Declare the parallel purpose: retained i18n/rbac sibling stacks share this checkout
 # root, and the registry refuses a second non-parallel task runtime per source identity.
-run_phase "$GS" up "$NAME" --slot "$SLOT" --ttl 2h --no-warm --runtime-mode "$RUNTIME_MODE" \
+# Each nightly run owns a unique runtime name and needs a database matching the current
+# schema snapshot; a retained slot database predating the snapshot aborts stack startup.
+run_phase "$GS" up "$NAME" --slot "$SLOT" --ttl 2h --no-warm --runtime-mode "$RUNTIME_MODE" --fresh-db \
   --parallel-reason "rbac nightly qualification alongside retained sibling golden stacks"
 run_phase "$GS" import "$NAME"
 
