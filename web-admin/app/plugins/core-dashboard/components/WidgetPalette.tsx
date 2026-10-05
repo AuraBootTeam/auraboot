@@ -5,6 +5,7 @@
 
 import React, { useCallback, useRef } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
+import { getLocalizedText } from '~/utils/i18n';
 import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
 import { widgetRegistry } from '../widgets/widgetRegistry';
 import type { WidgetDefinition, WidgetType } from '../types';
@@ -113,6 +114,8 @@ const WidgetItem: React.FC<{
   onDragStart?: (event: React.DragEvent) => void;
   onClick?: () => void;
 }> = ({ definition, onDragStart, onClick }) => {
+  const { locale, t } = useI18n();
+  const label = getLocalizedText(definition.label, locale, t);
   const dragPreviewRef = useRef<HTMLDivElement>(null);
 
   const handleDragStart = useCallback(
@@ -128,6 +131,7 @@ const WidgetItem: React.FC<{
   return (
     <div
       draggable
+      data-testid={`widget-palette-item-${definition.type}`}
       onDragStart={handleDragStart}
       onClick={onClick}
       className="group flex cursor-grab flex-col items-center rounded-lg border border-gray-200 bg-white p-3 transition-all hover:border-blue-400 hover:shadow-sm active:cursor-grabbing"
@@ -135,21 +139,21 @@ const WidgetItem: React.FC<{
       <div className="flex h-10 w-10 items-center justify-center text-gray-500 group-hover:text-blue-600">
         <WidgetIcon icon={definition.icon} className="h-6 w-6" />
       </div>
-      <span className="mt-2 text-center text-xs font-medium text-gray-700">{definition.label}</span>
+      <span className="mt-2 text-center text-xs font-medium text-gray-700">{label}</span>
       {/* Pre-rendered drag preview — hidden offscreen to avoid Safari race condition */}
       <div
         ref={dragPreviewRef}
         className="pointer-events-none fixed -top-[1000px] -left-[1000px] rounded-lg bg-blue-500 px-3 py-2 text-sm font-medium text-white shadow-lg"
         aria-hidden="true"
       >
-        {definition.label}
+        {label}
       </div>
     </div>
   );
 };
 
 export const WidgetPalette: React.FC<WidgetPaletteProps> = ({ onDragStart, onWidgetClick }) => {
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
   const widgetsByCategory = widgetRegistry.getByCategory();
 
   const handleDragStart = useCallback(
@@ -179,7 +183,7 @@ export const WidgetPalette: React.FC<WidgetPaletteProps> = ({ onDragStart, onWid
         {Object.entries(widgetsByCategory).map(([category, widgets]) => (
           <div key={category}>
             <h3 className="mb-3 text-xs font-medium tracking-wider text-gray-500 uppercase">
-              {category}
+              {getLocalizedText(widgets[0]?.categoryLabel, locale, t) || category}
             </h3>
             <div className="grid grid-cols-2 gap-2">
               {widgets.map((widget) => (

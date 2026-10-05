@@ -1,0 +1,1362 @@
+{
+  "metadata.widthGridColumns": {
+    "zh-CN": "宽度(Grid列数)",
+    "en-US": "Width (grid columns)"
+  },
+  "metadata.numberOfOccupiedGridColumns12FillsTheEntireRow": {
+    "zh-CN": "占用的网格列数，12列时自动占满整行",
+    "en-US": "Number of occupied grid columns; 12 fills the entire row"
+  },
+  "metadata.height": {
+    "zh-CN": "高度",
+    "en-US": "Height"
+  },
+  "metadata.heightValueSuchAsAuto100pxOr50vh": {
+    "zh-CN": "高度值，如: auto, 100px, 50vh",
+    "en-US": "Height value, such as auto, 100px or 50vh"
+  },
+  "metadata.backgroundColor": {
+    "zh-CN": "背景色",
+    "en-US": "Background color"
+  },
+  "metadata.borderRadius": {
+    "zh-CN": "圆角",
+    "en-US": "Border radius"
+  },
+  "metadata.borderRadiusInPixels": {
+    "zh-CN": "圆角大小(px)",
+    "en-US": "Border radius in pixels"
+  },
+  "metadata.border": {
+    "zh-CN": "边框",
+    "en-US": "Border"
+  },
+  "metadata.borderStyleSuchAs1pxSolidCcc": {
+    "zh-CN": "边框样式，如: 1px solid #ccc",
+    "en-US": "Border style, such as 1px solid #ccc"
+  },
+  "metadata.shadow": {
+    "zh-CN": "阴影",
+    "en-US": "Shadow"
+  },
+  "metadata.shadowEffectSuchAs02px4pxRgba00001": {
+    "zh-CN": "阴影效果，如: 0 2px 4px rgba(0,0,0,0.1)",
+    "en-US": "Shadow effect, such as 0 2px 4px rgba(0,0,0,0.1)"
+  },
+  "metadata.padding": {
+    "zh-CN": "内边距",
+    "en-US": "Padding"
+  },
+  "metadata.paddingInPixels": {
+    "zh-CN": "内边距大小(px)",
+    "en-US": "Padding in pixels"
+  },
+  "metadata.margin": {
+    "zh-CN": "外边距",
+    "en-US": "Margin"
+  },
+  "metadata.marginInPixels": {
+    "zh-CN": "外边距大小(px)",
+    "en-US": "Margin in pixels"
+  },
+  "metadata.input": {
+    "zh-CN": "输入框",
+    "en-US": "Input"
+  },
+  "metadata.singleLineTextInputWithValidationRules": {
+    "zh-CN": "单行文本输入框，支持多种验证规则",
+    "en-US": "Single-line text input with validation rules"
+  },
+  "metadata.label": {
+    "zh-CN": "标签",
+    "en-US": "Label"
+  },
+  "metadata.fieldName": {
+    "zh-CN": "字段名",
+    "en-US": "Field name"
+  },
+  "metadata.placeholder": {
+    "zh-CN": "占位符",
+    "en-US": "Placeholder"
+  },
+  "metadata.defaultValue": {
+    "zh-CN": "默认值",
+    "en-US": "Default value"
+  },
+  "metadata.required": {
+    "zh-CN": "必填",
+    "en-US": "Required"
+  },
+  "metadata.disabled": {
+    "zh-CN": "禁用",
+    "en-US": "Disabled"
+  },
+  "metadata.maximumLength": {
+    "zh-CN": "最大长度",
+    "en-US": "Maximum length"
+  },
+  "metadata.minimumLength": {
+    "zh-CN": "最小长度",
+    "en-US": "Minimum length"
+  },
+  "metadata.regularExpressionValidation": {
+    "zh-CN": "正则验证",
+    "en-US": "Regular expression validation"
+  },
+  "metadata.size": {
+    "zh-CN": "尺寸",
+    "en-US": "Size"
+  },
+  "metadata.small": {
+    "zh-CN": "小",
+    "en-US": "Small"
+  },
+  "metadata.medium": {
+    "zh-CN": "中",
+    "en-US": "Medium"
+  },
+  "metadata.large": {
+    "zh-CN": "大",
+    "en-US": "Large"
+  },
+  "metadata.style": {
+    "zh-CN": "样式",
+    "en-US": "Style"
+  },
+  "metadata.default": {
+    "zh-CN": "默认",
+    "en-US": "Default"
+  },
+  "metadata.filled": {
+    "zh-CN": "填充",
+    "en-US": "Filled"
+  },
+  "metadata.textarea": {
+    "zh-CN": "多行文本",
+    "en-US": "Textarea"
+  },
+  "metadata.multiLineTextInputForLongerContent": {
+    "zh-CN": "多行文本输入框，适用于长文本输入",
+    "en-US": "Multi-line text input for longer content"
+  },
+  "metadata.rows": {
+    "zh-CN": "行数",
+    "en-US": "Rows"
+  },
+  "metadata.resize": {
+    "zh-CN": "调整大小",
+    "en-US": "Resize"
+  },
+  "metadata.vertical": {
+    "zh-CN": "垂直",
+    "en-US": "Vertical"
+  },
+  "metadata.horizontal": {
+    "zh-CN": "水平",
+    "en-US": "Horizontal"
+  },
+  "metadata.bothDirections": {
+    "zh-CN": "双向",
+    "en-US": "Both directions"
+  },
+  "metadata.jsonEditor": {
+    "zh-CN": "JSON 编辑器",
+    "en-US": "JSON editor"
+  },
+  "metadata.jsonOrSchemaEditorWithObjectArrayValidationAndFormatting": {
+    "zh-CN": "JSON 或 schema 输入控件，支持对象/数组校验和格式化",
+    "en-US": "JSON or schema editor with object/array validation and formatting"
+  },
+  "metadata.formatOnBlur": {
+    "zh-CN": "失焦格式化",
+    "en-US": "Format on blur"
+  },
+  "metadata.mode": {
+    "zh-CN": "模式",
+    "en-US": "Mode"
+  },
+  "metadata.select": {
+    "zh-CN": "下拉选择",
+    "en-US": "Select"
+  },
+  "metadata.dropdownWithSingleAndMultipleSelection": {
+    "zh-CN": "下拉选择框，支持单选和多选",
+    "en-US": "Dropdown with single and multiple selection"
+  },
+  "metadata.multipleSelection": {
+    "zh-CN": "多选",
+    "en-US": "Multiple selection"
+  },
+  "metadata.clearable": {
+    "zh-CN": "可清空",
+    "en-US": "Clearable"
+  },
+  "metadata.searchable": {
+    "zh-CN": "可搜索",
+    "en-US": "Searchable"
+  },
+  "metadata.options": {
+    "zh-CN": "选项",
+    "en-US": "Options"
+  },
+  "metadata.formatLabelDisplayTextValueValue": {
+    "zh-CN": "格式: [{\"label\": \"显示文本\", \"value\": \"值\"}]",
+    "en-US": "Format: [{\"label\": \"Display text\", \"value\": \"Value\"}]"
+  },
+  "metadata.checkbox": {
+    "zh-CN": "复选框",
+    "en-US": "Checkbox"
+  },
+  "metadata.checkboxWithSingleOrMultipleOptions": {
+    "zh-CN": "复选框，支持单个或多个选项",
+    "en-US": "Checkbox with single or multiple options"
+  },
+  "metadata.checkedByDefault": {
+    "zh-CN": "默认选中",
+    "en-US": "Checked by default"
+  },
+  "metadata.indeterminate": {
+    "zh-CN": "半选状态",
+    "en-US": "Indeterminate"
+  },
+  "metadata.radio": {
+    "zh-CN": "单选框",
+    "en-US": "Radio"
+  },
+  "metadata.radioGroupForSingleSelection": {
+    "zh-CN": "单选框组，用于单选场景",
+    "en-US": "Radio group for single selection"
+  },
+  "metadata.direction": {
+    "zh-CN": "排列方向",
+    "en-US": "Direction"
+  },
+  "metadata.datePicker": {
+    "zh-CN": "日期选择",
+    "en-US": "Date picker"
+  },
+  "metadata.datePickerWithMultipleDateFormats": {
+    "zh-CN": "日期选择器，支持多种日期格式",
+    "en-US": "Date picker with multiple date formats"
+  },
+  "metadata.showTime": {
+    "zh-CN": "显示时间",
+    "en-US": "Show time"
+  },
+  "metadata.dateFormat": {
+    "zh-CN": "日期格式",
+    "en-US": "Date format"
+  },
+  "metadata.formReference": {
+    "zh-CN": "表单引用",
+    "en-US": "Form reference"
+  },
+  "metadata.referenceAStandaloneFormInEmbeddedModalOrOtherDisplayModes": {
+    "zh-CN": "引用独立的表单，支持嵌入、模态框等多种显示模式",
+    "en-US": "Reference a standalone form in embedded, modal or other display modes"
+  },
+  "metadata.formID": {
+    "zh-CN": "表单ID",
+    "en-US": "Form ID"
+  },
+  "metadata.selectTheFormToReference": {
+    "zh-CN": "选择要引用的表单",
+    "en-US": "Select the form to reference"
+  },
+  "metadata.displayMode": {
+    "zh-CN": "显示模式",
+    "en-US": "Display mode"
+  },
+  "metadata.embedded": {
+    "zh-CN": "嵌入",
+    "en-US": "Embedded"
+  },
+  "metadata.modal": {
+    "zh-CN": "模态框",
+    "en-US": "Modal"
+  },
+  "metadata.drawer": {
+    "zh-CN": "抽屉",
+    "en-US": "Drawer"
+  },
+  "metadata.page": {
+    "zh-CN": "页面",
+    "en-US": "Page"
+  },
+  "metadata.title": {
+    "zh-CN": "标题",
+    "en-US": "Title"
+  },
+  "metadata.showTitle": {
+    "zh-CN": "显示标题",
+    "en-US": "Show title"
+  },
+  "metadata.showBorder": {
+    "zh-CN": "显示边框",
+    "en-US": "Show border"
+  },
+  "metadata.width": {
+    "zh-CN": "宽度",
+    "en-US": "Width"
+  },
+  "metadata.appliesOnlyToModalAndDrawerModes": {
+    "zh-CN": "仅在模态框/抽屉模式下生效",
+    "en-US": "Applies only to modal and drawer modes"
+  },
+  "metadata.closable": {
+    "zh-CN": "可关闭",
+    "en-US": "Closable"
+  },
+  "metadata.closeOnBackdropClick": {
+    "zh-CN": "点击遮罩关闭",
+    "en-US": "Close on backdrop click"
+  },
+  "metadata.timePicker": {
+    "zh-CN": "时间选择",
+    "en-US": "Time picker"
+  },
+  "metadata.timePickerWithHoursMinutesAndSeconds": {
+    "zh-CN": "时间选择器，支持小时、分钟、秒选择",
+    "en-US": "Time picker with hours, minutes and seconds"
+  },
+  "metadata.formatHHMmOrHHMmSs": {
+    "zh-CN": "格式: HH:mm 或 HH:mm:ss",
+    "en-US": "Format: HH:mm or HH:mm:ss"
+  },
+  "metadata.timeFormat": {
+    "zh-CN": "时间格式",
+    "en-US": "Time format"
+  },
+  "metadata.showSeconds": {
+    "zh-CN": "显示秒",
+    "en-US": "Show seconds"
+  },
+  "metadata.12HourClock": {
+    "zh-CN": "12小时制",
+    "en-US": "12-hour clock"
+  },
+  "metadata.hourStep": {
+    "zh-CN": "小时步长",
+    "en-US": "Hour step"
+  },
+  "metadata.minuteStep": {
+    "zh-CN": "分钟步长",
+    "en-US": "Minute step"
+  },
+  "metadata.secondStep": {
+    "zh-CN": "秒步长",
+    "en-US": "Second step"
+  },
+  "metadata.switch": {
+    "zh-CN": "开关",
+    "en-US": "Switch"
+  },
+  "metadata.switchBetweenTwoStates": {
+    "zh-CN": "开关选择器，用于两种状态之间切换",
+    "en-US": "Switch between two states"
+  },
+  "metadata.loading": {
+    "zh-CN": "加载中",
+    "en-US": "Loading"
+  },
+  "metadata.checkedText": {
+    "zh-CN": "选中文本",
+    "en-US": "Checked text"
+  },
+  "metadata.textDisplayedWhenTheSwitchIsOn": {
+    "zh-CN": "开关打开时显示的文本",
+    "en-US": "Text displayed when the switch is on"
+  },
+  "metadata.uncheckedText": {
+    "zh-CN": "未选中文本",
+    "en-US": "Unchecked text"
+  },
+  "metadata.textDisplayedWhenTheSwitchIsOff": {
+    "zh-CN": "开关关闭时显示的文本",
+    "en-US": "Text displayed when the switch is off"
+  },
+  "metadata.checkedValue": {
+    "zh-CN": "选中值",
+    "en-US": "Checked value"
+  },
+  "metadata.valueWhenCheckedDefaultsToTrue": {
+    "zh-CN": "选中状态的值，默认为 true",
+    "en-US": "Value when checked; defaults to true"
+  },
+  "metadata.uncheckedValue": {
+    "zh-CN": "未选中值",
+    "en-US": "Unchecked value"
+  },
+  "metadata.valueWhenUncheckedDefaultsToFalse": {
+    "zh-CN": "未选中状态的值，默认为 false",
+    "en-US": "Value when unchecked; defaults to false"
+  },
+  "metadata.numberInput": {
+    "zh-CN": "数字输入",
+    "en-US": "Number input"
+  },
+  "metadata.numericInputWithPrecisionRangeAndStepControls": {
+    "zh-CN": "数字输入框，支持精度、范围、步进控制",
+    "en-US": "Numeric input with precision, range and step controls"
+  },
+  "metadata.minimum": {
+    "zh-CN": "最小值",
+    "en-US": "Minimum"
+  },
+  "metadata.maximum": {
+    "zh-CN": "最大值",
+    "en-US": "Maximum"
+  },
+  "metadata.step": {
+    "zh-CN": "步长",
+    "en-US": "Step"
+  },
+  "metadata.decimalPlaces": {
+    "zh-CN": "小数位数",
+    "en-US": "Decimal places"
+  },
+  "metadata.showIncrementDecrementButtons": {
+    "zh-CN": "显示加减按钮",
+    "en-US": "Show increment/decrement buttons"
+  },
+  "metadata.prefix": {
+    "zh-CN": "前缀",
+    "en-US": "Prefix"
+  },
+  "metadata.textBeforeTheInput": {
+    "zh-CN": "输入框前缀文本",
+    "en-US": "Text before the input"
+  },
+  "metadata.suffix": {
+    "zh-CN": "后缀",
+    "en-US": "Suffix"
+  },
+  "metadata.textAfterTheInputSuchAsAUnit": {
+    "zh-CN": "输入框后缀文本，如单位",
+    "en-US": "Text after the input, such as a unit"
+  },
+  "metadata.fileUpload": {
+    "zh-CN": "文件上传",
+    "en-US": "File upload"
+  },
+  "metadata.fileUploadWithDragAndDropMultipleFilesAndImagePreviews": {
+    "zh-CN": "文件上传组件，支持拖拽、多文件、图片预览",
+    "en-US": "File upload with drag and drop, multiple files and image previews"
+  },
+  "metadata.uploadURL": {
+    "zh-CN": "上传地址",
+    "en-US": "Upload URL"
+  },
+  "metadata.serverURLForFileUploads": {
+    "zh-CN": "文件上传的服务端地址",
+    "en-US": "Server URL for file uploads"
+  },
+  "metadata.multipleFiles": {
+    "zh-CN": "多文件",
+    "en-US": "Multiple files"
+  },
+  "metadata.maximumFileCount": {
+    "zh-CN": "最大文件数",
+    "en-US": "Maximum file count"
+  },
+  "metadata.maximumFileSizeMB": {
+    "zh-CN": "最大文件大小(MB)",
+    "en-US": "Maximum file size (MB)"
+  },
+  "metadata.acceptedFileTypes": {
+    "zh-CN": "接受的文件类型",
+    "en-US": "Accepted file types"
+  },
+  "metadata.forExampleJpgPngPdfOrImage": {
+    "zh-CN": "如: .jpg,.png,.pdf 或 image/*",
+    "en-US": "For example: .jpg,.png,.pdf or image/*"
+  },
+  "metadata.listType": {
+    "zh-CN": "列表类型",
+    "en-US": "List type"
+  },
+  "metadata.text": {
+    "zh-CN": "文本",
+    "en-US": "Text"
+  },
+  "metadata.image": {
+    "zh-CN": "图片",
+    "en-US": "Image"
+  },
+  "metadata.card": {
+    "zh-CN": "卡片",
+    "en-US": "Card"
+  },
+  "metadata.enableDragAndDrop": {
+    "zh-CN": "支持拖拽",
+    "en-US": "Enable drag and drop"
+  },
+  "metadata.showFileList": {
+    "zh-CN": "显示文件列表",
+    "en-US": "Show file list"
+  },
+  "metadata.buttonText": {
+    "zh-CN": "按钮文字",
+    "en-US": "Button text"
+  },
+  "metadata.textOnTheUploadButton": {
+    "zh-CN": "上传按钮的文字",
+    "en-US": "Text on the upload button"
+  },
+  "metadata.hintText": {
+    "zh-CN": "提示文字",
+    "en-US": "Hint text"
+  },
+  "metadata.hintDisplayedInTheUploadArea": {
+    "zh-CN": "上传区域的提示文字",
+    "en-US": "Hint displayed in the upload area"
+  },
+  "metadata.textDisplay": {
+    "zh-CN": "文本显示",
+    "en-US": "Text display"
+  },
+  "metadata.displayTextContent": {
+    "zh-CN": "用于显示文本内容",
+    "en-US": "Display text content"
+  },
+  "metadata.displayText": {
+    "zh-CN": "显示文本",
+    "en-US": "Display text"
+  },
+  "metadata.fontSize": {
+    "zh-CN": "字体大小",
+    "en-US": "Font size"
+  },
+  "metadata.extraLarge": {
+    "zh-CN": "特大",
+    "en-US": "Extra large"
+  },
+  "metadata.fontWeight": {
+    "zh-CN": "字体粗细",
+    "en-US": "Font weight"
+  },
+  "metadata.normal": {
+    "zh-CN": "正常",
+    "en-US": "Normal"
+  },
+  "metadata.bold": {
+    "zh-CN": "粗体",
+    "en-US": "Bold"
+  },
+  "metadata.light": {
+    "zh-CN": "细体",
+    "en-US": "Light"
+  },
+  "metadata.alignment": {
+    "zh-CN": "对齐方式",
+    "en-US": "Alignment"
+  },
+  "metadata.alignLeft": {
+    "zh-CN": "左对齐",
+    "en-US": "Align left"
+  },
+  "metadata.center": {
+    "zh-CN": "居中",
+    "en-US": "Center"
+  },
+  "metadata.alignRight": {
+    "zh-CN": "右对齐",
+    "en-US": "Align right"
+  },
+  "metadata.textColor": {
+    "zh-CN": "文字颜色",
+    "en-US": "Text color"
+  },
+  "metadata.imageDisplayComponent": {
+    "zh-CN": "图片展示组件",
+    "en-US": "Image display component"
+  },
+  "metadata.imageURL": {
+    "zh-CN": "图片地址",
+    "en-US": "Image URL"
+  },
+  "metadata.alternativeText": {
+    "zh-CN": "替代文本",
+    "en-US": "Alternative Text"
+  },
+  "metadata.fit": {
+    "zh-CN": "适应方式",
+    "en-US": "Fit"
+  },
+  "metadata.cover": {
+    "zh-CN": "覆盖",
+    "en-US": "Cover"
+  },
+  "metadata.contain": {
+    "zh-CN": "包含",
+    "en-US": "Contain"
+  },
+  "metadata.scaleDown": {
+    "zh-CN": "缩放",
+    "en-US": "Scale down"
+  },
+  "metadata.lazyLoading": {
+    "zh-CN": "懒加载",
+    "en-US": "Lazy loading"
+  },
+  "metadata.table": {
+    "zh-CN": "表格",
+    "en-US": "Table"
+  },
+  "metadata.dataTableDisplayComponent": {
+    "zh-CN": "数据表格展示组件",
+    "en-US": "Data table display component"
+  },
+  "metadata.columnConfiguration": {
+    "zh-CN": "列配置",
+    "en-US": "Column configuration"
+  },
+  "metadata.tableColumnConfiguration": {
+    "zh-CN": "表格列配置",
+    "en-US": "Table column configuration"
+  },
+  "metadata.dataSource": {
+    "zh-CN": "数据源",
+    "en-US": "Data source"
+  },
+  "metadata.tableData": {
+    "zh-CN": "表格数据",
+    "en-US": "Table data"
+  },
+  "metadata.pagination": {
+    "zh-CN": "分页",
+    "en-US": "Pagination"
+  },
+  "metadata.pageSize": {
+    "zh-CN": "每页条数",
+    "en-US": "Page size"
+  },
+  "metadata.stripedRows": {
+    "zh-CN": "斑马纹",
+    "en-US": "Striped Rows"
+  },
+  "metadata.button": {
+    "zh-CN": "按钮",
+    "en-US": "Button"
+  },
+  "metadata.interactiveButtonComponent": {
+    "zh-CN": "交互按钮组件",
+    "en-US": "Interactive button component"
+  },
+  "metadata.buttonType": {
+    "zh-CN": "按钮类型",
+    "en-US": "Button type"
+  },
+  "metadata.primary": {
+    "zh-CN": "主要",
+    "en-US": "Primary"
+  },
+  "metadata.secondary": {
+    "zh-CN": "次要",
+    "en-US": "Secondary"
+  },
+  "metadata.success": {
+    "zh-CN": "成功",
+    "en-US": "Success"
+  },
+  "metadata.warning": {
+    "zh-CN": "警告",
+    "en-US": "Warning"
+  },
+  "metadata.danger": {
+    "zh-CN": "危险",
+    "en-US": "Danger"
+  },
+  "metadata.link": {
+    "zh-CN": "链接",
+    "en-US": "Link"
+  },
+  "metadata.blockButton": {
+    "zh-CN": "块级按钮",
+    "en-US": "Block button"
+  },
+  "metadata.divContainer": {
+    "zh-CN": "Div容器",
+    "en-US": "Div container"
+  },
+  "metadata.generalDivContainerWithEditablePropertiesAndAutomaticGridOccupancy": {
+    "zh-CN": "通用div容器，支持属性面板编辑和自动grid占用",
+    "en-US": "General div container with editable properties and automatic grid occupancy"
+  },
+  "metadata.display": {
+    "zh-CN": "显示方式",
+    "en-US": "Display"
+  },
+  "metadata.block": {
+    "zh-CN": "块级",
+    "en-US": "Block"
+  },
+  "metadata.inlineBlock": {
+    "zh-CN": "内联块",
+    "en-US": "Inline block"
+  },
+  "metadata.flex": {
+    "zh-CN": "弹性盒",
+    "en-US": "Flex"
+  },
+  "metadata.grid": {
+    "zh-CN": "网格",
+    "en-US": "Grid"
+  },
+  "metadata.hidden": {
+    "zh-CN": "隐藏",
+    "en-US": "Hidden"
+  },
+  "metadata.position": {
+    "zh-CN": "定位方式",
+    "en-US": "Position"
+  },
+  "metadata.static": {
+    "zh-CN": "静态",
+    "en-US": "Static"
+  },
+  "metadata.relative": {
+    "zh-CN": "相对",
+    "en-US": "Relative"
+  },
+  "metadata.absolute": {
+    "zh-CN": "绝对",
+    "en-US": "Absolute"
+  },
+  "metadata.fixed": {
+    "zh-CN": "固定",
+    "en-US": "Fixed"
+  },
+  "metadata.sticky": {
+    "zh-CN": "粘性",
+    "en-US": "Sticky"
+  },
+  "metadata.zIndex": {
+    "zh-CN": "层级",
+    "en-US": "Z-index"
+  },
+  "metadata.stackingOrderSuchAsAuto1Or10": {
+    "zh-CN": "元素层级，如: auto, 1, 10",
+    "en-US": "Stacking order, such as auto, 1 or 10"
+  },
+  "metadata.overflow": {
+    "zh-CN": "溢出处理",
+    "en-US": "Overflow"
+  },
+  "metadata.visible": {
+    "zh-CN": "可见",
+    "en-US": "Visible"
+  },
+  "metadata.scroll": {
+    "zh-CN": "滚动",
+    "en-US": "Scroll"
+  },
+  "metadata.auto": {
+    "zh-CN": "自动",
+    "en-US": "Auto"
+  },
+  "metadata.formContainer": {
+    "zh-CN": "表单容器",
+    "en-US": "Form container"
+  },
+  "metadata.formLayoutContainer": {
+    "zh-CN": "表单布局容器",
+    "en-US": "Form layout container"
+  },
+  "metadata.formTitle": {
+    "zh-CN": "表单标题",
+    "en-US": "Form title"
+  },
+  "metadata.layout": {
+    "zh-CN": "布局方式",
+    "en-US": "Layout"
+  },
+  "metadata.inline": {
+    "zh-CN": "内联",
+    "en-US": "Inline"
+  },
+  "metadata.labelWidth": {
+    "zh-CN": "标签宽度",
+    "en-US": "Label width"
+  },
+  "metadata.navigation": {
+    "zh-CN": "导航组件",
+    "en-US": "Navigation"
+  },
+  "metadata.horizontalNavigationWithComponentSelectionAndDataSourceConfiguration": {
+    "zh-CN": "水平导航栏组件，支持组件选择和数据源配置",
+    "en-US": "Horizontal navigation with component selection and data source configuration"
+  },
+  "metadata.theme": {
+    "zh-CN": "主题",
+    "en-US": "Theme"
+  },
+  "metadata.light198": {
+    "zh-CN": "浅色",
+    "en-US": "Light"
+  },
+  "metadata.dark": {
+    "zh-CN": "深色",
+    "en-US": "Dark"
+  },
+  "metadata.navigationItems": {
+    "zh-CN": "导航项",
+    "en-US": "Navigation items"
+  },
+  "metadata.formatKeyUniqueKeyLabelDisplayTextHrefLinkURL": {
+    "zh-CN": "格式: [{\"key\": \"唯一标识\", \"label\": \"显示文本\", \"href\": \"链接地址\"}]",
+    "en-US": "Format: [{\"key\": \"Unique key\", \"label\": \"Display text\", \"href\": \"Link URL\"}]"
+  },
+  "metadata.selectedItem": {
+    "zh-CN": "选中项",
+    "en-US": "Selected item"
+  },
+  "metadata.collapsed": {
+    "zh-CN": "折叠状态",
+    "en-US": "Collapsed"
+  },
+  "metadata.targetComponent": {
+    "zh-CN": "目标组件",
+    "en-US": "Target component"
+  },
+  "metadata.selectTheComponentToAssociate": {
+    "zh-CN": "选择要关联的组件",
+    "en-US": "Select the component to associate"
+  },
+  "metadata.selectADataSource": {
+    "zh-CN": "选择数据源",
+    "en-US": "Select a data source"
+  },
+  "metadata.container": {
+    "zh-CN": "容器组件",
+    "en-US": "Container"
+  },
+  "metadata.generalLayoutContainerWithPaddingBordersAndOtherStyles": {
+    "zh-CN": "通用布局容器，支持内边距、边框等样式配置",
+    "en-US": "General layout container with padding, borders and other styles"
+  },
+  "metadata.none": {
+    "zh-CN": "无",
+    "en-US": "None"
+  },
+  "metadata.minimumHeight": {
+    "zh-CN": "最小高度",
+    "en-US": "Minimum height"
+  },
+  "metadata.gridLayout": {
+    "zh-CN": "网格布局",
+    "en-US": "Grid layout"
+  },
+  "metadata.gridLayoutContainerWithResponsiveColumns": {
+    "zh-CN": "网格布局容器，支持响应式网格系统",
+    "en-US": "Grid layout container with responsive columns"
+  },
+  "metadata.columns": {
+    "zh-CN": "列数",
+    "en-US": "Columns"
+  },
+  "metadata.gap": {
+    "zh-CN": "间距",
+    "en-US": "Gap"
+  },
+  "metadata.horizontalAlignment": {
+    "zh-CN": "水平对齐",
+    "en-US": "Horizontal alignment"
+  },
+  "metadata.spaceBetween": {
+    "zh-CN": "两端对齐",
+    "en-US": "Space between"
+  },
+  "metadata.spaceAround": {
+    "zh-CN": "环绕对齐",
+    "en-US": "Space around"
+  },
+  "metadata.verticalAlignment": {
+    "zh-CN": "垂直对齐",
+    "en-US": "Vertical alignment"
+  },
+  "metadata.top": {
+    "zh-CN": "顶部",
+    "en-US": "Top"
+  },
+  "metadata.bottom": {
+    "zh-CN": "底部",
+    "en-US": "Bottom"
+  },
+  "metadata.wrapAutomatically": {
+    "zh-CN": "自动换行",
+    "en-US": "Wrap automatically"
+  },
+  "metadata.responsive": {
+    "zh-CN": "响应式",
+    "en-US": "Responsive"
+  },
+  "metadata.flexLayout": {
+    "zh-CN": "弹性布局",
+    "en-US": "Flex layout"
+  },
+  "metadata.flexibleLayoutContainerBasedOnFlexbox": {
+    "zh-CN": "弹性布局容器，基于 Flexbox 实现灵活布局",
+    "en-US": "Flexible layout container based on Flexbox"
+  },
+  "metadata.rowReverse": {
+    "zh-CN": "水平反向",
+    "en-US": "Row reverse"
+  },
+  "metadata.columnReverse": {
+    "zh-CN": "垂直反向",
+    "en-US": "Column reverse"
+  },
+  "metadata.mainAxisAlignment": {
+    "zh-CN": "主轴对齐",
+    "en-US": "Main-axis alignment"
+  },
+  "metadata.start": {
+    "zh-CN": "起始",
+    "en-US": "Start"
+  },
+  "metadata.end": {
+    "zh-CN": "末尾",
+    "en-US": "End"
+  },
+  "metadata.spaceEvenly": {
+    "zh-CN": "均匀分布",
+    "en-US": "Space evenly"
+  },
+  "metadata.crossAxisAlignment": {
+    "zh-CN": "交叉轴对齐",
+    "en-US": "Cross-axis alignment"
+  },
+  "metadata.stretch": {
+    "zh-CN": "拉伸",
+    "en-US": "Stretch"
+  },
+  "metadata.baseline": {
+    "zh-CN": "基线",
+    "en-US": "Baseline"
+  },
+  "metadata.wrapMode": {
+    "zh-CN": "换行方式",
+    "en-US": "Wrap mode"
+  },
+  "metadata.noWrap": {
+    "zh-CN": "不换行",
+    "en-US": "No wrap"
+  },
+  "metadata.wrap": {
+    "zh-CN": "换行",
+    "en-US": "Wrap"
+  },
+  "metadata.wrapReverse": {
+    "zh-CN": "反向换行",
+    "en-US": "Wrap reverse"
+  },
+  "metadata.flexFactor": {
+    "zh-CN": "弹性系数",
+    "en-US": "Flex factor"
+  },
+  "metadata.columnLayout": {
+    "zh-CN": "分栏布局",
+    "en-US": "Column layout"
+  },
+  "metadata.multiColumnLayoutWithEqualOrCustomWidths": {
+    "zh-CN": "多列布局组件，支持等宽或自定义宽度分栏",
+    "en-US": "Multi-column layout with equal or custom widths"
+  },
+  "metadata.columnGap": {
+    "zh-CN": "列间距",
+    "en-US": "Column gap"
+  },
+  "metadata.showDividers": {
+    "zh-CN": "显示分割线",
+    "en-US": "Show dividers"
+  },
+  "metadata.breakpointConfiguration": {
+    "zh-CN": "断点配置",
+    "en-US": "Breakpoint configuration"
+  },
+  "metadata.columnCountsForDifferentScreenSizes": {
+    "zh-CN": "不同屏幕尺寸下的列数配置",
+    "en-US": "Column counts for different screen sizes"
+  },
+  "metadata.cardContainer": {
+    "zh-CN": "卡片容器",
+    "en-US": "Card container"
+  },
+  "metadata.cardContainerWithHeaderContentAndActionAreas": {
+    "zh-CN": "卡片式容器，包含标题、内容区域和操作区域",
+    "en-US": "Card container with header, content and action areas"
+  },
+  "metadata.cardTitle": {
+    "zh-CN": "卡片标题",
+    "en-US": "Card title"
+  },
+  "metadata.showHeader": {
+    "zh-CN": "显示头部",
+    "en-US": "Show header"
+  },
+  "metadata.showFooter": {
+    "zh-CN": "显示底部",
+    "en-US": "Show footer"
+  },
+  "metadata.hoverEffect": {
+    "zh-CN": "悬停效果",
+    "en-US": "Hover effect"
+  },
+  "metadata.loadingState": {
+    "zh-CN": "加载状态",
+    "en-US": "Loading state"
+  },
+  "metadata.contentStyle": {
+    "zh-CN": "内容样式",
+    "en-US": "Content style"
+  },
+  "metadata.cssStyleObject": {
+    "zh-CN": "CSS 样式对象",
+    "en-US": "CSS style object"
+  },
+  "metadata.dateDisplay": {
+    "zh-CN": "日期显示",
+    "en-US": "Date display"
+  },
+  "metadata.dateDisplayComponent": {
+    "zh-CN": "日期显示组件",
+    "en-US": "Date display component"
+  },
+  "metadata.dateValue": {
+    "zh-CN": "日期值",
+    "en-US": "Date value"
+  },
+  "metadata.displayFormat": {
+    "zh-CN": "显示格式",
+    "en-US": "Display Format"
+  },
+  "metadata.relativeTime": {
+    "zh-CN": "相对时间",
+    "en-US": "Relative time"
+  },
+  "metadata.datetimeDisplay": {
+    "zh-CN": "日期时间显示",
+    "en-US": "Datetime display"
+  },
+  "metadata.datetimeDisplayComponent": {
+    "zh-CN": "日期时间显示组件",
+    "en-US": "Datetime display component"
+  },
+  "metadata.datetimeValue": {
+    "zh-CN": "日期时间值",
+    "en-US": "Datetime value"
+  },
+  "metadata.numberCard": {
+    "zh-CN": "数字卡片",
+    "en-US": "Number Card"
+  },
+  "metadata.kpiMetricDisplay": {
+    "zh-CN": "KPI 指标数字展示",
+    "en-US": "KPI metric display"
+  },
+  "metadata.icon": {
+    "zh-CN": "图标",
+    "en-US": "Icon"
+  },
+  "metadata.format": {
+    "zh-CN": "格式",
+    "en-US": "Format"
+  },
+  "metadata.number": {
+    "zh-CN": "数字",
+    "en-US": "Number"
+  },
+  "metadata.currency": {
+    "zh-CN": "货币",
+    "en-US": "Currency"
+  },
+  "metadata.percentage": {
+    "zh-CN": "百分比",
+    "en-US": "Percentage"
+  },
+  "metadata.dataSourceType": {
+    "zh-CN": "数据源类型",
+    "en-US": "Data Source Type"
+  },
+  "metadata.aggregateQuery": {
+    "zh-CN": "聚合查询",
+    "en-US": "Aggregate Query"
+  },
+  "metadata.dataModel": {
+    "zh-CN": "数据模型",
+    "en-US": "Data model"
+  },
+  "metadata.metricConfiguration": {
+    "zh-CN": "指标配置",
+    "en-US": "Metric configuration"
+  },
+  "metadata.barChart": {
+    "zh-CN": "柱状图",
+    "en-US": "Bar Chart"
+  },
+  "metadata.barChartForComparisons": {
+    "zh-CN": "柱状图/条形图，适合对比分析",
+    "en-US": "Bar chart for comparisons"
+  },
+  "metadata.horizontal275": {
+    "zh-CN": "水平显示",
+    "en-US": "Horizontal"
+  },
+  "metadata.stacking": {
+    "zh-CN": "堆叠",
+    "en-US": "Stacking"
+  },
+  "metadata.dimensionField": {
+    "zh-CN": "维度字段",
+    "en-US": "Dimension field"
+  },
+  "metadata.enableDrilldown": {
+    "zh-CN": "启用钻取",
+    "en-US": "Enable drilldown"
+  },
+  "metadata.enableLinkage": {
+    "zh-CN": "启用联动",
+    "en-US": "Enable linkage"
+  },
+  "metadata.linkageGroup": {
+    "zh-CN": "联动组",
+    "en-US": "Linkage group"
+  },
+  "metadata.lineChart": {
+    "zh-CN": "折线图",
+    "en-US": "Line Chart"
+  },
+  "metadata.lineOrAreaChartForTrends": {
+    "zh-CN": "折线图/面积图，适合趋势分析",
+    "en-US": "Line or area chart for trends"
+  },
+  "metadata.smoothCurve": {
+    "zh-CN": "平滑曲线",
+    "en-US": "Smooth Curve"
+  },
+  "metadata.areaChart": {
+    "zh-CN": "面积图",
+    "en-US": "Area Chart"
+  },
+  "metadata.pieChart": {
+    "zh-CN": "饼图",
+    "en-US": "Pie Chart"
+  },
+  "metadata.pieOrDonutChartForProportions": {
+    "zh-CN": "饼图/环形图，适合占比分析",
+    "en-US": "Pie or donut chart for proportions"
+  },
+  "metadata.doughnut": {
+    "zh-CN": "环形图",
+    "en-US": "Doughnut"
+  },
+  "metadata.showLabels": {
+    "zh-CN": "显示标签",
+    "en-US": "Show Labels"
+  },
+  "metadata.kanban": {
+    "zh-CN": "看板",
+    "en-US": "Kanban"
+  },
+  "metadata.kanbanViewWithDraggableCards": {
+    "zh-CN": "看板视图，支持拖拽卡片",
+    "en-US": "Kanban view with draggable cards"
+  },
+  "metadata.allowDragging": {
+    "zh-CN": "允许拖拽",
+    "en-US": "Allow dragging"
+  },
+  "metadata.showCount": {
+    "zh-CN": "显示数量",
+    "en-US": "Show Count"
+  },
+  "metadata.showStatistics": {
+    "zh-CN": "显示统计",
+    "en-US": "Show statistics"
+  },
+  "metadata.groupField": {
+    "zh-CN": "分组字段",
+    "en-US": "Group Field"
+  },
+  "metadata.titleField": {
+    "zh-CN": "标题字段",
+    "en-US": "Title Field"
+  },
+  "metadata.descriptionField": {
+    "zh-CN": "描述字段",
+    "en-US": "Description field"
+  },
+  "metadata.barChartComparingCategories": {
+    "zh-CN": "柱状图，用于展示分类数据的对比",
+    "en-US": "Bar chart comparing categories"
+  },
+  "metadata.chartTitle": {
+    "zh-CN": "图表标题",
+    "en-US": "Chart title"
+  },
+  "metadata.chartDataCategoryCategoryValue10": {
+    "zh-CN": "图表数据，格式: [{\"category\": \"分类\", \"value\": 数值}]",
+    "en-US": "Chart data: [{\"category\": \"Category\", \"value\": 10}]"
+  },
+  "metadata.xAxisField": {
+    "zh-CN": "X轴字段",
+    "en-US": "X Axis Field"
+  },
+  "metadata.yAxisField": {
+    "zh-CN": "Y轴字段",
+    "en-US": "Y Axis Field"
+  },
+  "metadata.color": {
+    "zh-CN": "颜色",
+    "en-US": "Color"
+  },
+  "metadata.showLegend": {
+    "zh-CN": "显示图例",
+    "en-US": "Show Legend"
+  },
+  "metadata.showGrid": {
+    "zh-CN": "显示网格",
+    "en-US": "Show grid"
+  },
+  "metadata.showTooltip": {
+    "zh-CN": "显示提示",
+    "en-US": "Show tooltip"
+  },
+  "metadata.lineChartShowingDataTrends": {
+    "zh-CN": "折线图，用于展示数据的趋势变化",
+    "en-US": "Line chart showing data trends"
+  },
+  "metadata.chartDataDateDateValue10": {
+    "zh-CN": "图表数据，格式: [{\"date\": \"日期\", \"value\": 数值}]",
+    "en-US": "Chart data: [{\"date\": \"Date\", \"value\": 10}]"
+  },
+  "metadata.showDataPoints": {
+    "zh-CN": "显示数据点",
+    "en-US": "Show data points"
+  },
+  "metadata.pieChartShowingProportions": {
+    "zh-CN": "饼图，用于展示数据的占比关系",
+    "en-US": "Pie chart showing proportions"
+  },
+  "metadata.angleField": {
+    "zh-CN": "角度字段",
+    "en-US": "Angle field"
+  },
+  "metadata.colorField": {
+    "zh-CN": "颜色字段",
+    "en-US": "Color field"
+  },
+  "metadata.outerRadius": {
+    "zh-CN": "外半径",
+    "en-US": "Outer radius"
+  },
+  "metadata.innerRadius": {
+    "zh-CN": "内半径",
+    "en-US": "Inner radius"
+  },
+  "metadata.areaChartShowingCumulativeChanges": {
+    "zh-CN": "面积图，用于展示数据的累积变化",
+    "en-US": "Area chart showing cumulative changes"
+  },
+  "metadata.fillOpacity": {
+    "zh-CN": "填充透明度",
+    "en-US": "Fill Opacity"
+  },
+  "ui.all": {
+    "zh-CN": "全部",
+    "en-US": "All"
+  },
+  "ui.library": {
+    "zh-CN": "组件库",
+    "en-US": "Component library"
+  },
+  "ui.dragHint": {
+    "zh-CN": "拖拽组件到画布",
+    "en-US": "Drag a component onto the canvas"
+  },
+  "ui.search": {
+    "zh-CN": "搜索组件...",
+    "en-US": "Search components..."
+  },
+  "ui.noMatch": {
+    "zh-CN": "未找到匹配的组件",
+    "en-US": "No matching components"
+  },
+  "ui.emptyCategory": {
+    "zh-CN": "该分类下暂无组件",
+    "en-US": "No components in this category"
+  },
+  "ui.empty": {
+    "zh-CN": "暂无可用组件",
+    "en-US": "No components available"
+  },
+  "ui.field": {
+    "zh-CN": "字段",
+    "en-US": "Field"
+  },
+  "ui.component": {
+    "zh-CN": "组件",
+    "en-US": "Component"
+  },
+  "ui.count": {
+    "zh-CN": "共 {count} 个组件",
+    "en-US": "{count} components"
+  },
+  "ui.fieldHint": {
+    "zh-CN": "字段 - 添加到表单",
+    "en-US": "Field - add to form"
+  },
+  "ui.componentHint": {
+    "zh-CN": "组件 - 创建 Block",
+    "en-US": "Component - create block"
+  },
+  "category.form": {
+    "zh-CN": "表单组件",
+    "en-US": "Form components"
+  },
+  "category.formDescription": {
+    "zh-CN": "用于数据输入和表单构建的组件",
+    "en-US": "Components for data entry and form construction"
+  },
+  "category.display": {
+    "zh-CN": "展示组件",
+    "en-US": "Display components"
+  },
+  "category.displayDescription": {
+    "zh-CN": "用于数据展示和信息呈现的组件",
+    "en-US": "Components for displaying data and information"
+  },
+  "category.interaction": {
+    "zh-CN": "交互组件",
+    "en-US": "Interaction components"
+  },
+  "category.interactionDescription": {
+    "zh-CN": "用于用户交互和操作的组件",
+    "en-US": "Components for user interactions and actions"
+  },
+  "category.layout": {
+    "zh-CN": "布局组件",
+    "en-US": "Layout components"
+  },
+  "category.layoutDescription": {
+    "zh-CN": "用于页面布局和结构组织的组件",
+    "en-US": "Components for page layouts and structure"
+  },
+  "category.datetime": {
+    "zh-CN": "日期时间",
+    "en-US": "Date and time"
+  },
+  "category.datetimeDescription": {
+    "zh-CN": "用于日期时间选择和显示的组件",
+    "en-US": "Components for selecting and displaying dates and times"
+  },
+  "category.chart": {
+    "zh-CN": "图表组件",
+    "en-US": "Chart components"
+  },
+  "category.chartDescription": {
+    "zh-CN": "用于数据可视化和图表展示的组件",
+    "en-US": "Components for data visualization and charts"
+  }
+}

@@ -308,10 +308,11 @@ export interface WidgetDefinition {
   type: WidgetType;
   /** OSS 基础能力或 Enterprise 高级能力。缺省由 resolveWidgetTier 推断。 */
   tier?: WidgetTier;
-  label: string;
+  label: DashboardText;
   icon: string;
   category: string;
-  description?: string;
+  categoryLabel?: DashboardText;
+  description?: DashboardText;
   defaultConfig: Partial<WidgetConfig>;
   defaultSize: {
     w: number;
@@ -326,9 +327,9 @@ export interface WidgetDefinition {
 
 /**
  * Property schema for widget configuration.
- * Dashboard uses plain string labels (no i18n).
+ * Dashboard metadata accepts plain legacy strings and locale maps.
  */
-export type PropertySchema = SharedPropertySchema<string>;
+export type PropertySchema = SharedPropertySchema<DashboardText>;
 
 /**
  * Validation result

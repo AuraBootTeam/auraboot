@@ -36,6 +36,9 @@ public class CapabilityDefinitionDTO {
 
     private String description;
 
+    @JsonProperty("description:en")
+    private String descriptionEn;
+
     /** Atomic permission codes granted when this capability is selected. */
     private List<String> includes;
 

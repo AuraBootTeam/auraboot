@@ -582,10 +582,10 @@ export interface ListProps extends BaseSmartComponentProps {
 // 组件配置类型
 export interface ComponentConfig {
   type: string;
-  name: string;
+  name: string | LocalizedText;
   category: 'form' | 'display' | 'interaction' | 'layout' | 'datetime' | 'chart';
   icon: string;
-  description?: string;
+  description?: string | LocalizedText;
   defaultProps?: Record<string, any>;
   propertySchema?: Record<string, any>;
 }

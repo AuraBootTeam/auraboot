@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import test from 'node:test';
+import { spawnSync } from 'node:child_process';
 
 function read(path) {
   return readFileSync(path, 'utf8');
@@ -321,6 +322,33 @@ test('OSS golden stack stages manifest-declared backend jars from explicit roots
 
 test('OSS golden stack applies explicit product migrations only to a fresh database before backend startup', () => {
   const stack = read('scripts/oss-golden-stack.sh');
+
+  // Execute the actual preflight fragment, without invoking runtime or database tools.
+  const guardStart = stack.indexOf('  [ "$fresh_db$require_new_db" != "11" ]');
+  const guardEnd = stack.indexOf('  case "$runtime_mode" in', guardStart);
+  assert.ok(guardStart >= 0 && guardEnd > guardStart, 'freshness preflight must exist');
+  const guard = stack.slice(guardStart, guardEnd);
+  const cases = [
+    { fresh: '0', absent: '0', products: '0', allowed: true },
+    { fresh: '0', absent: '0', products: '1', allowed: false },
+    { fresh: '1', absent: '0', products: '1', allowed: true },
+    { fresh: '0', absent: '1', products: '1', allowed: true },
+    { fresh: '1', absent: '1', products: '1', allowed: false },
+    { fresh: '1', absent: '1', products: '0', allowed: false },
+  ];
+  for (const row of cases) {
+    const result = spawnSync('bash', ['-c', `
+      set -euo pipefail
+      die() { printf '%s\\n' "$*" >&2; exit 1; }
+      fresh_db="$1"; require_new_db="$2"
+      product_migration_roots=()
+      [ "$3" = "0" ] || product_migration_roots+=(/fixture/product-migrations)
+      ${guard}
+    `, 'freshness-contract', row.fresh, row.absent, row.products], { encoding: 'utf8' });
+    assert.equal(result.error, undefined);
+    assert.equal(result.status, row.allowed ? 0 : 1, JSON.stringify(row));
+    if (!row.allowed) assert.match(result.stderr, /mutually exclusive|requires/);
+  }
 
   assert.match(stack, /--product-migration-root requires a fresh database flag/);
   assert.match(stack, /\[ "\$\{#product_migration_roots\[@\]\}" -eq 0 \] \|\| \[ "\$fresh_db" = "1" \] \|\| \[ "\$require_new_db" = "1" \]/);

@@ -221,7 +221,7 @@ function getLocalizedTextFromObject(
   obj: Record<string, string | undefined>,
   locale: string,
 ): string {
-  // 优先使用当前语言
+  // Prefer the current locale.
   if (obj[locale]) {
     return obj[locale] as string;
   }
@@ -231,7 +231,13 @@ function getLocalizedTextFromObject(
     return obj[language] as string;
   }
 
-  // 回退到中文
+  // Prefer another regional variant of the requested language before cross-language fallback.
+  const regionalVariant = Object.entries(obj).find(([key, value]) =>
+    key.includes('-') && key.split('-')[0] === language && Boolean(value),
+  );
+  if (regionalVariant) return regionalVariant[1] as string;
+
+  // Fall back to Chinese.
   if (obj['zh-CN']) {
     return obj['zh-CN'];
   }
@@ -239,7 +245,7 @@ function getLocalizedTextFromObject(
     return obj.zh;
   }
 
-  // 回退到英文
+  // Fall back to English.
   if (obj['en-US']) {
     return obj['en-US'];
   }
@@ -247,7 +253,7 @@ function getLocalizedTextFromObject(
     return obj.en;
   }
 
-  // 返回第一个可用值
+  // Return the first available value.
   const firstValue = Object.values(obj).find((v) => v != null);
   return firstValue || '';
 }
