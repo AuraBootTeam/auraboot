@@ -310,7 +310,8 @@ function rolloutDisplay(log: DecisionLogRecord, locale = 'zh-CN'): string {
   return `${rolloutLabel(log.rolloutArm, locale)}${log.rolloutBucket != null ? ` #${log.rolloutBucket}` : ''}`;
 }
 
-function decisionLabel(logOrCode: DecisionLogRecord | string, locale = 'zh-CN', decisionName?: string): string {
+function decisionLabel(logOrCode: DecisionLogRecord | string | undefined, locale = 'zh-CN', decisionName?: string): string {
+  if (logOrCode == null) return '-';
   if (typeof logOrCode === 'string') {
     const name = decisionName?.trim();
     if (name) return name;
