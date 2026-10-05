@@ -116,6 +116,17 @@ public class ImportRequest {
     private Boolean dryRun = false;
 
     /**
+     * Optional absolute path to an identifier-mapping JSON
+     * ({"identifiers":[{"from":"legacy_code","to":"renamed_code"},...]}).
+     * When present, after the import's resources are persisted and its models
+     * published, the import chain migrates legacy-identifier physical-table
+     * rows into the freshly imported identifiers (plugin rename upgrade
+     * contract). See {@code IdentifierMappingDataMigrator}.
+     */
+    @JsonSetter(nulls = Nulls.SKIP)
+    private String identifierMappingPath;
+
+    /**
      * Apply defaults for any null fields.
      * Required because Jackson + Lombok @AllArgsConstructor + @ConstructorProperties
      * bypasses the no-arg constructor defaults when deserializing partial JSON.

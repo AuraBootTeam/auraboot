@@ -163,6 +163,7 @@ public class PluginImportServiceImpl implements PluginImportService {
     private final EventPolicyVersionService eventPolicyVersionService;
     private final SemanticPublishService semanticPublishService;
     private final JdbcTemplate jdbcTemplate;
+    private final IdentifierMappingDataMigrator identifierMappingDataMigrator;
     /** Used by {@link #verifyImportReferenceIntegrity()} to enumerate the tenant's commands. */
     private final com.auraboot.framework.meta.mapper.CommandDefinitionMapper commandDefinitionMapper;
 
@@ -769,6 +770,13 @@ public class PluginImportServiceImpl implements PluginImportService {
             // Import resources in dependency order
             importResources(context, request, result, pluginPid);
 
+            // Plugin rename upgrade contract: when the request carries an
+            // identifier mapping, migrate legacy-identifier physical-table rows
+            // into the freshly imported identifiers before the import commits.
+            // A migration failure fails the whole import so an upgrade is never
+            // half-applied silently.
+            applyIdentifierDataMigration(request, result, tenantId);
+
             // Mark as success
             result.setSuccess(true);
             result.setStatus(ImportStatus.SUCCESS);
@@ -825,6 +833,38 @@ public class PluginImportServiceImpl implements PluginImportService {
         }
 
         return result;
+    }
+
+    /**
+     * Plugin rename upgrade contract: run the identifier-mapping data migration
+     * when the request declares one, attaching per-model receipts to the result.
+     * Runs inside the import transaction — any failure rolls the whole import back.
+     */
+    private void applyIdentifierDataMigration(ImportRequest request, ImportExecuteResult result, Long tenantId) {
+        String mappingPath = request.getIdentifierMappingPath();
+        if (mappingPath == null || mappingPath.isBlank()) {
+            return;
+        }
+        log.info("Running identifier-mapping data migration for plugin {}: {}",
+                logSafe(result.getPluginId()), logSafe(mappingPath));
+        List<IdentifierMappingDataMigrator.ModelDataMigration> migrations =
+                identifierMappingDataMigrator.migrate(java.nio.file.Path.of(mappingPath), tenantId);
+        if (result.getDataMigrations() == null) {
+            result.setDataMigrations(new ArrayList<>());
+        }
+        for (IdentifierMappingDataMigrator.ModelDataMigration migration : migrations) {
+            result.getDataMigrations().add(ImportExecuteResult.IdentifierDataMigration.builder()
+                    .fromModel(migration.getFromModel())
+                    .toModel(migration.getToModel())
+                    .sourceTable(migration.getSourceTable())
+                    .targetTable(migration.getTargetTable())
+                    .rowsMigrated(migration.getRowsMigrated())
+                    .rowsAlreadyPresent(migration.getRowsAlreadyPresent())
+                    .columnsRenamed(migration.getColumnsRenamed())
+                    .droppedSourceColumns(migration.getDroppedSourceColumns())
+                    .unmappedNewColumns(migration.getUnmappedNewColumns())
+                    .build());
+        }
     }
 
     private void markImportFailedInNewTransaction(String importId, Throwable throwable) {
