@@ -1300,7 +1300,7 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
             </div>
             <div className="elta-drawer-meta">
               <span title={decisionTitle(selectedLog)}>
-                决策 {decisionLabel(selectedLog, locale)}
+                决策 {selectedLog ? decisionLabel(selectedLog, locale) : '-'}
               </span>
               <span title={display(selectedLog.status)}>
                 状态 {decisionStatusLabel(selectedLog.status, locale)}
