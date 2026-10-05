@@ -13588,7 +13588,8 @@ CREATE TABLE public.ab_permission_capability (
     order_no integer DEFAULT 100 NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    display_group_order integer
+    display_group_order integer,
+    description_en text
 );
 
 

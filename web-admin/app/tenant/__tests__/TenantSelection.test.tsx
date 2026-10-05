@@ -4,9 +4,14 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { COMMUNITY_BRANDING } from '~/config/branding';
 import TenantSelection from '../TenantSelection';
+import TEXT from '../tenantSelectionText.i18n.json';
+import { tenantSelectionText } from '../tenantSelectionText';
 
 const rootData = vi.hoisted(() => ({
   branding: null as any,
+  locale: 'zh-CN',
+  translations: {} as Record<string, string>,
+  actionData: undefined as any,
 }));
 
 const routeData = vi.hoisted(() => ({
@@ -18,7 +23,7 @@ vi.mock('react-router', async () => {
   return {
     ...actual,
     useLoaderData: () => routeData.loader,
-    useActionData: () => undefined,
+    useActionData: () => rootData.actionData,
     useNavigate: () => vi.fn(),
     useNavigation: () => ({ state: 'idle' }),
     useRevalidator: () => ({ state: 'idle', revalidate: vi.fn() }),
@@ -31,8 +36,9 @@ vi.mock('~/root-data', () => ({
 
 vi.mock('~/contexts/I18nContext', () => ({
   useI18n: () => ({
+    locale: rootData.locale,
     t: (_key: string, params?: Record<string, unknown>, fallback?: string) => {
-      let text = fallback ?? _key;
+      let text = rootData.translations[_key] ?? fallback ?? _key;
       for (const [key, value] of Object.entries(params ?? {})) {
         text = text.split(`{${key}}`).join(String(value));
       }
@@ -58,6 +64,9 @@ function renderSelection(loaderData: Record<string, unknown>) {
 
 describe('TenantSelection product onboarding', () => {
   beforeEach(() => {
+    rootData.locale = 'zh-CN';
+    rootData.translations = {};
+    rootData.actionData = undefined;
     rootData.branding = {
       ...COMMUNITY_BRANDING,
       mode: 'commercial',
@@ -189,5 +198,84 @@ describe('TenantSelection product onboarding', () => {
     expect(await screen.findByText('暂时无法加载入校信息')).toBeVisible();
     expect(screen.getByRole('button', { name: '重新加载' })).toBeVisible();
     expect(screen.queryByText('当前环境由管理员统一开通')).not.toBeInTheDocument();
+  });
+});
+
+
+describe('TenantSelection local translation defaults', () => {
+  beforeEach(() => {
+    rootData.locale = 'en-US';
+    rootData.translations = {};
+    rootData.actionData = undefined;
+    rootData.branding = { ...COMMUNITY_BRANDING };
+  });
+
+  const loaded = {
+    spaces: [], spacesStatus: 'loaded',
+    accessPolicy: selfServicePolicy, accessPolicyStatus: 'loaded',
+  };
+
+  it('renders English choices while the remote catalog is empty', async () => {
+    renderSelection(loaded);
+    expect(await screen.findByRole('heading', { name: 'Choose how to get started' })).toBeVisible();
+    expect(screen.getByRole('button', { name: /Create an organization/ })).toBeVisible();
+    expect(screen.getByRole('button', { name: /Join an organization/ })).toBeVisible();
+  });
+
+  it('keeps a catalog translation ahead of the local default', async () => {
+    rootData.translations['tenant.select.choice.title'] = 'Choose your team workspace';
+    renderSelection(loaded);
+    expect(await screen.findByRole('heading', { name: 'Choose your team workspace' })).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'Choose how to get started' })).not.toBeInTheDocument();
+  });
+
+  it('localizes empty-name validation after the create action', async () => {
+    const user = userEvent.setup();
+    renderSelection(loaded);
+    await user.click(await screen.findByRole('button', { name: /Create an organization/ }));
+    await user.click(screen.getByRole('button', { name: 'Create an organization' }));
+    expect(screen.getByText('Enter a name for the organization.')).toBeVisible();
+    expect(screen.queryByText(/\{entityLabel\}/)).not.toBeInTheDocument();
+  });
+
+  it('distinguishes an unavailable policy from managed access in English', async () => {
+    renderSelection({ ...loaded, accessPolicyStatus: 'unavailable' });
+    expect(await screen.findByText('Unable to load onboarding information')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Reload' })).toBeVisible();
+    expect(screen.queryByText('An administrator manages access to this environment')).not.toBeInTheDocument();
+  });
+
+  it('localizes managed access without offering self-service actions', async () => {
+    renderSelection({ ...loaded, accessPolicy: { ...selfServicePolicy, tenantProvisioningPolicy: 'disabled' } });
+    expect(await screen.findByText('An administrator manages access to this environment')).toBeVisible();
+    expect(screen.getAllByRole('link', { name: 'Get help' })[0]).toBeVisible();
+    expect(screen.queryByTestId('tenant-action-create')).not.toBeInTheDocument();
+  });
+
+  it.each(['tenant.select.policy.unavailable', 'tenant.select.policy.managed',
+    'tenant.select.error.authRequired', 'tenant.select.error.requestFailed',
+    'tenant.select.error.operationFailed', 'tenant.select.error.networkFailed'] as const)(
+    'localizes the action error %s with the active locale', async (key) => {
+      const user = userEvent.setup();
+      rootData.actionData = { success: false, errorKey: key, error: TEXT[key]['zh-CN'], errorParams: { status: 503 } };
+      renderSelection(loaded);
+      await user.click(await screen.findByRole('button', { name: /Create an organization/ }));
+      expect(await screen.findByRole('alert')).toHaveTextContent(tenantSelectionText(key, 'en-US', { status: 503 }));
+      expect(screen.getByRole('alert')).not.toHaveTextContent(TEXT[key]['zh-CN']);
+    },
+  );
+
+  it('interpolates the configured entity and mini-program names into English defaults', async () => {
+    const user = userEvent.setup();
+    rootData.branding.tenantOnboarding = {
+      entityLabel: 'school', joinChannel: 'wechat_mini', miniProgramName: 'Example School',
+      miniProgramQrUrl: '/example-school.png',
+    };
+    renderSelection({ ...loaded, spaces: [{ tenantId: 1, tenantName: 'School', tenantDisplayName: 'School', spaceType: 'business' }] });
+    expect(await screen.findByRole('heading', { name: 'Choose a school' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: /Join an organization/ }));
+    expect(screen.getByRole('img', { name: 'Example School WeChat mini program QR code' })).toBeVisible();
+    expect(screen.getByText('Search for “Example School” and sign in with WeChat')).toBeVisible();
+    expect(screen.queryByText(/\{productName\}/)).not.toBeInTheDocument();
   });
 });

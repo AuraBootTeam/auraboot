@@ -1,4 +1,5 @@
 import { useI18n } from '~/contexts/I18nContext';
+import { getLocalizedText } from '~/utils/i18n';
 import type { CapabilityGroup } from './types';
 import { groupSummary } from './capabilityHelpers';
 
@@ -17,7 +18,7 @@ interface CapabilityChecklistProps {
  * the matrix stays as an advanced "escape hatch".
  */
 export default function CapabilityChecklist({ groups, selected, onToggle }: CapabilityChecklistProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const selectedSet = new Set(selected);
 
   return (
@@ -44,6 +45,7 @@ export default function CapabilityChecklist({ groups, selected, onToggle }: Capa
                 <label
                   key={cap.code}
                   data-testid={`capability-${cap.code}`}
+                  title={getLocalizedText(cap.localizedDescriptions, locale, t) || cap.description || undefined}
                   className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer"
                 >
                   <input
@@ -55,7 +57,7 @@ export default function CapabilityChecklist({ groups, selected, onToggle }: Capa
                   />
                   <span className="flex flex-col gap-1">
                     <span className="flex items-center gap-2">
-                      <span>{cap.label}</span>
+                      <span>{getLocalizedText(cap.localizedLabels, locale, t) || cap.label}</span>
                       {cap.sensitive && (
                         <span
                           data-testid={`capability-sensitive-${cap.code}`}

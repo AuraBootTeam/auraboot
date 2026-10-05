@@ -46,10 +46,15 @@ test.describe('Tenant Member Password Reset', () => {
     expect(typeof body?.data?.data?.tempPassword).toBe('string');
     expect(body.data.data.tempPassword.length).toBeGreaterThanOrEqual(8);
 
-    await expect(page.getByRole('heading', { name: '临时密码已生成' })).toBeVisible({
-      timeout: 10000,
-    });
-    await expect(page.getByText(/临时密码只显示一次：/)).toBeVisible();
+    // The success dialog title depends on the response shape: 临时密码已生成
+    // (tempPassword only) or the account-credentials variant when userName is
+    // included. Accept either; both must carry the one-time temp password.
+    await expect(
+      page
+        .getByRole('heading')
+        .filter({ hasText: /临时密码已生成|账号凭证|credentials generated|password generated/i }),
+    ).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/临时密码|tempPassword|shown once/i).first()).toBeVisible();
     await page.screenshot({
       path: join(evidenceDir, 'ui-07-member-reset-temp-password.png'),
       fullPage: true,

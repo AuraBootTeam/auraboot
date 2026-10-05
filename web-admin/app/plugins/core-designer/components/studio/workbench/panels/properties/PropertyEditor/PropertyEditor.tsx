@@ -106,32 +106,32 @@ export const PropertyEditor: React.FC<PropertyEditorProps> = ({
         switch (rule.type) {
           case 'required':
             if (rule.value && (value === undefined || value === null || value === '')) {
-              return rule.message || text('required', { label: translatedLabel, value: rule.value });
+              return (rule.message ? lt(rule.message) : undefined) || text('required', { label: translatedLabel, value: rule.value });
             }
             break;
           case 'minLength':
             if (typeof value === 'string' && value.length < rule.value) {
-              return rule.message || text('minLength', { label: translatedLabel, value: rule.value });
+              return (rule.message ? lt(rule.message) : undefined) || text('minLength', { label: translatedLabel, value: rule.value });
             }
             break;
           case 'maxLength':
             if (typeof value === 'string' && value.length > rule.value) {
-              return rule.message || text('maxLength', { label: translatedLabel, value: rule.value });
+              return (rule.message ? lt(rule.message) : undefined) || text('maxLength', { label: translatedLabel, value: rule.value });
             }
             break;
           case 'min':
             if (typeof value === 'number' && value < rule.value) {
-              return rule.message || text('min', { label: translatedLabel, value: rule.value });
+              return (rule.message ? lt(rule.message) : undefined) || text('min', { label: translatedLabel, value: rule.value });
             }
             break;
           case 'max':
             if (typeof value === 'number' && value > rule.value) {
-              return rule.message || text('max', { label: translatedLabel, value: rule.value });
+              return (rule.message ? lt(rule.message) : undefined) || text('max', { label: translatedLabel, value: rule.value });
             }
             break;
           case 'pattern':
             if (typeof value === 'string' && !new RegExp(rule.value).test(value)) {
-              return rule.message || text('pattern', { label: translatedLabel, value: rule.value });
+              return (rule.message ? lt(rule.message) : undefined) || text('pattern', { label: translatedLabel, value: rule.value });
             }
             break;
         }
@@ -248,8 +248,8 @@ export const PropertyEditor: React.FC<PropertyEditorProps> = ({
   return (
     <div className="property-editor">
       <div className="mb-4 rounded-lg bg-gray-50 p-3">
-        <h3 className="text-sm font-medium text-gray-900">{config.name}</h3>
-        <p className="mt-1 text-xs text-gray-500">{config.description}</p>
+        <h3 className="text-sm font-medium text-gray-900">{lt(config.name)}</h3>
+        <p className="mt-1 text-xs text-gray-500">{lt(config.description)}</p>
       </div>
 
       <div className="space-y-2">

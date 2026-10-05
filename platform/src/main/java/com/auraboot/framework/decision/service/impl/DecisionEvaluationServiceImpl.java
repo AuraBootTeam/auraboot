@@ -94,7 +94,6 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
 
     private final DrtVersionMapper versionMapper;
     private final DrtLogMapper logMapper;
-    private final DrtDefinitionMapper definitionMapper;
     private final DecisionRuntime decisionRuntime;
     private final DecisionRolloutService rolloutService;
     private final ObjectMapper objectMapper;

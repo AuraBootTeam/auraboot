@@ -63,20 +63,21 @@ function toastLocator(page: Page) {
 // ---------------------------------------------------------------------------
 
 async function navigateToCrmLeadList(page: Page): Promise<void> {
-  await page.goto('/dashboards');
+  await page.goto('/');
   await page.waitForLoadState('domcontentloaded');
 
   const nav = page.locator('nav');
-  const crmBtn = nav.getByRole('button', { name: /crm/i }).first();
-  await crmBtn.waitFor({ state: 'visible', timeout: 10_000 });
-  await crmBtn.evaluate((el: HTMLElement) => el.click());
-  await page.waitForResponse(() => true, { timeout: 1_500 }).catch(() => null);
+  const groupBtn = nav.getByRole('button', { name: /E2E测试|E2E Test/i }).first();
+  if (await groupBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
+    await groupBtn.evaluate((el: HTMLElement) => el.click());
+    await page.waitForResponse(() => true, { timeout: 1_500 }).catch(() => null);
+  }
 
-  const leafLink = nav.locator('a[href="/p/crm_lead_common"]').first();
+  const leafLink = nav.locator('a[href="/p/e2et_order"]').first();
   await leafLink.waitFor({ state: 'attached', timeout: 8_000 });
 
   const listResponsePromise = page
-    .waitForResponse((r) => r.url().includes('/api/dynamic/crm_lead_common') && r.status() === 200, {
+    .waitForResponse((r) => r.url().includes('/api/dynamic/e2et_order') && r.status() === 200, {
       timeout: 15_000,
     })
     .catch(() => null);
@@ -107,34 +108,34 @@ async function openCreateForm(page: Page): Promise<void> {
 // Helper: fill the minimum CRM Lead fields and submit
 // ---------------------------------------------------------------------------
 
-async function fillAndSubmitCrmLeadForm(page: Page, companyName: string): Promise<void> {
+async function fillAndSubmitCrmLeadForm(page: Page, title: string): Promise<void> {
   // Wait for DSL form to fully render
   await page.waitForLoadState('domcontentloaded');
 
   const spinner = page.locator('.animate-spin, [data-testid="loading"]');
   await spinner.waitFor({ state: 'hidden', timeout: 15_000 }).catch(() => {});
 
-  const companyInput = page
+  const titleInput = page
     .locator(
-      '[data-testid="form-field-crm_lead_company"] input, ' +
-        'input[name="crm_lead_company"], ' +
-        '#crm_lead_company',
+      '[data-testid="form-field-e2et_order_title"] input, ' +
+        'input[name="e2et_order_title"], ' +
+        '#e2et_order_title',
     )
     .first();
 
-  await companyInput.waitFor({ state: 'visible', timeout: 15_000 });
-  await companyInput.fill(companyName);
+  await titleInput.waitFor({ state: 'visible', timeout: 15_000 });
+  await titleInput.fill(title);
 
-  // Contact name (often required)
-  const contactInput = page
+  // Customer reference (optional on the form)
+  const customerInput = page
     .locator(
-      '[data-testid="form-field-crm_lead_contact_name"] input, ' +
-        'input[name="crm_lead_contact_name"]',
+      '[data-testid="form-field-e2et_order_customer"] input, ' +
+        'input[name="e2et_order_customer"]',
     )
     .first();
-  const hasContact = await contactInput.isVisible({ timeout: 3_000 }).catch(() => false);
-  if (hasContact) {
-    await contactInput.fill(`Contact ${UID}`);
+  const hasCustomer = await customerInput.isVisible({ timeout: 3_000 }).catch(() => false);
+  if (hasCustomer) {
+    await customerInput.fill(`Customer ${UID}`);
   }
 
   // Submit
@@ -166,12 +167,11 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
     try {
       const result = await executeCommandViaApi(
         page,
-        'crm:create_lead',
+        'e2et:create_order',
         {
-          crm_lead_company: companyForDelete,
-          crm_lead_contact_name: `UOF Contact ${UID}`,
-          crm_lead_source: 'website',
-          crm_lead_status: 'new',
+          e2et_order_title: companyForDelete,
+          e2et_order_customer: `UOF Customer ${UID}`,
+          e2et_order_type: 'normal',
         },
         undefined,
         'create',
@@ -186,7 +186,7 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
   // UOF-001: Create operation shows success toast
   // -------------------------------------------------------------------------
 
-  test('UOF-001: Create CRM Lead — success toast appears after form submit', async ({ page }) => {
+  test('UOF-001: Create e2et order — success toast appears after form submit', async ({ page }) => {
     await navigateToCrmLeadList(page);
 
     // Layer 1 (Render): list page is functional
@@ -209,7 +209,7 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
     await Promise.race([
       createResponsePromise,
       page
-        .waitForURL((url) => url.pathname === '/p/crm_lead_common', { timeout: 10_000 })
+        .waitForURL((url) => url.pathname === '/p/e2et_order', { timeout: 10_000 })
         .catch(() => null),
     ]);
 
@@ -232,8 +232,7 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
     // Also accept navigation back to list OR to record detail (both signal success)
     const currentUrl = page.url();
     const navigatedBack =
-      currentUrl.includes('crm-lead') ||
-      currentUrl.includes('crm_lead_common') ||
+      currentUrl.includes('e2et_order') ||
       (await page
         .locator('[data-testid="dynamic-list"]')
         .isVisible({ timeout: 5_000 })
@@ -279,8 +278,22 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
     // Find the row for our delete-candidate record
     const targetRow = page.locator(`tbody tr:has-text("${companyForDelete}")`).first();
 
-    // Scroll through pages to find it (it may not be on page 1)
+    // Narrow to the candidate with keyword search first — the fixture list
+    // accumulates orders across runs, so page 1 rarely holds the row.
+    const searchInput = page
+      .locator('[data-testid="list-search-input"], input[type="search"], [placeholder*="搜索"]')
+      .first();
+    if (await searchInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
+      await searchInput.fill(companyForDelete);
+      await page
+        .waitForResponse((r) => r.url().includes('/api/dynamic/e2et_order') && r.status() === 200, {
+          timeout: 8_000,
+        })
+        .catch(() => null);
+      await page.waitForTimeout(500);
+    }
     let rowFound = await targetRow.isVisible({ timeout: 5_000 }).catch(() => false);
+
     if (!rowFound) {
       // Check last page if available
       const lastPageBtn = page.locator(
@@ -290,7 +303,7 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
       if (hasLastPage) {
         await lastPageBtn.click();
         await page
-          .waitForResponse((r) => r.url().includes('/api/dynamic/crm_lead_common') && r.status() === 200, {
+          .waitForResponse((r) => r.url().includes('/api/dynamic/e2et_order') && r.status() === 200, {
             timeout: 8_000,
           })
           .catch(() => null);
@@ -331,9 +344,21 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
 
     await expect(page.locator('[data-testid="dynamic-list"]')).toBeVisible({ timeout: 10_000 });
 
-    // Find the record
+    // Find the record — keyword search first (list accumulates across runs).
     const targetRow = page.locator(`tbody tr:has-text("${companyForDelete}")`).first();
 
+    const searchInput = page
+      .locator('[data-testid="list-search-input"], input[type="search"], [placeholder*="搜索"]')
+      .first();
+    if (await searchInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
+      await searchInput.fill(companyForDelete);
+      await page
+        .waitForResponse((r) => r.url().includes('/api/dynamic/e2et_order') && r.status() === 200, {
+          timeout: 8_000,
+        })
+        .catch(() => null);
+      await page.waitForTimeout(500);
+    }
     let rowFound = await targetRow.isVisible({ timeout: 5_000 }).catch(() => false);
     if (!rowFound) {
       const lastPageBtn = page.locator('[aria-label="last page"], .ant-pagination-last');
@@ -341,7 +366,7 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
       if (hasLastPage) {
         await lastPageBtn.click();
         await page
-          .waitForResponse((r) => r.url().includes('/api/dynamic/crm_lead_common') && r.status() === 200, {
+          .waitForResponse((r) => r.url().includes('/api/dynamic/e2et_order') && r.status() === 200, {
             timeout: 8_000,
           })
           .catch(() => null);
@@ -366,7 +391,7 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
       .waitForResponse(
         (r) =>
           (r.url().includes('/api/meta/commands/execute/') ||
-            r.url().includes('/api/dynamic/crm_lead_common/')) &&
+            r.url().includes('/api/dynamic/e2et_order/')) &&
           (r.request().method() === 'POST' || r.request().method() === 'DELETE'),
         { timeout: 15_000 },
       )
@@ -380,7 +405,7 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
 
     // Wait for list to refresh
     await page
-      .waitForResponse((r) => r.url().includes('/api/dynamic/crm_lead_common') && r.status() === 200, {
+      .waitForResponse((r) => r.url().includes('/api/dynamic/e2et_order') && r.status() === 200, {
         timeout: 10_000,
       })
       .catch(() => null);
@@ -434,9 +459,12 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
 
     // Layer 1 (Render): error feedback must appear in some form
     // Acceptable forms: inline field error, error toast, or validation summary
+    // DSL forms render field errors via ErrorText with the design-token class
+    // `.text-status-red` (see UFV-001); match non-empty ones only — the page
+    // also carries visible-but-empty red icon wrappers.
     const inlineError = page.locator(
-      '.text-red-500, .text-red-600, [class*="error"], [class*="invalid"], ' +
-        '.ant-form-item-explain-error, [data-testid*="error"]',
+      '.text-status-red:not(:empty), .text-red-500:not(:empty), ' +
+        '.text-red-600:not(:empty), [data-testid*="error"]:not(:empty)',
     );
     const errorToast = page.locator('[class*="bg-red-500"]').first();
     const validationSummary = page.locator('[data-testid="validation-summary"]');
@@ -515,7 +543,7 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
     // If action navigated to a detail/form page, go back to list
     const currentUrl = page.url();
     const isOnList =
-      currentUrl.includes('/p/crm_lead_common') &&
+      currentUrl.includes('/p/e2et_order') &&
       !currentUrl.includes('/new') &&
       !currentUrl.includes('/edit');
     if (!isOnList) {

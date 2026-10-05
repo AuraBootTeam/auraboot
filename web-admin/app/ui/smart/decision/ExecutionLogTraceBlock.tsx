@@ -310,8 +310,17 @@ function rolloutDisplay(log: DecisionLogRecord, locale = 'zh-CN'): string {
   return `${rolloutLabel(log.rolloutArm, locale)}${log.rolloutBucket != null ? ` #${log.rolloutBucket}` : ''}`;
 }
 
-function decisionLabel(log: DecisionLogRecord, locale = 'zh-CN'): string {
-  return log.decisionName?.trim() || traceLabel('semantic', 'decisionFallback', locale);
+function decisionLabel(logOrCode: DecisionLogRecord | string | undefined, locale = 'zh-CN', decisionName?: string): string {
+  if (logOrCode == null) return '-';
+  if (typeof logOrCode === 'string') {
+    const name = decisionName?.trim();
+    if (name) return name;
+    const code = display(logOrCode);
+    if (code === '-') return code;
+    const label = traceLabel('decision', code, locale);
+    return label === code ? traceLabel('semantic', 'decisionFallback', locale) : label;
+  }
+  return logOrCode.decisionName?.trim() || traceLabel('semantic', 'decisionFallback', locale);
 }
 
 function decisionTitle(log: DecisionLogRecord): string {
@@ -347,7 +356,12 @@ function payloadDisplay(value: unknown, key = '', traceSnapshot?: unknown, local
   if (typeof value === 'string') {
     const labeled = valueLabel(value, fieldLabels);
     if (labeled !== value) return labeled;
-    if (key === 'decisionCode') return decisionLabel(value, locale);
+    if (key === 'decisionCode') {
+      const code = display(value);
+      if (code === '-') return code;
+      const label = traceLabel('decision', code, locale);
+      return label === code ? traceLabel('semantic', 'decisionFallback', locale) : label;
+    }
     return traceSemanticValue(key, value, locale) ?? traceLabel('value', value, locale);
   }
   return traceSemanticValue(key, value, locale) ?? display(value);
@@ -1284,7 +1298,7 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
             <div className="elta-drawer-head">
               <div>
                 <h3>{traceLabel('ui', 'executionChain', locale)}</h3>
-                <span>{decisionLabel(selectedLog.decisionCode, locale, selectedLog.decisionName)}</span>
+                <span>{decisionLabel(selectedLog, locale)}</span>
               </div>
               <button type="button" data-testid="elta-close-trace" onClick={closeTrace}>
                 关闭
@@ -1292,7 +1306,7 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
             </div>
             <div className="elta-drawer-meta">
               <span title={decisionTitle(selectedLog)}>
-                决策 {decisionLabel(selectedLog, locale)}
+                决策 {selectedLog ? decisionLabel(selectedLog, locale) : '-'}
               </span>
               <span title={display(selectedLog.status)}>
                 状态 {decisionStatusLabel(selectedLog.status, locale)}

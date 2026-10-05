@@ -12,36 +12,36 @@ import type { FieldOption } from './ConditionBuilder';
 import type { TestSample } from './ConditionTestRunPanel';
 import { ConditionTestRunPanel } from './ConditionTestRunPanel';
 import {
-  actionDefinitionFor,
   actionFieldInputKind,
-  actionSchemaFields,
   type ActionSchemaField,
   payloadToJson,
   readActionFieldValue,
   writeActionFieldValue,
 } from './actionSchemaFields';
-import { resolveDecisionActionAvailability } from './actionAvailability';
+import { useI18n } from '~/contexts/I18nContext';
+import { createEventPolicyPresentation } from './eventPolicyPresentation';
+import { recordOf, stringOr, parsePayload } from './eventPolicyValues';
 import {
   DecisionRuleBindingBlock,
   type DecisionOption,
   type RuleConsumerBindingDraft,
 } from '~/ui/smart/decision/DecisionRuleBindingBlock';
 
-type DesignerStep = 'trigger' | 'rules' | 'actions' | 'test' | 'publish' | 'history';
-type PolicyPhase = 'BEFORE_SUBMIT' | 'AFTER_COMMIT' | 'ASYNC_WORKER';
-type ExecutionMode = 'ORDERED' | 'UNORDERED';
-type FailureStrategy =
+export type DesignerStep = 'trigger' | 'rules' | 'actions' | 'test' | 'publish' | 'history';
+export type PolicyPhase = 'BEFORE_SUBMIT' | 'AFTER_COMMIT' | 'ASYNC_WORKER';
+export type ExecutionMode = 'ORDERED' | 'UNORDERED';
+export type FailureStrategy =
   | 'FAIL_FAST'
   | 'CONTINUE_ON_ERROR'
   | 'ALL_OR_NOTHING'
   | 'RETRY_ASYNC'
   | 'DEAD_LETTER';
-type ConflictStrategy =
+export type ConflictStrategy =
   | 'REJECT_ON_CONFLICT'
   | 'PRIORITY_WINS'
   | 'LAST_WRITE_WINS'
   | 'MERGE_IF_COMPATIBLE';
-type DedupStrategy = 'NONE' | 'BY_IDEMPOTENCY_KEY' | 'BY_ACTION_TYPE_AND_TARGET';
+export type DedupStrategy = 'NONE' | 'BY_IDEMPOTENCY_KEY' | 'BY_ACTION_TYPE_AND_TARGET';
 type DecisionBindingValue = NonNullable<RuleConsumerBindingDraft['decisionBinding']>;
 
 export interface EventPolicyDesignerWorkflowProps {
@@ -58,15 +58,6 @@ export interface PolicyActionDraft {
   payloadJson: string;
   idempotencyKeyTemplate: string;
 }
-
-const STEPS: { key: DesignerStep; label: string }[] = [
-  { key: 'trigger', label: '触发源' },
-  { key: 'rules', label: '规则条件' },
-  { key: 'actions', label: '执行动作' },
-  { key: 'test', label: '测试运行' },
-  { key: 'publish', label: '发布治理' },
-  { key: 'history', label: '版本历史' },
-];
 
 const DEFAULT_IDEMPOTENCY =
   '${record.entityCode}:${record.recordPid}:${rule.ruleCode}:${action.type}';
@@ -90,279 +81,6 @@ const DEDUP_STRATEGIES: readonly DedupStrategy[] = [
   'BY_IDEMPOTENCY_KEY',
   'BY_ACTION_TYPE_AND_TARGET',
 ];
-const EVENT_POLICY_CONSUMER_TYPE = 'EVENT_POLICY';
-const SAFE_ACTIONS: DecisionAction[] = [
-  { actionType: 'NOTIFY', label: '发送站内通知', handlerAvailable: true },
-  {
-    actionType: 'SEND_SMS',
-    label: '发送短信',
-    handlerAvailable: false,
-    availabilityStatus: 'UNAVAILABLE',
-    availabilityReason: '当前环境未配置真实短信 provider',
-  },
-  { actionType: 'SEND_IM', label: '发送 IM 消息', handlerAvailable: true },
-  { actionType: 'START_PROCESS', label: '启动流程', handlerAvailable: true },
-  { actionType: 'CREATE_TASK', label: '创建任务', handlerAvailable: true },
-  { actionType: 'CC_TASK', label: '抄送任务', handlerAvailable: true },
-  { actionType: 'ADD_COMMENT', label: '添加评论', handlerAvailable: true },
-  { actionType: 'UPDATE_RECORD', label: '更新记录', handlerAvailable: true },
-  { actionType: 'PATCH_RECORD', label: '更新记录', handlerAvailable: true },
-  { actionType: 'WEBHOOK', label: '调用 Webhook', handlerAvailable: true },
-  { actionType: 'WRITE_AUDIT', label: '写入审计', handlerAvailable: true },
-];
-
-const PHASE_LABELS: Record<PolicyPhase, string> = {
-  BEFORE_SUBMIT: '提交前同步检查',
-  AFTER_COMMIT: '保存后提交执行',
-  ASYNC_WORKER: '异步队列执行',
-};
-
-const EXECUTION_MODE_LABELS: Record<ExecutionMode, string> = {
-  ORDERED: '按顺序执行',
-  UNORDERED: '可并行执行',
-};
-
-const FAILURE_STRATEGY_LABELS: Record<FailureStrategy, string> = {
-  FAIL_FAST: '失败即停止',
-  CONTINUE_ON_ERROR: '失败后继续',
-  ALL_OR_NOTHING: '全部成功才提交',
-  RETRY_ASYNC: '异步重试',
-  DEAD_LETTER: '进入死信队列',
-};
-
-const CONFLICT_STRATEGY_LABELS: Record<ConflictStrategy, string> = {
-  REJECT_ON_CONFLICT: '冲突时拒绝',
-  PRIORITY_WINS: '优先级高者生效',
-  LAST_WRITE_WINS: '后写入生效',
-  MERGE_IF_COMPATIBLE: '兼容时合并',
-};
-
-const DEDUP_STRATEGY_LABELS: Record<DedupStrategy, string> = {
-  NONE: '不去重',
-  BY_IDEMPOTENCY_KEY: '按幂等键去重',
-  BY_ACTION_TYPE_AND_TARGET: '按动作和目标去重',
-};
-
-const MATCH_MODE_LABELS: Record<MatchMode, string> = {
-  FIRST_MATCH: '命中首条即停止',
-  COLLECT_ALL: '收集全部命中',
-  UNIQUE: '必须唯一命中',
-  PRIORITY_FIRST: '按优先级命中',
-};
-
-const ACTION_LABELS: Record<string, string> = {
-  NOTIFY: '发送站内通知',
-  SEND_SMS: '发送短信',
-  SEND_IM: '发送 IM 消息',
-  START_PROCESS: '启动流程',
-  ADD_COMMENT: '添加评论',
-  UPDATE_RECORD: '更新记录',
-  PATCH_RECORD: '更新记录',
-  WEBHOOK: '调用 Webhook',
-  WRITE_AUDIT: '写入审计',
-  CREATE_TASK: '创建任务',
-  CC_TASK: '抄送任务',
-};
-
-const ACTION_RESULT_LABELS: Record<string, string> = {
-  channel: '通道',
-  recipientType: '接收类型',
-  recipientId: '接收对象',
-  targetType: '接收类型',
-  target: '接收对象',
-  targetUserId: '接收用户',
-  assigneeUserId: '处理人',
-  invalidTarget: '无效接收对象',
-  sentCount: '发送数',
-  recipientCount: '接收人数',
-  targetUserIds: '接收用户',
-  assigneeUserIds: '处理人',
-  createdCount: '创建数',
-  inboxItemIds: '待办记录',
-  itemType: '待办类型',
-  ccCount: '抄送数',
-  delivery: '投递方式',
-  taskId: '任务 ID',
-  sourceId: '来源',
-  processDefinitionId: '流程标识',
-  processInstanceId: '流程实例',
-  businessKey: '业务主键',
-  recordPid: '业务记录',
-  modelCode: '模型',
-  ruleCode: '规则',
-  updatedFields: '更新字段',
-  actionType: '动作类型',
-  commentPid: '评论',
-  content: '评论内容',
-  mentions: '提及对象',
-  auditPid: '审计',
-  message: '消息',
-  eventType: '事件',
-  tenantId: '租户',
-  dispatchAccepted: '已接收调度',
-  deliveryEventId: '投递追踪',
-  deliveryTraceStatus: '投递状态',
-  deliveryLogPids: '投递日志',
-  deliveryReceipts: '投递回执',
-  payloadKeys: 'Payload 字段',
-  validationError: '校验错误',
-  field: '字段',
-  actualLength: '当前长度',
-  maxLength: '最大长度',
-  attemptCount: '尝试次数',
-  maxAttempts: '最大尝试',
-  failureReason: '失败原因',
-  errorMessage: '错误信息',
-  requiredContext: '必需上下文',
-  fieldCount: '字段数',
-  resolvedCount: '解析人数',
-};
-
-const ACTION_RESULT_ORDER = [
-  'sentCount',
-  'recipientCount',
-  'createdCount',
-  'ccCount',
-  'targetUserIds',
-  'assigneeUserIds',
-  'inboxItemIds',
-  'itemType',
-  'delivery',
-  'failureReason',
-  'errorMessage',
-  'targetType',
-  'target',
-  'resolvedCount',
-  'taskId',
-  'channel',
-  'recipientType',
-  'recipientId',
-  'processInstanceId',
-  'processDefinitionId',
-  'businessKey',
-  'modelCode',
-  'recordPid',
-  'ruleCode',
-  'updatedFields',
-  'commentPid',
-  'content',
-  'mentions',
-  'auditPid',
-  'message',
-  'eventType',
-  'dispatchAccepted',
-  'deliveryEventId',
-  'deliveryTraceStatus',
-  'deliveryLogPids',
-  'deliveryReceipts',
-  'validationError',
-  'field',
-  'requiredContext',
-  'actualLength',
-  'maxLength',
-  'attemptCount',
-  'maxAttempts',
-  'fieldCount',
-  'payloadKeys',
-  'sourceId',
-  'actionType',
-  'tenantId',
-];
-
-const ACTION_RESULT_VALUE_LABELS: Record<string, string> = {
-  pending_async_delivery: '异步投递中',
-  tracked_delivery_logs: '已记录投递日志',
-  validation_failed: '校验失败',
-  dispatch_failed: '投递失败',
-  inbox: '待办',
-  task: '任务',
-  mention: '抄送任务',
-  cc_task: '抄送任务',
-  ROLE: '角色',
-  USER: '用户',
-  UNKNOWN: '未知',
-  GROUP: '群组',
-  TEAM: '团队',
-  target_resolved_no_users: '目标未匹配到用户',
-  target_resolved_no_phone_numbers: '目标未匹配到手机号',
-  action_target_missing: '缺少接收对象',
-  payload_content_missing: '缺少消息内容',
-  payload_title_missing: '缺少标题',
-  tenant_context_missing: '缺少租户上下文',
-  target_invalid: '接收对象格式错误',
-  target_role_code_missing: '缺少角色编码',
-  target_value_missing: '缺少接收对象值',
-  sms_delivery_failed: '短信发送失败',
-  im_delivery_failed: 'IM 消息发送失败',
-  task_write_failed: '创建任务失败',
-  cc_task_write_failed: '抄送任务失败',
-  notify_delivery_failed: '站内通知发送失败',
-  action_payload_serialization_failed: '动作 Payload 序列化失败',
-  webhook_dispatch_failed: 'Webhook 投递失败',
-  process_definition_missing: '缺少流程标识',
-  process_start_failed: '流程启动失败',
-  record_context_missing: '缺少业务记录上下文',
-  update_fields_missing: '缺少更新字段',
-  record_update_failed: '更新记录失败',
-  comment_context_missing: '缺少业务记录上下文',
-  comment_content_missing: '缺少评论内容',
-  comment_write_failed: '添加评论失败',
-  audit_tenant_missing: '缺少租户上下文',
-  audit_write_failed: '写入审计失败',
-  'record.entityCode': '记录模型',
-  'record.recordPid': '业务记录',
-  tenantId: '租户',
-  'payload.processDefinitionId': '流程标识',
-  'payload.fields': '更新字段',
-  'payload.content': '评论内容',
-  NOTIFY: '发送站内通知',
-  SEND_SMS: '发送短信',
-  SEND_IM: '发送 IM 消息',
-  CREATE_TASK: '创建任务',
-  CC_TASK: '抄送任务',
-  START_PROCESS: '启动流程',
-  WEBHOOK: '调用 Webhook',
-  UPDATE_RECORD: '更新记录',
-  PATCH_RECORD: '更新记录',
-  ADD_COMMENT: '添加评论',
-  WRITE_AUDIT: '写入审计',
-  modelCode: '模型',
-  recordPid: '业务记录',
-  'payload._eventId exceeds max length': '投递追踪 ID 超过 64 字符',
-};
-
-const POLICY_STATUS_LABELS: Record<string, string> = {
-  UNSAVED: '未保存',
-  DRAFT: '草稿',
-  VALIDATED: '已校验',
-  PUBLISHED: '已发布',
-  ENABLED: '已启用',
-  DISABLED: '已停用',
-  DEPRECATED: '已废弃',
-  RETIRED: '已停用',
-};
-
-const RUN_STATUS_LABELS: Record<string, string> = {
-  MATCHED: '已命中',
-  NOT_MATCHED: '未命中',
-  SUCCESS: '成功',
-  ERROR: '执行异常',
-  SKIPPED: '已跳过',
-  UNKNOWN: '未知',
-};
-
-const EXECUTION_STATUS_LABELS: Record<string, string> = {
-  ALL_SUCCESS: '全部成功',
-  PARTIAL_SUCCESS: '部分成功',
-  FAILED: '失败',
-  NOTHING_TO_DO: '无动作',
-  SUCCESS: '成功',
-  SKIPPED: '幂等跳过',
-  NO_HANDLER: '无处理器',
-  RETRY_PENDING: '等待重试',
-  DEAD_LETTER: '死信',
-  NOT_EXECUTED: '未执行',
-};
 
 function defaultRules(matchMode?: string): PolicyRulesValue {
   return {
@@ -384,22 +102,12 @@ function actionsOf(rule: PolicyRulesValue['rules'][number] | undefined): PolicyA
   return (rule as { actions?: PolicyActionDraft[] } | undefined)?.actions ?? [];
 }
 
-function recordOf(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-}
-
 function enumOr<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
   return typeof value === 'string' && allowed.includes(value as T) ? (value as T) : fallback;
 }
 
 function numberOr(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
-}
-
-function stringOr(value: unknown, fallback: string): string {
-  return typeof value === 'string' && value.trim() ? value : fallback;
 }
 
 function isCompareNode(value: unknown): value is CompareNode {
@@ -503,14 +211,6 @@ function latestVersion(
   );
 }
 
-function parsePayload(json: string): Record<string, unknown> {
-  if (!json.trim()) return {};
-  const parsed = JSON.parse(json) as unknown;
-  return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-    ? (parsed as Record<string, unknown>)
-    : {};
-}
-
 function buildRulesJson(value: PolicyRulesValue) {
   return value.rules.map((rule) => {
     const ruleJson: Record<string, unknown> = {
@@ -547,54 +247,6 @@ function enumOption<T extends string>(value: T, labels: Record<T, string>) {
   );
 }
 
-function actionLabel(action: DecisionAction): string {
-  return ACTION_LABELS[action.actionType] ?? action.label ?? action.actionType;
-}
-
-function actionAvailability(action?: DecisionAction) {
-  return resolveDecisionActionAvailability(action, EVENT_POLICY_CONSUMER_TYPE);
-}
-
-function actionOptionLabel(action: DecisionAction): string {
-  const label = actionLabel(action);
-  return actionAvailability(action).unavailable ? `${label}（不可用）` : label;
-}
-
-function actionAvailabilityForType(type: string, catalog: DecisionAction[]) {
-  return actionAvailability(catalog.find((action) => action.actionType === type));
-}
-
-function actionTypeLabel(type: string): string {
-  return ACTION_LABELS[type] ?? type;
-}
-
-function editableActionFields(
-  action: PolicyActionDraft,
-  catalog: DecisionAction[],
-): ActionSchemaField[] {
-  const fields = actionSchemaFields(actionDefinitionFor(action.type, catalog));
-  if (fields.length > 0) return fields;
-  return [{ path: 'target', label: '执行目标', dataType: 'string', required: false }];
-}
-
-function uniqueDecisions(rules: PolicyRulesValue['rules']): DecisionOption[] {
-  const decisions: DecisionOption[] = [
-    { code: 'approval_routing', name: '审批路由' },
-    { code: 'leave_request_automation', name: '请假策略决策' },
-    { code: 'complaint_sla_deadline', name: '投诉 SLA 截止时间' },
-    { code: 'task_assignee', name: '任务分派' },
-  ];
-  const seen = new Set(decisions.map((decision) => decision.code));
-  rules.forEach((rule) => {
-    const decisionCode = rule.decisionBinding?.decisionCode;
-    if (decisionCode && !seen.has(decisionCode)) {
-      seen.add(decisionCode);
-      decisions.push({ code: decisionCode, name: decisionCode });
-    }
-  });
-  return decisions;
-}
-
 function eventPolicyBindingValue(
   rule: PolicyRulesValue['rules'][number],
   selectedPolicy?: EventPolicySummary | null,
@@ -607,29 +259,6 @@ function eventPolicyBindingValue(
     decisionBinding: rule.decisionBinding,
     enabled: true,
   };
-}
-
-function payloadTitle(payloadJson: string): string {
-  try {
-    const payload = parsePayload(payloadJson);
-    const title = payload.title;
-    const message = payload.message ?? payload.content;
-    if (typeof title === 'string' && title.trim()) return title;
-    if (typeof message === 'string' && message.trim()) return message;
-  } catch {
-    return '负载需要修正';
-  }
-  return '未配置负载';
-}
-
-function runStatus(value: unknown): string {
-  const result = recordOf(value);
-  const policy = recordOf(result?.policy) ?? result;
-  const status = stringOr(
-    policy?.status,
-    value === null || value === undefined ? '-' : String(value),
-  );
-  return RUN_STATUS_LABELS[status] ?? status;
 }
 
 function executionRecord(value: unknown): Record<string, unknown> | null {
@@ -663,11 +292,6 @@ function eventPolicyTraceHref(value: unknown, selectedPolicy?: EventPolicySummar
   return `/p/decisionops_execution_logs?${params.toString()}`;
 }
 
-function executionStatus(value: unknown): string {
-  const status = String(value ?? '-').toUpperCase();
-  return EXECUTION_STATUS_LABELS[status] ?? (value == null ? '-' : String(value));
-}
-
 function actionExecutionRows(value: unknown): Record<string, unknown>[] {
   const actions = executionRecord(value)?.actions;
   if (!Array.isArray(actions)) return [];
@@ -683,77 +307,9 @@ function isFailedExecutionAction(action: Record<string, unknown>): boolean {
   return !['SUCCESS', 'SKIPPED', 'NOT_EXECUTED'].includes(status);
 }
 
-function resultPayloadRows(
-  action: Record<string, unknown>,
-): Array<{ key: string; label: string; value: string }> {
-  const payload = recordOf(action.resultPayload);
-  if (!payload) return [];
-  const keys = [
-    ...ACTION_RESULT_ORDER.filter((key) => Object.prototype.hasOwnProperty.call(payload, key)),
-    ...Object.keys(payload).filter((key) => !ACTION_RESULT_ORDER.includes(key)),
-  ];
-  return keys
-    .map((key) => ({
-      key,
-      label: ACTION_RESULT_LABELS[key] ?? key,
-      value: resultPayloadValue(key, payload[key]),
-    }))
-    .filter((row) => row.value !== '-');
-}
-
-function resultPayloadValue(key: string, value: unknown): string {
-  if (value === undefined || value === null || value === '') return '-';
-  if (typeof value === 'boolean') return value ? '是' : '否';
-  if (key === 'deliveryReceipts' && Array.isArray(value)) {
-    return (
-      value
-        .map(formatDeliveryReceipt)
-        .filter((item) => item !== '-')
-        .join('; ') || '-'
-    );
-  }
-  if (Array.isArray(value))
-    return (
-      value
-        .map((item) => resultPayloadValue('', item))
-        .filter((item) => item !== '-')
-        .join(', ') || '-'
-    );
-  if (typeof value === 'string') return ACTION_RESULT_VALUE_LABELS[value] ?? value;
-  if (typeof value === 'object') {
-    try {
-      return JSON.stringify(value);
-    } catch {
-      return String(value);
-    }
-  }
-  return String(value);
-}
-
-function idempotencyEvidence(value: unknown): string {
-  return value == null || value === '' ? '幂等键 -' : '幂等键 已记录';
-}
-
-function idempotencyTitle(value: unknown): string | undefined {
-  return value == null || value === '' ? undefined : String(value);
-}
-
-function formatDeliveryReceipt(value: unknown): string {
-  const receipt = recordOf(value);
-  if (!receipt) return resultPayloadValue('', value);
-  return [receipt.subscriptionPid, receipt.deliveryLogPid, receipt.deliveryStatus]
-    .map((item) => (item == null || item === '' ? '-' : String(item)))
-    .join(' / ');
-}
-
 function executionContextForSample(sample: TestSample | undefined): ScopedContext {
   return (sample?.executionContext?.() ??
     sample?.context ?? { record: { data: {} } }) as ScopedContext;
-}
-
-function policyStatusLabel(status: unknown): string {
-  const value = String(status ?? '').toUpperCase();
-  return POLICY_STATUS_LABELS[value] ?? (status ? String(status) : '-');
 }
 
 export function EventPolicyDesignerWorkflow({
@@ -762,6 +318,31 @@ export function EventPolicyDesignerWorkflow({
   selectedPolicy,
   samples = [],
 }: EventPolicyDesignerWorkflowProps) {
+  const { locale } = useI18n();
+  const presentation = useMemo(() => createEventPolicyPresentation(locale), [locale]);
+  const {
+    copy,
+    STEPS,
+    SAFE_ACTIONS,
+    PHASE_LABELS,
+    EXECUTION_MODE_LABELS,
+    FAILURE_STRATEGY_LABELS,
+    CONFLICT_STRATEGY_LABELS,
+    DEDUP_STRATEGY_LABELS,
+    MATCH_MODE_LABELS,
+    actionOptionLabel,
+    actionAvailabilityForType,
+    actionTypeLabel,
+    editableActionFields,
+    uniqueDecisions,
+    payloadTitle,
+    runStatus,
+    executionStatus,
+    resultPayloadRows,
+    idempotencyEvidence,
+    idempotencyTitle,
+    policyStatusLabel,
+  } = presentation;
   const [step, setStep] = useState<DesignerStep>('trigger');
   const [phase, setPhase] = useState<PolicyPhase>(
     (selectedPolicy?.phase as PolicyPhase | undefined) ?? 'AFTER_COMMIT',
@@ -790,8 +371,11 @@ export function EventPolicyDesignerWorkflow({
   const actionOptions = useMemo(() => {
     const runtimeActions = catalogActions.filter((action) => action.actionType);
     return runtimeActions.length > 0 ? runtimeActions : SAFE_ACTIONS;
-  }, [catalogActions]);
-  const decisionOptions = useMemo(() => uniqueDecisions(rulesValue.rules), [rulesValue.rules]);
+  }, [catalogActions, SAFE_ACTIONS]);
+  const decisionOptions = useMemo(
+    () => uniqueDecisions(rulesValue.rules),
+    [rulesValue.rules, uniqueDecisions],
+  );
   const configuredActions = useMemo(
     () =>
       rulesValue.rules.flatMap((rule) =>
@@ -824,25 +408,27 @@ export function EventPolicyDesignerWorkflow({
   const runExecutionStatus = executionRecord(runResult)?.overallStatus;
   const runSummary =
     runResult === null
-      ? '待运行样例'
+      ? copy('sample_run_pending')
       : `${runStatus(runResult)} / ${executionStatus(runExecutionStatus)}`;
   const runDetail =
     runResult === null
-      ? (samples[0]?.label ?? '暂无样例事实')
+      ? (samples[0]?.label ?? copy('no_sample_facts'))
       : executionRows.length > 0
-        ? `${executionRows.length} 个动作返回执行证据`
-        : '本次没有需要执行的动作';
+        ? copy('actions_with_execution_evidence', { count: executionRows.length })
+        : copy('no_actions_to_execute_for_this_run');
   const abnormalSummary =
-    abnormalActionCount === 0 ? '无异常动作' : `${abnormalActionCount} 项需要处理`;
+    abnormalActionCount === 0
+      ? copy('no_abnormal_actions')
+      : copy('items_requiring_attention', { count: abnormalActionCount });
   const abnormalDetail =
     abnormalActionCount === 0
-      ? '动作处理器和本次执行状态正常'
+      ? copy('action_handlers_and_execution_status_are_healthy')
       : [
           missingHandlerActions.length > 0
-            ? `${missingHandlerActions.length} 个动作当前不可用`
+            ? copy('currently_unavailable_actions', { count: missingHandlerActions.length })
             : '',
           failedExecutionActions.length > 0
-            ? `${failedExecutionActions.length} 个动作执行异常`
+            ? copy('actions_with_execution_errors', { count: failedExecutionActions.length })
             : '',
         ]
           .filter(Boolean)
@@ -1045,9 +631,11 @@ export function EventPolicyDesignerWorkflow({
         <div className="epd-command-main" data-testid="epd-strategy-summary">
           <div className="epd-panel-heading">
             <div>
-              <span className="epd-eyebrow">策略链路摘要</span>
+              <span className="epd-eyebrow">{copy('policy_summary')}</span>
               <strong>
-                {selectedPolicy?.policyName ?? selectedPolicy?.policyCode ?? '未选择策略'}
+                {selectedPolicy?.policyName ??
+                  selectedPolicy?.policyCode ??
+                  copy('no_policy_selected')}
               </strong>
               <div className="epd-context-meta">
                 <span>{selectedPolicy?.policyCode ?? '-'}</span>
@@ -1062,28 +650,28 @@ export function EventPolicyDesignerWorkflow({
             </span>
           </div>
           <div className="epd-command-metrics">
-            <span>{rulesValue.rules.length} 条规则</span>
-            <span>{configuredActions.length} 个动作</span>
-            <span>{decisionBindingCount} 个决策引用</span>
+            <span>{copy('rules', { count: rulesValue.rules.length })}</span>
+            <span>{copy('actions_sentence', { count: configuredActions.length })}</span>
+            <span>{copy('decision_references', { count: decisionBindingCount })}</span>
             <span>{MATCH_MODE_LABELS[rulesValue.matchMode]}</span>
           </div>
         </div>
 
         <div className="epd-command-card" data-testid="epd-run-summary">
-          <span>最近执行</span>
+          <span>{copy('latest_execution')}</span>
           <strong>{runSummary}</strong>
           <small>{runDetail}</small>
           <button type="button" onClick={() => setStep('test')}>
-            测试运行
+            {copy('test_run')}
           </button>
         </div>
 
         <div className="epd-command-card" data-testid="epd-abnormal-actions">
-          <span>异常动作</span>
+          <span>{copy('abnormal_actions')}</span>
           <strong>{abnormalSummary}</strong>
           <small>{abnormalDetail}</small>
           <button type="button" onClick={() => setStep('actions')}>
-            检查动作
+            {copy('inspect_actions')}
           </button>
         </div>
       </section>
@@ -1108,9 +696,11 @@ export function EventPolicyDesignerWorkflow({
         <section className="epd-panel" data-testid="epd-trigger-panel">
           <div className="epd-panel-heading" data-testid="epd-trigger-context">
             <div>
-              <span className="epd-eyebrow">事件策略</span>
+              <span className="epd-eyebrow">{copy('event_policy')}</span>
               <strong>
-                {selectedPolicy?.policyName ?? selectedPolicy?.policyCode ?? '未选择策略'}
+                {selectedPolicy?.policyName ??
+                  selectedPolicy?.policyCode ??
+                  copy('no_policy_selected')}
               </strong>
               <div className="epd-context-meta">
                 <span>{selectedPolicy?.policyCode ?? '-'}</span>
@@ -1126,7 +716,7 @@ export function EventPolicyDesignerWorkflow({
           </div>
           {versionLoading && (
             <div className="epd-state" data-testid="epd-version-loading">
-              正在加载版本...
+              {copy('loading_versions')}
             </div>
           )}
           {versionError && (
@@ -1136,26 +726,26 @@ export function EventPolicyDesignerWorkflow({
           )}
           <div className="epd-summary-grid">
             <div className="epd-summary-card">
-              <span>策略编码</span>
+              <span>{copy('policy_code')}</span>
               <strong>{selectedPolicy?.policyCode ?? '-'}</strong>
             </div>
             <div className="epd-summary-card">
-              <span>触发事件</span>
+              <span>{copy('trigger_event')}</span>
               <strong>{selectedPolicy?.eventType ?? '-'}</strong>
             </div>
             <div className="epd-summary-card">
-              <span>目标对象</span>
+              <span>{copy('target_object')}</span>
               <strong>
                 {selectedPolicy?.targetType ?? '-'} / {selectedPolicy?.targetKey ?? '-'}
               </strong>
             </div>
             <div className="epd-summary-card">
-              <span>匹配模式</span>
+              <span>{copy('match_mode')}</span>
               <strong>{MATCH_MODE_LABELS[rulesValue.matchMode]}</strong>
             </div>
           </div>
           <div className="epd-field-row">
-            <label htmlFor="epd-phase">执行阶段</label>
+            <label htmlFor="epd-phase">{copy('execution_phase')}</label>
             <select
               id="epd-phase"
               value={phase}
@@ -1171,10 +761,10 @@ export function EventPolicyDesignerWorkflow({
         <section className="epd-panel">
           <div className="epd-panel-heading">
             <div>
-              <span className="epd-eyebrow">条件编排</span>
-              <strong>规则命中后才执行动作</strong>
+              <span className="epd-eyebrow">{copy('condition_setup')}</span>
+              <strong>{copy('actions_execute_only_after_a_rule_matches')}</strong>
             </div>
-            <span className="epd-chip">{rulesValue.rules.length} 条规则</span>
+            <span className="epd-chip">{copy('rules', { count: rulesValue.rules.length })}</span>
           </div>
           <PolicyRulesEditor
             value={rulesValue}
@@ -1195,15 +785,15 @@ export function EventPolicyDesignerWorkflow({
               >
                 <div className="epd-panel-heading">
                   <div>
-                    <span className="epd-eyebrow">规则中心复用</span>
+                    <span className="epd-eyebrow">{copy('reuse_a_decision')}</span>
                     <strong>{rule.ruleName || rule.ruleCode}</strong>
                     <div className="epd-context-meta">
-                      <span>{rule.decisionBinding?.decisionCode ?? '未绑定决策'}</span>
+                      <span>{rule.decisionBinding?.decisionCode ?? copy('no_decision_bound')}</span>
                       <span>
                         {rule.decisionBinding?.inputMappings
                           ?.map((mapping) => mapping.input)
                           .filter(Boolean)
-                          .join(', ') || '未配置输入映射'}
+                          .join(', ') || copy('no_input_mappings_configured')}
                       </span>
                     </div>
                   </div>
@@ -1237,15 +827,15 @@ export function EventPolicyDesignerWorkflow({
         <section className="epd-panel" data-testid="epd-actions-panel">
           <div className="epd-panel-heading">
             <div>
-              <span className="epd-eyebrow">动作编排</span>
-              <strong>命中规则后的处理动作</strong>
+              <span className="epd-eyebrow">{copy('action_setup')}</span>
+              <strong>{copy('actions_after_a_rule_matches')}</strong>
             </div>
             <button type="button" data-testid="epd-add-action" onClick={addAction}>
-              添加动作
+              {copy('add_action')}
             </button>
           </div>
           <div className="epd-field-row">
-            <label htmlFor="epd-rule-select">当前规则</label>
+            <label htmlFor="epd-rule-select">{copy('current_rule')}</label>
             <select
               id="epd-rule-select"
               value={currentRule?.ruleCode ?? ''}
@@ -1260,13 +850,15 @@ export function EventPolicyDesignerWorkflow({
           </div>
           {catalogError && (
             <div className="epd-state is-warning" data-testid="epd-action-catalog-error">
-              动作目录暂不可用，已使用内置动作类型
+              {copy('action_catalog_unavailable_using_built_in_action_types')}
             </div>
           )}
           <div className="epd-action-grid">
             {currentActions.length === 0 && (
               <div className="epd-empty">
-                还没有动作。命中该规则后不会发送通知、启动流程或更新记录。
+                {copy(
+                  'no_actions_yet_matching_this_rule_will_not_send_notifications_start_processes_or_update_records',
+                )}
               </div>
             )}
             {currentActions.map((action, idx) => {
@@ -1284,7 +876,7 @@ export function EventPolicyDesignerWorkflow({
                   <div className="epd-action-title">
                     <strong>{actionTypeLabel(action.type)}</strong>
                     {availability.unavailable && (
-                      <span className="epd-action-availability-badge">不可用</span>
+                      <span className="epd-action-availability-badge">{copy('unavailable')}</span>
                     )}
                     <span>#{action.order}</span>
                   </div>
@@ -1302,7 +894,7 @@ export function EventPolicyDesignerWorkflow({
                     </div>
                   )}
                   <div className="epd-field-row">
-                    <label htmlFor={`epd-action-type-${idx}`}>动作类型</label>
+                    <label htmlFor={`epd-action-type-${idx}`}>{copy('action_type')}</label>
                     <select
                       id={`epd-action-type-${idx}`}
                       aria-label={`action-type-${idx}`}
@@ -1318,7 +910,7 @@ export function EventPolicyDesignerWorkflow({
                   </div>
                   <div className="epd-inline-fields">
                     <div className="epd-field-row">
-                      <label htmlFor={`epd-action-order-${idx}`}>顺序</label>
+                      <label htmlFor={`epd-action-order-${idx}`}>{copy('order')}</label>
                       <input
                         id={`epd-action-order-${idx}`}
                         aria-label={`action-order-${idx}`}
@@ -1328,7 +920,7 @@ export function EventPolicyDesignerWorkflow({
                       />
                     </div>
                     <div className="epd-payload-summary">
-                      <span>负载摘要</span>
+                      <span>{copy('payload_summary')}</span>
                       <strong>{payloadTitle(action.payloadJson)}</strong>
                     </div>
                   </div>
@@ -1344,7 +936,7 @@ export function EventPolicyDesignerWorkflow({
                         <label key={field.path} className="epd-field-row">
                           <span>
                             {field.label}
-                            {field.required && <em>必填</em>}
+                            {field.required && <em>{copy('required')}</em>}
                           </span>
                           {inputKind === 'textarea' || inputKind === 'json' ? (
                             <textarea
@@ -1358,7 +950,9 @@ export function EventPolicyDesignerWorkflow({
                               value={fieldValue}
                               onChange={(e) => updateActionField(idx, field, e.target.value)}
                               placeholder={
-                                field.path === 'target' ? '例如 ROLE:wd_manager' : undefined
+                                field.path === 'target'
+                                  ? copy('for_example_role_wd_manager')
+                                  : undefined
                               }
                             />
                           )}
@@ -1367,7 +961,7 @@ export function EventPolicyDesignerWorkflow({
                     })}
                   </div>
                   <details className="epd-advanced">
-                    <summary>高级负载</summary>
+                    <summary>{copy('advanced_payload')}</summary>
                     <textarea
                       aria-label={`action-payload-${idx}`}
                       value={action.payloadJson}
@@ -1385,11 +979,13 @@ export function EventPolicyDesignerWorkflow({
         <section className="epd-panel" data-testid="epd-test-panel">
           <div className="epd-panel-heading">
             <div>
-              <span className="epd-eyebrow">测试运行</span>
-              <strong>用样例事实验证策略命中和动作执行</strong>
+              <span className="epd-eyebrow">{copy('test_run')}</span>
+              <strong>
+                {copy('verify_policy_matches_and_action_execution_with_sample_facts')}
+              </strong>
             </div>
             <button type="button" data-testid="epd-run-published" onClick={runPublishedPolicy}>
-              运行并执行动作
+              {copy('run_and_execute_actions')}
             </button>
           </div>
           {currentRule && samples.length > 0 && (
@@ -1397,17 +993,19 @@ export function EventPolicyDesignerWorkflow({
               condition={currentRule.condition}
               samples={samples}
               fields={fields}
-              emptyPreviewLabel="当前版本以已发布策略条件为准"
+              emptyPreviewLabel={copy('this_version_uses_the_published_policy_conditions')}
             />
           )}
           {samples.length === 0 && (
             <div className="epd-empty">
-              暂无样例事实，可直接运行已发布策略或在调用方传入测试样例。
+              {copy(
+                'no_sample_facts_run_the_published_policy_directly_or_provide_a_test_sample_from_the_caller',
+              )}
             </div>
           )}
           {runResult !== null && (
             <div className="epd-result" data-testid="epd-run-result">
-              <span>运行结果</span>
+              <span>{copy('run_result')}</span>
               <strong>{runStatus(runResult)}</strong>
               {runCorrelationId(runResult) ? (
                 <span className="epd-correlation" data-testid="epd-correlation-id">
@@ -1419,7 +1017,7 @@ export function EventPolicyDesignerWorkflow({
                   data-testid="epd-open-trace"
                   href={eventPolicyTraceHref(runResult, selectedPolicy)}
                 >
-                  打开统一 Trace
+                  {copy('open_unified_trace')}
                 </a>
               ) : null}
             </div>
@@ -1427,12 +1025,14 @@ export function EventPolicyDesignerWorkflow({
           {runResult !== null && executionRecord(runResult) && (
             <div className="epd-action-execution" data-testid="epd-action-execution-results">
               <div className="epd-result">
-                <span>动作执行</span>
+                <span>{copy('action_execution')}</span>
                 <strong>{executionStatus(executionRecord(runResult)?.overallStatus)}</strong>
               </div>
               <div className="epd-action-grid">
                 {actionExecutionRows(runResult).length === 0 ? (
-                  <div className="epd-empty">本次没有需要执行的动作。</div>
+                  <div className="epd-empty">
+                    {copy('no_actions_to_execute_for_this_run_sentence')}
+                  </div>
                 ) : (
                   actionExecutionRows(runResult).map((action, idx) => {
                     const payloadRows = resultPayloadRows(action);
@@ -1482,12 +1082,12 @@ export function EventPolicyDesignerWorkflow({
         <section className="epd-panel" data-testid="epd-publish-panel">
           <div className="epd-panel-heading">
             <div>
-              <span className="epd-eyebrow">发布治理</span>
-              <strong>保存、校验并发布策略版本</strong>
+              <span className="epd-eyebrow">{copy('publishing')}</span>
+              <strong>{copy('save_validate_and_publish_policy_versions')}</strong>
             </div>
             <div className="epd-publish-actions">
               <button type="button" data-testid="epd-save-draft" onClick={createDraft}>
-                保存草稿
+                {copy('save_draft')}
               </button>
               <button
                 type="button"
@@ -1495,7 +1095,7 @@ export function EventPolicyDesignerWorkflow({
                 disabled={!draftPid}
                 onClick={validateDraft}
               >
-                校验版本
+                {copy('validate_version')}
               </button>
               <button
                 type="button"
@@ -1503,13 +1103,13 @@ export function EventPolicyDesignerWorkflow({
                 disabled={!draftPid}
                 onClick={publishDraft}
               >
-                发布版本
+                {copy('publish_version')}
               </button>
             </div>
           </div>
           <div className="epd-summary-grid">
             <div className="epd-field-row">
-              <label htmlFor="epd-execution-mode">执行模式</label>
+              <label htmlFor="epd-execution-mode">{copy('execution_mode')}</label>
               <select
                 id="epd-execution-mode"
                 value={executionMode}
@@ -1519,7 +1119,7 @@ export function EventPolicyDesignerWorkflow({
               </select>
             </div>
             <div className="epd-field-row">
-              <label htmlFor="epd-failure">失败策略</label>
+              <label htmlFor="epd-failure">{copy('failure_strategy')}</label>
               <select
                 id="epd-failure"
                 value={failureStrategy}
@@ -1529,7 +1129,7 @@ export function EventPolicyDesignerWorkflow({
               </select>
             </div>
             <div className="epd-field-row">
-              <label htmlFor="epd-conflict">冲突策略</label>
+              <label htmlFor="epd-conflict">{copy('conflict_strategy')}</label>
               <select
                 id="epd-conflict"
                 value={conflictStrategy}
@@ -1539,7 +1139,7 @@ export function EventPolicyDesignerWorkflow({
               </select>
             </div>
             <div className="epd-field-row">
-              <label htmlFor="epd-dedup">去重策略</label>
+              <label htmlFor="epd-dedup">{copy('deduplication_strategy')}</label>
               <select
                 id="epd-dedup"
                 value={dedupStrategy}
@@ -1550,7 +1150,7 @@ export function EventPolicyDesignerWorkflow({
             </div>
           </div>
           <div className="epd-result">
-            <span>当前状态</span>
+            <span>{copy('current_status')}</span>
             <strong data-testid="epd-publish-status">{policyStatusLabel(publishStatus)}</strong>
           </div>
           {error && (
@@ -1565,22 +1165,22 @@ export function EventPolicyDesignerWorkflow({
         <section className="epd-panel" data-testid="epd-history-panel">
           <div className="epd-panel-heading">
             <div>
-              <span className="epd-eyebrow">版本历史</span>
-              <strong>当前策略版本</strong>
+              <span className="epd-eyebrow">{copy('version_history')}</span>
+              <strong>{copy('current_policy_version')}</strong>
             </div>
           </div>
           <div className="epd-summary-grid">
             <div className="epd-summary-card">
-              <span>当前状态</span>
+              <span>{copy('current_status')}</span>
               <strong>{policyStatusLabel(selectedPolicy?.status)}</strong>
             </div>
             <div className="epd-summary-card">
-              <span>当前版本</span>
+              <span>{copy('current_version')}</span>
               <strong>v{selectedPolicy?.version ?? '-'}</strong>
             </div>
             <div className="epd-summary-card">
-              <span>草稿状态</span>
-              <strong>{draftPid ? '已创建' : '未创建'}</strong>
+              <span>{copy('draft_status')}</span>
+              <strong>{draftPid ? copy('created') : copy('not_created')}</strong>
             </div>
           </div>
         </section>
