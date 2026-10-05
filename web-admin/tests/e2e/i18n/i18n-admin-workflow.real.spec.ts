@@ -46,7 +46,11 @@ async function openResources(page: Page) {
 async function filter(page: Page, prefix: string) {
   await page.getByLabel('lang', { exact: true }).selectOption('zh-CN');
   await page.getByPlaceholder(/^(key 前缀，如 menu\.|key prefix, e\.g\. menu\.)$/).fill(prefix);
+  // Deterministically wait for the filtered list response; asserting the table
+  // before it lands races the async fetch and reads the unfiltered page.
+  const list = page.waitForResponse(r => r.url().includes('/api/admin/i18n/resources?') && r.request().method() === 'GET');
   await page.getByRole('button', { name: /^(查询|Search)$/ }).click();
+  await list;
 }
 function row(page: Page, key: string) {
   return page.getByTestId('i18n-resources-table').getByRole('row').filter({ has: page.getByRole('cell', { name: key, exact: true }) });
