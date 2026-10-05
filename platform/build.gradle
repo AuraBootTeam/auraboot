@@ -57,6 +57,11 @@ publishing {
         mavenJava(MavenPublication) {
             from components.java
             artifactId = 'auraboot-core'
+            // Consumers must receive the versions selected by the producer's BOMs.
+            versionMapping {
+                usage('java-api') { fromResolutionOf('runtimeClasspath') }
+                usage('java-runtime') { fromResolutionResult() }
+            }
         }
     }
 }
