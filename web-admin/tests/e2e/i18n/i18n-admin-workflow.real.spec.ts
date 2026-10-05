@@ -259,7 +259,11 @@ test.describe('i18n admin real workflow', () => {
       // through the admin menu API so the member sidebar is a genuinely filtered nonempty
       // tree; admin-tier entries must still stay hidden.
       const memberMenuPath = '/meta/models';
+      // ab_menu.pid is NOT NULL UNIQUE with no generator on the create path, so the
+      // fixture supplies its own 26-character identifier; the create envelope echoes it.
+      const memberMenuPid = `m${Date.now()}${info.workerIndex}membermenu`.padEnd(26, '0').slice(0, 26);
       const memberMenu = await accepted<{ pid: string }>(await admin.page.request.post('/api/menu/create', { data: {
+        pid: memberMenuPid,
         code: `e2e.ios-handover.${suffix}.member-models`,
         name: 'Member Baseline Models',
         path: memberMenuPath,

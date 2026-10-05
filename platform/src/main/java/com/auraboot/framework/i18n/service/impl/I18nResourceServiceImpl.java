@@ -7,6 +7,7 @@ import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.i18n.entity.I18nResource;
 import com.auraboot.framework.i18n.mapper.I18nResourceMapper;
 import com.auraboot.framework.i18n.service.I18nResourceService;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
@@ -385,6 +386,11 @@ public class I18nResourceServiceImpl implements I18nResourceService {
         resource.setUpdatedAt(Instant.now());
         resource.setUpdatedBy(MetaContext.getCurrentUserId());
         i18nResourceMapper.updateById(resource);
+        // updateById skips null fields (default NOT_NULL strategy), so a previously
+        // rejected draft would keep carrying the stale reason through review.
+        i18nResourceMapper.update(null, new LambdaUpdateWrapper<I18nResource>()
+                .eq(I18nResource::getPid, pid)
+                .set(I18nResource::getRejectReason, null));
         log.info("I18n resource {} submitted for review by user {}", pid, MetaContext.getCurrentUserId());
         return resource;
     }
@@ -408,6 +414,11 @@ public class I18nResourceServiceImpl implements I18nResourceService {
         resource.setUpdatedAt(Instant.now());
         resource.setUpdatedBy(currentUserId);
         i18nResourceMapper.updateById(resource);
+        // updateById skips null fields (default NOT_NULL strategy); the approval must
+        // clear the previous rejection reason so approved rows stop showing it.
+        i18nResourceMapper.update(null, new LambdaUpdateWrapper<I18nResource>()
+                .eq(I18nResource::getPid, pid)
+                .set(I18nResource::getRejectReason, null));
         log.info("I18n resource {} approved by user {}", pid, currentUserId);
         return resource;
     }
