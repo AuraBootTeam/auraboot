@@ -4905,7 +4905,7 @@ function ListPageContentInner(props: PageContentProps) {
               schema.title
                 ? getLocalizedText(schema.title, locale, t)
                 : schema.name && schema.name.trim()
-                  ? schema.name
+                  ? getLocalizedText(schema.name, locale, t)
                   : tableName
             }
             modelCode={modelCode}

@@ -5,6 +5,9 @@
 import React, { useRef, useState, useCallback } from 'react';
 import { uploadFile } from '~/shared/services/fileupload/uploadService';
 import { useToastContext } from '~/contexts/ToastContext';
+import { useI18n } from '~/contexts/I18nContext';
+import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
+import FILE_ATTACHMENT_TEXT from './FileAttachmentField.i18n.json';
 
 interface FileItem {
   name: string;
@@ -57,6 +60,11 @@ export function FileAttachmentField({
   const [uploading, setUploading] = useState(false);
   const files = parseValue(value);
   const { showErrorToast } = useToastContext();
+  const { locale } = useI18n();
+  const uploadText = useCallback(
+    (key: keyof typeof FILE_ATTACHMENT_TEXT) => getLocalizedText(FILE_ATTACHMENT_TEXT[key], locale),
+    [locale],
+  );
 
   const handleUpload = useCallback(
     async (fileList: FileList) => {
@@ -163,7 +171,7 @@ export function FileAttachmentField({
         onClick={() => inputRef.current?.click()}
         className="border-border-strong text-text-2 hover:border-accent hover:text-accent rounded border border-dashed px-3 py-1.5 text-sm disabled:opacity-50"
       >
-        {uploading ? 'Uploading...' : '+ Add file'}
+        {uploading ? uploadText('uploading') : uploadText('addFile')}
       </button>
     </div>
   );

@@ -15,8 +15,8 @@ public class WorkbenchTemplateProvider {
           {
             "id": "wb-stats",
             "type": "StatsRowWidget",
-            "x": 0, "y": 0, "w": 12, "h": 1,
-            "minW": 6, "minH": 1, "maxW": 12, "maxH": 2,
+            "x": 0, "y": 0, "w": 12, "h": 2,
+            "minW": 6, "minH": 2, "maxW": 12, "maxH": 2,
             "config": {
               "title": "workbench.stats.title",
               "dataSource": { "type": "static" },

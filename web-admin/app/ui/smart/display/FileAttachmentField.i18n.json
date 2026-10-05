@@ -1,0 +1,10 @@
+{
+  "addFile": {
+    "zh-CN": "+ 添加文件",
+    "en-US": "+ Add file"
+  },
+  "uploading": {
+    "zh-CN": "上传中…",
+    "en-US": "Uploading…"
+  }
+}

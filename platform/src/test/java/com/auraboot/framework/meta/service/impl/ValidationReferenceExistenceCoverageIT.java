@@ -122,7 +122,10 @@ class ValidationReferenceExistenceCoverageIT {
         assertFalse(result.isValid());
     }
 
-    @Configuration
+    // Lite configuration, explicitly registered via @SpringJUnitConfig: keep it
+    // invisible to TestApplication's broad component scan (house pattern from
+    // AuditTrailServiceCoverageIT — fixture beans must not leak into other
+    // real-stack suites).
     static class Stack {
         @Bean DataSource dataSource() {
             String url = System.getenv("TEST_DATABASE_URL");
