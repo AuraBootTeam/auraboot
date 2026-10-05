@@ -347,7 +347,12 @@ function payloadDisplay(value: unknown, key = '', traceSnapshot?: unknown, local
   if (typeof value === 'string') {
     const labeled = valueLabel(value, fieldLabels);
     if (labeled !== value) return labeled;
-    if (key === 'decisionCode') return decisionLabel(value, locale);
+    if (key === 'decisionCode') {
+      const code = display(value);
+      if (code === '-') return code;
+      const label = traceLabel('decision', code, locale);
+      return label === code ? traceLabel('semantic', 'decisionFallback', locale) : label;
+    }
     return traceSemanticValue(key, value, locale) ?? traceLabel('value', value, locale);
   }
   return traceSemanticValue(key, value, locale) ?? display(value);
@@ -1284,7 +1289,7 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
             <div className="elta-drawer-head">
               <div>
                 <h3>{traceLabel('ui', 'executionChain', locale)}</h3>
-                <span>{decisionLabel(selectedLog.decisionCode, locale, selectedLog.decisionName)}</span>
+                <span>{decisionLabel(selectedLog, locale)}</span>
               </div>
               <button type="button" data-testid="elta-close-trace" onClick={closeTrace}>
                 关闭
