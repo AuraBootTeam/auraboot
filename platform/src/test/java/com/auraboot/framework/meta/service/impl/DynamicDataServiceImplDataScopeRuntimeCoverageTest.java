@@ -400,7 +400,9 @@ class DynamicDataServiceImplDataScopeRuntimeCoverageTest {
         verify(dynamicDataMapper).updateByQuery(sql.capture(), params.capture());
         assertThat(sql.getValue()).contains("status = CASE pid", "tenant_id = #{params.tenantId}",
                 "status IS NOT DISTINCT FROM #{params.expected0}", "status IS NOT DISTINCT FROM #{params.expected1}",
-                "row_version = row_version + 1", "created_by = 20", "domain_id = 7");
+                "row_version = row_version + 1", "created_by = 20", "domain_id = 7")
+                .containsPattern("updated_by = #\\{params\\.shared\\d+}")
+                .doesNotContain("updated_by = CASE", "updated_at = CASE");
         assertThat(params.getValue()).containsEntry("id0", "row-a").containsEntry("id1", "row-b")
                 .containsEntry("expected0", "accepted").containsEntry("expected1", "pending");
         verify(dynamicDataMapper, never()).selectByQuery(anyString(), anyMap());

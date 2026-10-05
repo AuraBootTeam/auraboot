@@ -448,6 +448,16 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         for (String rawColumn : columns) {
             String column = SqlSafetyUtils.requireIdentifier(rawColumn, "column name");
             if (columnIndex > 0) sql.append(", ");
+            // Audit values are identical across the batch. Bind them as ordinary assignments:
+            // configured Release tables may store actor IDs as VARCHAR while legacy tables use
+            // BIGINT; PostgreSQL assignment coercion handles both, CASE type unification does not.
+            if ("updated_at".equals(column) || "updated_by".equals(column)) {
+                String sharedKey = "shared" + columnIndex;
+                sql.append(column).append(" = #{params.").append(sharedKey).append("}");
+                params.put(sharedKey, rows.get(0).get(column));
+                columnIndex++;
+                continue;
+            }
             sql.append(column).append(" = CASE ").append(pk);
             for (int i = 0; i < updates.size(); i++) {
                 String valueKey = "value" + columnIndex + "_" + i;
