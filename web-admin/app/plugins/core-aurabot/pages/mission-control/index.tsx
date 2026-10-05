@@ -23,7 +23,11 @@ import {
 } from 'lucide-react';
 import { get, post } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
-import { useI18n } from '~/contexts/I18nContext';
+import {
+  useMissionControlText,
+  type MissionControlTextFn,
+  type MissionControlTextKey,
+} from './missionControlText';
 import { MISSION_CONTROL_DSL_PATHS, MISSION_CONTROL_STATIC_PATHS } from './routes';
 
 // ============================================================================
@@ -177,16 +181,16 @@ function fmtDuration(ms: number): string {
   return `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;
 }
 
-function timeAgo(dateStr: string, l: (zh: string, en: string) => string): string {
+function timeAgo(dateStr: string, text: MissionControlTextFn): string {
   if (!dateStr) return '-';
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return l('刚刚', 'just now');
-  if (mins < 60) return `${mins}${l('分钟前', 'm ago')}`;
+  if (mins < 1) return text('timeJustNow');
+  if (mins < 60) return `${mins}${text('timeMinuteSuffix')}`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}${l('小时前', 'h ago')}`;
+  if (hrs < 24) return `${hrs}${text('timeHourSuffix')}`;
   const days = Math.floor(hrs / 24);
-  return `${days}${l('天前', 'd ago')}`;
+  return `${days}${text('timeDaySuffix')}`;
 }
 
 // ============================================================================
@@ -194,8 +198,7 @@ function timeAgo(dateStr: string, l: (zh: string, en: string) => string): string
 // ============================================================================
 
 export default function MissionControl() {
-  const { locale } = useI18n();
-  const l = useCallback((zh: string, en: string) => (locale === 'zh-CN' ? zh : en), [locale]);
+  const { text } = useMissionControlText();
   const navigate = useNavigate();
 
   const getTabFromHash = useCallback((): MCTab => {
@@ -217,10 +220,10 @@ export default function MissionControl() {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, [getTabFromHash]);
 
-  const tabs: { key: MCTab; label: { zh: string; en: string }; icon: string }[] = [
-    { key: 'dashboard', label: { zh: '仪表盘', en: 'Dashboard' }, icon: '📊' },
-    { key: 'analytics', label: { zh: '分析', en: 'Analytics' }, icon: '📈' },
-    { key: 'observations', label: { zh: '事件日志', en: 'Events' }, icon: '📡' },
+  const tabs: { key: MCTab; labelKey: MissionControlTextKey; icon: string }[] = [
+    { key: 'dashboard', labelKey: 'tabDashboard', icon: '📊' },
+    { key: 'analytics', labelKey: 'tabAnalytics', icon: '📈' },
+    { key: 'observations', labelKey: 'tabObservations', icon: '📡' },
   ];
 
   return (
@@ -230,7 +233,7 @@ export default function MissionControl() {
         <div className="flex items-center gap-3">
           <span className="text-2xl">🎯</span>
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-            {l('AuraBot 工作台', 'AuraBot Workbench')}
+            {text('workbenchTitle')}
           </h1>
           <LiveIndicator />
         </div>
@@ -240,14 +243,14 @@ export default function MissionControl() {
             className="shrink-0 whitespace-nowrap rounded-md bg-blue-50 px-3 py-1.5 text-sm text-blue-600 transition-colors hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
             data-testid="mc-view-missions"
           >
-            {l('创建调研使命', 'Create Research Mission')}
+            {text('createMissionHeader')}
           </button>
           <button
             onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.approvalList)}
             className="shrink-0 whitespace-nowrap rounded-md bg-gray-100 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
             data-testid="mc-needs-review"
           >
-            {l('待处理', 'Needs Review')}
+            {text('needsReview')}
           </button>
         </div>
       </div>
@@ -276,7 +279,7 @@ export default function MissionControl() {
               data-testid={`mc-tab-${tab.key}`}
             >
               <span className="pointer-events-none text-sm">{tab.icon}</span>
-              <span className="pointer-events-none">{l(tab.label.zh, tab.label.en)}</span>
+              <span className="pointer-events-none">{text(tab.labelKey)}</span>
             </a>
           );
         })}
@@ -285,10 +288,12 @@ export default function MissionControl() {
       {/* Tab Content */}
       <div className="flex-1 overflow-auto bg-gray-50 p-6 dark:bg-gray-900">
         {activeTab === 'dashboard' && (
-          <DashboardView l={l} navigate={navigate} refreshKey={refreshKey} />
+          <DashboardView text={text} navigate={navigate} refreshKey={refreshKey} />
         )}
-        {activeTab === 'analytics' && <AnalyticsView l={l} refreshKey={refreshKey} />}
-        {activeTab === 'observations' && <ObservationDrillDownView l={l} refreshKey={refreshKey} />}
+        {activeTab === 'analytics' && <AnalyticsView text={text} refreshKey={refreshKey} />}
+        {activeTab === 'observations' && (
+          <ObservationDrillDownView text={text} refreshKey={refreshKey} />
+        )}
       </div>
     </div>
   );
@@ -299,11 +304,11 @@ export default function MissionControl() {
 // ============================================================================
 
 function DashboardView({
-  l,
+  text,
   navigate,
   refreshKey,
 }: {
-  l: (zh: string, en: string) => string;
+  text: MissionControlTextFn;
   navigate: ReturnType<typeof useNavigate>;
   refreshKey: number;
 }) {
@@ -356,156 +361,153 @@ function DashboardView({
   const workflowSteps: WorkflowStep[] = [
     {
       icon: GitBranch,
-      title: l('使命', 'Mission'),
-      desc: l('定义竞对范围、周期和交付物', 'Define competitors, cadence, and deliverables'),
-      meta: l(`${kpi?.active_missions ?? 0} 个活跃使命`, `${kpi?.active_missions ?? 0} active missions`),
+      title: text('workflowMissionTitle'),
+      desc: text('workflowMissionDesc'),
+      meta: text('workflowMissionMeta', { count: kpi?.active_missions ?? 0 }),
       onClick: () => navigate(MISSION_CONTROL_DSL_PATHS.missionList),
     },
     {
       icon: ClipboardList,
-      title: l('任务拆解', 'Task Breakdown'),
-      desc: l('抓取、整理、分析、生成报告', 'Collect, normalize, analyze, and report'),
-      meta: l(`${kpi?.active_tasks ?? 0} 个活跃任务`, `${kpi?.active_tasks ?? 0} active tasks`),
+      title: text('workflowTasksTitle'),
+      desc: text('workflowTasksDesc'),
+      meta: text('workflowTasksMeta', { count: kpi?.active_tasks ?? 0 }),
       onClick: () => navigate(MISSION_CONTROL_DSL_PATHS.taskList),
     },
     {
       icon: PlayCircle,
-      title: l('运行与追踪', 'Runs And Traces'),
-      desc: l('查看模型调用、成本和失败原因', 'Inspect model calls, cost, and failure causes'),
-      meta: l(`${kpi?.running_now ?? 0} 个运行中`, `${kpi?.running_now ?? 0} running`),
+      title: text('workflowRunsTitle'),
+      desc: text('workflowRunsDesc'),
+      meta: text('workflowRunsMeta', { count: kpi?.running_now ?? 0 }),
       onClick: () => navigate(MISSION_CONTROL_STATIC_PATHS.runs),
     },
     {
       icon: ShieldCheck,
-      title: l('人工介入', 'Human Review'),
-      desc: l('处理审批、中断和风险策略', 'Handle approvals, interrupts, and policies'),
-      meta: l(
-        `${kpi?.pending_approvals ?? 0} 个待审批`,
-        `${kpi?.pending_approvals ?? 0} pending approvals`,
-      ),
+      title: text('workflowReviewTitle'),
+      desc: text('workflowReviewDesc'),
+      meta: text('workflowReviewMeta', { count: kpi?.pending_approvals ?? 0 }),
       onClick: () => navigate(MISSION_CONTROL_DSL_PATHS.approvalList),
     },
     {
       icon: FileText,
-      title: l('产出物', 'Artifacts'),
-      desc: l('沉淀周报、对比表和销售话术', 'Deliver reports, comparison tables, and battlecards'),
-      meta: l('报告交付面', 'Delivery surface'),
+      title: text('workflowArtifactsTitle'),
+      desc: text('workflowArtifactsDesc'),
+      meta: text('workflowArtifactsMeta'),
       onClick: () => navigate(MISSION_CONTROL_DSL_PATHS.artifactList),
     },
   ];
 
   const commandGroups: CommandGroup[] = [
     {
-      title: l('执行链路', 'Execution'),
-      desc: l('从使命到产出物的主路径', 'Primary path from mission to artifact'),
+      title: text('groupExecutionTitle'),
+      desc: text('groupExecutionDesc'),
       links: [
         {
           icon: GitBranch,
-          title: l('使命', 'Missions'),
-          desc: l('定义业务目标和拆解边界', 'Define business goal and scope'),
+          title: text('linkMissionsTitle'),
+          desc: text('linkMissionsDesc'),
           onClick: () => navigate(MISSION_CONTROL_DSL_PATHS.missionList),
         },
         {
           icon: ClipboardList,
-          title: l('任务', 'Tasks'),
-          desc: l('查看和推进 Agent 任务', 'Review and advance agent tasks'),
+          title: text('linkTasksTitle'),
+          desc: text('linkTasksDesc'),
           onClick: () => navigate(MISSION_CONTROL_DSL_PATHS.taskList),
         },
         {
           icon: History,
-          title: l('运行记录', 'Runs'),
-          desc: l('跟踪执行状态和成本', 'Track execution status and cost'),
+          title: text('linkRunsTitle'),
+          desc: text('linkRunsDesc'),
           onClick: () => navigate(MISSION_CONTROL_STATIC_PATHS.runs),
         },
         {
           icon: FileText,
-          title: l('产出物', 'Artifacts'),
-          desc: l('查看报告、摘要和表格', 'Open reports, summaries, and tables'),
+          title: text('linkArtifactsTitle'),
+          desc: text('linkArtifactsDesc'),
           onClick: () => navigate(MISSION_CONTROL_DSL_PATHS.artifactList),
         },
       ],
     },
     {
-      title: l('治理与审计', 'Governance'),
-      desc: l('处理人工判断和风险边界', 'Handle judgment points and risk boundaries'),
+      title: text('groupGovernanceTitle'),
+      desc: text('groupGovernanceDesc'),
       links: [
         {
           icon: ShieldCheck,
-          title: l('审批', 'Approvals'),
-          desc: l('处理待确认动作', 'Resolve pending decisions'),
+          title: text('linkApprovalsTitle'),
+          desc: text('linkApprovalsDesc'),
           badge: String(kpi?.pending_approvals ?? 0),
           onClick: () => navigate(MISSION_CONTROL_DSL_PATHS.approvalList),
         },
         {
           icon: AlertTriangle,
-          title: l('中断审计', 'Interrupts'),
-          desc: l('查看分类器产出的暂停点', 'Inspect classifier pause points'),
+          title: text('linkInterruptsTitle'),
+          desc: text('linkInterruptsDesc'),
           onClick: () => navigate(MISSION_CONTROL_STATIC_PATHS.interrupts),
         },
         {
           icon: Search,
-          title: l('AI 追踪', 'AI Traces'),
-          desc: l('审计 LLM 调用和证据链', 'Audit LLM calls and evidence'),
+          title: text('linkTracesTitle'),
+          desc: text('linkTracesDesc'),
           onClick: () => navigate(MISSION_CONTROL_STATIC_PATHS.traces),
         },
         {
           icon: Settings2,
-          title: l('审批策略', 'Policies'),
-          desc: l('配置风险规则', 'Configure risk rules'),
+          title: text('linkPoliciesTitle'),
+          desc: text('linkPoliciesDesc'),
           onClick: () => navigate(MISSION_CONTROL_DSL_PATHS.approvalPolicyList),
         },
       ],
     },
     {
-      title: l('团队与记忆', 'Team And Memory'),
-      desc: l('管理 Agent、调度和偏好', 'Manage agents, schedules, and preferences'),
+      title: text('groupTeamTitle'),
+      desc: text('groupTeamDesc'),
       links: [
         {
           icon: Bot,
-          title: l('Agent 定义', 'Agent Definitions'),
-          desc: l('维护 Agent 能力和职责', 'Maintain agent capabilities and ownership'),
+          title: text('linkAgentsTitle'),
+          desc: text('linkAgentsDesc'),
           onClick: () => navigate(MISSION_CONTROL_DSL_PATHS.agentList),
         },
         {
           icon: CalendarClock,
-          title: l('调度', 'Schedules'),
-          desc: l('配置周期性研究任务', 'Configure recurring research work'),
+          title: text('linkSchedulesTitle'),
+          desc: text('linkSchedulesDesc'),
           onClick: () => navigate(MISSION_CONTROL_DSL_PATHS.scheduleList),
         },
         {
           icon: Brain,
-          title: l('记忆库', 'Memory'),
-          desc: l('浏览企业偏好和上下文', 'Browse preferences and context'),
+          title: text('linkMemoryTitle'),
+          desc: text('linkMemoryDesc'),
           onClick: () => navigate(MISSION_CONTROL_DSL_PATHS.memoryList),
         },
         {
           icon: UserCircle,
-          title: l('我的画像', 'My Profile'),
-          desc: l('查看个人研究偏好', 'Review personal research preferences'),
+          title: text('linkProfileTitle'),
+          desc: text('linkProfileDesc'),
           onClick: () => navigate(MISSION_CONTROL_STATIC_PATHS.myProfile),
         },
       ],
     },
     {
-      title: l('能力演进', 'Capability Loop'),
-      desc: l('把运行反馈沉淀成技能和记忆', 'Turn run feedback into skills and memory'),
+      title: text('groupCapabilityTitle'),
+      desc: text('groupCapabilityDesc'),
       links: [
         {
           icon: Sparkles,
-          title: l('技能草稿', 'Skill Drafts'),
-          desc: l('审核 Learning Loop 生成的草稿', 'Review drafts from the learning loop'),
+          title: text('linkSkillDraftsTitle'),
+          desc: text('linkSkillDraftsDesc'),
           onClick: () => navigate(MISSION_CONTROL_STATIC_PATHS.learningDrafts),
         },
         {
           icon: Brain,
-          title: l('记忆晋升', 'Memory Promotions'),
-          desc: l('审核 user 到 tenant 的记忆晋升', 'Review user-to-tenant memory promotions'),
+          title: text('linkMemoryPromotionsTitle'),
+          desc: text('linkMemoryPromotionsDesc'),
           onClick: () => navigate(MISSION_CONTROL_STATIC_PATHS.memoryPromotions),
         },
         {
           icon: Users,
-          title: l('Soul Profiles 管理', 'Soul Profiles'),
-          desc: l('监控租户画像元数据', 'Monitor tenant profile metadata'),
+          title: text('linkSoulProfilesTitle'),
+          desc: text('linkSoulProfilesDesc'),
           onClick: () => navigate(MISSION_CONTROL_STATIC_PATHS.soulProfiles),
         },
       ],
@@ -523,10 +525,7 @@ function DashboardView({
           data-testid="mc-cost-alert-over"
         >
           <span>!!</span>
-          {l(
-            `月度成本已超预算: $${kpi.month_cost.toFixed(2)}`,
-            `Monthly cost exceeded budget: $${kpi.month_cost.toFixed(2)}`,
-          )}
+          {text('costAlertOver', { amount: kpi.month_cost.toFixed(2) })}
         </div>
       )}
       {kpi && kpi.month_cost > 80 && kpi.month_cost <= 100 && (
@@ -535,10 +534,7 @@ function DashboardView({
           data-testid="mc-cost-alert-warning"
         >
           <span>!</span>
-          {l(
-            `月度成本接近上限: $${kpi.month_cost.toFixed(2)}`,
-            `Monthly cost approaching limit: $${kpi.month_cost.toFixed(2)}`,
-          )}
+          {text('costAlertWarning', { amount: kpi.month_cost.toFixed(2) })}
         </div>
       )}
 
@@ -548,43 +544,43 @@ function DashboardView({
         data-testid="mc-kpi-cards"
       >
         <KpiCard
-          label={l('活跃使命', 'Active Missions')}
+          label={text('kpiActiveMissions')}
           value={String(kpi?.active_missions ?? 0)}
           color="blue"
           onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.missionList)}
         />
         <KpiCard
-          label={l('活跃任务', 'Active Tasks')}
+          label={text('kpiActiveTasks')}
           value={String(kpi?.active_tasks ?? 0)}
           color="indigo"
           onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.taskList)}
         />
         <KpiCard
-          label={l('运行中', 'Running Now')}
+          label={text('kpiRunningNow')}
           value={String(kpi?.running_now ?? 0)}
           color={kpi?.running_now ? 'green' : 'blue'}
         />
         <KpiCard
-          label={l('待审批', 'Pending Approvals')}
+          label={text('kpiPendingApprovals')}
           value={String(kpi?.pending_approvals ?? 0)}
           color={kpi?.pending_approvals ? 'amber' : 'green'}
           onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.approvalList)}
         />
         <KpiCard
-          label={l('活跃 Agent', 'Active Agents')}
+          label={text('kpiActiveAgents')}
           value={String(kpi?.active_agents ?? 0)}
           color="emerald"
           onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.agentList)}
         />
         <KpiCard
-          label={l('本月成本', 'Month Cost')}
+          label={text('kpiMonthCost')}
           value={fmtCost(kpi?.month_cost ?? 0)}
           color={kpi?.month_cost && kpi.month_cost > 100 ? 'amber' : 'green'}
         />
       </div>
 
       <CompetitiveIntelWorkbench
-        l={l}
+        text={text}
         kpi={kpi}
         agents={agents}
         schedules={schedules}
@@ -595,7 +591,7 @@ function DashboardView({
         onOpenAgents={() => navigate(MISSION_CONTROL_DSL_PATHS.agentList)}
       />
 
-      <WorkflowMap steps={workflowSteps} l={l} />
+      <WorkflowMap steps={workflowSteps} text={text} />
 
       <CommandHub groups={commandGroups} />
 
@@ -607,14 +603,14 @@ function DashboardView({
         >
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              {l('Agent 概览', 'Agent Overview')}
+              {text('agentOverviewTitle')}
             </h3>
             <button
               className="text-xs text-blue-600 hover:underline dark:text-blue-400"
               onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.agentList)}
               data-testid="mc-view-all-agents"
             >
-              {l('查看全部 Agent', 'View All Agents')} &rarr;
+              {text('viewAllAgents')} &rarr;
             </button>
           </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
@@ -645,13 +641,13 @@ function DashboardView({
                     <span
                       className={`font-medium ${agent.success_rate >= 90 ? 'text-green-600' : agent.success_rate >= 70 ? 'text-amber-600' : 'text-red-600'}`}
                     >
-                      {agent.success_rate}% {l('成功', 'success')}
+                      {agent.success_rate}% {text('successRateSuffix')}
                     </span>
                     <span>
-                      {agent.total_runs} {l('次运行', 'runs')}
+                      {agent.total_runs} {text('runsCountSuffix')}
                     </span>
                     <span>
-                      {fmtCost(agent.avg_cost)} {l('平均', 'avg')}
+                      {fmtCost(agent.avg_cost)} {text('avgCostSuffix')}
                     </span>
                   </div>
                 </div>
@@ -667,15 +663,10 @@ function DashboardView({
         data-testid="mc-activity-feed"
       >
         <h3 className="mb-4 text-sm font-medium text-gray-700 dark:text-gray-300">
-          {l('最近活动', 'Recent Activity')}
+          {text('recentActivityTitle')}
         </h3>
         {recentRuns.length === 0 ? (
-          <EmptyState
-            text={l(
-              '暂无运行记录。创建 Agent 和任务后，活动将在此显示。',
-              'No runs yet. Activity will appear here once agents start executing tasks.',
-            )}
-          />
+          <EmptyState text={text('emptyRecentRuns')} />
         ) : (
           <div className="space-y-3">
             {recentRuns.map((run) => (
@@ -691,7 +682,7 @@ function DashboardView({
                     </span>
                     <span className="text-xs text-gray-500">&rarr;</span>
                     <span className="truncate text-sm text-gray-600 dark:text-gray-400">
-                      {run.task_title || l('未关联任务', 'No task')}
+                      {run.task_title || text('noTaskLinked')}
                     </span>
                   </div>
                   <div className="mt-0.5 flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
@@ -704,7 +695,7 @@ function DashboardView({
                   </div>
                 </div>
                 <span className="text-xs whitespace-nowrap text-gray-400">
-                  {timeAgo(run.started_at, l)}
+                  {timeAgo(run.started_at, text)}
                 </span>
               </div>
             ))}
@@ -719,7 +710,7 @@ function DashboardView({
           data-testid="mc-schedules"
         >
           <h3 className="mb-4 text-sm font-medium text-gray-700 dark:text-gray-300">
-            {l('活跃调度', 'Active Schedules')}
+            {text('schedulesTitle')}
           </h3>
           <div className="space-y-2">
             {schedules.map((sch) => (
@@ -737,7 +728,7 @@ function DashboardView({
                     )}
                     {sch.last_run_at && (
                       <span>
-                        {l('上次运行', 'Last run')}: {timeAgo(sch.last_run_at, l)}
+                        {text('lastRunLabel')}: {timeAgo(sch.last_run_at, text)}
                       </span>
                     )}
                   </div>
@@ -748,9 +739,7 @@ function DashboardView({
                   disabled={triggeringSchedule === sch.pid}
                   data-testid={`trigger-schedule-${sch.pid}`}
                 >
-                  {triggeringSchedule === sch.pid
-                    ? l('触发中...', 'Triggering...')
-                    : l('立即运行', 'Run Now')}
+                  {triggeringSchedule === sch.pid ? text('triggeringNow') : text('runNow')}
                 </button>
               </div>
             ))}
@@ -787,10 +776,10 @@ function severityClass(severity: string): string {
 }
 
 function ObservationDrillDownView({
-  l,
+  text,
   refreshKey,
 }: {
-  l: (zh: string, en: string) => string;
+  text: MissionControlTextFn;
   refreshKey: number;
 }) {
   const [summary, setSummary] = useState<DailyActivity[]>([]);
@@ -854,12 +843,7 @@ function ObservationDrillDownView({
 
       {/* Observation Table */}
       {observations.length === 0 ? (
-        <EmptyState
-          text={l(
-            '暂无事件日志。Agent 活动将在此记录。',
-            'No events yet. Agent observations will appear here.',
-          )}
-        />
+        <EmptyState text={text('emptyObservations')} />
       ) : (
         <div className="overflow-hidden rounded-lg bg-white shadow-sm dark:bg-gray-800">
           <table className="w-full text-sm">
@@ -867,20 +851,20 @@ function ObservationDrillDownView({
               <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
                 <th className="w-8 px-2"></th>
                 <th className="px-4 py-3 text-left font-medium text-gray-500">
-                  {l('时间', 'Time')}
+                  {text('colTime')}
                 </th>
                 <th className="px-4 py-3 text-left font-medium text-gray-500">
-                  {l('类型', 'Type')}
+                  {text('colType')}
                 </th>
                 <th className="px-4 py-3 text-left font-medium text-gray-500">
-                  {l('严重性', 'Severity')}
+                  {text('colSeverity')}
                 </th>
                 <th className="px-4 py-3 text-left font-medium text-gray-500">
-                  {l('来源', 'Source')}
+                  {text('colSource')}
                 </th>
                 <th className="px-4 py-3 text-left font-medium text-gray-500">Agent</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-500">
-                  {l('标题', 'Title')}
+                  {text('colTitle')}
                 </th>
               </tr>
             </thead>
@@ -891,7 +875,7 @@ function ObservationDrillDownView({
                   <ObservationRow
                     key={obs.pid}
                     obs={obs}
-                    l={l}
+                    text={text}
                     expanded={isExpanded}
                     onToggle={() => setExpandedObs(isExpanded ? null : obs.pid)}
                   />
@@ -907,12 +891,12 @@ function ObservationDrillDownView({
 
 function ObservationRow({
   obs,
-  l,
+  text,
   expanded,
   onToggle,
 }: {
   obs: ObservationItem;
-  l: (zh: string, en: string) => string;
+  text: MissionControlTextFn;
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -937,7 +921,7 @@ function ObservationRow({
           </span>
         </td>
         <td className="px-4 py-3 text-xs whitespace-nowrap text-gray-500">
-          {obs.created_at ? timeAgo(obs.created_at, l) : '-'}
+          {obs.created_at ? timeAgo(obs.created_at, text) : '-'}
         </td>
         <td className="px-4 py-3">
           <span
@@ -958,7 +942,7 @@ function ObservationRow({
       {expanded && parsedDetail && (
         <tr className="bg-gray-50/50 dark:bg-gray-800/50">
           <td colSpan={7} className="px-6 py-4">
-            <div className="mb-1 text-xs font-medium text-gray-500">{l('详情', 'Detail')}</div>
+            <div className="mb-1 text-xs font-medium text-gray-500">{text('detailLabel')}</div>
             <pre className="max-h-60 overflow-x-auto rounded bg-gray-100 p-3 font-mono text-xs break-words whitespace-pre-wrap text-gray-700 dark:bg-gray-900 dark:text-gray-300">
               {parsedDetail}
             </pre>
@@ -1005,10 +989,10 @@ interface ErrorSummary {
 }
 
 function AnalyticsView({
-  l,
+  text,
   refreshKey,
 }: {
-  l: (zh: string, en: string) => string;
+  text: MissionControlTextFn;
   refreshKey: number;
 }) {
   const [costData, setCostData] = useState<CostByAgent[]>([]);
@@ -1064,14 +1048,14 @@ function AnalyticsView({
       {/* Cost by Agent */}
       <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
         <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
-          {l('30天成本分布', '30-Day Cost Breakdown')}
+          {text('costBreakdownTitle')}
           <span className="ml-3 text-sm font-normal text-gray-500">
-            {l('总计', 'Total')}: {fmtCost(totalCost30d)}
+            {text('totalLabel')}: {fmtCost(totalCost30d)}
           </span>
         </h3>
         {agentCosts.length === 0 ? (
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            {l('暂无成本数据', 'No cost data yet')}
+            {text('emptyCostData')}
           </p>
         ) : (
           <div className="space-y-3">
@@ -1095,7 +1079,7 @@ function AnalyticsView({
                     {fmtCost(agent.cost)}
                   </span>
                   <span className="w-16 text-right text-xs text-gray-500 dark:text-gray-400">
-                    {agent.runs} {l('次', 'runs')}
+                    {agent.runs} {text('runsSuffix')}
                   </span>
                 </div>
               );
@@ -1107,22 +1091,22 @@ function AnalyticsView({
       {/* Daily Activity */}
       <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
         <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
-          {l('每日活动', 'Daily Activity')}
+          {text('dailyActivityTitle')}
         </h3>
         {recentActivity.length === 0 ? (
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            {l('暂无活动数据', 'No activity data yet')}
+            {text('emptyActivityData')}
           </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm" data-testid="analytics-activity-table">
               <thead>
                 <tr className="border-b border-gray-200 text-left text-gray-500 dark:border-gray-700 dark:text-gray-400">
-                  <th className="py-2 pr-4">{l('日期', 'Date')}</th>
-                  <th className="py-2 pr-4 text-right">{l('活动', 'Activity')}</th>
-                  <th className="py-2 pr-4 text-right">{l('错误', 'Errors')}</th>
-                  <th className="py-2 pr-4 text-right">{l('告警', 'Alerts')}</th>
-                  <th className="py-2 text-right">{l('总计', 'Total')}</th>
+                  <th className="py-2 pr-4">{text('colDate')}</th>
+                  <th className="py-2 pr-4 text-right">{text('colActivity')}</th>
+                  <th className="py-2 pr-4 text-right">{text('colErrors')}</th>
+                  <th className="py-2 pr-4 text-right">{text('colAlerts')}</th>
+                  <th className="py-2 text-right">{text('totalLabel')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1173,14 +1157,14 @@ function AnalyticsView({
       {/* Error Summary */}
       <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
         <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
-          {l('最近错误', 'Recent Errors')}
+          {text('recentErrorsTitle')}
           {errorData.length > 0 && (
             <span className="ml-2 text-sm font-normal text-red-500">{errorData.length}</span>
           )}
         </h3>
         {errorData.length === 0 ? (
           <p className="text-sm text-green-600 dark:text-green-400">
-            {l('无错误记录', 'No errors — all clear!')}
+            {text('noErrors')}
           </p>
         ) : (
           <div className="space-y-3" data-testid="analytics-error-list">
@@ -1252,7 +1236,7 @@ function KpiCard({
 }
 
 function CompetitiveIntelWorkbench({
-  l,
+  text,
   kpi,
   agents,
   schedules,
@@ -1262,7 +1246,7 @@ function CompetitiveIntelWorkbench({
   onOpenArtifacts,
   onOpenAgents,
 }: {
-  l: (zh: string, en: string) => string;
+  text: MissionControlTextFn;
   kpi: KpiData | null;
   agents: AgentStat[];
   schedules: ScheduleItem[];
@@ -1283,20 +1267,17 @@ function CompetitiveIntelWorkbench({
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
             <Sparkles className="h-3.5 w-3.5" />
-            {l('企业场景模板', 'Enterprise scenario')}
+            {text('scenarioBadge')}
           </span>
           <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-            {l('默认: 竞对调研', 'Default: competitive intelligence')}
+            {text('scenarioDefaultBadge')}
           </span>
         </div>
         <h2 className="mt-3 text-lg font-semibold text-gray-950 dark:text-white">
-          {l('竞对调研 Agent 工作台', 'Competitive Intelligence Agent Workbench')}
+          {text('scenarioTitle')}
         </h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-600 dark:text-gray-300">
-          {l(
-            '围绕公开资料抓取、价格页变更、产品更新、招聘信号和销售话术生成，把使命、任务、运行、审批、追踪和产出物串成一条可审计链路。',
-            'Connect public-source collection, pricing changes, product updates, hiring signals, and battlecard generation into an auditable mission-to-artifact chain.',
-          )}
+          {text('scenarioDesc')}
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <button
@@ -1306,7 +1287,7 @@ function CompetitiveIntelWorkbench({
             data-testid="mc-scenario-start"
           >
             <GitBranch className="h-4 w-4" />
-            {l('创建调研使命', 'Create research mission')}
+            {text('scenarioCreateMission')}
           </button>
           <button
             type="button"
@@ -1314,7 +1295,7 @@ function CompetitiveIntelWorkbench({
             onClick={onOpenTasks}
           >
             <ClipboardList className="h-4 w-4" />
-            {l('查看任务链路', 'Open task chain')}
+            {text('scenarioOpenTaskChain')}
           </button>
           <button
             type="button"
@@ -1322,7 +1303,7 @@ function CompetitiveIntelWorkbench({
             onClick={onOpenArtifacts}
           >
             <FileText className="h-4 w-4" />
-            {l('查看产出物', 'Open artifacts')}
+            {text('scenarioOpenArtifacts')}
           </button>
         </div>
       </div>
@@ -1330,23 +1311,23 @@ function CompetitiveIntelWorkbench({
       <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
         <ScenarioMetric
           icon={ListChecks}
-          label={l('活跃任务', 'Active tasks')}
+          label={text('scenarioActiveTasks')}
           value={String(kpi?.active_tasks ?? 0)}
-          actionLabel={l('进入任务', 'Open tasks')}
+          actionLabel={text('scenarioOpenTasks')}
           onClick={onOpenTasks}
         />
         <ScenarioMetric
           icon={ShieldCheck}
-          label={l('待人工判断', 'Needs review')}
+          label={text('scenarioNeedsReview')}
           value={String(kpi?.pending_approvals ?? 0)}
-          actionLabel={l('处理审批', 'Review approvals')}
+          actionLabel={text('scenarioReviewApprovals')}
           onClick={onOpenApprovals}
         />
         <ScenarioMetric
           icon={Users}
-          label={l('可用 Agent / 调度', 'Agents / schedules')}
+          label={text('scenarioAgentsSchedules')}
           value={`${activeAgentCount || agents.length} / ${schedules.length}`}
-          actionLabel={l('团队状态', 'Team status')}
+          actionLabel={text('scenarioTeamStatus')}
           onClick={onOpenAgents}
         />
       </div>
@@ -1392,23 +1373,20 @@ function ScenarioMetric({
 
 function WorkflowMap({
   steps,
-  l,
+  text,
 }: {
   steps: WorkflowStep[];
-  l: (zh: string, en: string) => string;
+  text: MissionControlTextFn;
 }) {
   return (
     <div className="rounded-lg bg-white p-5 shadow-sm dark:bg-gray-800" data-testid="mc-workflow-map">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-            {l('竞对调研执行链路', 'Competitive Intelligence Execution Chain')}
+            {text('workflowMapTitle')}
           </h3>
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            {l(
-              '每个入口只承担一个环节，避免资源菜单重复堆叠。',
-              'Each entry owns one step, avoiding duplicate resource menus.',
-            )}
+            {text('workflowMapDesc')}
           </p>
         </div>
         <BarChart3 className="h-5 w-5 text-blue-500" />

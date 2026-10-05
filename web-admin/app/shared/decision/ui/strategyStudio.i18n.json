@@ -1,0 +1,598 @@
+{
+  "valueTaskManagerApprove": {
+    "zh-CN": "主管审批节点",
+    "en": "Manager approval node"
+  },
+  "valueTaskHrApprove": {
+    "zh-CN": "HR 审批节点",
+    "en": "HR approval node"
+  },
+  "valueGwManager": {
+    "zh-CN": "主管审批网关",
+    "en": "Manager approval gateway"
+  },
+  "valueLeaveAnnual": {
+    "zh-CN": "年假",
+    "en": "Annual leave"
+  },
+  "valueLeaveSick": {
+    "zh-CN": "病假",
+    "en": "Sick leave"
+  },
+  "valueLeavePersonal": {
+    "zh-CN": "事假",
+    "en": "Personal leave"
+  },
+  "fieldLeaveType": {
+    "zh-CN": "请假类型",
+    "en": "Leave type"
+  },
+  "fieldApplicant": {
+    "zh-CN": "申请人",
+    "en": "Applicant"
+  },
+  "modelNameLeaveRequest": {
+    "zh-CN": "请假申请",
+    "en": "Leave request"
+  },
+  "fieldSlaNode": {
+    "zh-CN": "SLA 节点",
+    "en": "SLA node"
+  },
+  "fieldDeadlineMinutes": {
+    "zh-CN": "截止分钟",
+    "en": "Deadline minutes"
+  },
+  "fieldAdvanceReminder": {
+    "zh-CN": "提前提醒",
+    "en": "Advance reminder"
+  },
+  "fieldProcessNode": {
+    "zh-CN": "流程节点",
+    "en": "Process node"
+  },
+  "fieldLeaveDays": {
+    "zh-CN": "请假天数",
+    "en": "Leave days"
+  },
+  "fieldApproverRoles": {
+    "zh-CN": "审批角色",
+    "en": "Approver roles"
+  },
+  "fieldLeaveRecord": {
+    "zh-CN": "申请记录",
+    "en": "Leave record"
+  },
+  "fieldTriggerTime": {
+    "zh-CN": "触发时间",
+    "en": "Trigger time"
+  },
+  "fieldOrgPath": {
+    "zh-CN": "组织路径",
+    "en": "Organization path"
+  },
+  "fieldRecordDepartment": {
+    "zh-CN": "记录部门",
+    "en": "Record department"
+  },
+  "fieldTenant": {
+    "zh-CN": "租户",
+    "en": "Tenant"
+  },
+  "fieldEventType": {
+    "zh-CN": "事件类型",
+    "en": "Event type"
+  },
+  "fieldTriggerActorRoles": {
+    "zh-CN": "触发人角色",
+    "en": "Trigger actor roles"
+  },
+  "scenarioSlaLabel": {
+    "zh-CN": "SLA",
+    "en": "SLA"
+  },
+  "scenarioSlaTitle": {
+    "zh-CN": "主管审批 SLA",
+    "en": "Manager approval SLA"
+  },
+  "scenarioSlaConsumer": {
+    "zh-CN": "SLA / 超时通知",
+    "en": "SLA / timeout notification"
+  },
+  "scenarioTriggerEnterApproval": {
+    "zh-CN": "进入审批节点",
+    "en": "Entering an approval node"
+  },
+  "scenarioSlaFragment": {
+    "zh-CN": "请假 SLA 节点匹配",
+    "en": "Leave SLA node match"
+  },
+  "scenarioBpmLabel": {
+    "zh-CN": "BPM",
+    "en": "BPM"
+  },
+  "scenarioBpmTitle": {
+    "zh-CN": "请假审批流程",
+    "en": "Leave approval process"
+  },
+  "scenarioBpmConsumer": {
+    "zh-CN": "BPM / 审批人分派",
+    "en": "BPM / approver dispatch"
+  },
+  "scenarioBpmFragment": {
+    "zh-CN": "请假审批路由条件",
+    "en": "Leave approval routing condition"
+  },
+  "scenarioAutomationLabel": {
+    "zh-CN": "自动化",
+    "en": "Automation"
+  },
+  "scenarioAutomationTitle": {
+    "zh-CN": "请假申请自动通知",
+    "en": "Automatic leave request notification"
+  },
+  "scenarioAutomationConsumer": {
+    "zh-CN": "自动化 / 条件触发",
+    "en": "Automation / conditional trigger"
+  },
+  "scenarioTriggerLeaveCreated": {
+    "zh-CN": "创建请假申请",
+    "en": "Leave request created"
+  },
+  "scenarioAutomationFragment": {
+    "zh-CN": "长假自动通知条件",
+    "en": "Long-leave auto notification condition"
+  },
+  "scenarioPermissionLabel": {
+    "zh-CN": "权限",
+    "en": "Permission"
+  },
+  "scenarioPermissionTitle": {
+    "zh-CN": "请假可见性权限",
+    "en": "Leave visibility permission"
+  },
+  "scenarioPermissionConsumer": {
+    "zh-CN": "权限 / 行级访问",
+    "en": "Permission / row-level access"
+  },
+  "scenarioTriggerPreQueryCheck": {
+    "zh-CN": "查询前校验",
+    "en": "Pre-query check"
+  },
+  "scenarioPermissionFragment": {
+    "zh-CN": "同部门请假可见",
+    "en": "Same-department leave visibility"
+  },
+  "scenarioEventPolicyLabel": {
+    "zh-CN": "事件策略",
+    "en": "Event policy"
+  },
+  "scenarioEventPolicyTitle": {
+    "zh-CN": "请假申请事件策略",
+    "en": "Leave request event policy"
+  },
+  "scenarioEventPolicyConsumer": {
+    "zh-CN": "事件策略 / 条件 + 动作",
+    "en": "Event policy / condition + action"
+  },
+  "scenarioTriggerLeaveCreatedEvent": {
+    "zh-CN": "请假申请已创建",
+    "en": "Leave request created"
+  },
+  "scenarioEventPolicyFragment": {
+    "zh-CN": "请假事件动作条件",
+    "en": "Leave event action condition"
+  },
+  "panelRuleLabel": {
+    "zh-CN": "规则配置",
+    "en": "Rule configuration"
+  },
+  "panelRuleSummary": {
+    "zh-CN": "条件 / 映射 / 测试",
+    "en": "Conditions / mappings / tests"
+  },
+  "panelFactsLabel": {
+    "zh-CN": "事实目录",
+    "en": "Fact catalog"
+  },
+  "panelFactsSummary": {
+    "zh-CN": "字段 / 上下文",
+    "en": "Fields / context"
+  },
+  "panelDmnLabel": {
+    "zh-CN": "决策表",
+    "en": "Decision table"
+  },
+  "panelDmnSummary": {
+    "zh-CN": "DMN / 输出",
+    "en": "DMN / outputs"
+  },
+  "panelReviewLabel": {
+    "zh-CN": "片段与发布",
+    "en": "Fragments & publish"
+  },
+  "panelReviewSummary": {
+    "zh-CN": "复用 / 动作 / 检查",
+    "en": "Reuse / actions / checks"
+  },
+  "noFragmentSelected": {
+    "zh-CN": "未选择条件片段",
+    "en": "No condition fragment selected"
+  },
+  "decisionComplaintSlaDeadline": {
+    "zh-CN": "请假审批 SLA 截止时间",
+    "en": "Leave approval SLA deadline"
+  },
+  "outputEscalationLevel": {
+    "zh-CN": "升级等级",
+    "en": "Escalation level"
+  },
+  "outputAdvanceReminderMinutes": {
+    "zh-CN": "提前提醒分钟",
+    "en": "Advance reminder minutes"
+  },
+  "decisionApprovalRouting": {
+    "zh-CN": "请假审批分派",
+    "en": "Leave approval dispatch"
+  },
+  "outputCandidateGroups": {
+    "zh-CN": "候选组",
+    "en": "Candidate groups"
+  },
+  "outputAssignee": {
+    "zh-CN": "审批人",
+    "en": "Approver"
+  },
+  "outputDueHours": {
+    "zh-CN": "任务时限",
+    "en": "Task due hours"
+  },
+  "decisionLeaveRequestAutomation": {
+    "zh-CN": "请假申请自动化策略",
+    "en": "Leave request automation policy"
+  },
+  "outputRoute": {
+    "zh-CN": "动作路由",
+    "en": "Action route"
+  },
+  "outputActions": {
+    "zh-CN": "动作列表",
+    "en": "Action list"
+  },
+  "decisionLeaveVisibilityPolicy": {
+    "zh-CN": "请假可见性策略",
+    "en": "Leave visibility policy"
+  },
+  "outputAllow": {
+    "zh-CN": "是否允许",
+    "en": "Allow"
+  },
+  "outputReason": {
+    "zh-CN": "拒绝原因",
+    "en": "Rejection reason"
+  },
+  "actionNotify": {
+    "zh-CN": "发送通知",
+    "en": "Send notification"
+  },
+  "actionStartProcess": {
+    "zh-CN": "启动流程",
+    "en": "Start process"
+  },
+  "actionAddComment": {
+    "zh-CN": "添加评论",
+    "en": "Add comment"
+  },
+  "actionUpdateRecord": {
+    "zh-CN": "更新记录",
+    "en": "Update record"
+  },
+  "actionPatchRecord": {
+    "zh-CN": "修补记录",
+    "en": "Patch record"
+  },
+  "actionWebhook": {
+    "zh-CN": "发送 Webhook",
+    "en": "Send webhook"
+  },
+  "actionWriteAudit": {
+    "zh-CN": "写入审计",
+    "en": "Write audit"
+  },
+  "actionSendSms": {
+    "zh-CN": "发送短信",
+    "en": "Send SMS"
+  },
+  "actionSendIm": {
+    "zh-CN": "发送 IM",
+    "en": "Send IM"
+  },
+  "actionCreateTask": {
+    "zh-CN": "创建任务",
+    "en": "Create task"
+  },
+  "actionCcTask": {
+    "zh-CN": "抄送任务",
+    "en": "CC task"
+  },
+  "categoryMessaging": {
+    "zh-CN": "消息",
+    "en": "Messaging"
+  },
+  "categoryWorkflow": {
+    "zh-CN": "流程",
+    "en": "Workflow"
+  },
+  "categoryCollaboration": {
+    "zh-CN": "协作",
+    "en": "Collaboration"
+  },
+  "categoryData": {
+    "zh-CN": "数据",
+    "en": "Data"
+  },
+  "categoryIntegration": {
+    "zh-CN": "集成",
+    "en": "Integration"
+  },
+  "categoryGovernance": {
+    "zh-CN": "治理",
+    "en": "Governance"
+  },
+  "categoryHandlerMissing": {
+    "zh-CN": "未接入处理器",
+    "en": "Handler not integrated"
+  },
+  "categoryPlatformAction": {
+    "zh-CN": "平台动作",
+    "en": "Platform action"
+  },
+  "fieldContextSuffix": {
+    "zh-CN": "{context}字段",
+    "en": "{context} field"
+  },
+  "fragmentNameFallback": {
+    "zh-CN": "{title} 条件",
+    "en": "{title} condition"
+  },
+  "operationFailed": {
+    "zh-CN": "操作失败",
+    "en": "Operation failed"
+  },
+  "validationFailedDefault": {
+    "zh-CN": "版本校验未通过",
+    "en": "Version validation failed"
+  },
+  "dmnProcessingFailed": {
+    "zh-CN": "DMN XML 处理失败",
+    "en": "DMN XML processing failed"
+  },
+  "evaluateNoResult": {
+    "zh-CN": "决策执行无返回结果",
+    "en": "Decision evaluation returned no result"
+  },
+  "fragmentVersionCreateFailed": {
+    "zh-CN": "条件片段版本创建失败",
+    "en": "Failed to create the condition fragment version"
+  },
+  "fragmentDraftUpdateFailed": {
+    "zh-CN": "条件片段草稿更新失败",
+    "en": "Failed to update the condition fragment draft"
+  },
+  "fragmentMissingCode": {
+    "zh-CN": "条件片段缺少编码，无法保存新版本",
+    "en": "The condition fragment has no code; a new version cannot be saved"
+  },
+  "versionValidationNoResult": {
+    "zh-CN": "版本校验无返回结果",
+    "en": "Version validation returned no result"
+  },
+  "publishNoResult": {
+    "zh-CN": "发布接口未返回版本结果",
+    "en": "The publish API returned no version result"
+  },
+  "fragmentLoaded": {
+    "zh-CN": "已加载共享片段 · {name}",
+    "en": "Shared fragment loaded · {name}"
+  },
+  "selectFragmentHint": {
+    "zh-CN": "请选择共享条件片段",
+    "en": "Select a shared condition fragment"
+  },
+  "fragmentScenarioMismatch": {
+    "zh-CN": "片段无法匹配消费场景 · {name}",
+    "en": "Fragment does not match a consumer scenario · {name}"
+  },
+  "publishBlockedCount": {
+    "zh-CN": "发布被阻断 · {count} 项待处理",
+    "en": "Publishing blocked · {count} item(s) pending"
+  },
+  "publishCheckPassed": {
+    "zh-CN": "发布检查通过 · {consumer}",
+    "en": "Publish check passed · {consumer}"
+  },
+  "impactQuerying": {
+    "zh-CN": "影响面查询中...",
+    "en": "Querying impact..."
+  },
+  "impactDefaultSummary": {
+    "zh-CN": "影响面已更新",
+    "en": "Impact refreshed"
+  },
+  "impactUpdated": {
+    "zh-CN": "{summary} · {count} 个引用",
+    "en": "{summary} · {count} reference(s)"
+  },
+  "impactFailed": {
+    "zh-CN": "影响面失败 · {message}",
+    "en": "Impact query failed · {message}"
+  },
+  "testRunning": {
+    "zh-CN": "测试运行中...",
+    "en": "Test running..."
+  },
+  "testMatched": {
+    "zh-CN": "测试通过",
+    "en": "Test matched"
+  },
+  "testNotMatched": {
+    "zh-CN": "测试未命中",
+    "en": "Test not matched"
+  },
+  "testResult": {
+    "zh-CN": "{result} · {id}",
+    "en": "{result} · {id}"
+  },
+  "testFailed": {
+    "zh-CN": "测试失败 · {message}",
+    "en": "Test failed · {message}"
+  },
+  "dmnStatusWithWarnings": {
+    "zh-CN": "{status} · 警告 {count}",
+    "en": "{status} · {count} warning(s)"
+  },
+  "dmnExported": {
+    "zh-CN": "DMN XML 已导出",
+    "en": "DMN XML exported"
+  },
+  "dmnImported": {
+    "zh-CN": "DMN XML 已导入",
+    "en": "DMN XML imported"
+  },
+  "roundTripPassed": {
+    "zh-CN": "Round-trip 通过",
+    "en": "Round-trip passed"
+  },
+  "draftSaving": {
+    "zh-CN": "草稿保存中...",
+    "en": "Saving draft..."
+  },
+  "draftSaved": {
+    "zh-CN": "草稿已保存 · {title}",
+    "en": "Draft saved · {title}"
+  },
+  "saveFailed": {
+    "zh-CN": "保存失败 · {message}",
+    "en": "Save failed · {message}"
+  },
+  "publishing": {
+    "zh-CN": "发布中...",
+    "en": "Publishing..."
+  },
+  "publishFailed": {
+    "zh-CN": "发布失败 · {message}",
+    "en": "Publish failed · {message}"
+  },
+  "publishSucceeded": {
+    "zh-CN": "发布成功 · {consumer}",
+    "en": "Published · {consumer}"
+  },
+  "impactAction": {
+    "zh-CN": "影响面",
+    "en": "Impact"
+  },
+  "runTestAction": {
+    "zh-CN": "测试运行",
+    "en": "Run test"
+  },
+  "saveDraftAction": {
+    "zh-CN": "保存草稿",
+    "en": "Save draft"
+  },
+  "publishAction": {
+    "zh-CN": "发布",
+    "en": "Publish"
+  },
+  "scenarioGroupLabel": {
+    "zh-CN": "规则消费场景",
+    "en": "Rule consumer scenarios"
+  },
+  "workspaceGroupLabel": {
+    "zh-CN": "策略工作区视图",
+    "en": "Strategy workspace views"
+  },
+  "metricConsumer": {
+    "zh-CN": "消费方",
+    "en": "Consumer"
+  },
+  "metricFields": {
+    "zh-CN": "字段事实",
+    "en": "Field facts"
+  },
+  "metricFieldsHint": {
+    "zh-CN": "来自模型 / 虚拟模型 / 参与人 / 系统",
+    "en": "From models / virtual models / participants / system"
+  },
+  "metricActions": {
+    "zh-CN": "动作",
+    "en": "Actions"
+  },
+  "metricActionsHint": {
+    "zh-CN": "命中后统一执行",
+    "en": "Executed uniformly after a hit"
+  },
+  "metricBlockers": {
+    "zh-CN": "阻断项",
+    "en": "Blockers"
+  },
+  "blockersPending": {
+    "zh-CN": "发布前需处理",
+    "en": "Must be resolved before publishing"
+  },
+  "blockersReady": {
+    "zh-CN": "可进入发布检查",
+    "en": "Ready for the publish check"
+  },
+  "dmnOutputTitle": {
+    "zh-CN": "DMN 决策输出",
+    "en": "DMN decision output"
+  },
+  "fragmentLibraryTitle": {
+    "zh-CN": "条件片段库",
+    "en": "Condition fragment library"
+  },
+  "fragmentLibraryHint": {
+    "zh-CN": "最新兼容",
+    "en": "Latest compatible"
+  },
+  "loading": {
+    "zh-CN": "加载中...",
+    "en": "Loading..."
+  },
+  "fragmentLoadFailed": {
+    "zh-CN": "条件片段加载失败",
+    "en": "Failed to load condition fragments"
+  },
+  "noFragments": {
+    "zh-CN": "暂无条件片段",
+    "en": "No condition fragments yet"
+  },
+  "actionOutputTitle": {
+    "zh-CN": "动作输出",
+    "en": "Action output"
+  },
+  "publishCheckTitle": {
+    "zh-CN": "发布检查",
+    "en": "Publish check"
+  },
+  "publishBlocked": {
+    "zh-CN": "已阻断",
+    "en": "Blocked"
+  },
+  "publishReady": {
+    "zh-CN": "就绪",
+    "en": "Ready"
+  },
+  "checkFieldsResolvable": {
+    "zh-CN": "字段可解析",
+    "en": "Fields resolvable"
+  },
+  "checkFragmentVersionAvailable": {
+    "zh-CN": "片段版本可用",
+    "en": "Fragment version available"
+  },
+  "checkImpactConfirmed": {
+    "zh-CN": "影响面已确认",
+    "en": "Impact confirmed"
+  }
+}
