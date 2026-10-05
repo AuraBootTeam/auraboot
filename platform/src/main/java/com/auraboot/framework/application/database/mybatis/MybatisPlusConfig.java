@@ -30,6 +30,19 @@ public class MybatisPlusConfig {
     @Value("${aura.persistence.tenant-bypass-table-prefixes:}")
     private String tenantBypassTablePrefixes = "";
 
+    /**
+     * Table families owned by the composing host (e.g. {@code commerce_} for the
+     * commerce storefront host). Host-owned families sit outside the platform
+     * tenant-line surface entirely: the platform never appends tenant_id predicates
+     * to them, and their mapper calls do not require a platform MetaContext. This is
+     * an ownership declaration — the host is responsible for whatever scoping its
+     * own tables need — so unlike {@code tenant-bypass-table-prefixes} it is not a
+     * dev-profile affordance and is allowed in every profile. Fail-closed default
+     * (empty = no host families declared).
+     */
+    @Value("${aura.persistence.host-table-prefixes:}")
+    private String hostTablePrefixes = "";
+
     /** Static cache populated on first access. Drop-in replacement for the prior hardcoded Set. */
     private static volatile Set<String> envScopedTables;
 
@@ -190,6 +203,11 @@ public class MybatisPlusConfig {
                     return true;
                 }
 
+                // ── Host-owned table families (B16 platform host contract) ──
+                if (hasConfiguredHostPrefix(tableName)) {
+                    return true;
+                }
+
                 // ── Application-contributed external stores ──
                 if (hasConfiguredBypassPrefix(tableName)) {
                     return true;
@@ -253,6 +271,20 @@ public class MybatisPlusConfig {
                 .filter(prefix -> !prefix.isEmpty())
                 .anyMatch(tableName::startsWith);
     }
+
+    private boolean hasConfiguredHostPrefix(String tableName) {
+        if (tableName == null || hostTablePrefixes == null || hostTablePrefixes.isBlank()) return false;
+        if (!hostPrefixesLogged) {
+            hostPrefixesLogged = true;
+            log.info("Platform host-owned table prefixes active: {}", hostTablePrefixes);
+        }
+        return java.util.Arrays.stream(hostTablePrefixes.split(","))
+                .map(String::trim)
+                .filter(prefix -> !prefix.isEmpty())
+                .anyMatch(tableName::startsWith);
+    }
+
+    private volatile boolean hostPrefixesLogged;
 
     /**
      * The prefix bypass turns the tenant filter off for whole table families. That is a
