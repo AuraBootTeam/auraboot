@@ -102,12 +102,18 @@ public class IdentifierMappingDataMigrator {
         }
 
         List<ModelDataMigration> receipts = new ArrayList<>();
+        // Column remap runs legacy->renamed, so lookups go through the inverted
+        // (renamed -> legacy) view of the mapping.
+        Map<String, String> reverseMap = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : identifierMap.entrySet()) {
+            reverseMap.putIfAbsent(entry.getValue(), entry.getKey());
+        }
         for (Map.Entry<String, String[]> pair : resolveModelPairs(identifierMap, tenantId).entrySet()) {
             String fromModel = pair.getKey();
             String toModel = pair.getValue()[0];
             String sourceTable = pair.getValue()[1];
             String targetTable = pair.getValue()[2];
-            receipts.add(migrateModelPair(identifierMap, fromModel, toModel, sourceTable, targetTable, tenantId));
+            receipts.add(migrateModelPair(reverseMap, fromModel, toModel, sourceTable, targetTable, tenantId));
         }
         return receipts;
     }
@@ -191,7 +197,7 @@ public class IdentifierMappingDataMigrator {
         return value != null && SAFE_SQL_IDENTIFIER.matcher(value).matches();
     }
 
-    private ModelDataMigration migrateModelPair(Map<String, String> identifierMap,
+    private ModelDataMigration migrateModelPair(Map<String, String> legacyByRenamed,
                                                 String fromModel, String toModel,
                                                 String sourceTable, String targetTable,
                                                 Long tenantId) {
@@ -209,7 +215,7 @@ public class IdentifierMappingDataMigrator {
         Set<String> consumedSourceColumns = new LinkedHashSet<>();
 
         for (String targetColumn : targetColumns) {
-            String legacyColumn = identifierMap.getOrDefault(targetColumn, targetColumn);
+            String legacyColumn = legacyByRenamed.getOrDefault(targetColumn, targetColumn);
             if (!sourceColumns.contains(legacyColumn)) {
                 // No legacy source: the column stays at its new-table default.
                 unmappedNewColumns.add(targetColumn);
