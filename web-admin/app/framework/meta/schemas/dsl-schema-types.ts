@@ -43,6 +43,7 @@ export type {
 } from './types';
 
 import type {
+  CardImageViewport,
   LocalizedText,
   LayoutConfig,
   BlockLayoutConfig,
@@ -74,6 +75,8 @@ export interface StrictBlockConfig {
   layout?: BlockLayoutConfig;
   visibleWhen?: string;
   className?: string;
+  imageField?: string;
+  imageViewports?: Record<string, CardImageViewport>;
 
   // Form
   fields?: FieldConfig[];

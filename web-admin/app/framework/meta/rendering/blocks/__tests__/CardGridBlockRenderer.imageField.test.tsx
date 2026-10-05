@@ -88,6 +88,37 @@ describe('CardGridBlockRenderer imageField', () => {
     expect(screen.queryByRole('img')).toBeNull();
   });
 
+  it('fits the configured visible artwork bounds without replacing the original image', () => {
+    render(<CardGridBlockRenderer block={{ ...block, imageViewports: {
+      '/bee.png': { width: 1024, height: 1024, viewBox: [200, 300, 600, 400] },
+    } } as any} runtime={runtime([{ pid: '1', name: 'Bee', cover: '/bee.png' }])} />);
+    const image = screen.getByRole('img', { name: 'Bee' });
+    expect(image.tagName.toLowerCase()).toBe('svg');
+    expect(image.getAttribute('viewBox')).toBe('200 300 600 400');
+    expect(image.querySelector('image')?.getAttribute('href')).toBe('/bee.png');
+    expect(image.querySelector('image')?.getAttribute('width')).toBe('1024');
+    expect(image.querySelector('image')?.getAttribute('height')).toBe('1024');
+  });
+
+  it.each([
+    { width: 1024, height: 1024, viewBox: [-1, 0, 600, 400] },
+    { width: 1024, height: 1024, viewBox: [0, 0, 0, 400] },
+    { width: 1024, height: 1024, viewBox: [500, 0, 600, 400] },
+    { width: Infinity, height: 1024, viewBox: [0, 0, 600, 400] },
+    { width: 1024, height: 1024, viewBox: [0, 0, '600', 400] },
+  ])('keeps the original image behavior for invalid viewport %j', viewport => {
+    render(<CardGridBlockRenderer block={{ ...block, imageViewports: { '/bee.png': viewport } } as any}
+      runtime={runtime([{ pid: '1', name: 'Bee', cover: '/bee.png' }])} />);
+    expect(screen.getByRole('img', { name: 'Bee' }).tagName.toLowerCase()).toBe('img');
+  });
+
+  it('does not apply another image URL viewport to an unknown uploaded cover', () => {
+    render(<CardGridBlockRenderer block={{ ...block, imageViewports: {
+      '/bee.png': { width: 1024, height: 1024, viewBox: [200, 300, 600, 400] },
+    } } as any} runtime={runtime([{ pid: '1', name: 'Upload', cover: '/upload.png' }])} />);
+    expect(screen.getByRole('img', { name: 'Upload' }).getAttribute('src')).toBe('/upload.png');
+  });
+
   it('renders no tile at all when imageField is not configured', () => {
     render(
       <CardGridBlockRenderer
