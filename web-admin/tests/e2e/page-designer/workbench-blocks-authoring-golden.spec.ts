@@ -218,7 +218,6 @@ test.describe.serial('Unified Designer workbench-block authoring golden', () => 
   test('A1: metric-strip — metrics JSON + variant + dataSource persist at the block top level and preview shows labels', async ({
     page,
   }, testInfo) => {
-    test.skip(true, 'product gap: metric-strip variant/metrics inputs unbound after widget normalize');
     const metrics = [
       { key: 'open_total', label: { 'en-US': 'Open', 'zh-CN': '未决' }, valueField: 'open_total', tone: 'blue' },
       { key: 'open_critical', label: { 'en-US': 'Critical', 'zh-CN': '严重' }, valueField: 'open_critical', tone: 'red' },
@@ -282,7 +281,6 @@ test.describe.serial('Unified Designer workbench-block authoring golden', () => 
 test('A2: status-banner — statusField + toneMap + titleMap persist at the block top level and preview shows a status sample', async ({
     page,
   }, testInfo) => {
-    test.skip(true, 'product gap: status-banner legacy fields unbound after widget normalize');
     const statusField = 'bom_task_status';
     const errorField = 'bom_task_error_message';
     const dataSource = `taskSummary_${uid}`;
@@ -354,7 +352,6 @@ test('A2: status-banner — statusField + toneMap + titleMap persist at the bloc
   test('A3 (sad path): invalid metrics JSON shows a per-field error and is NOT written back', async ({
     page,
   }, testInfo) => {
-    test.skip(true, 'depends on A1 seeding metrics — blocked by the A1 metric-strip binding gap (product)');
     await openDesigner(page, pid);
     await selectBlock(page, METRIC_STRIP);
 
