@@ -4,6 +4,7 @@ import com.auraboot.framework.plugin.extension.*;
 import lombok.extern.slf4j.Slf4j;
 import org.pf4j.PluginWrapper;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
@@ -32,9 +33,21 @@ public class ExtensionRegistry {
     private final ObjectProvider<CommandHandlerExtension> coreCommandHandlerProvider;
     private final ObjectProvider<ServiceTaskActionExtension> coreServiceTaskActionProvider;
 
+    private final ObjectProvider<ApplicationModuleRegistry> applicationModuleRegistryProvider;
+
+    /** Standalone registries without product application modules retain the original constructor. */
     public ExtensionRegistry(AuraPluginManager pluginManager,
                              ObjectProvider<CommandHandlerExtension> coreCommandHandlerProvider,
                              ObjectProvider<ServiceTaskActionExtension> coreServiceTaskActionProvider) {
+        this(pluginManager, coreCommandHandlerProvider, coreServiceTaskActionProvider, null);
+    }
+
+    @Autowired
+    public ExtensionRegistry(AuraPluginManager pluginManager,
+                             ObjectProvider<CommandHandlerExtension> coreCommandHandlerProvider,
+                             ObjectProvider<ServiceTaskActionExtension> coreServiceTaskActionProvider,
+                             ObjectProvider<ApplicationModuleRegistry> applicationModuleRegistryProvider) {
+        this.applicationModuleRegistryProvider = applicationModuleRegistryProvider;
         this.pluginManager = pluginManager;
         this.coreCommandHandlerProvider = coreCommandHandlerProvider;
         this.coreServiceTaskActionProvider = coreServiceTaskActionProvider;
@@ -107,6 +120,19 @@ public class ExtensionRegistry {
      * @return list of command handlers
      */
     public List<CommandHandlerExtension> getAllCommandHandlers() {
+        List<CommandHandlerExtension> cached = cachedCommandHandlers();
+        List<CommandHandlerExtension> modules = moduleCommandHandlers(null);
+        return modules.isEmpty() ? cached : Stream.concat(cached.stream(), modules.stream()).toList();
+    }
+
+    private List<CommandHandlerExtension> moduleCommandHandlers(String pluginId) {
+        if (applicationModuleRegistryProvider == null) return List.of();
+        ApplicationModuleRegistry modules = applicationModuleRegistryProvider.getIfAvailable();
+        // Module beans remain live: caching them would retain a stopped child context.
+        return modules == null ? List.of() : modules.commandHandlers(pluginId);
+    }
+
+    private List<CommandHandlerExtension> cachedCommandHandlers() {
         for (int attempt = 0; attempt < 3; attempt++) {
             long generation;
             synchronized (this) {
@@ -140,8 +166,10 @@ public class ExtensionRegistry {
      * @return list of command handlers
      */
     public List<CommandHandlerExtension> getCommandHandlers(String pluginId) {
-        return commandHandlers.computeIfAbsent(pluginId,
+        List<CommandHandlerExtension> indexed = commandHandlers.computeIfAbsent(pluginId,
                 id -> pluginManager.getExtensionsOfType(CommandHandlerExtension.class, id));
+        List<CommandHandlerExtension> modules = moduleCommandHandlers(pluginId);
+        return modules.isEmpty() ? indexed : Stream.concat(indexed.stream(), modules.stream()).toList();
     }
 
     // ========== ServiceTask Actions ==========

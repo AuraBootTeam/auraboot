@@ -1,6 +1,7 @@
 package com.auraboot.framework.plugin.pf4j;
 
 import com.auraboot.framework.plugin.extension.ApplicationModuleExtension;
+import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
 import com.auraboot.framework.plugin.extension.DecisionUsageSourceContributor;
 import org.springframework.context.ApplicationContext;
 import com.auraboot.framework.plugin.extension.WorkflowCapability;
@@ -96,6 +97,15 @@ public class ApplicationModuleRegistry {
     public synchronized List<String> registeredModuleIds(String pluginId) {
         return modulesByPlugin.getOrDefault(pluginId, List.of()).stream()
                 .map(LoadedModule::moduleId).toList();
+    }
+
+    /** Returns only live module-owned handlers, without promoting child beans into the host. */
+    public synchronized List<CommandHandlerExtension> commandHandlers(String pluginId) {
+        List<LoadedModule> modules = pluginId == null
+                ? modulesByPlugin.values().stream().flatMap(List::stream).toList()
+                : modulesByPlugin.getOrDefault(pluginId, List.of());
+        return modules.stream().flatMap(module -> module.context()
+                .getBeansOfType(CommandHandlerExtension.class).values().stream()).toList();
     }
 
     /**

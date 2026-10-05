@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 import java.util.Set;
 
 /**
- * Bridges PF4J-loaded plugin extensions into the import-time
+ * Bridges discovered PF4J and live application-module handlers into the import-time
  * {@link CommandHandlerRegistry}.
  *
  * <p>Two registries co-exist for command handlers:
@@ -48,7 +48,7 @@ import java.util.Set;
 @Order(Ordered.LOWEST_PRECEDENCE)
 public class PluginExtensionRegistryBridge {
 
-    private final AuraPluginManager pluginManager;
+    private final ExtensionRegistry extensionRegistry;
     private final CommandHandlerRegistry commandHandlerRegistry;
 
     @EventListener(ApplicationReadyEvent.class)
@@ -59,7 +59,7 @@ public class PluginExtensionRegistryBridge {
     public BridgeResult bridgePluginCommandHandlers() {
         int registered = 0;
         int skipped = 0;
-        for (CommandHandlerExtension ext : pluginManager.getExtensionsOfType(CommandHandlerExtension.class)) {
+        for (CommandHandlerExtension ext : extensionRegistry.getAllCommandHandlers()) {
             String primaryCode = ext.getCommandType();
             var commandTypes = ext.getSupportedCommandTypes();
             if (commandTypes == null) {
