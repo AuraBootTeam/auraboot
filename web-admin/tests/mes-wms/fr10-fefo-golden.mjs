@@ -103,7 +103,7 @@ async function createLot(code, prodId, expiryDays) {
 // Inbound one receipt with the given lot lines and confirm it → real pipeline creates lot-linked balance.
 async function inboundReceipt(whId, prodId, locId, lines) {
   const rcpt = await execCommand(token, 'inv:create_warehouse_in',
-    { inv_in_type: 'purchase', inv_in_date: dstr(0), inv_in_warehouse_id: whId }, undefined, 'create', { allowError: true });
+    { inv_in_type: 'purchase_in', inv_in_date: dstr(0), inv_in_warehouse_id: whId }, undefined, 'create', { allowError: true });
   if (!rcpt.recordId) throw new Error(`create_warehouse_in failed: ${JSON.stringify(rcpt.raw?.context || rcpt.raw)}`);
   for (const { lotCode, qty } of lines) {
     const line = await execCommand(token, 'inv:add_wh_in_line',

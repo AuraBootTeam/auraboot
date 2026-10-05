@@ -8,6 +8,7 @@ import { useI18n } from '~/contexts/I18nContext';
 import { useState, useEffect, useCallback } from 'react';
 import { InboxIcon } from '@heroicons/react/24/outline';
 import { getUnreadCount } from '~/shared/services/inboxService';
+import { useHydrated } from '~/hooks/useHydrated';
 
 interface InboxBadgeProps {
   onClick?: () => void;
@@ -18,6 +19,7 @@ interface InboxBadgeProps {
 
 export function InboxBadge({ onClick, isOpen, pollInterval = 30_000, className }: InboxBadgeProps) {
   const { t } = useI18n();
+  const hydrated = useHydrated();
   const [count, setCount] = useState(0);
 
   const fetchCount = useCallback(async () => {
@@ -49,7 +51,11 @@ export function InboxBadge({ onClick, isOpen, pollInterval = 30_000, className }
 
   return (
     <button
+      type="button"
       onClick={onClick}
+      disabled={!hydrated}
+      aria-busy={!hydrated}
+      aria-expanded={isOpen ?? false}
       data-testid="inbox-badge"
       className={`relative rounded-xl p-2.5 transition-all duration-200 hover:scale-105 hover:shadow-md ${
         isOpen

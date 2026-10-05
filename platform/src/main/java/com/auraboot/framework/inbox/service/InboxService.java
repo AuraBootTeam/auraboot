@@ -76,6 +76,9 @@ public interface InboxService {
      */
     void markActed(Long id, Long userId, Long tenantId, String action);
 
+    /** Record the caller's decision only after its exact workflow task completed. */
+    void recordCompletedWorkflowAction(Long id, Long userId, Long tenantId, String taskId, String action);
+
     /**
      * Dismiss an item (user chose to ignore it).
      */

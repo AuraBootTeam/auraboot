@@ -40,6 +40,17 @@ describe('I18nContext missing-key warnings', () => {
     });
   });
 
+  it('publishes the initial default UI locale for subsequent BFF business requests', async () => {
+    document.cookie = 'locale=;path=/;max-age=0';
+    render(
+      <I18nProvider initialData={{ search: { placeholder: '搜索' } }} initialLocale="zh-CN">
+        <TranslationProbe i18nKey="search.placeholder" />
+      </I18nProvider>,
+    );
+    expect(screen.getByTestId('translation')).toHaveTextContent('搜索');
+    await waitFor(() => expect(document.cookie).toMatch(/(?:^|;\s*)locale=zh-CN(?:;|$)/));
+  });
+
   it('does not warn while client-side i18n recovery is still in progress', async () => {
     globalThis.fetch = vi.fn(
       () =>

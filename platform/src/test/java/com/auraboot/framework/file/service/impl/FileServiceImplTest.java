@@ -725,6 +725,72 @@ class FileServiceImplTest {
         assertThat(url).isEqualTo("https://oss/path");
     }
 
+    @Test
+    void appendFileRelation_preservesPriorAttachmentsAndStoresExactCurrentTenantRelation() {
+        var request = attachmentRequest();
+        FileEntity file = finalizedOwnedFile();
+        when(fileMapper.selectOne(any(QueryWrapper.class))).thenReturn(file);
+        when(fileRelationMapper.insert(any(FileRelationEntity.class))).thenReturn(1);
+        assertThat(fileService.appendFileRelation(request, 42L)).isTrue();
+        var relation = forClass(FileRelationEntity.class);
+        verify(fileRelationMapper).insert(relation.capture());
+        assertThat(relation.getValue().getTenantId()).isEqualTo(7L);
+        assertThat(relation.getValue().getFileId()).isEqualTo("123");
+        assertThat(relation.getValue().getEntityType()).isEqualTo("BPM_TASK");
+        assertThat(relation.getValue().getEntityId()).isEqualTo("task-1");
+        assertThat(relation.getValue().getFieldName()).isEqualTo("attachment");
+        verify(fileRelationMapper, never()).delete(any(QueryWrapper.class));
+    }
+
+    @Test
+    void appendFileRelation_rejectsMissingSessionAndForgedActorBeforeAnyLookup() {
+        assertThatThrownBy(() -> fileService.appendFileRelation(attachmentRequest(), 99L))
+                .isInstanceOf(BusinessException.class);
+        MetaContext.clear();
+        assertThatThrownBy(() -> fileService.appendFileRelation(attachmentRequest(), 42L))
+                .isInstanceOf(BusinessException.class);
+        verify(fileMapper, never()).selectOne(any(QueryWrapper.class));
+        verify(fileRelationMapper, never()).insert(any(FileRelationEntity.class));
+        verify(fileRelationMapper, never()).delete(any(QueryWrapper.class));
+    }
+
+    @Test
+    void appendFileRelation_rejectsForeignOwnerUnfinalizedDeletedAndInternalFileIdentities() {
+        FileEntity file = finalizedOwnedFile();
+        when(fileMapper.selectOne(any(QueryWrapper.class))).thenReturn(file);
+        file.setCreatedBy(99L);
+        assertThatThrownBy(() -> fileService.appendFileRelation(attachmentRequest(), 42L)).isInstanceOf(BusinessException.class);
+        file.setCreatedBy(42L); file.setStatus("uploading");
+        assertThatThrownBy(() -> fileService.appendFileRelation(attachmentRequest(), 42L)).isInstanceOf(BusinessException.class);
+        file.setStatus("success"); file.setDeletedFlag(true);
+        assertThatThrownBy(() -> fileService.appendFileRelation(attachmentRequest(), 42L)).isInstanceOf(BusinessException.class);
+        file.setDeletedFlag(false); file.setPid("123");
+        assertThatThrownBy(() -> fileService.appendFileRelation(attachmentRequest(), 42L)).isInstanceOf(BusinessException.class);
+        verify(fileRelationMapper, never()).insert(any(FileRelationEntity.class));
+        verify(fileRelationMapper, never()).delete(any(QueryWrapper.class));
+    }
+
+    @Test
+    void appendFileRelation_refusesAnUnpersistedRelation() {
+        when(fileMapper.selectOne(any(QueryWrapper.class))).thenReturn(finalizedOwnedFile());
+        assertThatThrownBy(() -> fileService.appendFileRelation(attachmentRequest(), 42L))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("not persisted");
+        verify(fileRelationMapper, never()).delete(any(QueryWrapper.class));
+    }
+
+    private FileRelationRequestDTO attachmentRequest() {
+        var request = new FileRelationRequestDTO();
+        request.setEntityType("BPM_TASK"); request.setEntityId("task-1");
+        request.setFieldName("attachment"); request.setFileIds(new String[]{"file-public-pid"});
+        return request;
+    }
+
+    private FileEntity finalizedOwnedFile() {
+        var file = new FileEntity(); file.setId(123L); file.setPid("file-public-pid");
+        file.setCreatedBy(42L); file.setStatus("success"); file.setDeletedFlag(false);
+        return file;
+    }
+
     private void fireAfterCommit() {
         for (TransactionSynchronization synchronization
                 : TransactionSynchronizationManager.getSynchronizations()) {

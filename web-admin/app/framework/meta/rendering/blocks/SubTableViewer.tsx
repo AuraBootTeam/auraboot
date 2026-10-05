@@ -406,14 +406,18 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
             params,
             token,
           });
-          // Support both paginated (data.records) and direct array (data) responses
-          const rawData = result.data;
-          const resultRecords = Array.isArray(rawData) ? rawData : (rawData?.records ?? []);
-          if (ResultHelper.isSuccess(result) && Array.isArray(resultRecords)) {
-            setRows(resultRecords);
-          } else {
+          if (!ResultHelper.isSuccess(result)) {
             setRows([]);
+            throw new Error(result.message || t('common.loadDataFailed'));
           }
+          // Only a valid empty collection is an empty state; failures are errors.
+          const rawData = result.data;
+          const resultRecords = Array.isArray(rawData) ? rawData : rawData?.records;
+          if (!Array.isArray(resultRecords)) {
+            setRows([]);
+            throw new Error(t('common.loadDataFailed'));
+          }
+          setRows(resultRecords);
           setLoading(false);
           return;
         } else if (config.resolveVia) {
@@ -439,12 +443,16 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
             token,
           });
 
-          const intermediateRecords = intermediateRes.data?.records ?? [];
-          if (
-            !ResultHelper.isSuccess(intermediateRes) ||
-            !Array.isArray(intermediateRecords) ||
-            intermediateRecords.length === 0
-          ) {
+          if (!ResultHelper.isSuccess(intermediateRes)) {
+            setRows([]);
+            throw new Error(intermediateRes.message || t('common.loadDataFailed'));
+          }
+          const intermediateRecords = intermediateRes.data?.records;
+          if (!Array.isArray(intermediateRecords)) {
+            setRows([]);
+            throw new Error(t('common.loadDataFailed'));
+          }
+          if (intermediateRecords.length === 0) {
             setRows([]);
             setLoading(false);
             return;
@@ -479,12 +487,16 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
           token,
         });
 
-        const resultRecords = result.data?.records ?? [];
-        if (ResultHelper.isSuccess(result) && Array.isArray(resultRecords)) {
-          setRows(resultRecords);
-        } else {
+        if (!ResultHelper.isSuccess(result)) {
           setRows([]);
+          throw new Error(result.message || t('common.loadDataFailed'));
         }
+        const resultRecords = result.data?.records;
+        if (!Array.isArray(resultRecords)) {
+          setRows([]);
+          throw new Error(t('common.loadDataFailed'));
+        }
+        setRows(resultRecords);
       } catch (err) {
         console.error('[SubTableViewer] Failed to load data:', err);
         setError(err instanceof Error ? err.message : 'Failed to load data');
@@ -1282,7 +1294,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
   }
 
   if (error) {
-    return <div className="text-status-red py-4 text-center text-sm">{error}</div>;
+    return <div role="alert" className="text-status-red py-4 text-center text-sm">{error}</div>;
   }
 
   return (

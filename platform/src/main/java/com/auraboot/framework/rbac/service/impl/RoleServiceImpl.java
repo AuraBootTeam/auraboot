@@ -54,6 +54,9 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
     @Override
     @Transactional
     public Role createRole(Role role) {
+        if (!StringUtils.hasText(role.getCode())) {
+            throw new RootUnCheckedException(ResponseCode.BadParam, "Role code is required");
+        }
         log.info("Creating role: {} for tenant: {}", role.getName(), role.getTenantId());
 
         // Guard: platform-only roles (e.g. platform_admin) must have scope_type=global
@@ -81,6 +84,9 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
     @Override
     @Transactional
     public Role updateRole(Role role) {
+        if (role.getCode() != null && !StringUtils.hasText(role.getCode())) {
+            throw new RootUnCheckedException(ResponseCode.BadParam, "Role code must not be blank");
+        }
         log.info("Updating role: {}", role.getId());
         
         Role existingRole = getById(role.getId());

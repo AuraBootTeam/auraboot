@@ -1,3 +1,4 @@
+import { resolveTemporalType } from '~/shared/services/dateTimeFormatService';
 /**
  * ListPageContent — Extracted rendering logic from dynamic.$tableName.tsx
  *
@@ -2383,7 +2384,7 @@ function ListPageContentInner(props: PageContentProps) {
   // Use unified action handler hook
   // IMPORTANT: Must be declared before any useEffect that references handleAction
   // to avoid temporal dead zone ("Cannot access 'handleAction' before initialization").
-  const { handleAction } = useActionHandler({
+  const { handleAction, error: actionError, setError: setActionError } = useActionHandler({
     runtime,
     navigate: navigateAwayFromList,
     tableName,
@@ -2399,14 +2400,10 @@ function ListPageContentInner(props: PageContentProps) {
     t,
     token: token || undefined,
     showToast,
-    // A failed row/toolbar ACTION (e.g. a command rejected by a business rule such as the FR-05
-    // startup interlock) must surface as a toast only — useActionHandler already calls notifyToast.
-    // Do NOT route it into the page-level `error` state: that replaces the whole list with the
-    // full-page "加载失败" ErrorAlert (which is reserved for data/schema load failures), forcing a
-    // reload to recover. Blocking a single row's action should never blank the table.
+    // Action failures retain the table and render separately from data/schema load errors.
     onError: (err) => {
       if (import.meta.env?.DEV)
-        console.warn('[ListPageContent] action error (shown via toast):', err.message);
+        console.warn('[ListPageContent] action error:', err.message);
     },
   });
 
@@ -3228,22 +3225,15 @@ function ListPageContentInner(props: PageContentProps) {
       if (byRenderComponent) {
         return byRenderComponent;
       }
+      const declaredTemporalType = resolveTemporalType(undefined, modelFieldMap.get(field)?.dataType, undefined);
+      if (declaredTemporalType) return declaredTemporalType;
       // REFERENCE field: either ends with _id, or has a {field}_display sibling in the record
       if (field.endsWith('_id') || (record && record[`${field}_display`] !== undefined)) {
         return 'reference';
       }
-      if (field.endsWith('_at')) {
-        return 'datetime';
-      }
-      if (field.endsWith('_date')) {
-        return 'date';
-      }
-      if (field.endsWith('_time')) {
-        return 'time';
-      }
-      if (typeof value === 'string' && /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) {
-        return 'datetime';
-      }
+      const declaredDataType = modelFieldMap.get(field)?.dataType;
+      const temporalType = resolveTemporalType(field, declaredDataType, value);
+      if (temporalType) return temporalType;
       // Detect boolean values (native boolean or string "true"/"false")
       if (typeof value === 'boolean' || value === 'true' || value === 'false') {
         return 'boolean' as any;
@@ -4975,6 +4965,29 @@ function ListPageContentInner(props: PageContentProps) {
                   (schema as any)?.extension?.hideToolbarMore)
             }
           />
+
+          {actionError && (
+            <div
+              className="print-hide rounded-control bg-status-red-bg text-status-red border-status-red mx-6 mt-4 border px-4 py-3 text-sm"
+              role="alert"
+              data-testid={deriveTestId('list', modelCode, 'action-error')}
+              data-print="hide"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="font-medium">{translateCommon('common.actionFailed', 'Action failed')}</div>
+                  <div className="mt-1 break-words">{actionError}</div>
+                </div>
+                <button
+                  type="button"
+                  className="text-status-red hover:bg-status-red-bg shrink-0 rounded px-2 py-1 text-xs font-medium"
+                  onClick={() => setActionError(null)}
+                >
+                  {translateCommon('common.close', 'Close')}
+                </button>
+              </div>
+            </div>
+          )}
 
           {canManageMemberAccounts && (
             <TenantMemberAccountImportDialog

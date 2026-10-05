@@ -132,6 +132,19 @@ public class InboxController {
             return ApiResponse.error("Inbox item not found");
         }
 
+        if ("workflow".equals(item.getSourceType()) || "bpm".equals(item.getSourceType())) {
+            if (item.getSourceId() == null || item.getSourceId().isBlank()) {
+                throw new IllegalStateException("Workflow inbox item has no task identity");
+            }
+            Map<String, Object> detail = new java.util.LinkedHashMap<>(workflowCapabilities.execute(
+                    "task.approval-detail", workflowRequest(Map.of("taskId", item.getSourceId(),
+                            "locale", org.springframework.context.i18n.LocaleContextHolder.getLocale().toLanguageTag())))
+                    .payload());
+            detail.put("id", item.getId());
+            detail.put("processName", item.getTitle());
+            return ApiResponse.success(detail);
+        }
+
         // Build approval detail response from InboxItem
         // For items without a real workflow, return a stub with basic approval capabilities
         Map<String, Object> currentStep = Map.of(
@@ -184,8 +197,12 @@ public class InboxController {
         if (rejectionValidation != null) {
             return rejectionValidation;
         }
-        completeSourceBpmTaskIfNeeded(id, userId, tenantId, resolvedAction, resolvedComment);
-        inboxService.markActed(id, userId, tenantId, resolvedAction);
+        String completedTaskId = completeSourceBpmTaskIfNeeded(id, userId, tenantId, resolvedAction, resolvedComment);
+        if (completedTaskId != null) {
+            inboxService.recordCompletedWorkflowAction(id, userId, tenantId, completedTaskId, resolvedAction);
+        } else {
+            inboxService.markActed(id, userId, tenantId, resolvedAction);
+        }
         return ApiResponse.success(Map.of("status", resolvedAction, "actedAt", Instant.now().toString()));
     }
 
@@ -198,12 +215,12 @@ public class InboxController {
      * happens first: if it fails the item stays pending and the user can retry, instead of
      * an acted item hiding a dead approval.
      */
-    private void completeSourceBpmTaskIfNeeded(
+    private String completeSourceBpmTaskIfNeeded(
             Long itemId, Long userId, Long tenantId, String resolvedAction, String resolvedComment) {
         boolean approval = "approved".equals(resolvedAction) || "approve".equals(resolvedAction);
         boolean rejection = REJECTION_ACTIONS.contains(resolvedAction);
         if (!approval && !rejection) {
-            return;
+            return null;
         }
         InboxItem item = inboxService.getItem(itemId, userId, tenantId);
         // InboxEventListener creates BPM task items with sourceType "workflow"; older
@@ -213,7 +230,7 @@ public class InboxController {
         boolean bpmSourced = item != null
                 && ("bpm".equals(item.getSourceType()) || "workflow".equals(item.getSourceType()));
         if (!bpmSourced || item.getSourceId() == null) {
-            return;
+            return null;
         }
         if (approval) {
             workflowCapabilities.execute("task.approve", workflowRequest(Map.of(
@@ -222,6 +239,7 @@ public class InboxController {
             workflowCapabilities.execute("task.reject", workflowRequest(Map.of(
                     "taskId", item.getSourceId(), "comment", resolvedComment == null ? "" : resolvedComment, "variables", Map.of())));
         }
+        return item.getSourceId();
     }
 
     /**

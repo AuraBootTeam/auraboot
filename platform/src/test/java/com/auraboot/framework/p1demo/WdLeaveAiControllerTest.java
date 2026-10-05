@@ -1,6 +1,8 @@
 package com.auraboot.framework.p1demo;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.common.dto.ApiResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,14 +51,14 @@ class WdLeaveAiControllerTest {
 
     @Test
     void aiFill_nullRequest_returnsBadRequest() {
-        ResponseEntity<WdLeaveAiController.AiFillResponse> resp = controller.aiFill(null);
+        ResponseEntity<ApiResponse<WdLeaveAiController.AiFillResponse>> resp = controller.aiFill(null);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(resp.getBody().errorKey()).isEqualTo("ai.fill.nl_input_required");
+        assertThat(((WdLeaveAiController.AiFillResponse) resp.getBody().getContext()).errorKey()).isEqualTo("ai.fill.nl_input_required");
     }
 
     @Test
     void aiFill_blankNlInput_returnsBadRequest() {
-        ResponseEntity<WdLeaveAiController.AiFillResponse> resp = controller.aiFill(
+        ResponseEntity<ApiResponse<WdLeaveAiController.AiFillResponse>> resp = controller.aiFill(
                 new WdLeaveAiController.AiFillRequest("  ", null, null, null));
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
@@ -64,10 +66,10 @@ class WdLeaveAiControllerTest {
     @Test
     void aiFill_noTenant_returns401() {
         metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(null);
-        ResponseEntity<WdLeaveAiController.AiFillResponse> resp = controller.aiFill(
+        ResponseEntity<ApiResponse<WdLeaveAiController.AiFillResponse>> resp = controller.aiFill(
                 new WdLeaveAiController.AiFillRequest("一周年假", null, null, null));
         assertThat(resp.getStatusCodeValue()).isEqualTo(401);
-        assertThat(resp.getBody().errorKey()).isEqualTo("ai.fill.tenant_required");
+        assertThat(((WdLeaveAiController.AiFillResponse) resp.getBody().getContext()).errorKey()).isEqualTo("ai.fill.tenant_required");
     }
 
     @Test
@@ -79,12 +81,19 @@ class WdLeaveAiControllerTest {
         when(annotationRepository.insertGrounding(eq(7L), eq("wd_leave_request"), eq(99L),
                 eq("turn-1"), eq("我请假"), eq(Map.of("k", "v")))).thenReturn(123L);
 
-        ResponseEntity<WdLeaveAiController.AiFillResponse> resp = controller.aiFill(
+        ResponseEntity<ApiResponse<WdLeaveAiController.AiFillResponse>> resp = controller.aiFill(
                 new WdLeaveAiController.AiFillRequest("我请假", "2026-05-01", 99L, null));
 
         assertThat(resp.getStatusCode().is2xxSuccessful()).isTrue();
-        assertThat(resp.getBody().turnId()).isEqualTo("turn-1");
-        assertThat(resp.getBody().annotationId()).isEqualTo(123L);
+        assertThat(resp.getBody().getData().turnId()).isEqualTo("turn-1");
+        assertThat(resp.getBody().getData().annotationId()).isEqualTo(123L);
+        // The browser HTTP client reads code/data, not a bare controller record.
+        var wire = new ObjectMapper().valueToTree(resp.getBody());
+        assertThat(wire.path("code").asText()).isEqualTo("0");
+        assertThat(wire.path("data").path("turnId").asText()).isEqualTo("turn-1");
+        assertThat(wire.path("data").path("fields").path("k").asText()).isEqualTo("v");
+        assertThat(wire.path("data").path("errorKey").isNull()).isTrue();
+        assertThat(wire.has("fields")).isFalse();
     }
 
     @Test
@@ -99,13 +108,13 @@ class WdLeaveAiControllerTest {
         when(annotationRepository.insertGrounding(anyLong(), anyString(), anyLong(),
                 anyString(), anyString(), any())).thenReturn(1L);
 
-        ResponseEntity<WdLeaveAiController.AiFillResponse> resp = controller.aiFill(
+        ResponseEntity<ApiResponse<WdLeaveAiController.AiFillResponse>> resp = controller.aiFill(
                 new WdLeaveAiController.AiFillRequest(
                         "我请假", "2026-05-01", 99L, List.of("wd_req_reason")));
 
         // Locked field never reaches the response...
-        assertThat(resp.getBody().fields()).containsOnlyKeys("wd_req_type");
-        assertThat(resp.getBody().fields()).doesNotContainKey("wd_req_reason");
+        assertThat(resp.getBody().getData().fields()).containsOnlyKeys("wd_req_type");
+        assertThat(resp.getBody().getData().fields()).doesNotContainKey("wd_req_reason");
         // ...nor the grounding annotation that gets persisted.
         verify(annotationRepository).insertGrounding(eq(7L), eq("wd_leave_request"), eq(99L),
                 eq("turn-9"), eq("我请假"), eq(Map.of("wd_req_type", "annual")));

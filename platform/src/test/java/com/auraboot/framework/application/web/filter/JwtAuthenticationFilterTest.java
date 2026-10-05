@@ -125,6 +125,38 @@ class JwtAuthenticationFilterTest {
         }
     }
 
+
+    @Test
+    void anonymousI18nRemainsPublicWithoutInventingTenantContext() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/i18n/zh-CN");
+        request.setServletPath("/api/i18n/zh-CN");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        filter.doFilter(request, response, chain);
+        verify(chain).doFilter(request, response);
+        assertFalse(MetaContext.exists());
+        verifyNoInteractions(jwtUtil, userDetailsService);
+    }
+
+    @Test
+    void i18nWithCredentialsMustRunJwtValidation() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/i18n/zh-CN");
+        request.setServletPath("/api/i18n/zh-CN");
+        request.addHeader("Authorization", "Bearer supplied-token");
+        assertFalse(filter.shouldNotFilter(request));
+    }
+
+    @Test
+    void invalidI18nCredentialsCannotFallBackToAnonymousSuccess() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/i18n/zh-CN");
+        request.setServletPath("/api/i18n/zh-CN");
+        request.addHeader("Authorization", "Bearer invalid-i18n");
+        when(jwtUtil.extractIdentifier("invalid-i18n")).thenThrow(new IllegalArgumentException("invalid"));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        filter.doFilter(request, response, chain);
+        assertEquals(401, response.getStatus());
+        verifyNoInteractions(chain);
+    }
+
     @Test
     void missingAuthorizationHeader_returns401AndDoesNotChain() throws Exception {
         MockHttpServletRequest req = req();
@@ -592,5 +624,39 @@ class JwtAuthenticationFilterTest {
 
         // Request still proceeds; rbac failure is logged and swallowed by design.
         verify(chain).doFilter(req, resp);
+    }
+    @Test
+    void validI18nTokenBindsItsTenantBeforeLoadingTranslations() throws Exception {
+        MockHttpServletRequest req = new MockHttpServletRequest("GET", "/api/i18n/zh-CN");
+        req.setServletPath("/api/i18n/zh-CN");
+        req.addHeader("Authorization", "Bearer valid.token");
+
+        CustomUserDetails ud = new CustomUserDetails("alice", "p", 7L, "alice_pid",
+                Collections.emptyList(), true, true, true, true);
+        when(jwtUtil.extractIdentifier("valid.token")).thenReturn("alice_pid");
+        when(userDetailsService.loadUserByUsername("alice_pid")).thenReturn(ud);
+        when(jwtUtil.validateToken(eq("valid.token"), eq(ud))).thenReturn(true);
+        when(jwtUtil.extractSecurityVersion("valid.token")).thenReturn(0);
+        User user = new User();
+        user.setSecurityVersion(0);
+        when(userService.findByPid("alice_pid")).thenReturn(user);
+        when(sessionManagementService.isSessionValid("valid.token")).thenReturn(true);
+        when(jwtUtil.extractTenantId("valid.token")).thenReturn(100L);
+        when(jwtUtil.extractMemberId("valid.token")).thenReturn(55L);
+        when(userRoleService.getRoleIdsByMemberIdAndTenantId(55L, 100L))
+                .thenReturn(List.of(1L, 2L));
+
+        MockHttpServletResponse resp = new MockHttpServletResponse();
+        doAnswer(invocation -> {
+            assertEquals(100L, MetaContext.getCurrentTenantId());
+            assertEquals(7L, MetaContext.getCurrentUserId());
+            return null;
+        }).when(chain).doFilter(req, resp);
+        filter.doFilter(req, resp, chain);
+
+        verify(chain).doFilter(req, resp);
+        verify(sessionManagementService).updateLastActive("valid.token");
+        // After chain completes the filter clears MetaContext in finally.
+        assertFalse(MetaContext.exists());
     }
 }

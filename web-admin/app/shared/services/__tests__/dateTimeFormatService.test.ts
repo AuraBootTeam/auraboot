@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatInTimezone } from '~/shared/services/dateTimeFormatService';
+import { formatInTimezone, resolveTemporalType, resolveTemporalFormat } from '~/shared/services/dateTimeFormatService';
 
 describe('formatInTimezone', () => {
   it('converts a UTC ISO string with offset into the target timezone', () => {
@@ -49,5 +49,22 @@ describe('formatInTimezone', () => {
     expect(
       formatInTimezone('2026-06-03T03:08:00Z', 'YYYY-MM-DD HH:mm:ss', 'Not/AZone'),
     ).toBe('2026-06-03 03:08:00');
+  });
+});
+
+
+describe('business timestamp classification', () => {
+  it('retains the business date for timestamp values whose field name ends in time', () => {
+    const value = '2026-08-12T00:00:00Z';
+    const type = resolveTemporalType('mes_report_time', undefined, value);
+    expect(type).toBe('datetime');
+    expect(formatInTimezone(value, resolveTemporalFormat(type!), 'Asia/Shanghai')).toBe('2026-08-12 08:00:00');
+  });
+
+  it('honors uppercase runtime metadata and explicit time-only declarations', () => {
+    expect(resolveTemporalType('mes_report_time', 'DATETIME', '2026-08-12T00:00:00Z')).toBe('datetime');
+    expect(resolveTemporalType('shift_time', 'TIME', '2026-08-12T00:00:00Z')).toBe('time');
+    expect(resolveTemporalType('shift_time', undefined, '08:00:00')).toBe('time');
+    expect(resolveTemporalType('order_date', undefined, '2026-08-12')).toBe('date');
   });
 });

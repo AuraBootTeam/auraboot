@@ -111,4 +111,27 @@ class CommandServiceResolveCrudCommandsTest {
         assertEquals("m:create_it", crud.get("create"));
         assertEquals(1, crud.size());
     }
+
+    @Test
+    void explicitDefaultPreventsAuxiliaryCommandsFromReplacingFormCrud() {
+        CommandDefinition helper = cmd("sag:update_retry", "wd_leave_request", "update");
+        CommandDefinition standard = cmd("wd:update_leave_request", "wd_leave_request", "update");
+        standard.setExecutionConfig("{\"type\":\"update\",\"crudDefault\":true}");
+        when(commandDefinitionMapper.findByModelCode("wd_leave_request"))
+                .thenReturn(List.of(helper, standard));
+
+        assertEquals(Map.of("update", "wd:update_leave_request"),
+                commandService.resolveCrudCommands("wd_leave_request"));
+    }
+
+    @Test
+    void auxiliaryCrudCommandCanOptOutWithoutChangingItsExecutionType() {
+        CommandDefinition helper = cmd("sag:update_retry", "wd_leave_request", "update");
+        helper.setExecutionConfig("{\"type\":\"update\",\"crudDefault\":false}");
+        when(commandDefinitionMapper.findByModelCode("wd_leave_request"))
+                .thenReturn(List.of(helper));
+
+        assertTrue(commandService.resolveCrudCommands("wd_leave_request").isEmpty());
+        assertEquals("update", commandService.listByModelCode("wd_leave_request").get(0).getType());
+    }
 }

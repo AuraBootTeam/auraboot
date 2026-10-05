@@ -2,6 +2,9 @@ package com.auraboot.framework.plugin.extension;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Objects;
 
 /**
  * Narrow operation port between the platform and an installed workflow product.
@@ -12,15 +15,24 @@ public interface WorkflowCapability {
     Set<String> operations();
     WorkflowResult execute(String operation, WorkflowRequest request);
 
+    /** JSON object values may be null; keep a defensive, immutable top-level snapshot. */
+    private static Map<String, Object> snapshotPayload(Map<String, Object> payload) {
+        if (payload == null) return Map.of();
+        Map<String, Object> copy = new LinkedHashMap<>();
+        payload.forEach((key, value) -> copy.put(
+                Objects.requireNonNull(key, "Workflow payload keys must not be null"), value));
+        return Collections.unmodifiableMap(copy);
+    }
+
     record WorkflowRequest(Long tenantId, Long actorUserId, Map<String, Object> payload) {
         public WorkflowRequest {
-            payload = payload == null ? Map.of() : Map.copyOf(payload);
+            payload = snapshotPayload(payload);
         }
     }
 
     record WorkflowResult(Map<String, Object> payload) {
         public WorkflowResult {
-            payload = payload == null ? Map.of() : Map.copyOf(payload);
+            payload = snapshotPayload(payload);
         }
         public static WorkflowResult empty() { return new WorkflowResult(Map.of()); }
     }
@@ -37,7 +49,7 @@ public interface WorkflowCapability {
 
         public WorkflowExecutionException(String message, Throwable cause, Map<String, Object> payload) {
             super(message, cause);
-            this.payload = payload == null ? Map.of() : Map.copyOf(payload);
+            this.payload = snapshotPayload(payload);
         }
 
         public Map<String, Object> payload() {
