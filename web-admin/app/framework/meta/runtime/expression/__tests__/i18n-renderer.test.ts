@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { renderText } from '~/framework/meta/runtime/expression/i18n-renderer';
+import { renderText, getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 import {
   createExpressionContext,
   type ExpressionContext,
@@ -48,6 +48,23 @@ describe('i18n-renderer', () => {
         en: 'Revenue',
       };
       expect(renderText(text, context)).toBe('Revenue');
+    });
+  });
+
+  describe('regional locale fallback', () => {
+    it('uses an English regional translation before a Chinese fallback', () => {
+      expect(getLocalizedText({ 'zh-CN': '标题', 'en-US': 'Title' }, 'en-GB')).toBe('Title');
+    });
+    it('prefers an exact locale, then generic language, then another regional variant', () => {
+      const messages = { 'zh-CN': '标题', en: 'Generic', 'en-US': 'American' };
+      expect(getLocalizedText(messages, 'en-US')).toBe('American');
+      expect(getLocalizedText(messages, 'en-AU')).toBe('Generic');
+      expect(getLocalizedText({ 'zh-CN': '标题', 'fr-FR': 'Titre' }, 'fr-CA')).toBe('Titre');
+    });
+    it('ignores empty regional translations and preserves unknown-language fallback', () => {
+      const messages = { 'zh-CN': '标题', 'en-US': '' };
+      expect(getLocalizedText(messages, 'en-GB')).toBe('标题');
+      expect(getLocalizedText({ 'zh-CN': '标题', 'en-US': 'Title' }, 'ko-KR')).toBe('标题');
     });
   });
 

@@ -4,6 +4,8 @@
  */
 
 import { create } from 'zustand';
+import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
+import { widgetText } from '../widgets/widgetText';
 import { immer } from 'zustand/middleware/immer';
 import { subscribeWithSelector } from 'zustand/middleware';
 import type {
@@ -325,7 +327,11 @@ export const useDashboardStore = create<DashboardStore>()(
           y: widget.y + 1,
           config: {
             ...widget.config,
-            title: `${widget.config.title} (副本)`,
+            title: typeof widget.config.title === 'string'
+              ? `${widget.config.title} (${widgetText('panel.copySuffix')['zh-CN']})`
+              : Object.fromEntries(Object.entries(widget.config.title).map(([locale, title]) =>
+                [locale, `${title} (${getLocalizedText(widgetText('panel.copySuffix'), locale)})`],
+              )),
           },
         };
 

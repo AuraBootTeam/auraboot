@@ -30,6 +30,7 @@
 #                   startup, recording path + SHA-256 in the runtime state directory.
 #       --extra-plugin-root: repeatable explicit fallback after this checkout's OSS plugins;
 #                            sibling plugin repositories are never guessed implicitly.
+#       --source key=path: explicit owner for each external plugin root; Core binds itself.
 #   ./scripts/oss-golden-stack.sh import <name> [--extra-plugin-root PATH] [--plugin-profile P|--plugin X]
 #   ./scripts/oss-golden-stack.sh warm <name>          # re-run setup→auth→pre-warm (up does this)
 #   ./scripts/oss-golden-stack.sh env  <name>          # print the Playwright env exports
@@ -171,12 +172,12 @@ runtime_env() {
 web_admin_node_modules_seed() {
   local candidate
   for candidate in "$CANONICAL/web-admin/node_modules" "$REPO_ROOT/web-admin/node_modules"; do
-    web_admin_node_modules_usable "$candidate" && { echo "$candidate"; return 0; }
+    web_admin_node_modules_matches_checkout "$candidate" "$REPO_ROOT" && { echo "$candidate"; return 0; }
   done
 
   while IFS= read -r candidate; do
     candidate="$candidate/web-admin/node_modules"
-    web_admin_node_modules_usable "$candidate" && { echo "$candidate"; return 0; }
+    web_admin_node_modules_matches_checkout "$candidate" "$REPO_ROOT" && { echo "$candidate"; return 0; }
   done < <(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree /{print substr($0,10)}')
 
   return 1
@@ -347,6 +348,7 @@ PY
 # ---- up ------------------------------------------------------------------------------
 cmd_up() {
   local name="$1"; shift
+  local requested_args=("$@") source_specs=("core=$REPO_ROOT")
   local slot="" ttl="6h" runtime_mode="development" system_mode="single" frontend=1 warm=1 fresh_db=0 require_new_db=0
   local plugin_profile="" import_plugins=() extra_plugin_roots=() product_migration_roots=()
   local parallel_reason=""
@@ -356,6 +358,7 @@ cmd_up() {
     --ttl) ttl="$2"; shift 2;;
     --runtime-mode) runtime_mode="$2"; shift 2;;
     --parallel-reason) parallel_reason="$2"; shift 2;;
+    --source) source_specs+=("${2:?--source requires key=path}"); shift 2;;
     --system-mode) system_mode="${2:-}"; [ $# -ge 2 ] || die "--system-mode requires a value"; shift 2;;
     --no-frontend) frontend=0; shift;;
     --no-warm) warm=0; shift;;
@@ -408,6 +411,8 @@ cmd_up() {
   esac
 
   local sd; sd="$(state_dir "$name")" || return 1
+  node "$SCRIPT_DIR/lib/oss-stack-lifecycle.mjs" validate "$name" "$REPO_ROOT" "$sd" "${requested_args[@]}" \
+    || die "explicit plugin source ownership validation failed"
   # Refuse to overwrite a running jar or reset a database served by a live stack.
   assert_stack_stopped "$name"
 
@@ -443,15 +448,10 @@ for name in ("backend.log", "frontend.log", "bootjar.log", "import.log", "warm.l
     os.symlink(os.path.join("logs", name), old)
 PYLOG
 
-  local runtime_source_args=("$name" "$REPO_ROOT" "$WORKSPACE")
-  if [ "${#extra_plugin_roots[@]}" -gt 0 ]; then
-    runtime_source_args+=("${extra_plugin_roots[@]}")
-  fi
-  if [ "${#product_migration_roots[@]}" -gt 0 ]; then
-    runtime_source_args+=("${product_migration_roots[@]}")
-  fi
-  golden_runtime_bind_sources "${runtime_source_args[@]}" \
-    || die "immutable runtime sources could not be bound"
+  local binding_args=(runtime lifecycle bind "$name" --handler "$SCRIPT_DIR/oss-golden-lifecycle.sh")
+  local source_spec
+  for source_spec in "${source_specs[@]}"; do binding_args+=(--source "$source_spec"); done
+  "$DEV" "${binding_args[@]}" >/dev/null || die "immutable runtime sources could not be bound"
 
   local server_port vite_port bff_port pg_db redis_db pg_host pg_port pg_user pg_pass
   server_port="$(runtime_env "$name" SERVER_PORT)"
@@ -559,7 +559,7 @@ PYLOG
   local jar; jar="$(ls "$REPO_ROOT"/platform/build/libs/*-boot.jar 2>/dev/null | head -1)"
   [ -n "$jar" ] || die "boot jar not found after build"
   local run_jar runtime_token
-  run_jar="$(golden_runtime_stage_backend "$name" "$jar")" \
+  run_jar="$(golden_runtime_stage_backend "$name" "$jar" core)" \
     || die "backend artifact registration failed"
   runtime_token="$("$DEV" runtime process token "$name")" \
     || die "runtime ownership token could not be obtained"
@@ -596,7 +596,7 @@ XML
   log "5/9 start backend (java -jar) on $server_port"
   mkdir -p "$sd/pf4j-plugins"
   spawn_detached "$sd/backend.pid" "$REPO_ROOT/platform" "$sd/logs/backend-console.log" \
-    env AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" LOGGING_CONFIG="file:$sd/backend-logback.xml" LOGGING_FILE_NAME="$sd/logs/backend.log" SERVER_PORT="$server_port" SERVER_ADDRESS=127.0.0.1 \
+    env MANAGEMENT_HEALTH_DB_ENABLED=false AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" LOGGING_CONFIG="file:$sd/backend-logback.xml" LOGGING_FILE_NAME="$sd/logs/backend.log" SERVER_PORT="$server_port" SERVER_ADDRESS=127.0.0.1 \
       SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:5432/${pg_db}?charSet=UTF8" \
       SPRING_DATASOURCE_USERNAME=auraboot SPRING_DATASOURCE_PASSWORD=auraboot \
       SPRING_DATA_REDIS_HOST=127.0.0.1 SPRING_DATA_REDIS_PORT=6379 SPRING_DATA_REDIS_DATABASE="$redis_db" \
@@ -666,7 +666,7 @@ XML
 
   if [ "$frontend" -eq 1 ]; then
     log "7/9 frontend: reuse or provision node_modules + start Vite+BFF"
-    if ! web_admin_node_modules_usable "$REPO_ROOT/web-admin/node_modules"; then
+    if ! web_admin_node_modules_matches_checkout "$REPO_ROOT/web-admin/node_modules" "$REPO_ROOT"; then
       if [ -L "$REPO_ROOT/web-admin/node_modules" ]; then
         rm -f "$REPO_ROOT/web-admin/node_modules"
       elif [ -e "$REPO_ROOT/web-admin/node_modules" ]; then
@@ -692,7 +692,7 @@ XML
             pnpm --filter auraboot-app install --frozen-lockfile --reporter=append-only \
             >"$sd/logs/frontend-dependencies.log" 2>&1 \
           || die "web-admin dependency install failed — see $sd/logs/frontend-dependencies.log"
-        web_admin_node_modules_usable "$REPO_ROOT/web-admin/node_modules" \
+        web_admin_node_modules_matches_checkout "$REPO_ROOT/web-admin/node_modules" "$REPO_ROOT" \
           || die "web-admin dependency install completed without usable runtime packages"
       fi
     fi
@@ -887,6 +887,8 @@ cmd_warm() {
 cmd_verify_artifacts() {
   node "$SCRIPT_DIR/lib/golden-product-identity.mjs" "$1" "$REPO_ROOT" "$DEV" \
     || die "product artifact verification failed"
+  node "$SCRIPT_DIR/lib/oss-stack-identity.mjs" "$WORKSPACE" "$REPO_ROOT" "$1" "$(state_dir "$1")" \
+    || die "PF4J/source artifact verification failed"
   node "$SCRIPT_DIR/lib/golden-resume-state.mjs" record "$1" "$REPO_ROOT" "$DEV" \
     || die "retained launch recipe registration failed"
 }
@@ -985,18 +987,18 @@ cmd_resume_retained() {
   redis_db="$(runtime_env "$name" REDIS_DATABASE)"
   runtime_token="$("$DEV" runtime process token "$name")" || die "runtime ownership token unavailable"
   spawn_detached "$sd/backend.pid" "$REPO_ROOT/platform" "$sd/backend.log" \
-    env "${logging_args[@]}" AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" SERVER_PORT="$server_port" SERVER_ADDRESS=127.0.0.1 \
+    env "${logging_args[@]}" MANAGEMENT_HEALTH_DB_ENABLED=false AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" SERVER_PORT="$server_port" SERVER_ADDRESS=127.0.0.1 \
       SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:5432/${pg_db}?charSet=UTF8" \
       SPRING_DATASOURCE_USERNAME=auraboot SPRING_DATASOURCE_PASSWORD=auraboot \
       SPRING_DATA_REDIS_HOST=127.0.0.1 SPRING_DATA_REDIS_PORT=6379 SPRING_DATA_REDIS_DATABASE="$redis_db" \
       SPRING_KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:9092 \
       AURA_PLUGINS_DIR="$sd/pf4j-plugins" \
-      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_META_MAPPER=DEBUG \
-      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_PERMISSION_MAPPER=DEBUG \
-      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_TENANT_MAPPER=DEBUG \
-      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_VIEW_MAPPER=DEBUG \
-      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_USER_MAPPER=DEBUG \
-      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_OBSERVABILITY_MAPPER=DEBUG \
+      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_META_MAPPER="${AURA_GOLDEN_MAPPER_LOG_LEVEL:-INFO}" \
+      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_PERMISSION_MAPPER="${AURA_GOLDEN_MAPPER_LOG_LEVEL:-INFO}" \
+      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_TENANT_MAPPER="${AURA_GOLDEN_MAPPER_LOG_LEVEL:-INFO}" \
+      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_VIEW_MAPPER="${AURA_GOLDEN_MAPPER_LOG_LEVEL:-INFO}" \
+      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_USER_MAPPER="${AURA_GOLDEN_MAPPER_LOG_LEVEL:-INFO}" \
+      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_OBSERVABILITY_MAPPER="${AURA_GOLDEN_MAPPER_LOG_LEVEL:-INFO}" \
       AURA_BUILTIN_PLUGINS_DIR="$REPO_ROOT/plugins" \
       AGENT_LLM_STUB_MODE="$llm_stub_mode" \
       java -jar "$run_jar"

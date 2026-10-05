@@ -1,0 +1,178 @@
+{
+  "tenant.select.create.title": {
+    "zh-CN": "创建新租户",
+    "en": "Create an organization"
+  },
+  "tenant.select.create.desc": {
+    "zh-CN": "创建一个新的组织空间，你将成为该组织的管理员。",
+    "en": "Create an organization workspace and become its administrator."
+  },
+  "tenant.select.create.cta": {
+    "zh-CN": "开始创建",
+    "en": "Get started"
+  },
+  "tenant.select.join.title": {
+    "zh-CN": "加入现有租户",
+    "en": "Join an organization"
+  },
+  "tenant.select.join.desc": {
+    "zh-CN": "使用管理员提供的邀请码加入已有组织。",
+    "en": "Join an organization using the invitation code from its administrator."
+  },
+  "tenant.select.join.cta": {
+    "zh-CN": "立即加入",
+    "en": "Join now"
+  },
+  "tenant.select.pending.title": {
+    "zh-CN": "申请已提交",
+    "en": "Request submitted"
+  },
+  "tenant.select.pending.backToLogin": {
+    "zh-CN": "返回登录",
+    "en": "Back to sign in"
+  },
+  "tenant.select.existing.title": {
+    "zh-CN": "选择工作空间",
+    "en": "Choose a workspace"
+  },
+  "tenant.select.choice.title": {
+    "zh-CN": "选择你的开始方式",
+    "en": "Choose how to get started"
+  },
+  "tenant.select.existing.lead": {
+    "zh-CN": "选择已有空间继续，或使用其他方式开始。",
+    "en": "Choose an existing workspace or get started another way."
+  },
+  "tenant.select.existing.only": {
+    "zh-CN": "请选择一个已有空间继续。",
+    "en": "Choose an existing workspace to continue."
+  },
+  "tenant.select.choice.lead": {
+    "zh-CN": "创建新组织，或加入已有组织。",
+    "en": "Create or join an organization."
+  },
+  "tenant.select.loadError.title": {
+    "zh-CN": "暂时无法加载入校信息",
+    "en": "Unable to load onboarding information"
+  },
+  "tenant.select.loadError.desc": {
+    "zh-CN": "服务连接暂时不可用，请重试。你的账号和已有学校不会受到影响。",
+    "en": "The service is temporarily unavailable. Try again. Your account and existing workspaces are unaffected."
+  },
+  "tenant.select.retrying": {
+    "zh-CN": "正在重试…",
+    "en": "Retrying…"
+  },
+  "tenant.select.retry": {
+    "zh-CN": "重新加载",
+    "en": "Reload"
+  },
+  "tenant.select.space.platform": {
+    "zh-CN": "平台管理",
+    "en": "Platform administration"
+  },
+  "tenant.select.space.business": {
+    "zh-CN": "业务空间",
+    "en": "Business workspace"
+  },
+  "tenant.select.otherWays": {
+    "zh-CN": "其他开始方式",
+    "en": "Other ways to get started"
+  },
+  "tenant.select.managed.title": {
+    "zh-CN": "当前环境由管理员统一开通",
+    "en": "An administrator manages access to this environment"
+  },
+  "tenant.select.managed.desc": {
+    "zh-CN": "你的账号还没有可用空间，请联系平台管理员确认开通状态。",
+    "en": "You do not have an available workspace yet. Ask the platform administrator to confirm your access."
+  },
+  "tenant.select.getHelp": {
+    "zh-CN": "获取帮助",
+    "en": "Get help"
+  },
+  "tenant.select.logout": {
+    "zh-CN": "退出当前账号",
+    "en": "Sign out"
+  },
+  "tenant.select.back": {
+    "zh-CN": "返回选择",
+    "en": "Back to selection"
+  },
+  "tenant.select.create.submitting": {
+    "zh-CN": "正在创建…",
+    "en": "Creating…"
+  },
+  "tenant.select.mini.codeHint": {
+    "zh-CN": "学校教师码只在微信小程序内填写，本页面不会收集。入校后在小程序绑定 PC 已建班级；新班级请在 PC 端创建。",
+    "en": "Enter the teacher code only in the WeChat mini program. This page does not collect it. After joining, link classes created on the PC; create new classes on the PC."
+  },
+  "tenant.select.mini.open": {
+    "zh-CN": "打开微信小程序",
+    "en": "Open the WeChat mini program"
+  },
+  "tenant.select.join.inviteCodeLabel": {
+    "zh-CN": "邀请码",
+    "en": "Invitation code"
+  },
+  "tenant.select.join.inviteCodePlaceholder": {
+    "zh-CN": "输入邀请码",
+    "en": "Enter an invitation code"
+  },
+  "tenant.select.join.inviteCodeHint": {
+    "zh-CN": "请输入组织管理员提供的邀请码。",
+    "en": "Enter the invitation code provided by your organization administrator."
+  },
+  "tenant.select.join.submitting": {
+    "zh-CN": "正在提交…",
+    "en": "Submitting…"
+  },
+  "tenant.select.existing.entityTitle": {
+    "zh-CN": "选择{entityLabel}",
+    "en": "Choose a {entityLabel}"
+  },
+  "tenant.select.create.creatorAdmin": {
+    "zh-CN": "创建成功后，你将自动成为{entityLabel}管理员。",
+    "en": "After creation, you will become an administrator of the {entityLabel}."
+  },
+  "tenant.select.mini.search": {
+    "zh-CN": "搜索“{productName}”并完成微信登录",
+    "en": "Search for “{productName}” and sign in with WeChat"
+  },
+  "tenant.select.mini.qrAlt": {
+    "zh-CN": "{productName}微信小程序码",
+    "en": "{productName} WeChat mini program QR code"
+  },
+  "tenant.select.entityLabel": {
+    "zh-CN": "租户",
+    "en": "organization"
+  },
+  "tenant.select.create.nameRequired": {
+    "zh-CN": "{entityLabel}名称不能为空",
+    "en": "Enter a name for the {entityLabel}."
+  },
+  "tenant.select.policy.unavailable": {
+    "zh-CN": "服务暂时无法确认当前开通策略，请稍后重试。",
+    "en": "The service cannot confirm the current access policy. Try again later."
+  },
+  "tenant.select.policy.managed": {
+    "zh-CN": "当前环境未开放自助创建或加入组织，请联系平台管理员。",
+    "en": "This environment does not allow self-service organization creation or joining. Contact the platform administrator."
+  },
+  "tenant.select.error.authRequired": {
+    "zh-CN": "请重新登录后继续。",
+    "en": "Sign in again to continue."
+  },
+  "tenant.select.error.requestFailed": {
+    "zh-CN": "请求失败（HTTP {status}），请稍后重试。",
+    "en": "The request failed (HTTP {status}). Try again later."
+  },
+  "tenant.select.error.operationFailed": {
+    "zh-CN": "操作未完成，请稍后重试。",
+    "en": "The operation could not be completed. Try again later."
+  },
+  "tenant.select.error.networkFailed": {
+    "zh-CN": "网络请求失败，请检查连接后重试。",
+    "en": "The network request failed. Check your connection and try again."
+  }
+}

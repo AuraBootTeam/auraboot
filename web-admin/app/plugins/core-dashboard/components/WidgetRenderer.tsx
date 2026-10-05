@@ -37,7 +37,9 @@ function isLocalizedTextRecord(value: unknown): value is LocalizedText {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const entries = Object.entries(value as Record<string, unknown>);
   if (entries.length === 0) return false;
-  const hasLocaleKey = entries.some(([key]) => KNOWN_LOCALE_KEYS.has(key) || REGION_LOCALE_PATTERN.test(key));
+  const hasLocaleKey = entries.some(
+    ([key]) => KNOWN_LOCALE_KEYS.has(key) || REGION_LOCALE_PATTERN.test(key),
+  );
   return hasLocaleKey && entries.every(([, v]) => v === undefined || typeof v === 'string');
 }
 
@@ -68,6 +70,8 @@ function resolveI18nDeep<T>(value: T, locale: string, t: TranslateFunction): T {
 }
 
 interface WidgetRenderProps {
+  /** Let metric content determine its height in a narrow read-only viewer. */
+  autoHeight?: boolean;
   /** The widget to render */
   widget: Widget;
   /** Linkage filters to pass to the widget (already resolved for the widget's group) */
@@ -96,6 +100,7 @@ function RenderedWidget({
   linkageFilters,
   onLinkageEmit,
   onDrillDown,
+  autoHeight = false,
 }: WidgetRenderProps): React.ReactElement {
   const { locale, t } = useI18n();
   const chartType = normalizeChartType(widget.type);
@@ -106,7 +111,7 @@ function RenderedWidget({
       <div
         data-widget-id={widget.id}
         data-widget-type={widget.type}
-        className="h-full flex items-center justify-center text-sm text-gray-400"
+        className="flex h-full items-center justify-center text-sm text-gray-400"
       >
         Unknown widget: {widget.type}
       </div>
@@ -129,11 +134,15 @@ function RenderedWidget({
     linkageFilters,
     onLinkageEmit,
     onDrillDown,
-    className: 'h-full',
+    className: autoHeight ? 'h-auto' : 'h-full',
   };
 
   return (
-    <div data-widget-id={widget.id} data-widget-type={widget.type} className="h-full">
+    <div
+      data-widget-id={widget.id}
+      data-widget-type={widget.type}
+      className={autoHeight ? 'h-auto' : 'h-full'}
+    >
       <Suspense
         fallback={
           <div role="status" aria-live="polite" data-testid="dashboard-widget-loading" className="flex h-full items-center justify-center text-sm text-gray-400">

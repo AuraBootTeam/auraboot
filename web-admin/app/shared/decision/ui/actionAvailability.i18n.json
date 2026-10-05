@@ -1,0 +1,34 @@
+{
+  "unconfigured": {
+    "zh-CN": "未配置",
+    "en": "Not configured"
+  },
+  "unavailable": {
+    "zh-CN": "不可用",
+    "en": "Unavailable"
+  },
+  "available": {
+    "zh-CN": "可用",
+    "en": "Available"
+  },
+  "externalProvider": {
+    "zh-CN": "外部 provider",
+    "en": "External provider"
+  },
+  "dependency": {
+    "zh-CN": "依赖：{provider} · {status}",
+    "en": "Dependency: {provider} · {status}"
+  },
+  "providerReason": {
+    "zh-CN": "{label}不可用: {reason}",
+    "en": "{label} unavailable: {reason}"
+  },
+  "providerUnavailable": {
+    "zh-CN": "{label}不可用",
+    "en": "{label} unavailable"
+  },
+  "handlerUnavailable": {
+    "zh-CN": "动作处理器当前不可用",
+    "en": "Action handler is currently unavailable"
+  }
+}

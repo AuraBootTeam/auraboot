@@ -9,6 +9,11 @@ import { test, expect, type Page } from '@playwright/test';
 import { uniqueId } from '../helpers';
 
 import { acquireSavedViewLock, releaseSavedViewLock } from './_saved-view-lock';
+import {
+  createPersonalView,
+  deleteViewTolerant,
+  sweepStaleSavedViews,
+} from './_saved-view-helpers';
 
 // Serialize e2et_order saved-view specs — they share the model's per-user view
 // state (active view / created views) under the shared admin storageState.
@@ -18,6 +23,10 @@ test.afterAll(() => { releaseSavedViewLock('saved-view-system-fields'); });
 const MODEL_CODE = 'e2et_order';
 const SAVED_VIEW_PAGE_KEY = 'e2et_order_list';
 
+// Views created by this suite — deleted in afterAll so repeated runs on a
+// long-lived database never accumulate past the backend's personal-view cap.
+const createdViewPids: string[] = [];
+
 // API helpers
 async function createViewViaApi(
   page: Page,
@@ -25,19 +34,14 @@ async function createViewViaApi(
   name: string,
   columns?: any[],
 ): Promise<string> {
-  const resp = await page.request.post('/api/views', {
-    data: {
-      name,
-      modelCode,
-      pageKey: SAVED_VIEW_PAGE_KEY,
-      viewType: 'table',
-      scope: 'personal',
-      viewConfig: columns ? { columns } : {},
-    },
+  const pid = await createPersonalView(page, {
+    name,
+    modelCode,
+    pageKey: SAVED_VIEW_PAGE_KEY,
+    viewConfig: columns ? { columns } : {},
   });
-  if (!resp.ok()) return '';
-  const body = await resp.json();
-  return body.data?.pid ?? body.pid ?? '';
+  createdViewPids.push(pid);
+  return pid;
 }
 
 async function getViewViaApi(page: Page, pid: string): Promise<any> {
@@ -48,30 +52,32 @@ async function getViewViaApi(page: Page, pid: string): Promise<any> {
 }
 
 test.describe('System Fields Visible (GAP-126)', () => {
-  // Create a fresh view with NO system fields configured and set it as default,
-  // so SF-001/SF-002 see the clean/default state regardless of prior test runs
+  // Sweep leftovers from earlier runs FIRST (under the file lock): the backend
+  // caps explicit personal views per user+model+pageKey at 10, and every run
+  // of this suite seeds fresh views.
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
-    const resp = await page.request.post('/api/views', {
-      data: {
-        name: `SF_Clean_${uniqueId()}`,
-        modelCode: MODEL_CODE,
-        pageKey: SAVED_VIEW_PAGE_KEY,
-        viewType: 'table',
-        scope: 'personal',
-        viewConfig: {}, // empty config — system fields not configured → hidden by default
-      },
+    await sweepStaleSavedViews(page, MODEL_CODE, SAVED_VIEW_PAGE_KEY);
+    const pid = await createPersonalView(page, {
+      name: `SF_Clean_${uniqueId()}`,
+      modelCode: MODEL_CODE,
+      pageKey: SAVED_VIEW_PAGE_KEY,
+      viewConfig: {}, // empty config — system fields not configured → hidden by default
     });
-    if (resp.ok()) {
-      const body = await resp.json();
-      const pid = body?.data?.pid ?? '';
-      if (pid) {
-        // Set as default so useSavedViews auto-selects it on page load
-        await page.request.post(`/api/views/${pid}/set-default`, {
-          data: { modelCode: MODEL_CODE, pageKey: SAVED_VIEW_PAGE_KEY },
-        });
-      }
+    createdViewPids.push(pid);
+    // Set as default so useSavedViews auto-selects it on page load
+    await page.request.post(`/api/views/${pid}/set-default`, {
+      data: { modelCode: MODEL_CODE, pageKey: SAVED_VIEW_PAGE_KEY },
+    });
+    await ctx.close();
+  });
+
+  test.afterAll(async ({ browser }) => {
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
+    const page = await ctx.newPage();
+    for (const pid of createdViewPids.splice(0)) {
+      await deleteViewTolerant(page, pid).catch(() => {});
     }
     await ctx.close();
   });
@@ -82,21 +88,20 @@ test.describe('System Fields Visible (GAP-126)', () => {
     await expect(colBtn).toBeVisible({ timeout: 30000 });
     await colBtn.click();
 
-    // Column Settings panel opens as a fixed right panel with "Column Settings" header
-    const panelHeader = page.locator('text=Column Settings');
-    await expect(panelHeader).toBeVisible({ timeout: 5000 });
+    // Panel header (l10n key common.column_settings_title — copy is "Configure fields")
+    await expect(page.locator('#column-settings-title')).toBeVisible({ timeout: 5000 });
 
-    // Check "System Fields" section divider is visible
     const panel = page.getByTestId('column-settings-panel');
-    await expect(panel.getByText(/System Fields|SYSTEM FIELDS|系统字段/i)).toBeVisible({
-      timeout: 3000,
-    });
-
-    // Check system field labels exist in the panel
-    await expect(panel.getByText(/Created At|创建时间/i)).toBeVisible({ timeout: 3000 });
-    await expect(panel.getByText(/Updated At|更新时间/i)).toBeVisible();
-    await expect(panel.getByText(/Created By|创建人/i)).toBeVisible();
-    await expect(panel.getByText(/Updated By|修改人|更新人/i)).toBeVisible();
+    // GAP-126 core: the four system fields appear as panel rows with visibility
+    // toggles. (The "System" badge only renders when the field is not shadowed
+    // by model metadata — e2et_order declares them via model fields, so they
+    // group as business here; assert presence, not badge.)
+    for (const fieldCode of ['created_at', 'updated_at', 'created_by', 'updated_by']) {
+      await expect(panel.getByTestId(`column-settings-row-${fieldCode}`)).toBeVisible({
+        timeout: 3000,
+      });
+      await expect(panel.getByTestId(`column-settings-visible-${fieldCode}`)).toBeVisible();
+    }
   });
 
   test('SF-002: system fields are hidden by default', async ({ page }) => {
@@ -107,15 +112,11 @@ test.describe('System Fields Visible (GAP-126)', () => {
 
     await expect(page.locator('#column-settings-title')).toBeVisible({ timeout: 5000 });
 
-    // System fields should be unchecked (line-through class on label)
-    // The "Created At" label should have line-through styling (indicating hidden)
-    const createdAtLabel = page
-      .getByTestId('column-settings-panel')
-      .locator('span', { hasText: /Created At|创建时间/i })
-      .first();
-    await expect(createdAtLabel).toBeVisible();
-    // line-through class indicates unchecked
-    await expect(createdAtLabel).toHaveClass(/line-through/);
+    // Hidden fields render with an unchecked visibility toggle (checkbox) and a
+    // dimmed label — the panel no longer styles hidden rows with line-through.
+    const createdAtToggle = page.getByTestId('column-settings-visible-created_at');
+    await expect(createdAtToggle).toBeVisible();
+    await expect(createdAtToggle).not.toBeChecked();
   });
 
   test('SF-003: enabling system fields via viewConfig columns', async ({ page }) => {

@@ -23,7 +23,9 @@
 
 | script | refs | updated | purpose |
 |---|--:|---|---|
+| `check-batch4-gates.mjs` | 0 | 2026-10-02 | Large-file and i18n CJK structural ratchets. |
 | `check-agent-eval-boundary.mjs` | 2 | 2026-06-21 | OSS agent/RAG boundary gate. |
+| `check-oss-remediation-t3.mjs` | 1 | 2026-10-05 | Enforce complete T3 family 80% line coverage, nested classes and parent size limits. |
 | `check-batch4-gates.mjs` | 0 | 2026-10-03 | Check the large-file and i18n CJK structural ratchets. |
 | `check-cache-eviction.mjs` | 3 | 2026-07-14 | check-cache-eviction — every @Cacheable cache must have *someone* who evicts it. |
 | `check-capability-codes.mjs` | 0 | 2026-06-21 | Permission v2 capability-code drift gate. |
@@ -55,6 +57,7 @@
 | `check-license-boundary.sh` | 2 | 2026-09-27 | Fail when known copyleft dependency coordinates re-enter default distribution build files. |
 | `check-no-secret-echo.mjs` | 1 | 2026-07-14 | check-no-secret-echo — refuse shell scripts that print a secret to stdout/stderr. |
 | `check-no-secret-echo.sh` | 0 | 2026-07-14 | Wrapper so this gate shows up in `ls scripts/check-*.sh` — the repo's local-gate inventory. |
+| `check-oss-scope-consistency.mjs` | 0 | 2026-10-02 | Verify OSS scope declarations against code anchors and plugin directories. |
 | `check-oss-boundary.sh` | 3 | 2026-06-18 | OSS / Enterprise boundary check. |
 | `check-oss-no-internal-docs.sh` | 1 | 2026-07-02 | Fail if internal-process docs are tracked in the public OSS repo. |
 | `check-oss-scope-consistency.mjs` | 0 | 2026-10-03 | Verify OSS scope modules, plugin directories, and registry disjointness. |
@@ -77,6 +80,14 @@
 | `validate-plugin-i18n.mjs` | 1 | 2026-04-14 | Validates every plugins/<plugin>/config/i18n.json against the plugin i18n contract. |
 | `validate-public-record-id-contracts.mjs` | 2 | 2026-06-24 | Public dynamic-record id contract inventory and regression gate. |
 | `validate-workflows.sh` | 0 | 2026-03-26 | Validate GitHub Actions workflow YAML files. |
+| `gates/fixtures/workspace-control.mjs` | 0 | 2026-10-05 | Hermetic workspace-control fixture for gate tests. |
+| `lib/golden-new-database.sh` | 0 | 2026-10-05 | Create an absent owned golden database without replacement. |
+| `lib/golden-process-stop.mjs` | 0 | 2026-10-05 | Stop only identity-attested owned golden processes. |
+| `lib/golden-product-identity.mjs` | 0 | 2026-10-05 | Bind golden product environment and source identity. |
+| `lib/golden-resume-state.mjs` | 0 | 2026-10-05 | Validate saved golden state before resume. |
+| `lib/golden-runtime-identity.sh` | 0 | 2026-10-05 | Register declared golden source roots in workspace control. |
+| `lib/golden-stack-state.mjs` | 0 | 2026-10-05 | Resolve owned current or legacy golden stack state. |
+| `oss-golden-lifecycle.sh` | 0 | 2026-10-05 | Workspace suspend/resume lifecycle adapter for OSS golden stacks. |
 
 ## generator (5)
 
@@ -94,6 +105,7 @@
 
 | script | refs | updated | purpose |
 |---|--:|---|---|
+| `oss-remediation-t3-run.mjs` | 1 | 2026-10-05 | Clean-commit managed regression with explicit PostgreSQL identity, fresh XML and coverage receipt. |
 | `aurabot-scenario-golden-run.sh` | 0 | 2026-07-23 | aurabot-scenario-golden-run.sh — self-contained scenario golden for the |
 | `backlog-stats.sh` | 0 | 2026-03-26 | Backlog dashboard stats — counts GAP statuses across all backlog files |
 | `billing-it-run.sh` | 0 | 2026-07-31 | Exact-class billing integration-test runner with non-zero XML evidence checks. |
@@ -223,7 +235,7 @@
 | `import-templates.sh` | 2 | 2026-05-11 |  |
 | `install-agent-git-hooks.mjs` | 2 | 2026-06-24 |  |
 | `migrate-dsl-buttons.mjs` | 0 | 2026-03-26 | Migration script: batch-convert legacy button configs to unified action format. |
-| `oss-golden-stack.sh` | 19 | 2026-07-23 | oss-golden-stack.sh — one-click host-first golden stack for OSS auraboot. |
+| `oss-golden-stack.sh` | 19 | 2026-10-04 | Host-first OSS stack. Stable runtime-owned state; `verify-artifacts` verifies registered sources, staged Core/PF4J bytes, actual listeners, database/Redis and BFF upstream before publishing the public product manifest. |
 | `oss-reset-and-init.sh` | 24 | 2026-08-28 | AuraBoot OSS Environment Reset and Initialization Script. Requires `AURA_RESET_ALLOW_TARGETS="<pg_db>,<be_port>"` (target designation gate; `@any` overrides). |
 | `observability-grafana-browser.mjs` | 0 | 2026-09-12 | Browser verification helper for the observability Grafana surface. |
 | `observability-real-stack-ci.sh` | 0 | 2026-09-12 | CI entrypoint for the real-stack observability gate. |
@@ -258,3 +270,5 @@ receiver, requires an invalid-signature mutation to fail, and verifies restorati
 | script | refs | updated | purpose |
 |---|---|---|---|
 | `fixtures/open-platform-consumer/consumer.test.mjs` | 1 | 2026-10-02 | Nine consumer contract cases driven by the distribution gate from a fresh out-of-repo installation. |
+
+T3 acceptance: `node scripts/oss-remediation-t3-run.mjs --executor /absolute/path/to/aura --runtime OWNED_RUNTIME --database-url jdbc:postgresql://127.0.0.1:5432/OWNED_TEST_DB --database-user TEST_USER --out /absolute/fresh/evidence-directory`. The executor supplies owned dependency homes. The database must already be migrated; this runner never resets or migrates it. `TEST_DATABASE_PASSWORD` is inherited without being recorded. Test skips are reported explicitly; a coverage pass proves the fixed family line target, not execution of skipped scenarios. Gate self-tests: `node --test scripts/check-oss-remediation-t3.test.mjs`.
