@@ -76,6 +76,12 @@ class NamedQueryServiceImplTest {
         when(fieldProtection.rewrite(any(), anyString())).thenAnswer(invocation -> invocation.getArgument(1));
         when(fieldProtection.apply(any(), org.mockito.ArgumentMatchers.anyList()))
                 .thenAnswer(invocation -> invocation.getArgument(1));
+        // executeQuery calls prepare(...) and reads the returned plan; without a stub the
+        // mock returns null and every list path NPEs on protections().
+        when(fieldProtection.prepare(any(), org.mockito.ArgumentMatchers.anyList(),
+                anyString(), org.mockito.ArgumentMatchers.anyBoolean()))
+                .thenAnswer(invocation -> new NamedQueryFieldProtection.Plan(
+                        null, java.util.List.of(), java.util.Map.of()));
     }
 
     @AfterEach
