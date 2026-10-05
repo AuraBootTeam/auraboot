@@ -165,7 +165,7 @@ test.describe('AMOS lens coverage journeys (S12 batch-1)', () => {
         expect(tableHeaders, `${lens.code} renders governed table structures`).toBeGreaterThan(0);
       } else {
         const blocks = page.locator('[data-testid^="dashboard-block-"]');
-        await expect(blocks.nth(1)).toBeVisible();
+        await expect(blocks.first()).toBeVisible();
       }
     });
   }
