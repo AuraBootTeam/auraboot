@@ -698,7 +698,14 @@ XML
 
   if [ "$frontend" -eq 1 ]; then
     log "7/9 frontend: reuse or provision node_modules + start Vite+BFF"
-    if ! web_admin_node_modules_usable "$REPO_ROOT/web-admin/node_modules"; then
+    # Readability alone is not executability: .bin shims use $0-relative paths, so a
+    # symlinked view from a checkout with a different workspace-store layout fails at
+    # supervisor startup. Probe the supervisor bins before trusting any view.
+    web_admin_view_executable() {
+      web_admin_node_modules_usable "$REPO_ROOT/web-admin/node_modules" \
+        && web_admin_supervisor_bins_executable "$REPO_ROOT/web-admin/node_modules"
+    }
+    if ! web_admin_view_executable; then
       if [ -L "$REPO_ROOT/web-admin/node_modules" ]; then
         rm -f "$REPO_ROOT/web-admin/node_modules"
       elif [ -e "$REPO_ROOT/web-admin/node_modules" ]; then
@@ -708,7 +715,13 @@ XML
       node_modules_seed="$(web_admin_node_modules_seed || true)"
       if [ -n "$node_modules_seed" ]; then
         ln -sfn "$node_modules_seed" "$REPO_ROOT/web-admin/node_modules"
-      else
+        if ! web_admin_view_executable; then
+          rm -f "$REPO_ROOT/web-admin/node_modules"
+          log "    seeded view cannot execute supervisor bins; installing from lockfile"
+          node_modules_seed=""
+        fi
+      fi
+      if [ -z "$node_modules_seed" ]; then
         log "    no reusable node_modules found; installing from lockfile with the runtime pnpm store"
         local npm_registry="${NPM_CONFIG_REGISTRY:-https://registry.npmmirror.com}"
         local pnpm_version="${AURA_PNPM_VERSION:-9.15.9}"

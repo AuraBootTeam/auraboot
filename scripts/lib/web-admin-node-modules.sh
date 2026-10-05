@@ -95,3 +95,11 @@ try {
 }
 NODE
 }
+
+# .bin shims resolve package targets through $0-relative paths, so a view can pass every
+# readability probe and still be unexecutable once it is symlinked from a checkout with a
+# different workspace-store layout. Probe the bins the stack supervisor (dev:full) needs.
+web_admin_supervisor_bins_executable() {
+  "$1/.bin/concurrently" --version >/dev/null 2>&1
+}
+
