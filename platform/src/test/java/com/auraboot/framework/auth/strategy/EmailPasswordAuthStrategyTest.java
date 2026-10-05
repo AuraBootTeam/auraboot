@@ -2,11 +2,10 @@ package com.auraboot.framework.auth.strategy;
 
 import com.auraboot.framework.auth.dto.AuthStrategyRequest;
 import com.auraboot.framework.auth.dto.AuthenticationResponse;
-import com.auraboot.framework.auth.dto.CustomUserDetails;
 import com.auraboot.framework.auth.service.PasswordManagementService;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.user.dao.entity.User;
-import com.auraboot.framework.user.mapper.UserMapper;
+import com.auraboot.framework.user.service.UserService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -37,7 +36,7 @@ class EmailPasswordAuthStrategyTest {
     private LoginCompletionHelper loginCompletionHelper;
 
     @Mock
-    private UserMapper userMapper;
+    private UserService userService;
 
     @InjectMocks
     private EmailPasswordAuthStrategy strategy;
@@ -69,7 +68,7 @@ class EmailPasswordAuthStrategyTest {
     @Test
     void authenticate_lockedAccount_throwsRootUnCheckedException() {
         User lockedUser = buildUser("admin@auraboot.com");
-        when(userMapper.selectOne(any())).thenReturn(lockedUser);
+        when(userService.findByEmail(anyString())).thenReturn(lockedUser);
         when(passwordManagementService.isAccountLocked(lockedUser)).thenReturn(true);
 
         AuthStrategyRequest request = buildRequest("admin@auraboot.com", "pass");
@@ -86,12 +85,10 @@ class EmailPasswordAuthStrategyTest {
     @Test
     void authenticate_validCredentials_completesLogin() {
         User user = buildUser("user@example.com");
-        when(userMapper.selectOne(any())).thenReturn(user);
+        when(userService.findByEmail(anyString())).thenReturn(user);
         when(passwordManagementService.isAccountLocked(user)).thenReturn(false);
 
-        CustomUserDetails userDetails = mock(CustomUserDetails.class);
         Authentication auth = mock(Authentication.class);
-        when(auth.getPrincipal()).thenReturn(userDetails);
         when(authenticationManager.authenticate(any())).thenReturn(auth);
 
         AuthenticationResponse response = mock(AuthenticationResponse.class);
@@ -111,14 +108,11 @@ class EmailPasswordAuthStrategyTest {
     @Test
     void authenticate_userNameIdentifier_completesLoginWithIdentifierPrincipal() {
         User user = buildUser("user@example.com", "吴书生");
-        when(userMapper.selectOne(any()))
-                .thenReturn(null)  // email lookup
-                .thenReturn(user); // user_name lookup
+        when(userService.findByEmail("吴书生")).thenReturn(null);
+        when(userService.findByUserName("吴书生")).thenReturn(user);
         when(passwordManagementService.isAccountLocked(user)).thenReturn(false);
 
-        CustomUserDetails userDetails = mock(CustomUserDetails.class);
         Authentication auth = mock(Authentication.class);
-        when(auth.getPrincipal()).thenReturn(userDetails);
         when(authenticationManager.authenticate(any())).thenReturn(auth);
 
         AuthenticationResponse response = mock(AuthenticationResponse.class);
@@ -137,17 +131,13 @@ class EmailPasswordAuthStrategyTest {
 
     @Test
     void authenticate_userNotFoundInPreCheck_loadsAfterAuth() {
-        // First two calls are email and user_name pre-check lookups.
-        // Third call reloads the user after Spring Security authenticates.
+        // The canonical lookup is repeated after successful authentication.
         User user = buildUser("newlogin@example.com");
-        when(userMapper.selectOne(any()))
-                .thenReturn(null)   // pre-check
-                .thenReturn(null)   // pre-check
-                .thenReturn(user);  // reload after auth
+        when(userService.findByEmail(anyString()))
+                .thenReturn(null)
+                .thenReturn(user);
 
         Authentication auth = mock(Authentication.class);
-        CustomUserDetails userDetails = mock(CustomUserDetails.class);
-        when(auth.getPrincipal()).thenReturn(userDetails);
         when(authenticationManager.authenticate(any())).thenReturn(auth);
 
         AuthenticationResponse response = mock(AuthenticationResponse.class);
@@ -159,6 +149,53 @@ class EmailPasswordAuthStrategyTest {
         verify(loginCompletionHelper).completeLogin(eq(user), any(), any());
     }
 
+    @Test
+    void authenticate_mixedCaseEmail_usesCanonicalUserLookupForSessionAndFailureReset() {
+        User user = buildUser("user@example.com");
+        when(userService.findByEmail("USER@Example.COM")).thenReturn(user);
+        when(authenticationManager.authenticate(any())).thenReturn(mock(Authentication.class));
+        AuthenticationResponse response = mock(AuthenticationResponse.class);
+        when(loginCompletionHelper.completeLogin(eq(user), any(), any())).thenReturn(response);
+
+        assertThat(strategy.authenticate(buildRequest("USER@Example.COM", "pass"))).isSameAs(response);
+        verify(passwordManagementService).isAccountLocked(user);
+        verify(passwordManagementService).resetLoginFailures(user);
+        verify(loginCompletionHelper).completeLogin(eq(user), any(), any());
+    }
+
+    @Test
+    void authenticate_identifierWhitespace_usesSameTrimmedLookupAsAuthentication() {
+        User user = buildUser("user@example.com", "Teacher");
+        when(userService.findByEmail("Teacher")).thenReturn(null);
+        when(userService.findByUserName("Teacher")).thenReturn(user);
+        when(authenticationManager.authenticate(any())).thenReturn(mock(Authentication.class));
+
+        strategy.authenticate(buildIdentifierRequest("  Teacher  ", "pass"));
+
+        verify(authenticationManager).authenticate(argThat(token -> "Teacher".equals(token.getPrincipal())));
+        verify(loginCompletionHelper).completeLogin(eq(user), any(), any());
+    }
+
+    @Test
+    void authenticate_lookupFailure_propagatesWithoutCreatingSession() {
+        IllegalStateException failure = new IllegalStateException("database lookup failed");
+        when(userService.findByEmail(anyString())).thenThrow(failure);
+
+        assertThatThrownBy(() -> strategy.authenticate(buildRequest("user@example.com", "pass")))
+                .isSameAs(failure);
+        verifyNoInteractions(authenticationManager, loginCompletionHelper);
+    }
+
+    @Test
+    void authenticate_successWithoutResolvedUser_rejectsSessionCreation() {
+        when(authenticationManager.authenticate(any())).thenReturn(mock(Authentication.class));
+
+        assertThatThrownBy(() -> strategy.authenticate(buildRequest("missing@example.com", "pass")))
+                .isInstanceOf(BadCredentialsException.class);
+        verifyNoInteractions(loginCompletionHelper);
+        verify(passwordManagementService, never()).resetLoginFailures(any());
+    }
+
     // =========================================================
     // Bad credentials — records failure
     // =========================================================
@@ -166,7 +203,7 @@ class EmailPasswordAuthStrategyTest {
     @Test
     void authenticate_badCredentials_recordsFailureAndRethrows() {
         User user = buildUser("user@example.com");
-        when(userMapper.selectOne(any())).thenReturn(user);
+        when(userService.findByEmail(anyString())).thenReturn(user);
         when(passwordManagementService.isAccountLocked(user)).thenReturn(false);
         when(authenticationManager.authenticate(any()))
                 .thenThrow(new BadCredentialsException("bad password"));
@@ -182,7 +219,7 @@ class EmailPasswordAuthStrategyTest {
 
     @Test
     void authenticate_badCredentials_userNotFound_noFailureRecorded() {
-        when(userMapper.selectOne(any())).thenReturn(null);
+        when(userService.findByEmail(anyString())).thenReturn(null);
         when(authenticationManager.authenticate(any()))
                 .thenThrow(new BadCredentialsException("bad"));
 

@@ -280,6 +280,8 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
         // it the WHERE clause matches nothing and the chart shows an empty state. Mirrors
         // NamedQueryServiceImpl (the datasource/list executor).
         params.put("currentUserId", currentUserId != null ? currentUserId.toString() : null);
+        // Public user identity is server-owned, matching the datasource/list executor.
+        params.put("currentUserPid", MetaContext.getCurrentUserPid());
 
         log.debug("Executing named query aggregate: code={}, SQL={}, params={}", queryCode, sql, params);
 
