@@ -14,9 +14,10 @@ class I18nResourceTenantOverlayTest {
  @AfterEach void clearContext() { MetaContext.clear(); }
  private I18nResource entry(String key, String value) { return I18nResource.builder().i18nKey(key).value(value).build(); }
  private void systemResource() {
-  // Emulate tenant-line filtering: system rows disappear under tenant=-1/42 unless scoped.
-  when(mapper.selectAllByLang(0L, "zh-CN")).thenAnswer(invocation ->
-   MetaContext.isTenantFilterBypassed() ? List.of(entry("action.more", "更多")) : List.of());
+  // The public/system pack reads through the fixed-scope mapper statement: its SQL
+  // predicate pins tenant_id=0 and the tenant line interceptor is ignored for that
+  // statement only, so the service layer never toggles a MetaContext bypass.
+  when(mapper.selectSystemByLang("zh-CN")).thenReturn(List.of(entry("action.more", "更多")));
  }
  @Test void authenticatedPackIncludesSystemWithoutBroadTenantBypass() {
   MetaContext.setContext(42L, 7L, "user", "fixture"); systemResource();
@@ -27,13 +28,13 @@ class I18nResourceTenantOverlayTest {
   assertThat(MetaContext.isTenantFilterBypassed()).isFalse();
   assertThat(MetaContext.getCurrentTenantId()).isEqualTo(42L);
   verify(mapper).selectAllByLang(42L, "zh-CN");
-  verify(mapper).selectAllByLang(0L, "zh-CN");
+  verify(mapper).selectSystemByLang("zh-CN");
   verifyNoMoreInteractions(mapper);
  }
  @Test void publicPackLoadsDeclaredPublicResourcesWithoutTenantContext() {
   systemResource();
   assertThat(service.getResourceMapByLang("zh-CN")).containsEntry("action.more", "更多").doesNotContainKey("plugin.label");
-  verify(mapper).selectAllByLang(0L, "zh-CN");
+  verify(mapper).selectSystemByLang("zh-CN");
   verifyNoMoreInteractions(mapper);
   assertThat(MetaContext.isTenantFilterBypassed()).isFalse();
  }
@@ -45,7 +46,7 @@ class I18nResourceTenantOverlayTest {
  @Test void failedSystemReadRestoresTenantFilterScope() {
   MetaContext.setContext(42L, 7L, "user", "fixture");
   when(mapper.selectAllByLang(42L, "zh-CN")).thenReturn(List.of());
-  when(mapper.selectAllByLang(0L, "zh-CN")).thenThrow(new IllegalStateException("fixture failure"));
+  when(mapper.selectSystemByLang("zh-CN")).thenThrow(new IllegalStateException("fixture failure"));
   assertThatThrownBy(() -> service.getResourceMapByLang("zh-CN")).isInstanceOf(IllegalStateException.class);
   assertThat(MetaContext.isTenantFilterBypassed()).isFalse();
   assertThat(MetaContext.getCurrentTenantId()).isEqualTo(42L);

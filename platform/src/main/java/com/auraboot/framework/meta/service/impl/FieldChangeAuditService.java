@@ -38,6 +38,7 @@ public class FieldChangeAuditService {
     private final FieldAuditConfigMapper auditConfigMapper;
     private final MetaModelService metaModelService;
     private final ObjectMapper objectMapper;
+    private final com.auraboot.framework.user.mapper.UserMapper userMapper;
 
     /**
      * Cache key: "tenantId:modelCode" -> Map of fieldCode -> FieldAuditConfig.
@@ -412,4 +413,21 @@ public class FieldChangeAuditService {
             boolean requireReason,
             boolean notifyOnChange
     ) {}
+    /**
+     * Actor display names for audit responses; controllers must not touch the
+     * user mapper directly (frozen architecture rule).
+     */
+    public Map<Long, String> findActorDisplayNames(Long tenantId, java.util.Collection<Long> actorIds) {
+        Map<Long, String> actorNames = new java.util.HashMap<>();
+        if (actorIds == null || actorIds.isEmpty()) {
+            return actorNames;
+        }
+        for (Map<String, Object> row : userMapper.findDisplayNamesByIdsInTenant(tenantId, actorIds)) {
+            if (row.get("id") instanceof Number id && row.get("display_name") instanceof String name
+                    && !name.isBlank()) {
+                actorNames.put(id.longValue(), name);
+            }
+        }
+        return actorNames;
+    }
 }

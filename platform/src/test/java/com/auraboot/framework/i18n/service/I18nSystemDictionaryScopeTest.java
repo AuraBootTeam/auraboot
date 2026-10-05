@@ -26,28 +26,25 @@ class I18nSystemDictionaryScopeTest {
             assertThat(MetaContext.isTenantFilterBypassed()).isFalse();
             return List.of(resource("action.back", "Tenant back"));
         });
-        when(mapper.selectAllByLang(0L, "en-US")).thenAnswer(call -> {
-            assertThat(MetaContext.isTenantFilterBypassed()).isTrue();
-            return List.of(resource("action.back", "Back"), resource("ai.fill.banner_title", "Fill form from text"));
-        });
+        // System rows come from the fixed-scope statement: SQL pins tenant_id=0 and the
+        // interceptor ignore is scoped to that statement, never a context-wide bypass.
+        when(mapper.selectSystemByLang("en-US"))
+            .thenReturn(List.of(resource("action.back", "Back"), resource("ai.fill.banner_title", "Fill form from text")));
         assertThat(service.getResourceMapByLang("en-US"))
             .containsEntry("action.back", "Tenant back")
             .containsEntry("ai.fill.banner_title", "Fill form from text");
         assertThat(MetaContext.getCurrentTenantId()).isEqualTo(42L);
         assertThat(MetaContext.isTenantFilterBypassed()).isFalse();
         verify(mapper).selectAllByLang(42L, "en-US");
-        verify(mapper).selectAllByLang(0L, "en-US");
+        verify(mapper).selectSystemByLang("en-US");
         verifyNoMoreInteractions(mapper);
     }
 
     @Test
     void anonymousDictionaryReadsOnlyTheSystemScope() {
-        when(mapper.selectAllByLang(0L, "en-US")).thenAnswer(call -> {
-            assertThat(MetaContext.isTenantFilterBypassed()).isTrue();
-            return List.of(resource("action.back", "Back"));
-        });
+        when(mapper.selectSystemByLang("en-US")).thenReturn(List.of(resource("action.back", "Back")));
         assertThat(service.getResourceMapByLang("en-US")).containsOnlyKeys("action.back");
-        verify(mapper).selectAllByLang(0L, "en-US");
+        verify(mapper).selectSystemByLang("en-US");
         verifyNoMoreInteractions(mapper);
         assertThat(MetaContext.isTenantFilterBypassed()).isFalse();
     }
@@ -56,10 +53,7 @@ class I18nSystemDictionaryScopeTest {
     void failingSystemReadRestoresTheCallerScope() {
         MetaContext.setSystemTenantContext(42L);
         when(mapper.selectAllByLang(42L, "en-US")).thenReturn(List.of());
-        when(mapper.selectAllByLang(0L, "en-US")).thenAnswer(call -> {
-            assertThat(MetaContext.isTenantFilterBypassed()).isTrue();
-            throw new IllegalStateException("dictionary unavailable");
-        });
+        when(mapper.selectSystemByLang("en-US")).thenThrow(new IllegalStateException("dictionary unavailable"));
         assertThatThrownBy(() -> service.getResourceMapByLang("en-US"))
             .isInstanceOf(IllegalStateException.class).hasMessage("dictionary unavailable");
         assertThat(MetaContext.getCurrentTenantId()).isEqualTo(42L);
