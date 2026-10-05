@@ -4904,9 +4904,20 @@ function ListPageContentInner(props: PageContentProps) {
             title={
               schema.title
                 ? getLocalizedText(schema.title, locale, t)
-                : schema.name && schema.name.trim()
-                  ? getLocalizedText(schema.name, locale, t)
-                  : tableName
+                : (() => {
+                    // Import writes page titles into the tenant i18n bundle as
+                    // page.<pageKey>.title (en + zh-CN). Prefer that key so the
+                    // title follows the UI locale, then fall back to the stored
+                    // (zh) name and finally the table name.
+                    const pageKey = schema.pageKey || tableName;
+                    const keyedTitle = t(`page.${pageKey}.title`);
+                    if (keyedTitle && keyedTitle !== `page.${pageKey}.title`) {
+                      return keyedTitle;
+                    }
+                    return schema.name && schema.name.trim()
+                      ? getLocalizedText(schema.name, locale, t)
+                      : tableName;
+                  })()
             }
             modelCode={modelCode}
             savedViews={savedViews}
