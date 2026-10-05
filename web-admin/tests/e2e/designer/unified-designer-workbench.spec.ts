@@ -628,7 +628,10 @@ test.describe.serial('Unified Designer Workbench V3', () => {
         sortOrder: 13,
       },
       {
-        fieldCode: 'from',
+        // fieldCode 'from' is a reserved word — the SecureSqlRewriter's JSql
+        // projection parse cannot handle `AS from` (duplicate fields rejected),
+        // so use a non-reserved alias.
+        fieldCode: 'historyFrom',
         columnExpr: "'draft'",
         dataType: 'string',
         displayName: 'History from',
