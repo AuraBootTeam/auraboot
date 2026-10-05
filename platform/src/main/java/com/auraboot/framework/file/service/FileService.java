@@ -55,6 +55,9 @@ public interface FileService {
      * 建立文件关联关系
      */
     boolean createFileRelation(FileRelationRequestDTO request, Long userId);
+
+    /** Add owned files to a business field while preserving its existing relations. */
+    boolean appendFileRelation(FileRelationRequestDTO request, Long userId);
     
     /**
      * 获取实体关联的文件列表

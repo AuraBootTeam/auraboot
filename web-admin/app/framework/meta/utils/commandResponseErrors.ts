@@ -19,6 +19,7 @@ export function resolveCommandErrorMessage(
   commandCode: string,
   translate?: (key: string, params?: Record<string, string>) => string,
   locale?: string,
+  fallbackMessage?: string,
 ): string {
   const body = (result || {}) as Record<string, any>;
   const stableI18nKey =
@@ -69,7 +70,7 @@ export function resolveCommandErrorMessage(
       body.data?.message,
       body.message,
       body.desc,
-    ) || `Command ${commandCode} failed`;
+    ) || fallbackMessage || `Command ${commandCode} failed`;
 
   if (/Record not found: .* in model:/i.test(resolved)) {
     return locale?.toLowerCase().startsWith('zh')

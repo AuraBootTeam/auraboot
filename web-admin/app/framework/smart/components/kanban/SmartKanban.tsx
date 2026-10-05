@@ -22,6 +22,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { Check, X } from 'lucide-react';
 import { useKanbanData } from '~/framework/smart/hooks/useKanbanData';
 import { useDictWithExtras } from '~/framework/smart/hooks/useDictWithExtras';
+import { useDictCache } from '~/framework/meta/rendering/pages/hooks/useDictCache';
 import { KanbanCardItem } from './KanbanCardItem';
 import type { SmartKanbanProps, KanbanCard, KanbanColumn } from '~/framework/smart/types/kanban';
 import { cn } from '~/utils/cn';
@@ -89,6 +90,18 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
 
   // Resolve per-stage color / terminal from dict extension (no-op when dictCode absent).
   const { items: dictItems } = useDictWithExtras(groupByDictCode);
+  const cardDictCodes = useMemo(() => [...new Set((dataSource.cardFields ?? [])
+    .map((field) => field.dictCode).filter((code): code is string => Boolean(code)))], [dataSource.cardFields]);
+  const { getDictItems } = useDictCache({ dictCodes: cardDictCodes });
+  const displayDataSource = useMemo(() => ({
+    ...dataSource,
+    cardFields: dataSource.cardFields?.map((field) => field.dictCode ? {
+      ...field,
+      valueLabels: Object.fromEntries(getDictItems(field.dictCode).map((item) => [String(item.value), getLocalizedText(item.label, locale, t)])),
+      unrecognizedLabel: fallbackText('common.unknown', '未识别', 'Unknown'),
+    } : field),
+  }), [dataSource, getDictItems, locale, t, fallbackText]);
+
 
   // Fetch Kanban data. Pass dict items so the hook seeds the full set of
   // columns in dict order, even for stages with zero cards (full pipeline
@@ -325,7 +338,7 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
             cardIds={cardIds}
             cards={column.cards}
             draggable={draggable}
-            dataSource={dataSource}
+            dataSource={displayDataSource}
             onCardClick={onCardClick}
             terminal={column.terminal}
             emptyLabel={fallbackText('kanban.dropHere', '拖放到这里', 'Drop here')}
@@ -333,7 +346,7 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
         </div>
       );
     },
-    [dataSource, draggable, fallbackText, locale, onCardClick, showAggregations, showCount, t],
+    [displayDataSource, draggable, fallbackText, locale, onCardClick, showAggregations, showCount, t],
   );
 
   // All column IDs for droppable targets
@@ -424,7 +437,7 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
                   card={activeCard}
                   titleField={dataSource.titleField}
                   descriptionField={dataSource.descriptionField}
-                  cardFields={dataSource.cardFields}
+                  cardFields={displayDataSource.cardFields}
                   draggable={false}
                   terminal={
                     enrichedColumns.find((col) => col.cards.some((c) => c.id === activeCard.id))

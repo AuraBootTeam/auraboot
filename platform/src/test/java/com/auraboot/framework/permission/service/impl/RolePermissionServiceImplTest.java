@@ -265,37 +265,82 @@ class RolePermissionServiceImplTest {
         when(rolePermissionMapper.deleteByRoleId(7L, 100L)).thenReturn(2);
         Permission p = new Permission();
         p.setId(50L);
+        p.setPid("pid-50");
         when(permissionMapper.findByPids(List.of("pid-50"))).thenReturn(List.of(p));
 
-        boolean ok = service.syncRolePermissionsByPids(7L, List.of("pid-50"), "grant");
-
-        assertThat(ok).isTrue();
-        verify(rolePermissionMapper).batchInsert(anyList());
+        assertThat(service.syncRolePermissionsByPids(7L, List.of("pid-50"), "grant")).isTrue();
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(permissionMapper, rolePermissionMapper);
+        order.verify(permissionMapper).findByPids(List.of("pid-50"));
+        order.verify(rolePermissionMapper).deleteByRoleId(7L, 100L);
+        order.verify(rolePermissionMapper).batchInsert(anyList());
     }
 
     @Test
-    void syncRolePermissionsByPidsReturnsTrueWhenNoPermissionsFound() {
-        when(rolePermissionMapper.deleteByRoleId(7L, 100L)).thenReturn(0);
-        when(permissionMapper.findByPids(anyList())).thenReturn(List.of());
-
-        assertThat(service.syncRolePermissionsByPids(7L, List.of("missing"), "grant")).isTrue();
-        verify(rolePermissionMapper, never()).batchInsert(anyList());
+    void syncRejectsMissingPermissionBeforeDeletingExistingGrants() {
+        when(permissionMapper.findByPids(List.of("missing"))).thenReturn(List.of());
+        assertThatThrownBy(() -> service.syncRolePermissionsByPids(7L, List.of("missing"), "grant"))
+                .isInstanceOf(BusinessException.class);
+        org.mockito.Mockito.verifyNoInteractions(rolePermissionMapper, eventPublisher);
     }
 
     @Test
-    void removePermissionsFromRoleByPidsHandlesEmptyMatch() {
-        when(permissionMapper.findByPids(anyList())).thenReturn(List.of());
+    void syncRejectsPartiallyResolvedPermissionListBeforeDeletingExistingGrants() {
+        Permission p = new Permission();
+        p.setId(50L);
+        p.setPid("pid-50");
+        when(permissionMapper.findByPids(List.of("pid-50", "missing"))).thenReturn(List.of(p));
+        assertThatThrownBy(() -> service.syncRolePermissionsByPids(7L, List.of("pid-50", "missing"), "grant"))
+                .isInstanceOf(BusinessException.class);
+        org.mockito.Mockito.verifyNoInteractions(rolePermissionMapper, eventPublisher);
+    }
 
-        assertThat(service.removePermissionsFromRoleByPids(7L, List.of("pid-x"))).isTrue();
+    @Test
+    void nullAndBlankPermissionPidsFailBeforeLookupOrMutation() {
+        for (List<String> invalid : java.util.Arrays.asList(null, List.of(""), List.of("  "),
+                java.util.Arrays.asList("pid-50", null))) {
+            assertThatThrownBy(() -> service.syncRolePermissionsByPids(7L, invalid, "grant"))
+                    .isInstanceOf(BusinessException.class);
+            assertThatThrownBy(() -> service.removePermissionsFromRoleByPids(7L, invalid))
+                    .isInstanceOf(BusinessException.class);
+        }
+        org.mockito.Mockito.verifyNoInteractions(permissionMapper, rolePermissionMapper, eventPublisher);
+    }
+
+    @Test
+    void explicitEmptyListClearsGrantsWithoutPermissionLookup() {
+        assertThat(service.syncRolePermissionsByPids(7L, List.of(), "grant")).isTrue();
+        verify(rolePermissionMapper).deleteByRoleId(7L, 100L);
+        org.mockito.Mockito.verifyNoInteractions(permissionMapper);
+    }
+
+    @Test
+    void duplicatePidsResolveAndAssignOnce() {
+        Permission p = new Permission();
+        p.setId(50L);
+        p.setPid("pid-50");
+        when(permissionMapper.findByPids(List.of("pid-50"))).thenReturn(List.of(p));
+        assertThat(service.syncRolePermissionsByPids(7L, List.of("pid-50", "pid-50"), "grant")).isTrue();
+        ArgumentCaptor<List<RolePermission>> captor = ArgumentCaptor.forClass(List.class);
+        verify(rolePermissionMapper).batchInsert(captor.capture());
+        assertThat(captor.getValue()).hasSize(1);
+        assertThat(captor.getValue().get(0).getPermissionId()).isEqualTo(50L);
+    }
+
+    @Test
+    void removePermissionsRejectsUnknownPidWithoutMutation() {
+        when(permissionMapper.findByPids(List.of("pid-x"))).thenReturn(List.of());
+        assertThatThrownBy(() -> service.removePermissionsFromRoleByPids(7L, List.of("pid-x")))
+                .isInstanceOf(BusinessException.class);
+        org.mockito.Mockito.verifyNoInteractions(rolePermissionMapper, eventPublisher);
     }
 
     @Test
     void removePermissionsFromRoleByPidsRemovesEachPermission() {
         Permission p = new Permission();
         p.setId(50L);
-        when(permissionMapper.findByPids(anyList())).thenReturn(List.of(p));
+        p.setPid("pid-50");
+        when(permissionMapper.findByPids(List.of("pid-50"))).thenReturn(List.of(p));
         when(rolePermissionMapper.deleteByRoleAndPermission(7L, 50L, 100L)).thenReturn(1);
-
         assertThat(service.removePermissionsFromRoleByPids(7L, List.of("pid-50"))).isTrue();
         verify(rolePermissionMapper).deleteByRoleAndPermission(7L, 50L, 100L);
     }

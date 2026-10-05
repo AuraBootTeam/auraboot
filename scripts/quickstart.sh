@@ -112,24 +112,13 @@ else
 fi
 
 # ── 3. log in ─────────────────────────────────────────────────────────────────
-# Retried: bootstrap returns as soon as its own transaction commits, and the
-# first login right behind it can arrive before the admin's tenant membership is
-# readable. A bare single attempt failed in CI while the very same request
-# succeeded moments later.
-JWT=""
-for attempt in 1 2 3 4 5; do
-  login_resp="$(curl_ -X POST "${BACKEND_URL}/api/auth/login" -H 'Content-Type: application/json' \
-    -d "{\"email\":\"${ADMIN_EMAIL}\",\"password\":\"${ADMIN_PASSWORD}\"}" || true)"
-  JWT="$(echo "${login_resp}" | json "print(d.get('data',{}).get('jwt') or '')")"
-  [[ -n "${JWT}" ]] && break
-  sleep 3
-done
-if [[ -z "${JWT}" ]]; then
-  say "${RED}✗ could not log in as ${ADMIN_EMAIL} after 5 attempts.${NC}"
-  say "The server said:\n${login_resp}"
-  exit 1
-fi
-say "${GREEN}✓${NC} logged in"
+# Bootstrap administrators may belong to both business and platform spaces.
+# Deployment operations require a selected business-space session, not a bare login JWT.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+JWT="$(AURA_CORE_BASE_URL="$BACKEND_URL" ADMIN_EMAIL="$ADMIN_EMAIL" ADMIN_PASSWORD="$ADMIN_PASSWORD" \
+  python3 "$SCRIPT_DIR/application/core-admin-session.py")"
+[[ -n "$JWT" ]] || { say "${RED}✗ business-space login returned no session${NC}"; exit 1; }
+say "${GREEN}✓${NC} business-space session selected"
 
 # ── 4. import plugins ─────────────────────────────────────────────────────────
 import_one() {
@@ -180,5 +169,5 @@ fi
 say "${GREEN}✓${NC} plugin reference integrity"
 
 say "\n${GREEN}AuraBoot is ready.${NC}"
-say "  ${BACKEND_URL%:*}:3000   ${DIM}(or wherever you mapped the frontend)${NC}"
-say "  ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}   ${DIM}— change this password${NC}"
+say "  ${BACKEND_URL}   ${DIM}(configured frontend URL)${NC}"
+say "  ${ADMIN_EMAIL}   ${DIM}— use your configured administrator password${NC}"

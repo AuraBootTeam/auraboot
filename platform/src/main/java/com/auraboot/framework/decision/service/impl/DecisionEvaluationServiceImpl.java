@@ -17,6 +17,8 @@ import com.auraboot.framework.decision.dto.DrtValidateRequest;
 import com.auraboot.framework.decision.entity.DrtLogEntity;
 import com.auraboot.framework.decision.entity.DrtVersionEntity;
 import com.auraboot.framework.decision.mapper.DrtLogMapper;
+import com.auraboot.framework.decision.mapper.DrtDefinitionMapper;
+import com.auraboot.framework.decision.entity.DrtDefinitionEntity;
 import com.auraboot.framework.decision.mapper.DrtVersionMapper;
 import com.auraboot.framework.decision.model.DecisionEvaluateOptions;
 import com.auraboot.framework.decision.model.DecisionRolloutSelection;
@@ -186,15 +188,14 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
     @Override
     public List<DrtLogDTO> findLogsByTraceId(String traceId) {
         Long tid = requireTenant();
-        return logMapper.findByTraceId(tid, traceId).stream()
-                .map(this::toLogDTO)
-                .collect(Collectors.toList());
+        return toLogDTOs(logMapper.findByTraceId(tid, traceId), tid);
     }
 
     @Override
     public DrtLogDTO findLogByPid(String pid) {
         Long tid = requireTenant();
-        return toLogDTO(logMapper.findByPid(tid, pid));
+        var entity = logMapper.findByPid(tid, pid);
+        return entity == null ? null : toLogDTOs(List.of(entity), tid).get(0);
     }
 
     @Override
@@ -256,7 +257,7 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
 
         Page<DrtLogEntity> entityPage = logMapper.selectPage(new Page<>(safePage + 1L, safeSize), wrapper);
         PageResult<DrtLogDTO> result = new PageResult<>();
-        result.setRecords(entityPage.getRecords().stream().map(this::toLogDTO).toList());
+        result.setRecords(toLogDTOs(entityPage.getRecords(), tid));
         result.setTotal(entityPage.getTotal());
         result.setSize(entityPage.getSize());
         result.setCurrent(entityPage.getCurrent());
@@ -705,6 +706,37 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
             throw new ValidationException(ResponseCode.NOT_FOUND, "Tenant context required");
         }
         return tid;
+    }
+
+    private List<DrtLogDTO> toLogDTOs(List<DrtLogEntity> logs, Long tenantId) {
+        if (logs.isEmpty()) return List.of();
+        Set<String> codes = logs.stream().map(DrtLogEntity::getDecisionCode)
+                .filter(StringUtils::hasText).collect(Collectors.toSet());
+        Map<String, String> names = new HashMap<>();
+        if (!codes.isEmpty()) {
+            var definitions = definitionMapper.selectList(new LambdaQueryWrapper<DrtDefinitionEntity>()
+                    .eq(DrtDefinitionEntity::getTenantId, tenantId)
+                    .in(DrtDefinitionEntity::getDecisionCode, codes));
+            Set<String> seen = new LinkedHashSet<>();
+            for (var definition : definitions) {
+                if (definition == null || !tenantId.equals(definition.getTenantId())
+                        || !codes.contains(definition.getDecisionCode())
+                        || !seen.add(definition.getDecisionCode())) {
+                    throw new IllegalStateException("Decision log definition identity is invalid or ambiguous");
+                }
+                if (StringUtils.hasText(definition.getDecisionName())) {
+                    names.put(definition.getDecisionCode(), definition.getDecisionName().trim());
+                }
+            }
+        }
+        return logs.stream().map(log -> {
+            if (!tenantId.equals(log.getTenantId())) {
+                throw new IllegalStateException("Decision log tenant identity is invalid");
+            }
+            var dto = toLogDTO(log);
+            dto.setDecisionName(names.get(log.getDecisionCode()));
+            return dto;
+        }).toList();
     }
 
     private DrtLogDTO toLogDTO(DrtLogEntity e) {

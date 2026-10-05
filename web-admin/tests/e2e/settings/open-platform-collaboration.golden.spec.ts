@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { createCookieSessionStorage } from 'react-router';
 import path from 'node:path';
 import { BACKEND_URL, BASE_URL as WEB_BASE_URL } from '../../helpers/environments';
+import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 
 const EVIDENCE_DIR = path.join(
   process.env.AURA_EVIDENCE_ROOT || '/tmp',
@@ -22,7 +23,7 @@ type Role = 'owner' | 'maintainer' | 'viewer';
 
 async function authenticate(page: Page) {
   const loginResponse = await page.request.post(`${BACKEND_URL}/api/auth/login`, {
-    data: { email: 'admin@auraboot.com', password: 'Test2026x' },
+    data: { email: DEFAULT_TEST_ACCOUNT.email, password: DEFAULT_TEST_ACCOUNT.password },
   });
   expect(loginResponse.ok()).toBeTruthy();
   const login = (await loginResponse.json()).data;
@@ -177,9 +178,8 @@ test.describe('Open Platform collaboration golden states', () => {
         .or(page.getByTestId('open-platform-application-list')),
     ).toBeVisible();
 
-    // Create this scenario's own application even when other specs left disabled
-    // applications visible. DELETE means disable, so it cannot create an empty console.
-    const appName = `开放平台协作验收应用 ${process.env.OP_MULTIUSER_RUN_TAG || 'r1'}`;
+    // Preserve other applications and select only this journey's real fixture.
+    const appName = `开放平台协作验收应用-${Date.now()}`;
     await page.getByTestId('open-platform-create-app').click();
     const dialog = page.getByRole('dialog', { name: '创建外部应用' });
     await page.getByTestId('open-platform-app-name').fill(appName);
@@ -188,6 +188,7 @@ test.describe('Open Platform collaboration golden states', () => {
     const application = page.getByTestId('open-platform-application-list')
       .locator('article').filter({ hasText: appName });
     await expect(application).toHaveCount(1);
+    await expect(application).toContainText(appName);
     await dismissToasts(page);
     await expect(application).toContainText('所有者');
     await expect(application.getByRole('button', { name: '管理成员' })).toBeVisible();

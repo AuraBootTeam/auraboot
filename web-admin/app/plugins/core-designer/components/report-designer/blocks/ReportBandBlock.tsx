@@ -2,6 +2,7 @@
  * ReportBandBlock — renders header/footer band in design or runtime mode
  */
 
+import { useSmartText } from '~/utils/i18n';
 import React from 'react';
 import type { ReportBand, BandElement } from '../types';
 
@@ -12,6 +13,7 @@ interface ReportBandBlockProps {
 }
 
 const BandElementRenderer: React.FC<{ element: BandElement }> = ({ element }) => {
+  const text = useSmartText();
   const style: React.CSSProperties = {
     textAlign: element.align || 'left',
     fontSize: element.style?.fontSize ? `${element.style.fontSize}pt` : undefined,
@@ -24,7 +26,7 @@ const BandElementRenderer: React.FC<{ element: BandElement }> = ({ element }) =>
     case 'text':
       return <div style={style}>{element.content || ''}</div>;
     case 'page-number':
-      return <div style={style}>Page 1</div>;
+      return <div style={style}>{text({ zh: '第 1 页', en: 'Page 1' })}</div>;
     case 'date':
       return <div style={style}>{new Date().toLocaleDateString()}</div>;
     case 'image':
@@ -33,7 +35,7 @@ const BandElementRenderer: React.FC<{ element: BandElement }> = ({ element }) =>
           {element.content ? (
             <img src={element.content} alt="" className="inline max-h-8" />
           ) : (
-            <span className="text-xs text-gray-400">[Image]</span>
+            <span className="text-xs text-gray-400">{text({ zh: '[图片]', en: '[Image]' })}</span>
           )}
         </div>
       );
@@ -43,8 +45,10 @@ const BandElementRenderer: React.FC<{ element: BandElement }> = ({ element }) =>
 };
 
 export const ReportBandBlock: React.FC<ReportBandBlockProps> = ({ band, mode, position }) => {
+  const text = useSmartText();
   const bgColor = position === 'header' ? 'bg-blue-50' : 'bg-gray-50';
-  const label = position === 'header' ? 'Header' : 'Footer';
+  const label =
+    position === 'header' ? text({ zh: '页眉', en: 'Header' }) : text({ zh: '页脚', en: 'Footer' });
 
   return (
     <div

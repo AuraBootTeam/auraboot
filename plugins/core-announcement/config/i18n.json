@@ -1,0 +1,44 @@
+[
+  {
+    "key": "message.announcement.publish.confirm.title",
+    "zh-CN": "确认发布",
+    "en-US": "Confirm publication",
+    "source": "import",
+    "refType": "action"
+  },
+  {
+    "key": "message.announcement.publish.confirm.content",
+    "zh-CN": "发布后该公告将对读者可见，确定发布吗？",
+    "en-US": "Publishing will make this announcement visible to readers. Publish it?",
+    "source": "import",
+    "refType": "action"
+  },
+  {
+    "key": "message.announcement.archive.confirm.title",
+    "zh-CN": "确认撤回",
+    "en-US": "Confirm withdrawal",
+    "source": "import",
+    "refType": "action"
+  },
+  {
+    "key": "message.announcement.archive.confirm.content",
+    "zh-CN": "撤回后该公告将不再对读者展示，可稍后重新发布。确定撤回吗？",
+    "en-US": "Withdrawing will hide this announcement from readers. You can publish it again later. Withdraw it?",
+    "source": "import",
+    "refType": "action"
+  },
+  {
+    "key": "message.announcement.republish.confirm.title",
+    "zh-CN": "确认重新发布",
+    "en-US": "Confirm republication",
+    "source": "import",
+    "refType": "action"
+  },
+  {
+    "key": "message.announcement.republish.confirm.content",
+    "zh-CN": "重新发布后该公告将再次对读者可见，确定重新发布吗？",
+    "en-US": "Republishing will make this announcement visible to readers again. Republish it?",
+    "source": "import",
+    "refType": "action"
+  }
+]

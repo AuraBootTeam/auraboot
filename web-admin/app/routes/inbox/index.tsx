@@ -88,6 +88,22 @@ const TYPE_COPY: Record<string, { key: string; title: string; description: strin
   },
 };
 
+const SOURCE_COPY: Record<string, { key: string; fallback: string }> = {
+  workflow: { key: 'sourceWorkflow', fallback: 'Workflow' },
+  bpm: { key: 'sourceWorkflow', fallback: 'Workflow' },
+  command: { key: 'sourceCommand', fallback: 'Business action' },
+  im: { key: 'sourceChat', fallback: 'Messages' },
+  ai: { key: 'sourceAi', fallback: 'AI assistant' },
+  notification: { key: 'sourceNotification', fallback: 'Notifications' },
+};
+
+function sourceLabel(sourceType: string, tx: Tx) {
+  const copy = Object.hasOwn(SOURCE_COPY, sourceType)
+    ? SOURCE_COPY[sourceType]
+    : { key: 'sourceOther', fallback: 'Other source' };
+  return tx(copy.key, copy.fallback);
+}
+
 type InboxCardPayload = {
   cardType?: string;
   modelCode?: string;
@@ -419,7 +435,8 @@ export default function UnifiedInboxPage() {
         });
         fetchSummary();
       } catch {
-        showErrorToast('Failed to mark item as read');
+        showErrorToast(tx('markReadFailed', 'Failed to mark item as read'));
+        return;
       }
     }
 
@@ -440,7 +457,7 @@ export default function UnifiedInboxPage() {
       return;
     }
 
-    showSuccessToast('Item marked as read');
+    showSuccessToast(tx('markedRead', 'Item marked as read'));
   };
 
   const handleDismiss = async (item: InboxItem) => {
@@ -455,9 +472,9 @@ export default function UnifiedInboxPage() {
         };
       });
       fetchSummary();
-      showSuccessToast('Item dismissed');
+      showSuccessToast(tx('dismissed', 'Item dismissed'));
     } catch {
-      showErrorToast('Failed to dismiss item');
+      showErrorToast(tx('dismissFailed', 'Failed to dismiss item'));
     }
   };
 
@@ -472,9 +489,9 @@ export default function UnifiedInboxPage() {
         };
       });
       setSummary({});
-      showSuccessToast('All visible items marked as read');
+      showSuccessToast(tx('allMarkedRead', 'All inbox items marked as read'));
     } catch {
-      showErrorToast('Failed to mark all items as read');
+      showErrorToast(tx('markAllReadFailed', 'Failed to mark all items as read'));
     }
   };
 
@@ -482,7 +499,7 @@ export default function UnifiedInboxPage() {
     setDrawerTaskId(null);
     updateSearchParams({ type: activeTab, status: statusFilter, page: currentPage, task: null });
     fetchData('refresh');
-    showSuccessToast('Approval action completed');
+    showSuccessToast(tx('approvalCompleted', 'Approval action completed'));
   };
 
   const baseItems = useMemo(() => page?.records || [], [page]);
@@ -756,6 +773,7 @@ export default function UnifiedInboxPage() {
                 return (
                   <article
                     key={item.id}
+                    data-testid={`inbox-row-${item.id}`}
                     className={cn(
                       'dark:hover:bg-gray-750 grid grid-cols-[minmax(0,1.6fr)_110px_110px_120px_200px_120px] gap-4 px-4 py-3 transition-colors hover:bg-gray-50',
                       index > 0 && 'border-t border-gray-100 dark:border-gray-700',
@@ -769,7 +787,8 @@ export default function UnifiedInboxPage() {
                           type="button"
                           onClick={() => handleItemClick(item)}
                           data-testid={`inbox-item-${item.id}`}
-                          className="min-w-0 text-left"
+                          title={display.title}
+                          className="w-full min-w-0 max-w-full text-left"
                         >
                           <h3
                             className={cn(
@@ -796,7 +815,10 @@ export default function UnifiedInboxPage() {
                       </div>
                     </div>
 
-                    <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
+                    <div
+                      data-testid="inbox-type-cell"
+                      className="flex items-center text-sm text-gray-500 dark:text-gray-400"
+                    >
                       <span className="capitalize">{tx(item.itemType, item.itemType)}</span>
                     </div>
 
@@ -808,7 +830,11 @@ export default function UnifiedInboxPage() {
 
                     <div className="flex min-w-0 items-center text-sm text-gray-500 dark:text-gray-400">
                       <div className="min-w-0">
-                        {item.sourceType && <p className="truncate">{item.sourceType}</p>}
+                        {item.sourceType && (
+                          <p data-testid="inbox-source-label" className="truncate">
+                            {sourceLabel(item.sourceType, tx)}
+                          </p>
+                        )}
                         {(display.metaModelCode || display.metaRecordPid != null) && (
                           <p className="truncate text-xs text-gray-400 dark:text-gray-500">
                             {display.metaModelCode}

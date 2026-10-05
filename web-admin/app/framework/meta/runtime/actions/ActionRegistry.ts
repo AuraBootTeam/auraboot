@@ -1042,6 +1042,8 @@ actionRegistry.register(
   async ({
     args,
     fetchResult,
+    t,
+    locale,
     stateManager,
     scopeId,
     stepEndpoint,
@@ -1118,6 +1120,16 @@ actionRegistry.register(
         method,
         params: requestParams,
       });
+
+      // A rejected API response must abort the flow before any state update
+      // or subsequent success feedback. HTTP success alone is insufficient.
+      if (!ResultHelper.isSuccess(result)) {
+        const fallback = translateOrFallback(
+          t, 'message.operation.failed',
+          locale?.toLowerCase().startsWith('zh') ? '操作失败' : 'Operation failed',
+        );
+        throw new Error(resolveCommandErrorMessage(result, '', t, locale, fallback));
+      }
 
       // 如果指定了 target，将结果保存到状态中
       if (target && stateManager && scopeId) {

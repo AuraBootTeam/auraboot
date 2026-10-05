@@ -513,12 +513,12 @@ export default function OpenPlatformPage() {
             >
               <div className="flex flex-col gap-3 border-b border-gray-100 p-5 sm:flex-row sm:items-center sm:justify-between dark:border-gray-800">
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="font-semibold text-gray-950 dark:text-white">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="min-w-0 break-words font-semibold text-gray-950 dark:text-white">
                       {application.name}
                     </h2>
                     <StatusBadge status={application.status} t={t} />
-                    <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                    <span className="shrink-0 whitespace-nowrap rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
                       {t(`openPlatform.role.${application.accessRole}`, undefined, application.accessRole)}
                     </span>
                   </div>
@@ -1120,7 +1120,7 @@ function StatusBadge({
   const active = status === 'active' || status === 'success';
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${active ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
+      className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium ${active ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
     >
       {active && <CheckIcon className="h-3 w-3" />}
       {t(`openPlatform.status.${status}`, undefined, status)}

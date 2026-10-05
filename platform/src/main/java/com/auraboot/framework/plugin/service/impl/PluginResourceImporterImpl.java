@@ -67,12 +67,15 @@ import com.auraboot.framework.plugin.dto.imports.NamedQueryDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.OwnershipType;
 import com.auraboot.framework.plugin.dto.imports.PageSchemaDTO;
 import com.auraboot.framework.plugin.dto.imports.PermissionDefinitionDTO;
+import com.auraboot.framework.plugin.dto.imports.PluginManifestExtended;
 import com.auraboot.framework.plugin.dto.imports.ResourceAction;
 import com.auraboot.framework.plugin.dto.imports.ResourceType;
 import com.auraboot.framework.plugin.dto.imports.RoleDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.RoleDataScopeDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.RolePermissionPolicyDefinitionDTO;
+import com.auraboot.framework.plugin.entity.PluginRecord;
 import com.auraboot.framework.plugin.entity.PluginResource;
+import com.auraboot.framework.plugin.mapper.PluginRecordMapper;
 import com.auraboot.framework.plugin.exception.PluginException;
 import com.auraboot.framework.plugin.mapper.PluginResourceMapper;
 import com.auraboot.framework.rbac.entity.RolePermission;
@@ -99,8 +102,11 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.nio.file.Path;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -1332,14 +1338,63 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     }
 
     /**
-     * Re-resolve the role's declared permission codes and bind any that resolve now but
-     * did not at the ROLE import stage. Generated model actions (model.&lt;code&gt;.create/
-     * update/... and command verbs) are created by post-import auto-assignment, which runs
-     * AFTER the ROLE stage, so on a first import updateRolePermissions silently skipped
-     * them ("Permission not found for role binding") and business roles ended up without
-     * model write access. Called once model post-processing has generated every action.
+     * Reconcile declared role permissions for an installed plugin directory: validate
+     * the directory and installed version, then strictly check every declared role and
+     * permission resolves and is bound for the current tenant. The caller owns the
+     * transaction boundary.
      */
     @Override
+    public int reconcileDirectoryRolePermissions(String directoryPath,
+                                                 PluginDirectoryLoader directoryLoader,
+                                                 PluginRecordMapper pluginRecordMapper) {
+        Path directory = Path.of(directoryPath).normalize();
+        if (!directory.isAbsolute() || directory.toString().contains("..")) {
+            throw new PluginException("Role reconciliation requires an absolute plugin directory");
+        }
+        Long tenantId = MetaContext.getCurrentTenantId();
+        if (tenantId == null) {
+            throw new PluginException("Tenant context is required for role reconciliation");
+        }
+        PluginManifestExtended manifest = directoryLoader.loadFromDirectory(directory);
+        PluginRecord installed = pluginRecordMapper.findByTenantAndPluginId(manifest.getPluginId());
+        if (installed == null || !tenantId.equals(installed.getTenantId())
+                || !Objects.equals(installed.getVersion(), manifest.getVersion())) {
+            throw new PluginException("Role reconciliation requires the same installed plugin version");
+        }
+        return reconcileDeclaredRolesStrictly(manifest, tenantId);
+    }
+
+    int reconcileDeclaredRolesStrictly(PluginManifestExtended manifest, Long tenantId) {
+        if (manifest.getRoles() == null || manifest.getRoles().isEmpty()) return 0;
+        Map<String, Role> roles = roleService.findByTenantId(tenantId).stream()
+                .collect(Collectors.toMap(Role::getCode, Function.identity()));
+        int checked = 0;
+        for (RoleDefinitionDTO declaration : manifest.getRoles()) {
+            if (declaration == null || !declaration.isValid()) {
+                throw new PluginException("Invalid role declaration during batch reconciliation");
+            }
+            Role role = roles.get(declaration.getCode());
+            if (role == null) throw new PluginException("Imported role not found: " + declaration.getCode());
+            List<PermissionDTO> permissions = new ArrayList<>();
+            for (String code : Optional.ofNullable(declaration.getPermissions()).orElse(List.of())) {
+                PermissionDTO permission = permissionService.findByCode(code);
+                if (permission == null || permission.getId() == null) {
+                    throw new PluginException("Unresolved declared permission: " + declaration.getCode() + ":" + code);
+                }
+                permissions.add(permission);
+            }
+            reconcileRolePermissions(declaration, tenantId);
+            for (PermissionDTO permission : permissions) {
+                if (rolePermissionMapper.countByRoleAndPermission(role.getId(), permission.getId(), tenantId) <= 0) {
+                    throw new PluginException("Declared permission remains unbound: "
+                            + declaration.getCode() + ":" + permission.getCode());
+                }
+            }
+            checked++;
+        }
+        return checked;
+    }
+
     public boolean reconcileRolePermissions(RoleDefinitionDTO dto, Long tenantId) {
         if (dto == null || dto.getCode() == null || dto.getCode().isBlank()) {
             return false;

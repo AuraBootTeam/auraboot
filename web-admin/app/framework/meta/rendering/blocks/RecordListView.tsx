@@ -1,3 +1,4 @@
+import { resolveTemporalType } from '~/shared/services/dateTimeFormatService';
 /**
  * RecordListView — generic, embeddable model-bound record list.
  *
@@ -66,10 +67,8 @@ function inferValueType(
   const field = column.field || '';
   if (field.endsWith('_id') || (record && record[`${field}_display`] !== undefined))
     return 'reference';
-  if (field.endsWith('_at')) return 'datetime';
-  if (field.endsWith('_date')) return 'date';
-  if (field.endsWith('_time')) return 'time';
-  if (typeof value === 'string' && /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) return 'datetime';
+  const temporalType = resolveTemporalType(field, undefined, value);
+  if (temporalType) return temporalType;
   if (typeof value === 'boolean' || value === 'true' || value === 'false') return 'boolean';
   return undefined;
 }

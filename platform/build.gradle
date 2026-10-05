@@ -19,6 +19,14 @@ bootJar {
     archiveClassifier = 'boot'
 }
 
+// Runtime identity is content-addressed; repeated builds of one source must agree.
+allprojects {
+    tasks.withType(AbstractArchiveTask).configureEach {
+        preserveFileTimestamps = false
+        reproducibleFileOrder = true
+    }
+}
+
 // Fixture endpoints are a separate opt-in artifact, never production classes.
 // Reuse the six canonical fixture sources without JUnit or integration tests.
 sourceSets {
@@ -528,7 +536,9 @@ dependencies {
 
 // Spring Boot应用配置
 springBoot {
-    buildInfo()
+    buildInfo {
+        excludes = ['time']
+    }
     mainClass = 'com.auraboot.framework.application.MetaApplication'
 }
 
@@ -615,6 +625,18 @@ tasks.register('instrumentMainOffline') {
 
 // 配置测试任务使用JUnit Platform
 test {
+    // FreezingArchRule removes resolved violations. Keep those generated updates
+    // outside tracked source files while still checking the committed baseline.
+    def runtimeArchunitStore = file("${buildDir}/test-fixtures/archunit_store")
+    systemProperty 'archunit.freeze.store.default.path', runtimeArchunitStore.absolutePath
+    systemProperty 'archunit.freeze.store.default.allowStoreCreation', 'false'
+    doFirst {
+        delete runtimeArchunitStore
+        copy {
+            from file('src/test/resources/archunit_store')
+            into runtimeArchunitStore
+        }
+    }
     useJUnitPlatform {
         // Real-LLM evals (@Tag("agent-eval-live")) call the explicit
         // AURA_LIVE_LLM_* validation profile. They are
@@ -1129,6 +1151,32 @@ tasks.register('codeQuality') {
 //   platform/src/integrationTest/java       — *IT.java sources
 //   platform/src/integrationTest/resources  — IT-only application-*.yml etc.
 //
+// Compile only the existing HTTP fixtures into an opt-in test-support artifact.
+// This source set is deliberately absent from main, bootJar and publication.
+sourceSets {
+    e2eFixtures {
+        java {
+            srcDir 'src/test/java'
+            include 'com/auraboot/framework/test/test/**'
+        }
+        compileClasspath += sourceSets.main.output
+    }
+}
+configurations {
+    e2eFixturesImplementation.extendsFrom implementation
+    e2eFixturesCompileOnly.extendsFrom compileOnly
+    e2eFixturesAnnotationProcessor.extendsFrom annotationProcessor
+}
+tasks.named('compileE2eFixturesJava').configure {
+    options.annotationProcessorPath = configurations.e2eFixturesAnnotationProcessor
+}
+tasks.register('e2eFixtureSupportJar', Jar) {
+    group = 'verification'
+    description = 'Package opt-in HTTP fixtures for an explicitly enabled local E2E stack.'
+    archiveClassifier = 'e2e-fixture-support'
+    from sourceSets.e2eFixtures.output
+}
+
 // Existing IT under src/test/java continue to run via the default `test` task —
 // this source set is purely additive. New ITs (BootstrapEngineServiceIT,
 // future BootstrapRepairServiceIT, etc.) belong here.

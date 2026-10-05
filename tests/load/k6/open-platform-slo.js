@@ -70,3 +70,11 @@ export default function (data) {
   apiErrors.add(!accepted);
   apiDuration.add(response.timings.duration);
 }
+
+// Export acceptance metrics without setup credentials on both green and red exits.
+export function handleSummary(data) {
+  const summary = { metrics: data.metrics, root_group: data.root_group };
+  const output = { stdout: JSON.stringify({ metrics: data.metrics }, null, 2) + "\n" };
+  if (__ENV.SUMMARY_PATH) output[__ENV.SUMMARY_PATH] = JSON.stringify(summary, null, 2);
+  return output;
+}

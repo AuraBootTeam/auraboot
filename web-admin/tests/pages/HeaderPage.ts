@@ -43,11 +43,14 @@ export class HeaderPage {
 
   /** The theme dropdown panel */
   get themeDropdown(): Locator {
-    return this.page
-      .locator(
-        '[data-testid="theme-dropdown"], [role="menu"]:has-text("浅色"), [role="menu"]:has-text("Dark")',
-      )
-      .first();
+    // Labels may render as untranslated keys (theme.light/dark/auto) — match
+    // the container testid first, then the role=menu fallbacks.
+    return this.page.locator('[data-testid="theme-dropdown"]').first();
+  }
+
+  /** A theme option button inside the dropdown (any locale / raw-key copy). */
+  themeOption(label: string): Locator {
+    return this.themeDropdown.locator('button', { hasText: new RegExp(label, 'i') });
   }
 
   /** Open the theme dropdown if current UI uses dropdown mode. */
@@ -92,12 +95,12 @@ export class HeaderPage {
 
   /** Select dark theme */
   async selectDarkTheme(): Promise<void> {
-    await this.selectTheme(/深色|Dark/);
+    await this.selectTheme(/深色|[Dd]ark|theme\.dark/);
   }
 
   /** Select light theme */
   async selectLightTheme(): Promise<void> {
-    await this.selectTheme(/浅色|Light/);
+    await this.selectTheme(/浅色|[Ll]ight|theme\.light/);
   }
 
   /** Assert that dark mode is active on <html> */

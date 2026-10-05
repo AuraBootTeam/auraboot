@@ -324,6 +324,8 @@ describe('root loader authentication guard', () => {
       locale: 'zh-CN',
       runtimeProfile: 'storefront',
     });
+    expect(mocks.getI18nData).toHaveBeenCalledWith(
+      'zh-CN', expect.any(Request), false);
     expect(mocks.getUserInfo).not.toHaveBeenCalled();
     expect(mocks.getUserMenus).not.toHaveBeenCalled();
   });

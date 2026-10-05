@@ -367,8 +367,11 @@ test('OSS golden stack rejects dependency capsules with dangling required-packag
   assert.match(golden, /source "\$SCRIPT_DIR\/lib\/web-admin-node-modules\.sh"/);
   assert.match(
     golden,
-    /if ! web_admin_node_modules_usable "\$REPO_ROOT\/web-admin\/node_modules"/,
+    /if ! web_admin_node_modules_matches_checkout "\$REPO_ROOT\/web-admin\/node_modules" "\$REPO_ROOT"/,
   );
+  const helper = read('scripts/lib/web-admin-node-modules.sh');
+  assert.match(helper, /web_admin_node_modules_usable "\$candidate" \|\| return 1/);
+  assert.match(helper, /web-admin-lock-contract\.mjs/);
   assert.match(golden, /refusing to replace a real directory/);
 });
 
@@ -595,8 +598,8 @@ test('plugin import seeds BOM defaults when bom-standardization is imported', ()
     'BOM defaults must be seeded after cross-plugin references are verified',
   );
   assert.ok(
-    tail.indexOf('seed_bom_defaults_if_imported') < tail.indexOf('verify_latest_import_statuses'),
-    'BOM defaults must not be blocked by the post-import history audit',
+    tail.indexOf('seed_bom_defaults_if_imported') < tail.lastIndexOf('verify_latest_import_statuses'),
+    'BOM defaults must precede the final post-import history audit',
   );
 });
 

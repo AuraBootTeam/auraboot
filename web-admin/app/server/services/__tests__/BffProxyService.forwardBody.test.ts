@@ -1,6 +1,21 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { shouldForwardRequestBody } from '../BffProxyService';
+import { shouldForwardRequestBody, shouldParseProxyBody } from '../BffProxyService';
+
+describe('proxy-owned request body boundary', () => {
+  it('parses the exact OAuth token route and API routes', () => {
+    expect(shouldParseProxyBody('/oauth2/token', 'application/x-www-form-urlencoded')).toBe(true);
+    expect(shouldParseProxyBody('/api/open/v1/whoami', 'application/json')).toBe(true);
+  });
+
+  it('preserves Router actions and multipart upload streams', () => {
+    for (const path of ['/login', '/oauth2/token-extra', '/oauth2/token/child', '/apix']) {
+      expect(shouldParseProxyBody(path, 'application/x-www-form-urlencoded')).toBe(false);
+    }
+    expect(shouldParseProxyBody('/api/upload', 'multipart/form-data; boundary=fixture')).toBe(false);
+  });
+
+});
 
 describe('shouldForwardRequestBody', () => {
   it('forwards an empty array body (a deliberate client payload)', () => {

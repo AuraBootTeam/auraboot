@@ -75,6 +75,28 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
         return LogSanitizer.safe(value);
     }
 
+    private static boolean isMetadataOnlyModel(ModelDefinition model) {
+        String sourceType = model.getSourceType();
+        Object skipTableCreation = model.getExtension() == null
+                ? null : model.getExtension().get("skipTableCreation");
+        return (sourceType != null && !"physical".equals(sourceType))
+                || "view".equals(model.getModelType())
+                || (skipTableCreation != null && Boolean.parseBoolean(skipTableCreation.toString()));
+    }
+
+    private static SchemaOperationResult metadataOnlyResult(
+            ModelDefinition model, SchemaOperationResult.SchemaOperationType operationType) {
+        return SchemaOperationResult.builder()
+                .success(true)
+                .operationType(operationType)
+                .modelCode(model.getCode())
+                .tableName(model.getTableName())
+                .executedDDL(List.of())
+                .message("Metadata-only model; schema management skipped")
+                .operationTime(DateUtil.getCurrentLocalDateTimeUtc())
+                .build();
+    }
+
     private static boolean isExternallyManagedTable(String tableName) {
         if (tableName == null) {
             return false;
@@ -94,6 +116,10 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                     .orElseThrow(() -> new RuntimeException("Model not found: " + modelCode));
             log.info("Creating table: model {} has {} fields", logSafe(modelCode), model.getFields() != null ? model.getFields().size() : 0);
             
+            if (isMetadataOnlyModel(model)) {
+                return metadataOnlyResult(model, SchemaOperationResult.SchemaOperationType.CREATE_TABLE);
+            }
+
             String tableName = model.getTableName();
 
             if (isExternallyManagedTable(tableName)) {
@@ -393,6 +419,10 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
             // where the cache may still hold stale required/unique constraints.
             ModelDefinition model = metaModelService.getModelDefinitionFromDb(modelCode)
                     .orElseThrow(() -> new RuntimeException("Model not found: " + modelCode));
+
+            if (isMetadataOnlyModel(model)) {
+                return metadataOnlyResult(model, SchemaOperationResult.SchemaOperationType.SYNC_SCHEMA);
+            }
 
             if (isExternallyManagedTable(model.getTableName())) {
                 if (!tableMetadataService.tableExists(model.getTableName())) {
@@ -1180,9 +1210,11 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                     ddlStatements.add("UPDATE " + tableName + " SET row_version = 1 WHERE row_version IS NULL");
                     ddlStatements.add("ALTER TABLE " + tableName + " ALTER COLUMN row_version SET NOT NULL");
                 }
-                // SET DEFAULT is idempotent and avoids a second metadata connection querying
-                // the relation while the import transaction owns DDL locks.
-                ddlStatements.add("ALTER TABLE " + tableName + " ALTER COLUMN row_version SET DEFAULT 1");
+                // A correct default needs no DDL, which lets least-privilege imports
+                // synchronize metadata without requiring ownership of migrated tables.
+                if (!tableMetadataService.hasPostgresIntegerDefaultOne(tableName, "row_version")) {
+                    ddlStatements.add("ALTER TABLE " + tableName + " ALTER COLUMN row_version SET DEFAULT 1");
+                }
             } else {
                 if (nullable) {
                     ddlStatements.add("UPDATE " + tableName + " SET row_version = 1 WHERE row_version IS NULL");

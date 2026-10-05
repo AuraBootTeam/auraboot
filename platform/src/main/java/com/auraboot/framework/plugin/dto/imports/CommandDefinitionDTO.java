@@ -113,6 +113,9 @@ public class CommandDefinitionDTO {
     @JsonAlias("actionType")
     private String type;
 
+    /** true selects the form CRUD default; false keeps an auxiliary command explicit-only. */
+    private Boolean crudDefault;
+
     /**
      * Plugin command handler code.
      * Allows a business command such as "pr:submit_purchase_order" to invoke
@@ -278,6 +281,7 @@ public class CommandDefinitionDTO {
 
         // Merge DSL extended fields
         if (type != null) config.put("type", type);
+        if (crudDefault != null) config.put("crudDefault", crudDefault);
         if (handler != null) config.put("handler", handler);
         if (handlerParams != null) config.put("handlerParams", handlerParams);
         if (autoSetFields != null) config.put("autoSetFields", autoSetFields);

@@ -505,7 +505,7 @@ record_share:
   remove: 移除协作成员
   removed: 协作成员已移除
   remove_failed: 移除协作成员失败
-  notification_title: 客户协作权限已更新
+  notification_title: 记录协作权限已更新
   notification_content: 你已获得一条共享记录的{0}权限，请从对应的协作视图查看。
   notification_permission_read: 仅查看
   notification_permission_collaborate: 可协作
@@ -1330,6 +1330,13 @@ workbench:
     copyTaskDesc: 指派给你、仍需处理的工作项。
     copyMentionTitle: 提及
     copyMentionDesc: 同事在消息中 @ 你的内容。
+    markedRead: 待办已标为已读
+    markReadFailed: 待办标为已读失败
+    dismissed: 待办已忽略
+    dismissFailed: 忽略待办失败
+    allMarkedRead: 所有待办已标为已读
+    markAllReadFailed: 全部待办标为已读失败
+    approvalCompleted: 审批操作已完成
   notificationCenter:
     title: 通知中心
     unreadCount: "{count} 条未读通知"
@@ -2040,6 +2047,34 @@ openPlatform:
   replayConfirmTitle: 重放此投递？
   replayConfirmBody: 原始签名载荷将再次投递，可能重复触发下游副作用。
   confirmReplay: 确认重放
+  eventCatalog: 事件目录
+  eventCatalogHint: 仅已明确发布的合作事件可供已安装应用订阅。
+  noPublishedEvents: 暂无已发布的合作事件
+  supportedVersions: 兼容版本
+  webhookHealth: Webhook 兼容性与签名
+  webhookHealthHint: 每90天轮换签名密钥，并使用受支持的事件版本。
+  noInstalledWebhooks: 此安装暂无 Webhook 订阅
+  compatible: 兼容
+  actionRequired: 需要处理
+  eventSchema: 事件版本
+  catalogVersion: 目录版本
+  signing: 签名状态
+  rotateBy: 轮换截止时间
+  chooseSupportedEventVersion: 请选择受支持的事件版本。
+  rotateSigningSecretNow: 请立即轮换签名密钥。
+  addSigningSecretBeforeDelivery: 启用投递前请添加签名密钥。
+  deliveryState:
+    dead_letter: 死信
+    failed: 失败
+    pending: 待投递
+    success: 成功
+  signingState:
+    healthy: 正常
+    due: 即将到期
+    overdue: 已过期
+    missing: 未配置
+  eventClassification:
+    partner: 合作事件
   status:
     active: 已启用
     disabled: 已停用

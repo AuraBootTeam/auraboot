@@ -28,10 +28,13 @@ import ReactECharts, { type EChartsReactProps } from 'echarts-for-react';
 // intersection `ReactECharts & { updateEChartsOption?: ... }` collapses to
 // never (private members are invariant under intersection). Drop the
 // private member from the host type and re-add it as a public optional.
-function markChartReady(instance: EChartsType, ready: boolean): void {
+function markChartReady(instance: EChartsType, ready: boolean): boolean {
+  // The wrapper's own finished listener may dispose its temporary instance
+  // before ECharts dispatches the remaining listeners for that same event.
+  if (instance.isDisposed()) return false;
   const dom = instance.getDom();
   dom.setAttribute('data-chart-ready', String(ready));
-  if (!ready) return;
+  if (!ready) return true;
   const options = instance.getOption() as Record<string, any>;
   const items = (value: any) => Array.isArray(value) ? value : value ? [value] : [];
   const copy = [
@@ -42,6 +45,7 @@ function markChartReady(instance: EChartsType, ready: boolean): void {
       .filter((series) => ['line', 'bar', 'scatter'].includes(series.type)).map((series) => series.name) : []),
   ].filter((text): text is string => typeof text === 'string' && Boolean(text.trim()));
   dom.setAttribute('data-chart-ui-copy', JSON.stringify(copy));
+  return true;
 }
 
 type EChartsHostComponent = Omit<ReactECharts, 'updateEChartsOption'> & {
@@ -54,11 +58,11 @@ const EChartsHost = forwardRef<ReactECharts, EChartsReactProps>(
     const events = useMemo(() => ({
       ...props.onEvents,
       rendered: (event: unknown, instance: EChartsType) => {
-        markChartReady(instance, false);
+        if (!markChartReady(instance, false)) return;
         props.onEvents?.rendered?.(event, instance);
       },
       finished: (event: unknown, instance: EChartsType) => {
-        markChartReady(instance, true);
+        if (!markChartReady(instance, true)) return;
         props.onEvents?.finished?.(event, instance);
       },
     }), [props.onEvents]);
@@ -87,6 +91,7 @@ const EChartsHost = forwardRef<ReactECharts, EChartsReactProps>(
         data-chart-ready="false"
         onEvents={events}
         onChartReady={(instance: EChartsType) => {
+          if (instance.isDisposed()) return;
           markChartReady(instance, instance.getZr().animation.isFinished());
           props.onChartReady?.(instance);
         }}

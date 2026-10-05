@@ -1025,7 +1025,7 @@ public class PluginImportServiceImpl implements PluginImportService {
         // ("Permission not found for role binding"), so plugin business roles ended up
         // without model write access on first import. Reconcile now that every generated
         // action resolves; binding is idempotent.
-        reconcileRolePermissionBindings(manifest, tenantId);
+        pluginAccessResourceImporter().reconcileRolePermissionBindings(manifest, tenantId);
 
         // Semantic resources reference imported model/field codes, so publication
         // must run only after model auto-publish and schema synchronization.
@@ -1120,8 +1120,10 @@ public class PluginImportServiceImpl implements PluginImportService {
         }
     }
 
-    private void reconcileRolePermissionBindings(PluginManifestExtended manifest, Long tenantId) {
-        pluginAccessResourceImporter().reconcileRolePermissionBindings(manifest,tenantId);
+    @Override
+    @Transactional
+    public int reconcileDirectoryRolePermissions(String directoryPath) {
+        return resourceImporter.reconcileDirectoryRolePermissions(directoryPath, directoryLoader, pluginRecordMapper);
     }
 
     /**
@@ -1601,9 +1603,7 @@ public class PluginImportServiceImpl implements PluginImportService {
         pluginImportAssessment().collectConflicts(conflicts,importingPluginId,tenantId,resourceType,resources,codeExtractor,label);
     }
 
-    private String resolveOwnerPluginId(String pluginPid) {
-        return pluginImportAssessment().resolveOwnerPluginId(pluginPid);
-    }
+
 
     @Override
     public ImportPreviewResult.DependencyAnalysis analyzeDependencies(PluginManifestExtended manifest) {

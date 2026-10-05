@@ -6,7 +6,7 @@ import * as http from 'http';
 import * as https from 'https';
 import dns from 'node:dns';
 import { createRequestHandler } from '@react-router/express';
-import { BffProxyService } from '~/server/services/BffProxyService';
+import { BffProxyService, shouldParseProxyBody } from '~/server/services/BffProxyService';
 import { bffFlowDesignerService } from '~/server/services/BffFlowDesignerService';
 
 import uploadRouter from '~/server/routes/upload';
@@ -69,10 +69,10 @@ app.use(requestLogger);
 
 // React Router actions (for example POST /login) must receive the original
 // request body. Express body parsers consume it before the RR adapter can call
-// request.formData(), so only parse BFF-owned /api requests here.
+// request.formData(), so only parse BFF-owned API and OAuth token requests here.
 const skipBodyParsing = (req: express.Request) => {
   const contentType = req.headers['content-type'] || '';
-  return !req.path.startsWith('/api') || contentType.includes('multipart/form-data');
+  return !shouldParseProxyBody(req.path, contentType);
 };
 
 app.use((req, res, next) => {
@@ -97,7 +97,13 @@ app.use((req, res, next) => {
   if (skipBodyParsing(req)) {
     return next();
   }
-  express.urlencoded({ extended: true, limit: '10mb' })(req, res, next);
+  express.urlencoded({
+    extended: true,
+    limit: '10mb',
+    verify: (request, _response, buffer) => {
+      if (buffer.length) (request as express.Request & { rawBody?: Buffer }).rawBody = Buffer.from(buffer);
+    },
+  })(req, res, next);
 });
 
 app.use((req, res, next) => {
@@ -407,6 +413,11 @@ app.post(
 // Gateway 会处理认证、RBAC、租户隔离，然后转发到相应的服务
 app.use('/api', proxyService.createProxyMiddleware());
 
+// Keep API reference assets and schemas on the browser origin in both dev and
+// production. Backend security still decides access to the documentation.
+app.get(/^\/(swagger-ui(?:\/|$)|v3\/api-docs(?:\/|$))/, proxyService.createProxyMiddleware());
+app.post('/oauth2/token', proxyService.createProxyMiddleware());
+
 // 健康检查端点
 app.get('/health', async (req, res) => {
   try {
@@ -482,6 +493,15 @@ app.use(errorLogger);
 app.use((error: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
   const requestId = (req as any).requestId || 'unknown';
   console.error(`[${requestId}] BFF Server Error:`, error);
+  // Express body-parser marks malformed JSON as a client error before proxying.
+  if (error?.type === 'entity.parse.failed' && error?.status === 400) {
+    res.status(400).json({
+      error: 'Bad Request',
+      message: 'Invalid JSON request body',
+      requestId,
+    });
+    return;
+  }
   res.status(500).json({
     error: 'Internal Server Error',
     message:

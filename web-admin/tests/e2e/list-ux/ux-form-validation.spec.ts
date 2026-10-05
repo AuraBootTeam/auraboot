@@ -29,20 +29,22 @@ import { uniqueId } from '../helpers/index';
 // ---------------------------------------------------------------------------
 
 async function openCrmLeadCreateForm(page: Page): Promise<void> {
-  await page.goto('/dashboards');
+  await page.goto('/');
   await page.waitForLoadState('domcontentloaded');
 
   const nav = page.locator('nav');
-  const crmBtn = nav.getByRole('button', { name: /crm/i }).first();
-  await crmBtn.waitFor({ state: 'visible', timeout: 10_000 });
-  await crmBtn.evaluate((el: HTMLElement) => el.click());
-  await page.waitForResponse(() => true, { timeout: 1_500 }).catch(() => null);
+  // e2et fixtures group (leaf entries may also render at top level)
+  const groupBtn = nav.getByRole('button', { name: /E2E测试|E2E Test/i }).first();
+  if (await groupBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
+    await groupBtn.evaluate((el: HTMLElement) => el.click());
+    await page.waitForResponse(() => true, { timeout: 1_500 }).catch(() => null);
+  }
 
-  const leafLink = nav.locator('a[href="/p/crm_lead_common"]').first();
+  const leafLink = nav.locator('a[href="/p/e2et_order"]').first();
   await leafLink.waitFor({ state: 'attached', timeout: 8_000 });
 
   const listResponsePromise = page
-    .waitForResponse((r) => r.url().includes('/api/dynamic/crm_lead_common') && r.status() === 200, {
+    .waitForResponse((r) => r.url().includes('/api/dynamic/e2et_order') && r.status() === 200, {
       timeout: 15_000,
     })
     .catch(() => null);
@@ -139,7 +141,7 @@ test.describe('UX Form Validation — Inline Errors and Field Types', () => {
   test.setTimeout(120_000);
 
   // -------------------------------------------------------------------------
-  // UFV-001: Submit empty CRM Lead form — inline error appears near field
+  // UFV-001: Submit empty e2et order form — inline error appears near field
   // -------------------------------------------------------------------------
 
   test('UFV-001: Submit empty form — inline error visible near field (not only toast)', async ({
@@ -290,7 +292,7 @@ test.describe('UX Form Validation — Inline Errors and Field Types', () => {
   test('UFV-003: Date fields render as date input or DatePicker (not plain text)', async ({
     page,
   }) => {
-    // Try CRM Lead form first
+    // Try the e2et order form first
     await openCrmLeadCreateForm(page);
 
     // Look for any date-related inputs in the form
@@ -379,7 +381,7 @@ test.describe('UX Form Validation — Inline Errors and Field Types', () => {
       if (text.length === 0) continue;
 
       // Layer 2 (Data): error text must NOT be a raw i18n key
-      // Raw keys look like: "validation.required" or "field.crm_lead_company.label"
+      // Raw keys look like: "validation.required" or "field.e2et_order_title.label"
       expect(
         text,
         `UFV-004: error message "${text}" looks like a raw i18n key — must be translated text`,

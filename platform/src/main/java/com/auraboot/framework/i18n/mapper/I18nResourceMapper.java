@@ -45,6 +45,15 @@ public interface I18nResourceMapper extends BaseMapper<I18nResource> {
     // ==================== Batch Query ====================
 
     /**
+     * Public, approved system translations only. The fixed tenant predicate
+     * keeps this context-free lookup from exposing tenant-owned overrides.
+     */
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true")
+    @Select("SELECT * FROM ab_i18n_resource WHERE tenant_id = 0 AND lang = #{lang} AND status = 'approved' AND deleted_flag = false")
+    List<I18nResource> selectSystemByLang(@Param("lang") String lang);
+
+
+    /**
      * Find all resources for a language (for compilation)
      */
     @Select("SELECT * FROM ab_i18n_resource WHERE tenant_id = #{tenantId} AND lang = #{lang} AND status = 'approved' AND deleted_flag = false")

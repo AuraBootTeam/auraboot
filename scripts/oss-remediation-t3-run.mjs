@@ -25,6 +25,7 @@ if (fs.existsSync(output)) throw new Error('Evidence output must be a fresh dire
 // pinned IT database, not the runtime slot allocation injected by the managed executor.
 const databaseName = database.replace(/^jdbc:postgresql:\/\/[^/]+\/([^/?]+).*$/, '$1');
 if (!databaseName || databaseName === database) throw new Error(`Cannot derive database name from ${database}`);
+const hostPort = url => url.replace(/^jdbc:postgresql:\/\/([^/?]+).*$/, '$1');
 const catalog = JSON.parse(fs.readFileSync(path.join(root, 'scripts/oss-remediation-t3-catalog.json'), 'utf8'));
 const git = (...command) => {
     const result = spawnSync('git', command, { cwd: root, encoding: 'utf8' });
@@ -39,6 +40,8 @@ fs.mkdirSync(output, { recursive: true });
 const command = ['run', runtime, '--workdir', path.join(root, 'platform'), '--', 'env',
     `TEST_DATABASE_URL=${database}`, `SPRING_DATASOURCE_URL=${database}`, `DATABASE_URL=${database}`,
     `TEST_DATABASE_USERNAME=${user}`, `SPRING_DATASOURCE_USERNAME=${user}`, `POSTGRES_DB=${databaseName}`,
+    `TEST_EXPECTED_DATABASE=${databaseName}`,
+    `AURA_TEST_POSTGRES_JDBC_URL=jdbc:postgresql://${hostPort(database)}/${databaseName}`,
     './gradlew', ':test', '--rerun', ...catalog.testSelectors.flatMap(selector => ['--tests', selector]),
     'jacocoUnitFullReport', '--no-daemon'];
 fs.writeFileSync(path.join(output, 'command.json'), JSON.stringify({ source, executor, command, productionBefore }, null, 2) + '\n');

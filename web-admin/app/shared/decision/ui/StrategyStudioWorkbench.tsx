@@ -894,11 +894,6 @@ function latestRestorableTableVersion(
     .sort((a, b) => (b.version ?? 0) - (a.version ?? 0))[0]
 }
 
-function restoredOutputsMatchScenario(outputs: DecisionTable['outputs'], fallback: DecisionTable): boolean {
-  const restoredIds = new Set(outputs.map((output) => output.id))
-  return fallback.outputs.some((output) => restoredIds.has(output.id))
-}
-
 function normalizeRestoredTable(table: DecisionTable, fallback: DecisionTable): DecisionTable {
   const inputs = table.inputs
     .map((input) => {
@@ -919,14 +914,13 @@ function normalizeRestoredTable(table: DecisionTable, fallback: DecisionTable): 
   const outputs = table.outputs.filter((output) => output.id && output.label && output.dataType)
 
   if (inputs.length === 0 || outputs.length === 0) return fallback
-  const outputsMatchScenario = restoredOutputsMatchScenario(outputs, fallback)
   return {
     ...fallback,
     ...table,
     inputs,
-    outputs: outputsMatchScenario ? outputs : fallback.outputs,
-    rules: outputsMatchScenario && Array.isArray(table.rules) ? table.rules : [],
-    defaultOutput: outputsMatchScenario ? table.defaultOutput ?? fallback.defaultOutput : fallback.defaultOutput,
+    outputs,
+    rules: Array.isArray(table.rules) ? table.rules : [],
+    defaultOutput: table.defaultOutput,
   }
 }
 
@@ -1702,6 +1696,7 @@ export function StrategyStudioWorkbench({
             </div>
             <div className="strategy-table-panel">
               <DecisionTableEditor
+                key={activeScenario.key}
                 value={scenarioTable}
                 onChange={(next) => updateScenarioTable(activeScenario.key, next)}
                 analysis={tableAnalyses[activeScenario.key] ?? null}
