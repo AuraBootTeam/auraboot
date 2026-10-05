@@ -31,6 +31,40 @@ public class MybatisPlusConfig {
     @Value("${aura.persistence.tenant-bypass-table-prefixes:}")
     private String tenantBypassTablePrefixes = "";
 
+    /**
+     * Table families owned by the composing host (e.g. {@code commerce_} for the
+     * commerce storefront host). Host-owned families sit outside the platform
+     * tenant-line surface entirely: the platform never appends tenant_id predicates
+     * to them, and their mapper calls do not require a platform MetaContext. This is
+     * an ownership declaration — the host is responsible for whatever scoping its
+     * own tables need — so unlike {@code tenant-bypass-table-prefixes} it is not a
+     * dev-profile affordance and is allowed in every profile. Fail-closed default
+     * (empty = no host families declared).
+     */
+    @Value("${aura.persistence.host-table-prefixes:}")
+    private String hostTablePrefixes = "";
+
+    /**
+     * Mapper packages owned by the composing host (e.g. {@code com.aurashop} for the
+     * commerce storefront host). Statements whose mapper id lives under one of these
+     * packages skip the tenant-line interceptor entirely — before SQL parsing, so
+     * host SQL that uses vendor syntax JSQLParser cannot model still runs. Ownership
+     * declaration like {@link #hostTablePrefixes}; fail-closed default (empty).
+     */
+    @Value("${aura.persistence.host-mapper-packages:}")
+    private String hostMapperPackages = "";
+
+    /** Package-visible for tests. */
+    boolean isHostStatement(String mappedStatementId) {
+        if (mappedStatementId == null || hostMapperPackages == null || hostMapperPackages.isBlank()) {
+            return false;
+        }
+        return java.util.Arrays.stream(hostMapperPackages.split(","))
+                .map(String::trim)
+                .filter(prefix -> !prefix.isEmpty())
+                .anyMatch(mappedStatementId::startsWith);
+    }
+
     /** Static cache populated on first access. Drop-in replacement for the prior hardcoded Set. */
     private static volatile Set<String> envScopedTables;
 
@@ -135,6 +169,12 @@ public class MybatisPlusConfig {
         }
     }
 
+    @jakarta.annotation.PostConstruct
+    void logHostOwnershipConfig() {
+        log.info("Platform host ownership config: hostTablePrefixes='{}', hostMapperPackages='{}'",
+                hostTablePrefixes, hostMapperPackages);
+    }
+
     @Bean
     public MybatisPlusInterceptor mybatisPlusInterceptor(DatabaseDialect databaseDialect,
                                                           ApplicationContext applicationContext,
@@ -147,7 +187,8 @@ public class MybatisPlusConfig {
         // before tenant-line / env-line interceptors mutate boundSql.
         interceptor.addInnerInterceptor(new EnvWriteLockGuardInnerInterceptor(applicationContext));
 
-        TenantLineInnerInterceptor tenantInterceptor = new TenantLineInnerInterceptor();
+        TenantLineInnerInterceptor tenantInterceptor =
+                new HostScopeAwareTenantLineInterceptor(this::isHostStatement);
         tenantInterceptor.setTenantLineHandler(new TenantLineHandler() {
             @Override
             public Expression getTenantId() {
@@ -195,6 +236,11 @@ public class MybatisPlusConfig {
                     return true;
                 }
 
+                // ── Host-owned table families (B16 platform host contract) ──
+                if (hasConfiguredHostPrefix(tableName)) {
+                    return true;
+                }
+
                 // ── Application-contributed external stores ──
                 if (hasConfiguredBypassPrefix(tableName)) {
                     return true;
@@ -211,7 +257,10 @@ public class MybatisPlusConfig {
         // env-layering PoC: second tenant-line interceptor reused with column=env_id, applied
         // ONLY to whitelisted @EnvScoped tables (whitelist via blacklist inversion). The
         // TenantLineHandler abstraction has no native whitelist — we invert ignoreTable.
-        TenantLineInnerInterceptor envInterceptor = new TenantLineInnerInterceptor();
+        // The env-layering interceptor shares TenantLineInnerInterceptor's parse-first
+        // behavior, so host statements must skip it too.
+        TenantLineInnerInterceptor envInterceptor =
+                new HostScopeAwareTenantLineInterceptor(this::isHostStatement);
         envInterceptor.setTenantLineHandler(new TenantLineHandler() {
             @Override
             public Expression getTenantId() {
@@ -259,6 +308,20 @@ public class MybatisPlusConfig {
                 .anyMatch(tableName::startsWith);
     }
 
+    private boolean hasConfiguredHostPrefix(String tableName) {
+        if (tableName == null || hostTablePrefixes == null || hostTablePrefixes.isBlank()) return false;
+        if (!hostPrefixesLogged) {
+            hostPrefixesLogged = true;
+            log.info("Platform host-owned table prefixes active: {}", hostTablePrefixes);
+        }
+        return java.util.Arrays.stream(hostTablePrefixes.split(","))
+                .map(String::trim)
+                .filter(prefix -> !prefix.isEmpty())
+                .anyMatch(tableName::startsWith);
+    }
+
+    private volatile boolean hostPrefixesLogged;
+
     /**
      * The prefix bypass turns the tenant filter off for whole table families. That is a
      * single-tenant/dev-store affordance; in any non-dev profile a configured bypass is a
@@ -282,4 +345,42 @@ public class MybatisPlusConfig {
                 active, tenantBypassTablePrefixes);
     }
 
+
+    /**
+     * Tenant/env line interceptor that skips host-owned mapper statements entirely,
+     * before SQL parsing: JSQLParser cannot model vendor syntax some hosts use
+     * (e.g. PostgreSQL array containment in commerce checkout claims), and both the
+     * tenant-line and env-line instances parse every statement before consulting
+     * their handlers' ignoreTable.
+     */
+    static final class HostScopeAwareTenantLineInterceptor extends TenantLineInnerInterceptor {
+
+        private final java.util.function.Predicate<String> hostStatements;
+
+        HostScopeAwareTenantLineInterceptor(java.util.function.Predicate<String> hostStatements) {
+            this.hostStatements = hostStatements;
+        }
+
+        @Override
+        public void beforeQuery(org.apache.ibatis.executor.Executor executor,
+                org.apache.ibatis.mapping.MappedStatement mappedStatement, Object parameter,
+                org.apache.ibatis.session.RowBounds rowBounds,
+                org.apache.ibatis.session.ResultHandler resultHandler,
+                org.apache.ibatis.mapping.BoundSql boundSql) {
+            if (hostStatements.test(mappedStatement.getId())) {
+                return;
+            }
+            super.beforeQuery(executor, mappedStatement, parameter, rowBounds, resultHandler, boundSql);
+        }
+
+        @Override
+        public void beforePrepare(org.apache.ibatis.executor.statement.StatementHandler statementHandler,
+                java.sql.Connection connection, Integer transactionTimeout) {
+            if (hostStatements.test(com.baomidou.mybatisplus.core.toolkit.PluginUtils
+                    .mpStatementHandler(statementHandler).mappedStatement().getId())) {
+                return;
+            }
+            super.beforePrepare(statementHandler, connection, transactionTimeout);
+        }
+    }
 }

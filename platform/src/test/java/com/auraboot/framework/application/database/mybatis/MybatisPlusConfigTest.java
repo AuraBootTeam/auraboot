@@ -52,6 +52,26 @@ public class MybatisPlusConfigTest {
         MetaContext.clear();
     }
 
+    @Test
+    public void hostMapperPackageSkipsTenantLineBeforeParsing() {
+        org.springframework.test.util.ReflectionTestUtils.setField(config, "hostMapperPackages", "com.aurashop");
+        org.springframework.test.util.ReflectionTestUtils.setField(config, "hostTablePrefixes", "commerce_");
+
+        org.assertj.core.api.Assertions.assertThat(
+                config.isHostStatement("com.aurashop.commerce.checkout.mapper.CommerceCheckoutMapper.createCheckout"))
+                .as("host-owned mapper statements skip the tenant-line interceptor before SQL parsing")
+                .isTrue();
+        org.assertj.core.api.Assertions.assertThat(
+                config.isHostStatement("com.auraboot.framework.meta.mapper.PageSchemaMapper.insert"))
+                .as("platform statements stay tenant-line scoped")
+                .isFalse();
+        org.assertj.core.api.Assertions.assertThat(config.isHostStatement(null)).isFalse();
+        org.assertj.core.api.Assertions.assertThat(
+                new MybatisPlusConfig().isHostStatement("com.aurashop.commerce.X.insert"))
+                .as("fail-closed default: no host mapper packages declared")
+                .isFalse();
+    }
+
     /**
      * Find the TenantLineInnerInterceptor whose column == "tenant_id". Multiple instances now
      * exist (tenant + env-layering env_id) — index 0 is no longer guaranteed to be the tenant

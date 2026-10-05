@@ -75,6 +75,7 @@ class FileServiceImplTest {
     @BeforeEach
     void setUp() {
         multipartProperties.setMaxFileSize(DataSize.ofMegabytes(100));
+        ReflectionTestUtils.setField(fileService, "multipartProperties", multipartProperties);
         ReflectionTestUtils.setField(fileService, "baseUrl", "http://localhost:8080");
         // cdnUrlRewriter is @Autowired(required=false); InjectMocks will set it.
         // Explicit null-out to default to "no CDN" for most tests.
