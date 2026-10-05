@@ -1,0 +1,38 @@
+{
+  "generate": {
+    "zh-CN": "生成",
+    "en-US": "Generate"
+  },
+  "summarize": {
+    "zh-CN": "生成摘要",
+    "en-US": "Summarize"
+  },
+  "translate": {
+    "zh-CN": "翻译",
+    "en-US": "Translate"
+  },
+  "classify": {
+    "zh-CN": "分类",
+    "en-US": "Classify"
+  },
+  "extract": {
+    "zh-CN": "提取",
+    "en-US": "Extract"
+  },
+  "generating": {
+    "zh-CN": "生成中…",
+    "en-US": "Generating…"
+  },
+  "attachImage": {
+    "zh-CN": "添加图片",
+    "en-US": "Attach image"
+  },
+  "failedToGenerate": {
+    "zh-CN": "生成失败",
+    "en-US": "Failed to generate content"
+  },
+  "defaultPlaceholder": {
+    "zh-CN": "AI 生成的内容将显示在这里…",
+    "en-US": "AI-generated content will appear here…"
+  }
+}
