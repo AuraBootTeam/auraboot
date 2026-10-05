@@ -106,7 +106,12 @@ if [[ "$REUSE" == true ]]; then
   log "2/6 reuse verified stack name=$NAME slot=$SLOT (no reset, allocation or destruction)"
 else
   log "2/6 fresh stack name=$NAME slot=$SLOT (no existing runtime is destroyed)"
+  # A runtime whose source-set pins a frozen Workspace dependency only re-ups with the
+  # same binding; the checkout is validated fail-closed by the stack launcher.
+  workspace_source_args=()
+  [[ -z "${AURA_GOLDEN_WORKSPACE_SOURCE_ROOT:-}" ]] || workspace_source_args=(--workspace-source-root "$AURA_GOLDEN_WORKSPACE_SOURCE_ROOT")
   "$GS" up "$NAME" --slot "$SLOT" --ttl 12h --runtime-mode verification --require-new-db --plugin-profile demo \
+    "${workspace_source_args[@]}" \
     || die_env 'stack bring-up failed; inspect retained golden-stack logs'
 fi
 log '3/6 import test-fixtures'

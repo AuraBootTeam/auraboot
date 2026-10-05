@@ -11,7 +11,7 @@ for (const external of [false, true]) test(`env reads ${external ? 'external CI'
   fs.writeFileSync(path.join(workspace, 'dev.sh'), '#!/bin/bash\nexit 0\n', { mode: 0o755 });
   // Hermetic registered Workspace controller; no real runtime allocation.
   assert.equal(spawnSync('git', ['init', workspace], { encoding: 'utf8' }).status, 0);
-  fs.writeFileSync(path.join(workspace, 'aura'), 'if (process.argv.slice(2).join(" ") !== "control require 1") process.exit(2);\n');
+  fs.writeFileSync(path.join(workspace, 'aura'), 'if (process.argv.slice(2).join(" ") !== "control require 1") process.exit(2);\n', { mode: 0o755 });
   fs.writeFileSync(path.join(workspace, 'runtime.yaml'), 'version: 1\n');
   const state = path.join(workspace, external ? 'external-state' : '.workspace');
   fs.mkdirSync(path.join(state, 'golden', 'fixture'), { recursive: true });

@@ -39,13 +39,13 @@ fi
   script(path.join(root, 'bin/ps'), `[[ "$MODE" != wrong-ancestor ]] || { printf '1\\n'; exit 0; }
 printf '1000000002\\n'
 `);
-  const run = command => {
+  const run = (command, extraEnv = {}) => {
     const r = spawnSync('bash', ['-c', 'set -euo pipefail\nsource "$HELPER"\n' + command], {
       env: { ...process.env, PATH: path.join(root, 'bin') + ':' + process.env.PATH,
         HELPER: helper, DEV: path.join(root, 'aura'), CALLS: calls, MODE: mode,
         FOREIGN_CWD: path.join(root, 'foreign'),
         ARTIFACT: mode === 'missing-artifact' ? path.join(root, 'missing.jar') : artifact,
-        REPO: repo, WORKSPACE: root, EXPECTED_CWD: path.join(repo, 'web-admin') }, encoding: 'utf8',
+        REPO: repo, WORKSPACE: root, EXPECTED_CWD: path.join(repo, 'web-admin'), ...extraEnv }, encoding: 'utf8',
     });
     return { ...r, calls: fs.readFileSync(calls, 'utf8') };
   };
@@ -84,4 +84,42 @@ for (const mode of ['no-listener', 'two-listeners', 'wrong-cwd', 'wrong-ancestor
 }
 test('does not suppress a failed Workspace process registration', t => {
   assert.notEqual(fixture(t, 'register-fail').run(register).status, 0);
+});
+
+// The frozen workspace dependency is an opt-in source identity: it must be a clean git
+// checkout that is not the moving control root, or the launcher refuses before any
+// registration mutation.
+function gitFixture(t) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'golden-workspace-dep-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const repo = path.join(root, 'dep');
+  fs.mkdirSync(repo, { recursive: true });
+  const git = (args) => spawnSync('git', ['-C', repo, ...args], { encoding: 'utf8' });
+  git(['init', '--quiet']);
+  fs.writeFileSync(path.join(repo, 'frozen.txt'), 'frozen\n');
+  git(['add', 'frozen.txt']);
+  git(['-c', 'user.email=fixture@auraboot', '-c', 'user.name=fixture', 'commit', '--quiet', '-m', 'frozen dependency']);
+  return { root, repo };
+}
+test('resolves a clean frozen dependency checkout outside the control root', t => {
+  const f = fixture(t); const g = gitFixture(t);
+  const r = f.run(`golden_workspace_dependency_root "$DEP" "$CONTROL"`, { DEP: g.repo, CONTROL: f.root });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout.trim(), fs.realpathSync(g.repo));
+});
+for (const [name, prepare] of [
+  ['the control root itself', null],
+  ['a dirty checkout', (g) => fs.writeFileSync(path.join(g.repo, 'dirty.txt'), 'drift\n')],
+  ['a non-git directory', (g) => { fs.rmSync(path.join(g.repo, '.git'), { recursive: true, force: true }); }],
+]) test(`refuses ${name} before any binding`, t => {
+  const f = fixture(t); const g = gitFixture(t);
+  prepare?.(g);
+  const dep = name === 'the control root itself' ? f.root : g.repo;
+  const r = f.run(`golden_workspace_dependency_root "$DEP" "$CONTROL"`, { DEP: dep, CONTROL: f.root });
+  assert.notEqual(r.status, 0);
+});
+test('refuses a missing dependency path', t => {
+  const f = fixture(t);
+  const r = f.run('golden_workspace_dependency_root "$DEP" "$CONTROL"', { DEP: path.join(f.root, 'absent'), CONTROL: f.root });
+  assert.notEqual(r.status, 0);
 });

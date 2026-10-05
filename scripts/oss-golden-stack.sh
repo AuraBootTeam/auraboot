@@ -30,6 +30,13 @@
 #                   startup, recording path + SHA-256 in the runtime state directory.
 #       --extra-plugin-root: repeatable explicit fallback after this checkout's OSS plugins;
 #                            sibling plugin repositories are never guessed implicitly.
+#       --workspace-source-root: bind the immutable `workspace` source identity from this
+#                   clean frozen checkout instead of the moving control root. The
+#                   management entry (canonical aura CLI) is unaffected; only the frozen
+#                   source-set is pinned, so shared-main advances no longer invalidate the
+#                   runtime. Required for re-uping a runtime whose source-set was bound
+#                   this way; rejected checkouts (missing, non-git, dirty, or the control
+#                   root itself) fail closed before any registration changes.
 #   ./scripts/oss-golden-stack.sh import <name> [--extra-plugin-root PATH] [--plugin-profile P|--plugin X]
 #   ./scripts/oss-golden-stack.sh warm <name>          # re-run setup→auth→pre-warm (up does this)
 #   ./scripts/oss-golden-stack.sh env  <name>          # print the Playwright env exports
@@ -349,6 +356,7 @@ cmd_up() {
   local slot="" ttl="6h" runtime_mode="development" system_mode="single" frontend=1 warm=1 fresh_db=0 require_new_db=0
   local plugin_profile="" import_plugins=() extra_plugin_roots=() product_migration_roots=()
   local parallel_reason=""
+  local workspace_source_root=""
   local extra_root migration_root plugin_item
   while [ $# -gt 0 ]; do case "$1" in
     --slot) slot="$2"; shift 2;;
@@ -382,6 +390,16 @@ cmd_up() {
       extra_plugin_roots+=("$(cd "$extra_root" && pwd)")
       shift
       ;;
+    --workspace-source-root)
+      [ $# -ge 2 ] || die "--workspace-source-root requires a path"
+      workspace_source_root="$2"
+      shift 2
+      ;;
+    --workspace-source-root=*)
+      workspace_source_root="${1#--workspace-source-root=}"
+      [ -n "$workspace_source_root" ] || die "--workspace-source-root requires a path"
+      shift
+      ;;
     --plugin-profile) plugin_profile="$2"; shift 2;;
     --plugin) import_plugins+=("$2"); shift 2;;
     --plugins)
@@ -405,6 +423,18 @@ cmd_up() {
     single|multi|hybrid) ;;
     *) die "--system-mode must be single|multi|hybrid" ;;
   esac
+  if [ -n "$workspace_source_root" ]; then
+    workspace_source_root="$(golden_workspace_dependency_root "$workspace_source_root" "$WORKSPACE")" \
+      || die "frozen workspace dependency checkout rejected (see diagnostic above)"
+  fi
+  # Toolchain preflight: the backend is launched with bare `java` from this PATH. A broken
+  # shim (e.g. a removed version manager) otherwise kills the JVM instantly and surfaces as
+  # a confusing launch registration failure after a successful build.
+  if ! java_probe="$(bash -c 'command -v java >/dev/null 2>&1 && java -version' 2>&1)"; then
+    die "java toolchain is not usable from this PATH:
+$java_probe
+Repair the shell environment (e.g. export PATH=\"\$JAVA_HOME/bin:\$PATH\") and retry."
+  fi
 
   local sd; sd="$(state_dir "$name")" || return 1
   # Refuse to overwrite a running jar or reset a database served by a live stack.
@@ -442,7 +472,10 @@ for name in ("backend.log", "frontend.log", "bootjar.log", "import.log", "warm.l
     os.symlink(os.path.join("logs", name), old)
 PYLOG
 
-  local runtime_source_args=("$name" "$REPO_ROOT" "$WORKSPACE")
+  local runtime_source_args=("$name" "$REPO_ROOT" "${workspace_source_root:-$WORKSPACE}")
+  if [ -n "$workspace_source_root" ]; then
+    log "    frozen workspace dependency: $workspace_source_root @$(git -C "$workspace_source_root" rev-parse HEAD)"
+  fi
   if [ "${#extra_plugin_roots[@]}" -gt 0 ]; then
     runtime_source_args+=("${extra_plugin_roots[@]}")
   fi
