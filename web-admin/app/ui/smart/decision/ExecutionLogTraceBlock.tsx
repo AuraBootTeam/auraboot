@@ -310,8 +310,16 @@ function rolloutDisplay(log: DecisionLogRecord, locale = 'zh-CN'): string {
   return `${rolloutLabel(log.rolloutArm, locale)}${log.rolloutBucket != null ? ` #${log.rolloutBucket}` : ''}`;
 }
 
-function decisionLabel(log: DecisionLogRecord, locale = 'zh-CN'): string {
-  return log.decisionName?.trim() || traceLabel('semantic', 'decisionFallback', locale);
+function decisionLabel(logOrCode: DecisionLogRecord | string, locale = 'zh-CN', decisionName?: string): string {
+  if (typeof logOrCode === 'string') {
+    const name = decisionName?.trim();
+    if (name) return name;
+    const code = display(logOrCode);
+    if (code === '-') return code;
+    const label = traceLabel('decision', code, locale);
+    return label === code ? traceLabel('semantic', 'decisionFallback', locale) : label;
+  }
+  return logOrCode.decisionName?.trim() || traceLabel('semantic', 'decisionFallback', locale);
 }
 
 function decisionTitle(log: DecisionLogRecord): string {
