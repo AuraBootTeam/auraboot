@@ -265,6 +265,9 @@ run_backend_gradle() {
   local database="$1"
   shift
 TEST_DATABASE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/${database}?charSet=UTF8" \
+TEST_EXPECTED_DATABASE="$database" \
+AURA_TEST_POSTGRES_JDBC_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/${database}?charSet=UTF8" \
+POSTGRES_PASSWORD='auraboot_dev' \
 BOOTSTRAP_TEST_DATABASE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/${BOOTSTRAP_DATABASE}?charSet=UTF8" \
 TEST_DATABASE_USERNAME='auraboot' \
 TEST_DATABASE_PASSWORD='auraboot_dev' \

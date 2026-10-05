@@ -46,26 +46,27 @@ class FieldChangeAuditActorProjectionTest {
         FieldChangeLog stored = change(7L, ACTOR_PID);
         when(audit.getRecordHistoryByRecordPid(41L, "inv_lot", "lot-pid"))
                 .thenReturn(List.of(stored, stored));
-        when(users.findDisplayNamesByIdsInTenant(41L, List.of(7L)))
-                .thenReturn(List.of(Map.of("id", 7L, "display_name", "仓库管理员")));
+        when(audit.findActorDisplayNames(41L, List.of(7L)))
+                .thenReturn(Map.of(7L, "仓库管理员"));
         var response = controller.getRecordChanges("inv_lot", "lot-pid").getData();
         assertThat(response).hasSize(2).allSatisfy(row -> {
             assertThat(row.actorName()).isEqualTo("仓库管理员");
             assertThat(row.oldValue()).isEqualTo("2027-09-01");
             assertThat(row.newValue()).isEqualTo("2028-09-01");
         });
-        verify(users, times(1)).findDisplayNamesByIdsInTenant(41L, List.of(7L));
+        verify(audit, times(1)).findActorDisplayNames(41L, List.of(7L));
+        verify(users, never()).findDisplayNamesByIdsInTenant(any(), any());
         assertThat(stored.getActorName()).isEqualTo(ACTOR_PID);
     }
     @Test void neverFallsBackToAnUnresolvedUserPidOrQueriesAnUnscopedDirectory() {
         when(audit.getRecordHistoryByRecordPid(41L, "inv_lot", "lot-pid"))
                 .thenReturn(List.of(change(999L, ACTOR_PID), change(0L, ACTOR_PID), change(0L, "System")));
-        when(users.findDisplayNamesByIdsInTenant(41L, List.of(999L))).thenReturn(List.of());
+        when(audit.findActorDisplayNames(41L, List.of(999L))).thenReturn(Map.of());
         var response = controller.getRecordChanges("inv_lot", "lot-pid").getData();
         assertThat(response.get(0).actorName()).isNull();
         assertThat(response.get(1).actorName()).isNull();
         assertThat(response.get(2).actorName()).isEqualTo("System");
-        verify(users).findDisplayNamesByIdsInTenant(41L, List.of(999L));
-        verifyNoMoreInteractions(users);
+        verify(audit).findActorDisplayNames(41L, List.of(999L));
+        verify(users, never()).findDisplayNamesByIdsInTenant(any(), any());
     }
 }

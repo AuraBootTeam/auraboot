@@ -50,7 +50,7 @@ class SchemaPublishedEventIntegrationTest extends BaseIntegrationTest {
                 "list",
                 "default",
                 "{}",
-                "{\"blocks\":[]}",
+                "[{\"blockType\":\"table\"}]",
                 3,
                 false,
                 null,
