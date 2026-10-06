@@ -102,3 +102,31 @@ try {
 }
 NODE
 }
+
+# .bin shims resolve package targets through $0-relative paths, so a view can pass every
+# readability probe and still be unexecutable once it is symlinked from a checkout with a
+# different workspace-store layout. Probe the bins the stack supervisor (dev:full) needs.
+web_admin_supervisor_bins_executable() {
+  "$1/.bin/concurrently" --version >/dev/null 2>&1
+}
+
+# Receipt lines (KEY=VALUE) wiring the WYSIWYG report renderer (DDR-2026-06-21) into the
+# co-located backend JVM through Spring's indexed environment binding. Fails closed when
+# the renderer prerequisites (runnable tsx, cli.ts, a resolvable @playwright/test with a
+# chromium binary) are absent — without the command the export service silently falls
+# back to the legacy PDFBox text path.
+web_admin_report_renderer_receipt() {
+  local web_admin="$1" tsx cli
+  tsx="$web_admin/node_modules/.bin/tsx"
+  cli="$web_admin/app/framework/smart/report-export/cli.ts"
+  [ -x "$tsx" ] || { echo "report renderer: tsx is missing (web-admin deps not installed): $tsx" >&2; return 1; }
+  "$tsx" --version >/dev/null 2>&1 || { echo "report renderer: tsx is not runnable: $tsx" >&2; return 1; }
+  [ -r "$cli" ] || { echo "report renderer: cli.ts is missing: $cli" >&2; return 1; }
+  node -e "require.resolve(process.argv[1], {paths:[process.argv[2]]})" "@playwright/test" "$web_admin" >/dev/null 2>&1 \
+    || { echo "report renderer: no resolvable @playwright/test (chromium provider) under $web_admin" >&2; return 1; }
+  printf 'AURABOOT_REPORT_EXPORT_RENDERER_ENABLED=true\n'
+  printf 'AURABOOT_REPORT_EXPORT_RENDERER_COMMAND_0=%s\n' "$tsx"
+  printf 'AURABOOT_REPORT_EXPORT_RENDERER_COMMAND_1=%s\n' "$cli"
+  printf 'AURABOOT_REPORT_EXPORT_RENDERER_TIMEOUT_SECONDS=90\n'
+}
+

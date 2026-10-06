@@ -76,12 +76,15 @@ export async function navigateToMenuByClick(page: Page, labels: string[]): Promi
   for (const label of labels) {
     const nav = page.locator('nav, aside, [role="navigation"]').first();
     const item = nav
-      .getByRole('button', { name: label })
-      .or(nav.getByRole('menuitem', { name: label }))
+      .getByRole('button', { name: label, exact: true })
+      .or(nav.getByRole('link', { name: label, exact: true }))
+      .or(nav.getByRole('menuitem', { name: label, exact: true }))
       .or(nav.locator(`[title="${label}"]`))
       .or(nav.locator(`text="${label}"`))
       .first();
     await item.waitFor({ state: 'visible', timeout: 8000 });
+    // Expanded parent menus already expose their children; clicking would collapse them.
+    if (await item.getAttribute('aria-expanded') === 'true') continue;
     await item.click();
     // Wait for any loading/navigation triggered by menu click
     await page.waitForLoadState('domcontentloaded').catch(() => {});

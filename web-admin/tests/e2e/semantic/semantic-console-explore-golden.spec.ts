@@ -9,7 +9,7 @@ const EV = process.env.AURA_EVIDENCE_DIR!;
 const run = randomUUID().replaceAll('-', '').slice(0, 12);
 const model = `console_golden_orders_${run}`;
 const topnModel = `console_golden_topn_${run}`;
-const statuses = ['draft', 'confirmed', 'shipped', 'completed'];
+const statuses = ['draft', 'submitted', 'approved', 'completed'];
 const dates = ['2026-01-15', '2026-02-15'];
 const limits = [10, 50, 100, 200, 500];
 const grains = ['day', 'week', 'month', 'quarter', 'year'] as const;
@@ -71,18 +71,25 @@ const topnYaml = yaml
 async function openConsole(page: Page) {
   await page.goto('/');
   await ensureSidebarExpanded(page);
-  const catalog = page.waitForResponse(r => r.url().endsWith('/api/semantic/meta'));
-  await navigateToMenuByClick(page, ['语义模型']);
+  const catalog = page.waitForResponse(r => new URL(r.url()).pathname === '/api/semantic/meta'
+    && r.request().method() === 'GET');
+  await navigateToMenuByClick(page, ['元数据管理', '语义模型']);
   const catalogBody = await (await catalog).json();
   expect(String(catalogBody.code)).toBe('0');
   await expect(page).toHaveURL(/\/semantic\/models$/);
-  await expect(page.getByTestId('semantic-models-page')).toBeVisible();
+  // First navigation to this route compiles its dev-server chunk graph on a freshly
+  // started stack; the default 5s visibility budget does not cover that cold path.
+  await expect(page.getByTestId('semantic-models-page')).toBeVisible({ timeout: 30000 });
   await expect(page.getByTestId('semantic-models-loading')).toHaveCount(0);
   await expect(page.getByTestId('semantic-models-error')).toHaveCount(0);
 }
 
 test.beforeAll(async ({ request }) => {
-  // Setup only. Authoring/publishing/querying are browser actions below.
+  // 513 creates against a freshly started stack: the first dynamic-entity calls
+  // bootstrap/JIT the server path, so the default 15s hook budget is not enough.
+  // playwright 1.60 has no beforeAll(fn, timeout) overload; setTimeout inside
+  // the hook extends the hook's own budget.
+  test.setTimeout(180000);
   for (let i = 0; i < 12; i++) {
     const response = await request.post('/api/dynamic/e2et_order/create', { data: {
       e2et_order_title: `SC-${run}-${i}`, e2et_order_type: 'normal',

@@ -14,6 +14,18 @@ vi.mock('~/utils/icon-resolver', () => ({
 }));
 
 describe('SidebarSubmenu navigation', () => {
+  it('exposes the current expansion state without collapsing initially visible leaves', () => {
+    render(<MemoryRouter><SidebarSubmenu name="Metadata" submenu={[
+      { path: '/semantic/models', name: 'Semantic Models' },
+    ]} /></MemoryRouter>);
+    const parent = screen.getByRole('button', { name: 'Metadata' });
+    expect(parent).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(parent);
+    expect(parent).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(parent);
+    expect(parent).toHaveAttribute('aria-expanded', 'true');
+  });
+
   it('notifies the mobile drawer when a nested leaf navigates', () => {
     const onNavigate = vi.fn();
     render(

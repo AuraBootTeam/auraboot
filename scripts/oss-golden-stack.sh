@@ -31,6 +31,18 @@
 #       --extra-plugin-root: repeatable explicit fallback after this checkout's OSS plugins;
 #                            sibling plugin repositories are never guessed implicitly.
 #       --source key=path: explicit owner for each external plugin root; Core binds itself.
+#       --workspace-source-root: bind the immutable `workspace` source identity from this
+#                   clean frozen checkout instead of leaving the shared control root
+#                   unbound. The management entry (canonical aura CLI) is unaffected; the
+#                   frozen source-set is pinned, so shared-main advances no longer
+#                   invalidate the runtime. Re-uping a runtime whose source-set was bound
+#                   this way requires the flag again; rejected checkouts (missing,
+#                   non-git, dirty, or the control root itself) fail closed.
+#       --report-renderer: wire the WYSIWYG PDF report renderer (DDR-2026-06-21) into the
+#                   backend via a registered receipt (report-renderer.env in the runtime
+#                   state dir; suspend/resume replays it). Fails closed when tsx, cli.ts
+#                   or a resolvable @playwright/test are absent; without it PDF export
+#                   uses the legacy PDFBox text fallback.
 #   ./scripts/oss-golden-stack.sh import <name> [--extra-plugin-root PATH] [--plugin-profile P|--plugin X]
 #   ./scripts/oss-golden-stack.sh warm <name>          # re-run setup→auth→pre-warm (up does this)
 #   ./scripts/oss-golden-stack.sh env  <name>          # print the Playwright env exports
@@ -349,6 +361,7 @@ PY
 cmd_up() {
   local name="$1"; shift
   local requested_args=("$@") source_specs=("core=$REPO_ROOT")
+  local workspace_source_root="" report_renderer=0 renderer_env_args=()
   local slot="" ttl="6h" runtime_mode="development" system_mode="single" frontend=1 warm=1 fresh_db=0 require_new_db=0
   local plugin_profile="" import_plugins=() extra_plugin_roots=() product_migration_roots=()
   local parallel_reason=""
@@ -359,6 +372,20 @@ cmd_up() {
     --runtime-mode) runtime_mode="$2"; shift 2;;
     --parallel-reason) parallel_reason="$2"; shift 2;;
     --source) source_specs+=("${2:?--source requires key=path}"); shift 2;;
+    --workspace-source-root)
+      [ $# -ge 2 ] || die "--workspace-source-root requires a path"
+      workspace_source_root="$2"
+      shift 2
+      ;;
+    --workspace-source-root=*)
+      workspace_source_root="${1#--workspace-source-root=}"
+      [ -n "$workspace_source_root" ] || die "--workspace-source-root requires a path"
+      shift
+      ;;
+    --report-renderer)
+      report_renderer=1
+      shift
+      ;;
     --system-mode) system_mode="${2:-}"; [ $# -ge 2 ] || die "--system-mode requires a value"; shift 2;;
     --no-frontend) frontend=0; shift;;
     --no-warm) warm=0; shift;;
@@ -409,6 +436,19 @@ cmd_up() {
     single|multi|hybrid) ;;
     *) die "--system-mode must be single|multi|hybrid" ;;
   esac
+  if [ -n "$workspace_source_root" ]; then
+    workspace_source_root="$(golden_workspace_dependency_root "$workspace_source_root" "$WORKSPACE")" \
+      || die "frozen workspace dependency checkout rejected (see diagnostic above)"
+    source_specs+=("workspace=$workspace_source_root")
+  fi
+  # Toolchain preflight: the backend is launched with bare `java` from this PATH. A broken
+  # shim (e.g. a removed version manager) otherwise kills the JVM instantly and surfaces as
+  # a confusing launch registration failure after a successful build.
+  if ! java_probe="$(bash -c 'command -v java >/dev/null 2>&1 && java -version' 2>&1)"; then
+    die "java toolchain is not usable from this PATH:
+$java_probe
+Repair the shell environment (e.g. export PATH=\"\$JAVA_HOME/bin:\$PATH\") and retry."
+  fi
 
   local sd; sd="$(state_dir "$name")" || return 1
   node "$SCRIPT_DIR/lib/oss-stack-lifecycle.mjs" validate "$name" "$REPO_ROOT" "$sd" "${requested_args[@]}" \
@@ -447,6 +487,13 @@ for name in ("backend.log", "frontend.log", "bootjar.log", "import.log", "warm.l
             shutil.move(old, os.path.join(archive, name))
     os.symlink(os.path.join("logs", name), old)
 PYLOG
+
+  if [ "$report_renderer" = "1" ]; then
+    web_admin_report_renderer_receipt "$REPO_ROOT/web-admin" >"$sd/report-renderer.env" \
+      || die "report renderer requirements not met (see diagnostic above)"
+    while IFS= read -r line; do renderer_env_args+=("$line"); done <"$sd/report-renderer.env"
+    log "    WYSIWYG report renderer wired (${#renderer_env_args[@]} env keys; receipt $sd/report-renderer.env)"
+  fi
 
   local binding_args=(runtime lifecycle bind "$name" --handler "$SCRIPT_DIR/oss-golden-lifecycle.sh")
   local source_spec
@@ -610,6 +657,7 @@ XML
       LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_OBSERVABILITY_MAPPER="${AURA_GOLDEN_MAPPER_LOG_LEVEL:-INFO}" \
       AURA_BUILTIN_PLUGINS_DIR="$REPO_ROOT/plugins" \
       AGENT_LLM_STUB_MODE="${AGENT_LLM_STUB_MODE:-true}" \
+      ${renderer_env_args[@]+"${renderer_env_args[@]}"} \
       java -jar "$run_jar"
   node "$SCRIPT_DIR/lib/golden-process-stop.mjs" register-backend "$name" "$REPO_ROOT" "$DEV" "$(cat "$sd/backend.pid")" \
     || die "backend launch process registration failed"
@@ -986,6 +1034,12 @@ cmd_resume_retained() {
   pg_db="$(runtime_env "$name" POSTGRES_DB)"
   redis_db="$(runtime_env "$name" REDIS_DATABASE)"
   runtime_token="$("$DEV" runtime process token "$name")" || die "runtime ownership token unavailable"
+  # The renderer receipt is written by 'up --report-renderer'; resume replays the same
+  # registered wiring instead of silently dropping the WYSIWYG export path.
+  local renderer_env_args=()
+  if [ -f "$sd/report-renderer.env" ]; then
+    while IFS= read -r line; do renderer_env_args+=("$line"); done <"$sd/report-renderer.env"
+  fi
   spawn_detached "$sd/backend.pid" "$REPO_ROOT/platform" "$sd/backend.log" \
     env "${logging_args[@]}" MANAGEMENT_HEALTH_DB_ENABLED=false AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" SERVER_PORT="$server_port" SERVER_ADDRESS=127.0.0.1 \
       SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:5432/${pg_db}?charSet=UTF8" \
@@ -1001,6 +1055,7 @@ cmd_resume_retained() {
       LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_OBSERVABILITY_MAPPER="${AURA_GOLDEN_MAPPER_LOG_LEVEL:-INFO}" \
       AURA_BUILTIN_PLUGINS_DIR="$REPO_ROOT/plugins" \
       AGENT_LLM_STUB_MODE="$llm_stub_mode" \
+      ${renderer_env_args[@]+"${renderer_env_args[@]}"} \
       java -jar "$run_jar"
   node "$SCRIPT_DIR/lib/golden-process-stop.mjs" register-backend "$name" "$REPO_ROOT" "$DEV" "$(cat "$sd/backend.pid")" \
     || die "backend launch process registration failed"

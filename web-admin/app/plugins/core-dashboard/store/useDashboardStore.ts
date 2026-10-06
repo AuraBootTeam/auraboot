@@ -55,6 +55,11 @@ interface DashboardStore {
   isSaving: boolean;
   isLoading: boolean;
 
+  // Monotonic counter bumped by every content mutation. A dashboard fetch that
+  // started before a mutation is OLDER than the on-screen state and must not
+  // replace it when it lands (widgets would visibly vanish mid-authoring).
+  mutationGeneration: number;
+
   // Undo/Redo history
   history: Widget[][];
   historyIndex: number;
@@ -106,6 +111,10 @@ interface DashboardStore {
   getWidgetById: (widgetId: string) => Widget | undefined;
 }
 
+// In-flight dashboard loads keyed by pid: concurrent loadDashboard calls share
+// one fetch instead of racing two responses into the same widgets array.
+const loadDashboardInFlight = new Map<string, Promise<void>>();
+
 const initialState = {
   dashboard: null as Dashboard | null,
   widgets: [] as Widget[],
@@ -114,6 +123,7 @@ const initialState = {
   isDirty: false,
   isSaving: false,
   isLoading: false,
+  mutationGeneration: 0,
   history: [] as Widget[][],
   historyIndex: -1,
   validationResult: null as ValidationResult | null,
@@ -127,28 +137,50 @@ export const useDashboardStore = create<DashboardStore>()(
       // ==================== Dashboard Actions ====================
 
       loadDashboard: async (pid: string) => {
+        // Concurrent loads for the same dashboard (double effect invocation,
+        // remounts) must share one fetch: a later response would otherwise
+        // clobber widgets saved by actions that ran between the two responses.
+        const inFlight = loadDashboardInFlight.get(pid);
+        if (inFlight) return inFlight;
+
+        const requestedGeneration = get().mutationGeneration;
         set((state) => {
           state.isLoading = true;
         });
 
-        try {
-          const dashboard = await dashboardService.findByPid(pid);
-          set((state) => {
-            state.dashboard = dashboard;
-            state.widgets = dashboard.widgets || [];
-            state.layoutConfig = dashboard.layoutConfig || { ...DEFAULT_LAYOUT_CONFIG };
-            state.isDirty = false;
-            state.isLoading = false;
-            state.selectedWidgetId = null;
-            state.history = [dashboard.widgets || []];
-            state.historyIndex = 0;
-          });
-        } catch (error) {
-          set((state) => {
-            state.isLoading = false;
-          });
-          throw error;
-        }
+        const load = (async () => {
+          try {
+            const dashboard = await dashboardService.findByPid(pid);
+            set((state) => {
+              // The response is older than what is on screen when local content
+              // mutated during the fetch or the designer moved to another
+              // dashboard: applying it would visibly wipe unsaved user changes.
+              const stale = state.mutationGeneration !== requestedGeneration
+                || (state.dashboard !== null && state.dashboard.pid !== pid);
+              if (stale) {
+                state.isLoading = false;
+                return;
+              }
+              state.dashboard = dashboard;
+              state.widgets = dashboard.widgets || [];
+              state.layoutConfig = dashboard.layoutConfig || { ...DEFAULT_LAYOUT_CONFIG };
+              state.isDirty = false;
+              state.isLoading = false;
+              state.selectedWidgetId = null;
+              state.history = [dashboard.widgets || []];
+              state.historyIndex = 0;
+            });
+          } catch (error) {
+            set((state) => {
+              state.isLoading = false;
+            });
+            throw error;
+          } finally {
+            loadDashboardInFlight.delete(pid);
+          }
+        })();
+        loadDashboardInFlight.set(pid, load);
+        return load;
       },
 
       createDashboard: (title: string, scope: DashboardScope = 'personal') => {
@@ -258,6 +290,7 @@ export const useDashboardStore = create<DashboardStore>()(
         set((state) => {
           state.widgets.push(widget);
           state.isDirty = true;
+          state.mutationGeneration += 1;
           state.selectedWidgetId = widgetId;
 
           // Add to history (deep copy to prevent shared references)
@@ -275,6 +308,7 @@ export const useDashboardStore = create<DashboardStore>()(
           if (index !== -1) {
             state.widgets[index] = { ...state.widgets[index], ...updates };
             state.isDirty = true;
+            state.mutationGeneration += 1;
 
             // Add to history (deep copy to prevent shared references)
             state.history = state.history.slice(0, state.historyIndex + 1);
@@ -290,6 +324,7 @@ export const useDashboardStore = create<DashboardStore>()(
           if (widget) {
             widget.config = { ...widget.config, ...configUpdates };
             state.isDirty = true;
+            state.mutationGeneration += 1;
 
             // Add to history (deep copy to prevent shared references)
             state.history = state.history.slice(0, state.historyIndex + 1);
@@ -306,6 +341,7 @@ export const useDashboardStore = create<DashboardStore>()(
             state.selectedWidgetId = null;
           }
           state.isDirty = true;
+          state.mutationGeneration += 1;
 
           // Add to history (deep copy to prevent shared references)
           state.history = state.history.slice(0, state.historyIndex + 1);
@@ -339,6 +375,7 @@ export const useDashboardStore = create<DashboardStore>()(
           s.widgets.push(newWidget);
           s.selectedWidgetId = newWidgetId;
           s.isDirty = true;
+          s.mutationGeneration += 1;
 
           // Add to history (deep copy to prevent shared references)
           s.history = s.history.slice(0, s.historyIndex + 1);
@@ -355,6 +392,7 @@ export const useDashboardStore = create<DashboardStore>()(
         set((state) => {
           state.widgets = widgets;
           state.isDirty = true;
+          state.mutationGeneration += 1;
 
           // Add to history so layout changes can be undone
           state.history = state.history.slice(0, state.historyIndex + 1);
@@ -367,6 +405,7 @@ export const useDashboardStore = create<DashboardStore>()(
         set((state) => {
           state.layoutConfig = { ...state.layoutConfig, ...config };
           state.isDirty = true;
+          state.mutationGeneration += 1;
         });
       },
 
@@ -386,6 +425,7 @@ export const useDashboardStore = create<DashboardStore>()(
             state.historyIndex -= 1;
             state.widgets = JSON.parse(JSON.stringify(state.history[state.historyIndex]));
             state.isDirty = true;
+            state.mutationGeneration += 1;
           }
         });
       },
@@ -396,6 +436,7 @@ export const useDashboardStore = create<DashboardStore>()(
             state.historyIndex += 1;
             state.widgets = JSON.parse(JSON.stringify(state.history[state.historyIndex]));
             state.isDirty = true;
+            state.mutationGeneration += 1;
           }
         });
       },
@@ -501,7 +542,15 @@ export const useDashboardStore = create<DashboardStore>()(
       },
 
       reset: () => {
-        set(initialState);
+        // Mutate the draft instead of returning a replacement object: under the
+        // immer middleware a returned value diverges from the set(initialState)
+        // semantics and broke palette adds after an unmount reset (verified by
+        // bisect). The generation must only move forward so a fetch that started
+        // before the reset lands as stale.
+        set((state) => {
+          Object.assign(state, initialState);
+          state.mutationGeneration = state.mutationGeneration + 1;
+        });
       },
 
       // ==================== Utilities ====================

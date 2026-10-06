@@ -138,7 +138,9 @@ export async function registerGoldenLaunch(name, repo, cli, pid, key) {
     'Launch source owner mismatch');
   const token = readFileSync(join(report.stateDir, 'runtimes', name, 'processes', 'ownership.token'), 'utf8').trim();
   let current, previous, ready = false;
-  for (let attempt = 0; attempt < 100; attempt++) {
+  // A detached JVM can take seconds to exec its environment on a loaded host; the probe
+  // requires stability, not speed. A dead child still fails fast on the snapshot probe.
+  for (let attempt = 0; attempt < 500; attempt++) {
     current = snapshot(pid);
     if (!current) break;
     if (stableGoldenLaunch(current, previous, { runtime: name, token, cwd: join(realpathSync(repo), cwd), executable })) {

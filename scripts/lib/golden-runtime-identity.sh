@@ -1,6 +1,31 @@
 #!/usr/bin/env bash
 # Workspace identity registration for an explicitly owned golden stack.
 
+# Resolve the optional frozen Workspace dependency checkout for --workspace-source-root.
+# The management entry stays the canonical control root; only the source-set identity is
+# pinned here. Binding the control root itself would re-record whatever shared main
+# currently is (including foreign dirty state) and drift on the next shared commit, so
+# that alias is rejected together with missing, non-git, or dirty checkouts.
+golden_workspace_dependency_root() {
+  local candidate="$1" control="$2" resolved control_resolved
+  resolved="$(cd "$candidate" 2>/dev/null && pwd -P)" || {
+    echo "frozen workspace dependency checkout does not exist: $candidate" >&2; return 2;
+  }
+  control_resolved="$(cd "$control" 2>/dev/null && pwd -P)" || {
+    echo "workspace control root does not exist: $control" >&2; return 2;
+  }
+  [ "$resolved" != "$control_resolved" ] || {
+    echo "frozen workspace dependency must not be the control root: $resolved" >&2; return 2;
+  }
+  git -C "$resolved" rev-parse --show-toplevel >/dev/null 2>&1 || {
+    echo "frozen workspace dependency is not a git checkout: $resolved" >&2; return 2;
+  }
+  [ -z "$(git -C "$resolved" status --porcelain)" ] || {
+    echo "frozen workspace dependency must be a clean checkout: $resolved" >&2; return 2;
+  }
+  printf '%s\n' "$resolved"
+}
+
 # Bind all declared input roots before building or starting any process.
 golden_runtime_bind_sources() {
   local name="$1" repo="$2" workspace="$3"; shift 3
