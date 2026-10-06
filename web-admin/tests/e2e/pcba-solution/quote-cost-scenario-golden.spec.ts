@@ -233,6 +233,9 @@ test.describe('PCBA quote cost scenario golden', () => {
       page.getByText('汇率假设 7.0 CNY/USD').first(),
       'assumption description renders',
     ).toBeVisible({ timeout: 20_000 });
+    for (const evidence of ['汇率口径经财务复核', '缺少测试报告成本项', '由历史测试报告覆盖,无需另行收费']) {
+      await expect(page.locator('main').getByText(evidence, { exact: true })).toBeVisible({ timeout: 20_000 });
+    }
     const bodyText = await page.locator('main').innerText();
     // 人类可读:假设描述/批准原因、缺口描述/豁免原因全部可见
     expect(bodyText).toContain('汇率假设 7.0 CNY/USD');

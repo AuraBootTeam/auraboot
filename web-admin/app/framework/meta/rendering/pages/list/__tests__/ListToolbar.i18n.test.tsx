@@ -179,6 +179,18 @@ describe('ListToolbar i18n', () => {
     expect(input.placeholder).toBe('搜索...');
   });
 
+  it('uses the configured business search hint without changing search submission', () => {
+    const onSearch = vi.fn();
+    const onKeywordChange = vi.fn();
+    renderToolbar({ searchPlaceholder: '搜索人员编号、姓名或状态', onSearch, onKeywordChange });
+    const input = screen.getByTestId('list-search-input');
+    expect(input).toHaveAttribute('placeholder', '搜索人员编号、姓名或状态');
+    fireEvent.change(input, { target: { value: '张三' } });
+    expect(onKeywordChange).toHaveBeenCalledWith('张三');
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onSearch).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps toolbar controls responsive on narrow list pages', () => {
     renderToolbar();
     const toolbar = screen.getByTestId('list-toolbar');

@@ -290,6 +290,20 @@ class HandlerPhaseTest {
                 .isInstanceOf(AccessDeniedException.class)
                 .hasMessage("record ownership required");
         assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+        CommandHandlerExtension codedDenial = new CommandHandlerExtension() {
+            @Override public String getCommandType() { return PLUGIN_HANDLER_CODE; }
+            @Override public Object execute(CommandContext context) {
+                throw new com.auraboot.framework.plugin.extension.DataAccessorException(
+                        com.auraboot.framework.plugin.extension.DataAccessErrorCode.PERMISSION_DENIED,
+                        new AccessDeniedException("record ownership required"));
+            }
+        };
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(codedDenial));
+        assertThatThrownBy(() -> phase.execute(buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of(
+                "type", "state_transition", "handler", PLUGIN_HANDLER_CODE))))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasCauseInstanceOf(com.auraboot.framework.plugin.extension.DataAccessorException.class);
+        assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
     }
 
     @Test

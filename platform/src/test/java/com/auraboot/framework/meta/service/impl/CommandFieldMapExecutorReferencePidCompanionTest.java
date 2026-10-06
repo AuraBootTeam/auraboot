@@ -1,6 +1,8 @@
 package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.common.constant.ResponseCode;
+import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.dto.ModelDefinition;
@@ -19,6 +21,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.DataAccessResourceFailureException;
 
 import java.util.List;
 import java.util.Map;
@@ -26,6 +30,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
@@ -54,6 +59,36 @@ class CommandFieldMapExecutorReferencePidCompanionTest {
     @AfterEach
     void tearDown() {
         MetaContext.clear();
+    }
+
+    @Test
+    void implicitCreateReportsDuplicateAsLocalizedBusinessFailureWithoutSqlDetails() {
+        when(metaModelService.getModelDefinition("mkt_purchase")).thenReturn(Optional.of(purchaseModel()));
+        DuplicateKeyException duplicate = new DuplicateKeyException("INSERT INTO private_table: duplicate key");
+        when(dynamicDataMapper.insert(eq("mt_mkt_purchase"), anyMap())).thenThrow(duplicate);
+
+        assertThatThrownBy(() -> executor().executeImplicitFieldMapPhase(
+                Map.of("type", "create", "inputFields", List.of("mkt_pur_plugin_pid")),
+                Map.of("mkt_pur_plugin_pid", "PLG-PID"),
+                100L, new CommandExecuteRequest(), command()))
+                .isInstanceOfSatisfying(BusinessException.class, failure -> {
+                    assertThat(failure.getResponseCode()).isEqualTo(ResponseCode.BadParam);
+                    assertThat(failure.getMessage()).isEqualTo("$i18n:meta_record.duplicate");
+                    assertThat(failure.getCause()).isSameAs(duplicate);
+                });
+    }
+
+    @Test
+    void implicitCreateDoesNotMisclassifyDatabaseAvailabilityFailureAsDuplicate() {
+        when(metaModelService.getModelDefinition("mkt_purchase")).thenReturn(Optional.of(purchaseModel()));
+        DataAccessResourceFailureException unavailable = new DataAccessResourceFailureException("Database unavailable");
+        when(dynamicDataMapper.insert(eq("mt_mkt_purchase"), anyMap())).thenThrow(unavailable);
+
+        assertThatThrownBy(() -> executor().executeImplicitFieldMapPhase(
+                Map.of("type", "create", "inputFields", List.of("mkt_pur_plugin_pid")),
+                Map.of("mkt_pur_plugin_pid", "PLG-PID"),
+                100L, new CommandExecuteRequest(), command()))
+                .isSameAs(unavailable);
     }
 
     @Test

@@ -1,5 +1,20 @@
 [
   {
+    "code": "sys.cap.dashboard",
+    "group": "系统管理",
+    "displayGroupOrder": 95,
+    "name:zh-CN": "管理仪表盘",
+    "name:en": "Manage Dashboards",
+    "description": "创建、编辑、发布仪表盘及维护版本，包含既有仪表盘管理页入口；数据读取仍受原有数据权限约束，不开放未启用菜单。",
+    "includes": [
+      "dashboard.read",
+      "dashboard.update",
+      "dashboard_mgmt"
+    ],
+    "tier": "admin",
+    "order": 15
+  },
+  {
     "code": "sys.cap.console",
     "group": "系统管理",
     "displayGroupOrder": 95,
@@ -74,7 +89,8 @@
     "name:en": "Automation View",
     "description": "查看自动化规则与执行",
     "includes": [
-      "automation.automation.read"
+      "automation.automation.read",
+      "automation.read"
     ],
     "tier": "viewer",
     "order": 60
@@ -175,5 +191,1341 @@
     ],
     "tier": "viewer",
     "order": 110
+  },
+  {
+    "code": "sys.cap.decision_view",
+    "group": "决策与事件策略管理",
+    "displayGroupOrder": 96,
+    "name:zh-CN": "查看决策定义与运行证据",
+    "name:en": "View Decision Definitions and Evidence",
+    "description": "查看决策定义与运行证据，仅包含该职责及其读取依赖；不自动授予其他维护、发布、批准或执行动作。",
+    "sensitive": false,
+    "includes": [
+      "decision.definition.read"
+    ],
+    "tier": "viewer",
+    "order": 200
+  },
+  {
+    "code": "sys.cap.decision_manage",
+    "group": "决策与事件策略管理",
+    "displayGroupOrder": 96,
+    "name:zh-CN": "维护决策定义",
+    "name:en": "Manage Decision Definitions",
+    "description": "维护决策定义，仅包含该职责及其读取依赖；不自动授予其他维护、发布、批准或执行动作。",
+    "sensitive": false,
+    "includes": [
+      "decision.definition.read",
+      "decision.definition.manage"
+    ],
+    "tier": "admin",
+    "order": 201
+  },
+  {
+    "code": "sys.cap.decision_publish",
+    "group": "决策与事件策略管理",
+    "displayGroupOrder": 96,
+    "name:zh-CN": "发布决策版本",
+    "name:en": "Publish Decision Versions",
+    "description": "发布决策版本，仅包含该职责及其读取依赖；不自动授予其他维护、发布、批准或执行动作。",
+    "sensitive": true,
+    "includes": [
+      "decision.definition.read",
+      "decision.definition.publish"
+    ],
+    "tier": "admin",
+    "order": 202
+  },
+  {
+    "code": "sys.cap.decision_approve",
+    "group": "决策与事件策略管理",
+    "displayGroupOrder": 96,
+    "name:zh-CN": "批准决策版本",
+    "name:en": "Approve Decision Versions",
+    "description": "批准决策版本，仅包含该职责及其读取依赖；不自动授予其他维护、发布、批准或执行动作。",
+    "sensitive": true,
+    "includes": [
+      "decision.definition.read",
+      "decision.definition.approve"
+    ],
+    "tier": "admin",
+    "order": 203
+  },
+  {
+    "code": "sys.cap.decision_evaluate",
+    "group": "决策与事件策略管理",
+    "displayGroupOrder": 96,
+    "name:zh-CN": "评估决策",
+    "name:en": "Evaluate Decisions",
+    "description": "评估决策，仅包含该职责及其读取依赖；不自动授予其他维护、发布、批准或执行动作。",
+    "sensitive": false,
+    "includes": [
+      "decision.definition.read",
+      "decision.runtime.evaluate"
+    ],
+    "tier": "admin",
+    "order": 204
+  },
+  {
+    "code": "sys.cap.decision_rollout_manage",
+    "group": "决策与事件策略管理",
+    "displayGroupOrder": 96,
+    "name:zh-CN": "维护决策灰度发布计划",
+    "name:en": "Manage Decision Rollout Plans",
+    "description": "维护决策灰度发布计划，仅包含该职责及其读取依赖；不自动授予其他维护、发布、批准或执行动作。",
+    "sensitive": true,
+    "includes": [
+      "decision.definition.read",
+      "decision.rollout.manage"
+    ],
+    "tier": "admin",
+    "order": 205
+  },
+  {
+    "code": "sys.cap.decision_rollout_promote",
+    "group": "决策与事件策略管理",
+    "displayGroupOrder": 96,
+    "name:zh-CN": "推进决策灰度发布",
+    "name:en": "Promote Decision Rollouts",
+    "description": "推进决策灰度发布，仅包含该职责及其读取依赖；不自动授予其他维护、发布、批准或执行动作。",
+    "sensitive": true,
+    "includes": [
+      "decision.definition.read",
+      "decision.rollout.promote"
+    ],
+    "tier": "admin",
+    "order": 206
+  },
+  {
+    "code": "sys.cap.decision_rollout_rollback",
+    "group": "决策与事件策略管理",
+    "displayGroupOrder": 96,
+    "name:zh-CN": "回退决策灰度发布",
+    "name:en": "Roll Back Decision Rollouts",
+    "description": "回退决策灰度发布，仅包含该职责及其读取依赖；不自动授予其他维护、发布、批准或执行动作。",
+    "sensitive": true,
+    "includes": [
+      "decision.definition.read",
+      "decision.rollout.rollback"
+    ],
+    "tier": "admin",
+    "order": 207
+  },
+  {
+    "code": "sys.cap.policy_view",
+    "group": "决策与事件策略管理",
+    "displayGroupOrder": 96,
+    "name:zh-CN": "查看事件策略与执行记录",
+    "name:en": "View Event Policies and Execution Logs",
+    "description": "查看事件策略与执行记录，仅包含该职责及其读取依赖；不自动授予其他维护、发布、批准或执行动作。",
+    "sensitive": false,
+    "includes": [
+      "decision.policy.read"
+    ],
+    "tier": "viewer",
+    "order": 208
+  },
+  {
+    "code": "sys.cap.policy_manage",
+    "group": "决策与事件策略管理",
+    "displayGroupOrder": 96,
+    "name:zh-CN": "维护事件策略",
+    "name:en": "Manage Event Policies",
+    "description": "维护事件策略，仅包含该职责及其读取依赖；不自动授予其他维护、发布、批准或执行动作。",
+    "sensitive": true,
+    "includes": [
+      "decision.policy.read",
+      "decision.policy.manage"
+    ],
+    "tier": "admin",
+    "order": 209
+  },
+  {
+    "code": "sys.cap.policy_publish",
+    "group": "决策与事件策略管理",
+    "displayGroupOrder": 96,
+    "name:zh-CN": "发布事件策略版本",
+    "name:en": "Publish Event Policy Versions",
+    "description": "发布事件策略版本，仅包含该职责及其读取依赖；不自动授予其他维护、发布、批准或执行动作。",
+    "sensitive": true,
+    "includes": [
+      "decision.policy.read",
+      "decision.policy.publish"
+    ],
+    "tier": "admin",
+    "order": 210
+  },
+  {
+    "code": "sys.cap.policy_run",
+    "group": "决策与事件策略管理",
+    "displayGroupOrder": 96,
+    "name:zh-CN": "执行与重放事件策略",
+    "name:en": "Run and Replay Event Policies",
+    "description": "执行事件策略，包括既有执行动作和日志重放接口；可能产生业务副作用，仍须通过既有业务动作与记录权限校验。",
+    "sensitive": true,
+    "includes": [
+      "decision.policy.read",
+      "decision.policy.run"
+    ],
+    "tier": "admin",
+    "order": 211
+  },
+  {
+    "code": "sys.cap.report_view",
+    "group": "报表定义管理",
+    "displayGroupOrder": 96,
+    "name:zh-CN": "查看报表定义",
+    "name:en": "View Report Definitions",
+    "description": "查看报表定义，仅包含该职责及其读取依赖；不自动授予其他维护、发布、批准或执行动作。",
+    "sensitive": false,
+    "includes": [
+      "report.definition.view"
+    ],
+    "tier": "viewer",
+    "order": 212
+  },
+  {
+    "code": "sys.cap.report_manage",
+    "group": "报表定义管理",
+    "displayGroupOrder": 96,
+    "name:zh-CN": "维护报表定义与版本",
+    "name:en": "Manage Report Definitions and Versions",
+    "description": "创建、编辑、删除报表定义并维护及回滚版本；报表数据查询仍走既有来源记录与字段权限，不授予模型直接写入。",
+    "sensitive": false,
+    "includes": [
+      "report.definition.view",
+      "report.definition.manage"
+    ],
+    "tier": "admin",
+    "order": 213
+  },
+  {
+    "code": "sys.cap.model_view",
+    "group": "元数据与页面配置",
+    "displayGroupOrder": 97,
+    "name:zh-CN": "查看模型定义",
+    "name:en": "View Model Definitions",
+    "description": "进入现有模型定义入口并只读查看定义；不授予维护。",
+    "sensitive": false,
+    "includes": [
+      "model_management",
+      "meta.model.read"
+    ],
+    "tier": "viewer",
+    "order": 230
+  },
+  {
+    "code": "sys.cap.model_manage",
+    "group": "元数据与页面配置",
+    "displayGroupOrder": 97,
+    "name:zh-CN": "维护模型定义",
+    "name:en": "Manage Model Definitions",
+    "description": "进入现有模型定义入口并执行既有维护接口（含创建、更新及删除等动作）；不因此授予业务记录直接写入。",
+    "sensitive": true,
+    "includes": [
+      "model_management",
+      "meta.model.read",
+      "meta.model.update",
+      "meta.field.read"
+    ],
+    "tier": "admin",
+    "order": 231
+  },
+  {
+    "code": "sys.cap.field_view",
+    "group": "元数据与页面配置",
+    "displayGroupOrder": 97,
+    "name:zh-CN": "查看字段库",
+    "name:en": "View Field Library",
+    "description": "进入现有字段库入口并只读查看定义；不授予维护。",
+    "sensitive": false,
+    "includes": [
+      "field_management",
+      "meta.field.read"
+    ],
+    "tier": "viewer",
+    "order": 232
+  },
+  {
+    "code": "sys.cap.field_manage",
+    "group": "元数据与页面配置",
+    "displayGroupOrder": 97,
+    "name:zh-CN": "维护字段库",
+    "name:en": "Manage Field Library",
+    "description": "进入现有字段库入口并执行既有维护接口（含创建、更新及删除等动作）；不因此授予业务记录直接写入。",
+    "sensitive": true,
+    "includes": [
+      "field_management",
+      "meta.field.read",
+      "meta.field.update"
+    ],
+    "tier": "admin",
+    "order": 233
+  },
+  {
+    "code": "sys.cap.dict_view",
+    "group": "元数据与页面配置",
+    "displayGroupOrder": 97,
+    "name:zh-CN": "查看业务字典",
+    "name:en": "View Business Dictionaries",
+    "description": "进入现有业务字典入口并只读查看定义；不授予维护。",
+    "sensitive": false,
+    "includes": [
+      "dict_management",
+      "meta.dict.read"
+    ],
+    "tier": "viewer",
+    "order": 234
+  },
+  {
+    "code": "sys.cap.dict_manage",
+    "group": "元数据与页面配置",
+    "displayGroupOrder": 97,
+    "name:zh-CN": "维护业务字典",
+    "name:en": "Manage Business Dictionaries",
+    "description": "进入现有业务字典入口并执行既有维护接口（含创建、更新及删除等动作）；不因此授予业务记录直接写入。",
+    "sensitive": true,
+    "includes": [
+      "dict_management",
+      "meta.dict.read",
+      "meta.dict.update"
+    ],
+    "tier": "admin",
+    "order": 235
+  },
+  {
+    "code": "sys.cap.named_query_view",
+    "group": "元数据与页面配置",
+    "displayGroupOrder": 97,
+    "name:zh-CN": "查看命名查询定义",
+    "name:en": "View Named Query Definitions",
+    "description": "进入现有命名查询定义入口并只读查看定义；不授予维护。",
+    "sensitive": false,
+    "includes": [
+      "named_query_management",
+      "meta.query.read"
+    ],
+    "tier": "viewer",
+    "order": 236
+  },
+  {
+    "code": "sys.cap.named_query_manage",
+    "group": "元数据与页面配置",
+    "displayGroupOrder": 97,
+    "name:zh-CN": "维护命名查询定义",
+    "name:en": "Manage Named Query Definitions",
+    "description": "进入现有命名查询定义入口并执行既有维护接口（含创建、更新及删除等动作）；不因此授予业务记录直接写入。",
+    "sensitive": true,
+    "includes": [
+      "named_query_management",
+      "meta.query.read",
+      "meta.query.update"
+    ],
+    "tier": "admin",
+    "order": 237
+  },
+  {
+    "group": "元数据与页面配置",
+    "displayGroupOrder": 97,
+    "code": "sys.cap.page_view",
+    "name:zh-CN": "查看页面配置",
+    "name:en": "View Page Configuration",
+    "description": "查看现有页面定义、关联页面与版本；不授予生成、编辑或发布。",
+    "includes": [
+      "pgm.page_schema.read",
+      "model.page_schema.read",
+      "meta.page.read",
+      "page.page.read"
+    ],
+    "tier": "viewer",
+    "order": 240,
+    "sensitive": false
+  },
+  {
+    "group": "元数据与页面配置",
+    "displayGroupOrder": 97,
+    "code": "sys.cap.page_manage",
+    "name:zh-CN": "维护页面配置",
+    "name:en": "Manage Page Configuration",
+    "description": "生成、维护及发布现有页面定义，包含页面版本操作和已有页面配置命令；不授予模型定义、业务记录或角色权限维护。",
+    "includes": [
+      "pgm.page_schema.read",
+      "model.page_schema.read",
+      "meta.page.read",
+      "page.page.read",
+      "pgm.page_schema.manage",
+      "meta.page.update",
+      "page.page.manage",
+      "meta.command.execute",
+      "model.page_schema.create",
+      "model.page_schema.update",
+      "model.page_schema.delete",
+      "model.page_schema.publish",
+      "model.page_schema.archive",
+      "model.page_schema.duplicate"
+    ],
+    "tier": "admin",
+    "order": 241,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.query_builder",
+    "group": "元数据与页面配置",
+    "displayGroupOrder": 97,
+    "name:zh-CN": "构建并执行只读查询",
+    "name:en": "Build and Execute Read-Only Queries",
+    "description": "进入查询构建器；目标模型读取须另行授权，查询沿用记录范围、字段隐藏与脱敏保护。受保护字段不可用于筛选、排序、分组或聚合，不授予业务记录写入。",
+    "includes": [
+      "query_builder"
+    ],
+    "tier": "viewer",
+    "order": 239
+  },
+  {
+    "code": "sys.cap.tenant_member_native_manage",
+    "group": "系统管理",
+    "displayGroupOrder": 95,
+    "name:zh-CN": "租户成员原生接口管理",
+    "name:en": "Manage Tenant Members through Native APIs",
+    "description": "既有宽权限接口：直接创建成员并指定角色、审批加入、状态变更、移除及批量状态/移除；成员读取和离职预检采用当前租户管理路径，不能按单项模型权限收窄。敏感授权，仅用于确需该原生管理范围的管理员，不授予角色定义或通用角色分配接口。",
+    "sensitive": true,
+    "includes": [
+      "admin_tenant_member",
+      "model.tenant_member.read",
+      "meta.command.execute"
+    ],
+    "tier": "admin",
+    "order": 91
+  },
+  {
+    "code": "sys.cap.authoring_edit",
+    "group": "页面配置治理",
+    "displayGroupOrder": 98,
+    "name:zh-CN": "编辑页面配置草稿",
+    "name:en": "Edit Page Configuration Drafts",
+    "description": "进入现有配置会话，编辑和提交本人有权操作的页面草稿；不包含结构接管、审核、发布或身份模拟。",
+    "includes": [
+      "meta.designer.read",
+      "meta.designer.update"
+    ],
+    "tier": "editor",
+    "order": 250,
+    "sensitive": false
+  },
+  {
+    "code": "sys.cap.authoring_structure",
+    "group": "页面配置治理",
+    "displayGroupOrder": 98,
+    "name:zh-CN": "管理页面配置结构与会话",
+    "name:en": "Manage Page Configuration Structure and Sessions",
+    "description": "包含草稿编辑、新页面工作区、块结构操作及配置会话接管等既有管理动作；不包含审核、发布或身份模拟，仍受会话和资源规则约束。",
+    "includes": [
+      "meta.designer.read",
+      "meta.designer.update",
+      "meta.designer.admin"
+    ],
+    "tier": "admin",
+    "order": 251,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.authoring_review",
+    "group": "页面配置治理",
+    "displayGroupOrder": 98,
+    "name:zh-CN": "审核页面配置变更",
+    "name:en": "Review Page Configuration Changes",
+    "description": "查看配置能力、发布历史及审核工作区，批准或驳回既有配置变更；不包含编辑、接管、发布或身份模拟。",
+    "includes": [
+      "meta.designer.read",
+      "meta.publish.read",
+      "meta.publish.update"
+    ],
+    "tier": "admin",
+    "order": 252,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.authoring_publish",
+    "group": "页面配置治理",
+    "displayGroupOrder": 98,
+    "name:zh-CN": "发布与回滚页面配置变更",
+    "name:en": "Publish and Roll Back Page Configuration Changes",
+    "description": "查看配置能力及发布历史，执行既有发布和发布回滚；不包含草稿编辑、结构接管或审核，仍遵守现有审核状态与版本规则。",
+    "includes": [
+      "meta.designer.read",
+      "meta.publish.read",
+      "meta.publish.admin"
+    ],
+    "tier": "admin",
+    "order": 253,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.field_audit_view",
+    "group": "审计与留痕",
+    "displayGroupOrder": 99,
+    "name:zh-CN": "查看字段变更留痕",
+    "name:en": "View Field Change History",
+    "description": "查看既有字段变更记录、报告和审计配置；不包含字段审计策略或模型定义维护。",
+    "includes": [
+      "audit.field_audit.read"
+    ],
+    "tier": "viewer",
+    "order": 260,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.field_audit_manage",
+    "group": "审计与留痕",
+    "displayGroupOrder": 99,
+    "name:zh-CN": "维护字段审计策略",
+    "name:en": "Manage Field Audit Policies",
+    "description": "查看字段留痕并配置单项或批量字段审计策略；不包含模型定义、字段定义或审计链管理。",
+    "includes": [
+      "audit.field_audit.read",
+      "audit.field_audit.update"
+    ],
+    "tier": "admin",
+    "order": 261,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.audit_view",
+    "group": "审计与留痕",
+    "displayGroupOrder": 99,
+    "name:zh-CN": "查看操作审计",
+    "name:en": "View Operation Audit Trails",
+    "description": "查看本租户既有操作审计，包括按操作人和命令查询；不包含审计核验或身份模拟。",
+    "includes": [
+      "audit.trail.read"
+    ],
+    "tier": "viewer",
+    "order": 262,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.audit_verify",
+    "group": "审计与留痕",
+    "displayGroupOrder": 99,
+    "name:zh-CN": "核验审计与运行授权模拟",
+    "name:en": "Verify Audits and Run Authorization Simulations",
+    "description": "查看操作审计、核验审计链、生成合规报告，并使用同一既有守卫保护的配置身份模拟；不授予模型维护、配置编辑、审核或发布。",
+    "includes": [
+      "audit.trail.read",
+      "audit.trail.admin"
+    ],
+    "tier": "admin",
+    "order": 263,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.record_print",
+    "group": "报表与输出",
+    "displayGroupOrder": 100,
+    "name:zh-CN": "打印业务记录",
+    "name:en": "Print Business Records",
+    "description": "使用现有记录打印和预览接口；目标业务记录仍受既有访问规则约束，不授予模板维护或记录读取权限。",
+    "includes": [
+      "meta.print.generate"
+    ],
+    "tier": "editor",
+    "order": 273,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.report_export",
+    "group": "报表与输出",
+    "displayGroupOrder": 100,
+    "name:zh-CN": "导出设计报表",
+    "name:en": "Export Designed Reports",
+    "description": "读取设计报表定义并导出既有Excel、PDF或JSON结果；源模型读取必须另行授权，不包含模板维护或投递计划。",
+    "includes": [
+      "report.definition.view",
+      "report.export.execute"
+    ],
+    "tier": "editor",
+    "order": 274,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.report_schedule",
+    "group": "报表与输出",
+    "displayGroupOrder": 100,
+    "name:zh-CN": "管理报表定时投递",
+    "name:en": "Manage Scheduled Report Delivery",
+    "description": "读取报表定义并维护既有投递计划及测试投递；不授予源业务记录读取、模板维护或独立报表导出。",
+    "includes": [
+      "report.definition.view",
+      "report.schedule.manage"
+    ],
+    "tier": "admin",
+    "order": 275,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.file_delete",
+    "group": "文件与附件",
+    "displayGroupOrder": 101,
+    "name:zh-CN": "删除本人上传文件",
+    "name:en": "Delete Own Uploaded Files",
+    "description": "读取本人有权访问的文件并删除本人上传且未受发布留存锁定的文件；不包含上传、关联管理或他人文件删除。",
+    "includes": [
+      "sys.file.read",
+      "sys.file.delete"
+    ],
+    "tier": "editor",
+    "order": 280,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.file_relation",
+    "group": "文件与附件",
+    "displayGroupOrder": 101,
+    "name:zh-CN": "关联业务附件",
+    "name:en": "Associate Business Attachments",
+    "description": "读取有权访问的文件并建立业务记录附件关联；仍须对目标记录拥有更新权限，不包含文件删除、上传或业务模型授权。",
+    "includes": [
+      "sys.file.read",
+      "sys.file.relation.manage"
+    ],
+    "tier": "editor",
+    "order": 281,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.agent_approval",
+    "group": "AI运行与治理",
+    "displayGroupOrder": 102,
+    "name:zh-CN": "处理AI审批请求",
+    "name:en": "Handle AI Approval Requests",
+    "description": "批准或拒绝AI待审批动作；批准可能恢复暂停的运行或执行待批准工具。操作仍受审批策略、当前租户与审批状态约束，不授予运行时管理能力。",
+    "includes": [
+      "acp.agent.approval"
+    ],
+    "tier": "admin",
+    "order": 300,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.agent_runs",
+    "group": "AI运行与治理",
+    "displayGroupOrder": 102,
+    "name:zh-CN": "查看AI运行与诊断记录",
+    "name:en": "Inspect AI Runs and Diagnostics",
+    "description": "查看当前租户的AI运行列表、详情、审计及运行诊断；原接口同时要求租户管理员身份，单独勾选本能力不会赋予该身份，也不授予运行、恢复或重试操作。",
+    "includes": [
+      "acp.agent_run.admin"
+    ],
+    "tier": "admin",
+    "order": 301,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.learning_review",
+    "group": "AI运行与治理",
+    "displayGroupOrder": 102,
+    "name:zh-CN": "评审与评估学习草稿",
+    "name:en": "Review & Evaluate Learning Drafts",
+    "description": "评审学习草稿，并可触发自动重命名和推升评估；这些动作共用既有评审权限，自动重命名可能调用模型服务。保留租户、草稿状态和并发校验，不附带AI运行时管理。",
+    "includes": [
+      "acp.learning.review"
+    ],
+    "tier": "admin",
+    "order": 302,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.memory_manage",
+    "group": "AI运行与治理",
+    "displayGroupOrder": 102,
+    "name:zh-CN": "评审与维护AI记忆推升",
+    "name:en": "Review & Maintain AI Memory Promotions",
+    "description": "评审、批量批准与撤回AI记忆推升；实际执行仍要求对应推升服务可用。管理员即时推升另要求租户管理员身份及既有功能开关，勾选本能力不会授予管理员身份或开启该功能。",
+    "includes": [
+      "acp.memory.admin"
+    ],
+    "tier": "admin",
+    "order": 303,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.profile_manage",
+    "group": "AI运行与治理",
+    "displayGroupOrder": 102,
+    "name:zh-CN": "查看画像元数据与执行遗忘",
+    "name:en": "View Profile Metadata & Execute Forget",
+    "description": "在租户管理员身份前提下查看用户画像元数据及统计，并执行用户画像遗忘；管理员读取不暴露画像正文。本能力不授予管理员身份、画像内容编辑或其他用户的画像导出。",
+    "includes": [
+      "acp.profile.admin"
+    ],
+    "tier": "admin",
+    "order": 304,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.agent_operate",
+    "group": "AI运行与治理",
+    "displayGroupOrder": 102,
+    "name:zh-CN": "运行AI任务与维护运行时",
+    "name:en": "Operate AI Tasks and Runtime",
+    "description": "运行、重试与恢复AI任务，维护运行时、计划、技能及MCP服务器配置，包括外部服务器连接和工具执行。仍受既有功能开关及各消费服务策略限制，可能产生模型费用和外部副作用；不自动开放隐藏模块或授予AI审批能力。",
+    "includes": [
+      "acp.runtime.manage"
+    ],
+    "tier": "admin",
+    "order": 305,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.knowledge_view",
+    "group": "知识库",
+    "displayGroupOrder": 103,
+    "name:zh-CN": "查看知识库与文档",
+    "name:en": "View Knowledge Bases and Documents",
+    "description": "查看知识库与文档：仅组合该原生职责及读取依赖，沿用既有租户、记录和业务规则，不自动更新角色或开放隐藏模块。",
+    "includes": [
+      "ai.knowledge.read"
+    ],
+    "tier": "viewer",
+    "order": 306,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.knowledge_manage",
+    "group": "知识库",
+    "displayGroupOrder": 103,
+    "name:zh-CN": "维护知识库与访问授权",
+    "name:en": "Manage Knowledge Bases and Access Grants",
+    "description": "维护知识库与访问授权：仅组合该原生职责及读取依赖，沿用既有租户、记录和业务规则，不自动更新角色或开放隐藏模块。包含既有文档上传、索引和访问授权维护，不包含知识检索执行。",
+    "includes": [
+      "ai.knowledge.read",
+      "ai.knowledge.manage"
+    ],
+    "tier": "admin",
+    "order": 307,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.knowledge_retrieve",
+    "group": "知识库",
+    "displayGroupOrder": 103,
+    "name:zh-CN": "检索知识库",
+    "name:en": "Retrieve Knowledge",
+    "description": "检索知识库：仅组合该原生职责及读取依赖，沿用既有租户、记录和业务规则，不自动更新角色或开放隐藏模块。不包含知识库维护；仍须满足既有知识库访问授权。",
+    "includes": [
+      "ai.knowledge.read",
+      "ai.knowledge.retrieve"
+    ],
+    "tier": "editor",
+    "order": 308,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.record_scoring",
+    "group": "AI运行与治理",
+    "displayGroupOrder": 102,
+    "name:zh-CN": "运行AI记录评分",
+    "name:en": "Run AI Record Scoring",
+    "description": "运行AI记录评分：仅组合该原生职责及读取依赖，沿用既有租户、记录和业务规则，不自动更新角色或开放隐藏模块。可能产生模型调用费用和记录评分写入；目标模型及记录权限须另行满足。",
+    "includes": [
+      "ai.scoring.run"
+    ],
+    "tier": "admin",
+    "order": 309,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.automation_manage",
+    "group": "自动化规则",
+    "displayGroupOrder": 104,
+    "name:zh-CN": "维护与调试自动化规则",
+    "name:en": "Maintain and Debug Automation Rules",
+    "description": "查看、维护、启停及调试本租户自动化规则。调试的单步与继续会实际执行配置动作，可能产生业务写入或外部副作用，不能理解为仅预览；手动触发与日志清理使用独立运行能力。",
+    "includes": [
+      "automation.automation.read",
+      "automation.read",
+      "automation.update"
+    ],
+    "tier": "admin",
+    "order": 310,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.automation_operate",
+    "group": "自动化规则",
+    "displayGroupOrder": 104,
+    "name:zh-CN": "触发自动化与清理日志",
+    "name:en": "Trigger Automations and Clean Logs",
+    "description": "触发自动化与清理日志：仅组合该原生职责及读取依赖，沿用既有租户、记录和业务规则，不自动更新角色或开放隐藏模块。同一既有守卫允许手动触发及日志清理，可能产生业务副作用，不包含规则维护。",
+    "includes": [
+      "automation.automation.read",
+      "automation.read",
+      "automation.admin"
+    ],
+    "tier": "admin",
+    "order": 311,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.billing_catalog",
+    "group": "计费信息",
+    "displayGroupOrder": 105,
+    "name:zh-CN": "查看平台计费方案与资源目录",
+    "name:en": "View Platform Billing Plans and Resource Catalog",
+    "description": "查看平台计费方案版本、价格与配额模板及资源目录。平台方案目录包括未发布版本，区别于租户自助的已发布方案目录；不授予计费写操作或租户自助权限。",
+    "includes": [
+      "billing.plan.read",
+      "billing.catalog.read"
+    ],
+    "tier": "viewer",
+    "order": 312,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.billing_invoice",
+    "group": "计费信息",
+    "displayGroupOrder": 105,
+    "name:zh-CN": "查看平台账单",
+    "name:en": "View Platform Invoices",
+    "description": "查看平台计费运营的账单列表、指定账单和明细，接口支持全局账户筛选，不能理解为仅当前租户的账单读取。租户自助账单使用独立身份与权限。",
+    "includes": [
+      "billing.invoice.read"
+    ],
+    "tier": "viewer",
+    "order": 313,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.billing_license",
+    "group": "计费信息",
+    "displayGroupOrder": 105,
+    "name:zh-CN": "查看平台许可证",
+    "name:en": "View Platform Licenses",
+    "description": "查看平台计费运营的许可证及心跳信息，包含全局客户许可证，不能理解为仅当前租户的许可证读取；不授予签发或撤销操作。",
+    "includes": [
+      "billing.license.read"
+    ],
+    "tier": "viewer",
+    "order": 314,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.billing_quota",
+    "group": "计费信息",
+    "displayGroupOrder": 105,
+    "name:zh-CN": "查看平台账户配额余额",
+    "name:en": "View Platform Account Quota Balances",
+    "description": "按账户与资源类型查看平台配额余额，账户来自运营查询参数，不能理解为自动限定当前租户账户；不包含预留、扣减或释放配额。",
+    "includes": [
+      "billing.quota.read"
+    ],
+    "tier": "viewer",
+    "order": 315,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.billing_subscription",
+    "group": "计费信息",
+    "displayGroupOrder": 105,
+    "name:zh-CN": "查看平台订阅",
+    "name:en": "View Platform Subscriptions",
+    "description": "查看平台计费运营的订阅和订阅明细，接口支持全局账户筛选，不能理解为仅当前租户订阅；不授予订阅写操作或租户自助权限。",
+    "includes": [
+      "billing.subscription.read"
+    ],
+    "tier": "viewer",
+    "order": 316,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.billing_usage",
+    "group": "计费信息",
+    "displayGroupOrder": 105,
+    "name:zh-CN": "查看平台账户计费用量",
+    "name:en": "View Platform Account Billing Usage",
+    "description": "按事件码或指定账户查看平台计费用量，不能理解为自动限定当前租户账户；不包含用量上报或计费写操作。",
+    "includes": [
+      "billing.usage.read"
+    ],
+    "tier": "viewer",
+    "order": 317,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.announcement_manage",
+    "group": "公告与通知",
+    "displayGroupOrder": 106,
+    "name:zh-CN": "维护租户公告",
+    "name:en": "Manage Tenant Announcements",
+    "description": "维护租户公告：仅组合该原生职责及读取依赖，沿用既有租户、记录和业务规则，不自动更新角色或开放隐藏模块。",
+    "includes": [
+      "dashboard.announcement.manage"
+    ],
+    "tier": "admin",
+    "order": 318,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.edi_view",
+    "group": "数据交换与设备",
+    "displayGroupOrder": 107,
+    "name:zh-CN": "查看EDI伙伴与消息",
+    "name:en": "View EDI Partners and Messages",
+    "description": "查看EDI伙伴与消息：仅组合该原生职责及读取依赖，沿用既有租户、记录和业务规则，不自动更新角色或开放隐藏模块。",
+    "includes": [
+      "data.edi.read"
+    ],
+    "tier": "viewer",
+    "order": 319,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.edi_manage",
+    "group": "数据交换与设备",
+    "displayGroupOrder": 107,
+    "name:zh-CN": "维护EDI配置与处理消息",
+    "name:en": "Manage EDI Configuration & Process Messages",
+    "description": "维护EDI伙伴及消息类型，并可接收、准备发送和重试消息；这些动作共用既有维护权限并写入交易记录。当前发送实现准备消息及交易记录，不表示已经向伙伴完成网络投递；不自动授予目标业务模型读写。",
+    "includes": [
+      "data.edi.read",
+      "data.edi.update"
+    ],
+    "tier": "admin",
+    "order": 320,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.ot_device_view",
+    "group": "数据交换与设备",
+    "displayGroupOrder": 107,
+    "name:zh-CN": "查看工业设备配置",
+    "name:en": "View Industrial Device Configuration",
+    "description": "查看工业设备配置：仅组合该原生职责及读取依赖，沿用既有租户、记录和业务规则，不自动更新角色或开放隐藏模块。",
+    "includes": [
+      "data.ot_device.read"
+    ],
+    "tier": "viewer",
+    "order": 321,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.ot_device_manage",
+    "group": "数据交换与设备",
+    "displayGroupOrder": 107,
+    "name:zh-CN": "维护工业设备配置",
+    "name:en": "Manage Industrial Device Configuration",
+    "description": "维护工业设备配置：仅组合该原生职责及读取依赖，沿用既有租户、记录和业务规则，不自动更新角色或开放隐藏模块。",
+    "includes": [
+      "data.ot_device.read",
+      "data.ot_device.update"
+    ],
+    "tier": "admin",
+    "order": 322,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.ot_device_data",
+    "group": "数据交换与设备",
+    "displayGroupOrder": 107,
+    "name:zh-CN": "上报工业设备数据与心跳",
+    "name:en": "Submit Device Data & Heartbeats",
+    "description": "向已启用的当前租户设备上报数据并更新心跳，写入接入日志及设备状态；包含既有设备读取依赖，不是只读能力。当前数据处理完成不表示已写入目标业务模型。",
+    "includes": [
+      "data.ot_device.read",
+      "data.ot_device.data"
+    ],
+    "tier": "admin",
+    "order": 323,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.reconciliation_view",
+    "group": "数据交换与设备",
+    "displayGroupOrder": 107,
+    "name:zh-CN": "查看对账配置与结果",
+    "name:en": "View Reconciliation Configuration and Results",
+    "description": "查看对账配置与结果：仅组合该原生职责及读取依赖，沿用既有租户、记录和业务规则，不自动更新角色或开放隐藏模块。",
+    "includes": [
+      "data.reconciliation.read"
+    ],
+    "tier": "viewer",
+    "order": 324,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.reconciliation_manage",
+    "group": "数据交换与设备",
+    "displayGroupOrder": 107,
+    "name:zh-CN": "维护与执行对账",
+    "name:en": "Manage and Run Reconciliation",
+    "description": "维护与执行对账：仅组合该原生职责及读取依赖，沿用既有租户、记录和业务规则，不自动更新角色或开放隐藏模块。",
+    "includes": [
+      "data.reconciliation.read",
+      "data.reconciliation.update"
+    ],
+    "tier": "admin",
+    "order": 325,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.sod_view",
+    "group": "数据交换与设备",
+    "displayGroupOrder": 107,
+    "name:zh-CN": "查看与检查职责分离规则",
+    "name:en": "View & Check Separation-of-Duties Rules",
+    "description": "查看职责分离规则及违规记录，并运行手动冲突检查；手动检查共用既有读取权限，发现冲突时可能记录违规日志。本能力不允许维护规则或豁免违规。",
+    "includes": [
+      "data.sod.read"
+    ],
+    "tier": "viewer",
+    "order": 326,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.sod_manage",
+    "group": "数据交换与设备",
+    "displayGroupOrder": 107,
+    "name:zh-CN": "维护职责分离规则与豁免违规",
+    "name:en": "Manage SoD Rules & Override Violations",
+    "description": "维护职责分离规则、查看并检查冲突，以及对违规记录执行豁免；规则维护与豁免共用既有维护权限。保留租户及目标记录约束，不表示取得相关业务命令的执行权限。",
+    "includes": [
+      "data.sod.read",
+      "data.sod.update"
+    ],
+    "tier": "admin",
+    "order": 327,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.timeseries_view",
+    "group": "数据交换与设备",
+    "displayGroupOrder": 107,
+    "name:zh-CN": "查询设备时序数据",
+    "name:en": "Query Device Time Series",
+    "description": "查询设备时序数据：仅组合该原生职责及读取依赖，沿用既有租户、记录和业务规则，不自动更新角色或开放隐藏模块。",
+    "includes": [
+      "iot.data_point.read"
+    ],
+    "tier": "viewer",
+    "order": 328,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.category_manage",
+    "group": "元数据工具",
+    "displayGroupOrder": 108,
+    "name:zh-CN": "维护资源分类",
+    "name:en": "Manage Resource Categories",
+    "description": "维护资源分类：仅组合该原生职责及读取依赖，沿用既有租户、记录和业务规则，不自动更新角色或开放隐藏模块。",
+    "includes": [
+      "meta.category.update"
+    ],
+    "tier": "admin",
+    "order": 329,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.analysis_tools",
+    "group": "元数据工具",
+    "displayGroupOrder": 108,
+    "name:zh-CN": "使用数据分析与接入工具",
+    "name:en": "Use Data Analysis and Ingestion Tools",
+    "description": "使用数据分析与接入工具：仅组合该原生职责及读取依赖，沿用既有租户、记录和业务规则，不自动更新角色或开放隐藏模块。如实包含同码的数据质量分析及dbt接入，不作为仅查询的只读能力。",
+    "includes": [
+      "meta.chatbi.use"
+    ],
+    "tier": "admin",
+    "order": 330,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.command_manage",
+    "group": "元数据工具",
+    "displayGroupOrder": 108,
+    "name:zh-CN": "维护命令定义",
+    "name:en": "Manage Command Definitions",
+    "description": "维护命令定义：仅组合该原生职责及读取依赖，沿用既有租户、记录和业务规则，不自动更新角色或开放隐藏模块。",
+    "includes": [
+      "meta.command.read",
+      "meta.command.update"
+    ],
+    "tier": "admin",
+    "order": 331,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.customer_service_manage",
+    "group": "客服配置与接待",
+    "displayGroupOrder": 109,
+    "name:zh-CN": "维护客服站点与停用清理",
+    "name:en": "Manage Customer Service Sites and Decommissioning",
+    "description": "维护本租户客服站点、来源与知识库绑定，轮换访客身份签名密钥，并执行客服停用清理。现有停用清理还会物理删除本租户全部知识库及其文档、分块，并清理客服会话记录；接待会话使用独立能力。",
+    "includes": [
+      "meta.cs.manage"
+    ],
+    "tier": "admin",
+    "order": 332,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.customer_service_seat",
+    "group": "客服配置与接待",
+    "displayGroupOrder": 109,
+    "name:zh-CN": "接待在线客服会话",
+    "name:en": "Work Customer Service Conversations",
+    "description": "接待在线客服会话：仅组合该原生职责及读取依赖，沿用既有租户、记录和业务规则，不自动更新角色或开放隐藏模块。包括上线、领取、回复和关闭会话，声明不会自行发送消息。",
+    "includes": [
+      "meta.cs.seat"
+    ],
+    "tier": "editor",
+    "order": 333,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.adjudication_manage",
+    "group": "业务裁定",
+    "displayGroupOrder": 110,
+    "name:zh-CN": "维护业务裁定定义",
+    "name:en": "Manage Business Adjudication Definitions",
+    "description": "维护业务裁定定义：仅组合该原生职责及读取依赖，沿用既有租户、记录和业务规则，不自动更新角色或开放隐藏模块。对应元裁定定义，与Decision Runtime规则是不同资源。",
+    "includes": [
+      "meta.decision.read",
+      "meta.decision.update"
+    ],
+    "tier": "admin",
+    "order": 334,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.adjudication_execute",
+    "group": "业务裁定",
+    "displayGroupOrder": 110,
+    "name:zh-CN": "执行业务裁定",
+    "name:en": "Execute Business Adjudications",
+    "description": "执行业务裁定：仅组合该原生职责及读取依赖，沿用既有租户、记录和业务规则，不自动更新角色或开放隐藏模块。对应元裁定执行，与Decision Runtime评估是不同资源，不包含定义维护。",
+    "includes": [
+      "meta.decision.read",
+      "meta.decision.execute"
+    ],
+    "tier": "admin",
+    "order": 335,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.event_store_manage",
+    "group": "元数据工具",
+    "displayGroupOrder": 108,
+    "name:zh-CN": "管理与重放事件存储",
+    "name:en": "Manage and Replay Event Storage",
+    "description": "管理与重放事件存储：仅组合该原生职责及读取依赖，沿用既有租户、记录和业务规则，不自动更新角色或开放隐藏模块。可能重放既有事件，不自动授予关联业务动作。",
+    "includes": [
+      "meta.event_store.read",
+      "meta.event_store.admin"
+    ],
+    "tier": "admin",
+    "order": 336,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.filter_manage",
+    "group": "元数据工具",
+    "displayGroupOrder": 108,
+    "name:zh-CN": "维护筛选预设",
+    "name:en": "Manage Filter Presets",
+    "description": "维护筛选预设：仅组合该原生职责及读取依赖，沿用既有租户、记录和业务规则，不自动更新角色或开放隐藏模块。",
+    "includes": [
+      "meta.filter.update"
+    ],
+    "tier": "editor",
+    "order": 337,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.invariant_manage",
+    "group": "元数据工具",
+    "displayGroupOrder": 108,
+    "name:zh-CN": "维护数据不变量",
+    "name:en": "Manage Data Invariants",
+    "description": "维护数据不变量：仅组合该原生职责及读取依赖，沿用既有租户、记录和业务规则，不自动更新角色或开放隐藏模块。",
+    "includes": [
+      "meta.invariant.read",
+      "meta.invariant.update"
+    ],
+    "tier": "admin",
+    "order": 338,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.state_graph_manage",
+    "group": "元数据工具",
+    "displayGroupOrder": 108,
+    "name:zh-CN": "维护状态图定义",
+    "name:en": "Manage State Graph Definitions",
+    "description": "维护状态图定义：仅组合该原生职责及读取依赖，沿用既有租户、记录和业务规则，不自动更新角色或开放隐藏模块。",
+    "includes": [
+      "meta.state_graph.read",
+      "meta.state_graph.update"
+    ],
+    "tier": "admin",
+    "order": 339,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.manufacturing_schedule",
+    "group": "制造计划与指标",
+    "displayGroupOrder": 111,
+    "name:zh-CN": "运行与清理制造排产",
+    "name:en": "Run and Clear Manufacturing Schedules",
+    "description": "运行与清理制造排产：仅组合该原生职责及读取依赖，沿用既有租户、记录和业务规则，不自动更新角色或开放隐藏模块。",
+    "includes": [
+      "meta.manufacturing.aps"
+    ],
+    "tier": "admin",
+    "order": 340,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.manufacturing_metrics",
+    "group": "制造计划与指标",
+    "displayGroupOrder": 111,
+    "name:zh-CN": "查看设备效能指标",
+    "name:en": "View Equipment Effectiveness Metrics",
+    "description": "查看设备效能指标：仅组合该原生职责及读取依赖，沿用既有租户、记录和业务规则，不自动更新角色或开放隐藏模块。",
+    "includes": [
+      "meta.manufacturing.oee"
+    ],
+    "tier": "viewer",
+    "order": 341,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.qr_manage",
+    "group": "二维码管理",
+    "displayGroupOrder": 112,
+    "name:zh-CN": "管理租户二维码",
+    "name:en": "Manage Tenant QR Codes",
+    "description": "管理租户二维码：仅组合该原生职责及读取依赖，沿用既有租户、记录和业务规则，不自动更新角色或开放隐藏模块。不包含QR平台跨租户、自助/AI插件权限或模块启用。",
+    "includes": [
+      "meta.qr.manage"
+    ],
+    "tier": "admin",
+    "order": 342,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.semantic_query",
+    "group": "语义指标",
+    "displayGroupOrder": 113,
+    "name:zh-CN": "查询语义指标与目录",
+    "name:en": "Query Semantic Metrics and Catalog",
+    "description": "查询语义指标与目录：仅组合该原生职责及读取依赖，沿用既有租户、记录和业务规则，不自动更新角色或开放隐藏模块。包括目录、血缘和查询，指标required_permissions及数据范围仍由原服务裁决。",
+    "includes": [
+      "meta.semantic.use"
+    ],
+    "tier": "viewer",
+    "order": 343,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.semantic_publish",
+    "group": "语义指标",
+    "displayGroupOrder": 113,
+    "name:zh-CN": "发布语义模型与管理指标任务",
+    "name:en": "Publish Semantic Models and Manage Metric Tasks",
+    "description": "发布语义模型与管理指标任务：仅组合该原生职责及读取依赖，沿用既有租户、记录和业务规则，不自动更新角色或开放隐藏模块。包含语义模型发布、预聚合维护/刷新、指标告警维护/评估，不自动授予指标要求的业务权限。",
+    "includes": [
+      "meta.semantic.use",
+      "meta.semantic.publish"
+    ],
+    "tier": "admin",
+    "order": 344,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.notification_template_manage",
+    "group": "公告与通知",
+    "displayGroupOrder": 106,
+    "name:zh-CN": "维护通知模板",
+    "name:en": "Manage Notification Templates",
+    "description": "维护通知模板：仅组合该原生职责及读取依赖，沿用既有租户、记录和业务规则，不自动更新角色或开放隐藏模块。",
+    "includes": [
+      "notification.template.manage"
+    ],
+    "tier": "admin",
+    "order": 345,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.party_manage",
+    "group": "业务参与方",
+    "displayGroupOrder": 114,
+    "name:zh-CN": "审核业务参与方",
+    "name:en": "Approve Business Parties",
+    "description": "批准当前租户待审核的业务参与方并激活其待审核成员关系；保留活跃租户成员与参与方状态校验。参与方创建和身份切换继续受原有策略与成员关系约束，本能力不表示通用参与方CRUD。",
+    "includes": [
+      "party.party.manage"
+    ],
+    "tier": "admin",
+    "order": 346,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.view_public_share",
+    "group": "列表视图",
+    "displayGroupOrder": 116,
+    "name:zh-CN": "管理视图公开分享链接",
+    "name:en": "Manage Public View Share Links",
+    "description": "为本人有权管理的保存视图生成、查看或撤销公开链接；仍检查现有所有者、团队、角色及锁定规则。仅分享视图配置，不授予源业务记录读取、视图维护或仪表盘维护，也不自动更新角色。",
+    "includes": [
+      "dashboard.saved_view.read",
+      "dashboard.manage"
+    ],
+    "tier": "admin",
+    "order": 347,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.governance_view",
+    "group": "主数据治理",
+    "displayGroupOrder": 117,
+    "name:zh-CN": "查看治理请求与快照",
+    "name:en": "View Governance Requests and Snapshots",
+    "description": "查看本租户治理请求、版本快照、差异、策略与统计；保留现有租户隔离，不授予提交、审核或策略维护。",
+    "includes": [
+      "governance.governance.read"
+    ],
+    "tier": "viewer",
+    "order": 348,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.governance_submit",
+    "group": "主数据治理",
+    "displayGroupOrder": 117,
+    "name:zh-CN": "提交与撤销治理请求",
+    "name:en": "Submit and Cancel Governance Requests",
+    "description": "创建、提交治理请求，并按现有申请人规则撤销；包含请求读取，不附带审核、应用或策略维护。",
+    "includes": [
+      "governance.governance.read",
+      "governance.governance.submit"
+    ],
+    "tier": "editor",
+    "order": 349,
+    "sensitive": true
+  },
+  {
+    "code": "sys.cap.governance_review",
+    "group": "主数据治理",
+    "displayGroupOrder": 117,
+    "name:zh-CN": "审核治理请求与维护策略",
+    "name:en": "Review Governance Requests and Manage Policies",
+    "description": "审核与应用治理请求、初始化治理快照并维护治理策略；沿用现有状态检查与快照逻辑，不新增源记录发布功能，也不自动更新角色授权。",
+    "includes": [
+      "governance.governance.read",
+      "governance.governance.review"
+    ],
+    "tier": "admin",
+    "order": 350,
+    "sensitive": true
   }
 ]

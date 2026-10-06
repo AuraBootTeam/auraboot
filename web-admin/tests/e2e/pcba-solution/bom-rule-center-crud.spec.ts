@@ -17,6 +17,8 @@ import {
   dynamicCreate,
 } from './quote-e2e-helpers';
 
+test.use({ locale: 'zh-CN' });
+
 /** Creates an independent, recallable fixture through the production material writer. */
 async function createRecallableMaterial(page: Page, code: string, category: string, spec: string, packageCode: string, brand = '') {
   const result = await executeCommand(page, 'bom:create_material', {
@@ -364,6 +366,9 @@ for (const c of cases) {
 
 
 test('category metadata: duplicate category fails safely without changing the existing definition', async ({ page }, info) => {
+  // This multi-role journey verifies four detail views, policies, write denials
+  // and original screenshots. Its total deadline is separate from step waits.
+  test.setTimeout(60_000);
   const records = () => queryDynamicRecords(page, 'bom_category_meta', [
     { fieldName: 'bom_cm_category', operator: 'EQ', value: 'resistor' },
   ]);
@@ -425,11 +430,38 @@ test('category metadata: duplicate category fails safely without changing the ex
     expect(projections.veto.map(({ attribute, comparison, tolerance_percent }) => ({ attribute, comparison, tolerance_percent: tolerance_percent ?? null })))
       .toEqual(parse(row.bom_cm_veto_attrs_json).map((veto: any) => ({ attribute: veto.attr, comparison: veto.op, tolerance_percent: veto.tol === undefined ? null : veto.tol * 100 })));
     const block = (suffix: string) => client.locator(`[data-aura-block-id="bom_category_policy_${suffix}"]`);
+    const expectPolicyLabels = async (suffix: string) => {
+      if (projections[suffix].length === 0) {
+        await expect(block(suffix)).toContainText('未单独配置工程适配维度');
+        return;
+      }
+      await expect(block(suffix).getByRole('row')).toHaveCount(projections[suffix].length + 1);
+      await expect(block(suffix).getByRole('status')).toHaveCount(0);
+      await expect(block(suffix).getByRole('alert')).toHaveCount(0);
+      await expect(block(suffix)).not.toContainText('标签加载失败');
+      await expect(block(suffix)).not.toContainText('标签未配置');
+      const dictionaryFields = ['requirement', 'purpose', 'attribute', 'comparison', 'aggregation', 'missing_handling'];
+      for (const record of projections[suffix]) {
+        for (const field of dictionaryFields) {
+          if (record[field] === undefined || record[field] === null || record[field] === '') continue;
+          await expect(block(suffix).getByRole('cell', { name: String(record[field]), exact: true })).toHaveCount(0);
+        }
+      }
+    };
+    const attributesTab = client.getByRole('tab', { name: '品类与属性', exact: true });
+    const matchingTab = client.getByRole('tab', { name: '匹配策略', exact: true });
+    const notesTab = client.getByRole('tab', { name: '补充说明', exact: true });
+    await expect(attributesTab).toHaveAttribute('aria-selected', 'true');
+    await expect(client.getByRole('tab')).toHaveCount(4);
+    await expect(client.getByRole('tab', { name: '变更历史', exact: true })).toBeVisible();
     await expect(client.getByTestId('form-field-bom_cm_category')).toContainText(categoryLabel);
     await expect(client.getByTestId('form-field-bom_cm_primary_attr')).toContainText(categoryLabel === '电阻' ? '阻值' : '容值');
-    await expect(client.getByTestId('form-field-bom_cm_remark')).toContainText(String(row.bom_cm_remark));
+    await expect(client.getByTestId('form-field-bom_cm_remark')).toHaveCount(0);
     await expect(block('attributes')).toContainText('必需属性');
     await expect(block('attributes')).toContainText('推荐属性');
+    await matchingTab.click();
+    await expect(matchingTab).toHaveAttribute('aria-selected', 'true');
+    await expect(block('attributes')).toHaveCount(0);
     await expect(block('recipe')).toContainText('参与匹配的字段');
     await expect(block('recipe')).toContainText('封装');
     await expect(block('veto')).toContainText('在容差内相等');
@@ -445,13 +477,16 @@ test('category metadata: duplicate category fails safely without changing the ex
       expect(projections.fit).toEqual([]);
       await expect(block('fit')).toContainText('未单独配置工程适配维度');
     }
-    for (const suffix of policyQueries)
-      await expect(block(suffix)).not.toContainText(/resistance_ohms|capacitance_farads|weighted_average|eq_tol|policyId|\{"/);
     await expect(client.getByTestId('export-pdf-button')).toHaveCount(0);
     await expect(client.getByTestId('toolbar-btn-edit')).toHaveCount(0);
     await expect(client.getByTestId('toolbar-btn-delete')).toHaveCount(0);
     await expect(client.locator('main input:not([readonly]):not([disabled]), main textarea:not([readonly]):not([disabled]), main [contenteditable="true"]')).toHaveCount(0);
     for (const suffix of policyQueries) {
+      await (suffix === 'attributes' ? attributesTab : matchingTab).click();
+      for (const visiblePolicy of suffix === 'attributes' ? ['attributes'] : ['recipe', 'veto', 'fit']) {
+        await expectPolicyLabels(visiblePolicy);
+      }
+      await expect(block(suffix)).not.toContainText(/resistance_ohms|capacitance_farads|weighted_average|eq_tol|policyId|\{"/);
       const heading = client.locator(`[data-aura-block-id="bom_category_policy_${suffix}_heading"]`);
       await block(suffix).scrollIntoViewIfNeeded();
       await block(suffix).evaluate(element => element.scrollIntoView({ block: 'center' }));
@@ -459,6 +494,15 @@ test('category metadata: duplicate category fails safely without changing the ex
       await expect(block(suffix)).toBeInViewport({ ratio: 1 });
       await client.screenshot({ path: info.outputPath(`category-${row.bom_cm_category}-${reader ? 'reader' : 'admin'}-${suffix}.png`) });
     }
+    await notesTab.click();
+    await expect(notesTab).toHaveAttribute('aria-selected', 'true');
+    await expect(client.getByTestId('form-field-bom_cm_remark')).toContainText(String(row.bom_cm_remark));
+    await expect(block('recipe')).toHaveCount(0);
+    await expect(client.locator('main input:not([readonly]):not([disabled]), main textarea:not([readonly]):not([disabled]), main [contenteditable="true"]')).toHaveCount(0);
+    await client.screenshot({ path: info.outputPath(`category-${row.bom_cm_category}-${reader ? 'reader' : 'admin'}-notes.png`) });
+    await attributesTab.click();
+    await expect(attributesTab).toHaveAttribute('aria-selected', 'true');
+    await expectPolicyLabels('attributes');
     await client.getByTestId('form-field-bom_cm_category').scrollIntoViewIfNeeded();
     await client.screenshot({ path: info.outputPath(`category-${row.bom_cm_category}-${reader ? 'reader' : 'admin'}-detail.png`) });
   };
@@ -493,12 +537,13 @@ test('category metadata: duplicate category fails safely without changing the ex
     r.request().method() === 'POST');
   await page.getByRole('button', { name: '保存', exact: true }).click();
   const response = await failure;
-  expect(response.status()).toBe(500);
+  expect(response.status()).toBe(400);
   const body = await response.json();
   expect(String(body.code)).not.toBe('0');
   expect(JSON.stringify(body)).not.toMatch(/INSERT INTO|SQL:|DuplicateKeyException|Mapper\.xml|mt_bom_category_meta|duplicate key/i);
   await expect(page.getByTestId('dynamic-page-form')).toBeVisible();
-  await expect(page.locator('body')).toContainText(/unexpected error|Internal system error|发生错误|操作失败|保存失败/i);
+  await expect(page.locator('body')).toContainText('记录已存在，请检查唯一字段后再保存');
+  await expect(page.locator('body')).not.toContainText(/unexpected error|Internal system error|meta_record\.duplicate/i);
   await expect(page.locator('body')).not.toContainText(/INSERT INTO|Mapper\.xml|mt_bom_category_meta|duplicate key/i);
   expect(await records()).toEqual(before);
   await page.screenshot({ path: info.outputPath('duplicate-category-safe-error.png') });
@@ -1339,8 +1384,11 @@ test('B18-03 part map: mapping applies to a new conversion, prior snapshots stay
   const dupResponse = page.waitForResponse(r => r.url().includes('/api/meta/commands/execute/bom:create_customer_part_map') && r.request().method() === 'POST');
   await page.getByRole('button', { name: '保存', exact: true }).click();
   const duplicate = await dupResponse;
-  expect(duplicate.status()).toBe(500);
-  const dupBody = await duplicate.json().catch(() => ({}));
+  expect(duplicate.status()).toBe(400);
+  const dupBody = await duplicate.json();
+  await expect(page.getByTestId('dynamic-page-form')).toBeVisible();
+  await expect(page.locator('body')).toContainText('记录已存在，请检查唯一字段后再保存');
+  await expect(page.locator('body')).not.toContainText(/unexpected error|Internal system error|meta_record\.duplicate/i);
   expect(String(dupBody.code)).not.toBe('0');
   expect(JSON.stringify(dupBody)).not.toMatch(/INSERT INTO|SQL:|DuplicateKeyException|Mapper\.xml|mt_bom_customer_part_map|duplicate key/i);
   const finalMappings = await queryDynamicRecords(page, 'bom_customer_part_map', [
@@ -1349,6 +1397,7 @@ test('B18-03 part map: mapping applies to a new conversion, prior snapshots stay
   expect(finalMappings, 'duplicate mapping is rejected without creating another row').toHaveLength(1);
   expect(finalMappings[0].bom_cpm_status).toBe('active');
   expect(finalMappings[0].bom_cpm_material_code).toBe(mappedMaterial);
+  await page.screenshot({ path: info.outputPath('B18-03-duplicate-safe-error.png') });
   await info.attach('B18-03-part-map-evidence', {
     body: JSON.stringify({
       marker,

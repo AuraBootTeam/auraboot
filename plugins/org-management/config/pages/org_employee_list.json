@@ -1,6 +1,6 @@
 {
   "pageKey": "org_employee_list",
-  "name:zh-CN": "Employee Management",
+  "name:zh-CN": "人员管理",
   "name:en": "Employee Management",
   "modelCode": "org_employee",
   "description": "Employee list with status tabs and CRUD",
@@ -22,7 +22,7 @@
         {
           "key": "all",
           "label": {
-            "zh-CN": "All",
+            "zh-CN": "全部",
             "en": "All"
           },
           "filter": null
@@ -42,7 +42,7 @@
         {
           "key": "on_leave",
           "label": {
-            "zh-CN": "On Leave",
+            "zh-CN": "休假",
             "en": "On Leave"
           },
           "filter": {
@@ -54,7 +54,7 @@
         {
           "key": "resigned",
           "label": {
-            "zh-CN": "Resigned",
+            "zh-CN": "离职",
             "en": "Resigned"
           },
           "filter": {
@@ -84,7 +84,8 @@
           "action": {
             "type": "navigate",
             "to": "org_employee_form"
-          }
+          },
+          "permissionCode": "org.hr.manage"
         }
       ]
     },
@@ -104,6 +105,10 @@
         "org_emp_name",
         "org_emp_status"
       ],
+      "searchPlaceholder": {
+        "zh-CN": "搜索人员编号、姓名或状态",
+        "en": "Search employee number, name or status"
+      },
       "columns": [
         {
           "field": "org_emp_code",
@@ -158,7 +163,8 @@
               "action": {
                 "type": "navigate",
                 "to": "org_employee_form"
-              }
+              },
+              "permissionCode": "org.hr.manage"
             },
             {
               "code": "open_account",
@@ -174,7 +180,8 @@
               "action": {
                 "type": "command",
                 "command": "org:open_employee_account"
-              }
+              },
+              "permissionCode": "org.hr.manage"
             },
             {
               "code": "delete",
@@ -187,7 +194,8 @@
               "confirm": "delete.confirm",
               "action": {
                 "type": "command"
-              }
+              },
+              "permissionCode": "org.hr.manage"
             }
           ],
           "label": {
@@ -195,11 +203,21 @@
             "en": "Actions"
           }
         }
-      ]
+      ],
+      "empty": {
+        "title": {
+          "zh-CN": "没有符合条件的人员",
+          "en": "No matching employees"
+        },
+        "description": {
+          "zh-CN": "请清空或调整筛选条件；如需新增人员，请联系人事管理员。",
+          "en": "Clear or adjust the filters. Contact an HR administrator to create an employee."
+        }
+      }
     }
   ],
   "title": {
-    "zh-CN": "Employee Management",
+    "zh-CN": "人员管理",
     "en": "Employee Management"
   }
 }

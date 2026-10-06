@@ -8,6 +8,7 @@ import com.auraboot.framework.meta.dto.MetaFieldDTO;
 import com.auraboot.framework.meta.service.FieldBindingContextService;
 import com.auraboot.framework.meta.service.MetaFieldService;
 import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
@@ -42,7 +43,7 @@ public class FieldBindingContextController {
      * @return Configured binding
      */
     @PostMapping("/{fieldPid}/configure")
-    @RequirePermission("model.update")
+    @RequirePermission(MetaPermission.MODEL_MANAGE)
     public ApiResponse<BindingConfiguration> configureBinding(
             @PathVariable String modelPid,
             @PathVariable String fieldPid,
@@ -64,7 +65,7 @@ public class FieldBindingContextController {
      * @return Binding configuration
      */
     @GetMapping("/{fieldPid}")
-    @RequirePermission("model.read")
+    @RequirePermission(MetaPermission.MODEL_READ)
     public ApiResponse<BindingConfiguration> getBindingConfiguration(
             @PathVariable String modelPid,
             @PathVariable String fieldPid) {
@@ -86,7 +87,7 @@ public class FieldBindingContextController {
      * @return Updated binding configuration
      */
     @PutMapping("/{bindingId}")
-    @RequirePermission("model.update")
+    @RequirePermission(MetaPermission.MODEL_MANAGE)
     public ApiResponse<BindingConfiguration> updateBindingConfiguration(
             @PathVariable String modelPid,
             @PathVariable Long bindingId,
@@ -94,7 +95,7 @@ public class FieldBindingContextController {
         
         log.info("Updating binding configuration: modelPid={}, bindingId={}", logSafe(modelPid), bindingId);
         
-        BindingConfiguration binding = bindingContextService.updateBindingConfiguration(bindingId, request);
+        BindingConfiguration binding = bindingContextService.updateBindingConfiguration(modelPid, bindingId, request);
         
         return ApiResponse.success(binding);
     }
@@ -108,7 +109,7 @@ public class FieldBindingContextController {
      * @return Default binding configuration
      */
     @GetMapping("/{fieldPid}/default")
-    @RequirePermission("model.read")
+    @RequirePermission(MetaPermission.MODEL_READ)
     public ApiResponse<BindingConfiguration> getDefaultBindingConfiguration(
             @PathVariable String modelPid,
             @PathVariable String fieldPid) {

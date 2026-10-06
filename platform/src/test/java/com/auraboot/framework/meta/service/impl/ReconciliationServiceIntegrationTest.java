@@ -4,6 +4,19 @@ import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.meta.dto.PaginationResult;
+import com.auraboot.framework.meta.dto.MetaModelCreateRequest;
+import com.auraboot.framework.meta.dto.MetaFieldCreateRequest;
+import com.auraboot.framework.meta.dto.DataPermissionPolicyCreateRequest;
+import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.meta.service.MetaFieldService;
+import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.meta.service.DataPermissionPolicyService;
+import com.auraboot.framework.permission.service.DataScopeService;
+import com.auraboot.framework.permission.service.PermissionService;
+import com.auraboot.framework.rbac.entity.Role;
+import com.auraboot.framework.rbac.entity.UserRole;
+import com.auraboot.framework.rbac.service.RoleService;
+import com.auraboot.framework.rbac.service.UserRoleService;
 import com.auraboot.framework.meta.dto.ReconciliationItemDTO;
 import com.auraboot.framework.meta.dto.ReconciliationItemResolveRequest;
 import com.auraboot.framework.meta.dto.ReconciliationProfileDTO;
@@ -33,12 +46,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -50,7 +66,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * No mocked mappers/bridges (AGENTS.md §2.2 seam discipline).
  *
  * <p>Uses {@code integration-test} profile (shared Postgres :5432). All data is created
- * under a dedicated tenant with {@code recon}-prefixed codes and hard-deleted in tearDown.
+ * under a unique tenant per method with {@code recon}-prefixed codes. Evidence is retained.
  *
  * <p>4 product bugs fixed (see individual test methods for details):
  * 1. validateProfileType: lowercase Set vs toUpperCase comparison (all valid types rejected).
@@ -92,6 +108,15 @@ class ReconciliationServiceIntegrationTest {
     @Autowired
     private TenantMemberService tenantMemberService;
 
+    @Autowired private MetaModelService metaModelService;
+    @Autowired private MetaFieldService metaFieldService;
+    @Autowired private DynamicDataService dynamicDataService;
+    @Autowired private DataPermissionPolicyService policyService;
+    @Autowired private DataScopeService dataScopeService;
+    @Autowired private PermissionService permissionService;
+    @Autowired private RoleService roleService;
+    @Autowired private UserRoleService userRoleService;
+
     private User testUser;
     private Tenant testTenant;
 
@@ -99,15 +124,16 @@ class ReconciliationServiceIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        // Find or create dedicated test user
-        String testEmail = "reconsvc-test@auraboot.com";
+        // Each method owns its tenant; retained data cannot satisfy later assertions.
+        String fixtureSuffix = RUN + "_" + Long.toUnsignedString(System.nanoTime());
+        String testEmail = "reconsvc-" + fixtureSuffix + "@auraboot.com";
         testUser = userService.findByEmail(testEmail);
         if (testUser == null) {
             testUser = userService.signUp(testEmail, "test-password-123");
         }
 
         // Find or create dedicated test tenant
-        String testTenantName = "reconsvc-test-tenant";
+        String testTenantName = "reconsvc-tenant-" + fixtureSuffix;
         testTenant = tenantService.findByName(testTenantName);
         if (testTenant == null) {
             Tenant tenant = new Tenant();
@@ -126,42 +152,16 @@ class ReconciliationServiceIntegrationTest {
         // Add user as tenant member if not already
         TenantMember member = tenantMemberService.findByTenantIdAndUserId(testTenant.getId(), testUser.getId());
         if (member == null) {
-            tenantMemberService.addMember(testUser.getId(), testTenant.getId(), "active");
+            member = tenantMemberService.addMember(testUser.getId(), testTenant.getId(), "active");
         }
 
         MetaContext.setContext(testTenant.getId(), testUser.getId(), testUser.getPid(), testUser.getUserName());
+        MetaContext.setMemberId(member.getId());
     }
 
     @AfterEach
     void tearDown() {
-        try {
-            // Delete reconciliation items for all runs belonging to our test tenant
-            QueryWrapper<ReconciliationRun> runQw = new QueryWrapper<>();
-            runQw.eq("tenant_id", testTenant.getId());
-            List<ReconciliationRun> runs = runMapper.selectList(runQw);
-            for (ReconciliationRun run : runs) {
-                QueryWrapper<ReconciliationItem> itemQw = new QueryWrapper<>();
-                itemQw.eq("run_id", run.getId());
-                itemMapper.delete(itemQw);
-            }
-
-            // Delete all runs for test tenant
-            if (!runs.isEmpty()) {
-                runMapper.delete(runQw);
-            }
-
-            // Hard-delete all profiles for test tenant (bypass soft-delete)
-            QueryWrapper<ReconciliationProfile> profileQw = new QueryWrapper<>();
-            profileQw.eq("tenant_id", testTenant.getId());
-            profileQw.likeRight("profile_code", CODE_PREFIX);
-            // Note: need to bypass the @TableLogic soft-delete — use raw delete
-            profileMapper.delete(profileQw);
-
-        } catch (Exception e) {
-            log.warn("reconciliation cleanup failed: {}", e.getMessage());
-        } finally {
-            MetaContext.clear();
-        }
+        MetaContext.clear();
     }
 
     // ==================== Helpers ====================
@@ -478,6 +478,171 @@ class ReconciliationServiceIntegrationTest {
         assertTrue(ex.getMessage().contains("Profile not found"));
     }
 
+    @Test
+    void protectedSourcesMatchOnlyOwnedRowsAndRejectUnreadableComparisonInputs() {
+        String suffix = Long.toUnsignedString(System.nanoTime());
+        SourceFixture sourceA = createProtectedSource("recon_a_" + suffix, "a_" + suffix);
+        SourceFixture sourceB = createProtectedSource("recon_b_" + suffix, "b_" + suffix);
+        Role role = new Role();
+        role.setPid(UniqueIdGenerator.generate());
+        role.setCode("recon_reader_" + suffix);
+        role.setName("Reconciliation source reader " + suffix);
+        role.setTenantId(testTenant.getId());
+        role.setType("custom");
+        role.setScopeType("tenant");
+        role.setStatus("active");
+        role.setIsDefault(false);
+        role.setIsSystem(false);
+        role.setDeletedFlag(false);
+        role.setPriority(100);
+        role.setCreatedAt(Instant.now());
+        role.setUpdatedAt(Instant.now());
+        role = roleService.createRole(role);
+        List<Long> grants = new ArrayList<>();
+        for (SourceFixture source : List.of(sourceA, sourceB)) {
+            for (String action : List.of("create", "read")) {
+                var permission = permissionService.findByCode("model." + source.code() + "." + action);
+                assertNotNull(permission);
+                grants.add(permission.getId());
+            }
+            dataScopeService.setScope(testTenant.getId(), role.getId(), source.code(), "create", "all", "MAX");
+            dataScopeService.setScope(testTenant.getId(), role.getId(), source.code(), "read", "self", "MAX");
+        }
+        assertTrue(roleService.assignPermissions(role.getId(), grants));
+        User actor = userService.signUp("recon-actor-" + suffix + "@auraboot.com", "test-password-123");
+        User other = userService.signUp("recon-other-" + suffix + "@auraboot.com", "test-password-123");
+        TenantMember actorMember = tenantMemberService.addMember(actor.getId(), testTenant.getId(), "active");
+        TenantMember otherMember = tenantMemberService.addMember(other.getId(), testTenant.getId(), "active");
+        assertNotEquals(actor.getId(), other.getId());
+        for (TenantMember member : List.of(actorMember, otherMember)) {
+            assertTrue(userRoleService.assignRolesToMember(member.getId(), List.of(role.getId()),
+                    testTenant.getId(), testUser.getId()));
+            assertEquals(Set.of(role.getId()), userRoleService.findByMemberIdAndTenantId(
+                    member.getId(), testTenant.getId()).stream().map(UserRole::getRoleId)
+                    .collect(java.util.stream.Collectors.toSet()));
+        }
+        applySourceActor(actor, actorMember);
+        Map<String, Object> ownedA = createSourceRow(sourceA, "OWN", "42.50");
+        Map<String, Object> ownedB = createSourceRow(sourceB, "OWN", "42.50");
+        applySourceActor(other, otherMember);
+        Map<String, Object> otherA = createSourceRow(sourceA, "OTHER", "999.00");
+        Map<String, Object> otherB = createSourceRow(sourceB, "OTHER", "999.00");
+        applySourceActor(actor, actorMember);
+
+        ReconciliationProfileRequest request = profileRequest(CODE_PREFIX + suffix + "_protected", "SUPPLIER");
+        request.setSourceAModel(sourceA.code());
+        request.setSourceAAmountField(sourceA.amount());
+        request.setSourceARefField(sourceA.reference());
+        request.setSourceADateField(null);
+        request.setSourceBModel(sourceB.code());
+        request.setSourceBAmountField(sourceB.amount());
+        request.setSourceBRefField(sourceB.reference());
+        request.setSourceBDateField(null);
+        var profile = reconciliationService.createProfile(request);
+        ReconciliationRunRequest runRequest = new ReconciliationRunRequest();
+        runRequest.setProfileId(profile.getId());
+        var completed = reconciliationService.startReconciliation(runRequest);
+        assertEquals(ReconciliationRun.STATUS_COMPLETED, completed.getStatus());
+        assertEquals(1, completed.getTotalSourceA());
+        assertEquals(1, completed.getTotalSourceB());
+        assertEquals(1, completed.getMatchedCount());
+        var items = reconciliationService.getRunItems(completed.getRunCode(), null, 1, 10);
+        assertEquals(1L, items.getTotal());
+        assertEquals(1, items.getRecords().size());
+        var matched = items.getRecords().get(0);
+        assertEquals(ReconciliationItem.MATCH_MATCHED, matched.getMatchStatus());
+        assertEquals(((Number) ownedA.get("id")).longValue(), matched.getSourceARecordId());
+        assertEquals(((Number) ownedB.get("id")).longValue(), matched.getSourceBRecordId());
+        assertNotEquals(((Number) otherA.get("id")).longValue(), matched.getSourceARecordId());
+        assertNotEquals(((Number) otherB.get("id")).longValue(), matched.getSourceBRecordId());
+        assertEquals("OWN", matched.getSourceARef());
+        assertEquals("OWN", matched.getSourceBRef());
+        assertEquals(0, new BigDecimal("42.50").compareTo(matched.getSourceAAmount()));
+        assertEquals(0, new BigDecimal("42.50").compareTo(matched.getSourceBAmount()));
+
+        var readB = permissionService.findByCode("model." + sourceB.code() + ".read");
+        assertTrue(roleService.removePermissions(role.getId(), List.of(readB.getId())));
+        assertFailedSourceRun(runRequest, profile.getId(), 1);
+        assertTrue(roleService.assignPermissions(role.getId(), grants));
+
+        var hiddenReference = comparisonMask(sourceB, sourceB.reference(), "hide", role);
+        assertFailedSourceRun(runRequest, profile.getId(), 2);
+        policyService.disable(hiddenReference.getPid());
+        var maskedAmount = comparisonMask(sourceA, sourceA.amount(), "partial", role);
+        assertFailedSourceRun(runRequest, profile.getId(), 3);
+        policyService.disable(maskedAmount.getPid());
+        var restored = reconciliationService.startReconciliation(runRequest);
+        assertEquals(ReconciliationRun.STATUS_COMPLETED, restored.getStatus());
+        assertEquals(1, restored.getTotalSourceA());
+        assertEquals(1, restored.getTotalSourceB());
+        assertEquals(1, restored.getMatchedCount());
+        assertEquals(1L, reconciliationService.getRunItems(restored.getRunCode(), null, 1, 10).getTotal());
+        // Restore only the test thread context; retained rows and audits remain inspectable.
+    }
+
+    private SourceFixture createProtectedSource(String modelCode, String suffix) {
+        MetaModelCreateRequest request = new MetaModelCreateRequest();
+        request.setCode(modelCode);
+        request.setDisplayName("Reconciliation protected source " + suffix);
+        request.setModelCategory("entity");
+        request.setTableName("mt_" + modelCode);
+        var model = metaModelService.create(request);
+        String amount = "recon_amount_" + suffix;
+        String reference = "recon_ref_" + suffix;
+        for (String code : List.of(amount, reference)) {
+            MetaFieldCreateRequest fieldRequest = new MetaFieldCreateRequest();
+            fieldRequest.setCode(code);
+            fieldRequest.setDataType(code.equals(amount) ? "decimal" : "string");
+            fieldRequest.setAutoPublish(true);
+            var field = metaFieldService.create(fieldRequest);
+            metaModelService.bindFieldToModel(model.getId(), field.getId(), code.equals(amount) ? 1 : 2,
+                    false, true, false, null, null, null, null);
+        }
+        metaModelService.publish(model.getPid(), "Reconciliation source permission fixture");
+        return new SourceFixture(modelCode, amount, reference);
+    }
+
+    private Map<String, Object> createSourceRow(SourceFixture source, String reference, String amount) {
+        return dynamicDataService.create(source.code(), Map.of(
+                source.reference(), reference, source.amount(), new BigDecimal(amount)));
+    }
+
+    private void applySourceActor(User user, TenantMember member) {
+        MetaContext.setContext(testTenant.getId(), user.getId(), user.getPid(), user.getUserName());
+        MetaContext.setMemberId(member.getId());
+    }
+
+    private com.auraboot.framework.meta.entity.DataPermissionPolicy comparisonMask(
+            SourceFixture source, String fieldCode, String maskType, Role role) {
+        DataPermissionPolicyCreateRequest request = new DataPermissionPolicyCreateRequest();
+        request.setName("Protected reconciliation input " + fieldCode);
+        request.setModelCode(source.code());
+        request.setPolicyType("column");
+        request.setFieldCode(fieldCode);
+        request.setMaskType(maskType);
+        var policy = policyService.create(request);
+        policyService.bindToRole(policy.getPid(), role.getPid());
+        return policy;
+    }
+
+    private void assertFailedSourceRun(ReconciliationRunRequest request, Long profileId, int failedCount) {
+        assertThrows(AccessDeniedException.class, () -> reconciliationService.startReconciliation(request));
+        QueryWrapper<ReconciliationRun> query = new QueryWrapper<>();
+        query.eq("tenant_id", testTenant.getId()).eq("profile_id", profileId);
+        var runs = runMapper.selectList(query);
+        assertEquals(failedCount + 1, runs.size());
+        assertEquals(1L, runs.stream().filter(run -> ReconciliationRun.STATUS_COMPLETED.equals(run.getStatus())).count());
+        var failed = runs.stream().filter(run -> ReconciliationRun.STATUS_FAILED.equals(run.getStatus())).toList();
+        assertEquals(failedCount, failed.size());
+        for (var run : failed) {
+            assertNotNull(run.getErrorMessage());
+            assertNotNull(run.getCompletedAt());
+            assertEquals(0L, reconciliationService.getRunItems(run.getRunCode(), null, 1, 10).getTotal());
+        }
+    }
+
+    private record SourceFixture(String code, String amount, String reference) {}
+
     // ==================== startReconciliation Guard Tests ====================
 
     @Test
@@ -514,7 +679,7 @@ class ReconciliationServiceIntegrationTest {
 
     @Test
     @DisplayName("startReconciliation: saves FAILED-run audit even when outer transaction rolls back")
-    void testStartReconciliation_modelNotFound_failedRunAuditPersisted() throws InterruptedException {
+    void testStartReconciliation_modelNotFound_failedRunAuditPersisted() {
         // Bug-4 fix: startReconciliation is @Transactional. When loadRecords fails (model not
         // found), the outer transaction rolls back — so any persistence attempted inside the
         // still-open transaction would also be rolled back. The fix registers a
@@ -538,11 +703,6 @@ class ReconciliationServiceIntegrationTest {
                 () -> reconciliationService.startReconciliation(req));
         assertTrue(ex.getMessage().startsWith("Reconciliation failed:"),
                 "Expected 'Reconciliation failed:' but got: " + ex.getMessage());
-
-        // afterCompletion fires synchronously within the same thread's transaction completion,
-        // but give the synchronization a brief moment to complete the insert in case of any
-        // scheduling delay in test environment.
-        Thread.sleep(200);
 
         // The FAILED-run audit row MUST be persisted via the afterCompletion hook
         QueryWrapper<ReconciliationRun> qw = new QueryWrapper<>();

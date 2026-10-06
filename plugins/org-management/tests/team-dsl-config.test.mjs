@@ -54,6 +54,10 @@ test('team list/form/detail pages are present and route to the platform team mod
     .find((button) => button.code === 'save');
   assert.equal(save.action.type, 'command');
   assert.equal(save.action.command, undefined);
+  assert.equal(save.permissionCode, 'org.team.manage',
+    'direct create/edit routes must declare the same authoring guard as both team commands');
+  assert.ok(createCommand.permissions.includes(save.permissionCode));
+  assert.ok(readJson('config/commands/org_update_team.json').permissions.includes(save.permissionCode));
   const formFields = formPage.blocks.find((block) => block.id === 'team_basic').fields;
   assert.equal(
     formFields.find((field) => field.field === 'status')?.required,

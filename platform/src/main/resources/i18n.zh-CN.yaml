@@ -1,4 +1,8 @@
+meta_record:
+  duplicate: "记录已存在，请检查唯一字段后再保存"
 common:
+  saved_view_public_share_group: 公开分享链接
+  saved_view_public_share_subtitle: 管理个人视图与获授权的公开链接
   type: 类型
   title: 标题
   notice: 提示
@@ -2068,6 +2072,7 @@ aurabot:
 "admin.permission.role.recommendedHint": "按职责分别设置管理员、销售、采购和工程岗位角色。"
 "admin.permission.policy.loadError": "权限策略加载失败，请重试"
 "admin.permission.editor.roleHint": "选择业务能力，核对变更后保存；数据范围决定能访问哪些记录。"
+"admin.permission.editor.readOnlyHint": "当前仅可查看角色；修改需具备对应的管理权限。"
 "admin.permission.advanced.colCoverage": "能力覆盖"
 
 "admin.permission.capability.partialV2": "部分动作已授权"
@@ -2102,6 +2107,7 @@ aurabot:
 "admin.permission.capability.revokePartialV2": "撤销已有授权"
 "admin.permission.capability.undoRevokeV2": "待撤销 · 取消撤销"
 "admin.permission.capability.scopeNamesErrorV2": "无法加载业务名称，请关闭后重新打开。"
+"admin.permission.capability.teamUnavailableV2": "此类记录未配置团队关联，不能选择“我的团队”。已有该范围本身不提供记录访问；其他角色授权或有效共享仍可能生效。"
 "admin.permission.members.temporary": "限时授权"
 "admin.permission.members.effectiveDate": "生效日期"
 "admin.permission.members.expiryDate": "到期日期"
@@ -2113,3 +2119,6 @@ permission.org.role.update: "修改角色"
 "cloudConfig.save.readbackPending": "配置已保存，请重新读取后继续修改。"
 
 "cloudConfig.save.retryReadback": "重试读取"
+
+"admin.permission.editor.impactStateDetailsV2": "查看关联能力状态、菜单及动作明细"
+"admin.permission.editor.previewStateCountsV2": "关联能力保存后状态：完整授权 {full} 项 · 部分动作 {partial} 项 · 未授权 {none} 项"

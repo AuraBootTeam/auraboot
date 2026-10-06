@@ -70,4 +70,49 @@ class MetaContextCommandPermitTest {
             assertThat(MetaContext.getCommandExpectedVersion("quote", "q-11")).isEqualTo(12L);
         });
     }
+    @Test
+    void independentSourceReadRestoresOuterPlanAndIdentity() {
+        MetaContext.setContext(1L, 2L, "user", "Actor");
+        MetaContext.setMemberId(3L);
+        MetaContext.runWithCommandPermitPlan("ALL", 7L, "asset", "record", () -> {
+            String value = MetaContext.runWithoutCommandPermit(() -> {
+                assertThat(MetaContext.hasCommandPermitScope()).isFalse();
+                assertThat(MetaContext.getCommandExpectedVersion("asset", "record")).isNull();
+                assertThat(MetaContext.getCurrentUserId()).isEqualTo(2L);
+                assertThat(MetaContext.getCurrentMemberId()).isEqualTo(3L);
+                return "source";
+            });
+            assertThat(value).isEqualTo("source");
+            assertThat(MetaContext.getCommandPermitScopeFor("asset")).isEqualTo("ALL");
+            assertThat(MetaContext.getCommandExpectedVersion("asset", "record")).isEqualTo(7L);
+        });
+        assertThat(MetaContext.hasCommandPermitScope()).isFalse();
+    }
+
+    @Test
+    void independentSourceFailureAndNestedPermitRestoreExactOuterPlan() {
+        MetaContext.runWithCommandPermitPlan("SELF", 11L, "quote", "q-11", () -> {
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                    () -> MetaContext.runWithoutCommandPermit(() -> {
+                        MetaContext.runWithCommandPermitScope("ALL", () -> {
+                            assertThat(MetaContext.getCommandPermitScope()).isEqualTo("ALL");
+                        });
+                        assertThat(MetaContext.hasCommandPermitScope()).isFalse();
+                        throw new IllegalStateException("source denied");
+                    }));
+            assertThat(MetaContext.getCommandPermitScopeFor("quote")).isEqualTo("SELF");
+            assertThat(MetaContext.getCommandExpectedVersion("quote", "q-11")).isEqualTo(11L);
+        });
+        assertThat(MetaContext.hasCommandPermitScope()).isFalse();
+    }
+
+    @Test
+    void independentSourceReadWithoutOuterPermitDoesNotCreateOne() {
+        MetaContext.runWithoutCommandPermit(() -> {
+            assertThat(MetaContext.hasCommandPermitScope()).isFalse();
+            return null;
+        });
+        assertThat(MetaContext.hasCommandPermitScope()).isFalse();
+    }
+
 }

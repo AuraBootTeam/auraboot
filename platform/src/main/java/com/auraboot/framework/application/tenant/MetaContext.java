@@ -558,6 +558,22 @@ public class MetaContext {
         return permit.scopeGrade;
     }
 
+    /**
+     * Evaluate a separate source-access decision using the actor's current policies, without
+     * inheriting the enclosing command's row grade or target version. Restores the exact outer
+     * plan on both success and failure; identity and command bookkeeping remain unchanged.
+     */
+    public static <T> T runWithoutCommandPermit(java.util.function.Supplier<T> action) {
+        CommandPermitExecution prior = COMMAND_PERMIT.get();
+        COMMAND_PERMIT.remove();
+        try {
+            return action.get();
+        } finally {
+            if (prior == null) COMMAND_PERMIT.remove();
+            else COMMAND_PERMIT.set(prior);
+        }
+    }
+
     /** Whether a resolved command permit plan exists, for propagation and diagnostics. */
     public static boolean hasCommandPermitScope() {
         return COMMAND_PERMIT.get() != null;

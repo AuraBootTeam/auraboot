@@ -10,6 +10,7 @@ import {
   PowerIcon,
   ClockIcon,
 } from '@heroicons/react/24/outline';
+import { useAuth } from '~/contexts/AuthContext';
 import { useI18n } from '~/contexts/I18nContext';
 import { useToastContext } from '~/contexts/ToastContext';
 import { fetchResult } from '~/shared/services/http-client';
@@ -49,6 +50,11 @@ const TYPE_BADGE: Record<string, string> = {
 
 export default function PermissionManagement() {
   const { t } = useI18n();
+  const { hasPermission, hasRole } = useAuth();
+  const isTenantAdmin = hasRole('tenant_admin');
+  const canManageRoles = isTenantAdmin && hasPermission('org.role.update');
+  const canAssignMembers = isTenantAdmin && hasPermission('org.user_role.update');
+  const canManageScope = isTenantAdmin && hasPermission('meta.permission.update');
   const { showSuccessToast, showErrorToast } = useToastContext();
   const { handleSubmitResult } = useFormSubmit();
   const location = useLocation();
@@ -69,7 +75,7 @@ export default function PermissionManagement() {
 
   // Right panel tab state — capability editor is the default surface.
   const [activeRightTab, setActiveRightTab] = useState<RightTabKey>(
-    auditDeepLink ? 'audit' : 'capabilities',
+    auditDeepLink && canManageScope ? 'audit' : 'capabilities',
   );
 
   const selectRole = (rolePid: string) => {
@@ -78,6 +84,7 @@ export default function PermissionManagement() {
     else setSelectedRolePid(rolePid);
   };
   const selectTab = (tab: RightTabKey) => {
+    if (tab === 'audit' && !canManageScope) return;
     if (tab === activeRightTab) return;
     if (editorDirty) setPendingNavigation({ tab });
     else setActiveRightTab(tab);
@@ -99,6 +106,13 @@ export default function PermissionManagement() {
     open: false,
     role: null,
   });
+
+  useEffect(() => {
+    if (canManageRoles) return;
+    setShowRoleForm(false);
+    setEditingRole(null);
+    setConfirmDelete({ open: false, role: null });
+  }, [canManageRoles]);
 
   // -------------------------------------------------------------------------
   // Data fetching
@@ -126,10 +140,12 @@ export default function PermissionManagement() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (auditDeepLink) {
+    if (auditDeepLink && canManageScope) {
       setActiveRightTab('audit');
+    } else if (!canManageScope) {
+      setActiveRightTab((current) => current === 'audit' ? 'capabilities' : current);
     }
-  }, [auditDeepLink]);
+  }, [auditDeepLink, canManageScope]);
 
   const filteredRoles = useMemo(() => {
     const q = searchQuery.toLowerCase();
@@ -164,6 +180,7 @@ export default function PermissionManagement() {
     description: string;
     type: string;
   }) => {
+    if (!canManageRoles) return;
     const isEditing = !!editingRole;
     const url = isEditing ? `/api/roles/${editingRole!.pid}` : '/api/roles';
     const method = isEditing ? 'put' : 'post';
@@ -188,7 +205,7 @@ export default function PermissionManagement() {
   };
 
   const handleDeleteRole = async () => {
-    if (!confirmDelete.role) return;
+    if (!canManageRoles || !confirmDelete.role) return;
     const result = await fetchResult<boolean>(`/api/roles/${confirmDelete.role.pid}`, {
       method: 'delete',
     });
@@ -207,6 +224,7 @@ export default function PermissionManagement() {
   };
 
   const handleToggleRole = async (role: Role) => {
+    if (!canManageRoles) return;
     const disabled = role.status === 'disabled';
     const action = disabled ? 'enable' : 'disable';
     const nextStatus = disabled ? 'active' : 'disabled';
@@ -258,11 +276,12 @@ export default function PermissionManagement() {
             </div>
             <button
               data-testid="role-create-btn"
+              disabled={!canManageRoles}
               onClick={() => {
                 setEditingRole(null);
                 setShowRoleForm(true);
               }}
-              className="flex-shrink-0 rounded-md bg-blue-600 p-1.5 text-white hover:bg-blue-700"
+              className="flex-shrink-0 rounded-md bg-blue-600 p-1.5 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400 dark:disabled:bg-gray-700 dark:disabled:text-gray-500"
               title={t('admin.permission.role.create') || 'Create Role'}
             >
               <PlusIcon className="h-4 w-4" />
@@ -345,6 +364,7 @@ export default function PermissionManagement() {
                         <div className="flex items-center justify-end gap-0.5">
                           <button
                             data-testid={`role-action-edit-${role.code}`}
+              disabled={!canManageRoles}
                             onClick={(e) => {
                               e.stopPropagation();
                               setEditingRole(role);
@@ -359,6 +379,7 @@ export default function PermissionManagement() {
                             <>
                               <button
                                 data-testid={`role-action-toggle-${role.code}`}
+              disabled={!canManageRoles}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleToggleRole(role);
@@ -370,6 +391,7 @@ export default function PermissionManagement() {
                               </button>
                               <button
                                 data-testid={`role-action-delete-${role.code}`}
+              disabled={!canManageRoles}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setConfirmDelete({ open: true, role });
@@ -431,6 +453,7 @@ export default function PermissionManagement() {
               role="tab"
               aria-selected={activeRightTab === 'audit'}
               data-testid="permission-right-tab-audit"
+              disabled={!canManageScope}
               onClick={() => selectTab('audit')}
               className={`flex items-center border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
                 activeRightTab === 'audit'
@@ -452,9 +475,11 @@ export default function PermissionManagement() {
               </h2>
               <p className="mt-1 text-xs text-gray-500">
                 {t(
-                  'admin.permission.editor.roleHint',
+                  canManageRoles ? 'admin.permission.editor.roleHint' : 'admin.permission.editor.readOnlyHint',
                   undefined,
-                  'Select business capabilities, then review and save the changes.',
+                  canManageRoles
+                    ? 'Select business capabilities, then review and save the changes.'
+                    : 'Read-only role access. Changes require the corresponding administration permission.',
                 )}
               </p>
             </div>
@@ -465,6 +490,8 @@ export default function PermissionManagement() {
               <CapabilityRoleEditor
                 key={selectedRole.pid}
                 rolePid={selectedRole.pid}
+                readOnly={!canManageRoles}
+                scopeReadOnly={!canManageScope}
                 onDirtyChange={setEditorDirty}
               />
             ) : (
@@ -472,8 +499,8 @@ export default function PermissionManagement() {
                 {t('admin.permission.selectRole') || 'Select a role'}
               </div>
             ))}
-          {activeRightTab === 'members' && <RoleMemberTab rolePid={selectedRolePid} />}
-          {activeRightTab === 'audit' && <PermissionAuditTab />}
+          {activeRightTab === 'members' && <RoleMemberTab rolePid={selectedRolePid} readOnly={!canAssignMembers} />}
+          {activeRightTab === 'audit' && canManageScope && <PermissionAuditTab />}
         </div>
       </div>
     </div>
@@ -507,7 +534,7 @@ export default function PermissionManagement() {
 
       {/* Role Form Dialog */}
       <RoleFormDialog
-        open={showRoleForm}
+        open={showRoleForm && canManageRoles}
         onOpenChange={(open) => {
           setShowRoleForm(open);
           if (!open) setEditingRole(null);
@@ -543,7 +570,7 @@ export default function PermissionManagement() {
         }}
       />
       <ConfirmDialog
-        open={confirmDelete.open}
+        open={confirmDelete.open && canManageRoles}
         title={t('admin.permission.role.delete.title') || 'Delete Role'}
         content={
           t('admin.permission.role.delete.content') ||

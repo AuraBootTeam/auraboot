@@ -216,10 +216,13 @@ test.describe('Quote and BOM operations dashboard @smoke', () => {
   test('admin gets one menu link and the same four charts on dashboard and home', async ({ page }, testInfo) => {
     await expectFourCharts(page, '/home');
     await ensureSidebarExpanded(page);
+    // Sidebar expansion reloads the document; validate the charts in the captured document.
+    await expectFourCharts(page, HOME_PATH);
     await expect(page.getByTestId('sidebar').locator(`a[href="${HOME_PATH}"]`)).toHaveCount(1);
 
     await page.screenshot({ path: testInfo.outputPath('home-weekly-order.png'), fullPage: true });
     await expectFourCharts(page, DASHBOARD_PATH);
+    await expect(page.getByText('查看报价与 BOM 的创建趋势及人员贡献。', { exact: true })).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('dashboard-weekly-order.png'), fullPage: true });
 
     for (const code of TREND_QUERIES) {

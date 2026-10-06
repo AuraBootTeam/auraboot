@@ -26,13 +26,14 @@ import type { RoleMemberDTO } from './types';
 
 interface RoleMemberTabProps {
   rolePid: string | null;
+  readOnly?: boolean;
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export default function RoleMemberTab({ rolePid }: RoleMemberTabProps) {
+export default function RoleMemberTab({ rolePid, readOnly = false }: RoleMemberTabProps) {
   const { t } = useI18n();
   const { showSuccessToast, showErrorToast } = useToastContext();
 
@@ -50,6 +51,12 @@ export default function RoleMemberTab({ rolePid }: RoleMemberTabProps) {
     member: RoleMemberDTO | null;
   }>({ open: false, member: null });
   const [removing, setRemoving] = useState(false);
+
+  useEffect(() => {
+    if (!readOnly) return;
+    setShowAddDialog(false);
+    setConfirmRemove({ open: false, member: null });
+  }, [readOnly]);
 
   // ---------------------------------------------------------------------------
   // Data fetching
@@ -85,7 +92,7 @@ export default function RoleMemberTab({ rolePid }: RoleMemberTabProps) {
   // ---------------------------------------------------------------------------
 
   const handleRemove = async () => {
-    if (!rolePid || !confirmRemove.member) return;
+    if (readOnly || !rolePid || !confirmRemove.member) return;
     setRemoving(true);
     try {
       await permissionService.removeRoleMembers(rolePid, [confirmRemove.member.memberPid]);
@@ -149,8 +156,9 @@ export default function RoleMemberTab({ rolePid }: RoleMemberTabProps) {
         </span>
         <button
           data-testid="role-member-add-btn"
+          disabled={readOnly}
           onClick={() => setShowAddDialog(true)}
-          className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+          className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400 dark:disabled:bg-gray-700 dark:disabled:text-gray-500"
         >
           <UserPlusIcon className="h-4 w-4" />
           {t('admin.permission.members.add', undefined, 'Add Members')}
@@ -246,12 +254,13 @@ export default function RoleMemberTab({ rolePid }: RoleMemberTabProps) {
                     <td className="whitespace-nowrap px-2 py-3 text-right">
                       <button
                         data-testid={`role-member-remove-${member.memberId}`}
+                        disabled={readOnly}
                         aria-label={`${t('common.remove', undefined, 'Remove')} ${member.userName}`}
                         title={t('common.remove', undefined, 'Remove')}
                         onClick={() =>
                           setConfirmRemove({ open: true, member })
                         }
-                        className="inline-flex h-8 w-8 items-center justify-center rounded text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-gray-400 disabled:hover:bg-transparent dark:text-red-400 dark:hover:bg-red-900/20 dark:disabled:text-gray-500 dark:disabled:hover:bg-transparent"
                       >
                         <TrashIcon className="h-4 w-4" />
                       </button>
@@ -293,7 +302,7 @@ export default function RoleMemberTab({ rolePid }: RoleMemberTabProps) {
 
       {/* Add Member Dialog */}
       <AddMemberDialog
-        open={showAddDialog}
+        open={showAddDialog && !readOnly}
         onClose={() => setShowAddDialog(false)}
         rolePid={rolePid}
         existingMemberPids={existingMemberPids}
@@ -305,7 +314,7 @@ export default function RoleMemberTab({ rolePid }: RoleMemberTabProps) {
 
       {/* Remove Confirmation */}
       <ConfirmDialog
-        open={confirmRemove.open}
+        open={confirmRemove.open && !readOnly}
         title={t('admin.permission.members.removeTitle', undefined, 'Remove Member')}
         content={
           (

@@ -22,6 +22,8 @@ interface CapabilityRoleEditorProps {
   /** Role pid (all role-scoped endpoints key on the PID — role ids exceed JS safe-int range). */
   rolePid: string;
   onDirtyChange?: (dirty: boolean) => void;
+  readOnly?: boolean;
+  scopeReadOnly?: boolean;
 }
 
 /**
@@ -35,6 +37,8 @@ interface CapabilityRoleEditorProps {
 export default function CapabilityRoleEditor({
   rolePid,
   onDirtyChange,
+  readOnly = false,
+  scopeReadOnly = readOnly,
 }: CapabilityRoleEditorProps) {
   const { t } = useI18n();
   const { showSuccessToast, showErrorToast } = useToastContext();
@@ -118,7 +122,7 @@ export default function CapabilityRoleEditor({
     } finally {
       if (request === loadRequest.current) setLoading(false);
     }
-  }, [rolePid]);
+  }, [rolePid, readOnly, scopeReadOnly]);
 
   useEffect(() => {
     void load();
@@ -128,12 +132,14 @@ export default function CapabilityRoleEditor({
   }, [load]);
 
   const onToggle = useCallback((code: string) => {
+    if (readOnly) return;
     setRevokedPartial((current) => current.filter((item) => item !== code));
     setSelected((current) => toggleCapability(current, code));
-  }, []);
+  }, [readOnly]);
 
   const applyPreset = useCallback(
     (tier: string) => {
+      if (readOnly) return;
       const tieredCodes = new Set(capabilityCodesForTier(capabilityView.primaryGroups, 'admin'));
       const preservedSelection = selected.filter((code) => !tieredCodes.has(code));
       const nextSelection = [
@@ -143,10 +149,11 @@ export default function CapabilityRoleEditor({
       setSelected(nextSelection);
       setRevokedPartial((current) => current.filter((code) => !nextSelection.includes(code)));
     },
-    [capabilityView.primaryGroups, primaryCodes, selected],
+    [capabilityView.primaryGroups, primaryCodes, selected, readOnly],
   );
 
   const save = useCallback(async () => {
+    if (readOnly) return;
     setSaving(true);
     let submitted = false;
     try {
@@ -182,10 +189,10 @@ export default function CapabilityRoleEditor({
     } finally {
       setSaving(false);
     }
-  }, [rolePid, selected, primarySelected, revokedPartial, showSuccessToast, showErrorToast, t]);
+  }, [rolePid, selected, primarySelected, revokedPartial, showSuccessToast, showErrorToast, t, readOnly]);
 
   const reviewChanges = async () => {
-    if (!dirty || saving || previewLoading) return;
+    if (readOnly || !dirty || saving || previewLoading) return;
     setPreviewLoading(true);
     const request = loadRequest.current;
     try {
@@ -266,6 +273,10 @@ export default function CapabilityRoleEditor({
   const primaryImpact = (previewPlan?.resultingCapabilities ?? []).filter(
     (cap) => cap.authorizationState !== 'partial' || changedCodes.has(cap.code),
   );
+  const resulting = previewPlan?.resultingCapabilities ?? [];
+  const fullCount = resulting.filter((cap) => cap.authorizationState === 'full').length;
+  const partialCount = resulting.filter((cap) => cap.authorizationState === 'partial').length;
+  const noneCount = resulting.filter((cap) => cap.authorizationState === 'none').length;
   const renderImpact = (cap: Capability) => (
     <li key={cap.code} data-testid={`capability-preview-impact-${cap.code}`}>
       {cap.label}:{' '}
@@ -299,18 +310,42 @@ export default function CapabilityRoleEditor({
           `Add ${previewPlan.grantedCodes.length} actions, remove ${previewPlan.revokedCodes.length}; ${previewPlan.preservedCodes.length} existing actions outside the selection remain unchanged.`,
         )}
       </p>
+      {resulting.length > 0 && (
+        <div className="space-y-1">
+          <p data-testid="capability-preview-state-guidance" className="text-text-2 text-xs leading-5">
+            {t(
+              'admin.permission.capability.partialGuidanceV2',
+              undefined,
+              'Some actions may be shared dependencies of other capabilities. Partial actions do not grant the complete capability. Select to complete; review revocation effects before saving.',
+            )}
+          </p>
+        </div>
+      )}
       <details
         data-testid="capability-preview-impact"
         className="border-border rounded-card border p-3"
       >
         <summary className="cursor-pointer font-medium">
           {t(
-            'admin.permission.editor.impactDetailsV2',
-            { count: previewPlan.resultingCapabilities.length },
-            `Review affected capabilities (${previewPlan.resultingCapabilities.length}), menus and action details`,
+            'admin.permission.editor.impactStateDetailsV2',
+            undefined,
+            'Review related capability states, menus and action details',
           )}
         </summary>
         <div className="mt-3 space-y-3">
+          <p
+            data-testid="capability-preview-state-counts"
+            data-full={fullCount}
+            data-partial={partialCount}
+            data-none={noneCount}
+            className="text-text text-sm font-medium"
+          >
+            {t(
+              'admin.permission.editor.previewStateCountsV2',
+              { full: fullCount, partial: partialCount, none: noneCount },
+              `Related capabilities after saving: ${fullCount} fully granted · ${partialCount} with partial actions · ${noneCount} not granted`,
+            )}
+          </p>
           <div data-testid="capability-preview-resulting" className="space-y-3">
             {primaryImpact.length > 0 && (
               <ul className="space-y-1">{primaryImpact.map(renderImpact)}</ul>
@@ -381,7 +416,7 @@ export default function CapabilityRoleEditor({
         rolePid={rolePid}
         matrix={matrix}
         onScopeApplied={loadMatrix}
-        disabled={dirty || saving || previewLoading || scopeUpdating}
+        disabled={scopeReadOnly || dirty || saving || previewLoading || scopeUpdating}
       />
 
       {/* ① business capabilities (primary) */}
@@ -428,7 +463,7 @@ export default function CapabilityRoleEditor({
               type="button"
               data-testid={`capability-preset-${p.tier}`}
               onClick={() => applyPreset(p.tier)}
-              disabled={saving || previewLoading || scopeUpdating}
+              disabled={readOnly || saving || previewLoading || scopeUpdating}
               className="h-7 rounded-md border border-gray-200 px-2 text-xs text-gray-700 hover:bg-gray-50"
             >
               {p.label}
@@ -441,12 +476,13 @@ export default function CapabilityRoleEditor({
           onToggle={onToggle}
           revokedPartial={revokedPartial}
           onRevokePartial={(code) => {
+            if (readOnly) return;
             setSelected((current) => current.filter((item) => item !== code));
             setRevokedPartial((current) => toggleCapability(current, code));
           }}
-          onConfigureScope={dirty ? undefined : setScopeCapability}
+          onConfigureScope={scopeReadOnly || dirty ? undefined : setScopeCapability}
           scopeConfigurableCodes={scopeConfigurableCodes}
-          disabled={saving || previewLoading || scopeUpdating}
+          disabled={readOnly || saving || previewLoading || scopeUpdating}
         />
         {filteredGroups.length === 0 && (
           <p data-testid="capability-search-empty" className="text-text-2 py-4 text-sm">
@@ -484,7 +520,7 @@ export default function CapabilityRoleEditor({
             <button
               type="button"
               data-testid="capability-save"
-              disabled={!dirty || saving || previewLoading}
+              disabled={readOnly || !dirty || saving || previewLoading}
               onClick={() => void reviewChanges()}
               className="h-8 rounded-md bg-blue-600 px-3 text-sm text-white disabled:opacity-50"
             >
@@ -497,7 +533,7 @@ export default function CapabilityRoleEditor({
       </div>
 
       <CapabilityDiagnostics matrix={matrix} groups={groups} />
-      {scopeCapability && (
+      {scopeCapability && !scopeReadOnly && (
         <CapabilityScopeSettings
           rolePid={rolePid}
           capability={scopeCapability}
@@ -510,7 +546,7 @@ export default function CapabilityRoleEditor({
       )}
 
       <ConfirmDialog
-        open={preview}
+        open={preview && !readOnly}
         title={t('admin.permission.editor.preview', undefined, 'Review permission changes')}
         content={previewContent}
         confirmText={t('common.save', undefined, 'Save')}

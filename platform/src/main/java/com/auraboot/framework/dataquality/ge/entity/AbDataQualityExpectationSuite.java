@@ -1,6 +1,7 @@
 package com.auraboot.framework.dataquality.ge.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler;
 import lombok.Data;
 
 import java.time.Instant;
@@ -14,7 +15,7 @@ import java.time.Instant;
  * for parsing and validating it at runtime.
  */
 @Data
-@TableName("ab_dataquality_expectation_suite")
+@TableName(value = "ab_dataquality_expectation_suite", autoResultMap = true)
 public class AbDataQualityExpectationSuite {
 
     @TableId(type = IdType.ASSIGN_ID)
@@ -35,6 +36,7 @@ public class AbDataQualityExpectationSuite {
      * Raw GE expectations JSON array.
      * Stored as JSONB; accessed via Jackson during validation.
      */
+    @TableField(value = "expectations_json", typeHandler = JsonbStringTypeHandler.class)
     private String expectationsJson;
 
     @TableField(fill = FieldFill.INSERT)

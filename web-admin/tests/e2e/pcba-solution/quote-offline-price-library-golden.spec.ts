@@ -78,6 +78,7 @@ test.describe('PCBA quote offline price library golden', () => {
       await expect(page.getByRole('row').filter({ hasText: seeded[1].mpn })).toHaveCount(0);
 
       // Imported evidence is inspected in this list; row clicks must not open a missing detail.
+      await expect(page).toHaveURL(url => url.pathname === listPath && url.searchParams.get('keyword') === seeded[0].mpn);
       const filteredUrl = page.url();
       await row.click();
       expect(page.url()).toBe(filteredUrl);

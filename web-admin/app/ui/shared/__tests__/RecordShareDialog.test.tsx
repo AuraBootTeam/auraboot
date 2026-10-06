@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { StrictMode } from 'react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '~/contexts/I18nContext';
 import { RecordShareDialog } from '../RecordShareDialog';
@@ -224,6 +225,34 @@ describe('RecordShareDialog', () => {
       method: 'DELETE',
     });
     expect(showSuccessToast).toHaveBeenCalledWith('协作成员已移除');
+  });
+
+  it('does not restore a revoked collaborator from a late initial read', async () => {
+    const entry = { pid: 'share-public-pid', subjectName: '销售二组成员', permissionMask: 'read' };
+    let resolveOldRead!: (value: unknown) => void;
+    const oldRead = new Promise(resolve => { resolveOldRead = resolve; });
+    const fetchMock = vi.fn()
+      .mockReturnValueOnce(oldRead)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', data: [entry] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', data: null }) });
+    vi.stubGlobal('fetch', fetchMock);
+    render(
+      <StrictMode>
+        <I18nProvider initialLocale="zh-CN" initialData={I18N}>
+          <RecordShareDialog open onClose={vi.fn()} resourceCode="crm_account_common" recordPid="account-pid" />
+        </I18nProvider>
+      </StrictMode>,
+    );
+    await screen.findByText('销售二组成员');
+    fireEvent.click(screen.getByRole('button', { name: '移除协作成员' }));
+    await screen.findByTestId('record-share-empty');
+    await act(async () => {
+      resolveOldRead({ ok: true, json: async () => ({ code: '0', data: [entry] }) });
+      await oldRead;
+    });
+    expect(screen.getByTestId('record-share-empty')).toBeInTheDocument();
+    expect(screen.queryByText('销售二组成员')).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/record-share/share-public-pid', { method: 'DELETE' });
   });
 
   it('batch-removes selected collaborators only after explicit confirmation', async () => {

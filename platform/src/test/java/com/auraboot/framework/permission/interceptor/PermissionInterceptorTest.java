@@ -62,6 +62,61 @@ class PermissionInterceptorTest {
         MetaContext.clear();
     }
 
+    @Test
+    void dashboardVersionHandlersKeepReadWriteAndPublicSharingIndependent() throws Exception {
+        authenticate(7L);
+        java.util.Set<String> grants = new java.util.HashSet<>(java.util.Set.of(MetaPermission.DASHBOARD_READ));
+        when(userPermissionService.hasPermission(eq(7L), anyString()))
+                .thenAnswer(invocation -> grants.contains(invocation.getArgument(1, String.class)));
+        var service = mock(com.auraboot.framework.versioning.service.VersionHistoryService.class);
+        var controller = new com.auraboot.framework.versioning.controller.VersionHistoryController(service,
+                mock(com.auraboot.framework.dashboard.service.DashboardService.class));
+        var rollback = new HandlerMethod(controller, controller.getClass().getMethod("rollback", String.class, String.class));
+        var sharing = new com.auraboot.framework.view.controller.ViewShareController(
+                mock(com.auraboot.framework.view.service.ViewShareService.class));
+        var share = new HandlerMethod(sharing, sharing.getClass().getMethod("shareView", String.class, Map.class));
+        var revokeShare = new HandlerMethod(sharing, sharing.getClass().getMethod("revokeShare", String.class));
+        var shareStatus = new HandlerMethod(sharing, sharing.getClass().getMethod("getShareStatus", String.class));
+        var shareHandlers = List.of(share, revokeShare, shareStatus);
+        for (String name : List.of("getHistory", "getVersion", "countVersions")) {
+            Method method = name.equals("getVersion")
+                    ? controller.getClass().getMethod(name, String.class, String.class)
+                    : controller.getClass().getMethod(name, String.class);
+            assertThat(interceptor.preHandle(request, response, new HandlerMethod(controller, method))).isTrue();
+        }
+        assertThatThrownBy(() -> interceptor.preHandle(request, response, rollback))
+                .isInstanceOf(AccessDeniedException.class);
+        grants.add(MetaPermission.DASHBOARD_MANAGE);
+        assertThat(interceptor.preHandle(request, response, rollback)).isTrue();
+        controller.rollback("test-dashboard", "version-1");
+        verify(service).rollback("dashboard", "test-dashboard", "version-1");
+        for (var handler : shareHandlers) {
+            assertThatThrownBy(() -> interceptor.preHandle(request, response, handler))
+                    .isInstanceOf(AccessDeniedException.class);
+        }
+        grants.remove(MetaPermission.DASHBOARD_MANAGE);
+        grants.add(MetaPermission.VIEW_PUBLIC_SHARE);
+        for (var handler : shareHandlers) {
+            assertThat(interceptor.preHandle(request, response, handler)).isTrue();
+        }
+        grants.remove(MetaPermission.VIEW_PUBLIC_SHARE);
+        for (var handler : shareHandlers) {
+            assertThatThrownBy(() -> interceptor.preHandle(request, response, handler))
+                    .isInstanceOf(AccessDeniedException.class);
+        }
+        assertThatThrownBy(() -> interceptor.preHandle(request, response, rollback))
+                .isInstanceOf(AccessDeniedException.class);
+        grants.clear();
+        for (String name : List.of("getHistory", "getVersion", "countVersions")) {
+            Method method = name.equals("getVersion")
+                    ? controller.getClass().getMethod(name, String.class, String.class)
+                    : controller.getClass().getMethod(name, String.class);
+            assertThatThrownBy(() -> interceptor.preHandle(request, response, new HandlerMethod(controller, method)))
+                    .isInstanceOf(AccessDeniedException.class);
+        }
+        verify(service, times(1)).rollback(anyString(), anyString(), anyString());
+    }
+
     // ---- handler classes for HandlerMethod construction ----
     static class StaticHandler {
         @RequirePermission("model.user.read")

@@ -2,6 +2,9 @@ package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.common.constant.StatusConstants;
 import com.auraboot.framework.integration.BaseIntegrationTest;
+import com.auraboot.framework.exception.ValidationException;
+import com.auraboot.framework.meta.controller.config.FieldBindingContextController;
+import com.auraboot.framework.meta.dto.BindingConfigRequest;
 import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.entity.Field;
@@ -11,6 +14,9 @@ import com.auraboot.framework.meta.entity.payload.ExtensionBean;
 import com.auraboot.framework.meta.entity.payload.FieldFeatureBean;
 import com.auraboot.framework.meta.mapper.MetaFieldMapper;
 import com.auraboot.framework.meta.mapper.MetaModelMapper;
+import com.auraboot.framework.meta.service.FieldBindingContextService;
+import com.auraboot.framework.meta.service.MetaFieldService;
+import com.auraboot.framework.meta.service.ModelFieldBindingService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,6 +31,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Regression coverage for P5 metadata cache correctness.
@@ -38,6 +45,15 @@ class ModelFieldBindingCacheInvalidationIT extends BaseIntegrationTest {
 
     @Autowired
     private MetaModelService metaModelService;
+
+    @Autowired
+    private FieldBindingContextService fieldBindingContextService;
+
+    @Autowired
+    private ModelFieldBindingService modelFieldBindingService;
+
+    @Autowired
+    private MetaFieldService metaFieldService;
 
     @Autowired
     private MetaModelMapper metaModelMapper;
@@ -150,6 +166,96 @@ class ModelFieldBindingCacheInvalidationIT extends BaseIntegrationTest {
                 .isEmpty();
         assertThat(findBinding(metaModelService.getModelFieldBindings(model.getId(), false), field.getId()))
                 .isNull();
+    }
+
+    @Test
+    @DisplayName("configureBinding refreshes field DTOs and runtime model definitions")
+    void configureBindingRefreshesFieldDtosAndRuntimeModelDefinitions() {
+        Model model = insertModel("permission_config_model");
+        Field field = insertField("permission_config_field", false);
+        metaModelService.bindFieldToModel(
+                model.getId(), field.getId(), 10, true, true, true,
+                null, null, null, null);
+
+        assertThat(findFieldDefinition(model.getCode(), field.getCode()).orElseThrow().isRequired())
+                .isTrue();
+        assertThat(modelFieldBindingService.getModelFields(model.getPid()))
+                .filteredOn(dto -> field.getPid().equals(dto.getPid()))
+                .singleElement()
+                .satisfies(dto -> {
+                    assertThat(dto.getEditable()).isTrue();
+                    assertThat(dto.getFieldOrder()).isEqualTo(10);
+                });
+        assertThat(findBinding(metaModelService.getModelFieldBindings(model.getId(), false), field.getId()))
+                .extracting(ModelFieldBinding::getFieldOrder).isEqualTo(10);
+
+        BindingConfigRequest request = new BindingConfigRequest();
+        request.setRequired(false);
+        request.setEditable(false);
+        request.setFieldOrder(25);
+        fieldBindingContextService.configureBinding(model.getPid(), field.getPid(), request);
+
+        assertThat(modelFieldBindingService.getModelFields(model.getPid()))
+                .filteredOn(dto -> field.getPid().equals(dto.getPid()))
+                .singleElement()
+                .satisfies(dto -> {
+                    assertThat(dto.getEditable()).isFalse();
+                    assertThat(dto.getFieldOrder()).isEqualTo(25);
+                });
+        FieldDefinition refreshed = findFieldDefinition(model.getCode(), field.getCode()).orElseThrow();
+        assertThat(refreshed.isRequired()).isFalse();
+        assertThat(refreshed.getSortOrder()).isEqualTo(25);
+        assertThat(findBinding(metaModelService.getModelFieldBindings(model.getId(), false), field.getId()))
+                .extracting(ModelFieldBinding::getFieldOrder).isEqualTo(25);
+
+        ModelFieldBinding binding = metaModelService.getFieldBinding(model.getId(), field.getId()).orElseThrow();
+        request.setRequired(true);
+        request.setEditable(true);
+        request.setFieldOrder(40);
+        fieldBindingContextService.updateBindingConfiguration(binding.getId(), request);
+
+        assertThat(modelFieldBindingService.getModelFields(model.getPid()))
+                .filteredOn(dto -> field.getPid().equals(dto.getPid()))
+                .singleElement()
+                .satisfies(dto -> {
+                    assertThat(dto.getEditable()).isTrue();
+                    assertThat(dto.getFieldOrder()).isEqualTo(40);
+                });
+        FieldDefinition restored = findFieldDefinition(model.getCode(), field.getCode()).orElseThrow();
+        assertThat(restored.isRequired()).isTrue();
+        assertThat(restored.getSortOrder()).isEqualTo(40);
+        assertThat(findBinding(metaModelService.getModelFieldBindings(model.getId(), false), field.getId()))
+                .extracting(ModelFieldBinding::getFieldOrder).isEqualTo(40);
+    }
+
+    @Test
+    @DisplayName("binding update rejects a different model path without changing the target")
+    void bindingUpdateRejectsDifferentModelPathWithoutMutation() {
+        Model target = insertModel("permission_binding_target");
+        Model other = insertModel("permission_binding_other");
+        Field field = insertField("permission_binding_scoped_field", false);
+        ModelFieldBinding binding = metaModelService.bindFieldToModel(
+                target.getId(), field.getId(), 10, false, true, true,
+                null, null, null, null);
+        BindingConfigRequest request = new BindingConfigRequest();
+        request.setEditable(false);
+        request.setFieldOrder(25);
+        FieldBindingContextController controller =
+                new FieldBindingContextController(fieldBindingContextService, metaFieldService);
+
+        assertThatThrownBy(() -> controller.updateBindingConfiguration(other.getPid(), binding.getId(), request))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("Binding does not belong to requested model");
+        ModelFieldBinding unchanged = metaModelService.getFieldBinding(target.getId(), field.getId()).orElseThrow();
+        assertThat(unchanged.getEditable()).isTrue();
+        assertThat(unchanged.getFieldOrder()).isEqualTo(10);
+
+        var response = controller.updateBindingConfiguration(target.getPid(), binding.getId(), request);
+        assertThat(response.getData().getModelPid()).isEqualTo(target.getPid());
+        assertThat(response.getData().getFieldPid()).isEqualTo(field.getPid());
+        ModelFieldBinding updated = metaModelService.getFieldBinding(target.getId(), field.getId()).orElseThrow();
+        assertThat(updated.getEditable()).isFalse();
+        assertThat(updated.getFieldOrder()).isEqualTo(25);
     }
 
     private Model insertModel(String prefix) {

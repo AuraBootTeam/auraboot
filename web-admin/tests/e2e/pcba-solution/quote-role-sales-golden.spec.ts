@@ -10,6 +10,8 @@ import {
   createCorrectedBomWorkbook,
   dynamicCreate,
   executeCommand,
+  ensureQuoteRoleUser,
+  makeQuoteRoleUser,
   isTransientViteDynamicImportIssue,
   openQuoteCreateFormFromList,
   openQuoteDetailFromList,
@@ -627,6 +629,68 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         expect(page.url()).toBe(originalDetailUrl);
       }
       await page.screenshot({ path: testInfo.outputPath('ordinary-sales-upload-original-downloads.png'), fullPage: true });
+
+      // Exercise automatic upload relations, without a test-created file/relation binding.
+      step = 'share uploaded originals with another ordinary sales user';
+      const peer = makeQuoteRoleUser('upload-peer', suffix, ['qo_sales']);
+      const peerSetup = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+      try {
+        const adminPage = await peerSetup.newPage();
+        await loginViaUI(adminPage, ADMIN_EMAIL, ADMIN_PASSWORD);
+        await ensureQuoteRoleUser(adminPage, peer);
+      } finally {
+        await peerSetup.close();
+      }
+      const peerSession = await openQuoteRolePage(browser, peer);
+      try {
+        const originals = [] as Array<{ fixture: string; href: string }>;
+        for (const fixture of [workbookPath, gerberFixture, cplFixture]) {
+          const row = page.getByRole('row').filter({ hasText: path.basename(fixture) });
+          const href = await row.getByRole('link', { name: '下载文件', exact: true }).getAttribute('href');
+          expect(href).toMatch(/^\/api\/file\/download\/[^/]+$/);
+          originals.push({ fixture, href: href! });
+          expect((await peerSession.page.request.get(href!)).status()).toBe(403);
+        }
+        await page.getByTestId('ab:detail:qo_quote_common:share-btn').click();
+        const shareDialog = page.getByTestId('record-share-dialog');
+        await expect(shareDialog).toBeVisible();
+        await shareDialog.getByTestId('member-picker-add').click();
+        await page.getByTestId('member-picker-search-input').fill(peer.email);
+        await page.locator('[data-testid^="member-picker-option-"]').filter({ hasText: peer.displayName }).click();
+        await shareDialog.getByRole('heading', { name: '添加协作成员' }).click();
+        const shareResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/record-share'
+          && response.request().method() === 'POST');
+        await shareDialog.getByTestId('record-share-add-btn').click();
+        expect((await shareResponse).status()).toBe(200);
+        await shareDialog.getByTestId('record-share-dialog-close').click();
+        await openQuoteDetailFromList(peerSession.page, created);
+        await peerSession.page.getByRole('tab', { name: '资料上传', exact: true }).click();
+        for (const [index, original] of originals.entries()) {
+          const filename = path.basename(original.fixture);
+          const row = peerSession.page.getByRole('row').filter({ hasText: filename });
+          const link = row.getByRole('link', { name: '下载文件', exact: true });
+          await expect(link).toBeVisible();
+          expect(await link.getAttribute('href')).toBe(original.href);
+          const event = peerSession.page.waitForEvent('download');
+          await link.click();
+          const download = await event;
+          expect(download.suggestedFilename()).toBe(filename);
+          const output = testInfo.outputPath(`ordinary-peer-original-${index}-${filename}`);
+          await download.saveAs(output);
+          expect(fs.readFileSync(output)).toEqual(fs.readFileSync(original.fixture));
+        }
+        await peerSession.page.screenshot({ path: testInfo.outputPath('ordinary-peer-upload-original-downloads.png'), fullPage: true });
+        await page.getByTestId('ab:detail:qo_quote_common:share-btn').click();
+        await expect(shareDialog.getByTestId('record-share-list')).toContainText(peer.displayName);
+        await shareDialog.locator('[data-testid^="record-share-remove-"]').click();
+        await expect(shareDialog.getByTestId('record-share-empty')).toBeVisible();
+        await shareDialog.getByTestId('record-share-dialog-close').click();
+        for (const original of originals) {
+          expect((await peerSession.page.request.get(original.href)).status()).toBe(403);
+        }
+      } finally {
+        await peerSession.context.close();
+      }
 
       // 3. Seed deterministic channel evidence through admin setup, then hand only those fixture
       // rows to the quote owner. All user actions below remain real qo_sales browser actions.
@@ -1469,9 +1533,26 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         const adminPage = await adminGoldenContext.newPage();
         await loginViaUI(adminPage, ADMIN_EMAIL, ADMIN_PASSWORD);
         await setYunhanMockScenario(adminPage, 'reprice-v2');
+        const adminWaterfallResponses: Response[] = [];
+        adminPage.on('response', (response) => {
+          const url = new URL(response.url());
+          if (response.request().method() === 'GET' && url.pathname === '/api/datasource/list'
+            && url.searchParams.get('datasourceId') === 'nq:qo_quote_bom_price_waterfall'
+            && url.searchParams.get('quoteId') === quoteId) {
+            adminWaterfallResponses.push(response);
+          }
+        });
         await openQuoteDetailFromList(adminPage, created);
         await adminPage.getByRole('tab', { name: /BOM价格|BOM Price/ }).click();
-        await adminPage.getByTestId(`table-row-${lineId}`).click();
+        const adminPriceRow = adminPage.getByTestId(`table-row-${lineId}`);
+        await expect(adminPriceRow).toBeVisible({ timeout: 20_000 });
+        const adminWaterfallResponse = adminWaterfallResponses.at(-1);
+        expect(adminWaterfallResponse, 'The current quote Waterfall response must precede row rendering').toBeDefined();
+        expect(adminWaterfallResponse!.status()).toBe(200);
+        const adminWaterfallBody = await adminWaterfallResponse!.json();
+        expect(String(adminWaterfallBody.code)).toBe('0');
+        expect(adminWaterfallBody.data.records.some((record: { pid: string }) => record.pid === lineId)).toBe(true);
+        await adminPriceRow.click();
         await expectLegacyPricingActionsHidden(adminPage);
         await adminPage.getByTestId('review-drawer-edit-open').click();
         await adminPage

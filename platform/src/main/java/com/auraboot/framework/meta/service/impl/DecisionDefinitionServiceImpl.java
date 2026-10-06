@@ -67,7 +67,7 @@ public class DecisionDefinitionServiceImpl implements DecisionDefinitionService 
 
     @Override
     public DecisionDefinition getByPid(String pid) {
-        DecisionDefinition definition = definitionMapper.findByPid(pid);
+        DecisionDefinition definition = definitionMapper.findByPid(MetaContext.getCurrentTenantId(), pid);
         if (definition == null) {
             throw new BusinessException(ResponseCode.BadParam, "Decision definition not found: " + pid);
         }
@@ -127,7 +127,7 @@ public class DecisionDefinitionServiceImpl implements DecisionDefinitionService 
         }
 
         definitionMapper.markAsNotCurrent(definition.getTenantId(), definition.getCode());
-        definitionMapper.publishById(definition.getId(), Status.PUBLISHED.getCode());
+        definitionMapper.publishById(definition.getTenantId(), definition.getId(), Status.PUBLISHED.getCode());
         log.info("Published decision definition: code={}, version={}", definition.getCode(), definition.getVersion());
     }
 
@@ -135,7 +135,7 @@ public class DecisionDefinitionServiceImpl implements DecisionDefinitionService 
     @Transactional
     public void delete(String pid) {
         DecisionDefinition definition = getByPid(pid);
-        definitionMapper.softDelete(pid);
+        definitionMapper.softDelete(definition.getTenantId(), pid);
         log.info("Deleted decision definition: pid={}, code={}", pid, definition.getCode());
     }
 

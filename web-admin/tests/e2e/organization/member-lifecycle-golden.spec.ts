@@ -45,6 +45,7 @@ test('MEMBER-DETAIL-07: native lifecycle buttons execute commands and persist st
   await expect(membersLink).toBeVisible();
   await membersLink.click();
   await expect(page).toHaveURL(/\/p\/tenant_member/);
+  await expect(page.getByTestId('invite-section')).toBeVisible();
   const row = page.locator('table tbody tr').filter({ hasText: stamp });
   await expect(row).toHaveCount(1, { timeout: 20000 });
   await expect(row).toBeVisible();
@@ -211,12 +212,13 @@ test('MEMBER-DETAIL-08: independent member-view capability permits reading and r
   await page.getByTestId('data-scope-option-all').click();
   await page.getByTestId('data-scope-apply').click();
   await expect(page.getByTestId('data-scope-drawer')).toHaveCount(0);
-  const memberCapabilities = ['org.cap.member_view', 'org.cap.member_offboarding', 'org.cap.member_remove'];
-  const saveCapability = async (selected: string | null) => {
+  const memberCapabilities = ['org.cap.member_view', 'org.cap.member_offboarding', 'org.cap.member_remove', 'org.cap.tenant', 'sys.cap.saved_view_personalize', 'sys.cap.member_base'];
+  const saveCapability = async (selected: string | string[] | null) => {
+    const selectedCodes = selected === null ? [] : Array.isArray(selected) ? selected : [selected];
     for (const code of memberCapabilities) {
       const checkbox = page.getByTestId(`capability-checkbox-${code}`);
       await checkbox.scrollIntoViewIfNeeded();
-      await checkbox.setChecked(code === selected);
+      await checkbox.setChecked(selectedCodes.includes(code));
     }
     await page.getByTestId('capability-save').click();
     await expect(page.getByTestId('confirm-dialog')).toBeVisible();
@@ -226,7 +228,7 @@ test('MEMBER-DETAIL-08: independent member-view capability permits reading and r
     const response = await savedPromise;
     expect(response.status()).toBe(200);
     expect(String((await response.json()).code)).toBe('0');
-    expect(response.request().postDataJSON()).toEqual(selected ? [selected] : []);
+    expect([...response.request().postDataJSON()].sort()).toEqual([...selectedCodes].sort());
     await expect(page.getByTestId('capability-save')).toBeDisabled();
   };
   await saveCapability('org.cap.member_view');
@@ -247,9 +249,24 @@ test('MEMBER-DETAIL-08: independent member-view capability permits reading and r
       await viewerPage.locator('nav button').filter({ hasText: '组织管理' }).first().click();
     }
     await expect(membersLink).toBeVisible();
+    const automaticInviteReads: string[] = [];
+    viewerPage.on('request', request => {
+      if (new URL(request.url()).pathname === '/api/tenant/invite-code/current') {
+        automaticInviteReads.push(request.url());
+      }
+    });
     await membersLink.click();
     const row = viewerPage.locator('table tbody tr').filter({ hasText: target.displayName });
     await expect(row).toHaveCount(1);
+    await expect(viewerPage.getByTestId('invite-section')).toHaveCount(0);
+    await expect(viewerPage.getByRole('button', { name: '从人员开通账号', exact: true })).toHaveCount(0);
+    await expect(viewerPage.locator('table').getByRole('button', { name: '暂停', exact: true })).toHaveCount(0);
+    await expect(row.getByRole('button', { name: /^(同意|拒绝|暂停|恢复|离职|删除|重置密码)$/ })).toHaveCount(0);
+    expect(automaticInviteReads, 'member reader must not automatically request invitation data').toEqual([]);
+    await expect(viewerPage.getByTestId('invite-dialog')).toHaveCount(0);
+    expect((await viewerPage.request.get('/api/tenant/invite-code/current')).status()).toBe(403);
+    expect((await viewerPage.request.post('/api/tenant/invite-code/generate?expiryDays=7')).status()).toBe(403);
+    expect((await viewerPage.request.post('/api/tenant/invite-code/revoke?code=unauthorized-probe')).status()).toBe(403);
     const readPromise = viewerPage.waitForResponse(response => new URL(response.url()).pathname === `/api/tenant/members/${pid}`);
     await row.click();
     const read = await readPromise;
@@ -274,9 +291,194 @@ test('MEMBER-DETAIL-08: independent member-view capability permits reading and r
     await info.attach('member-write-denials', { body: JSON.stringify({ impact: await impact.json(), command: await command.json(), targetPid: pid, persistedStatus: 'active' }), contentType: 'application/json' });
     await viewerPage.screenshot({ path: info.outputPath('independent-member-write-denied.png'), fullPage: true });
 
+    // The existing enterprise-profile capability owns invitation management.
+    // Combine it with member read for menu access, then revoke it in the same session.
+    await saveCapability(['org.cap.member_view', 'org.cap.tenant']);
+    const inviteGranted = await fetchRoleSnapshot(viewerPage);
+    expect(inviteGranted.permissionCodes).toContain('org.tenant.invite.manage');
+    expect(inviteGranted.permissionCodes).toContain('model.tenant_member.read');
+    expect(inviteGranted.permissionCodes).not.toContain('admin_tenant_member');
+    expect(inviteGranted.roleCodes).not.toContain('tenant_admin');
+    await viewerPage.goto('/home');
+    await viewerPage.reload();
+    if (!(await membersLink.isVisible())) {
+      await viewerPage.locator('nav button').filter({ hasText: '组织管理' }).first().click();
+    }
+    await expect(membersLink).toBeVisible();
+    await membersLink.click();
+    await expect(viewerPage.getByTestId('invite-section')).toBeVisible();
+    const inviteResponse = (action: string, method: string) => viewerPage.waitForResponse(response => {
+      const url = new URL(response.url());
+      return url.pathname === `/api/tenant/invite-code/${action}` &&
+        url.origin === new URL(viewerPage.url()).origin && response.request().method() === method;
+    });
+    const initialInvite = inviteResponse('current', 'GET');
+    await viewerPage.getByTestId('invite-section').click();
+    expect((await initialInvite).status()).toBe(200);
+    const inviteDialog = viewerPage.getByTestId('invite-dialog');
+    await expect(inviteDialog.getByRole('heading')).toHaveText('成员邀请');
+    await expect(viewerPage.getByTestId('invite-loading')).toHaveCount(0);
+    await expect(viewerPage.getByTestId('invite-read-error')).toHaveCount(0);
+    const generatedInvite = inviteResponse('generate', 'POST');
+    const generatedReadback = inviteResponse('current', 'GET');
+    await inviteDialog.getByRole('button', { name: /^生成(新)?邀请码$/ }).click();
+    const generated = await generatedInvite;
+    expect(generated.status()).toBe(200);
+    expect(new URL(generated.url()).searchParams.get('expiryDays')).toBe('7');
+    const generatedBody = await generated.json();
+    expect(generatedBody.code).toBe('0');
+    expect(generatedBody.data).toMatch(/^[a-z0-9]{8}$/);
+    const generatedCurrent = await generatedReadback;
+    expect(generatedCurrent.status()).toBe(200);
+    const generatedCurrentBody = await generatedCurrent.json();
+    expect(generatedCurrentBody.code).toBe('0');
+    expect(generatedCurrentBody.data.code).toBe(generatedBody.data);
+    await expect(viewerPage.getByTestId('invite-code-value')).toHaveText(generatedBody.data);
+    await viewerPage.screenshot({ path: info.outputPath('upper-invitation-generated.png'), fullPage: true });
+
+    const inviteRevoke = inviteResponse('revoke', 'POST');
+    const revokedReadback = inviteResponse('current', 'GET');
+    await inviteDialog.getByRole('button', { name: '撤销当前邀请码', exact: true }).click();
+    const revokedInvite = await inviteRevoke;
+    expect(revokedInvite.status()).toBe(200);
+    expect(new URL(revokedInvite.url()).searchParams.get('code')).toBe(generatedBody.data);
+    const revokedInviteBody = await revokedInvite.json();
+    expect(revokedInviteBody.code).toBe('0');
+    expect(revokedInviteBody.data).toBe(true);
+    const remainingInvite = await revokedReadback;
+    expect(remainingInvite.status()).toBe(200);
+    const remainingBody = await remainingInvite.json();
+    expect(remainingBody.code).toBe('0');
+    expect(remainingBody.data?.code).not.toBe(generatedBody.data);
+    const validation = await viewerPage.request.get(`/api/tenant/invite-code/validate?code=${encodeURIComponent(generatedBody.data)}`);
+    expect(validation.status()).toBe(200);
+    const validationBody = await validation.json();
+    expect(validationBody.code).toBe('0');
+    expect(validationBody.data).toBe(false);
+    await expect(viewerPage.getByTestId('invite-read-error')).toHaveCount(0);
+    if (remainingBody.data) {
+      await expect(viewerPage.getByTestId('invite-code-value')).toHaveText(remainingBody.data.code);
+    } else {
+      await expect(inviteDialog).toContainText('当前没有有效邀请码');
+    }
+    await viewerPage.screenshot({ path: info.outputPath('upper-invitation-code-revoked.png'), fullPage: true });
+
+    await saveCapability('org.cap.member_view');
+    const inviteRemoved = await fetchRoleSnapshot(viewerPage);
+    expect(inviteRemoved.permissionCodes).not.toContain('org.tenant.invite.manage');
+    expect(inviteRemoved.permissionCodes).not.toContain('org.tenant.update');
+    expect(inviteRemoved.permissionCodes).toContain('model.tenant_member.read');
+    await viewerPage.reload();
+    await expect(viewerPage.locator('table')).toBeVisible();
+    await expect(viewerPage.getByTestId('invite-section')).toHaveCount(0);
+    await expect(inviteDialog).toHaveCount(0);
+    const deniedInviteRead = await viewerPage.request.get('/api/tenant/invite-code/current');
+    const deniedInviteGenerate = await viewerPage.request.post('/api/tenant/invite-code/generate?expiryDays=7');
+    const deniedInviteRevoke = await viewerPage.request.post(`/api/tenant/invite-code/revoke?code=${encodeURIComponent(generatedBody.data)}`);
+    expect(deniedInviteRead.status()).toBe(403);
+    expect(deniedInviteGenerate.status()).toBe(403);
+    expect(deniedInviteRevoke.status()).toBe(403);
+    const unchangedInvite = await page.request.get('/api/tenant/invite-code/current');
+    expect(unchangedInvite.status()).toBe(200);
+    const unchangedInviteBody = await unchangedInvite.json();
+    expect(unchangedInviteBody.code).toBe('0');
+    expect(unchangedInviteBody.data).toEqual(remainingBody.data);
+    await viewerPage.screenshot({ path: info.outputPath('upper-invitation-capability-revoked.png'), fullPage: true });
+    await info.attach('upper-invitation-grant-revoke', {
+      body: JSON.stringify({ rolePid: role.pid, granted: inviteGranted.permissionCodes,
+        removed: inviteRemoved.permissionCodes, generatedCode: generatedBody.data,
+        remainingCode: remainingBody.data?.code ?? null, deniedStatuses: [403, 403, 403] }),
+      contentType: 'application/json',
+    });
+
+    // Verify the existing shared-view contract through an enabled business list.
+    const sharedName = `Shared member view ${stamp}`;
+    const createdView = await page.request.post('/api/views', {
+      data: { name: sharedName, modelCode: 'tenant_member', pageKey: 'tenant_member_list',
+        viewType: 'table', scope: 'global', viewConfig: { rowHeight: 'medium' } },
+    });
+    expect(createdView.status()).toBe(200);
+    const createdViewBody = await createdView.json();
+    expect(String(createdViewBody.code)).toBe('0');
+    const viewPid = createdViewBody.data.pid as string;
+    expect(viewPid).toBeTruthy();
+    await expect(page.getByTestId('capability-checkbox-sys.cap.saved_view_personalize'))
+      .toHaveAttribute('aria-label', '维护列表视图');
+    await saveCapability(['org.cap.member_view', 'sys.cap.member_base', 'sys.cap.saved_view_personalize']);
+    const viewGranted = await fetchRoleSnapshot(viewerPage);
+    expect(viewGranted.permissionCodes).toContain('dashboard.saved_view.update');
+    expect(viewGranted.permissionCodes).not.toContain('admin_tenant_member');
+    const selectSharedView = async () => {
+      await viewerPage.getByTestId('view-selector-trigger').click();
+      const dropdown = viewerPage.getByRole('listbox');
+      const option = dropdown.getByRole('option').filter({ hasText: sharedName });
+      await expect(option).toHaveCount(1);
+      await option.click();
+      await expect(viewerPage.getByTestId('view-selector-trigger')).toContainText(sharedName);
+    };
+    await viewerPage.reload();
+    await expect(row).toHaveCount(1);
+    await selectSharedView();
+    await viewerPage.getByTestId('row-height-btn').click();
+    await viewerPage.getByTestId('row-height-option-tall').click();
+    await expect(viewerPage.getByTestId('shared-view-draft-banner')).toBeVisible();
+    const beforeSave = await page.request.get(`/api/views/${viewPid}`);
+    expect(beforeSave.status()).toBe(200);
+    expect((await beforeSave.json()).data.viewConfig.rowHeight).toBe('medium');
+    await expect(viewerPage.getByTestId('shared-view-save')).toBeEnabled();
+    await viewerPage.getByTestId('shared-view-save').click();
+    const viewSavedPromise = viewerPage.waitForResponse(response => {
+      const url = new URL(response.url());
+      return url.origin === new URL(viewerPage.url()).origin &&
+        url.pathname === `/api/views/${viewPid}` && response.request().method() === 'PUT';
+    });
+    await acceptConfirmDialog(viewerPage);
+    const viewSaved = await viewSavedPromise;
+    expect(viewSaved.status()).toBe(200);
+    expect(viewSaved.request().postDataJSON().viewConfig.rowHeight).toBe('tall');
+    expect(String((await viewSaved.json()).code)).toBe('0');
+    const storedView = await page.request.get(`/api/views/${viewPid}`);
+    expect(storedView.status()).toBe(200);
+    expect((await storedView.json()).data.viewConfig.rowHeight).toBe('tall');
+    await viewerPage.reload();
+    await selectSharedView();
+    await expect(viewerPage.getByTestId('shared-view-draft-banner')).toHaveCount(0);
+    await viewerPage.screenshot({ path: info.outputPath('upper-list-view-shared-saved.png'), fullPage: true });
+
+    await saveCapability(['org.cap.member_view', 'sys.cap.member_base']);
+    const viewRemoved = await fetchRoleSnapshot(viewerPage);
+    expect(viewRemoved.permissionCodes).not.toContain('dashboard.saved_view.update');
+    expect(viewRemoved.permissionCodes).toContain('dashboard.saved_view.read');
+    expect(viewRemoved.permissionCodes).toContain('model.tenant_member.read');
+    await viewerPage.reload();
+    await selectSharedView();
+    await viewerPage.getByTestId('row-height-btn').click();
+    await viewerPage.getByTestId('row-height-option-short').click();
+    await expect(viewerPage.getByTestId('shared-view-draft-banner')).toBeVisible();
+    await expect(viewerPage.getByTestId('shared-view-save-disabled')).toBeDisabled();
+    const draftBounds = await viewerPage.getByTestId('shared-view-draft-banner').boundingBox();
+    const selectorBounds = await viewerPage.getByTestId('view-selector-trigger').boundingBox();
+    expect(draftBounds).not.toBeNull();
+    expect(selectorBounds).not.toBeNull();
+    expect(draftBounds!.y + draftBounds!.height).toBeLessThanOrEqual(selectorBounds!.y);
+    const deniedViewWrite = await viewerPage.request.put(`/api/views/${viewPid}`, {
+      data: { viewConfig: { rowHeight: 'short' } },
+    });
+    expect(deniedViewWrite.status()).toBe(403);
+    const unchangedView = await page.request.get(`/api/views/${viewPid}`);
+    expect(unchangedView.status()).toBe(200);
+    expect((await unchangedView.json()).data.viewConfig.rowHeight).toBe('tall');
+    await viewerPage.screenshot({ path: info.outputPath('upper-list-view-maintenance-revoked.png'), fullPage: true });
+    await info.attach('upper-shared-view-grant-revoke', {
+      body: JSON.stringify({ rolePid: role.pid, viewPid, scope: 'global',
+        granted: viewGranted.permissionCodes, removed: viewRemoved.permissionCodes,
+        persistedRowHeight: 'tall', deniedWriteStatus: deniedViewWrite.status() }),
+      contentType: 'application/json',
+    });
+
     await saveCapability(null);
     const revokedReadPromise = viewerPage.waitForResponse(response => new URL(response.url()).pathname === `/api/tenant/members/${pid}`);
-    await viewerPage.reload();
+    await viewerPage.goto(`/organization/members/${pid}`);
     const revoked = await revokedReadPromise;
     expect(revoked.status()).toBe(403);
     await expect(viewerPage.getByTestId('member-name')).toHaveCount(0);
@@ -410,7 +612,15 @@ test('MEMBER-DETAIL-08: independent member-view capability permits reading and r
     const afterRemovalBody = await afterRemoval.json();
     expect(String(afterRemovalBody.code)).toBe('0');
     expect(afterRemovalBody.data.records.some((record: { pid: string }) => record.pid === pid)).toBe(false);
+    await expect(viewerPage.locator('table')).toBeVisible();
+    await expect(viewerPage.locator('table').getByRole('columnheader').first()).toBeVisible();
+    await expect(viewerPage.locator('table tbody')).not.toContainText(/加载中|Loading/i);
+    await expect(viewerPage.locator('table tbody tr').first()).toBeVisible();
+    await expect(viewerPage.locator('table tbody')).not.toContainText(/暂无数据|No data/i);
     await expect(viewerPage.locator('table tbody tr').filter({ hasText: target.displayName })).toHaveCount(0);
+    await expect(viewerPage.locator('table').getByRole('button', { name: '暂停', exact: true })).toHaveCount(0);
+    await expect(viewerPage.getByRole('button', { name: '从人员开通账号', exact: true })).toHaveCount(0);
+    await expect(viewerPage.getByTestId('invite-section')).toHaveCount(0);
     await capture('independent-member-removed');
 
     // Test revocation against an existing member, not the deleted target's 404.

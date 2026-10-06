@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 import dns from 'node:dns';
+import { isAbsolute, resolve } from 'node:path';
+import { existsSync } from 'node:fs';
 
 // Force Node.js to prefer IPv4 when resolving localhost.
 // macOS /etc/hosts has both 127.0.0.1 and ::1 for localhost.
@@ -27,6 +29,21 @@ if (process.env.FORCE_COLOR && process.env.NO_COLOR) {
 // Must use 'localhost' not '127.0.0.1' — the BFF returns 502 on direct IP.
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5173';
 const runProfile = process.env.PW_PROFILE || 'fast';
+// Cross-repository tests keep their source ownership and use explicit runtime roots.
+const enterpriseTestRoot = process.env.PW_ENTERPRISE_TEST_ROOT;
+if (enterpriseTestRoot && (!isAbsolute(enterpriseTestRoot)
+    || !existsSync(resolve(enterpriseTestRoot, 'tests/e2e/pcba-solution')))) {
+  throw new Error('PW_ENTERPRISE_TEST_ROOT must bind an existing absolute Enterprise web-admin root');
+}
+const enterpriseQuoteOpsSpecNames = [
+  'bom-import-gateway-manual-path',
+  'bom-workbench-golden',
+  'bom-workbench-self-scope-golden',
+];
+const enterpriseQuoteOpsGatePattern = new RegExp(
+  `[/\\\\]pcba-solution[/\\\\](${enterpriseQuoteOpsSpecNames.join('|')})\\.spec\\.ts$`,
+);
+
 const enableRoleProjects = process.env.PW_ROLE_PROJECTS === '1';
 const skipWebServer = process.env.PW_SKIP_WEBSERVER === '1';
 const storageDir = process.env.PW_STORAGE_DIR;
@@ -195,6 +212,7 @@ const contractScopeRegex = scopeRegex(contractScopeDirs);
  * @see https://playwright.dev/docs/test-configuration
  */
 export default defineConfig({
+  ...(enterpriseTestRoot ? { tsconfig: './tsconfig.enterprise-tests.json' } : {}),
   // Test directory structure
   testDir: './tests',
   testMatch: ['**/*.spec.ts'],
@@ -252,6 +270,19 @@ export default defineConfig({
 
   // Browser projects
   projects: [
+    ...(runProfile === 'quoteops' && enterpriseTestRoot
+      ? [{
+          name: 'enterprise-quoteops',
+          testDir: resolve(enterpriseTestRoot, 'tests/e2e'),
+          testMatch: enterpriseQuoteOpsGatePattern,
+          dependencies: ['auth'],
+          use: {
+            ...devices['Desktop Chrome'],
+            storageState: adminStorageState,
+            extraHTTPHeaders: { Referer: `${baseURL}/` },
+          },
+        }]
+      : []),
     ...(runProfile === 'rbac'
       ? [
           {

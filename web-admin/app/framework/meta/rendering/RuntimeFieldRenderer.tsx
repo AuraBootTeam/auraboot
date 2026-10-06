@@ -12,7 +12,7 @@
  * ```
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { FieldConfig, DataSourceConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { evaluateCondition } from '~/framework/meta/runtime/expression/evaluator';
@@ -159,6 +159,20 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
   const allowCreate =
     Boolean(field.allowCreate) && isReferenceField && !!refTargetModel && hasCreatePerm;
   const [createOpen, setCreateOpen] = useState(false);
+  const creationAuthorization = useRef({ allowed: allowCreate, generation: 0 });
+  if (creationAuthorization.current.allowed !== allowCreate) {
+    creationAuthorization.current = {
+      allowed: allowCreate,
+      generation: creationAuthorization.current.generation + 1,
+    };
+  }
+  const creationGeneration = creationAuthorization.current.generation;
+  const canApplyCreation = () =>
+    creationAuthorization.current.allowed &&
+    creationGeneration === creationAuthorization.current.generation;
+  useEffect(() => {
+    if (!allowCreate) setCreateOpen(false);
+  }, [allowCreate]);
   const { executeCommand } = useActionHandler({
     runtime,
     navigate: (() => undefined) as any,
@@ -169,6 +183,7 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
   });
 
   const handleCreated = (selected: { value: string; label: string }) => {
+    if (!canApplyCreation()) return;
     // Pin before selecting so controlled selects never see a value without a matching option.
     const dataSourceManager = runtime?.getDataSourceManager?.() as any;
     const ids =
@@ -176,6 +191,7 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
         ? dataSourceManager.getDataSourceIdsByModel(refTargetModel)
         : [];
     const pinCreatedOption = () => {
+      if (!canApplyCreation()) return;
       if (
         typeof dataSourceManager?.getState !== 'function' ||
         typeof dataSourceManager?.setData !== 'function'
@@ -431,7 +447,9 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
   // Reference inline-create: set canCreateNew on the selector when permission is held.
   if (allowCreate) {
     componentProps.canCreateNew = true;
-    componentProps.onCreateNew = () => setCreateOpen(true);
+    componentProps.onCreateNew = () => {
+      if (canApplyCreation()) setCreateOpen(true);
+    };
   }
 
   // 处理布局
@@ -470,7 +488,9 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
           )}
           executeCommand={executeCommand}
           onCreated={handleCreated}
-          onClose={() => setCreateOpen(false)}
+          onClose={() => {
+            if (canApplyCreation()) setCreateOpen(false);
+          }}
         />
       )}
     </>

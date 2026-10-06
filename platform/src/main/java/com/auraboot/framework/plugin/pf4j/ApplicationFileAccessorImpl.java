@@ -31,6 +31,9 @@ public class ApplicationFileAccessorImpl implements FileAccessor {
         return delegate().isLinkedTo(fileId, entityType, entityId, fieldName);
     }
     @Override public boolean retain(String fileId) { return delegate().retain(fileId); }
+    @Override public void linkExisting(String fileId, String entityType, String entityId, String fieldName) {
+        delegate().linkExisting(fileId, entityType, entityId, fieldName);
+    }
     @Override public SavedFile save(String originalName, String contentType, byte[] bytes) {
         return delegate().save(originalName, contentType, bytes);
     }

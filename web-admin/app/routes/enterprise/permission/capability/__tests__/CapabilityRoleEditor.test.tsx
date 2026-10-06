@@ -6,8 +6,12 @@ import type { PermissionMatrixDTO } from '../../types';
 
 vi.mock('~/contexts/I18nContext', () => ({
   useI18n: () => ({
-    t: (key: string, _vars?: unknown, fallback?: string) =>
-      key === 'permission.qo.quote.read' ? '查看报价单' : fallback,
+    t: (key: string, _vars?: unknown, fallback?: string) => {
+      // Existing database translations override resource changes on upgraded environments.
+      if (key === 'admin.permission.editor.impactDetailsV2')
+        return 'Review affected capabilities ({count}), menus and action details';
+      return key === 'permission.qo.quote.read' ? '查看报价单' : fallback;
+    },
   }),
 }));
 vi.mock('~/contexts/ToastContext', () => ({
@@ -87,6 +91,38 @@ describe('CapabilityRoleEditor', () => {
       (screen.getByTestId('capability-checkbox-qo.cap.quote_edit') as HTMLInputElement).checked,
     ).toBe(false);
     expect((screen.getByTestId('capability-save') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('keeps grants and diagnostics readable while disabling all authoring for a role reader', async () => {
+    mockData();
+    render(<CapabilityRoleEditor rolePid="role-pid-5" readOnly />);
+    await waitFor(() => screen.getByTestId('capability-role-editor'));
+    const edit = screen.getByTestId('capability-checkbox-qo.cap.quote_edit') as HTMLInputElement;
+    expect(edit.disabled).toBe(true);
+    expect((screen.getByTestId('data-scope-modify-btn') as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByTestId('capability-preset-admin') as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByTestId('capability-save') as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(edit);
+    fireEvent.click(screen.getByTestId('capability-save'));
+    expect(screen.getByTestId('permission-diagnostics')).toBeTruthy();
+    expect(screen.queryByTestId('capability-draft')).toBeNull();
+    expect(capabilityService.previewSelection).not.toHaveBeenCalled();
+    expect(capabilityService.applySelection).not.toHaveBeenCalled();
+    expect(permissionService.setRoleDefaultScope).not.toHaveBeenCalled();
+  });
+
+  it('discards an authoring draft when management access is revoked', async () => {
+    mockData();
+    const { rerender } = render(<CapabilityRoleEditor rolePid="role-pid-5" />);
+    await waitFor(() => screen.getByTestId('capability-role-editor'));
+    fireEvent.click(screen.getByTestId('capability-checkbox-qo.cap.quote_edit'));
+    expect(screen.getByTestId('capability-draft')).toBeTruthy();
+    rerender(<CapabilityRoleEditor rolePid="role-pid-5" readOnly />);
+    await waitFor(() => screen.getByTestId('capability-role-editor'));
+    expect(screen.queryByTestId('capability-draft')).toBeNull();
+    expect((screen.getByTestId('capability-checkbox-qo.cap.quote_edit') as HTMLInputElement).checked).toBe(false);
+    expect((screen.getByTestId('capability-save') as HTMLButtonElement).disabled).toBe(true);
+    expect(capabilityService.applySelection).not.toHaveBeenCalled();
   });
 
   it('enables Save after a toggle and persists the selection via applySelection', async () => {
@@ -375,6 +411,7 @@ describe('CapabilityRoleEditor', () => {
         ...affected,
         { ...cap('qo.cap.quote_edit', '编辑报价', false), authorizationState: 'partial' },
         { ...cap('qo.cap.quote_view', '查看报价', false), authorizationState: 'none' },
+        { ...cap('full.cap', 'Complete capability', true), authorizationState: 'full' },
       ],
       relatedMenus: ['Quotes', 'Organization'],
     });
@@ -385,9 +422,15 @@ describe('CapabilityRoleEditor', () => {
     const impact = (await screen.findByTestId('capability-preview-impact')) as HTMLDetailsElement;
     expect(impact.open).toBe(false);
     expect(screen.getByText('Grant: 编辑报价')).toBeTruthy();
-    expect(impact.querySelector('summary')).toHaveTextContent('affected capabilities (32)');
+    expect(impact.querySelector('summary')).toHaveTextContent('Review related capability states, menus and action details');
+    expect(screen.getByTestId('capability-preview-state-counts')).toHaveTextContent(
+      'Related capabilities after saving: 1 fully granted · 31 with partial actions · 1 not granted',
+    );
+    expect(screen.getByTestId('capability-preview-state-guidance')).toHaveTextContent(
+      'Partial actions do not grant the complete capability',
+    );
     expect(screen.getByTestId('capability-preview-resulting').querySelectorAll('li')).toHaveLength(
-      32,
+      33,
     );
     const secondary = screen.getByTestId('capability-preview-partial-impact') as HTMLDetailsElement;
     expect(secondary.open).toBe(false);

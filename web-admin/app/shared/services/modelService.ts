@@ -357,7 +357,15 @@ export class ModelService implements IModelService {
       undefined,
       request,
     );
-    return handleResponse(result, 'Failed to fetch model fields');
+    return handleResponse(result, 'Failed to fetch model fields').map((field) => {
+      if (!field.pid || !field.code) throw new Error('Model field identity is missing');
+      return {
+        ...field,
+        fieldCode: field.code,
+        displayOrder: field.fieldOrder ?? 0,
+        readonly: field.editable === false,
+      };
+    });
   }
 
   /**
@@ -494,14 +502,14 @@ export class ModelService implements IModelService {
       throw new Error(`Field binding not found: ${fieldCode}`);
     }
 
-    // Update the binding
-    const result = await put<ModelFieldBinding>(
-      `/api/meta/models/${pid}/field-bindings/${binding.id}`,
+    // Configure within the exact model and field instead of treating a field ID as a binding ID.
+    const result = await post<ModelFieldBinding>(
+      `/api/meta/models/${pid}/field-bindings/${binding.pid}/configure`,
       {
         required: config.required,
         readonly: config.readonly,
+        editable: config.readonly === undefined ? config.editable : !config.readonly,
         visible: config.visible,
-        editable: config.editable,
         defaultValue: config.defaultValue == null ? undefined : String(config.defaultValue),
         dictOverrideCode: config.dictCode,
         validationOverride: config.validationRules
@@ -519,25 +527,20 @@ export class ModelService implements IModelService {
    * 解绑字段
    */
   async unbindField(pid: string, fieldCode: string, request?: Request): Promise<void> {
-    // Convert pid to id for API call
-    const model = await this.findByPid(pid, request);
-
-    // Find the field by fieldCode
     const fields = await this.getModelFields(pid, request);
-    const field = fields.find((f) => f.fieldCode === fieldCode);
-
+    const field = fields.find((candidate) => candidate.fieldCode === fieldCode);
     if (!field) {
       throw new Error(`Field not found: ${fieldCode}`);
     }
-
-    const result = await del<void>(
-      `/api/meta/model-field-bindings/model/${model.id}/field/${field.id}`,
+    const result = await del<boolean>(
+      `${this.baseUrl}/${pid}/fields/${field.pid}`,
       undefined,
       undefined,
       request,
     );
-    if (!ResultHelper.isSuccess(result)) {
-      throw new Error(result.desc || 'Failed to unbind field');
+    const removed = handleResponse(result, 'Failed to unbind field');
+    if (removed !== true) {
+      throw new Error('Field was not removed');
     }
   }
 
@@ -619,10 +622,7 @@ export class ModelService implements IModelService {
   /**
    * Preview the DDL statements that will be executed on publish
    */
-  async previewPublishDDL(
-    pid: string,
-    request?: Request,
-  ): Promise<PublishPreview> {
+  async previewPublishDDL(pid: string, request?: Request): Promise<PublishPreview> {
     const result = await get<PublishPreview>(
       `${this.baseUrl}/${pid}/publish/preview`,
       undefined,

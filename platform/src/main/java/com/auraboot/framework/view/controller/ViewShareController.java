@@ -2,6 +2,7 @@ package com.auraboot.framework.view.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.view.service.ViewShareService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -27,7 +28,7 @@ public class ViewShareController {
     private final ViewShareService viewShareService;
 
     @PostMapping("/{viewPid}/share")
-    @RequirePermission("dashboard.manage")
+    @RequirePermission(MetaPermission.VIEW_PUBLIC_SHARE)
     @Operation(summary = "Generate a public share link for a view")
     public ApiResponse<Map<String, Object>> shareView(
             @PathVariable String viewPid,
@@ -41,7 +42,7 @@ public class ViewShareController {
     }
 
     @DeleteMapping("/{viewPid}/share")
-    @RequirePermission("dashboard.manage")
+    @RequirePermission(MetaPermission.VIEW_PUBLIC_SHARE)
     @Operation(summary = "Revoke a public share link")
     public ApiResponse<Boolean> revokeShare(@PathVariable String viewPid) {
         viewShareService.revokeShareLink(viewPid);
@@ -49,6 +50,7 @@ public class ViewShareController {
     }
 
     @GetMapping("/{viewPid}/share/status")
+    @RequirePermission(MetaPermission.VIEW_PUBLIC_SHARE)
     @Operation(summary = "Get share status for a view")
     public ApiResponse<Map<String, Object>> getShareStatus(@PathVariable String viewPid) {
         Map<String, Object> status = viewShareService.getShareStatus(viewPid);

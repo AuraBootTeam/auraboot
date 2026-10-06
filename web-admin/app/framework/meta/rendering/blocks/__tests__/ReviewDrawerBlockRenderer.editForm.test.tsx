@@ -16,6 +16,10 @@ import { ReviewDrawerBlockRenderer } from '../ReviewDrawerBlockRenderer';
  */
 
 const executeSimpleWorkbenchAction = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+const permission = vi.hoisted(() => ({ allowed: true }));
+vi.mock('~/contexts/AuthContext', () => ({
+  useAuth: () => ({ hasPermission: () => permission.allowed }),
+}));
 
 vi.mock('../workbenchBlockUtils', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../workbenchBlockUtils')>();
@@ -286,7 +290,88 @@ function evidenceComparisonBlock(): BlockConfig {
 }
 
 describe('ReviewDrawerBlockRenderer — inline edit form', () => {
-  beforeEach(() => executeSimpleWorkbenchAction.mockReset().mockResolvedValue(undefined));
+  beforeEach(() => {
+    permission.allowed = true;
+    executeSimpleWorkbenchAction.mockReset().mockResolvedValue(undefined);
+  });
+
+  it('keeps a guarded edit entry disabled for a reader without executing a command', () => {
+    permission.allowed = false;
+    const guarded = block() as any;
+    guarded.editForm.permissionCode = 'qo.quote.manage';
+    render(<ReviewDrawerBlockRenderer block={guarded} runtime={makeRuntime(LINE)} />);
+    const trigger = screen.getByTestId('review-drawer-edit-open');
+    expect(trigger).toBeDisabled();
+    fireEvent.click(trigger);
+    expect(screen.queryByTestId('review-drawer-edit-submit')).toBeNull();
+    expect(executeSimpleWorkbenchAction).not.toHaveBeenCalled();
+  });
+
+  it('closes a guarded draft on revocation and clears it before granting again', () => {
+    const guarded = block() as any;
+    guarded.editForm.permissionCode = 'qo.quote.manage';
+    const runtime = makeRuntime(LINE);
+    const { rerender } = render(<ReviewDrawerBlockRenderer block={guarded} runtime={runtime} />);
+    fireEvent.click(screen.getByTestId('review-drawer-edit-open'));
+    const input = screen.getByTestId('review-drawer-edit-field-qo_ql_qty_per_set').querySelector('input')!;
+    fireEvent.change(input, { target: { value: '99' } });
+    permission.allowed = false;
+    rerender(<ReviewDrawerBlockRenderer block={guarded} runtime={runtime} />);
+    expect(screen.queryByTestId('review-drawer-edit-submit')).toBeNull();
+    expect(screen.getByTestId('review-drawer-edit-open')).toBeDisabled();
+    permission.allowed = true;
+    rerender(<ReviewDrawerBlockRenderer block={guarded} runtime={runtime} />);
+    fireEvent.click(screen.getByTestId('review-drawer-edit-open'));
+    expect(screen.getByTestId('review-drawer-edit-field-qo_ql_qty_per_set').querySelector('input')).toHaveValue('2');
+    expect(executeSimpleWorkbenchAction).not.toHaveBeenCalled();
+  });
+
+  it('discards a pending preview after revoke and regrant', async () => {
+    let resolvePreview!: (value: unknown) => void;
+    executeSimpleWorkbenchAction.mockImplementationOnce(() => new Promise((resolve) => { resolvePreview = resolve; }));
+    const guarded = twoPhaseBlock() as any;
+    guarded.editForm.permissionCode = 'qo.quote.manage';
+    const runtime = makeRuntime(LINE);
+    const { rerender } = render(<ReviewDrawerBlockRenderer block={guarded} runtime={runtime} />);
+    fireEvent.click(screen.getByTestId('review-drawer-edit-open'));
+    fireEvent.change(screen.getByTestId('review-drawer-edit-field-searchText').querySelector('input')!, { target: { value: 'NEW-MPN' } });
+    fireEvent.click(screen.getByTestId('review-drawer-edit-submit'));
+    expect(executeSimpleWorkbenchAction).toHaveBeenCalledTimes(1);
+    permission.allowed = false;
+    rerender(<ReviewDrawerBlockRenderer block={guarded} runtime={runtime} />);
+    permission.allowed = true;
+    rerender(<ReviewDrawerBlockRenderer block={guarded} runtime={runtime} />);
+    fireEvent.click(screen.getByTestId('review-drawer-edit-open'));
+    await act(async () => resolvePreview({ previewId: 'stale-preview', confirmable: true, status: 'ready' }));
+    expect(screen.queryByTestId('review-drawer-edit-preview')).toBeNull();
+    expect(screen.getByTestId('review-drawer-edit-submit')).toBeInTheDocument();
+    expect(executeSimpleWorkbenchAction).toHaveBeenCalledTimes(1);
+  });
+
+  it('checks candidate and export permissions independently of drawer readability', async () => {
+    const guarded = evidenceComparisonBlock() as any;
+    const action = { action: 'command.execute', args: { command: 'quote:adopt', targetRecordPid: 'L1' } };
+    guarded.candidates.actions = [{ code: 'adopt', label: { en: 'Adopt' }, requiresSelection: false, permissionCode: 'qo.price.manage', onClick: action }];
+    guarded.exportImpact = { actions: [{ code: 'download', label: { en: 'Download' }, permissionCode: 'qo.price.manage', onClick: action }] };
+    const runtime = makeRuntime(LINE);
+    permission.allowed = false;
+    const { rerender } = render(<ReviewDrawerBlockRenderer block={guarded} runtime={runtime} />);
+    expect(screen.getByTestId('review-drawer-content-grid')).toBeInTheDocument();
+    expect(screen.queryByTestId('review-drawer-candidate-action-adopt')).toBeNull();
+    expect(screen.queryByTestId('review-drawer-export-action-download')).toBeNull();
+    permission.allowed = true;
+    rerender(<ReviewDrawerBlockRenderer block={guarded} runtime={runtime} />);
+    fireEvent.click(screen.getByTestId('review-drawer-candidate-action-adopt'));
+    await waitFor(() => expect(executeSimpleWorkbenchAction).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByTestId('review-drawer-export-action-download'));
+    await waitFor(() => expect(executeSimpleWorkbenchAction).toHaveBeenCalledTimes(2));
+    expect(executeSimpleWorkbenchAction.mock.calls[0][1]).toEqual(action);
+    permission.allowed = false;
+    rerender(<ReviewDrawerBlockRenderer block={guarded} runtime={runtime} />);
+    expect(screen.queryByTestId('review-drawer-candidate-action-adopt')).toBeNull();
+    expect(screen.queryByTestId('review-drawer-export-action-download')).toBeNull();
+    expect(executeSimpleWorkbenchAction).toHaveBeenCalledTimes(2);
+  });
 
   it('submits changed fields as a command targeting the selected line', async () => {
     render(<ReviewDrawerBlockRenderer block={block()} runtime={makeRuntime(LINE)} />);

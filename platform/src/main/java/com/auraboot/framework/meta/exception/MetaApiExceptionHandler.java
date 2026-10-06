@@ -75,21 +75,6 @@ public class MetaApiExceptionHandler {
     }
 
     /**
-     * Handle SQL exception — do not expose database details.
-     */
-    @ExceptionHandler(org.springframework.dao.DataAccessException.class)
-    public ResponseEntity<ApiResponse<Void>> handleDataAccessException(
-            org.springframework.dao.DataAccessException e) {
-
-        log.error("Data access exception: {}", e.getMessage(), e);
-
-        ApiResponse<Void> response = ApiResponse.error(
-            ResponseCode.SystemError, "An unexpected error occurred. Please try again later.");
-
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-    }
-
-    /**
      * Handle duplicate idempotent request (HTTP 409 Conflict).
      */
     @ExceptionHandler(IdempotentException.class)

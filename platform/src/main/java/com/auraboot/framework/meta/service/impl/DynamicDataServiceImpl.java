@@ -1937,6 +1937,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
             return updatedRecord;
 
+        } catch (AccessDeniedException e) {
+            throw e;
         } catch (RecordVersionConflictException e) {
             // Pass the wire-stable 409/40900 contract through unwrapped: mobile
             // offline replay keys on this status to branch into conflict resolution.
@@ -1980,7 +1982,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             updateData.put("updated_at", java.time.Instant.now());
             updateData.put("updated_by", getCurrentUserId());
             result = executeScopedUpdate(
-                    model, modelCode, primaryKeyColumn, recordId, updateData, Set.of(), planExpectedVersion);
+                    model, modelCode, primaryKeyColumn, recordId, updateData, Set.of(), planExpectedVersion, "delete");
         } else {
             // Hard delete: DELETE FROM (default behavior)
             result = executeScopedDelete(
@@ -2032,6 +2034,14 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     private int executeScopedUpdate(
+            ModelDefinition model, String modelCode, String primaryKeyColumn, String recordId,
+            Map<String, Object> columnData, Set<String> jsonbColumns, Object expectedVersion,
+            String permissionOperation) {
+        return executeScopedUpdate(model, modelCode, primaryKeyColumn, recordId, columnData,
+                jsonbColumns, expectedVersion, null, null, permissionOperation);
+    }
+
+    private int executeScopedUpdate(
             ModelDefinition model,
             String modelCode,
             String primaryKeyColumn,
@@ -2041,6 +2051,20 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             Object expectedVersion,
             String compareColumn,
             Object compareValue) {
+        return executeScopedUpdate(model, modelCode, primaryKeyColumn, recordId, columnData,
+                jsonbColumns, expectedVersion, compareColumn, compareValue, "update");
+    }
+
+    private int executeScopedUpdate(
+            ModelDefinition model,
+            String modelCode,
+            String primaryKeyColumn,
+            String recordId,
+            Map<String, Object> columnData,
+            Set<String> jsonbColumns,
+            Object expectedVersion,
+            String compareColumn,
+            Object compareValue, String permissionOperation) {
         if (columnData == null || columnData.isEmpty()) {
             throw new MetaServiceException("Update data cannot be empty");
         }
@@ -2109,7 +2133,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                     .append(" IS NOT DISTINCT FROM #{params.compareValue}");
         }
         appendAggregateBindingGuard(sql, params, model);
-        appendScopedWriteGuards(sql, tenantId, modelCode, userId, "update");
+        appendScopedWriteGuards(sql, tenantId, modelCode, userId, permissionOperation);
 
         return dynamicDataMapper.updateByQuery(sql.toString(), params);
     }
@@ -2223,7 +2247,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         }
 
         try {
-            String rowFilter = resolveWriteRowFilter(tenantId, modelCode, userId);
+            String rowFilter = resolveWriteRowFilter(tenantId, modelCode, userId, operation);
             appendScopedBulkFilter(sql, rowFilter);
         } catch (Exception e) {
             log.error("Failed to apply row-level data permission for {} on model {} — denying access",
@@ -2245,15 +2269,14 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     /**
      * The row filter for a guarded write. A command plan executes its authoritative grade directly:
      * ALL contributes no predicate and SELF contributes the owner predicate. Without a command plan,
-     * direct callers retain the existing engine path.
+     * direct callers use the existing engine with the actual write action.
      */
-    private String resolveWriteRowFilter(Long tenantId, String modelCode, Long userId) {
+    private String resolveWriteRowFilter(Long tenantId, String modelCode, Long userId, String operation) {
         String permitFilter = CommandPermitDataAccess.rowFilter(modelCode, userId);
         if (permitFilter != null) {
             return permitFilter;
         }
-        return DynamicDataQueryScope.rowFilter(tenantId, modelCode, userId,
-                () -> dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId));
+        return dataPermissionEngine.buildRowFilter(tenantId, modelCode, operation, userId);
     }
 
     @Override
@@ -2496,7 +2519,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             appendScopedBulkFilter(sql, permitFilter);
         } else {
             try {
-                String rowFilter = dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId);
+                String rowFilter = dataPermissionEngine.buildRowFilter(tenantId, modelCode, "delete", userId);
                 appendScopedBulkFilter(sql, rowFilter);
             } catch (Exception e) {
                 log.error("Failed to apply row-level data permission for batch delete on model {} — denying access",

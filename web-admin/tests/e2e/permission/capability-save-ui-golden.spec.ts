@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { BASE_URL } from '../../helpers/environments';
+import { makeQuoteRoleUser, ensureQuoteRoleUser, openQuoteRolePage, fetchRoleSnapshot } from '../pcba-solution/quote-e2e-helpers';
 
 /**
  * Regression guard for the snowflake-id precision bug (fixed in #993): capability save must work when
@@ -29,8 +30,9 @@ async function createRole(page: Page) {
 }
 
 test('① capability save persists through the browser on a snowflake-id role', async ({
-  page,
+  page, browser,
 }, info) => {
+  test.setTimeout(120_000);
   const role = await createRole(page);
   const capUrl = `${BASE}/api/permission/capabilities?rolePid=${encodeURIComponent(role.pid)}`;
   const grantedCaps = (groups: any[]) =>
@@ -126,11 +128,21 @@ test('① capability save persists through the browser on a snowflake-id role', 
   await expect(page.getByRole('dialog')).toBeInViewport({ ratio: 1 });
   await expect(page.getByTestId('confirm-ok')).toBeInViewport({ ratio: 1 });
   await expect(page.getByTestId('confirm-cancel')).toBeInViewport({ ratio: 1 });
+  const stateCounts = page.getByTestId('capability-preview-state-counts');
+  await expect(stateCounts).toBeHidden();
+  for (const state of ['full', 'partial', 'none'] as const) {
+    const count = previewBody.data.resultingCapabilities.filter(
+      (affected: { authorizationState: string }) => affected.authorizationState === state,
+    ).length;
+    await expect(stateCounts).toHaveAttribute(`data-${state}`, String(count));
+  }
+  await expect(page.getByTestId('capability-preview-state-guidance')).toBeVisible();
   await page.screenshot({ path: info.outputPath('00-capability-preview.png'), fullPage: true });
   const impact = page.getByTestId('capability-preview-impact');
   await expect(impact).toHaveJSProperty('open', false);
   await impact.locator(':scope > summary').click();
   await expect(impact).toHaveJSProperty('open', true);
+  await expect(stateCounts).toBeVisible();
   await expect(page.getByTestId('capability-preview-resulting')).toBeVisible();
   const previewMenus = page.getByTestId('capability-preview-menus');
   await expect(previewMenus).toHaveCount(previewBody.data.relatedMenus.length ? 1 : 0);
@@ -200,6 +212,102 @@ test('① capability save persists through the browser on a snowflake-id role', 
 
   await checkbox.scrollIntoViewIfNeeded();
   await page.screenshot({ path: info.outputPath('01-capability-saved.png'), fullPage: true });
+
+  // A fresh user receives only the declared read capability through the same upper-level UI.
+  const readerRole = await createRole(page);
+  // API fixture creation does not refresh the already mounted role list.
+  await page.reload();
+  await expect(page.getByTestId('permission-page')).toBeVisible();
+  await page.getByTestId('role-search-input').fill(readerRole.code);
+  await page.getByTestId(`role-item-${readerRole.code}`).click();
+  await expect(page.getByTestId('capability-role-editor')).toHaveAttribute('data-role-pid', readerRole.pid);
+  const readerCheckbox = page.getByTestId('capability-checkbox-org.cap.role_view');
+  await readerCheckbox.check();
+  const saveReader = async (selection: string[]) => {
+    const responsePromise = page.waitForResponse(response => {
+      const url = new URL(response.url());
+      return url.origin === new URL(page.url()).origin
+        && url.pathname === '/api/permission/capabilities'
+        && url.searchParams.get('rolePid') === readerRole.pid
+        && response.request().method() === 'PUT';
+    });
+    await page.getByTestId('capability-save').click();
+    await expect(page.getByTestId('confirm-dialog')).toBeVisible();
+    await page.getByTestId('confirm-ok').click();
+    const response = await responsePromise;
+    expect(response.status()).toBe(200);
+    expect(response.request().postDataJSON()).toEqual(selection);
+    expect(String((await response.json()).code)).toBe('0');
+    await expect(page.getByTestId('capability-save')).toBeDisabled();
+  };
+  await saveReader(['org.cap.role_view']);
+  const user = makeQuoteRoleUser('role-reader', readerRole.code, [readerRole.code]);
+  await ensureQuoteRoleUser(page, user);
+  const reader = await openQuoteRolePage(browser, user);
+  try {
+    const snapshot = await fetchRoleSnapshot(reader.page);
+    expect(snapshot.roleCodes).toContain(readerRole.code);
+    expect(snapshot.roleCodes).not.toContain('tenant_admin');
+    expect(snapshot.permissionCodes).toContain('org.role.read');
+    for (const code of ['org.role.update', 'org.user_role.update', 'meta.permission.update']) {
+      expect(snapshot.permissionCodes).not.toContain(code);
+    }
+    const readerCapUrl = `/api/permission/capabilities?rolePid=${encodeURIComponent(readerRole.pid)}`;
+    const readerMatrixUrl = `/api/permissions/matrix/${encodeURIComponent(readerRole.pid)}`;
+    const matrixResponse = reader.page.waitForResponse(response => {
+      const url = new URL(response.url());
+      return url.origin === new URL(reader.page.url()).origin
+        && url.pathname === readerMatrixUrl && response.request().method() === 'GET';
+    });
+    await reader.page.getByRole('link', { name: /角色|Roles/, exact: true }).click();
+    await expect(reader.page.getByTestId('permission-page')).toBeVisible();
+    await reader.page.getByTestId('role-search-input').fill(readerRole.code);
+    await reader.page.getByTestId(`role-item-${readerRole.code}`).click();
+    expect((await matrixResponse).status()).toBe(200);
+    await expect(reader.page.getByTestId('capability-role-editor')).toHaveAttribute('data-role-pid', readerRole.pid);
+    await expect(reader.page.getByTestId('capability-checkbox-org.cap.role_view')).toBeChecked();
+    await expect(reader.page.getByTestId('capability-checkbox-org.cap.role_view')).toBeDisabled();
+    await expect(reader.page.getByText('当前为角色只读访问，修改需具备对应管理权限。', { exact: true })).toBeVisible();
+    for (const id of ['role-create-btn', `role-action-edit-${readerRole.code}`,
+      `role-action-toggle-${readerRole.code}`, `role-action-delete-${readerRole.code}`,
+      'capability-save', 'data-scope-modify-btn', 'permission-right-tab-audit']) {
+      await expect(reader.page.getByTestId(id)).toBeDisabled();
+    }
+    await reader.page.screenshot({ path: info.outputPath('role-reader-capabilities.png'), fullPage: true });
+    await reader.page.getByTestId('permission-right-tab-members').click();
+    await expect(reader.page.getByTestId('role-member-tab')).toBeVisible();
+    await expect(reader.page.getByTestId('role-member-add-btn')).toBeDisabled();
+    const removeButtons = reader.page.locator('[data-testid^="role-member-remove-"]');
+    await expect(removeButtons).toHaveCount(1);
+    await expect(removeButtons.first()).toBeDisabled();
+    await reader.page.screenshot({ path: info.outputPath('role-reader-members.png'), fullPage: true });
+    const beforeScopeResponse = await page.request.get(`${BASE}${readerMatrixUrl}/default-scope`);
+    expect(beforeScopeResponse.status()).toBe(200);
+    const beforeScope = await beforeScopeResponse.json();
+    expect(String(beforeScope.code)).toBe('0');
+    expect((await reader.page.request.put(readerCapUrl, { data: [] })).status()).toBe(403);
+    expect((await reader.page.request.put(`${readerMatrixUrl}/default-scope`, { data: { scopeType: 'all' } })).status()).toBe(403);
+    expect((await reader.page.request.post(`/api/roles/${readerRole.pid}/members/remove`, { data: [] })).status()).toBe(403);
+    const afterScopeResponse = await page.request.get(`${BASE}${readerMatrixUrl}/default-scope`);
+    expect(afterScopeResponse.status()).toBe(200);
+    const afterScope = await afterScopeResponse.json();
+    expect(String(afterScope.code)).toBe('0');
+    expect(afterScope.data).toEqual(beforeScope.data);
+    const persisted = await (await page.request.get(`${BASE}${readerCapUrl}`)).json();
+    expect(persisted.data.flatMap((group: any) => group.capabilities)
+      .find((item: any) => item.code === 'org.cap.role_view').authorizationState).toBe('full');
+
+    // Explicit revocation through the upper-level editor removes the reader's access.
+    await readerCheckbox.uncheck();
+    await saveReader([]);
+    await reader.page.reload();
+    const revoked = await fetchRoleSnapshot(reader.page);
+    expect(revoked.permissionCodes).not.toContain('org.role.read');
+    expect((await reader.page.request.get(readerCapUrl)).status()).toBe(403);
+    expect((await reader.page.request.get(readerMatrixUrl)).status()).toBe(403);
+  } finally {
+    await reader.context.close();
+  }
 });
 
 test('capability draft survives failed save and canceled navigation', async ({ page }, info) => {

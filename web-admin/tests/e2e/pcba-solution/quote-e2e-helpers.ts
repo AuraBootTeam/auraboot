@@ -283,6 +283,19 @@ const BOM_INTERNAL_FIXTURE_MODELS = [
 
 const MODEL_FIXTURE_ACTIONS = ['read', 'create', 'update', 'delete', 'export', 'import'];
 
+// Data scaffolds deliberately use raw CRUD. This opt-in fixture list is not a product role preset.
+export const QUOTE_BOM_FIXTURE_MODELS = [
+  ...BOM_INTERNAL_FIXTURE_MODELS,
+  'ab_team', 'bom_material_master', 'bom_source_format_profile',
+  'crm_account_common', 'crm_contact_common', 'crm_customer_request_pcba_rfq',
+  'qo_cost_assumption_common', 'qo_cost_gap_common', 'qo_cost_item_common',
+  'qo_cost_scenario_common', 'qo_cost_scenario_tier_common',
+  'qo_offline_material_price_common', 'qo_price_evidence_common', 'qo_process_fee_rule_hit_common',
+  'qo_quote_common', 'qo_quote_customer_attachment_common', 'qo_quote_line_common',
+  'qo_quote_send_audit_common', 'qo_rfq_source_attachment_common',
+  'qo_supplier_request_common', 'qo_supplier_request_line_common', 'req_requirement_line_pcba_bom',
+];
+
 export function makeQuoteRoleUser(key: string, uid: string, roleCodes: string[]): QuoteRoleUser {
   const normalized = key.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
   return {
@@ -755,7 +768,7 @@ async function fetchTenantAdminRole(page: Page): Promise<Record<string, unknown>
   return role as Record<string, unknown>;
 }
 
-async function fetchModelPermissionPids(page: Page, modelCodes: string[]): Promise<string[]> {
+async function fetchModelPermissionPids(page: Page, modelCodes: string[], actions = MODEL_FIXTURE_ACTIONS, requireRegistered = false): Promise<string[]> {
   const permissions: Array<Record<string, unknown>> = [];
   for (const resourceType of ['model', 'MODEL']) {
     const permissionsResp = await page.request.get(
@@ -800,9 +813,10 @@ async function fetchModelPermissionPids(page: Page, modelCodes: string[]): Promi
 
   const out = new Set<string>();
   for (const modelCode of modelCodes) {
-    for (const action of MODEL_FIXTURE_ACTIONS) {
+    for (const action of actions) {
       const code = `model.${modelCode}.${action}`;
       let pid = byCode.get(code);
+      if (requireRegistered) expect(pid, `${code}: fixture permissions must already be registered by model import`).toBeTruthy();
       if (!pid) {
         const createResp = await page.request.post('/api/permissions', {
           data: {
@@ -835,6 +849,8 @@ async function fetchModelPermissionPids(page: Page, modelCodes: string[]): Promi
 export async function ensureTenantAdminModelPermissions(
   page: Page,
   modelCodes: string[] = BOM_INTERNAL_FIXTURE_MODELS,
+  actions = MODEL_FIXTURE_ACTIONS,
+  requireRegistered = false,
 ): Promise<void> {
   const role = await fetchTenantAdminRole(page);
   const rolePid = String(role.pid ?? '');
@@ -855,7 +871,7 @@ export async function ensureTenantAdminModelPermissions(
     ? (currentBody as any).data.map(String)
     : [];
   const currentSet = new Set(currentPids);
-  const neededPids = await fetchModelPermissionPids(page, modelCodes);
+  const neededPids = await fetchModelPermissionPids(page, modelCodes, actions, requireRegistered);
   const missing = neededPids.filter((pid) => !currentSet.has(pid));
   if (missing.length === 0) return;
 
@@ -2232,9 +2248,19 @@ export async function searchBusinessList(page: Page, listPath: string, keyword: 
   const modelCode = sourceModelCode ?? listPath.split('/').filter(Boolean).pop();
   const isListResponse = (response: import('@playwright/test').Response) =>
     response.url().includes(`/api/dynamic/${modelCode}/list`) && response.request().method() === 'GET';
-  const initial = page.waitForResponse(isListResponse);
-  await page.goto(listPath, { waitUntil: 'domcontentloaded' });
-  expect((await initial).ok(), 'initial list request must succeed').toBe(true);
+  let capturedInitial: import('@playwright/test').Response | undefined;
+  const captureInitial = (response: import('@playwright/test').Response) => {
+    if (isListResponse(response) && !capturedInitial) capturedInitial = response;
+  };
+  page.on('response', captureInitial);
+  try {
+    await page.goto(listPath, { waitUntil: 'domcontentloaded' });
+    // Capture early responses, but start the response deadline after navigation.
+    const initial = capturedInitial ?? await page.waitForResponse(isListResponse);
+    expect(initial.ok(), 'initial list request must succeed').toBe(true);
+  } finally {
+    page.off('response', captureInitial);
+  }
   const search = page.getByTestId('list-search-input');
   await expect(search).toBeVisible();
   if (await search.inputValue() !== keyword) {

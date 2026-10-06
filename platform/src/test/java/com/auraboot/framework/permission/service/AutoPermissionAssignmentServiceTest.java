@@ -13,6 +13,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -56,12 +58,14 @@ class AutoPermissionAssignmentServiceTest {
         );
 
         when(commandActionDeriver.deriveActions("crm_lead_common")).thenReturn(List.of("read", "create"));
-        when(permissionMapper.findByCode(any())).thenReturn(null);
+        Map<String, Permission> definitions = new HashMap<>();
+        when(permissionMapper.findByCode(any())).thenAnswer(invocation -> definitions.get(invocation.getArgument(0)));
 
         AtomicLong nextId = new AtomicLong(100);
         doAnswer(invocation -> {
             Permission permission = invocation.getArgument(0);
             permission.setId(nextId.getAndIncrement());
+            definitions.put(permission.getCode(), permission);
             return 1;
         }).when(permissionMapper).insert(any(Permission.class));
 
@@ -104,5 +108,43 @@ class AutoPermissionAssignmentServiceTest {
         verify(permissionMapper).findByCode(eq("model.crm_lead_common"));
         verify(permissionMapper).findByCode(eq("model.crm_lead_common.read"));
         verify(permissionMapper).findByCode(eq("model.crm_lead_common.create"));
+
+        // A synchronization must register new actions without restoring revoked grants
+        // or applying the default template to an existing resource again.
+        when(commandActionDeriver.deriveActions("crm_lead_common"))
+                .thenReturn(List.of("read", "create", "export"));
+        service.autoAssignPermissions("crm_lead_common", "crm", 123L);
+        assertThat(definitions.keySet()).containsExactlyInAnyOrder(
+                "module.crm", "model.crm_lead_common", "model.crm_lead_common.read",
+                "model.crm_lead_common.create", "model.crm_lead_common.export");
+        verify(permissionMapper, org.mockito.Mockito.times(5)).insert(any(Permission.class));
+        verify(rolePermissionMapper, org.mockito.Mockito.times(2)).insert(any(RolePermission.class));
+        verify(roleService, org.mockito.Mockito.times(1)).findByTenantId(123L);
+        verify(userPermissionService, org.mockito.Mockito.times(2)).evictPermissionDefinitions(123L);
+        verify(userPermissionService, org.mockito.Mockito.times(1)).evictRoleUsers(123L, 88L);
     }
+    @Test
+    void shouldRegisterImportedActionsWithoutGrantingRoles() {
+        AutoPermissionAssignmentService service = new AutoPermissionAssignmentService(
+                permissionService, permissionMapper, roleService, rolePermissionMapper,
+                commandActionDeriver, userPermissionService);
+        when(commandActionDeriver.deriveActions("crm_lead_common")).thenReturn(List.of("read", "create"));
+        AtomicLong nextId = new AtomicLong(100);
+        doAnswer(invocation -> {
+            Permission permission = invocation.getArgument(0);
+            permission.setId(nextId.getAndIncrement());
+            return 1;
+        }).when(permissionMapper).insert(any(Permission.class));
+
+        service.registerPermissions("crm_lead_common", "crm", 123L);
+
+        ArgumentCaptor<Permission> definitions = ArgumentCaptor.forClass(Permission.class);
+        verify(permissionMapper, org.mockito.Mockito.times(4)).insert(definitions.capture());
+        assertThat(definitions.getAllValues()).extracting(Permission::getCode)
+                .containsExactly("module.crm", "model.crm_lead_common",
+                        "model.crm_lead_common.read", "model.crm_lead_common.create");
+        org.mockito.Mockito.verifyNoInteractions(roleService, rolePermissionMapper);
+        verify(userPermissionService).evictPermissionDefinitions(123L);
+    }
+
 }

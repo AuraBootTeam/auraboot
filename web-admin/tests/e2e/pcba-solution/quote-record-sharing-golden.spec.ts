@@ -221,26 +221,57 @@ test('quote sharing release gate: multiple members, role access and revocation t
     const quoteRoot = process.env.AURA_QUOTE_ROOT;
     expect(quoteRoot, 'The gate must provide its manifest-bound AURA_QUOTE_ROOT').toBeTruthy();
     expect(path.isAbsolute(quoteRoot!)).toBe(true);
-    const pluginPath = path.join(quoteRoot!, 'plugin-aura', 'quote-core');
-    const manifest = JSON.parse(readFileSync(path.join(pluginPath, 'plugin.json'), 'utf8'));
-    expect(manifest.pluginId).toBe('com.auraboot.quote-core');
-    const imported = await foreign.page.request.post('/api/plugins/import/import-directory-sync', {
-      data: {
-        path: pluginPath,
-        conflictStrategy: 'OVERWRITE',
-        autoPublishModels: true,
-        autoPublishFields: true,
-        autoPublishCommands: true,
-        autoPublishPages: true,
-        deferReferenceValidation: true,
-      },
-      timeout: 90_000,
-    });
-    expect(imported.status()).toBe(200);
-    expect((await imported.json()).success).toBe(true);
+    const crmRoot = process.env.AURA_CRM_ROOT;
+    const pluginsRoot = process.env.AURA_PLUGINS_PROJECT_ROOT;
+    for (const sourceRoot of [crmRoot, pluginsRoot]) {
+      expect(sourceRoot, 'The gate must provide each manifest-bound dependency root').toBeTruthy();
+      expect(path.isAbsolute(sourceRoot!)).toBe(true);
+    }
+    const dependencies = [
+      [path.join(crmRoot!, 'plugin-aura', 'crm'), 'com.auraboot.crm'],
+      [path.join(pluginsRoot!, 'pcba-crm'), 'com.auraboot.pcba-crm'],
+      [path.join(quoteRoot!, 'plugin-aura', 'quote-core'), 'com.auraboot.quote-core'],
+    ];
+    for (const [pluginPath, pluginId] of dependencies) {
+      const manifest = JSON.parse(readFileSync(path.join(pluginPath, 'plugin.json'), 'utf8'));
+      expect(manifest.pluginId).toBe(pluginId);
+      const imported = await foreign.page.request.post('/api/plugins/import/import-directory-sync', {
+        data: {
+          path: pluginPath,
+          conflictStrategy: 'OVERWRITE',
+          autoPublishModels: true,
+          autoPublishFields: true,
+          autoPublishCommands: true,
+          autoPublishPages: true,
+          deferReferenceValidation: true,
+        },
+        timeout: 90_000,
+      });
+      expect(imported.status(), pluginId).toBe(200);
+      expect((await imported.json()).success, pluginId).toBe(true);
+    }
     const foreignSchema = await foreign.page.request.get('/api/pages/key/qo_quote_common_detail');
     expect(foreignSchema.status()).toBe(200);
     expect(String((await foreignSchema.json()).code)).toBe('0');
+    // Registration does not grant newly imported actions. Give the foreign fixture
+    // only the declared read surfaces needed to reach the tenant record boundary.
+    const foreignRoles = await foreign.page.request.get('/api/roles?keyword=tenant_admin&pageNum=1&pageSize=50');
+    expect(foreignRoles.status()).toBe(200);
+    const foreignAdminRole = (await foreignRoles.json()).data.records.find((role: { code: string }) => role.code === 'tenant_admin');
+    expect(foreignAdminRole?.pid).toBeTruthy();
+    const capabilityUrl = `/api/permission/capabilities?rolePid=${foreignAdminRole.pid}`;
+    const foreignCapabilities = await foreign.page.request.get(capabilityUrl);
+    expect(foreignCapabilities.status()).toBe(200);
+    const declared = (await foreignCapabilities.json()).data.flatMap((group: { capabilities: Array<{ code: string; granted: boolean; conventionDerived: boolean }> }) => group.capabilities)
+      .filter((capability: { conventionDerived: boolean }) => !capability.conventionDerived);
+    const readSurfaces = ['qo.cap.quote_view', 'qo.cap.surface_bom_price', 'qo.cap.surface_process_fee'];
+    for (const code of readSurfaces) expect(declared.some((capability: { code: string }) => capability.code === code), code).toBe(true);
+    const explicitRead = await foreign.page.request.put(capabilityUrl, { data: [...new Set([
+      ...declared.filter((capability: { granted: boolean }) => capability.granted).map((capability: { code: string }) => capability.code),
+      ...readSurfaces,
+    ])] });
+    expect(explicitRead.status()).toBe(200);
+    expect(String((await explicitRead.json()).code)).toBe('0');
     const deniedRecord = foreign.page.waitForResponse(response =>
       new URL(response.url()).pathname === root && response.request().method() === 'GET');
     await foreign.page.goto(new URL(`/p/qo_quote_common/view/${quote.quoteId}`, page.url()).href);

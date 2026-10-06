@@ -30,6 +30,7 @@ export default function CapabilityScopeSettings({
   const [pending, setPending] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [modelNames, setModelNames] = useState<Record<string, string>>({});
+  const [modelTeams, setModelTeams] = useState<Record<string, boolean>>({});
   const [namesLoading, setNamesLoading] = useState(true);
   const [namesError, setNamesError] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -72,6 +73,8 @@ export default function CapabilityScopeSettings({
               (action) =>
                 action.granted &&
                 capability.includes.includes(action.code) &&
+                // The generic command entry checks RBAC only; target models own record scopes.
+                action.code !== 'meta.command.execute' &&
                 (action.code.startsWith('model.') || action.scopeType != null),
             )
             .map((action) => ({
@@ -93,9 +96,15 @@ export default function CapabilityScopeSettings({
       const model = await modelService.findByCode(code);
       if (!model.displayName || model.displayName === code)
         throw new Error('Model has no business display name');
-      return [code, model.displayName] as const;
-    })).then((names) => {
-      if (current) setModelNames(Object.fromEntries(names));
+      const scope = model.extension?.dataScope;
+      const teamField = scope && typeof scope === 'object' && !Array.isArray(scope)
+        ? (scope as Record<string, unknown>).teamField : null;
+      return { code, name: model.displayName, teamSupported: teamField != null && String(teamField).trim() !== '' };
+    })).then((models) => {
+      if (current) {
+        setModelNames(Object.fromEntries(models.map((model) => [model.code, model.name])));
+        setModelTeams(Object.fromEntries(models.map((model) => [model.code, model.teamSupported])));
+      }
     }).catch(() => {
       if (current) setNamesError(true);
     }).finally(() => {
@@ -114,11 +123,13 @@ export default function CapabilityScopeSettings({
   const rowLabel = (row: typeof rows[number]) => row.code.startsWith('model.')
     ? `${modelNames[row.resourceCode]} · ${actionNames[row.action] ?? row.label}`
     : row.label;
+  const teamUnavailable = (row: typeof rows[number]) => row.code.startsWith('model.') && !modelTeams[row.resourceCode];
   const apply = async () => {
     const changes = rows.filter(
       (row) => pending[row.code] != null && pending[row.code] !== row.scopeType,
     );
-    if (!changes.length || saving || namesLoading || namesError || changes.some((row) => !isValidScope(pending[row.code])))
+    if (!changes.length || saving || namesLoading || namesError || changes.some((row) =>
+      !isValidScope(pending[row.code]) || (pending[row.code] === 'team' && teamUnavailable(row))))
       return;
     setSaving(true);
     onBusy(true);
@@ -188,10 +199,12 @@ export default function CapabilityScopeSettings({
             const value = pending[row.code] ?? row.scopeType ?? '';
             const option = scopeOption(pending[row.code] ?? row.scopeType);
             return (
-              <label key={row.code} className="flex items-center justify-between gap-3 text-sm">
+              <div key={row.code} className="text-sm">
+                <div className="flex items-center justify-between gap-3">
                 <span>{rowLabel(row)}</span>
                 <select
                   aria-label={rowLabel(row)}
+                  aria-describedby={teamUnavailable(row) ? `scope-team-note-${row.code}` : undefined}
                   data-testid={`capability-scope-${row.code}`}
                   disabled={saving}
                   value={value}
@@ -206,12 +219,17 @@ export default function CapabilityScopeSettings({
                     </option>
                   )}
                   {SCOPE_OPTIONS.map((scope) => (
-                    <option key={scope.value} value={scope.value}>
+                    <option key={scope.value} value={scope.value} disabled={scope.value === 'team' && teamUnavailable(row)}>
                       {t(scope.labelKey, undefined, scope.labelFallback)}
                     </option>
                   ))}
                 </select>
-              </label>
+                </div>
+                {teamUnavailable(row) && <p id={`scope-team-note-${row.code}`} data-testid={`capability-scope-team-note-${row.code}`} className="text-text-2 mt-1 text-xs">
+                  {t('admin.permission.capability.teamUnavailableV2', undefined,
+                    'This record type has no team association configured, so My teams cannot be selected. An existing My teams scope grants no records by itself; other roles or valid shares may still allow access.')}
+                </p>}
+              </div>
             );
           })}
         </div>

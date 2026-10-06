@@ -535,6 +535,57 @@ describe('ControlledFieldRenderer', () => {
     });
   });
 
+  it('clears inline-create state and rejects old callbacks across revoke and regrant', async () => {
+    vi.resetModules();
+    let allowed = true;
+    const onChange = vi.fn();
+    const executeCommand = vi.fn();
+    const dialogProps: Record<string, any> = {};
+    vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
+      ComponentLoader: ({ componentName, props }: any) => {
+        capturedPropsSpy({ componentName, props });
+        return <div data-testid="controlled-create-selector" />;
+      },
+    }));
+    vi.doMock('~/contexts/AuthContext', () => ({ usePermission: () => allowed }));
+    vi.doMock('~/framework/meta/hooks/useActionHandler', () => ({ useActionHandler: () => ({ executeCommand }) }));
+    vi.doMock('~/framework/meta/contexts/DataSourceContext', () => ({ useDataSourceManagerOptional: () => null }));
+    vi.doMock('~/framework/meta/runtime/reference-create/ReferenceCreateDialog', () => ({
+      ReferenceCreateDialog: (props: Record<string, any>) => {
+        Object.assign(dialogProps, props);
+        return props.open ? <div data-testid="controlled-create-dialog" /> : null;
+      },
+    }));
+    const { ControlledFieldRenderer } = await import('../ControlledFieldRenderer');
+    const field = { field: 'customer_id', component: 'SmartSelect', dataType: 'reference', allowCreate: true, createCommand: 'crm:create_account', createPermission: 'crm.account.manage', refTarget: { targetModel: 'crm_account_common', displayField: 'crm_acc_name' } } as any;
+    const context = { locale: 'zh-CN', t: (key: string) => key } as any;
+    const node = () => <ControlledFieldRenderer field={field} value={undefined} onChange={onChange} context={context} />;
+    const { rerender } = render(node());
+    const latestProps = () => capturedPropsSpy.mock.calls.at(-1)![0].props;
+    act(() => latestProps().onCreateNew());
+    expect(screen.getByTestId('controlled-create-dialog')).toBeInTheDocument();
+    const staleOpen = latestProps().onCreateNew;
+    const staleCreated = dialogProps.onCreated;
+    const staleClose = dialogProps.onClose;
+    allowed = false;
+    rerender(node());
+    expect(screen.queryByTestId('controlled-create-dialog')).toBeNull();
+    allowed = true;
+    rerender(node());
+    expect(screen.queryByTestId('controlled-create-dialog')).toBeNull();
+    act(() => {
+      staleOpen();
+      staleCreated({ value: 'stale', label: 'Stale' });
+    });
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('controlled-create-dialog')).toBeNull();
+    act(() => latestProps().onCreateNew());
+    expect(screen.getByTestId('controlled-create-dialog')).toBeInTheDocument();
+    act(() => staleClose());
+    expect(screen.getByTestId('controlled-create-dialog')).toBeInTheDocument();
+    expect(executeCommand).not.toHaveBeenCalled();
+  });
+
   it('wires permitted reference inline-create through controlled form fields', async () => {
     vi.resetModules();
     const onChange = vi.fn();

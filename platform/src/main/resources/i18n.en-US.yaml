@@ -941,7 +941,11 @@ search:
   navigate: Navigate
   open: Open
   close: Close
+meta_record:
+  duplicate: "Record already exists. Check unique fields before saving."
 common:
+  saved_view_public_share_group: Public share links
+  saved_view_public_share_subtitle: Manage personal views and authorized public links
   collaborative_records: Collaborative records
   title: Title
   notice: Notice
@@ -1762,6 +1766,7 @@ aurabot:
 "admin.permission.role.recommendedHint": "Set up separate administrator, sales, procurement and engineering roles according to responsibilities."
 "admin.permission.policy.loadError": "Could not load permission policy. Retry to continue."
 "admin.permission.editor.roleHint": "Select business capabilities, then review and save. Data scope controls which records can be accessed."
+"admin.permission.editor.readOnlyHint": "Read-only role access. Changes require the corresponding administration permission."
 "admin.permission.advanced.colCoverage": "Capability coverage"
 
 "admin.permission.capability.partialV2": "Some actions granted"
@@ -1796,6 +1801,7 @@ aurabot:
 "admin.permission.capability.revokePartialV2": "Revoke existing grants"
 "admin.permission.capability.undoRevokeV2": "Pending revocation · undo"
 "admin.permission.capability.scopeNamesErrorV2": "Could not load business names. Close and reopen to try again."
+"admin.permission.capability.teamUnavailableV2": "This record type has no team association configured, so My teams cannot be selected. An existing My teams scope grants no records by itself; other roles or valid shares may still allow access."
 "admin.permission.members.temporary": "Time-bounded access"
 "admin.permission.members.effectiveDate": "Effective date"
 "admin.permission.members.expiryDate": "Expiry date"
@@ -1807,3 +1813,6 @@ permission.org.role.update: "Update roles"
 "cloudConfig.save.readbackPending": "Configuration saved. Reload it before making further changes."
 
 "cloudConfig.save.retryReadback": "Retry loading"
+
+"admin.permission.editor.impactStateDetailsV2": "Review related capability states, menus and action details"
+"admin.permission.editor.previewStateCountsV2": "Related capabilities after saving: {full} fully granted · {partial} with partial actions · {none} not granted"

@@ -205,6 +205,8 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
 
   // 字典数据缓存
   const dictDataCache = useRef<Map<string, DictItem[]>>(new Map());
+  const completedDictRequests = useRef<Set<string>>(new Set());
+  const failedDictRequests = useRef<Set<string>>(new Set());
   const [_dictLoaded, setDictLoaded] = useState(false);
 
   // 加载字典数据
@@ -217,7 +219,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     }
 
     // 获取尚未加载的字典
-    const unloadedCodes = dictCodes.filter((code) => !dictDataCache.current.has(code));
+    const unloadedCodes = dictCodes.filter((code) => !completedDictRequests.current.has(code));
 
     if (unloadedCodes.length === 0) {
       setDictLoaded(true);
@@ -226,6 +228,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
 
     // Track if this effect is still active
     let cancelled = false;
+    setDictLoaded(false);
 
     // 并行加载所有字典数据
     const loadDictData = async () => {
@@ -239,9 +242,15 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
             const data = result.data as { items?: DictItem[] } | DictItem[];
             const items: DictItem[] = Array.isArray(data) ? data : data.items || [];
             dictDataCache.current.set(code, items);
+            failedDictRequests.current.delete(code);
+          } else {
+            failedDictRequests.current.add(code);
           }
         } catch (error) {
+          failedDictRequests.current.add(code);
           console.error(`[TableBlockRenderer] Failed to load dict: ${code}`, error);
+        } finally {
+          completedDictRequests.current.add(code);
         }
       });
 
@@ -675,9 +684,42 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     // 如果有 dictCode，尝试翻译值为标签
     if (column.dictCode) {
       const dictItems = dictDataCache.current.get(column.dictCode);
+      if (!dictItems && !completedDictRequests.current.has(column.dictCode)) {
+        // A mounted tab can have rows before its dictionary response arrives.
+        // Keep the pending state explicit instead of exposing internal codes.
+        const loadingLabel = t('common.loading');
+        return (
+          <span role="status" className="text-text-3">
+            {loadingLabel !== 'common.loading' ? loadingLabel : 'Loading…'}
+          </span>
+        );
+      }
+      const dictionaryText = (key: string, zh: string, en: string) => {
+        const translated = t(key);
+        return translated !== key ? translated : getLocalizedText({ 'zh-CN': zh, en }, locale);
+      };
+      if (failedDictRequests.current.has(column.dictCode)) {
+        return (
+          <span
+            role="alert"
+            className="text-danger"
+            title={dictionaryText(
+              'meta.table.dictionaryRetryHint',
+              '请刷新页面重试',
+              'Refresh the page to retry',
+            )}
+          >
+            {dictionaryText(
+              'meta.table.dictionaryLoadFailed',
+              '标签加载失败',
+              'Labels failed to load',
+            )}
+          </span>
+        );
+      }
       if (dictItems) {
         const item = dictItems.find((i) => String(i.value) === String(value));
-        if (item) {
+        if (item && typeof item.label === 'string' && item.label.trim()) {
           const tone = resolveStatusTone(item.extension?.color);
           if (column.renderType === 'status-pill') {
             return renderStatusPill(tone, item.label);
@@ -687,8 +729,15 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
           return <StatusDot tone={tone} label={item.label} />;
         }
       }
-      // 字典未加载或未找到匹配项时显示原始值
-      return String(value);
+      return (
+        <span className="text-text-3">
+          {dictionaryText(
+            'meta.table.dictionaryLabelMissing',
+            '标签未配置',
+            'Label not configured',
+          )}
+        </span>
+      );
     }
 
     // 自定义 render 表达式
@@ -1402,9 +1451,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
                         key={column.field}
                         className={`${bodyCellClass} text-text text-sm ${
                           colIdx === 0 ? 'font-medium' : ''
-                        } ${
-                          column.ellipsis ? 'truncate' : ''
-                        } text-${column.align || 'left'}`}
+                        } ${column.ellipsis ? 'truncate' : ''} text-${column.align || 'left'}`}
                         title={getCellTitle(column, row)}
                         style={{
                           maxWidth: column.ellipsis ? column.width : undefined,

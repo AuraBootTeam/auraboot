@@ -23,6 +23,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { DEFAULT_TEST_ACCOUNT } from './helpers/test-accounts';
 import { BASE_URL as DEFAULT_BASE_URL } from './helpers/playwright-env';
+import { ensureTenantAdminModelPermissions, QUOTE_BOM_FIXTURE_MODELS } from './e2e/pcba-solution/quote-e2e-helpers';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -422,6 +423,13 @@ setup('authenticate as admin', async ({ page, baseURL: configURL }) => {
   }
 
   expect(ok, 'Admin login must succeed').toBe(true);
+
+  if (process.env.PW_QUOTE_BOM_FIXTURE_PERMISSIONS === '1') {
+    // APIRequestContext must satisfy the same application-origin contract as browser writes.
+    await page.context().setExtraHTTPHeaders({ Referer: `${baseURL}/` });
+    await ensureTenantAdminModelPermissions(page, QUOTE_BOM_FIXTURE_MODELS, ['read', 'create', 'update', 'delete'], true);
+    console.log('Quote/BOM fixture administrator CRUD initialized explicitly; independent business roles are unchanged.');
+  }
 
   await page.context().storageState({ path: storagePath });
   patchStorageStateCookies(storagePath);

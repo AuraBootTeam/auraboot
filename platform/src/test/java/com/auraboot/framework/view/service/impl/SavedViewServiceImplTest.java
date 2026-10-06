@@ -30,6 +30,9 @@ import com.auraboot.framework.view.mapper.SavedViewMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import com.auraboot.framework.exception.DataNotFoundException;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -497,6 +500,7 @@ class SavedViewServiceImplTest {
         when(currentUserTeamResolver.resolveCurrentUserTeamIds()).thenReturn(List.of("teamA"));
         when(userPermissionService.hasPermission(7L, MetaPermission.VIEW_TEAM_MANAGE)).thenReturn(true);
 
+        when(userPermissionService.hasPermission(7L, MetaPermission.VIEW_PUBLIC_SHARE)).thenReturn(true);
         SavedViewDTO dto = service.findByPid("team1");
 
         assertEquals("manage", dto.getEffectivePermission());
@@ -1254,4 +1258,78 @@ class SavedViewServiceImplTest {
         SavedViewDTO dto = service.create(req);
         assertEquals("Team A", dto.getTeamName());
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"personal", "team", "global"})
+    void checkPublicShareAccess_ownerCanShareOnlyWithIndependentPermission(String scope) {
+        SavedView view = new SavedView();
+        view.setPid("shareable");
+        view.setTenantId(100L);
+        view.setScope(scope);
+        view.setOwnerId("user_pid");
+        view.setCreatedBy("user_pid");
+        view.setTeamId("teamA");
+        when(savedViewMapper.findByPid("shareable")).thenReturn(view);
+        when(currentUserTeamResolver.resolveCurrentUserTeamIds()).thenReturn(List.of("teamA"));
+        when(userPermissionService.hasPermission(7L, MetaPermission.VIEW_PUBLIC_SHARE)).thenReturn(true);
+
+        assertDoesNotThrow(() -> service.checkPublicShareAccess("shareable"));
+        SavedViewDTO granted = service.findByPid("shareable");
+        if (!"personal".equals(scope)) assertThat(granted.getActions()).contains("share");
+        else assertThat(granted.getActions()).doesNotContain("share");
+
+        when(userPermissionService.hasPermission(7L, MetaPermission.VIEW_PUBLIC_SHARE)).thenReturn(false);
+        assertThrows(ValidationException.class, () -> service.checkPublicShareAccess("shareable"));
+        assertThat(service.findByPid("shareable").getActions()).contains("view", "manage").doesNotContain("share");
+        verify(savedViewMapper, never()).updateViewConfigJson(anyString(), anyString());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"otherPersonalOwner", "teamCreatorOutsideTeam", "teamReader", "globalReader", "locked", "unknownScope", "nullScope"})
+    void checkPublicShareAccess_publicPermissionDoesNotBypassExistingScope(String scenario) {
+        SavedView view = new SavedView();
+        view.setPid("protected");
+        view.setTenantId(100L);
+        view.setScope("personal");
+        view.setOwnerId("other_user");
+        view.setCreatedBy("other_user");
+        view.setTeamId("teamA");
+        switch (scenario) {
+            case "otherPersonalOwner" -> { }
+            case "teamCreatorOutsideTeam" -> { view.setScope("team"); view.setCreatedBy("user_pid"); }
+            case "teamReader" -> {
+                view.setScope("team");
+                when(currentUserTeamResolver.resolveCurrentUserTeamIds()).thenReturn(List.of("teamA"));
+            }
+            case "globalReader" -> view.setScope("global");
+            case "locked" -> {
+                view.setOwnerId("user_pid");
+                ViewConfig config = new ViewConfig();
+                config.setMeta(ViewConfig.Meta.builder().locked(true).managedBy("plugin").build());
+                view.setViewConfig(config);
+            }
+            case "unknownScope" -> view.setScope("invalid");
+            case "nullScope" -> view.setScope(null);
+            default -> throw new AssertionError(scenario);
+        }
+        when(savedViewMapper.findByPid("protected")).thenReturn(view);
+        when(userPermissionService.hasPermission(7L, MetaPermission.VIEW_PUBLIC_SHARE)).thenReturn(true);
+        assertThrows(ValidationException.class, () -> service.checkPublicShareAccess("protected"));
+        verify(savedViewMapper, never()).updateViewConfigJson(anyString(), anyString());
+    }
+
+    @Test
+    void checkPublicShareAccess_missingAndOtherTenantResourcesAreNotFound() {
+        when(userPermissionService.hasPermission(7L, MetaPermission.VIEW_PUBLIC_SHARE)).thenReturn(true);
+        assertThrows(DataNotFoundException.class, () -> service.checkPublicShareAccess("missing"));
+        SavedView otherTenant = new SavedView();
+        otherTenant.setPid("otherTenant");
+        otherTenant.setTenantId(200L);
+        otherTenant.setScope("global");
+        otherTenant.setCreatedBy("user_pid");
+        when(savedViewMapper.findByPid("otherTenant")).thenReturn(otherTenant);
+        assertThrows(DataNotFoundException.class, () -> service.checkPublicShareAccess("otherTenant"));
+        verify(savedViewMapper, never()).updateViewConfigJson(anyString(), anyString());
+    }
+
 }

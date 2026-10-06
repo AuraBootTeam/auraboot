@@ -50,7 +50,7 @@ const cap = {
   granted: true,
   conventionDerived: false,
 };
-function fixture(refreshed: PermissionMatrixDTO = matrix, initial: PermissionMatrixDTO = matrix) {
+function fixture(refreshed: PermissionMatrixDTO = matrix, initial: PermissionMatrixDTO = matrix, capability = cap) {
   const onRefresh = vi.fn().mockResolvedValue(refreshed);
   const onClose = vi.fn();
   const onReadFailure = vi.fn();
@@ -58,7 +58,7 @@ function fixture(refreshed: PermissionMatrixDTO = matrix, initial: PermissionMat
   render(
     <CapabilityScopeSettings
       rolePid="role-5"
-      capability={cap}
+      capability={capability}
       matrix={initial}
       onRefresh={onRefresh}
       onClose={onClose}
@@ -122,6 +122,55 @@ describe('CapabilityScopeSettings', () => {
     await screen.findByRole('alert');
     expect(screen.queryByTestId('capability-scope-model.qo_quote_common.read')).not.toBeInTheDocument();
     expect(screen.getByTestId('capability-scope-apply')).toBeDisabled();
+    expect(permissionService.updateScope).not.toHaveBeenCalled();
+  });
+
+  it('preserves an existing unsupported team scope and explains the denial without writing', async () => {
+    fixture();
+    const select = await screen.findByTestId('capability-scope-model.qo_quote_common.read');
+    expect(select).toHaveValue('team');
+    expect(screen.getByRole('option', { name: 'My teams' })).toBeDisabled();
+    expect(select).toHaveAccessibleDescription(/no team association configured/);
+    expect(screen.getByTestId('capability-scope-apply')).toBeDisabled();
+    expect(permissionService.updateScope).not.toHaveBeenCalled();
+  });
+
+  it('allows team scope when the model declares a team association', async () => {
+    const model = await modelService.findByCode('qo_quote_common');
+    vi.mocked(modelService.findByCode).mockResolvedValue({ ...model, extension: { dataScope: { teamField: 'quote_team' } } });
+    const initial = structuredClone(matrix);
+    initial.modules[0].resources[0].actions[0].scopeType = 'self';
+    const callbacks = fixture(matrix, initial);
+    const select = await screen.findByTestId('capability-scope-model.qo_quote_common.read');
+    expect(screen.getByRole('option', { name: 'My teams' })).not.toBeDisabled();
+    fireEvent.change(select, { target: { value: 'team' } });
+    fireEvent.click(screen.getByTestId('capability-scope-apply'));
+    await waitFor(() => expect(callbacks.onClose).toHaveBeenCalledOnce());
+    expect(permissionService.updateScope).toHaveBeenCalledWith('role-5', { resourceCode: 'qo_quote_common', actionCode: 'read', scopeType: 'team' });
+  });
+
+  it('rejects a forced unsupported team selection before calling the scope API', async () => {
+    const initial = structuredClone(matrix);
+    initial.modules[0].resources[0].actions[0].scopeType = 'self';
+    fixture(initial, initial);
+    const select = await screen.findByTestId('capability-scope-model.qo_quote_common.read');
+    fireEvent.change(select, { target: { value: 'team' } });
+    fireEvent.click(screen.getByTestId('capability-scope-apply'));
+    expect(permissionService.updateScope).not.toHaveBeenCalled();
+  });
+
+  it('does not offer record scopes for a generic command entry with a stored role default', async () => {
+    const mixed = structuredClone(matrix);
+    mixed.modules[0].resources.push({
+      resourceCode: 'meta.command', resourceName: 'Command', actions: [{
+        permissionId: 2, permissionPid: 'p2', code: 'meta.command.execute', action: 'execute',
+        label: 'Meta command execute', granted: true, supported: true, scopeType: 'all',
+      }],
+    });
+    fixture(mixed, mixed, { ...cap, includes: [...cap.includes, 'meta.command.execute'] });
+    await screen.findByTestId('capability-scope-model.qo_quote_common.read');
+    expect(screen.queryByTestId('capability-scope-meta.command.execute')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('combobox')).toHaveLength(1);
     expect(permissionService.updateScope).not.toHaveBeenCalled();
   });
 

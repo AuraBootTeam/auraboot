@@ -12,6 +12,7 @@ import { ChartBarSquareIcon } from '@heroicons/react/24/outline';
 import { ExportPdfButton } from '~/framework/smart/components/data-tools/ExportPdfButton';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useI18n } from '~/contexts/I18nContext';
+import { usePermissions } from '~/contexts/AuthContext';
 import { DashboardViewer } from '~/plugins/core-dashboard/components/DashboardViewer';
 import { dashboardService } from '~/plugins/core-dashboard/services/dashboardService';
 import { resolveDashboardRuntimeValue } from '~/plugins/core-dashboard/utils/drillDownNavigation';
@@ -20,6 +21,7 @@ import type { Dashboard } from '~/plugins/core-dashboard/types';
 export default function DashboardViewByCode() {
   const { showSuccessToast } = useToastContext();
   const { locale, t } = useI18n();
+  const { hasPermission } = usePermissions();
   const { code } = useParams<{ code: string }>();
   const [searchParams] = useSearchParams();
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
@@ -98,7 +100,7 @@ export default function DashboardViewByCode() {
               orientation="landscape"
             />
           )}
-          {dashboard?.pid && (
+          {dashboard?.pid && hasPermission('dashboard.update') && (
             <Link
               to={`/dashboard-designer/${dashboard.pid}`}
               className="inline-flex shrink-0 items-center rounded-md bg-blue-600 px-3 py-1.5 text-sm whitespace-nowrap text-white transition-colors hover:bg-blue-700"

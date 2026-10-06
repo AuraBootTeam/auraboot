@@ -18,6 +18,7 @@
   },
   {
     "code": "admin:create_data_permission",
+    "permissions": ["model.data_permission.create"],
     "displayName:zh-CN": "创建数据权限策略",
     "displayName:en": "Create Data Permission Policy",
     "type": "create",
@@ -38,6 +39,7 @@
   },
   {
     "code": "admin:update_data_permission",
+    "permissions": ["model.data_permission.update"],
     "displayName:zh-CN": "更新数据权限策略",
     "displayName:en": "Update Data Permission Policy",
     "type": "update",
@@ -58,6 +60,7 @@
   },
   {
     "code": "admin:delete_data_permission",
+    "permissions": ["model.data_permission.delete"],
     "displayName:zh-CN": "删除数据权限策略",
     "displayName:en": "Delete Data Permission Policy",
     "type": "delete",
@@ -69,6 +72,7 @@
   },
   {
     "code": "admin:create_webhook",
+    "permissions": ["model.webhook.create"],
     "displayName:zh-CN": "创建 Webhook",
     "displayName:en": "Create Webhook",
     "type": "create",
@@ -88,6 +92,7 @@
   },
   {
     "code": "admin:update_webhook",
+    "permissions": ["model.webhook.update"],
     "displayName:zh-CN": "更新 Webhook",
     "displayName:en": "Update Webhook",
     "type": "update",
@@ -107,6 +112,7 @@
   },
   {
     "code": "admin:delete_webhook",
+    "permissions": ["model.webhook.delete"],
     "displayName:zh-CN": "删除 Webhook",
     "displayName:en": "Delete Webhook",
     "type": "delete",
@@ -118,6 +124,7 @@
   },
   {
     "code": "admin:create_api_connector",
+    "permissions": ["model.api_connector.create"],
     "displayName:zh-CN": "创建 API 连接器",
     "displayName:en": "Create API Connector",
     "type": "create",
@@ -135,6 +142,7 @@
   },
   {
     "code": "admin:update_api_connector",
+    "permissions": ["model.api_connector.update"],
     "displayName:zh-CN": "更新 API 连接器",
     "displayName:en": "Update API Connector",
     "type": "update",
@@ -152,6 +160,7 @@
   },
   {
     "code": "admin:delete_api_connector",
+    "permissions": ["model.api_connector.delete"],
     "displayName:zh-CN": "删除 API 连接器",
     "displayName:en": "Delete API Connector",
     "type": "delete",
@@ -301,6 +310,7 @@
   },
   {
     "code": "admin:create_scheduled_task",
+    "permissions": ["model.scheduled_task.create"],
     "displayName:zh-CN": "创建定时任务",
     "displayName:en": "Create Scheduled Task",
     "type": "create",
@@ -321,6 +331,7 @@
   },
   {
     "code": "admin:update_scheduled_task",
+    "permissions": ["model.scheduled_task.update"],
     "displayName:zh-CN": "更新定时任务",
     "displayName:en": "Update Scheduled Task",
     "type": "update",
@@ -341,6 +352,7 @@
   },
   {
     "code": "admin:delete_scheduled_task",
+    "permissions": ["model.scheduled_task.delete"],
     "displayName:zh-CN": "删除定时任务",
     "displayName:en": "Delete Scheduled Task",
     "type": "delete",

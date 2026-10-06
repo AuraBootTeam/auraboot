@@ -92,4 +92,23 @@ class NamedQuerySourceScopeRewriterTest {
                 Map.of(NamedQuerySourceModels.identity("customer_view"), "SELECT * FROM customers"));
         assertEquals(2, sql.split("FROM \"public\".\"customers\" WHERE", -1).length - 1, sql);
     }
+    @Test void validationCountsPreservePredicatesAndParametersInsideScopedSources() {
+        var countScope = Map.of(NamedQuerySourceModels.identity("orders"), "tenant_id = 7 AND created_by = 99");
+        for (String predicate : java.util.List.of(
+                "", " WHERE amount IS NULL", " WHERE LENGTH(name) NOT BETWEEN #{params.minVal} AND #{params.maxVal}",
+                " WHERE phone IS NOT NULL AND phone !~ #{params.regex}",
+                " WHERE status IS NOT NULL AND status NOT IN (#{params.v0}, #{params.v1})",
+                " WHERE NOT (ship_date > order_date)")) {
+            String sql = rewriter.rewrite("SELECT COUNT(*) AS cnt FROM orders" + predicate, countScope);
+            assertTrue(sql.contains("COUNT(*) AS cnt"), sql);
+            assertEquals(1, sql.split("tenant_id = 7 AND created_by = 99", -1).length - 1, sql);
+            assertTrue(sql.contains("FROM \"public\".\"orders\" WHERE"), sql);
+            for (String parameter : java.util.List.of("minVal", "maxVal", "regex", "v0", "v1")) {
+                if (predicate.contains("#{params." + parameter + "}"))
+                    assertTrue(sql.contains("#{params." + parameter + "}"), sql);
+            }
+            assertFalse(sql.contains("__nq_scope_parameter"), sql);
+        }
+    }
+
 }

@@ -1,9 +1,15 @@
 package com.auraboot.framework.view.service;
 
-import com.auraboot.framework.view.entity.SavedView;
 import com.auraboot.framework.view.mapper.SavedViewMapper;
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import com.auraboot.framework.common.constant.ResponseCode;
+import com.auraboot.framework.exception.DataNotFoundException;
+import com.auraboot.framework.exception.ValidationException;
+import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
+import com.auraboot.framework.view.controller.ViewShareController;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -22,17 +28,11 @@ import static org.mockito.Mockito.*;
 class ViewShareServiceTest {
 
     @Mock private SavedViewMapper savedViewMapper;
+    @Mock private SavedViewService savedViewService;
     @InjectMocks private ViewShareService service;
-
-    private void mockExists(String pid) {
-        SavedView v = new SavedView();
-        v.setPid(pid);
-        when(savedViewMapper.selectOne(any(QueryWrapper.class))).thenReturn(v);
-    }
 
     @Test
     void createShareLink_generatesTokenAndUrl() {
-        mockExists("v1");
         when(savedViewMapper.selectRawViewConfigJson("v1")).thenReturn("{}");
 
         Map<String, Object> result = service.createShareLink("v1", null, 24);
@@ -41,12 +41,14 @@ class ViewShareServiceTest {
         assertTrue(((String) result.get("shareUrl")).startsWith("/api/views/shared/"));
         assertNotNull(result.get("expiresAt"));
         assertEquals(false, result.get("passwordProtected"));
-        verify(savedViewMapper).updateViewConfigJson(eq("v1"), contains("__share"));
+        var ordered = inOrder(savedViewService, savedViewMapper);
+        ordered.verify(savedViewService).checkPublicShareAccess("v1");
+        ordered.verify(savedViewMapper).selectRawViewConfigJson("v1");
+        ordered.verify(savedViewMapper).updateViewConfigJson(eq("v1"), contains("__share"));
     }
 
     @Test
     void createShareLink_withPasswordSetsHash() {
-        mockExists("v1");
         when(savedViewMapper.selectRawViewConfigJson("v1")).thenReturn("{}");
 
         Map<String, Object> result = service.createShareLink("v1", "secret", null);
@@ -58,7 +60,6 @@ class ViewShareServiceTest {
 
     @Test
     void createShareLink_blankPasswordTreatedAsNoPassword() {
-        mockExists("v1");
         when(savedViewMapper.selectRawViewConfigJson("v1")).thenReturn("{}");
         Map<String, Object> result = service.createShareLink("v1", "  ", null);
         assertEquals(false, result.get("passwordProtected"));
@@ -66,17 +67,22 @@ class ViewShareServiceTest {
 
     @Test
     void createShareLink_throwsWhenViewMissing() {
-        when(savedViewMapper.selectOne(any(QueryWrapper.class))).thenReturn(null);
-        assertThrows(RuntimeException.class, () -> service.createShareLink("missing", null, 1));
+        DataNotFoundException missing = new DataNotFoundException(ResponseCode.NOT_FOUND, "Saved view not found");
+        doThrow(missing).when(savedViewService).checkPublicShareAccess("missing");
+        assertSame(missing, assertThrows(DataNotFoundException.class,
+                () -> service.createShareLink("missing", null, 1)));
+        verifyNoInteractions(savedViewMapper);
     }
 
     @Test
     void revokeShareLink_removesShareKey() {
-        mockExists("v1");
         when(savedViewMapper.selectRawViewConfigJson("v1"))
                 .thenReturn("{\"__share\":{\"token\":\"t\",\"active\":true},\"keep\":1}");
         service.revokeShareLink("v1");
-        verify(savedViewMapper).updateViewConfigJson(eq("v1"), argThat(json -> !json.contains("__share")));
+        var ordered = inOrder(savedViewService, savedViewMapper);
+        ordered.verify(savedViewService).checkPublicShareAccess("v1");
+        ordered.verify(savedViewMapper).selectRawViewConfigJson("v1");
+        ordered.verify(savedViewMapper).updateViewConfigJson(eq("v1"), argThat(json -> !json.contains("__share") && json.contains("keep")));
     }
 
     @Test
@@ -94,6 +100,9 @@ class ViewShareServiceTest {
         Map<String, Object> r = service.getShareStatus("v1");
         assertEquals(true, r.get("shared"));
         assertEquals("abc", r.get("token"));
+        var ordered = inOrder(savedViewService, savedViewMapper);
+        ordered.verify(savedViewService).checkPublicShareAccess("v1");
+        ordered.verify(savedViewMapper).selectRawViewConfigJson("v1");
         assertEquals(true, r.get("passwordProtected"));
     }
 
@@ -162,6 +171,7 @@ class ViewShareServiceTest {
 
         Map<String, Object> r = service.accessSharedView("t", null);
         assertEquals("Saved", r.get("name"));
+        verifyNoInteractions(savedViewService);
         assertEquals("User", r.get("modelCode"));
         assertEquals("list", r.get("viewType"));
         @SuppressWarnings("unchecked")
@@ -184,4 +194,35 @@ class ViewShareServiceTest {
         when(savedViewMapper.findRawViewByShareToken("t")).thenReturn(new HashMap<>());
         assertThrows(RuntimeException.class, () -> service.accessSharedView("t", null));
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"create", "revoke", "status"})
+    void authenticatedShareOperations_denyBeforeReadingOrChangingToken(String operation) {
+        ValidationException denied = new ValidationException(ResponseCode.FORBIDDEN);
+        doThrow(denied).when(savedViewService).checkPublicShareAccess("v1");
+        ValidationException actual = assertThrows(ValidationException.class, () -> {
+            switch (operation) {
+                case "create" -> service.createShareLink("v1", null, null);
+                case "revoke" -> service.revokeShareLink("v1");
+                case "status" -> service.getShareStatus("v1");
+                default -> throw new AssertionError(operation);
+            }
+        });
+        assertSame(denied, actual);
+        verifyNoInteractions(savedViewMapper);
+    }
+
+    @Test
+    void authenticatedEndpointsRequirePublicSharingButTokenAccessRemainsPublic() throws Exception {
+        for (String name : new String[]{"shareView", "revokeShare", "getShareStatus"}) {
+            var method = java.util.Arrays.stream(ViewShareController.class.getDeclaredMethods())
+                    .filter(candidate -> candidate.getName().equals(name)).findFirst().orElseThrow();
+            RequirePermission guard = method.getAnnotation(RequirePermission.class);
+            assertNotNull(guard, name);
+            assertEquals(MetaPermission.VIEW_PUBLIC_SHARE, guard.value(), name);
+        }
+        assertNull(ViewShareController.class.getDeclaredMethod("accessSharedView", String.class, String.class)
+                .getAnnotation(RequirePermission.class));
+    }
+
 }

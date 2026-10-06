@@ -112,10 +112,14 @@ class PermissionMatrixServiceImplTest {
         PermissionDTO module = permission(1L, "model", 1, null, "MODEL", null, null);
         PermissionDTO resource = permission(2L, "model.user", 2, 1L, "MODEL", "model.user", null);
         PermissionDTO action = permission(3L, "model.user.read", 3, 2L, "MODEL", "model.user", "read");
-        PermissionDTO visibility = permission(4L, "qo.quote.material.read", null, null, "data", null, null);
+        PermissionDTO visibility = permission(4L, "qo.quote.material.read", null, null, "data", "qo.quote.material.read", "view");
         when(permissionService.findAllActive()).thenReturn(List.of(module, resource, action, visibility));
         when(rolePermissionService.getPermissionIdsByRoleId(7L)).thenReturn(Set.of(4L));
-        when(dataScopeService.getScopesByRole(100L, 7L)).thenReturn(List.of());
+        RoleDataScope fallbackScope = new RoleDataScope();
+        fallbackScope.setResourceCode("qo.quote.material.read");
+        fallbackScope.setActionCode("view");
+        fallbackScope.setScopeType("team");
+        when(dataScopeService.getScopesByRole(100L, 7L)).thenReturn(List.of(fallbackScope));
         when(policyService.getPoliciesByRoleId(7L)).thenReturn(Map.of());
 
         PermissionMatrixDTO matrix = service.getMatrixForRole(100L, 7L);
@@ -127,7 +131,7 @@ class PermissionMatrixServiceImplTest {
             .findFirst().orElseThrow();
         assertThat(visibleAction.granted()).isTrue();
         assertThat(visibleAction.scopeType()).isNull();
-        assertThat(visibleAction.action()).isEqualTo("unknown");
+        assertThat(visibleAction.action()).isEqualTo("view");
         assertThat(matrix.modules().stream()
             .flatMap(m -> m.resources().stream())
             .flatMap(r -> r.actions().stream()))

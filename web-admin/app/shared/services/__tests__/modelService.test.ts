@@ -42,16 +42,23 @@ describe('modelService', () => {
 
       const result = await modelService.findByPage({ page: 2, size: 20 });
 
-      expect(getMock).toHaveBeenCalledWith('/api/meta/models', { page: 2, size: 20 }, undefined, undefined);
+      expect(getMock).toHaveBeenCalledWith(
+        '/api/meta/models',
+        { page: 2, size: 20 },
+        undefined,
+        undefined,
+      );
       expect(result.data).toEqual([dto]);
       expect(result.total).toBe(1);
-      expect(result.page).toBe(2);      // current → page
+      expect(result.page).toBe(2); // current → page
       expect(result.size).toBe(20);
       expect(result.totalPages).toBe(5); // pages → totalPages
     });
 
     it('returns empty data with defaults on empty response fields', async () => {
-      getMock.mockResolvedValue(ok({ records: null, total: null, size: null, current: null, pages: null }));
+      getMock.mockResolvedValue(
+        ok({ records: null, total: null, size: null, current: null, pages: null }),
+      );
 
       const result = await modelService.findByPage({});
 
@@ -92,7 +99,12 @@ describe('modelService', () => {
 
       const result = await modelService.findByCode('order');
 
-      expect(getMock).toHaveBeenCalledWith('/api/meta/models/code/order', undefined, undefined, undefined);
+      expect(getMock).toHaveBeenCalledWith(
+        '/api/meta/models/code/order',
+        undefined,
+        undefined,
+        undefined,
+      );
       expect(result).toEqual(dto);
     });
 
@@ -120,7 +132,9 @@ describe('modelService', () => {
     it('throws on failure', async () => {
       postMock.mockResolvedValue(fail('Code already exists'));
 
-      await expect(modelService.create({ code: 'dup', displayName: 'Dup' } as any)).rejects.toThrow('Code already exists');
+      await expect(modelService.create({ code: 'dup', displayName: 'Dup' } as any)).rejects.toThrow(
+        'Code already exists',
+      );
     });
   });
 
@@ -133,7 +147,12 @@ describe('modelService', () => {
 
       const result = await modelService.update('m1', { displayName: 'Order Updated' });
 
-      expect(putMock).toHaveBeenCalledWith('/api/meta/models/m1', { displayName: 'Order Updated' }, undefined, undefined);
+      expect(putMock).toHaveBeenCalledWith(
+        '/api/meta/models/m1',
+        { displayName: 'Order Updated' },
+        undefined,
+        undefined,
+      );
       expect(result).toEqual(dto);
     });
   });
@@ -163,7 +182,12 @@ describe('modelService', () => {
 
       await modelService.batchDelete(['m1', 'm2']);
 
-      expect(postMock).toHaveBeenCalledWith('/api/meta/models/batch-delete', { pids: ['m1', 'm2'] }, undefined, undefined);
+      expect(postMock).toHaveBeenCalledWith(
+        '/api/meta/models/batch-delete',
+        { pids: ['m1', 'm2'] },
+        undefined,
+        undefined,
+      );
     });
 
     it('throws on failure', async () => {
@@ -181,7 +205,12 @@ describe('modelService', () => {
 
       const result = await modelService.checkCodeUnique('order');
 
-      expect(getMock).toHaveBeenCalledWith('/api/meta/models/code/order/unique', {}, undefined, undefined);
+      expect(getMock).toHaveBeenCalledWith(
+        '/api/meta/models/code/order/unique',
+        {},
+        undefined,
+        undefined,
+      );
       expect(result).toBe(true);
     });
 
@@ -190,7 +219,12 @@ describe('modelService', () => {
 
       await modelService.checkCodeUnique('order', 'm-old');
 
-      expect(getMock).toHaveBeenCalledWith('/api/meta/models/code/order/unique', { excludePid: 'm-old' }, undefined, undefined);
+      expect(getMock).toHaveBeenCalledWith(
+        '/api/meta/models/code/order/unique',
+        { excludePid: 'm-old' },
+        undefined,
+        undefined,
+      );
     });
   });
 
@@ -203,7 +237,12 @@ describe('modelService', () => {
 
       const result = await modelService.getVersionHistory('order');
 
-      expect(getMock).toHaveBeenCalledWith('/api/meta/models/code/order/versions', undefined, undefined, undefined);
+      expect(getMock).toHaveBeenCalledWith(
+        '/api/meta/models/code/order/versions',
+        undefined,
+        undefined,
+        undefined,
+      );
       expect(result).toEqual(versions);
     });
   });
@@ -217,7 +256,12 @@ describe('modelService', () => {
 
       const result = await modelService.getVersionDetail('order', 3);
 
-      expect(getMock).toHaveBeenCalledWith('/api/meta/models/code/order/versions/3', undefined, undefined, undefined);
+      expect(getMock).toHaveBeenCalledWith(
+        '/api/meta/models/code/order/versions/3',
+        undefined,
+        undefined,
+        undefined,
+      );
       expect(result).toEqual(dto);
     });
   });
@@ -268,7 +312,12 @@ describe('modelService', () => {
 
       await modelService.refreshCache('m1');
 
-      expect(postMock).toHaveBeenCalledWith('/api/meta/models/m1/refresh-cache', undefined, undefined, undefined);
+      expect(postMock).toHaveBeenCalledWith(
+        '/api/meta/models/m1/refresh-cache',
+        undefined,
+        undefined,
+        undefined,
+      );
     });
 
     it('throws on failure', async () => {
@@ -282,13 +331,67 @@ describe('modelService', () => {
 
   describe('getModelFields', () => {
     it('GETs /api/meta/models/:pid/fields', async () => {
-      const fields = [{ id: 1, fieldCode: 'name', fieldType: 'text' }];
+      const fields = [
+        {
+          id: 41,
+          pid: 'field-pid',
+          code: 'name',
+          dataType: 'string',
+          fieldOrder: 7,
+          editable: false,
+        },
+      ];
       getMock.mockResolvedValue(ok(fields));
 
       const result = await modelService.getModelFields('m1');
 
-      expect(getMock).toHaveBeenCalledWith('/api/meta/models/m1/fields', undefined, undefined, undefined);
-      expect(result).toEqual(fields);
+      expect(getMock).toHaveBeenCalledWith(
+        '/api/meta/models/m1/fields',
+        undefined,
+        undefined,
+        undefined,
+      );
+      expect(result).toEqual([
+        { ...fields[0], fieldCode: 'name', displayOrder: 7, readonly: true },
+      ]);
+    });
+  });
+
+  describe('updateFieldBinding', () => {
+    it('configures the field within its model using the field PID, not its numeric field ID', async () => {
+      getMock.mockResolvedValue(
+        ok([
+          {
+            id: 41,
+            pid: 'field-pid',
+            code: 'name',
+            dataType: 'string',
+            fieldOrder: 7,
+            editable: true,
+          },
+        ]),
+      );
+      postMock.mockResolvedValue(
+        ok({
+          bindingId: 93,
+          modelPid: 'model-pid',
+          fieldPid: 'field-pid',
+          fieldCode: 'name',
+          required: true,
+        }),
+      );
+      putMock.mockResolvedValue(ok({ bindingId: 41, required: true }));
+      await modelService.updateFieldBinding('model-pid', 'name', {
+        required: true,
+        readonly: true,
+      });
+      expect(postMock).toHaveBeenCalledWith(
+        '/api/meta/models/model-pid/field-bindings/field-pid/configure',
+        expect.objectContaining({ required: true, readonly: true, editable: false }),
+        undefined,
+        undefined,
+      );
+      expect(putMock).not.toHaveBeenCalled();
     });
   });
 
@@ -301,7 +404,12 @@ describe('modelService', () => {
 
       const result = await modelService.getRelatedPages('m1');
 
-      expect(getMock).toHaveBeenCalledWith('/api/meta/models/m1/pages', undefined, undefined, undefined);
+      expect(getMock).toHaveBeenCalledWith(
+        '/api/meta/models/m1/pages',
+        undefined,
+        undefined,
+        undefined,
+      );
       expect(result).toEqual(pages);
     });
   });
@@ -315,7 +423,12 @@ describe('modelService', () => {
 
       const result = await modelService.getStatistics();
 
-      expect(getMock).toHaveBeenCalledWith('/api/meta/models/statistics', undefined, undefined, undefined);
+      expect(getMock).toHaveBeenCalledWith(
+        '/api/meta/models/statistics',
+        undefined,
+        undefined,
+        undefined,
+      );
       expect(result).toEqual(stats);
     });
   });
@@ -330,7 +443,12 @@ describe('modelService', () => {
       const data = { code: 'order', displayName: 'Order' } as any;
       const result = await modelService.validate(data);
 
-      expect(postMock).toHaveBeenCalledWith('/api/meta/models/validate', data, undefined, undefined);
+      expect(postMock).toHaveBeenCalledWith(
+        '/api/meta/models/validate',
+        data,
+        undefined,
+        undefined,
+      );
       expect(result).toEqual(validation);
     });
   });
@@ -363,12 +481,23 @@ describe('modelService', () => {
 
   describe('getReleaseInfo', () => {
     it('GETs /api/meta/models/:pid/release', async () => {
-      const info = { releaseId: 1, releasePid: 'r1', status: 'RELEASED', version: 3, createdAt: '2024-01-01' };
+      const info = {
+        releaseId: 1,
+        releasePid: 'r1',
+        status: 'RELEASED',
+        version: 3,
+        createdAt: '2024-01-01',
+      };
       getMock.mockResolvedValue(ok(info));
 
       const result = await modelService.getReleaseInfo('m1');
 
-      expect(getMock).toHaveBeenCalledWith('/api/meta/models/m1/release', undefined, undefined, undefined);
+      expect(getMock).toHaveBeenCalledWith(
+        '/api/meta/models/m1/release',
+        undefined,
+        undefined,
+        undefined,
+      );
       expect(result).toEqual(info);
     });
   });
@@ -403,7 +532,12 @@ describe('modelService', () => {
 
       const result = await modelService.publish('m1');
 
-      expect(postMock).toHaveBeenCalledWith('/api/meta/models/m1/publish', undefined, undefined, undefined);
+      expect(postMock).toHaveBeenCalledWith(
+        '/api/meta/models/m1/publish',
+        undefined,
+        undefined,
+        undefined,
+      );
       expect(result).toEqual(dto);
     });
 
@@ -448,7 +582,12 @@ describe('modelService', () => {
 
       const result = await modelService.unpublish('m1');
 
-      expect(postMock).toHaveBeenCalledWith('/api/meta/models/m1/unpublish', undefined, undefined, undefined);
+      expect(postMock).toHaveBeenCalledWith(
+        '/api/meta/models/m1/unpublish',
+        undefined,
+        undefined,
+        undefined,
+      );
       expect(result).toEqual(dto);
     });
   });
@@ -467,7 +606,8 @@ describe('modelService', () => {
           modelCode: 'order',
           requiresAcknowledgement: true,
           schemaChangeKinds: ['CREATE_TABLE'],
-          migrationPlan: 'Create the physical table and generated indexes before enabling runtime writes.',
+          migrationPlan:
+            'Create the physical table and generated indexes before enabling runtime writes.',
           historicalVersionPolicy: 'Initial publish: no historical published model version exists.',
           replayPlan: [
             {
@@ -479,7 +619,8 @@ describe('modelService', () => {
               fieldRef: 'order.amount',
               targetPath: 'record.data.amount',
               binding: 'GATEWAY_CONDITION',
-              recommendedAction: '打开 BPMN 设计器校验规则绑定、候选人、网关条件和服务任务参数，重新部署流程。',
+              recommendedAction:
+                '打开 BPMN 设计器校验规则绑定、候选人、网关条件和服务任务参数，重新部署流程。',
               required: true,
             },
           ],
@@ -487,7 +628,11 @@ describe('modelService', () => {
             {
               fieldRef: 'order.amount',
               references: [{ sourceType: 'BPM', sourceCode: 'approval_flow' }],
-              risk: { blocking: true, summary: 'BPM consumer references this field', counts: { BPM: 1 } },
+              risk: {
+                blocking: true,
+                summary: 'BPM consumer references this field',
+                counts: { BPM: 1 },
+              },
             },
           ],
         },
@@ -496,7 +641,12 @@ describe('modelService', () => {
 
       const result = await modelService.previewPublishDDL('m1');
 
-      expect(getMock).toHaveBeenCalledWith('/api/meta/models/m1/publish/preview', undefined, undefined, undefined);
+      expect(getMock).toHaveBeenCalledWith(
+        '/api/meta/models/m1/publish/preview',
+        undefined,
+        undefined,
+        undefined,
+      );
       expect(result.ddlStatements).toHaveLength(1);
       expect(result.operationType).toBe('CREATE');
       expect(result.governance?.requiresAcknowledgement).toBe(true);
@@ -580,7 +730,12 @@ describe('modelService', () => {
 
       await modelService.bindDictToField('f1', 'ORDER_STATUS');
 
-      expect(postMock).toHaveBeenCalledWith('/api/meta/fields/f1/bind-dict', { dictCode: 'ORDER_STATUS' }, undefined, undefined);
+      expect(postMock).toHaveBeenCalledWith(
+        '/api/meta/fields/f1/bind-dict',
+        { dictCode: 'ORDER_STATUS' },
+        undefined,
+        undefined,
+      );
     });
 
     it('throws on failure', async () => {
@@ -598,7 +753,12 @@ describe('modelService', () => {
 
       await modelService.unbindDictFromField('f1');
 
-      expect(delMock).toHaveBeenCalledWith('/api/meta/fields/f1/unbind-dict', undefined, undefined, undefined);
+      expect(delMock).toHaveBeenCalledWith(
+        '/api/meta/fields/f1/unbind-dict',
+        undefined,
+        undefined,
+        undefined,
+      );
     });
 
     it('throws on failure', async () => {
@@ -617,7 +777,12 @@ describe('modelService', () => {
 
       const result = await modelService.getBoundDict('f1');
 
-      expect(getMock).toHaveBeenCalledWith('/api/meta/fields/f1/bound-dict', undefined, undefined, undefined);
+      expect(getMock).toHaveBeenCalledWith(
+        '/api/meta/fields/f1/bound-dict',
+        undefined,
+        undefined,
+        undefined,
+      );
       expect(result).toEqual(dict);
     });
   });
@@ -632,7 +797,12 @@ describe('modelService', () => {
       const req = { fieldPid: 'f1', required: true } as any;
       const result = await modelService.bindFieldToModel('m1', req);
 
-      expect(postMock).toHaveBeenCalledWith('/api/meta/models/m1/fields/bind', req, undefined, undefined);
+      expect(postMock).toHaveBeenCalledWith(
+        '/api/meta/models/m1/fields/bind',
+        req,
+        undefined,
+        undefined,
+      );
       expect(result).toEqual(binding);
     });
   });
@@ -647,12 +817,49 @@ describe('modelService', () => {
       const req = { fieldPids: ['f1', 'f2'], required: false } as any;
       const result = await modelService.batchBindFieldsToModel('m1', req);
 
-      expect(postMock).toHaveBeenCalledWith('/api/meta/models/m1/fields/bind-batch', req, undefined, undefined);
+      expect(postMock).toHaveBeenCalledWith(
+        '/api/meta/models/m1/fields/bind-batch',
+        req,
+        undefined,
+        undefined,
+      );
       expect(result).toEqual(bindings);
     });
   });
 
   // ── exportModels (native fetch) ────────────────────────────────────────────────
+
+  describe('unbindField', () => {
+    beforeEach(() => {
+      getMock.mockImplementation((url: string) =>
+        Promise.resolve(
+          ok(
+            url.endsWith('/fields')
+              ? [{ id: 41, pid: 'field-pid', code: 'status', fieldOrder: 1, editable: true }]
+              : { id: 9, pid: 'model-pid' },
+          ),
+        ),
+      );
+    });
+
+    it('removes the field through the model and field PID route', async () => {
+      delMock.mockResolvedValue(ok(true));
+      await modelService.unbindField('model-pid', 'status');
+      expect(delMock).toHaveBeenCalledWith(
+        '/api/meta/models/model-pid/fields/field-pid',
+        undefined,
+        undefined,
+        undefined,
+      );
+    });
+
+    it('rejects an unsuccessful unbind result', async () => {
+      delMock.mockResolvedValue(ok(false));
+      await expect(modelService.unbindField('model-pid', 'status')).rejects.toThrow(
+        'Field was not removed',
+      );
+    });
+  });
 
   describe('exportModels', () => {
     it('POSTs to /api/meta/models/export via native fetch and returns Blob', async () => {
@@ -664,10 +871,13 @@ describe('modelService', () => {
 
       const result = await modelService.exportModels({ page: 1 }, ['m1']);
 
-      expect(fetchSpy).toHaveBeenCalledWith('/api/meta/models/export', expect.objectContaining({
-        method: 'post',
-        body: JSON.stringify({ filters: { page: 1 }, selectedIds: ['m1'] }),
-      }));
+      expect(fetchSpy).toHaveBeenCalledWith(
+        '/api/meta/models/export',
+        expect.objectContaining({
+          method: 'post',
+          body: JSON.stringify({ filters: { page: 1 }, selectedIds: ['m1'] }),
+        }),
+      );
       expect(result).toBe(blob);
 
       fetchSpy.mockRestore();

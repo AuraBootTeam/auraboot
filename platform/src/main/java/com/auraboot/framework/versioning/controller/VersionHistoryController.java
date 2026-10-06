@@ -1,6 +1,9 @@
 package com.auraboot.framework.versioning.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.common.constant.ResponseCode;
+import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.versioning.dto.DesignVersionDTO;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.versioning.service.VersionHistoryService;
@@ -35,6 +38,7 @@ import java.util.Map;
 public class VersionHistoryController {
 
     private final VersionHistoryService versionHistoryService;
+    private final com.auraboot.framework.dashboard.service.DashboardService dashboardService;
 
     private static final String RESOURCE_TYPE = "dashboard";
 
@@ -42,12 +46,14 @@ public class VersionHistoryController {
      * Get version history for a dashboard
      */
     @GetMapping("/{pid}/versions")
+    @RequirePermission(MetaPermission.DASHBOARD_READ)
     @Operation(summary = "Get version history",
             description = "List all versions for a dashboard, ordered by newest first")
     public ApiResponse<List<DesignVersionDTO>> getHistory(
             @Parameter(description = "Dashboard PID") @PathVariable @NotBlank String pid) {
         log.info("Getting version history for dashboard: pid={}", pid);
 
+        dashboardService.checkVersionReadAccess(pid);
         List<DesignVersionDTO> versions = versionHistoryService.getHistory(RESOURCE_TYPE, pid);
 
         log.info("Found {} versions for dashboard: pid={}", versions.size(), pid);
@@ -58,6 +64,7 @@ public class VersionHistoryController {
      * Get a specific version with full snapshot
      */
     @GetMapping("/{pid}/versions/{versionPid}")
+    @RequirePermission(MetaPermission.DASHBOARD_READ)
     @Operation(summary = "Get version detail",
             description = "Get a specific version entry with its full snapshot")
     public ApiResponse<DesignVersionDTO> getVersion(
@@ -65,9 +72,11 @@ public class VersionHistoryController {
             @Parameter(description = "Version PID") @PathVariable @NotBlank String versionPid) {
         log.info("Getting version detail: dashboardPid={}, versionPid={}", pid, versionPid);
 
+        dashboardService.checkVersionReadAccess(pid);
         DesignVersionDTO version = versionHistoryService.getVersion(versionPid);
-        if (version == null) {
-            return ApiResponse.error("Version not found: " + versionPid);
+        if (version == null || !RESOURCE_TYPE.equals(version.getResourceType())
+                || !pid.equals(version.getResourceId())) {
+            throw new BusinessException(ResponseCode.NOT_FOUND, "Dashboard version not found");
         }
 
         return ApiResponse.success(version);
@@ -77,7 +86,7 @@ public class VersionHistoryController {
      * Rollback dashboard to a specific version
      */
     @PostMapping("/{pid}/versions/{versionPid}/rollback")
-    @RequirePermission("dashboard.manage")
+    @RequirePermission(MetaPermission.DASHBOARD_MANAGE)
     @Operation(summary = "Rollback to version",
             description = "Rollback a dashboard to a specific version. Creates a backup and applies the target snapshot.")
     public ApiResponse<DesignVersionDTO> rollback(
@@ -85,6 +94,7 @@ public class VersionHistoryController {
             @Parameter(description = "Version PID") @PathVariable @NotBlank String versionPid) {
         log.info("Rolling back dashboard {} to version {}", pid, versionPid);
 
+        dashboardService.checkVersionWriteAccess(pid);
         DesignVersionDTO result = versionHistoryService.rollback(RESOURCE_TYPE, pid, versionPid);
 
         log.info("Dashboard {} rolled back successfully", pid);
@@ -95,10 +105,12 @@ public class VersionHistoryController {
      * Get version count for a dashboard
      */
     @GetMapping("/{pid}/versions/count")
+    @RequirePermission(MetaPermission.DASHBOARD_READ)
     @Operation(summary = "Count versions",
             description = "Get the total number of versions for a dashboard")
     public ApiResponse<Map<String, Integer>> countVersions(
             @Parameter(description = "Dashboard PID") @PathVariable @NotBlank String pid) {
+        dashboardService.checkVersionReadAccess(pid);
         int count = versionHistoryService.countVersions(RESOURCE_TYPE, pid);
         return ApiResponse.success(Map.of("count", count));
     }

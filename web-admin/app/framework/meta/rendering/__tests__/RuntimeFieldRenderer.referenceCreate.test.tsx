@@ -246,6 +246,49 @@ describe('RuntimeFieldRenderer reference inline-create', () => {
     expect(dialogProps.createCommand).toBe('customer:create');
   });
 
+  it('requires a new create interaction after revoke and regrant', () => {
+    permits.add('customer.manage');
+    const field = { ...refField, createCommand: 'customer:create', createPermission: 'customer.manage' };
+    const { runtime } = makeRuntime();
+    const { rerender } = render(<RuntimeFieldRenderer field={field} runtime={runtime} />);
+    act(() => loaded.onCreateNew());
+    expect(screen.getByTestId('fire-created')).toBeInTheDocument();
+    permits.clear();
+    rerender(<RuntimeFieldRenderer field={field} runtime={runtime} />);
+    expect(screen.queryByTestId('fire-created')).toBeNull();
+    permits.add('customer.manage');
+    rerender(<RuntimeFieldRenderer field={field} runtime={runtime} />);
+    expect(screen.queryByTestId('fire-created')).toBeNull();
+    act(() => loaded.onCreateNew());
+    expect(screen.getByTestId('fire-created')).toBeInTheDocument();
+  });
+
+  it('ignores a stale creation callback after revoke and regrant', () => {
+    permits.add('customer.manage');
+    const field = { ...refField, createCommand: 'customer:create', createPermission: 'customer.manage' };
+    const { runtime, updateField, reload } = makeRuntime();
+    const { rerender } = render(<RuntimeFieldRenderer field={field} runtime={runtime} />);
+    act(() => loaded.onCreateNew());
+    const staleCreated = dialogProps.onCreated;
+    const staleClose = dialogProps.onClose;
+    const staleOpen = loaded.onCreateNew;
+    permits.clear();
+    rerender(<RuntimeFieldRenderer field={field} runtime={runtime} />);
+    permits.add('customer.manage');
+    rerender(<RuntimeFieldRenderer field={field} runtime={runtime} />);
+    act(() => {
+      staleCreated({ value: 'stale-record', label: 'Stale' });
+      staleOpen();
+    });
+    expect(updateField).not.toHaveBeenCalled();
+    expect(reload).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('fire-created')).toBeNull();
+    act(() => loaded.onCreateNew());
+    expect(screen.getByTestId('fire-created')).toBeInTheDocument();
+    act(() => staleClose());
+    expect(screen.getByTestId('fire-created')).toBeInTheDocument();
+  });
+
   it('passes the configured create page key to the create dialog', () => {
     permits.add('customer:create');
     const { runtime } = makeRuntime();

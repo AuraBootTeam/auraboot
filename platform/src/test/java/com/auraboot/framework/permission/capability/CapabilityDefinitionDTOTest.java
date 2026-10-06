@@ -18,6 +18,17 @@ class CapabilityDefinitionDTOTest {
     }
 
     @Test
+    void serializedDeclarationCanBeImportedWithoutComputedProperties() throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        CapabilityDefinitionDTO declaration = CapabilityDefinitionDTO.builder()
+                .code("example.cap.read").group("Example").nameEn("Read example")
+                .includes(List.of("model.example.read")).build();
+        String json = mapper.writeValueAsString(declaration);
+        assertThat(mapper.readTree(json).has("valid")).isFalse();
+        assertThat(mapper.readValue(json, CapabilityDefinitionDTO.class)).isEqualTo(declaration);
+    }
+
+    @Test
     void rejectsEmptyDuplicateAndBlankDependencies() {
         assertThat(CapabilityDefinitionDTO.builder().code("cap").includes(List.of()).build().isValid()).isFalse();
         assertThat(CapabilityDefinitionDTO.builder().code("cap").includes(List.of("read", "read")).build().isValid()).isFalse();

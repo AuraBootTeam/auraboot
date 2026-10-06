@@ -1,6 +1,7 @@
 package com.auraboot.framework.plugin.dto.imports;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -66,6 +67,7 @@ public class CapabilityDefinitionDTO {
         throw new IllegalArgumentException("Unknown capability declaration property: " + name);
     }
 
+    @JsonIgnore
     public boolean isValid() {
         return code != null && !code.isBlank() && includes != null && !includes.isEmpty()
                 && includes.stream().allMatch(value -> value != null && !value.isBlank())

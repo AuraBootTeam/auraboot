@@ -10,11 +10,13 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
+import { PermissionGuard } from '~/ui/PermissionGuard';
+import { DynamicPageUnavailable } from '~/framework/meta/rendering/pages/DynamicPageUnavailable';
 import { PhysicalModelForm } from '~/plugins/core-meta/components/PhysicalModelForm';
 
 type Step = 'type' | 'physical';
 
-export default function NewModelPage() {
+function ModelCreationContent() {
   const [step, setStep] = useState<Step>('type');
   const navigate = useNavigate();
 
@@ -125,5 +127,13 @@ function TypeCard({
         {primaryAction}
       </div>
     </button>
+  );
+}
+
+export default function NewModelPage() {
+  return (
+    <PermissionGuard permission="meta.model.update" fallback={<DynamicPageUnavailable message="Access denied" />}>
+      <ModelCreationContent />
+    </PermissionGuard>
   );
 }
