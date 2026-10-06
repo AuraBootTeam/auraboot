@@ -4,6 +4,8 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.plugin.extension.DataAccessorException;
+import com.auraboot.framework.plugin.extension.DataAccessErrorCode;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.file.service.FileService;
 import com.auraboot.framework.infrastructure.storage.StorageProvider;
@@ -705,6 +707,10 @@ public class HandlerPhase implements CommandPhase {
                     handlerCode, commandCode, e.getMessage(), e);
             if (e instanceof AccessDeniedException accessDeniedException) {
                 throw accessDeniedException;
+            }
+            if (e instanceof DataAccessorException dataAccess
+                    && dataAccess.code() == DataAccessErrorCode.PERMISSION_DENIED) {
+                throw new AccessDeniedException("Plugin source data access denied", dataAccess);
             }
             // Plugin handlers use stable, transport-neutral error keys because
             // the plugin API must not depend on host web exceptions. Preserve

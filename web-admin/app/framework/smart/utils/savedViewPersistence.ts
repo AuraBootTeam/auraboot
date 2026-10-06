@@ -82,13 +82,13 @@ export function canDeleteSavedView(
 }
 
 export function canShareSavedView(
-  view: Pick<SavedView, 'viewConfig' | 'actions' | 'isImplicit'> | null | undefined,
+  view: Pick<SavedView, 'viewConfig' | 'actions' | 'isImplicit' | 'scope'> | null | undefined,
 ): boolean {
   if (!view || isImplicitSavedView(view) || isSavedViewLockedPreset(view)) {
     return false;
   }
   const actionAllowed = resolveSavedViewAction(view, 'share');
-  return actionAllowed ?? true;
+  return (view.scope === 'team' || view.scope === 'global') && actionAllowed === true;
 }
 
 export function mergeViewConfigPatch(

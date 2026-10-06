@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ComponentType } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
 import {
   CalendarClock,
   Eye,
@@ -82,6 +82,8 @@ function MemberRecordShareDialog({
 }: RecordShareDialogProps) {
   const { t } = useI18n();
   const { showSuccessToast, showErrorToast } = useToastContext();
+  const readGeneration = useRef(0);
+  const dialogGeneration = useRef(0);
   const [shares, setShares] = useState<ShareEntry[]>([]);
   const [subjectPid, setSubjectPid] = useState<string[]>();
   const [subjectType, setSubjectType] = useState<'member' | 'role'>('member');
@@ -157,6 +159,7 @@ function MemberRecordShareDialog({
 
   const loadShares = useCallback(async () => {
     if (!open || !resourceCode || !recordPid) return;
+    const generation = ++readGeneration.current;
     setLoading(true);
     try {
       const params = new URLSearchParams({ resourceCode, recordPid });
@@ -165,16 +168,23 @@ function MemberRecordShareDialog({
       if (!response.ok || !ResultHelper.isSuccess(body)) {
         throw new Error(body?.message || `HTTP ${response.status}`);
       }
+      if (generation !== readGeneration.current) return;
       setShares(Array.isArray(body?.data) ? body.data : []);
     } catch {
+      if (generation !== readGeneration.current) return;
       showErrorToast(t('record_share.load_failed', undefined, 'Failed to load collaborators'));
     } finally {
-      setLoading(false);
+      if (generation === readGeneration.current) setLoading(false);
     }
   }, [open, recordPid, resourceCode, showErrorToast, t]);
 
   useEffect(() => {
     if (!open) return;
+    setLoading(false);
+    setAdding(false);
+    setRemovingPid(undefined);
+    setRemovingBatch(false);
+    setShares([]);
     setSubjectPid(undefined);
     setPermissionMask(permissionMode === 'collaborate-only' ? 'read,update' : 'read');
     setExpiryPreset('never');
@@ -183,6 +193,10 @@ function MemberRecordShareDialog({
     setSelectedSharePids([]);
     setConfirmBatchDelete(false);
     void loadShares();
+    return () => {
+      readGeneration.current += 1;
+      dialogGeneration.current += 1;
+    };
   }, [loadShares, open, permissionMode]);
 
   const resetEditor = useCallback(() => {
@@ -214,6 +228,7 @@ function MemberRecordShareDialog({
   const saveShare = useCallback(async () => {
     if (!resourceCode || !recordPid || (!editingShare && !subjectPid?.length)) return;
     if (expiryPreset === 'custom' && !customExpiry) return;
+    const generation = dialogGeneration.current;
     setAdding(true);
     try {
       const expiresAt = resolveExpiresAt(expiryPreset, customExpiry);
@@ -242,6 +257,8 @@ function MemberRecordShareDialog({
       if (!response.ok || !ResultHelper.isSuccess(body)) {
         throw new Error(body?.message || `HTTP ${response.status}`);
       }
+      if (generation !== dialogGeneration.current) return;
+      readGeneration.current += 1;
       showSuccessToast(
         editingShare
           ? t('record_share.updated', undefined, 'Collaboration access updated')
@@ -250,13 +267,14 @@ function MemberRecordShareDialog({
       resetEditor();
       await loadShares();
     } catch {
+      if (generation !== dialogGeneration.current) return;
       showErrorToast(
         editingShare
           ? t('record_share.update_failed', undefined, 'Failed to update collaboration access')
           : t('record_share.save_failed', undefined, 'Failed to save collaborator'),
       );
     } finally {
-      setAdding(false);
+      if (generation === dialogGeneration.current) setAdding(false);
     }
   }, [
     loadShares,
@@ -276,6 +294,7 @@ function MemberRecordShareDialog({
 
   const removeShare = useCallback(
     async (sharePid: string) => {
+      const generation = dialogGeneration.current;
       setRemovingPid(sharePid);
       try {
         const response = await fetch(`/api/record-share/${encodeURIComponent(sharePid)}`, {
@@ -285,12 +304,16 @@ function MemberRecordShareDialog({
         if (!response.ok || !ResultHelper.isSuccess(body)) {
           throw new Error(body?.message || `HTTP ${response.status}`);
         }
+        if (generation !== dialogGeneration.current) return;
+        readGeneration.current += 1;
+        setLoading(false);
         setShares((current) => current.filter((share) => share.pid !== sharePid));
         showSuccessToast(t('record_share.removed', undefined, 'Collaborator removed'));
       } catch {
+        if (generation !== dialogGeneration.current) return;
         showErrorToast(t('record_share.remove_failed', undefined, 'Failed to remove collaborator'));
       } finally {
-        setRemovingPid(undefined);
+        if (generation === dialogGeneration.current) setRemovingPid(undefined);
       }
     },
     [showErrorToast, showSuccessToast, t],
@@ -298,6 +321,7 @@ function MemberRecordShareDialog({
 
   const removeSelectedShares = useCallback(async () => {
     if (selectedSharePids.length === 0) return;
+    const generation = dialogGeneration.current;
     setRemovingBatch(true);
     try {
       const response = await fetch('/api/record-share/batch-delete', {
@@ -309,17 +333,21 @@ function MemberRecordShareDialog({
       if (!response.ok || !ResultHelper.isSuccess(body)) {
         throw new Error(body?.message || `HTTP ${response.status}`);
       }
+      if (generation !== dialogGeneration.current) return;
+      readGeneration.current += 1;
+      setLoading(false);
       const removed = new Set(selectedSharePids);
       setShares((current) => current.filter((share) => !removed.has(share.pid)));
       setSelectedSharePids([]);
       setConfirmBatchDelete(false);
       showSuccessToast(t('record_share.batch_removed', undefined, 'Collaborators removed'));
     } catch {
+      if (generation !== dialogGeneration.current) return;
       showErrorToast(
         t('record_share.batch_remove_failed', undefined, 'Failed to remove collaborators'),
       );
     } finally {
-      setRemovingBatch(false);
+      if (generation === dialogGeneration.current) setRemovingBatch(false);
     }
   }, [selectedSharePids, showErrorToast, showSuccessToast, t]);
 
@@ -336,10 +364,10 @@ function MemberRecordShareDialog({
       <section
         aria-labelledby="record-share-title"
         aria-modal="true"
-        className="rounded-card bg-panel border-border max-h-[92vh] w-full max-w-3xl overflow-hidden border shadow-2xl"
+        className="rounded-card bg-panel border-border flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden border shadow-2xl"
         role="dialog"
       >
-        <header className="border-border bg-subtle flex items-start justify-between gap-4 border-b px-6 py-5">
+        <header className="border-border bg-subtle flex shrink-0 items-start justify-between gap-4 border-b px-6 py-5">
           <div className="flex min-w-0 items-start gap-3">
             <span className="bg-accent-weak text-accent rounded-control flex h-10 w-10 shrink-0 items-center justify-center">
               <UsersRound className="h-5 w-5" />
@@ -368,7 +396,7 @@ function MemberRecordShareDialog({
           </button>
         </header>
 
-        <div className="grid max-h-[calc(92vh-85px)] gap-6 overflow-y-auto px-6 py-6 md:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
+        <div className="grid min-h-0 gap-6 overflow-y-auto px-6 py-6 md:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
           <section className="space-y-5">
             <div>
               <div className="mb-3 flex items-center gap-2">

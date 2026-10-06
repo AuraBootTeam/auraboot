@@ -12,8 +12,11 @@ import { test, expect } from '@playwright/test';
  * unit + real-stack ITs.
  */
 test.describe('Permission v2 capability editor', () => {
-  test('renders the capability checklist for a role and toggles Save dirty-state', async ({ page }) => {
+  test('renders the capability checklist for a role and toggles Save dirty-state', async ({
+    page,
+  }) => {
     await page.goto('/enterprise/permissions');
+    await expect(page.locator('header[data-hydrated]')).toHaveAttribute('data-hydrated', 'true');
 
     // Roles load and the first one is auto-selected.
     await expect(page.getByTestId('role-table')).toBeVisible();
@@ -33,17 +36,23 @@ test.describe('Permission v2 capability editor', () => {
     await expect(save).toBeDisabled();
 
     // Toggle a capability -> the checkbox flips and Save becomes enabled (dirty).
-    const first = checkboxes.first();
+    // Keep the same capability identity across rerenders, during the mouse-driven toggle journey.
+    const checkboxId = await checkboxes.first().getAttribute('data-testid');
+    expect(checkboxId).toBeTruthy();
+    const first = page.getByTestId(checkboxId!);
     const before = await first.isChecked();
     await first.click();
-    expect(await first.isChecked()).toBe(!before);
+    await expect(first).toBeChecked({ checked: !before });
     await expect(save).toBeEnabled();
 
     // Toggle back to the baseline -> Save disabled again. (No Save click => non-destructive.)
     await first.click();
-    expect(await first.isChecked()).toBe(before);
+    await expect(first).toBeChecked({ checked: before });
     await expect(save).toBeDisabled();
 
-    await page.screenshot({ path: 'test-results/permission-capability-golden.png', fullPage: true });
+    await page.screenshot({
+      path: 'test-results/permission-capability-golden.png',
+      fullPage: true,
+    });
   });
 });

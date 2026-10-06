@@ -1,5 +1,6 @@
 package com.auraboot.framework.integration;
 
+import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.meta.controller.config.ModelController;
 import com.auraboot.framework.permission.entity.Permission;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
@@ -59,6 +60,16 @@ class ModelPermissionIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private UserPermissionService userPermissionService;
     
+    @Autowired private com.auraboot.framework.permission.service.AutoPermissionAssignmentService autoPermissions;
+    @Autowired private com.auraboot.framework.meta.service.CommandService commandService;
+    @Autowired private com.auraboot.framework.meta.service.MetaFieldService authoringFields;
+    @Autowired private com.auraboot.framework.tenant.service.TenantService authoringTenants;
+    @Autowired private com.auraboot.framework.tenant.service.TenantMemberService authoringMembers;
+    @Autowired private com.auraboot.framework.user.service.UserService authoringUsers;
+    @Autowired private com.auraboot.framework.rbac.service.UserRoleService authoringRoles;
+    @Autowired private com.auraboot.framework.permission.engine.PermissionEvaluator authoringEvaluator;
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate authoringJdbc;
+
     private static final String TEST_MODEL_CODE = "test_model_permission";
     private static final String TEST_MODEL_DISPLAY_NAME = "Test Model for Permission";
     
@@ -96,50 +107,126 @@ class ModelPermissionIntegrationTest extends BaseIntegrationTest {
     }
     
     @Test
-    @DisplayName("Model creation should automatically assign permissions to default roles")
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    @DisplayName("First authoring keeps template grants; synchronization never restores or expands grants")
     void testModelCreation_AutoAssignsPermissionsToRoles() {
-        // Given: Model creation request
-        MetaModelCreateRequest request = new MetaModelCreateRequest();
-        request.setCode(TEST_MODEL_CODE);
-        request.setDisplayName(TEST_MODEL_DISPLAY_NAME);
-        request.setDescription("Test model for role assignment test");
-        request.setModelType("entity");
-          
-
-        request.setTenantId(getTestTenant().getId());
-        
-        // When: Create model
-        MetaModelDTO model = metaModelService.create(request);
-        
-        // Then: Get resource permission node
-        String resourceCode = "model." + TEST_MODEL_CODE;
-        Permission resourcePermission = permissionMapper.findByCode(resourceCode);
-        assertNotNull(resourcePermission, "Resource permission should exist: " + resourceCode);
-        
-        // Then: Check roles have permissions
-        // Note: Role-permission binding verification requires roles to exist in test database
-        // This test verifies that permissions are created, not the role assignments
-        // Role assignment tests should be done in a separate test with proper role setup
-        
-        List<Role> roles = roleService.findByTenantId(getTestTenant().getId());
-        if (!roles.isEmpty()) {
-            log.info("Found {} roles for tenant {}", roles.size(), getTestTenant().getId());
-            
-            // Check if any role has the resource permission
-            for (Role role : roles) {
-                Set<Long> permissionIds = rolePermissionMapper.findPermissionIdsByRoles(
-                    java.util.List.of(role.getId()));
-
-                if (permissionIds.contains(resourcePermission.getId())) {
-                    log.info("Role {} has model permissions", role.getName());
-                }
+        String marker = Long.toUnsignedString(System.nanoTime());
+        String modelCode = "authoring_grant_" + marker;
+        var previous = com.auraboot.framework.application.tenant.MetaContext.snapshot();
+        var tenant = new com.auraboot.framework.tenant.dao.entity.Tenant();
+        tenant.setPid(UniqueIdGenerator.generate());
+        tenant.setName("authoring_" + marker);
+        tenant.setDisplayName("Authoring grant fixture");
+        tenant.setStatus("active");
+        tenant = authoringTenants.createTenant(tenant);
+        Long tenantId = tenant.getId();
+        var actor = authoringUsers.signUp("authoring-grant-" + marker + "@auraboot.com", "test-password-123");
+        var member = authoringMembers.addMember(actor.getId(), tenantId, "active");
+        com.auraboot.framework.application.tenant.MetaContext.setContext(
+                tenantId, actor.getId(), actor.getPid(), actor.getUserName());
+        com.auraboot.framework.application.tenant.MetaContext.setMemberId(member.getId());
+        try {
+            java.util.Map<String, Role> roles = new java.util.LinkedHashMap<>();
+            for (String code : List.of("tenant_admin", "developer", "viewer", "authoring_business_" + marker)) {
+                var role = new Role();
+                role.setTenantId(tenantId);
+                role.setCode(code);
+                role.setName(code);
+                role.setStatus("active");
+                roles.put(code, roleService.createRole(role));
             }
-        } else {
-            log.warn("No roles found for tenant {}, skipping role-permission binding verification", 
-                getTestTenant().getId());
+            var business = roles.get("authoring_business_" + marker);
+            assertTrue(authoringRoles.assignRolesToMember(member.getId(), List.of(business.getId()), tenantId, actor.getId()));
+            assertEquals(Set.of(business.getId()), authoringRoles.findByMemberIdAndTenantId(member.getId(), tenantId)
+                    .stream().map(com.auraboot.framework.rbac.entity.UserRole::getRoleId)
+                    .collect(java.util.stream.Collectors.toSet()));
+            MetaModelCreateRequest request = new MetaModelCreateRequest();
+            request.setCode(modelCode);
+            request.setDisplayName("First authoring grant fixture");
+            request.setModelCategory("entity");
+            request.setTableName("mt_" + modelCode);
+            var model = metaModelService.create(request);
+            assertEquals(modelCode, model.getCode());
+            var fieldRequest = new com.auraboot.framework.meta.dto.MetaFieldCreateRequest();
+            fieldRequest.setCode("authoring_value_" + marker);
+            fieldRequest.setDataType("string");
+            fieldRequest.setAutoPublish(true);
+            var field = authoringFields.create(fieldRequest);
+            metaModelService.bindFieldToModel(model.getId(), field.getId(), 1,
+                    false, true, false, null, null, null, null);
+            var resource = permissionMapper.findByCode("model." + modelCode);
+            assertNotNull(resource);
+            assertEquals(2, resource.getLevel());
+            java.util.Map<String, Long> actionIds = new java.util.LinkedHashMap<>();
+            for (String action : List.of("read", "create", "update", "delete", "export", "import")) {
+                var permission = permissionMapper.findByCode("model." + modelCode + "." + action);
+                assertNotNull(permission);
+                assertEquals(3, permission.getLevel());
+                assertEquals(resource.getId(), permission.getParentId());
+                actionIds.put(action, permission.getId());
+            }
+            assertEquals(Set.copyOf(actionIds.values()), authoringGrantIds(roles.get("tenant_admin").getId()));
+            assertEquals(Set.copyOf(actionIds.values()), authoringGrantIds(roles.get("developer").getId()));
+            assertEquals(Set.of(actionIds.get("read")), authoringGrantIds(roles.get("viewer").getId()));
+            assertEquals(Set.of(), authoringGrantIds(business.getId()));
+            assertFalse(authoringEvaluator.canAction(member.getId(), modelCode, "read"));
+            assertFalse(authoringEvaluator.canAction(member.getId(), modelCode, "update"));
+
+            // Removing an initial template grant is an explicit administrator decision.
+            assertTrue(roleService.removePermissions(roles.get("tenant_admin").getId(), List.of(actionIds.get("read"))));
+            assertTrue(roleService.removePermissions(roles.get("viewer").getId(), List.of(actionIds.get("read"))));
+            List<String> revokedEdges = authoringGrantSnapshot(tenantId);
+            var commandRequest = new com.auraboot.framework.meta.dto.CommandDefinitionCreateRequest();
+            commandRequest.setCode("authoring:qualify_" + modelCode);
+            commandRequest.setDisplayName("New authoring command action");
+            commandRequest.setModelCode(modelCode);
+            commandRequest.setInputSchema("{}");
+            commandRequest.setTargetModels("[]");
+            commandRequest.setExecutionConfig("{\"type\":\"custom\"}");
+            var command = commandService.create(commandRequest);
+            assertEquals("published", commandService.publish(command.getPid()).getStatus());
+            metaModelService.publish(model.getPid(), "Public authoring synchronization");
+            var newAction = permissionMapper.findByCode("model." + modelCode + ".qualify");
+            assertNotNull(newAction);
+            assertEquals(resource.getId(), newAction.getParentId());
+            assertEquals(3, newAction.getLevel());
+            assertEquals(revokedEdges, authoringGrantSnapshot(tenantId));
+            for (Role role : roles.values()) assertFalse(authoringGrantIds(role.getId()).contains(newAction.getId()));
+            assertNull(rolePermissionMapper.findByRoleAndPermission(roles.get("tenant_admin").getId(), actionIds.get("read")));
+            assertNull(rolePermissionMapper.findByRoleAndPermission(roles.get("viewer").getId(), actionIds.get("read")));
+            assertFalse(authoringEvaluator.canAction(member.getId(), modelCode, "qualify"));
+
+            // Grant/revoke the new action only through the existing role service.
+            assertTrue(roleService.assignPermissions(business.getId(), List.of(newAction.getId())));
+            assertTrue(authoringEvaluator.canAction(member.getId(), modelCode, "qualify"));
+            assertEquals(Set.of(newAction.getId()), authoringGrantIds(business.getId()));
+            assertTrue(roleService.removePermissions(business.getId(), List.of(newAction.getId())));
+            assertFalse(authoringEvaluator.canAction(member.getId(), modelCode, "qualify"));
+            List<String> explicitRevokedEdges = authoringGrantSnapshot(tenantId);
+            autoPermissions.autoAssignPermissions(modelCode, null, tenantId);
+            autoPermissions.registerPermissions(modelCode, null, tenantId);
+            assertEquals(explicitRevokedEdges, authoringGrantSnapshot(tenantId));
+            assertEquals(newAction.getId(), permissionMapper.findByCode("model." + modelCode + ".qualify").getId());
+            assertEquals(actionIds.get("read"), permissionMapper.findByCode("model." + modelCode + ".read").getId());
+            assertFalse(authoringEvaluator.canAction(member.getId(), modelCode, "qualify"));
+            assertEquals(Set.of(business.getId()), authoringRoles.findByMemberIdAndTenantId(member.getId(), tenantId)
+                    .stream().map(com.auraboot.framework.rbac.entity.UserRole::getRoleId)
+                    .collect(java.util.stream.Collectors.toSet()));
+        } finally {
+            com.auraboot.framework.application.tenant.MetaContext.restore(previous);
         }
     }
-    
+
+    private Set<Long> authoringGrantIds(Long roleId) {
+        return Set.copyOf(rolePermissionMapper.findPermissionIdsByRoles(List.of(roleId)));
+    }
+
+    private List<String> authoringGrantSnapshot(Long tenantId) {
+        return authoringJdbc.queryForList(
+                "SELECT row_to_json(rp)::text FROM ab_role_permission rp WHERE tenant_id = ? ORDER BY id",
+                String.class, tenantId);
+    }
+
     @Test
     @DisplayName("User with tenant_admin role can access model details")
     void testUserCanAccessModelDetails_WithReadPermission() {

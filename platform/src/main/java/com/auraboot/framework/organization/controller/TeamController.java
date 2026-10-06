@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import com.auraboot.framework.application.annotation.CurrentUserId;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.organization.dto.*;
 import com.auraboot.framework.organization.service.TeamMemberService;
 import com.auraboot.framework.organization.service.TeamService;
@@ -12,6 +13,7 @@ import com.auraboot.framework.permission.annotation.RequirePermission;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -28,6 +30,9 @@ public class TeamController {
     @Autowired
     private TeamMemberService teamMemberService;
 
+    @Autowired
+    private DynamicDataService dynamicDataService;
+
     @GetMapping
     public ApiResponse<List<TeamResponse>> listTeams() {
         Long tenantId = MetaContext.getCurrentTenantId();
@@ -35,7 +40,9 @@ public class TeamController {
     }
 
     @GetMapping("/{pid}")
+    @RequirePermission("org.team.read")
     public ApiResponse<TeamResponse> getTeam(@PathVariable String pid) {
+        requireReadableTeam(pid);
         return ApiResponse.success(teamService.getTeamByPid(pid));
     }
 
@@ -67,7 +74,9 @@ public class TeamController {
     // --- Team Members ---
 
     @GetMapping("/{teamPid}/members")
+    @RequirePermission("org.team.read")
     public ApiResponse<List<TeamMemberResponse>> listMembers(@PathVariable String teamPid) {
+        requireReadableTeam(teamPid);
         return ApiResponse.success(teamMemberService.listMembers(teamPid));
     }
 
@@ -95,6 +104,12 @@ public class TeamController {
     public ApiResponse<List<TeamResponse>> getCurrentUserTeams(@CurrentUserId Long userId) {
         Long tenantId = MetaContext.getCurrentTenantId();
         return ApiResponse.success(teamService.getCurrentUserTeams(userId, tenantId));
+    }
+
+    private void requireReadableTeam(String pid) {
+        if (dynamicDataService.getById("ab_team", pid) == null) {
+            throw new AccessDeniedException("Team record is not accessible");
+        }
     }
 
 }

@@ -18,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
@@ -35,6 +36,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(MockitoExtension.class)
@@ -85,6 +87,42 @@ class FileUploadControllerTest {
         mvc = MockMvcBuilders.standaloneSetup(controller)
                 .setCustomArgumentResolvers(currentUserResolver)
                 .build();
+    }
+
+    @Test
+    void getFile_absentFromTenantReturnsSafeNotFoundWithoutReadingStorage() throws Exception {
+        mvc.perform(get("/api/file/missing-file").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("404"))
+                .andExpect(jsonPath("$.message").value("Resource not found"))
+                .andExpect(jsonPath("$.data").doesNotExist())
+                .andExpect(jsonPath("$.context").doesNotExist());
+        verifyNoInteractions(storageProvider, dataAccessAuthorizationHelper, adminEventLogService);
+    }
+
+    @Test
+    void getFile_ownerReceivesMetadataWithoutServerStoragePath() throws Exception {
+        FileEntity file = storedFile("quote.pdf", "application/pdf", "/private/storage/quote.pdf");
+        file.setFileSize(123L);
+        when(fileService.getFileById("file-pid")).thenReturn(file);
+        when(fileService.getFileRelations("file-pid")).thenReturn(List.of());
+
+        mvc.perform(get("/api/file/file-pid").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.fileId").value("file-pid"))
+                .andExpect(jsonPath("$.data.originalName").value("quote.pdf"))
+                .andExpect(jsonPath("$.data.mimeType").value("application/pdf"))
+                .andExpect(jsonPath("$.data.fileSize").value(123))
+                .andExpect(jsonPath("$.data.localPath").doesNotExist());
+        verifyNoInteractions(storageProvider, dataAccessAuthorizationHelper, adminEventLogService);
+    }
+
+    @Test
+    void downloadFile_absentFromTenantDoesNotReadStorage() throws Exception {
+        mvc.perform(get("/api/file/download/missing-file"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().string(""));
+        verifyNoInteractions(storageProvider, dataAccessAuthorizationHelper, adminEventLogService);
     }
 
     @Test

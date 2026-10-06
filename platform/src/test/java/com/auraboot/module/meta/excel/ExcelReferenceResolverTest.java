@@ -6,6 +6,9 @@ import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.user.service.UserService;
+import com.auraboot.framework.user.dto.UserSearchDTO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,11 +35,32 @@ class ExcelReferenceResolverTest {
     @Mock
     private MetaModelService metaModelService;
 
+    @Mock
+    private UserService userService;
+
     private ExcelReferenceResolver resolver;
 
     @BeforeEach
     void setUp() {
-        resolver = new ExcelReferenceResolver(dynamicDataService, metaModelService);
+        resolver = new ExcelReferenceResolver(dynamicDataService, metaModelService, userService);
+    }
+
+    @Test
+    void resolve_userPidRequiresActiveMembershipInTheCurrentTenant() {
+        MetaContext.setContext(7L, 11L, "actor", "Actor");
+        try {
+            FieldDefinition field = accountReference(List.of());
+            field.getRefTarget().setTargetEntity("sys_user");
+            UserSearchDTO member = new UserSearchDTO();
+            member.setPid("01KZTENANTUSER");
+            when(userService.findInTenantByPid(7L, "01KZTENANTUSER")).thenReturn(member);
+            assertThat(resolver.resolve(field, "01KZTENANTUSER")).isEqualTo("01KZTENANTUSER");
+            assertThatThrownBy(() -> resolver.resolve(field, "01KZFOREIGNUSER"))
+                    .isInstanceOf(BusinessException.class);
+            org.mockito.Mockito.verifyNoInteractions(dynamicDataService, metaModelService);
+        } finally {
+            MetaContext.clear();
+        }
     }
 
     @Test

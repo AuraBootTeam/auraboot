@@ -108,6 +108,7 @@
               "en-US": "New Model"
             },
             "primary": true,
+            "permissionCode": "meta.model.update",
             "navigateTo": "/meta/models/new"
           }
         ]
@@ -115,6 +116,10 @@
       {
         "id": "model_table",
         "blockType": "table",
+        "empty": {
+          "title": {"zh-CN": "未找到模型", "en-US": "No models found"},
+          "description": {"zh-CN": "请调整筛选条件；需要新增时，请有模型管理权限的管理员使用“新建模型”。", "en-US": "Adjust the filters. An administrator with model management access can use New Model to add a definition."}
+        },
         "table": {
           "rowKey": "pid",
           "dataSource": "modelList",
@@ -268,7 +273,7 @@
                 { "value": "date", "label": "Date" },
                 { "value": "datetime", "label": "DateTime" },
                 { "value": "text", "label": "Text" },
-                { "value": "json", "label": "json" },
+                { "value": "json", "label": { "zh-CN": "结构化数据", "en-US": "Structured Data" } },
                 { "value": "reference", "label": "Reference" }
               ],
               "valueField": "value",
@@ -283,6 +288,10 @@
           },
           {
             "field": "semanticType",
+            "helpText": {
+              "zh-CN": "按字段用途筛选，例如电子邮箱或电话号码。",
+              "en-US": "Filter by the purpose of a field, such as email address or phone number."
+            },
             "label": {
               "zh-CN": "语义类型",
               "en-US": "Semantic Type"
@@ -365,6 +374,10 @@
       {
         "id": "field_table",
         "blockType": "table",
+        "empty": {
+          "title": {"zh-CN": "未找到字段", "en-US": "No fields found"},
+          "description": {"zh-CN": "请调整筛选条件；需要新增时，请有字段管理权限的管理员创建字段定义。", "en-US": "Adjust the filters. An administrator with field management access can create a field definition."}
+        },
         "table": {
           "rowKey": "pid",
           "dataSource": "fieldList",

@@ -101,12 +101,15 @@ public class FileUploadController {
      */
     @GetMapping("/{fileId}")
     @RequirePermission(MetaPermission.SYS_FILE_READ)
-    public ApiResponse<FileUploadResponseDTO> getFile(
+    public ResponseEntity<ApiResponse<FileUploadResponseDTO>> getFile(
             @PathVariable String fileId,
             @CurrentUserId Long userId) {
         FileEntity fileEntity = fileService.getFileById(fileId);
+        if (fileEntity == null) {
+            return ResponseEntity.status(404).body(ApiResponse.error(404, "Resource not found"));
+        }
         authorizeFileAccess(fileId, fileEntity, userId);
-        return ApiResponse.success(toDto(fileEntity));
+        return ResponseEntity.ok(ApiResponse.success(toDto(fileEntity)));
     }
 
     /**

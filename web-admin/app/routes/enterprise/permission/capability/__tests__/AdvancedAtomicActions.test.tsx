@@ -12,6 +12,9 @@ vi.mock('~/contexts/I18nContext', () => ({
     },
   }),
 }));
+vi.mock('~/contexts/ToastContext', () => ({
+  useToastContext: () => ({ showErrorToast: vi.fn(), showSuccessToast: vi.fn() }),
+}));
 vi.mock('~/shared/services/permissionService', () => ({
   permissionService: {
     getPolicy: vi.fn(),
@@ -23,7 +26,9 @@ vi.mock('../../PolicyConfigDialog', () => ({
     props.open ? (
       <div data-testid="policy-dialog">
         {props.permissionLabel}
-        <span data-testid="policy-dialog-initial-values">{JSON.stringify(props.initialValues ?? {})}</span>
+        <span data-testid="policy-dialog-initial-values">
+          {JSON.stringify(props.initialValues ?? {})}
+        </span>
       </div>
     ) : null,
 }));
@@ -41,10 +46,45 @@ const matrix: PermissionMatrixDTO = {
           resourceCode: 'crm.account',
           resourceName: '客户',
           actions: [
-            { permissionId: 1, permissionPid: 'p1', code: 'crm.account.read', action: 'read', label: '查看客户', granted: true, supported: true, scopeType: 'dept' },
-            { permissionId: 2, permissionPid: 'p2', code: 'crm.account.export', action: 'export', label: '导出客户', granted: true, supported: true },
-            { permissionId: 3, permissionPid: 'p3', code: 'crm.account.manage', action: 'manage', label: '维护客户', granted: false, supported: true, extension: { displayGroup: '客户管理', displayGroupOrder: 20, displayOrder: 20 } },
-            { permissionId: 4, permissionPid: 'p4', code: 'crm.account.audit', action: 'audit', label: '审计客户', granted: false, supported: true, extension: { displayGroup: '审计', displayGroupOrder: 80, displayOrder: 10 } },
+            {
+              permissionId: 1,
+              permissionPid: 'p1',
+              code: 'crm.account.read',
+              action: 'read',
+              label: '查看客户',
+              granted: true,
+              supported: true,
+              scopeType: 'dept',
+            },
+            {
+              permissionId: 2,
+              permissionPid: 'p2',
+              code: 'crm.account.export',
+              action: 'export',
+              label: '导出客户',
+              granted: true,
+              supported: true,
+            },
+            {
+              permissionId: 3,
+              permissionPid: 'p3',
+              code: 'crm.account.manage',
+              action: 'manage',
+              label: '维护客户',
+              granted: false,
+              supported: true,
+              extension: { displayGroup: '客户管理', displayGroupOrder: 20, displayOrder: 20 },
+            },
+            {
+              permissionId: 4,
+              permissionPid: 'p4',
+              code: 'crm.account.audit',
+              action: 'audit',
+              label: '审计客户',
+              granted: false,
+              supported: true,
+              extension: { displayGroup: '审计', displayGroupOrder: 80, displayOrder: 10 },
+            },
           ],
         },
       ],
@@ -57,8 +97,24 @@ const capabilityGroups: CapabilityGroup[] = [
     group: '客户管理',
     // crm.account.read covered by a declared capability; crm.account.export only convention-derived
     capabilities: [
-      { code: 'crm.cap.account', group: '客户管理', label: '查看客户列表', sensitive: false, includes: ['crm.account.read'], granted: true, conventionDerived: false },
-      { code: 'crm.account', group: 'crm', label: '客户', sensitive: false, includes: ['crm.account.read', 'crm.account.export'], granted: true, conventionDerived: true },
+      {
+        code: 'crm.cap.account',
+        group: '客户管理',
+        label: '查看客户列表',
+        sensitive: false,
+        includes: ['crm.account.read'],
+        granted: true,
+        conventionDerived: false,
+      },
+      {
+        code: 'crm.account',
+        group: 'crm',
+        label: '客户',
+        sensitive: false,
+        includes: ['crm.account.read', 'crm.account.export'],
+        granted: true,
+        conventionDerived: true,
+      },
     ],
   },
 ];
@@ -86,7 +142,9 @@ const matrixWithPolicy: PermissionMatrixDTO = {
   })),
 };
 
-function renderAdvanced(overrides: Partial<React.ComponentProps<typeof AdvancedAtomicActions>> = {}) {
+function renderAdvanced(
+  overrides: Partial<React.ComponentProps<typeof AdvancedAtomicActions>> = {},
+) {
   const onToggle = vi.fn();
   const onScopeChange = vi.fn();
   render(
@@ -118,8 +176,12 @@ describe('AdvancedAtomicActions', () => {
   it('shows the covering capability for a covered code and "exception" for an uncovered one', () => {
     renderAdvanced();
     fireEvent.click(screen.getByTestId('advanced-atomic-toggle'));
-    expect(screen.getByTestId('atomic-source-crm.account.read').textContent).toContain('查看客户列表');
-    expect(screen.getByTestId('atomic-source-crm.account.export').textContent).toContain('exception');
+    expect(screen.getByTestId('atomic-source-crm.account.read').textContent).toContain(
+      '查看客户列表',
+    );
+    expect(screen.getByTestId('atomic-source-crm.account.export').textContent).toContain(
+      'No declared capability coverage',
+    );
   });
 
   it('toggles a grant and changes a per-code scope', () => {
@@ -129,7 +191,9 @@ describe('AdvancedAtomicActions', () => {
     fireEvent.click(screen.getByTestId('atomic-checkbox-crm.account.read'));
     expect(onToggle).toHaveBeenCalledWith(1, false);
 
-    fireEvent.change(screen.getByTestId('atomic-scope-crm.account.read'), { target: { value: 'self' } });
+    fireEvent.change(screen.getByTestId('atomic-scope-crm.account.read'), {
+      target: { value: 'self' },
+    });
     expect(onScopeChange).toHaveBeenCalledWith('crm.account', 'read', 'self');
   });
 
@@ -155,7 +219,9 @@ describe('AdvancedAtomicActions', () => {
 
     const bodyText = screen.getByTestId('advanced-atomic-body').textContent ?? '';
     expect(bodyText.indexOf('客户管理')).toBeLessThan(bodyText.indexOf('审计'));
-    expect(bodyText.indexOf('crm.account.manage')).toBeLessThan(bodyText.indexOf('crm.account.audit'));
+    expect(bodyText.indexOf('crm.account.manage')).toBeLessThan(
+      bodyText.indexOf('crm.account.audit'),
+    );
   });
 
   it('loads saved policy values before opening the policy dialog', async () => {
@@ -181,5 +247,20 @@ describe('AdvancedAtomicActions', () => {
     expect(screen.getByTestId('policy-dialog-initial-values').textContent).toContain(
       'permission_department_guard',
     );
+  });
+  it('does not display an empty policy editor after a read failure', async () => {
+    vi.mocked(permissionService.getPolicy).mockRejectedValue(new Error('offline'));
+    renderAdvanced({ matrix: matrixWithPolicy });
+    fireEvent.click(screen.getByTestId('advanced-atomic-toggle'));
+    fireEvent.click(screen.getByTestId('atomic-policy-crm.account.read'));
+    await waitFor(() => expect(permissionService.getPolicy).toHaveBeenCalled());
+    expect(screen.queryByTestId('policy-dialog')).toBeNull();
+  });
+  it('blocks atomic writes while a capability draft exists', () => {
+    const { onToggle } = renderAdvanced({ disabled: true });
+    fireEvent.click(screen.getByTestId('advanced-atomic-toggle'));
+    expect(screen.getByTestId('atomic-checkbox-crm.account.read')).toBeDisabled();
+    fireEvent.click(screen.getByTestId('atomic-checkbox-crm.account.read'));
+    expect(onToggle).not.toHaveBeenCalled();
   });
 });

@@ -17,6 +17,26 @@ import {
   dynamicCreate,
 } from './quote-e2e-helpers';
 
+test.use({ locale: 'zh-CN' });
+
+/** Creates an independent, recallable fixture through the production material writer. */
+async function createRecallableMaterial(page: Page, code: string, category: string, spec: string, packageCode: string, brand = '') {
+  const result = await executeCommand(page, 'bom:create_material', {
+    bom_mm_material_code: code,
+    bom_mm_material_name: category === 'resistor' ? '贴片电阻' : '贴片电容',
+    bom_mm_spec_model: spec, bom_mm_category: category, bom_mm_package: packageCode,
+    bom_mm_unit: 'PCS', bom_mm_brand: brand, bom_mm_enabled: true,
+  });
+  expect(result.success).toBe(true);
+  const rows = await queryDynamicRecords(page, 'bom_material_master', [
+    { fieldName: 'bom_mm_material_code', operator: 'EQ', value: code },
+  ]);
+  expect(rows).toHaveLength(1);
+  expect(String(rows[0].bom_mm_norm_text ?? '')).not.toBe('');
+  expect(JSON.parse(String(rows[0].bom_mm_attributes_json))).toEqual(expect.objectContaining({ package: packageCode }));
+  return rows[0];
+}
+
 type Choice = { field: string; label: string; value: string };
 type RuleCase = {
   model: string;
@@ -221,13 +241,51 @@ for (const c of cases) {
     await ensureQuoteRoleUser(page, deniedUser);
     const denied = await openQuoteRolePage(page.context().browser()!, deniedUser);
     try {
+      await denied.page.goto('/home', { waitUntil: 'domcontentloaded' });
+      await ensureSidebarExpanded(denied.page);
+      const readerSidebar = denied.page.getByTestId('sidebar');
+      const readerLink = readerSidebar.locator(`a[href="/p/${c.model}"]`);
+      if (!(await readerLink.isVisible())) {
+        const center = readerSidebar.getByRole('button', { name: '规则中心', exact: true });
+        if (!(await center.isVisible()))
+          await readerSidebar.getByRole('button', { name: 'BOM转化工具', exact: true }).click();
+        await center.click();
+      }
+      await readerLink.click();
+      await expect(denied.page).toHaveURL(new RegExp(`/p/${c.model}$`));
+      await expect(denied.page.locator('main').getByRole('button', { name: '新建', exact: true })).toHaveCount(0);
+      const readerSearch = denied.page.getByTestId('list-search-input');
+      await expect(readerSearch).toBeVisible();
+      await readerSearch.fill(marker);
+      const filtered = denied.page.waitForResponse(response =>
+        response.url().includes(`/api/dynamic/${c.model}/list`) && response.request().method() === 'GET');
+      await readerSearch.press('Enter');
+      const readerListResponse = await filtered;
+      expect(readerListResponse.status()).toBe(200);
+      expect(String((await readerListResponse.json()).code)).toBe('0');
+      const readerRow = denied.page.getByRole('row').filter({ hasText: marker });
+      await expect(readerRow).toHaveCount(1);
+      await clickRowActionByLocator(denied.page, readerRow, 'view', '查看');
+      await expect(denied.page).toHaveURL(new RegExp(`/p/${c.model}/view/${saved.pid}$`));
+      const readerKey = denied.page.getByTestId(`form-field-${c.key}`);
+      await expect(readerKey).toBeVisible();
+      await expect.poll(() => readerKey.evaluate(element => [
+        element.textContent,
+        ...Array.from(element.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea')).map(input => input.value),
+      ].join(' '))).toContain(marker);
+      await expect(denied.page.getByTestId('toolbar-btn-edit')).toHaveCount(0);
+      await expect(denied.page.getByTestId('toolbar-btn-delete')).toHaveCount(0);
+      await expect(denied.page.locator('main input:not([readonly]):not([disabled]), main textarea:not([readonly]):not([disabled]), main [contenteditable="true"]')).toHaveCount(0);
+      await denied.page.screenshot({ path: info.outputPath('rule-reader-detail.png'), fullPage: true });
       await denied.page.goto(`/p/${c.model}/new?commandCode=bom:create_${c.command}`, {
         waitUntil: 'domcontentloaded',
       });
       await expect(denied.page.locator('main')).toContainText(
         /Page Unavailable|Access forbidden|Access denied|无权限|未授权|权限不足/i,
       );
-      await expect(denied.page.getByTestId('dynamic-page-form')).toHaveCount(0);
+      // The shared page shell remains; denied authoring must expose no editable controls.
+      await expect(denied.page.locator('main input, main textarea, main select, main [contenteditable="true"]')).toHaveCount(0);
+      await expect(denied.page.locator('main [data-testid^="form-btn-"]')).toHaveCount(0);
       await denied.page.screenshot({ path: info.outputPath('denied.png') });
       for (const operation of c.allowDelete === false ? ['create', 'update'] : ['create', 'update', 'delete']) {
         await expectCommandDenied(
@@ -308,13 +366,167 @@ for (const c of cases) {
 
 
 test('category metadata: duplicate category fails safely without changing the existing definition', async ({ page }, info) => {
+  // This multi-role journey verifies four detail views, policies, write denials
+  // and original screenshots. Its total deadline is separate from step waits.
+  test.setTimeout(60_000);
   const records = () => queryDynamicRecords(page, 'bom_category_meta', [
     { fieldName: 'bom_cm_category', operator: 'EQ', value: 'resistor' },
   ]);
   await page.goto('/home', { waitUntil: 'domcontentloaded' });
   const before = await records();
   expect(before).toHaveLength(1);
-  await page.goto('/p/bom_category_meta', { waitUntil: 'domcontentloaded' });
+  const capacitors = await queryDynamicRecords(page, 'bom_category_meta', [
+    { fieldName: 'bom_cm_category', operator: 'EQ', value: 'capacitor' },
+  ]);
+  expect(capacitors).toHaveLength(1);
+  const policyQueries = ['attributes', 'recipe', 'veto', 'fit'];
+  const parse = (value: unknown): any => typeof value === 'string' ? JSON.parse(value) : value;
+  const openCategory = async (client: Page, row: Record<string, any>, categoryLabel: string, reader: boolean) => {
+    await ensureSidebarExpanded(client);
+    const sidebar = client.getByTestId('sidebar');
+    const link = sidebar.locator('a[href="/p/bom_category_meta"]');
+    if (!(await link.isVisible())) {
+      const center = sidebar.getByRole('button', { name: '规则中心', exact: true });
+      if (!(await center.isVisible())) await sidebar.getByRole('button', { name: 'BOM转化工具', exact: true }).click();
+      await center.click();
+    }
+    await link.click();
+    await expect(client).toHaveURL(/\/p\/bom_category_meta$/);
+    const search = client.getByTestId('list-search-input');
+    await expect(search).toBeVisible();
+    await search.fill(String(row.bom_cm_category));
+    const filtered = client.waitForResponse(response =>
+      response.url().includes('/api/dynamic/bom_category_meta/list') && response.request().method() === 'GET');
+    await search.press('Enter');
+    const listResponse = await filtered;
+    expect(listResponse.status()).toBe(200);
+    expect(String((await listResponse.json()).code)).toBe('0');
+    const target = client.getByRole('row').filter({ has: client.getByRole('cell', { name: categoryLabel, exact: true }) });
+    await expect(target).toHaveCount(1);
+    const responses = policyQueries.map(suffix => client.waitForResponse(response => {
+      const url = new URL(response.url());
+      return url.pathname === '/api/datasource/list' &&
+        url.searchParams.get('datasourceId') === `nq:bom_category_policy_${suffix}` &&
+        url.searchParams.get('categoryMetaPid') === String(row.pid);
+    }));
+    await clickRowActionByLocator(client, target, 'view', '查看');
+    await expect(client).toHaveURL(new RegExp(`/p/bom_category_meta/view/${row.pid}$`));
+    const projections: Record<string, any[]> = {};
+    for (let index = 0; index < responses.length; index++) {
+      const response = await responses[index];
+      expect(response.status()).toBe(200);
+      const body = await response.json();
+      expect(String(body.code)).toBe('0');
+      expect(Array.isArray(body.data.records)).toBe(true);
+      projections[policyQueries[index]] = body.data.records;
+    }
+    const attributeRows = ['required', 'recommended'].flatMap(requirement =>
+      (parse(row[`bom_cm_${requirement}_attrs_json`]) || []).map((attribute: string, index: number) =>
+        ({ requirement, position: index + 1, attribute })));
+    expect(projections.attributes.map(({ requirement, position, attribute }) => ({ requirement, position, attribute })))
+      .toEqual(attributeRows);
+    const recipe = parse(row.bom_cm_match_text_recipe_json);
+    expect(projections.recipe.filter(record => record.purpose === 'field').map(record => record.attribute)).toEqual(recipe.fields);
+    expect(projections.veto.map(({ attribute, comparison, tolerance_percent }) => ({ attribute, comparison, tolerance_percent: tolerance_percent ?? null })))
+      .toEqual(parse(row.bom_cm_veto_attrs_json).map((veto: any) => ({ attribute: veto.attr, comparison: veto.op, tolerance_percent: veto.tol === undefined ? null : veto.tol * 100 })));
+    const block = (suffix: string) => client.locator(`[data-aura-block-id="bom_category_policy_${suffix}"]`);
+    const expectPolicyLabels = async (suffix: string) => {
+      if (projections[suffix].length === 0) {
+        await expect(block(suffix)).toContainText('未单独配置工程适配维度');
+        return;
+      }
+      await expect(block(suffix).getByRole('row')).toHaveCount(projections[suffix].length + 1);
+      await expect(block(suffix).getByRole('status')).toHaveCount(0);
+      await expect(block(suffix).getByRole('alert')).toHaveCount(0);
+      await expect(block(suffix)).not.toContainText('标签加载失败');
+      await expect(block(suffix)).not.toContainText('标签未配置');
+      const dictionaryFields = ['requirement', 'purpose', 'attribute', 'comparison', 'aggregation', 'missing_handling'];
+      for (const record of projections[suffix]) {
+        for (const field of dictionaryFields) {
+          if (record[field] === undefined || record[field] === null || record[field] === '') continue;
+          await expect(block(suffix).getByRole('cell', { name: String(record[field]), exact: true })).toHaveCount(0);
+        }
+      }
+    };
+    const attributesTab = client.getByRole('tab', { name: '品类与属性', exact: true });
+    const matchingTab = client.getByRole('tab', { name: '匹配策略', exact: true });
+    const notesTab = client.getByRole('tab', { name: '补充说明', exact: true });
+    await expect(attributesTab).toHaveAttribute('aria-selected', 'true');
+    await expect(client.getByRole('tab')).toHaveCount(4);
+    await expect(client.getByRole('tab', { name: '变更历史', exact: true })).toBeVisible();
+    await expect(client.getByTestId('form-field-bom_cm_category')).toContainText(categoryLabel);
+    await expect(client.getByTestId('form-field-bom_cm_primary_attr')).toContainText(categoryLabel === '电阻' ? '阻值' : '容值');
+    await expect(client.getByTestId('form-field-bom_cm_remark')).toHaveCount(0);
+    await expect(block('attributes')).toContainText('必需属性');
+    await expect(block('attributes')).toContainText('推荐属性');
+    await matchingTab.click();
+    await expect(matchingTab).toHaveAttribute('aria-selected', 'true');
+    await expect(block('attributes')).toHaveCount(0);
+    await expect(block('recipe')).toContainText('参与匹配的字段');
+    await expect(block('recipe')).toContainText('封装');
+    await expect(block('veto')).toContainText('在容差内相等');
+    await expect(block('veto').getByRole('cell', { name: '5', exact: true })).toHaveCount(1);
+    if (categoryLabel === '电容') {
+      const fit = parse(row.bom_cm_fit_policy_json);
+      expect(projections.fit.map(({ attribute, comparison, weight, missing_handling, aggregation }) => ({ attribute, comparison, weight, missing_handling, aggregation })))
+        .toEqual(fit.dimensions.map((dimension: any) => ({ attribute: dimension.attr, comparison: dimension.direction, weight: dimension.weight, missing_handling: dimension.missing, aggregation: fit.aggregation })));
+      await expect(block('fit')).toContainText('加权平均');
+      await expect(block('fit')).toContainText('候选值不低于需求');
+      await expect(block('fit')).toContainText('该项按零分计');
+    } else {
+      expect(projections.fit).toEqual([]);
+      await expect(block('fit')).toContainText('未单独配置工程适配维度');
+    }
+    await expect(client.getByTestId('export-pdf-button')).toHaveCount(0);
+    await expect(client.getByTestId('toolbar-btn-edit')).toHaveCount(0);
+    await expect(client.getByTestId('toolbar-btn-delete')).toHaveCount(0);
+    await expect(client.locator('main input:not([readonly]):not([disabled]), main textarea:not([readonly]):not([disabled]), main [contenteditable="true"]')).toHaveCount(0);
+    for (const suffix of policyQueries) {
+      await (suffix === 'attributes' ? attributesTab : matchingTab).click();
+      for (const visiblePolicy of suffix === 'attributes' ? ['attributes'] : ['recipe', 'veto', 'fit']) {
+        await expectPolicyLabels(visiblePolicy);
+      }
+      await expect(block(suffix)).not.toContainText(/resistance_ohms|capacitance_farads|weighted_average|eq_tol|policyId|\{"/);
+      const heading = client.locator(`[data-aura-block-id="bom_category_policy_${suffix}_heading"]`);
+      await block(suffix).scrollIntoViewIfNeeded();
+      await block(suffix).evaluate(element => element.scrollIntoView({ block: 'center' }));
+      await expect(heading).toBeInViewport({ ratio: 1 });
+      await expect(block(suffix)).toBeInViewport({ ratio: 1 });
+      await client.screenshot({ path: info.outputPath(`category-${row.bom_cm_category}-${reader ? 'reader' : 'admin'}-${suffix}.png`) });
+    }
+    await notesTab.click();
+    await expect(notesTab).toHaveAttribute('aria-selected', 'true');
+    await expect(client.getByTestId('form-field-bom_cm_remark')).toContainText(String(row.bom_cm_remark));
+    await expect(block('recipe')).toHaveCount(0);
+    await expect(client.locator('main input:not([readonly]):not([disabled]), main textarea:not([readonly]):not([disabled]), main [contenteditable="true"]')).toHaveCount(0);
+    await client.screenshot({ path: info.outputPath(`category-${row.bom_cm_category}-${reader ? 'reader' : 'admin'}-notes.png`) });
+    await attributesTab.click();
+    await expect(attributesTab).toHaveAttribute('aria-selected', 'true');
+    await expectPolicyLabels('attributes');
+    await client.getByTestId('form-field-bom_cm_category').scrollIntoViewIfNeeded();
+    await client.screenshot({ path: info.outputPath(`category-${row.bom_cm_category}-${reader ? 'reader' : 'admin'}-detail.png`) });
+  };
+  await openCategory(page, before[0], '电阻', false);
+  await openCategory(page, capacitors[0], '电容', false);
+  const user = makeQuoteRoleUser('category-reader', String(Date.now()), ['qo_procurement']);
+  await ensureQuoteRoleUser(page, user);
+  const reader = await openQuoteRolePage(page.context().browser()!, user);
+  try {
+    await reader.page.goto('/home', { waitUntil: 'domcontentloaded' });
+    await openCategory(reader.page, before[0], '电阻', true);
+    await openCategory(reader.page, capacitors[0], '电容', true);
+    for (const operation of ['create', 'update', 'delete'])
+      await expectCommandDenied(reader.page, `bom:${operation}_category_meta`, {
+        bom_cm_category: 'resistor', bom_cm_group: 'resistive', bom_cm_remark: 'denied-reader-write',
+      }, operation === 'create' ? undefined : String(before[0].pid), operation);
+  } finally {
+    await reader.context.close();
+  }
+  expect(await records()).toEqual(before);
+  expect(await queryDynamicRecords(page, 'bom_category_meta', [{ fieldName: 'bom_cm_category', operator: 'EQ', value: 'capacitor' }]))
+    .toEqual(capacitors);
+  await page.getByTestId('toolbar-btn-back').click();
+  await expect(page).toHaveURL(/\/p\/bom_category_meta$/);
   await page.locator('main').getByRole('button', { name: '新建', exact: true }).click();
   await page.getByTestId('form-field-bom_cm_category').getByRole('combobox').first().click();
   await page.getByRole('option', { name: '电阻', exact: true }).click();
@@ -325,12 +537,13 @@ test('category metadata: duplicate category fails safely without changing the ex
     r.request().method() === 'POST');
   await page.getByRole('button', { name: '保存', exact: true }).click();
   const response = await failure;
-  expect(response.status()).toBe(500);
+  expect(response.status()).toBe(400);
   const body = await response.json();
   expect(String(body.code)).not.toBe('0');
   expect(JSON.stringify(body)).not.toMatch(/INSERT INTO|SQL:|DuplicateKeyException|Mapper\.xml|mt_bom_category_meta|duplicate key/i);
   await expect(page.getByTestId('dynamic-page-form')).toBeVisible();
-  await expect(page.locator('body')).toContainText(/unexpected error|Internal system error|发生错误|操作失败|保存失败/i);
+  await expect(page.locator('body')).toContainText('记录已存在，请检查唯一字段后再保存');
+  await expect(page.locator('body')).not.toContainText(/unexpected error|Internal system error|meta_record\.duplicate/i);
   await expect(page.locator('body')).not.toContainText(/INSERT INTO|Mapper\.xml|mt_bom_category_meta|duplicate key/i);
   expect(await records()).toEqual(before);
   await page.screenshot({ path: info.outputPath('duplicate-category-safe-error.png') });
@@ -349,7 +562,8 @@ test('header alias enabled/disabled affects new BOM conversions and preserves pr
   const file = info.outputPath('rule-effect.xlsx');
   fs.writeFileSync(file, XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }));
   await page.goto('/home', { waitUntil: 'domcontentloaded' });
-  // Setup creates only customer/project; all rule changes and conversion starts use UI.
+  // Setup creates isolated material/customer/project; rule changes and conversion starts use UI.
+  await createRecallableMaterial(page, `${marker}-R`, 'resistor', '10kΩ ±1% 0603', '0603', brand);
   const account = await executeCommand(page, 'crm:create_account', { crm_acc_name: marker }, undefined, 'create');
   const customerId = String(account.recordId ?? account.pid ?? account.id ?? '');
   expect(customerId).toBeTruthy();
@@ -588,6 +802,51 @@ test('header alias enabled/disabled affects new BOM conversions and preserves pr
   lifecycle.push({ taskId: reused.taskId, profileDecision: reusedDecision });
   await page.goto(`/p/bom_source_format_profile/view/${profileId}`, { waitUntil: 'domcontentloaded' });
 
+  // Procurement has rules_view: prove the active revision and its regression evidence are
+  // readable through the real menu while every lifecycle write remains unauthorized.
+  profile = (await profiles())[0];
+  const readerUser = makeQuoteRoleUser('profile-reader-proc', marker.toLowerCase(), ['qo_procurement']);
+  await ensureQuoteRoleUser(page, readerUser);
+  const reader = await openQuoteRolePage(page.context().browser()!, readerUser);
+  try {
+    await reader.page.goto('/home', { waitUntil: 'domcontentloaded' });
+    await ensureSidebarExpanded(reader.page);
+    const sidebar = reader.page.getByTestId('sidebar');
+    const profileLink = sidebar.locator('a[href="/p/bom_source_format_profile"]');
+    if (!(await profileLink.isVisible())) {
+      const center = sidebar.getByRole('button', { name: '规则中心', exact: true });
+      if (!(await center.isVisible())) await sidebar.getByRole('button', { name: 'BOM转化工具', exact: true }).click();
+      await center.click();
+    }
+    await profileLink.click();
+    await expect(reader.page).toHaveURL(/\/p\/bom_source_format_profile$/);
+    await expect(reader.page.locator('main').getByRole('button', { name: '新建', exact: true })).toHaveCount(0);
+    await searchBusinessList(reader.page, '/p/bom_source_format_profile', String(profile.bom_sfp_code));
+    const row = reader.page.getByRole('row').filter({ hasText: String(profile.bom_sfp_code) });
+    await expect(row).toHaveCount(1);
+    await clickRowActionByLocator(reader.page, row, 'view', '查看');
+    await expect(reader.page).toHaveURL(new RegExp(`/view/${profileId}$`));
+    await expect(reader.page.locator('main').getByText(String(profile.bom_sfp_code), { exact: true })).toBeVisible();
+    const regressionRuns = await queryDynamicRecords(reader.page, 'bom_profile_regression_run', [
+      { fieldName: 'bom_prr_profile_id', operator: 'EQ', value: profileId },
+    ]);
+    expect(regressionRuns).toHaveLength(1);
+    expect(regressionRuns[0].pid).toBe(profile.bom_sfp_last_regression_run_id);
+    const readerCases = await queryDynamicRecords(reader.page, 'bom_profile_regression_case', [
+      { fieldName: 'bom_prc_run_id', operator: 'EQ', value: profile.bom_sfp_last_regression_run_id },
+    ]);
+    expect(readerCases.map(record => record.pid).sort()).toEqual(regressionCases.map(record => record.pid).sort());
+    await expect(reader.page.getByRole('row').filter({ hasText: String(regressionRuns[0].bom_prr_code) })).toBeVisible();
+    for (const label of ['编辑候选修订', '运行历史样本回归', '晋升为生效版本', '隔离', '废弃修订', '删除'])
+      await expect(reader.page.locator('main').getByRole('button', { name: label, exact: true })).toHaveCount(0);
+    for (const action of ['update', 'promote', 'run_source_format_profile_regression', 'quarantine', 'deprecate', 'delete']) {
+      const command = action === 'run_source_format_profile_regression' ? `bom:${action}` : `bom:${action}_source_format_profile`;
+      await expectCommandDenied(reader.page, command, { reason: 'unauthorized', overrideReason: 'unauthorized' }, profileId, action === 'delete' ? 'delete' : 'update');
+    }
+    expect((await profiles())[0]).toEqual(profile);
+    await reader.page.screenshot({ path: info.outputPath('profile-reader-active.png') });
+  } finally { await reader.context.close(); }
+
   await profileAction('隔离', 'bom:quarantine_source_format_profile', { reason: `E2E quarantine ${marker}` });
   profile = (await profiles())[0];
   expect(profile.bom_sfp_status).toBe('quarantined');
@@ -612,19 +871,6 @@ test('header alias enabled/disabled affects new BOM conversions and preserves pr
   await page.screenshot({ path: info.outputPath('profile-deprecated.png') });
   for (const snapshot of snapshots)
     expect(await queryDynamicRecords(page, 'bom_raw_line_pcba', [{ fieldName: 'bom_raw_task_id', operator: 'EQ', value: snapshot.taskId }])).toEqual(snapshot.raw);
-  const deniedUser = makeQuoteRoleUser('profile-denied-proc', marker.toLowerCase(), ['qo_procurement']);
-  await ensureQuoteRoleUser(page, deniedUser);
-  const denied = await openQuoteRolePage(page.context().browser()!, deniedUser);
-  try {
-    await denied.page.goto(`/p/bom_source_format_profile/view/${profileId}`, { waitUntil: 'domcontentloaded' });
-    await expect(denied.page.locator('main')).toContainText(/Page Unavailable|Access forbidden|Access denied|无权限|未授权|权限不足/i);
-    for (const action of ['update', 'promote', 'run_source_format_profile_regression', 'quarantine', 'deprecate', 'delete']) {
-      const command = action === 'run_source_format_profile_regression' ? `bom:${action}` : `bom:${action}_source_format_profile`;
-      await expectCommandDenied(denied.page, command, { reason: 'unauthorized', overrideReason: 'unauthorized' }, profileId, action === 'delete' ? 'delete' : 'update');
-    }
-    expect((await profiles())[0]).toEqual(profile);
-    await denied.page.screenshot({ path: info.outputPath('profile-denied.png') });
-  } finally { await denied.context.close(); }
   info.annotations.push({ type: 'profile-lifecycle', description: JSON.stringify({ profileId, finalStatus: profile.bom_sfp_status }) });
 
 });
@@ -649,7 +895,8 @@ test(`${kind} rule enabled/disabled changes extracted attributes in real BOM con
   const file = info.outputPath('rule-effect.xlsx');
   fs.writeFileSync(file, XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }));
   await page.goto('/home', { waitUntil: 'domcontentloaded' });
-  // Setup creates only customer/project; all rule changes and conversion starts use UI.
+  // Setup creates isolated material/customer/project; rule changes and conversion starts use UI.
+  await createRecallableMaterial(page, `${marker}-R`, 'resistor', '10kΩ ±1% 0603', '0603');
   const account = await executeCommand(page, 'crm:create_account', { crm_acc_name: marker }, undefined, 'create');
   const customerId = String(account.recordId ?? account.pid ?? account.id ?? '');
   expect(customerId).toBeTruthy();
@@ -1036,16 +1283,9 @@ test('B18-03 part map: mapping applies to a new conversion, prior snapshots stay
   test.setTimeout(600_000);
   const marker = `B18-${Date.now()}`;
   const customerPn = `CUSTPNB18${Date.now()}`;
-  // V2 召回查冻结算力投影:映射目标必须是库内已存在的标准料号(生产语义:
-  // 客户料号 → 内部标准料号),新建料号不在冻结投影中不可召回
-  const libraryMaterial = (
-    await queryDynamicRecords(page, 'bom_material_master', [
-      { fieldName: 'bom_mm_enabled', operator: 'EQ', value: true },
-    ])
-  ).find((row) => String(row.bom_mm_material_code ?? '').startsWith('10'))
-    ?? (await queryDynamicRecords(page, 'bom_material_master', [
-      { fieldName: 'bom_mm_enabled', operator: 'EQ', value: true },
-    ]))[0];
+  // The production writer creates the target and refreshes its frozen recall projection.
+  // A fresh runtime must not depend on a material left by a previous suite.
+  const libraryMaterial = await createRecallableMaterial(page, `${marker}-C`, 'capacitor', '100nF 50V 0402', '0402');
   const mappedMaterial = String(libraryMaterial.bom_mm_material_code);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
@@ -1108,8 +1348,7 @@ test('B18-03 part map: mapping applies to a new conversion, prior snapshots stay
     { fieldName: 'bom_cpm_customer_pn_norm', operator: 'EQ', value: customerPn },
   ]);
   expect(mappings, 'mapping persisted').toHaveLength(1);
-  // 映射目标已在冻结物料库中,无需建料(物料库投影按快照绑定)
-  // V2 召回查物料投影而非主档:建料后刷新投影,新料才进入 K1 召回视野
+  // Refresh after mapping so K1 sees the new customer-part relation.
   await executeCommand(page, 'bom:refresh_material_snapshot', {});
 
   const after = await convert();
@@ -1145,8 +1384,11 @@ test('B18-03 part map: mapping applies to a new conversion, prior snapshots stay
   const dupResponse = page.waitForResponse(r => r.url().includes('/api/meta/commands/execute/bom:create_customer_part_map') && r.request().method() === 'POST');
   await page.getByRole('button', { name: '保存', exact: true }).click();
   const duplicate = await dupResponse;
-  expect(duplicate.status()).toBe(500);
-  const dupBody = await duplicate.json().catch(() => ({}));
+  expect(duplicate.status()).toBe(400);
+  const dupBody = await duplicate.json();
+  await expect(page.getByTestId('dynamic-page-form')).toBeVisible();
+  await expect(page.locator('body')).toContainText('记录已存在，请检查唯一字段后再保存');
+  await expect(page.locator('body')).not.toContainText(/unexpected error|Internal system error|meta_record\.duplicate/i);
   expect(String(dupBody.code)).not.toBe('0');
   expect(JSON.stringify(dupBody)).not.toMatch(/INSERT INTO|SQL:|DuplicateKeyException|Mapper\.xml|mt_bom_customer_part_map|duplicate key/i);
   const finalMappings = await queryDynamicRecords(page, 'bom_customer_part_map', [
@@ -1155,6 +1397,7 @@ test('B18-03 part map: mapping applies to a new conversion, prior snapshots stay
   expect(finalMappings, 'duplicate mapping is rejected without creating another row').toHaveLength(1);
   expect(finalMappings[0].bom_cpm_status).toBe('active');
   expect(finalMappings[0].bom_cpm_material_code).toBe(mappedMaterial);
+  await page.screenshot({ path: info.outputPath('B18-03-duplicate-safe-error.png') });
   await info.attach('B18-03-part-map-evidence', {
     body: JSON.stringify({
       marker,

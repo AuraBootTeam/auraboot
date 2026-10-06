@@ -4,6 +4,7 @@ import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.entity.BindingRule;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.meta.service.CommandHandler;
 import com.auraboot.framework.meta.service.impl.CommandCascadeDeleteExecutor;
 import com.auraboot.framework.meta.service.impl.CommandFieldMapExecutor;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
@@ -13,6 +14,8 @@ import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
+import org.springframework.context.ApplicationContext;
+import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -32,6 +35,7 @@ public class FieldMapPhase implements CommandPhase {
     private final RecordSnapshotReader snapshotReader;
     private final ExtensionRegistry extensionRegistry;
     private final MetaModelService metaModelService;
+    private final ApplicationContext applicationContext;
 
     @Override
     public String name() {
@@ -47,23 +51,21 @@ public class FieldMapPhase implements CommandPhase {
                     ctx.getTenantId(), ctx.getCommand().getModelCode(), ctx.getRequest().getTargetRecordId()));
         }
 
-        // Cascade delete — accept type=delete from execConfig as well so the
-        // request need not redundantly carry operationType.
-        Object execType = ctx.getExecConfig() != null ? ctx.getExecConfig().get("type") : null;
-        boolean isDeleteOperation = "delete".equalsIgnoreCase(ctx.getRequest().getOperationType())
-                || (execType instanceof String s && "delete".equalsIgnoreCase(s));
-        if (isDeleteOperation && !isSoftDeleteModel(ctx.getCommand().getModelCode())) {
-            // Soft-delete models flag the parent only — children must survive (recoverable),
-            // so skip the physical cascade-delete for them.
-            cascadeDeleteExecutor.executeCascadeDeletePhase(ctx.getExecConfig(), ctx.getTenantId(), ctx.getRequest());
-        }
-
         // Field map
         Map<String, Object> fieldMapResults;
-        if (isPluginHandledWithoutDslPersistence(ctx)) {
+        if (isPluginHandledWithoutDslPersistence(ctx) || isSpringHandledWithoutDslPersistence(ctx)) {
             fieldMapResults = new HashMap<>();
-            log.info("Skipping FIELD_MAP for plugin-handled command: {}", ctx.getCommand().getCode());
+            log.info("Skipping FIELD_MAP for handler-owned mutation: {}", ctx.getCommand().getCode());
         } else {
+            // Cascade persistence belongs to the same owner as the parent mutation.
+            // A domain handler must inspect intact dependent records before deleting.
+            Object execType = ctx.getExecConfig() != null ? ctx.getExecConfig().get("type") : null;
+            boolean isDeleteOperation = "delete".equalsIgnoreCase(ctx.getRequest().getOperationType())
+                    || (execType instanceof String s && "delete".equalsIgnoreCase(s));
+            if (isDeleteOperation && !isSoftDeleteModel(ctx.getCommand().getModelCode())) {
+                // Recoverable soft-deleted parents retain their children.
+                cascadeDeleteExecutor.executeCascadeDeletePhase(ctx.getExecConfig(), ctx.getTenantId(), ctx.getRequest());
+            }
             List<BindingRule> fieldMapRules = ctx.getRulesByType().getOrDefault("field_map", Collections.emptyList());
             boolean noBindingRules = fieldMapRules.isEmpty();
             Map<String, Object> ec = ctx.getExecConfig();
@@ -138,6 +140,27 @@ public class FieldMapPhase implements CommandPhase {
                     return !requiresPersistence;
                 })
                 .orElse(false);
+    }
+
+    private boolean isSpringHandledWithoutDslPersistence(CommandPipelineContext ctx) {
+        for (BindingRule rule : ctx.getRulesByType().getOrDefault("handler", Collections.emptyList())) {
+            if (!StringUtils.hasText(rule.getHandlerClass())) {
+                continue;
+            }
+            CommandHandler handler;
+            try {
+                handler = applicationContext.getBean(rule.getHandlerClass(), CommandHandler.class);
+            } catch (NoSuchBeanDefinitionException missingByBeanName) {
+                // Match the same declared handler identity used by HandlerPhase.
+                handler = applicationContext.getBeansOfType(CommandHandler.class).values().stream()
+                        .filter(candidate -> rule.getHandlerClass().equals(candidate.getHandlerName()))
+                        .findFirst().orElseThrow(() -> missingByBeanName);
+            }
+            if (!handler.requiresDslPersistence(ctx.getCommandCode(), ctx.getExecConfig(), ctx.getRequest())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String resolvePluginHandlerCode(String commandCode, Map<String, Object> execConfig) {

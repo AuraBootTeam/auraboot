@@ -46,7 +46,10 @@ export function FieldConfigDialog({ field, onSave, onClose }: FieldConfigDialogP
   }, [config, onSave, onClose, t]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div
+      data-testid="model-field-config-dialog"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+    >
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="rounded-card bg-panel relative flex max-h-[80vh] w-full max-w-3xl flex-col shadow-xl">
         <div className="border-b px-6 py-4">
@@ -68,6 +71,7 @@ export function FieldConfigDialog({ field, onSave, onClose }: FieldConfigDialogP
             {t('common.cancel', undefined, '取消')}
           </button>
           <button
+            data-testid="model-field-config-save"
             onClick={handleSave}
             disabled={saving}
             className="bg-accent rounded px-4 py-2 text-white disabled:opacity-50"

@@ -9,10 +9,10 @@ import {
 import { post } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { useToastContext } from '~/contexts/ToastContext';
+import { useAuth } from '~/contexts/AuthContext';
 import { useI18n } from '~/contexts/I18nContext';
 import { getLocalizedText, type LocalizedText } from '~/utils/i18n';
 import TEXT from './TeamMembers.i18n.json';
-
 function useTeamText() {
   const { locale } = useI18n();
   return useCallback((key: keyof typeof TEXT) => getLocalizedText(TEXT[key], locale), [locale]);
@@ -48,9 +48,16 @@ export function TeamMembersBlock({ block, runtime }: TeamMembersBlockProps) {
   const [loadFailed, setLoadFailed] = useState(false);
   const requestVersion = useRef(0);
   const { showSuccessToast, showErrorToast } = useToastContext();
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission('org.team.manage');
+  const l = (zh: string, en: string) => (locale === 'zh-CN' ? zh : en);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+
+  useEffect(() => {
+    if (!canManage) setShowAddModal(false);
+  }, [canManage]);
 
   const context = runtime?.getContext?.();
   const record = context?.record || context?.row || {};
@@ -88,15 +95,15 @@ export function TeamMembersBlock({ block, runtime }: TeamMembersBlockProps) {
   const existingMemberKeys = useMemo(
     () =>
       members.flatMap((member) =>
-        [member.userId, member.userPid, member.memberPid].filter(
-          (value): value is string => Boolean(value),
+        [member.userId, member.userPid, member.memberPid].filter((value): value is string =>
+          Boolean(value),
         ),
       ),
     [members],
   );
 
   const handleAddMember = async (memberPid: string, role: string) => {
-    if (!teamPid) return;
+    if (!teamPid || !canManage) return;
     try {
       await addTeamMember(teamPid, { memberPid, role });
       showSuccessToast(text('added'));
@@ -108,12 +115,12 @@ export function TeamMembersBlock({ block, runtime }: TeamMembersBlockProps) {
   };
 
   const handleRemoveMember = async (member: TeamMember) => {
-    if (!teamPid) return;
-    const name = member.userName || member.userEmail || member.memberPid || member.pid;
-    if (!window.confirm(text('confirmRemove').replace('{name}', name))) return;
+    if (!teamPid || !canManage) return;
+    const name = member.userName || member.userEmail || l('该成员', 'this member');
+    if (!window.confirm(`确认将 ${name} 移出团队？`)) return;
     try {
-      await removeTeamMember(teamPid, member.memberPid || member.pid);
-      showSuccessToast(text('removed'));
+      await removeTeamMember(teamPid, member.pid);
+      showSuccessToast('成员已移出团队');
       void loadMembers();
     } catch (error) {
       showErrorToast(error instanceof Error ? error.message : text('removeFailure'));
@@ -122,39 +129,44 @@ export function TeamMembersBlock({ block, runtime }: TeamMembersBlockProps) {
 
   if (!teamPid) {
     return (
-      <div className="border-border bg-panel rounded-card border px-5 py-6 text-sm text-text-3">
-        {text('missingTeam')}
+      <div className="border-border bg-panel rounded-card text-text-3 border px-5 py-6 text-sm">
+        未找到团队记录，无法加载成员。
       </div>
     );
   }
 
   return (
-    <section className="border-border bg-panel overflow-hidden rounded-card border shadow-sm">
+    <section className="border-border bg-panel rounded-card overflow-hidden border shadow-sm">
       <div className="border-border flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-2">
-          <UserGroupIcon className="h-5 w-5 shrink-0 text-accent" />
+          <UserGroupIcon className="text-accent h-5 w-5 shrink-0" />
           <div className="min-w-0">
             <h3 className="text-text text-base font-semibold">
               {title} ({members.length})
             </h3>
-            <p className="text-text-3 mt-0.5 text-xs">{text('subtitle')}</p>
+            <p className="text-text-3 mt-0.5 text-xs">
+              {canManage
+                ? l('维护团队成员与团队角色', 'Manage team members and roles')
+                : l('查看团队成员与团队角色', 'View team members and roles')}
+            </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowAddModal(true)}
-          className="bg-accent hover:bg-accent-hover focus-visible:shadow-focus inline-flex h-9 items-center justify-center gap-2 rounded-control px-3.5 text-sm font-medium text-white transition-colors focus:outline-none"
-          disabled={loading || loadFailed}
-          data-testid="team-members-add"
-        >
-          <PlusIcon className="h-4 w-4" />
-          {text('addMember')}
-        </button>
+        {canManage && (
+          <button
+            type="button"
+            onClick={() => setShowAddModal(true)}
+            className="bg-accent hover:bg-accent-hover focus-visible:shadow-focus rounded-control inline-flex h-9 items-center justify-center gap-2 px-3.5 text-sm font-medium text-white transition-colors focus:outline-none"
+            data-testid="team-members-add"
+          >
+            <PlusIcon className="h-4 w-4" />
+            {l('添加成员', 'Add member')}
+          </button>
+        )}
       </div>
 
       {loading ? (
-        <div role="status" aria-label={text('loading')} className="flex justify-center px-6 py-10">
-          <div className="h-7 w-7 animate-spin rounded-full border-2 border-accent border-b-transparent" />
+        <div className="flex justify-center px-6 py-10">
+          <div className="border-accent h-7 w-7 animate-spin rounded-full border-2 border-b-transparent" />
         </div>
       ) : loadFailed ? (
         <div role="alert" className="px-6 py-10 text-center" data-testid="team-members-load-error">
@@ -163,19 +175,23 @@ export function TeamMembersBlock({ block, runtime }: TeamMembersBlockProps) {
         </div>
       ) : members.length === 0 ? (
         <div className="px-6 py-10 text-center">
-          <p className="text-text-2 text-sm font-medium">{text('empty')}</p>
-          <p className="text-text-3 mt-1 text-sm">{text('emptyHint')}</p>
+          <p className="text-text-2 text-sm font-medium">暂无团队成员</p>
+          <p className="text-text-3 mt-1 text-sm">
+            {canManage
+              ? l('添加成员后，他们会出现在这里。', 'Added members will appear here.')
+              : l('此团队尚未添加成员。', 'This team has no members yet.')}
+          </p>
         </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="divide-border min-w-full divide-y">
             <thead className="bg-subtle">
               <tr>
-                <HeaderCell>{text('user')}</HeaderCell>
-                <HeaderCell>{text('email')}</HeaderCell>
-                <HeaderCell>{text('role')}</HeaderCell>
-                <HeaderCell>{text('joined')}</HeaderCell>
-                <HeaderCell align="right">{text('actions')}</HeaderCell>
+                <HeaderCell>用户</HeaderCell>
+                <HeaderCell>邮箱</HeaderCell>
+                <HeaderCell>角色</HeaderCell>
+                <HeaderCell>加入时间</HeaderCell>
+                {canManage && <HeaderCell align="right">{l('操作', 'Actions')}</HeaderCell>}
               </tr>
             </thead>
             <tbody className="divide-border divide-y">
@@ -188,20 +204,20 @@ export function TeamMembersBlock({ block, runtime }: TeamMembersBlockProps) {
                   <td className="px-5 py-3">
                     <RoleBadge role={member.role} />
                   </td>
-                  <td className="text-text-2 px-5 py-3 text-sm">
-                    {formatDate(member.joinedAt, locale)}
-                  </td>
-                  <td className="px-5 py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => void handleRemoveMember(member)}
-                      className="text-text-3 hover:text-status-red focus-visible:shadow-focus inline-flex h-8 w-8 items-center justify-center rounded-control transition-colors focus:outline-none"
-                      title={text('removeMember')}
-                      data-testid={`team-members-remove-${member.memberPid || member.pid}`}
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </button>
-                  </td>
+                  <td className="text-text-2 px-5 py-3 text-sm">{formatDate(member.joinedAt, locale)}</td>
+                  {canManage && (
+                    <td className="px-5 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => void handleRemoveMember(member)}
+                        className="text-text-3 hover:text-status-red focus-visible:shadow-focus rounded-control inline-flex h-8 w-8 items-center justify-center transition-colors focus:outline-none"
+                        title={l('移除成员', 'Remove member')}
+                        data-testid={`team-members-remove-${member.pid}`}
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -209,7 +225,7 @@ export function TeamMembersBlock({ block, runtime }: TeamMembersBlockProps) {
         </div>
       )}
 
-      {showAddModal && (
+      {canManage && showAddModal && (
         <AddMemberModal
           existingMemberKeys={existingMemberKeys}
           onAdd={handleAddMember}
@@ -312,7 +328,7 @@ function AddMemberModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-      <div role="dialog" aria-modal="true" aria-labelledby={dialogTitleId} className="bg-panel border-border w-full max-w-lg overflow-hidden rounded-card border shadow-xl">
+      <div className="bg-panel border-border rounded-card w-full max-w-lg overflow-hidden border shadow-xl">
         <div className="border-border border-b px-6 py-4">
           <h3 id={dialogTitleId} className="text-text text-base font-semibold">{text('modalTitle')}</h3>
         </div>
@@ -333,7 +349,7 @@ function AddMemberModal({
                 value={selectedMemberPid}
                 onChange={(event) => setSelectedMemberPid(event.target.value)}
                 required
-                className="border-border-strong bg-panel text-text focus:border-accent focus-visible:shadow-focus w-full rounded-control border px-3 py-2 text-sm focus:outline-none"
+                className="border-border-strong bg-panel text-text focus:border-accent focus-visible:shadow-focus rounded-control w-full border px-3 py-2 text-sm focus:outline-none"
                 data-testid="team-members-select"
               >
                 <option value="">{text('selectPlaceholder')}</option>
@@ -392,7 +408,7 @@ function RoleBadge({ role }: { role?: string }) {
   const leader = role === 'leader';
   return (
     <span
-      className={`inline-flex rounded-pill px-2.5 py-1 text-xs font-medium ${
+      className={`rounded-pill inline-flex px-2.5 py-1 text-xs font-medium whitespace-nowrap ${
         leader ? 'bg-accent-weak text-accent' : 'bg-hover text-text-2'
       }`}
     >

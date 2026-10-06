@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.exception.ValidationException;
+import com.auraboot.framework.exception.DataNotFoundException;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.organization.mapper.TeamMapper;
@@ -47,6 +48,7 @@ import java.util.Locale;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -177,6 +179,26 @@ public class SavedViewServiceImpl implements SavedViewService {
         validateReadAccess(savedView);
 
         return toDTO(savedView);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void checkPublicShareAccess(String pid) {
+        Long userId = MetaContext.getCurrentUserId();
+        Long tenantId = MetaContext.getCurrentTenantId();
+        if (userId == null || tenantId == null || !StringUtils.hasText(MetaContext.getCurrentUserPid())
+                || !userPermissionService.hasPermission(userId, MetaPermission.VIEW_PUBLIC_SHARE)) {
+            throw new ValidationException(ResponseCode.FORBIDDEN, "Public view sharing is not permitted");
+        }
+        SavedView savedView = savedViewMapper.findByPid(pid);
+        if (savedView == null || !Objects.equals(tenantId, savedView.getTenantId())) {
+            throw new DataNotFoundException(ResponseCode.NOT_FOUND, "Saved view not found");
+        }
+        if (!StringUtils.hasText(savedView.getScope()) || !VIEW_SCOPES.contains(savedView.getScope())) {
+            throw new ValidationException(ResponseCode.FORBIDDEN, "Unknown saved view scope");
+        }
+        validateReadAccess(savedView);
+        validateManageAccess(savedView);
     }
 
     @Override
@@ -1136,7 +1158,9 @@ public class SavedViewServiceImpl implements SavedViewService {
         if (canManage(savedView)) {
             actions.add("manage");
             actions.add("delete");
-            if (savedView != null && (savedView.isTeam() || savedView.isGlobal())) {
+            Long userId = MetaContext.getCurrentUserId();
+            if ((savedView.isTeam() || savedView.isGlobal()) && userId != null
+                    && userPermissionService.hasPermission(userId, MetaPermission.VIEW_PUBLIC_SHARE)) {
                 actions.add("share");
             }
         }

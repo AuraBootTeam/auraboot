@@ -15,7 +15,7 @@ import { ModelPublishReplayResultCard } from './ModelPublishReplayResultCard';
  * - 版本管理
  */
 
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   useNavigate,
   useParams,
@@ -39,7 +39,9 @@ import { FieldListManager } from '~/ui/meta/FieldListManager';
 import { FieldConfigDialog } from '~/ui/meta/FieldConfigDialog';
 import { DictConfigDialog } from '~/ui/meta/DictConfigDialog';
 import { SourceTypeBadge } from '~/shared/components/SourceTypeBadge';
-import type { ModelFieldBinding, Permission, ModelVersion } from '~/types/model';
+import { PermissionGuard } from '~/ui/PermissionGuard';
+import { useSmartText, type LocalizedText } from '~/utils/i18n';
+import type { MetaModelDTO, ModelFieldBinding, Permission, ModelVersion } from '~/types/model';
 
 /**
  * Check whether the given model is a virtual model (non-physical sourceType).
@@ -194,6 +196,20 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
  */
 export default function ModelDetailPage() {
   const { locale, text } = useModelDetailText();
+  const smartText = useSmartText();
+  const statusLabels: Record<string, LocalizedText> = {
+    published: { 'zh-CN': '已发布', en: 'Published' },
+    draft: { 'zh-CN': '草稿', en: 'Draft' },
+    archived: { 'zh-CN': '已归档', en: 'Archived' },
+  };
+  const sourceLabels: Record<string, LocalizedText> = {
+    physical: { 'zh-CN': '物理表', en: 'Physical table' },
+    namedQuery: { 'zh-CN': '命名查询', en: 'Named query' },
+    endpoint: { 'zh-CN': '接口数据', en: 'Endpoint data' },
+    sqlView: { 'zh-CN': '数据库视图', en: 'Database view' },
+  };
+  const statusLabel = (value: string) => smartText(statusLabels[value] ?? { 'zh-CN': '未知状态', en: 'Unknown status' });
+  const sourceLabel = (value?: string) => smartText(sourceLabels[value || 'physical'] ?? { 'zh-CN': '其他来源', en: 'Other source' });
   const navigate = useNavigate();
   const location = useLocation();
   const { pid } = useParams();
@@ -224,7 +240,18 @@ export default function ModelDetailPage() {
   const [fields, setFields] = useState<ModelFieldBinding[]>(initialFields);
   const [permissions] = useState<Permission[]>(initialPermissions);
   const [versions] = useState<ModelVersion[]>(initialVersions);
+  const [viewedVersion, setViewedVersion] = useState<MetaModelDTO | null>(null);
+  const [viewingVersion, setViewingVersion] = useState<number | null>(null);
+  const [versionReadError, setVersionReadError] = useState<string | null>(null);
+  const versionReadGeneration = useRef(0);
   const [pages, setPages] = useState<any[]>(initialPages);
+
+  useEffect(() => {
+    setViewedVersion(null);
+    setViewingVersion(null);
+    setVersionReadError(null);
+    return () => { versionReadGeneration.current += 1; };
+  }, [model.code]);
 
   // 加载状态
   const [loading, setLoading] = useState(false);
@@ -465,8 +492,8 @@ export default function ModelDetailPage() {
         if (!fieldCode) throw new Error('Missing field code for binding update');
         await modelService.updateFieldBinding(pid!, fieldCode, binding);
 
-        // 更新本地状态
-        setFields(fields.map((f) => (f.id === configField.id ? { ...f, ...binding } : f)));
+        const savedFields = await modelService.getModelFields(pid!);
+        setFields(savedFields);
 
         showSuccessToast(text('fieldConfigUpdated'));
       } catch (error) {
@@ -919,11 +946,23 @@ export default function ModelDetailPage() {
    * 查看版本详情
    */
   const handleViewVersion = useCallback(
-    (version: number) => {
-      // TODO: 实现版本详情查看
-      showSuccessToast(text('viewVersionWip', { version }));
+    async (version: number) => {
+      const generation = ++versionReadGeneration.current;
+      setViewedVersion(null);
+      setVersionReadError(null);
+      setViewingVersion(version);
+      try {
+        const detail = await modelService.getVersionDetail(model.code, version);
+        if (generation === versionReadGeneration.current) setViewedVersion(detail);
+      } catch {
+        if (generation === versionReadGeneration.current) {
+          setVersionReadError(smartText({ 'zh-CN': '无法读取版本详情，请重试。', en: 'Could not read this version. Please try again.' }));
+        }
+      } finally {
+        if (generation === versionReadGeneration.current) setViewingVersion(null);
+      }
     },
-    [showSuccessToast, text],
+    [model.code, smartText],
   );
 
   /**
@@ -954,10 +993,10 @@ export default function ModelDetailPage() {
   );
 
   return (
-    <div className="mx-auto max-w-7xl p-6">
+    <div className="mx-auto w-full min-w-0 max-w-7xl p-6">
       <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-4">
+          <div className="min-w-0 flex-1 space-y-4">
             <div>
               <div className="mb-2 flex flex-wrap items-center gap-2">
                 <span
@@ -975,9 +1014,9 @@ export default function ModelDetailPage() {
                 </span>
                 <SourceTypeBadge sourceType={model.sourceType} />
               </div>
-              <h1 className="text-2xl font-bold text-gray-900">{model.displayName}</h1>
-              <p className="mt-1 text-sm text-gray-500">
-                {text('modelCodePrefix')} <span className="font-mono text-blue-600">{model.code}</span>
+              <h1 className="break-words text-2xl font-bold text-gray-900">{model.displayName}</h1>
+              <p className="mt-1 break-words text-sm text-gray-500">
+                模型编码: <span className="break-all font-mono text-blue-600">{model.code}</span>
                 {model.description && ` · ${model.description}`}
               </p>
             </div>
@@ -1004,14 +1043,14 @@ export default function ModelDetailPage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 lg:max-w-md lg:justify-end">
-            <button
+          <div className="flex min-w-0 flex-wrap items-center gap-2 lg:max-w-md lg:justify-end">
+            <PermissionGuard permission={hasGeneratedPages ? "page.page.manage" : "meta.page.update"}><button
               data-testid="model-primary-page-action"
               onClick={handlePrimaryPageAction}
               className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
             >
-              {hasGeneratedPages ? text('actionOpenPageDesign') : text('actionGenerateCrud')}
-            </button>
+              {hasGeneratedPages ? '打开页面设计' : '生成基础 CRUD'}
+            </button></PermissionGuard>
             {hasGeneratedPages && (
               <button
                 data-testid="model-primary-page-preview"
@@ -1021,65 +1060,68 @@ export default function ModelDetailPage() {
                 {text('actionPreviewMainPage')}
               </button>
             )}
-            <button
-              onClick={handleEdit}
-              className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 focus:outline-none"
-              disabled={loading}
-            >
-              {text('actionEditModel')}
-            </button>
-            <details className="group relative">
-              <summary
-                data-testid="model-more-actions"
-                className="list-none rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 focus:outline-none"
+            <PermissionGuard permission="meta.model.update">
+              <button
+                data-testid="model-edit-action"
+                onClick={handleEdit}
+                className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 focus:outline-none"
+                disabled={loading}
               >
-                {text('moreActions')}
-              </summary>
-              <div className="absolute right-0 z-10 mt-2 w-44 rounded-xl border border-gray-200 bg-white p-2 shadow-lg">
-                {model.status === 'draft' && (
+                编辑模型
+              </button>
+              <details className="group relative">
+                <summary
+                  data-testid="model-more-actions"
+                  className="list-none rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 focus:outline-none"
+                >
+                  更多
+                </summary>
+                <div className="absolute right-0 z-10 mt-2 w-44 rounded-xl border border-gray-200 bg-white p-2 shadow-lg">
+                  {model.status === 'draft' && (
+                    <button
+                      data-testid="model-publish-action"
+                      onClick={handlePublishClick}
+                      className="block w-full rounded-lg px-3 py-2 text-left text-sm text-green-700 hover:bg-green-50"
+                      disabled={loading || publishLoading}
+                    >
+                      {publishLoading ? '加载中...' : '发布模型'}
+                    </button>
+                  )}
+                  {model.status === 'published' && (
+                    <button
+                      onClick={handleUnpublish}
+                      className="block w-full rounded-lg px-3 py-2 text-left text-sm text-amber-700 hover:bg-amber-50"
+                      disabled={loading}
+                    >
+                      取消发布
+                    </button>
+                  )}
                   <button
-                    data-testid="model-publish-action"
-                    onClick={handlePublishClick}
-                    className="block w-full rounded-lg px-3 py-2 text-left text-sm text-green-700 hover:bg-green-50"
-                    disabled={loading || publishLoading}
-                  >
-                    {publishLoading ? text('loading') : text('actionPublishModel')}
-                  </button>
-                )}
-                {model.status === 'published' && (
-                  <button
-                    onClick={handleUnpublish}
-                    className="block w-full rounded-lg px-3 py-2 text-left text-sm text-amber-700 hover:bg-amber-50"
+                    onClick={handleRefreshCache}
+                    className="block w-full rounded-lg px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
                     disabled={loading}
                   >
-                    {text('actionUnpublish')}
+                    刷新缓存
                   </button>
-                )}
-                <button
-                  onClick={handleRefreshCache}
-                  className="block w-full rounded-lg px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-                  disabled={loading}
-                >
-                  {text('actionRefreshCache')}
-                </button>
-                {isVirtualModel(model) && (
+                  {isVirtualModel(model) && (
+                    <button
+                      className="block w-full rounded-lg px-3 py-2 text-left text-sm text-blue-700 hover:bg-blue-50"
+                      onClick={() => triggerRedetection(model.pid)}
+                      data-testid="redetect-btn"
+                    >
+                      重新检测
+                    </button>
+                  )}
                   <button
-                    className="block w-full rounded-lg px-3 py-2 text-left text-sm text-blue-700 hover:bg-blue-50"
-                    onClick={() => triggerRedetection(model.pid)}
-                    data-testid="redetect-btn"
+                    onClick={handleDelete}
+                    className="block w-full rounded-lg px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50"
+                    disabled={loading}
                   >
-                    {text('actionRedetect')}
+                    删除模型
                   </button>
-                )}
-                <button
-                  onClick={handleDelete}
-                  className="block w-full rounded-lg px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50"
-                  disabled={loading}
-                >
-                  {text('actionDeleteModel')}
-                </button>
-              </div>
-            </details>
+                </div>
+              </details>
+            </PermissionGuard>
           </div>
         </div>
       </div>
@@ -1193,20 +1235,20 @@ export default function ModelDetailPage() {
                   <h2 className="mb-4 text-sm font-semibold tracking-wide text-gray-900">{text('sectionModelInfo')}</h2>
                   <div className="grid grid-cols-2 gap-5">
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">{text('labelModelCode')}</label>
-                      <div className="font-mono text-sm text-gray-900">{model.code}</div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">模型编码</label>
+                      <div className="break-all font-mono text-sm text-gray-900">{model.code}</div>
                     </div>
                     <div>
                       <label className="mb-1 block text-sm font-medium text-gray-700">{text('labelDisplayName')}</label>
                       <div className="text-sm text-gray-900">{model.displayName}</div>
                     </div>
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">{text('labelStatus')}</label>
-                      <div className="text-sm text-gray-900">{model.status}</div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">状态</label>
+                      <div className="text-sm text-gray-900">{statusLabel(model.status)}</div>
                     </div>
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">{text('labelSource')}</label>
-                      <div className="text-sm text-gray-900">{model.sourceType || 'physical'}</div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">来源</label>
+                      <div className="text-sm text-gray-900">{sourceLabel(model.sourceType)}</div>
                     </div>
                     <div>
                       <label className="mb-1 block text-sm font-medium text-gray-700">{text('labelNamespace')}</label>
@@ -1260,12 +1302,12 @@ export default function ModelDetailPage() {
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <button
+                      <PermissionGuard permission={hasGeneratedPages ? "page.page.manage" : "meta.page.update"}><button
                         onClick={handlePrimaryPageAction}
                         className="rounded-md bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700"
                       >
-                        {hasGeneratedPages ? text('actionOpenPageDesign') : text('actionGenerateCrud')}
-                      </button>
+                        {hasGeneratedPages ? '打开页面设计' : '生成基础 CRUD'}
+                      </button></PermissionGuard>
                       <button
                         data-testid="overview-page-workbench-link"
                         onClick={() => handleTabChange('pages')}
@@ -1331,6 +1373,7 @@ export default function ModelDetailPage() {
           {/* 版本Tab */}
           {activeTab === 'versions' && (
             <div>
+              {versionReadError && <p role="alert" data-testid="model-version-read-error" className="mb-3 text-sm text-red-700">{versionReadError}</p>}
               {versions.length === 0 ? (
                 <div className="py-12 text-center">
                   <p className="text-gray-500">{text('noVersionHistory')}</p>
@@ -1359,7 +1402,7 @@ export default function ModelDetailPage() {
                                     : 'bg-gray-100 text-gray-800'
                               }`}
                             >
-                              {version.status}
+                              {statusLabel(version.status)}
                             </span>
                           </div>
                           <p className="mt-1 text-sm text-gray-500">
@@ -1371,21 +1414,35 @@ export default function ModelDetailPage() {
                         </div>
                         <div className="flex gap-2">
                           <button
+                            data-testid={`model-version-view-${version.version}`}
                             onClick={() => handleViewVersion(version.version)}
-                            className="text-sm text-blue-600 hover:text-blue-900"
+                            disabled={viewingVersion === version.version}
+                            className="text-sm text-blue-600 hover:text-blue-900 disabled:opacity-50"
                           >
-                            {text('actionView')}
+                            {viewingVersion === version.version
+                              ? smartText({ 'zh-CN': '读取中…', en: 'Loading…' })
+                              : smartText({ 'zh-CN': '查看', en: 'View' })}
                           </button>
                           {!version.isCurrent && (
-                            <button
-                              onClick={() => handleRollbackToVersion(version.version)}
-                              className="text-sm text-orange-600 hover:text-orange-900"
-                            >
-                              {text('actionRollback')}
-                            </button>
+                            <PermissionGuard permission="meta.model.update">
+                              <button
+                                onClick={() => handleRollbackToVersion(version.version)}
+                                className="text-sm text-orange-600 hover:text-orange-900"
+                              >
+                                回滚
+                              </button>
+                            </PermissionGuard>
                           )}
                         </div>
                       </div>
+                      {viewedVersion?.version === version.version && (
+                        <dl data-testid="model-version-detail" data-version={viewedVersion.version} className="border-border bg-subtle mt-3 grid grid-cols-1 gap-3 rounded-lg border p-3 text-sm sm:grid-cols-2">
+                          <div><dt className="text-text-2">{smartText({ 'zh-CN': '名称', en: 'Name' })}</dt><dd className="break-words font-medium">{viewedVersion.displayName}</dd></div>
+                          <div><dt className="text-text-2">{smartText({ 'zh-CN': '版本', en: 'Version' })}</dt><dd>{viewedVersion.version}</dd></div>
+                          <div><dt className="text-text-2">{smartText({ 'zh-CN': '状态', en: 'Status' })}</dt><dd>{statusLabel(viewedVersion.status)}</dd></div>
+                          <div><dt className="text-text-2">{smartText({ 'zh-CN': '说明', en: 'Description' })}</dt><dd className="whitespace-pre-wrap break-words">{viewedVersion.description || smartText({ 'zh-CN': '暂无说明', en: 'No description' })}</dd></div>
+                        </dl>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1411,13 +1468,13 @@ export default function ModelDetailPage() {
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <button
+                      <PermissionGuard permission="meta.page.update"><button
                         data-testid="pages-empty-generate-crud"
                         onClick={handleOpenCrudWizard}
                         className="rounded-md bg-green-600 px-3 py-2 text-sm text-white hover:bg-green-700"
                       >
-                        {text('actionGenerateCrudOneClick')}
-                      </button>
+                        一键生成 CRUD
+                      </button></PermissionGuard>
                       <button
                         data-testid="pages-empty-create-page"
                         onClick={() => handleCreatePage()}

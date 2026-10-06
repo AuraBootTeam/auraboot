@@ -3,9 +3,14 @@ import { MemoryRouter, useParams, useSearchParams } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import DashboardViewByCode from '../view.$code';
 
-const { findByCode, dashboardViewer } = vi.hoisted(() => ({
+const { findByCode, dashboardViewer, hasPermission } = vi.hoisted(() => ({
   findByCode: vi.fn(),
   dashboardViewer: vi.fn(),
+  hasPermission: vi.fn(),
+}));
+
+vi.mock('~/contexts/AuthContext', () => ({
+  usePermissions: () => ({ hasPermission }),
 }));
 
 vi.mock('~/plugins/core-dashboard/services/dashboardService', () => ({
@@ -39,6 +44,7 @@ vi.mock('~/contexts/I18nContext', () => ({
 
 describe('DashboardViewByCode responsive header', () => {
   beforeEach(() => {
+    hasPermission.mockReset().mockReturnValue(true);
     dashboardViewer.mockReset();
     vi.mocked(useParams).mockReturnValue({ code: 'billing_dashboard' });
     vi.mocked(useSearchParams).mockReturnValue([new URLSearchParams(), vi.fn()]);
@@ -50,6 +56,30 @@ describe('DashboardViewByCode responsive header', () => {
       widgets: [],
       layoutConfig: { columns: 12, rowHeight: 80, gap: 16 },
     });
+  });
+
+  it('keeps the dashboard visible without offering edit to a read-only user', async () => {
+    hasPermission.mockImplementation(code => code === 'dashboard.read');
+    render(<MemoryRouter><DashboardViewByCode /></MemoryRouter>);
+    await screen.findByTestId('dashboard-viewer');
+    expect(screen.queryByRole('link', { name: '编辑' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '刷新' })).toBeVisible();
+  });
+
+  it('offers the existing designer only when dashboard.update is granted', async () => {
+    hasPermission.mockImplementation(code => code === 'dashboard.update');
+    render(<MemoryRouter><DashboardViewByCode /></MemoryRouter>);
+    expect(await screen.findByRole('link', { name: '编辑' }))
+      .toHaveAttribute('href', '/dashboard-designer/dashboard-pid');
+  });
+
+  it('removes the edit entry when write permission is revoked', async () => {
+    const view = render(<MemoryRouter><DashboardViewByCode /></MemoryRouter>);
+    await screen.findByRole('link', { name: '编辑' });
+    hasPermission.mockReturnValue(false);
+    view.rerender(<MemoryRouter><DashboardViewByCode /></MemoryRouter>);
+    expect(screen.queryByRole('link', { name: '编辑' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('dashboard-viewer')).toBeVisible();
   });
 
   it('materializes record-scoped widget data and drill-down values from the URL', async () => {

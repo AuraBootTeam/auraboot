@@ -57,6 +57,10 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
             Object expectedVersion,
             String compareColumn,
             Object compareValue){
+        return executeScopedUpdate(model, modelCode, primaryKeyColumn, recordId, columnData, jsonbColumns, expectedVersion, compareColumn, compareValue, "update");
+    }
+
+    int executeScopedUpdate(ModelDefinition model, String modelCode, String primaryKeyColumn, String recordId, Map<String,Object> columnData, Set<String> jsonbColumns, Object expectedVersion, String compareColumn, Object compareValue, String permissionOperation){
         if (columnData == null || columnData.isEmpty()) {
             throw new MetaServiceException("Update data cannot be empty");
         }
@@ -125,7 +129,7 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
                     .append(" IS NOT DISTINCT FROM #{params.compareValue}");
         }
         appendAggregateBindingGuard(sql, params, model);
-        appendScopedWriteGuards(sql, tenantId, modelCode, userId, "update");
+        appendScopedWriteGuards(sql, tenantId, modelCode, userId, permissionOperation);
 
         return dynamicDataMapper.updateByQuery(sql.toString(), params);
     }
@@ -201,7 +205,7 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
         }
 
         try {
-            String rowFilter = resolveWriteRowFilter(tenantId, modelCode, userId);
+            String rowFilter = resolveWriteRowFilter(tenantId, modelCode, userId, operation);
             appendScopedBulkFilter(sql, rowFilter);
         } catch (Exception e) {
             log.error("Failed to apply row-level data permission for {} on model {} — denying access",
@@ -221,12 +225,15 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
     }
 
     String resolveWriteRowFilter(Long tenantId, String modelCode, Long userId){
+        return resolveWriteRowFilter(tenantId, modelCode, userId, "update");
+    }
+
+    String resolveWriteRowFilter(Long tenantId, String modelCode, Long userId, String operation){
         String permitFilter = CommandPermitDataAccess.rowFilter(modelCode, userId);
         if (permitFilter != null) {
             return permitFilter;
         }
-        return DynamicDataQueryScope.rowFilter(tenantId, modelCode, userId,
-                () -> dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId));
+        return dataPermissionEngine.buildRowFilter(tenantId, modelCode, operation, userId);
     }
 
     void appendScopedBulkFilter(StringBuilder sql, String filter){

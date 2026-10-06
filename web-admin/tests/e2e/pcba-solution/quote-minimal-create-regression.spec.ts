@@ -463,6 +463,29 @@ test.describe('PCBA quote minimal create regression', () => {
         timeout: 20_000,
       });
       await expect(page.getByRole('tab', { name: /BOM价格计算|BOM Price/i })).toBeVisible();
+      await page.getByRole('tab', { name: /资料上传|Source Upload/ }).click();
+      const materialRow = page.getByRole('row').filter({ hasText: path.basename(cplFixture) });
+      await expect(materialRow).toBeVisible();
+      const uploadedAt = materialRow.getByRole('cell').nth(4);
+      await expect(uploadedAt).toHaveText(/\d{4}\/\d{1,2}\/\d{1,2}\s+\d{1,2}:\d{2}:\d{2}/);
+      await expect(uploadedAt).not.toContainText(/\d{4}-\d{2}-\d{2}T/);
+      const fileLink = materialRow.getByRole('link', { name: '下载文件', exact: true });
+      const fileHref = await fileLink.getAttribute('href');
+      expect(fileHref).toMatch(/^\/api\/file\/download\/[^/]+$/);
+      const detailUrlBeforeDownload = page.url();
+      const openPagesBeforeDownload = page.context().pages().length;
+      const downloadEvent = page.waitForEvent('download');
+      await fileLink.click();
+      const downloaded = await downloadEvent;
+      expect(downloaded.url()).toBe(new URL(fileHref!, page.url()).href);
+      expect(downloaded.suggestedFilename()).toBe(path.basename(cplFixture));
+      const downloadedPath = testInfo.outputPath('uploaded-cpl-readback.csv');
+      await downloaded.saveAs(downloadedPath);
+      expect(fs.readFileSync(downloadedPath)).toEqual(fs.readFileSync(cplFixture));
+      expect(page.url()).toBe(detailUrlBeforeDownload);
+      expect(page.context().pages()).toHaveLength(openPagesBeforeDownload);
+      await page.screenshot({ path: testInfo.outputPath('created-quote-upload-readback.png'), fullPage: true });
+
       // Materials upload is create-only now: the detail toolbar keeps only the
       // pricing-input mutation, and no upload buttons may reappear.
       await expect(page.getByTestId('toolbar-btn-upload_gerber_package')).toHaveCount(0);

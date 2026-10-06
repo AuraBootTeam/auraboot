@@ -206,14 +206,23 @@ test.describe('Purchase price library deep golden as qo_procurement @smoke', () 
         if ((await searchButton.count()) > 0) await searchButton.first().click();
         else await page.keyboard.press('Enter');
       }
-      await expect(page.locator(`table tbody tr:has-text("${partNos[0]}")`).first()).toBeVisible({
-        timeout: 20_000,
-      });
+      const importedRow = page.getByRole('row').filter({ hasText: partNos[0] });
+      await expect(importedRow).toHaveCount(1);
+      await expect(importedRow).toBeVisible({ timeout: 20_000 });
+      step = 'inspect imported price row';
+      await expect(page).toHaveURL(url => url.pathname === '/p/qo_offline_material_price_common' && url.searchParams.get('keyword') === partNos[0]);
+      const libraryUrl = page.url();
+      await importedRow.click();
+      expect(page.url()).toBe(libraryUrl);
+      await expect(importedRow).toBeVisible();
+      await expect(importButton).toBeVisible();
+      await expect(page.locator('main')).not.toContainText(/Page Unavailable|页面不可用|加载失败/);
 
       // 4. hard gates
       expect(consoleIssues, `console issues:\n${consoleIssues.join('\n')}`).toEqual([]);
       const hits = forbidden.map((h) => `[${h.step}] ${h.status} ${h.url}`);
       expect(hits, `forbidden API hits as qo_procurement:\n${hits.join('\n')}`).toEqual([]);
+      await page.screenshot({ path: testInfo.outputPath('procurement-imported-price-library.png'), fullPage: true });
     } finally {
       await context.close();
     }

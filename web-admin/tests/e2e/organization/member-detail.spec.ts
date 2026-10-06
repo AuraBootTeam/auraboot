@@ -17,9 +17,10 @@
  */
 
 import { test, expect } from '../../fixtures';
-import { uniqueId, navigateToDynamicPage } from '../helpers';
+import { navigateToDynamicPage } from '../helpers';
 import { BASE_URL } from '../../helpers/playwright-env';
 const MEMBER_PAGE_KEY = 'tenant-member';
+test.use({ locale: 'zh-CN' });
 
 // ---------------------------------------------------------------------------
 // Shared: get first member pid via API
@@ -48,12 +49,16 @@ test.describe('MEMBER-MENU: Sidebar Organization menu', () => {
     // Navigate to any page first, clear the sidebar-collapsed flag, then navigate
     // to the member page (which is in org_management submenu) so 组织管理 auto-expands.
     await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
-    await page.evaluate(() => { localStorage.removeItem('sidebar-collapsed'); });
+    await page.evaluate(() => {
+      localStorage.removeItem('sidebar-collapsed');
+    });
 
-    const listResp = page.waitForResponse(
-      (r) => r.url().includes('/api/dynamic/tenant-member') && r.status() === 200,
-      { timeout: 10000 },
-    ).catch(() => null);
+    const listResp = page
+      .waitForResponse(
+        (r) => r.url().includes('/api/dynamic/tenant-member') && r.status() === 200,
+        { timeout: 10000 },
+      )
+      .catch(() => null);
     await page.goto('/p/tenant_member', { waitUntil: 'domcontentloaded' });
     await listResp;
 
@@ -61,7 +66,10 @@ test.describe('MEMBER-MENU: Sidebar Organization menu', () => {
 
     // 组织管理 parent menu label should be visible in the expanded sidebar submenu button
     // (SidebarSubmenu renders it as a <button> with the menu name)
-    const orgGroupBtn = nav.locator('button').filter({ hasText: /组织管理/ }).first();
+    const orgGroupBtn = nav
+      .locator('button')
+      .filter({ hasText: /组织管理/ })
+      .first();
     await expect(orgGroupBtn).toBeVisible({ timeout: 10000 });
 
     // Members should be visible under Organization
@@ -134,7 +142,7 @@ test.describe('MEMBER-DETAIL: Detail page', () => {
     // Status badge visible
     const statusBadge = page.locator('[data-testid="member-status"]');
     await expect(statusBadge).toBeVisible();
-    const statusText = await statusBadge.textContent();
+    const statusText = await statusBadge.getAttribute('data-status');
     expect(['active', 'pending', 'suspended', 'rejected', 'inactive']).toContain(statusText);
   });
 
@@ -168,8 +176,9 @@ test.describe('MEMBER-DETAIL: Detail page', () => {
     await expect(tabContent).toBeVisible();
 
     // Either has employee data fields or empty state message
-    const hasOrgData = await tabContent.locator('dl').count() > 0;
-    const hasEmptyState = await tabContent.getByText(/No organization info|暂无组织信息/i).count() > 0;
+    const hasOrgData = (await tabContent.locator('dl').count()) > 0;
+    const hasEmptyState =
+      (await tabContent.getByText(/No organization info|暂无组织信息/i).count()) > 0;
     expect(hasOrgData || hasEmptyState).toBeTruthy();
   });
 
@@ -185,8 +194,9 @@ test.describe('MEMBER-DETAIL: Detail page', () => {
     const tabContent = page.locator('[data-testid="tab-content"]');
     await expect(tabContent).toBeVisible();
 
-    const hasTeamTable = await tabContent.locator('table').count() > 0;
-    const hasEmptyState = await tabContent.getByText(/Not a member of any team|暂未加入任何团队/i).count() > 0;
+    const hasTeamTable = (await tabContent.locator('table').count()) > 0;
+    const hasEmptyState =
+      (await tabContent.getByText(/Not a member of any team|暂未加入任何团队/i).count()) > 0;
     expect(hasTeamTable || hasEmptyState).toBeTruthy();
   });
 
@@ -197,7 +207,7 @@ test.describe('MEMBER-DETAIL: Detail page', () => {
     await expect(actionBar).toBeVisible({ timeout: 10000 });
 
     const statusBadge = page.locator('[data-testid="member-status"]');
-    const status = await statusBadge.textContent();
+    const status = await statusBadge.getAttribute('data-status');
 
     // Delete button always present
     await expect(actionBar.getByText(/Delete|删除/)).toBeVisible();

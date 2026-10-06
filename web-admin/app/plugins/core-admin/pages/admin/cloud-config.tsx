@@ -62,6 +62,8 @@ export default function CloudConfigPage() {
     handleTest,
     handleToggleEnabled,
     handleSave,
+    saveReadbackPending,
+    retrySaveReadback,
   } = useCloudConfigs();
 
   const [activeTab, setActiveTab] = useState<ServiceType>('sms');
@@ -198,6 +200,8 @@ export default function CloudConfigPage() {
           serviceTypes={PAGE_SERVICE_TYPES}
           onClose={() => setShowEditor(false)}
           onSave={handleSave}
+          saveReadbackPending={saveReadbackPending}
+          onRetryReadback={retrySaveReadback}
         />
       )}
     </div>

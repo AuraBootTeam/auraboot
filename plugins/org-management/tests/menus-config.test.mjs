@@ -147,6 +147,10 @@ describe('org-management RBAC menu configuration', () => {
     const openAccountButton = actionButtons.find((button) => button.code === 'open_account');
     assert.equal(openAccountButton.action.type, 'command');
     assert.equal(openAccountButton.action.command, 'org:open_employee_account');
+    assert.deepEqual(employeeOpenAccountCommand.permissions, [openAccountButton.permissionCode]);
     assert.equal(openAccountButton.label['zh-CN'], '开通账号');
+    for (const button of actionButtons) assert.equal(button.permissionCode, 'org.hr.manage', button.code);
+    const create = employeeListPage.blocks.find(block => block.id === 'block_emp_toolbar').buttons[0];
+    assert.equal(create.permissionCode, employeeCreateCommand.permissions[0]);
   });
 });

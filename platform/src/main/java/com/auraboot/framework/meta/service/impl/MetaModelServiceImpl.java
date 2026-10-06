@@ -641,7 +641,11 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         MetaModelDTO dto = convertToMetaModelDTO(model);
 
         // 自动分配 permissions
-        autoPermissionAssignmentService.autoAssignPermissions(request.getCode(), null);
+        if (StringUtils.hasText(model.getPluginPid())) {
+            autoPermissionAssignmentService.registerPermissions(model.getCode(), null, model.getTenantId());
+        } else {
+            autoPermissionAssignmentService.autoAssignPermissions(request.getCode(), null);
+        }
         log.info("Auto permission assignment completed for model: {}", logSafe(request.getCode()));
 
         return dto;
@@ -1568,7 +1572,11 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         log.info("Model published successfully: pid={}, code={}", logSafe(pid), logSafe(model.getCode()));
 
         // Auto-create hierarchical permissions for the published model
-        autoPermissionAssignmentService.autoAssignPermissions(model.getCode(), null);
+        if (StringUtils.hasText(model.getPluginPid())) {
+            autoPermissionAssignmentService.registerPermissions(model.getCode(), null, model.getTenantId());
+        } else {
+            autoPermissionAssignmentService.autoAssignPermissions(model.getCode(), null);
+        }
         log.info("Hierarchical permissions created for model: {}", logSafe(model.getCode()));
 
         // Invalidate roll-up field registry (model fields may include rollUp config)

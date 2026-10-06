@@ -125,13 +125,13 @@
   },
   {
     "code": "org_emp_status",
-    "name:zh-CN": "员工状态",
+    "name:zh-CN": "人员状态",
     "name:en": "Employee Status",
     "dictType": "static",
     "items": [
       {
         "value": "active",
-        "label:zh-CN": "启用",
+        "label:zh-CN": "在职",
         "label:en": "Active",
         "sortNo": 1,
         "color": "#52c41a",
@@ -151,7 +151,7 @@
       },
       {
         "value": "resigned",
-        "label:zh-CN": "离职",
+        "label:zh-CN": "已离职",
         "label:en": "Resigned",
         "sortNo": 3,
         "color": "#d9d9d9",

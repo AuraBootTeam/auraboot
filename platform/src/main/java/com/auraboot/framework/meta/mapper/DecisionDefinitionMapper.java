@@ -35,8 +35,8 @@ public interface DecisionDefinitionMapper extends BaseMapper<DecisionDefinition>
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insertIdempotent(DecisionDefinition definition);
 
-    @Select("SELECT * FROM ab_decision_definition WHERE pid = #{pid} AND deleted_flag = false")
-    DecisionDefinition findByPid(@Param("pid") String pid);
+    @Select("SELECT * FROM ab_decision_definition WHERE tenant_id = #{tenantId} AND pid = #{pid} AND deleted_flag = false")
+    DecisionDefinition findByPid(@Param("tenantId") Long tenantId, @Param("pid") String pid);
 
     @Select("""
         SELECT * FROM ab_decision_definition
@@ -75,10 +75,10 @@ public interface DecisionDefinitionMapper extends BaseMapper<DecisionDefinition>
     @Update("""
         UPDATE ab_decision_definition
         SET is_current = TRUE, status = #{status}, updated_at = NOW()
-        WHERE id = #{id}
+        WHERE tenant_id = #{tenantId} AND id = #{id}
         """)
-    int publishById(@Param("id") Long id, @Param("status") String status);
+    int publishById(@Param("tenantId") Long tenantId, @Param("id") Long id, @Param("status") String status);
 
-    @Update("UPDATE ab_decision_definition SET deleted_flag = TRUE, updated_at = NOW() WHERE pid = #{pid}")
-    int softDelete(@Param("pid") String pid);
+    @Update("UPDATE ab_decision_definition SET deleted_flag = TRUE, updated_at = NOW() WHERE tenant_id = #{tenantId} AND pid = #{pid}")
+    int softDelete(@Param("tenantId") Long tenantId, @Param("pid") String pid);
 }

@@ -89,20 +89,28 @@ class AdminBootstrapInternalSystemPermissionsTest extends BaseIntegrationTest {
         Long tenantId = getTestTenant().getId();
         Long userId = getTestUser().getId();
 
+        // The default template does not create viewer. Materialize this actual
+        // non-template role before bootstrap so absence cannot make the assertion pass.
+        Role viewer = findRole(tenantId, "viewer");
+        if (viewer == null) {
+            var request = new Role();
+            request.setTenantId(tenantId);
+            request.setCode("viewer");
+            request.setName("Bootstrap PII boundary fixture");
+            request.setStatus("active");
+            viewer = roleService.createRole(request);
+        }
+        Long viewerId = viewer.getId();
+        assertThat(viewerId).isNotNull();
+        assertThat(rolePermissionMapper.findPermissionIdsByRoles(List.of(viewerId))).isEmpty();
         BootstrapResult result = tenantBootstrapService.bootstrapTenant(tenantId, userId);
         assertThat(result.isSuccess()).isTrue();
 
         Permission sysUserRead = permissionMapper.findByCode("model.sys_user.read");
         assertThat(sysUserRead).isNotNull();
 
-        Role viewer = findRole(tenantId, "viewer");
-        if (viewer == null) {
-            // default-bootstrap.json may or may not materialize a viewer role;
-            // if it does not exist there is nothing to assert on.
-            return;
-        }
-
-        assertThat(rolePermissionMapper.findByRoleAndPermission(viewer.getId(), sysUserRead.getId()))
+        assertThat(findRole(tenantId, "viewer").getId()).isEqualTo(viewerId);
+        assertThat(rolePermissionMapper.findByRoleAndPermission(viewerId, sysUserRead.getId()))
             .as("viewer must NOT be granted model.sys_user.read to avoid leaking the user directory")
             .isNull();
     }

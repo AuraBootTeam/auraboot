@@ -19,6 +19,7 @@ import {
 } from '@heroicons/react/24/outline';
 import {
   useCloudConfigs,
+  SaveReadbackNotice,
   PROVIDER_LABELS,
   PROVIDER_FIELDS,
   PROVIDERS_BY_TYPE,
@@ -185,8 +186,9 @@ export function meta() {
 
 export default function LlmProvidersPage() {
   const { t } = useI18n();
-  const { hasPermission } = useAuth();
-  const canManageProviders = hasPermission('ai_center') || hasPermission('system_management');
+  const { hasPermission, hasRole } = useAuth();
+  const canManagePlatform = hasRole('platform_admin');
+  const canManageProviders = hasPermission('ai_center');
   const {
     configs,
     loading,
@@ -196,7 +198,9 @@ export default function LlmProvidersPage() {
     handleDelete,
     handleToggleEnabled,
     handleSave,
-  } = useCloudConfigs();
+    saveReadbackPending,
+    retrySaveReadback,
+  } = useCloudConfigs({ apiBase: '/api/llm-config', initialLevel: canManagePlatform ? 'platform' : 'tenant' });
 
   const { showSuccessToast, showErrorToast } = useToastContext();
 
@@ -275,14 +279,15 @@ export default function LlmProvidersPage() {
       PROVIDER_FIELDS[data.providerCode] = fields;
       setCustomProviderFields((prev) => ({ ...prev, [data.providerCode]: fields }));
     }
-    await handleSave(data);
-    setSidePanel(null);
+    if (await handleSave({ ...data, pid: sidePanel?.config?.pid })) {
+      setSidePanel(null);
+    }
   };
 
   const handleTestInline = async (config: CloudConfig) => {
     setLocalTestingPid(config.pid);
     try {
-      const result = await post('/api/admin/cloud-config/{pid}/test', { pid: config.pid });
+      const result = await post('/api/llm-config/{pid}/test', { pid: config.pid });
       if (ResultHelper.isSuccess(result)) {
         // Auto-enable provider after successful test
         if (!config.enabled) {
@@ -357,7 +362,7 @@ export default function LlmProvidersPage() {
         {/* Level toggle + count */}
         <div className="mb-5 flex items-center justify-between">
           <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 dark:border-gray-600 dark:bg-gray-700">
-            {(['platform', 'tenant'] as const).map((lv) => (
+            {(canManagePlatform ? ['platform', 'tenant'] as const : ['tenant'] as const).map((lv) => (
               <button
                 key={lv}
                 onClick={() => setLevel(lv)}
@@ -428,6 +433,13 @@ export default function LlmProvidersPage() {
           isNew={sidePanel.isNew}
           customMode={sidePanel.customMode}
           currentLevel={level}
+          canManagePlatform={canManagePlatform}
+          saveReadbackPending={saveReadbackPending}
+          onRetryReadback={async () => {
+            const loaded = await retrySaveReadback();
+            if (loaded) setSidePanel(null);
+            return loaded;
+          }}
           onClose={handleSideClose}
           onSave={handleSideSave}
           onTest={handleTestInline}
@@ -733,6 +745,9 @@ function EditSidePanel({
   isNew,
   customMode,
   currentLevel,
+  canManagePlatform,
+  saveReadbackPending,
+  onRetryReadback,
   onClose,
   onSave,
   onTest,
@@ -743,6 +758,9 @@ function EditSidePanel({
   isNew: boolean;
   customMode?: boolean;
   currentLevel: ConfigLevel;
+  canManagePlatform: boolean;
+  saveReadbackPending: boolean;
+  onRetryReadback: () => Promise<boolean>;
   onClose: () => void;
   onSave: (data: {
     configLevel: ConfigLevel;
@@ -894,8 +912,9 @@ function EditSidePanel({
         </div>
 
         {/* Panel body (scrollable) */}
+        {saveReadbackPending && <SaveReadbackNotice onRetry={onRetryReadback} />}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
-          <div className="space-y-5 p-6">
+          <fieldset disabled={saving || saveReadbackPending} className="space-y-5 p-6">
             {/* Custom mode: Display Name + Base URL first */}
             {customMode && isNew && (
               <>
@@ -933,7 +952,7 @@ function EditSidePanel({
                 {t('ai.providers.field.configLevel', undefined, 'Config Level')}
               </label>
               <div className="flex gap-3">
-                {(['platform', 'tenant'] as ConfigLevel[]).map((lv) => (
+                {((canManagePlatform ? ['platform', 'tenant'] : ['tenant']) as ConfigLevel[]).map((lv) => (
                   <label key={lv} className="flex cursor-pointer items-center gap-2">
                     <input
                       type="radio"
@@ -1102,7 +1121,7 @@ function EditSidePanel({
                 )}
               </button>
             )}
-          </div>
+          </fieldset>
         </form>
 
         {/* Panel footer */}
@@ -1117,7 +1136,7 @@ function EditSidePanel({
           <button
             onClick={handleSubmit as any}
             disabled={
-              saving ||
+              saving || saveReadbackPending ||
               (!customMode && !providerCode) ||
               (customMode && isNew && !customDisplayName.trim())
             }

@@ -13,6 +13,8 @@ import com.auraboot.framework.menu.entity.Menu;
 import com.auraboot.framework.menu.service.MenuService;
 import com.auraboot.framework.meta.converter.ExtensionConverter;
 import com.auraboot.framework.meta.entity.payload.ExtensionBean;
+import com.auraboot.framework.meta.entity.payload.FieldFeatureBean;
+import com.auraboot.framework.meta.entity.payload.FieldRefTargetBean;
 import com.auraboot.framework.meta.dto.CommandDefinitionCreateRequest;
 import com.auraboot.framework.meta.dto.DictCreateRequest;
 import com.auraboot.framework.meta.dto.DictDTO;
@@ -511,13 +513,19 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
 
         // 2. Convert extension to ExtensionBean
         var extensionBean = extensionConverter.toBean(extension);
+        var feature = buildFieldFeature(dto);
+        var refTarget = resolveFieldRefTarget(dto);
+        boolean definitionChanged = !Objects.equals(existingField.getDataType(), dto.getDataType())
+                || !Objects.equals(existingField.getFeature(), objectMapper.convertValue(feature, FieldFeatureBean.class))
+                || !Objects.equals(existingField.getRefTarget(), objectMapper.convertValue(refTarget, FieldRefTargetBean.class))
+                || !Objects.equals(fieldExtensionValues(existingField.getExtension()), fieldExtensionValues(extensionBean));
 
         // 3. Update in place via Mapper (no version creation, no validation)
         int updated = metaFieldMapper.updateFieldInPlace(
             existingField.getPid(),
             dto.getDataType(),
-            buildFieldFeature(dto),
-            resolveFieldRefTarget(dto),
+            feature,
+            refTarget,
             extensionBean,
             pluginPid
         );
@@ -530,7 +538,9 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         evictFieldCache(existingField.getPid());
         metaModelService.clearAllCache();
 
-        syncPublishedModelsForUpdatedField(existingField, dto.getCode());
+        if (definitionChanged) {
+            syncPublishedModelsForUpdatedField(existingField, dto.getCode());
+        }
 
         log.info("Field updated in place for plugin reimport: code={}, pid={}",
                  logSafe(dto.getCode()), logSafe(existingField.getPid()));
@@ -539,6 +549,18 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         return createResourceRecord(pluginPid, importId, tenantId, ResourceType.FIELD,
                 existingField.getPid(), null, dto.getCode(), dto.getEffectiveDisplayName(),
                 ResourceAction.UPDATE, null, extension);
+    }
+
+    private Map<String, Object> fieldExtensionValues(ExtensionBean extension) {
+        if (extension == null) {
+            return Map.of();
+        }
+        // Both persisted JSON shapes expose the same values; nested values take precedence.
+        Map<String, Object> values = new LinkedHashMap<>(extension.getDynamicProperties());
+        if (extension.getExtension() != null) {
+            values.putAll(extension.getExtension());
+        }
+        return values;
     }
 
     private void syncPublishedModelsForUpdatedField(Field existingField, String fieldCode) {

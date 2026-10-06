@@ -82,6 +82,8 @@ public class CapabilityResolver {
                             .displayOrder(displayMeta.order())
                             .includes(d.getIncludes())
                             .granted(granted.containsAll(d.getIncludes()))
+                            .authorizationState(authorizationState(d.getIncludes(), granted))
+                            .missingCodes(d.getIncludes().stream().filter(code -> !granted.contains(code)).toList())
                             .conventionDerived(false)
                             .build();
                     byGroup.computeIfAbsent(displayMeta.group(), g -> new ArrayList<>()).add(cap);
@@ -114,6 +116,8 @@ public class CapabilityResolver {
                     .displayOrder(displayMeta.order())
                     .includes(includes)
                     .granted(granted.containsAll(includes))
+                    .authorizationState(authorizationState(includes, granted))
+                    .missingCodes(includes.stream().filter(code -> !granted.contains(code)).toList())
                     .conventionDerived(true)
                     .build();
             byGroup.computeIfAbsent(displayMeta.group(), g -> new ArrayList<>()).add(cap);
@@ -122,6 +126,11 @@ public class CapabilityResolver {
         List<CapabilityGroup> result = new ArrayList<>();
         byGroup.forEach((group, caps) -> result.add(new CapabilityGroup(group, caps)));
         return result;
+    }
+
+    private String authorizationState(List<String> includes, Set<String> granted) {
+        long count = includes.stream().filter(granted::contains).count();
+        return count == includes.size() ? "full" : count == 0 ? "none" : "partial";
     }
 
     public Set<String> expandToPermissionCodes(Set<String> selectedCapabilityCodes,

@@ -11,6 +11,29 @@ const commands = JSON.parse(readFileSync(join(__dirname, '../config/commands.jso
 const pages = JSON.parse(readFileSync(join(__dirname, '../config/pages.json'), 'utf8'));
 const bindingRules = JSON.parse(readFileSync(join(__dirname, '../config/bindingRules.json'), 'utf8'));
 
+test('member bulk actions use permissions covered by the member capability', () => {
+  const capabilities = JSON.parse(
+    readFileSync(join(__dirname, '../../org-management/config/capabilities.json'), 'utf8'),
+  );
+  const member = capabilities.find((item) => item.code === 'org.cap.member');
+  const role = capabilities.find((item) => item.code === 'org.cap.role');
+  const page = pages.find((item) => item.pageKey === 'tenant_member_list');
+  const actions = page?.blocks?.flatMap((block) => block.bulkActions ?? []) ?? [];
+
+  for (const verb of ['restore', 'suspend']) {
+    const action = actions.find((item) => item.code === `bulk_${verb}_members`);
+    assert.ok(action, `bulk ${verb} must be present`);
+    const command = commands.find((item) => item.code === action.action.command);
+    assert.equal(command?.code, `admin:${verb}_member`);
+    assert.equal(command?.modelCode, 'tenant_member');
+    assert.equal(command?.type, 'state_transition');
+    const permission = `model.tenant_member.${verb}`;
+    assert.equal(action.permissionCode, permission);
+    assert.ok(member?.includes.includes(permission), 'member capability must authorize the action');
+    assert.ok(!role?.includes.includes(permission), 'role editing alone must not authorize member state changes');
+  }
+});
+
 test('platform-admin pages keep import-compatible top-level names', () => {
   for (const page of pages) {
     if (page.name !== undefined) {
@@ -158,7 +181,7 @@ test('platform-admin exposes account page provisioning from existing employees',
   );
 
   assert.ok(command, 'admin:provision_member_from_employee command must exist');
-  assert.equal(command.modelCode, 'tenant_member');
+  assert.equal(command.modelCode, 'org_employee', 'provisioning must retain employee row scope');
   assert.equal(
     command.inputFields,
     undefined,
@@ -169,7 +192,7 @@ test('platform-admin exposes account page provisioning from existing employees',
   assert.equal(button.action.command, 'admin:provision_member_from_employee');
   assert.equal(button.action.operationType, 'create');
   assert.equal(inputField?.type, 'select');
-  assert.equal(inputField?.dataSource?.endpoint, '/api/org/employees?pageNum=1&pageSize=500');
+  assert.equal(inputField?.dataSource?.endpoint, '/api/org/employees/provision-options?pageNum=1&pageSize=500');
   assert.equal(inputField?.dataSource?.valueField, 'pid');
   assert.equal(inputField?.dataSource?.labelField, 'name');
   assert.ok(handlerRule, 'admin:provision_member_from_employee must have a handler bindingRule');

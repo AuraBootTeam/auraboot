@@ -1194,6 +1194,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
             return updatedRecord;
 
+        } catch (AccessDeniedException e) {
+            throw e;
         } catch (RecordVersionConflictException e) {
             // Pass the wire-stable 409/40900 contract through unwrapped: mobile
             // offline replay keys on this status to branch into conflict resolution.
@@ -1237,7 +1239,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             updateData.put("updated_at", java.time.Instant.now());
             updateData.put("updated_by", getCurrentUserId());
             result = executeScopedUpdate(
-                    model, modelCode, primaryKeyColumn, recordId, updateData, Set.of(), planExpectedVersion);
+                    model, modelCode, primaryKeyColumn, recordId, updateData, Set.of(), planExpectedVersion, "delete");
         } else {
             // Hard delete: DELETE FROM (default behavior)
             result = executeScopedDelete(
@@ -1280,6 +1282,14 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     private int executeScopedUpdate(
+            ModelDefinition model, String modelCode, String primaryKeyColumn, String recordId,
+            Map<String, Object> columnData, Set<String> jsonbColumns, Object expectedVersion,
+            String permissionOperation) {
+        return executeScopedUpdate(model, modelCode, primaryKeyColumn, recordId, columnData,
+                jsonbColumns, expectedVersion, null, null, permissionOperation);
+    }
+
+    private int executeScopedUpdate(
             ModelDefinition model,
             String modelCode,
             String primaryKeyColumn,
@@ -1290,6 +1300,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             String compareColumn,
             Object compareValue) {
         return dynamicScopedWriteSupport().executeScopedUpdate(model,modelCode,primaryKeyColumn,recordId,columnData,jsonbColumns,expectedVersion,compareColumn,compareValue);
+    }
+
+    private int executeScopedUpdate(ModelDefinition model, String modelCode, String primaryKeyColumn, String recordId, Map<String,Object> columnData, Set<String> jsonbColumns, Object expectedVersion, String compareColumn, Object compareValue, String permissionOperation) {
+        return dynamicScopedWriteSupport().executeScopedUpdate(model, modelCode, primaryKeyColumn, recordId, columnData, jsonbColumns, expectedVersion, compareColumn, compareValue, permissionOperation);
     }
 
     private int executeScopedDelete(
@@ -1359,7 +1373,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     /**
      * The row filter for a guarded write. A command plan executes its authoritative grade directly:
      * ALL contributes no predicate and SELF contributes the owner predicate. Without a command plan,
-     * direct callers retain the existing engine path.
+     * direct callers use the existing engine with the actual write action.
      */
     private String resolveWriteRowFilter(Long tenantId, String modelCode, Long userId) {
         return dynamicScopedWriteSupport().resolveWriteRowFilter(tenantId,modelCode,userId);

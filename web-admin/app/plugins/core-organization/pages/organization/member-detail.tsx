@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useFetcher } from 'react-router';
 import {
   ArrowLeftIcon,
@@ -9,15 +9,17 @@ import {
 } from '@heroicons/react/24/outline';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useI18n } from '~/contexts/I18nContext';
-import { get, post, put, del } from '~/shared/services/http-client';
+import { get } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { useAuth } from '~/contexts/AuthContext';
-import { authorizationMethodCodes, authorizationMethodLabel, memberStatusLabel } from './member-detail-labels';
+import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
+import type { ButtonConfig } from '~/framework/meta/schemas/types';
+import { authorizationMethodCodes, authorizationMethodLabel } from './member-detail-labels';
+import FormDialog from '~/framework/meta/runtime/actions/FormDialog';
 
 // --- Types ---
 
 interface UserInfo {
-  id: number;
   pid: string;
   username: string;
   email: string;
@@ -87,14 +89,24 @@ const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
   inactive: { bg: 'bg-gray-100 dark:bg-gray-700', text: 'text-gray-600 dark:text-gray-400' },
 };
 
+const MEMBER_STATUS_LABELS: Record<string, [string, string]> = {
+  active: ['已激活', 'Active'], pending: ['待审批', 'Pending approval'],
+  suspended: ['已暂停', 'Suspended'], rejected: ['已拒绝', 'Rejected'],
+  inactive: ['已离职', 'Inactive'],
+};
+function memberStatusLabel(status: string, l: (zh: string, en: string) => string) {
+  const label = MEMBER_STATUS_LABELS[status];
+  return label ? l(label[0], label[1]) : l('未知状态', 'Unknown status');
+}
+
 // --- Main Component ---
 
 export default function MemberDetailPage() {
   const { memberPid } = useParams();
   const navigate = useNavigate();
-  const { showSuccessToast, showErrorToast } = useToastContext();
-  const { locale } = useI18n();
-  const { hasPermission } = useAuth();
+  const { showSuccessToast, showErrorToast, showWarningToast, showInfoToast } = useToastContext();
+  const { locale, t } = useI18n();
+  const { token, hasPermission } = useAuth();
   const impersonationFetcher = useFetcher<{ ok?: boolean; error?: string }>();
   const l = useCallback((zh: string, en: string) => (locale === 'zh-CN' ? zh : en), [locale]);
 
@@ -102,10 +114,10 @@ export default function MemberDetailPage() {
   const [employee, setEmployee] = useState<EmployeeData | null>(null);
   const [teams, setTeams] = useState<TeamMembership[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<'forbidden' | 'not-found' | 'error' | null>(null);
   const [activeTab, setActiveTab] = useState<'basic' | 'org' | 'teams' | 'accessHistory'>('basic');
   const [accessHistory, setAccessHistory] = useState<ImpersonationAuditRecord[]>([]);
   const [historyLoaded, setHistoryLoaded] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
   const [showImpersonationDialog, setShowImpersonationDialog] = useState(false);
   const [reasonRequired, setReasonRequired] = useState(false);
 
@@ -113,14 +125,22 @@ export default function MemberDetailPage() {
     if (impersonationFetcher.data?.ok) window.location.assign('/');
   }, [impersonationFetcher.data]);
 
+  const actionRefreshTarget = useRef<'detail' | 'list'>('detail');
+
   const loadData = useCallback(async () => {
     if (!memberPid) return;
     setLoading(true);
+    setLoadError(null);
+    setMember(null);
+    setEmployee(null);
+    setTeams([]);
     try {
       // 1. Fetch member info
       const memberResult = await get<MemberData>(`/api/tenant/members/${memberPid}`);
       if (!ResultHelper.isSuccess(memberResult) || !memberResult.data) {
-        throw new Error(memberResult.desc || 'Failed to load member');
+        const status = Number(memberResult.httpStatus ?? memberResult.code);
+        setLoadError(status === 403 ? 'forbidden' : status === 404 ? 'not-found' : 'error');
+        return;
       }
       const m = memberResult.data;
       setMember(m);
@@ -151,8 +171,8 @@ export default function MemberDetailPage() {
       } catch {
         // teams may be empty
       }
-    } catch (e: any) {
-      showErrorToast(e.message || l('加载成员信息失败', 'Failed to load member info'));
+    } catch {
+      setLoadError('error');
     } finally {
       setLoading(false);
     }
@@ -162,79 +182,76 @@ export default function MemberDetailPage() {
     loadData();
   }, [loadData]);
 
-  useEffect(() => {
-    if (!memberPid || activeTab !== 'accessHistory' || historyLoaded) return;
-    (async () => {
-      try {
-        const result = await get<ImpersonationAuditRecord[]>('/api/impersonation-sessions/history', {
-          targetMemberPid: memberPid,
-          limit: '50',
-        });
-        if (!ResultHelper.isSuccess(result)) throw new Error(result.desc || 'Failed to load access history');
-        setAccessHistory(result.data || []);
-      } catch (error: any) {
-        showErrorToast(error.message || l('加载代登录记录失败', 'Failed to load access history'));
-      } finally {
-        setHistoryLoaded(true);
-      }
-    })();
-  }, [activeTab, historyLoaded, l, memberPid, showErrorToast]);
+  // Existing native detail delegates to the same action pipeline as the DSL list.
+  const { handleAction, loading: actionLoading } = useActionHandler({
+    navigate,
+    tableName: 'tenant_member',
+    locale,
+    t,
+    token: token || undefined,
+    context: {
+      loadData: async () => {
+        if (actionRefreshTarget.current === 'list') navigate('/p/tenant_member');
+        else await loadData();
+      },
+    },
+    showToast: (message, type) => {
+      if (type === 'error') showErrorToast(message);
+      else if (type === 'warning') showWarningToast(message);
+      else if (type === 'success') showSuccessToast(message);
+      else showInfoToast(message);
+    },
+  });
 
-  // --- Action handlers ---
+  const canPerform = (verb: string) =>
+    hasPermission('meta.command.execute') && hasPermission(`model.tenant_member.${verb}`);
 
-  const handleAction = async (action: string, apiCall: () => Promise<any>) => {
-    const confirmMessages: Record<string, string> = {
-      approve: l('确认审批通过该成员？', 'Approve this member?'),
-      reject: l('确认拒绝该成员？', 'Reject this member?'),
-      suspend: l('确认暂停该成员？', 'Suspend this member?'),
-      restore: l('确认恢复该成员？', 'Restore this member?'),
-      leave: l('确认该成员离职？', 'Mark this member as inactive?'),
-      delete: l('确认删除该成员？此操作不可逆。', 'Delete this member? This cannot be undone.'),
+  const dispatchMemberAction = async (action: string, command: string, offboardingAction?: string) => {
+    if (!member || actionLoading) return;
+    const confirmations: Record<string, { 'zh-CN': string; en: string }> = {
+      approve: { 'zh-CN': '确认审批通过该成员？', en: 'Approve this member?' },
+      reject: { 'zh-CN': '确认拒绝该成员？', en: 'Reject this member?' },
+      suspend: { 'zh-CN': '确认暂停该成员？', en: 'Suspend this member?' },
+      restore: { 'zh-CN': '确认恢复该成员？', en: 'Restore this member?' },
+      leave: { 'zh-CN': '确认该成员离职？', en: 'Mark this member as inactive?' },
+      delete: { 'zh-CN': '确认移除该成员并交接资源？', en: 'Remove this member and transfer resources?' },
     };
-    if (!confirm(confirmMessages[action] || `Confirm ${action}?`)) return;
-
-    setActionLoading(true);
+    const inputFields = action === 'suspend' || action === 'leave' ? [{
+      field: 'reason',
+      label: { 'zh-CN': action === 'suspend' ? '暂停原因' : '离职说明', en: 'Reason' },
+      type: 'textarea',
+      required: action === 'suspend',
+      placeholder: action === 'suspend'
+        ? { 'zh-CN': '请说明暂停原因，例如临时停用账号', en: 'Explain why this account needs to be suspended' }
+        : { 'zh-CN': '请填写离职说明，便于管理员了解背景', en: 'Describe the offboarding context for administrators' },
+      helpText: action === 'suspend'
+        ? { 'zh-CN': '暂停后，该成员的所有登录会话将立即失效。', en: 'Suspending the member immediately invalidates all their sign-in sessions.' }
+        : { 'zh-CN': '可补充离职背景；涉及的资源交接将在提交前确认。', en: 'You may add context; resource transfers are confirmed before submission.' },
+    }] : [];
+    actionRefreshTarget.current = action === 'delete' ? 'list' : 'detail';
     try {
-      await apiCall();
-      showSuccessToast(l('操作成功', 'Action completed'));
-      loadData();
-    } catch (e: any) {
-      showErrorToast(e.message || l('操作失败', 'Action failed'));
+      await handleAction({
+        code: action,
+        confirm: confirmations[action],
+        confirmVariant: action === 'approve' || action === 'restore' ? 'default' : 'danger',
+        action: {
+          type: 'command', command, offboardingAction, inputFields,
+          inputFieldsTitle: action === 'suspend'
+            ? l('暂停成员', 'Suspend member')
+            : action === 'leave' ? l('办理离职', 'Offboard member') : undefined,
+        },
+      } as ButtonConfig, member);
     } finally {
-      setActionLoading(false);
+      actionRefreshTarget.current = 'detail';
     }
   };
 
-  const doApprove = () =>
-    handleAction('approve', () =>
-      post(`/api/tenant/members/${memberPid}/approve`, { action: 'approve' }),
-    );
-
-  const doReject = () =>
-    handleAction('reject', () =>
-      post(`/api/tenant/members/${memberPid}/approve`, { action: 'reject' }),
-    );
-
-  const doSuspend = () =>
-    handleAction('suspend', () =>
-      put(`/api/tenant/members/${memberPid}/status`, { action: 'suspended' }),
-    );
-
-  const doRestore = () =>
-    handleAction('restore', () =>
-      put(`/api/tenant/members/${memberPid}/status`, { action: 'active' }),
-    );
-
-  const doLeave = () =>
-    handleAction('leave', () =>
-      put(`/api/tenant/members/${memberPid}/status`, { action: 'inactive' }),
-    );
-
-  const doDelete = () =>
-    handleAction('delete', async () => {
-      await del(`/api/tenant/members/${memberPid}`);
-      navigate('/p/tenant_member');
-    });
+  const doApprove = () => dispatchMemberAction('approve', 'admin:approve_member');
+  const doReject = () => dispatchMemberAction('reject', 'admin:reject_member');
+  const doSuspend = () => dispatchMemberAction('suspend', 'admin:suspend_member', 'suspend');
+  const doRestore = () => dispatchMemberAction('restore', 'admin:restore_member');
+  const doLeave = () => dispatchMemberAction('leave', 'admin:leave_member', 'deactivate');
+  const doDelete = () => dispatchMemberAction('delete', 'admin:delete_member', 'remove');
 
   // --- Render ---
 
@@ -248,21 +265,27 @@ export default function MemberDetailPage() {
 
   if (!member) {
     return (
-      <div className="p-6 py-20 text-center text-gray-500 dark:text-gray-400">
-        {l('成员不存在', 'Member not found')}
+      <div className="p-6 py-20 text-center text-gray-500 dark:text-gray-400" data-testid="member-load-error" data-error-kind={loadError}>
+        <p>{loadError === 'forbidden'
+          ? l('无权查看此成员', 'You do not have permission to view this member')
+          : loadError === 'error'
+            ? l('加载成员信息失败，请重试。', 'Failed to load member information. Please try again.')
+            : l('成员不存在', 'Member not found')}</p>
+        <button type="button" className="mt-4 text-blue-600 hover:underline" onClick={() => navigate('/p/tenant_member')}>
+          {l('返回成员列表', 'Back to members')}
+        </button>
       </div>
     );
   }
 
-  const statusStyle = STATUS_STYLES[member.status.toLowerCase()] || STATUS_STYLES.inactive;
+  const statusStyle = STATUS_STYLES[member.status] || STATUS_STYLES.inactive;
   const displayName =
     employee?.org_emp_name ||
     member.user?.realName ||
     member.user?.username ||
     member.user?.email ||
-    l('客户账户', 'Customer account');
-  const accountName =
-    member.user?.username || member.user?.email || l('客户账户', 'Customer account');
+    l('未命名成员', 'Unnamed member');
+  const accountName = member.user?.username || member.user?.email || l('未设置账号名称', 'Account name not set');
   const avatarText = (displayName || accountName).charAt(0).toUpperCase();
 
   const tabs = [
@@ -301,15 +324,14 @@ export default function MemberDetailPage() {
               </h1>
               <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500 dark:text-gray-400">
                 <span className="font-medium text-gray-700 dark:text-gray-300">{accountName}</span>
-                {member.user?.email && member.user.email !== accountName && (
-                  <span>{member.user.email}</span>
-                )}
+                {member.user?.email && member.user.email !== accountName && <span>{member.user.email}</span>}
                 {member.user?.phone && <span>{member.user.phone}</span>}
               </p>
             </div>
             <span
               className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusStyle.bg} ${statusStyle.text}`}
               data-testid="member-status"
+              data-status={member.status}
             >
               {memberStatusLabel(member.status, l)}
             </span>
@@ -322,41 +344,32 @@ export default function MemberDetailPage() {
       <div className="mb-6 flex flex-wrap gap-2" data-testid="action-bar">
         {member.status === 'pending' && (
           <>
-            <ActionButton onClick={doApprove} disabled={actionLoading} variant="primary">
+            {canPerform('approve') && (<ActionButton onClick={doApprove} disabled={actionLoading} variant="primary">
               {l('审批通过', 'Approve')}
-            </ActionButton>
-            <ActionButton onClick={doReject} disabled={actionLoading} variant="danger">
+            </ActionButton>)}
+            {canPerform('reject') && (<ActionButton onClick={doReject} disabled={actionLoading} variant="danger">
               {l('拒绝', 'Reject')}
-            </ActionButton>
+            </ActionButton>)}
           </>
         )}
         {member.status === 'active' && (
           <>
-            {member.user && hasPermission('admin.customer.impersonate') && (
-              <ActionButton
-                onClick={() => { setReasonRequired(false); setShowImpersonationDialog(true); }}
-                disabled={actionLoading}
-                variant="primary"
-              >
-                {l('代客户登录', 'Access as customer')}
-              </ActionButton>
-            )}
-            <ActionButton onClick={doSuspend} disabled={actionLoading} variant="warning">
+            {canPerform('suspend') && (<ActionButton onClick={doSuspend} disabled={actionLoading} variant="warning">
               {l('暂停', 'Suspend')}
-            </ActionButton>
-            <ActionButton onClick={doLeave} disabled={actionLoading} variant="danger">
+            </ActionButton>)}
+            {canPerform('leave') && (<ActionButton onClick={doLeave} disabled={actionLoading} variant="danger">
               {l('离职', 'Leave')}
-            </ActionButton>
+            </ActionButton>)}
           </>
         )}
-        {(member.status === 'suspended' || member.status === 'rejected') && (
+        {(member.status === 'suspended' || member.status === 'rejected') && canPerform('restore') && (
           <ActionButton onClick={doRestore} disabled={actionLoading} variant="primary">
             {l('恢复', 'Restore')}
           </ActionButton>
         )}
-        <ActionButton onClick={doDelete} disabled={actionLoading} variant="danger-outline">
+        {canPerform('delete') && (<ActionButton onClick={doDelete} disabled={actionLoading} variant="danger-outline">
           {l('删除', 'Delete')}
-        </ActionButton>
+        </ActionButton>)}
       </div>
 
       {showImpersonationDialog && (
@@ -526,6 +539,7 @@ export default function MemberDetailPage() {
           <AccessHistoryTab records={accessHistory} loaded={historyLoaded} l={l} />
         )}
       </div>
+      <FormDialog />
     </div>
   );
 }
@@ -626,7 +640,7 @@ function BasicInfoTab({
           <div key={i}>
             <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">{f.label}</dt>
             <dd className="mt-1 text-sm text-gray-900 dark:text-white">
-              {f.isStatus ? <StatusBadge l={l} status={f.value || ''} /> : f.value || '-'}
+              {f.isStatus ? <StatusBadge status={f.value || ''} label={memberStatusLabel(f.value || '', l)} /> : f.value || '-'}
             </dd>
           </div>
         ))}
@@ -761,13 +775,13 @@ function TeamsTab({
 
 // --- Shared Components ---
 
-function StatusBadge({ status, l }: { status: string; l: (zh: string, en: string) => string }) {
-  const style = STATUS_STYLES[status.toLowerCase()] || STATUS_STYLES.inactive;
+function StatusBadge({ status, label, l }: { status: string; label?: string; l?: (zh: string, en: string) => string }) {
+  const style = STATUS_STYLES[status] || STATUS_STYLES.inactive;
   return (
     <span
       className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${style.bg} ${style.text}`}
     >
-      {memberStatusLabel(status, l)}
+      {label ?? (l ? memberStatusLabel(status, l) : status)}
     </span>
   );
 }

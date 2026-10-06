@@ -90,6 +90,29 @@ class DashboardServiceImplBranchTest {
     }
 
     @Test
+    void versionAccessReusesPersonalOwnershipAndRejectsForeignTenants() {
+        Dashboard own = fixture("own", "personal", "u-1");
+        when(dashboardMapper.findByPid("own")).thenReturn(own);
+        service.checkVersionReadAccess("own");
+        service.checkVersionWriteAccess("own");
+        Dashboard other = fixture("other", "personal", "u-2");
+        when(dashboardMapper.findByPid("other")).thenReturn(other);
+        assertThrows(ValidationException.class, () -> service.checkVersionReadAccess("other"));
+        assertThrows(ValidationException.class, () -> service.checkVersionWriteAccess("other"));
+        Dashboard foreign = fixture("foreign", "global", "u-1");
+        foreign.setTenantId(11L);
+        when(dashboardMapper.findByPid("foreign")).thenReturn(foreign);
+        assertThrows(ValidationException.class, () -> service.checkVersionReadAccess("foreign"));
+        assertThrows(ValidationException.class, () -> service.checkVersionWriteAccess("foreign"));
+        when(dashboardMapper.findByPid("missing")).thenReturn(null);
+        assertThrows(ValidationException.class, () -> service.checkVersionReadAccess("missing"));
+        Dashboard invalid = fixture("invalid", "unknown", "u-1");
+        when(dashboardMapper.findByPid("invalid")).thenReturn(invalid);
+        assertThrows(ValidationException.class, () -> service.checkVersionWriteAccess("invalid"));
+        verify(dashboardMapper, never()).updateDashboard(any());
+    }
+
+    @Test
     @DisplayName("create team scope blocked when current user not in team")
     void createTeamUserNotMember() {
         DashboardCreateRequest req = new DashboardCreateRequest();

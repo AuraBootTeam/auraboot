@@ -1,6 +1,11 @@
 package com.auraboot.framework.meta.service;
 
 import com.auraboot.framework.integration.BaseIntegrationTest;
+import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.tenant.dao.entity.Tenant;
+import com.auraboot.framework.tenant.service.TenantService;
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.entity.InvariantDefinition;
 import lombok.extern.slf4j.Slf4j;
@@ -8,6 +13,7 @@ import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.*;
+import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -34,6 +40,9 @@ class InvariantEngineIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private InvariantDefinitionService invariantDefinitionService;
+
+    @Autowired
+    private TenantService tenantService;
 
     // ==================== Helper Methods ====================
 
@@ -447,5 +456,73 @@ class InvariantEngineIntegrationTest extends BaseIntegrationTest {
         assertThrows(Exception.class, () -> {
             invariantDefinitionService.delete("non_existent_pid_" + System.currentTimeMillis());
         });
+    }
+
+    @Test
+    @Order(80)
+    @DisplayName("Definition PID access cannot read, update, publish or delete another tenant's definition")
+    void test80_definitionPidIsTenantScoped() {
+        InvariantDefinition own = createInvariant(generateCode("tenant_owner"), "pre", "error", "model", "LoanApplication", "LoanApplication", "true");
+        Tenant otherTenant = new Tenant();
+        otherTenant.setPid(UniqueIdGenerator.generate());
+        otherTenant.setName("definition-scope-" + UUID.randomUUID());
+        otherTenant.setDisplayName("Definition scope fixture");
+        otherTenant.setStatus("active");
+        otherTenant.setContactEmail("scope@example.test");
+        otherTenant.setDeletedFlag(false);
+        otherTenant.setCreatedAt(Instant.now());
+        otherTenant.setUpdatedAt(Instant.now());
+        otherTenant = tenantService.createTenant(otherTenant);
+
+        InvariantDefinition foreign;
+        try {
+            MetaContext.setContext(otherTenant.getId(), testUser.getId(), testUser.getPid(), testUser.getUserName());
+            foreign = createInvariant(generateCode("tenant_foreign"), "pre", "error", "model", "LoanApplication", "LoanApplication", "true");
+        } finally {
+            applyTestMetaContext();
+        }
+        assertNotEquals(own.getTenantId(), foreign.getTenantId());
+        assertEquals(own.getPid(), invariantDefinitionService.getByPid(own.getPid()).getPid());
+
+        InvariantDefinitionCreateRequest request = new InvariantDefinitionCreateRequest();
+        request.setCode(foreign.getCode());
+        request.setDisplayName("Unauthorized replacement");
+        request.setDescription("Unauthorized replacement");
+        request.setExpression("false");
+        request.setInvariantType("pre");
+        request.setSeverity("error");
+        request.setScopeType("model");
+        request.setScopeRef("LoanApplication");
+        request.setModelCode("LoanApplication");
+        request.setEnabled(true);
+        assertAll(
+                () -> assertThrows(BusinessException.class, () -> invariantDefinitionService.getByPid(foreign.getPid())),
+                () -> assertThrows(BusinessException.class, () -> invariantDefinitionService.update(foreign.getPid(), request)),
+                () -> assertThrows(BusinessException.class, () -> invariantDefinitionService.publish(foreign.getPid())),
+                () -> assertThrows(BusinessException.class, () -> invariantDefinitionService.delete(foreign.getPid())));
+
+        try {
+            MetaContext.setContext(otherTenant.getId(), testUser.getId(), testUser.getPid(), testUser.getUserName());
+            InvariantDefinition unchanged = invariantDefinitionService.getByPid(foreign.getPid());
+            assertAll(
+                    () -> assertEquals(foreign.getDisplayName(), unchanged.getDisplayName()),
+                    () -> assertEquals(foreign.getDescription(), unchanged.getDescription()),
+                    () -> assertEquals(foreign.getVersion(), unchanged.getVersion()),
+                    () -> assertEquals(foreign.getRowVersion(), unchanged.getRowVersion()),
+                    () -> assertEquals(foreign.getStatus(), unchanged.getStatus()),
+                    () -> assertEquals(foreign.getIsCurrent(), unchanged.getIsCurrent()),
+                    () -> assertEquals(foreign.getDeletedFlag(), unchanged.getDeletedFlag()));
+            InvariantDefinition updated = invariantDefinitionService.update(foreign.getPid(), request);
+            assertEquals("Unauthorized replacement", updated.getDisplayName());
+            assertEquals(foreign.getRowVersion() + 1, updated.getRowVersion());
+            assertEquals(updated.getDisplayName(), invariantDefinitionService.getByPid(foreign.getPid()).getDisplayName());
+            invariantDefinitionService.publish(foreign.getPid());
+            assertEquals("published", invariantDefinitionService.getByPid(foreign.getPid()).getStatus());
+            invariantDefinitionService.delete(foreign.getPid());
+            assertThrows(BusinessException.class, () -> invariantDefinitionService.getByPid(foreign.getPid()));
+        } finally {
+            applyTestMetaContext();
+        }
+        assertEquals(own.getDisplayName(), invariantDefinitionService.getByPid(own.getPid()).getDisplayName());
     }
 }

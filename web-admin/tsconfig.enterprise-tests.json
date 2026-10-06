@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "~/*": [
+        "./app/*"
+      ],
+      "@oss-tests/*": [
+        "./tests/*"
+      ],
+      "@playwright/test": [
+        "./node_modules/@playwright/test/index.mjs"
+      ],
+      "xlsx": [
+        "./node_modules/xlsx"
+      ]
+    }
+  }
+}

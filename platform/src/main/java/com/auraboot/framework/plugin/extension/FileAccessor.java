@@ -108,6 +108,15 @@ public interface FileAccessor {
         throw new UnsupportedOperationException("file deletion capability is unavailable");
     }
 
+    /**
+     * Link an existing uploaded file to an authorized business record without copying bytes.
+     * Hosts must validate the public file identity and ownership before creating a relation.
+     * A field key identifies one attachment slot; callers retaining versions must use distinct keys.
+     */
+    default void linkExisting(String fileId, String entityType, String entityId, String fieldName) {
+        throw new UnsupportedOperationException("uploaded file relation capability is unavailable");
+    }
+
     /** Saved platform file metadata returned to plugin handlers. */
     record SavedFile(String fileId, String originalName, long size, String url) {
     }

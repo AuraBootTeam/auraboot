@@ -126,7 +126,7 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
         // active permission set (same source the matrix builds from).
         List<PermissionDTO> granted = permissionService.findAllActive().stream()
                 .filter(p -> p.getId() != null && grantedIds.contains(p.getId()))
-                .filter(p -> p.getResourceCode() != null && p.getAction() != null)
+                .filter(this::hasRecordScopeMapping)
                 .toList();
         for (PermissionDTO p : granted) {
             dataScopeService.setScope(tenantId, roleId, p.getResourceCode(), p.getAction(), scopeType, "MAX");
@@ -227,7 +227,6 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
 
         List<PermissionDTO> orphanActions = actions.stream()
             .filter(action -> action.getId() == null || !attachedActionIds.contains(action.getId()))
-            .filter(action -> action.getResourceCode() != null || action.getAction() != null)
             .toList();
         moduleDTOs.addAll(buildFlatModules(orphanActions, grantedIds, scopeMap, policyMap));
 
@@ -310,7 +309,7 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
             .map(p -> {
                 String resourceCode = p.getResourceCode() != null ? p.getResourceCode() : "";
                 String actionCode = p.getAction() != null ? p.getAction() : "";
-                RoleDataScope scope = scopeMap.get(resourceCode + ":" + actionCode);
+                RoleDataScope scope = hasRecordScopeMapping(p) ? scopeMap.get(resourceCode + ":" + actionCode) : null;
 
                 // Policy schema from permission definition
                 String policySchemaJson = serializePolicySchema(p.getPolicySchema());
@@ -362,6 +361,16 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    private boolean hasRecordScopeMapping(PermissionDTO permission) {
+        if (permission.getResourceCode() == null || permission.getAction() == null) {
+            return false;
+        }
+        // Plugin import uses code + view as a generic registration fallback.
+        // That pair grants entry access; it does not identify a record-scope consumer.
+        return !("view".equals(permission.getAction())
+                && permission.getResourceCode().equals(permission.getCode()));
     }
 
     private String unwrapPgJsonWrapper(Map<?, ?> map) {

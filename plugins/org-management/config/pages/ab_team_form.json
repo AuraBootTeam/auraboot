@@ -68,6 +68,7 @@
         {
           "code": "save",
           "primary": true,
+          "permissionCode": "org.team.manage",
           "label": {
             "zh-CN": "保存",
             "en": "Save"

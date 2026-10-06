@@ -25,7 +25,5 @@
       "value": "active"
     }
   },
-  "permissions": [
-    "ORG.hr.manage"
-  ]
+  "permissions": ["org.hr.manage"]
 }

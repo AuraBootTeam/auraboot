@@ -799,7 +799,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                     required: true,
                     dataSource: {
                       type: 'api',
-                      endpoint: '/api/tenant/members/${record.pid}/offboarding-candidates',
+                      endpoint: `/api/tenant/members/\${record.pid}/offboarding-candidates?action=${encodeURIComponent(offboardingAction)}`,
                       valueField: 'memberPid',
                       labelField: 'displayName',
                       descriptionField: 'email',

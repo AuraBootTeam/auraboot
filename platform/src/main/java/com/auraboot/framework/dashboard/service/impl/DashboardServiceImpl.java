@@ -803,6 +803,28 @@ public class DashboardServiceImpl implements DashboardService {
         }
     }
 
+    @Override
+    public void checkVersionReadAccess(String pid) {
+        validateReadAccess(requireVersionDashboard(pid));
+    }
+
+    @Override
+    public void checkVersionWriteAccess(String pid) {
+        validateWriteAccess(requireVersionDashboard(pid));
+    }
+
+    private Dashboard requireVersionDashboard(String pid) {
+        Dashboard dashboard = dashboardMapper.findByPid(pid);
+        if (dashboard == null || !java.util.Objects.equals(
+                MetaContext.getCurrentTenantId(), dashboard.getTenantId())) {
+            throw new ValidationException(ResponseCode.NOT_FOUND, "Dashboard not found");
+        }
+        if (!dashboard.isPersonal() && !dashboard.isTeam() && !dashboard.isGlobal()) {
+            throw new ValidationException(ResponseCode.FORBIDDEN, "Invalid dashboard scope");
+        }
+        return dashboard;
+    }
+
     private void validateReadAccess(Dashboard dashboard) {
         String currentUserPid = MetaContext.getCurrentUserPid();
 

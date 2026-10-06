@@ -23,6 +23,8 @@ import com.auraboot.framework.permission.dto.PermissionCreateRequest;
 import com.auraboot.framework.permission.dto.PermissionDTO;
 import com.auraboot.framework.permission.service.PermissionService;
 import com.auraboot.framework.permission.service.RolePermissionService;
+import com.auraboot.framework.permission.service.UserPermissionService;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.rbac.entity.UserRole;
 import com.auraboot.framework.rbac.service.UserRoleService;
 import com.auraboot.framework.application.tenant.MetaContext;
@@ -31,6 +33,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
@@ -62,6 +65,7 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
     private final UserRoleService userRoleService;
     private final PageSchemaService pageSchemaService;
     private final ObjectMapper objectMapper;
+    private final UserPermissionService userPermissionService;
     
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -70,6 +74,7 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
         
         // 1. Validate configuration
         validateConfiguration(modelCode, config);
+        authorizeOptionalResources(config);
         
         // 2. Load Model and Fields
         MetaModelDTO modelDTO = metaModelService.findByCode(modelCode);
@@ -137,6 +142,27 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
         return result;
     }
     
+    private void authorizeOptionalResources(CrudTemplateConfig config) {
+        // Page management does not imply authority to create menus, permissions,
+        // or role grants. Check all requested side effects before persisting pages.
+        if (config.isCreateMenu()) {
+            requireResourcePermission(MetaPermission.MENU_MANAGE);
+        }
+        if (config.isCreatePermissions()) {
+            requireResourcePermission(MetaPermission.PERMISSION_MANAGE);
+        }
+        if (config.isAssignRoles()) {
+            requireResourcePermission(MetaPermission.ROLE_MANAGE);
+        }
+    }
+
+    private void requireResourcePermission(String permissionCode) {
+        if (!MetaContext.exists()
+                || !userPermissionService.hasPermission(MetaContext.getCurrentUserId(), permissionCode)) {
+            throw new AccessDeniedException("Access denied for template resource generation");
+        }
+    }
+
     @Override
     public void validateConfiguration(String modelCode, CrudTemplateConfig config) {
         if (!StringUtils.hasText(modelCode)) {

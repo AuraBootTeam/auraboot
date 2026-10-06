@@ -17,6 +17,17 @@ public interface CommandHandler {
     String getHandlerName();
 
     /**
+     * Whether FIELD_MAP should persist before this handler executes. Return false
+     * only when the handler owns the complete mutation, including dependent data.
+     * Authorization and declarative state checks still run before the handler.
+     * Existing handlers retain DSL persistence unless they explicitly opt out.
+     */
+    default boolean requiresDslPersistence(String commandCode, Map<String, Object> execConfig,
+            com.auraboot.framework.meta.dto.CommandExecuteRequest request) {
+        return true;
+    }
+
+    /**
      * Execute handler logic
      *
      * @param context execution context with payload, command info, and intermediate results

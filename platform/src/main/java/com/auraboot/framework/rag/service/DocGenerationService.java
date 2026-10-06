@@ -1,6 +1,7 @@
 package com.auraboot.framework.rag.service;
 
 import com.auraboot.framework.common.util.PathSafetyUtils;
+import com.auraboot.framework.application.tenant.MetaContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -30,12 +31,16 @@ public class DocGenerationService {
      * @return generation summary
      */
     public GenerationResult generate(String outputDir) throws IOException {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        if (tenantId == null) {
+            throw new IllegalStateException("Tenant context required for documentation generation");
+        }
         Path outPath = PathSafetyUtils.normalizeAbsolute(Path.of(outputDir), "doc generation outputDir");
         Files.createDirectories(outPath);
 
-        int modelCount = generateModelDictionary(outPath);
-        int commandCount = generateCommandReference(outPath);
-        int fieldSummary = generateFieldSummary(outPath);
+        int modelCount = generateModelDictionary(outPath, tenantId);
+        int commandCount = generateCommandReference(outPath, tenantId);
+        int fieldSummary = generateFieldSummary(outPath, tenantId);
 
         GenerationResult result = new GenerationResult(modelCount, commandCount, fieldSummary, outPath.toString());
         log.info("Doc generation complete: {}", result);
@@ -45,16 +50,14 @@ public class DocGenerationService {
     /**
      * Generate model dictionary — one section per published model with fields and relationships.
      */
-    private int generateModelDictionary(Path outPath) throws IOException {
+    private int generateModelDictionary(Path outPath, Long tenantId) throws IOException {
         List<Map<String, Object>> models = jdbcTemplate.queryForList(
-                "SELECT m.code, m.semantic_description, m.model_category, m.status, "
+                "SELECT m.id, m.code, m.semantic_description, m.model_category, m.status, "
                 + "m.table_name "
                 + "FROM ab_meta_model m "
-                + "WHERE m.status = 'published' AND m.is_current = TRUE "
+                + "WHERE m.tenant_id = ? AND m.status = 'published' AND m.is_current = TRUE "
                 + "AND (m.deleted_flag IS NULL OR m.deleted_flag = FALSE) "
-                + "ORDER BY m.model_category, m.code");
-
-        if (models.isEmpty()) return 0;
+                + "ORDER BY m.model_category, m.code", tenantId);
 
         StringBuilder sb = new StringBuilder();
         sb.append("---\n");
@@ -90,10 +93,11 @@ public class DocGenerationService {
                     + "FROM ab_meta_field f "
                     + "JOIN ab_meta_model_field_binding b ON f.id = b.field_id "
                     + "JOIN ab_meta_model m ON b.model_id = m.id "
-                    + "WHERE m.code = ? "
+                    + "WHERE m.id = ? AND m.tenant_id = ? AND b.tenant_id = ? AND f.tenant_id = ? "
+                    + "AND b.deleted_flag = FALSE "
                     + "AND (f.deleted_flag IS NULL OR f.deleted_flag = FALSE) "
                     + "ORDER BY f.code",
-                    code);
+                    model.get("id"), tenantId, tenantId, tenantId);
 
             if (!fields.isEmpty()) {
                 sb.append("| Field | Type | Description |\n");
@@ -117,16 +121,14 @@ public class DocGenerationService {
     /**
      * Generate command reference — lists all commands grouped by model.
      */
-    private int generateCommandReference(Path outPath) throws IOException {
+    private int generateCommandReference(Path outPath, Long tenantId) throws IOException {
         List<Map<String, Object>> commands = jdbcTemplate.queryForList(
                 "SELECT c.code, c.display_name, c.description, "
                 + "c.model_code, c.status "
                 + "FROM ab_command_definition c "
-                + "WHERE c.status = 'published' AND c.is_current = TRUE "
+                + "WHERE c.tenant_id = ? AND c.status = 'published' AND c.is_current = TRUE "
                 + "AND (c.deleted_flag IS NULL OR c.deleted_flag = FALSE) "
-                + "AND c.is_current = TRUE ORDER BY c.model_code, c.code");
-
-        if (commands.isEmpty()) return 0;
+                + "ORDER BY c.model_code, c.code", tenantId);
 
         StringBuilder sb = new StringBuilder();
         sb.append("---\n");
@@ -153,12 +155,12 @@ public class DocGenerationService {
     /**
      * Generate field summary — aggregated statistics by data type.
      */
-    private int generateFieldSummary(Path outPath) throws IOException {
+    private int generateFieldSummary(Path outPath, Long tenantId) throws IOException {
         List<Map<String, Object>> stats = jdbcTemplate.queryForList(
                 "SELECT f.data_type, COUNT(*) AS cnt "
                 + "FROM ab_meta_field f "
-                + "WHERE (f.deleted_flag IS NULL OR f.deleted_flag = FALSE) "
-                + "GROUP BY f.data_type ORDER BY cnt DESC");
+                + "WHERE f.tenant_id = ? AND (f.deleted_flag IS NULL OR f.deleted_flag = FALSE) "
+                + "GROUP BY f.data_type ORDER BY cnt DESC", tenantId);
 
         int totalFields = stats.stream()
                 .mapToInt(s -> ((Number) s.get("cnt")).intValue())

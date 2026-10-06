@@ -29,13 +29,10 @@ final class PluginAccessResourceImporter {
 
     private final com.auraboot.framework.permission.capability.CapabilityRegistryService capabilityRegistryService;
 
-    private final PermissionService permissionService;
 
     private final UserPermissionService userPermissionService;
 
-    private final RoleService roleService;
 
-    private final RolePermissionMapper rolePermissionMapper;
 
     private final GenerateMenuI18nRecordsOperation0 generateMenuI18nRecordsOperation0;
 
@@ -105,62 +102,7 @@ final class PluginAccessResourceImporter {
         }
 
         generatePermissionI18nRecords(manifest.getPermissions(), tenantId);
-        bindImportedPermissionsToTenantAdmin(manifest.getPermissions(), tenantId);
-    }
-
-    void bindImportedPermissionsToTenantAdmin(List<PermissionDefinitionDTO> permissions, Long tenantId){
-        if (permissions == null || permissions.isEmpty()) return;
-        if (tenantId == null) return;
-
-        Role tenantAdminRole = roleService.findByTenantId(tenantId).stream()
-                .filter(role -> "tenant_admin".equals(role.getCode()))
-                .findFirst()
-                .orElse(null);
-        if (tenantAdminRole == null) {
-            log.warn("tenant_admin role not found, skip binding imported permissions: tenantId={}", tenantId);
-            return;
-        }
-
-        Set<Long> boundPermissionIds = permissionService.findRolePermissions(tenantAdminRole.getId()).stream()
-                .map(PermissionDTO::getId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-
-        for (PermissionDefinitionDTO permission : permissions) {
-            try {
-                PermissionDTO permissionDTO = permissionService.findByCode(permission.getCode());
-                if (permissionDTO == null) {
-                    log.warn("Imported permission not found after import: code={}", logSafe(permission.getCode()));
-                    continue;
-                }
-
-                //todo check logic
-                if (boundPermissionIds.contains(permissionDTO.getId())) {
-                    log.warn("Duplicated permission found: code={}", logSafe(permission.getCode()));
-
-                    continue;
-                }
-                RolePermission binding = new RolePermission();
-                binding.setPid(UniqueIdGenerator.generate());
-                binding.setTenantId(tenantId);
-                binding.setRoleId(tenantAdminRole.getId());
-                binding.setPermissionId(permissionDTO.getId());
-                binding.setGrantType(StatusConstants.GRANT);
-                binding.setPriority(0);
-                binding.setStatus(StatusConstants.ACTIVE);
-                binding.setDeletedFlag(false);
-                binding.setCreatedAt(Instant.now());
-                binding.setUpdatedAt(Instant.now());
-                rolePermissionMapper.insert(binding);
-                boundPermissionIds.add(permissionDTO.getId());
-            } catch (Exception e) {
-                // Duplicate bind and stale edge cases should not fail plugin import.
-                log.debug("Skip binding permission to tenant_admin: code={}, reason={}",
-                        logSafe(permission.getCode()), logSafe(e.getMessage()));
-            }
-        }
         userPermissionService.evictPermissionDefinitions(tenantId);
-        userPermissionService.evictRoleUsers(tenantId, tenantAdminRole.getId());
     }
 
     void importRoles(PluginManifestExtended manifest, ImportRequest request,
@@ -302,6 +244,10 @@ final class PluginAccessResourceImporter {
     void importCapabilities(PluginManifestExtended manifest){
         if (manifest.getCapabilities() == null || manifest.getCapabilities().isEmpty()) return;
         int created = 0;
+        Set<String> codes = new java.util.HashSet<>();
+        for (CapabilityDefinitionDTO dto : manifest.getCapabilities()) {
+            if (!codes.add(dto.getCode()) || !dto.isValid()) throw new IllegalArgumentException("Invalid or duplicate capability declaration: " + dto.getCode());
+        }
         for (CapabilityDefinitionDTO dto : manifest.getCapabilities()) {
             if (!dto.isValid()) {
                 log.warn("Skipping invalid capability (missing code/includes): index={}",

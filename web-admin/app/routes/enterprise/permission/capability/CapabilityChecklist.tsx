@@ -1,7 +1,6 @@
-import { useI18n } from '~/contexts/I18nContext';
 import { getLocalizedText } from '~/utils/i18n';
-import type { CapabilityGroup } from './types';
-import { groupSummary } from './capabilityHelpers';
+import { useI18n } from '~/contexts/I18nContext';
+import type { CapabilityGroup, Capability } from './types';
 
 interface CapabilityChecklistProps {
   groups: CapabilityGroup[];
@@ -9,27 +8,64 @@ interface CapabilityChecklistProps {
   selected: string[];
   /** Called with a capability code when its checkbox is toggled. */
   onToggle: (code: string) => void;
+  disabled?: boolean;
+  revokedPartial?: string[];
+  onRevokePartial?: (code: string) => void;
+  onConfigureScope?: (capability: Capability) => void;
+  scopeConfigurableCodes?: Set<string>;
 }
 
 /**
  * Permission v2 capability checklist: business-language capabilities folded by group, each a
  * checkbox, sensitive ones marked with a lock. Presentational — selection state and persistence
  * live in the parent (role editor). Replaces the raw resource x action matrix as the primary view;
- * the matrix stays as an advanced "escape hatch".
+ * atomic actions remain available as read-only diagnostics.
  */
-export default function CapabilityChecklist({ groups, selected, onToggle }: CapabilityChecklistProps) {
+export default function CapabilityChecklist({
+  groups,
+  selected,
+  onToggle,
+  disabled = false,
+  revokedPartial = [],
+  onRevokePartial,
+  onConfigureScope,
+  scopeConfigurableCodes,
+}: CapabilityChecklistProps) {
   const { t, locale } = useI18n();
   const selectedSet = new Set(selected);
 
   return (
-    <div data-testid="capability-checklist" className="flex flex-col gap-4">
+    <div
+      data-testid="capability-checklist"
+      className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2"
+    >
+      {groups.some((group) =>
+        group.capabilities.some(
+          (cap) =>
+            cap.authorizationState === 'partial' &&
+            !selectedSet.has(cap.code) &&
+            !revokedPartial.includes(cap.code),
+        ),
+      ) && (
+        <p
+          data-testid="capability-partial-guidance"
+          className="text-text-2 col-span-full text-xs leading-5"
+        >
+          {t(
+            'admin.permission.capability.partialGuidanceV2',
+            undefined,
+            'Some actions may be shared dependencies of other capabilities. Partial actions do not grant the complete capability. Select to complete; review revocation effects before saving.',
+          )}
+        </p>
+      )}
       {groups.map((group) => {
-        const { granted, total } = groupSummary(group);
+        const total = group.capabilities.length;
+        const granted = group.capabilities.filter((cap) => selectedSet.has(cap.code)).length;
         return (
           <fieldset
             key={group.group}
             data-testid={`capability-group-${group.group}`}
-            className="border border-gray-200 rounded-md p-3"
+            className="rounded-card border-border bg-panel border p-4 dark:border-gray-700 dark:bg-gray-900"
           >
             <legend className="px-1 text-sm font-medium text-gray-900">
               {/* Declared groups carry a business bucket name (e.g. 客户管理) — t() misses and falls
@@ -42,22 +78,58 @@ export default function CapabilityChecklist({ groups, selected, onToggle }: Capa
             </legend>
             <div className="flex flex-col gap-1.5">
               {group.capabilities.map((cap) => (
-                <label
+                <div
                   key={cap.code}
                   data-testid={`capability-${cap.code}`}
                   title={getLocalizedText(cap.localizedDescriptions, locale, t) || cap.description || undefined}
-                  className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer"
+                  className="flex cursor-pointer items-start gap-2 text-sm text-gray-700"
                 >
                   <input
                     type="checkbox"
+                    id={`capability-input-${cap.code}`}
                     className="mt-1"
                     data-testid={`capability-checkbox-${cap.code}`}
                     checked={selectedSet.has(cap.code)}
+                    ref={(input) => {
+                      if (input)
+                        input.indeterminate =
+                          cap.authorizationState === 'partial' &&
+                          !selectedSet.has(cap.code) &&
+                          !revokedPartial.includes(cap.code);
+                    }}
+                    aria-checked={
+                      cap.authorizationState === 'partial' &&
+                      !selectedSet.has(cap.code) &&
+                      !revokedPartial.includes(cap.code)
+                        ? 'mixed'
+                        : selectedSet.has(cap.code)
+                    }
+                    disabled={disabled}
+                    aria-label={getLocalizedText(cap.localizedLabels, locale, t) || cap.label}
                     onChange={() => onToggle(cap.code)}
                   />
-                  <span className="flex flex-col gap-1">
-                    <span className="flex items-center gap-2">
-                      <span>{getLocalizedText(cap.localizedLabels, locale, t) || cap.label}</span>
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <label htmlFor={`capability-input-${cap.code}`} className="cursor-pointer">
+                        {getLocalizedText(cap.localizedLabels, locale, t) || cap.label}
+                      </label>
+                      {cap.authorizationState === 'partial' &&
+                        !selectedSet.has(cap.code) &&
+                        !revokedPartial.includes(cap.code) && (
+                          <span
+                            data-testid={`capability-partial-${cap.code}`}
+                            className="text-text-2 text-xs"
+                          >
+                            {t(
+                              'admin.permission.capability.partialActionsV2',
+                              {
+                                granted: cap.includes.length - (cap.missingCodes?.length ?? 0),
+                                total: cap.includes.length,
+                              },
+                              `Actions ${cap.includes.length - (cap.missingCodes?.length ?? 0)}/${cap.includes.length}`,
+                            )}
+                          </span>
+                        )}
                       {cap.sensitive && (
                         <span
                           data-testid={`capability-sensitive-${cap.code}`}
@@ -67,25 +139,70 @@ export default function CapabilityChecklist({ groups, selected, onToggle }: Capa
                           🔒
                         </span>
                       )}
-                    </span>
-                    {cap.unlockedMenus && cap.unlockedMenus.length > 0 && (
-                      <span
-                        data-testid={`capability-menus-${cap.code}`}
-                        className="flex flex-wrap items-center gap-1 text-xs text-gray-400"
-                      >
-                        <span>{t('permission.capability.unlocksMenus', undefined, '解锁菜单')}:</span>
-                        {cap.unlockedMenus.map((m) => (
-                          <span
-                            key={m}
-                            className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-500"
+                      {cap.authorizationState === 'partial' &&
+                        onRevokePartial &&
+                        !selectedSet.has(cap.code) && (
+                          <button
+                            type="button"
+                            data-testid={`capability-revoke-partial-${cap.code}`}
+                            disabled={disabled}
+                            onClick={() => onRevokePartial(cap.code)}
+                            className={
+                              revokedPartial.includes(cap.code)
+                                ? 'text-left text-xs text-amber-700 hover:underline'
+                                : 'text-left text-xs text-gray-500 hover:text-red-700 hover:underline'
+                            }
                           >
-                            {m}
-                          </span>
-                        ))}
-                      </span>
+                            {revokedPartial.includes(cap.code)
+                              ? t(
+                                  'admin.permission.capability.undoRevokeV2',
+                                  undefined,
+                                  'Pending revocation · undo',
+                                )
+                              : t(
+                                  'admin.permission.capability.revokePartialV2',
+                                  undefined,
+                                  'Revoke existing grants',
+                                )}
+                          </button>
+                        )}
+                    </span>
+                    {onConfigureScope && scopeConfigurableCodes?.has(cap.code) && (
+                      <button
+                        type="button"
+                        data-testid={`capability-scope-configure-${cap.code}`}
+                        disabled={disabled}
+                        onClick={() => onConfigureScope(cap)}
+                        className="text-accent text-left text-xs hover:underline"
+                      >
+                        {t('admin.permission.capability.scopeV2', undefined, 'Record scope')}
+                      </button>
                     )}
-                  </span>
-                </label>
+                    {cap.unlockedMenus && cap.unlockedMenus.length > 0 && (
+                      <details
+                        data-testid={`capability-menus-${cap.code}`}
+                        className="text-xs text-gray-500"
+                      >
+                        <summary className="cursor-pointer hover:text-gray-700">
+                          {t(
+                            'admin.permission.capability.relatedMenusV2',
+                            undefined,
+                            'Related menus',
+                          )}
+                          {' · '}
+                          {cap.unlockedMenus.length}
+                        </summary>
+                        <ul className="mt-1 flex flex-wrap gap-1">
+                          {cap.unlockedMenus.map((m) => (
+                            <li key={m} className="rounded bg-gray-100 px-1.5 py-0.5">
+                              {m}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    )}
+                  </div>
+                </div>
               ))}
             </div>
           </fieldset>
