@@ -7,6 +7,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
+import org.springframework.security.access.AccessDeniedException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -31,6 +32,8 @@ public class PlatformAiController {
         try {
             PlatformAiScoreResult result = platformAiScoringService.score(request, tenantId);
             return ApiResponse.success(result);
+        } catch (AccessDeniedException e) {
+            throw e;
         } catch (IllegalStateException | IllegalArgumentException e) {
             return ApiResponse.error(e.getMessage());
         } catch (Exception e) {

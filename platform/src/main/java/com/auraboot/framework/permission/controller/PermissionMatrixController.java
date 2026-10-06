@@ -74,6 +74,7 @@ public class PermissionMatrixController {
      * @param rolePid Role PID (string identifier, avoids BigInt precision loss)
      */
     @GetMapping("/{rolePid}")
+    @RequirePermission(MetaPermission.ROLE_READ)
     @Operation(summary = "Get permission matrix for role")
     public ApiResponse<PermissionMatrixDTO> getMatrixForRole(@PathVariable String rolePid) {
         Long tenantId = MetaContext.getCurrentTenantId();
@@ -133,6 +134,7 @@ public class PermissionMatrixController {
      * @param rolePid Role PID
      */
     @GetMapping("/{rolePid}/default-scope")
+    @RequirePermission(MetaPermission.ROLE_READ)
     @Operation(summary = "Get role default data scope")
     public ApiResponse<String> getDefaultScope(@PathVariable String rolePid) {
         Role role = roleService.findByPid(rolePid);

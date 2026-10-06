@@ -54,7 +54,7 @@ export interface PermissionMatrixActionDTO {
   label: string;
   granted: boolean;
   supported: boolean;
-  scopeType?: string;       // 'all' | 'self' | 'dept' | 'dept_and_sub' | 'none' | null
+  scopeType?: string | null;       // 'all' | 'self' | 'dept' | 'dept_and_sub' | 'none' | null
   mergeStrategy?: string;   // 'MAX' | 'MIN' | null
   policySchema?: string;    // JSON string of policy schema definition, null if no policy
   policyValues?: Record<string, any>; // current policy values for this role

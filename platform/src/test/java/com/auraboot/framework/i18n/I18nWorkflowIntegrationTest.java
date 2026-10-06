@@ -105,6 +105,9 @@ class I18nWorkflowIntegrationTest extends BaseIntegrationTest {
         I18nResource persisted = i18nResourceService.findByPid(review.getPid());
         assertThat(persisted.getStatus()).isEqualTo(I18nResource.STATUS_APPROVED);
         assertThat(persisted.getReviewedAt()).isNotNull();
+        // The approval must clear a previous rejection reason in the database, not only
+        // on the returned entity (updateById skips null fields by default).
+        assertThat(persisted.getRejectReason()).isNull();
 
         // Cleanup
         i18nResourceService.delete(review.getPid());
@@ -134,8 +137,31 @@ class I18nWorkflowIntegrationTest extends BaseIntegrationTest {
         i18nResourceService.delete(review.getPid());
     }
 
-    // ==================== WF-04: approve from wrong status ====================
+    // ==================== WF-03b: resubmit after reject clears the stale reason ====================
 
+    @Test
+    @Order(10)
+    @DisplayName("WF-03b: submit-review after a rejection clears the stale reason, and a later approval keeps it cleared")
+    void resubmitAfterReject_clearsStaleReason() {
+        I18nResource review = createReviewResource("wf03b");
+        String reason = "Please clarify this wording";
+        i18nResourceService.reject(review.getPid(), reason);
+
+        i18nResourceService.submitReview(review.getPid());
+        I18nResource resubmitted = i18nResourceService.findByPid(review.getPid());
+        assertThat(resubmitted.getStatus()).isEqualTo(I18nResource.STATUS_REVIEW);
+        assertThat(resubmitted.getRejectReason()).isNull();
+
+        i18nResourceService.approve(review.getPid());
+        I18nResource approved = i18nResourceService.findByPid(review.getPid());
+        assertThat(approved.getStatus()).isEqualTo(I18nResource.STATUS_APPROVED);
+        assertThat(approved.getRejectReason()).isNull();
+
+        // Cleanup
+        i18nResourceService.delete(review.getPid());
+    }
+
+    // ==================== WF-04: approve from wrong status ====================
     @Test
     @Order(4)
     @DisplayName("WF-04: approve on DRAFT status returns 400 (invalid transition)")

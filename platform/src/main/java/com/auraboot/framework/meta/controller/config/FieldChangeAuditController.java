@@ -7,7 +7,6 @@ import com.auraboot.framework.meta.entity.FieldChangeLog;
 import com.auraboot.framework.meta.service.impl.FieldChangeAuditService;
 import com.auraboot.framework.meta.service.impl.FieldChangeAuditService.FieldAuditConfigRequest;
 import com.auraboot.framework.permission.annotation.RequirePermission;
-import com.auraboot.framework.user.mapper.UserMapper;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -32,7 +31,6 @@ import java.util.Map;
 public class FieldChangeAuditController {
 
     private final FieldChangeAuditService fieldChangeAuditService;
-    private final UserMapper userMapper;
 
     // =====================================================================
     // Query endpoints
@@ -199,16 +197,8 @@ public class FieldChangeAuditController {
     private List<FieldChangeLogResponse> toResponses(List<FieldChangeLog> changes) {
         List<Long> actorIds = changes.stream().map(FieldChangeLog::getActorId)
                 .filter(id -> id != null && id > 0).distinct().toList();
-        Map<Long, String> actorNames = new java.util.HashMap<>();
-        if (!actorIds.isEmpty()) {
-            for (Map<String, Object> row : userMapper.findDisplayNamesByIdsInTenant(
-                    MetaContext.getCurrentTenantId(), actorIds)) {
-                if (row.get("id") instanceof Number id && row.get("display_name") instanceof String name
-                        && !name.isBlank()) {
-                    actorNames.put(id.longValue(), name);
-                }
-            }
-        }
+        Map<Long, String> actorNames =
+                fieldChangeAuditService.findActorDisplayNames(MetaContext.getCurrentTenantId(), actorIds);
         return changes.stream().map(change -> toResponse(change, actorNames)).toList();
     }
 

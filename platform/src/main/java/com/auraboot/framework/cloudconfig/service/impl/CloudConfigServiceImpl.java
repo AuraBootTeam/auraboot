@@ -7,6 +7,7 @@ import com.auraboot.framework.cloudconfig.entity.CloudConfig;
 import com.auraboot.framework.cloudconfig.mapper.CloudConfigMapper;
 import com.auraboot.framework.cloudconfig.service.CloudConfigService;
 import com.auraboot.framework.common.crypto.FieldEncryptionService;
+import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.util.UlidGenerator;
 import com.auraboot.framework.exception.BusinessException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -185,6 +186,31 @@ public class CloudConfigServiceImpl implements CloudConfigService {
     }
 
     // ==================== Private helpers ====================
+
+    /** Retain stored ciphertext when an editor sends back its unchanged masked value. */
+    private String preserveMaskedSecrets(String submitted, String encrypted, String stored) {
+        if (submitted == null || submitted.isBlank() || stored == null || stored.isBlank()) {
+            return encrypted;
+        }
+        try {
+            JsonNode input = objectMapper.readTree(submitted);
+            JsonNode previous = objectMapper.readTree(stored);
+            JsonNode result = objectMapper.readTree(encrypted);
+            if (!input.isObject() || !previous.isObject() || !result.isObject()) {
+                return encrypted;
+            }
+            ObjectNode updated = (ObjectNode) result;
+            for (String field : SENSITIVE_FIELDS) {
+                if (input.path(field).isTextual() && previous.path(field).isTextual()
+                        && input.path(field).asText().equals(fieldEncryptionService.mask(previous.path(field).asText()))) {
+                    updated.set(field, previous.get(field));
+                }
+            }
+            return objectMapper.writeValueAsString(updated);
+        } catch (JsonProcessingException exception) {
+            throw new BusinessException(ResponseCode.BadParam, "Cloud configuration must be valid JSON", exception);
+        }
+    }
 
     /**
      * Encrypt sensitive fields in the config JSON string.

@@ -312,6 +312,7 @@ class OrgEmployeeServiceImplTest {
     void linkMemberHappy() {
         TenantMember member = new TenantMember();
         member.setId(50L);
+        member.setTenantId(1L);
         member.setPid("mem-50");
         member.setUserId(99L);
         when(tenantMemberService.findByPid("mem-50")).thenReturn(member);
@@ -353,6 +354,7 @@ class OrgEmployeeServiceImplTest {
 
         TenantMember member = new TenantMember();
         member.setId(50L);
+        member.setTenantId(1L);
         member.setPid("mem-50");
         member.setUserId(99L);
         when(tenantMemberService.findByPid("mem-50")).thenReturn(member);
@@ -385,6 +387,7 @@ class OrgEmployeeServiceImplTest {
     void linkMemberUsesUserName() {
         TenantMember m = new TenantMember();
         m.setId(50L);
+        m.setTenantId(1L);
         m.setUserId(99L);
         when(tenantMemberService.findByPid("mem-50")).thenReturn(m);
 
@@ -415,11 +418,13 @@ class OrgEmployeeServiceImplTest {
         assertThrows(BusinessException.class, () -> service.linkMember(req));
 
         TenantMember alreadyLinked = new TenantMember();
+        alreadyLinked.setTenantId(1L);
         alreadyLinked.setEmployeeId(123L);
         when(tenantMemberService.findByPid("mem-50")).thenReturn(alreadyLinked);
         assertThrows(BusinessException.class, () -> service.linkMember(req));
 
         TenantMember m = new TenantMember();
+        m.setTenantId(1L);
         m.setUserId(99L);
         when(tenantMemberService.findByPid("mem-50")).thenReturn(m);
         when(userService.findByUserId(99L)).thenReturn(null);

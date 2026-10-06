@@ -106,6 +106,13 @@ class SemanticPreaggCallerContextTest {
         when(preaggs.listAllAcrossTenants()).thenReturn(List.of(first, second));
         when(preaggs.findByPid(11L, first.getPid())).thenReturn(first);
         when(preaggs.findByPid(21L, second.getPid())).thenReturn(second);
+        when(models.findByPid(anyLong(), anyString())).thenAnswer(invocation -> {
+            assertThat(MetaContext.getCurrentTenantId()).isEqualTo((Long) invocation.getArgument(0));
+            AbSemanticModel model = new AbSemanticModel();
+            model.setPid("model-pid");
+            model.setCode("context_metric");
+            return model;
+        });
         Set<Long> compiledTenants = new HashSet<>();
         when(queries.explainQuery(any(), any())).thenAnswer(invocation -> {
             UserContext creator = invocation.getArgument(1);

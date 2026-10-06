@@ -64,7 +64,8 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
         // 验证每个字段
         if (modelDefinition.getFields() != null) {
             for (FieldDefinition field : modelDefinition.getFields()) {
-                FieldValidationResult fieldResult = validateField(field, data.get(field.getCode()), context);
+                FieldValidationResult fieldResult = validateField(field, data.get(field.getCode()), context,
+                        relationsVerified);
                 
                 if (fieldResult.isValid()) {
                     validFields.add(field.getCode());
@@ -113,6 +114,7 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
                         "Validation failed: " + String.join(", ", result.getErrors()), result);
             }
         }
+        validateBatchBusinessReferences(model, rows);
         if (model.getRelations() == null) return;
         Long tenantId = MetaContext.getCurrentTenantId();
         for (RelationDefinition relation : model.getRelations()) {
@@ -161,8 +163,74 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
         }
     }
 
+    private void validateBatchBusinessReferences(ModelDefinition model, List<Map<String, Object>> rows) {
+        if (model.getFields() == null) return;
+        for (FieldDefinition field : model.getFields()) {
+            FieldDefinition.RefTarget target = field.getRefTarget();
+            if (target == null || target.getTargetEntity() == null || target.getTargetEntity().isBlank()
+                    || "sys_user".equalsIgnoreCase(target.getTargetEntity())) continue;
+            Set<String> values = new LinkedHashSet<>();
+            for (Map<String, Object> row : rows) {
+                if (row.get(field.getCode()) instanceof String value && !value.isBlank()) {
+                    values.addAll(parseReferenceValues(value));
+                }
+            }
+            if (values.isEmpty()) continue;
+            String table = target.getTargetTable();
+            if (table == null || table.isBlank()) {
+                MetaModelDTO targetModel = metaModelService.findByCode(target.getTargetEntity());
+                if (targetModel == null || targetModel.getTableName() == null
+                        || targetModel.getTableName().isBlank()) {
+                    log.warn("Reference field '{}' points at model '{}' without a resolvable table; "
+                            + "skipping existence check", field.getCode(), target.getTargetEntity());
+                    continue;
+                }
+                table = targetModel.getTableName();
+            }
+            String valueField = target.getValueField() != null && !target.getValueField().isBlank()
+                    ? target.getValueField()
+                    : target.getTargetField() != null && !target.getTargetField().isBlank()
+                            ? target.getTargetField() : "pid";
+            SqlSafetyUtils.validateIdentifier(table, "reference targetTable");
+            SqlSafetyUtils.validateIdentifier(valueField, "reference valueField");
+            List<String> references = new ArrayList<>(values);
+            // Match the scalar equality semantics, but resolve repeated references
+            // once per field and bound projection size for large bulk commands.
+            for (int offset = 0; offset < references.size(); offset += 128) {
+                int size = Math.min(128, references.size() - offset);
+                List<String> queries = new ArrayList<>();
+                Map<String, Object> params = new HashMap<>();
+                params.put("tenantId", MetaContext.getCurrentTenantId());
+                for (int index = 0; index < size; index++) {
+                    String key = "ref" + index;
+                    params.put(key, references.get(offset + index));
+                    queries.add("(SELECT COUNT(*) FROM " + table + " WHERE " + valueField
+                            + " = #{params." + key + "} AND tenant_id = #{params.tenantId}) AS cnt" + index);
+                }
+                List<Map<String, Object>> matches = dynamicDataMapper.selectByQuery(
+                        "SELECT " + String.join(", ", queries), params);
+                if (matches.size() != 1) {
+                    throw new com.auraboot.framework.meta.exception.ValidationException(
+                            "Incomplete reference validation for field '" + field.getName() + "'");
+                }
+                for (int index = 0; index < size; index++) {
+                    if (!(matches.get(0).get("cnt" + index) instanceof Number count)
+                            || count.longValue() < 1) {
+                        throw new com.auraboot.framework.meta.exception.ValidationException(
+                                "Referenced record not found for field '" + field.getName() + "'");
+                    }
+                }
+            }
+        }
+    }
+
     @Override
     public FieldValidationResult validateField(FieldDefinition fieldDefinition, Object value, ValidationContext context) {
+        return validateField(fieldDefinition, value, context, false);
+    }
+
+    private FieldValidationResult validateField(FieldDefinition fieldDefinition, Object value,
+                                                ValidationContext context, boolean businessReferencesVerified) {
         if (fieldDefinition == null) {
             return FieldValidationResult.invalid("Field definition cannot be null");
         }
@@ -201,7 +269,9 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
         // record in the target model, exactly like model-level relations do. Without
         // this check a command accepts a dangling pid and persists a row that can
         // never be joined (P2 finding: sc_monthly_metric.sc_showcase_pid).
-        validateBusinessReference(fieldDefinition, value, errors);
+        if (!businessReferencesVerified) {
+            validateBusinessReference(fieldDefinition, value, errors);
+        }
 
         // 长度验证
         validateLength(fieldDefinition, value, errors, warnings);

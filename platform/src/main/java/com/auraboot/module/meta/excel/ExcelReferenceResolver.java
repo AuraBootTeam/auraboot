@@ -7,6 +7,8 @@ import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.dto.QueryCondition;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -32,6 +34,7 @@ public class ExcelReferenceResolver {
 
     private final DynamicDataService dynamicDataService;
     private final MetaModelService metaModelService;
+    private final UserService userService;
 
     public String resolve(FieldDefinition field, String uploadedValue) {
         if (uploadedValue == null || uploadedValue.isBlank()) {
@@ -40,6 +43,18 @@ public class ExcelReferenceResolver {
         FieldDefinition.RefTarget refTarget = requireRefTarget(field);
         String targetModel = refTarget.getTargetEntity();
         String valueField = textOrDefault(refTarget.getValueField(), "pid");
+
+        // Member pickers store global user PIDs, but ownership eligibility is tenant-local.
+        // Reuse the same active-member lookup as write validation, without global user read access.
+        if ("sys_user".equalsIgnoreCase(targetModel)) {
+            Long tenantId = MetaContext.getCurrentTenantId();
+            var user = tenantId == null || !"pid".equals(valueField)
+                    ? null : userService.findInTenantByPid(tenantId, uploadedValue);
+            if (user == null) {
+                throw unresolved(field, uploadedValue, List.of("current tenant member PID"));
+            }
+            return user.getPid();
+        }
 
         // Keep the existing public-PID contract. Permission and tenant visibility are checked by
         // getById; failures fall through to explicitly configured business keys.

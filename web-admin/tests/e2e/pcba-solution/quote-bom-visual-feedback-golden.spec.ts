@@ -1,6 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import { utils as XLSXUtils, write } from 'xlsx';
-import type { Page } from '@playwright/test';
+import type { Page, Response } from '@playwright/test';
 import { test, expect } from '../../fixtures';
 import { waitForFormReady } from '../helpers';
 import {
@@ -75,6 +75,17 @@ test.describe('QuoteOps visual feedback golden', () => {
       testInfo.outputPath('invalid-corrected-bom.xlsx'),
     );
 
+    let waterfallResponse: Response | undefined;
+    const captureWaterfall = (response: Response) => {
+      const url = new URL(response.url());
+      if (url.pathname === '/api/datasource/list'
+        && response.request().method() === 'GET'
+        && url.searchParams.get('datasourceId') === 'nq:qo_quote_bom_price_waterfall'
+        && url.searchParams.get('quoteId') === created.quoteId) {
+        waterfallResponse = response;
+      }
+    };
+    page.on('response', captureWaterfall);
     try {
       const receipt = await createQuoteFromReviewedBom(page, created, invalidWorkbookPath);
       await testInfo.attach('create-command-response.json', {
@@ -122,6 +133,14 @@ test.describe('QuoteOps visual feedback golden', () => {
       const main = page.locator('main');
       await expect(main).toContainText('invalid-corrected-bom.xlsx', { timeout: 20_000 });
       await page.getByRole('tab', { name: /BOM价格计算|BOM Price/i }).click();
+      await expect.poll(() => waterfallResponse !== undefined).toBe(true);
+      const waterfall = waterfallResponse!;
+      expect(waterfall.status()).toBe(200);
+      const waterfallBody = await waterfall.json();
+      expect(String(waterfallBody.code)).toBe('0');
+      expect(waterfallBody.data.records).toEqual(expect.arrayContaining([
+        expect.objectContaining({ pid: quoteLines[0].pid, current_price_status: '待云汉识别' }),
+      ]));
       const pendingRow = page.getByTestId(`table-row-${quoteLines[0].pid}`);
       await expect(pendingRow).toContainText('opaque-row-value');
       const pendingStatus = pendingRow.getByText('待云汉识别', { exact: true });
@@ -131,6 +150,7 @@ test.describe('QuoteOps visual feedback golden', () => {
         body: await page.screenshot(), contentType: 'image/png',
       });
     } finally {
+      page.off('response', captureWaterfall);
       await cleanupRows(page, created);
       await setYunhanMockScenario(page, 'release-default');
     }

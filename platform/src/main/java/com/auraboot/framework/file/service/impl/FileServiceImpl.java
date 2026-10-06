@@ -50,7 +50,15 @@ public class FileServiceImpl implements FileService {
     private final FileMapper fileMapper;
     private final FileRelationMapper fileRelationMapper;
     private final StorageProvider storageProvider;
-    private final MultipartProperties multipartProperties;
+
+    /**
+     * Provided by MultipartAutoConfiguration in servlet web hosts. Optional so a
+     * non-web platform host (web-application-type=none, e.g. a consumer's
+     * database-only integration context) can still compose this service; uploads
+     * fall back to the MultipartProperties default limit there.
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private MultipartProperties multipartProperties;
 
     @Autowired(required = false)
     private CdnUrlRewriter cdnUrlRewriter;
@@ -115,7 +123,9 @@ public class FileServiceImpl implements FileService {
             }
 
             // Validate file size
-            long maxFileSize = multipartProperties.getMaxFileSize().toBytes();
+            long maxFileSize = (multipartProperties != null
+                    ? multipartProperties.getMaxFileSize()
+                    : new MultipartProperties().getMaxFileSize()).toBytes();
             if (maxFileSize >= 0 && file.getSize() > maxFileSize) {
                 throw new BusinessException("File too large: max " + (maxFileSize / 1024 / 1024) + "MB");
             }

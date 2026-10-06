@@ -70,7 +70,7 @@ public class ModelController {
 
     @PostMapping
     @Operation(summary = "创建模型", description = "创建新的模型定义 ")
-//    @RequirePermission(MetaPermissions.MODEL_CREATE) todo
+    @RequirePermission(MetaPermission.MODEL_MANAGE)
     public ApiResponse<MetaModelDTO> createModel(
             @Valid @RequestBody MetaModelCreateRequest request) {
         log.info("创建模型: code={}, displayName={}", logSafe(request.getCode()), logSafe(request.getDisplayName()));

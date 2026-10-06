@@ -4,6 +4,6 @@
   "displayName:en": "Department",
   "dataType": "reference",
   "constraints": { "required": true },
-  "refTarget": { "targetModel": "org_department", "targetField": "org_dept_name" },
+  "refTarget": { "targetModel": "org_department", "targetField": "org_dept_name", "displayField": "org_dept_name" },
   "extension": { "placeholder:zh-CN": "请选择部门" }
 }

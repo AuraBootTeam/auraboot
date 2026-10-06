@@ -71,7 +71,7 @@ public class InvariantDefinitionServiceImpl implements InvariantDefinitionServic
 
     @Override
     public InvariantDefinition getByPid(String pid) {
-        InvariantDefinition definition = invariantMapper.findByPid(pid);
+        InvariantDefinition definition = invariantMapper.findByPid(MetaContext.getCurrentTenantId(), pid);
         if (definition == null) {
             throw new BusinessException(ResponseCode.BadParam, "Invariant not found: " + pid);
         }
@@ -134,7 +134,7 @@ public class InvariantDefinitionServiceImpl implements InvariantDefinitionServic
         }
 
         invariantMapper.markAsNotCurrent(definition.getTenantId(), definition.getCode());
-        invariantMapper.publishById(definition.getId(), Status.PUBLISHED.getCode());
+        invariantMapper.publishById(definition.getTenantId(), definition.getId(), Status.PUBLISHED.getCode());
         log.info("Published invariant: code={}, version={}", definition.getCode(), definition.getVersion());
     }
 
@@ -142,7 +142,7 @@ public class InvariantDefinitionServiceImpl implements InvariantDefinitionServic
     @Transactional
     public void delete(String pid) {
         InvariantDefinition definition = getByPid(pid);
-        invariantMapper.softDelete(pid);
+        invariantMapper.softDelete(definition.getTenantId(), pid);
         log.info("Deleted invariant: pid={}, code={}", pid, definition.getCode());
     }
 

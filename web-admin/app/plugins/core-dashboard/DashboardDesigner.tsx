@@ -22,6 +22,8 @@ import type { WidgetType, DashboardScope } from './types';
 import { widgetRegistry } from './widgets/widgetRegistry';
 import { useToast } from '~/contexts/ToastContext';
 import { useI18n } from '~/contexts/I18nContext';
+import { usePermissions } from '~/contexts/AuthContext';
+import { RouteAccessDenied } from '~/ui/PermissionGuard';
 import { useVersioning, VersionHistoryPanel, dashboardVersionService } from '~/shared/versioning';
 import { fetchCurrentUserTeams, type TeamOption } from '~/shared/services/teamService';
 import { useHydrated } from '~/hooks/useHydrated';
@@ -36,12 +38,28 @@ interface DashboardDesignerProps {
   /** Initial title for new dashboard */
   initialTitle?: string;
   /** Callback when save is completed */
-  onSaveComplete?: () => void;
+  onSaveComplete?: (dashboardPid: string) => void;
   /** Callback when close is requested */
   onClose?: () => void;
 }
 
-export const DashboardDesigner: React.FC<DashboardDesignerProps> = ({
+export const DashboardDesigner: React.FC<DashboardDesignerProps> = (props) => {
+  const { hasPermission } = usePermissions();
+  const { locale, t } = useI18n();
+  if (!hasPermission('dashboard.update')) {
+    return (
+      <RouteAccessDenied
+        title={t('dashboard.designer.accessDeniedTitle', undefined,
+          locale === 'zh-CN' ? '无权编辑仪表盘' : 'Dashboard editing unavailable')}
+        message={t('dashboard.designer.accessDeniedMessage', undefined,
+          locale === 'zh-CN' ? '当前账号没有仪表盘管理权限，请联系管理员。' : 'Contact an administrator for dashboard management access.')}
+      />
+    );
+  }
+  return <AuthorizedDashboardDesigner {...props} />;
+};
+
+const AuthorizedDashboardDesigner: React.FC<DashboardDesignerProps> = ({
   dashboardId,
   initialTitle,
   onSaveComplete,
@@ -145,6 +163,12 @@ export const DashboardDesigner: React.FC<DashboardDesignerProps> = ({
     };
   }, []);
 
+  const notifySaveComplete = useCallback(() => {
+    const savedPid = useDashboardStore.getState().dashboard?.pid;
+    if (!savedPid) throw new Error(t('dashboard.designer.saveFailedRetry'));
+    onSaveComplete?.(savedPid);
+  }, [onSaveComplete, t]);
+
   // Auto-save when dirty (debounced) — with mutual exclusion against manual save
   useEffect(() => {
     if (!isDirty || isSaving) {
@@ -165,6 +189,7 @@ export const DashboardDesigner: React.FC<DashboardDesignerProps> = ({
         await saveDashboard();
         lastSaveTimeRef.current = Date.now();
         showInfoToast(t('dashboard.designer.autoSaveSuccess'));
+        notifySaveComplete();
       } catch (error) {
         console.error('Auto-save failed:', error);
       }
@@ -176,7 +201,7 @@ export const DashboardDesigner: React.FC<DashboardDesignerProps> = ({
         autoSaveTimerRef.current = null;
       }
     };
-  }, [isDirty, isSaving, saveDashboard, showInfoToast, t]);
+  }, [isDirty, isSaving, saveDashboard, showInfoToast, t, notifySaveComplete]);
 
   const handleSave = useCallback(async () => {
     // Validate before saving
@@ -201,7 +226,7 @@ export const DashboardDesigner: React.FC<DashboardDesignerProps> = ({
       lastSaveTimeRef.current = Date.now();
       showSuccessToast(t('common.saveSuccess'));
       refreshVersions();
-      onSaveComplete?.();
+      notifySaveComplete();
     } catch (error) {
       console.error('Save failed:', error);
       const message =
@@ -214,7 +239,7 @@ export const DashboardDesigner: React.FC<DashboardDesignerProps> = ({
     showSuccessToast,
     showErrorToast,
     showWarningToast,
-    onSaveComplete,
+    notifySaveComplete,
     refreshVersions,
     t,
   ]);

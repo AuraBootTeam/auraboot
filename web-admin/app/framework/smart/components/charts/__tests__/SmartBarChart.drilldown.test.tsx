@@ -48,6 +48,20 @@ describe('SmartBarChart drill-down', () => {
     });
   });
 
+  it('enables a complete semantic source without a raw model', () => {
+    render(<SmartBarChart dataSource={{ type: 'aggregate', semanticModelCode: 'governed_orders',
+      metrics: [{ field: 'count', aggregation: 'none' }] }} />);
+    expect(mockUseChartData.mock.calls.at(-1)?.[0].enabled).toBe(true);
+    expect(screen.getByTestId('echarts-point')).toBeVisible();
+  });
+
+  it('keeps an incomplete semantic source disabled despite a stale raw model', () => {
+    render(<SmartBarChart dataSource={{ type: 'aggregate', semanticModelCode: '', modelCode: 'stale_orders',
+      metrics: [{ field: 'count', aggregation: 'none' }] }} />);
+    expect(mockUseChartData.mock.calls.at(-1)?.[0].enabled).toBe(false);
+    expect(screen.queryByTestId('echarts-point')).toBeNull();
+  });
+
   it('renders the localized category but drills into the raw dimension value', () => {
     const onDrillDown = vi.fn();
 

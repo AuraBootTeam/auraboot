@@ -4,7 +4,14 @@ import com.auraboot.framework.common.util.UlidGenerator;
 import com.auraboot.framework.dataquality.ge.entity.AbDataQualityExpectationSuite;
 import com.auraboot.framework.dataquality.ge.entity.AbDataQualityValidationRun;
 import com.auraboot.framework.dataquality.ge.mapper.AbDataQualityValidationRunMapper;
-import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.meta.constant.SystemFieldConstants;
+import com.auraboot.framework.meta.dto.QueryBuilderDTO;
+import com.auraboot.framework.meta.mapper.MetaModelMapper;
+import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.meta.service.QueryBuilderReadProtection;
+import com.auraboot.framework.permission.engine.PermissionEvaluator;
+import org.springframework.security.access.AccessDeniedException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -18,31 +25,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Executes Great Expectations-style validations against a real database table.
- *
- * <p>For each expectation in the suite, one or more parameterized SQL queries
- * are executed via {@link DynamicDataMapper}. Results are collected and
- * persisted in {@code ab_dataquality_validation_run}.
- *
- * <h3>Security</h3>
- * <ul>
- *   <li>{@code dataset_name} and column names are validated against
- *       {@link #IDENTIFIER_PATTERN} (same pattern as
- *       {@code AggregateQueryServiceImpl}) before being interpolated into SQL.
- *       Any value that fails validation causes {@link IllegalArgumentException}.</li>
- *   <li>User-supplied literal values ({@code value_set}, regex, row-count bounds)
- *       are passed as JDBC parameters, never interpolated.</li>
- * </ul>
- *
- * <h3>Transaction model</h3>
- * <p>The validation SELECT queries are read-only; only the final
- * {@code INSERT INTO ab_dataquality_validation_run} is transactional.
- * We use {@link org.springframework.transaction.annotation.Transactional} for
- * the outer method and run the SELECT queries outside the write transaction via
- * the injected {@code dynamicDataMapper} which operates with default propagation.
+ * Executes parameterized validations on a registered source using the existing
+ * model-read, field-inference and tenant/row-scope query protection. The SQL
+ * reads and final validation-run insert participate in the outer transaction.
  */
 @Slf4j
 @Service
@@ -52,7 +43,10 @@ public class GreatExpectationsValidator {
     /** Matches valid SQL identifiers: letter or underscore, then letters/digits/underscores. */
     static final Pattern IDENTIFIER_PATTERN = Pattern.compile("^[a-zA-Z_][a-zA-Z0-9_]*$");
 
-    private final DynamicDataMapper dynamicDataMapper;
+    private final MetaModelMapper modelMapper;
+    private final MetaModelService models;
+    private final QueryBuilderReadProtection sourceProtection;
+    private final PermissionEvaluator permissions;
     private final AbDataQualityValidationRunMapper runMapper;
     private final ExpectationsParser parser;
     private final ObjectMapper objectMapper;
@@ -68,10 +62,9 @@ public class GreatExpectationsValidator {
      */
     @Transactional
     public AbDataQualityValidationRun validate(Long tenantId, AbDataQualityExpectationSuite suite) {
-        String datasetName = suite.getDatasetName();
-        validateIdentifier(datasetName, "dataset_name");
-
         List<ExpectationConfig> expectations = parser.parse(suite.getExpectationsJson());
+        Source source = prepareSource(tenantId, suite, expectations);
+        String datasetName = suite.getDatasetName();
 
         Instant started = Instant.now();
         List<Map<String, Object>> results = new ArrayList<>();
@@ -79,7 +72,7 @@ public class GreatExpectationsValidator {
         int failed = 0;
 
         for (ExpectationConfig exp : expectations) {
-            ExpectationResult r = evaluate(datasetName, exp);
+            ExpectationResult r = evaluate(datasetName, exp, source);
             results.add(r.toMap());
             if (r.passed()) {
                 passed++;
@@ -110,14 +103,14 @@ public class GreatExpectationsValidator {
     // Per-expectation evaluation
     // -----------------------------------------------------------------------
 
-    private ExpectationResult evaluate(String dataset, ExpectationConfig exp) {
+    private ExpectationResult evaluate(String dataset, ExpectationConfig exp, Source source) {
         return switch (exp.expectationType()) {
-            case ExpectationConfig.NOT_NULL -> evalNotNull(dataset, exp);
-            case ExpectationConfig.COLUMN_LENGTH -> evalColumnLength(dataset, exp);
-            case ExpectationConfig.MATCH_REGEX -> evalMatchRegex(dataset, exp);
-            case ExpectationConfig.TABLE_ROW_COUNT -> evalRowCount(dataset, exp);
-            case ExpectationConfig.IN_SET -> evalInSet(dataset, exp);
-            case ExpectationConfig.PAIR_A_GT_B -> evalPairAGtB(dataset, exp);
+            case ExpectationConfig.NOT_NULL -> evalNotNull(dataset, exp, source);
+            case ExpectationConfig.COLUMN_LENGTH -> evalColumnLength(dataset, exp, source);
+            case ExpectationConfig.MATCH_REGEX -> evalMatchRegex(dataset, exp, source);
+            case ExpectationConfig.TABLE_ROW_COUNT -> evalRowCount(dataset, exp, source);
+            case ExpectationConfig.IN_SET -> evalInSet(dataset, exp, source);
+            case ExpectationConfig.PAIR_A_GT_B -> evalPairAGtB(dataset, exp, source);
             default -> throw new IllegalStateException("Unhandled expectation type: " + exp.expectationType());
         };
     }
@@ -127,10 +120,10 @@ public class GreatExpectationsValidator {
      * {@code SELECT COUNT(*) FROM dataset WHERE col IS NULL}
      * Pass if count = 0.
      */
-    private ExpectationResult evalNotNull(String dataset, ExpectationConfig exp) {
+    private ExpectationResult evalNotNull(String dataset, ExpectationConfig exp, Source source) {
         String col = requireValidColumn(exp.column());
         String sql = "SELECT COUNT(*) AS cnt FROM " + dataset + " WHERE " + col + " IS NULL";
-        long nullCount = countQuery(sql, Map.of());
+        long nullCount = countQuery(source, sql, Map.of());
         boolean passed = nullCount == 0;
         return new ExpectationResult(exp.expectationType(), exp.column(), passed, nullCount,
                 "null_count=" + nullCount);
@@ -141,7 +134,7 @@ public class GreatExpectationsValidator {
      * {@code SELECT COUNT(*) FROM dataset WHERE LENGTH(col) NOT BETWEEN minValue AND maxValue}
      * Pass if count = 0.
      */
-    private ExpectationResult evalColumnLength(String dataset, ExpectationConfig exp) {
+    private ExpectationResult evalColumnLength(String dataset, ExpectationConfig exp, Source source) {
         String col = requireValidColumn(exp.column());
         Map<String, Object> params = new HashMap<>();
         StringBuilder sql = new StringBuilder("SELECT COUNT(*) AS cnt FROM ").append(dataset)
@@ -160,7 +153,7 @@ public class GreatExpectationsValidator {
             // No bounds: trivially passes (nothing to check).
             return new ExpectationResult(exp.expectationType(), exp.column(), true, 0L, "no_bounds");
         }
-        long violationCount = countQuery(sql.toString(), params);
+        long violationCount = countQuery(source, sql.toString(), params);
         boolean passed = violationCount == 0;
         return new ExpectationResult(exp.expectationType(), exp.column(), passed, violationCount,
                 "violation_count=" + violationCount);
@@ -171,13 +164,13 @@ public class GreatExpectationsValidator {
      * PostgreSQL {@code ~} operator: {@code SELECT COUNT(*) WHERE col !~ 'regex'}
      * Pass if count = 0.
      */
-    private ExpectationResult evalMatchRegex(String dataset, ExpectationConfig exp) {
+    private ExpectationResult evalMatchRegex(String dataset, ExpectationConfig exp, Source source) {
         String col = requireValidColumn(exp.column());
         // Regex is passed as a JDBC parameter to prevent injection.
         String sql = "SELECT COUNT(*) AS cnt FROM " + dataset
                 + " WHERE " + col + " IS NOT NULL AND " + col + " !~ #{params.regex}";
         Map<String, Object> params = Map.of("regex", exp.regex());
-        long violationCount = countQuery(sql, params);
+        long violationCount = countQuery(source, sql, params);
         boolean passed = violationCount == 0;
         return new ExpectationResult(exp.expectationType(), exp.column(), passed, violationCount,
                 "regex_mismatch_count=" + violationCount);
@@ -188,9 +181,9 @@ public class GreatExpectationsValidator {
      * {@code SELECT COUNT(*) FROM dataset}
      * Pass if result is between minValue and maxValue (inclusive).
      */
-    private ExpectationResult evalRowCount(String dataset, ExpectationConfig exp) {
+    private ExpectationResult evalRowCount(String dataset, ExpectationConfig exp, Source source) {
         String sql = "SELECT COUNT(*) AS cnt FROM " + dataset;
-        long count = countQuery(sql, Map.of());
+        long count = countQuery(source, sql, Map.of());
         boolean passed = true;
         if (exp.minValue() != null && count < exp.minValue()) passed = false;
         if (exp.maxValue() != null && count > exp.maxValue()) passed = false;
@@ -204,14 +197,14 @@ public class GreatExpectationsValidator {
      * Pass if count = 0.
      * NULL values are skipped (GE default behaviour for not_null is a separate expectation).
      */
-    private ExpectationResult evalInSet(String dataset, ExpectationConfig exp) {
+    private ExpectationResult evalInSet(String dataset, ExpectationConfig exp, Source source) {
         String col = requireValidColumn(exp.column());
         List<String> valueSet = exp.valueSet();
         if (valueSet == null || valueSet.isEmpty()) {
             // Empty set: no values are ever in the set → every non-null row fails.
             // This is the correct GE semantics.
             String countSql = "SELECT COUNT(*) AS cnt FROM " + dataset + " WHERE " + col + " IS NOT NULL";
-            long nonNullCount = countQuery(countSql, Map.of());
+            long nonNullCount = countQuery(source, countSql, Map.of());
             boolean passed = nonNullCount == 0;
             return new ExpectationResult(exp.expectationType(), exp.column(), passed, nonNullCount,
                     "violation_count=" + nonNullCount + " (empty_set)");
@@ -228,7 +221,7 @@ public class GreatExpectationsValidator {
         String inClause = placeholders.stream().collect(Collectors.joining(", ", "(", ")"));
         String sql = "SELECT COUNT(*) AS cnt FROM " + dataset
                 + " WHERE " + col + " IS NOT NULL AND " + col + " NOT IN " + inClause;
-        long violationCount = countQuery(sql, params);
+        long violationCount = countQuery(source, sql, params);
         boolean passed = violationCount == 0;
         return new ExpectationResult(exp.expectationType(), exp.column(), passed, violationCount,
                 "violation_count=" + violationCount);
@@ -239,12 +232,12 @@ public class GreatExpectationsValidator {
      * {@code SELECT COUNT(*) FROM dataset WHERE NOT (colA > colB)}
      * Pass if count = 0.
      */
-    private ExpectationResult evalPairAGtB(String dataset, ExpectationConfig exp) {
+    private ExpectationResult evalPairAGtB(String dataset, ExpectationConfig exp, Source source) {
         String colA = requireValidColumn(exp.columnA());
         String colB = requireValidColumn(exp.columnB());
         String sql = "SELECT COUNT(*) AS cnt FROM " + dataset
                 + " WHERE NOT (" + colA + " > " + colB + ")";
-        long violationCount = countQuery(sql, Map.of());
+        long violationCount = countQuery(source, sql, Map.of());
         boolean passed = violationCount == 0;
         return new ExpectationResult(exp.expectationType(), colA + "," + colB, passed, violationCount,
                 "violation_count=" + violationCount);
@@ -254,13 +247,74 @@ public class GreatExpectationsValidator {
     // SQL helpers
     // -----------------------------------------------------------------------
 
-    private long countQuery(String sql, Map<String, Object> params) {
-        // Use countByQueryWithoutTenant: the dataset may be any user table, not an
-        // AuraBoot multi-tenant table. Tenant isolation is the responsibility of
-        // the caller who selects which suite to run. If the dataset does contain
-        // tenant_id, the user's expectation suite should include a filter condition.
-        Long count = dynamicDataMapper.countByQueryWithoutTenant(sql, params);
-        return count != null ? count : 0L;
+    /** Check the source before creating a suite or returning its stored results. */
+    public void authorizeSuite(Long tenantId, AbDataQualityExpectationSuite suite) {
+        prepareSource(tenantId, suite, parser.parse(suite.getExpectationsJson()));
+    }
+
+    private record Source(QueryBuilderReadProtection.Plan plan, boolean softDelete) { }
+
+    private Source prepareSource(Long tenantId, AbDataQualityExpectationSuite suite,
+                                 List<ExpectationConfig> expectations) {
+        if (!MetaContext.exists() || MetaContext.getCurrentUserId() == null
+                || tenantId == null || !tenantId.equals(MetaContext.getCurrentTenantId())
+                || !tenantId.equals(suite.getTenantId())) {
+            throw new AccessDeniedException("Validation requires the current suite tenant and identity");
+        }
+        String dataset = suite.getDatasetName();
+        validateIdentifier(dataset, "dataset_name");
+        Set<String> inputs = new LinkedHashSet<>();
+        for (ExpectationConfig exp : expectations) {
+            for (String column : new String[] {exp.column(), exp.columnA(), exp.columnB()}) {
+                if (column != null) inputs.add(requireValidColumn(column));
+            }
+        }
+        // A suite stores a local relation name, not a connector or external-source grant.
+        var candidates = modelMapper.findCurrentForTenant(tenantId).stream().filter(model -> {
+            String relation = "sqlView".equals(model.getSourceType()) ? model.getSourceRef() : model.getTableName();
+            if (relation == null || relation.isBlank()) relation = SystemFieldConstants.generateTableName(model.getCode());
+            return dataset.equalsIgnoreCase(relation);
+        }).toList();
+        if (candidates.size() != 1) {
+            throw new AccessDeniedException("Validation source model is unknown or ambiguous");
+        }
+        String modelCode = candidates.getFirst().getCode();
+        Long memberId = MetaContext.getCurrentMemberId();
+        if (memberId == null) memberId = MetaContext.getCurrentUserId();
+        if (!permissions.canAction(memberId, modelCode, "read")) {
+            throw new AccessDeniedException("Validation source read permission is required");
+        }
+        Map<String, String> columns = new LinkedHashMap<>();
+        for (var field : models.getModelFields(modelCode)) {
+            // Host-column inference depends on every virtual field stored in that host.
+            String column = field.isJsonbVirtual() ? field.getJsonbColumn() : field.getColumnName();
+            if (column == null || column.isBlank()) column = field.getCode();
+            columns.put(field.getCode(), column);
+        }
+        Set<String> inferenceFields = new LinkedHashSet<>();
+        for (String input : inputs) {
+            Set<String> aliases = columns.entrySet().stream().filter(entry -> input.equals(entry.getValue()))
+                    .map(Map.Entry::getKey).collect(Collectors.toSet());
+            if (aliases.isEmpty()) throw new AccessDeniedException("Validation columns must be registered");
+            inferenceFields.addAll(aliases);
+        }
+        QueryBuilderReadProtection.Plan plan;
+        if (inferenceFields.isEmpty()) {
+            QueryBuilderDTO dto = new QueryBuilderDTO();
+            dto.setModelCode(modelCode);
+            plan = sourceProtection.prepare(dto, columns, dataset);
+        } else {
+            plan = sourceProtection.prepareComparison(modelCode, inferenceFields, columns, dataset);
+        }
+        return new Source(plan, columns.containsValue("deleted_flag"));
+    }
+
+    private long countQuery(Source source, String sql, Map<String, Object> params) {
+        if (source.softDelete()) {
+            sql += sql.contains(" WHERE ") ? " AND " : " WHERE ";
+            sql += "(deleted_flag = FALSE OR deleted_flag IS NULL)";
+        }
+        return sourceProtection.executeCount(source.plan(), sql, params);
     }
 
     // -----------------------------------------------------------------------

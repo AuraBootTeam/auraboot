@@ -819,6 +819,10 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
             if (!IDENTIFIER_PATTERN.matcher(request.getSemanticModelCode()).matches()) {
                 throw new MetaServiceException("Invalid semantic model code format");
             }
+            // Semantic fields and metrics belong to the governed model catalogue.
+            // The adapter/compiler validates them, including permissions and grains;
+            // raw aggregation syntax would reject semantic metrics and qualified codes.
+            return;
         } else if ("namedQuery".equals(request.getType())) {
             if (request.getQueryCode() == null || request.getQueryCode().isBlank()) {
                 throw new MetaServiceException("Query code is required for named queries");

@@ -3,6 +3,11 @@ package com.auraboot.framework.meta.service.impl.pipeline.phases;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.entity.CommandDefinition;
+import com.auraboot.framework.meta.entity.BindingRule;
+import com.auraboot.framework.meta.handler.TenantMemberCommandHandler;
+import com.auraboot.framework.meta.service.CommandHandler;
+import com.auraboot.framework.organization.service.OrgEmployeeService;
+import com.auraboot.framework.tenant.service.TenantMemberApplicationService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.impl.CommandCascadeDeleteExecutor;
 import com.auraboot.framework.meta.service.impl.CommandFieldMapExecutor;
@@ -14,17 +19,25 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationContext;
+import org.springframework.beans.factory.NoSuchBeanDefinitionException;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class FieldMapPhaseTest {
@@ -47,10 +60,104 @@ class FieldMapPhaseTest {
     @Mock
     private MetaModelService metaModelService;
 
+    @Mock
+    private ApplicationContext applicationContext;
+
+    @ParameterizedTest
+    @ValueSource(strings = {"approve", "reject", "suspend", "restore", "leave", "delete"})
+    void nativeMemberHandlerOwnsMutationBeforeOffboardingChecks(String action) {
+        TenantMemberCommandHandler handler = new TenantMemberCommandHandler(
+                mock(TenantMemberApplicationService.class), mock(OrgEmployeeService.class));
+        CommandPipelineContext ctx = handlerContext("admin:" + action + "_member",
+                "delete".equals(action) ? "delete" : "state_transition");
+        when(applicationContext.getBean("tenantMemberCommandHandler", CommandHandler.class)).thenReturn(handler);
+
+        phase().execute(ctx);
+
+        verifyNoInteractions(fieldMapExecutor, cascadeDeleteExecutor);
+        assertThat(ctx.getFieldMapResults()).isEmpty();
+    }
+
+    @Test
+    void pluginOwnedDeleteAlsoRetainsChildrenUntilItsHandlerRuns() {
+        CommandPipelineContext ctx = handlerContext("test:domain_delete", "delete");
+        when(extensionRegistry.getCommandHandler(ctx.getCommandCode())).thenReturn(Optional.of(pluginHandler));
+        when(pluginHandler.requiresDslPersistence(ctx.getCommandCode(), ctx.getExecConfig(), ctx.getRequest()))
+                .thenReturn(false);
+
+        phase().execute(ctx);
+
+        verifyNoInteractions(fieldMapExecutor, cascadeDeleteExecutor, applicationContext);
+        assertThat(ctx.getFieldMapResults()).isEmpty();
+    }
+
+    @Test
+    void ordinarySpringHandlerRetainsImplicitPersistence() {
+        CommandPipelineContext ctx = handlerContext("test:ordinary_delete", "delete");
+        CommandHandler handler = mock(CommandHandler.class);
+        when(applicationContext.getBean("tenantMemberCommandHandler", CommandHandler.class)).thenReturn(handler);
+        when(handler.requiresDslPersistence(ctx.getCommandCode(), ctx.getExecConfig(), ctx.getRequest()))
+                .thenReturn(true);
+
+        phase().execute(ctx);
+
+        verify(cascadeDeleteExecutor).executeCascadeDeletePhase(ctx.getExecConfig(), 1L, ctx.getRequest());
+        verify(fieldMapExecutor).executeImplicitFieldMapPhase(
+                ctx.getExecConfig(), ctx.getPayload(), 1L, ctx.getRequest(), ctx.getCommand());
+    }
+
+    @Test
+    void resolvesDeclaredHandlerNameWhenItDiffersFromBeanName() {
+        CommandPipelineContext ctx = handlerContext("admin:delete_member", "delete");
+        TenantMemberCommandHandler handler = new TenantMemberCommandHandler(
+                mock(TenantMemberApplicationService.class), mock(OrgEmployeeService.class));
+        when(applicationContext.getBean("tenantMemberCommandHandler", CommandHandler.class))
+                .thenThrow(new NoSuchBeanDefinitionException("tenantMemberCommandHandler"));
+        when(applicationContext.getBeansOfType(CommandHandler.class)).thenReturn(Map.of("differentBeanName", handler));
+
+        phase().execute(ctx);
+
+        verifyNoInteractions(fieldMapExecutor, cascadeDeleteExecutor);
+        assertThat(ctx.getFieldMapResults()).isEmpty();
+    }
+
+    @Test
+    void missingDeclaredHandlerFailsBeforeAnyGenericDelete() {
+        CommandPipelineContext ctx = handlerContext("admin:delete_member", "delete");
+        ctx.getRulesByType().get("handler").getFirst().setHandlerClass("missingHandler");
+        when(applicationContext.getBean("missingHandler", CommandHandler.class))
+                .thenThrow(new NoSuchBeanDefinitionException("missingHandler"));
+        when(applicationContext.getBeansOfType(CommandHandler.class)).thenReturn(Map.of());
+
+        assertThatThrownBy(() -> phase().execute(ctx)).isInstanceOf(NoSuchBeanDefinitionException.class);
+
+        verifyNoInteractions(fieldMapExecutor, cascadeDeleteExecutor);
+    }
+
+    private FieldMapPhase phase() {
+        return new FieldMapPhase(fieldMapExecutor, cascadeDeleteExecutor, snapshotReader,
+                extensionRegistry, metaModelService, applicationContext);
+    }
+
+    private CommandPipelineContext handlerContext(String code, String type) {
+        CommandExecuteRequest request = new CommandExecuteRequest();
+        request.setOperationType(type);
+        request.setTargetRecordId("member-target");
+        CommandDefinition command = new CommandDefinition();
+        command.setCode(code);
+        command.setModelCode("tenant_member");
+        BindingRule rule = new BindingRule();
+        rule.setHandlerClass("tenantMemberCommandHandler");
+        return CommandPipelineContext.builder().commandCode(code).request(request)
+                .command(command).tenantId(1L).userId(2L).startTime(System.currentTimeMillis())
+                .payload(new HashMap<>()).execConfig(new HashMap<>(Map.of("type", type)))
+                .rulesByType(Map.of("handler", List.of(rule))).build();
+    }
+
     @Test
     void executeSkipsImplicitStateTransitionWhenPluginHandlerDisablesDslPersistence() {
         FieldMapPhase phase = new FieldMapPhase(
-                fieldMapExecutor, cascadeDeleteExecutor, snapshotReader, extensionRegistry, metaModelService);
+                fieldMapExecutor, cascadeDeleteExecutor, snapshotReader, extensionRegistry, metaModelService, applicationContext);
 
         CommandExecuteRequest request = new CommandExecuteRequest();
         request.setOperationType("state_transition");
@@ -103,7 +210,7 @@ class FieldMapPhaseTest {
     @Test
     void deleteCommandWithoutOperationTypeStillRoutesToImplicitFieldMap() {
         FieldMapPhase phase = new FieldMapPhase(
-                fieldMapExecutor, cascadeDeleteExecutor, snapshotReader, extensionRegistry, metaModelService);
+                fieldMapExecutor, cascadeDeleteExecutor, snapshotReader, extensionRegistry, metaModelService, applicationContext);
 
         CommandExecuteRequest request = new CommandExecuteRequest();
         // operationType deliberately not set — the CLI/API flow we're regressing
@@ -151,7 +258,7 @@ class FieldMapPhaseTest {
     @Test
     void deleteOfSoftDeleteModel_skipsPhysicalCascadeDelete() {
         FieldMapPhase phase = new FieldMapPhase(
-                fieldMapExecutor, cascadeDeleteExecutor, snapshotReader, extensionRegistry, metaModelService);
+                fieldMapExecutor, cascadeDeleteExecutor, snapshotReader, extensionRegistry, metaModelService, applicationContext);
 
         CommandExecuteRequest request = new CommandExecuteRequest();
         request.setOperationType("delete");

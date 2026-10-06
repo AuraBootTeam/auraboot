@@ -1,4 +1,6 @@
 import { test, expect } from '../../fixtures';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import {
   cleanupRows,
   createCorrectedBomWorkbook,
@@ -11,7 +13,6 @@ import {
 } from './quote-e2e-helpers';
 
 test.describe('QuoteOps corrected BOM upload golden', () => {
-
   test.describe.configure({ timeout: 120_000 });
 
   test('creates a quote with reviewed standard BOM and preserves valid/error row traceability', async ({
@@ -117,6 +118,34 @@ test.describe('QuoteOps corrected BOM upload golden', () => {
       const main = page.locator('main');
       await expect(main).toContainText('customer-corrected-bom-e2e.xlsx', { timeout: 20_000 });
       await page.reload();
+      await page.getByRole('tab', { name: /资料上传|Source Upload/ }).click();
+      const originalFileId = String(importHeaders[0].qo_bi_file_id ?? '');
+      expect(originalFileId, 'the BOM import must retain its uploaded original file').not.toBe('');
+      const materialRow = page.getByRole('row').filter({ hasText: path.basename(workbookPath) });
+      await expect(materialRow).toBeVisible();
+      const uploadedAt = materialRow.getByRole('cell').nth(4);
+      await expect(uploadedAt).toHaveText(/\d{4}\/\d{1,2}\/\d{1,2}\s+\d{1,2}:\d{2}:\d{2}/);
+      await expect(uploadedAt).not.toContainText(/\d{4}-\d{2}-\d{2}T/);
+
+      const originalLink = materialRow.getByRole('link', { name: '下载文件', exact: true });
+      const originalHref = await originalLink.getAttribute('href');
+      expect(originalHref).toBe(`/api/file/download/${originalFileId}`);
+      const detailUrl = page.url();
+      const downloadEvent = page.waitForEvent('download');
+      await originalLink.click();
+      const downloaded = await downloadEvent;
+      expect(downloaded.url()).toBe(new URL(originalHref!, detailUrl).href);
+      expect(downloaded.suggestedFilename()).toBe(path.basename(workbookPath));
+      const readbackPath = testInfo.outputPath('uploaded-bom-original-readback.xlsx');
+      await downloaded.saveAs(readbackPath);
+      const originalBytes = readFileSync(workbookPath);
+      expect(originalBytes.byteLength).toBeGreaterThan(0);
+      expect(readFileSync(readbackPath)).toEqual(originalBytes);
+      expect(page.url()).toBe(detailUrl);
+      await page.screenshot({
+        path: testInfo.outputPath('uploaded-bom-original-access.png'),
+        fullPage: true,
+      });
 
       await page.getByRole('tab', { name: /BOM价格计算|BOM Price/i }).click();
       await expect(page.getByTestId('metric-strip-qo_bom_price_metrics')).toBeVisible({

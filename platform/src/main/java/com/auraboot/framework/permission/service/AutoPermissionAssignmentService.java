@@ -80,6 +80,17 @@ public class AutoPermissionAssignmentService {
      */
     @Transactional
     public void autoAssignPermissions(String modelCode, String moduleCode, Long tenantId) {
+        generatePermissions(modelCode, moduleCode, tenantId, true);
+    }
+
+    /** Register dynamic actions without changing any role grants. */
+    @Transactional
+    public void registerPermissions(String modelCode, String moduleCode, Long tenantId) {
+        generatePermissions(modelCode, moduleCode, tenantId, false);
+    }
+
+    private void generatePermissions(String modelCode, String moduleCode, Long tenantId,
+                                     boolean assignInitialTemplate) {
         log.info("Auto-assigning hierarchical permissions: modelCode={}, moduleCode={}",
                 modelCode, moduleCode);
 
@@ -99,7 +110,11 @@ public class AutoPermissionAssignmentService {
         Permission modulePermission = ensureModulePermission(resolvedModule);
 
         // 3. Ensure Resource node (level=2)
-        Permission resourcePermission = ensureResourcePermission(modelCode, modulePermission, resolvedModule);
+        Permission resourcePermission = permissionMapper.findByCode("model." + modelCode);
+        boolean resourceCreated = resourcePermission == null;
+        if (resourceCreated) {
+            resourcePermission = createResourcePermission(modelCode, modulePermission, resolvedModule);
+        }
 
         // 4. Ensure Action nodes (level=3) and collect for role assignment
         List<Permission> actionPermissions = new ArrayList<>();
@@ -113,8 +128,15 @@ public class AutoPermissionAssignmentService {
             return;
         }
 
-        // 5. Assign level-3 action permissions to roles
-        assignPermissionsToRoles(actionPermissions, tenantId);
+        Long effectiveTenantId = tenantId != null ? tenantId : MetaContext.getCurrentTenantId();
+        if (effectiveTenantId != null) {
+            userPermissionService.evictPermissionDefinitions(effectiveTenantId);
+        }
+        // Only explicit first-time authoring applies the initial role template.
+        // Synchronization never restores revoked grants or grants newly added actions.
+        if (assignInitialTemplate && resourceCreated) {
+            assignPermissionsToRoles(actionPermissions, effectiveTenantId);
+        }
 
         log.info("Auto-assignment completed: modelCode={}, moduleCode={}, actionCount={}",
                 modelCode, resolvedModule, actionPermissions.size());
@@ -167,14 +189,8 @@ public class AutoPermissionAssignmentService {
      * Ensure a Resource permission node exists at level=2.
      * Code format: "model.{modelCode}"
      */
-    private Permission ensureResourcePermission(String modelCode, Permission modulePermission, String moduleCode) {
+    private Permission createResourcePermission(String modelCode, Permission modulePermission, String moduleCode) {
         String code = "model." + modelCode;
-        Permission existing = permissionMapper.findByCode(code);
-        if (existing != null) {
-            log.debug("Resource permission already exists: code={}, id={}", code, existing.getId());
-            return existing;
-        }
-
         Permission permission = new Permission();
         permission.setPid(UniqueIdGenerator.generate());
         permission.setCode(code);
@@ -262,10 +278,6 @@ public class AutoPermissionAssignmentService {
             log.warn("Tenant ID is null, skipping role assignment");
             return;
         }
-
-        // Permission rows are written directly through the mapper, bypassing
-        // PermissionService's definition-cache eviction.
-        userPermissionService.evictPermissionDefinitions(effectiveTenantId);
 
         List<Role> roles = roleService.findByTenantId(effectiveTenantId);
 

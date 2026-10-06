@@ -76,11 +76,13 @@ export const MetricEditor: React.FC<MetricEditorProps> = ({
       ) : (
         <div className="space-y-2">
           {metrics.map((metric, index) => (
-            <div key={index} className="flex items-center gap-2 rounded bg-gray-50 p-2">
+            // min-w-0 lets the selects shrink inside the narrow property panel
+            // instead of pushing the aggregation control past the panel edge.
+            <div key={index} className="flex min-w-0 items-center gap-2 rounded bg-gray-50 p-2">
               <select
                 value={metric.field}
                 onChange={(e) => updateMetric(index, 'field', e.target.value)}
-                className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm"
+                className="min-w-0 flex-1 rounded border border-gray-300 px-2 py-1 text-sm"
               >
                 <option value="">Select field</option>
                 {fields.map((field) => (
@@ -92,7 +94,7 @@ export const MetricEditor: React.FC<MetricEditorProps> = ({
               <select
                 value={metric.aggregation}
                 onChange={(e) => updateMetric(index, 'aggregation', e.target.value)}
-                className="w-32 rounded border border-gray-300 px-2 py-1 text-sm"
+                className="w-28 min-w-0 shrink-0 rounded border border-gray-300 px-1 py-1 text-sm"
               >
                 {AGGREGATION_FUNCTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>

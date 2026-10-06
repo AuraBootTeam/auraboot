@@ -36,6 +36,15 @@ public interface SavedViewService {
     SavedViewDTO findByPid(String pid);
 
     /**
+     * Require public-sharing permission and the existing view read/manage scope.
+     * Applies to authenticated link generation, revocation and status; public token access is separate.
+     *
+     * @param pid view PID in the current tenant
+     */
+    void checkPublicShareAccess(String pid);
+
+
+    /**
      * Update an existing view
      *
      * @param pid view PID

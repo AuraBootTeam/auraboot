@@ -1,6 +1,7 @@
 package com.auraboot.framework.dataquality.ge.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler;
 import lombok.Data;
 
 import java.time.Instant;
@@ -13,7 +14,7 @@ import java.time.Instant;
  * with the actual observed value for diagnosability.
  */
 @Data
-@TableName("ab_dataquality_validation_run")
+@TableName(value = "ab_dataquality_validation_run", autoResultMap = true)
 public class AbDataQualityValidationRun {
 
     @TableId(type = IdType.ASSIGN_ID)
@@ -40,6 +41,7 @@ public class AbDataQualityValidationRun {
      * Per-expectation results array.
      * Each element: {@code {"expectation_type":…, "column":…, "passed":true/false, "actualValue":…}}.
      */
+    @TableField(value = "results_json", typeHandler = JsonbStringTypeHandler.class)
     private String resultsJson;
 
     private Instant startedAt;

@@ -171,7 +171,10 @@ public class SemanticAggregateAdapter {
         sf.setField(f.getField());
         sf.setOp(f.getOperator() == null ? "eq"
                 : f.getOperator().toLowerCase(java.util.Locale.ROOT));
-        sf.setValue(f.getValue());
+        // Aggregate LIKE means contains; preserve that contract when translating
+        // to the semantic compiler, whose LIKE value is an explicit SQL pattern.
+        sf.setValue("like".equals(sf.getOp()) && f.getValue() instanceof String value
+                ? "%" + value + "%" : f.getValue());
         sem.getFilters().add(sf);
     }
 

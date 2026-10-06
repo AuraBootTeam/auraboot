@@ -158,7 +158,7 @@ public class MetricCompiler {
             referencedColumns.add(rd.dim.getFieldRef().toLowerCase(Locale.ROOT));
             String expr = rd.grain == null
                     ? rd.dim.getFieldRef()
-                    : "DATE_TRUNC('" + rd.grain + "', " + rd.dim.getFieldRef() + ")";
+                    : calendarBucketExpression(rd.grain, rd.dim.getFieldRef());
             String alias = '"' + model.getSemanticModel().getCode() + "."
                     + rd.dim.getCode()
                     + (rd.grain == null ? "" : "__" + rd.grain) + '"';
@@ -472,7 +472,7 @@ public class MetricCompiler {
             ResolvedDim rd = resolvedDims.get(i);
             String expr = rd.grain == null
                     ? rd.dim.getFieldRef()
-                    : "DATE_TRUNC('" + rd.grain + "', " + rd.dim.getFieldRef() + ")";
+                    : calendarBucketExpression(rd.grain, rd.dim.getFieldRef());
             String alias = '"' + modelCode + "." + rd.dim.getCode()
                     + (rd.grain == null ? "" : "__" + rd.grain) + '"';
             if (i > 0) select.append(", ");
@@ -730,6 +730,15 @@ public class MetricCompiler {
             }
         }
         return null;
+    }
+
+    /** Preserve calendar buckets across JDBC/Jackson timezone conversion. */
+    private String calendarBucketExpression(String grain, String fieldRef) {
+        // Grain and field are validated against the model before reaching this helper.
+        // A calendar label has no UTC offset: serializing DATE_TRUNC as a Timestamp
+        // would shift a local midnight to the previous date in the API response.
+        return "to_char(DATE_TRUNC('" + grain + "', " + fieldRef
+                + "), 'YYYY-MM-DD\"T\"HH24:MI:SS')";
     }
 
     private ResolvedDim resolveDim(String raw, Map<String, DimensionDTO> dimMap, String modelCode) {

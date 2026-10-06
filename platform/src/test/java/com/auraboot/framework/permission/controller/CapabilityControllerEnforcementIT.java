@@ -27,9 +27,12 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 /**
  * Real-stack permission-enforcement matrix for {@code /api/permission/capabilities}, exercising the
@@ -59,10 +62,10 @@ class CapabilityControllerEnforcementIT extends BaseIntegrationTest {
     @BeforeEach
     void cleanSlate() {
         grantTenantAdminRoleToTestUser();
-        // Unknown codes have a deliberate tenant-admin bootstrap allowance. Register
-        // both definitions before revoking grants so this tests registered-code denial.
-        ensurePermissionDefinition(MetaPermission.ROLE_READ);
-        ensurePermissionDefinition(MetaPermission.ROLE_MANAGE);
+        // Register the required codes before revoking grants. An unregistered code exercises
+        // the distinct tenant-admin bootstrap contract, not the registered permission deny path.
+        grantToTestRole(MetaPermission.ROLE_READ);
+        grantToTestRole(MetaPermission.ROLE_MANAGE);
         revokeFromTestRole(MetaPermission.ROLE_READ);
         revokeFromTestRole(MetaPermission.ROLE_MANAGE);
         userPermissionService.evictPermissionDefinitions(getTestTenant().getId());
@@ -126,6 +129,61 @@ class CapabilityControllerEnforcementIT extends BaseIntegrationTest {
                 .andExpect(status().isOk());
     }
 
+    @Test
+    void previewWithoutRoleRead_isForbidden() throws Exception {
+        mvc().perform(post("/api/permission/capabilities/preview?rolePid=" + getTestRole().getPid())
+                .contentType(MediaType.APPLICATION_JSON).content("[]"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void previewWithRoleRead_isOkWithoutManage() throws Exception {
+        grantToTestRole(MetaPermission.ROLE_READ);
+        userPermissionService.evictUserPermissions(getTestUser().getId());
+        mvc().perform(post("/api/permission/capabilities/preview?rolePid=" + getTestRole().getPid())
+                .contentType(MediaType.APPLICATION_JSON).content("[]"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("A non-admin role reader can inspect grants and scope but cannot write either")
+    void roleReaderCanInspectMatrixWithoutPermissionManagement() throws Exception {
+        // Register then revoke the management code so this cannot pass through the
+        // tenant-admin bootstrap behavior for an unregistered permission.
+        grantToTestRole(MetaPermission.PERMISSION_MANAGE);
+        revokeFromTestRole(MetaPermission.PERMISSION_MANAGE);
+        grantToTestRole(MetaPermission.ROLE_READ);
+        jdbcTemplate.update("""
+                UPDATE ab_user_role SET deleted_flag = TRUE, status = 'disabled'
+                WHERE tenant_id = ? AND member_id = ? AND role_id IN (
+                    SELECT id FROM ab_role WHERE tenant_id = ? AND code = ?)
+                """, getTestTenant().getId(), getTestTenantMember().getId(),
+                getTestTenant().getId(), RoleCodes.TENANT_ADMIN);
+        adminRoleChecker.invalidateAll();
+        userPermissionService.evictUserPermissions(getTestUser().getId());
+        assertFalse(adminRoleChecker.hasRole(getTestTenant().getId(), getTestUser().getId(),
+                RoleCodes.TENANT_ADMIN), "The reader fixture must not retain tenant-admin privileges");
+
+        String matrixUrl = "/api/permissions/matrix/" + getTestRole().getPid();
+        mvc().perform(get(url())).andExpect(status().isOk());
+        mvc().perform(get(matrixUrl)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.modules").isArray());
+        mvc().perform(get(matrixUrl + "/default-scope")).andExpect(status().isOk());
+        mvc().perform(put(url()).contentType(MediaType.APPLICATION_JSON).content("[]"))
+                .andExpect(status().isForbidden());
+        mvc().perform(put(matrixUrl + "/batch")
+                .contentType(MediaType.APPLICATION_JSON).content("[]"))
+                .andExpect(status().isForbidden());
+        mvc().perform(put(matrixUrl + "/default-scope")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"scopeType\":\"all\"}"))
+                .andExpect(status().isForbidden());
+
+        revokeFromTestRole(MetaPermission.ROLE_READ);
+        userPermissionService.evictUserPermissions(getTestUser().getId());
+        mvc().perform(get(matrixUrl)).andExpect(status().isForbidden());
+        mvc().perform(get(matrixUrl + "/default-scope")).andExpect(status().isForbidden());
+    }
+
     private void grantTenantAdminRoleToTestUser() {
         Long tenantId = getTestTenant().getId();
         Long memberId = getTestTenantMember().getId();
@@ -187,6 +245,12 @@ class CapabilityControllerEnforcementIT extends BaseIntegrationTest {
 
     private void grantToTestRole(String code) {
         Permission permission = ensurePermissionDefinition(code);
+        // Revocation is a logical delete; reactivate the existing fixture row rather than
+        // inserting a duplicate against the tenant/role/permission unique constraint.
+        jdbcTemplate.update("""
+                UPDATE ab_role_permission SET deleted_flag = FALSE, status = 'active', grant_type = 'grant'
+                WHERE tenant_id = ? AND role_id = ? AND permission_id = ?
+                """, getTestTenant().getId(), getTestRole().getId(), permission.getId());
         boolean notAssigned = rolePermissionMapper.selectList(
                 new LambdaQueryWrapper<RolePermission>()
                         .eq(RolePermission::getRoleId, getTestRole().getId())
@@ -211,6 +275,7 @@ class CapabilityControllerEnforcementIT extends BaseIntegrationTest {
     }
 
     private void revokeFromTestRole(String code) {
+        applyTestMetaContext();
         Permission permission = permissionMapper.findByCode(code);
         if (permission == null) {
             return;

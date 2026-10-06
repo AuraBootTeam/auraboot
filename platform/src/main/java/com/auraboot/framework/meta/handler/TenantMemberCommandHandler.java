@@ -50,6 +50,14 @@ public class TenantMemberCommandHandler implements CommandHandler {
     }
 
     @Override
+    public boolean requiresDslPersistence(String commandCode, Map<String, Object> execConfig,
+            com.auraboot.framework.meta.dto.CommandExecuteRequest request) {
+        // The application services validate tenant/self boundaries and offboarding
+        // dependencies before writing. Generic persistence must not run first.
+        return false;
+    }
+
+    @Override
     public Map<String, Object> execute(CommandHandlerContext context) {
         String commandCode = context.getCommandCode();
         log.info("TenantMemberCommandHandler executing: {}", commandCode);

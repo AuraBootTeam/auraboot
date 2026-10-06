@@ -69,6 +69,7 @@ public class DataQualityController {
         suite.setDatasetName(datasetName);
         suite.setExpectationsJson(expectationsJson);
 
+        validator.authorizeSuite(tenantId, suite);
         suiteMapper.insert(suite);
 
         log.info("Created expectation suite: tenant={} suite={} dataset={}", tenantId, suite.getPid(), datasetName);
@@ -112,6 +113,9 @@ public class DataQualityController {
     @RequirePermission(MetaPermission.META_CHATBI_USE)
     public List<AbDataQualityValidationRun> listRuns(@PathVariable("suitePid") String suitePid) {
         Long tenantId = MetaContext.get().getTenantId();
+        AbDataQualityExpectationSuite suite = suiteMapper.findByPid(tenantId, suitePid);
+        if (suite == null) throw new IllegalArgumentException("Expectation suite not found: " + suitePid);
+        validator.authorizeSuite(tenantId, suite);
         return runMapper.listBySuite(tenantId, suitePid);
     }
 

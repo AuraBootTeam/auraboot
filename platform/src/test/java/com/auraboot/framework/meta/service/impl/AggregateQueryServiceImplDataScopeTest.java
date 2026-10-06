@@ -302,6 +302,38 @@ class AggregateQueryServiceImplDataScopeTest {
     }
 
     @Test
+    void semanticMetricsReachGovernedAdapterWithoutRawAggregationValidation() {
+        AggregateQueryRequest request = new AggregateQueryRequest();
+        request.setSemanticModelCode("revenue");
+        MetricConfig metric = new MetricConfig();
+        metric.setField("revenue.order_count");
+        metric.setAggregation("none");
+        request.setMetrics(List.of(metric));
+        request.setDimensions(List.of("revenue.order_day__month"));
+        SemanticAggregateAdapter adapter = org.mockito.Mockito.mock(SemanticAggregateAdapter.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "semanticAggregateAdapter", adapter);
+        AggregateQueryResponse expected = new AggregateQueryResponse();
+        when(adapter.execute(request)).thenReturn(expected);
+
+        assertThat(service.execute(request)).isSameAs(expected);
+        verify(adapter).execute(request);
+        org.mockito.Mockito.verifyNoInteractions(dynamicDataMapper, namedQueryMapper, metaModelService);
+    }
+
+    @Test
+    void semanticMetricWithoutAdapterStillFailsClosed() {
+        AggregateQueryRequest request = new AggregateQueryRequest();
+        request.setSemanticModelCode("revenue");
+        MetricConfig metric = new MetricConfig();
+        metric.setField("order_count");
+        metric.setAggregation("none");
+        request.setMetrics(List.of(metric));
+        assertThatThrownBy(() -> service.execute(request))
+                .hasMessageContaining("SEMANTIC_ADAPTER_UNAVAILABLE");
+        org.mockito.Mockito.verifyNoInteractions(dynamicDataMapper, namedQueryMapper);
+    }
+
+    @Test
     void invalidSemanticSourceCannotReachAnExecutor() {
         AggregateQueryRequest request = new AggregateQueryRequest();
         request.setSemanticModelCode("invalid;source");

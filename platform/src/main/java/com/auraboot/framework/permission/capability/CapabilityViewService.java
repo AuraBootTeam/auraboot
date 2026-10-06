@@ -14,5 +14,13 @@ public interface CapabilityViewService {
      * revoke included codes (within the capability universe) that are no longer selected. Permission
      * codes outside any capability's includes (convention-derived / platform) are left untouched.
      */
+    CapabilitySelectionPreview previewCapabilitySelection(Long roleId, Set<String> selectedCapabilityCodes);
+
     void applyCapabilitySelection(Long roleId, Set<String> selectedCapabilityCodes);
+
+    CapabilitySelectionPreview previewCapabilitySelection(Long roleId, Set<String> selectedCapabilityCodes,
+                                                           Set<String> revokedPartialCapabilityCodes);
+
+    void applyCapabilitySelection(Long roleId, Set<String> selectedCapabilityCodes,
+                                  Set<String> revokedPartialCapabilityCodes);
 }

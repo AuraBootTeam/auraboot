@@ -3,6 +3,7 @@ package com.auraboot.framework.organization.service.impl;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.auth.service.PasswordPolicyService;
 import com.auraboot.framework.common.constant.StatusConstants;
+import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.organization.dto.CreateEmployeeRequest;
@@ -229,10 +230,7 @@ public class OrgEmployeeServiceImpl implements OrgEmployeeService {
         log.info("Linking member {} to new employee", request.getMemberPid());
 
         // 1. Find existing member
-        TenantMember member = tenantMemberService.findByPid(request.getMemberPid());
-        if (member == null) {
-            throw new BusinessException("Member not found: " + request.getMemberPid());
-        }
+        TenantMember member = requireCurrentTenantMember(request.getMemberPid());
 
         if (member.getEmployeeId() != null) {
             throw new BusinessException("Member is already linked to an employee");
@@ -286,10 +284,7 @@ public class OrgEmployeeServiceImpl implements OrgEmployeeService {
             throw new BusinessException("Employee is already linked to a tenant member");
         }
 
-        TenantMember member = tenantMemberService.findByPid(memberPid);
-        if (member == null) {
-            throw new BusinessException("Member not found: " + memberPid);
-        }
+        TenantMember member = requireCurrentTenantMember(memberPid);
         if (member.getEmployeeId() != null) {
             throw new BusinessException("Tenant member is already linked to an employee");
         }
@@ -314,6 +309,15 @@ public class OrgEmployeeServiceImpl implements OrgEmployeeService {
             linkedEmployee.putAll(updated);
         }
         return organizationService.toEmployeeDTO(linkedEmployee);
+    }
+
+    private TenantMember requireCurrentTenantMember(String memberPid) {
+        TenantMember member = tenantMemberService.findByPid(memberPid);
+        Long tenantId = MetaContext.getCurrentTenantId();
+        if (member == null || tenantId == null || !tenantId.equals(member.getTenantId())) {
+            throw new BusinessException(ResponseCode.NOT_FOUND);
+        }
+        return member;
     }
 
     @Override

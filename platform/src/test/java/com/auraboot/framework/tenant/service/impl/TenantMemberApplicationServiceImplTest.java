@@ -1,20 +1,28 @@
 package com.auraboot.framework.tenant.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.auth.service.PasswordManagementService;
 import com.auraboot.framework.auth.service.PasswordPolicyService;
 import com.auraboot.framework.auth.service.SessionManagementService;
 import com.auraboot.framework.common.constant.StatusConstants;
+import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.organization.service.TeamMemberService;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
+import com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper;
 import com.auraboot.framework.tenant.dto.MemberQueryRequest;
 import com.auraboot.framework.tenant.dto.MemberResponse;
 import com.auraboot.framework.tenant.service.TenantMemberService;
 import com.auraboot.framework.tenant.offboarding.TenantMemberOffboardingCoordinator;
+import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.permission.service.UserPermissionService;
+import com.auraboot.framework.permission.service.PermissionFacade;
+import com.auraboot.framework.permission.engine.model.PermissionResult;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.service.UserService;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -30,6 +38,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -57,6 +67,10 @@ class TenantMemberApplicationServiceImplTest {
     @Mock private TeamMemberService teamMemberService;
     @Mock private JdbcTemplate jdbcTemplate;
     @Mock private TenantMemberOffboardingCoordinator offboardingCoordinator;
+    @Mock private UserPermissionService userPermissionService;
+    @Mock private DynamicDataService dynamicDataService;
+    @Mock private PermissionFacade permissionFacade;
+    @Mock private TenantMemberMapper tenantMemberMapper;
 
     @InjectMocks
     private TenantMemberApplicationServiceImpl service;
@@ -93,6 +107,118 @@ class TenantMemberApplicationServiceImplTest {
     }
 
     @Test
+    void offboardingImpactRejectsCallerWithoutTheRequestedAction() {
+        metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(99L);
+        when(tenantMemberService.findByPid("mpid-2")).thenReturn(member(2L, 99L, 8L, "active"));
+        assertEquals(ResponseCode.FORBIDDEN, assertThrows(BusinessException.class,
+                () -> service.inspectOffboardingImpact("mpid-2", null, "suspend", 7L)).getResponseCode());
+        verify(offboardingCoordinator, never()).inspect(any(), any(), any(), any());
+    }
+
+    @Test
+    void offboardingImpactChecksTheRealModelMapWithTheMemberSubject() {
+        TenantMember target = member(2L, 99L, 8L, "active");
+        Map<String, Object> record = Map.of("pid", target.getPid(), "created_by", 8L);
+        metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(99L);
+        metaContextMock.when(MetaContext::getCurrentMemberId).thenReturn(77L);
+        metaContextMock.when(() -> MetaContext.runWithCommandPermitScope(eq("ALL"),
+                Mockito.<java.util.function.Supplier<Map<String, Object>>>any()))
+                .thenAnswer(invocation -> ((java.util.function.Supplier<?>) invocation.getArgument(1)).get());
+        when(tenantMemberService.findByPid(target.getPid())).thenReturn(target);
+        when(userPermissionService.hasPermission(7L, "admin_tenant_member")).thenReturn(false);
+        when(userPermissionService.hasPermission(7L, "model.tenant_member.suspend")).thenReturn(true);
+        when(dynamicDataService.getById("tenant_member", target.getPid())).thenReturn(record);
+        when(permissionFacade.canOperate(77L, "tenant_member", "read", record))
+                .thenReturn(PermissionResult.allow(List.of()));
+        service.inspectOffboardingImpact(target.getPid(), null, "suspend", 7L);
+        verify(permissionFacade).canOperate(77L, "tenant_member", "read", record);
+        verify(offboardingCoordinator).inspect(target, null, 7L,
+                com.auraboot.framework.tenant.offboarding.TenantMemberOffboardingAction.SUSPEND);
+    }
+
+    @Test
+    void offboardingImpactRejectsAnUnreadableTargetEvenWithTheAction() {
+        TenantMember target = member(2L, 99L, 8L, "active");
+        Map<String, Object> record = Map.of("pid", target.getPid(), "created_by", 8L);
+        metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(99L);
+        metaContextMock.when(MetaContext::getCurrentMemberId).thenReturn(77L);
+        metaContextMock.when(() -> MetaContext.runWithCommandPermitScope(eq("ALL"),
+                Mockito.<java.util.function.Supplier<Map<String, Object>>>any()))
+                .thenAnswer(invocation -> ((java.util.function.Supplier<?>) invocation.getArgument(1)).get());
+        when(tenantMemberService.findByPid(target.getPid())).thenReturn(target);
+        when(userPermissionService.hasPermission(7L, "admin_tenant_member")).thenReturn(false);
+        when(userPermissionService.hasPermission(7L, "model.tenant_member.suspend")).thenReturn(true);
+        when(dynamicDataService.getById("tenant_member", target.getPid())).thenReturn(record);
+        when(permissionFacade.canOperate(77L, "tenant_member", "read", record))
+                .thenReturn(PermissionResult.deny("outside scope", List.of()));
+        assertEquals(ResponseCode.FORBIDDEN, assertThrows(BusinessException.class,
+                () -> service.inspectOffboardingImpact(target.getPid(), null, "suspend", 7L)).getResponseCode());
+        verify(offboardingCoordinator, never()).inspect(any(), any(), any(), any());
+    }
+
+    @Test
+    void offboardingLegacyAdministratorRetainsTenantWidePreflight() {
+        TenantMember target = member(2L, 99L, 8L, "active");
+        metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(99L);
+        when(tenantMemberService.findByPid(target.getPid())).thenReturn(target);
+        when(userPermissionService.hasPermission(7L, "admin_tenant_member")).thenReturn(true);
+        service.inspectOffboardingImpact(target.getPid(), null, "remove", 7L);
+        verify(offboardingCoordinator).inspect(target, null, 7L,
+                com.auraboot.framework.tenant.offboarding.TenantMemberOffboardingAction.REMOVE);
+        verify(dynamicDataService, never()).getById(anyString(), anyString());
+    }
+
+    @Test
+    void offboardingPreflightCannotCrossTenantBoundaries() {
+        metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(99L);
+        when(tenantMemberService.findByPid("mpid-2")).thenReturn(member(2L, 100L, 8L, "active"));
+        assertEquals(ResponseCode.FORBIDDEN, assertThrows(BusinessException.class,
+                () -> service.inspectOffboardingImpact("mpid-2", null, "suspend", 7L)).getResponseCode());
+        verify(offboardingCoordinator, never()).inspect(any(), any(), any(), any());
+    }
+
+    @Test
+    void offboardingCandidatesRequireTheActualRemovalAction() {
+        metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(99L);
+        when(tenantMemberService.findByPid("mpid-2")).thenReturn(member(2L, 99L, 8L, "active"));
+        assertEquals(ResponseCode.FORBIDDEN, assertThrows(BusinessException.class,
+                () -> service.listOffboardingCandidates("mpid-2", "remove", 7L)).getResponseCode());
+        verify(userPermissionService).hasPermission(7L, "model.tenant_member.delete");
+        verify(tenantMemberMapper, never()).findActiveOffboardingCandidates(anyLong(), anyString());
+    }
+
+    @Test
+    void offboardingCandidatesFilterRecordsOutsideTheReadScope() {
+        TenantMember target = member(2L, 99L, 8L, "active");
+        Map<String, Object> targetRecord = Map.of("pid", target.getPid(), "created_by", 7L);
+        Map<String, Object> visible = Map.of("pid", "visible", "created_by", 7L);
+        Map<String, Object> hidden = Map.of("pid", "hidden", "created_by", 8L);
+        metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(99L);
+        metaContextMock.when(MetaContext::getCurrentMemberId).thenReturn(77L);
+        metaContextMock.when(() -> MetaContext.runWithCommandPermitScope(eq("ALL"),
+                Mockito.<java.util.function.Supplier<Map<String, Object>>>any()))
+                .thenAnswer(invocation -> ((java.util.function.Supplier<?>) invocation.getArgument(1)).get());
+        when(tenantMemberService.findByPid(target.getPid())).thenReturn(target);
+        when(userPermissionService.hasPermission(7L, "admin_tenant_member")).thenReturn(false);
+        when(userPermissionService.hasPermission(7L, "model.tenant_member.suspend")).thenReturn(true);
+        when(dynamicDataService.getById("tenant_member", target.getPid())).thenReturn(targetRecord);
+        when(dynamicDataService.getById("tenant_member", "visible")).thenReturn(visible);
+        when(dynamicDataService.getById("tenant_member", "hidden")).thenReturn(hidden);
+        when(permissionFacade.canOperate(77L, "tenant_member", "read", targetRecord))
+                .thenReturn(PermissionResult.allow(List.of()));
+        when(permissionFacade.canOperate(77L, "tenant_member", "read", visible))
+                .thenReturn(PermissionResult.allow(List.of()));
+        when(permissionFacade.canOperate(77L, "tenant_member", "read", hidden))
+                .thenReturn(PermissionResult.deny("outside scope", List.of()));
+        when(tenantMemberMapper.findActiveOffboardingCandidates(99L, target.getPid())).thenReturn(List.of(
+                Map.of("memberPid", "visible", "displayName", "Allowed", "email", "allowed@example.test"),
+                Map.of("memberPid", "hidden", "displayName", "Hidden", "email", "hidden@example.test")));
+        var result = service.listOffboardingCandidates(target.getPid(), "suspend", 7L);
+        assertEquals(1, result.size());
+        assertEquals("visible", result.get(0).memberPid());
+    }
+
+    @Test
     @DisplayName("searchMembers throws when no tenant context and no membership")
     void searchMembersNoTenant() {
         metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(null);
@@ -110,11 +236,17 @@ class TenantMemberApplicationServiceImplTest {
     void searchMembersOk() {
         metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(99L);
         Page<TenantMember> page = new Page<>(1, 10);
-        page.setRecords(List.of(member(1L, 99L, 7L, StatusConstants.ACTIVE)));
+        TenantMember source = member(1L, 99L, 7L, StatusConstants.ACTIVE);
+        source.setJoinDate(Instant.EPOCH);
+        source.setPermissions("{\"privatePermission\":true}");
+        source.setSettings("{\"privateSetting\":true}");
+        page.setRecords(List.of(source));
         page.setTotal(1L);
         when(tenantMemberService.findMembers(anyInt(), anyInt(), eq(99L), any(), any(), any()))
                 .thenReturn(page);
-        when(userService.findByUserId(7L)).thenReturn(u(7L, "u@x.com"));
+        User user = u(7L, "u@x.com");
+        user.setMobile("13912345679");
+        when(userService.findByUserId(7L)).thenReturn(user);
 
         MemberQueryRequest req = new MemberQueryRequest();
         req.setPageNum(1);
@@ -123,7 +255,16 @@ class TenantMemberApplicationServiceImplTest {
         var result = service.searchMembers(req, 7L);
         assertNotNull(result);
         assertEquals(1, result.getRecords().size());
-        assertEquals("用户 7", result.getRecords().get(0).getUser().getRealName());
+        var option = result.getRecords().get(0);
+        assertEquals("用户 7", option.user().realName());
+        assertEquals("u@x.com", option.user().email());
+        assertEquals(source.getPid(), option.pid());
+        assertEquals(StatusConstants.ACTIVE, option.status());
+        var json = new ObjectMapper().valueToTree(option);
+        assertEquals(Set.of("pid", "status", "user"),
+                new ObjectMapper().convertValue(json, Map.class).keySet());
+        assertEquals(Set.of("pid", "username", "email", "realName", "avatar"),
+                new ObjectMapper().convertValue(json.get("user"), Map.class).keySet());
     }
 
     @Test
@@ -148,6 +289,7 @@ class TenantMemberApplicationServiceImplTest {
         when(tenantMemberService.findByPid("p")).thenReturn(member(1L, 99L, 5L, StatusConstants.ACTIVE));
         metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(99L);
         when(userService.findByUserId(5L)).thenReturn(u(5L, "u@x.com"));
+        when(userPermissionService.hasPermission(7L, MetaPermission.TENANT_MEMBER_MANAGE)).thenReturn(true);
 
         MemberResponse resp = service.getMemberById("p", 7L);
         assertNotNull(resp);
@@ -361,6 +503,8 @@ class TenantMemberApplicationServiceImplTest {
     void getMemberTeamsOk() {
         when(tenantMemberService.findByPid("p")).thenReturn(member(1L, 99L, 5L, StatusConstants.ACTIVE));
         metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(99L);
+        metaContextMock.when(MetaContext::getCurrentUserId).thenReturn(7L);
+        when(userPermissionService.hasPermission(7L, MetaPermission.TENANT_MEMBER_MANAGE)).thenReturn(true);
         List<Map<String, Object>> teams = List.of(Map.of("id", 1L));
         when(teamMemberService.getTeamMembershipsByUserId(5L, 99L)).thenReturn(teams);
 

@@ -227,7 +227,7 @@ class DynamicDataServiceImplDataScopeRuntimeCoverageTest {
     void batchDelete_usesScopedBulkSqlWithTenantAndDataScope() {
         ModelDefinition model = physicalModel(MODEL_CODE, "mt_phase_one_model");
         wireModel(model);
-        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, USER_ID))
+        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, "delete", USER_ID))
                 .thenReturn("AND created_by = 20");
         when(dataDomainService.buildDomainFilter(MODEL_CODE, USER_ID)).thenReturn("");
         when(dynamicDataMapper.deleteByQuery(anyString(), anyMap())).thenReturn(1);
@@ -278,7 +278,7 @@ class DynamicDataServiceImplDataScopeRuntimeCoverageTest {
         wireSingleRecordRead(model, Map.of("pid", RECORD_ID, "name", "before", "created_by", USER_ID));
         when(dataPermissionEngine.canAccessRecord(eq(TENANT_ID), eq(MODEL_CODE), eq(USER_ID), anyMap()))
                 .thenReturn(true);
-        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, USER_ID))
+        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, "update", USER_ID))
                 .thenReturn("AND created_by = 20");
         when(dataDomainService.buildDomainFilter(MODEL_CODE, USER_ID)).thenReturn("AND domain_id = 7");
         when(dynamicDataMapper.updateByQuery(anyString(), anyMap())).thenReturn(1);
@@ -319,7 +319,7 @@ class DynamicDataServiceImplDataScopeRuntimeCoverageTest {
                                 .dataType("string").build()))
                 .build();
         wireModel(model);
-        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, USER_ID))
+        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, "update", USER_ID))
                 .thenReturn("AND created_by = 20");
         when(dataDomainService.buildDomainFilter(MODEL_CODE, USER_ID)).thenReturn("AND domain_id = 7");
         when(dynamicDataMapper.updateByQuery(anyString(), anyMap())).thenReturn(1);
@@ -364,7 +364,7 @@ class DynamicDataServiceImplDataScopeRuntimeCoverageTest {
                                 .dataType("string").build()))
                 .build();
         wireModel(model);
-        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, USER_ID)).thenReturn("");
+        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, "update", USER_ID)).thenReturn("");
         when(dataDomainService.buildDomainFilter(MODEL_CODE, USER_ID)).thenReturn("");
         when(dynamicDataMapper.updateByQuery(anyString(), anyMap())).thenReturn(1);
         Map<String, Object> nextValues = new java.util.HashMap<>();
@@ -391,7 +391,7 @@ class DynamicDataServiceImplDataScopeRuntimeCoverageTest {
     void compareAndSetBatch_keepsEveryRowGuardAndUsesOneWrite() {
         ModelDefinition model = batchCasModel();
         wireModel(model);
-        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, USER_ID)).thenReturn("AND created_by = 20");
+        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, "update", USER_ID)).thenReturn("AND created_by = 20");
         when(dataDomainService.buildDomainFilter(MODEL_CODE, USER_ID)).thenReturn("AND domain_id = 7");
         when(dynamicDataMapper.updateByQuery(anyString(), anyMap())).thenReturn(2);
         service.compareAndSetBatch(MODEL_CODE, "status", batchCasUpdates());
@@ -446,7 +446,7 @@ class DynamicDataServiceImplDataScopeRuntimeCoverageTest {
         wireSingleRecordRead(model, Map.of("pid", RECORD_ID, "created_by", USER_ID));
         when(dataPermissionEngine.canAccessRecord(eq(TENANT_ID), eq(MODEL_CODE), eq(USER_ID), anyMap()))
                 .thenReturn(true);
-        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, USER_ID))
+        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, "delete", USER_ID))
                 .thenReturn("AND created_by = 20");
         when(dataDomainService.buildDomainFilter(MODEL_CODE, USER_ID)).thenReturn("AND domain_id = 7");
         when(dynamicDataMapper.deleteByQuery(anyString(), anyMap())).thenReturn(1);
@@ -473,7 +473,7 @@ class DynamicDataServiceImplDataScopeRuntimeCoverageTest {
     void batchDelete_failsOnPartialScopedBulkDelete() {
         ModelDefinition model = physicalModel(MODEL_CODE, "mt_phase_one_model");
         wireModel(model);
-        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, USER_ID))
+        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, "delete", USER_ID))
                 .thenReturn("AND created_by = 20");
         when(dataDomainService.buildDomainFilter(MODEL_CODE, USER_ID)).thenReturn("");
         when(dynamicDataMapper.deleteByQuery(anyString(), anyMap())).thenReturn(1);

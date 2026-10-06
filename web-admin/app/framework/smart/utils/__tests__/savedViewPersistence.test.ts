@@ -3,6 +3,7 @@ import type { SavedView, ViewConfig } from '~/framework/smart/types/savedView';
 import {
   buildPersonalCopyName,
   canCopySavedView,
+  canShareSavedView,
   getSavedViewPersistenceMode,
   isSavedViewLockedPreset,
   mergeViewConfigPatch,
@@ -56,6 +57,15 @@ describe('savedViewPersistence', () => {
   it('uses server actions as the authoritative copy permission when present', () => {
     expect(canCopySavedView({ ...makeView('team'), actions: ['view'] })).toBe(false);
     expect(canCopySavedView({ ...makeView('team'), actions: ['view', 'copy'] })).toBe(true);
+  });
+
+  it('requires explicit server sharing action for an eligible unlocked view', () => {
+    expect(canShareSavedView(makeView('team'))).toBe(false);
+    expect(canShareSavedView({ ...makeView('team'), actions: ['view', 'manage'] })).toBe(false);
+    expect(canShareSavedView({ ...makeView('team'), actions: ['view', 'manage', 'share'] })).toBe(true);
+    expect(canShareSavedView({ ...makeView('global'), actions: ['view', 'share'] })).toBe(true);
+    expect(canShareSavedView({ ...makeView('personal'), actions: ['view', 'share'] })).toBe(false);
+    expect(canShareSavedView({ ...makeView('team'), actions: ['share'], viewConfig: { meta: { locked: true } } })).toBe(false);
   });
 
   it('merges pending local config over the source view config', () => {

@@ -15,5 +15,8 @@
       "strategy": "fixed_value",
       "value": "active"
     }
-  }
+  },
+  "permissions": [
+    "org.team.manage"
+  ]
 }

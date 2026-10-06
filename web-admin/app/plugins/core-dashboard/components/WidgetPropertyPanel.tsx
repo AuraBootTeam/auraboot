@@ -271,6 +271,9 @@ export const WidgetPropertyPanel: React.FC<WidgetPropertyPanelProps> = ({ classN
 
   // Check if a property should be visible based on dependsOn
   const isPropertyVisible = (schema: PropertySchema): boolean => {
+    // Semantic sources use the governed picker, not legacy model/query inputs.
+    if ((widget.config.dataSource as ChartDataSource | undefined)?.semanticModelCode !== undefined
+      && schema.key.startsWith('dataSource.')) return false;
     if (!schema.dependsOn) return true;
     const dependValue = getNestedValue(
       widget.config as unknown as Record<string, unknown>,
@@ -285,7 +288,7 @@ export const WidgetPropertyPanel: React.FC<WidgetPropertyPanelProps> = ({ classN
   return (
     <div
       data-testid="widget-property-panel"
-      className={`flex w-72 flex-col border-l border-gray-200 bg-white ${className}`}
+      className={`flex w-72 shrink-0 flex-col border-l border-gray-200 bg-white ${className}`}
     >
       <div className="border-b border-gray-200 p-4">
         <div className="flex items-center justify-between">

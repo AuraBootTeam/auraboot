@@ -1,6 +1,11 @@
 package com.auraboot.framework.meta.service;
 
 import com.auraboot.framework.integration.BaseIntegrationTest;
+import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.tenant.dao.entity.Tenant;
+import com.auraboot.framework.tenant.service.TenantService;
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.entity.DecisionDefinition;
 import lombok.extern.slf4j.Slf4j;
@@ -8,6 +13,7 @@ import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.*;
+import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -68,6 +74,9 @@ class DecisionDefinitionIntegrationTest extends BaseIntegrationTest {
 
         return decisionDefinitionService.create(request);
     }
+
+    @Autowired
+    private TenantService tenantService;
 
     // ==================== CRUD Tests ====================
 
@@ -293,5 +302,71 @@ class DecisionDefinitionIntegrationTest extends BaseIntegrationTest {
         assertThrows(Exception.class, () -> {
             decisionDefinitionService.delete("non_existent_pid");
         });
+    }
+
+    @Test
+    @Order(80)
+    @DisplayName("Definition PID access cannot read, update, publish or delete another tenant's definition")
+    void test80_definitionPidIsTenantScoped() {
+        DecisionDefinition own = createTestDecision("tenant_owner");
+        Tenant otherTenant = new Tenant();
+        otherTenant.setPid(UniqueIdGenerator.generate());
+        otherTenant.setName("definition-scope-" + UUID.randomUUID());
+        otherTenant.setDisplayName("Definition scope fixture");
+        otherTenant.setStatus("active");
+        otherTenant.setContactEmail("scope@example.test");
+        otherTenant.setDeletedFlag(false);
+        otherTenant.setCreatedAt(Instant.now());
+        otherTenant.setUpdatedAt(Instant.now());
+        otherTenant = tenantService.createTenant(otherTenant);
+
+        DecisionDefinition foreign;
+        try {
+            MetaContext.setContext(otherTenant.getId(), testUser.getId(), testUser.getPid(), testUser.getUserName());
+            foreign = createTestDecision("tenant_foreign");
+        } finally {
+            applyTestMetaContext();
+        }
+        assertNotEquals(own.getTenantId(), foreign.getTenantId());
+        assertEquals(own.getPid(), decisionDefinitionService.getByPid(own.getPid()).getPid());
+
+        DecisionDefinitionCreateRequest request = new DecisionDefinitionCreateRequest();
+        request.setCode(foreign.getCode());
+        request.setDisplayName("Unauthorized replacement");
+        request.setDescription("Unauthorized replacement");
+        request.setSubjectType(TEST_SUBJECT_TYPE);
+        request.setStage("review");
+        request.setRequiredEvidence(List.of());
+        request.setOutcomeOptions(List.of());
+        request.setInvariants(List.of());
+        assertAll(
+                () -> assertThrows(BusinessException.class, () -> decisionDefinitionService.getByPid(foreign.getPid())),
+                () -> assertThrows(BusinessException.class, () -> decisionDefinitionService.update(foreign.getPid(), request)),
+                () -> assertThrows(BusinessException.class, () -> decisionDefinitionService.publish(foreign.getPid())),
+                () -> assertThrows(BusinessException.class, () -> decisionDefinitionService.delete(foreign.getPid())));
+
+        try {
+            MetaContext.setContext(otherTenant.getId(), testUser.getId(), testUser.getPid(), testUser.getUserName());
+            DecisionDefinition unchanged = decisionDefinitionService.getByPid(foreign.getPid());
+            assertAll(
+                    () -> assertEquals(foreign.getDisplayName(), unchanged.getDisplayName()),
+                    () -> assertEquals(foreign.getDescription(), unchanged.getDescription()),
+                    () -> assertEquals(foreign.getVersion(), unchanged.getVersion()),
+                    () -> assertEquals(foreign.getRowVersion(), unchanged.getRowVersion()),
+                    () -> assertEquals(foreign.getStatus(), unchanged.getStatus()),
+                    () -> assertEquals(foreign.getIsCurrent(), unchanged.getIsCurrent()),
+                    () -> assertEquals(foreign.getDeletedFlag(), unchanged.getDeletedFlag()));
+            DecisionDefinition updated = decisionDefinitionService.update(foreign.getPid(), request);
+            assertEquals("Unauthorized replacement", updated.getDisplayName());
+            assertEquals(foreign.getRowVersion() + 1, updated.getRowVersion());
+            assertEquals(updated.getDisplayName(), decisionDefinitionService.getByPid(foreign.getPid()).getDisplayName());
+            decisionDefinitionService.publish(foreign.getPid());
+            assertEquals("published", decisionDefinitionService.getByPid(foreign.getPid()).getStatus());
+            decisionDefinitionService.delete(foreign.getPid());
+            assertThrows(BusinessException.class, () -> decisionDefinitionService.getByPid(foreign.getPid()));
+        } finally {
+            applyTestMetaContext();
+        }
+        assertEquals(own.getDisplayName(), decisionDefinitionService.getByPid(own.getPid()).getDisplayName());
     }
 }

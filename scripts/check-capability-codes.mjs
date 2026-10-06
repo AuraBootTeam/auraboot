@@ -3,13 +3,13 @@
  * Permission v2 capability-code drift gate.
  *
  * For every plugin's config/capabilities.json, verifies that each capability's `includes[]`
- * resolves to a real permission code — either declared in the SAME plugin's config/permissions.json
+ * resolves to a real permission code — either declared in the selected composition's config/permissions.json
  * or an auto-generated model permission (`model.<model>.<action>`). Also checks capability codes are
  * unique and that `unmasksFields` entries look like `model.field`. Prevents a capability from
  * pointing at a ghost permission code (which would silently grant nothing).
  *
  * Usage:
- *   node scripts/check-capability-codes.mjs [--root <pluginsDir>]
+ *   node scripts/check-capability-codes.mjs [--root <pluginsDir>] [--include-root <contributionRoot> ...]
  * Scans `<root>/* /config/capabilities.json`. Default root: ./plugins, else ./ if it holds
  * plugin dirs directly (the plugins repo layout). Exits 1 on any violation.
  */
@@ -19,24 +19,43 @@ import path from 'node:path';
 // The seven CRUD-ish actions the platform always generates for a model.
 const CRUD_ACTIONS = /^model\.[a-z0-9_]+\.(read|create|update|delete|manage|export|import)$/i;
 
-// A model permission is `model.<modelCode>.<action>` where <action> comes from a
-// declared command — see TestSeedController: "model." + modelCode + "." + action. The
-// action set is therefore whatever the commands declare, not a fixed seven. Allowing
-// only the seven flagged six legitimate codes (model.tenant_member.approve, .suspend,
-// …) whose commands exist as admin:approve_member and friends.
+// Mirror CommandActionDeriver's manifest-time action contract; a command suffix is
+// not necessarily its permission verb (admin:approve_member -> tenant_member.approve).
 function declaredModelActions(roots) {
   const out = new Set();
   for (const root of roots) {
     if (!fs.existsSync(root)) continue;
     for (const dir of fs.readdirSync(root)) {
-      const f = path.join(root, dir, 'config', 'commands.json');
-      if (!fs.existsSync(f)) continue;
-      let j; try { j = readJson(f); } catch { continue; }
-      for (const c of Array.isArray(j) ? j : (j.commands || [])) {
-        const model = c.modelCode;
-        const code = c.code || c.commandCode || '';
-        const action = code.includes(':') ? code.split(':').pop() : code;
-        if (model && action) out.add(`${model}.${action}`);
+      const config = path.join(root, dir, 'config');
+      const combined = path.join(config, 'commands.json');
+      const folder = path.join(config, 'commands');
+      const files = [
+        ...(fs.existsSync(combined) ? [combined] : []),
+        ...(fs.existsSync(folder) ? fs.readdirSync(folder).filter(f => f.endsWith('.json')).map(f => path.join(folder, f)) : []),
+      ];
+      for (const file of files) {
+        const value = readJson(file);
+        for (const c of Array.isArray(value) ? value : (value.commands || [value])) {
+          const model = c.modelCode;
+          const type = c.type?.toLowerCase();
+          if (!model || !type || type === 'query') continue;
+          if (['create', 'update', 'delete'].includes(type)) {
+            out.add(`${model}.${type}`);
+            continue;
+          }
+          const code = c.code || c.commandCode || '';
+          const suffix = code.includes(':') ? code.slice(code.indexOf(':') + 1) : code;
+          let verb = suffix;
+          const parts = model.split('_');
+          for (let i = 0; i < parts.length; i++) {
+            const modelSuffix = `_${parts.slice(i).join('_')}`;
+            if (suffix.endsWith(modelSuffix) && suffix.length > modelSuffix.length) {
+              verb = suffix.slice(0, -modelSuffix.length);
+              break;
+            }
+          }
+          if (verb && !['create', 'update', 'delete', 'query'].includes(verb)) out.add(`${model}.${verb}`);
+        }
       }
     }
   }
@@ -86,16 +105,27 @@ function pluginDirs(root) {
 }
 
 const root = resolveRoot();
+const extraRoots = process.argv.flatMap((value, index) => value === '--include-root' && process.argv[index + 1] ? [path.resolve(process.argv[index + 1])] : []);
+const roots = [...new Set([root, ...extraRoots])];
 // The repo root is the parent of the plugin root, so platform/ resolves from it.
 const repoRoot = path.resolve(root, '..');
 const platformCodes = platformPermissionCodes(repoRoot);
-const modelActions = declaredModelActions([root]);
+const modelActions = declaredModelActions(roots);
+const compositionCodes = new Set(platformCodes);
+for (const contributionRoot of roots) {
+  if (!fs.existsSync(contributionRoot)) continue;
+  for (const plugin of fs.readdirSync(contributionRoot)) {
+    const file = path.join(contributionRoot, plugin, 'config', 'permissions.json');
+    if (!fs.existsSync(file)) continue;
+    for (const permission of readJson(file)) compositionCodes.add(permission.code);
+  }
+}
 const violations = [];
 const seenCapCodes = new Set();
 let plugins = 0;
 let capabilities = 0;
 
-for (const dir of pluginDirs(root)) {
+for (const dir of roots.flatMap(pluginDirs)) {
   plugins++;
   const name = path.basename(dir);
   const caps = readJson(path.join(dir, 'config', 'capabilities.json'));
@@ -106,6 +136,14 @@ for (const dir of pluginDirs(root)) {
 
   for (const cap of caps) {
     capabilities++;
+    const allowed = new Set(['code', 'group', 'name:zh-CN', 'name:en', 'description', 'includes', 'tier', 'sensitive', 'unmasksFields', 'order', 'displayGroupOrder']);
+    for (const key of Object.keys(cap)) {
+      if (!allowed.has(key)) violations.push(`${name}: capability '${cap.code}' has unknown property '${key}'`);
+    }
+    if (Array.isArray(cap.includes) && (cap.includes.some(code => typeof code !== 'string' || !code.trim()) || new Set(cap.includes).size !== cap.includes.length)) {
+      violations.push(`${name}: capability '${cap.code}' has blank or duplicate dependencies`);
+      continue;
+    }
     if (!cap.code || !Array.isArray(cap.includes) || cap.includes.length === 0) {
       violations.push(`${name}: capability missing code or non-empty includes[]: ${JSON.stringify(cap.code)}`);
       continue;
@@ -116,10 +154,10 @@ for (const dir of pluginDirs(root)) {
     seenCapCodes.add(cap.code);
 
     for (const code of cap.includes) {
-      if (permCodes.has(code) || platformCodes.has(code) || CRUD_ACTIONS.test(code)) continue;
+      if (permCodes.has(code) || compositionCodes.has(code) || CRUD_ACTIONS.test(code)) continue;
       const m = /^model\.([a-z0-9_]+)\.([a-z0-9_]+)$/i.exec(code);
       if (m && modelActions.has(`${m[1]}.${m[2]}`)) continue;
-      violations.push(`${name}: capability '${cap.code}' includes ghost permission code '${code}' — not in this plugin's permissions.json, not declared by the platform, and not model.<model>.<action> for any declared command`);
+      violations.push(`${name}: capability '${cap.code}' includes ghost permission code '${code}' — not declared by the selected composition or platform, and not model.<model>.<action> for any declared command`);
     }
     for (const f of cap.unmasksFields || []) {
       if (!/^[a-z0-9_]+\.[a-z0-9_]+$/i.test(f)) {

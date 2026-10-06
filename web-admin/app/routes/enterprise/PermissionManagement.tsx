@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useLocation } from 'react-router';
+import { useLocation, useBlocker } from 'react-router';
 import {
   ShieldCheckIcon,
   PlusIcon,
@@ -10,6 +10,7 @@ import {
   PowerIcon,
   ClockIcon,
 } from '@heroicons/react/24/outline';
+import { useAuth } from '~/contexts/AuthContext';
 import { useI18n } from '~/contexts/I18nContext';
 import { useToastContext } from '~/contexts/ToastContext';
 import { fetchResult } from '~/shared/services/http-client';
@@ -74,6 +75,11 @@ function RoleAccessDenied() {
 
 function PermissionManagementContent() {
   const { t } = useI18n();
+  const { hasPermission, hasRole } = useAuth();
+  const isTenantAdmin = hasRole('tenant_admin');
+  const canManageRoles = isTenantAdmin && hasPermission('org.role.update');
+  const canAssignMembers = isTenantAdmin && hasPermission('org.user_role.update');
+  const canManageScope = isTenantAdmin && hasPermission('meta.permission.update');
   const { showSuccessToast, showErrorToast } = useToastContext();
   const { handleSubmitResult } = useFormSubmit();
   const location = useLocation();
@@ -86,11 +92,38 @@ function PermissionManagementContent() {
   const [rolesError, setRolesError] = useState<'denied' | 'failed' | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRolePid, setSelectedRolePid] = useState<string | null>(null);
+  const [editorDirty, setEditorDirty] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<{
+    rolePid?: string;
+    tab?: RightTabKey;
+  } | null>(null);
+  const blocker = useBlocker(editorDirty);
 
   // Right panel tab state — capability editor is the default surface.
   const [activeRightTab, setActiveRightTab] = useState<RightTabKey>(
-    auditDeepLink ? 'audit' : 'capabilities',
+    auditDeepLink && canManageScope ? 'audit' : 'capabilities',
   );
+
+  const selectRole = (rolePid: string) => {
+    if (rolePid === selectedRolePid) return;
+    if (editorDirty) setPendingNavigation({ rolePid });
+    else setSelectedRolePid(rolePid);
+  };
+  const selectTab = (tab: RightTabKey) => {
+    if (tab === 'audit' && !canManageScope) return;
+    if (tab === activeRightTab) return;
+    if (editorDirty) setPendingNavigation({ tab });
+    else setActiveRightTab(tab);
+  };
+  useEffect(() => {
+    if (!editorDirty) return;
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', beforeUnload);
+    return () => window.removeEventListener('beforeunload', beforeUnload);
+  }, [editorDirty]);
 
   // Dialog state
   const [showRoleForm, setShowRoleForm] = useState(false);
@@ -99,6 +132,13 @@ function PermissionManagementContent() {
     open: false,
     role: null,
   });
+
+  useEffect(() => {
+    if (canManageRoles) return;
+    setShowRoleForm(false);
+    setEditingRole(null);
+    setConfirmDelete({ open: false, role: null });
+  }, [canManageRoles]);
 
   // -------------------------------------------------------------------------
   // Data fetching
@@ -130,10 +170,12 @@ function PermissionManagementContent() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (auditDeepLink) {
+    if (auditDeepLink && canManageScope) {
       setActiveRightTab('audit');
+    } else if (!canManageScope) {
+      setActiveRightTab((current) => current === 'audit' ? 'capabilities' : current);
     }
-  }, [auditDeepLink]);
+  }, [auditDeepLink, canManageScope]);
 
   const filteredRoles = useMemo(() => {
     const q = searchQuery.toLowerCase();
@@ -168,6 +210,7 @@ function PermissionManagementContent() {
     description: string;
     type: string;
   }) => {
+    if (!canManageRoles) return;
     const isEditing = !!editingRole;
     const url = isEditing ? `/api/roles/${editingRole!.pid}` : '/api/roles';
     const method = isEditing ? 'put' : 'post';
@@ -192,7 +235,7 @@ function PermissionManagementContent() {
   };
 
   const handleDeleteRole = async () => {
-    if (!confirmDelete.role) return;
+    if (!canManageRoles || !confirmDelete.role) return;
     const result = await fetchResult<boolean>(`/api/roles/${confirmDelete.role.pid}`, {
       method: 'delete',
     });
@@ -211,6 +254,7 @@ function PermissionManagementContent() {
   };
 
   const handleToggleRole = async (role: Role) => {
+    if (!canManageRoles) return;
     const disabled = role.status === 'disabled';
     const action = disabled ? 'enable' : 'disable';
     const nextStatus = disabled ? 'active' : 'disabled';
@@ -244,9 +288,9 @@ function PermissionManagementContent() {
   // -------------------------------------------------------------------------
 
   const renderRolesTab = () => (
-    <div className="flex min-w-0 flex-1 overflow-hidden">
+    <div className="flex min-w-0 flex-1 flex-col overflow-hidden lg:flex-row">
       {/* Left — Role table */}
-      <div className="flex w-80 min-w-0 flex-shrink-0 flex-col border-r border-gray-200 dark:border-gray-700">
+      <div className="border-border flex max-h-56 w-full min-w-0 flex-shrink-0 flex-col border-b lg:max-h-none lg:w-72 lg:border-r lg:border-b-0 dark:border-gray-700">
         <div className="border-b border-gray-200 p-3 dark:border-gray-700">
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
@@ -260,19 +304,18 @@ function PermissionManagementContent() {
                 className="w-full rounded-md border border-gray-300 py-1.5 pr-3 pl-8 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
               />
             </div>
-            <PermissionGuard permission="org.role.update">
-              <button
-                data-testid="role-create-btn"
-                onClick={() => {
-                  setEditingRole(null);
-                  setShowRoleForm(true);
-                }}
-                className="flex-shrink-0 rounded-md bg-blue-600 p-1.5 text-white hover:bg-blue-700"
-                title={t('admin.permission.role.create') || 'Create Role'}
-              >
-                <PlusIcon className="h-4 w-4" />
-              </button>
-            </PermissionGuard>
+            <button
+              data-testid="role-create-btn"
+              disabled={!canManageRoles}
+              onClick={() => {
+                setEditingRole(null);
+                setShowRoleForm(true);
+              }}
+              className="flex-shrink-0 rounded-md bg-blue-600 p-1.5 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400 dark:disabled:bg-gray-700 dark:disabled:text-gray-500"
+              title={t('admin.permission.role.create') || 'Create Role'}
+            >
+              <PlusIcon className="h-4 w-4" />
+            </button>
           </div>
         </div>
 
@@ -285,7 +328,7 @@ function PermissionManagementContent() {
               {t(
                 'admin.permission.role.recommendedHint',
                 undefined,
-                '按业务职责分配角色；管理员角色仅授予需要管理权限的人员。',
+                'Set up separate administrator, sales, procurement and engineering roles according to responsibilities.',
               )}
             </div>
           )}
@@ -303,9 +346,9 @@ function PermissionManagementContent() {
             <table data-testid="role-table" className="w-full table-fixed">
               <thead className="sr-only">
                 <tr>
-                  <th>{t('permission.role')}</th>
-                  <th>{t('permission.type')}</th>
-                  <th>{t('common.actions')}</th>
+                  <th>{t('admin.permission.role.name', undefined, 'Role')}</th>
+                  <th>{t('admin.permission.role.type', undefined, 'Type')}</th>
+                  <th>{t('common.actions', undefined, 'Actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -316,7 +359,7 @@ function PermissionManagementContent() {
                     <tr
                       key={role.pid}
                       data-testid={`role-item-${role.code}`}
-                      onClick={() => setSelectedRolePid(role.pid)}
+                      onClick={() => selectRole(role.pid)}
                       className={`group cursor-pointer border-b border-gray-100 transition-colors dark:border-gray-700 ${
                         isSelected
                           ? 'bg-blue-50 dark:bg-blue-900/20'
@@ -349,54 +392,39 @@ function PermissionManagementContent() {
                             </span>
                           )}
                         </div>
-                        {role.description && (
-                          <div
-                            className="mt-0.5 truncate text-xs text-gray-500"
-                            data-i18n-ui-copy={
-                              t(
-                                `role.${role.code}._meta.description`,
-                                undefined,
-                                role.description,
-                              ) !== role.description
-                                ? 'role-description'
-                                : undefined
-                            }
-                          >
-                            {t(`role.${role.code}._meta.description`, undefined, role.description)}
-                          </div>
-                        )}
                       </td>
                       <td className="w-20 px-2 py-2 text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                          <PermissionGuard permission="org.role.update">
-                            <button
-                              data-testid={`role-action-edit-${role.code}`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditingRole(role);
-                                setShowRoleForm(true);
-                              }}
-                              className="rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
-                              title={t('common.edit') || 'Edit'}
-                            >
-                              <PencilIcon className="h-3.5 w-3.5" />
-                            </button>
-                          </PermissionGuard>
+                        <div className="flex items-center justify-end gap-0.5">
+                          <button
+                            data-testid={`role-action-edit-${role.code}`}
+              disabled={!canManageRoles}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingRole(role);
+                              setShowRoleForm(true);
+                            }}
+                            className="rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+                            title={t('common.edit') || 'Edit'}
+                          >
+                            <PencilIcon className="h-3.5 w-3.5" />
+                          </button>
                           {!role.isSystem && (
                             <PermissionGuard permission="org.role.update">
                               <button
                                 data-testid={`role-action-toggle-${role.code}`}
+              disabled={!canManageRoles}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleToggleRole(role);
                                 }}
                                 className="rounded p-1 text-gray-400 hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-900/20"
-                                title={t(isDisabled ? 'action.enable' : 'action.disable')}
+                                title={t(isDisabled ? 'common.enable' : 'common.disable')}
                               >
                                 <PowerIcon className="h-3.5 w-3.5" />
                               </button>
                               <button
                                 data-testid={`role-action-delete-${role.code}`}
+              disabled={!canManageRoles}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setConfirmDelete({ open: true, role });
@@ -420,7 +448,7 @@ function PermissionManagementContent() {
       </div>
 
       {/* Right — Role detail tabs (Permissions / Members) */}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <div className="border-b border-gray-200 px-6 dark:border-gray-700">
           <nav className="-mb-px flex space-x-6">
             <button
@@ -428,7 +456,7 @@ function PermissionManagementContent() {
               role="tab"
               aria-selected={activeRightTab === 'capabilities'}
               data-testid="permission-right-tab-capabilities"
-              onClick={() => setActiveRightTab('capabilities')}
+              onClick={() => selectTab('capabilities')}
               className={`flex items-center border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
                 activeRightTab === 'capabilities'
                   ? 'border-blue-500 text-blue-600 dark:text-blue-400'
@@ -443,7 +471,7 @@ function PermissionManagementContent() {
               role="tab"
               aria-selected={activeRightTab === 'members'}
               data-testid="permission-right-tab-members"
-              onClick={() => setActiveRightTab('members')}
+              onClick={() => selectTab('members')}
               className={`flex items-center border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
                 activeRightTab === 'members'
                   ? 'border-blue-500 text-blue-600 dark:text-blue-400'
@@ -458,7 +486,8 @@ function PermissionManagementContent() {
               role="tab"
               aria-selected={activeRightTab === 'audit'}
               data-testid="permission-right-tab-audit"
-              onClick={() => setActiveRightTab('audit')}
+              disabled={!canManageScope}
+              onClick={() => selectTab('audit')}
               className={`flex items-center border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
                 activeRightTab === 'audit'
                   ? 'border-blue-500 text-blue-600 dark:text-blue-400'
@@ -477,39 +506,34 @@ function PermissionManagementContent() {
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                 {selectedRole.name}
               </h2>
-              {selectedRole.description && (
-                <p
-                  className="mt-0.5 text-sm text-gray-500"
-                  data-i18n-ui-copy={
-                    t(
-                      `role.${selectedRole.code}._meta.description`,
-                      undefined,
-                      selectedRole.description,
-                    ) !== selectedRole.description
-                      ? 'role-description'
-                      : undefined
-                  }
-                >
-                  {t(
-                    `role.${selectedRole.code}._meta.description`,
-                    undefined,
-                    selectedRole.description,
-                  )}
-                </p>
-              )}
+              <p className="mt-1 text-xs text-gray-500">
+                {t(
+                  canManageRoles ? 'admin.permission.editor.roleHint' : 'admin.permission.editor.readOnlyHint',
+                  undefined,
+                  canManageRoles
+                    ? 'Select business capabilities, then review and save the changes.'
+                    : 'Read-only role access. Changes require the corresponding administration permission.',
+                )}
+              </p>
             </div>
           )}
 
           {activeRightTab === 'capabilities' &&
             (selectedRole ? (
-              <CapabilityRoleEditor key={selectedRole.pid} rolePid={selectedRole.pid} />
+              <CapabilityRoleEditor
+                key={selectedRole.pid}
+                rolePid={selectedRole.pid}
+                readOnly={!canManageRoles}
+                scopeReadOnly={!canManageScope}
+                onDirtyChange={setEditorDirty}
+              />
             ) : (
               <div className="text-sm text-gray-400">
                 {t('admin.permission.selectRole') || 'Select a role'}
               </div>
             ))}
-          {activeRightTab === 'members' && <RoleMemberTab rolePid={selectedRolePid} />}
-          {activeRightTab === 'audit' && <PermissionAuditTab />}
+          {activeRightTab === 'members' && <RoleMemberTab rolePid={selectedRolePid} readOnly={!canAssignMembers} />}
+          {activeRightTab === 'audit' && canManageScope && <PermissionAuditTab />}
         </div>
       </div>
     </div>
@@ -556,7 +580,7 @@ function PermissionManagementContent() {
 
       {/* Role Form Dialog */}
       <RoleFormDialog
-        open={showRoleForm}
+        open={showRoleForm && canManageRoles}
         onOpenChange={(open) => {
           setShowRoleForm(open);
           if (!open) setEditingRole(null);
@@ -567,7 +591,32 @@ function PermissionManagementContent() {
 
       {/* Delete Confirmation */}
       <ConfirmDialog
-        open={confirmDelete.open}
+        open={pendingNavigation !== null || blocker.state === 'blocked'}
+        title={t(
+          'admin.permission.editor.discardTitle',
+          undefined,
+          'Discard unsaved permission changes?',
+        )}
+        content={t(
+          'admin.permission.editor.discardNote',
+          undefined,
+          'Your draft has not been saved. Continue to discard it, or cancel to keep editing.',
+        )}
+        confirmText={t('admin.permission.editor.discard', undefined, 'Discard changes')}
+        onCancel={() => {
+          setPendingNavigation(null);
+          if (blocker.state === 'blocked') blocker.reset();
+        }}
+        onConfirm={() => {
+          setEditorDirty(false);
+          if (pendingNavigation?.rolePid) setSelectedRolePid(pendingNavigation.rolePid);
+          if (pendingNavigation?.tab) setActiveRightTab(pendingNavigation.tab);
+          setPendingNavigation(null);
+          if (blocker.state === 'blocked') blocker.proceed();
+        }}
+      />
+      <ConfirmDialog
+        open={confirmDelete.open && canManageRoles}
         title={t('admin.permission.role.delete.title') || 'Delete Role'}
         content={
           t('admin.permission.role.delete.content') ||

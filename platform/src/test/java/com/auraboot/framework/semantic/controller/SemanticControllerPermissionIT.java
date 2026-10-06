@@ -230,6 +230,8 @@ class SemanticControllerPermissionIT extends BaseIntegrationTest {
         permission.setCreatedAt(Instant.now());
         permission.setUpdatedAt(Instant.now());
         permissions.insert(permission);
+        // Fixture writes bypass PermissionService's definition-cache invalidation.
+        userPermissions.evictPermissionDefinitions(tenant.getId());
         return permission;
     }
 
@@ -832,7 +834,7 @@ class SemanticControllerPermissionIT extends BaseIntegrationTest {
             var request = MockMvcRequestBuilders.request(HttpMethod.valueOf(rejected.method()), rejected.path());
             if (rejected.body() != null) request.contentType("application/json").content(rejected.body());
             var result = mvc.perform(request).andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.data.errorCode").value(rejected.error()))
+                    .andExpect(jsonPath("$.context.errorCode").value(rejected.error()))
                     .andExpect(jsonPath("$.data.rows").doesNotExist()).andReturn();
             assertThat(result.getHandler()).isInstanceOf(HandlerMethod.class);
             var handler = (HandlerMethod) result.getHandler();

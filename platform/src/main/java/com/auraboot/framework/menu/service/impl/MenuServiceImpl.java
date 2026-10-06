@@ -179,6 +179,10 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
     }
 
     private boolean isAllowedByPermissionCode(Menu menu, Set<String> userPermissionCodes) {
+        // Directories organize authorized children; empty directories are pruned afterwards.
+        if (Integer.valueOf(0).equals(menu.getType())) {
+            return true;
+        }
         String permissionCode = menu.getPermissionCode();
         if (permissionCode == null || permissionCode.isBlank()) {
             return true;
@@ -294,7 +298,7 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
                 // Convert path to valid resourceCode: /meta/models -> meta_models
                 String resourceCode = convertPathToResourceCode(menu.getPath());
                 if (resourceCode != null) {
-                    autoPermissionAssignmentService.autoAssignPermissions(resourceCode, null);
+                    autoPermissionAssignmentService.registerPermissions(resourceCode, null, menu.getTenantId());
                     log.info("Auto-assigned permissions for menu: menuId={}, resourceCode={}",
                             menu.getId(), resourceCode);
                 } else {

@@ -337,7 +337,7 @@ final class DynamicDataBatchSupport extends BaseMetaService {
             appendScopedBulkFilter(sql, permitFilter);
         } else {
             try {
-                String rowFilter = dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId);
+                String rowFilter = dataPermissionEngine.buildRowFilter(tenantId, modelCode, "delete", userId);
                 appendScopedBulkFilter(sql, rowFilter);
             } catch (Exception e) {
                 log.error("Failed to apply row-level data permission for batch delete on model {} — denying access",

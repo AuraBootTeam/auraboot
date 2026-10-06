@@ -26,27 +26,19 @@ class PluginAccessResourceImporterTest {
     final PluginAccessResourceImporter.GeneratePermissionI18nRecordsOperation1 permissionI18n=mock(PluginAccessResourceImporter.GeneratePermissionI18nRecordsOperation1.class);
     final PluginAccessResourceImporter.SaveOrUpdatePluginResourceOperation save=mock(PluginAccessResourceImporter.SaveOrUpdatePluginResourceOperation.class);
     final PluginAccessResourceImporter.CaptureImportSnapshotOperation snapshot=mock(PluginAccessResourceImporter.CaptureImportSnapshotOperation.class);
-    final PluginAccessResourceImporter importer=new PluginAccessResourceImporter(resources,masks,capabilities,permissions,users,roles,bindings,menuI18n,permissionI18n,save,snapshot);
+    final PluginAccessResourceImporter importer=new PluginAccessResourceImporter(resources,masks,capabilities,users,menuI18n,permissionI18n,save,snapshot);
     PermissionDefinitionDTO permission(String code) { return PermissionDefinitionDTO.builder().code(code).build(); }
-    @Test void newPermissionsBindOnceToThisTenantAdminAndInvalidateCachesDespiteStaleEdges() {
-        var admin=new Role(); admin.setCode("tenant_admin"); admin.setId(7L);
-        var other=new Role(); other.setCode("operator"); other.setId(8L);
-        when(roles.findByTenantId(42L)).thenReturn(List.of(other,admin));
-        var bound=new PermissionDTO(); bound.setId(1L);
-        when(permissions.findRolePermissions(7L)).thenReturn(List.of(bound));
-        var fresh=new PermissionDTO(); fresh.setId(2L);
-        when(permissions.findByCode("existing")).thenReturn(bound); when(permissions.findByCode("fresh")).thenReturn(fresh);
-        when(permissions.findByCode("offline")).thenThrow(new IllegalStateException("lookup unavailable"));
-        importer.bindImportedPermissionsToTenantAdmin(List.of(permission("existing"),permission("fresh"),permission("fresh"),permission("absent"),permission("offline")),42L);
-        verify(bindings).insert(argThat((com.auraboot.framework.rbac.entity.RolePermission binding) -> binding.getTenantId().equals(42L) && binding.getRoleId().equals(7L) && binding.getPermissionId().equals(2L) && binding.getGrantType().equals("grant") && binding.getStatus().equals("active") && !binding.getDeletedFlag()));
-        verify(users).evictPermissionDefinitions(42L); verify(users).evictRoleUsers(42L,7L);
+    @Test void declarationsRegisterWithoutGrantingOrRestoringRevokedBindings() {
+        var manifest = new PluginManifestExtended();
+        manifest.setPermissions(List.of(permission("invoice.read")));
+        importer.importPermissions(manifest, new ImportRequest(), new ImportExecuteResult(), "p", "i", 42L);
+        verify(resources).importPermission(eq(manifest.getPermissions().get(0)), eq("p"), eq("i"), eq(42L), any());
+        verify(users).evictPermissionDefinitions(42L);
+        verifyNoInteractions(bindings, permissions, roles);
     }
-    @Test void missingTenantOrAdminDoesNotCreateGlobalBindings() {
-        importer.bindImportedPermissionsToTenantAdmin(List.of(permission("read")),null);
-        importer.bindImportedPermissionsToTenantAdmin(List.of(),42L);
-        importer.bindImportedPermissionsToTenantAdmin(null,42L);
-        when(roles.findByTenantId(42L)).thenReturn(List.of()); importer.bindImportedPermissionsToTenantAdmin(List.of(permission("read")),42L);
-        verifyNoInteractions(bindings,permissions,users);
+    @Test void absentDeclarationsDoNotTouchGrantsOrAuthorizationCaches() {
+        importer.importPermissions(new PluginManifestExtended(), new ImportRequest(), new ImportExecuteResult(), "p", "i", 42L);
+        verifyNoInteractions(resources, bindings, permissions, roles, users);
     }
     @Test void importsPreserveSnapshotsCountsAndMenuParentOrder() {
         var resource=new PluginResource(); resource.setAction("CREATE"); resource.setResourcePid("r-42");
@@ -77,7 +69,11 @@ class PluginAccessResourceImporterTest {
                 .replacementChar("#").applyToExport(false).exemptRoles("finance_admin").exemptPermissionCodes("invoice.unmask").build();
         var capability=CapabilityDefinitionDTO.builder().code("invoice.manage").includes(List.of("invoice.read","invoice.write")).build();
         var m=new PluginManifestExtended(); m.setFieldMasks(List.of(new FieldMaskDefinitionDTO(),mask)); m.setCapabilities(List.of(new CapabilityDefinitionDTO(),capability));
-        importer.importFieldMasks(m); importer.importCapabilities(m);
+        importer.importFieldMasks(m);
+        assertThatThrownBy(() -> importer.importCapabilities(m)).isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(capabilities);
+        m.setCapabilities(List.of(capability));
+        importer.importCapabilities(m);
         verify(masks).saveConfig(argThat(c -> c.getModelCode().equals("invoice") && c.getFieldCode().equals("amount") && c.getReplacementChar().equals("#") && !c.getApplyToExport() && c.getExemptRoles().equals("finance_admin") && c.getExemptPermissionCodes().equals("invoice.unmask")));
         verify(capabilities).saveDefinition(capability);
     }

@@ -29,6 +29,13 @@ public interface DashboardService {
      */
     DashboardDTO findByPid(String pid);
 
+    /** Check the current tenant and existing dashboard read scope before returning version data. */
+    void checkVersionReadAccess(String pid);
+
+    /** Check the current tenant and existing dashboard write scope before applying a version. */
+    void checkVersionWriteAccess(String pid);
+
+
     /**
      * Get dashboard by code within current tenant
      *

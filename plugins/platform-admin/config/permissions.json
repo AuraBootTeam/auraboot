@@ -1,5 +1,15 @@
 [
   {
+    "code": "model.tenant_member.provision_member_from_employee",
+    "name:zh-CN": "从人员开通账号",
+    "name:en": "Provision Member from Employee",
+    "description": "Provision a tenant member account from an authorized employee record",
+    "resourceType": "model",
+    "module": "enterprise",
+    "resourceCode": "tenant_member",
+    "action": "provision_member_from_employee"
+  },
+  {
     "code": "admin_data_permission",
     "name:zh-CN": "数据权限策略管理",
     "name:en": "Data Permission Policy Management",

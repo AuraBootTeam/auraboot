@@ -72,9 +72,8 @@ export default function SemanticModelsPage() {
     try {
       const meta = await fetchSemanticMeta();
       setModels(meta.models || []);
-      if (!selectedCode && meta.models?.length) {
-        setSelectedCode(meta.models[0].code);
-      }
+      // A late initial load must not replace a choice made after another load.
+      setSelectedCode(current => current || meta.models?.[0]?.code || null);
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -284,6 +283,24 @@ function BrowsePanel({
     setResult(null);
     setQueryError(null);
   }, [model?.code]);
+
+  // Result columns arrive as qualified keys (`model.field`, `model.field__grain`).
+  // Headers show the model's own labels so readers never see raw field codes; an
+  // unknown column falls back to its key.
+  const columnLabels = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!model) return map;
+    for (const m of model.metrics) map.set(`${model.code}.${m.code}`, localize(m.label, m.code, locale));
+    for (const d of model.dimensions) {
+      const label = localize(d.label, d.code, locale);
+      map.set(`${model.code}.${d.code}`, label);
+      for (const grain of ['day', 'week', 'month', 'quarter', 'year']) {
+        map.set(`${model.code}.${d.code}__${grain}`, `${label} · ${grain}`);
+      }
+    }
+    return map;
+  }, [model, locale]);
+  const columnLabel = (column: string) => columnLabels.get(column) ?? column;
 
   if (!model) {
     return (
@@ -525,7 +542,7 @@ function BrowsePanel({
                         key={c}
                         className="border-b border-gray-200 px-3 py-1.5 text-left font-medium text-gray-600 dark:border-gray-700 dark:text-gray-300"
                       >
-                        {c}
+                        {columnLabel(c)}
                       </th>
                     ))}
                   </tr>
@@ -597,9 +614,11 @@ function AuthorPanel({
     setStatus(null);
     try {
       const r = await publishSemanticYaml(yaml, pluginCode);
+      // The internal PID stays out of user-facing copy (the model list and the
+      // browse header surface the published model instead).
       setStatus({
         kind: 'ok',
-        text: t('semantic.models.publish_ok', undefined, '发布成功') + `: ${r.pid}`,
+        text: t('semantic.models.publish_ok', undefined, '发布成功'),
       });
       toast.success(t('semantic.models.publish_ok', undefined, '发布成功'));
       onPublished();

@@ -1,5 +1,6 @@
 import type { Browser, Page } from '@playwright/test';
 import { test, expect } from '../../fixtures';
+import { BASE_URL } from '../../helpers/environments';
 import { ensureSidebarExpanded, uniqueId } from '../helpers';
 import {
   ensureQuoteRoleUser,
@@ -35,17 +36,39 @@ async function queryRecords(page: Page, code: string): Promise<Record<string, un
 
 async function expectFourCharts(page: Page, path: string): Promise<void> {
   const expectedSeries: number[][] = [];
-  const trends = TREND_QUERIES.map((code) => page.waitForResponse((response) => {
-    if (response.request().method() !== 'POST') return false;
-    try { return response.request().postDataJSON()?.queryCode === code; }
-    catch { return false; }
-  }));
-  await page.goto(path, { waitUntil: 'domcontentloaded' });
-  for (const pending of trends) {
-    const response = await pending;
-    expect(response.ok()).toBe(true);
-    const payload = response.request().postDataJSON();
-    const body = await response.json();
+  const targetPath = new URL(path, BASE_URL).pathname;
+  const trends = TREND_QUERIES.map((code) =>
+    page
+      .waitForResponse((response) => {
+        const request = response.request();
+        if (
+          request.method() !== 'POST' ||
+          new URL(response.url()).pathname !== '/api/meta/chart-data'
+        )
+          return false;
+        // The previous document can still issue chart requests while goto is pending.
+        // Never bind the next page's assertions to an old-document response.
+        if (
+          request.frame() !== page.mainFrame() ||
+          new URL(request.frame().url()).pathname !== targetPath
+        )
+          return false;
+        try {
+          return request.postDataJSON()?.queryCode === code;
+        } catch {
+          return false;
+        }
+      })
+      .then(async (response) => {
+        expect(response.ok()).toBe(true);
+        return { payload: response.request().postDataJSON(), body: await response.json() };
+      }),
+  );
+  const [results] = await Promise.all([
+    Promise.all(trends),
+    page.goto(path, { waitUntil: 'domcontentloaded' }),
+  ]);
+  for (const { payload, body } of results) {
     const rows = body.data.rows;
     expect(rows).toHaveLength(12);
     expectedSeries.push(rows.map((row: any) => Number(row.quote_count ?? row.bom_count)));
@@ -191,13 +214,15 @@ test.describe('Quote and BOM operations dashboard @smoke', () => {
   });
 
   test('admin gets one menu link and the same four charts on dashboard and home', async ({ page }, testInfo) => {
-    await page.goto('/home', { waitUntil: 'domcontentloaded' });
+    await expectFourCharts(page, '/home');
     await ensureSidebarExpanded(page);
+    // Sidebar expansion reloads the document; validate the charts in the captured document.
+    await expectFourCharts(page, HOME_PATH);
     await expect(page.getByTestId('sidebar').locator(`a[href="${HOME_PATH}"]`)).toHaveCount(1);
 
-    await expectFourCharts(page, '/home');
     await page.screenshot({ path: testInfo.outputPath('home-weekly-order.png'), fullPage: true });
     await expectFourCharts(page, DASHBOARD_PATH);
+    await expect(page.getByText('查看报价与 BOM 的创建趋势及人员贡献。', { exact: true })).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('dashboard-weekly-order.png'), fullPage: true });
 
     for (const code of TREND_QUERIES) {

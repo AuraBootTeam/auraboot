@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { ensureSidebarExpanded } from '../helpers';
+import { ensureSidebarExpanded, navigateToMenuByClick } from '../helpers';
 
 test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json', locale: 'zh-CN' });
 
@@ -127,7 +127,8 @@ test('HIFI-00 seed realistic dataset and build the multi-block report', async ({
         grandTotal: { enabled: true, columns: [{ field: 'cnt', aggregation: 'sum' }] } },
       { id: 'xtab', blockType: 'cross-tab', title: '状态 × 类型 交叉统计', dataSource: 'cross',
         rowField: 'status', columnField: 'type', valueField: 'cnt', aggregation: 'sum',
-        showRowTotal: true, showColumnTotal: true },
+        showRowTotal: true, showColumnTotal: true,
+        columns: [{ field: 'status', label: '状态' }, { field: 'type', label: '类型' }] },
       { id: 'chart', blockType: 'chart', title: '状态分布', dataSource: 'chart',
         chartType: 'bar', categoryField: 'status', valueField: 'cnt', aggregation: 'sum', height: 240 },
     ],
@@ -216,8 +217,10 @@ async function openReportFromManagement(page: import('@playwright/test').Page) {
   expect(body.data).toEqual(expect.arrayContaining([
     expect.objectContaining({ pid: reportPid, title: `订单运营月报 ${run}` }),
   ]));
-  // Match the freshly generated title in the management table; navigation must resolve its exact pid.
-  const row = page.getByRole('row').filter({ has: page.getByRole('cell', { name: `订单运营月报 ${run}`, exact: true }) });
+  // Match the current run's exact business title across supported table renderers.
+  const row = page.getByRole('row').filter({
+    has: page.getByRole('cell', { name: `订单运营月报 ${run}`, exact: true }),
+  });
   await expect(row).toHaveCount(1);
   await expect(row).toContainText(`订单运营月报 ${run}`);
   await row.getByRole('button', { name: /^(打开|Open)$/ }).click();
@@ -225,8 +228,10 @@ async function openReportFromManagement(page: import('@playwright/test').Page) {
 }
 
 async function downloadAndInspectPdf(page: import('@playwright/test').Page, button: RegExp, artifact: string) {
-  const responsePromise = page.waitForResponse(r => r.url().endsWith('/api/reports/export/pdf') && r.request().method() === 'POST');
-  const downloadPromise = page.waitForEvent('download');
+  // The WYSIWYG renderer (DDR-2026-06-21) renders a real Chromium PDF server-side, which
+  // takes seconds; the old 5s default was calibrated on the instant PDFBox fallback.
+  const responsePromise = page.waitForResponse(r => r.url().endsWith('/api/reports/export/pdf') && r.request().method() === 'POST', { timeout: 60000 });
+  const downloadPromise = page.waitForEvent('download', { timeout: 60000 });
   await page.getByRole('button', { name: button }).click();
   const response = await responsePromise;
   expect(response.request().postDataJSON().reportPid).toBe(reportPid);

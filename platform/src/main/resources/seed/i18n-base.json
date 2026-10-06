@@ -5679,5 +5679,416 @@
     "key": "workbench.inbox.sourceOther",
     "zh-CN": "其他来源",
     "en-US": "Other source"
+  },
+  {
+    "key": "meta_record.duplicate",
+    "zh-CN": "记录已存在，请检查唯一字段后再保存",
+    "en-US": "Record already exists. Check unique fields before saving.",
+    "ja-JP": "レコードは既に存在します。一意の項目を確認してから保存してください。",
+    "ko-KR": "레코드가 이미 존재합니다. 고유 필드를 확인한 후 저장하세요."
+  },
+  {
+    "key": "admin.permission.scope.team",
+    "zh-CN": "所属团队",
+    "en-US": "My teams"
+  },
+  {
+    "key": "admin.permission.scope.not_configured",
+    "zh-CN": "未配置",
+    "en-US": "Not configured"
+  },
+  {
+    "key": "admin.permission.scope.invalid",
+    "zh-CN": "范围配置无效",
+    "en-US": "Invalid scope configuration"
+  },
+  {
+    "key": "admin.permission.scope.no_grants",
+    "zh-CN": "暂无已授权动作",
+    "en-US": "No granted actions"
+  },
+  {
+    "key": "admin.permission.scope.unavailable",
+    "zh-CN": "范围不可用",
+    "en-US": "Scope unavailable"
+  },
+  {
+    "key": "admin.permission.scope.actual",
+    "zh-CN": "当前已授权动作范围",
+    "en-US": "Current granted action scopes"
+  },
+  {
+    "key": "admin.permission.scope.default",
+    "zh-CN": "角色默认范围",
+    "en-US": "Role default scope"
+  },
+  {
+    "key": "admin.permission.scope.loadError",
+    "zh-CN": "角色默认范围加载失败",
+    "en-US": "Could not load role default scope"
+  },
+  {
+    "key": "admin.permission.scope.verifyError",
+    "zh-CN": "范围已提交，但未能确认保存结果，请重新加载后继续",
+    "en-US": "Scope was submitted but could not be verified. Reload before continuing."
+  },
+  {
+    "key": "admin.permission.editor.loadError",
+    "zh-CN": "角色权限加载失败，请重试",
+    "en-US": "Could not load role permissions. Retry to continue."
+  },
+  {
+    "key": "admin.permission.editor.capabilities",
+    "zh-CN": "业务能力",
+    "en-US": "Business capabilities"
+  },
+  {
+    "key": "admin.permission.editor.search",
+    "zh-CN": "搜索业务能力",
+    "en-US": "Search business capabilities"
+  },
+  {
+    "key": "admin.permission.editor.empty",
+    "zh-CN": "没有匹配的业务能力",
+    "en-US": "No matching business capabilities"
+  },
+  {
+    "key": "admin.permission.editor.selection",
+    "zh-CN": "已选 {selected} / {total} 项",
+    "en-US": "{selected} selected of {total}"
+  },
+  {
+    "key": "admin.permission.editor.draft",
+    "zh-CN": "有 {count} 项待保存变更。请先保存或撤销草稿，再修改数据范围或高级权限。",
+    "en-US": "{count} pending changes. Save or discard before editing data scope or advanced permissions."
+  },
+  {
+    "key": "admin.permission.editor.discard",
+    "zh-CN": "撤销变更",
+    "en-US": "Discard changes"
+  },
+  {
+    "key": "admin.permission.editor.reviewSave",
+    "zh-CN": "预览并保存",
+    "en-US": "Review and save"
+  },
+  {
+    "key": "admin.permission.editor.preview",
+    "zh-CN": "确认权限变更",
+    "en-US": "Review permission changes"
+  },
+  {
+    "key": "admin.permission.editor.add",
+    "zh-CN": "授予",
+    "en-US": "Grant"
+  },
+  {
+    "key": "admin.permission.editor.remove",
+    "zh-CN": "移除",
+    "en-US": "Revoke"
+  },
+  {
+    "key": "admin.permission.editor.discardTitle",
+    "zh-CN": "放弃未保存的权限变更？",
+    "en-US": "Discard unsaved permission changes?"
+  },
+  {
+    "key": "admin.permission.editor.discardNote",
+    "zh-CN": "草稿尚未保存。继续将放弃草稿，取消则保留并继续编辑。",
+    "en-US": "Your draft has not been saved. Continue to discard it, or cancel to keep editing."
+  },
+  {
+    "key": "admin.permission.policy.loadError",
+    "zh-CN": "权限策略加载失败，请重试",
+    "en-US": "Could not load permission policy. Retry to continue."
+  },
+  {
+    "key": "admin.permission.editor.roleHint",
+    "zh-CN": "选择业务能力，核对变更后保存；数据范围决定能访问哪些记录。",
+    "en-US": "Select business capabilities, then review and save. Data scope controls which records can be accessed."
+  },
+  {
+    "key": "admin.permission.advanced.coverageSummary",
+    "zh-CN": "共 {total} 个动作 · {exceptions} 项已授权动作未被业务能力覆盖",
+    "en-US": "{total} actions · {exceptions} granted actions without business capability coverage"
+  },
+  {
+    "key": "admin.permission.advanced.coverageBanner",
+    "zh-CN": "日常授权请使用上方业务能力。此表用于查看单个动作及包含它的能力；覆盖关系不能证明授权来源。",
+    "en-US": "Use business capabilities for everyday changes. This table shows individual actions and which capabilities include them. Coverage does not prove the source of a grant."
+  },
+  {
+    "key": "admin.permission.advanced.coverageOnlyUncovered",
+    "zh-CN": "仅看未被业务能力覆盖的动作",
+    "en-US": "Actions without business capability coverage"
+  },
+  {
+    "key": "admin.permission.advanced.coverageCapability",
+    "zh-CN": "能力「{name}」包含",
+    "en-US": "Included in “{name}”"
+  },
+  {
+    "key": "admin.permission.advanced.coverageAbsent",
+    "zh-CN": "无业务能力覆盖",
+    "en-US": "No business capability coverage"
+  },
+  {
+    "key": "admin.permission.advanced.coverageLegend",
+    "zh-CN": "“能力包含”表示该动作被某个已声明能力收录；“无覆盖”表示没有对应声明。二者都不代表实际授权来源。",
+    "en-US": "Coverage means a declared capability includes the action. Uncovered means no such declaration exists. Neither label proves the source of a grant."
+  },
+  {
+    "key": "admin.permission.effective.coverageSummary",
+    "zh-CN": "已授权动作 {total} 项 · {exceptions} 项未被业务能力覆盖",
+    "en-US": "{total} granted actions · {exceptions} not covered by business capabilities"
+  },
+  {
+    "key": "admin.permission.advanced.colCoverage",
+    "zh-CN": "能力覆盖",
+    "en-US": "Capability coverage"
+  },
+  {
+    "key": "admin.permission.capability.partialV2",
+    "zh-CN": "部分动作已授权",
+    "en-US": "Some actions granted"
+  },
+  {
+    "key": "admin.permission.capability.partialActionsV2",
+    "zh-CN": "部分动作 {granted}/{total}",
+    "en-US": "Actions {granted}/{total}"
+  },
+  {
+    "key": "admin.permission.capability.partialGuidanceV2",
+    "zh-CN": "部分动作可能来自其他能力的共享依赖，不代表该能力已完整可用。勾选可补齐，撤销影响以保存前预览为准。",
+    "en-US": "Some actions may be shared dependencies of other capabilities. Partial actions do not grant the complete capability. Select to complete; review revocation effects before saving."
+  },
+  {
+    "key": "admin.permission.capability.noneV2",
+    "zh-CN": "未授权",
+    "en-US": "Not granted"
+  },
+  {
+    "key": "admin.permission.capability.fullV2",
+    "zh-CN": "完整授权",
+    "en-US": "Fully granted"
+  },
+  {
+    "key": "admin.permission.capability.relatedMenusV2",
+    "zh-CN": "相关菜单",
+    "en-US": "Related menus"
+  },
+  {
+    "key": "admin.permission.diagnostics.titleV2",
+    "zh-CN": "权限诊断 · 只读",
+    "en-US": "Permission diagnostics · read only"
+  },
+  {
+    "key": "admin.permission.diagnostics.noteV2",
+    "zh-CN": "共 {total} 个动作；{uncovered} 项已授权动作未关联声明能力。此处展示声明覆盖关系，不代表授权来源或用户最终访问结果。",
+    "en-US": "{total} actions; {uncovered} granted actions without declared capability coverage. Coverage does not identify grant origin or effective user access."
+  },
+  {
+    "key": "admin.permission.diagnostics.searchV2",
+    "zh-CN": "搜索权限名称或标识",
+    "en-US": "Search permission diagnostics"
+  },
+  {
+    "key": "admin.permission.diagnostics.actionV2",
+    "zh-CN": "动作",
+    "en-US": "Action"
+  },
+  {
+    "key": "admin.permission.diagnostics.stateV2",
+    "zh-CN": "本角色授权",
+    "en-US": "Role grant"
+  },
+  {
+    "key": "admin.permission.diagnostics.scopeV2",
+    "zh-CN": "记录范围",
+    "en-US": "Record scope"
+  },
+  {
+    "key": "admin.permission.diagnostics.capabilitiesV2",
+    "zh-CN": "关联能力",
+    "en-US": "Related capabilities"
+  },
+  {
+    "key": "admin.permission.diagnostics.codeV2",
+    "zh-CN": "技术标识",
+    "en-US": "Technical identifier"
+  },
+  {
+    "key": "admin.permission.diagnostics.grantedV2",
+    "zh-CN": "已授权",
+    "en-US": "Granted"
+  },
+  {
+    "key": "admin.permission.diagnostics.noneV2",
+    "zh-CN": "未授权",
+    "en-US": "Not granted"
+  },
+  {
+    "key": "admin.permission.diagnostics.unmappedV2",
+    "zh-CN": "未关联声明能力",
+    "en-US": "No declared capability"
+  },
+  {
+    "key": "admin.permission.diagnostics.emptyV2",
+    "zh-CN": "没有匹配动作",
+    "en-US": "No matching actions"
+  },
+  {
+    "key": "admin.permission.editor.readbackErrorV2",
+    "zh-CN": "权限已保存，但读取结果失败。请重新加载后继续。",
+    "en-US": "Permissions were saved, but the result could not be loaded. Reload before continuing."
+  },
+  {
+    "key": "admin.permission.editor.previewErrorV2",
+    "zh-CN": "无法计算变更影响，草稿已保留。",
+    "en-US": "Could not calculate permission changes. Your draft is preserved."
+  },
+  {
+    "key": "admin.permission.editor.atomicDiffV2",
+    "zh-CN": "新增 {added} 个动作，移除 {removed} 个动作；另有 {preserved} 个现有动作保持不变。",
+    "en-US": "Add {added} actions, remove {removed}; {preserved} existing actions remain unchanged."
+  },
+  {
+    "key": "admin.permission.editor.impactDetailsV2",
+    "zh-CN": "查看受影响的能力（{count} 项）、菜单及动作明细",
+    "en-US": "Review affected capabilities ({count}), menus and action details"
+  },
+  {
+    "key": "admin.permission.editor.impactStateDetailsV2",
+    "zh-CN": "查看关联能力状态、菜单及动作明细",
+    "en-US": "Review related capability states, menus and action details"
+  },
+  {
+    "key": "admin.permission.editor.previewStateCountsV2",
+    "zh-CN": "关联能力保存后状态：完整授权 {full} 项 · 部分动作 {partial} 项 · 未授权 {none} 项",
+    "en-US": "Related capabilities after saving: {full} fully granted · {partial} with partial actions · {none} not granted"
+  },
+  {
+    "key": "admin.permission.editor.roleLocalV2",
+    "zh-CN": "变更仅作用于当前角色。用户访问仍受其他角色、记录范围和共享关系共同影响。",
+    "en-US": "This changes this role only. Other roles, record scopes and sharing still determine user access."
+  },
+  {
+    "key": "admin.permission.editor.draftV2",
+    "zh-CN": "有 {count} 项待保存变更。请保存或放弃后再修改数据范围。",
+    "en-US": "{count} pending changes. Save or discard before editing data scope."
+  },
+  {
+    "key": "admin.permission.capability.scopeV2",
+    "zh-CN": "调整记录范围",
+    "en-US": "Record scope"
+  },
+  {
+    "key": "admin.permission.capability.scopeNoteV2",
+    "zh-CN": "仅调整此能力已有授权的记录动作。同一个动作被多个能力包含时，范围调整会共同生效；新增和撤销授权请使用上方能力选择。",
+    "en-US": "Adjust existing record grants for this capability. Shared actions also affect other capabilities; use the checklist to grant or revoke access."
+  },
+  {
+    "key": "admin.permission.capability.noScopesV2",
+    "zh-CN": "没有已授权的记录动作可配置。",
+    "en-US": "No granted record actions to configure."
+  },
+  {
+    "key": "admin.permission.capability.scopeFailureV2",
+    "zh-CN": "无法确认范围变更结果，部分变更可能已保存。请重新加载后继续。",
+    "en-US": "Scope changes could not be verified. Some changes may have been saved; reload before continuing."
+  },
+  {
+    "key": "admin.permission.capability.revokePartialV2",
+    "zh-CN": "撤销已有授权",
+    "en-US": "Revoke existing grants"
+  },
+  {
+    "key": "admin.permission.capability.undoRevokeV2",
+    "zh-CN": "待撤销 · 取消撤销",
+    "en-US": "Pending revocation · undo"
+  },
+  {
+    "key": "admin.permission.capability.teamUnavailableV2",
+    "zh-CN": "此类记录未配置团队关联，不能选择“我的团队”。已有该范围本身不提供记录访问；其他角色授权或有效共享仍可能生效。",
+    "en-US": "This record type has no team association configured, so My teams cannot be selected. An existing My teams scope grants no records by itself; other roles or valid shares may still allow access."
+  },
+  {
+    "key": "admin.permission.capability.scopeNamesErrorV2",
+    "zh-CN": "无法加载业务名称，请关闭后重新打开。",
+    "en-US": "Could not load business names. Close and reopen to try again."
+  },
+  {
+    "key": "admin.permission.members.temporary",
+    "zh-CN": "限时授权",
+    "en-US": "Time-bounded access"
+  },
+  {
+    "key": "admin.permission.members.effectiveDate",
+    "zh-CN": "生效日期",
+    "en-US": "Effective date"
+  },
+  {
+    "key": "admin.permission.members.expiryDate",
+    "zh-CN": "到期日期",
+    "en-US": "Expiry date"
+  },
+  {
+    "key": "admin.permission.members.colValidity",
+    "zh-CN": "有效期",
+    "en-US": "Validity"
+  },
+  {
+    "key": "admin.permission.members.permanent",
+    "zh-CN": "长期有效",
+    "en-US": "Permanent"
+  },
+  {
+    "key": "permission.org.role.update",
+    "zh-CN": "修改角色",
+    "en-US": "Update roles"
+  },
+  {
+    "key": "cloudConfig.save.readbackPending",
+    "zh-CN": "配置已保存，请重新读取后继续修改。",
+    "en-US": "Configuration saved. Reload it before making further changes.",
+    "source": "seed",
+    "refType": "ui"
+  },
+  {
+    "key": "cloudConfig.save.retryReadback",
+    "zh-CN": "重试读取",
+    "en-US": "Retry loading",
+    "source": "seed",
+    "refType": "ui"
+  },
+  {
+    "key": "meta.table.dictionaryRetryHint",
+    "zh-CN": "请刷新页面重试",
+    "en-US": "Refresh the page to retry"
+  },
+  {
+    "key": "meta.table.dictionaryLoadFailed",
+    "zh-CN": "标签加载失败",
+    "en-US": "Labels failed to load"
+  },
+  {
+    "key": "meta.table.dictionaryLabelMissing",
+    "zh-CN": "标签未配置",
+    "en-US": "Label not configured"
+  },
+  {
+    "key": "admin.permission.editor.readOnlyHint",
+    "zh-CN": "当前为角色只读访问，修改需具备对应管理权限。",
+    "en-US": "Read-only role access. Changes require the corresponding administration permission."
+  },
+  {
+    "key": "common.saved_view_public_share_group",
+    "zh-CN": "公开分享链接",
+    "en-US": "Public share links"
+  },
+  {
+    "key": "common.saved_view_public_share_subtitle",
+    "zh-CN": "管理个人视图与获授权的公开链接",
+    "en-US": "Manage personal views and authorized public links"
   }
 ]

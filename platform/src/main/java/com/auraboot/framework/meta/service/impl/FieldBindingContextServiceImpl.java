@@ -16,6 +16,7 @@ import com.auraboot.framework.meta.service.MetaModelService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
@@ -41,6 +42,13 @@ public class FieldBindingContextServiceImpl implements FieldBindingContextServic
 
     @Override
     @Transactional
+    @CacheEvict(value = {
+            "modelDefinitions",
+            "modelFieldBindings",
+            "metaField",
+            "viewModelFields",
+            "viewModelSummary"
+    }, allEntries = true)
     public BindingConfiguration configureBinding(String modelPid, String fieldPid, BindingConfigRequest request) {
         if (!StringUtils.hasText(modelPid) || !StringUtils.hasText(fieldPid)) {
             throw new ValidationException(ResponseCode.CommonValidationFailed, 
@@ -141,6 +149,13 @@ public class FieldBindingContextServiceImpl implements FieldBindingContextServic
 
     @Override
     @Transactional
+    @CacheEvict(value = {
+            "modelDefinitions",
+            "modelFieldBindings",
+            "metaField",
+            "viewModelFields",
+            "viewModelSummary"
+    }, allEntries = true)
     public BindingConfiguration updateBindingConfiguration(Long bindingId, BindingConfigRequest request) {
         if (bindingId == null) {
             throw new ValidationException(ResponseCode.CommonValidationFailed, 
@@ -198,6 +213,33 @@ public class FieldBindingContextServiceImpl implements FieldBindingContextServic
             bindingMapper.getModelPidByBinding(bindingId));
 
         return convertToConfiguration(binding, field, model);
+    }
+
+    @Override
+    @Transactional
+    @CacheEvict(value = {
+            "modelDefinitions",
+            "modelFieldBindings",
+            "metaField",
+            "viewModelFields",
+            "viewModelSummary"
+    }, allEntries = true)
+    public BindingConfiguration updateBindingConfiguration(
+            String modelPid, Long bindingId, BindingConfigRequest request) {
+        if (!StringUtils.hasText(modelPid) || bindingId == null) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Model PID and binding ID cannot be empty");
+        }
+        ModelFieldBinding binding = bindingMapper.selectById(bindingId);
+        if (binding == null || !MetaContext.getCurrentTenantId().equals(binding.getTenantId())) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Binding does not belong to current tenant");
+        }
+        if (!modelPid.equals(bindingMapper.getModelPidByBinding(bindingId))) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Binding does not belong to requested model");
+        }
+        return updateBindingConfiguration(bindingId, request);
     }
 
     @Override

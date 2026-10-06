@@ -299,6 +299,9 @@ public class GlobalExceptionHandler {
             return null;
         }
         detail.put("detail", userMessage);
+        if (ex.getCause() instanceof DataAccessException) {
+            detail.remove("cause");
+        }
         if (ex.getMessage() != null) {
             detail.put("messageKey", ex.getMessage());
         }

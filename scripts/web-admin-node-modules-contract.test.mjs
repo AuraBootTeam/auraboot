@@ -106,3 +106,46 @@ test('rejects a capsule receipt pointing at a different dependency view or store
     assert.notEqual(usable(value.modules).status, 0);
   } finally { fs.rmSync(value.root, { recursive: true, force: true }); }
 });
+
+function rendererFixture({ missingTsx = false, brokenTsx = false, missingCli = false, missingPlaywright = false } = {}) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'aura-renderer-receipt-'));
+  const webAdmin = path.join(root, 'web-admin');
+  if (!missingTsx) {
+    write(webAdmin, 'node_modules/.bin/tsx', brokenTsx ? '#!/bin/sh\nexit 3\n' : '#!/bin/sh\necho tsx 4.22.4\n', 0o755);
+  }
+  if (!missingCli) write(webAdmin, 'app/framework/smart/report-export/cli.ts', 'export {};\n');
+  if (!missingPlaywright) {
+    write(webAdmin, 'node_modules/@playwright/test/package.json', JSON.stringify({ name: '@playwright/test', version: '1.0.0', main: 'index.js' }));
+    write(webAdmin, 'node_modules/@playwright/test/index.js', 'module.exports = {};\n');
+  }
+  return webAdmin;
+}
+function receipt(webAdmin) {
+  return spawnSync('bash', ['-c', 'source "$1"; web_admin_report_renderer_receipt "$2"', 'bash', helper, webAdmin], { encoding: 'utf8' });
+}
+test('emits the indexed renderer receipt when prerequisites are co-located', () => {
+  const webAdmin = rendererFixture();
+  try {
+    const r = receipt(webAdmin);
+    assert.equal(r.status, 0, r.stderr);
+    const lines = r.stdout.trim().split('\n');
+    assert.deepEqual(lines.map(l => l.split('=')[0]), [
+      'AURABOOT_REPORT_EXPORT_RENDERER_ENABLED',
+      'AURABOOT_REPORT_EXPORT_RENDERER_COMMAND_0',
+      'AURABOOT_REPORT_EXPORT_RENDERER_COMMAND_1',
+      'AURABOOT_REPORT_EXPORT_RENDERER_TIMEOUT_SECONDS',
+    ]);
+    assert.match(lines[1], /node_modules\/\.bin\/tsx$/);
+    assert.match(lines[2], /report-export\/cli\.ts$/);
+  } finally { fs.rmSync(webAdmin, { recursive: true, force: true }); }
+});
+for (const [name, flag] of [
+  ['missing tsx', { missingTsx: true }],
+  ['non-runnable tsx', { brokenTsx: true }],
+  ['missing cli.ts', { missingCli: true }],
+  ['missing @playwright/test', { missingPlaywright: true }],
+]) test(`refuses the renderer receipt on ${name}`, () => {
+  const webAdmin = rendererFixture(flag);
+  try { assert.notEqual(receipt(webAdmin).status, 0); }
+  finally { fs.rmSync(webAdmin, { recursive: true, force: true }); }
+});

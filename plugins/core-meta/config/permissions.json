@@ -118,5 +118,53 @@
     "resource": "changelog",
     "action": "read",
     "resourceType": "function"
+  },
+  {
+    "code": "governance.governance.read",
+    "name": "查看治理请求与快照",
+    "name:zh-CN": "查看治理请求与快照",
+    "name:en": "View Governance Requests and Snapshots",
+    "description": "查看本租户治理请求、版本快照、差异、策略与统计。",
+    "description:zh-CN": "查看本租户治理请求、版本快照、差异、策略与统计。",
+    "description:en": "View tenant governance requests, version snapshots, diffs, policies and statistics.",
+    "type": "function",
+    "module": "governance",
+    "resource": "governance",
+    "resourceType": "governance",
+    "resourceCode": "governance",
+    "category": "governance",
+    "action": "read"
+  },
+  {
+    "code": "governance.governance.submit",
+    "name": "提交与撤销治理请求",
+    "name:zh-CN": "提交与撤销治理请求",
+    "name:en": "Submit and Cancel Governance Requests",
+    "description": "创建、提交治理请求及按既有申请人规则撤销请求。",
+    "description:zh-CN": "创建、提交治理请求及按既有申请人规则撤销请求。",
+    "description:en": "Create and submit governance requests, and cancel them under the existing submitter rules.",
+    "type": "function",
+    "module": "governance",
+    "resource": "governance",
+    "resourceType": "governance",
+    "resourceCode": "governance",
+    "category": "governance",
+    "action": "submit"
+  },
+  {
+    "code": "governance.governance.review",
+    "name": "审核治理请求与维护策略",
+    "name:zh-CN": "审核治理请求与维护策略",
+    "name:en": "Review Governance Requests and Manage Policies",
+    "description": "审核与应用治理请求、初始化版本快照，以及维护治理策略；沿用既有租户和状态检查。",
+    "description:zh-CN": "审核与应用治理请求、初始化版本快照，以及维护治理策略；沿用既有租户和状态检查。",
+    "description:en": "Review and apply governance requests, initialize version snapshots and manage policies under existing tenant and state checks.",
+    "type": "function",
+    "module": "governance",
+    "resource": "governance",
+    "resourceType": "governance",
+    "resourceCode": "governance",
+    "category": "governance",
+    "action": "review"
   }
 ]

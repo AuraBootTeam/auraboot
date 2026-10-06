@@ -146,6 +146,93 @@ describe('useDashboardStore', () => {
 
       expect(useDashboardStore.getState().isLoading).toBe(false);
     });
+
+    it('does not clobber widgets mutated while a load was in flight', async () => {
+      findByPidMock.mockResolvedValueOnce(minimalDashboard({ pid: 'dash-1' }));
+      await useDashboardStore.getState().loadDashboard('dash-1');
+
+      let releaseLoad: (dashboard: Record<string, unknown>) => void = () => {};
+      findByPidMock.mockImplementationOnce(
+        () => new Promise((resolve) => { releaseLoad = resolve; }),
+      );
+      const reload = useDashboardStore.getState().loadDashboard('dash-1');
+
+      // The author adds a widget while the reload is on the wire.
+      const addedId = useDashboardStore.getState().addWidget(widgetData());
+
+      releaseLoad(minimalDashboard({
+        pid: 'dash-1',
+        widgets: [{ id: 'server-widget', type: 'smart-number-card' }],
+      }));
+      await reload;
+
+      const state = useDashboardStore.getState();
+      // The response predates the local edit: applying it would visibly wipe
+      // the just-added widget, so the newer local state must survive.
+      expect(state.widgets.map((w) => w.id)).toContain(addedId);
+      expect(state.widgets).toHaveLength(1);
+      expect(state.isDirty).toBe(true);
+      expect(state.isLoading).toBe(false);
+    });
+
+    it('shares one fetch for concurrent loads of the same dashboard', async () => {
+      findByPidMock.mockResolvedValue(minimalDashboard({ pid: 'dash-1' }));
+
+      await Promise.all([
+        useDashboardStore.getState().loadDashboard('dash-1'),
+        useDashboardStore.getState().loadDashboard('dash-1'),
+        useDashboardStore.getState().loadDashboard('dash-1'),
+      ]);
+
+      expect(findByPidMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('applies a load whose fetch started after the last local edit', async () => {
+      // The dashboard on screen is dash-1 with one unsaved local addition.
+      findByPidMock.mockResolvedValueOnce(minimalDashboard({ pid: 'dash-1' }));
+      await useDashboardStore.getState().loadDashboard('dash-1');
+      useDashboardStore.getState().addWidget(widgetData());
+
+      // A reload starts AFTER that edit and no mutation races it: the server
+      // state is authoritative and must be applied (the guard must not
+      // over-block loads that cannot clobber anything).
+      findByPidMock.mockResolvedValueOnce(minimalDashboard({
+        pid: 'dash-1',
+        widgets: [{ id: 'server-widget', type: 'smart-number-card' }],
+      }));
+      const generationAtRequest = useDashboardStore.getState().mutationGeneration;
+      await useDashboardStore.getState().loadDashboard('dash-1');
+
+      expect(useDashboardStore.getState().mutationGeneration).toBe(generationAtRequest);
+      expect(useDashboardStore.getState().widgets.map((w) => w.id)).toEqual(['server-widget']);
+      expect(useDashboardStore.getState().isDirty).toBe(false);
+    });
+
+    it('drops a response for a dashboard that was reset away', async () => {
+      let releaseStaleLoad: (dashboard: Record<string, unknown>) => void = () => {};
+      findByPidMock.mockImplementationOnce(
+        () => new Promise((resolve) => { releaseStaleLoad = resolve; }),
+      );
+      const staleLoad = useDashboardStore.getState().loadDashboard('old-dash');
+
+      // The designer navigates away: unmount cleanup resets the store, the new
+      // dashboard mounts and loads its own data.
+      useDashboardStore.getState().reset();
+      findByPidMock.mockResolvedValueOnce(minimalDashboard({
+        pid: 'new-dash',
+        widgets: [{ id: 'new-widget', type: 'smart-number-card' }],
+      }));
+      await useDashboardStore.getState().loadDashboard('new-dash');
+      releaseStaleLoad(minimalDashboard({
+        pid: 'old-dash',
+        widgets: [{ id: 'old-widget', type: 'smart-number-card' }],
+      }));
+      await staleLoad;
+
+      const state = useDashboardStore.getState();
+      expect(state.dashboard?.pid).toBe('new-dash');
+      expect(state.widgets.map((w) => w.id)).toEqual(['new-widget']);
+    });
   });
 
   // ── addWidget ─────────────────────────────────────────────────────────────
@@ -407,6 +494,37 @@ describe('useDashboardStore', () => {
 
       const dsError = result.errors.find((e) => e.field === 'dataSource');
       expect(dsError).toBeDefined();
+    });
+
+    it('accepts the supported model-table source and persists its filters and columns', async () => {
+      findByPidMock.mockResolvedValue(minimalDashboard());
+      updateDashboardMock.mockResolvedValue(minimalDashboard());
+      await useDashboardStore.getState().loadDashboard('dash-1');
+      const config = {
+        title: 'Recent opportunities',
+        modelCode: 'crm_opportunity_common',
+        table: { columns: [{ field: 'crm_opp_name', label: 'Opportunity' }] },
+        filters: [{ field: 'crm_opp_account_id', operator: 'eq' as const, value: '${recordPid}' }],
+        defaultSort: { field: 'created_at', order: 'desc' as const },
+      };
+      useDashboardStore.getState().addWidget(widgetData({ type: 'smart-table-chart', config }));
+      expect(useDashboardStore.getState().validate().valid).toBe(true);
+      await useDashboardStore.getState().saveDashboard();
+      expect(updateDashboardMock.mock.calls[0][1].widgets[0].config).toEqual(config);
+    });
+
+    it.each([
+      { type: 'smart-table-chart' as const, modelCode: '', columns: [{ field: 'name' }] },
+      { type: 'smart-table-chart' as const, modelCode: 'crm_account_common', columns: [] },
+      { type: 'smart-number-card' as const, modelCode: 'crm_account_common', columns: [{ field: 'name' }] },
+    ])('rejects incomplete or unsupported model-table sources: %j', ({ type, modelCode, columns }) => {
+      useDashboardStore.getState().createDashboard('Board');
+      useDashboardStore.getState().addWidget(widgetData({
+        type, config: { title: 'Widget', modelCode, table: { columns } },
+      }));
+      expect(useDashboardStore.getState().validate().errors).toEqual(expect.arrayContaining([
+        expect.objectContaining({ field: 'dataSource', type: 'error' }),
+      ]));
     });
 
     it('adds warning for widget missing title', () => {

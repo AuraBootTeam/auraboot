@@ -9,5 +9,8 @@
     "description",
     "leader_id",
     "status"
+  ],
+  "permissions": [
+    "org.team.manage"
   ]
 }

@@ -134,5 +134,19 @@
     "permissionCode": "report.definition.view",
     "orderNo": 19,
     "visible": true
+  },
+  {
+    "code": "semantic_models",
+    "parentCode": "meta_management",
+    "name": "语义模型",
+    "name:zh-CN": "语义模型",
+    "name:en": "Semantic Models",
+    "path": "/semantic/models",
+    "component": null,
+    "icon": "database",
+    "type": 1,
+    "permissionCode": "meta.semantic.use",
+    "orderNo": 20,
+    "visible": true
   }
 ]

@@ -4,6 +4,7 @@ import com.auraboot.framework.billing.catalog.model.ResourceCatalog;
 import com.auraboot.framework.billing.catalog.spi.ResourceCatalogService;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.annotation.RequirePlatformAdmin;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,6 +24,7 @@ import java.util.List;
  */
 @Tag(name = "Billing Resource Catalog", description = "Read-only catalog of billing/quota resource types")
 @RestController
+@RequirePlatformAdmin
 @RequestMapping("/api/billing/resource-catalog")
 @RequiredArgsConstructor
 public class ResourceCatalogController {

@@ -374,12 +374,12 @@ describe('ViewManagePanel public share link', () => {
   });
 
   const shareableView = () =>
-    makeView({ pid: 'personal-view', name: '我的默认视图', scope: 'personal' });
+    makeView({ pid: 'team-view', name: '团队工作视图', scope: 'team', teamId: 'team-a', actions: ['view', 'manage', 'share'] });
 
-  it('exposes a share affordance on a shareable personal view', () => {
+  it('exposes a share affordance on a authorized team view', () => {
     renderPanel({ views: [shareableView()] });
 
-    const shareBtn = screen.getByTestId('saved-view-action-share-personal-view');
+    const shareBtn = screen.getByTestId('saved-view-action-share-team-view');
     expect(shareBtn).toBeInTheDocument();
     expect(shareBtn).toBeEnabled();
   });
@@ -388,8 +388,8 @@ describe('ViewManagePanel public share link', () => {
     renderPanel({
       views: [
         makeView({
-          pid: 'personal-view',
-          scope: 'personal',
+          pid: 'team-view',
+          scope: 'team',
           viewConfig: { meta: { locked: true } },
         }),
       ],
@@ -397,60 +397,99 @@ describe('ViewManagePanel public share link', () => {
 
     // Absent, not disabled. A greyed-out icon nobody can ever click and nothing explains is worse
     // than no icon: it advertises a capability the user does not have.
-    expect(screen.queryByTestId('saved-view-action-share-personal-view')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('saved-view-action-share-team-view')).not.toBeInTheDocument();
   });
 
   it('shows no share affordance when the backend denies the share action', () => {
     renderPanel({
-      views: [makeView({ pid: 'personal-view', scope: 'personal', actions: ['view', 'copy'] })],
+      views: [makeView({ pid: 'team-view', scope: 'team', actions: ['view', 'copy'] })],
     });
 
-    expect(screen.queryByTestId('saved-view-action-share-personal-view')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('saved-view-action-share-team-view')).not.toBeInTheDocument();
   });
 
   it('shows the share affordance when the backend allows it', () => {
     renderPanel({
       views: [
         makeView({
-          pid: 'personal-view',
-          scope: 'personal',
+          pid: 'team-view',
+          scope: 'team',
           actions: ['view', 'copy', 'manage', 'share'],
         }),
       ],
     });
 
-    // The plumbing is complete and waiting. The day a view becomes shareable — whether because the
-    // policy opens up or because team/global views get surfaced here — the button appears on its own.
-    expect(screen.getByTestId('saved-view-action-share-personal-view')).toBeEnabled();
+    expect(screen.getByTestId('saved-view-action-share-team-view')).toBeEnabled();
+  });
+
+  it('does not infer public sharing when server actions are missing', () => {
+    renderPanel({ views: [makeView({ pid: 'team-view', scope: 'team' })] });
+    expect(screen.queryByTestId('saved-view-action-share-team-view')).toBeNull();
+    expect(savedViewService.getShareStatus).not.toHaveBeenCalled();
+  });
+
+  it('exposes authorized global and team links independently of team pin privileges', () => {
+    renderPanel({
+      views: [makeView({ pid: 'global-share', scope: 'global', actions: ['view', 'manage', 'share'] })],
+      teamViews: [shareableView()],
+      canManageTeamPins: false,
+    });
+    expect(screen.getByTestId('saved-view-public-share-group')).toBeInTheDocument();
+    expect(screen.getByTestId('saved-view-action-share-global-share')).toBeEnabled();
+    expect(screen.getByTestId('saved-view-action-share-team-view')).toBeEnabled();
+    expect(screen.queryByTestId('saved-view-team-group')).toBeNull();
+  });
+
+  it('drops a displayed token when refreshed server actions revoke sharing', async () => {
+    vi.mocked(savedViewService.getShareStatus).mockResolvedValue({ shared: true, token: 'before-revoke' });
+    const props: React.ComponentProps<typeof ViewManagePanel> = {
+      open: true, onClose: vi.fn(), views: [shareableView()], currentView: null,
+      onCreateView: vi.fn(), onDeleteView: vi.fn(), onDuplicateView: vi.fn(),
+      onSetDefaultView: vi.fn(), onSelectView: vi.fn(), modelCode: 'order', pageKey: 'order_list',
+    };
+    const content = (views: SavedView[]) => (
+      <I18nProvider initialData={ZH} initialLocale="zh-CN">
+        <ViewManagePanel {...props} views={views} />
+      </I18nProvider>
+    );
+    const rendered = render(content(props.views));
+    fireEvent.click(screen.getByTestId('saved-view-action-share-team-view'));
+    expect(await screen.findByTestId('saved-view-share-link-team-view')).toHaveValue(
+      `${window.location.origin}/share/before-revoke`,
+    );
+    rendered.rerender(content([{ ...shareableView(), actions: ['view', 'manage'] }]));
+    await waitFor(() => expect(screen.queryByTestId('saved-view-share-link-team-view')).toBeNull());
+    expect(screen.queryByTestId('saved-view-public-share-group')).toBeNull();
+    expect(savedViewService.revokeShare).not.toHaveBeenCalled();
   });
 
   it('opening the share panel reads current status from the status endpoint', async () => {
     renderPanel({ views: [shareableView()] });
 
-    fireEvent.click(screen.getByTestId('saved-view-action-share-personal-view'));
+    fireEvent.click(screen.getByTestId('saved-view-action-share-team-view'));
 
     await waitFor(() =>
-      expect(savedViewService.getShareStatus).toHaveBeenCalledWith('personal-view'),
+      expect(savedViewService.getShareStatus).toHaveBeenCalledWith('team-view'),
     );
     await waitFor(() =>
-      expect(screen.getByTestId('saved-view-share-generate-personal-view')).toBeInTheDocument(),
+      expect(screen.getByTestId('saved-view-share-generate-team-view')).toBeInTheDocument(),
     );
-    expect(screen.queryByTestId('saved-view-share-link-personal-view')).toBeNull();
+    expect(screen.queryByTestId('saved-view-share-link-team-view')).toBeNull();
   });
 
   it('generating a link calls POST .../share and shows the public /share/{token} URL', async () => {
     renderPanel({ views: [shareableView()] });
 
-    fireEvent.click(screen.getByTestId('saved-view-action-share-personal-view'));
+    fireEvent.click(screen.getByTestId('saved-view-action-share-team-view'));
     await waitFor(() =>
-      expect(screen.getByTestId('saved-view-share-generate-personal-view')).toBeInTheDocument(),
+      expect(screen.getByTestId('saved-view-share-generate-team-view')).toBeInTheDocument(),
     );
 
-    fireEvent.click(screen.getByTestId('saved-view-share-generate-personal-view'));
+    fireEvent.click(screen.getByTestId('saved-view-share-generate-team-view'));
 
-    await waitFor(() => expect(savedViewService.shareView).toHaveBeenCalledWith('personal-view'));
+    await waitFor(() => expect(savedViewService.shareView).toHaveBeenCalledWith('team-view'));
 
-    const link = await screen.findByTestId('saved-view-share-link-personal-view');
+    const link = await screen.findByTestId('saved-view-share-link-team-view');
     // Public page is the /share/{token} route, NOT the API path the backend returns.
     expect((link as HTMLInputElement).value).toBe(`${window.location.origin}/share/tok123`);
     expect((link as HTMLInputElement).value).not.toContain('/api/views/shared/');
@@ -460,14 +499,14 @@ describe('ViewManagePanel public share link', () => {
   it('copies the generated link to the clipboard and confirms', async () => {
     renderPanel({ views: [shareableView()] });
 
-    fireEvent.click(screen.getByTestId('saved-view-action-share-personal-view'));
+    fireEvent.click(screen.getByTestId('saved-view-action-share-team-view'));
     await waitFor(() =>
-      expect(screen.getByTestId('saved-view-share-generate-personal-view')).toBeInTheDocument(),
+      expect(screen.getByTestId('saved-view-share-generate-team-view')).toBeInTheDocument(),
     );
-    fireEvent.click(screen.getByTestId('saved-view-share-generate-personal-view'));
-    await screen.findByTestId('saved-view-share-link-personal-view');
+    fireEvent.click(screen.getByTestId('saved-view-share-generate-team-view'));
+    await screen.findByTestId('saved-view-share-link-team-view');
 
-    fireEvent.click(screen.getByTestId('saved-view-share-copy-personal-view'));
+    fireEvent.click(screen.getByTestId('saved-view-share-copy-team-view'));
 
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     expect(writeText.mock.calls[0][0]).toBe(`${window.location.origin}/share/tok123`);
@@ -483,11 +522,11 @@ describe('ViewManagePanel public share link', () => {
     });
     renderPanel({ views: [shareableView()] });
 
-    fireEvent.click(screen.getByTestId('saved-view-action-share-personal-view'));
+    fireEvent.click(screen.getByTestId('saved-view-action-share-team-view'));
 
-    const link = await screen.findByTestId('saved-view-share-link-personal-view');
+    const link = await screen.findByTestId('saved-view-share-link-team-view');
     expect((link as HTMLInputElement).value).toContain('/share/existing-tok');
-    expect(screen.getByTestId('saved-view-share-expires-personal-view')).toBeInTheDocument();
+    expect(screen.getByTestId('saved-view-share-expires-team-view')).toBeInTheDocument();
     expect(savedViewService.shareView).not.toHaveBeenCalled();
   });
 
@@ -498,17 +537,17 @@ describe('ViewManagePanel public share link', () => {
     });
     renderPanel({ views: [shareableView()] });
 
-    fireEvent.click(screen.getByTestId('saved-view-action-share-personal-view'));
-    await screen.findByTestId('saved-view-share-link-personal-view');
+    fireEvent.click(screen.getByTestId('saved-view-action-share-team-view'));
+    await screen.findByTestId('saved-view-share-link-team-view');
 
-    fireEvent.click(screen.getByTestId('saved-view-share-revoke-personal-view'));
+    fireEvent.click(screen.getByTestId('saved-view-share-revoke-team-view'));
 
     await waitFor(() => expect(confirmDialog).toHaveBeenCalled());
-    await waitFor(() => expect(savedViewService.revokeShare).toHaveBeenCalledWith('personal-view'));
+    await waitFor(() => expect(savedViewService.revokeShare).toHaveBeenCalledWith('team-view'));
     await waitFor(() =>
-      expect(screen.getByTestId('saved-view-share-generate-personal-view')).toBeInTheDocument(),
+      expect(screen.getByTestId('saved-view-share-generate-team-view')).toBeInTheDocument(),
     );
-    expect(screen.queryByTestId('saved-view-share-link-personal-view')).toBeNull();
+    expect(screen.queryByTestId('saved-view-share-link-team-view')).toBeNull();
   });
 
   it('does not revoke when the confirmation is cancelled', async () => {
@@ -519,30 +558,30 @@ describe('ViewManagePanel public share link', () => {
     vi.mocked(confirmDialog).mockResolvedValue(false);
     renderPanel({ views: [shareableView()] });
 
-    fireEvent.click(screen.getByTestId('saved-view-action-share-personal-view'));
-    await screen.findByTestId('saved-view-share-link-personal-view');
+    fireEvent.click(screen.getByTestId('saved-view-action-share-team-view'));
+    await screen.findByTestId('saved-view-share-link-team-view');
 
-    fireEvent.click(screen.getByTestId('saved-view-share-revoke-personal-view'));
+    fireEvent.click(screen.getByTestId('saved-view-share-revoke-team-view'));
 
     await waitFor(() => expect(confirmDialog).toHaveBeenCalled());
     expect(savedViewService.revokeShare).not.toHaveBeenCalled();
-    expect(screen.getByTestId('saved-view-share-link-personal-view')).toBeInTheDocument();
+    expect(screen.getByTestId('saved-view-share-link-team-view')).toBeInTheDocument();
   });
 
   it('surfaces a backend failure instead of silently showing an empty link box', async () => {
     vi.mocked(savedViewService.shareView).mockRejectedValue(new Error('share denied'));
     renderPanel({ views: [shareableView()] });
 
-    fireEvent.click(screen.getByTestId('saved-view-action-share-personal-view'));
+    fireEvent.click(screen.getByTestId('saved-view-action-share-team-view'));
     await waitFor(() =>
-      expect(screen.getByTestId('saved-view-share-generate-personal-view')).toBeInTheDocument(),
+      expect(screen.getByTestId('saved-view-share-generate-team-view')).toBeInTheDocument(),
     );
 
-    fireEvent.click(screen.getByTestId('saved-view-share-generate-personal-view'));
+    fireEvent.click(screen.getByTestId('saved-view-share-generate-team-view'));
 
-    const alert = await screen.findByTestId('saved-view-share-error-personal-view');
+    const alert = await screen.findByTestId('saved-view-share-error-team-view');
     expect(alert).toHaveTextContent('share denied');
-    expect(screen.queryByTestId('saved-view-share-link-personal-view')).toBeNull();
+    expect(screen.queryByTestId('saved-view-share-link-team-view')).toBeNull();
   });
 });
 

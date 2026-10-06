@@ -7,6 +7,10 @@ import com.auraboot.framework.auth.service.PasswordManagementService;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.constant.StatusConstants;
 import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.permission.constants.MetaPermission;
+import com.auraboot.framework.permission.service.UserPermissionService;
+import com.auraboot.framework.permission.service.PermissionFacade;
 import com.auraboot.framework.rbac.service.UserRoleService;
 import com.auraboot.framework.tenant.dto.TenantMemberCreateRequest;
 import com.auraboot.framework.tenant.dto.TenantMemberCreateResult;
@@ -15,6 +19,7 @@ import com.auraboot.framework.organization.service.TeamMemberService;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.dto.MemberQueryRequest;
 import com.auraboot.framework.tenant.dto.MemberResponse;
+import com.auraboot.framework.tenant.dto.MemberSearchOption;
 import com.auraboot.framework.tenant.service.TenantMemberApplicationService;
 import com.auraboot.framework.tenant.service.TenantMemberService;
 import com.auraboot.framework.tenant.dto.TenantMemberOffboardingImpactResponse;
@@ -39,6 +44,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -78,9 +84,18 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
 
     @Autowired
     private TenantMemberMapper tenantMemberMapper;
+
+    @Autowired
+    private UserPermissionService userPermissionService;
+
+    @Autowired
+    private PermissionFacade permissionFacade;
+
+    @Autowired
+    private DynamicDataService dynamicDataService;
     
     @Override
-    public PaginationResult<MemberResponse> searchMembers(MemberQueryRequest request, Long userId) {
+    public PaginationResult<MemberSearchOption> searchMembers(MemberQueryRequest request, Long userId) {
         try {
             // 获取当前用户的租户ID
             Long tenantId = MetaContext.getCurrentTenantId();
@@ -103,12 +118,12 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
             );
             
             // 转换为响应对象
-            List<MemberResponse> memberResponses = page.getRecords().stream()
-                .map(this::convertToMemberResponse)
+            List<MemberSearchOption> memberResponses = page.getRecords().stream()
+                .map(this::toMemberSearchOption)
                 .collect(Collectors.toList());
 
 
-            PaginationResult<MemberResponse> memberResponsePaginationResult = PaginationResult.of(memberResponses, page.getTotal(), request.getPageNum(), request.getPageSize());
+            PaginationResult<MemberSearchOption> memberResponsePaginationResult = PaginationResult.of(memberResponses, page.getTotal(), request.getPageNum(), request.getPageSize());
 
             return memberResponsePaginationResult;
             
@@ -128,15 +143,7 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
                 throw new BusinessException(ResponseCode.NOT_FOUND, "成员不存在");
             }
 
-            // 验证权限：只能查看同租户的成员
-            Long currentTenantId = MetaContext.getCurrentTenantId();
-            if (currentTenantId == null) {
-                currentTenantId = tenantMemberService.getTenantIdByUserId(userId);
-            }
-
-            if (!member.getTenantId().equals(currentTenantId)) {
-                throw new BusinessException(ResponseCode.FORBIDDEN, "无权限查看该成员信息");
-            }
+            authorizeMemberRead(member, userId);
 
             return convertToMemberResponse(member);
 
@@ -333,17 +340,14 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
         if (!member.getTenantId().equals(currentTenantId)) {
             throw new BusinessException(ResponseCode.FORBIDDEN, "无权限操作该成员");
         }
-        TenantMemberOffboardingAction parsedAction;
-        try {
-            parsedAction = TenantMemberOffboardingAction.valueOf(action.trim().toUpperCase());
-        } catch (RuntimeException ex) {
-            throw new BusinessException(ResponseCode.BadParam, "Invalid offboarding action: " + action);
-        }
+        TenantMemberOffboardingAction parsedAction = parseOffboardingAction(action);
+        authorizeOffboardingPreflight(memberPid, parsedAction, userId);
         return offboardingCoordinator.inspect(member, targetMemberPid, userId, parsedAction);
     }
 
     @Override
-    public List<TenantMemberOffboardingCandidate> listOffboardingCandidates(String memberPid, Long userId) {
+    public List<TenantMemberOffboardingCandidate> listOffboardingCandidates(
+            String memberPid, String action, Long userId) {
         TenantMember member = tenantMemberService.findByPid(memberPid);
         if (member == null) {
             throw new BusinessException(ResponseCode.NOT_FOUND, "成员不存在");
@@ -355,12 +359,88 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
         if (!member.getTenantId().equals(currentTenantId)) {
             throw new BusinessException(ResponseCode.FORBIDDEN, "无权限操作该成员");
         }
+        Long subjectMemberId = authorizeOffboardingPreflight(
+                memberPid, parseOffboardingAction(action), userId);
         return tenantMemberMapper.findActiveOffboardingCandidates(currentTenantId, memberPid).stream()
+                .filter(row -> subjectMemberId == null || canReadMemberRecord(
+                        String.valueOf(row.get("memberPid")), subjectMemberId))
                 .map(row -> new TenantMemberOffboardingCandidate(
                         String.valueOf(row.get("memberPid")),
                         String.valueOf(row.get("displayName")),
                         row.get("email") == null ? null : String.valueOf(row.get("email"))))
                 .toList();
+    }
+
+    private TenantMemberOffboardingAction parseOffboardingAction(String action) {
+        if (action == null) {
+            throw new BusinessException(ResponseCode.BadParam, "Offboarding action is required");
+        }
+        try {
+            return TenantMemberOffboardingAction.valueOf(action.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            throw new BusinessException(ResponseCode.BadParam, "Invalid offboarding action: " + action);
+        }
+    }
+
+    /** Null denotes the existing tenant-wide legacy member administrator path. */
+    private Long authorizeOffboardingPreflight(
+            String memberPid, TenantMemberOffboardingAction action, Long userId) {
+        if (userId == null) {
+            throw new BusinessException(ResponseCode.FORBIDDEN, "Authenticated member is required");
+        }
+        if (userPermissionService.hasPermission(userId, MetaPermission.TENANT_MEMBER_MANAGE)) {
+            return null;
+        }
+        String verb = switch (action) {
+            case SUSPEND -> "suspend";
+            case DEACTIVATE -> "leave";
+            case REMOVE -> "delete";
+        };
+        if (!userPermissionService.hasPermission(userId, "model.tenant_member." + verb)) {
+            throw new BusinessException(ResponseCode.FORBIDDEN, "Member action is not permitted");
+        }
+        Long subjectMemberId = MetaContext.getCurrentMemberId();
+        if (subjectMemberId == null) {
+            TenantMember subject = tenantMemberService.findByTenantIdAndUserId(
+                    MetaContext.getCurrentTenantId(), userId);
+            subjectMemberId = subject == null ? null : subject.getId();
+        }
+        if (subjectMemberId == null || !canReadMemberRecord(memberPid, subjectMemberId)) {
+            throw new BusinessException(ResponseCode.FORBIDDEN, "Member record is not accessible");
+        }
+        return subjectMemberId;
+    }
+
+    private void authorizeMemberRead(TenantMember member, Long userId) {
+        if (userId == null) {
+            throw new BusinessException(ResponseCode.FORBIDDEN, "Authenticated member is required");
+        }
+        Long tenantId = resolveCurrentTenantId(userId);
+        if (tenantId == null || !tenantId.equals(member.getTenantId())) {
+            throw new BusinessException(ResponseCode.FORBIDDEN, "Member is not in the current tenant");
+        }
+        if (userPermissionService.hasPermission(userId, MetaPermission.TENANT_MEMBER_MANAGE)) {
+            return;
+        }
+        if (!userPermissionService.hasPermission(userId, "model.tenant_member.read")) {
+            throw new BusinessException(ResponseCode.FORBIDDEN, "Member read is not permitted");
+        }
+        Long subjectMemberId = MetaContext.getCurrentMemberId();
+        if (subjectMemberId == null) {
+            TenantMember subject = tenantMemberService.findByTenantIdAndUserId(tenantId, userId);
+            subjectMemberId = subject == null ? null : subject.getId();
+        }
+        if (subjectMemberId == null || !canReadMemberRecord(member.getPid(), subjectMemberId)) {
+            throw new BusinessException(ResponseCode.FORBIDDEN, "Member record is not accessible");
+        }
+    }
+
+    private boolean canReadMemberRecord(String memberPid, Long subjectMemberId) {
+        // Load the actual model map before evaluating, as the command target-scope phase does.
+        Map<String, Object> record = MetaContext.runWithCommandPermitScope("ALL",
+                () -> dynamicDataService.getById("tenant_member", memberPid));
+        return record != null && permissionFacade.canOperate(
+                subjectMemberId, "tenant_member", "read", record).granted();
     }
 
     @Override
@@ -552,13 +632,21 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
         if (member == null) {
             throw new BusinessException(ResponseCode.NOT_FOUND, "Member not found");
         }
-        Long tenantId = MetaContext.getCurrentTenantId();
+        authorizeMemberRead(member, MetaContext.getCurrentUserId());
+        Long tenantId = resolveCurrentTenantId(MetaContext.getCurrentUserId());
         return teamMemberService.getTeamMembershipsByUserId(member.getUserId(), tenantId);
     }
 
     /**
      * 转换为成员响应对象
      */
+    private MemberSearchOption toMemberSearchOption(TenantMember member) {
+        User user = member.getUserId() == null ? null : userService.findByUserId(member.getUserId());
+        MemberSearchOption.UserIdentity identity = user == null ? null : new MemberSearchOption.UserIdentity(
+                user.getPid(), user.getUserName(), user.getEmail(), user.getNickName(), null);
+        return new MemberSearchOption(member.getPid(), member.getStatus(), identity);
+    }
+
     private MemberResponse convertToMemberResponse(TenantMember member) {
         MemberResponse response = new MemberResponse();
         BeanUtils.copyProperties(member, response);
