@@ -1,9 +1,11 @@
 package com.auraboot.framework.plugin.pf4j;
 
 import com.auraboot.framework.plugin.extension.ApplicationModuleExtension;
+import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
 import com.auraboot.framework.plugin.extension.DecisionUsageSourceContributor;
 import org.springframework.context.ApplicationContext;
 import com.auraboot.framework.plugin.extension.WorkflowCapability;
+import com.auraboot.framework.plugin.extension.ServiceTaskActionExtension;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -25,18 +27,21 @@ public class ApplicationModuleRegistry {
     private final PluginRequestMappingHandlerMapping requestMappings;
     private final WorkflowCapabilityRegistry workflowCapabilities;
     private final DecisionUsageSourceRegistry usageSources;
+    private final ExtensionRegistry extensionRegistry;
     private final Map<String, List<LoadedModule>> modulesByPlugin = new LinkedHashMap<>();
 
     public ApplicationModuleRegistry(ConfigurableApplicationContext hostContext,
                                      AuraPluginManager pluginManager,
                                      PluginRequestMappingHandlerMapping requestMappings,
                                      WorkflowCapabilityRegistry workflowCapabilities,
-                                     DecisionUsageSourceRegistry usageSources) {
+                                     DecisionUsageSourceRegistry usageSources,
+                                     ExtensionRegistry extensionRegistry) {
         this.hostContext = hostContext;
         this.pluginManager = pluginManager;
         this.requestMappings = requestMappings;
         this.workflowCapabilities = workflowCapabilities;
         this.usageSources = usageSources;
+        this.extensionRegistry = extensionRegistry;
     }
 
     public synchronized void register(String pluginId) {
@@ -57,20 +62,25 @@ public class ApplicationModuleRegistry {
                 extension.configurationTypes().forEach(child::register);
                 child.refresh();
 
-                List<Object> controllers = child.getBeansWithAnnotation(RestController.class)
-                        .values().stream().toList();
+                List<Object> controllers = new ArrayList<>();
+                List<DecisionUsageSourceContributor> contributors = new ArrayList<>();
+                loaded.add(new LoadedModule(extension.moduleId(), child, controllers, contributors));
+                controllers.addAll(child.getBeansWithAnnotation(RestController.class).values());
                 controllers.forEach(requestMappings::registerApplicationModuleController);
                 child.getBeansOfType(WorkflowCapability.class).values()
                         .forEach(provider -> workflowCapabilities.register(pluginId, provider));
-                List<DecisionUsageSourceContributor> contributors = child
-                        .getBeansOfType(DecisionUsageSourceContributor.class).values().stream().toList();
+                contributors.addAll(child.getBeansOfType(DecisionUsageSourceContributor.class).values());
                 contributors.forEach(contributor -> usageSources.register(pluginId, contributor));
+                extensionRegistry.registerApplicationModuleActions(pluginId, loaded.stream()
+                        .flatMap(module -> module.context().getBeansOfType(ServiceTaskActionExtension.class)
+                                .values().stream()).toList());
                 child.publishEvent(new ApplicationModuleReadyEvent(extension.moduleId()));
-                loaded.add(new LoadedModule(extension.moduleId(), child, controllers, contributors));
                 log.info("Registered plugin application module {} ({})", extension.moduleId(), pluginId);
             }
             modulesByPlugin.put(pluginId, List.copyOf(loaded));
         } catch (RuntimeException error) {
+            extensionRegistry.unregisterApplicationModuleActions(pluginId);
+            usageSources.unregister(pluginId);
             workflowCapabilities.unregister(pluginId);
             closeReverse(loaded);
             throw error;
@@ -78,6 +88,7 @@ public class ApplicationModuleRegistry {
     }
 
     public synchronized void unregister(String pluginId) {
+        extensionRegistry.unregisterApplicationModuleActions(pluginId);
         workflowCapabilities.unregister(pluginId);
         usageSources.unregister(pluginId);
         closeReverse(modulesByPlugin.remove(pluginId));
@@ -86,6 +97,15 @@ public class ApplicationModuleRegistry {
     public synchronized List<String> registeredModuleIds(String pluginId) {
         return modulesByPlugin.getOrDefault(pluginId, List.of()).stream()
                 .map(LoadedModule::moduleId).toList();
+    }
+
+    /** Returns only live module-owned handlers, without promoting child beans into the host. */
+    public synchronized List<CommandHandlerExtension> commandHandlers(String pluginId) {
+        List<LoadedModule> modules = pluginId == null
+                ? modulesByPlugin.values().stream().flatMap(List::stream).toList()
+                : modulesByPlugin.getOrDefault(pluginId, List.of());
+        return modules.stream().flatMap(module -> module.context()
+                .getBeansOfType(CommandHandlerExtension.class).values().stream()).toList();
     }
 
     /**

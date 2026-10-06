@@ -1,9 +1,9 @@
 AuraBoot
 Copyright (c) 2026 The AuraBoot Project and its contributors.
 
-This product is licensed under the AuraBoot License (see LICENSE.txt),
-a source-available license based on the Apache License, Version 2.0,
-with supplementary terms.
+This product is licensed under the Apache License, Version 2.0 with the
+AuraBoot supplementary terms (trademark and commercial-contact provisions
+only) — see LICENSE.txt (AuraBoot License v2.0, Part 1 + Part 2).
 
 ================================================================================
 Third-Party Software
@@ -33,11 +33,6 @@ PF4J (Plugin Framework for Java)
   Copyright Decebal Suiu
   Licensed under Apache License 2.0
   https://github.com/pf4j/pf4j
-
-SmartEngine (BPMN engine)
-  Copyright Alibaba Group
-  Licensed under Apache License 2.0
-  https://github.com/alibaba/SmartEngine
 
 Jackson
   Copyright FasterXML, LLC

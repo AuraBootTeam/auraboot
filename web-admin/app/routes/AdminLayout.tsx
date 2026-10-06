@@ -12,6 +12,7 @@ import { recordVisit } from '~/plugins/core-dashboard/widgets/workbench/useRecen
 import { AuraBotPanel } from '~/plugins/core-aurabot/components-shell/AuraBotPanel';
 import { sanitizeRoute } from '@auraboot/track';
 import { getTracker } from '~/shared/services/trackerInstance';
+import { ImpersonationBanner } from '~/components/ImpersonationBanner';
 
 function inferModelCodeFromPath(pathname: string): string | undefined {
   if (!pathname || pathname === '/') return undefined;
@@ -69,6 +70,7 @@ export default function AdminLayout() {
         <LeftSidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden" data-print="content">
+          <ImpersonationBanner />
           <PageContent />
         </div>
 

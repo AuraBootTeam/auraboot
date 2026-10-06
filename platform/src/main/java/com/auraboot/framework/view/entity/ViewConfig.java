@@ -392,6 +392,8 @@ public class ViewConfig {
     @AllArgsConstructor
     public static class KanbanCardFieldConfig {
         private String field;
+        /** Dictionary binding used to render enum values as localized business labels. */
+        private String dictCode;
         /**
          * Display label: either a plain string or a localized map ({@code {"zh-CN": "…", "en": "…"}}).
          * Typed as Object so localized maps survive the jsonb round-trip — a strict String here made

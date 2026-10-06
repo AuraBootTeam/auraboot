@@ -191,3 +191,144 @@ describe('AsyncTaskProgressModal', () => {
     expect(screen.getByText(/未导入任何数据|No rows/)).toBeTruthy();
   });
 });
+
+describe('English async task status UX', () => {
+  const callbacks = () => ({ onClose: vi.fn(), onBackground: vi.fn() });
+  it('running localizes counts and preserves background action', () => {
+    const props = callbacks();
+    render(
+      <AsyncTaskProgressModal
+        {...props}
+        task={{
+          status: 'running',
+          locale: 'en-US',
+          progress: 40,
+          progressMessage: '{"processed":4,"total":10,"ok":3,"failed":1,"skipped":0}',
+        }}
+      />,
+    );
+    expect(screen.getByText('Background task')).toBeTruthy();
+    for (const label of ['Total:', 'Processed:', 'Succeeded:', 'Failed:', 'Skipped:'])
+      expect(screen.getByText(label, { exact: false })).toBeTruthy();
+    expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('40');
+    fireEvent.click(screen.getByRole('button', { name: 'Run in background' }));
+    expect(props.onBackground).toHaveBeenCalledOnce();
+    expect(props.onClose).not.toHaveBeenCalled();
+  });
+  it('pending rerenders in a changed locale', () => {
+    const props = callbacks();
+    const view = render(
+      <AsyncTaskProgressModal {...props} task={{ status: 'pending', locale: 'en-US' }} />,
+    );
+    expect(screen.getByText('Background task in progress\u2026')).toBeTruthy();
+    view.rerender(
+      <AsyncTaskProgressModal {...props} task={{ status: 'pending', locale: 'zh-CN' }} />,
+    );
+    expect(screen.queryByText('Background task')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Run in background' })).toBeNull();
+  });
+  it('completed import localizes rows, expansion and clipboard', () => {
+    const writeText = vi.fn();
+    Object.assign(navigator, { clipboard: { writeText } });
+    render(
+      <AsyncTaskProgressModal
+        {...callbacks()}
+        task={{
+          status: 'completed',
+          locale: 'en-US',
+          taskLabel: 'Import',
+          resultData: {
+            totalRows: 4,
+            importedRows: 2,
+            skippedRows: 0,
+            failedRows: 2,
+            failures: [
+              { row: 3, reason: 'Duplicate material' },
+              { row: 4, reason: 'Missing name' },
+            ],
+          },
+        }}
+      />,
+    );
+    expect(screen.getByText('Import completed')).toBeTruthy();
+    expect(screen.getByText('Row 3 \u2014 Duplicate material')).toBeTruthy();
+    expect(screen.queryByText('Row 4 \u2014 Missing name')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Show failure details (2)' }));
+    expect(screen.getByText('Row 4 \u2014 Missing name')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
+    expect(writeText).toHaveBeenCalledWith(
+      'Row 3 \u2014 Duplicate material\nRow 4 \u2014 Missing name',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Hide failure details' }));
+    expect(screen.queryByText('Row 4 \u2014 Missing name')).toBeNull();
+  });
+  it('empty and generic completion preserve close action', () => {
+    const props = callbacks();
+    const view = render(
+      <AsyncTaskProgressModal
+        {...props}
+        task={{
+          status: 'completed',
+          locale: 'en-US',
+          resultData: { totalRows: 0, importedRows: 0, skippedRows: 0, failedRows: 0 },
+        }}
+      />,
+    );
+    expect(screen.getByText('No rows imported')).toBeTruthy();
+    view.rerender(
+      <AsyncTaskProgressModal {...props} task={{ status: 'completed', locale: 'en-US' }} />,
+    );
+    expect(screen.getByText('Task completed successfully.')).toBeTruthy();
+    fireEvent.click(screen.getByText('Close', { selector: 'button' }));
+    expect(props.onClose).toHaveBeenCalledOnce();
+  });
+  it('declared titles, metrics and boolean values remain localized', () => {
+    render(
+      <AsyncTaskProgressModal
+        {...callbacks()}
+        task={{
+          status: 'completed',
+          locale: 'en-US',
+          resultData: { ready: true, accepted: false },
+          presentation: {
+            title: { 'en-US': 'Sync status' },
+            completedMessage: { 'en-US': 'Sync finished' },
+            metrics: [
+              { field: 'ready', label: { 'en-US': 'Ready' } },
+              { field: 'accepted', label: { 'en-US': 'Accepted' } },
+            ],
+          },
+        }}
+      />,
+    );
+    for (const text of ['Sync status', 'Sync finished', 'Yes', 'No'])
+      expect(screen.getByText(text)).toBeTruthy();
+  });
+  it('failed fallback preserves original error messages', () => {
+    const props = callbacks();
+    const view = render(
+      <AsyncTaskProgressModal {...props} task={{ status: 'failed', locale: 'en-US' }} />,
+    );
+    expect(screen.getByText('Task failed')).toBeTruthy();
+    expect(screen.getByText('Unknown error')).toBeTruthy();
+    view.rerender(
+      <AsyncTaskProgressModal
+        {...props}
+        task={{ status: 'failed', locale: 'en-US', errorMessage: 'Original failure' }}
+      />,
+    );
+    expect(screen.getByText('Original failure')).toBeTruthy();
+    expect(screen.queryByText('Unknown error')).toBeNull();
+  });
+  it('cancelled is terminal and can be closed', () => {
+    const props = callbacks();
+    render(<AsyncTaskProgressModal {...props} task={{ status: 'cancelled', locale: 'en-US' }} />);
+    expect(screen.getByText('Task cancelled')).toBeTruthy();
+    expect(
+      screen.getByText('The task stopped. Unfinished steps will not be processed.'),
+    ).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Run in background' })).toBeNull();
+    fireEvent.click(screen.getByText('Close', { selector: 'button' }));
+    expect(props.onClose).toHaveBeenCalledOnce();
+  });
+});

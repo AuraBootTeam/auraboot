@@ -23,6 +23,19 @@ class CommandDefinitionDTOTest {
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Test
+    void crudDefaultSurvivesPluginImportWithoutChangingCommandExecutionType() throws Exception {
+        var dto = mapper.readValue("""
+                {"code":"wd:update_leave_request","type":"update","crudDefault":true}
+                """, CommandDefinitionDTO.class);
+        assertEquals(Boolean.TRUE, dto.getConsolidatedExecutionConfig().get("crudDefault"));
+        assertEquals("update", dto.getConsolidatedExecutionConfig().get("type"));
+        assertTrue(dto.getUnknownFields() == null || dto.getUnknownFields().isEmpty());
+        dto.setCrudDefault(false);
+        assertEquals(Boolean.FALSE, dto.getConsolidatedExecutionConfig().get("crudDefault"));
+    }
+
+
+    @Test
     void currentStatePolicySurvivesDslImportWithItsStateBoundaries() throws Exception {
         var dto = mapper.readValue("""
                 {"code":"bom:cancel_task","type":"state_transition",

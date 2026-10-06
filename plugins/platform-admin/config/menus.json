@@ -292,6 +292,25 @@
     "visible": true
   },
   {
+    "code": "i18n_resources",
+    "parentCode": "system_management",
+    "name": "翻译资源管理",
+    "name:zh-CN": "翻译资源管理",
+    "name:en": "Translation Resources",
+    "path": "/i18n-resources",
+    "component": null,
+    "icon": "translation",
+    "type": 1,
+    "permissionCode": "system_management",
+    "orderNo": 91,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
+  },
+  {
     "code": "i18n_coverage",
     "parentCode": "system_management",
     "name": "翻译覆盖率",
@@ -380,6 +399,25 @@
     "permissionCode": "org.tenant.update",
     "orderNo": 1,
     "visible": false,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
+  },
+  {
+    "code": "auth_appearance",
+    "parentCode": "system_management",
+    "name:zh-CN": "品牌与登录外观",
+    "name:en": "Brand and Authentication Appearance",
+    "path": "/p/c/auth_appearance",
+    "pageKey": "auth_appearance",
+    "component": null,
+    "icon": "palette",
+    "type": 1,
+    "permissionCode": "system_management",
+    "orderNo": 58,
+    "visible": true,
     "extension": {
       "platforms": [
         "web"

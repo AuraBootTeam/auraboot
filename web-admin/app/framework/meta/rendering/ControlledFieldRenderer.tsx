@@ -432,17 +432,36 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
 
   if (!visible) return null;
 
+  // A $i18n placeholder key missing from the served dictionary must degrade to
+  // no placeholder — the component's own localized default then applies —
+  // instead of surfacing the raw key (P2 raw-key leak, team-members picker).
+  // The key may arrive on the metadata field or in the page DSL's field props;
+  // either way the raw string never reaches component props unguarded.
+  const { placeholder: dslPlaceholder, ...restDslProps } = (field.props || {}) as Record<string, any>;
+  const rawPlaceholder = dslPlaceholder !== undefined ? dslPlaceholder : field.placeholder;
+  let resolvedPlaceholder: string | undefined;
+  if (typeof rawPlaceholder === 'string' && rawPlaceholder.startsWith('$i18n:')) {
+    const placeholderKey = rawPlaceholder.slice(6);
+    const translated = t(placeholderKey);
+    resolvedPlaceholder = translated !== placeholderKey ? translated : undefined;
+  } else if (rawPlaceholder !== undefined) {
+    resolvedPlaceholder =
+      getLocalizedText(rawPlaceholder as any, context.locale || 'zh-CN', t) || undefined;
+  }
+
   const componentProps: Record<string, any> = {
     // Inferred presentation defaults may be overridden by an explicit DSL/component option.
     ...(componentLower === 'smartdatepicker' && fieldKind === 'datetime'
       ? { dateType: 'datetime-local' }
       : {}),
-    ...field.props,
+    ...restDslProps,
+    ...(resolvedPlaceholder ? { placeholder: resolvedPlaceholder } : {}),
     // Controlled identity, state, and governance resolved by this wrapper are authoritative and
     // must never be shadowed by metadata extension keys.
     name: field.field,
     // label is rendered by ControlledFieldRenderer wrapper, not passed to component
     // to ensure consistent vertical label-above-input layout across all components
+    'aria-label': resolvedLabel,
     value: adaptedValue,
     onChange: adaptedOnChange,
     disabled: isDisabled,

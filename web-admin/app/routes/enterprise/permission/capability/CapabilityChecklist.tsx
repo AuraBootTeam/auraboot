@@ -1,3 +1,4 @@
+import { getLocalizedText } from '~/utils/i18n';
 import { useI18n } from '~/contexts/I18nContext';
 import type { CapabilityGroup, Capability } from './types';
 
@@ -30,7 +31,7 @@ export default function CapabilityChecklist({
   onConfigureScope,
   scopeConfigurableCodes,
 }: CapabilityChecklistProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const selectedSet = new Set(selected);
 
   return (
@@ -80,6 +81,7 @@ export default function CapabilityChecklist({
                 <div
                   key={cap.code}
                   data-testid={`capability-${cap.code}`}
+                  title={getLocalizedText(cap.localizedDescriptions, locale, t) || cap.description || undefined}
                   className="flex cursor-pointer items-start gap-2 text-sm text-gray-700"
                 >
                   <input
@@ -103,13 +105,13 @@ export default function CapabilityChecklist({
                         : selectedSet.has(cap.code)
                     }
                     disabled={disabled}
-                    aria-label={cap.label}
+                    aria-label={getLocalizedText(cap.localizedLabels, locale, t) || cap.label}
                     onChange={() => onToggle(cap.code)}
                   />
                   <div className="flex min-w-0 flex-col gap-1">
                     <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                       <label htmlFor={`capability-input-${cap.code}`} className="cursor-pointer">
-                        {cap.label}
+                        {getLocalizedText(cap.localizedLabels, locale, t) || cap.label}
                       </label>
                       {cap.authorizationState === 'partial' &&
                         !selectedSet.has(cap.code) &&

@@ -1,3 +1,6 @@
+import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
+import { asBlockText, getBlockLabel, getBlockTypeLabel } from '../utils/blockLabel';
+export { getBlockLabel, getBlockTypeLabel } from '../utils/blockLabel';
 import React from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { ArrowDown, ArrowUp, GripVertical, Lock, Maximize2, Trash2 } from 'lucide-react';
@@ -146,9 +149,11 @@ export function CanvasHost({
             {kindLabel}
           </div>
           <div className="mt-1 text-lg font-semibold text-slate-900">{canvasSubject}</div>
-          <div className="mt-2 text-xs text-slate-500">
+          <div className="mt-2 text-xs text-slate-500" data-i18n-ui-copy>
             {resolveDesignerText(DESIGNER_I18N.unified.mode, locale)}:{' '}
-            <span className="font-medium text-blue-700">{mode}</span>
+            <span className="font-medium text-blue-700">
+              {resolveDesignerText(DESIGNER_I18N.unified[mode], locale)}
+            </span>
           </div>
         </RootDropZone>
         <div className="grid grid-cols-12 gap-4">
@@ -398,6 +403,7 @@ interface BlockFrameProps {
 }
 
 function BlockFrame(props: BlockFrameProps) {
+  const { t } = useI18n();
   const {
     block,
     siblingBlocks,
@@ -547,7 +553,7 @@ function BlockFrame(props: BlockFrameProps) {
             {!isDashboardWidget && reorderAllowed ? (
               <button
                 type="button"
-                aria-label={`Drag ${getBlockLabel(block, locale)}`}
+                aria-label={t('designer.dragBlock', { label: getBlockLabel(block, locale, t) })}
                 data-testid={`block-drag-handle-${block.id}`}
                 data-no-block-drag="true"
                 className="mt-0.5 shrink-0 cursor-grab touch-none text-slate-300 hover:text-blue-500 active:cursor-grabbing"
@@ -561,7 +567,7 @@ function BlockFrame(props: BlockFrameProps) {
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
                 <span className="truncate text-sm font-semibold text-slate-900">
-                  {getBlockLabel(block, locale)}
+                  {getBlockLabel(block, locale, t)}
                 </span>
                 {(block.props as { aiLocked?: unknown } | undefined)?.aiLocked === true ? (
                   <span
@@ -574,7 +580,7 @@ function BlockFrame(props: BlockFrameProps) {
                   </span>
                 ) : null}
               </div>
-              <div className="truncate font-mono text-[11px] text-slate-400">{block.blockType}</div>
+              <div className="truncate font-mono text-[11px] text-slate-400">{getBlockTypeLabel(block.blockType, locale, t)}</div>
             </div>
           </div>
           {mode === 'layout' && !isDashboardWidget && reorderAllowed ? (
@@ -596,7 +602,7 @@ function BlockFrame(props: BlockFrameProps) {
       {canDeleteBlock(block.id) ? (
         <button
           type="button"
-          aria-label={`${resolveDesignerText(DESIGNER_I18N.unified.deleteBlock, locale)} ${getBlockLabel(block, locale)}`}
+          aria-label={`${resolveDesignerText(DESIGNER_I18N.unified.deleteBlock, locale)} ${getBlockLabel(block, locale, t)}`}
           title={resolveDesignerText(DESIGNER_I18N.unified.deleteBlock, locale)}
           data-testid={`block-delete-${block.id}`}
           data-no-block-drag="true"
@@ -634,8 +640,8 @@ function BlockFrame(props: BlockFrameProps) {
       {mode === 'layout' && isDashboardWidget && !structuralReadOnly ? (
         <button
           type="button"
-          aria-label={`Resize ${getBlockLabel(block, locale)}`}
-          title="Resize widget"
+          aria-label={t('designer.resizeBlock', { label: getBlockLabel(block, locale, t) })}
+          title={t('designer.resizeBlock', { label: getBlockLabel(block, locale, t) })}
           data-testid={`widget-resize-${block.id}`}
           data-no-block-drag="true"
           onPointerDown={(event) => {
@@ -755,10 +761,11 @@ function DashboardBlockContent(props: BlockContentProps) {
 }
 
 function LeafBlock({ block, locale }: { block: DslBlockV3; locale: string }) {
+  const { t } = useI18n();
   return (
     <div className="p-3">
       <div className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-        {getBlockLabel(block, locale)}
+        {getBlockLabel(block, locale, t)}
       </div>
     </div>
   );
@@ -797,13 +804,13 @@ function resolveModelFieldLabel(
  * the table header reads like the live list (名称) instead of the field code (sc_name).
  */
 function CanvasColumnLeaf({ block, locale }: { block: DslBlockV3; locale: string }) {
+  const { t } = useI18n();
   const modelFields = React.useContext(DesignerModelFieldsContext);
   const modelField = block.field
     ? modelFields.find((candidate) => candidate.code === block.field)
     : undefined;
-  const propLabel =
-    typeof block.props?.label === 'string' ? (block.props.label as string) : undefined;
-  const label = propLabel ?? resolveModelFieldLabel(modelField, locale) ?? getBlockLabel(block, locale);
+  const propLabel = block.props?.label ? getLocalizedText(asBlockText(block.props.label), locale, t) : undefined;
+  const label = propLabel ?? resolveModelFieldLabel(modelField, locale) ?? getBlockLabel(block, locale, t);
   return <div className="px-3 py-2 text-sm font-medium text-slate-700">{label}</div>;
 }
 
@@ -879,13 +886,14 @@ function BlockOrderControls({
   onSelect: (blockId: string) => void;
   onMoveBefore: (movingBlockId: string, targetBlockId: string) => void;
 }) {
+  const { t } = useI18n();
   const stopControlEvent = (event: React.MouseEvent<HTMLDivElement>) => {
     event.stopPropagation();
   };
 
   return (
     <div
-      aria-label="Block order"
+      aria-label={t('designer.blockOrder')}
       data-no-block-drag="true"
       className="flex shrink-0 items-center gap-1 rounded-md bg-slate-100 p-0.5"
       onClick={stopControlEvent}
@@ -894,8 +902,8 @@ function BlockOrderControls({
     >
       <button
         type="button"
-        aria-label="Move block up"
-        title="Move up"
+        aria-label={t('designer.moveUp')}
+        title={t('designer.moveUp')}
         data-testid={`block-move-up-${blockId}`}
         disabled={!previousBlockId}
         onClick={(event) => {
@@ -910,8 +918,8 @@ function BlockOrderControls({
       </button>
       <button
         type="button"
-        aria-label="Move block down"
-        title="Move down"
+        aria-label={t('designer.moveDown')}
+        title={t('designer.moveDown')}
         data-testid={`block-move-down-${blockId}`}
         disabled={!nextBlockId}
         onClick={(event) => {
@@ -937,9 +945,10 @@ function SpanQuickControls({
   currentSpan: number;
   onResizeSpan: (blockId: string, span: number) => void;
 }) {
+  const { t } = useI18n();
   return (
     <div
-      aria-label="Span presets"
+      aria-label={t('designer.spanPresets')}
       data-testid={`field-span-controls-${blockId}`}
       data-no-block-drag="true"
       className="grid w-full grid-cols-5 gap-1 rounded-md bg-slate-100 p-0.5"
@@ -951,7 +960,7 @@ function SpanQuickControls({
         <button
           key={preset}
           type="button"
-          aria-label={`Set span ${preset}`}
+          aria-label={t('designer.setSpan', { span: preset })}
           data-testid={`field-span-${blockId}-${preset}`}
           onClick={(event) => {
             event.preventDefault();
@@ -969,18 +978,6 @@ function SpanQuickControls({
       ))}
     </div>
   );
-}
-
-export function getBlockLabel(block: DslBlockV3, locale = 'en-US'): string {
-  const title = block.title;
-  if (typeof title === 'string') return title;
-  if (title) {
-    const resolved = title[locale] || title['en-US'] || title.en || title['zh-CN'];
-    if (resolved) return resolved;
-  }
-  if (typeof block.props?.label === 'string') return block.props.label;
-  if (typeof block.props?.title === 'string') return block.props.title;
-  return block.field || block.widgetType || block.actionType || block.blockType;
 }
 
 function handleWidgetMovePointerDown(

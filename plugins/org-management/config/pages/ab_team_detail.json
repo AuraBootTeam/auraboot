@@ -83,7 +83,10 @@
       "component": "TeamMembersBlock",
       "props": {
         "teamPidField": "pid",
-        "title": "团队成员"
+        "title": {
+          "zh-CN": "团队成员",
+          "en-US": "Team members"
+        }
       }
     }
   ],

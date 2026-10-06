@@ -19,6 +19,17 @@ import { group, type GroupNode, type Operator, type Scope } from '../ast/conditi
 import { useSmartText } from '~/utils/i18n'
 import { dataTypeLabel, scenarioScopeLabel, scopeLabel } from './displayLabels'
 import { downloadDmnXml } from './dmnDownload'
+import {
+  strategyStudioText,
+  useStrategyStudioText,
+  type StrategyStudioTextFn,
+  type StrategyStudioTextKey,
+} from './strategyStudioText'
+
+// Default/demo data keeps its zh-CN source values (identical to the previous
+// literals) so business payloads stay stable; the catalog is the single home
+// for the text so the locale contract tests can resolve every side.
+const zhText = (key: StrategyStudioTextKey) => strategyStudioText(key, 'zh-CN')
 
 type StrategyScenarioKey = 'SLA' | 'BPM' | 'AUTOMATION' | 'PERMISSION' | 'EVENT_POLICY'
 type StrategyWorkspacePanelKey = 'rule' | 'facts' | 'dmn' | 'review'
@@ -52,41 +63,41 @@ type RuntimeDecisionTable = Omit<DecisionTable, 'inputs'> & {
 }
 
 const SLA_NODE_VALUE_LABELS: Record<string, string> = {
-  task_manager_approve: '主管审批节点',
-  task_hr_approve: 'HR 审批节点',
+  task_manager_approve: zhText('valueTaskManagerApprove'),
+  task_hr_approve: zhText('valueTaskHrApprove'),
 };
 
 const PROCESS_NODE_VALUE_LABELS: Record<string, string> = {
-  task_manager_approve: '主管审批节点',
-  task_hr_approve: 'HR 审批节点',
-  gw_manager: '主管审批网关',
+  task_manager_approve: zhText('valueTaskManagerApprove'),
+  task_hr_approve: zhText('valueTaskHrApprove'),
+  gw_manager: zhText('valueGwManager'),
 };
 
 const LEAVE_TYPE_VALUE_LABELS: Record<string, string> = {
-  annual: '年假',
-  sick: '病假',
-  personal: '事假',
+  annual: zhText('valueLeaveAnnual'),
+  sick: zhText('valueLeaveSick'),
+  personal: zhText('valueLeavePersonal'),
 };
 
 const LEAVE_TYPE_FIELD: FieldOption = {
   scope: 'record',
   path: 'data.wd_req_type',
-  label: '请假类型',
+  label: zhText('fieldLeaveType'),
   dataType: 'dict',
   options: Object.keys(LEAVE_TYPE_VALUE_LABELS),
   valueLabels: LEAVE_TYPE_VALUE_LABELS,
   modelCode: 'wd_leave_request',
-  modelName: '请假申请',
+  modelName: zhText('modelNameLeaveRequest'),
   dictCode: 'wd_leave_type',
 };
 
 const LEAVE_APPLICANT_REFERENCE_FIELD: FieldOption = {
   scope: 'record',
   path: 'data.wd_req_applicant',
-  label: '申请人',
+  label: zhText('fieldApplicant'),
   dataType: 'user',
   modelCode: 'wd_leave_request',
-  modelName: '请假申请',
+  modelName: zhText('modelNameLeaveRequest'),
   reference: {
     targetEntity: 'sys_user',
     valueField: 'pid',
@@ -106,13 +117,13 @@ export interface StrategyStudioWorkbenchProps {
 const SCENARIOS: StrategyScenario[] = [
   {
     key: 'SLA',
-    label: 'SLA',
-    title: '主管审批 SLA',
-    consumer: 'SLA / 超时通知',
-    trigger: '进入审批节点',
+    label: zhText('scenarioSlaLabel'),
+    title: zhText('scenarioSlaTitle'),
+    consumer: zhText('scenarioSlaConsumer'),
+    trigger: zhText('scenarioTriggerEnterApproval'),
     ruleCode: 'wd_manager_approve_sla',
     decisionCode: 'complaint_sla_deadline',
-    fragment: '请假 SLA 节点匹配',
+    fragment: zhText('scenarioSlaFragment'),
     actionTypes: ['NOTIFY', 'WRITE_AUDIT'],
     blockers: 0,
     modelCodes: ['sla_config', 'wd_leave_request'],
@@ -120,19 +131,19 @@ const SCENARIOS: StrategyScenario[] = [
       {
         scope: 'record',
         path: 'data.targetKey',
-        label: 'SLA 节点',
+        label: zhText('fieldSlaNode'),
         dataType: 'string',
         options: Object.keys(SLA_NODE_VALUE_LABELS),
         valueLabels: SLA_NODE_VALUE_LABELS,
       },
-      { scope: 'sla', path: 'deadlineMinutes', label: '截止分钟', dataType: 'integer' },
-      { scope: 'sla', path: 'warningBeforeMinutes', label: '提前提醒', dataType: 'integer' },
+      { scope: 'sla', path: 'deadlineMinutes', label: zhText('fieldDeadlineMinutes'), dataType: 'integer' },
+      { scope: 'sla', path: 'warningBeforeMinutes', label: zhText('fieldAdvanceReminder'), dataType: 'integer' },
       LEAVE_TYPE_FIELD,
       LEAVE_APPLICANT_REFERENCE_FIELD,
       {
         scope: 'process',
         path: 'nodeId',
-        label: '流程节点',
+        label: zhText('fieldProcessNode'),
         dataType: 'string',
         options: Object.keys(PROCESS_NODE_VALUE_LABELS),
         valueLabels: PROCESS_NODE_VALUE_LABELS,
@@ -141,13 +152,13 @@ const SCENARIOS: StrategyScenario[] = [
   },
   {
     key: 'BPM',
-    label: 'BPM',
-    consumer: 'BPM / 审批人分派',
-    title: '请假审批流程',
-    trigger: '进入审批节点',
+    label: zhText('scenarioBpmLabel'),
+    consumer: zhText('scenarioBpmConsumer'),
+    title: zhText('scenarioBpmTitle'),
+    trigger: zhText('scenarioTriggerEnterApproval'),
     ruleCode: 'wd_leave_approval',
     decisionCode: 'approval_routing',
-    fragment: '请假审批路由条件',
+    fragment: zhText('scenarioBpmFragment'),
     actionTypes: ['ADD_COMMENT', 'WRITE_AUDIT'],
     blockers: 0,
     modelCodes: ['wd_leave_request'],
@@ -155,156 +166,235 @@ const SCENARIOS: StrategyScenario[] = [
       {
         scope: 'process',
         path: 'nodeId',
-        label: '流程节点',
+        label: zhText('fieldProcessNode'),
         dataType: 'string',
         options: Object.keys(PROCESS_NODE_VALUE_LABELS),
         valueLabels: PROCESS_NODE_VALUE_LABELS,
       },
-      { scope: 'record', path: 'data.wd_req_days', label: '请假天数', dataType: 'decimal' },
+      { scope: 'record', path: 'data.wd_req_days', label: zhText('fieldLeaveDays'), dataType: 'decimal' },
       LEAVE_TYPE_FIELD,
       LEAVE_APPLICANT_REFERENCE_FIELD,
-      { scope: 'actor', path: 'roles', label: '审批角色', dataType: 'collection' },
+      { scope: 'actor', path: 'roles', label: zhText('fieldApproverRoles'), dataType: 'collection' },
     ],
   },
   {
     key: 'AUTOMATION',
-    label: '自动化',
-    title: '请假申请自动通知',
-    consumer: '自动化 / 条件触发',
-    trigger: '创建请假申请',
+    label: zhText('scenarioAutomationLabel'),
+    title: zhText('scenarioAutomationTitle'),
+    consumer: zhText('scenarioAutomationConsumer'),
+    trigger: zhText('scenarioTriggerLeaveCreated'),
     ruleCode: 'wd_leave_high_value_notify',
     decisionCode: 'leave_request_automation',
-    fragment: '长假自动通知条件',
+    fragment: zhText('scenarioAutomationFragment'),
     actionTypes: ['NOTIFY', 'WRITE_AUDIT'],
     blockers: 0,
     modelCodes: ['wd_leave_request'],
     fields: [
-      { scope: 'record', path: 'data.wd_req_days', label: '请假天数', dataType: 'decimal' },
+      { scope: 'record', path: 'data.wd_req_days', label: zhText('fieldLeaveDays'), dataType: 'decimal' },
       LEAVE_TYPE_FIELD,
       LEAVE_APPLICANT_REFERENCE_FIELD,
-      { scope: 'record', path: 'pid', label: '申请记录', dataType: 'string' },
-      { scope: 'time', path: 'now', label: '触发时间', dataType: 'datetime' },
+      { scope: 'record', path: 'pid', label: zhText('fieldLeaveRecord'), dataType: 'string' },
+      { scope: 'time', path: 'now', label: zhText('fieldTriggerTime'), dataType: 'datetime' },
     ],
   },
   {
     key: 'PERMISSION',
-    label: '权限',
-    title: '请假可见性权限',
-    consumer: '权限 / 行级访问',
-    trigger: '查询前校验',
+    label: zhText('scenarioPermissionLabel'),
+    title: zhText('scenarioPermissionTitle'),
+    consumer: zhText('scenarioPermissionConsumer'),
+    trigger: zhText('scenarioTriggerPreQueryCheck'),
     ruleCode: 'ABAC_LEAVE_VISIBILITY',
     decisionCode: 'leave_visibility_policy',
-    fragment: '同部门请假可见',
+    fragment: zhText('scenarioPermissionFragment'),
     actionTypes: ['WRITE_AUDIT'],
     blockers: 0,
     modelCodes: ['wd_leave_request', 'tenant_member', 'department'],
     fields: [
-      { scope: 'actor', path: 'orgPath', label: '组织路径', dataType: 'department' },
-      { scope: 'record', path: 'data.departmentId', label: '记录部门', dataType: 'department' },
+      { scope: 'actor', path: 'orgPath', label: zhText('fieldOrgPath'), dataType: 'department' },
+      { scope: 'record', path: 'data.departmentId', label: zhText('fieldRecordDepartment'), dataType: 'department' },
       LEAVE_TYPE_FIELD,
       LEAVE_APPLICANT_REFERENCE_FIELD,
-      { scope: 'tenant', path: 'id', label: '租户', dataType: 'string' },
+      { scope: 'tenant', path: 'id', label: zhText('fieldTenant'), dataType: 'string' },
     ],
   },
   {
     key: 'EVENT_POLICY',
-    label: '事件策略',
-    title: '请假申请事件策略',
-    consumer: '事件策略 / 条件 + 动作',
-    trigger: '请假申请已创建',
+    label: zhText('scenarioEventPolicyLabel'),
+    title: zhText('scenarioEventPolicyTitle'),
+    consumer: zhText('scenarioEventPolicyConsumer'),
+    trigger: zhText('scenarioTriggerLeaveCreatedEvent'),
     ruleCode: 'leave_request_event_policy',
     decisionCode: 'leave_request_automation',
-    fragment: '请假事件动作条件',
+    fragment: zhText('scenarioEventPolicyFragment'),
     actionTypes: ['NOTIFY', 'WRITE_AUDIT'],
     blockers: 0,
     modelCodes: ['wd_leave_request'],
     fields: [
-      { scope: 'event', path: 'type', label: '事件类型', dataType: 'string' },
-      { scope: 'record', path: 'data.wd_req_days', label: '请假天数', dataType: 'decimal' },
+      { scope: 'event', path: 'type', label: zhText('fieldEventType'), dataType: 'string' },
+      { scope: 'record', path: 'data.wd_req_days', label: zhText('fieldLeaveDays'), dataType: 'decimal' },
       LEAVE_TYPE_FIELD,
       LEAVE_APPLICANT_REFERENCE_FIELD,
-      { scope: 'actor', path: 'roles', label: '触发人角色', dataType: 'collection' },
+      { scope: 'actor', path: 'roles', label: zhText('fieldTriggerActorRoles'), dataType: 'collection' },
     ],
   },
 ]
 
-const WORKSPACE_PANELS: Array<{ key: StrategyWorkspacePanelKey; label: string; summary: string }> = [
-  { key: 'rule', label: '规则配置', summary: '条件 / 映射 / 测试' },
-  { key: 'facts', label: '事实目录', summary: '字段 / 上下文' },
-  { key: 'dmn', label: '决策表', summary: 'DMN / 输出' },
-  { key: 'review', label: '片段与发布', summary: '复用 / 动作 / 检查' },
+const WORKSPACE_PANELS: Array<{ key: StrategyWorkspacePanelKey }> = [
+  { key: 'rule' },
+  { key: 'facts' },
+  { key: 'dmn' },
+  { key: 'review' },
 ]
 
-const NO_FRAGMENT_LABEL = '未选择条件片段'
+// Chrome copy for the workspace tabs; resolved at render time via the catalog.
+const WORKSPACE_PANEL_TEXT: Record<
+  StrategyWorkspacePanelKey,
+  { label: StrategyStudioTextKey; summary: StrategyStudioTextKey }
+> = {
+  rule: { label: 'panelRuleLabel', summary: 'panelRuleSummary' },
+  facts: { label: 'panelFactsLabel', summary: 'panelFactsSummary' },
+  dmn: { label: 'panelDmnLabel', summary: 'panelDmnSummary' },
+  review: { label: 'panelReviewLabel', summary: 'panelReviewSummary' },
+}
+
+// Scenario-level vocabulary keyed by the stable scenario enum so the chrome
+// localizes while the zh-CN constants above keep feeding business payloads.
+const SCENARIO_TEXT: Record<
+  StrategyScenarioKey,
+  {
+    label: StrategyStudioTextKey
+    title: StrategyStudioTextKey
+    consumer: StrategyStudioTextKey
+    trigger: StrategyStudioTextKey
+  }
+> = {
+  SLA: {
+    label: 'scenarioSlaLabel',
+    title: 'scenarioSlaTitle',
+    consumer: 'scenarioSlaConsumer',
+    trigger: 'scenarioTriggerEnterApproval',
+  },
+  BPM: {
+    label: 'scenarioBpmLabel',
+    title: 'scenarioBpmTitle',
+    consumer: 'scenarioBpmConsumer',
+    trigger: 'scenarioTriggerEnterApproval',
+  },
+  AUTOMATION: {
+    label: 'scenarioAutomationLabel',
+    title: 'scenarioAutomationTitle',
+    consumer: 'scenarioAutomationConsumer',
+    trigger: 'scenarioTriggerLeaveCreated',
+  },
+  PERMISSION: {
+    label: 'scenarioPermissionLabel',
+    title: 'scenarioPermissionTitle',
+    consumer: 'scenarioPermissionConsumer',
+    trigger: 'scenarioTriggerPreQueryCheck',
+  },
+  EVENT_POLICY: {
+    label: 'scenarioEventPolicyLabel',
+    title: 'scenarioEventPolicyTitle',
+    consumer: 'scenarioEventPolicyConsumer',
+    trigger: 'scenarioTriggerLeaveCreatedEvent',
+  },
+}
+
+const NO_FRAGMENT_LABEL = zhText('noFragmentSelected')
 
 const DECISIONS = [
   {
     code: 'complaint_sla_deadline',
-    name: '请假审批 SLA 截止时间',
+    name: zhText('decisionComplaintSlaDeadline'),
     outputs: [
-      { id: 'deadlineMinutes', label: '截止分钟', dataType: 'integer' },
-      { id: 'warningBeforeMinutes', label: '提前提醒分钟', dataType: 'integer' },
-      { id: 'escalationLevel', label: '升级等级', dataType: 'string' },
+      { id: 'deadlineMinutes', label: zhText('fieldDeadlineMinutes'), dataType: 'integer' },
+      { id: 'warningBeforeMinutes', label: zhText('outputAdvanceReminderMinutes'), dataType: 'integer' },
+      { id: 'escalationLevel', label: zhText('outputEscalationLevel'), dataType: 'string' },
     ],
   },
   {
     code: 'approval_routing',
-    name: '请假审批分派',
+    name: zhText('decisionApprovalRouting'),
     outputs: [
-      { id: 'candidateGroups', label: '候选组', dataType: 'collection' },
-      { id: 'assigneeUserId', label: '审批人', dataType: 'string' },
-      { id: 'dueHours', label: '任务时限', dataType: 'integer' },
+      { id: 'candidateGroups', label: zhText('outputCandidateGroups'), dataType: 'collection' },
+      { id: 'assigneeUserId', label: zhText('outputAssignee'), dataType: 'string' },
+      { id: 'dueHours', label: zhText('outputDueHours'), dataType: 'integer' },
     ],
   },
   {
     code: 'leave_request_automation',
-    name: '请假申请自动化策略',
+    name: zhText('decisionLeaveRequestAutomation'),
     outputs: [
-      { id: 'route', label: '动作路由', dataType: 'string' },
-      { id: 'actions', label: '动作列表', dataType: 'collection' },
+      { id: 'route', label: zhText('outputRoute'), dataType: 'string' },
+      { id: 'actions', label: zhText('outputActions'), dataType: 'collection' },
     ],
   },
   {
     code: 'leave_visibility_policy',
-    name: '请假可见性策略',
+    name: zhText('decisionLeaveVisibilityPolicy'),
     outputs: [
-      { id: 'allow', label: '是否允许', dataType: 'boolean' },
-      { id: 'reason', label: '拒绝原因', dataType: 'string' },
+      { id: 'allow', label: zhText('outputAllow'), dataType: 'boolean' },
+      { id: 'reason', label: zhText('outputReason'), dataType: 'string' },
     ],
   },
 ]
 
 const SAFE_ACTIONS: DecisionAction[] = [
-  { actionType: 'NOTIFY', label: '发送通知', handlerAvailable: true, category: 'messaging' },
-  { actionType: 'START_PROCESS', label: '启动流程', handlerAvailable: true, category: 'workflow' },
-  { actionType: 'ADD_COMMENT', label: '添加评论', handlerAvailable: true, category: 'collaboration' },
-  { actionType: 'UPDATE_RECORD', label: '更新记录', handlerAvailable: true, category: 'data' },
-  { actionType: 'PATCH_RECORD', label: '修补记录', handlerAvailable: true, category: 'data' },
-  { actionType: 'WEBHOOK', label: '发送 Webhook', handlerAvailable: true, category: 'integration' },
-  { actionType: 'WRITE_AUDIT', label: '写入审计', handlerAvailable: true, category: 'governance' },
+  { actionType: 'NOTIFY', label: zhText('actionNotify'), handlerAvailable: true, category: 'messaging' },
+  { actionType: 'START_PROCESS', label: zhText('actionStartProcess'), handlerAvailable: true, category: 'workflow' },
+  { actionType: 'ADD_COMMENT', label: zhText('actionAddComment'), handlerAvailable: true, category: 'collaboration' },
+  { actionType: 'UPDATE_RECORD', label: zhText('actionUpdateRecord'), handlerAvailable: true, category: 'data' },
+  { actionType: 'PATCH_RECORD', label: zhText('actionPatchRecord'), handlerAvailable: true, category: 'data' },
+  { actionType: 'WEBHOOK', label: zhText('actionWebhook'), handlerAvailable: true, category: 'integration' },
+  { actionType: 'WRITE_AUDIT', label: zhText('actionWriteAudit'), handlerAvailable: true, category: 'governance' },
 ]
 
 const ACTION_LABELS: Record<string, string> = {
-  NOTIFY: '发送通知',
-  START_PROCESS: '启动流程',
-  ADD_COMMENT: '添加评论',
-  UPDATE_RECORD: '更新记录',
-  PATCH_RECORD: '修补记录',
-  WEBHOOK: '发送 Webhook',
-  WRITE_AUDIT: '写入审计',
-  SEND_SMS: '发送短信',
-  SEND_IM: '发送 IM',
-  CREATE_TASK: '创建任务',
-  CC_TASK: '抄送任务',
+  NOTIFY: zhText('actionNotify'),
+  START_PROCESS: zhText('actionStartProcess'),
+  ADD_COMMENT: zhText('actionAddComment'),
+  UPDATE_RECORD: zhText('actionUpdateRecord'),
+  PATCH_RECORD: zhText('actionPatchRecord'),
+  WEBHOOK: zhText('actionWebhook'),
+  WRITE_AUDIT: zhText('actionWriteAudit'),
+  SEND_SMS: zhText('actionSendSms'),
+  SEND_IM: zhText('actionSendIm'),
+  CREATE_TASK: zhText('actionCreateTask'),
+  CC_TASK: zhText('actionCcTask'),
 }
 
-const ACTION_CATEGORY_LABELS: Record<string, string> = {
-  messaging: '消息',
-  workflow: '流程',
-  collaboration: '协作',
-  data: '数据',
-  integration: '集成',
-  governance: '治理',
+// Render-side catalog keys for the platform action vocabulary; payload paths
+// keep consuming ACTION_LABELS so stored schemas stay locale-independent.
+const ACTION_LABEL_KEYS: Record<string, StrategyStudioTextKey> = {
+  NOTIFY: 'actionNotify',
+  START_PROCESS: 'actionStartProcess',
+  ADD_COMMENT: 'actionAddComment',
+  UPDATE_RECORD: 'actionUpdateRecord',
+  PATCH_RECORD: 'actionPatchRecord',
+  WEBHOOK: 'actionWebhook',
+  WRITE_AUDIT: 'actionWriteAudit',
+  SEND_SMS: 'actionSendSms',
+  SEND_IM: 'actionSendIm',
+  CREATE_TASK: 'actionCreateTask',
+  CC_TASK: 'actionCcTask',
+}
+
+const ACTION_CATEGORY_KEYS: Record<string, StrategyStudioTextKey> = {
+  messaging: 'categoryMessaging',
+  workflow: 'categoryWorkflow',
+  collaboration: 'categoryCollaboration',
+  data: 'categoryData',
+  integration: 'categoryIntegration',
+  governance: 'categoryGovernance',
+}
+
+// Built-in decision names are platform vocabulary; a server-provided custom
+// name still wins through decisionDisplayName for codes outside this map.
+const DECISION_NAME_KEYS: Record<string, StrategyStudioTextKey> = {
+  complaint_sla_deadline: 'decisionComplaintSlaDeadline',
+  approval_routing: 'decisionApprovalRouting',
+  leave_request_automation: 'decisionLeaveRequestAutomation',
+  leave_visibility_policy: 'decisionLeaveVisibilityPolicy',
 }
 
 function fieldKey(field: Pick<FieldOption, 'scope' | 'path'>): string {
@@ -371,10 +461,21 @@ function actionLabel(action: DecisionAction): string {
   return ACTION_LABELS[action.actionType] ?? action.actionType
 }
 
-function actionCategoryLabel(action: DecisionAction): string {
+function actionDisplayLabel(action: DecisionAction, text: StrategyStudioTextFn): string {
+  const key = ACTION_LABEL_KEYS[action.actionType]
+  if (key) return text(key)
+  const label = action.label?.trim()
+  if (label && label !== action.actionType) return label
+  return action.actionType
+}
+
+function actionCategoryLabel(action: DecisionAction, text: StrategyStudioTextFn): string {
   const category = action.category?.trim()
-  if (!category) return action.handlerAvailable === false ? '未接入处理器' : '平台动作'
-  return ACTION_CATEGORY_LABELS[category] ?? category
+  if (!category) {
+    return text(action.handlerAvailable === false ? 'categoryHandlerMissing' : 'categoryPlatformAction')
+  }
+  const key = ACTION_CATEGORY_KEYS[category]
+  return key ? text(key) : category
 }
 
 function actionOutputSchema(actions: DecisionAction[]) {
@@ -428,11 +529,11 @@ function fieldContextLabel(field: FieldOption): string {
   return field.modelName?.trim() || scopeLabel(field.scope)
 }
 
-function fieldDisplayLabel(field: FieldOption): string {
+function fieldDisplayLabel(field: FieldOption, text: StrategyStudioTextFn): string {
   const label = field.label?.trim()
   const path = formatFieldPath(field)
   if (label && label !== path) return label
-  return `${fieldContextLabel(field)}字段`
+  return text('fieldContextSuffix', { context: fieldContextLabel(field) })
 }
 
 function decisionDisplayName(
@@ -693,7 +794,8 @@ function buildConditionFragmentRequest(
 ): ConditionFragmentUpsertRequest & { fragmentName: string } {
   const fallbackRoot = conditionRootFromFragment(fragment)
   const scenarioDefaultFragment =
-    SCENARIOS.find((candidate) => candidate.key === scenario.key)?.fragment || `${scenario.title} 条件`
+    SCENARIOS.find((candidate) => candidate.key === scenario.key)?.fragment
+    || strategyStudioText('fragmentNameFallback', 'zh-CN', { title: scenario.title })
   const fragmentName =
     fragment?.fragmentName || (scenario.fragment === NO_FRAGMENT_LABEL ? scenarioDefaultFragment : scenario.fragment)
   return {
@@ -792,11 +894,6 @@ function latestRestorableTableVersion(
     .sort((a, b) => (b.version ?? 0) - (a.version ?? 0))[0]
 }
 
-function restoredOutputsMatchScenario(outputs: DecisionTable['outputs'], fallback: DecisionTable): boolean {
-  const restoredIds = new Set(outputs.map((output) => output.id))
-  return fallback.outputs.some((output) => restoredIds.has(output.id))
-}
-
 function normalizeRestoredTable(table: DecisionTable, fallback: DecisionTable): DecisionTable {
   const inputs = table.inputs
     .map((input) => {
@@ -817,14 +914,13 @@ function normalizeRestoredTable(table: DecisionTable, fallback: DecisionTable): 
   const outputs = table.outputs.filter((output) => output.id && output.label && output.dataType)
 
   if (inputs.length === 0 || outputs.length === 0) return fallback
-  const outputsMatchScenario = restoredOutputsMatchScenario(outputs, fallback)
   return {
     ...fallback,
     ...table,
     inputs,
-    outputs: outputsMatchScenario ? outputs : fallback.outputs,
-    rules: outputsMatchScenario && Array.isArray(table.rules) ? table.rules : [],
-    defaultOutput: outputsMatchScenario ? table.defaultOutput ?? fallback.defaultOutput : fallback.defaultOutput,
+    outputs,
+    rules: Array.isArray(table.rules) ? table.rules : [],
+    defaultOutput: table.defaultOutput,
   }
 }
 
@@ -850,17 +946,22 @@ function toRuntimeDecisionTable(table: DecisionTable): RuntimeDecisionTable {
   }
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : '操作失败'
+function errorMessage(error: unknown, text: StrategyStudioTextFn): string {
+  return error instanceof Error ? error.message : text('operationFailed')
 }
 
-function validationMessage(result: Awaited<ReturnType<DecisionApi['validateVersion']>>): string {
-  return result?.errors?.[0]?.message ?? '版本校验未通过'
+function validationMessage(
+  result: Awaited<ReturnType<DecisionApi['validateVersion']>>,
+  text: StrategyStudioTextFn,
+): string {
+  return result?.errors?.[0]?.message ?? text('validationFailedDefault')
 }
 
-function formatDmnError(result: DecisionTableDmnXmlResult): string {
+function formatDmnError(result: DecisionTableDmnXmlResult, text: StrategyStudioTextFn): string {
   const first = result.errors?.[0]
-  return first ? `${first.code}: ${first.message ?? 'DMN XML 处理失败'}` : 'DMN XML 处理失败'
+  return first
+    ? `${first.code}: ${first.message ?? text('dmnProcessingFailed')}`
+    : text('dmnProcessingFailed')
 }
 
 function sampleContext() {
@@ -901,6 +1002,7 @@ export function StrategyStudioWorkbench({
   conditionFragmentsError = false,
 }: StrategyStudioWorkbenchProps) {
   const st = useSmartText()
+  const { text } = useStrategyStudioText()
   const [scenarioKey, setScenarioKey] = useState<StrategyScenarioKey>('SLA')
   const [selectedFragmentCode, setSelectedFragmentCode] = useState<string | null>(null)
   const [operationStatus, setOperationStatus] = useState<string | null>(null)
@@ -1028,14 +1130,16 @@ export function StrategyStudioWorkbench({
     setSelectedFragmentCode(fragment?.fragmentCode ?? null)
     setActiveWorkspacePanel('rule')
     setOperationStatus(
-      fragment ? `已加载共享片段 · ${fragmentLabel(fragment)}` : '请选择共享条件片段',
+      fragment
+        ? text('fragmentLoaded', { name: fragmentLabel(fragment) })
+        : text('selectFragmentHint'),
     )
   }
 
   const selectFragment = (fragment: ConditionFragment) => {
     const nextScenario = scenarioForFragment(fragment)
     if (!nextScenario) {
-      setOperationStatus(`片段无法匹配消费场景 · ${fragmentLabel(fragment)}`)
+      setOperationStatus(text('fragmentScenarioMismatch', { name: fragmentLabel(fragment) }))
       return
     }
     selectScenario(nextScenario, fragment)
@@ -1061,13 +1165,15 @@ export function StrategyStudioWorkbench({
 
   const publishStatus =
     activeScenario.blockers > 0
-      ? `发布被阻断 · ${activeScenario.blockers} 项待处理`
-      : `发布检查通过 · ${activeScenario.consumer}`
-  const activeDecisionName = decisionDisplayName(
-    activeDecisionOptions,
-    activeScenario.decisionCode,
-    activeScenario.title,
-  )
+      ? text('publishBlockedCount', { count: activeScenario.blockers })
+      : text('publishCheckPassed', { consumer: text(SCENARIO_TEXT[activeScenario.key].consumer) })
+  const activeDecisionName = DECISION_NAME_KEYS[activeScenario.decisionCode]
+    ? text(DECISION_NAME_KEYS[activeScenario.decisionCode])
+    : decisionDisplayName(
+      activeDecisionOptions,
+      activeScenario.decisionCode,
+      text(SCENARIO_TEXT[activeScenario.key].title),
+    )
   const activeRuleBindingKey = ruleBindingKey(activeScenario, selectedFragment)
   const activeRuleBinding = useMemo(
     () =>
@@ -1084,18 +1190,23 @@ export function StrategyStudioWorkbench({
   }
 
   const refreshImpact = async () => {
-    setOperationStatus('影响面查询中...')
+    setOperationStatus(text('impactQuerying'))
     try {
       const impact = await api.getDecisionImpact(activeScenario.decisionCode)
       const refCount = (impact.incoming?.length ?? 0) + (impact.outgoing?.length ?? 0)
-      setOperationStatus(`${impact.risk?.summary ?? '影响面已更新'} · ${refCount} 个引用`)
+      setOperationStatus(
+        text('impactUpdated', {
+          summary: impact.risk?.summary ?? text('impactDefaultSummary'),
+          count: refCount,
+        }),
+      )
     } catch (error) {
-      setOperationStatus(`影响面失败 · ${errorMessage(error)}`)
+      setOperationStatus(text('impactFailed', { message: errorMessage(error, text) }))
     }
   }
 
   const runTest = async () => {
-    setOperationStatus('测试运行中...')
+    setOperationStatus(text('testRunning'))
     try {
       const result = await api.evaluate({
         decisionCode: activeScenario.decisionCode,
@@ -1105,13 +1216,16 @@ export function StrategyStudioWorkbench({
         context: sampleContext(),
       })
       if (!result) {
-        throw new Error('决策执行无返回结果')
+        throw new Error(text('evaluateNoResult'))
       }
       setOperationStatus(
-        `${result.matched ? '测试通过' : '测试未命中'} · ${result.traceId ?? result.status}`,
+        text('testResult', {
+          result: result.matched ? text('testMatched') : text('testNotMatched'),
+          id: result.traceId ?? result.status,
+        }),
       )
     } catch (error) {
-      setOperationStatus(`测试失败 · ${errorMessage(error)}`)
+      setOperationStatus(text('testFailed', { message: errorMessage(error, text) }))
     }
   }
 
@@ -1128,7 +1242,7 @@ export function StrategyStudioWorkbench({
       setTableAnalyses((current) => ({ ...current, [target.key]: result }))
     } catch (error) {
       setTableAnalyses((current) => ({ ...current, [target.key]: null }))
-      setTableAnalysisErrors((current) => ({ ...current, [target.key]: errorMessage(error) }))
+      setTableAnalysisErrors((current) => ({ ...current, [target.key]: errorMessage(error, text) }))
     } finally {
       setTableAnalyzing(false)
     }
@@ -1153,12 +1267,14 @@ export function StrategyStudioWorkbench({
       updateScenarioTable(key, result.model)
     }
     if (!result.valid) {
-      throw new Error(formatDmnError(result))
+      throw new Error(formatDmnError(result, text))
     }
     const warningCount = result.warnings?.length ?? 0
     setTableDmnStatuses((current) => ({
       ...current,
-      [key]: warningCount > 0 ? `${status} · 警告 ${warningCount}` : status,
+      [key]: warningCount > 0
+        ? text('dmnStatusWithWarnings', { status, count: warningCount })
+        : status,
     }))
   }
 
@@ -1172,12 +1288,12 @@ export function StrategyStudioWorkbench({
         target.ruleCode,
         target.decisionCode,
       )
-      applyDmnResult(target.key, result, 'DMN XML 已导出', false)
+      applyDmnResult(target.key, result, text('dmnExported'), false)
       if (result.valid && result.dmnXml) {
         downloadDmnXml(target.ruleCode, result.dmnXml)
       }
     } catch (error) {
-      setTableDmnErrors((current) => ({ ...current, [target.key]: errorMessage(error) }))
+      setTableDmnErrors((current) => ({ ...current, [target.key]: errorMessage(error, text) }))
       setTableDmnStatuses((current) => ({ ...current, [target.key]: null }))
     } finally {
       setTableDmnBusy(false)
@@ -1190,9 +1306,9 @@ export function StrategyStudioWorkbench({
     setTableDmnErrors((current) => ({ ...current, [target.key]: null }))
     try {
       const result = await api.importTableDmn(tableDmnXmls[target.key] ?? '')
-      applyDmnResult(target.key, result, 'DMN XML 已导入', true)
+      applyDmnResult(target.key, result, text('dmnImported'), true)
     } catch (error) {
-      setTableDmnErrors((current) => ({ ...current, [target.key]: errorMessage(error) }))
+      setTableDmnErrors((current) => ({ ...current, [target.key]: errorMessage(error, text) }))
       setTableDmnStatuses((current) => ({ ...current, [target.key]: null }))
     } finally {
       setTableDmnBusy(false)
@@ -1209,9 +1325,9 @@ export function StrategyStudioWorkbench({
         target.ruleCode,
         target.decisionCode,
       )
-      applyDmnResult(target.key, result, 'Round-trip 通过', true)
+      applyDmnResult(target.key, result, text('roundTripPassed'), true)
     } catch (error) {
-      setTableDmnErrors((current) => ({ ...current, [target.key]: errorMessage(error) }))
+      setTableDmnErrors((current) => ({ ...current, [target.key]: errorMessage(error, text) }))
       setTableDmnStatuses((current) => ({ ...current, [target.key]: null }))
     } finally {
       setTableDmnBusy(false)
@@ -1290,14 +1406,14 @@ export function StrategyStudioWorkbench({
       if (draft?.pid) {
         return api.updateConditionFragmentDraft(draft.pid, request)
       }
-      throw originalError instanceof Error ? originalError : new Error('条件片段版本创建失败')
+      throw originalError instanceof Error ? originalError : new Error(text('fragmentVersionCreateFailed'))
     }
     const saveExistingFragmentDraft = async (candidate: ConditionFragment): Promise<ConditionFragment> => {
       if (candidate.pid && editableFragmentStatus(candidate.status)) {
         try {
           return await api.updateConditionFragmentDraft(candidate.pid, request)
         } catch {
-          if (!candidate.fragmentCode) throw new Error('条件片段草稿更新失败')
+          if (!candidate.fragmentCode) throw new Error(text('fragmentDraftUpdateFailed'))
         }
       }
       if (candidate.fragmentCode) {
@@ -1307,7 +1423,7 @@ export function StrategyStudioWorkbench({
           return updateExistingDraftVersion(candidate.fragmentCode, error)
         }
       }
-      throw new Error('条件片段缺少编码，无法保存新版本')
+      throw new Error(text('fragmentMissingCode'))
     }
     let saved: ConditionFragment
     if (existingDefaultFragment) {
@@ -1341,14 +1457,16 @@ export function StrategyStudioWorkbench({
   const saveDraft = async (
     target: StrategyScenario = activeScenario,
   ): Promise<{ decisionPid: string | null; conditionFragmentPid: string | null } | null> => {
-    setOperationStatus('草稿保存中...')
+    setOperationStatus(text('draftSaving'))
     try {
       const conditionFragmentPid = await saveConditionFragmentDraft(target)
       const decisionPid = await saveDecisionTableDraft(target)
-      setOperationStatus(`草稿已保存 · ${target.title}`)
+      setOperationStatus(
+        text('draftSaved', { title: text(SCENARIO_TEXT[target.key].title) }),
+      )
       return { decisionPid, conditionFragmentPid }
     } catch (error) {
-      setOperationStatus(`保存失败 · ${errorMessage(error)}`)
+      setOperationStatus(text('saveFailed', { message: errorMessage(error, text) }))
       return null
     }
   }
@@ -1358,7 +1476,7 @@ export function StrategyStudioWorkbench({
       setOperationStatus(publishStatus)
       return
     }
-    setOperationStatus('发布中...')
+    setOperationStatus(text('publishing'))
     const saved = await saveDraft()
     const pid = saved?.decisionPid ?? draftVersionPids[activeScenario.key]
     if (!pid) return
@@ -1379,10 +1497,10 @@ export function StrategyStudioWorkbench({
       }
       const validation = await api.validateVersion(pid)
       if (!validation) {
-        throw new Error('版本校验无返回结果')
+        throw new Error(text('versionValidationNoResult'))
       }
       if (!validation.valid) {
-        setOperationStatus(`发布失败 · ${validationMessage(validation)}`)
+        setOperationStatus(text('publishFailed', { message: validationMessage(validation, text) }))
         return
       }
       const published = await api.publishVersion(pid, {
@@ -1390,11 +1508,13 @@ export function StrategyStudioWorkbench({
         note: `Published from Strategy Studio for ${activeScenario.consumer}`,
       })
       if (!published) {
-        throw new Error('发布接口未返回版本结果')
+        throw new Error(text('publishNoResult'))
       }
-      setOperationStatus(`发布成功 · ${activeScenario.consumer}`)
+      setOperationStatus(
+        text('publishSucceeded', { consumer: text(SCENARIO_TEXT[activeScenario.key].consumer) }),
+      )
     } catch (error) {
-      setOperationStatus(`发布失败 · ${errorMessage(error)}`)
+      setOperationStatus(text('publishFailed', { message: errorMessage(error, text) }))
     }
   }
 
@@ -1403,7 +1523,7 @@ export function StrategyStudioWorkbench({
       <header className="strategy-studio-header">
         <div>
           <p>{studioEyebrow}</p>
-          <h3>{activeScenario.title}</h3>
+          <h3>{text(SCENARIO_TEXT[activeScenario.key].title)}</h3>
         </div>
         <div className="strategy-studio-actions">
           <button
@@ -1411,21 +1531,21 @@ export function StrategyStudioWorkbench({
             data-testid="strategy-impact-preview"
             onClick={() => void refreshImpact()}
           >
-            影响面
+            {text('impactAction')}
           </button>
           <button
             type="button"
             data-testid="strategy-run-test"
             onClick={() => void runTest()}
           >
-            测试运行
+            {text('runTestAction')}
           </button>
           <button
             type="button"
             data-testid="strategy-save-draft"
             onClick={() => void saveDraft()}
           >
-            保存草稿
+            {text('saveDraftAction')}
           </button>
           <button
             type="button"
@@ -1433,7 +1553,7 @@ export function StrategyStudioWorkbench({
             className="strategy-studio-primary"
             onClick={() => void publish()}
           >
-            发布
+            {text('publishAction')}
           </button>
         </div>
       </header>
@@ -1443,7 +1563,7 @@ export function StrategyStudioWorkbench({
         </div>
       )}
 
-      <div className="strategy-scenarios" aria-label="规则消费场景">
+      <div className="strategy-scenarios" aria-label={text('scenarioGroupLabel')}>
         {SCENARIOS.map((candidate) => (
           <button
             key={candidate.key}
@@ -1452,36 +1572,36 @@ export function StrategyStudioWorkbench({
             aria-pressed={candidate.key === activeScenario.key}
             onClick={() => selectScenario(candidate)}
           >
-            <span>{candidate.label}</span>
-            <strong>{candidate.trigger}</strong>
+            <span>{text(SCENARIO_TEXT[candidate.key].label)}</span>
+            <strong>{text(SCENARIO_TEXT[candidate.key].trigger)}</strong>
           </button>
         ))}
       </div>
 
       <div className="strategy-studio-metrics">
         <div data-testid="strategy-consumer-summary">
-          <span>消费方</span>
-          <strong>{activeScenario.consumer}</strong>
-          <small>{activeScenario.trigger}</small>
+          <span>{text('metricConsumer')}</span>
+          <strong>{text(SCENARIO_TEXT[activeScenario.key].consumer)}</strong>
+          <small>{text(SCENARIO_TEXT[activeScenario.key].trigger)}</small>
         </div>
         <div>
-          <span>字段事实</span>
+          <span>{text('metricFields')}</span>
           <strong>{scenarioFields.length}</strong>
-          <small>来自模型 / 虚拟模型 / 参与人 / 系统</small>
+          <small>{text('metricFieldsHint')}</small>
         </div>
         <div>
-          <span>动作</span>
+          <span>{text('metricActions')}</span>
           <strong>{scenarioActions.length}</strong>
-          <small>命中后统一执行</small>
+          <small>{text('metricActionsHint')}</small>
         </div>
         <div>
-          <span>阻断项</span>
+          <span>{text('metricBlockers')}</span>
           <strong>{activeScenario.blockers}</strong>
-          <small>{activeScenario.blockers > 0 ? '发布前需处理' : '可进入发布检查'}</small>
+          <small>{activeScenario.blockers > 0 ? text('blockersPending') : text('blockersReady')}</small>
         </div>
       </div>
 
-      <div className="strategy-workspace-tabs" aria-label="策略工作区视图">
+      <div className="strategy-workspace-tabs" aria-label={text('workspaceGroupLabel')}>
         {WORKSPACE_PANELS.map((panel) => (
           <button
             key={panel.key}
@@ -1490,8 +1610,8 @@ export function StrategyStudioWorkbench({
             aria-pressed={activeWorkspacePanel === panel.key}
             onClick={() => setActiveWorkspacePanel(panel.key)}
           >
-            <span>{panel.label}</span>
-            <strong>{panel.summary}</strong>
+            <span>{text(WORKSPACE_PANEL_TEXT[panel.key].label)}</span>
+            <strong>{text(WORKSPACE_PANEL_TEXT[panel.key].summary)}</strong>
           </button>
         ))}
       </div>
@@ -1504,7 +1624,7 @@ export function StrategyStudioWorkbench({
           data-active={activeWorkspacePanel === 'facts' ? 'true' : 'false'}
         >
           <div className="strategy-studio-panel-head">
-            <strong>事实目录</strong>
+            <strong>{text('panelFactsLabel')}</strong>
             <span>{scenarioFields.length}</span>
           </div>
           <ul className="strategy-fact-list">
@@ -1518,7 +1638,7 @@ export function StrategyStudioWorkbench({
                 data-model-code={field.modelCode ?? ''}
                 data-data-type={field.dataType}
               >
-                <span>{fieldDisplayLabel(field)}</span>
+                <span>{fieldDisplayLabel(field, text)}</span>
                 <small>{fieldContextLabel(field)} · {dataTypeLabel(field.dataType)}</small>
               </li>
             ))}
@@ -1533,8 +1653,10 @@ export function StrategyStudioWorkbench({
             data-active={activeWorkspacePanel === 'rule' ? 'true' : 'false'}
           >
             <div className="strategy-studio-panel-head">
-              <strong>规则配置</strong>
-              <span>{activeScenario.fragment}</span>
+              <strong>{text('panelRuleLabel')}</strong>
+              <span>
+                {selectedFragment ? fragmentLabel(selectedFragment) : text('noFragmentSelected')}
+              </span>
             </div>
             <DecisionRuleBindingBlock
               key={activeRuleBindingKey}
@@ -1569,11 +1691,12 @@ export function StrategyStudioWorkbench({
             data-active={activeWorkspacePanel === 'dmn' ? 'true' : 'false'}
           >
             <div className="strategy-studio-panel-head">
-              <strong>DMN 决策输出</strong>
+              <strong>{text('dmnOutputTitle')}</strong>
               <span title={activeScenario.decisionCode}>{activeDecisionName}</span>
             </div>
             <div className="strategy-table-panel">
               <DecisionTableEditor
+                key={activeScenario.key}
                 value={scenarioTable}
                 onChange={(next) => updateScenarioTable(activeScenario.key, next)}
                 analysis={tableAnalyses[activeScenario.key] ?? null}
@@ -1602,23 +1725,23 @@ export function StrategyStudioWorkbench({
         >
           <section className="strategy-studio-panel" data-testid="strategy-fragment-library">
             <div className="strategy-studio-panel-head">
-              <strong>条件片段库</strong>
-              <span>最新兼容</span>
+              <strong>{text('fragmentLibraryTitle')}</strong>
+              <span>{text('fragmentLibraryHint')}</span>
             </div>
             <ul className="strategy-fragment-list">
               {conditionFragmentsLoading && (
                 <li>
-                  <span>加载中...</span>
+                  <span>{text('loading')}</span>
                 </li>
               )}
               {conditionFragmentsError && !conditionFragmentsLoading && (
                 <li>
-                  <span>条件片段加载失败</span>
+                  <span>{text('fragmentLoadFailed')}</span>
                 </li>
               )}
               {!conditionFragmentsLoading && !conditionFragmentsError && compatibleFragments.length === 0 && (
                 <li>
-                  <span>暂无条件片段</span>
+                  <span>{text('noFragments')}</span>
                 </li>
               )}
               {!conditionFragmentsLoading && !conditionFragmentsError && compatibleFragments.map((fragment) => {
@@ -1634,7 +1757,9 @@ export function StrategyStudioWorkbench({
                     >
                       <span>{fragmentLabel(fragment)}</span>
                       <small>
-                        {fragmentScenario?.label ?? scenarioScopeLabel(fragment.scopeType)}
+                        {fragmentScenario
+                          ? text(SCENARIO_TEXT[fragmentScenario.key].label)
+                          : scenarioScopeLabel(fragment.scopeType)}
                         {fragment.version ? ` · v${fragment.version}` : ''}
                       </small>
                     </button>
@@ -1646,15 +1771,15 @@ export function StrategyStudioWorkbench({
 
           <section className="strategy-studio-panel" data-testid="strategy-action-plan">
             <div className="strategy-studio-panel-head">
-              <strong>动作输出</strong>
+              <strong>{text('actionOutputTitle')}</strong>
               <span>{scenarioActions.length}</span>
             </div>
             <ol className="strategy-action-list">
               {scenarioActions.map((action) => (
                 <li key={action.actionType} data-testid={`strategy-action-${action.actionType}`}>
                   <div className="strategy-action-copy">
-                    <strong>{actionLabel(action)}</strong>
-                    <span>{actionCategoryLabel(action)}</span>
+                    <strong>{actionDisplayLabel(action, text)}</strong>
+                    <span>{actionCategoryLabel(action, text)}</span>
                   </div>
                 </li>
               ))}
@@ -1663,14 +1788,16 @@ export function StrategyStudioWorkbench({
 
           <section className="strategy-studio-panel">
             <div className="strategy-studio-panel-head">
-              <strong>发布检查</strong>
-              <span>{activeScenario.blockers > 0 ? '已阻断' : '就绪'}</span>
+              <strong>{text('publishCheckTitle')}</strong>
+              <span>
+                {activeScenario.blockers > 0 ? text('publishBlocked') : text('publishReady')}
+              </span>
             </div>
             <div className="strategy-check-list">
-              <span data-state="ok">字段可解析</span>
-              <span data-state="ok">片段版本可用</span>
+              <span data-state="ok">{text('checkFieldsResolvable')}</span>
+              <span data-state="ok">{text('checkFragmentVersionAvailable')}</span>
               <span data-state={activeScenario.blockers > 0 ? 'warn' : 'ok'}>
-                影响面已确认
+                {text('checkImpactConfirmed')}
               </span>
             </div>
           </section>

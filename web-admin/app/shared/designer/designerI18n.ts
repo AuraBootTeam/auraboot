@@ -6,6 +6,16 @@
 type L = Record<string, string>;
 
 export const DESIGNER_I18N = {
+  semanticMeta: {
+    modelsLabel: { 'zh-CN': '语义模型', 'en-US': 'Semantic model' } as L,
+    selectModel: { 'zh-CN': '请选择语义模型', 'en-US': 'Select a semantic model' } as L,
+    loadingModels: { 'zh-CN': '加载语义模型中…', 'en-US': 'Loading semantic models…' } as L,
+    noModels: { 'zh-CN': '当前没有可用的语义模型', 'en-US': 'No semantic models are available' } as L,
+    failed: { 'zh-CN': '无法加载语义模型，请重试', 'en-US': 'Unable to load the semantic model. Please retry.' } as L,
+    denied: { 'zh-CN': '无权读取语义模型，请联系管理员', 'en-US': 'You cannot access this semantic model. Contact an administrator.' } as L,
+    unavailable: { 'zh-CN': '该语义模型当前不可用，请重新选择', 'en-US': 'This semantic model is unavailable. Select another model.' } as L,
+    retry: { 'zh-CN': '重试', 'en-US': 'Retry' } as L,
+  },
   // ── Empty state ───────────────────────────────────────────────
   emptyState: {
     dragToCanvas: {
@@ -195,6 +205,8 @@ export const DESIGNER_I18N = {
   },
   // ── AutoSave ──────────────────────────────────────────────────
   autoSave: {
+    synced: { 'zh-CN': '已同步', 'en-US': 'Synced' } as L,
+    currentEdits: { 'zh-CN': '存在未保存修改', 'en-US': 'Unsaved changes' } as L,
     saving: {
       'zh-CN': '保存中...',
       'en-US': 'Saving...',
@@ -291,14 +303,14 @@ export const DESIGNER_I18N = {
     },
     mode: { 'zh-CN': '模式', 'en-US': 'Mode' } as L,
     paletteDisabledHint: {
-      'zh-CN':
-        '当前选中位置不能添加该块：请先在画布或大纲中选择列表、分区等容器，再从这里添加',
+      'zh-CN': '当前选中位置不能添加该块：请先在画布或大纲中选择列表、分区等容器，再从这里添加',
       'en-US':
         'This block cannot be added to the current selection: select a container (list, section, …) on the canvas or outline first',
     } as L,
     modelMissingHint: {
       'zh-CN': '绑定的模型不存在或暂无字段元数据，画布以结构预览展示',
-      'en-US': 'The bound model is missing or has no field metadata; the canvas shows a structural preview',
+      'en-US':
+        'The bound model is missing or has no field metadata; the canvas shows a structural preview',
     } as L,
     untitledPage: { 'zh-CN': '未命名页面', 'en-US': 'Untitled page' } as L,
     deleteBlock: { 'zh-CN': '删除', 'en-US': 'Delete' } as L,

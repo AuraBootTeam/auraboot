@@ -127,11 +127,15 @@ async function seedDraftPage(page: Page, uid: string): Promise<{ pid: string; pa
       title: `Diff golden ${uid}`,
       kind: 'detail',
       modelCode: MODEL_CODE,
-      // The unified designer loads/saves a V3 document; its client validator
-      // requires schemaVersion 3. A v4 seed loads but fails save validation.
-      schemaVersion: 3,
+      // v4 flat dialect: top-level detail-sections, designerRootId in
+      // extension keeps the editor outline ids stable.
+      schemaVersion: 4,
       blocks: detailDoc(pageKey, SECTION_BLOCK, 'Original section', `Diff golden ${uid}`).blocks,
-      extension: { e2e: true, scenario: 'version-diff-golden' },
+      extension: {
+        e2e: true,
+        scenario: 'version-diff-golden',
+        designerRootId: 'detail_root',
+      },
     },
   });
   expect(resp.ok(), `seed page failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();

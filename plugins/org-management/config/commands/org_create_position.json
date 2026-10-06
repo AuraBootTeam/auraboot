@@ -1,6 +1,6 @@
 {
   "code": "org:create_position",
-  "displayName:zh-CN": "Create Position",
+  "displayName:zh-CN": "新建岗位",
   "displayName:en": "Create Position",
   "description": "Create a new position",
   "type": "create",

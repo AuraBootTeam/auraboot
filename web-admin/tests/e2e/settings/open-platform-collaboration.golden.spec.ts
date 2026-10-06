@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { createCookieSessionStorage } from 'react-router';
 import path from 'node:path';
 import { BACKEND_URL, BASE_URL as WEB_BASE_URL } from '../../helpers/environments';
+import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 
 const EVIDENCE_DIR = path.join(
   process.env.AURA_EVIDENCE_ROOT || '/tmp',
@@ -22,7 +23,7 @@ type Role = 'owner' | 'maintainer' | 'viewer';
 
 async function authenticate(page: Page) {
   const loginResponse = await page.request.post(`${BACKEND_URL}/api/auth/login`, {
-    data: { email: 'admin@auraboot.com', password: 'Test2026x' },
+    data: { email: DEFAULT_TEST_ACCOUNT.email, password: DEFAULT_TEST_ACCOUNT.password },
   });
   expect(loginResponse.ok()).toBeTruthy();
   const login = (await loginResponse.json()).data;
@@ -177,22 +178,24 @@ test.describe('Open Platform collaboration golden states', () => {
         .or(page.getByTestId('open-platform-application-list')),
     ).toBeVisible();
 
-    if ((await page.getByTestId('open-platform-empty').count()) > 0) {
-      await page.getByTestId('open-platform-create-app').click();
-      const dialog = page.getByRole('dialog', { name: '创建外部应用' });
-      await page.getByTestId('open-platform-app-name').fill('开放平台协作验收应用');
-      await dialog.getByRole('textbox', { name: '描述' }).fill('真实后端 owner 与成员管理验收');
-      await dialog.getByRole('button', { name: '新建' }).click();
-    }
-    const application = page.getByTestId('open-platform-application-list');
-    await expect(application).toContainText('开放平台协作验收应用');
+    // Preserve other applications and select only this journey's real fixture.
+    const appName = `开放平台协作验收应用-${Date.now()}`;
+    await page.getByTestId('open-platform-create-app').click();
+    const dialog = page.getByRole('dialog', { name: '创建外部应用' });
+    await page.getByTestId('open-platform-app-name').fill(appName);
+    await dialog.getByRole('textbox', { name: '描述' }).fill('真实后端 owner 与成员管理验收');
+    await dialog.getByRole('button', { name: '新建' }).click();
+    const application = page.getByTestId('open-platform-application-list')
+      .locator('article').filter({ hasText: appName });
+    await expect(application).toHaveCount(1);
+    await expect(application).toContainText(appName);
     await dismissToasts(page);
     await expect(application).toContainText('所有者');
-    await expect(page.getByRole('button', { name: '管理成员' })).toBeVisible();
-    await expect(page.getByRole('button', { name: '添加安装' })).toBeVisible();
+    await expect(application.getByRole('button', { name: '管理成员' })).toBeVisible();
+    await expect(application.getByRole('button', { name: '添加安装' })).toBeVisible();
     await capture(page, 'OPC-UI-02');
 
-    await page.getByRole('button', { name: '管理成员' }).click();
+    await application.getByRole('button', { name: '管理成员' }).click();
     const memberDialog = page.getByRole('dialog', { name: '管理成员' });
     await expect(memberDialog).toBeVisible();
     await capture(page, 'OPC-UI-03');

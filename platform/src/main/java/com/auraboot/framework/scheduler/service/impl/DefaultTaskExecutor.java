@@ -1,6 +1,7 @@
 package com.auraboot.framework.scheduler.service.impl;
 
 import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.scheduler.entity.ScheduledTask;
 import com.auraboot.framework.scheduler.entity.ScheduledTaskLog;
 import com.auraboot.framework.scheduler.mapper.ScheduledTaskLogMapper;
@@ -33,6 +34,13 @@ public class DefaultTaskExecutor implements TaskExecutor {
 
     @Override
     public void execute(ScheduledTask task) {
+        // Whole method is scheduler-plane state (task row + run log). The handler
+        // is invoked on a separate executorService thread whose ThreadLocal scope
+        // is NOT inherited — handlers stay fail-closed (tenant-exemption W3).
+        MetaContext.runWithoutTenantFilter(() -> executeScoped(task));
+    }
+
+    private void executeScoped(ScheduledTask task) {
         ScheduledTaskLog logEntry = new ScheduledTaskLog();
         logEntry.setTenantId(task.getTenantId());
         logEntry.setTaskPid(task.getPid());

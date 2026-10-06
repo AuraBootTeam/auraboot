@@ -17,6 +17,7 @@ import com.auraboot.framework.user.dto.UserSearchDTO;
 import com.auraboot.framework.user.mapper.UserMapper;
 import com.auraboot.framework.user.exception.UserException;
 import com.auraboot.framework.user.service.UserService;
+import com.auraboot.framework.user.util.EmailAddressNormalizer;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -104,7 +105,7 @@ public class UserServiceImpl implements UserService {
     
     @Override
     public User signUp(String email, String rawPassword, String displayName, String userName) throws UserException {
-        String normalizedEmail = normalizeBlankToNull(email);
+        String normalizedEmail = EmailAddressNormalizer.normalize(email);
         String normalizedUserName = normalizeBlankToNull(userName);
         if (normalizedEmail == null && normalizedUserName == null) {
             throw new BusinessException("Email or user name is required");
@@ -165,10 +166,8 @@ public class UserServiceImpl implements UserService {
     }
 
     private User queryUserByEmail(String email) {
-        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
-        queryWrapper.lambda().eq(User::getEmail, email);
-        User user = userMapper.selectOne(queryWrapper);
-        return user;
+        String normalized = EmailAddressNormalizer.normalize(email);
+        return normalized == null ? null : userMapper.findByNormalizedEmail(normalized);
     }
 
 

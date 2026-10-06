@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * A resolved capability for the permission v2 UI: a business-language bundle of permission codes
@@ -20,6 +21,13 @@ public class Capability {
     private String code;
     private String group;
     private String label;
+    /** Localized declaration labels; the legacy label remains available for older clients. */
+    @Builder.Default
+    private Map<String, String> localizedLabels = Map.of();
+    /** Legacy description plus translations for display; neither affects grants. */
+    private String description;
+    @Builder.Default
+    private Map<String, String> localizedDescriptions = Map.of();
     private boolean sensitive;
     /** Preset tier this capability belongs to (viewer/editor/admin); null for convention-derived. */
     private String tier;

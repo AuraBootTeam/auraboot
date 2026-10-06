@@ -2,6 +2,7 @@ package com.auraboot.framework.meta.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.*;
+import com.auraboot.framework.meta.validator.ValidPageSchemaProfile;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -13,6 +14,7 @@ import java.util.Map;
  * 用于更新现有的页面Schema
  */
 @Data
+@ValidPageSchemaProfile
 @EqualsAndHashCode(callSuper = true)
 public class PageSchemaUpdateRequest extends AbstractUpdateRequest {
 
@@ -57,8 +59,6 @@ public class PageSchemaUpdateRequest extends AbstractUpdateRequest {
     /**
      * Page kind.
      */
-    @Pattern(regexp = "^(list|form|detail|dashboard|composite)$",
-        message = "Invalid kind: must be one of list, form, detail, dashboard, composite")
     @JsonProperty("kind")
     private String kind;
 
@@ -80,6 +80,12 @@ public class PageSchemaUpdateRequest extends AbstractUpdateRequest {
      */
     @JsonProperty("dataSources")
     private Map<String, Object> dataSources;
+
+    /**
+     * Field linkage rules consumed by the shared schema runtime.
+     */
+    @JsonProperty("linkageRules")
+    private List<Object> linkageRules;
 
     /**
      * Ordered list of page blocks.

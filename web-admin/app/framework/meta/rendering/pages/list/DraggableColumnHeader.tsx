@@ -1,3 +1,4 @@
+import { useI18n } from '~/contexts/I18nContext';
 /**
  * DraggableColumnHeader — Table column header (<th>) with three interaction zones:
  *
@@ -39,6 +40,7 @@ export const DraggableColumnHeader = React.memo(function DraggableColumnHeader({
   width,
   frozenOffset = 0,
 }: DraggableColumnHeaderProps) {
+  const { t } = useI18n();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: column.field,
     disabled: !draggable,
@@ -145,7 +147,7 @@ export const DraggableColumnHeader = React.memo(function DraggableColumnHeader({
             {...attributes}
             {...listeners}
             className="flex-shrink-0 cursor-grab opacity-0 transition-opacity group-hover/th:opacity-60 hover:opacity-100 active:cursor-grabbing"
-            aria-label="Drag to reorder column"
+            aria-label={t('table.reorderColumn')}
             onClick={(e) => e.stopPropagation()}
           >
             <svg

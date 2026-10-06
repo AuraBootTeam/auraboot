@@ -1,10 +1,11 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CapabilityChecklist from '../CapabilityChecklist';
-import type { CapabilityGroup } from '../types';
+import type { Capability, CapabilityGroup } from '../types';
 
+const i18n = vi.hoisted(() => ({ locale: 'zh-CN' }));
 vi.mock('~/contexts/I18nContext', () => ({
-  useI18n: () => ({ t: (_key: string, _vars?: unknown, fallback?: string) => fallback }),
+  useI18n: () => ({ locale: i18n.locale, t: (_key: string, _vars?: unknown, fallback?: string) => fallback }),
 }));
 
 function cap(code: string, granted: boolean, sensitive = false) {
@@ -19,6 +20,8 @@ function cap(code: string, granted: boolean, sensitive = false) {
   };
 }
 
+const legacyTranslations: Array<Capability['localizedLabels']> = [undefined, null, {}, { en: '' }];
+
 const groups: CapabilityGroup[] = [
   {
     group: '客户管理',
@@ -27,6 +30,7 @@ const groups: CapabilityGroup[] = [
 ];
 
 describe('CapabilityChecklist', () => {
+  beforeEach(() => { i18n.locale = 'zh-CN'; });
   it('renders capability labels and marks only sensitive ones with a lock', () => {
     render(
       <CapabilityChecklist groups={groups} selected={['crm.cap.account']} onToggle={() => {}} />,
@@ -130,4 +134,68 @@ describe('CapabilityChecklist', () => {
       'Pending revocation · undo',
     );
   });
+  it('renders the English declaration label and toggles its original capability code', () => {
+    i18n.locale = 'en-US';
+    const onToggle = vi.fn();
+    const localized: CapabilityGroup[] = [{ group: 'Organization', capabilities: [{
+      ...cap('org.cap.role', true), label: '管理角色',
+      localizedLabels: { 'zh-CN': '管理角色', en: 'Manage Roles' },
+    }] }];
+    render(<CapabilityChecklist groups={localized} selected={['org.cap.role']} onToggle={onToggle} />);
+    const checkbox = screen.getByRole('checkbox', { name: 'Manage Roles' });
+    expect((checkbox as HTMLInputElement).checked).toBe(true);
+    expect(screen.queryByText('管理角色')).toBeNull();
+    fireEvent.click(checkbox);
+    expect(onToggle).toHaveBeenCalledExactlyOnceWith('org.cap.role');
+  });
+
+  it('updates a declaration label when the locale changes without changing selection', () => {
+    const localized: CapabilityGroup[] = [{ group: 'Organization', capabilities: [{
+      ...cap('org.cap.role', true), label: '管理角色',
+      localizedLabels: { 'zh-CN': '管理角色', en: 'Manage Roles' },
+    }] }];
+    const props = { groups: localized, selected: ['org.cap.role'], onToggle: vi.fn() };
+    const view = render(<CapabilityChecklist {...props} />);
+    expect(screen.getByRole('checkbox', { name: '管理角色' })).toBeChecked();
+    i18n.locale = 'en-GB';
+    view.rerender(<CapabilityChecklist {...props} />);
+    expect(screen.getByRole('checkbox', { name: 'Manage Roles' })).toBeChecked();
+    expect(props.onToggle).not.toHaveBeenCalled();
+  });
+
+  it.each(legacyTranslations)('preserves a legacy label for absent or empty translations: %j', (localizedLabels) => {
+    i18n.locale = 'en-US';
+    const legacy: CapabilityGroup[] = [{ group: 'Legacy', capabilities: [{
+      ...cap('legacy.cap.read', false), label: 'Legacy Read', localizedLabels,
+    }] }];
+    render(<CapabilityChecklist groups={legacy} selected={[]} onToggle={() => {}} />);
+    expect(screen.getByRole('checkbox', { name: 'Legacy Read' })).not.toBeChecked();
+  });
+
+  it('switches a description hint by locale without changing the grant selection', () => {
+    const capability = {
+      ...cap('org.cap.role', true), label: 'Manage Roles',
+      description: 'Source role description',
+      localizedDescriptions: { 'zh-CN': 'Source role description', en: 'View and manage roles' },
+    };
+    const props = { groups: [{ group: 'Organization', capabilities: [capability] }],
+      selected: ['org.cap.role'], onToggle: vi.fn() };
+    const view = render(<CapabilityChecklist {...props} />);
+    expect(screen.getByTestId('capability-org.cap.role')).toHaveAttribute('title', 'Source role description');
+    i18n.locale = 'en-GB';
+    view.rerender(<CapabilityChecklist {...props} />);
+    expect(screen.getByTestId('capability-org.cap.role')).toHaveAttribute('title', 'View and manage roles');
+    expect(screen.getByRole('checkbox', { name: 'Manage Roles' })).toBeChecked();
+    expect(props.onToggle).not.toHaveBeenCalled();
+  });
+
+  it('keeps a legacy description and omits the hint when no description is supplied', () => {
+    i18n.locale = 'en-US';
+    const legacy = { ...cap('legacy.cap.read', false), description: 'Legacy description' };
+    render(<CapabilityChecklist groups={[{ group: 'Legacy', capabilities: [legacy, cap('empty.cap.read', false)] }]}
+      selected={[]} onToggle={vi.fn()} />);
+    expect(screen.getByTestId('capability-legacy.cap.read')).toHaveAttribute('title', 'Legacy description');
+    expect(screen.getByTestId('capability-empty.cap.read')).not.toHaveAttribute('title');
+  });
+
 });

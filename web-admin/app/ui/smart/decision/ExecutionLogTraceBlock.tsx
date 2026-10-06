@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import { getApiService } from '~/shared/services/ApiService';
 import { useI18n } from '~/contexts/I18nContext';
+import { useTimezone } from '~/contexts/TimezoneContext';
+import { formatInTimezone } from '~/shared/services/dateTimeFormatService';
 import {
   createDecisionApi,
   type DecisionApi,
@@ -14,6 +16,7 @@ import {
   type HttpClient,
 } from '~/shared/decision/api/decisionApi';
 import { decisionStatusLabel } from '~/shared/decision/ui/statusLabels';
+import { traceLabel, traceFieldValueLabels, traceSemanticValue, runtimeAdapterLabel } from '~/shared/decision/ui/tracePresentation';
 import { valueLabel } from '~/shared/decision/ui/displayLabels';
 import { getKernel } from '~/framework/bootstrap';
 
@@ -66,102 +69,11 @@ const CALLER_OPTIONS = [
   'TEST',
 ];
 const ROLLOUT_OPTIONS = ['ALL', 'BASELINE', 'CANDIDATE'];
-const CALLER_LABELS: Record<string, string> = {
-  ALL: '全部',
-  API: 'API',
-  AUTOMATION: '自动化',
-  EVENT_POLICY: '事件策略',
-  PERMISSION: '权限',
-  SLA: 'SLA',
-  BPM: 'BPM',
-  TEST: '测试',
-};
-const ROLLOUT_LABELS: Record<string, string> = {
-  ALL: '全部',
-  BASELINE: '基线',
-  CANDIDATE: '候选',
-};
-const DECISION_LABELS: Record<string, string> = {
-  complaint_sla_deadline: '请假审批 SLA 截止时间',
-  sla_deadline: 'SLA 截止时间',
-  approval_routing: '请假审批分派',
-  leave_request_automation: '请假申请自动化策略',
-};
-const ACTION_TYPE_LABELS: Record<string, string> = {
-  NOTIFY: '发送站内通知',
-  SEND_SMS: '发送短信',
-  SEND_IM: '发送 IM 消息',
-  START_PROCESS: '启动流程',
-  CREATE_TASK: '创建任务',
-  CC_TASK: '抄送任务',
-  ADD_COMMENT: '添加评论',
-  UPDATE_RECORD: '更新记录',
-  PATCH_RECORD: '更新记录',
-  WEBHOOK: '调用 Webhook',
-  WRITE_AUDIT: '写入审计',
-};
-const ACTION_PAYLOAD_LABELS: Record<string, string> = {
-  sentCount: '发送数',
-  recipientCount: '接收人数',
-  channel: '通道',
-  targetPhones: '短信号码',
-  targetType: '接收类型',
-  target: '接收对象',
-  targetUserId: '接收用户',
-  assigneeUserId: '处理人',
-  invalidTarget: '无效接收对象',
-  source: '来源',
-  sourceId: '来源',
-  title: '标题',
-  content: '评论内容',
-  mentions: '提及对象',
-  commentPid: '评论',
-  auditPid: '审计记录',
-  actionType: '动作类型',
-  tenantId: '租户',
-  ruleCode: '规则',
-  message: '消息',
-  notificationRef: '通知记录',
-  recipientType: '接收类型',
-  recipientId: '接收对象',
-  targetUserIds: '接收用户',
-  assigneeUserIds: '处理人',
-  createdCount: '创建数',
-  inboxItemIds: '待办记录',
-  itemType: '待办类型',
-  ccCount: '抄送数',
-  delivery: '投递方式',
-  taskId: '任务 ID',
-  processInstanceId: '流程实例',
-  processDefinitionId: '流程标识',
-  businessKey: '业务主键',
-  modelCode: '模型',
-  recordPid: '业务记录',
-  wd_req_type: '请假类型',
-  leaveType: '请假类型',
-  leave_type: '请假类型',
-  reqType: '请假类型',
-  updatedFields: '更新字段',
-  attemptCount: '尝试次数',
-  maxAttempts: '最大尝试',
-  eventType: '事件',
-  dispatchAccepted: '已接收调度',
-  deliveryEventId: '投递追踪',
-  deliveryTraceStatus: '投递状态',
-  deliveryLogPids: '投递日志',
-  deliveryReceipts: '投递回执',
-  payloadKeys: 'Payload 字段',
-  validationError: '校验错误',
-  field: '字段',
-  actualLength: '当前长度',
-  maxLength: '最大长度',
-  retryExhausted: '重试耗尽',
-  failureReason: '失败原因',
-  errorMessage: '错误信息',
-  requiredContext: '必需上下文',
-  fieldCount: '字段数',
-  resolvedCount: '解析人数',
-};
+
+
+
+
+
 const ACTION_PAYLOAD_ORDER = [
   'sentCount',
   'recipientCount',
@@ -218,105 +130,8 @@ const ACTION_PAYLOAD_ORDER = [
   'notificationRef',
 ];
 
-const ACTION_PAYLOAD_VALUE_LABELS: Record<string, string> = {
-  pending_async_delivery: '异步投递中',
-  tracked_delivery_logs: '已记录投递日志',
-  validation_failed: '校验失败',
-  dispatch_failed: '投递失败',
-  inbox: '待办',
-  task: '任务',
-  mention: '抄送任务',
-  cc_task: '抄送任务',
-  target_resolved_no_users: '目标未匹配到用户',
-  webhook_dispatch_failed: 'Webhook 投递失败',
-  process_definition_missing: '缺少流程标识',
-  process_start_failed: '流程启动失败',
-  record_context_missing: '缺少业务记录上下文',
-  update_fields_missing: '缺少更新字段',
-  record_update_failed: '更新记录失败',
-  comment_context_missing: '缺少业务记录上下文',
-  comment_content_missing: '缺少评论内容',
-  comment_write_failed: '添加评论失败',
-  audit_tenant_missing: '缺少租户上下文',
-  audit_write_failed: '写入审计失败',
-  'payload.processDefinitionId': '流程标识',
-  'payload.fields': '更新字段',
-  'payload.content': '评论内容',
-  'record.entityCode': '记录模型',
-  'record.recordPid': '业务记录',
-  tenantId: '租户',
-  NOTIFY: '发送站内通知',
-  SEND_SMS: '发送短信',
-  SEND_IM: '发送 IM 消息',
-  CREATE_TASK: '创建任务',
-  CC_TASK: '抄送任务',
-  START_PROCESS: '启动流程',
-  WEBHOOK: '调用 Webhook',
-  UPDATE_RECORD: '更新记录',
-  PATCH_RECORD: '更新记录',
-  ADD_COMMENT: '添加评论',
-  WRITE_AUDIT: '写入审计',
-  ROLE: '角色',
-  USER: '用户',
-  GROUP: '群组',
-  TEAM: '团队',
-  UNKNOWN: '未知',
-  modelCode: '模型',
-  recordPid: '业务记录',
-  action_target_missing: '缺少接收对象',
-  payload_content_missing: '缺少消息内容',
-  payload_title_missing: '缺少标题',
-  tenant_context_missing: '缺少租户上下文',
-  target_invalid: '接收对象格式错误',
-  target_role_code_missing: '缺少角色编码',
-  target_value_missing: '缺少接收对象值',
-  target_resolved_no_phone_numbers: '目标未匹配到手机号',
-  sms_delivery_failed: '短信发送失败',
-  im_delivery_failed: 'IM 消息发送失败',
-  task_write_failed: '创建任务失败',
-  cc_task_write_failed: '抄送任务失败',
-  notify_delivery_failed: '站内通知发送失败',
-  action_payload_serialization_failed: '动作 Payload 序列化失败',
-  'payload._eventId exceeds max length': '投递追踪 ID 超过 64 字符',
-};
-const TRACE_VALUE_LABELS_BY_FIELD: Record<string, Record<string, string>> = {
-  wd_req_type: {
-    annual: '年假',
-    sick: '病假',
-    personal: '事假',
-    marriage: '婚假',
-    maternity: '产假',
-    bereavement: '丧假',
-    compensatory: '调休',
-  },
-  leaveType: {
-    annual: '年假',
-    sick: '病假',
-    personal: '事假',
-    marriage: '婚假',
-    maternity: '产假',
-    bereavement: '丧假',
-    compensatory: '调休',
-  },
-  leave_type: {
-    annual: '年假',
-    sick: '病假',
-    personal: '事假',
-    marriage: '婚假',
-    maternity: '产假',
-    bereavement: '丧假',
-    compensatory: '调休',
-  },
-  reqType: {
-    annual: '年假',
-    sick: '病假',
-    personal: '事假',
-    marriage: '婚假',
-    maternity: '产假',
-    bereavement: '丧假',
-    compensatory: '调休',
-  },
-};
+
+
 const HIDDEN_TRACE_FIELDS = new Set(['id', 'tenant_id', 'tenantId', 'deleted_flag']);
 
 function createApi(): DecisionApi {
@@ -400,12 +215,8 @@ function errorMessage(error: unknown): string {
   return '日志加载失败';
 }
 
-function formatDate(value?: string): string {
-  if (!value) return '-';
-  return value
-    .replace('T', ' ')
-    .replace(/\.\d+Z?$/, '')
-    .replace(/Z$/, '');
+function formatDate(value: string | undefined, timezone: string, format: string): string {
+  return formatInTimezone(value, format, timezone) || '-';
 }
 
 function display(value: unknown): string {
@@ -415,13 +226,14 @@ function display(value: unknown): string {
   return String(value);
 }
 
-function callerLabel(value: unknown): string {
+function callerLabel(value: unknown, locale = 'zh-CN'): string {
   const code = display(value);
-  return CALLER_LABELS[code] ?? code;
+  return traceLabel('caller', code, locale);
 }
 
-function callerDisplay(log: DecisionLogRecord): string {
-  return `${callerLabel(log.callerType)} / ${display(log.callerRef)}`;
+function callerDisplay(log: DecisionLogRecord, locale = 'zh-CN'): string {
+  if (String(log.callerType ?? '').toUpperCase() === 'SLA') return callerLabel(log.callerType, locale);
+  return `${callerLabel(log.callerType, locale)} / ${display(log.callerRef)}`;
 }
 
 function permissionResourceCode(log: DecisionLogRecord): string | undefined {
@@ -489,41 +301,46 @@ function eventPolicyCodeFromFilters(filters: FilterState): string {
   return filters.policyCode.trim() || filters.callerRef.trim();
 }
 
-function rolloutLabel(value: unknown): string {
+function rolloutLabel(value: unknown, locale = 'zh-CN'): string {
   const code = display(value);
-  return ROLLOUT_LABELS[code] ?? code;
+  return traceLabel('rollout', code, locale);
 }
 
-function rolloutDisplay(log: DecisionLogRecord): string {
-  return `${rolloutLabel(log.rolloutArm)}${log.rolloutBucket != null ? ` #${log.rolloutBucket}` : ''}`;
+function rolloutDisplay(log: DecisionLogRecord, locale = 'zh-CN'): string {
+  return `${rolloutLabel(log.rolloutArm, locale)}${log.rolloutBucket != null ? ` #${log.rolloutBucket}` : ''}`;
 }
 
-function decisionLabel(value: unknown): string {
-  const code = display(value);
-  if (code === '-') return code;
-  return DECISION_LABELS[code] ?? code;
+function decisionLabel(logOrCode: DecisionLogRecord | string | undefined, locale = 'zh-CN', decisionName?: string): string {
+  if (logOrCode == null) return '-';
+  if (typeof logOrCode === 'string') {
+    const name = decisionName?.trim();
+    if (name) return name;
+    const code = display(logOrCode);
+    if (code === '-') return code;
+    const label = traceLabel('decision', code, locale);
+    return label === code ? traceLabel('semantic', 'decisionFallback', locale) : label;
+  }
+  return logOrCode.decisionName?.trim() || traceLabel('semantic', 'decisionFallback', locale);
 }
 
-function decisionTitle(value: unknown): string {
-  const code = display(value);
-  const label = decisionLabel(value);
-  return label === code ? code : `${label} (${code})`;
+function decisionTitle(log: DecisionLogRecord): string {
+  return decisionLabel(log);
 }
 
-function decisionCell(value: unknown) {
+function decisionCell(log: DecisionLogRecord, locale = 'zh-CN') {
   return (
-    <div className="elta-cell-text" title={decisionTitle(value)}>
-      {decisionLabel(value)}
+    <div className="elta-cell-text" title={decisionTitle(log)}>
+      {decisionLabel(log, locale)}
     </div>
   );
 }
 
-function payloadDisplay(value: unknown, key = '', traceSnapshot?: unknown): string {
-  const fieldLabels = traceValueLabels(key, traceSnapshot);
+function payloadDisplay(value: unknown, key = '', traceSnapshot?: unknown, locale = 'zh-CN'): string {
+  const fieldLabels = traceValueLabels(key, traceSnapshot, locale);
   if (key === 'deliveryReceipts' && Array.isArray(value)) {
     return (
       value
-        .map(formatDeliveryReceipt)
+        .map(item => formatDeliveryReceipt(item, locale))
         .filter((item) => item !== '-')
         .join('; ') || '-'
     );
@@ -531,7 +348,7 @@ function payloadDisplay(value: unknown, key = '', traceSnapshot?: unknown): stri
   if (Array.isArray(value)) {
     return (
       value
-        .map((item) => payloadDisplay(item, key, traceSnapshot))
+        .map((item) => payloadDisplay(item, key, traceSnapshot, locale))
         .filter((item) => item !== '-')
         .join(', ') || '-'
     );
@@ -539,14 +356,21 @@ function payloadDisplay(value: unknown, key = '', traceSnapshot?: unknown): stri
   if (typeof value === 'string') {
     const labeled = valueLabel(value, fieldLabels);
     if (labeled !== value) return labeled;
-    return ACTION_PAYLOAD_VALUE_LABELS[value] ?? display(value);
+    if (key === 'decisionCode') {
+      const code = display(value);
+      if (code === '-') return code;
+      const label = traceLabel('decision', code, locale);
+      return label === code ? traceLabel('semantic', 'decisionFallback', locale) : label;
+    }
+    return traceSemanticValue(key, value, locale) ?? traceLabel('value', value, locale);
   }
-  return display(value);
+  return traceSemanticValue(key, value, locale) ?? display(value);
 }
 
 function traceValueLabels(
   key: string,
   traceSnapshot?: unknown,
+  locale = 'zh-CN',
 ): Record<string, string> | undefined {
   if (!key) return undefined;
   const metadataLabels = factValueLabels(key, traceSnapshot);
@@ -554,11 +378,11 @@ function traceValueLabels(
   const outputLabels = outputValueLabels(key, traceSnapshot);
   if (outputLabels) return outputLabels;
   const normalized = key.split('.').filter(Boolean).pop() ?? key;
-  return TRACE_VALUE_LABELS_BY_FIELD[normalized];
+  return traceFieldValueLabels(normalized, locale);
 }
 
-function formatDeliveryReceipt(value: unknown): string {
-  if (!value || typeof value !== 'object') return payloadDisplay(value);
+function formatDeliveryReceipt(value: unknown, locale = 'zh-CN'): string {
+  if (!value || typeof value !== 'object') return payloadDisplay(value, '', undefined, locale);
   const receipt = value as Record<string, unknown>;
   return [receipt.subscriptionPid, receipt.deliveryLogPid, receipt.deliveryStatus]
     .map((item) => (item == null || item === '' ? '-' : String(item)))
@@ -832,7 +656,7 @@ function orderedPayloadEntries(payload?: Record<string, unknown>) {
   return [...ordered, ...rest];
 }
 
-function payloadLabel(key: string, traceSnapshot?: unknown): string {
+function payloadLabel(key: string, traceSnapshot?: unknown, locale = 'zh-CN'): string {
   const metadataLabel = factMetadataForKey(key, traceSnapshot)?.label;
   if (typeof metadataLabel === 'string' && metadataLabel.trim().length > 0) {
     return metadataLabel;
@@ -841,7 +665,8 @@ function payloadLabel(key: string, traceSnapshot?: unknown): string {
   if (typeof outputLabel === 'string' && outputLabel.trim().length > 0) {
     return outputLabel;
   }
-  return ACTION_PAYLOAD_LABELS[key] ?? key;
+  return ['matched', 'truth', 'conditionResult', 'decisionCode'].includes(key)
+    ? traceLabel('semantic', key, locale) : traceLabel('payload', key, locale);
 }
 
 function factMetadataLabel(row: FactMetadataRow): string {
@@ -882,7 +707,7 @@ function factMetadataValueLabelEntries(row: FactMetadataRow): Array<[string, str
     .sort(([left], [right]) => left.localeCompare(right));
 }
 
-function actionRetryItems(action: EventPolicyActionLogRecord): string[] {
+function actionRetryItems(action: EventPolicyActionLogRecord, timezone: string, format: string): string[] {
   const parts: string[] = [];
   const attempt = Number(action.attemptCount ?? 0);
   const maxAttempts = Number(action.maxAttempts ?? 0);
@@ -899,9 +724,9 @@ function actionRetryItems(action: EventPolicyActionLogRecord): string[] {
     parts.push(`${attemptLabel} ${attempt}`);
   }
   if (retryState) {
-    if (action.lastRetryAt) parts.push(`上次 ${formatDate(action.lastRetryAt)}`);
-    if (action.nextRetryAt) parts.push(`下次 ${formatDate(action.nextRetryAt)}`);
-    if (action.deadLetteredAt) parts.push(`死信 ${formatDate(action.deadLetteredAt)}`);
+    if (action.lastRetryAt) parts.push(`上次 ${formatDate(action.lastRetryAt, timezone, format)}`);
+    if (action.nextRetryAt) parts.push(`下次 ${formatDate(action.nextRetryAt, timezone, format)}`);
+    if (action.deadLetteredAt) parts.push(`死信 ${formatDate(action.deadLetteredAt, timezone, format)}`);
     if (action.resultPayload?.retryExhausted === true) parts.push('重试已耗尽');
   }
   return parts;
@@ -927,10 +752,10 @@ function idempotencyTitle(value: unknown): string | undefined {
   return value == null || value === '' ? undefined : String(value);
 }
 
-function actionTypeLabel(value: unknown): string {
+function actionTypeLabel(value: unknown, locale = 'zh-CN'): string {
   const code = display(value);
   if (code === '-') return code;
-  return ACTION_TYPE_LABELS[code] ?? code;
+  return traceLabel('action', code, locale);
 }
 
 function ActionLogCard({
@@ -942,7 +767,9 @@ function ActionLogCard({
   replayingActionPid: string | null;
   onReplay: (action: EventPolicyActionLogRecord) => void;
 }) {
-  const retryItems = actionRetryItems(action);
+  const { locale } = useI18n();
+  const { timezone, formats } = useTimezone();
+  const retryItems = actionRetryItems(action, timezone, formats.datetime);
   const payloadEntries = orderedPayloadEntries(action.resultPayload);
   const key = actionLogKey(action);
   return (
@@ -950,12 +777,12 @@ function ActionLogCard({
       <div className="elta-action-card-head">
         <strong>{display(action.ruleCode)}</strong>
         <span className={`elta-status elta-status-${action.status ?? 'UNKNOWN'}`}>
-          {decisionStatusLabel(action.status)}
+          {decisionStatusLabel(action.status, locale)}
         </span>
       </div>
       <div className="elta-action-sub">
-        <span>{actionTypeLabel(action.actionType)}</span>
-        <span>{formatDate(action.executedAt)}</span>
+        <span>{actionTypeLabel(action.actionType, locale)}</span>
+        <span>{formatDate(action.executedAt, timezone, formats.datetime)}</span>
         <span className="mono" title={idempotencyTitle(action.idempotencyKey)}>
           {idempotencyEvidence(action.idempotencyKey)}
         </span>
@@ -982,8 +809,8 @@ function ActionLogCard({
         <dl className="elta-action-payload">
           {payloadEntries.map(([payloadKey, value]) => (
             <div key={payloadKey}>
-              <dt>{payloadLabel(payloadKey)} </dt>
-              <dd>{payloadDisplay(value, payloadKey)}</dd>
+              <dt>{payloadLabel(payloadKey, undefined, locale)} </dt>
+              <dd>{payloadDisplay(value, payloadKey, undefined, locale)}</dd>
             </div>
           ))}
         </dl>
@@ -994,7 +821,8 @@ function ActionLogCard({
 }
 
 export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBlockProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const { timezone, formats } = useTimezone();
   const api = useMemo(() => createApi(), []);
   const location = useLocation();
   const navigate = useNavigate();
@@ -1205,7 +1033,7 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
       {mode === 'list' && (
         <div className="elta-filters" data-testid="elta-filters">
           <label>
-            <span>关键词</span>
+            <span>{traceLabel('ui', 'keyword', locale)}</span>
             <input
               aria-label={t('decision.executionLog.keywordLabel', undefined, '执行日志关键词')}
               data-testid="log-keyword"
@@ -1219,7 +1047,7 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
             />
           </label>
           <label>
-            <span>决策编码</span>
+            <span>{traceLabel('ui', 'decisionIdentifier', locale)}</span>
             <input
               aria-label={t('decision.executionLog.decisionCodeLabel', undefined, '决策编码')}
               data-testid="log-decision-code"
@@ -1233,7 +1061,7 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
             />
           </label>
           <label>
-            <span>状态</span>
+            <span>{traceLabel('ui', 'status', locale)}</span>
             <select
               aria-label={t('decision.executionLog.statusLabel', undefined, '执行状态')}
               data-testid="log-status"
@@ -1242,13 +1070,13 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
             >
               {STATUS_OPTIONS.map((option) => (
                 <option key={option} value={option}>
-                  {option === 'ALL' ? '全部' : decisionStatusLabel(option)}
+                  {option === 'ALL' ? '全部' : decisionStatusLabel(option, locale)}
                 </option>
               ))}
             </select>
           </label>
           <label>
-            <span>调用方</span>
+            <span>{traceLabel('ui', 'caller', locale)}</span>
             <select
               aria-label={t('decision.executionLog.callerTypeLabel', undefined, '调用方类型')}
               data-testid="log-caller-type"
@@ -1257,26 +1085,26 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
             >
               {CALLER_OPTIONS.map((option) => (
                 <option key={option} value={option}>
-                  {CALLER_LABELS[option] ?? option}
+                  {traceLabel('caller', option, locale)}
                 </option>
               ))}
             </select>
           </label>
           <label>
-            <span>命中</span>
+            <span>{traceLabel('ui', 'matched', locale)}</span>
             <select
               aria-label={t('decision.executionLog.matchedLabel', undefined, '是否命中')}
               data-testid="log-matched"
               value={filters.matched}
               onChange={(e) => updateFilter('matched', e.target.value)}
             >
-              <option value="ALL">全部</option>
-              <option value="true">命中</option>
-              <option value="false">未命中</option>
+              <option value="ALL">{traceLabel('ui', 'all', locale)}</option>
+              <option value="true">{traceLabel('ui', 'matched', locale)}</option>
+              <option value="false">{traceLabel('ui', 'notMatched', locale)}</option>
             </select>
           </label>
           <label>
-            <span>灰度分支</span>
+            <span>{traceLabel('ui', 'rolloutBranch', locale)}</span>
             <select
               aria-label={t('decision.executionLog.rolloutArmLabel', undefined, '灰度分支')}
               data-testid="log-rollout-arm"
@@ -1285,13 +1113,13 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
             >
               {ROLLOUT_OPTIONS.map((option) => (
                 <option key={option} value={option}>
-                  {ROLLOUT_LABELS[option] ?? option}
+                  {traceLabel('rollout', option, locale)}
                 </option>
               ))}
             </select>
           </label>
           <label>
-            <span>最小耗时</span>
+            <span>{traceLabel('ui', 'minimumDuration', locale)}</span>
             <input
               aria-label={t('decision.executionLog.minDurationLabel', undefined, '最小耗时')}
               data-testid="log-min-duration"
@@ -1302,7 +1130,7 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
             />
           </label>
           <label>
-            <span>最大耗时</span>
+            <span>{traceLabel('ui', 'maximumDuration', locale)}</span>
             <input
               aria-label={t('decision.executionLog.maxDurationLabel', undefined, '最大耗时')}
               data-testid="log-max-duration"
@@ -1338,7 +1166,7 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
         linkedActionLogs.length) ? (
         <section className="elta-action-evidence" data-testid="elta-linked-action-evidence">
           <div className="elta-action-evidence-head">
-            <h4>动作执行证据</h4>
+            <h4>{traceLabel('ui', 'actionEvidence', locale)}</h4>
             <span>{linkedActionLogsLoading ? '加载中...' : `${linkedActionLogs.length} 条`}</span>
           </div>
           <div className="elta-drawer-meta">
@@ -1356,7 +1184,7 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
             ) : null}
           </div>
           {!linkedActionLogsLoading && !linkedActionLogs.length ? (
-            <div className="elta-action-empty">暂无动作执行记录</div>
+            <div className="elta-action-empty">{traceLabel('ui', 'noActionRecords', locale)}</div>
           ) : null}
           <div className="elta-action-list">
             {linkedActionLogs.map((action) => (
@@ -1388,34 +1216,34 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
             <thead>
               <tr>
                 <th>Trace ID</th>
-                <th>决策</th>
-                <th>版本</th>
-                <th>状态</th>
-                <th>调用方</th>
-                <th>灰度</th>
-                <th>耗时</th>
-                <th>时间</th>
-                <th>操作</th>
+                <th>{traceLabel('ui', 'decision', locale)}</th>
+                <th>{traceLabel('ui', 'version', locale)}</th>
+                <th>{traceLabel('ui', 'status', locale)}</th>
+                <th>{traceLabel('ui', 'caller', locale)}</th>
+                <th>{traceLabel('ui', 'rollout', locale)}</th>
+                <th>{traceLabel('ui', 'duration', locale)}</th>
+                <th>{traceLabel('ui', 'time', locale)}</th>
+                <th>{traceLabel('ui', 'actions', locale)}</th>
               </tr>
             </thead>
             <tbody>
               {records.map((log) => (
                 <tr key={log.pid ?? log.traceId} data-testid={`elta-row-${log.pid ?? log.traceId}`}>
                   <td className="mono">{cellText(log.traceId, 'mono')}</td>
-                  <td>{decisionCell(log.decisionCode)}</td>
+                  <td>{decisionCell(log, locale)}</td>
                   <td>{cellText(log.selectedVersion ?? log.decisionVersion)}</td>
                   <td>
                     <span
                       className={`elta-status elta-status-${log.status ?? 'UNKNOWN'}`}
                       title={display(log.status)}
                     >
-                      {decisionStatusLabel(log.status)}
+                      {decisionStatusLabel(log.status, locale)}
                     </span>
                   </td>
-                  <td>{cellText(callerDisplay(log))}</td>
-                  <td>{cellText(rolloutDisplay(log))}</td>
+                  <td>{cellText(callerDisplay(log, locale))}</td>
+                  <td>{cellText(rolloutDisplay(log, locale))}</td>
                   <td>{cellText(log.durationMs != null ? `${log.durationMs}ms` : '-')}</td>
-                  <td>{cellText(formatDate(log.createdAt))}</td>
+                  <td>{cellText(formatDate(log.createdAt, timezone, formats.datetime))}</td>
                   <td className="elta-row-actions">
                     <button
                       type="button"
@@ -1469,21 +1297,21 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
           >
             <div className="elta-drawer-head">
               <div>
-                <h3>执行链路</h3>
-                <span className="mono">{display(selectedLog.traceId)}</span>
+                <h3>{traceLabel('ui', 'executionChain', locale)}</h3>
+                <span>{decisionLabel(selectedLog, locale)}</span>
               </div>
               <button type="button" data-testid="elta-close-trace" onClick={closeTrace}>
                 关闭
               </button>
             </div>
             <div className="elta-drawer-meta">
-              <span title={decisionTitle(selectedLog.decisionCode)}>
-                决策 {decisionLabel(selectedLog.decisionCode)}
+              <span title={decisionTitle(selectedLog)}>
+                决策 {selectedLog ? decisionLabel(selectedLog, locale) : '-'}
               </span>
               <span title={display(selectedLog.status)}>
-                状态 {decisionStatusLabel(selectedLog.status)}
+                状态 {decisionStatusLabel(selectedLog.status, locale)}
               </span>
-              <span>调用方 {callerDisplay(selectedLog)}</span>
+              <span>调用方 {callerDisplay(selectedLog, locale)}</span>
               <span>
                 耗时 {selectedLog.durationMs != null ? `${selectedLog.durationMs}ms` : '-'}
               </span>
@@ -1526,11 +1354,11 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
             {isEventPolicyLog(selectedLog) ? (
               <section className="elta-action-evidence" data-testid="elta-action-evidence">
                 <div className="elta-action-evidence-head">
-                  <h4>动作执行证据</h4>
+                  <h4>{traceLabel('ui', 'actionEvidence', locale)}</h4>
                   <span>{actionLogsLoading ? '加载中...' : `${actionLogs.length} 条`}</span>
                 </div>
                 {!actionLogsLoading && !actionLogs.length ? (
-                  <div className="elta-action-empty">暂无动作执行记录</div>
+                  <div className="elta-action-empty">{traceLabel('ui', 'noActionRecords', locale)}</div>
                 ) : null}
                 <div className="elta-action-list">
                   {actionLogs.map((action) => (
@@ -1552,29 +1380,48 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                   data-testid={`elta-chain-node-${log.pid ?? index}`}
                 >
                   <div className="elta-chain-main">
-                    <strong title={decisionTitle(log.decisionCode)}>
-                      {decisionLabel(log.decisionCode)}
+                    <strong title={decisionTitle(log)}>
+                      {decisionLabel(log, locale)}
                     </strong>
                     <span
                       className={`elta-status elta-status-${log.status ?? 'UNKNOWN'}`}
                       title={display(log.status)}
                     >
-                      {decisionStatusLabel(log.status)}
+                      {decisionStatusLabel(log.status, locale)}
                     </span>
                   </div>
                   <div className="elta-chain-sub">
                     <span
                       className="mono"
                       data-testid={`elta-chain-caller-${log.pid ?? index}`}
-                      title={callerDisplay(log)}
+                      title={callerDisplay(log, locale)}
                     >
-                      {callerDisplay(log)}
+                      {callerDisplay(log, locale)}
                     </span>
                     <span>v{display(log.selectedVersion ?? log.decisionVersion)}</span>
-                    <span>{display(log.runtimeAdapter)}</span>
+                    <span title={log.runtimeAdapter}>{runtimeAdapterLabel(log.runtimeAdapter, locale)}</span>
                     <span>{log.durationMs != null ? `${log.durationMs}ms` : '-'}</span>
-                    <span>{formatDate(log.createdAt)}</span>
+                    <span>{formatDate(log.createdAt, timezone, formats.datetime)}</span>
                   </div>
+                  {(log.traceId || log.callerRef || log.runtimeAdapter || (log.decisionCode &&
+                    traceLabel('decision', log.decisionCode, locale) === log.decisionCode)) &&
+                    <details className="mt-2 text-xs" data-testid={'elta-chain-technical-' + (log.pid ?? index)}>
+                      <summary>{traceLabel('semantic', 'technicalDetails', locale)}</summary>
+                      <dl className="mt-1 break-all">
+                        {log.traceId && <>
+                          <dt>{traceLabel('semantic', 'traceIdentifier', locale)}</dt><dd>{log.traceId}</dd>
+                        </>}
+                        {log.callerRef && <>
+                          <dt>{traceLabel('semantic', 'callerIdentifier', locale)}</dt><dd>{log.callerRef}</dd>
+                        </>}
+                        {log.decisionCode && traceLabel('decision', log.decisionCode, locale) === log.decisionCode && <>
+                          <dt>{traceLabel('semantic', 'decisionCode', locale)}</dt><dd>{log.decisionCode}</dd>
+                        </>}
+                        {log.runtimeAdapter && <>
+                          <dt>{runtimeAdapterLabel(log.runtimeAdapter, locale)}</dt><dd>{log.runtimeAdapter}</dd>
+                        </>}
+                      </dl>
+                    </details>}
                   <div className="elta-chain-rules">
                     命中规则: {matchedRuleLabels(log.matchedRulesJson).join(', ') || '-'}
                   </div>
@@ -1583,7 +1430,7 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                       className="elta-output-snapshot elta-fact-metadata"
                       data-testid={`elta-fact-metadata-${log.pid ?? index}`}
                     >
-                      <h4>事实快照</h4>
+                      <h4>{traceLabel('ui', 'factSnapshot', locale)}</h4>
                       <div className="elta-fact-list">
                         {factMetadataRows(log.traceSnapshot).map((row) => (
                           <article className="elta-fact-card" key={factMetadataPath(row)}>
@@ -1602,12 +1449,22 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                               <div className="elta-fact-values">
                                 {factMetadataValueLabelEntries(row).map(([value, label]) => (
                                   <span key={value}>
-                                    <code>{value}</code>
+                                    {!['reference', 'user'].includes(String(row.metadata.dataType).toLowerCase()) && <code>{value}</code>}
                                     {label}
                                   </span>
                                 ))}
                               </div>
                             ) : null}
+                            {['reference', 'user'].includes(String(row.metadata.dataType).toLowerCase()) && factMetadataValueLabelEntries(row).length > 0 && (
+                              <details className="mt-2 text-xs" data-testid="elta-reference-identifiers">
+                                <summary>{traceLabel('semantic', 'technicalDetails', locale)}</summary>
+                                <dl className="mt-1 break-all">
+                                  {factMetadataValueLabelEntries(row).map(([value, label]) => (
+                                    <div key={value}><dt>{label}</dt><dd>{value}</dd></div>
+                                  ))}
+                                </dl>
+                              </details>
+                            )}
                           </article>
                         ))}
                       </div>
@@ -1622,8 +1479,8 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                       <dl className="elta-action-payload">
                         {outputSnapshotEntries(log.outputSnapshot).map(([key, value]) => (
                           <div key={key}>
-                            <dt>{payloadLabel(key, log.traceSnapshot)}</dt>
-                            <dd>{payloadDisplay(value, key, log.traceSnapshot)}</dd>
+                            <dt>{payloadLabel(key, log.traceSnapshot, locale)}</dt>
+                            <dd>{payloadDisplay(value, key, log.traceSnapshot, locale)}</dd>
                           </div>
                         ))}
                       </dl>
@@ -1634,7 +1491,7 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                       className="elta-output-snapshot"
                       data-testid={`elta-virtual-sources-${log.pid ?? index}`}
                     >
-                      <h4>虚拟源</h4>
+                      <h4>{traceLabel('ui', 'virtualSources', locale)}</h4>
                       {virtualSourceEntries(log.traceSnapshot).map((source, sourceIndex) => (
                         <article
                           className="elta-virtual-source"
@@ -1654,8 +1511,8 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                             <dl className="elta-action-payload">
                               {virtualSourceFieldEntries(source.fields).map(([key, value]) => (
                                 <div key={key}>
-                                  <dt>{payloadLabel(key, log.traceSnapshot)}</dt>
-                                  <dd>{payloadDisplay(value, key, log.traceSnapshot)}</dd>
+                                  <dt>{payloadLabel(key, log.traceSnapshot, locale)}</dt>
+                                  <dd>{payloadDisplay(value, key, log.traceSnapshot, locale)}</dd>
                                 </div>
                               ))}
                             </dl>
@@ -1669,7 +1526,7 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                       className="elta-output-snapshot"
                       data-testid={`elta-unknown-reasons-${log.pid ?? index}`}
                     >
-                      <h4>未知原因</h4>
+                      <h4>{traceLabel('ui', 'unknownReasons', locale)}</h4>
                       <ul>
                         {unknownReasonEntries(log.traceSnapshot).map((reason) => (
                           <li key={reason}>{reason}</li>

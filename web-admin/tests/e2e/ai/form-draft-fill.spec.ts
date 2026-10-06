@@ -147,6 +147,10 @@ test('draft fill preserves customer edits; only Save persists the final form', a
     e2et_cust_region: 'east',
   });
   expect(writes.length).toBeGreaterThan(0);
+  const savedRow = page.getByRole('row').filter({ hasText: code });
+  await expect(savedRow).toBeVisible();
+  await expect(savedRow).toContainText('客户手工名称');
+  await expect(savedRow).toContainText('客户修改联系人');
   await page.screenshot({ path: info.outputPath('F03-submitted.png'), fullPage: true });
 });
 

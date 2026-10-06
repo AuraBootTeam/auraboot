@@ -1,3 +1,6 @@
+import AuthAppearanceShell from './AuthAppearanceShell';
+import { useI18n } from '~/contexts/I18nContext';
+import IcpComplianceFooter from './IcpComplianceFooter';
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
@@ -114,6 +117,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
 export default function Join() {
   const branding = useRootLoaderData()?.branding ?? COMMUNITY_BRANDING;
+  const { t, locale } = useI18n();
   const [searchParams] = useSearchParams();
   const actionData = useActionData<typeof action>();
   const emailRef = useRef<HTMLInputElement>(null);
@@ -139,6 +143,17 @@ export default function Join() {
       passwordRef.current?.focus();
     }
   }, [actionData]);
+
+  if (branding.authAppearance) {
+    return <>
+      <AuthAppearanceShell branding={branding} appearance={branding.authAppearance}>
+        <h1 className="mb-2 text-2xl font-semibold">{t('auth.appearance.signupTitle', undefined, locale.startsWith('zh') ? '创建账号' : 'Create an account')}</h1>
+        <p className="mb-6">{t('auth.appearance.signupLead', { productName: branding.productName }, locale.startsWith('zh') ? `注册以开始使用 ${branding.productName}` : `Sign up to start using ${branding.productName}`)}</p>
+        <SignUpForm emailRef={emailRef} passwordRef={passwordRef} actionData={actionData} searchParams={searchParams} isMobile={isMobile} />
+      </AuthAppearanceShell>
+      <IcpComplianceFooter />
+    </>;
+  }
 
   return (
     <div

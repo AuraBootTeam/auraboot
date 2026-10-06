@@ -315,6 +315,9 @@
     "displayName:en": "Create Scheduled Task",
     "type": "create",
     "modelCode": "scheduled_task",
+    "permissions": [
+      "model.scheduled_task.create"
+    ],
     "inputFields": [
       "name",
       "description",
@@ -336,6 +339,9 @@
     "displayName:en": "Update Scheduled Task",
     "type": "update",
     "modelCode": "scheduled_task",
+    "permissions": [
+      "model.scheduled_task.update"
+    ],
     "inputFields": [
       "name",
       "description",
@@ -357,6 +363,9 @@
     "displayName:en": "Delete Scheduled Task",
     "type": "delete",
     "modelCode": "scheduled_task",
+    "permissions": [
+      "model.scheduled_task.delete"
+    ],
     "extension": {
       "confirmMessage:zh-CN": "确认删除此定时任务？",
       "confirmMessage:en": "Confirm delete this scheduled task?"

@@ -1,3 +1,4 @@
+import { useI18n } from '~/contexts/I18nContext';
 /**
  * RowHeightSelector — Dropdown to select table row height preset.
  *
@@ -6,8 +7,11 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import type { RowHeight } from '~/framework/smart/types/savedView';
-import { ROW_HEIGHT_CONFIG, DEFAULT_ROW_HEIGHT } from '~/framework/smart/types/savedView';
+import {
+  ROW_HEIGHT_CONFIG,
+  DEFAULT_ROW_HEIGHT,
+  type RowHeight,
+} from '~/framework/smart/types/savedView';
 
 export interface RowHeightSelectorProps {
   /** Current row height value */
@@ -42,6 +46,7 @@ function HeightIcon({ height }: { height: RowHeight }) {
 }
 
 export const RowHeightSelector: React.FC<RowHeightSelectorProps> = ({ value, onChange }) => {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const current = normalizeRowHeight(value);
@@ -71,7 +76,7 @@ export const RowHeightSelector: React.FC<RowHeightSelectorProps> = ({ value, onC
       <button
         type="button"
         onClick={() => setOpen((p) => !p)}
-        title="Row height"
+        title={t('table.rowHeight')}
         className="text-text-3 hover:bg-hover hover:text-text-2 rounded-md p-1.5 transition-colors"
         data-testid="row-height-btn"
       >

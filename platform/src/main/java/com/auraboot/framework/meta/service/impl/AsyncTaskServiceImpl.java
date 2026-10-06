@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.common.util.UlidGenerator;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.AsyncTaskDTO;
 import com.auraboot.framework.meta.dto.AsyncTaskSubmitRequest;
 import com.auraboot.framework.meta.entity.AsyncTask;
@@ -62,19 +63,23 @@ public class AsyncTaskServiceImpl {
 
     @Scheduled(fixedDelay = 15000, initialDelay = 15000, scheduler = "asyncTaskLeaseScheduler")
     public void renewExecutionLeases() {
-        for (Execution execution : executions.values()) {
-            synchronized (execution) {
-                if (!execution.active().get()) continue;
-                try {
-                    if (asyncTaskMapper.renewLease(execution.id(), execution.tenantId(), execution.token()) == 1) continue;
-                } catch (RuntimeException failure) {
-                    log.error("Async task lease renewal failed: id={}", execution.id(), failure);
+        // @Scheduled threads have no propagated MetaContext (only @Async executors
+        // carry TenantAwareTaskDecorator) — explicit scope (tenant-exemption W3).
+        MetaContext.runWithoutTenantFilter(() -> {
+            for (Execution execution : executions.values()) {
+                synchronized (execution) {
+                    if (!execution.active().get()) continue;
+                    try {
+                        if (asyncTaskMapper.renewLease(execution.id(), execution.tenantId(), execution.token()) == 1) continue;
+                    } catch (RuntimeException failure) {
+                        log.error("Async task lease renewal failed: id={}", execution.id(), failure);
+                    }
+                    // Finish waits for this check, so an already-reused pool thread cannot be interrupted.
+                    // Interrupt is cooperative; database writes remain fenced independently.
+                    execution.thread().interrupt();
                 }
-                // Finish waits for this check, so an already-reused pool thread cannot be interrupted.
-                // Interrupt is cooperative; database writes remain fenced independently.
-                execution.thread().interrupt();
             }
-        }
+        });
     }
 
     @PostConstruct
@@ -89,11 +94,15 @@ public class AsyncTaskServiceImpl {
 
     @org.springframework.scheduling.annotation.Scheduled(fixedDelay = 5000, initialDelay = 30000)
     public void recoverResumablePendingTasks() {
-        asyncTaskMapper.requeueExpiredResumableTasks();
-        asyncTaskMapper.failExpiredTasks();
-        for (AsyncTask task : asyncTaskMapper.findResumablePendingTasks(100)) {
-            self.executeTaskAsync(task.getId(), task.getTenantId());
-        }
+        // @Scheduled thread: explicit scope (tenant-exemption W3). Re-dispatch goes
+        // through the @Async proxy so the executor's decorator re-propagates tenant.
+        MetaContext.runWithoutTenantFilter(() -> {
+            asyncTaskMapper.requeueExpiredResumableTasks();
+            asyncTaskMapper.failExpiredTasks();
+            for (AsyncTask task : asyncTaskMapper.findResumablePendingTasks(100)) {
+                self.executeTaskAsync(task.getId(), task.getTenantId());
+            }
+        });
     }
 
     // ==================== Public API ====================
@@ -211,15 +220,19 @@ public class AsyncTaskServiceImpl {
      * Delete a completed/failed/cancelled task record.
      */
     public void deleteTask(String taskCode) {
-        AsyncTask task = asyncTaskMapper.findByTaskCode(taskCode);
-        if (task == null) {
-            throw new MetaServiceException("Async task not found: " + taskCode);
-        }
-        if (!task.isTerminal()) {
-            throw new MetaServiceException("Only terminal tasks can be deleted (current: " + task.getStatus() + ")");
-        }
-        asyncTaskMapper.deleteById(task.getId());
-        log.info("Async task deleted: code={}", taskCode);
+        // Reachable pre-context via the plugin-import accessor during bootstrap —
+        // explicit scope (tenant-exemption W3, found by the W5 real-stack gate).
+        MetaContext.runWithoutTenantFilter(() -> {
+            AsyncTask task = asyncTaskMapper.findByTaskCode(taskCode);
+            if (task == null) {
+                throw new MetaServiceException("Async task not found: " + taskCode);
+            }
+            if (!task.isTerminal()) {
+                throw new MetaServiceException("Only terminal tasks can be deleted (current: " + task.getStatus() + ")");
+            }
+            asyncTaskMapper.deleteById(task.getId());
+            log.info("Async task deleted: code={}", taskCode);
+        });
     }
 
     // ==================== Async Execution ====================
@@ -250,7 +263,8 @@ public class AsyncTaskServiceImpl {
 
     /**
      * Execute a task asynchronously in the thread pool.
-     * Note: tenantId is captured at submission time since @Async threads lack MetaContext.
+     * Note: tenantId is captured at submission time as an execution fence; the
+     * asyncTaskExecutor also propagates MetaContext via TenantAwareTaskDecorator.
      */
     @Async("asyncTaskExecutor")
     public void executeTaskAsync(Long taskId, Long tenantId) {
@@ -345,16 +359,19 @@ public class AsyncTaskServiceImpl {
      */
     @Scheduled(fixedDelay = 21600000) // 6 hours
     public void cleanupOldTasks() {
-        Instant cutoff = Instant.now().minusSeconds(7 * 24 * 3600);
-        LambdaQueryWrapper<AsyncTask> wrapper = new LambdaQueryWrapper<>();
-        wrapper.in(AsyncTask::getStatus,
-                AsyncTask.STATUS_COMPLETED, AsyncTask.STATUS_FAILED, AsyncTask.STATUS_CANCELLED);
-        wrapper.lt(AsyncTask::getCreatedAt, cutoff);
+        // @Scheduled thread: explicit scope (tenant-exemption W3, missed in W3b).
+        MetaContext.runWithoutTenantFilter(() -> {
+            Instant cutoff = Instant.now().minusSeconds(7 * 24 * 3600);
+            LambdaQueryWrapper<AsyncTask> wrapper = new LambdaQueryWrapper<>();
+            wrapper.in(AsyncTask::getStatus,
+                    AsyncTask.STATUS_COMPLETED, AsyncTask.STATUS_FAILED, AsyncTask.STATUS_CANCELLED);
+            wrapper.lt(AsyncTask::getCreatedAt, cutoff);
 
-        int deleted = asyncTaskMapper.delete(wrapper);
-        if (deleted > 0) {
-            log.info("Cleaned up {} old async tasks (older than 7 days)", deleted);
-        }
+            int deleted = asyncTaskMapper.delete(wrapper);
+            if (deleted > 0) {
+                log.info("Cleaned up {} old async tasks (older than 7 days)", deleted);
+            }
+        });
     }
 
     // ==================== Private Helpers ====================

@@ -7,9 +7,11 @@ import com.auraboot.framework.meta.entity.AuditTrail;
 import com.auraboot.framework.meta.mapper.AuditTrailMapper;
 import com.auraboot.framework.user.mapper.UserMapper;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.util.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -19,6 +21,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -32,8 +36,8 @@ import java.util.stream.Collectors;
  * blockchain-like integrity chain per tenant — any tampering with historical
  * records will break the chain and be detectable via verifyChainIntegrity().
  *
- * Thread safety: concurrent writes are handled via the unique constraint on
- * (tenant_id, sequence_no) with retry on collision.
+ * Concurrent app instances serialize each tenant chain with a PostgreSQL
+ * transaction advisory lock before reading its head and allocating the next sequence.
  *
  * @since 6.1.0
  */
@@ -43,49 +47,24 @@ import java.util.stream.Collectors;
 public class AuditTrailService {
 
     private static final String GENESIS_HASH = "genesis";
-    private static final int MAX_RETRY_ATTEMPTS = 3;
 
     private final AuditTrailMapper auditTrailMapper;
     private final UserMapper userMapper;
 
     /**
-     * Record an audit trail entry with SHA-256 chain hashing.
-     *
-     * Retries on DuplicateKeyException (sequence_no collision from concurrent writes)
-     * up to MAX_RETRY_ATTEMPTS times with exponential backoff.
-     */
-    public AuditTrail recordAudit(AuditTrailEvent event) {
-        DuplicateKeyException lastException = null;
-        for (int attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
-            try {
-                return doRecordAudit(event);
-            } catch (DuplicateKeyException e) {
-                lastException = e;
-                log.warn("Audit trail sequence collision (attempt {}/{}), retrying...",
-                        attempt, MAX_RETRY_ATTEMPTS);
-                if (attempt < MAX_RETRY_ATTEMPTS) {
-                    try {
-                        Thread.sleep(50L * (1L << (attempt - 1)));
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                        throw new RuntimeException("Interrupted during audit trail retry", ie);
-                    }
-                }
-            }
-        }
-        throw new RuntimeException("Failed to record audit trail after " +
-                MAX_RETRY_ATTEMPTS + " attempts due to sequence collisions", lastException);
-    }
-
-    /**
-     * Internal method that performs the actual audit record insertion.
-     * Uses REQUIRES_NEW propagation so each retry attempt gets a fresh transaction.
+     * Append one record in an independent transaction, holding the tenant chain lock
+     * through commit. The annotation is on the externally invoked entry point:
+     * self-invocation would neither start a transaction nor recover an aborted one.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public AuditTrail doRecordAudit(AuditTrailEvent event) {
+    public AuditTrail recordAudit(AuditTrailEvent event) {
         Long tenantId = event.getTenantId();
+        if (tenantId == null) {
+            throw new IllegalArgumentException("Audit event tenantId is required");
+        }
+        auditTrailMapper.lockTenantChain(tenantId);
 
-        // 1. Get current max sequence_no (atomic read under the new transaction)
+        // 1. Read the chain head only after acquiring the transaction-scoped lock.
         Long maxSeq = auditTrailMapper.getMaxSequenceNo(tenantId);
         long nextSeq = (maxSeq == null) ? 1L : maxSeq + 1L;
 
@@ -99,8 +78,9 @@ public class AuditTrailService {
         }
 
         // 3. Build the audit trail record
-        Instant now = Instant.now();
+        Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         AuditTrail record = new AuditTrail();
+        record.setHashVersion(2);
         record.setTenantId(tenantId);
         record.setSequenceNo(nextSeq);
         record.setEventType(event.getEventType());
@@ -294,6 +274,13 @@ public class AuditTrailService {
      * Null values are represented as empty strings.
      */
     String buildCanonicalString(AuditTrail record) {
+        int version = record.getHashVersion() == null ? 1 : record.getHashVersion();
+        if (version == 2) {
+            return canonicalJson(versionTwoContent(record));
+        }
+        if (version != 1) {
+            throw new IllegalArgumentException("Unsupported audit hash version: " + version);
+        }
         StringBuilder sb = new StringBuilder();
         sb.append(nullSafe(record.getTenantId()));
         sb.append('|');
@@ -327,6 +314,54 @@ public class AuditTrailService {
         sb.append('|');
         sb.append(jsonToString(record.getMetadata()));
         return sb.toString();
+    }
+
+    private ObjectNode versionTwoContent(AuditTrail record) {
+        ObjectNode content = JsonNodeFactory.instance.objectNode();
+        content.put("hashVersion", 2);
+        content.put("tenantId", record.getTenantId());
+        content.put("sequenceNo", record.getSequenceNo());
+        content.put("eventType", record.getEventType());
+        content.put("entityType", record.getEntityType());
+        content.put("entityId", record.getEntityId());
+        content.put("entityPid", record.getEntityPid());
+        content.put("commandCode", record.getCommandCode());
+        content.put("operationType", record.getOperationType());
+        content.put("actorId", record.getActorId());
+        content.put("actorName", record.getActorName());
+        content.put("actorIp", record.getActorIp());
+        content.put("timestamp", record.getTimestamp() == null ? null : record.getTimestamp().toString());
+        content.set("beforeSnapshot", record.getBeforeSnapshot());
+        content.set("afterSnapshot", record.getAfterSnapshot());
+        content.set("metadata", record.getMetadata());
+        ArrayNode changed = content.putArray("changedFields");
+        if (record.getChangedFields() != null) {
+            for (String field : record.getChangedFields()) changed.add(field);
+        }
+        return content;
+    }
+
+    /** Stable across JSONB key order, numeric notation and nested objects. */
+    private String canonicalJson(JsonNode node) {
+        if (node == null || node.isNull()) return "null";
+        if (node.isObject()) {
+            List<String> names = new ArrayList<>();
+            node.fieldNames().forEachRemaining(names::add);
+            Collections.sort(names);
+            return names.stream()
+                    .map(name -> JsonNodeFactory.instance.textNode(name).toString()
+                            + ":" + canonicalJson(node.get(name)))
+                    .collect(Collectors.joining(",", "{", "}"));
+        }
+        if (node.isArray()) {
+            List<String> values = new ArrayList<>();
+            node.forEach(value -> values.add(canonicalJson(value)));
+            return String.join(",", values).transform(value -> "[" + value + "]");
+        }
+        if (node.isNumber()) {
+            return node.decimalValue().stripTrailingZeros().toPlainString();
+        }
+        return node.toString();
     }
 
     /**

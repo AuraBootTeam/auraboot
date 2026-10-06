@@ -11,6 +11,8 @@ import com.auraboot.framework.meta.entity.CommandDefinition;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.meta.service.DataPermissionEngine;
+import com.auraboot.framework.meta.service.DataDomainService;
 import com.auraboot.framework.permission.engine.model.FieldPermissionSet;
 import com.auraboot.framework.permission.service.FieldPermissionService;
 import org.junit.jupiter.api.AfterEach;
@@ -22,6 +24,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -48,6 +51,12 @@ class CommandFieldMapExecutorFieldPermissionTest {
     @Mock
     private FieldPermissionService fieldPermissionService;
 
+    @Mock
+    private DataPermissionEngine dataPermissionEngine;
+
+    @Mock
+    private DataDomainService dataDomainService;
+
     @InjectMocks
     private CommandFieldMapExecutor executor;
 
@@ -60,6 +69,76 @@ class CommandFieldMapExecutorFieldPermissionTest {
     @AfterEach
     void tearDown() {
         MetaContext.clear();
+    }
+
+    @Test
+    void implicitUpdatePreservesExplicitNullAndLeavesOmittedFieldsUnchanged() {
+        assertUpdateClearsOnlySubmittedField(false);
+    }
+
+    @Test
+    void explicitUpdatePreservesMappedNullAndLeavesOmittedFieldsUnchanged() {
+        assertUpdateClearsOnlySubmittedField(true);
+    }
+
+    private void assertUpdateClearsOnlySubmittedField(boolean explicit) {
+        when(metaModelService.getModelDefinition(MODEL)).thenReturn(Optional.of(modelDefinition()));
+        when(fieldPermissionService.getFieldPermissions(MEMBER_ID, MODEL))
+                .thenReturn(FieldPermissionSet.allAllowed(Set.of("name", "gross_margin")));
+        when(dynamicDataMapper.updateByQuery(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyMap())).thenReturn(1);
+        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL, 10L))
+                .thenReturn("AND created_by = 10");
+        when(dataDomainService.buildDomainFilter(MODEL, 10L)).thenReturn("AND domain_id = 7");
+        var payload = new HashMap<String, Object>();
+        payload.put(explicit ? "margin" : "gross_margin", null);
+        executeUpdate(explicit, payload);
+        var sql = org.mockito.ArgumentCaptor.forClass(String.class);
+        @SuppressWarnings("unchecked")
+        org.mockito.ArgumentCaptor<Map<String, Object>> params = org.mockito.ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper).updateByQuery(sql.capture(), params.capture());
+        assertThat(sql.getValue()).contains("gross_margin = #{params.").doesNotContain("name =");
+        assertThat(sql.getValue()).contains("AND created_by = 10", "AND domain_id = 7");
+        assertThat(params.getValue()).containsValue(null).containsEntry("tenantId", TENANT_ID)
+                .containsEntry("recordId", "quote-1");
+    }
+
+    @Test
+    void implicitUpdateCannotClearAFieldWithoutEditPermission() {
+        assertNullUpdateRequiresPermission(false);
+    }
+
+    @Test
+    void explicitUpdateCannotClearAMappedFieldWithoutEditPermission() {
+        assertNullUpdateRequiresPermission(true);
+    }
+
+    private void assertNullUpdateRequiresPermission(boolean explicit) {
+        when(metaModelService.getModelDefinition(MODEL)).thenReturn(Optional.of(modelDefinition()));
+        when(fieldPermissionService.getFieldPermissions(MEMBER_ID, MODEL))
+                .thenReturn(new FieldPermissionSet(Set.of("name", "gross_margin"), Set.of("name"), Set.of()));
+        var payload = new HashMap<String, Object>();
+        payload.put(explicit ? "margin" : "gross_margin", null);
+        assertThatThrownBy(() -> executeUpdate(explicit, payload)).isInstanceOf(BusinessException.class)
+                .satisfies(ex -> assertThat(((BusinessException) ex).getResponseCode())
+                        .isEqualTo(ResponseCode.FORBIDDEN));
+        verify(dynamicDataMapper, never()).updateByQuery(
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyMap());
+    }
+
+    private Map<String, Object> executeUpdate(boolean explicit, Map<String, Object> payload) {
+        var request = new CommandExecuteRequest();
+        request.setOperationType("update");
+        request.setTargetRecordId("quote-1");
+        if (explicit) {
+            return executor.executeFieldMapPhase(List.of(bindingRule("name", "name"),
+                    bindingRule("margin", "gross_margin")), payload, TENANT_ID, request);
+        }
+        var command = new CommandDefinition();
+        command.setCode("crm.quote:update");
+        command.setModelCode(MODEL);
+        return executor.executeImplicitFieldMapPhase(Map.of("type", "update",
+                "inputFields", List.of("name", "gross_margin")), payload, TENANT_ID, request, command);
     }
 
     @Test

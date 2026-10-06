@@ -127,6 +127,23 @@ wait_for_port() {
     return 1
 }
 
+# A killed tmux pane can disappear from ps before the kernel releases its
+# listener. Wait on the fixture's own socket state before testing stale-record
+# cleanup; the product's fail-closed ownership check is never retried.
+wait_for_port_release() {
+    local port="$1"
+    local attempts=0
+    while [ "$attempts" -lt 100 ]; do
+        if [ -z "$(aura_reset_listener_pids "$port")" ] && aura_reset_port_is_bindable "$port"; then
+            return 0
+        fi
+        sleep 0.05
+        attempts=$((attempts + 1))
+    done
+    echo "fixture listener did not release: $port" >&2
+    return 1
+}
+
 wait_for_file() {
     local file="$1"
     local owner_pid="${2:-}"
@@ -484,6 +501,7 @@ tmux_replacement_pid="$(tmux display-message -p \
     -t "=$tmux_owned_session:0.0" '#{pane_pid}')"
 assert_alive "$tmux_replacement_pid"
 tmux kill-session -t "=$tmux_owned_session"
+wait_for_port_release "$tmux_web"
 aura_reset_stop_service web "$tmux_web" "$TEST_ROOT/source-a" \
     "http.server $tmux_web" "$tmux_owned_session"
 tmux kill-session -t "=$tmux_foreign_session"

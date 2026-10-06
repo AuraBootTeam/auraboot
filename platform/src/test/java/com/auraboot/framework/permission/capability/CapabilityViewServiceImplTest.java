@@ -70,7 +70,7 @@ class CapabilityViewServiceImplTest {
         when(permissionService.findRolePermissions(5L))
                 .thenReturn(List.of(perm(1L, "p1", "crm.account.read"))); // only read granted
         when(registry.listDeclarations(any())).thenReturn(List.of(
-                CapabilityDefinitionDTO.builder().code("crm.cap.account").group("客户管理").nameZhCN("维护客户资料")
+                CapabilityDefinitionDTO.builder().code("crm.cap.account").group("客户管理").nameZhCN("维护客户资料").nameEn("Manage Customer Profiles")
                         .includes(List.of("crm.account.read", "crm.account.manage")).build()));
         when(menuMapper.findAllActiveMenus()).thenReturn(List.of());
 
@@ -85,6 +85,9 @@ class CapabilityViewServiceImplTest {
         assertThat(cap.isGranted()).isFalse();
         assertThat(cap.getAuthorizationState()).isEqualTo("partial");
         assertThat(cap.getMissingCodes()).containsExactly("crm.account.manage");
+        assertThat(cap.getLocalizedLabels()).containsEntry("en", "Manage Customer Profiles");
+        verifyNoInteractions(rolePermissionService);
+        assertThat(cap.isGranted()).isFalse(); // crm.account.manage not granted
     }
 
     @Test

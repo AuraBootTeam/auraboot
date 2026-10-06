@@ -48,6 +48,14 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+      # Existing runtime SQL pin: 5.4 reserves currently unquoted columns.
+      - dependency-name: "com.github.jsqlparser:jsqlparser"
+        versions: ["5.4"]
+      # Offline instrumentation and reports must keep the same validated version.
+      - dependency-name: "org.jacoco:org.jacoco.ant"
+        versions: ["0.8.15"]
+      - dependency-name: "org.jacoco:org.jacoco.agent"
+        versions: ["0.8.15"]
       # 3.5.17 no longer exposes the extension API through the current starter
       # classpath. Keep later versions eligible for a dedicated migration.
       - dependency-name: "com.baomidou:*"

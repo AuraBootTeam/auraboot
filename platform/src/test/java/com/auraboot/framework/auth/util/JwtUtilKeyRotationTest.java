@@ -86,7 +86,7 @@ class JwtUtilKeyRotationTest {
         CustomUserDetails user = mockUser("pid-actor");
         SessionTokenContext context = new SessionTokenContext(
                 11L, 12L, 13L, 14L, ExecutionScope.PARTY,
-                15L, 16L, SessionStage.READY, 7L, 3);
+                15L, 16L, SessionStage.READY, 7L, 3, false, null, null);
 
         String token = util.generateTokenWithContext(user, "pid-actor", context);
 
@@ -100,6 +100,49 @@ class JwtUtilKeyRotationTest {
         assertThat(util.extractSessionStage(token)).isEqualTo("ready");
         assertThat(util.extractContextVersion(token)).isEqualTo(7L);
         assertThat(util.extractSecurityVersion(token)).isEqualTo(3);
+    }
+
+    @Test
+    void impersonationTokenCarriesDualIdentityAndShortDeadline() {
+        JwtUtil util = createUtil(SECRET_A, KID_A, null, null);
+        CustomUserDetails user = mockUser("customer-pid");
+        SessionTokenContext context = new SessionTokenContext(
+                11L, 12L, 13L, 14L, ExecutionScope.TENANT,
+                null, null, SessionStage.READY, 1L, 2,
+                true, 99L, "web");
+
+        Instant before = Instant.now();
+        String token = util.generateImpersonationToken(
+                user, "customer-pid", context, "session-pid", 1800);
+
+        assertThat(util.extractSessionId(token)).isEqualTo("session-pid");
+        assertThat(util.extractImpersonation(token)).isTrue();
+        assertThat(util.extractOperatorUserId(token)).isEqualTo(99L);
+        assertThat(util.extractClientType(token)).isEqualTo("web");
+        assertThat(util.extractExpiration(token).toInstant())
+                .isAfter(before.plusSeconds(1790))
+                .isBefore(before.plusSeconds(1810));
+    }
+
+    @Test
+    void impersonationTokenRequiresAnOperatorAndBoundedTtl() {
+        JwtUtil util = createUtil(SECRET_A, KID_A, null, null);
+        CustomUserDetails user = mockUser("customer-pid");
+        SessionTokenContext missingOperator = new SessionTokenContext(
+                11L, 12L, null, null, ExecutionScope.TENANT,
+                null, null, SessionStage.READY, 1L, 0,
+                true, null, "web");
+
+        assertThatThrownBy(() -> util.generateImpersonationToken(
+                user, "customer-pid", missingOperator, "sid", 1800))
+                .isInstanceOf(IllegalArgumentException.class);
+        SessionTokenContext valid = new SessionTokenContext(
+                11L, 12L, null, null, ExecutionScope.TENANT,
+                null, null, SessionStage.READY, 1L, 0,
+                true, 99L, "web");
+        assertThatThrownBy(() -> util.generateImpersonationToken(
+                user, "customer-pid", valid, "sid", 3601))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     // --- Dual-key rotation: old tokens still verify ---

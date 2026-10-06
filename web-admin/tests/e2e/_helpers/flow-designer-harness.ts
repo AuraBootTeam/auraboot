@@ -124,6 +124,22 @@ async function closeCompactPaletteDrawer(page: Page): Promise<void> {
   }
 }
 
+/** Open a responsive designer panel using the same toggle as a user. */
+export async function openFlowDesignerPanel(page: Page, panel: 'palette' | 'inspector'): Promise<void> {
+  const workspace = page.getByTestId('flow-designer-workspace');
+  // The initial viewport mode may precede ResizeObserver's container-width mode.
+  // Wait for the actual responsive layout before deciding whether to toggle.
+  await expect.poll(async () => workspace.evaluate((element) =>
+    element.getAttribute('data-layout') === (element.clientWidth < 1440 ? 'compact' : 'wide'),
+  )).toBe(true);
+  const shell = page.getByTestId(`flow-${panel}-shell`);
+  if (await shell.getAttribute('data-open') !== 'true') {
+    await page.getByTestId(`flow-toggle-${panel}`).click();
+  }
+  await expect(shell).toBeVisible();
+  await expect(shell).toHaveAttribute('data-open', 'true');
+}
+
 /** Current node ids on the canvas (by flow-node-<id> testid). */
 export async function currentNodeIds(page: Page): Promise<string[]> {
   return page.$$eval('[data-testid^="flow-node-"]', (els) =>

@@ -280,11 +280,23 @@ public class PluginImportController {
                 .autoPublishCommands(request.getAutoPublishCommands())
                 .autoPublishPages(request.getAutoPublishPages())
                 .createResourcePermissions(request.getCreateResourcePermissions())
+                .identifierMappingPath(request.getIdentifierMappingPath())
                 .build();
 
         ImportExecuteResult result = importService.execute(preview.getImportId(), importRequest);
 
         return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/reconcile-directory-role-permissions")
+    @Operation(summary = "Reconcile declared role permissions after batch import")
+    public ResponseEntity<ApiResponse<Integer>> reconcileDirectoryRolePermissions(
+            @RequestBody DirectoryImportRequest request) {
+        if (request.getPath() == null || request.getPath().isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(ApiResponse.success(
+                importService.reconcileDirectoryRolePermissions(request.getPath())));
     }
 
     /**
@@ -309,6 +321,9 @@ public class PluginImportController {
         // Used by batch cold-reset of cyclic plugin sets (e.g. crm↔sales). See
         // PluginImportService.verifyImportReferenceIntegrity().
         private Boolean deferReferenceValidation;
+        // Plugin rename upgrade contract: optional identifier-mapping JSON consumed by
+        // IdentifierMappingDataMigrator after the imported models are published.
+        private String identifierMappingPath;
     }
 
     // ==================== Preview ====================

@@ -2,6 +2,7 @@ package com.auraboot.framework.menu.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.menu.entity.Menu;
+import com.auraboot.framework.menu.service.ApplicationNavigationPolicy;
 import com.auraboot.framework.menu.mapper.MenuMapper;
 import com.auraboot.framework.menu.service.MenuEnvironmentScopeService;
 import com.auraboot.framework.menu.service.MenuService;
@@ -216,8 +217,10 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
 
     private List<Menu> releaseMenuTree(Long tenantId, Set<String> permissionCodes) {
         if (!releaseReadsEnabled(tenantId)) return List.of();
-        return filterReleaseMenus(applicationRuntimeDefinitionCatalog.menuTree(
-                tenantId, defaultApplicationCode.trim()), permissionCodes);
+        List<Menu> roots = applicationRuntimeDefinitionCatalog.menuTree(tenantId, defaultApplicationCode.trim());
+        boolean deduplicate = ApplicationNavigationPolicy.declared(roots);
+        List<Menu> allowed = filterReleaseMenus(roots, permissionCodes);
+        return deduplicate ? ApplicationNavigationPolicy.deduplicateVisible(allowed) : allowed;
     }
 
     private List<Menu> filterReleaseMenus(List<Menu> menus, Set<String> permissionCodes) {
@@ -242,7 +245,12 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
     
     @Override
     public boolean hasMenuPermission(Long userId, String permissionCode, Long tenantId) {
-        // 1. 通过permissionCode查询Menu
+        if (userId == null || tenantId == null || permissionCode == null || permissionCode.isBlank()) return false;
+        if (releaseReadsEnabled(tenantId) && containsMenuPermission(
+                releaseMenuTree(tenantId, userPermissionService.getUserPermissionCodes(userId)), permissionCode)) {
+            return true;
+        }
+        // Platform/legacy menus retain their persisted subject visibility check.
         Menu menu = baseMapper.findByPermissionCode(permissionCode);
 
         if (!MenuEnvironmentScopeService.isVisibleIn(
@@ -259,6 +267,15 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
 
 
     
+    private boolean containsMenuPermission(List<Menu> menus, String permissionCode) {
+        for (Menu menu : menus) {
+            if (Objects.equals(menu.getPermissionCode(), permissionCode)
+                    && MenuEnvironmentScopeService.isVisibleIn(menu, MetaContext.getCurrentEnvironmentId())) return true;
+            if (menu.getChildren() != null && containsMenuPermission(menu.getChildren(), permissionCode)) return true;
+        }
+        return false;
+    }
+
     @Override
     @Transactional
     public Menu createMenu(Menu menu) {

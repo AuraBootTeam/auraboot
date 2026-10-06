@@ -6,9 +6,10 @@
  * @since 3.2.0
  */
 
-import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { searchService } from './SearchService';
 import type { SearchScope, SearchResult, SearchState } from './types';
+import { useI18n } from '~/contexts/I18nContext';
 
 interface SearchPanelProps {
   /** Default scope */
@@ -30,13 +31,7 @@ interface SearchPanelProps {
 /**
  * Scope options
  */
-const SCOPE_OPTIONS: Array<{ value: SearchScope; label: string }> = [
-  { value: 'all', label: '全部' },
-  { value: 'fields', label: '字段' },
-  { value: 'components', label: '组件' },
-  { value: 'bindings', label: '绑定' },
-  { value: 'actions', label: '动作' },
-];
+const SCOPE_OPTIONS: SearchScope[] = ['all', 'fields', 'components', 'bindings', 'actions'];
 
 /**
  * Result type icons
@@ -72,12 +67,13 @@ const TYPE_COLORS: Record<string, string> = {
 export const SearchPanel: React.FC<SearchPanelProps> = ({
   defaultScope = 'all',
   onSelect,
-  placeholder = '搜索字段、组件、绑定...',
+  placeholder,
   autoFocus = false,
   showScopeTabs = true,
   compact = false,
   className = '',
 }) => {
+  const { t } = useI18n();
   const [scope, setScope] = useState<SearchScope>(defaultScope);
   const [query, setQuery] = useState('');
   const [state, setState] = useState<SearchState>(searchService.getState());
@@ -220,16 +216,16 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
         <div className="mb-2 flex gap-1 overflow-x-auto">
           {SCOPE_OPTIONS.map((option) => (
             <button
-              key={option.value}
+              key={option}
               type="button"
-              onClick={() => setScope(option.value)}
+              onClick={() => setScope(option)}
               className={`rounded px-2 py-1 text-xs whitespace-nowrap transition-colors ${
-                scope === option.value
+                scope === option
                   ? 'bg-blue-100 text-blue-700'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               } `}
             >
-              {option.label}
+              {t(`designer_search.scope.${option}`)}
             </button>
           ))}
         </div>
@@ -259,13 +255,14 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
             onFocus={handleInputFocus}
             onBlur={handleInputBlur}
             onKeyDown={handleKeyDown}
-            placeholder={placeholder}
+            placeholder={placeholder ?? t('designer_search.placeholder')}
             className={`w-full rounded-md border border-gray-200 pr-8 pl-9 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none ${compact ? 'py-1.5 text-sm' : 'py-2'} `}
           />
           {query && (
             <button
               type="button"
               onClick={handleClear}
+              aria-label={t('designer_search.clear_query')}
               className="absolute top-1/2 right-2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
             >
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -283,7 +280,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
         {/* History dropdown */}
         {showHistory && state.history.length > 0 && (
           <div className="absolute z-50 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg">
-            <div className="border-b border-gray-100 p-2 text-xs text-gray-400">搜索历史</div>
+            <div className="border-b border-gray-100 p-2 text-xs text-gray-400">{t('designer_search.history')}</div>
             {state.history.slice(0, 5).map((historyQuery, index) => (
               <button
                 key={index}
@@ -312,7 +309,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
               onClick={() => searchService.clearHistory()}
               className="w-full border-t border-gray-100 px-3 py-1.5 text-xs text-gray-400 hover:text-red-500"
             >
-              清除历史
+              {t('designer_search.clear_history')}
             </button>
           </div>
         )}
@@ -320,18 +317,20 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
 
       {/* Loading */}
       {state.loading && (
-        <div className="flex items-center justify-center py-4">
+        <div role="status" aria-label={t('designer_search.searching')} className="flex items-center justify-center py-4">
           <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
         </div>
       )}
 
       {/* Error */}
       {state.error && (
-        <div className="mt-2 rounded bg-red-50 p-2 text-sm text-red-600">{state.error}</div>
+        <div role="alert" className="mt-2 rounded bg-red-50 p-2 text-sm text-red-600">
+          {state.errorKey ? t(state.errorKey) : state.error}
+        </div>
       )}
 
       {/* Results */}
-      {!state.loading && query && state.results.length > 0 && (
+      {!state.loading && !state.error && query && state.results.length > 0 && (
         <div
           ref={resultsRef}
           className="mt-2 max-h-80 overflow-auto rounded-md border border-gray-200"
@@ -387,9 +386,9 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
       )}
 
       {/* No results */}
-      {!state.loading && query && state.results.length === 0 && (
+      {!state.loading && !state.error && query && state.results.length === 0 && (
         <div className="mt-2 py-4 text-center text-sm text-gray-500">
-          没有找到匹配 "{query}" 的结果
+          {t('designer_search.no_results', { query })}
         </div>
       )}
     </div>

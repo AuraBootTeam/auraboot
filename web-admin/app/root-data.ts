@@ -4,6 +4,7 @@ import type { BrandingConfig, BuildIdentity } from '~/config/branding';
 import type { IcpComplianceConfig } from '~/config/icpCompliance';
 import type { BootstrapStatus } from '~/services/bootstrapStatus';
 import type { AccessPolicy } from '~/services/accessPolicy';
+import type { ImpersonationSessionInfo } from '~/shared/services/session';
 
 export interface RootLoaderData {
   runtimeProfile: RuntimeProfile;
@@ -22,6 +23,7 @@ export interface RootLoaderData {
   branding: BrandingConfig;
   buildIdentity: BuildIdentity;
   accessPolicy: AccessPolicy;
+  impersonation: ImpersonationSessionInfo | null;
 }
 
 export function useRootLoaderData(): RootLoaderData | undefined {

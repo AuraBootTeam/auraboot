@@ -105,7 +105,7 @@ export function chartConfigToSpec(config: ChartConfig): {
   }));
   const measures: ChartMeasure[] = (config.dataSource.metrics ?? []).map((m) => ({
     field: m.field,
-    aggregation: m.aggregation,
+    aggregation: m.aggregation === 'none' ? undefined : m.aggregation,
     label: m.alias,
   }));
 

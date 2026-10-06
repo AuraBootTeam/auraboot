@@ -47,6 +47,7 @@ public class DesignRuleValidator implements PluginValidator {
 
         if (pages != null) {
             for (PageSchemaDTO page : pages) {
+                if (page == null) continue;
                 String modelCode = page.getModelCode();
                 if (modelCode == null) continue;
                 String kind = page.getKind();
@@ -59,6 +60,7 @@ public class DesignRuleValidator implements PluginValidator {
         }
 
         for (ModelDefinitionDTO model : models) {
+            if (model == null) continue;
             String modelType = model.getModelType();
             // Only check ENTITY models (skip VIEW, CONFIG, etc.)
             if (!"entity".equalsIgnoreCase(modelType)) continue;
@@ -89,7 +91,11 @@ public class DesignRuleValidator implements PluginValidator {
 
         for (int i = 0; i < commands.size(); i++) {
             CommandDefinitionDTO cmd = commands.get(i);
+            if (cmd == null) continue;
             Map<String, Object> execConfig = cmd.getConsolidatedExecutionConfig();
+            // Structural validation owns incomplete commands. Missing metadata
+            // must not make this advisory quality validator fail internally.
+            if (execConfig == null) execConfig = Map.of();
             String type = (String) execConfig.get("type");
             String code = cmd.getCode();
 

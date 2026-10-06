@@ -51,6 +51,6 @@ class AccountSecurityPolicyControllerTest {
         assertThat(response.getData().getLockout().getDurationMinutes()).isEqualTo(30);
         assertThat(response.getData().getLockout().getMaxAttemptsDisplay()).isEqualTo("5 次失败");
         assertThat(response.getData().getLockout().getDurationDisplay()).isEqualTo("30 分钟");
-        assertThat(response.getData().getNotesText()).contains("部署级配置");
+        assertThat(response.getData().getNotesText()).contains("由系统管理员统一配置");
     }
 }

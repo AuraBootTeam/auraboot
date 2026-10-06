@@ -36,6 +36,9 @@ public class CapabilityRecord {
 
     private String description;
 
+    @TableField("description_en")
+    private String descriptionEn;
+
     /** Comma-separated permission codes. Column include_codes (field matches via underscore-to-camel;
      *  not named 'includes' because that is a jsqlparser keyword and breaks the MP SQL parser). */
     private String includeCodes;

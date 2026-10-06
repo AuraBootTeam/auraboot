@@ -7,6 +7,7 @@
  */
 
 import { DependencyGraph } from './DependencyGraph';
+import { evaluateScopedExpression } from '~/framework/meta/runtime/expression/scopedEval';
 import type {
   ComputedFieldDef,
   ComputedFieldResult,
@@ -179,10 +180,6 @@ export class ComputedFieldEngine {
     scope['Date'] = Date;
 
     // Simple expression evaluator using Function constructor
-    // Restricted to the provided scope (no access to global objects)
-    const keys = Object.keys(scope);
-    const values = Object.values(scope);
-
     try {
       // Handle template expressions like ${field1 + field2}
       let expr = expression.trim();
@@ -190,8 +187,9 @@ export class ComputedFieldEngine {
         expr = expr.slice(2, -1).trim();
       }
 
-      const fn = new Function(...keys, `"use strict"; return (${expr});`);
-      return fn(...values);
+      // Sandbox AST interpreter (was: new Function compilation — injection
+      // vector). Scope keys resolve as identifiers via the context bridge.
+      return evaluateScopedExpression(expr, scope, { strict: true });
     } catch {
       // Fallback: try as a simple field reference
       const fieldRef = expression.replace(/^\$\{|\}$/g, '').trim();

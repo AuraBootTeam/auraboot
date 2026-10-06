@@ -15,7 +15,12 @@
  */
 
 import type { Page } from '@playwright/test';
-import { widgetDefinitions } from '../../../app/plugins/core-dashboard/widgets/widgetRegistry';
+import { createRequire } from 'node:module';
+import { getLocalizedText } from '../../../app/framework/meta/runtime/expression/i18n-renderer';
+// Load registry through Playwright's CommonJS transform so JSON catalogs work in Node.
+const { widgetDefinitions } = createRequire(import.meta.url)(
+  '../../../app/plugins/core-dashboard/widgets/widgetRegistry',
+) as typeof import('../../../app/plugins/core-dashboard/widgets/widgetRegistry');
 import type { PropertySchema } from '../../../app/plugins/core-dashboard/types';
 import { test, expect } from '../../fixtures';
 import { DashboardDesignerPage } from '../../pages';
@@ -81,7 +86,7 @@ const STATIC_PAYLOAD_DATA_SOURCE = {
 };
 
 const CONFIG_SCHEMA_WIDGETS = widgetDefinitions.map((widget) => ({
-  label: widget.label,
+  label: getLocalizedText(widget.label, 'zh-CN'),
   type: widget.type,
   configSchema: widget.configSchema ?? [],
 }));
@@ -482,12 +487,21 @@ async function saveDashboardAndReadBack(
   return readBody.data;
 }
 
+function expectedPersistedTitle(widgetCase: WidgetPayloadCase) {
+  const definition = widgetDefinitions.find((widget) => widget.type === widgetCase.type);
+  const title = definition?.defaultConfig.title;
+  if (title && typeof title === 'object') {
+    return { ...title, 'zh-CN': widgetCase.expectedTitle ?? widgetCase.label };
+  }
+  return widgetCase.expectedTitle ?? widgetCase.label;
+}
+
 function widgetPropertyTestId(key: string): string {
   return `widget-prop-${key.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
 }
 
 async function setWidgetProperty(page: Page, edit: WidgetPropertyEdit): Promise<void> {
-  const field = page.getByTestId(widgetPropertyTestId(edit.key));
+  const field = page.getByTestId(widgetPropertyTestId(edit.key) + (edit.key === 'title' ? '-zh' : ''));
   await expect(field).toBeVisible({ timeout: 5000 });
 
   switch (edit.kind) {
@@ -1260,7 +1274,7 @@ test.describe('Dashboard Widget Types — Saved Payload', () => {
       expect(widget.componentType).toBe(widgetCase.type);
       expectWidgetLayout(widget, widgetCase.size);
       expect(widget.config).toMatchObject({
-        title: widgetCase.expectedTitle ?? widgetCase.label,
+        title: expectedPersistedTitle(widgetCase),
         dataSource: widgetCase.dataSource,
         ...widgetCase.expectedConfig,
       });

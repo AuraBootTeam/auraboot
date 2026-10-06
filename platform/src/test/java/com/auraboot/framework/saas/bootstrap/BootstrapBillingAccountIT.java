@@ -3,7 +3,6 @@ package com.auraboot.framework.saas.bootstrap;
 import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.saas.bootstrap.dto.BootstrapRequest;
 import com.auraboot.framework.saas.config.service.SystemConfigService;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -32,11 +31,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code @Transactional} scope for the core pipeline).  Instead, this test
  * runs bootstrap via {@link TransactionTemplate} with
  * {@code PROPAGATION_NOT_SUPPORTED} so that bootstrap's own transaction
- * management is in control, and performs manual cleanup in {@link #cleanup()}.
+ * management is in control. Committed facts remain in the dedicated database.
  *
- * <p><b>Isolation:</b> the {@code destructive-bootstrap} tag is excluded from the shared
- * {@code test} task and executed by {@code bootstrapBillingAccountTest} only after that task.
- * The CI runner destroys the dedicated database immediately afterwards.
+ * <p><b>Isolation:</b> the legacy {@code destructive-bootstrap} tag remains excluded from the shared
+ * {@code test} task. The dedicated task requires BOOTSTRAP_TEST_DATABASE_URL for a separately
+ * migrated blank database. Immutable binding facts are never truncated or deleted for cleanup.
  */
 @SpringBootTest(classes = TestApplication.class)
 @ActiveProfiles("integration-test")
@@ -53,54 +52,40 @@ class BootstrapBillingAccountIT {
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
-    private PlatformTransactionManager transactionManager;
+    private SystemConfigService systemConfigService;
 
     @Autowired
-    private SystemConfigService systemConfigService;
+    private PlatformTransactionManager transactionManager;
 
     /** Always mocked per project convention — never send real mail in tests. */
     @MockitoBean
     @SuppressWarnings("unused")
     private JavaMailSender mailSender;
 
-    // ── state ─────────────────────────────────────────────────────────────────
-
-    /** Set to true if bootstrap actually ran (so cleanup knows what to scrub). */
-    private boolean bootstrapRan = false;
-
     // ── lifecycle ─────────────────────────────────────────────────────────────
 
-    /**
-     * Guard: skip if the system is already initialized (e.g. another test in the
-     * suite ran bootstrap first without cleanup).  A fresh reset-db will always
-     * pass this gate.
-     */
+    /** Fail closed on an initialized or populated database; never reset retained facts. */
     @BeforeEach
-    void resetBootstrapState() {
-        TransactionTemplate tx = new TransactionTemplate(transactionManager);
-        tx.executeWithoutResult(status -> cleanupBootstrapRows());
+    void assertBlankBootstrapDatabase() {
+        assertThat(System.getenv("AURA_BOOTSTRAP_ISOLATED_DATABASE"))
+                .as("use the dedicated database provisioned by scripts/oss-backend-unit-ci.sh")
+                .isEqualTo("1");
+        assertThat(jdbcTemplate.queryForObject("SELECT current_database()", String.class))
+                .startsWith("aura_boot_bootstrap_");
         systemConfigService.evictCache();
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ab_tenant", Integer.class))
+                .as("bootstrap verification requires its own blank migrated database")
+                .isZero();
         Integer initialized = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM ab_system_config WHERE config_key = 'system.initialized' AND config_value = 'true'",
                 Integer.class);
         assertThat(initialized)
                 .as("system must be uninitialized before this test runs; "
-                        + "run `scripts/reset-db.sh` on enterprise_5 first")
+                        + "provide a newly migrated BOOTSTRAP_TEST_DATABASE_URL")
                 .isZero();
-    }
-
-    /**
-     * Hard cleanup: remove every row created by the bootstrap, in reverse
-     * FK-safe order.  Runs even if the test assertion fails.
-     */
-    @AfterEach
-    void cleanup() {
-        if (!bootstrapRan) {
-            return;
-        }
-        TransactionTemplate tx = new TransactionTemplate(transactionManager);
-        tx.executeWithoutResult(status -> cleanupBootstrapRows());
-        systemConfigService.evictCache();
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ab_bootstrap", Integer.class))
+                .as("bootstrap progress must not be inherited from an earlier run")
+                .isZero();
     }
 
     // ── test ─────────────────────────────────────────────────────────────────
@@ -123,8 +108,6 @@ class BootstrapBillingAccountIT {
                         new org.springframework.transaction.support.DefaultTransactionDefinition(
                                 org.springframework.transaction.TransactionDefinition.PROPAGATION_NOT_SUPPORTED))
                         .execute(status -> bootstrapEngineService.execute(req));
-
-        bootstrapRan = true;
 
         // Assert — bootstrap must succeed
         assertThat(result).isNotNull();
@@ -155,21 +138,4 @@ class BootstrapBillingAccountIT {
                 .isEqualTo("active");
     }
 
-    private void cleanupBootstrapRows() {
-        // This test owns an isolated, terminal test task. Truncating the tenant root with
-        // CASCADE clears newer tenant/member dependants (sessions, Party Actor rows, etc.)
-        // without maintaining a fragile hand-written FK order every time the schema grows.
-        jdbcTemplate.execute("TRUNCATE TABLE ab_tenant CASCADE");
-        jdbcTemplate.update("DELETE FROM ab_user_role WHERE 1=1");
-        jdbcTemplate.update("DELETE FROM ab_role_permission WHERE 1=1");
-        jdbcTemplate.update("DELETE FROM ab_subject_permission WHERE 1=1");
-        jdbcTemplate.update("DELETE FROM ab_menu WHERE 1=1");
-        jdbcTemplate.update("DELETE FROM ab_invitation WHERE 1=1");
-        jdbcTemplate.update("DELETE FROM ab_role WHERE 1=1");
-        jdbcTemplate.execute("TRUNCATE TABLE ab_billing_account CASCADE");
-        jdbcTemplate.update("DELETE FROM ab_user WHERE 1=1");
-        jdbcTemplate.update("DELETE FROM ab_system_config WHERE 1=1");
-        jdbcTemplate.update("DELETE FROM ab_bootstrap WHERE 1=1");
-        jdbcTemplate.update("DELETE FROM ab_permission WHERE 1=1");
-    }
 }

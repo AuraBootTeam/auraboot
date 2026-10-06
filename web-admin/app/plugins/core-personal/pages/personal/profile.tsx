@@ -11,6 +11,7 @@ import {
 import { getUserProfile, updateUserProfile, uploadAvatar } from '~/shared/services/profile';
 import type { UserProfile, UpdateUserProfileRequest } from '~/types/profile';
 import { useToast } from '~/contexts/ToastContext';
+import { useI18n } from '~/contexts/I18nContext';
 
 // Loader函数 - 获取用户资料
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -230,9 +231,9 @@ function FormField({
 // 信息显示组件
 function InfoDisplay({ label, value }: { label: string; value: string }) {
   return (
-    <div>
+    <div className="min-w-0">
       <label className="mb-1 block text-sm font-medium text-gray-700">{label}</label>
-      <p className="text-gray-900">{value || '未设置'}</p>
+      <p className="text-gray-900 [overflow-wrap:anywhere]">{value || '未设置'}</p>
     </div>
   );
 }
@@ -278,6 +279,7 @@ function ErrorDisplay({ error, onRetry }: { error: string; onRetry: () => void }
 }
 
 export default function PersonalProfile() {
+  const { t, locale } = useI18n();
   const { showSuccessToast: showSuccessToast2, showErrorToast: showErrorToast2 } = useToast();
   const showToast2 = (message: string, type: 'success' | 'error') => {
     if (type === 'success') {
@@ -500,7 +502,7 @@ export default function PersonalProfile() {
                     <InfoDisplay label="地区" value={profile.area || ''} />
                     <InfoDisplay
                       label="注册时间"
-                      value={new Date(profile.createdAt).toLocaleString()}
+                      value={profile.createdAt == null ? t('common.notSet', undefined, locale.startsWith('zh') ? '未设置' : 'Not set') : new Date(profile.createdAt).toLocaleString(locale)}
                     />
                   </div>
 
@@ -529,18 +531,18 @@ export default function PersonalProfile() {
       {/* Social Account Binding Section */}
       <div className="rounded-lg bg-white shadow-md">
         <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-          <h2 className="text-xl font-semibold text-gray-900">Social Account Binding</h2>
+          <h2 className="text-xl font-semibold text-gray-900">{t('profile.socialTitle', undefined, locale.startsWith('zh') ? '社交账号绑定' : 'Social Account Binding')}</h2>
           <Link
             to="/personal/social-links"
             className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
             data-testid="profile-social-links-link"
           >
-            Manage &rarr;
+            {t('profile.manageSocial', undefined, locale.startsWith('zh') ? '管理绑定' : 'Manage')} &rarr;
           </Link>
         </div>
         <div className="p-6">
           <p className="text-sm text-gray-500">
-            Link your social accounts (WeChat, Google, Apple) for one-click login.
+            {t('profile.socialHelp', undefined, locale.startsWith('zh') ? '绑定微信、Google 或 Apple 账号，便于快捷登录。' : 'Link your social accounts (WeChat, Google, Apple) for one-click login.')}
           </p>
         </div>
       </div>
@@ -548,18 +550,18 @@ export default function PersonalProfile() {
       {/* Account Deactivation Section */}
       <div className="rounded-lg bg-white shadow-md">
         <div className="border-b border-gray-200 px-6 py-4">
-          <h2 className="text-xl font-semibold text-red-600">Account Deactivation</h2>
+          <h2 className="text-xl font-semibold text-red-600">{t('profile.deactivationTitle', undefined, locale.startsWith('zh') ? '注销账户' : 'Account Deactivation')}</h2>
         </div>
-        <div className="flex items-center justify-between p-6">
+        <div className="flex flex-col items-start gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-gray-500">
-            Permanently deactivate your account and anonymize all personal data.
+            {t('profile.deactivationHelp', undefined, locale.startsWith('zh') ? '永久注销账户，并匿名化个人数据。' : 'Permanently deactivate your account and anonymize all personal data.')}
           </p>
           <Link
             to="/personal/deactivation"
             className="rounded-md border border-red-300 px-4 py-2 text-sm whitespace-nowrap text-red-600 transition-colors hover:bg-red-50"
             data-testid="profile-deactivation-link"
           >
-            Deactivate Account
+            {t('profile.deactivate', undefined, locale.startsWith('zh') ? '注销账户' : 'Deactivate Account')}
           </Link>
         </div>
       </div>

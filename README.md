@@ -4,7 +4,7 @@
 </p>
 
 <p align="center">
-  <a href="LICENSE.txt"><img src="https://img.shields.io/badge/License-AuraBoot_v1.3-blue.svg" alt="License"></a>
+  <a href="LICENSE.txt"><img src="https://img.shields.io/badge/License-Apache_2.0_with_AuraBoot_supplements-blue.svg" alt="License"></a>
   <a href="#"><img src="https://img.shields.io/badge/Java-21-orange.svg" alt="Java 21"></a>
   <a href="#"><img src="https://img.shields.io/badge/Spring_Boot-3.5-green.svg" alt="Spring Boot 3.5"></a>
   <a href="#"><img src="https://img.shields.io/badge/React-19-blue.svg" alt="React 19"></a>
@@ -69,6 +69,8 @@ Full positioning rationale: [auraboot.com/docs/positioning](https://auraboot.com
 ### DSL Engine
 Define models, fields, commands, pages, and formulas in declarative JSON. A single model definition creates the database table, REST endpoints, form validation, and list/detail pages with no code generation step.
 
+Use [model mutation policies](docs/system-reference/model-mutation-policy.md) to protect immutable history and require command authorization for creation or deletion.
+
 ### 20+ Stage Command Pipeline
 Every data operation flows through a unified pipeline: schema validation → permission check → state machine → field mapping → handler → side effects → webhooks → audit. Fully configurable per command through DSL.
 
@@ -97,7 +99,7 @@ Multi-channel notifications (email, in-app, webhook), event bus for cross-module
 
 ## Quick Start
 
-> **Mainland-China users:** start with the Docker path below and pull the prebuilt images from the Tencent TCR mirror (see [DEPLOY.md](DEPLOY.md#pull-only-deployment-no-source-checkout-no-build)) — a plain `git clone` of this repository is unreliable from mainland networks, and the Manual Setup path additionally downloads the Gradle distribution and Maven dependencies from endpoints that are blocked there (the Gradle wrapper does not honor `http_proxy`). The Manual Setup path below expects open network access to the Gradle and Maven endpoints.
+> **Mainland-China users:** Gitee and Tencent TCR distribution are deferred; no working mainland mirror is promised. The source-build path below requires access to GitHub, container registries, Gradle and Maven dependencies. Check that connectivity first. For pull-only deployment, use a release tag whose images and first-boot procedure have been verified; see [DEPLOY.md](DEPLOY.md#pull-only-deployment-no-source-checkout-no-build).
 
 ### Docker (recommended)
 
@@ -112,7 +114,7 @@ The `full` profile starts PostgreSQL + the Spring Boot backend + the Node BFF/SS
 
 **`scripts/quickstart.sh` is not optional.** `docker compose up` starts the services and nothing else: it creates no admin user and imports no plugins. Without this step the login below fails with *"Invalid username or password"*, and even past it the platform has zero models and zero menus. The script is idempotent — run it again any time.
 
-> **Windows:** the runtime is fully supported through **Docker Desktop**, which runs the whole stack in its WSL2 backend — `docker compose --profile full up` works exactly as above. The only caveat is that `quickstart.sh` (and every other `scripts/*.sh`) is a bash script, so run it from a **WSL** shell or **Git Bash**, not PowerShell/cmd. It needs only `bash` + `curl` and talks to the published port, so `./scripts/quickstart.sh` works unchanged. Native, non-Docker Windows-host deployment is **not** supported: the reset/init/build tooling is bash-only and there is no `gradlew.bat`.
+> **Windows:** the runtime is fully supported through **Docker Desktop**, which runs the whole stack in its WSL2 backend — `docker compose --profile full up` works exactly as above. The only caveat is that `quickstart.sh` (and every other `scripts/*.sh`) is a bash script, so run it from a **WSL** shell or **Git Bash**, not PowerShell/cmd. It needs `bash`, `curl` and `python3` and talks to the published port, so `./scripts/quickstart.sh` works unchanged. Native, non-Docker Windows-host deployment is **not** supported: the reset/init/build tooling is bash-only and there is no `gradlew.bat`.
 
 Then open [http://localhost:3000](http://localhost:3000) and log in:
 
@@ -131,7 +133,7 @@ POSTGRES_PORT=15432 docker compose --profile full up --build -d
 
 #### Run from prebuilt images (no build, no clone)
 
-To just **run** AuraBoot without building from source, pull the prebuilt multi-arch images instead — you need only `docker-compose.pull.yml` + `scripts/quickstart.sh` (no `git clone`; postgres schema and backend plugins are baked into the images). Mainland-China users can pull from the Tencent TCR mirror by setting `REGISTRY=ccr.ccs.tencentyun.com/auraboot-oss`. See [DEPLOY.md → Pull-only deployment](DEPLOY.md#pull-only-deployment-no-source-checkout-no-build).
+To **run** AuraBoot without building from source, the pull-only configuration uses `docker-compose.pull.yml` + `scripts/quickstart.sh`. Use it with a verified published release tag; the current 1.0 readiness checks do not establish registry publication or a complete fresh installation. Gitee/TCR mirrors remain deferred. See [DEPLOY.md → Pull-only deployment](DEPLOY.md#pull-only-deployment-no-source-checkout-no-build).
 
 ### Manual Setup
 

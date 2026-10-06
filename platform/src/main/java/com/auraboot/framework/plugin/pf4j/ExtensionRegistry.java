@@ -4,6 +4,7 @@ import com.auraboot.framework.plugin.extension.*;
 import lombok.extern.slf4j.Slf4j;
 import org.pf4j.PluginWrapper;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
@@ -32,9 +33,21 @@ public class ExtensionRegistry {
     private final ObjectProvider<CommandHandlerExtension> coreCommandHandlerProvider;
     private final ObjectProvider<ServiceTaskActionExtension> coreServiceTaskActionProvider;
 
+    private final ObjectProvider<ApplicationModuleRegistry> applicationModuleRegistryProvider;
+
+    /** Standalone registries without product application modules retain the original constructor. */
     public ExtensionRegistry(AuraPluginManager pluginManager,
                              ObjectProvider<CommandHandlerExtension> coreCommandHandlerProvider,
                              ObjectProvider<ServiceTaskActionExtension> coreServiceTaskActionProvider) {
+        this(pluginManager, coreCommandHandlerProvider, coreServiceTaskActionProvider, null);
+    }
+
+    @Autowired
+    public ExtensionRegistry(AuraPluginManager pluginManager,
+                             ObjectProvider<CommandHandlerExtension> coreCommandHandlerProvider,
+                             ObjectProvider<ServiceTaskActionExtension> coreServiceTaskActionProvider,
+                             ObjectProvider<ApplicationModuleRegistry> applicationModuleRegistryProvider) {
+        this.applicationModuleRegistryProvider = applicationModuleRegistryProvider;
         this.pluginManager = pluginManager;
         this.coreCommandHandlerProvider = coreCommandHandlerProvider;
         this.coreServiceTaskActionProvider = coreServiceTaskActionProvider;
@@ -48,6 +61,9 @@ public class ExtensionRegistry {
     private final Map<String, List<ValidatorExtension>> validators = new ConcurrentHashMap<>();
     private final Map<String, List<MenuProviderExtension>> menuProviders = new ConcurrentHashMap<>();
     private final Map<String, List<ServiceTaskActionExtension>> serviceTaskActions = new ConcurrentHashMap<>();
+
+    // Spring beans in product child contexts are invisible to host ObjectProviders.
+    private final Map<String, List<ServiceTaskActionExtension>> applicationModuleActions = new ConcurrentHashMap<>();
 
     // Global caches
     private volatile List<CommandHandlerExtension> allCommandHandlers;
@@ -104,6 +120,19 @@ public class ExtensionRegistry {
      * @return list of command handlers
      */
     public List<CommandHandlerExtension> getAllCommandHandlers() {
+        List<CommandHandlerExtension> cached = cachedCommandHandlers();
+        List<CommandHandlerExtension> modules = moduleCommandHandlers(null);
+        return modules.isEmpty() ? cached : Stream.concat(cached.stream(), modules.stream()).toList();
+    }
+
+    private List<CommandHandlerExtension> moduleCommandHandlers(String pluginId) {
+        if (applicationModuleRegistryProvider == null) return List.of();
+        ApplicationModuleRegistry modules = applicationModuleRegistryProvider.getIfAvailable();
+        // Module beans remain live: caching them would retain a stopped child context.
+        return modules == null ? List.of() : modules.commandHandlers(pluginId);
+    }
+
+    private List<CommandHandlerExtension> cachedCommandHandlers() {
         for (int attempt = 0; attempt < 3; attempt++) {
             long generation;
             synchronized (this) {
@@ -137,8 +166,10 @@ public class ExtensionRegistry {
      * @return list of command handlers
      */
     public List<CommandHandlerExtension> getCommandHandlers(String pluginId) {
-        return commandHandlers.computeIfAbsent(pluginId,
+        List<CommandHandlerExtension> indexed = commandHandlers.computeIfAbsent(pluginId,
                 id -> pluginManager.getExtensionsOfType(CommandHandlerExtension.class, id));
+        List<CommandHandlerExtension> modules = moduleCommandHandlers(pluginId);
+        return modules.isEmpty() ? indexed : Stream.concat(indexed.stream(), modules.stream()).toList();
     }
 
     // ========== ServiceTask Actions ==========
@@ -157,19 +188,33 @@ public class ExtensionRegistry {
     }
 
     /**
-     * Get all service-task action extensions. Merges two sources (same pattern as command
-     * handlers): PF4J plugin extensions and core Spring beans baked into the platform/host.
+     * Get service-task actions from PF4J, host Spring beans, and registered application modules.
      *
      * @return list of service-task action extensions
      */
-    public List<ServiceTaskActionExtension> getAllServiceTaskActions() {
+    public synchronized List<ServiceTaskActionExtension> getAllServiceTaskActions() {
         if (allServiceTaskActions == null) {
             List<ServiceTaskActionExtension> pluginActions =
                     pluginManager.getExtensionsOfType(ServiceTaskActionExtension.class);
             List<ServiceTaskActionExtension> coreActions = coreServiceTaskActionProvider.stream().toList();
-            allServiceTaskActions = Stream.concat(pluginActions.stream(), coreActions.stream()).toList();
+            allServiceTaskActions = Stream.of(pluginActions.stream(), coreActions.stream(),
+                    applicationModuleActions.values().stream().flatMap(List::stream))
+                    .flatMap(stream -> stream).distinct().toList();
         }
         return allServiceTaskActions;
+    }
+
+    public synchronized void registerApplicationModuleActions(String pluginId,
+                                                               List<ServiceTaskActionExtension> actions) {
+        applicationModuleActions.put(pluginId, List.copyOf(actions));
+        serviceTaskActions.remove(pluginId);
+        allServiceTaskActions = null;
+    }
+
+    public synchronized void unregisterApplicationModuleActions(String pluginId) {
+        applicationModuleActions.remove(pluginId);
+        serviceTaskActions.remove(pluginId);
+        allServiceTaskActions = null;
     }
 
     /**
@@ -178,9 +223,10 @@ public class ExtensionRegistry {
      * @param pluginId the plugin ID
      * @return list of service-task action extensions
      */
-    public List<ServiceTaskActionExtension> getServiceTaskActions(String pluginId) {
-        return serviceTaskActions.computeIfAbsent(pluginId,
-                id -> pluginManager.getExtensionsOfType(ServiceTaskActionExtension.class, id));
+    public synchronized List<ServiceTaskActionExtension> getServiceTaskActions(String pluginId) {
+        return serviceTaskActions.computeIfAbsent(pluginId, id -> Stream.concat(
+                pluginManager.getExtensionsOfType(ServiceTaskActionExtension.class, id).stream(),
+                applicationModuleActions.getOrDefault(id, List.of()).stream()).distinct().toList());
     }
 
     // ========== Event Listeners ==========

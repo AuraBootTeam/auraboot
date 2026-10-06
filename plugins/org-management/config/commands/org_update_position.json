@@ -1,6 +1,6 @@
 {
   "code": "org:update_position",
-  "displayName:zh-CN": "Update Position",
+  "displayName:zh-CN": "更新岗位",
   "displayName:en": "Update Position",
   "type": "update",
   "modelCode": "org_position",

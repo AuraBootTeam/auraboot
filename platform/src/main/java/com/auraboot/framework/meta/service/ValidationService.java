@@ -112,6 +112,13 @@ public interface ValidationService {
         }
     }
 
+    /** Validate every row before a mechanical bulk insert. */
+    default void validateBatchAndThrow(ModelDefinition modelDefinition,
+                                      java.util.List<Map<String, Object>> rows,
+                                      ValidationContext context) {
+        for (Map<String, Object> row : rows) validateAndThrow(modelDefinition, row, context);
+    }
+
     /**
      * Evaluate field-level domain invariants that depend on the record's CURRENT state
      * ({@link com.auraboot.framework.meta.dto.FieldDefinition#getImmutableWhen()} /

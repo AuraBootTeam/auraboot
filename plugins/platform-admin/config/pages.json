@@ -1175,6 +1175,11 @@
             "dictCode": "member_status"
           },
           {
+            "field": "created_at",
+            "width": 200,
+            "valueType": "datetime"
+          },
+          {
             "field": "join_date",
             "width": 128
           },
@@ -1434,6 +1439,16 @@
         "defaultSort": {
           "field": "created_at",
           "order": "desc"
+        },
+        "empty": {
+          "title": {
+            "zh-CN": "暂无符合条件的成员",
+            "en-US": "No matching members"
+          },
+          "description": {
+            "zh-CN": "请调整状态筛选；如尚未开通账号，可从人员开通账号。",
+            "en-US": "Adjust the status filter, or provision an account from an employee."
+          }
         }
       }
     ],
@@ -1462,6 +1477,34 @@
       "type": "stack"
     },
     "blocks": [
+      {
+        "id": "task_filters",
+        "blockType": "filters",
+        "fields": [
+          {
+            "field": "name",
+            "label": {
+              "zh-CN": "任务名称",
+              "en-US": "Task name"
+            },
+            "component": "SmartInput",
+            "placeholder": {
+              "zh-CN": "例如：每日系统健康检查",
+              "en-US": "For example: Daily system health check"
+            },
+            "helpText": {
+              "zh-CN": "按任务名称查找配置。",
+              "en-US": "Find configurations by task name."
+            },
+            "props": {
+              "placeholder": {
+                "zh-CN": "例如：每日系统健康检查",
+                "en-US": "For example: Daily system health check"
+              }
+            }
+          }
+        ]
+      },
       {
         "id": "toolbar",
         "blockType": "toolbar",
@@ -1566,6 +1609,16 @@
         "defaultSort": {
           "field": "created_at",
           "order": "desc"
+        },
+        "empty": {
+          "title": {
+            "zh-CN": "暂无定时任务",
+            "en-US": "No scheduled tasks"
+          },
+          "description": {
+            "zh-CN": "创建任务配置，或调整名称筛选查看现有任务。",
+            "en-US": "Create a task configuration or adjust the name filter to find existing tasks."
+          }
         }
       }
     ]
@@ -1586,14 +1639,22 @@
         "id": "basic",
         "blockType": "form-section",
         "title": {
-          "zh-CN": "基本信息",
-          "en-US": "Basic Information"
+          "zh-CN": "任务与触发计划",
+          "en-US": "Task and trigger plan"
         },
         "fields": [
           {
             "field": "name",
             "colSpan": 6,
-            "required": true
+            "required": true,
+            "placeholder": {
+              "zh-CN": "每日系统健康检查",
+              "en-US": "Daily system health check"
+            },
+            "helpText": {
+              "zh-CN": "同一租户内名称须唯一。",
+              "en-US": "Names must be unique within this tenant."
+            }
           },
           {
             "field": "enabled",
@@ -1606,15 +1667,39 @@
           },
           {
             "field": "cron_expression",
-            "colSpan": 4
+            "colSpan": 4,
+            "placeholder": {
+              "zh-CN": "0 0 2 * * ?",
+              "en-US": "0 0 2 * * ?"
+            },
+            "helpText": {
+              "zh-CN": "Cron任务使用六段时间格式；示例为每日02:00。",
+              "en-US": "Cron tasks use six fields; the example runs daily at 02:00."
+            }
           },
           {
             "field": "interval_ms",
-            "colSpan": 4
+            "colSpan": 4,
+            "placeholder": {
+              "zh-CN": "60000",
+              "en-US": "60000"
+            },
+            "helpText": {
+              "zh-CN": "间隔任务的执行间隔，单位为毫秒。",
+              "en-US": "Execution interval for interval tasks, in milliseconds."
+            }
           },
           {
             "field": "description",
-            "colSpan": 12
+            "colSpan": 12,
+            "placeholder": {
+              "zh-CN": "说明任务用途和维护责任",
+              "en-US": "Describe the purpose and maintenance responsibility"
+            },
+            "helpText": {
+              "zh-CN": "帮助维护人员判断配置影响。",
+              "en-US": "Help maintainers understand the configuration impact."
+            }
           }
         ]
       },
@@ -1629,11 +1714,27 @@
           {
             "field": "handler_bean",
             "colSpan": 6,
-            "required": true
+            "required": true,
+            "placeholder": {
+              "zh-CN": "systemHealthCheckTask",
+              "en-US": "systemHealthCheckTask"
+            },
+            "helpText": {
+              "zh-CN": "选择平台已注册的执行处理器名称。",
+              "en-US": "Use an execution handler registered on the platform."
+            }
           },
           {
             "field": "handler_method",
-            "colSpan": 6
+            "colSpan": 6,
+            "placeholder": {
+              "zh-CN": "execute",
+              "en-US": "execute"
+            },
+            "helpText": {
+              "zh-CN": "处理器方法名称；通常使用execute。",
+              "en-US": "Handler method name; normally execute."
+            }
           },
           {
             "field": "params",
@@ -1641,11 +1742,27 @@
           },
           {
             "field": "max_retries",
-            "colSpan": 4
+            "colSpan": 4,
+            "placeholder": {
+              "zh-CN": "0",
+              "en-US": "0"
+            },
+            "helpText": {
+              "zh-CN": "执行失败后的最大重试次数。",
+              "en-US": "Maximum retries after an execution failure."
+            }
           },
           {
             "field": "timeout_ms",
-            "colSpan": 4
+            "colSpan": 4,
+            "placeholder": {
+              "zh-CN": "30000",
+              "en-US": "30000"
+            },
+            "helpText": {
+              "zh-CN": "单次执行超时上限，单位为毫秒。",
+              "en-US": "Timeout for one execution, in milliseconds."
+            }
           }
         ]
       },
@@ -1723,11 +1840,11 @@
         ]
       },
       {
-        "id": "basic",
-        "blockType": "form-section",
+        "id": "task_summary",
+        "blockType": "detail-section",
         "title": {
-          "zh-CN": "基本信息",
-          "en-US": "Basic Information"
+          "zh-CN": "任务摘要",
+          "en-US": "Task summary"
         },
         "readOnly": true,
         "fields": [
@@ -1740,6 +1857,21 @@
             "colSpan": 6
           },
           {
+            "field": "description",
+            "colSpan": 12
+          }
+        ]
+      },
+      {
+        "id": "trigger_plan",
+        "blockType": "detail-section",
+        "title": {
+          "zh-CN": "触发计划",
+          "en-US": "Trigger plan"
+        },
+        "readOnly": true,
+        "fields": [
+          {
             "field": "task_type",
             "colSpan": 4
           },
@@ -1750,7 +1882,18 @@
           {
             "field": "interval_ms",
             "colSpan": 4
-          },
+          }
+        ]
+      },
+      {
+        "id": "execution_config",
+        "blockType": "detail-section",
+        "title": {
+          "zh-CN": "执行配置",
+          "en-US": "Execution configuration"
+        },
+        "readOnly": true,
+        "fields": [
           {
             "field": "handler_bean",
             "colSpan": 6
@@ -1778,19 +1921,15 @@
           {
             "field": "next_run_at",
             "colSpan": 3
-          },
-          {
-            "field": "description",
-            "colSpan": 12
           }
         ]
       },
       {
-        "id": "execution_logs",
+        "id": "execution_history",
         "blockType": "sub-table",
         "title": {
-          "zh-CN": "执行日志",
-          "en-US": "Execution Logs"
+          "zh-CN": "执行日志与历史",
+          "en-US": "Execution logs and history"
         },
         "dataSource": {
           "type": "api",
@@ -1859,11 +1998,22 @@
           }
         ]
       }
-    ]
+    ],
+    "extension": {
+      "showShare": false,
+      "showReport": false,
+      "showPrint": false,
+      "showPdfExport": false
+    }
   },
   {
     "pageKey": "enterprise_info_detail",
-    "name": "企业信息",
+    "name:zh-CN": "企业信息",
+    "name:en": "Enterprise Profile",
+    "title": {
+      "zh-CN": "企业信息",
+      "en": "Enterprise Profile"
+    },
     "kind": "detail",
     "schemaVersion": 4,
     "layout": {
@@ -2011,7 +2161,12 @@
   },
   {
     "pageKey": "enterprise_info_form",
-    "name": "编辑企业信息",
+    "name:zh-CN": "编辑企业信息",
+    "name:en": "Edit Enterprise Profile",
+    "title": {
+      "zh-CN": "编辑企业信息",
+      "en": "Edit Enterprise Profile"
+    },
     "kind": "form",
     "schemaVersion": 4,
     "layout": {
@@ -2444,12 +2599,12 @@
         "id": "account_security_policy_delivery_notes",
         "blockType": "detail-section",
         "title": {
-          "zh-CN": "交付说明",
-          "en": "Delivery Notes"
+          "zh-CN": "策略说明",
+          "en": "Policy Notes"
         },
         "description": {
-          "zh-CN": "说明当前只读视图的策略来源和交付边界。",
-          "en": "Explains the policy source and delivery boundary of this read-only view."
+          "zh-CN": "查看安全策略的管理方式与调整途径。",
+          "en": "Review how security policies are managed and how to request changes."
         },
         "extension": {
           "displayVariant": "settings-card",
@@ -2667,6 +2822,23 @@
             }
           }
         ]
+      }
+    ]
+  },
+  {
+    "pageKey": "auth_appearance",
+    "name:zh-CN": "品牌与登录外观",
+    "name:en": "Brand and Authentication Appearance",
+    "kind": "list",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "auth_appearance_editor",
+        "blockType": "custom",
+        "component": "AuthAppearanceEditor"
       }
     ]
   }

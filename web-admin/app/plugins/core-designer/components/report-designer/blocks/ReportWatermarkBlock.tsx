@@ -3,6 +3,7 @@
  * Supports repeating text pattern with configurable rotation, opacity, and style
  */
 
+import { useSmartText } from '~/utils/i18n';
 import React from 'react';
 import type { WatermarkBlock } from '../types';
 
@@ -12,7 +13,8 @@ interface ReportWatermarkBlockProps {
 }
 
 export const ReportWatermarkBlock: React.FC<ReportWatermarkBlockProps> = ({ block, mode }) => {
-  const text = block.text || 'watermark';
+  const localize = useSmartText();
+  const text = block.text || localize({ zh: '水印', en: 'watermark' });
   const rotation = block.rotation ?? -30;
   const opacity = block.opacity ?? 0.1;
   const fontSize = block.fontSize ?? 16;

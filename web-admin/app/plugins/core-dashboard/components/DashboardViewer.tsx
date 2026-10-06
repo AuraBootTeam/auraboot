@@ -5,10 +5,11 @@
  */
 
 import React, { useCallback, useRef, useMemo, useState, useEffect } from 'react';
-import GridLayout from 'react-grid-layout';
+import GridLayout from 'react-grid-layout/legacy';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 import { renderWidget } from './WidgetRenderer';
+import { normalizeChartType } from '~/framework/smart/charts/SharedChartFactory';
 import type { Widget, LayoutConfig } from '../types';
 import type { Layout } from '~/framework/smart/types/dashboard';
 import type { DrillDownConfig, FilterConfig } from '~/framework/smart/types/chart';
@@ -83,6 +84,8 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
     return () => resizeObserver.disconnect();
   }, []);
 
+  // Keep authored desktop geometry; stack narrow viewers in reading order.
+  const singleColumn = containerWidth < 640;
   const layout = useMemo(
     () =>
       widgets.map(
@@ -102,7 +105,7 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
     [widgets],
   );
 
-  const renderViewerWidget = (widget: Widget) => {
+  const renderViewerWidget = (widget: Widget, autoHeight = false) => {
     const linkageConfig = widget.config.linkage;
     const drillDownConfig = widget.config.drillDown;
     const cardDrillDownEnabled = Array.isArray(widget.config.cards)
@@ -117,6 +120,7 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
 
     const chartElement = renderWidget({
       widget,
+      autoHeight,
       linkageFilters: widgetLinkageFilters,
       onLinkageEmit: linkageConfig?.emitFilter
         ? (filters: FilterConfig[]) => handleLinkageEmit(groupId, filters)
@@ -142,6 +146,7 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
         value={dashboardPid ? { dashboardPid, widgetId: widget.id, usageId } : null}
       >
         <ChartWidgetWrapper
+          autoHeight={autoHeight}
           title={widgetTitle}
           dataSource={
             widget.config
@@ -192,30 +197,53 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
           <DashboardExportExcel widgets={widgets} fileName={title} />
         </div>
       )}
-      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-      <GridLayout
-        {...({
-          className: 'layout',
-          layout,
-          cols: layoutConfig.columns,
-          rowHeight: layoutConfig.rowHeight,
-          width: containerWidth,
-          margin: [layoutConfig.gap, layoutConfig.gap] as [number, number],
-          containerPadding: [0, 0] as [number, number],
-          isDraggable: false,
-          isResizable: false,
-          compactType: layoutConfig.compactType || 'vertical',
-          useCSSTransforms: true,
-        } as any)}
-      >
-        {widgets.map((widget) => (
-          <div key={widget.id} data-testid={`dashboard-block-${widget.id}`}>
-            <div className="h-full overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/92 shadow-[0_12px_34px_rgba(15,23,42,0.08)] backdrop-blur-sm dark:border-gray-700/80 dark:bg-gray-900/92 dark:shadow-[0_12px_34px_rgba(0,0,0,0.35)]">
-              {renderViewerWidget(widget)}
+      {singleColumn ? (
+        <div className="grid grid-cols-1" style={{ gap: layoutConfig.gap }}>
+          {[...widgets]
+            .sort((a, b) => a.y - b.y || a.x - b.x)
+            .map((widget) => {
+              const autoHeight = normalizeChartType(widget.type) === 'number-card';
+              const authoredHeight =
+                widget.h * layoutConfig.rowHeight + (widget.h - 1) * layoutConfig.gap;
+              return (
+                <div
+                  key={widget.id}
+                  data-testid={`dashboard-block-${widget.id}`}
+                  style={autoHeight ? undefined : { height: authoredHeight }}
+                >
+                  <div
+                    className={`${autoHeight ? 'h-auto' : 'h-full'} overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/92 shadow-[0_12px_34px_rgba(15,23,42,0.08)] backdrop-blur-sm dark:border-gray-700/80 dark:bg-gray-900/92 dark:shadow-[0_12px_34px_rgba(0,0,0,0.35)]`}
+                  >
+                    {renderViewerWidget(widget, autoHeight)}
+                  </div>
+                </div>
+              );
+            })}
+        </div>
+      ) : (
+        <GridLayout
+          className="layout"
+          layout={layout}
+          cols={layoutConfig.columns}
+          rowHeight={layoutConfig.rowHeight}
+          width={containerWidth}
+          margin={[layoutConfig.gap, layoutConfig.gap]}
+          containerPadding={[0, 0]}
+          isDraggable={false}
+          isResizable={false}
+          resizeHandles={[]}
+          compactType={layoutConfig.compactType ?? 'vertical'}
+          useCSSTransforms
+        >
+          {widgets.map((widget) => (
+            <div key={widget.id} data-testid={`dashboard-block-${widget.id}`}>
+              <div className="h-full overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/92 shadow-[0_12px_34px_rgba(15,23,42,0.08)] backdrop-blur-sm dark:border-gray-700/80 dark:bg-gray-900/92 dark:shadow-[0_12px_34px_rgba(0,0,0,0.35)]">
+                {renderViewerWidget(widget)}
+              </div>
             </div>
-          </div>
-        ))}
-      </GridLayout>
+          ))}
+        </GridLayout>
+      )}
     </div>
   );
 };

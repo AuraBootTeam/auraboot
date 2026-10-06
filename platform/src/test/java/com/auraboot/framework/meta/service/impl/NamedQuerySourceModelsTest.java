@@ -14,7 +14,8 @@ class NamedQuerySourceModelsTest {
     private final MetaModelMapper mapper = mock(MetaModelMapper.class);
     private final SecureSqlRewriter sql = mock(SecureSqlRewriter.class);
     private final org.springframework.jdbc.core.JdbcTemplate jdbc = mock(org.springframework.jdbc.core.JdbcTemplate.class);
-    private final NamedQuerySourceModels resolver = new NamedQuerySourceModels(mapper, sql, jdbc);
+    private final com.auraboot.framework.plugin.pf4j.AuraPluginManager plugins = mock(com.auraboot.framework.plugin.pf4j.AuraPluginManager.class);
+    private final NamedQuerySourceModels resolver = new NamedQuerySourceModels(mapper, sql, jdbc, plugins);
     @org.junit.jupiter.api.BeforeEach void tenantMetadata() {
         when(jdbc.queryForMap(anyString(), anyString())).thenReturn(Map.of("kind", "r", "tenant_column", true, "definition", ""));
     }
@@ -26,6 +27,41 @@ class NamedQuerySourceModelsTest {
         NamedQueryField field = new NamedQueryField(); field.setFieldCode("title"); field.setColumnExpr("title");
         return resolver.resolve(42L, table, List.of(field));
     }
+    private com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog bindSources(List<com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.BoundModelSource> sources) {
+        var catalog = mock(com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(resolver, "runtimeCatalog", catalog);
+        org.springframework.test.util.ReflectionTestUtils.setField(resolver, "defaultApplicationCode", "aura-edu");
+        org.springframework.test.util.ReflectionTestUtils.setField(resolver, "runtimePrimaryEnabled", true);
+        when(catalog.modelSources(42L, "aura-edu")).thenReturn(Optional.of(sources));
+        return catalog;
+    }
+
+    @Test void exactBoundReleaseResolvesSourcesWithoutLegacyMetadata() {
+        var catalog = bindSources(List.of(new com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.BoundModelSource("orders", "mt_orders")));
+        assertEquals(Map.of(identity("mt_orders"), "orders"), resolve("mt_orders"));
+        verify(catalog).modelSources(42L, "aura-edu");
+        verify(mapper, never()).findCurrentForTenant(anyLong());
+    }
+
+    @Test void boundReleaseDoesNotAdmitStaleOrAmbiguousSources() {
+        bindSources(List.of());
+        when(mapper.findCurrentForTenant(42L)).thenReturn(List.of(model("orders", null)));
+        assertThrows(AccessDeniedException.class, () -> resolve("mt_orders"));
+        bindSources(List.of(
+                new com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.BoundModelSource("orders", "mt_orders"),
+                new com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.BoundModelSource("shadow", "mt_orders")));
+        assertThrows(AccessDeniedException.class, () -> resolve("mt_orders"));
+        verify(mapper, never()).findCurrentForTenant(anyLong());
+    }
+
+    @Test void unboundReleaseRetainsTenantMetadataResolution() {
+        var catalog = bindSources(List.of());
+        when(catalog.modelSources(42L, "aura-edu")).thenReturn(Optional.empty());
+        when(mapper.findCurrentForTenant(42L)).thenReturn(List.of(model("orders", null)));
+        assertEquals(Map.of(identity("mt_orders"), "orders"), resolve("mt_orders"));
+        verify(mapper).findCurrentForTenant(42L);
+    }
+
     @Test void generatedAndCustomTablesUseExplicitTenant() {
         when(mapper.findCurrentForTenant(42L)).thenReturn(List.of(model("orders", null), model("users", "custom_users")));
         assertEquals(Map.of("\"public\".\"mt_orders\"", "orders"), resolve("public.mt_orders"));
@@ -182,4 +218,27 @@ class NamedQuerySourceModelsTest {
         Map<String, String> resolved = resolve("public.product_engine_job");
         assertEquals("engine.product_engine_job", resolved.get("\"public\".\"product_engine_job\""));
     }
+    @Test void activePluginNativeSourceRequiresAnExactIdentityAndTenantColumn() {
+        when(plugins.getExtensionsOfType(com.auraboot.framework.plugin.extension.NamedQueryNativeSourceExtension.class))
+                .thenReturn(List.of(() -> List.of(new com.auraboot.framework.plugin.extension.NamedQueryNativeSourceExtension.Source("public.product_audit", "product.audit"))));
+        assertEquals("native.product.audit", resolve("public.product_audit").get(identity("product_audit")));
+        assertThrows(AccessDeniedException.class, () -> resolve("private.product_audit"));
+        assertThrows(AccessDeniedException.class, () -> resolve("public.product_audit_shadow"));
+        when(jdbc.queryForMap(anyString(), anyString())).thenReturn(Map.of("kind", "r", "tenant_column", false));
+        assertThrows(AccessDeniedException.class, () -> resolve("public.product_audit"));
+    }
+    @Test void ambiguousNativeRegistrationFailsClosed() {
+        com.auraboot.framework.plugin.extension.NamedQueryNativeSourceExtension owner =
+                () -> List.of(new com.auraboot.framework.plugin.extension.NamedQueryNativeSourceExtension.Source("public.product_audit", "product.audit"));
+        when(plugins.getExtensionsOfType(com.auraboot.framework.plugin.extension.NamedQueryNativeSourceExtension.class)).thenReturn(List.of(owner, owner));
+        assertThrows(AccessDeniedException.class, () -> resolve("public.product_audit"));
+    }
+    @Test void stoppedPluginCannotLeaveAnAdmittedNativeSource() {
+        when(plugins.getExtensionsOfType(com.auraboot.framework.plugin.extension.NamedQueryNativeSourceExtension.class))
+                .thenReturn(List.of(() -> List.of(new com.auraboot.framework.plugin.extension.NamedQueryNativeSourceExtension.Source("public.product_audit", "product.audit"))))
+                .thenReturn(List.of());
+        assertEquals("native.product.audit", resolve("product_audit").get(identity("product_audit")));
+        assertThrows(AccessDeniedException.class, () -> resolve("product_audit"));
+    }
+
 }

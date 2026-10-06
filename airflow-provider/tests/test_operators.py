@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import builtins
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -196,8 +197,23 @@ class TestAuraBootSemanticQueryOperator:
         with pytest.raises(ValueError, match="metric.*request"):
             AuraBootSemanticQueryOperator(task_id="test_query")
 
+    def test_dataframe_mode_reports_a_missing_optional_dependency(self):
+        original_import = builtins.__import__
+
+        def import_without_pandas(name, *args, **kwargs):
+            if name == "pandas":
+                raise ImportError("pandas not installed")
+            return original_import(name, *args, **kwargs)
+
+        op = AuraBootSemanticQueryOperator(task_id="missing_pandas", metric="revenue.daily", to_df=True)
+        with patch("airflow_provider_auraboot.operators.semantic_query.AuraBootHook",
+                   return_value=_mock_hook(run_return={"rows": []})), patch(
+            "builtins.__import__", side_effect=import_without_pandas
+        ):
+            with pytest.raises(ImportError, match="pandas is required when to_df=True"):
+                op.execute(_CONTEXT)
+
     def test_execute_to_df_converts_rows(self):
-        pytest.importorskip("pandas")
         import pandas as pd
 
         op = AuraBootSemanticQueryOperator(

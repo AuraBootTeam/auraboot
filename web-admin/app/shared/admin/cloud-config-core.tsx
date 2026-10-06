@@ -540,11 +540,13 @@ export function useCloudConfigs(options: { apiBase?: string; initialLevel?: Conf
   const handleTest = async (config: CloudConfig) => {
     setTestingPid(config.pid);
     try {
-      const result = await post(`${apiBase}/{pid}/test`, { pid: config.pid });
-      if (ResultHelper.isSuccess(result)) {
+      const result = await post<{ status: string; message: string }>(
+        '/api/admin/cloud-config/{pid}/test', { pid: config.pid },
+      );
+      if (ResultHelper.isSuccess(result) && result.data?.status === 'ok') {
         showSuccessToast('连接测试成功');
       } else {
-        showErrorToast(result.desc || '连接测试失败');
+        showErrorToast(ResultHelper.isSuccess(result) ? '连接测试失败' : result.desc || '连接测试失败');
       }
     } catch (e: any) {
       showErrorToast(e.message || '连接测试失败');
@@ -666,6 +668,7 @@ export function ConfigCard({
           : 'border-gray-100 bg-gray-50 dark:border-gray-700/50 dark:bg-gray-800/50'
       }`}
       data-testid={`cloud-config-card-${config.providerCode}`}
+      data-config-pid={config.pid}
     >
       <div className="flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-3">

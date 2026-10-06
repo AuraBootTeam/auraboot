@@ -2,6 +2,7 @@ package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.meta.entity.DecisionAlarm;
 import com.auraboot.framework.meta.entity.DecisionDefinition;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.mapper.DecisionAlarmMapper;
 import com.auraboot.framework.meta.mapper.DecisionDefinitionMapper;
 import com.auraboot.framework.meta.mapper.DecisionRecordMapper;
@@ -40,17 +41,21 @@ public class DecisionAlarmWorker {
      * Scheduled via DatabaseSchedulerEngine (sys-decision-alarm, interval 1min).
      */
     public void checkAlarms() {
-        try {
-            checkEvidenceMissing();
-        } catch (Exception e) {
-            log.error("Evidence missing check failed: {}", e.getMessage());
-        }
+        // Scans across all tenants — explicit scope instead of a blanket table
+        // exemption (tenant-exemption cleanup W3).
+        MetaContext.runWithoutTenantFilter(() -> {
+            try {
+                checkEvidenceMissing();
+            } catch (Exception e) {
+                log.error("Evidence missing check failed: {}", e.getMessage());
+            }
 
-        try {
-            checkDecisionMissing();
-        } catch (Exception e) {
-            log.error("Decision missing check failed: {}", e.getMessage());
-        }
+            try {
+                checkDecisionMissing();
+            } catch (Exception e) {
+                log.error("Decision missing check failed: {}", e.getMessage());
+            }
+        });
     }
 
     /**

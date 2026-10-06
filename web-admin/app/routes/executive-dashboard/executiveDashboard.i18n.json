@@ -1,0 +1,434 @@
+{
+  "title": {
+    "zh-CN": "经营驾驶舱",
+    "en": "Executive Dashboard"
+  },
+  "scopeNote": {
+    "zh-CN": "数据范围：全部项目（不含已取消/归档）",
+    "en": "Scope: All projects (excl. cancelled/archived)"
+  },
+  "tabOverview": {
+    "zh-CN": "总览",
+    "en": "Overview"
+  },
+  "tabProfit": {
+    "zh-CN": "利润分析",
+    "en": "Profit Analysis"
+  },
+  "tabPayment": {
+    "zh-CN": "回款分析",
+    "en": "Payment Analysis"
+  },
+  "tabCostWarning": {
+    "zh-CN": "成本预警",
+    "en": "Cost Warning"
+  },
+  "tabProgress": {
+    "zh-CN": "进度健康",
+    "en": "Progress Health"
+  },
+  "tabPmOverview": {
+    "zh-CN": "项目管理",
+    "en": "Project Management"
+  },
+  "fmtAmountYi": {
+    "zh-CN": "¥{value}亿",
+    "en": "¥{value} × 100000000"
+  },
+  "fmtAmountWan": {
+    "zh-CN": "¥{value}万",
+    "en": "¥{value} × 10000"
+  },
+  "kpiProjects": {
+    "zh-CN": "项目数",
+    "en": "Projects"
+  },
+  "kpiContracts": {
+    "zh-CN": "合同总额",
+    "en": "Contracts"
+  },
+  "kpiReceived": {
+    "zh-CN": "已回款",
+    "en": "Received"
+  },
+  "kpiCost": {
+    "zh-CN": "总成本",
+    "en": "Cost"
+  },
+  "kpiProfit": {
+    "zh-CN": "总利润",
+    "en": "Profit"
+  },
+  "kpiAtRisk": {
+    "zh-CN": "风险项目",
+    "en": "At Risk"
+  },
+  "profitRankingTop10": {
+    "zh-CN": "利润排行 TOP 10",
+    "en": "Profit Ranking TOP 10"
+  },
+  "noData": {
+    "zh-CN": "暂无数据",
+    "en": "No data"
+  },
+  "riskProjects": {
+    "zh-CN": "风险项目",
+    "en": "Risk Projects"
+  },
+  "noRiskProjects": {
+    "zh-CN": "无风险项目",
+    "en": "No risk projects"
+  },
+  "riskTypeBudgetOverrun": {
+    "zh-CN": "预算超支",
+    "en": "Budget overrun"
+  },
+  "riskTypeTaskOverdue": {
+    "zh-CN": "任务逾期",
+    "en": "Task overdue"
+  },
+  "riskTypePaymentOverdue": {
+    "zh-CN": "回款逾期",
+    "en": "Payment overdue"
+  },
+  "riskTypeTaskAndPayment": {
+    "zh-CN": "任务+回款逾期",
+    "en": "Task and payment overdue"
+  },
+  "riskTypeBudgetWarning": {
+    "zh-CN": "预算预警",
+    "en": "Budget warning"
+  },
+  "projectFinancialDetail": {
+    "zh-CN": "项目财务明细",
+    "en": "Project Financial Detail"
+  },
+  "clearFilter": {
+    "zh-CN": "清除筛选",
+    "en": "Clear filter"
+  },
+  "colProject": {
+    "zh-CN": "项目",
+    "en": "Project"
+  },
+  "colDept": {
+    "zh-CN": "部门",
+    "en": "Dept"
+  },
+  "colStatus": {
+    "zh-CN": "状态",
+    "en": "Status"
+  },
+  "colContract": {
+    "zh-CN": "合同",
+    "en": "Contract"
+  },
+  "colReceived": {
+    "zh-CN": "已回款",
+    "en": "Received"
+  },
+  "colCost": {
+    "zh-CN": "成本",
+    "en": "Cost"
+  },
+  "colProfit": {
+    "zh-CN": "利润",
+    "en": "Profit"
+  },
+  "colProfitRate": {
+    "zh-CN": "利润率",
+    "en": "Rate"
+  },
+  "deptProfitAnalysis": {
+    "zh-CN": "部门利润分析",
+    "en": "Department Profit"
+  },
+  "deptProjectsCount": {
+    "zh-CN": "{count} 个项目",
+    "en": "{count} projects"
+  },
+  "titleContractAmount": {
+    "zh-CN": "合同: {amount}",
+    "en": "Contract: {amount}"
+  },
+  "titleCostAmount": {
+    "zh-CN": "成本: {amount}",
+    "en": "Cost: {amount}"
+  },
+  "titleProfitAmount": {
+    "zh-CN": "利润: {amount}",
+    "en": "Profit: {amount}"
+  },
+  "legendContractAmount": {
+    "zh-CN": "合同 {amount}",
+    "en": "Contract {amount}"
+  },
+  "legendCostAmount": {
+    "zh-CN": "成本 {amount}",
+    "en": "Cost {amount}"
+  },
+  "legendProfitAmount": {
+    "zh-CN": "利润 {amount}",
+    "en": "Profit {amount}"
+  },
+  "projectProfitDetail": {
+    "zh-CN": "项目利润明细",
+    "en": "Project Profit Detail"
+  },
+  "kpiTotalDue": {
+    "zh-CN": "应收总额",
+    "en": "Total Due"
+  },
+  "kpiTotalReceived": {
+    "zh-CN": "已收总额",
+    "en": "Received"
+  },
+  "kpiPaymentRate": {
+    "zh-CN": "回款率",
+    "en": "Rate"
+  },
+  "kpiOverdueAmount": {
+    "zh-CN": "逾期金额",
+    "en": "Overdue"
+  },
+  "paymentRateLabel": {
+    "zh-CN": "回款率",
+    "en": "Payment Rate"
+  },
+  "healthHealthy": {
+    "zh-CN": "健康",
+    "en": "Healthy"
+  },
+  "healthFair": {
+    "zh-CN": "一般",
+    "en": "Fair"
+  },
+  "healthAtRisk": {
+    "zh-CN": "风险",
+    "en": "At Risk"
+  },
+  "colDue": {
+    "zh-CN": "应收",
+    "en": "Due"
+  },
+  "colReceivedShort": {
+    "zh-CN": "已收",
+    "en": "Recv"
+  },
+  "colPaymentRate": {
+    "zh-CN": "回款率",
+    "en": "Rate"
+  },
+  "colOverdue": {
+    "zh-CN": "逾期",
+    "en": "Overdue"
+  },
+  "noPaymentData": {
+    "zh-CN": "暂无回款数据",
+    "en": "No payment data"
+  },
+  "kpiTotalWarnings": {
+    "zh-CN": "预警总数",
+    "en": "Total Warnings"
+  },
+  "kpiOverBudget": {
+    "zh-CN": "已超支",
+    "en": "Over Budget"
+  },
+  "kpiNearLimit": {
+    "zh-CN": "接近上限",
+    "en": "Near Limit"
+  },
+  "colLevel": {
+    "zh-CN": "级别",
+    "en": "Level"
+  },
+  "colCategory": {
+    "zh-CN": "成本类别",
+    "en": "Category"
+  },
+  "colBudget": {
+    "zh-CN": "预算",
+    "en": "Budget"
+  },
+  "colActual": {
+    "zh-CN": "实际",
+    "en": "Actual"
+  },
+  "colExecRate": {
+    "zh-CN": "执行率",
+    "en": "Exec %"
+  },
+  "colVariance": {
+    "zh-CN": "偏差",
+    "en": "Variance"
+  },
+  "noCostWarnings": {
+    "zh-CN": "暂无成本预警",
+    "en": "No cost warnings"
+  },
+  "kpiProgressNormal": {
+    "zh-CN": "正常",
+    "en": "Normal"
+  },
+  "kpiProgressAtRisk": {
+    "zh-CN": "有风险",
+    "en": "At Risk"
+  },
+  "kpiProgressDelayed": {
+    "zh-CN": "已延迟",
+    "en": "Delayed"
+  },
+  "plannedVsActual": {
+    "zh-CN": "计划 vs 实际进度",
+    "en": "Planned vs Actual"
+  },
+  "tasksProgress": {
+    "zh-CN": "任务: {done}/{total}",
+    "en": "Tasks: {done}/{total}"
+  },
+  "overdueTasksCount": {
+    "zh-CN": "{count} 逾期",
+    "en": "{count} overdue"
+  },
+  "labelPlanned": {
+    "zh-CN": "计划",
+    "en": "Planned"
+  },
+  "labelActual": {
+    "zh-CN": "实际",
+    "en": "Actual"
+  },
+  "statusPlanning": {
+    "zh-CN": "规划中",
+    "en": "Planning"
+  },
+  "statusInProgress": {
+    "zh-CN": "进行中",
+    "en": "In Progress"
+  },
+  "statusCompleted": {
+    "zh-CN": "已完成",
+    "en": "Completed"
+  },
+  "statusArchived": {
+    "zh-CN": "已归档",
+    "en": "Archived"
+  },
+  "taskStatusTodo": {
+    "zh-CN": "待办",
+    "en": "To Do"
+  },
+  "taskStatusDone": {
+    "zh-CN": "已完成",
+    "en": "Done"
+  },
+  "taskStatusCancelled": {
+    "zh-CN": "已取消",
+    "en": "Cancelled"
+  },
+  "priorityCritical": {
+    "zh-CN": "紧急",
+    "en": "Critical"
+  },
+  "priorityHigh": {
+    "zh-CN": "高",
+    "en": "High"
+  },
+  "priorityMedium": {
+    "zh-CN": "中",
+    "en": "Medium"
+  },
+  "priorityLow": {
+    "zh-CN": "低",
+    "en": "Low"
+  },
+  "kpiTotalProjects": {
+    "zh-CN": "项目总数",
+    "en": "Projects"
+  },
+  "kpiActive": {
+    "zh-CN": "进行中",
+    "en": "Active"
+  },
+  "kpiCompleted": {
+    "zh-CN": "已完成",
+    "en": "Completed"
+  },
+  "kpiTotalTasks": {
+    "zh-CN": "总任务",
+    "en": "Tasks"
+  },
+  "kpiDoneRate": {
+    "zh-CN": "完成率",
+    "en": "Done Rate"
+  },
+  "kpiOverdueTasks": {
+    "zh-CN": "逾期任务",
+    "en": "Overdue"
+  },
+  "kpiTotalHours": {
+    "zh-CN": "总工时",
+    "en": "Hours"
+  },
+  "kpiBillable": {
+    "zh-CN": "可计费",
+    "en": "Billable"
+  },
+  "projectStatusDistribution": {
+    "zh-CN": "项目状态分布",
+    "en": "Project Status Distribution"
+  },
+  "taskStatusDistribution": {
+    "zh-CN": "任务状态分布",
+    "en": "Task Status Distribution"
+  },
+  "overdueTasksTitle": {
+    "zh-CN": "逾期任务 ({count})",
+    "en": "Overdue Tasks ({count})"
+  },
+  "colTask": {
+    "zh-CN": "任务",
+    "en": "Task"
+  },
+  "colPriority": {
+    "zh-CN": "优先级",
+    "en": "Priority"
+  },
+  "colDueDate": {
+    "zh-CN": "截止日期",
+    "en": "Due Date"
+  },
+  "colOverdueDays": {
+    "zh-CN": "逾期天数",
+    "en": "Overdue Days"
+  },
+  "projectHealth": {
+    "zh-CN": "项目健康度",
+    "en": "Project Health"
+  },
+  "colTasks": {
+    "zh-CN": "任务",
+    "en": "Tasks"
+  },
+  "colProgress": {
+    "zh-CN": "进度",
+    "en": "Progress"
+  },
+  "colHealth": {
+    "zh-CN": "健康",
+    "en": "Health"
+  },
+  "healthStatusNormal": {
+    "zh-CN": "正常",
+    "en": "Normal"
+  },
+  "healthStatusAtRisk": {
+    "zh-CN": "有风险",
+    "en": "At risk"
+  },
+  "healthStatusDelayed": {
+    "zh-CN": "延迟",
+    "en": "Delayed"
+  }
+}

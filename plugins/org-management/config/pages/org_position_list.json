@@ -1,6 +1,6 @@
 {
   "pageKey": "org_position_list",
-  "name:zh-CN": "Position Management",
+  "name:zh-CN": "岗位管理",
   "name:en": "Position Management",
   "modelCode": "org_position",
   "description": "Position list with status tabs and CRUD",
@@ -22,7 +22,7 @@
         {
           "key": "all",
           "label": {
-            "zh-CN": "All",
+            "zh-CN": "全部",
             "en": "All"
           },
           "filter": null
@@ -42,7 +42,7 @@
         {
           "key": "inactive",
           "label": {
-            "zh-CN": "Inactive",
+            "zh-CN": "停用",
             "en": "Inactive"
           },
           "filter": {
@@ -157,7 +157,7 @@
     }
   ],
   "title": {
-    "zh-CN": "Position Management",
+    "zh-CN": "岗位管理",
     "en": "Position Management"
   }
 }

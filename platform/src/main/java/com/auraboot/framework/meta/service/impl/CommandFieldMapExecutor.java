@@ -89,7 +89,10 @@ public class CommandFieldMapExecutor {
                         continue;
                     }
                     Object value = payload.get(sourceField);
-                    if (value != null) {
+                    // On update, a present null clears the mapped field. An omitted key
+                    // leaves it untouched; include clear attempts in the edit-permission check.
+                    if (value != null || ("update".equalsIgnoreCase(request.getOperationType())
+                            && payload.containsKey(sourceField))) {
                         data.put(targetField, value);
                         userMappedFields.add(targetField);
                     }
@@ -237,7 +240,8 @@ public class CommandFieldMapExecutor {
         Set<String> userMappedFields = new LinkedHashSet<>();
         for (String fieldCode : (inputFields != null ? inputFields : List.<String>of())) {
             Object value = payload.get(fieldCode);
-            if (value != null) {
+            // Preserve explicit clears while keeping omitted fields out of partial updates.
+            if (value != null || ("update".equalsIgnoreCase(operationType) && payload.containsKey(fieldCode))) {
                 // Skip virtual/readonly fields
                 if (modelDef != null && isVirtualReadonlyField(modelDef, fieldCode)) {
                     continue;

@@ -35,6 +35,10 @@ public class SessionRenewalServiceImpl implements SessionRenewalService {
             log.warn("Session renewal rejected: session missing or revoked");
             throw new BusinessException(ResponseCode.Unauthorized, "Session is no longer valid, please login again");
         }
+        if ("impersonation".equals(session.getSessionKind()) || jwtUtil.extractImpersonation(bearerToken)) {
+            throw new BusinessException(ResponseCode.Unauthorized,
+                    "Impersonation sessions cannot be renewed");
+        }
 
         String userPid = jwtUtil.extractIdentifier(bearerToken);
         User user = userPid == null ? null : userService.findByPid(userPid);

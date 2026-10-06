@@ -1,6 +1,7 @@
 package com.auraboot.framework.plugin.extension;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -15,7 +16,7 @@ public interface DecisionUsageAccessor {
 
     record Source(String type, String code, String version, String pid) {
         public Source {
-            type = type == null ? "" : type.trim().toUpperCase();
+            type = type == null ? "" : type.trim().toUpperCase(Locale.ROOT);
             code = code == null ? "" : code;
             version = version == null ? "" : version;
             pid = pid == null ? "" : pid;

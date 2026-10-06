@@ -1,0 +1,470 @@
+{
+  "workbenchTitle": {
+    "zh-CN": "AuraBot 工作台",
+    "en": "AuraBot Workbench"
+  },
+  "createMissionHeader": {
+    "zh-CN": "创建调研使命",
+    "en": "Create Research Mission"
+  },
+  "needsReview": {
+    "zh-CN": "待处理",
+    "en": "Needs Review"
+  },
+  "tabDashboard": {
+    "zh-CN": "仪表盘",
+    "en": "Dashboard"
+  },
+  "tabAnalytics": {
+    "zh-CN": "分析",
+    "en": "Analytics"
+  },
+  "tabObservations": {
+    "zh-CN": "事件日志",
+    "en": "Events"
+  },
+  "timeJustNow": {
+    "zh-CN": "刚刚",
+    "en": "just now"
+  },
+  "timeMinuteSuffix": {
+    "zh-CN": "分钟前",
+    "en": "m ago"
+  },
+  "timeHourSuffix": {
+    "zh-CN": "小时前",
+    "en": "h ago"
+  },
+  "timeDaySuffix": {
+    "zh-CN": "天前",
+    "en": "d ago"
+  },
+  "workflowMissionTitle": {
+    "zh-CN": "使命",
+    "en": "Mission"
+  },
+  "workflowMissionDesc": {
+    "zh-CN": "定义竞对范围、周期和交付物",
+    "en": "Define competitors, cadence, and deliverables"
+  },
+  "workflowMissionMeta": {
+    "zh-CN": "{count} 个活跃使命",
+    "en": "{count} active missions"
+  },
+  "workflowTasksTitle": {
+    "zh-CN": "任务拆解",
+    "en": "Task Breakdown"
+  },
+  "workflowTasksDesc": {
+    "zh-CN": "抓取、整理、分析、生成报告",
+    "en": "Collect, normalize, analyze, and report"
+  },
+  "workflowTasksMeta": {
+    "zh-CN": "{count} 个活跃任务",
+    "en": "{count} active tasks"
+  },
+  "workflowRunsTitle": {
+    "zh-CN": "运行与追踪",
+    "en": "Runs And Traces"
+  },
+  "workflowRunsDesc": {
+    "zh-CN": "查看模型调用、成本和失败原因",
+    "en": "Inspect model calls, cost, and failure causes"
+  },
+  "workflowRunsMeta": {
+    "zh-CN": "{count} 个运行中",
+    "en": "{count} running"
+  },
+  "workflowReviewTitle": {
+    "zh-CN": "人工介入",
+    "en": "Human Review"
+  },
+  "workflowReviewDesc": {
+    "zh-CN": "处理审批、中断和风险策略",
+    "en": "Handle approvals, interrupts, and policies"
+  },
+  "workflowReviewMeta": {
+    "zh-CN": "{count} 个待审批",
+    "en": "{count} pending approvals"
+  },
+  "workflowArtifactsTitle": {
+    "zh-CN": "产出物",
+    "en": "Artifacts"
+  },
+  "workflowArtifactsDesc": {
+    "zh-CN": "沉淀周报、对比表和销售话术",
+    "en": "Deliver reports, comparison tables, and battlecards"
+  },
+  "workflowArtifactsMeta": {
+    "zh-CN": "报告交付面",
+    "en": "Delivery surface"
+  },
+  "groupExecutionTitle": {
+    "zh-CN": "执行链路",
+    "en": "Execution"
+  },
+  "groupExecutionDesc": {
+    "zh-CN": "从使命到产出物的主路径",
+    "en": "Primary path from mission to artifact"
+  },
+  "linkMissionsTitle": {
+    "zh-CN": "使命",
+    "en": "Missions"
+  },
+  "linkMissionsDesc": {
+    "zh-CN": "定义业务目标和拆解边界",
+    "en": "Define business goal and scope"
+  },
+  "linkTasksTitle": {
+    "zh-CN": "任务",
+    "en": "Tasks"
+  },
+  "linkTasksDesc": {
+    "zh-CN": "查看和推进 Agent 任务",
+    "en": "Review and advance agent tasks"
+  },
+  "linkRunsTitle": {
+    "zh-CN": "运行记录",
+    "en": "Runs"
+  },
+  "linkRunsDesc": {
+    "zh-CN": "跟踪执行状态和成本",
+    "en": "Track execution status and cost"
+  },
+  "linkArtifactsTitle": {
+    "zh-CN": "产出物",
+    "en": "Artifacts"
+  },
+  "linkArtifactsDesc": {
+    "zh-CN": "查看报告、摘要和表格",
+    "en": "Open reports, summaries, and tables"
+  },
+  "groupGovernanceTitle": {
+    "zh-CN": "治理与审计",
+    "en": "Governance"
+  },
+  "groupGovernanceDesc": {
+    "zh-CN": "处理人工判断和风险边界",
+    "en": "Handle judgment points and risk boundaries"
+  },
+  "linkApprovalsTitle": {
+    "zh-CN": "审批",
+    "en": "Approvals"
+  },
+  "linkApprovalsDesc": {
+    "zh-CN": "处理待确认动作",
+    "en": "Resolve pending decisions"
+  },
+  "linkInterruptsTitle": {
+    "zh-CN": "中断审计",
+    "en": "Interrupts"
+  },
+  "linkInterruptsDesc": {
+    "zh-CN": "查看分类器产出的暂停点",
+    "en": "Inspect classifier pause points"
+  },
+  "linkTracesTitle": {
+    "zh-CN": "AI 追踪",
+    "en": "AI Traces"
+  },
+  "linkTracesDesc": {
+    "zh-CN": "审计 LLM 调用和证据链",
+    "en": "Audit LLM calls and evidence"
+  },
+  "linkPoliciesTitle": {
+    "zh-CN": "审批策略",
+    "en": "Policies"
+  },
+  "linkPoliciesDesc": {
+    "zh-CN": "配置风险规则",
+    "en": "Configure risk rules"
+  },
+  "groupTeamTitle": {
+    "zh-CN": "团队与记忆",
+    "en": "Team And Memory"
+  },
+  "groupTeamDesc": {
+    "zh-CN": "管理 Agent、调度和偏好",
+    "en": "Manage agents, schedules, and preferences"
+  },
+  "linkAgentsTitle": {
+    "zh-CN": "Agent 定义",
+    "en": "Agent Definitions"
+  },
+  "linkAgentsDesc": {
+    "zh-CN": "维护 Agent 能力和职责",
+    "en": "Maintain agent capabilities and ownership"
+  },
+  "linkSchedulesTitle": {
+    "zh-CN": "调度",
+    "en": "Schedules"
+  },
+  "linkSchedulesDesc": {
+    "zh-CN": "配置周期性研究任务",
+    "en": "Configure recurring research work"
+  },
+  "linkMemoryTitle": {
+    "zh-CN": "记忆库",
+    "en": "Memory"
+  },
+  "linkMemoryDesc": {
+    "zh-CN": "浏览企业偏好和上下文",
+    "en": "Browse preferences and context"
+  },
+  "linkProfileTitle": {
+    "zh-CN": "我的画像",
+    "en": "My Profile"
+  },
+  "linkProfileDesc": {
+    "zh-CN": "查看个人研究偏好",
+    "en": "Review personal research preferences"
+  },
+  "groupCapabilityTitle": {
+    "zh-CN": "能力演进",
+    "en": "Capability Loop"
+  },
+  "groupCapabilityDesc": {
+    "zh-CN": "把运行反馈沉淀成技能和记忆",
+    "en": "Turn run feedback into skills and memory"
+  },
+  "linkSkillDraftsTitle": {
+    "zh-CN": "技能草稿",
+    "en": "Skill Drafts"
+  },
+  "linkSkillDraftsDesc": {
+    "zh-CN": "审核 Learning Loop 生成的草稿",
+    "en": "Review drafts from the learning loop"
+  },
+  "linkMemoryPromotionsTitle": {
+    "zh-CN": "记忆晋升",
+    "en": "Memory Promotions"
+  },
+  "linkMemoryPromotionsDesc": {
+    "zh-CN": "审核 user 到 tenant 的记忆晋升",
+    "en": "Review user-to-tenant memory promotions"
+  },
+  "linkSoulProfilesTitle": {
+    "zh-CN": "Soul Profiles 管理",
+    "en": "Soul Profiles"
+  },
+  "linkSoulProfilesDesc": {
+    "zh-CN": "监控租户画像元数据",
+    "en": "Monitor tenant profile metadata"
+  },
+  "costAlertOver": {
+    "zh-CN": "月度成本已超预算: ${amount}",
+    "en": "Monthly cost exceeded budget: ${amount}"
+  },
+  "costAlertWarning": {
+    "zh-CN": "月度成本接近上限: ${amount}",
+    "en": "Monthly cost approaching limit: ${amount}"
+  },
+  "kpiActiveMissions": {
+    "zh-CN": "活跃使命",
+    "en": "Active Missions"
+  },
+  "kpiActiveTasks": {
+    "zh-CN": "活跃任务",
+    "en": "Active Tasks"
+  },
+  "kpiRunningNow": {
+    "zh-CN": "运行中",
+    "en": "Running Now"
+  },
+  "kpiPendingApprovals": {
+    "zh-CN": "待审批",
+    "en": "Pending Approvals"
+  },
+  "kpiActiveAgents": {
+    "zh-CN": "活跃 Agent",
+    "en": "Active Agents"
+  },
+  "kpiMonthCost": {
+    "zh-CN": "本月成本",
+    "en": "Month Cost"
+  },
+  "agentOverviewTitle": {
+    "zh-CN": "Agent 概览",
+    "en": "Agent Overview"
+  },
+  "viewAllAgents": {
+    "zh-CN": "查看全部 Agent",
+    "en": "View All Agents"
+  },
+  "successRateSuffix": {
+    "zh-CN": "成功",
+    "en": "success"
+  },
+  "runsCountSuffix": {
+    "zh-CN": "次运行",
+    "en": "runs"
+  },
+  "avgCostSuffix": {
+    "zh-CN": "平均",
+    "en": "avg"
+  },
+  "recentActivityTitle": {
+    "zh-CN": "最近活动",
+    "en": "Recent Activity"
+  },
+  "emptyRecentRuns": {
+    "zh-CN": "暂无运行记录。创建 Agent 和任务后，活动将在此显示。",
+    "en": "No runs yet. Activity will appear here once agents start executing tasks."
+  },
+  "noTaskLinked": {
+    "zh-CN": "未关联任务",
+    "en": "No task"
+  },
+  "schedulesTitle": {
+    "zh-CN": "活跃调度",
+    "en": "Active Schedules"
+  },
+  "lastRunLabel": {
+    "zh-CN": "上次运行",
+    "en": "Last run"
+  },
+  "triggeringNow": {
+    "zh-CN": "触发中...",
+    "en": "Triggering..."
+  },
+  "runNow": {
+    "zh-CN": "立即运行",
+    "en": "Run Now"
+  },
+  "emptyObservations": {
+    "zh-CN": "暂无事件日志。Agent 活动将在此记录。",
+    "en": "No events yet. Agent observations will appear here."
+  },
+  "colTime": {
+    "zh-CN": "时间",
+    "en": "Time"
+  },
+  "colType": {
+    "zh-CN": "类型",
+    "en": "Type"
+  },
+  "colSeverity": {
+    "zh-CN": "严重性",
+    "en": "Severity"
+  },
+  "colSource": {
+    "zh-CN": "来源",
+    "en": "Source"
+  },
+  "colTitle": {
+    "zh-CN": "标题",
+    "en": "Title"
+  },
+  "detailLabel": {
+    "zh-CN": "详情",
+    "en": "Detail"
+  },
+  "costBreakdownTitle": {
+    "zh-CN": "30天成本分布",
+    "en": "30-Day Cost Breakdown"
+  },
+  "totalLabel": {
+    "zh-CN": "总计",
+    "en": "Total"
+  },
+  "emptyCostData": {
+    "zh-CN": "暂无成本数据",
+    "en": "No cost data yet"
+  },
+  "runsSuffix": {
+    "zh-CN": "次",
+    "en": "runs"
+  },
+  "dailyActivityTitle": {
+    "zh-CN": "每日活动",
+    "en": "Daily Activity"
+  },
+  "emptyActivityData": {
+    "zh-CN": "暂无活动数据",
+    "en": "No activity data yet"
+  },
+  "colDate": {
+    "zh-CN": "日期",
+    "en": "Date"
+  },
+  "colActivity": {
+    "zh-CN": "活动",
+    "en": "Activity"
+  },
+  "colErrors": {
+    "zh-CN": "错误",
+    "en": "Errors"
+  },
+  "colAlerts": {
+    "zh-CN": "告警",
+    "en": "Alerts"
+  },
+  "recentErrorsTitle": {
+    "zh-CN": "最近错误",
+    "en": "Recent Errors"
+  },
+  "noErrors": {
+    "zh-CN": "无错误记录",
+    "en": "No errors — all clear!"
+  },
+  "scenarioBadge": {
+    "zh-CN": "企业场景模板",
+    "en": "Enterprise scenario"
+  },
+  "scenarioDefaultBadge": {
+    "zh-CN": "默认: 竞对调研",
+    "en": "Default: competitive intelligence"
+  },
+  "scenarioTitle": {
+    "zh-CN": "竞对调研 Agent 工作台",
+    "en": "Competitive Intelligence Agent Workbench"
+  },
+  "scenarioDesc": {
+    "zh-CN": "围绕公开资料抓取、价格页变更、产品更新、招聘信号和销售话术生成，把使命、任务、运行、审批、追踪和产出物串成一条可审计链路。",
+    "en": "Connect public-source collection, pricing changes, product updates, hiring signals, and battlecard generation into an auditable mission-to-artifact chain."
+  },
+  "scenarioCreateMission": {
+    "zh-CN": "创建调研使命",
+    "en": "Create research mission"
+  },
+  "scenarioOpenTaskChain": {
+    "zh-CN": "查看任务链路",
+    "en": "Open task chain"
+  },
+  "scenarioOpenArtifacts": {
+    "zh-CN": "查看产出物",
+    "en": "Open artifacts"
+  },
+  "scenarioActiveTasks": {
+    "zh-CN": "活跃任务",
+    "en": "Active tasks"
+  },
+  "scenarioOpenTasks": {
+    "zh-CN": "进入任务",
+    "en": "Open tasks"
+  },
+  "scenarioNeedsReview": {
+    "zh-CN": "待人工判断",
+    "en": "Needs review"
+  },
+  "scenarioReviewApprovals": {
+    "zh-CN": "处理审批",
+    "en": "Review approvals"
+  },
+  "scenarioAgentsSchedules": {
+    "zh-CN": "可用 Agent / 调度",
+    "en": "Agents / schedules"
+  },
+  "scenarioTeamStatus": {
+    "zh-CN": "团队状态",
+    "en": "Team status"
+  },
+  "workflowMapTitle": {
+    "zh-CN": "竞对调研执行链路",
+    "en": "Competitive Intelligence Execution Chain"
+  },
+  "workflowMapDesc": {
+    "zh-CN": "每个入口只承担一个环节，避免资源菜单重复堆叠。",
+    "en": "Each entry owns one step, avoiding duplicate resource menus."
+  }
+}

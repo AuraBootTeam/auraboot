@@ -9,6 +9,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 
 const fetchResultMock = vi.fn();
+const confirmMock = vi.hoisted(() => vi.fn());
+vi.mock('~/utils/confirmDialog', () => ({ confirmDialog: confirmMock }));
 vi.mock('~/shared/services/http-client', () => ({
   fetchResult: (...args: unknown[]) => fetchResultMock(...args),
 }));
@@ -80,7 +82,46 @@ describe('useActionHandler - offboarding action propagation', () => {
 });
 
 describe('useActionHandler - handlerParams.async polling', () => {
-  beforeEach(() => fetchResultMock.mockReset());
+  beforeEach(() => { fetchResultMock.mockReset(); confirmMock.mockReset(); });
+
+  it.each([
+    [{}, 'default'],
+    [{ danger: true }, 'danger'],
+    [{ variant: 'danger' }, 'danger'],
+  ] as const)('uses the declared confirmation intent and cancels before dispatch: %j', async (intent, expectedVariant) => {
+    confirmMock.mockResolvedValue(false);
+    const { result } = renderHook(() => useActionHandler({
+      runtime: makeRuntime(), navigate: vi.fn() as any, tableName: 'inv_arrival_notice',
+      locale: 'zh-CN', t: ((key: string, _params?: any, fallback?: string) => fallback ?? key) as any,
+    }));
+    await act(async () => {
+      await result.current.handleAction({
+        code: 'convert_to_inbound', confirm: 'Generate a draft receipt?', ...intent,
+        action: { type: 'command', command: 'inv:convert_notice_to_inbound' },
+      } as unknown as ButtonConfig, { pid: 'notice-1' });
+    });
+    expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ variant: expectedVariant }));
+    expect(fetchResultMock).not.toHaveBeenCalled();
+    expect(result.current.loading).toBe(false);
+  });
+
+  it('normalizes rejected HTTP command errors before displaying detail feedback', async () => {
+    fetchResultMock.mockRejectedValue(new Error(
+      'Plugin handler execution failed: Insufficient stock for product [01SECRET-PID] at the line location: required 5.00, available 2.00'));
+    const showToast = vi.fn();
+    const { result } = renderHook(() => useActionHandler({
+      runtime: makeRuntime(), navigate: vi.fn() as any, tableName: 'inv_outbound',
+      locale: 'zh-CN', t: ((key: string) => key) as any, showToast,
+    }));
+    await act(async () => {
+      await result.current.handleAction({ code: 'confirm_other_out',
+        action: { type: 'command', command: 'inv:confirm_other_out' },
+      } as unknown as ButtonConfig, { pid: 'issue-1', row_version: 1 });
+    });
+    expect(result.current.error).toBe('所选库位库存不足：需要 5.00，可用 2.00。请调整数量或选择其他库位。');
+    expect(showToast).toHaveBeenCalledWith(result.current.error, 'error');
+    expect(result.current.loading).toBe(false);
+  });
 
   it('keeps the action loading until the post-command detail refresh settles', async () => {
     fetchResultMock.mockResolvedValueOnce({

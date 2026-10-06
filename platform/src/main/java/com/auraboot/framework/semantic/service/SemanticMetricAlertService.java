@@ -1,6 +1,7 @@
 package com.auraboot.framework.semantic.service;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.common.constant.StatusConstants;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.notification.service.NotificationService;
 import com.auraboot.framework.semantic.compiler.SemanticQueryRequest;
@@ -16,6 +17,8 @@ import com.auraboot.framework.semantic.mapper.AbSemanticMetricAlertMapper;
 import com.auraboot.framework.semantic.mapper.AbSemanticMetricMapper;
 import com.auraboot.framework.semantic.mapper.AbSemanticModelMapper;
 import com.auraboot.framework.userattribute.service.UserAttributeService;
+import com.auraboot.framework.tenant.service.TenantMemberService;
+import org.springframework.security.access.AccessDeniedException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -57,6 +60,7 @@ public class SemanticMetricAlertService {
     private final SemanticQueryService queryService;
     private final NotificationService notificationService;
     private final UserAttributeService userAttributeService;
+    private final TenantMemberService tenantMemberService;
 
     // ==================== CRUD ====================
 
@@ -104,9 +108,8 @@ public class SemanticMetricAlertService {
     public void delete(String pid) {
         Long tenantId = MetaContext.get().getTenantId();
         AbSemanticMetricAlert alert = requireAlert(tenantId, pid);
-        alert.setDeletedFlag(true);
-        alert.setUpdatedAt(OffsetDateTime.now());
-        alertMapper.updateById(alert);
+        // Global logical-delete fields are excluded from updateById SET clauses.
+        alertMapper.softDelete(tenantId, alert.getPid(), OffsetDateTime.now());
     }
 
     // ==================== Evaluation ====================
@@ -128,7 +131,12 @@ public class SemanticMetricAlertService {
      */
     @Scheduled(fixedDelay = 300_000)
     public void evaluateAll() {
-        List<AbSemanticMetricAlert> alerts = alertMapper.listActiveAcrossTenants();
+        // Cross-tenant scan on a @Scheduled thread; per-alert evaluation binds its
+        // own tenant. Explicit scope instead of relying on a registry exemption
+        // this table never had (surfaced by the W5 real-stack gate 2026-10-01 —
+        // this task has been failing on every tick prior to this fix).
+        List<AbSemanticMetricAlert> alerts = MetaContext.runWithoutTenantFilter(
+                () -> alertMapper.listActiveAcrossTenants());
         for (AbSemanticMetricAlert alert : alerts) {
             try {
                 evaluate(alert);
@@ -143,66 +151,70 @@ public class SemanticMetricAlertService {
         // API caller's thread, where wiping the context would break every
         // subsequent request on it. Only the scheduler thread has no prior
         // context to restore.
-        MetaContext previous = MetaContext.exists() ? MetaContext.get() : null;
-        MetaContext.setContext(alert.getTenantId(), alert.getCreatedBy(),
-                "semantic-alert", "semantic-alert-evaluator");
-        try {
-            AbSemanticMetric metric = metricMapper.findByPid(alert.getTenantId(), alert.getMetricPid());
-            if (metric == null) {
-                log.warn("Semantic metric alert {}: metric {} vanished; skipping",
-                        alert.getPid(), alert.getMetricPid());
-                return Map.of("skipped", "metric_missing");
-            }
-            AbSemanticModel model = modelMapper.findByPid(alert.getTenantId(), metric.getSemanticModelPid());
-            if (model == null) {
-                log.warn("Semantic metric alert {}: model {} vanished; skipping",
-                        alert.getPid(), metric.getSemanticModelPid());
-                return Map.of("skipped", "model_missing");
-            }
+        var result = new java.util.concurrent.atomic.AtomicReference<Map<String, Object>>();
+        MetaContext.Snapshot creator = new MetaContext.Snapshot(
+                alert.getTenantId(), alert.getCreatedBy(), "semantic-alert",
+                "semantic-alert-evaluator", java.util.Set.of(), null, null, null, null);
+        MetaContext.runWithSnapshot(creator, () -> result.set(evaluateAsCreator(alert)));
+        return result.get();
+    }
 
-            SemanticQueryRequest request = new SemanticQueryRequest();
-            request.setMetrics(List.of(model.getCode() + "." + metric.getCode()));
-            UserContext creator = new UserContext(alert.getCreatedBy(), alert.getTenantId(),
-                    userAttributeService.getAttributes(alert.getTenantId(), alert.getCreatedBy()));
-            SemanticQueryResponse response = queryService.executeQuery(request, creator);
-
-            BigDecimal value = extractValue(response);
-            if (value == null) {
-                log.warn("Semantic metric alert {}: metric returned no value; skipping", alert.getPid());
-                return Map.of("skipped", "no_value");
-            }
-
-            boolean triggered = compare(value, alert.getComparator(), alert.getThreshold());
-            boolean notify = triggered && silenceWindowClosed(alert);
-            if (notify) {
-                notificationService.sendInApp(alert.getCreatedBy(),
-                        "指标告警: " + alert.getName(),
-                        metricLabel(metric) + " 当前值 " + value.toPlainString()
-                                + " 已" + comparatorPhrase(alert.getComparator()) + "阈值 "
-                                + alert.getThreshold().toPlainString(),
-                        "semantic-alert", "semantic_metric_alert", alert.getPid());
-            }
-
-            OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-            alert.setLastEvaluatedAt(now);
-            if (notify) alert.setLastTriggeredAt(now);
-            alert.setUpdatedAt(now);
-            alertMapper.updateById(alert);
-
-            Map<String, Object> out = new LinkedHashMap<>();
-            out.put("value", value);
-            out.put("triggered", triggered);
-            out.put("notified", notify);
-            if (triggered && !notify) out.put("silenced", true);
-            return out;
-        } finally {
-            if (previous != null) {
-                MetaContext.setContext(previous.getTenantId(), previous.getUserId(),
-                        previous.getUserPid(), previous.getUsername(), previous.getCurrentRoleIds());
-            } else {
-                MetaContext.clear();
-            }
+    private Map<String, Object> evaluateAsCreator(AbSemanticMetricAlert alert) {
+        AbSemanticMetric metric = metricMapper.findByPid(alert.getTenantId(), alert.getMetricPid());
+        if (metric == null) {
+            log.warn("Semantic metric alert {}: metric {} vanished; skipping",
+                    alert.getPid(), alert.getMetricPid());
+            return Map.of("skipped", "metric_missing");
         }
+        AbSemanticModel model = modelMapper.findByPid(alert.getTenantId(), metric.getSemanticModelPid());
+        if (model == null) {
+            log.warn("Semantic metric alert {}: model {} vanished; skipping",
+                    alert.getPid(), metric.getSemanticModelPid());
+            return Map.of("skipped", "model_missing");
+        }
+
+        var member = tenantMemberService.findByTenantIdAndUserId(alert.getTenantId(), alert.getCreatedBy());
+        if (member == null || !StatusConstants.ACTIVE.equalsIgnoreCase(member.getStatus()) || Boolean.TRUE.equals(member.getDeletedFlag())
+                || !java.util.Objects.equals(member.getTenantId(), alert.getTenantId())
+                || !java.util.Objects.equals(member.getUserId(), alert.getCreatedBy()) || member.getId() == null) {
+            throw new AccessDeniedException("Semantic alert creator is not an active tenant member");
+        }
+        MetaContext.setMemberId(member.getId());
+        SemanticQueryRequest request = new SemanticQueryRequest();
+        request.setMetrics(List.of(model.getCode() + "." + metric.getCode()));
+        UserContext creator = new UserContext(alert.getCreatedBy(), alert.getTenantId(),
+                userAttributeService.getAttributes(alert.getTenantId(), alert.getCreatedBy()));
+        SemanticQueryResponse response = queryService.executeQuery(request, creator);
+
+        BigDecimal value = extractValue(response);
+        if (value == null) {
+            log.warn("Semantic metric alert {}: metric returned no value; skipping", alert.getPid());
+            return Map.of("skipped", "no_value");
+        }
+
+        boolean triggered = compare(value, alert.getComparator(), alert.getThreshold());
+        boolean notify = triggered && silenceWindowClosed(alert);
+        if (notify) {
+            notificationService.sendInApp(alert.getCreatedBy(),
+                    "指标告警: " + alert.getName(),
+                    metricLabel(metric) + " 当前值 " + value.toPlainString()
+                            + " 已" + comparatorPhrase(alert.getComparator()) + "阈值 "
+                            + alert.getThreshold().toPlainString(),
+                    "semantic-alert", "semantic_metric_alert", alert.getPid());
+        }
+
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        alert.setLastEvaluatedAt(now);
+        if (notify) alert.setLastTriggeredAt(now);
+        alert.setUpdatedAt(now);
+        alertMapper.updateById(alert);
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("value", value);
+        out.put("triggered", triggered);
+        out.put("notified", notify);
+        if (triggered && !notify) out.put("silenced", true);
+        return out;
     }
 
     // ==================== helpers ====================

@@ -37,6 +37,7 @@ import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
 import com.auraboot.framework.meta.service.impl.pipeline.RecordSnapshotReader;
 import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
+import com.auraboot.framework.plugin.extension.PluginCommandRejectionException;
 import com.auraboot.framework.plugin.pf4j.BiTemporalAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
 import com.auraboot.framework.plugin.pf4j.AsyncTaskAccessorImpl;
@@ -717,6 +718,13 @@ public class HandlerPhase implements CommandPhase {
             // clients receive HTTP 409 and can offer reload/retry recovery.
             if (e.getMessage() != null && e.getMessage().contains("iot.error.version_conflict")) {
                 throw new com.auraboot.framework.exception.ConflictException(e.getMessage(), e);
+            }
+            // Classification is a public SPI contract, independent of diagnostic text or locale.
+            if (e instanceof PluginCommandRejectionException rejection) {
+                ResponseCode responseCode = switch (rejection.code()) {
+                    case INVALID_ARGUMENT, BUSINESS_RULE_BLOCKED -> ResponseCode.BadParam;
+                };
+                throw new BusinessException(responseCode, "$i18n:" + rejection.messageKey(), rejection);
             }
             throw new BusinessException(ResponseCode.BadParam, "Plugin handler execution failed: " + e.getMessage());
         } finally {

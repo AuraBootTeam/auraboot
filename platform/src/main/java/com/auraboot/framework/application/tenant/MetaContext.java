@@ -19,6 +19,7 @@ public class MetaContext {
      *  can correlate without an active span (A-G6 / §2.6). */
     private static final ThreadLocal<String> OTEL_TRACE_ID = new ThreadLocal<>();
     private static final ThreadLocal<Boolean> ENV_FILTER_BYPASSED = ThreadLocal.withInitial(() -> false);
+    private static final ThreadLocal<Boolean> TENANT_FILTER_BYPASSED = ThreadLocal.withInitial(() -> false);
     private static final ThreadLocal<Boolean> LOCK_GUARD_BYPASSED = ThreadLocal.withInitial(() -> false);
     private static final ThreadLocal<String> COMMAND_AUTHORITY = new ThreadLocal<>();
     /** Server-published machine command permission; never propagated across async boundaries. */
@@ -113,6 +114,7 @@ public class MetaContext {
         SESSION_CONTEXT.remove();
         OTEL_TRACE_ID.remove();
         ENV_FILTER_BYPASSED.remove();
+        TENANT_FILTER_BYPASSED.remove();
         LOCK_GUARD_BYPASSED.remove();
         COMMAND_AUTHORITY.remove();
         EXTERNAL_COMMAND_PERMISSION.remove();
@@ -136,7 +138,10 @@ public class MetaContext {
             Long actorPartyId,
             Long partyMembershipId,
             String sessionStage,
-            long contextVersion) {}
+            long contextVersion,
+            boolean impersonation,
+            Long operatorUserId,
+            String clientType) {}
 
     public record Snapshot(Long tenantId, Long userId, String userPid, String username,
                            Set<Long> roleIds, Long memberId, Long envId, String otelTraceId,
@@ -171,6 +176,39 @@ public class MetaContext {
         SESSION_CONTEXT.set(s.sessionContext());
     }
 
+    /**
+     * Run with propagated identity but without the executing thread's command authority.
+     * Restore all prior thread-local state, including authority, on this same thread only.
+     * This also supports saturated executors using CallerRunsPolicy.
+     */
+    public static void runWithSnapshot(Snapshot snapshot, Runnable task) {
+        ThreadLocal<?>[] locals = { HOLDER, MEMBER_ID, ENV_ID, SESSION_CONTEXT, OTEL_TRACE_ID,
+                ENV_FILTER_BYPASSED, TENANT_FILTER_BYPASSED, LOCK_GUARD_BYPASSED,
+                COMMAND_AUTHORITY, EXTERNAL_COMMAND_PERMISSION, AUTHORIZED_COMMAND_CODE,
+                COMMAND_AGGREGATE, COMMAND_PERMIT };
+        Object[] previous = new Object[locals.length];
+        for (int i = 0; i < locals.length; i++) {
+            previous[i] = locals[i].get();
+        }
+        clear();
+        restore(snapshot);
+        try {
+            task.run();
+        } finally {
+            clear();
+            for (int i = 0; i < locals.length; i++) {
+                restoreLocal(locals[i], previous[i]);
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> void restoreLocal(ThreadLocal<T> local, Object value) {
+        if (value != null) {
+            local.set((T) value);
+        }
+    }
+
     public static void setSessionContext(
             Long applicationId,
             Long loginChannelId,
@@ -179,6 +217,21 @@ public class MetaContext {
             Long partyMembershipId,
             String sessionStage,
             long contextVersion) {
+        setSessionContext(applicationId, loginChannelId, executionScope, actorPartyId,
+                partyMembershipId, sessionStage, contextVersion, false, null, null);
+    }
+
+    public static void setSessionContext(
+            Long applicationId,
+            Long loginChannelId,
+            String executionScope,
+            Long actorPartyId,
+            Long partyMembershipId,
+            String sessionStage,
+            long contextVersion,
+            boolean impersonation,
+            Long operatorUserId,
+            String clientType) {
         SESSION_CONTEXT.set(new SessionContext(
                 applicationId,
                 loginChannelId,
@@ -186,7 +239,10 @@ public class MetaContext {
                 actorPartyId,
                 partyMembershipId,
                 sessionStage,
-                Math.max(1, contextVersion)));
+                Math.max(1, contextVersion),
+                impersonation,
+                operatorUserId,
+                clientType));
     }
 
     public static SessionContext getSessionContext() {
@@ -216,6 +272,25 @@ public class MetaContext {
     public static Long getCurrentPartyMembershipId() {
         SessionContext context = SESSION_CONTEXT.get();
         return context == null ? null : context.partyMembershipId();
+    }
+
+    public static boolean isImpersonating() {
+        SessionContext context = SESSION_CONTEXT.get();
+        return context != null && context.impersonation();
+    }
+
+    /** The human who initiated this request's effective identity. */
+    public static Long getActualActorUserId() {
+        SessionContext context = SESSION_CONTEXT.get();
+        if (context != null && context.impersonation() && context.operatorUserId() != null) {
+            return context.operatorUserId();
+        }
+        return getCurrentUserId();
+    }
+
+    public static String getCurrentClientType() {
+        SessionContext context = SESSION_CONTEXT.get();
+        return context == null ? null : context.clientType();
     }
 
     /** Snapshotted OTel trace id for the current thread (A-G6 correlation); may be null. */
@@ -271,6 +346,44 @@ public class MetaContext {
      */
     public static void runWithoutEnvFilter(Runnable action) {
         runWithoutEnvFilter(() -> {
+            action.run();
+            return null;
+        });
+    }
+
+    // ---- tenant filter scope (tenant-exemption cleanup W1) ----
+
+    /**
+     * @return true if the tenant-line filter is currently suppressed for this thread.
+     */
+    public static boolean isTenantFilterBypassed() {
+        return Boolean.TRUE.equals(TENANT_FILTER_BYPASSED.get());
+    }
+
+    /**
+     * Run a block with the tenant-line filter suppressed. This is the code-level
+     * replacement for blanket table exemptions: pre-auth lookups (login) and
+     * system workers (schedulers, outbox processors) that legitimately operate
+     * across or before tenants must declare it at the call site instead of the
+     * table being permanently exempt in {@code MybatisPlusConfig}. State is
+     * restored even on exception. Deliberately NOT propagated by
+     * {@link #snapshot()} — async workers must opt in explicitly.
+     */
+    public static <T> T runWithoutTenantFilter(java.util.function.Supplier<T> action) {
+        Boolean prior = TENANT_FILTER_BYPASSED.get();
+        TENANT_FILTER_BYPASSED.set(true);
+        try {
+            return action.get();
+        } finally {
+            TENANT_FILTER_BYPASSED.set(prior);
+        }
+    }
+
+    /**
+     * Run a block with the tenant-line filter suppressed (no return value).
+     */
+    public static void runWithoutTenantFilter(Runnable action) {
+        runWithoutTenantFilter(() -> {
             action.run();
             return null;
         });

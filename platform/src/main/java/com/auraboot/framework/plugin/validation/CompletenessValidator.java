@@ -35,7 +35,7 @@ public class CompletenessValidator implements PluginValidator {
         Set<String> pluginModelCodes = new HashSet<>();
         if (manifest.getModels() != null) {
             for (ModelDefinitionDTO model : manifest.getModels()) {
-                if (model.getCode() != null) {
+                if (model != null && model.getCode() != null) {
                     pluginModelCodes.add(model.getCode());
                 }
             }
@@ -48,11 +48,12 @@ public class CompletenessValidator implements PluginValidator {
         Map<String, Set<String>> modelPageTypes = new HashMap<>();
         if (manifest.getPages() != null) {
             for (PageSchemaDTO page : manifest.getPages()) {
+                if (page == null) continue;
                 String mc = page.getModelCode();
                 String pk = page.getKind();
                 if (mc != null && pk != null) {
                     modelPageTypes.computeIfAbsent(mc, k -> new HashSet<>())
-                            .add(pk.toLowerCase());
+                            .add(pk.toLowerCase(Locale.ROOT));
                 }
             }
         }
@@ -61,11 +62,12 @@ public class CompletenessValidator implements PluginValidator {
         Map<String, Set<String>> modelCommandTypes = new HashMap<>();
         if (manifest.getCommands() != null) {
             for (CommandDefinitionDTO cmd : manifest.getCommands()) {
+                if (cmd == null) continue;
                 String mc = cmd.getModelCode();
                 String type = cmd.getType();
                 if (mc != null && type != null) {
                     modelCommandTypes.computeIfAbsent(mc, k -> new HashSet<>())
-                            .add(type.toLowerCase());
+                            .add(type.toLowerCase(Locale.ROOT));
                 }
             }
         }
@@ -74,7 +76,7 @@ public class CompletenessValidator implements PluginValidator {
         Set<String> modelsWithBindings = new HashSet<>();
         if (manifest.getModelFieldBindings() != null) {
             for (ModelFieldBindingDTO binding : manifest.getModelFieldBindings()) {
-                if (binding.getModelCode() != null) {
+                if (binding != null && binding.getModelCode() != null) {
                     modelsWithBindings.add(binding.getModelCode());
                 }
             }

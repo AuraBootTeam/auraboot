@@ -68,13 +68,10 @@ export interface DesignerDocumentController<T = PageSchemaV3> {
    */
   update: (updater: (current: T) => T) => void;
   /**
-   * Mutate the LIVE document WITHOUT appending a history entry and WITHOUT
-   * perturbing the existing undo/redo stack (the snapshot at `historyIndex`
-   * keeps its previous value, so it may diverge from the live document until the
-   * next `update`/`undo`/`redo`). Mirrors edits that were intentionally
-   * non-undoable in their host (e.g. the report designer's title/description and
-   * parameter edits). A result that serializes identically to the current
-   * document is a no-op (no `onChange`).
+   * Apply non-undoable metadata edits without appending an entry or moving the
+   * cursor. Rebase the same pure updater over retained snapshots so subsequent
+   * undo/redo of structural edits keeps that metadata. Redo remains available.
+   * A result identical to the current document is a no-op (no onChange).
    */
   mutateNoHistory: (updater: (current: T) => T) => void;
   undo: () => void;
@@ -136,10 +133,12 @@ export function useDesignerDocument<T = PageSchemaV3>({
       const nextDocument = updater(prev.document);
       const nextSnapshot = serializeDocument(nextDocument);
       if (nextSnapshot === prevSnapshot) return; // no-op edit: nothing changed
-      // History stack (and its cursor) is left exactly as-is; only the live
-      // document advances. The entry at historyIndex may now differ from the
-      // live document, which is the intended non-undoable behavior.
-      commit({ ...prev, document: nextDocument }, nextSnapshot);
+      // Non-undoable metadata must survive traversal of every retained entry.
+      // Keep entry count and cursor intact, including an existing redo branch.
+      const history = prev.history.map((snapshot) =>
+        serializeDocument(updater(parseDocumentSnapshot<T>(snapshot))),
+      );
+      commit({ ...prev, document: nextDocument, history }, nextSnapshot);
     },
     [commit],
   );

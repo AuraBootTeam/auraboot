@@ -76,11 +76,85 @@ class NamedQueryServiceImplTest {
         when(fieldProtection.rewrite(any(), anyString())).thenAnswer(invocation -> invocation.getArgument(1));
         when(fieldProtection.apply(any(), org.mockito.ArgumentMatchers.anyList()))
                 .thenAnswer(invocation -> invocation.getArgument(1));
+        // executeQuery calls prepare(...) and reads the returned plan; without a stub the
+        // mock returns null and every list path NPEs on protections().
+        when(fieldProtection.prepare(any(), org.mockito.ArgumentMatchers.anyList(),
+                anyString(), org.mockito.ArgumentMatchers.anyBoolean()))
+                .thenAnswer(invocation -> new NamedQueryFieldProtection.Plan(
+                        null, java.util.List.of(), java.util.Map.of()));
     }
 
     @AfterEach
     void clearContext() {
         MetaContext.clear();
+    }
+
+    @Test
+    void boundQueryExecutionUsesReleaseWhitelistAndPreservesResourceAuthorization() {
+        MetaContext.setContext(10L, 20L, "tester", "Tester");
+        var catalog = mock(com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "applicationRuntimeDefinitionCatalog", catalog);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "applicationRuntimePrimaryEnabled", true);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "defaultApplicationCode", "aura-edu");
+        NamedQuery query = sqlQuery();
+        query.setResourceCode("e2et_order");
+        query.setActionCode("read");
+        var field = new NamedQueryField(10L, "order_summary", "total", "total", "number");
+        field.setSortable(true);
+        var definition = new com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.BoundNamedQuery(query, List.of(field));
+        when(catalog.findNamedQuery(10L, "aura-edu", "order_summary")).thenReturn(java.util.Optional.of(definition));
+        when(permissionEvaluator.canAction(20L, "e2et_order", "read")).thenReturn(true);
+        when(rateLimiter.tryAcquire(10L, "order_summary", 60)).thenReturn(true);
+        when(dataPermissionEngine.buildRowFilter(10L, "e2et_order", "read", 20L)).thenReturn("AND created_by = 20");
+        when(dynamicDataMapper.countByQueryWithoutTenant(anyString(), anyMap())).thenReturn(1L);
+        when(dynamicDataMapper.selectByQueryWithoutTenant(anyString(), anyMap())).thenReturn(List.of(Map.of("total", 5)));
+
+        var dto = service.findByCode("order_summary");
+        assertThat(dto.getFields()).extracting("fieldCode").containsExactly("total");
+        service.executeQuery("order_summary", new com.auraboot.framework.meta.dto.NamedQueryTestRequest());
+        var sql = ArgumentCaptor.forClass(String.class);
+        verify(dynamicDataMapper).selectByQueryWithoutTenant(sql.capture(), anyMap());
+        assertThat(sql.getValue()).contains("total AS \"total\"", "created_by = 20");
+        verify(namedQueryMapper, never()).findByCode(anyString());
+        verify(namedQueryFieldMapper, never()).findByQueryCode(any(), anyString());
+
+        when(permissionEvaluator.canAction(20L, "e2et_order", "read")).thenReturn(false);
+        assertThatThrownBy(() -> service.executeQuery("order_summary", new com.auraboot.framework.meta.dto.NamedQueryTestRequest()))
+                .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    void boundReleaseBypassesResidualNamedQueryCacheAndObservesNextBinding() {
+        MetaContext.setContext(10L, 20L, "tester", "Tester");
+        var catalog = mock(com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "applicationRuntimeDefinitionCatalog", catalog);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "defaultApplicationCode", "aura-edu");
+        var caches = new org.springframework.cache.concurrent.ConcurrentMapCacheManager("namedQuery");
+        var old = new com.auraboot.framework.meta.dto.NamedQueryDTO();
+        old.setTitle("stale local query");
+        caches.getCache("namedQuery").put(
+                com.auraboot.framework.meta.cache.MetaCacheKeyGenerator.getTenantContextSuffix() + ":code:order_summary", old);
+        var first = sqlQuery();
+        first.setTitle("first release");
+        var next = sqlQuery();
+        next.setTitle("next release");
+        var field = new NamedQueryField(10L, "order_summary", "total", "total", "number");
+        when(catalog.findNamedQuery(10L, "aura-edu", "order_summary")).thenReturn(
+                java.util.Optional.of(new com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.BoundNamedQuery(first, List.of(field))),
+                java.util.Optional.of(new com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.BoundNamedQuery(next, List.of(field))));
+        var interceptor = new org.springframework.cache.interceptor.CacheInterceptor();
+        interceptor.setCacheManager(caches);
+        interceptor.setCacheOperationSources(new org.springframework.cache.annotation.AnnotationCacheOperationSource());
+        interceptor.afterPropertiesSet();
+        interceptor.afterSingletonsInstantiated();
+        var factory = new org.springframework.aop.framework.ProxyFactory(service);
+        factory.addAdvice(interceptor);
+        var proxy = (com.auraboot.framework.meta.service.NamedQueryService) factory.getProxy();
+        assertThat(proxy.findByCode("order_summary")).isSameAs(old);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "applicationRuntimePrimaryEnabled", true);
+        assertThat(proxy.findByCode("order_summary").getTitle()).isEqualTo("first release");
+        assertThat(proxy.findByCode("order_summary").getTitle()).isEqualTo("next release");
+        org.mockito.Mockito.verifyNoInteractions(namedQueryMapper, namedQueryFieldMapper);
     }
 
     @Test

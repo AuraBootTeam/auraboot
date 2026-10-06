@@ -46,6 +46,7 @@ import { dictService } from '~/shared/services/dictService';
 import { toast } from 'sonner';
 import type { FieldAdapter } from '~/ui/field-adapter';
 import type { PropertySchema } from './types';
+import type { LocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 import { getLocalizedText, useSmartText } from '~/utils/i18n';
 import { useI18n } from '~/contexts/I18nContext';
 
@@ -55,7 +56,7 @@ import { useI18n } from '~/contexts/I18nContext';
 
 export interface PropertyFieldRendererProps {
   /** Schema that describes the field type, label, options, etc. */
-  schema: PropertySchema<string>;
+  schema: PropertySchema<string | LocalizedText>;
   /** FieldAdapter that bridges the designer store with base-field components. */
   adapter: FieldAdapter<unknown>;
 }
@@ -64,7 +65,7 @@ export interface PropertyFieldRendererProps {
  * Render a single property field based on its PropertySchema.
  *
  * The caller is responsible for:
- *  - Resolving i18n labels to plain strings before passing `schema`
+ *  - Passing plain or localized labels, resolved by this renderer
  *  - Creating the appropriate FieldAdapter (flow, dashboard, etc.)
  *  - Evaluating `dependsOn` visibility (keep at panel level)
  */
@@ -441,7 +442,7 @@ function ExpressionField({
   label,
   helpText,
 }: {
-  schema: PropertySchema<string>;
+  schema: PropertySchema<string | LocalizedText>;
   adapter: FieldAdapter<unknown>;
   name: string;
   label?: string;
@@ -564,7 +565,7 @@ function expressionFieldGroup(
 }
 
 function resolveExpressionFieldCatalogModelCode(
-  schema: PropertySchema<string>,
+  schema: PropertySchema<unknown>,
   adapter: FieldAdapter<unknown>,
 ): string | undefined {
   if (schema.expressionFieldCatalogModelCode?.trim()) {
@@ -969,7 +970,7 @@ function ruleBindingDecisionOptions(
 }
 
 function resolveRuleBindingModelCode(
-  schema: PropertySchema<string>,
+  schema: PropertySchema<unknown>,
   adapter: FieldAdapter<unknown>,
 ): string | undefined {
   if (schema.ruleBindingFieldCatalogModelCode?.trim()) {
@@ -982,7 +983,7 @@ function resolveRuleBindingModelCode(
 }
 
 function resolveRuleBindingConsumerCode(
-  schema: PropertySchema<string>,
+  schema: PropertySchema<unknown>,
   adapter: FieldAdapter<unknown>,
 ): string | undefined {
   if (schema.ruleBindingConsumerCode?.trim()) {
@@ -1020,7 +1021,7 @@ function normalizeRuleBindingInitialContext(
 }
 
 function resolveRuleBindingInitialContextJson(
-  schema: PropertySchema<string>,
+  schema: PropertySchema<unknown>,
   adapter: FieldAdapter<unknown>,
 ): string | undefined {
   if (schema.ruleBindingInitialContextJson?.trim()) {

@@ -57,7 +57,8 @@ public class ExportTaskService {
 
     /**
      * Submit an async export task.
-     * Captures tenant context at submission time since @Async threads lack MetaContext.
+     * Captures tenant context at submission time as an execution fence; the
+     * exportTaskExecutor also propagates MetaContext via TenantAwareTaskDecorator.
      */
     public ExportTaskDTO submitExport(String queryCode, NamedQueryDataExportRequest request,
                                        Long tenantId, Long userId) {
@@ -416,6 +417,8 @@ public class ExportTaskService {
      */
     @Scheduled(fixedDelay = 3600000) // Every hour
     public void cleanupExpiredTasks() {
+        // @Scheduled thread: explicit scope (tenant-exemption W3).
+        MetaContext.runWithoutTenantFilter(() -> {
         List<ExportTask> expired = exportTaskMapper.findExpired(Instant.now());
         for (ExportTask task : expired) {
             try {
@@ -431,6 +434,7 @@ public class ExportTaskService {
         if (!expired.isEmpty()) {
             log.info("Cleaned up {} expired export tasks", expired.size());
         }
+        });
     }
 
     // ==================== Private helpers ====================

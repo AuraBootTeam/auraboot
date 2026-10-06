@@ -64,6 +64,20 @@ vi.mock('../ToolbarBlockRenderer', () => ({
   },
 }));
 
+vi.mock('~/ui/smart/form/Select', () => ({
+  Select: ({ name, value, onChange, dataSource }: any) => (
+    <select
+      data-testid={`reference-picker-${name}`}
+      data-endpoint={dataSource?.endpoint}
+      data-label-field={dataSource?.labelField}
+      value={value || ''}
+      onChange={(event) => onChange(event.target.value)}
+    >
+      <option value="">Select</option>
+      <option value="product-public-pid">Business product name</option>
+    </select>
+  ),
+}));
 import { SubTableViewer } from '../SubTableViewer';
 
 function buildConfig(overrides?: Partial<SubTableConfig>): SubTableConfig {
@@ -90,6 +104,36 @@ describe('SubTableViewer', () => {
     toolbarRendererMock.mockReset();
   });
 
+  it.each([
+    { code: '403', message: 'Approval history access denied', data: null },
+    { code: '1', message: 'Approval history unavailable', data: null },
+    { code: '403', message: 'Approval history access denied', data: { records: [{ pid: 'forbidden-row', taskName: 'Private task' }] } },
+  ])('shows the datasource error instead of an empty or unauthorized collection ($code)', async (result) => {
+    fetchResultMock.mockResolvedValue(result);
+    render(
+      <SubTableViewer
+        config={{ ...buildConfig(), dataSource: { kind: 'namedQuery', queryCode: 'wd_leave_request_approval_history' } } as any}
+        parentRecordPid="leave-1"
+      />,
+    );
+    await expect(screen.findByRole('alert')).resolves.toHaveTextContent(result.message);
+    expect(screen.queryByTestId('subtable-empty-state')).not.toBeInTheDocument();
+    expect(screen.queryByText('Private task')).not.toBeInTheDocument();
+  });
+
+  it('rejects a successful datasource envelope with a malformed records payload', async () => {
+    fetchResultMock.mockResolvedValue({ code: '0', data: { records: { private: 'not a collection' } } });
+    render(
+      <SubTableViewer
+        config={{ ...buildConfig(), dataSource: { kind: 'namedQuery', queryCode: 'wd_leave_request_approval_history' } } as any}
+        parentRecordPid="leave-1"
+        t={(key) => key === 'common.loadDataFailed' ? 'Unable to load data' : key}
+      />,
+    );
+    await expect(screen.findByRole('alert')).resolves.toHaveTextContent('Unable to load data');
+    expect(screen.queryByTestId('subtable-empty-state')).not.toBeInTheDocument();
+  });
+
   it('renders parent-scoped toolbar actions above an empty child collection', async () => {
     fetchResultMock.mockResolvedValue({ code: '0', data: { records: [] } });
 
@@ -112,6 +156,8 @@ describe('SubTableViewer', () => {
     );
 
     await expect(screen.findByTestId('subtable-empty-state')).resolves.toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: '节点' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: '状态' })).toBeInTheDocument();
     expect(screen.getByTestId('subtable-toolbar-actions')).toBeInTheDocument();
     expect(screen.getByTestId('mock-subtable-toolbar')).toBeInTheDocument();
     const renderedBlock = toolbarRendererMock.mock.calls.at(-1)?.[0]?.block;
@@ -810,5 +856,88 @@ describe('SubTableViewer', () => {
     fireEvent.click(screen.getByTestId('subtable-row-action-open_quoteops-0'));
 
     expect(navigateMock).toHaveBeenCalledWith('/p/qo_quote/view/quote-1');
+  });
+});
+
+describe('SubTableViewer reference input', () => {
+  it('offers a business-name picker and persists its selected public PID', async () => {
+    fetchResultMock.mockImplementation(async (endpoint: string) =>
+      endpoint.endsWith('/field-meta')
+        ? {
+            code: '0',
+            data: [
+              {
+                code: 'line_product_id',
+                dataType: 'reference',
+                refTarget: { targetModel: 'prod_product', targetField: 'prod_name' },
+              },
+            ],
+          }
+        : { code: '0', data: { records: [] } },
+    );
+    render(
+      <SubTableViewer
+        config={{
+          childModel: 'line',
+          parentField: 'parent_id',
+          columns: [{ field: 'line_product_id', label: 'Product' }],
+          commands: { create: 'inventory:add_line' },
+          readOnly: false,
+        }}
+        parentRecordPid="parent-public-pid"
+        isEditable
+      />,
+    );
+    fireEvent.click(await screen.findByTestId('subtable-empty-action'));
+    const picker = await screen.findByTestId('reference-picker-line_product_id');
+    expect(picker).toHaveAttribute('data-endpoint', '/api/dynamic/prod_product/list');
+    expect(picker).toHaveAttribute('data-label-field', 'prod_name');
+    fireEvent.change(picker, { target: { value: 'product-public-pid' } });
+    fireEvent.click(screen.getByTestId('subtable-save-btn'));
+    await waitFor(() =>
+      expect(fetchResultMock).toHaveBeenCalledWith(
+        '/api/meta/commands/execute/inventory:add_line',
+        expect.objectContaining({
+          params: expect.objectContaining({
+            payload: expect.objectContaining({
+              parent_id: 'parent-public-pid',
+              line_product_id: 'product-public-pid',
+            }),
+          }),
+        }),
+      ),
+    );
+  });
+});
+
+describe('SubTableViewer string constraints', () => {
+  it('inherits the child field maximum length in the actual row input', async () => {
+    fetchResultMock.mockImplementation(async (endpoint: string) =>
+      endpoint.endsWith('/field-meta')
+        ? {
+            code: '0',
+            data: [
+              { code: 'lot_code', dataType: 'string', feature: { validation: { maxLength: 100 } } },
+            ],
+          }
+        : { code: '0', data: { records: [] } },
+    );
+    render(
+      <SubTableViewer
+        config={{
+          childModel: 'line',
+          parentField: 'parent_id',
+          columns: [{ field: 'lot_code', label: 'Batch' }],
+          commands: { create: 'inventory:add_line' },
+          readOnly: false,
+        }}
+        parentRecordPid="parent-public-pid"
+        isEditable
+      />,
+    );
+    fireEvent.click(await screen.findByTestId('subtable-empty-action'));
+    await waitFor(() =>
+      expect(screen.getByTestId('subtable-add-lot_code')).toHaveAttribute('maxlength', '100'),
+    );
   });
 });

@@ -12,12 +12,57 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PageSchemaValidatorTest {
 
     private final PageSchemaValidator validator = new PageSchemaValidator();
+
+    @Test
+    void registeredRenderProfileIsScopedAndKeepsVersionIdAndI18nChecks() {
+        var profile = new PageSchemaRenderProfile("storefront", Set.of("plp"), Set.of("product-grid"));
+        var registered = new PageSchemaValidator(List.of(profile));
+        var manifest = new PluginManifestExtended();
+        var p = page("commerce_plp", "plp", null,
+                List.of(Map.of("id", "products", "blockType", "product-grid")));
+        p.setProfile("storefront");
+        manifest.setPages(List.of(p));
+        var ctx = PluginValidationContext.builder().pluginId("commerce").namespace("commerce")
+                .manifest(manifest).build();
+        assertTrue(registered.validate(ctx).isEmpty());
+        assertHasError(validator.validate(ctx), "S-PAGE-KIND-UNKNOWN", "pages[0].kind");
+        assertHasError(validator.validate(ctx), "S-PAGE-BLOCK-TYPE", "pages[0].blocks[0].blockType");
+
+        p.setProfile("admin");
+        assertHasError(registered.validate(ctx), "S-PAGE-KIND-UNKNOWN", "pages[0].kind");
+        assertHasError(registered.validate(ctx), "S-PAGE-BLOCK-TYPE", "pages[0].blocks[0].blockType");
+        p.setProfile("storefront");
+        p.setKind("list");
+        assertHasError(registered.validate(ctx), "S-PAGE-KIND-UNKNOWN", "pages[0].kind");
+        p.setKind("plp");
+        p.setBlocks(validTable());
+        assertHasError(registered.validate(ctx), "S-PAGE-BLOCK-TYPE", "pages[0].blocks[0].blockType");
+
+        p.setSchemaVersion(3);
+        p.setBlocks(List.of(Map.of("blockType", "product-grid", "title", "商品")));
+        var violations = registered.validate(ctx);
+        assertHasError(violations, "S-PAGE-VERSION", "pages[0].schemaVersion");
+        assertHasError(violations, "S-PAGE-BLOCK-ID", "pages[0].blocks[0].id");
+        assertHasError(violations, "S-PAGE-I18N", "pages[0].blocks[0].title");
+    }
+
+    @Test
+    void duplicateOrInvalidRenderProfileRegistrationFailsClosed() {
+        var profile = new PageSchemaRenderProfile("storefront", Set.of("plp"), Set.of("product-grid"));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                () -> new PageSchemaValidator(List.of(profile, profile)));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                () -> new PageSchemaRenderProfile("admin", Set.of("plp"), Set.of("product-grid")));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                () -> new PageSchemaRenderProfile("storefront", Set.of(), Set.of("product-grid")));
+    }
 
     @Test
     void tableBlockWithoutIdIsRejected() {
@@ -602,6 +647,33 @@ class PageSchemaValidatorTest {
         p.setLayout(Map.of("type", "grid", "cols", 12));
         manifest.setPages(List.of(p));
         assertNoError(validate(manifest), "S-PAGE-BLOCK-COL");
+    }
+
+    @Test
+    void linkageRulesRemainFirstClassAfterJsonImport() throws Exception {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        ObjectMapper mapper = new ObjectMapper();
+        PageSchemaDTO imported = mapper.readValue("""
+                {
+                  "pageKey": "pe_order_form",
+                  "kind": "form",
+                  "schemaVersion": 4,
+                  "modelCode": "pe_order",
+                  "layout": {"type": "stack"},
+                  "blocks": [{
+                    "id": "order_section",
+                    "blockType": "form-section",
+                    "fields": [{"field": "pe_order_no", "required": true}]
+                  }],
+                  "linkageRules": [{
+                    "id": "clear-number",
+                    "trigger": {"fieldCode": "pe_order_no", "event": "change"},
+                    "actions": [{"type": "setValue", "target": "pe_order_no", "value": "null"}]
+                  }]
+                }
+                """, PageSchemaDTO.class);
+        manifest.setPages(List.of(imported));
+        assertNoError(validate(manifest), "S-PAGE-UNKNOWN-FIELDS");
     }
 
     @Test

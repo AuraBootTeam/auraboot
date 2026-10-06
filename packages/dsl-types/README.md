@@ -35,3 +35,7 @@ This package introduces **strong type contracts for the DSL without changing the
 ## DetailSchema?
 
 There is no separate `DetailSchema`. Detail pages use `kind: 'detail'` with the same blocks (`stat-card`, `form-section` in readonly mode, `tabs`, `sub-table`, etc).
+
+## License
+
+Apache-2.0. See [LICENSE](./LICENSE) for the full text. The package license does not grant AuraBoot trademark rights.

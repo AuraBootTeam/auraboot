@@ -1,9 +1,11 @@
+import type { ComponentText, ValidationRule } from '~/framework/meta/registry/components/ComponentConfig';
 /**
  * 属性输入控件组件
  * 根据属性类型动态渲染不同的输入控件
  * 最小化stopPropagation使用，只在叶子组件中使用
  */
 
+import { usePropertyEditorText } from './propertyEditorI18n';
 import React, { useCallback } from 'react';
 import { useLocalizedText } from '~/utils/i18n';
 import { IconPicker } from '~/plugins/core-designer/components/studio/workbench/panels/property-editors/IconPicker';
@@ -12,11 +14,11 @@ import { IconPicker } from '~/plugins/core-designer/components/studio/workbench/
 interface PropertySchema {
   key: string;
   type: string;
-  label?: string;
-  description?: string;
+  label?: ComponentText;
+  description?: ComponentText;
   defaultValue?: any;
-  options?: Array<{ label: string; value: any }>;
-  validation?: {
+  options?: Array<{ label: ComponentText; value: any }>;
+  validation?: ValidationRule[] | {
     required?: boolean;
     min?: number;
     max?: number;
@@ -43,6 +45,7 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
   onChange,
 }) => {
   const lt = useLocalizedText();
+  const text = usePropertyEditorText();
 
   const handleChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -125,7 +128,7 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
           <input
             {...commonProps}
             type="text"
-            placeholder={translatedDescription || `请输入${translatedLabel}`}
+            placeholder={translatedDescription || text('enter', { label: translatedLabel })}
             data-domain="input"
           />
         );
@@ -137,7 +140,7 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
             type="number"
             min={property.min}
             max={property.max}
-            placeholder={translatedDescription || `请输入${translatedLabel}`}
+            placeholder={translatedDescription || text('enter', { label: translatedLabel })}
             data-domain="input"
           />
         );
@@ -167,10 +170,10 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
       case 'select':
         return (
           <select {...commonProps} value={value || ''} data-domain="input">
-            <option value="">请选择{translatedLabel}</option>
+            <option value="">{text('select', { label: translatedLabel })}</option>
             {property.options?.map((option) => (
               <option key={option.value} value={option.value}>
-                {option.label}
+                {lt(option.label)}
               </option>
             ))}
           </select>
@@ -181,7 +184,7 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
           <textarea
             {...commonProps}
             rows={4}
-            placeholder={translatedDescription || `请输入${translatedLabel}`}
+            placeholder={translatedDescription || text('enter', { label: translatedLabel })}
             data-domain="input"
           />
         );
@@ -233,7 +236,7 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
           <textarea
             {...commonProps}
             rows={3}
-            placeholder="请输入JSON格式的数组，如: [1, 2, 3]"
+            placeholder={text('array')}
             value={Array.isArray(value) ? JSON.stringify(value) : value || ''}
             onChange={(e) => {
               try {
@@ -256,7 +259,7 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
           <textarea
             {...commonProps}
             rows={4}
-            placeholder='请输入JSON格式的对象，如: {"key": "value"}'
+            placeholder={text('object')}
             value={typeof value === 'object' ? JSON.stringify(value, null, 2) : value || ''}
             onChange={(e) => {
               try {
@@ -279,11 +282,11 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
         );
 
         return (
-          <React.Suspense fallback={<div className="text-sm text-gray-500">加载中...</div>}>
+          <React.Suspense fallback={<div className="text-sm text-gray-500">{text('loading')}</div>}>
             <FormRefSelectEditor
               value={value}
               onChange={onChange}
-              placeholder={translatedDescription || `请选择${translatedLabel}`}
+              placeholder={translatedDescription || text('select', { label: translatedLabel })}
             />
           </React.Suspense>
         );
@@ -293,7 +296,7 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
           <input
             {...commonProps}
             type="text"
-            placeholder={translatedDescription || `请输入${translatedLabel}`}
+            placeholder={translatedDescription || text('enter', { label: translatedLabel })}
             data-domain="input"
           />
         );

@@ -15,7 +15,7 @@ command -v k6 >/dev/null || { echo "k6 is required" >&2; exit 2; }
 
 k6_args=(run)
 if [[ -n "${K6_SUMMARY_EXPORT:-}" ]]; then
-  k6_args+=(--summary-export "$K6_SUMMARY_EXPORT")
+  k6_args+=(--env "SUMMARY_PATH=$K6_SUMMARY_EXPORT")
 fi
 
 exec k6 "${k6_args[@]}" \

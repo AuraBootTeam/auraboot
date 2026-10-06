@@ -26,10 +26,18 @@
 import { existsSync, openSync, writeSync, closeSync, readFileSync, rmSync, statSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import { test } from '@playwright/test';
 
 const LOCK_PATH = join(tmpdir(), 'aura-e2et-order-savedview.lock');
 const ACQUIRE_TIMEOUT_MS = 25 * 60 * 1000;
+// Coordination has its own budget; callers keep the normal test/action deadlines.
+export const SAVED_VIEW_LOCK_HOOK_TIMEOUT_MS = ACQUIRE_TIMEOUT_MS + 1000;
 const HARD_STALE_MS = 30 * 60 * 1000;
+// A queued file waits for the holder's remaining runtime (≤ a file's duration).
+// The beforeAll hook itself dies at the per-test timeout (15s) unless raised —
+// the source of "beforeAll hook timeout" flakes whenever two saved-view files
+// started in the same worker wave.
+const LOCK_WAIT_HOOK_BUDGET_MS = 5 * 60 * 1000;
 
 function pidAlive(pid: number): boolean {
   if (!Number.isInteger(pid) || pid <= 0) return false;
@@ -47,6 +55,13 @@ function sleep(ms: number): Promise<void> {
 
 /** Acquire the exclusive e2et_order saved-view lock. Call in a top-level beforeAll. */
 export async function acquireSavedViewLock(label: string): Promise<void> {
+  // Raise the enclosing beforeAll hook's timeout so the wait below can actually
+  // outlive the current lock holder instead of dying at the per-test timeout.
+  try {
+    test.setTimeout(LOCK_WAIT_HOOK_BUDGET_MS);
+  } catch {
+    /* called outside a hook context — nothing to raise */
+  }
   const start = Date.now();
   for (;;) {
     try {

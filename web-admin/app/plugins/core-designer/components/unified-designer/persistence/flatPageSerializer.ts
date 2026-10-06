@@ -67,6 +67,21 @@ const PASSTHROUGH_BLOCK_TYPES = new Set([
   'custom',
 ]);
 
+/** Keys serializePassthrough manages explicitly; everything else on a passthrough
+ * block is legacy top-level payload and must survive the round trip verbatim. */
+const RESIDUAL_MANAGED_KEYS = new Set([
+  'id',
+  'blockType',
+  'region',
+  'title',
+  'dataSource',
+  'layout',
+  'props',
+  'blocks',
+  'extension',
+  'widgetType',
+]);
+
 /** Leaf block types that live inside passthrough containers and pass through verbatim. */
 const PASSTHROUGH_LEAF_TYPES = new Set(['field', 'column', 'action', 'filter-field']);
 
@@ -144,12 +159,12 @@ function serializeBlock(block: DslBlockV3, issues: string[]): LegacyDslBlockV2 |
     case 'filter-bar':
       return serializeFilterBar(block, issues);
     case 'action-bar':
-      return serializeActionBar(block);
+      return serializeActionBar(block, issues);
     case 'form-section':
     case 'detail-section':
       return serializeSection(block, issues);
     case 'table':
-      return serializeTable(block);
+      return serializeTable(block, issues);
     case 'tabs':
       return serializeTabs(block, issues);
     case 'widget': {
@@ -209,7 +224,12 @@ function serializeFilterBar(block: DslBlockV3, issues: string[]): LegacyDslBlock
  * `toolbar` and `form-buttons` to these exact regions, so the region is a
  * reliable discriminator.
  */
-function serializeActionBar(block: DslBlockV3): LegacyDslBlockV2 {
+function serializeActionBar(block: DslBlockV3, issues: string[]): LegacyDslBlockV2 {
+  for (const child of block.blocks ?? []) {
+    if (child.blockType !== 'action') {
+      issues.push(`${describeBlock(child)} cannot live inside an action-bar: expected action`);
+    }
+  }
   const flatType = block.region === 'footer' ? 'form-buttons' : 'toolbar';
   const flat: LegacyDslBlockV2 = {
     id: block.id,
@@ -239,7 +259,7 @@ function serializeSection(block: DslBlockV3, issues: string[]): LegacyDslBlockV2
 }
 
 /** table → flat table block; `columns` / `rowActions` arrays are restored from children and props. */
-function serializeTable(block: DslBlockV3): LegacyDslBlockV2 {
+function serializeTable(block: DslBlockV3, issues: string[]): LegacyDslBlockV2 {
   const { selection, rowActions, ...residualProps } = stripNone(block.props);
   const columns: LegacyDslBlockV2['columns'] = [];
   const serializedRowActions: Array<string | Record<string, unknown>> = [];
@@ -249,8 +269,7 @@ function serializeTable(block: DslBlockV3): LegacyDslBlockV2 {
     } else if (child.blockType === 'action') {
       serializedRowActions.push(serializeActionEntry(child, block.id));
     } else {
-      // Not reachable through migratePageSchemaV2ToV3; keep the guard loud.
-      columns.push(child as unknown as Record<string, unknown>);
+      issues.push(`${describeBlock(child)} cannot live inside a table: expected column or action`);
     }
   }
   const flat: LegacyDslBlockV2 = {
@@ -290,6 +309,9 @@ function serializeTabEntry(
   index: number,
   issues: string[],
 ): Record<string, unknown> {
+  if (tab.blockType !== 'tab') {
+    issues.push(`${describeBlock(tab)} cannot live inside tabs: expected tab`);
+  }
   const entry: Record<string, unknown> = {
     ...stripNone(tab.props),
     blocks: (tab.blocks ?? []).map((child) => {
@@ -314,6 +336,19 @@ function serializePassthrough(block: DslBlockV3, issues: string[]): LegacyDslBlo
   if (block.title !== undefined) flat.title = block.title;
   if (block.dataSource !== undefined) flat.dataSource = unwrapDataSourceRef(block.dataSource);
   applyCommonShape(block, flat, stripNone(block.props));
+  // Legacy top-level block keys (metric-strip variant/metrics, description
+  // content, embedded-list modelCode/parentField, status-banner statusField/
+  // toneMap, workbench-action-bar actions/surface/align, …) live OUTSIDE
+  // `props` on the editor tree. The passthrough contract is "verbatim" —
+  // dropping them silently emptied every legacy-authored display block on the
+  // first save (binding-loss). Carry everything unmanaged straight through;
+  // props still wins for keys the editor itself materialized into props.
+  for (const [key, value] of Object.entries(block)) {
+    if (RESIDUAL_MANAGED_KEYS.has(key) || value === undefined) continue;
+    if (flat[key as keyof LegacyDslBlockV2] === undefined) {
+      (flat as Record<string, unknown>)[key] = value;
+    }
+  }
   const children = block.blocks ?? [];
   if (children.length > 0) {
     // Passthrough containers (repeater / subform / sub-table / columns / …)

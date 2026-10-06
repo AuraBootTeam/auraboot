@@ -20,13 +20,11 @@
 
 import { test, expect } from '../../fixtures';
 import { uniqueId } from '../helpers';
+import { openFlowDesignerPanel } from '../_helpers/flow-designer-harness';
 import { ErrorCodes } from '~/shared/services/http-client/types';
 
-// The flow designer switches to a compact layout below 1600px (palette/inspector
-// collapse behind toggles). These specs assert the palette/canvas directly, so run
-// them in the wide layout the designer is built for. See FlowDesigner.tsx
-// COMPACT_FLOW_DESIGNER_QUERY '(max-width: 1599px)'.
-test.use({ viewport: { width: 1680, height: 1050 } });
+// Keep the original viewport and drive responsive panels through their UI toggles.
+test.use({ viewport: { width: 1680, height: 1050 }, locale: 'zh-CN' });
 
 // ---------------------------------------------------------------------------
 // Locator helpers — handle both Chinese (zh-CN) and English (en-US) i18n
@@ -72,12 +70,13 @@ async function createAutomationViaApi(
       triggerType: 'on_record_create',
       modelCode: 'e2et_order',
       actions: [
-        { type: 'send_notification', config: { message: 'e2e designer test' }, sequence: 0, label: 'Notify' },
+        { type: 'send_notification', config: { notificationType: 'in_app', title: 'Designer test', content: 'E2E notification', recipients: 'ROLE:admin' }, sequence: 0, label: 'Notify' },
       ],
       enabled: false,
       ...overrides,
     },
   });
+  expect(resp.status()).toBe(200);
   const body = await resp.json();
   if (String(body.code) !== ErrorCodes.SUCCESS) {
     throw new Error(`Failed to create automation: ${body.message || JSON.stringify(body)}`);
@@ -106,11 +105,9 @@ test.describe('Automation Designer', () => {
     try {
       testAutomation = await createAutomationViaApi(page);
       createdPids.push(testAutomation.pid);
-    } catch (e) {
-      console.warn('Automation designer setup failed:', e);
+    } finally {
+      await context.close();
     }
-    await page.close();
-    await context.close();
   });
 
   test.afterAll(async ({ browser }) => {
@@ -133,22 +130,30 @@ test.describe('Automation Designer', () => {
 
     await page.goto(`/automation/${testAutomation.pid}`);
     await page.waitForLoadState('domcontentloaded');
+    await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
 
     // Verify the name input is visible (editor loaded)
     await expect(nameInput(page)).toBeVisible({ timeout: 10000 });
 
     // Palette column (left side — FlowPalette uses w-64 + overflow-y-auto)
+    await openFlowDesignerPanel(page, 'palette');
     const palette = flowPalette(page);
     await expect(palette).toBeVisible({ timeout: 5000 });
+    await page.screenshot({ path: test.info().outputPath('AD-01-palette.png'), fullPage: true });
 
     // Canvas area — ReactFlow renders inside a flex-1 container
-    // Use toBeAttached instead of toBeVisible for canvas-like elements (overflow/initial 0x0)
     const canvas = page.locator('.react-flow__renderer').first();
-    await expect(canvas).toBeAttached({ timeout: 8000 });
+    await expect(canvas).toBeVisible({ timeout: 8000 });
 
-    // Properties panel (right side, w-80 with border-l)
-    const properties = page.locator('.w-80.border-l').first();
+    await openFlowDesignerPanel(page, 'inspector');
+    const properties = page.getByTestId('flow-inspector-shell');
     await expect(properties).toBeVisible({ timeout: 5000 });
+    const panelBox = await properties.locator(':scope > div').last().boundingBox();
+    const shellBox = await properties.boundingBox();
+    expect(panelBox).not.toBeNull();
+    expect(shellBox).not.toBeNull();
+    expect(Math.abs(panelBox!.height - shellBox!.height)).toBeLessThanOrEqual(1);
+    await page.screenshot({ path: test.info().outputPath('AD-01-inspector.png'), fullPage: true });
   });
 
   /**
@@ -161,10 +166,12 @@ test.describe('Automation Designer', () => {
 
     await page.goto(`/automation/${testAutomation.pid}`);
     await page.waitForLoadState('domcontentloaded');
+    await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
 
     await expect(nameInput(page)).toBeVisible({ timeout: 10000 });
 
     // The palette groups nodes by category with toggle buttons
+    await openFlowDesignerPanel(page, 'palette');
     const palette = flowPalette(page);
     await expect(palette).toBeVisible({ timeout: 5000 });
 
@@ -189,10 +196,12 @@ test.describe('Automation Designer', () => {
 
     await page.goto(`/automation/${testAutomation.pid}`);
     await page.waitForLoadState('domcontentloaded');
+    await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
 
     await expect(nameInput(page)).toBeVisible({ timeout: 10000 });
 
     // Find draggable items in the palette
+    await openFlowDesignerPanel(page, 'palette');
     const palette = flowPalette(page);
     const paletteItems = palette.locator('[draggable="true"]');
     await expect(paletteItems.first()).toBeVisible({ timeout: 5000 });
@@ -205,16 +214,7 @@ test.describe('Automation Designer', () => {
     // The icon container is the first span.text-lg inside each item.
     const lucideIconNames = ['Plus', 'Save', 'Pencil', 'Bell', 'Terminal', 'Globe', 'Send', 'Play', 'FilePlus'];
     for (const iconName of lucideIconNames) {
-      // Check that the icon name does NOT appear as standalone visible text in the palette
-      // (it would if the icon was rendered as plain text instead of SVG)
-      const plainTextIcon = palette.locator(`span.text-lg:has-text("${iconName}")`).first();
-      const isPlainText = await plainTextIcon.isVisible({ timeout: 1000 }).catch(() => false);
-      if (isPlainText) {
-        // Double-check: if the span contains an SVG child, that's correct (icon rendered).
-        // Only fail if it literally has the text with no SVG.
-        const hasSvg = await plainTextIcon.locator('svg').count();
-        expect(hasSvg).toBeGreaterThan(0);
-      }
+      await expect(palette.getByText(iconName, { exact: true })).toHaveCount(0);
     }
 
     // Verify that SVG icons exist in the palette items (lucide renders as svg)
@@ -232,20 +232,24 @@ test.describe('Automation Designer', () => {
 
     await page.goto(`/automation/${testAutomation.pid}`);
     await page.waitForLoadState('domcontentloaded');
+    await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
 
     await expect(nameInput(page)).toBeVisible({ timeout: 10000 });
 
     // ReactFlow canvas should be attached (outer wrapper may have 0x0 initially)
     const canvas = page.locator('.react-flow__renderer').first();
-    await expect(canvas).toBeAttached({ timeout: 8000 });
+    await expect(canvas).toBeVisible({ timeout: 8000 });
 
     // ReactFlow renders a viewport container
     const viewport = page.locator('.react-flow__viewport').first();
-    await expect(viewport).toBeAttached({ timeout: 5000 });
+    await expect(viewport).toBeVisible({ timeout: 5000 });
 
     // Canvas should accept drag-over (has onDragOver handler)
     const pane = page.locator('.react-flow__pane').first();
-    await expect(pane).toBeAttached({ timeout: 5000 });
+    await expect(pane).toBeVisible({ timeout: 5000 });
+    const transform = await viewport.getAttribute('style');
+    await page.locator('.react-flow__controls button').first().click();
+    await expect(viewport).not.toHaveAttribute('style', transform!);
   });
 
   /**
@@ -256,10 +260,12 @@ test.describe('Automation Designer', () => {
 
     await page.goto(`/automation/${testAutomation.pid}`);
     await page.waitForLoadState('domcontentloaded');
+    await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
 
     await expect(nameInput(page)).toBeVisible({ timeout: 10000 });
 
     // Find all draggable items in the palette
+    await openFlowDesignerPanel(page, 'palette');
     const palette = flowPalette(page);
     const draggableItems = palette.locator('[draggable="true"]');
 
@@ -287,6 +293,7 @@ test.describe('Automation Designer', () => {
 
     await page.goto(`/automation/${testAutomation.pid}`);
     await page.waitForLoadState('domcontentloaded');
+    await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
 
     // Verify name input is editable
     const name = nameInput(page);
@@ -297,7 +304,7 @@ test.describe('Automation Designer', () => {
     await name.clear();
     await name.fill('Updated Designer Name');
     const nameValue = await name.inputValue();
-    expect(nameValue.length).toBeGreaterThan(0);
+    expect(nameValue).toBe('Updated Designer Name');
 
     // Verify description input is editable
     const desc = descriptionInput(page);
@@ -308,7 +315,7 @@ test.describe('Automation Designer', () => {
     await desc.clear();
     await desc.fill('Updated description text');
     const descValue = await desc.inputValue();
-    expect(descValue.length).toBeGreaterThan(0);
+    expect(descValue).toBe('Updated description text');
   });
 
   /**
@@ -318,42 +325,41 @@ test.describe('Automation Designer', () => {
    * After modifying the name and clicking Save, it should call PUT /api/automations/{pid}.
    */
   test('AD-07: save button triggers API call @critical', async ({ page }) => {
-    if (!testAutomation?.pid) { throw new Error(String('Test automation not created')); }
+    const saveFixture = await createAutomationViaApi(page);
+    createdPids.push(saveFixture.pid);
 
-    await page.goto(`/automation/${testAutomation.pid}`);
+    await page.goto(`/automation/${saveFixture.pid}`);
     await page.waitForLoadState('domcontentloaded');
+    await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
 
     const name = nameInput(page);
     await expect(name).toBeVisible({ timeout: 10000 });
 
     // Modify the name to mark the editor as dirty
     await name.clear();
-    await name.fill(`${testAutomation.name} Modified`);
+    await name.fill(`${saveFixture.name} Modified`);
 
-    // The Save button in FlowToolbar — matches zh-CN "保存" or en-US "Save"
-    const saveButton = page.locator('button').filter({ hasText: /save|保存/i }).first();
-    await expect(saveButton).toBeVisible({ timeout: 5000 });
-
-    // The save button may be disabled until the flow data changes.
-    // Trigger a change in the flow by interacting with canvas or just check the button exists.
-    // If the button is enabled, click it and verify the API call.
-    const isEnabled = await saveButton.isEnabled({ timeout: 3000 }).catch(() => false);
-
-    if (isEnabled) {
-      // Wait for the PUT API call
-      const [response] = await Promise.all([
-        page.waitForResponse(
-          (resp) => resp.url().includes(`/api/automations/${testAutomation.pid}`) && resp.request().method().toLowerCase() === 'put',
-          { timeout: 10000 }
-        ),
-        saveButton.click(),
-      ]);
-      expect(response.status()).toBeLessThan(400);
-    } else {
-      // Save button exists but is disabled (no dirty state) — this is acceptable
-      // Verify the button is present, which confirms save functionality is wired up
-      expect(saveButton).toBeTruthy();
-    }
+    const updatedName = `${saveFixture.name} Modified`;
+    await expect(name).toHaveValue(updatedName);
+    const saveButton = page.getByTestId('automation-editor-toolbar-btn-save');
+    await expect(saveButton).toBeEnabled();
+    const responsePromise = page.waitForResponse(
+      (resp) => new URL(resp.url()).pathname === `/api/automations/${saveFixture.pid}`
+        && resp.request().method() === 'PUT',
+    );
+    await saveButton.click();
+    const response = await responsePromise;
+    expect(response.status()).toBe(200);
+    // Read the exact record through an independent GET; browser PUT body retrieval can stall.
+    const saved = await page.request.get(`/api/automations/${saveFixture.pid}`);
+    expect(saved.status()).toBe(200);
+    const body = await saved.json();
+    expect(String(body.code)).toBe(ErrorCodes.SUCCESS);
+    expect(body.data.name).toBe(updatedName);
+    await page.reload();
+    await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
+    await expect(nameInput(page)).toHaveValue(updatedName);
+    await page.screenshot({ path: test.info().outputPath('AD-07-saved.png'), fullPage: true });
   });
 
   /**
@@ -361,11 +367,37 @@ test.describe('Automation Designer', () => {
    *
    * The AutomationEditor shows a "Debug" button (bg-gray-800) when automationId is set.
    */
+  test('AD-07-invalid: localized validation prevents a persistence request', async ({ page }) => {
+    const fixture = await createAutomationViaApi(page, { actions: [
+      { type: 'send_notification', config: { message: 'Incomplete fixture' }, sequence: 0 },
+    ] });
+    createdPids.push(fixture.pid);
+    await page.goto(`/automation/${fixture.pid}`);
+    await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
+    await nameInput(page).fill(`${fixture.name} Unsaved`);
+    let puts = 0;
+    page.on('request', (request) => {
+      if (new URL(request.url()).pathname === `/api/automations/${fixture.pid}` && request.method() === 'PUT') puts++;
+    });
+    await page.getByTestId('automation-editor-toolbar-btn-save').click();
+    for (const field of ['notificationType', 'title', 'content', 'recipients']) {
+      await expect(page.getByTestId(`prop-field-${field}`)).toContainText('此字段必填');
+    }
+    const response = await page.request.get(`/api/automations/${fixture.pid}`);
+    expect(response.status()).toBe(200);
+    const saved = await response.json();
+    expect(String(saved.code)).toBe(ErrorCodes.SUCCESS);
+    expect(saved.data.name).toBe(fixture.name);
+    expect(puts).toBe(0);
+    await page.screenshot({ path: test.info().outputPath('AD-07-invalid.png'), fullPage: true });
+  });
+
   test('AD-08: debug button is visible for existing automation', async ({ page }) => {
     if (!testAutomation?.pid) { throw new Error(String('Test automation not created')); }
 
     await page.goto(`/automation/${testAutomation.pid}`);
     await page.waitForLoadState('domcontentloaded');
+    await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
 
     await expect(nameInput(page)).toBeVisible({ timeout: 10000 });
 
@@ -376,6 +408,7 @@ test.describe('Automation Designer', () => {
     // Debug button should NOT be visible on /automation/new (no automationId)
     await page.goto('/automation/new');
     await page.waitForLoadState('domcontentloaded');
+    await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
 
     await expect(nameInput(page)).toBeVisible({ timeout: 10000 });
 
@@ -393,6 +426,7 @@ test.describe('Automation Designer', () => {
 
     await page.goto(`/automation/${testAutomation.pid}`);
     await page.waitForLoadState('domcontentloaded');
+    await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
 
     const name = nameInput(page);
     await expect(name).toBeVisible({ timeout: 10000 });
@@ -400,20 +434,7 @@ test.describe('Automation Designer', () => {
     // Check that no visible text contains the raw $i18n: prefix
     // This would indicate the i18n system failed to resolve the key
     const rawI18nElements = page.locator('text=/\\$i18n:/');
-    const rawCount = await rawI18nElements.count();
-
-    // All $i18n: prefixed strings should have been resolved by the useSmartText hook
-    // If any remain visible, it means i18n resolution failed
-    if (rawCount > 0) {
-      // Collect the raw keys for debugging
-      const rawTexts: string[] = [];
-      for (let i = 0; i < Math.min(rawCount, 5); i++) {
-        const text = await rawI18nElements.nth(i).textContent();
-        if (text) rawTexts.push(text.trim());
-      }
-      // Log but don't necessarily fail — i18n may not be compiled in test env
-      console.warn(`Found ${rawCount} unresolved i18n keys:`, rawTexts);
-    }
+    await expect(rawI18nElements).toHaveCount(0);
 
     // At minimum, verify that placeholders and button text are not empty
     const placeholderValue = await name.getAttribute('placeholder');
@@ -429,6 +450,7 @@ test.describe('Automation Designer', () => {
 
     await page.goto(`/automation/${testAutomation.pid}`);
     await page.waitForLoadState('domcontentloaded');
+    await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
 
     // Verify name input has the automation name
     const name = nameInput(page);
@@ -436,22 +458,19 @@ test.describe('Automation Designer', () => {
 
     // The name might have been modified by AD-07, so check it contains either original or modified
     const nameValue = await name.inputValue();
-    expect(nameValue).toBeTruthy();
-    expect(nameValue.length).toBeGreaterThan(0);
+    expect(nameValue).toBe(testAutomation.name);
 
     // Verify description input has the description
     const desc = descriptionInput(page);
     await expect(desc).toBeVisible({ timeout: 5000 });
     const descValue = await desc.inputValue();
-    expect(descValue).toBeTruthy();
-    expect(descValue.length).toBeGreaterThan(0);
+    expect(descValue).toBe(testAutomation.description);
 
     // Verify the page title in the toolbar includes the automation name
     // zh-CN: "编辑自动化: {name}", en-US: "Edit Automation: {name}"
     const toolbarTitle = page.locator('h1').first();
     await expect(toolbarTitle).toBeVisible({ timeout: 5000 });
     const titleText = await toolbarTitle.textContent();
-    expect(titleText).toBeTruthy();
-    expect(titleText!.length).toBeGreaterThan(0);
+    expect(titleText).toContain(testAutomation.name);
   });
 });

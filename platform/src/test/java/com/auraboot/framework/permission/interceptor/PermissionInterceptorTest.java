@@ -7,6 +7,7 @@ import com.auraboot.framework.menu.mapper.MenuMapper;
 import com.auraboot.framework.meta.entity.PageSchema;
 import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.annotation.DisallowImpersonation;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -147,6 +148,9 @@ class PermissionInterceptorTest {
         public void decisionRolloutPromote() {}
 
         public void noAnnotation() {}
+
+        @DisallowImpersonation
+        public void securitySensitive() {}
     }
 
     @RequirePermission("class.level.read")
@@ -188,6 +192,17 @@ class PermissionInterceptorTest {
         boolean ok = interceptor.preHandle(request, response, hm);
         assertThat(ok).isTrue();
         verifyNoInteractions(userPermissionService);
+    }
+
+    @Test
+    void preHandle_impersonationCannotReachSecuritySensitiveHandler() throws Exception {
+        HandlerMethod hm = handlerMethod(StaticHandler.class, "securitySensitive");
+        MetaContext.setSessionContext(null, null, "tenant", null, null,
+                "ready", 1, true, 77L, "web");
+
+        assertThatThrownBy(() -> interceptor.preHandle(request, response, hm))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessageContaining("unavailable while acting as another user");
     }
 
     @Test

@@ -16,7 +16,12 @@ import type {
 interface SemanticMetaModel {
   code: string;
   label?: Record<string, string>;
-  metrics?: Array<{ code: string; type?: string; label?: Record<string, string>; description?: string }>;
+  metrics?: Array<{
+    code: string;
+    type?: string;
+    label?: Record<string, string>;
+    description?: string;
+  }>;
   dimensions?: Array<{
     code: string;
     type?: string;
@@ -148,27 +153,28 @@ export function useModelFields(modelCode: string | undefined) {
  */
 export function useSemanticModels() {
   const [models, setModels] = useState<ModelOption[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<SemanticMetaFailure | null>(null);
+  const [version, setVersion] = useState(0);
+  const refetch = useCallback(() => setVersion(value => value + 1), []);
 
   useEffect(() => {
     let mounted = true;
+    setModels([]);
+    setError(null);
     setIsLoading(true);
 
     fetch('/api/semantic/meta')
-      .then((res) => res.json())
-      .then((result) => {
+      .then(readSemanticCatalog)
+      .then((catalog) => {
         if (!mounted) return;
-        if (ResultHelper.isSuccess(result) && result.data?.models) {
-          setModels(
-            (result.data.models as SemanticMetaModel[]).map((m) => ({
-              pid: m.code,
-              code: m.code,
-              name: localize(m.label, m.code),
-            })),
-          );
-        }
+        setModels(catalog.map((m) => ({ pid: m.code, code: m.code, name: localize(m.label, m.code) })));
       })
-      .catch((error) => console.error('Failed to fetch semantic models:', error))
+      .catch((failure: unknown) => {
+        if (!mounted) return;
+        setModels([]);
+        setError({ kind: failure instanceof SemanticMetaLookupError ? failure.kind : 'failed' });
+      })
       .finally(() => {
         if (mounted) setIsLoading(false);
       });
@@ -176,70 +182,87 @@ export function useSemanticModels() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [version]);
 
-  return { models, isLoading };
+  return { models, isLoading, error, refetch };
 }
 
-/**
- * Fetch the metrics + dimensions of a single semantic model from
- * GET /api/semantic/meta (PRD 16 §6.2). Drives the Dashboard widget semantic
- * metric / dimension pickers. Returns empty lists until a code is supplied or
- * if the model is not found in the catalog.
- */
+export interface SemanticMetaFailure {
+  kind: 'failed' | 'denied' | 'unavailable';
+}
+
+class SemanticMetaLookupError extends Error {
+  constructor(readonly kind: SemanticMetaFailure['kind']) {
+    super('Semantic metadata lookup failed');
+  }
+}
+
+async function readSemanticCatalog(response: Response): Promise<SemanticMetaModel[]> {
+  if (!response.ok) throw new SemanticMetaLookupError(response.status === 401 || response.status === 403 ? 'denied' : 'failed');
+  const result = await response.json();
+  if (!result || !ResultHelper.isSuccess(result) || !Array.isArray(result.data?.models)) {
+    throw new SemanticMetaLookupError('failed');
+  }
+  const models = result.data.models as SemanticMetaModel[];
+  if (!models.every(model => model && typeof model === 'object' && typeof model.code === 'string' && model.code.trim())) {
+    throw new SemanticMetaLookupError('failed');
+  }
+  return models;
+}
+
+/** Load the selected model without interpreting failures as an empty model. */
 export function useSemanticModelMeta(semanticModelCode: string | undefined) {
   const [metrics, setMetrics] = useState<SemanticMetricOption[]>([]);
   const [dimensions, setDimensions] = useState<SemanticDimensionOption[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<SemanticMetaFailure | null>(null);
+  const [version, setVersion] = useState(0);
+  const refetch = useCallback(() => setVersion(value => value + 1), []);
 
   useEffect(() => {
+    // Old options must not remain selectable while another model is loading.
+    setMetrics([]);
+    setDimensions([]);
+    setError(null);
     if (!semanticModelCode) {
-      setMetrics([]);
-      setDimensions([]);
+      setIsLoading(false);
       return;
     }
 
     let mounted = true;
     setIsLoading(true);
-
     fetch('/api/semantic/meta')
-      .then((res) => res.json())
-      .then((result) => {
+      .then(readSemanticCatalog)
+      .then((models) => {
         if (!mounted) return;
-        if (ResultHelper.isSuccess(result) && result.data?.models) {
-          const model = (result.data.models as SemanticMetaModel[]).find(
-            (m) => m.code === semanticModelCode,
-          );
-          setMetrics(
-            (model?.metrics || []).map((m) => ({
-              code: m.code,
-              name: localize(m.label, m.code),
-              type: m.type,
-              description: m.description,
-            })),
-          );
-          setDimensions(
-            (model?.dimensions || []).map((d) => ({
-              code: d.code,
-              name: localize(d.label, d.code),
-              type: d.type,
-              timeGrains: d.timeGrains,
-              primaryTime: d.primaryTime,
-            })),
-          );
+        const model = models.find(m => m.code === semanticModelCode);
+        // Catalog omission does not prove a published model has no fields.
+        if (!model) throw new SemanticMetaLookupError('unavailable');
+        if (!Array.isArray(model.metrics) || !Array.isArray(model.dimensions)) {
+          throw new SemanticMetaLookupError('failed');
         }
+        setMetrics(model.metrics.map(m => ({
+          code: m.code, name: localize(m.label, m.code), type: m.type, description: m.description,
+        })));
+        setDimensions(model.dimensions.map(d => ({
+          code: d.code, name: localize(d.label, d.code), type: d.type,
+          timeGrains: d.timeGrains, primaryTime: d.primaryTime,
+        })));
       })
-      .catch((error) => console.error('Failed to fetch semantic meta:', error))
+      .catch((failure: unknown) => {
+        if (!mounted) return;
+        setMetrics([]);
+        setDimensions([]);
+        setError({ kind: failure instanceof SemanticMetaLookupError ? failure.kind : 'failed' });
+      })
       .finally(() => {
         if (mounted) setIsLoading(false);
       });
 
-    return () => {
-      mounted = false;
-    };
-  }, [semanticModelCode]);
+    return () => { mounted = false; };
+  }, [semanticModelCode, version]);
 
-  return { metrics, dimensions, isLoading };
+  return { metrics, dimensions, isLoading, error, refetch };
 }
 
 /**
@@ -248,26 +271,36 @@ export function useSemanticModelMeta(semanticModelCode: string | undefined) {
 export function useNamedQueries() {
   const [namedQueries, setNamedQueries] = useState<NamedQueryOption[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     let mounted = true;
     setIsLoading(true);
+    setError(null);
 
-    fetch('/api/meta/named-queries?status=enabled')
-      .then((res) => res.json())
+    fetch('/api/meta/named-queries/enabled')
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Named query catalog returned ${response.status}`);
+        return response.json();
+      })
       .then((result) => {
         if (!mounted) return;
-        if (ResultHelper.isSuccess(result) && result.data?.content) {
-          setNamedQueries(
-            result.data.content.map((q: { pid: string; code: string; title: string }) => ({
-              pid: q.pid,
-              code: q.code,
-              title: q.title,
-            })),
-          );
+        if (!ResultHelper.isSuccess(result) || !Array.isArray(result.data)) {
+          throw new Error('Malformed named query catalog response');
         }
+        setNamedQueries(
+          result.data.map((q: { pid: string; code: string; title: string }) => ({
+            pid: q.pid,
+            code: q.code,
+            title: q.title,
+          })),
+        );
       })
-      .catch((error) => console.error('Failed to fetch named queries:', error))
+      .catch((failure: unknown) => {
+        if (!mounted) return;
+        setNamedQueries([]);
+        setError(failure instanceof Error ? failure : new Error('Named query catalog unavailable'));
+      })
       .finally(() => {
         if (mounted) setIsLoading(false);
       });
@@ -277,5 +310,5 @@ export function useNamedQueries() {
     };
   }, []);
 
-  return { namedQueries, isLoading };
+  return { namedQueries, isLoading, error };
 }

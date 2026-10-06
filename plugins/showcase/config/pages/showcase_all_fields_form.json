@@ -24,7 +24,7 @@
           "colSpan": 6,
           "required": true,
           "props": {
-            "placeholder": "请输入展示项名称"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_name.placeholder"
           }
         },
         {
@@ -32,14 +32,14 @@
           "colSpan": 6,
           "readOnly": true,
           "props": {
-            "placeholder": "保存后自动生成"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_code.placeholder"
           }
         },
         {
           "field": "sc_description",
           "colSpan": 12,
           "props": {
-            "placeholder": "简要描述该展示项的用途、特性或说明"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_description.placeholder"
           }
         }
       ]
@@ -56,7 +56,7 @@
           "field": "sc_quantity",
           "colSpan": 4,
           "props": {
-            "placeholder": "请输入数量"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_quantity.placeholder"
           }
         },
         {
@@ -95,28 +95,28 @@
           "field": "sc_status",
           "colSpan": 4,
           "props": {
-            "placeholder": "选择状态"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_status.placeholder"
           }
         },
         {
           "field": "sc_priority",
           "colSpan": 4,
           "props": {
-            "placeholder": "选择优先级"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_priority.placeholder"
           }
         },
         {
           "field": "sc_category",
           "colSpan": 4,
           "props": {
-            "placeholder": "选择分类"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_category.placeholder"
           }
         },
         {
           "field": "sc_tags",
           "colSpan": 6,
           "props": {
-            "placeholder": "输入标签后回车，多个用逗号分隔"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_tags.placeholder"
           }
         },
         {
@@ -128,7 +128,7 @@
           "colSpan": 12,
           "visibleWhen": "record.sc_status === 'active'",
           "props": {
-            "placeholder": "状态为「进行中」时填写高级配置（JSON 或说明）"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_advanced_settings.placeholder"
           }
         }
       ]
@@ -180,14 +180,14 @@
           "field": "sc_cascade_category",
           "colSpan": 6,
           "props": {
-            "placeholder": "逐级选择分类"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_cascade_category.placeholder"
           }
         },
         {
           "field": "sc_tree_node",
           "colSpan": 6,
           "props": {
-            "placeholder": "搜索并选择节点"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_tree_node.placeholder"
           }
         }
       ]
@@ -204,28 +204,28 @@
           "field": "sc_assignee",
           "colSpan": 4,
           "props": {
-            "placeholder": "选择负责人"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_assignee.placeholder"
           }
         },
         {
           "field": "sc_team_members",
           "colSpan": 4,
           "props": {
-            "placeholder": "选择团队成员（可多选）"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_team_members.placeholder"
           }
         },
         {
           "field": "sc_department",
           "colSpan": 4,
           "props": {
-            "placeholder": "选择所属部门"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_department.placeholder"
           }
         },
         {
           "field": "sc_owner_user",
           "colSpan": 6,
           "props": {
-            "placeholder": "搜索并选择所有者"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_owner_user.placeholder"
           }
         }
       ]
@@ -256,7 +256,7 @@
           "field": "sc_phone",
           "colSpan": 6,
           "props": {
-            "placeholder": "如 021-58769300 或 138-0000-0000"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_phone.placeholder"
           }
         },
         {
@@ -267,7 +267,7 @@
           "field": "sc_address",
           "colSpan": 12,
           "props": {
-            "placeholder": "请输入详细地址（省 / 市 / 区 / 街道门牌）"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_address.placeholder"
           }
         }
       ]
@@ -284,7 +284,7 @@
           "field": "sc_richtext_content",
           "colSpan": 12,
           "props": {
-            "placeholder": "输入图文富文本内容…"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_richtext_content.placeholder"
           }
         },
         {
@@ -299,14 +299,14 @@
           "field": "sc_ai_summary",
           "colSpan": 12,
           "props": {
-            "placeholder": "AI 将根据内容自动生成摘要"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_ai_summary.placeholder"
           }
         },
         {
           "field": "sc_remark",
           "colSpan": 12,
           "props": {
-            "placeholder": "补充说明（选填）"
+            "placeholder": "$i18n:model.showcase_all_fields.sc_remark.placeholder"
           }
         }
       ]

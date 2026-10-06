@@ -23,13 +23,17 @@
 
 | script | refs | updated | purpose |
 |---|--:|---|---|
+| `check-batch4-gates.mjs` | 0 | 2026-10-02 | Large-file and i18n CJK structural ratchets. |
 | `check-agent-eval-boundary.mjs` | 2 | 2026-06-21 | OSS agent/RAG boundary gate. |
+| `check-oss-remediation-t3.mjs` | 1 | 2026-10-05 | Enforce complete T3 family 80% line coverage, nested classes and parent size limits. |
+| `check-batch4-gates.mjs` | 0 | 2026-10-03 | Check the large-file and i18n CJK structural ratchets. |
 | `check-cache-eviction.mjs` | 3 | 2026-07-14 | check-cache-eviction — every @Cacheable cache must have *someone* who evicts it. |
 | `check-capability-codes.mjs` | 0 | 2026-06-21 | Permission v2 capability-code drift gate. |
 | `check-command-permissions.mjs` | 0 | 2026-07-23 | A command whose handler stage does real work must declare the permission that authorizes it. |
 | `check-command-reachability.mjs` | 4 | 2026-07-23 | Gate: a declared command must have a way for a user to reach it. |
 | `check-command-reachability.sh` | 0 | 2026-07-23 | Pre-push gate: every declared command needs a UI entry point. |
 | `check-controller-authz.mjs` | 0 | 2026-07-15 | check-controller-authz.mjs — regression guard for the deep-review fail-open finding |
+| `check-airflow-provider-coverage.sh` | 0 | 2026-10-02 | Run hermetic provider tests and enforce 90% line and branch coverage per source file. |
 | `check-coverage-manifest-freshness.mjs` | 2 | 2026-07-23 | Gate: the committed coverage manifest must still describe reality. |
 | `check-cs-widget-bundle.mjs` | 0 | 2026-07-14 | The widget bundle served to customers is a build artifact that lives on the Java classpath, so |
 | `check-derived-field-writers.mjs` | 1 | 2026-07-23 | Gate: a declared derived field must not have a write path that bypasses its |
@@ -49,11 +53,14 @@
 | `check-hand-written-page-matrix.mjs` | 0 | 2026-07-24 | Gate: no new hand-written page-coverage matrices — the denominator is generated. |
 | `check-i18n-hardcoded.mjs` | 0 | 2026-06-20 | check-i18n-hardcoded.mjs — i18n hardcoded-Chinese gate (ratchet). |
 | `check-jsonb-typehandler.sh` | 3 | 2026-06-11 | check-jsonb-typehandler.sh — guard against the recurring "varchar→jsonb on insert/update" bug. |
+| `check-package-distribution.py` | 2 | 2026-10-02 | Pack all public OSS packages plus the private QR client; verify licenses, exports, README and clean consumers. Requires --enterprise-root and a fresh --out directory. Never publishes. |
 | `check-license-boundary.sh` | 2 | 2026-09-27 | Fail when known copyleft dependency coordinates re-enter default distribution build files. |
 | `check-no-secret-echo.mjs` | 1 | 2026-07-14 | check-no-secret-echo — refuse shell scripts that print a secret to stdout/stderr. |
 | `check-no-secret-echo.sh` | 0 | 2026-07-14 | Wrapper so this gate shows up in `ls scripts/check-*.sh` — the repo's local-gate inventory. |
+| `check-oss-scope-consistency.mjs` | 0 | 2026-10-02 | Verify OSS scope declarations against code anchors and plugin directories. |
 | `check-oss-boundary.sh` | 3 | 2026-06-18 | OSS / Enterprise boundary check. |
 | `check-oss-no-internal-docs.sh` | 1 | 2026-07-02 | Fail if internal-process docs are tracked in the public OSS repo. |
+| `check-oss-scope-consistency.mjs` | 0 | 2026-10-03 | Verify OSS scope modules, plugin directories, and registry disjointness. |
 | `check-public-record-id-contracts.sh` | 1 | 2026-06-24 |  |
 | `check-public-record-openapi-contract.mjs` | 1 | 2026-06-24 | Validate public-record pid-only naming in a live or captured OpenAPI document. |
 | `check-reset-init-contracts.sh` | 1 | 2026-05-28 |  |
@@ -73,12 +80,22 @@
 | `validate-plugin-i18n.mjs` | 1 | 2026-04-14 | Validates every plugins/<plugin>/config/i18n.json against the plugin i18n contract. |
 | `validate-public-record-id-contracts.mjs` | 2 | 2026-06-24 | Public dynamic-record id contract inventory and regression gate. |
 | `validate-workflows.sh` | 0 | 2026-03-26 | Validate GitHub Actions workflow YAML files. |
+| `gates/fixtures/workspace-control.mjs` | 0 | 2026-10-05 | Hermetic workspace-control fixture for gate tests. |
+| `lib/golden-new-database.sh` | 0 | 2026-10-05 | Create an absent owned golden database without replacement. |
+| `lib/golden-process-stop.mjs` | 0 | 2026-10-05 | Stop only identity-attested owned golden processes. |
+| `lib/golden-product-identity.mjs` | 0 | 2026-10-05 | Bind golden product environment and source identity. |
+| `lib/golden-resume-state.mjs` | 0 | 2026-10-05 | Validate saved golden state before resume. |
+| `lib/golden-runtime-identity.sh` | 0 | 2026-10-05 | Register declared golden source roots in workspace control. |
+| `lib/golden-stack-state.mjs` | 0 | 2026-10-05 | Resolve owned current or legacy golden stack state. |
+| `oss-golden-lifecycle.sh` | 0 | 2026-10-05 | Workspace suspend/resume lifecycle adapter for OSS golden stacks. |
 
 ## generator (5)
 
 | script | refs | updated | purpose |
 |---|--:|---|---|
 | `db/generate-schema-snapshot.sh` | 3 | 2026-06-23 | Generate a deterministic schema-only snapshot from a freshly migrated DB. |
+| `i18n-admin-browser-result.mjs` | 0 | 2026-10-04 | Validate current translation administration browser scenarios and execution provenance. |
+| `i18n-admin-browser-run.sh` | 0 | 2026-10-04 | Run translation administration acceptance in an owned isolated runtime. |
 | `gen-coverage-manifest.mjs` | 2 | 2026-07-23 | Generate a coverage manifest from the DSL and the test tree. |
 | `generate-plugin-routes.mjs` | 5 | 2026-04-26 | scripts/generate-plugin-routes.mjs |
 | `application/generate-product-extraction-inventory.mjs` | 1 | 2026-09-12 | Generate the BPM/CRM extraction owner, dependency, migration, route, and candidate-test denominator. |
@@ -88,6 +105,7 @@
 
 | script | refs | updated | purpose |
 |---|--:|---|---|
+| `oss-remediation-t3-run.mjs` | 1 | 2026-10-05 | Clean-commit managed regression with explicit PostgreSQL identity, fresh XML and coverage receipt. |
 | `aurabot-scenario-golden-run.sh` | 0 | 2026-07-23 | aurabot-scenario-golden-run.sh — self-contained scenario golden for the |
 | `backlog-stats.sh` | 0 | 2026-03-26 | Backlog dashboard stats — counts GAP statuses across all backlog files |
 | `billing-it-run.sh` | 0 | 2026-07-31 | Exact-class billing integration-test runner with non-zero XML evidence checks. |
@@ -102,7 +120,10 @@
 | `e2e-report.sh` | 0 | 2026-03-26 | e2e-report.sh — View E2E test run results by testRunId |
 | `e2e-run.sh` | 0 | 2026-03-31 | Unified E2E Test Runner — GAP-169 |
 | `host-e2e-up.sh` | 0 | 2026-06-08 | Host-mode E2E stack bring-up — host parity with docker-ga-e2e-up.sh. |
-| `hifi-golden-gate-run.sh` | 0 | 2026-09-25 | Run the analytics designer high-fidelity browser golden gate. |
+| `hifi-golden-gate-run.sh` | 0 | 2026-10-02 | Run the fixed BI browser profile, reconcile every result, and retain its isolated runtime and evidence. |
+| `gates/hifi-golden-results.mjs` | 1 | 2026-10-02 | Reject missing, duplicate, skipped, retried, or incomplete BI profile results; collection is never execution. |
+| `check-batch4-gates.mjs` | 0 | 2026-10-02 | Enforce the existing large-file and CJK internationalization ratchets. |
+| `check-oss-scope-consistency.mjs` | 0 | 2026-10-02 | Verify the OSS boundary registry against its declared modules and plugin directories. |
 | `kb-ingestion-golden-run.sh` | 0 | 2026-07-13 | kb-ingestion-golden-run.sh — one command, whole knowledge-ingestion golden, exit code = verdict. |
 | `local-pr-gate.sh` | 0 | 2026-07-18 | Local replacement for the required GitHub status checks. |
 | `collab-trio-golden-run.sh` | 0 | 2026-07-25 | collab-trio-golden-run.sh — self-contained browser golden runner for the collaboration trio: Inbox, notification centre, IM/agent mentions. |
@@ -110,6 +131,7 @@
 | `oss-backend-nightly-coverage.sh` | 0 | 2026-09-12 | Linux CI entrypoint for full backend coverage evidence. |
 | `oss-init-env-only.sh` | 0 | 2026-05-11 | AuraBoot Quick Environment Initialization |
 | `quick-filter-chip-golden-run.sh` | 0 | 2026-07-17 | quick-filter-chip-golden-run.sh — self-contained quick-filter view-chip browser golden runner. |
+| `rbac-golden-result.mjs` | 0 | 2026-10-04 | Validate recent real RBAC browser receipts against the expected scenario inventory. |
 | `rbac-golden-run.sh` | 0 | 2026-07-04 | rbac-golden-run.sh — self-contained RBAC platform-baseline browser golden runner. |
 | `release/tag-release.sh` | 2 | 2026-07-25 | Gated OSS release tag entrypoint; runs capability and test-system gates on the exact release commit. |
 | `run-open-platform-slo-gate.sh` | 1 | 2026-09-14 | Run smoke or production-threshold k6 checks for the Open Platform. |
@@ -140,6 +162,7 @@
 | `dev/lib/env-registry.mjs` | 4 | 2026-05-22 |  |
 | `dev/lib/health.sh` | 3 | 2026-05-22 | Sourceable health helpers for per-worktree dev stacks. |
 | `dev/lib/process-manager.sh` | 3 | 2026-05-22 | Sourceable process helpers for per-worktree host dev services. |
+| `lib/oss-ci-subnet.mjs` | 0 | 2026-10-04 | Select a non-overlapping subnet for isolated OSS CI Docker networks. |
 | `lib/multi-worktree-guard.sh` | 5 | 2026-05-22 | Multi-worktree pre-flight guard |
 | `lib/plugin-config.mjs` | 3 | 2026-07-23 | Read a plugin's config regardless of how it is laid out on disk. |
 | `lib/repo-root.mjs` | 5 | 2026-07-23 | Resolve the repo the test-system gates should run against. |
@@ -147,6 +170,7 @@
 | `lib/runtime-process-owner.sh` | 4 | 2026-08-19 | Runtime-scoped process ownership and exact cleanup safeguards. |
 | `lib/test-multi-worktree-guard.sh` | 1 | 2026-05-22 | Sanity tests for scripts/lib/multi-worktree-guard.sh |
 | `lib/test-runtime-process-owner.sh` | 1 | 2026-08-19 | Fixture integration tests for runtime process ownership. |
+| `lib/workspace-control.sh` | 2 | 2026-10-04 | Bind product lifecycle scripts to the canonical Workspace controller. |
 | `lib/web-admin-node-modules.sh` | 2 | 2026-09-29 | Validate a reusable Web Admin dependency tree, including native-module ABI compatibility. |
 | `application/application-contract.mjs` | 2 | 2026-09-12 | Shared manifest, lock, artifact identity, and checksum contract implementation. |
 | `application/oci-layout.mjs` | 1 | 2026-09-12 | Build a digest-addressed Linux OCI layout with Docker on the admitted CI builder. |
@@ -211,7 +235,7 @@
 | `import-templates.sh` | 2 | 2026-05-11 |  |
 | `install-agent-git-hooks.mjs` | 2 | 2026-06-24 |  |
 | `migrate-dsl-buttons.mjs` | 0 | 2026-03-26 | Migration script: batch-convert legacy button configs to unified action format. |
-| `oss-golden-stack.sh` | 19 | 2026-07-23 | oss-golden-stack.sh — one-click host-first golden stack for OSS auraboot. |
+| `oss-golden-stack.sh` | 19 | 2026-10-04 | Host-first OSS stack. Stable runtime-owned state; `verify-artifacts` verifies registered sources, staged Core/PF4J bytes, actual listeners, database/Redis and BFF upstream before publishing the public product manifest. |
 | `oss-reset-and-init.sh` | 24 | 2026-08-28 | AuraBoot OSS Environment Reset and Initialization Script. Requires `AURA_RESET_ALLOW_TARGETS="<pg_db>,<be_port>"` (target designation gate; `@any` overrides). |
 | `observability-grafana-browser.mjs` | 0 | 2026-09-12 | Browser verification helper for the observability Grafana surface. |
 | `observability-real-stack-ci.sh` | 0 | 2026-09-12 | CI entrypoint for the real-stack observability gate. |
@@ -234,3 +258,17 @@
 ## test (20)
 
 Co-located `*.test.mjs`; run via the repo test task. Not listed individually.
+
+## Package distribution self-tests
+
+`pnpm test:open-platform-tools` validates the shared probe transport and independent webhook
+receiver, requires an invalid-signature mutation to fail, and verifies restoration. See
+[`ci/README.md`](ci/README.md) for receiver operation and the explicitly unverified deployed-target scope.
+
+`pnpm test:package-distribution` runs `test-package-distribution.py`: rejects missing or competing license text, retired v1.3 text, metadata/identity/privacy drift, missing exports and README mismatch. The pack gate also executes `fixtures/open-platform-consumer/consumer.test.mjs` and typechecks `fixtures/open-platform-consumer/consumer-ts-check.ts` against a freshly installed tarball outside the repositories. These contract tests use a loopback fixture server; they do not certify a staging deployment.
+
+| script | refs | updated | purpose |
+|---|---|---|---|
+| `fixtures/open-platform-consumer/consumer.test.mjs` | 1 | 2026-10-02 | Nine consumer contract cases driven by the distribution gate from a fresh out-of-repo installation. |
+
+T3 acceptance: `node scripts/oss-remediation-t3-run.mjs --executor /absolute/path/to/aura --runtime OWNED_RUNTIME --database-url jdbc:postgresql://127.0.0.1:5432/OWNED_TEST_DB --database-user TEST_USER --out /absolute/fresh/evidence-directory`. The executor supplies owned dependency homes. The database must already be migrated; this runner never resets or migrates it. `TEST_DATABASE_PASSWORD` is inherited without being recorded. Test skips are reported explicitly; a coverage pass proves the fixed family line target, not execution of skipped scenarios. Gate self-tests: `node --test scripts/check-oss-remediation-t3.test.mjs`.

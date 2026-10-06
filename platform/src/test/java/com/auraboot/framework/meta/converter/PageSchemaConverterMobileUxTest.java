@@ -18,6 +18,41 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PageSchemaConverterMobileUxTest {
 
     @Test
+    void createAndPartialUpdatePreserveOrExplicitlyClearLinkageRules() {
+        PageSchemaConverter converter = buildConverter();
+        List<Object> rules = List.of(Map.of(
+                "id", "clear-zone",
+                "trigger", Map.of("fieldCode", "warehouse", "event", "change"),
+                "actions", List.of(Map.of("type", "setValue", "target", "zone", "value", "null"))
+        ));
+        PageSchemaCreateRequest create = new PageSchemaCreateRequest();
+        create.setPageKey("location_form");
+        create.setName("Location");
+        create.setTitle("Location");
+        create.setKind("form");
+        create.setBlocks(List.of());
+        create.setExtension(Map.of("recordSource", Map.of("endpoint", "/api/locations/{recordPid}")));
+        create.setLinkageRules(rules);
+        PageSchema entity = converter.toEntity(create);
+        assertThat(converter.extensionBeanToMap(entity.getExtension()))
+                .containsEntry("linkageRules", rules)
+                .containsEntry("recordSource", Map.of("endpoint", "/api/locations/{recordPid}"));
+        assertThat(converter.toDTO(entity).getLinkageRules()).isEqualTo(rules);
+
+        PageSchemaUpdateRequest partial = new PageSchemaUpdateRequest();
+        partial.setDescription("Unrelated edit");
+        converter.updateEntity(entity, partial);
+        assertThat(converter.toDTO(entity).getLinkageRules()).isEqualTo(rules);
+
+        PageSchemaUpdateRequest clear = new PageSchemaUpdateRequest();
+        clear.setLinkageRules(List.of());
+        converter.updateEntity(entity, clear);
+        assertThat(converter.toDTO(entity).getLinkageRules()).isEmpty();
+        assertThat(converter.extensionBeanToMap(entity.getExtension()))
+                .containsKey("recordSource");
+    }
+
+    @Test
     void preservesExplicitSchemaVersionFromCreateAndUpdateRequests() {
         PageSchemaConverter converter = buildConverter();
 

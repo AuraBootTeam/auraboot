@@ -20,13 +20,34 @@
  * wrapper's flow has already completed normally, the instance has an option
  * and the kick is skipped.
  */
-import { forwardRef, useEffect, useRef } from 'react';
+import type { EChartsType } from 'echarts';
+import { forwardRef, useEffect, useMemo, useRef } from 'react';
 import ReactECharts, { type EChartsReactProps } from 'echarts-for-react';
 
 // ReactECharts declares updateEChartsOption as PRIVATE, so a plain
 // intersection `ReactECharts & { updateEChartsOption?: ... }` collapses to
 // never (private members are invariant under intersection). Drop the
 // private member from the host type and re-add it as a public optional.
+function markChartReady(instance: EChartsType, ready: boolean): boolean {
+  // The wrapper's own finished listener may dispose its temporary instance
+  // before ECharts dispatches the remaining listeners for that same event.
+  if (instance.isDisposed()) return false;
+  const dom = instance.getDom();
+  dom.setAttribute('data-chart-ready', String(ready));
+  if (!ready) return true;
+  const options = instance.getOption() as Record<string, any>;
+  const items = (value: any) => Array.isArray(value) ? value : value ? [value] : [];
+  const copy = [
+    ...items(options.title).map((title) => title.text),
+    ...items(options.xAxis).map((axis) => axis.name),
+    ...items(options.yAxis).map((axis) => axis.name),
+    ...(items(options.legend).length ? items(options.series)
+      .filter((series) => ['line', 'bar', 'scatter'].includes(series.type)).map((series) => series.name) : []),
+  ].filter((text): text is string => typeof text === 'string' && Boolean(text.trim()));
+  dom.setAttribute('data-chart-ui-copy', JSON.stringify(copy));
+  return true;
+}
+
 type EChartsHostComponent = Omit<ReactECharts, 'updateEChartsOption'> & {
   updateEChartsOption?: () => unknown;
 };
@@ -34,6 +55,17 @@ type EChartsHostComponent = Omit<ReactECharts, 'updateEChartsOption'> & {
 const EChartsHost = forwardRef<ReactECharts, EChartsReactProps>(
   function EChartsHost(props, forwardedRef) {
     const componentRef = useRef<ReactECharts | null>(null);
+    const events = useMemo(() => ({
+      ...props.onEvents,
+      rendered: (event: unknown, instance: EChartsType) => {
+        if (!markChartReady(instance, false)) return;
+        props.onEvents?.rendered?.(event, instance);
+      },
+      finished: (event: unknown, instance: EChartsType) => {
+        if (!markChartReady(instance, true)) return;
+        props.onEvents?.finished?.(event, instance);
+      },
+    }), [props.onEvents]);
 
     useEffect(() => {
       const component = componentRef.current as EChartsHostComponent | null;
@@ -56,6 +88,13 @@ const EChartsHost = forwardRef<ReactECharts, EChartsReactProps>(
           else if (forwardedRef) forwardedRef.current = instance;
         }}
         {...props}
+        data-chart-ready="false"
+        onEvents={events}
+        onChartReady={(instance: EChartsType) => {
+          if (instance.isDisposed()) return;
+          markChartReady(instance, instance.getZr().animation.isFinished());
+          props.onChartReady?.(instance);
+        }}
       />
     );
   },

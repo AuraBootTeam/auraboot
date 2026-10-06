@@ -157,4 +157,28 @@ class NamedQueryFieldProtectionAuthorizationTest {
         var plan = protection.prepare(masked, List.of(projected), "list");
         assertEquals("crm_acc_phone", plan.protections().getFirst().aliases().get("acc_contact"));
     }
+    private void nativeAuditSource() {
+        when(sources.resolvePlan(10L, query.getFromSql(), List.of())).thenReturn(
+                new NamedQuerySourceModels.Sources(Map.of("public.product_audit", "native.product.audit"), Map.of()));
+    }
+    @Test void nativeSourceUsesDeclaredReadPermissionAndAlwaysHasTenantScope() {
+        nativeAuditSource();
+        when(permissions.canAction(30L, "product.audit", "read")).thenReturn(true);
+        var plan = protection.prepare(query, List.of(), "list");
+        assertEquals("tenant_id = '10'", plan.sourceScopes().get("public.product_audit"));
+        verify(permissions).canAction(30L, "product.audit", "read");
+        verifyNoInteractions(models);
+    }
+    @Test void selfAnchoredPolicyCannotOverrideNativeReadDenial() {
+        nativeAuditSource();
+        var policy = new NamedQueryPolicy(); policy.setSelfAnchoredSources(true); query.setPolicy(policy);
+        assertThrows(AccessDeniedException.class, () -> protection.prepare(query, List.of(), "list"));
+    }
+    @Test void authorizedAggregateProjectionKeepsNativeTenantIsolation() {
+        nativeAuditSource();
+        var plan = protection.prepare(query, List.of(), "list", true);
+        assertEquals("tenant_id = '10'", plan.sourceScopes().get("public.product_audit"));
+        verifyNoInteractions(permissions);
+    }
+
 }

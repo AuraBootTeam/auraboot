@@ -65,6 +65,7 @@ public class PluginQualityScorer {
 
         Set<String> entityModels = new HashSet<>();
         for (ModelDefinitionDTO m : models) {
+            if (m == null) continue;
             if ("entity".equalsIgnoreCase(m.getModelType())) {
                 entityModels.add(m.getCode());
             }
@@ -75,6 +76,7 @@ public class PluginQualityScorer {
         Set<String> hasFormPage = new HashSet<>();
         if (pages != null) {
             for (PageSchemaDTO page : pages) {
+                if (page == null) continue;
                 String mc = page.getModelCode();
                 if (mc == null) continue;
                 String pk = page.getKind();
@@ -95,8 +97,8 @@ public class PluginQualityScorer {
      * Score = (rich commands / total commands) * 100
      */
     private int scoreSemanticRichness(PluginManifestExtended manifest) {
-        List<CommandDefinitionDTO> commands = manifest.getCommands();
-        if (commands == null || commands.isEmpty()) return 100;
+        List<CommandDefinitionDTO> commands = nonNullCommands(manifest);
+        if (commands.isEmpty()) return 100;
 
         int rich = 0;
         for (CommandDefinitionDTO cmd : commands) {
@@ -114,8 +116,8 @@ public class PluginQualityScorer {
      * Score = average of (hasInputSpec rate + hasRiskLevel rate) * 100
      */
     private int scoreAgentReadiness(PluginManifestExtended manifest) {
-        List<CommandDefinitionDTO> commands = manifest.getCommands();
-        if (commands == null || commands.isEmpty()) return 100;
+        List<CommandDefinitionDTO> commands = nonNullCommands(manifest);
+        if (commands.isEmpty()) return 100;
 
         int withInput = 0;
         int withRisk = 0;
@@ -123,6 +125,7 @@ public class PluginQualityScorer {
 
         for (CommandDefinitionDTO cmd : commands) {
             Map<String, Object> exec = cmd.getConsolidatedExecutionConfig();
+            if (exec == null) exec = Map.of();
             String type = (String) exec.get("type");
 
             // Input spec check (skip QUERY/DELETE which don't need input)
@@ -154,14 +157,15 @@ public class PluginQualityScorer {
      */
     @SuppressWarnings("unchecked")
     private int scoreSafety(PluginManifestExtended manifest) {
-        List<CommandDefinitionDTO> commands = manifest.getCommands();
-        if (commands == null || commands.isEmpty()) return 100;
+        List<CommandDefinitionDTO> commands = nonNullCommands(manifest);
+        if (commands.isEmpty()) return 100;
 
         int applicable = 0;
         int compliant = 0;
 
         for (CommandDefinitionDTO cmd : commands) {
             Map<String, Object> exec = cmd.getConsolidatedExecutionConfig();
+            if (exec == null) exec = Map.of();
             String type = (String) exec.get("type");
 
             // DELETE must have risk_level
@@ -197,6 +201,7 @@ public class PluginQualityScorer {
         List<ModelDefinitionDTO> models = manifest.getModels();
         if (models != null) {
             for (ModelDefinitionDTO m : models) {
+                if (m == null) continue;
                 total++;
                 if (m.getDisplayName() != null && !m.getDisplayName().isBlank()) withName++;
             }
@@ -205,12 +210,20 @@ public class PluginQualityScorer {
         List<CommandDefinitionDTO> commands = manifest.getCommands();
         if (commands != null) {
             for (CommandDefinitionDTO cmd : commands) {
+                if (cmd == null) continue;
                 total++;
                 if (cmd.getDisplayName() != null && !cmd.getDisplayName().isBlank()) withName++;
             }
         }
 
         return total > 0 ? (withName * 100 / total) : 100;
+    }
+
+    // Structural validation reports invalid entries. Score applicable resources
+    // without counting null placeholders as commands in percentage denominators.
+    private List<CommandDefinitionDTO> nonNullCommands(PluginManifestExtended manifest) {
+        if (manifest.getCommands() == null) return List.of();
+        return manifest.getCommands().stream().filter(Objects::nonNull).toList();
     }
 
     private boolean hasNonBlankUnknown(CommandDefinitionDTO cmd, String fieldName) {

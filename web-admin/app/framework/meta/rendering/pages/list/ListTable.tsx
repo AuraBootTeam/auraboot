@@ -740,7 +740,7 @@ export const ListTable = React.memo(function ListTable({
                               key={column.field}
                               style={getCellStyle(column)}
                               data-testid={`table-cell-${index}-${column.field}`}
-                              className={`px-6 ${rowHeightCfg.pyClass} text-text-2 text-sm whitespace-nowrap ${
+                              className={`px-6 ${rowHeightCfg.pyClass} text-text-2 text-sm whitespace-nowrap overflow-hidden ${
                                 column.align === 'right'
                                   ? 'text-right'
                                   : column.align === 'center'
@@ -847,7 +847,7 @@ export const ListTable = React.memo(function ListTable({
                               key={column.field}
                               style={getCellStyle(column)}
                               data-testid={`table-cell-${index}-${column.field}`}
-                              className={`px-6 ${rowHeightCfg.pyClass} text-text-2 text-sm whitespace-nowrap ${
+                              className={`px-6 ${rowHeightCfg.pyClass} text-text-2 text-sm whitespace-nowrap overflow-hidden ${
                                 column.align === 'right'
                                   ? 'text-right'
                                   : column.align === 'center'

@@ -25,7 +25,8 @@ vi.mock('react-router', () => ({
 vi.mock('~/shared/services/modelService', () => ({ modelService: { getVersionDetail: mocks.detail } }));
 vi.mock('~/shared/services/permissionService', () => ({ permissionService: {} }));
 vi.mock('~/contexts/ToastContext', () => ({ useToastContext: () => ({ showSuccessToast: mocks.toast, showErrorToast: mocks.toast }) }));
-vi.mock('~/utils/i18n', () => ({ useSmartText: () => (text: string | Record<string, string>) => typeof text === 'string' ? text : text['zh-CN'] }));
+vi.mock('~/utils/i18n', async (importOriginal) => ({ ...await importOriginal<typeof import('~/utils/i18n')>(), useSmartText: () => (text: string | Record<string, string>) => typeof text === 'string' ? text : text['zh-CN'] }));
+vi.mock('~/contexts/I18nContext', () => ({ useI18n: () => ({ locale: 'zh-CN', t: (_key: string, _vars?: unknown, fallback?: string) => fallback }) }));
 vi.mock('~/ui/PermissionGuard', () => ({ PermissionGuard: ({ children }: { children: ReactNode }) => <>{children}</> }));
 vi.mock('~/ui/meta/CrudTemplateWizard', () => ({ CrudTemplateWizard: () => null }));
 vi.mock('~/ui/meta/RuntimeVerification', () => ({ RuntimeVerification: () => null }));

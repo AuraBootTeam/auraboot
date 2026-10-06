@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { createCookieSessionStorage } from 'react-router';
 import path from 'node:path';
 import { BACKEND_URL, BASE_URL as WEB_BASE_URL } from '../../helpers/environments';
+import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 
 const EVIDENCE_DIR = path.join(process.env.AURA_EVIDENCE_ROOT || '/tmp', 'ui-golden-20260914');
 const sessionStorage = createCookieSessionStorage({
@@ -16,15 +17,34 @@ const sessionStorage = createCookieSessionStorage({
 });
 
 async function authenticate(page: import('@playwright/test').Page) {
-  const seedResponse = await page.request.post(
-    `${BACKEND_URL}/api/test/seed?testRunId=open-platform-ui-20260914`,
-    { timeout: 30_000 },
+  const loginResponse = await page.request.post(`${BACKEND_URL}/api/auth/login`, {
+    data: { email: DEFAULT_TEST_ACCOUNT.email, password: DEFAULT_TEST_ACCOUNT.password },
+  });
+  expect(loginResponse.status()).toBe(200);
+  const login = await loginResponse.json();
+  expect(String(login.code)).toBe('0');
+  expect(login.data.jwt).toEqual(expect.any(String));
+  const authorization = { Authorization: `Bearer ${login.data.jwt}` };
+  const spacesResponse = await page.request.get(`${BACKEND_URL}/api/tenant-selection/my-spaces`, {
+    headers: authorization,
+  });
+  expect(spacesResponse.status()).toBe(200);
+  const spaces = await spacesResponse.json();
+  expect(String(spaces.code)).toBe('0');
+  const business = spaces.data.find(
+    (space: { spaceType: string; tenantId: string }) => space.spaceType === 'business',
   );
-  expect(seedResponse.ok()).toBeTruthy();
-  const seed = await seedResponse.json();
-  expect(seed.jwt).toEqual(expect.any(String));
+  expect(business).toBeDefined();
+  const selectionResponse = await page.request.post(`${BACKEND_URL}/api/tenant-selection/process`, {
+    headers: authorization,
+    data: { action: 'select', tenantId: business.tenantId },
+  });
+  expect(selectionResponse.status()).toBe(200);
+  const selected = await selectionResponse.json();
+  expect(String(selected.code)).toBe('0');
+  expect(selected.data.jwt).toEqual(expect.any(String));
   const session = await sessionStorage.getSession();
-  session.set('jwtToken', seed.jwt);
+  session.set('jwtToken', selected.data.jwt);
   const setCookie = await sessionStorage.commitSession(session, { maxAge: 604800 });
   const value = setCookie.match(/__session=([^;]+)/)?.[1];
   expect(value).toBeTruthy();
@@ -33,6 +53,7 @@ async function authenticate(page: import('@playwright/test').Page) {
     { name: 'locale', value: 'zh-CN', url: WEB_BASE_URL, sameSite: 'Lax' },
   ]);
   await page.addInitScript(() => localStorage.setItem('locale', 'zh-CN'));
+
 }
 
 async function capture(page: import('@playwright/test').Page, id: string, fullPage = true) {
@@ -80,11 +101,22 @@ test.describe('Open Platform golden journey', () => {
     context,
   }) => {
     await authenticate(page);
+    const existingResponse = await page.request.get(`${WEB_BASE_URL}/api/open-platform/applications`);
+    expect(existingResponse.status()).toBe(200);
+    const existing = await existingResponse.json();
+    expect(String(existing.code)).toBe('0');
+    const existingPids = (existing.data as Array<{ pid: string }>).map((entry) => entry.pid);
+    // Empty-state rendering is a controlled UI projection, not a claim that the DB is empty.
+    await page.route('**/api/open-platform/applications', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ code: '0', data: [] }) });
+    });
     await page.goto('/');
     await expect(page).not.toHaveURL(/\/login|\/setup/);
     await openAccountMenu(page);
     const menuEntry = page.getByTestId('open-platform-link');
     await expect(menuEntry).toBeVisible();
+    await expect(page.getByTestId('user-dropdown')).toContainText('退出登录');
+    await expect(page.getByTestId('user-dropdown')).not.toContainText('user.logout');
     await capture(page, 'OP-OPS-01');
     await menuEntry.click();
     await expect(page.getByTestId('open-platform-page')).toBeVisible();
@@ -94,6 +126,7 @@ test.describe('Open Platform golden journey', () => {
     await expect(page.getByTestId('open-platform-empty')).toBeVisible();
     await expect(page.getByRole('heading', { name: '暂无外部应用' })).toBeVisible();
     await capture(page, 'OP-UI-03');
+    await page.unroute('**/api/open-platform/applications');
 
     await page.route('**/api/open-platform/applications', async (route) => {
       await route.fulfill({
@@ -111,25 +144,32 @@ test.describe('Open Platform golden journey', () => {
     await capture(page, 'OP-UI-04');
     await page.unroute('**/api/open-platform/applications');
     await page.getByRole('button', { name: '重试' }).click();
-    await expect(page.getByTestId('open-platform-empty')).toBeVisible();
+    if (existingPids.length === 0) {
+      await expect(page.getByTestId('open-platform-empty')).toBeVisible();
+    } else {
+      await expect(page.getByTestId('open-platform-application-list').locator('article')).toHaveCount(existingPids.length);
+    }
 
     await page.getByTestId('open-platform-create-app').click();
     const createDialog = page.getByRole('dialog', { name: '创建外部应用' });
     await expect(createDialog).toBeVisible();
     await expect(createDialog.getByRole('button', { name: '新建' })).toBeDisabled();
     await capture(page, 'OP-UI-05');
-    await page.getByTestId('open-platform-app-name').fill('金蝶 ERP 连接器');
+    const appName = `金蝶 ERP 连接器 ${Date.now()}-${Math.random().toString(16).slice(2, 6)}`;
+    await page.getByTestId('open-platform-app-name').fill(appName);
     await createDialog.getByRole('textbox', { name: '描述' }).fill('生产订单与库存事件统一接入');
     await createDialog.getByRole('button', { name: '新建' }).click();
-    await expect(page.getByText('金蝶 ERP 连接器')).toBeVisible();
-    await expect(page.getByText('生产订单与库存事件统一接入')).toBeVisible();
+    const appCard = page.getByTestId('open-platform-application-list').locator('article').filter({ hasText: appName });
+    await expect(appCard).toHaveCount(1);
+    await expect(appCard.getByText(appName, { exact: true })).toBeVisible();
+    await expect(appCard.getByText('生产订单与库存事件统一接入')).toBeVisible();
     await expect(page.getByTestId('open-platform-page')).not.toContainText(
       /01[A-Z0-9]{20,}|[0-9a-f]{8}-[0-9a-f-]{27,}/i,
     );
     await capture(page, 'OP-UI-06');
     await dismissToasts(page);
 
-    await page.getByRole('button', { name: '添加安装' }).click();
+    await appCard.getByRole('button', { name: '添加安装' }).click();
     const installDialog = page.getByRole('dialog', { name: '安装应用' });
     await installDialog.getByLabel('环境').selectOption('production');
     await installDialog.getByTestId('open-platform-rate-limit').fill('1200');
@@ -144,10 +184,10 @@ test.describe('Open Platform golden journey', () => {
     await installDialog.getByLabel('openapi.profile.read').check();
     await capture(page, 'OP-UI-07');
     await installDialog.getByRole('button', { name: '安装' }).click();
-    await expect(page.getByText('生产环境')).toBeVisible();
-    await expect(page.getByText('限流: 1200/min')).toBeVisible();
+    await expect(appCard.getByText('生产环境')).toBeVisible();
+    await expect(appCard.getByText('限流: 1200/min')).toBeVisible();
 
-    await page.getByRole('button', { name: '新建凭据' }).click();
+    await appCard.getByRole('button', { name: '新建凭据' }).click();
     const secretDialog = page.getByRole('dialog', { name: '立即保存此凭据' });
     await expect(secretDialog).toContainText('Client Secret 仅显示一次');
     await expect(secretDialog.getByText('client_id')).toBeVisible();
@@ -206,6 +246,75 @@ test.describe('Open Platform golden journey', () => {
     expect(principal.applicationPid).toEqual(expect.any(String));
     expect(principal.installationPid).toEqual(expect.any(String));
 
+    // Exercise the developer entry while this credential is active. Document
+    // loading alone cannot prove the OAuth and API transport paths work.
+    await context.setExtraHTTPHeaders({});
+    const authorizedReferencePromise = context.waitForEvent('page');
+    await page.getByRole('button', { name: /API 参考/ }).click();
+    const authorizedReference = await authorizedReferencePromise;
+    try {
+      await expect(authorizedReference).toHaveURL(
+        `${WEB_BASE_URL}/swagger-ui/index.html?urls.primaryName=open-platform`,
+      );
+      await expect(authorizedReference.locator('.opblock').first()).toBeVisible({ timeout: 30_000 });
+      const publicDocument = await authorizedReference.request.get(`${WEB_BASE_URL}/v3/api-docs/open-platform`);
+      expect(publicDocument.status()).toBe(200);
+      expect((await publicDocument.json()).servers).toEqual([{ url: '/' }]);
+      await authorizedReference.getByRole('button', { name: 'Authorize', exact: true }).first().click();
+      const authorizationDialog = authorizedReference.locator('.dialog-ux');
+      await expect(authorizationDialog).toBeVisible();
+      const oauthAuthorization = authorizationDialog.locator('.auth-container').filter({
+        hasText: 'oauth2ClientCredentials',
+      });
+      await oauthAuthorization.getByLabel('client_id:', { exact: true }).fill(clientId!);
+      await oauthAuthorization.getByLabel('client_secret:', { exact: true }).fill(clientSecret!);
+      const browserTokenPromise = authorizedReference.waitForResponse(
+        (response) => response.request().method() === 'POST'
+          && response.url() === `${WEB_BASE_URL}/oauth2/token`,
+      );
+      await oauthAuthorization.getByRole('button', {
+        name: 'Apply given OAuth2 credentials', exact: true,
+      }).click();
+      const browserTokenResponse = await browserTokenPromise;
+      expect(browserTokenResponse.status()).toBe(200);
+      const browserToken = await browserTokenResponse.json();
+      expect(browserToken.token_type).toBe('Bearer');
+      await expect(oauthAuthorization.getByRole('button', {
+        name: 'Remove authorization', exact: true,
+      })).toBeVisible();
+      await oauthAuthorization.getByRole('button', { name: 'Close', exact: true }).click();
+      await expect(authorizationDialog).toHaveCount(0);
+      const whoamiOperation = authorizedReference.locator('.opblock').filter({
+        has: authorizedReference.locator('[data-path="/api/open/v1/whoami"]'),
+      });
+      await whoamiOperation.locator('.opblock-summary-control').click();
+      // The product enables Try it out by default in its Swagger configuration.
+      await expect(whoamiOperation.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible();
+      const browserWhoamiPromise = authorizedReference.waitForResponse(
+        (response) => response.request().method() === 'GET'
+          && response.url() === `${WEB_BASE_URL}/api/open/v1/whoami`,
+      );
+      await whoamiOperation.getByRole('button', { name: 'Execute', exact: true }).click();
+      const browserWhoamiResponse = await browserWhoamiPromise;
+      // Swagger renders the live Authorization header in its curl example.
+      // Redact only evidence text after the actual browser request has completed.
+      await authorizedReference.locator('body').evaluate((body, accessToken: string) => {
+        const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+          if (node.nodeValue?.includes(accessToken)) {
+            node.nodeValue = node.nodeValue.replaceAll(accessToken, '[redacted for evidence]');
+          }
+        }
+      }, browserToken.access_token);
+      expect(browserWhoamiResponse.status()).toBe(200);
+      expect(await browserWhoamiResponse.json()).toEqual(principal);
+      await expect(whoamiOperation.locator('.responses-wrapper')).toContainText('production');
+      await capture(authorizedReference, 'OP-UI-13-authorized', false);
+    } finally {
+      await authorizedReference.close();
+      await context.setExtraHTTPHeaders({ Referer: `${WEB_BASE_URL}/` });
+    }
+
     const externalEvent = {
       id: 'order-10001-created',
       type: 'order.created',
@@ -234,6 +343,8 @@ test.describe('Open Platform golden journey', () => {
     for (const template of ['asset-management', 'simple-inventory']) {
       const installTemplate = await page.request.post(`/api/templates/${template}/install`, {
         data: {},
+        // Model provisioning is fixture setup, separate from action and production SLO budgets.
+        timeout: 30_000,
       });
       expect(installTemplate.status(), `install ${template}`).toBe(200);
       expect(await installTemplate.json()).toMatchObject({ success: true, status: 'SUCCESS' });
@@ -415,7 +526,7 @@ test.describe('Open Platform golden journey', () => {
     );
     expect(internalResourceProbe.status()).toBe(404);
 
-    await page.getByRole('button', { name: '运维' }).click();
+    await appCard.getByRole('button', { name: '运维' }).click();
     const operations = page.getByTestId('open-platform-operations-panel');
     await expect(operations).toBeVisible();
     await expect(operations).toContainText('调用审计');
@@ -516,16 +627,19 @@ test.describe('Open Platform golden journey', () => {
     const eventCatalog = operations.getByTestId('open-platform-event-catalog');
     const webhookHealth = operations.getByTestId('open-platform-webhook-health');
     await expect(eventCatalog).toContainText('inventory.stock-in.confirmed');
+    await expect(eventCatalog).toContainText('事件目录');
+    await expect(eventCatalog).toContainText('支持 v1');
+    await expect(webhookHealth).toContainText('Webhook 兼容性与签名');
     await expect(webhookHealth.locator('[data-rotation-status="healthy"]')).toHaveCount(2);
     await expect(webhookHealth.locator('[data-rotation-status="due"]')).toHaveCount(1);
     await expect(webhookHealth.locator('[data-rotation-status="overdue"]')).toContainText(
-      'Rotate the signing secret now.',
+      '请立即轮换签名密钥。',
     );
     await expect(webhookHealth.locator('[data-rotation-status="missing"]')).toContainText(
-      'Add a signing secret before enabling delivery.',
+      '启用投递前请添加签名密钥。',
     );
     await expect(webhookHealth.locator('[data-compatible="false"]')).toContainText(
-      'Choose a supported event version.',
+      '请选择受支持的事件版本。',
     );
     await expect(operations).not.toContainText(
       /super-secret|https:\/\/.*hook|Bearer [A-Za-z0-9._-]+/,
@@ -674,6 +788,7 @@ test.describe('Open Platform golden journey', () => {
     await expect(operations).toContainText('金蝶库存事件');
     await capture(page, 'OP-OPS-06');
     await operations.getByLabel('投递状态').selectOption('dead_letter');
+    await expect(operations.getByLabel('投递状态').locator('option:checked')).toHaveText('死信');
     await expect(operations).toContainText('HTTP 503');
     await expect(operations).not.toContainText('evt-success');
     await expect(operations).not.toContainText('evt-pending');
@@ -768,8 +883,8 @@ test.describe('Open Platform golden journey', () => {
     await operations.getByRole('button', { name: /重试|Retry/ }).click();
     await expect(operations).toContainText('调用审计');
 
-    await page.getByRole('button', { name: '查看凭据' }).click();
-    const credentialList = page.locator('[data-testid^="open-platform-credentials-"]');
+    await appCard.getByRole('button', { name: '查看凭据' }).click();
+    const credentialList = appCard.locator('[data-testid^="open-platform-credentials-"]');
     await expect(credentialList).toContainText('ab_client_');
     await credentialList.getByRole('button', { name: '轮换' }).click();
     const rotateDialog = page.getByRole('dialog', { name: '轮换凭据' });
@@ -824,7 +939,7 @@ test.describe('Open Platform golden journey', () => {
     await capture(page, 'OP-UI-09');
     await revokeDialog.getByRole('button', { name: '取消' }).click();
 
-    await page.getByRole('button', { name: '编辑 Scope' }).click();
+    await appCard.getByRole('button', { name: '编辑 Scope' }).click();
     const scopeDialog = page.getByRole('dialog', { name: '编辑 Scope' });
     await expect(scopeDialog).toContainText('立即吊销此安装的现有 Access Token');
     await capture(page, 'OP-UI-10');
@@ -836,15 +951,15 @@ test.describe('Open Platform golden journey', () => {
     });
     expect(revokedTokenResponse.status()).toBe(401);
 
-    await page.getByRole('button', { name: '停用安装' }).click();
+    await appCard.getByRole('button', { name: '停用安装' }).click();
     const disableInstallationDialog = page.getByRole('dialog', { name: '确认停用访问？' });
     await expect(disableInstallationDialog).toContainText('立即吊销有效 Token');
     await capture(page, 'OP-UI-11');
     await disableInstallationDialog.getByRole('button', { name: '停用' }).click();
-    await expect(page.getByText('已停用').first()).toBeVisible();
+    await expect(appCard.getByText('已停用', { exact: true })).toBeVisible();
     await dismissToasts(page);
 
-    await page.getByRole('button', { name: '停用' }).first().click();
+    await appCard.getByRole('button', { name: '停用', exact: true }).click();
     const disableApplicationDialog = page.getByRole('dialog', { name: '确认停用访问？' });
     await expect(disableApplicationDialog).toContainText('无法在本页面恢复');
     await expect
@@ -852,24 +967,29 @@ test.describe('Open Platform golden journey', () => {
       .toBeGreaterThan(400);
     await capture(page, 'OP-UI-12');
     await disableApplicationDialog.getByRole('button', { name: '停用' }).click();
-    await expect(page.getByRole('button', { name: '添加安装' })).toBeDisabled();
+    await expect(appCard.getByRole('button', { name: '添加安装' })).toBeDisabled();
     await dismissToasts(page);
     await capture(page, 'OP-UI-02');
 
+    // APIRequestContext needs the project's synthetic same-origin Referer for writes.
+    // Chromium rejects that forced header on the real noreferrer popup; browser
+    // navigation must use its native referrer policy, as an ordinary user does.
+    await context.setExtraHTTPHeaders({});
     const popupPromise = context.waitForEvent('page');
     await page.getByRole('button', { name: /API 参考/ }).click();
     const apiReference = await popupPromise;
     await apiReference.waitForLoadState('domcontentloaded');
     await expect(apiReference).toHaveURL(
-      /swagger-ui\/index\.html\?urls\.primaryName=open-platform/,
+      `${WEB_BASE_URL}/swagger-ui/index.html?urls.primaryName=open-platform`,
     );
-    await apiReference.goto(`${BACKEND_URL}/swagger-ui/index.html?urls.primaryName=open-platform`);
+    expect(new URL(apiReference.url()).origin).toBe(new URL(WEB_BASE_URL).origin);
     await expect(apiReference.locator('.opblock').first()).toBeVisible({ timeout: 30_000 });
     await expect(apiReference.locator('body')).not.toContainText(
       /Whitelabel Error Page|404 Not Found|Loading page configuration/,
     );
     await capture(apiReference, 'OP-UI-13', false);
     await apiReference.close();
+    await context.setExtraHTTPHeaders({ Referer: `${WEB_BASE_URL}/` });
 
     await page.route('**/api/open-platform/event-catalog', async (route) => {
       await route.fulfill({
@@ -925,9 +1045,19 @@ test.describe('Open Platform golden journey', () => {
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
     expect(overflow).toBeLessThanOrEqual(1);
+    for (const label of ['已停用', '所有者']) {
+      const badge = appCard.getByText(label, { exact: true }).first();
+      await expect(badge).toHaveCSS('white-space', 'nowrap');
+    }
     await capture(page, 'OP-OPS-16-top', false);
     await expect(operations).toContainText('open-platform-golden-whoami');
-    await operations.scrollIntoViewIfNeeded();
+    const mobileAudit = operations.getByTestId('open-platform-call-audit');
+    await mobileAudit.scrollIntoViewIfNeeded();
+    await expect(mobileAudit.locator('code').first()).toBeInViewport();
+    // Settle the resized scroll container before capturing its painted content.
+    await page.evaluate(() => new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    }));
     await capture(page, 'OP-OPS-16', false);
     await eventCatalog.scrollIntoViewIfNeeded();
     await captureLocator(eventCatalog, 'OP-PROTO-10');
@@ -936,5 +1066,11 @@ test.describe('Open Platform golden journey', () => {
       .toBeLessThanOrEqual(1);
     await webhookHealth.scrollIntoViewIfNeeded();
     await captureLocator(webhookHealth, 'OP-PROTO-11');
+    const preservedResponse = await page.request.get(`${WEB_BASE_URL}/api/open-platform/applications`);
+    expect(preservedResponse.status()).toBe(200);
+    const preserved = await preservedResponse.json();
+    expect(String(preserved.code)).toBe('0');
+    const preservedPids = (preserved.data as Array<{ pid: string }>).map((entry) => entry.pid);
+    expect(preservedPids).toEqual(expect.arrayContaining(existingPids));
   });
 });

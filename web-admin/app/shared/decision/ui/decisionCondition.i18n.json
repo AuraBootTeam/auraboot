@@ -1,0 +1,274 @@
+{
+  "matchMode": {
+    "zh-CN": "匹配模式",
+    "en": "Match mode"
+  },
+  "noRules": {
+    "zh-CN": "暂无规则",
+    "en": "No rules"
+  },
+  "enabled": {
+    "zh-CN": "启用",
+    "en": "Enabled"
+  },
+  "disabled": {
+    "zh-CN": "停用",
+    "en": "Disabled"
+  },
+  "delete": {
+    "zh-CN": "删除",
+    "en": "Delete"
+  },
+  "addRule": {
+    "zh-CN": "添加规则",
+    "en": "Add rule"
+  },
+  "newRule": {
+    "zh-CN": "规则 {n}",
+    "en": "Rule {n}"
+  },
+  "COLLECT_ALL": {
+    "zh-CN": "收集全部命中",
+    "en": "Collect all matches"
+  },
+  "FIRST_MATCH": {
+    "zh-CN": "命中首条即停止",
+    "en": "Stop at first match"
+  },
+  "UNIQUE": {
+    "zh-CN": "必须唯一命中",
+    "en": "Require a unique match"
+  },
+  "PRIORITY_FIRST": {
+    "zh-CN": "按优先级命中",
+    "en": "Match by priority"
+  },
+  "scopeMeta": {
+    "zh-CN": "元数据",
+    "en": "Metadata"
+  },
+  "scopeEvent": {
+    "zh-CN": "事件",
+    "en": "Event"
+  },
+  "scopeRecord": {
+    "zh-CN": "业务记录",
+    "en": "Business record"
+  },
+  "scopeBefore": {
+    "zh-CN": "变更前",
+    "en": "Before change"
+  },
+  "scopeAfter": {
+    "zh-CN": "变更后",
+    "en": "After change"
+  },
+  "scopeProcess": {
+    "zh-CN": "流程",
+    "en": "Process"
+  },
+  "scopeTask": {
+    "zh-CN": "任务",
+    "en": "Task"
+  },
+  "scopeActor": {
+    "zh-CN": "操作者",
+    "en": "Actor"
+  },
+  "scopeTenant": {
+    "zh-CN": "租户",
+    "en": "Tenant"
+  },
+  "scopeTime": {
+    "zh-CN": "时间",
+    "en": "Time"
+  },
+  "scopeEnvironment": {
+    "zh-CN": "环境",
+    "en": "Environment"
+  },
+  "user": {
+    "zh-CN": "用户",
+    "en": "User"
+  },
+  "reference": {
+    "zh-CN": "引用对象",
+    "en": "Reference"
+  },
+  "selectReference": {
+    "zh-CN": "选择{target}",
+    "en": "Select {target}"
+  },
+  "searchReference": {
+    "zh-CN": "搜索{target}",
+    "en": "Search {target}"
+  },
+  "loading": {
+    "zh-CN": "加载中...",
+    "en": "Loading..."
+  },
+  "noMatches": {
+    "zh-CN": "没有匹配项",
+    "en": "No matches"
+  },
+  "loadFailed": {
+    "zh-CN": "无法加载引用选项",
+    "en": "Could not load reference options"
+  },
+  "notHeading": {
+    "zh-CN": "非(NOT)",
+    "en": "NOT"
+  },
+  "groupHeading": {
+    "zh-CN": "条件组",
+    "en": "Condition group"
+  },
+  "allMatch": {
+    "zh-CN": "全部满足",
+    "en": "All conditions match"
+  },
+  "anyMatch": {
+    "zh-CN": "任一满足",
+    "en": "Any condition matches"
+  },
+  "noConditions": {
+    "zh-CN": "暂无条件",
+    "en": "No conditions"
+  },
+  "addCondition": {
+    "zh-CN": "添加条件",
+    "en": "Add condition"
+  },
+  "addGroup": {
+    "zh-CN": "添加条件组",
+    "en": "Add condition group"
+  },
+  "addNot": {
+    "zh-CN": "添加 NOT",
+    "en": "Add NOT"
+  },
+  "negated": {
+    "zh-CN": "非({condition})",
+    "en": "NOT({condition})"
+  },
+  "andSeparator": {
+    "zh-CN": " 并且 ",
+    "en": " AND "
+  },
+  "orSeparator": {
+    "zh-CN": " 或 ",
+    "en": " OR "
+  },
+  "listSeparator": {
+    "zh-CN": "、",
+    "en": ", "
+  },
+  "fieldSearch": {
+    "zh-CN": "字段搜索",
+    "en": "Field search"
+  },
+  "fieldSearchHint": {
+    "zh-CN": "搜索字段、模型或路径",
+    "en": "Search fields, models, or paths"
+  },
+  "noFields": {
+    "zh-CN": "没有匹配字段",
+    "en": "No matching fields"
+  },
+  "truthTrue": {
+    "zh-CN": "命中",
+    "en": "Matched"
+  },
+  "truthFalse": {
+    "zh-CN": "未命中",
+    "en": "Not matched"
+  },
+  "truthUnknown": {
+    "zh-CN": "未知",
+    "en": "Unknown"
+  },
+  "previewNote": {
+    "zh-CN": "预览仅辅助,以后端 test-run 为准",
+    "en": "Preview is advisory; the backend test run is authoritative"
+  },
+  "operatorEQ": {
+    "zh-CN": "等于",
+    "en": "equals"
+  },
+  "operatorNE": {
+    "zh-CN": "不等于",
+    "en": "does not equal"
+  },
+  "operatorGT": {
+    "zh-CN": "大于",
+    "en": "greater than"
+  },
+  "operatorGTE": {
+    "zh-CN": "大于等于",
+    "en": "greater than or equal to"
+  },
+  "operatorLT": {
+    "zh-CN": "小于",
+    "en": "less than"
+  },
+  "operatorLTE": {
+    "zh-CN": "小于等于",
+    "en": "less than or equal to"
+  },
+  "operatorIN": {
+    "zh-CN": "属于集合",
+    "en": "is in"
+  },
+  "operatorNOT_IN": {
+    "zh-CN": "不在集合",
+    "en": "is not in"
+  },
+  "operatorBETWEEN": {
+    "zh-CN": "介于",
+    "en": "between"
+  },
+  "operatorCONTAINS_TEXT": {
+    "zh-CN": "包含文本",
+    "en": "contains text"
+  },
+  "operatorCONTAINS_ELEMENT": {
+    "zh-CN": "包含元素",
+    "en": "contains element"
+  },
+  "operatorSTARTS_WITH": {
+    "zh-CN": "开头是",
+    "en": "starts with"
+  },
+  "operatorENDS_WITH": {
+    "zh-CN": "结尾是",
+    "en": "ends with"
+  },
+  "operatorIS_NULL": {
+    "zh-CN": "为空",
+    "en": "is null"
+  },
+  "operatorIS_NOT_NULL": {
+    "zh-CN": "不为空",
+    "en": "is not null"
+  },
+  "operatorIS_EMPTY": {
+    "zh-CN": "为空",
+    "en": "is empty"
+  },
+  "operatorIS_NOT_EMPTY": {
+    "zh-CN": "不为空",
+    "en": "is not empty"
+  },
+  "operatorCHANGED": {
+    "zh-CN": "发生变化",
+    "en": "changed"
+  },
+  "operatorMATCHES": {
+    "zh-CN": "匹配",
+    "en": "matches"
+  },
+  "scopeSLA": {
+    "zh-CN": "SLA",
+    "en": "SLA"
+  }
+}

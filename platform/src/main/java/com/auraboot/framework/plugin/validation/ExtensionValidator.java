@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import static com.auraboot.framework.plugin.validation.PluginValidationMessage.error;
@@ -187,7 +188,7 @@ public class ExtensionValidator implements PluginValidator {
         String renderComponent = renderComponentObj.toString();
         if (dataType == null || dataType.isBlank() || renderComponent.isBlank()) return;
 
-        List<String> compatible = TYPE_COMPATIBLE_COMPONENTS.get(dataType.toLowerCase());
+        List<String> compatible = TYPE_COMPATIBLE_COMPONENTS.get(dataType.toLowerCase(Locale.ROOT));
         if (compatible == null) return; // Unknown dataType — skip check
 
         boolean isCompatible = compatible.stream()

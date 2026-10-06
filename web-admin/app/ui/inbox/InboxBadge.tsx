@@ -1,3 +1,4 @@
+import { useI18n } from '~/contexts/I18nContext';
 /**
  * InboxBadge — header icon showing unified inbox unread count.
  * Replaces ApprovalBadge with unified inbox data source.
@@ -7,6 +8,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { InboxIcon } from '@heroicons/react/24/outline';
 import { getUnreadCount } from '~/shared/services/inboxService';
+import { useHydrated } from '~/hooks/useHydrated';
 
 interface InboxBadgeProps {
   onClick?: () => void;
@@ -16,6 +18,8 @@ interface InboxBadgeProps {
 }
 
 export function InboxBadge({ onClick, isOpen, pollInterval = 30_000, className }: InboxBadgeProps) {
+  const { t } = useI18n();
+  const hydrated = useHydrated();
   const [count, setCount] = useState(0);
 
   const fetchCount = useCallback(async () => {
@@ -37,24 +41,31 @@ export function InboxBadge({ onClick, isOpen, pollInterval = 30_000, className }
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
-      if (detail?.type === 'inbox' && typeof detail?.count === 'number') {
+      if (detail?.type !== 'inbox') return;
+      if (typeof detail.count === 'number') {
         setCount(detail.count);
+      } else {
+        void fetchCount();
       }
     };
     window.addEventListener('aura:inbox-update', handler);
     return () => window.removeEventListener('aura:inbox-update', handler);
-  }, []);
+  }, [fetchCount]);
 
   return (
     <button
+      type="button"
       onClick={onClick}
+      disabled={!hydrated}
+      aria-busy={!hydrated}
+      aria-expanded={isOpen ?? false}
       data-testid="inbox-badge"
       className={`relative rounded-xl p-2.5 transition-all duration-200 hover:scale-105 hover:shadow-md ${
         isOpen
           ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
           : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200'
       } ${className || ''}`}
-      title={count > 0 ? `${count} unread items` : 'Inbox'}
+      title={count > 0 ? t('inbox.unreadCount', { count }) : t('inbox.title')}
     >
       <InboxIcon className="h-5 w-5" />
       {count > 0 && (

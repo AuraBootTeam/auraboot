@@ -1,6 +1,6 @@
 {
   "code": "org:update_employee",
-  "displayName:zh-CN": "Update Employee",
+  "displayName:zh-CN": "更新员工",
   "displayName:en": "Update Employee",
   "type": "update",
   "modelCode": "org_employee",

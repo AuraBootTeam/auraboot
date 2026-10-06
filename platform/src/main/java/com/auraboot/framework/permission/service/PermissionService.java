@@ -49,6 +49,10 @@ public interface PermissionService {
      * @return Permission DTO or null
      */
     PermissionDTO findById(Long id);
+
+    /** Resolve a permission by its public identity within the current tenant. */
+    PermissionDTO findByPid(String pid);
+
     
     /**
      * Find permission by code

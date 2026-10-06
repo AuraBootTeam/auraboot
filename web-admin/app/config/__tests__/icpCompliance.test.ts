@@ -6,7 +6,7 @@ describe('ICP compliance configuration', () => {
     expect(resolveIcpComplianceConfig()).toEqual({
       enabled: false,
       siteTitle: '个人技术',
-      recordNumber: '浙ICP备XXXXXXX号',
+      recordNumber: '',
       siteDisplayName: 'AuraBoot',
     });
   });
@@ -32,5 +32,19 @@ describe('ICP compliance configuration', () => {
       siteDisplayName: 'AuraBoot My filed site',
     });
     expect(ICP_RECORD_LOOKUP_URL).toBe('https://beian.miit.gov.cn/');
+  });
+
+  it.each(['0', 'false', 'no', 'off', 'unknown', ''])('stays disabled for %s', (value) => {
+    expect(resolveIcpComplianceConfig({ ICP_COMPLIANCE_ENABLED: value }).enabled).toBe(false);
+  });
+
+  it('normalizes whitespace without inventing a filing number', () => {
+    expect(resolveIcpComplianceConfig({
+      ICP_COMPLIANCE_ENABLED: ' TRUE ', ICP_SITE_TITLE: '  ', ICP_RECORD_NUMBER: '  ',
+    })).toEqual({
+      enabled: true, siteTitle: '个人技术', recordNumber: '', siteDisplayName: 'AuraBoot 个人技术',
+    });
+    expect(resolveIcpComplianceConfig({ ICP_RECORD_NUMBER: '  Filed-123  ' }).recordNumber)
+      .toBe('Filed-123');
   });
 });

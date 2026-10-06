@@ -26,7 +26,7 @@ interface FieldChangeLog {
 
 export interface FieldHistoryViewerProps {
   modelCode: string;
-  recordPid: string; // numeric id (not pid)
+  recordPid: string; // public record PID
   token?: string;
   locale?: string;
   t?: (key: string) => string;
@@ -61,6 +61,7 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
           setChanges(result.data);
         } else {
           setChanges([]);
+          setError(locale === 'zh-CN' ? '加载变更历史失败' : 'Failed to load field history');
         }
       } catch (e: any) {
         // 403 = no permission, show friendly message
@@ -124,12 +125,7 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
               <span className="text-text-2 font-medium">{group.actorName || '—'}</span>
               <span>&middot;</span>
               <time>{formatTime(group.changedAt, locale)}</time>
-              {group.commandCode && (
-                <>
-                  <span>&middot;</span>
-                  <span className="text-text-3">{group.commandCode}</span>
-                </>
-              )}
+
             </div>
 
             {/* Change entries */}
@@ -147,14 +143,14 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
                       {entry.fieldLabel || entry.fieldCode}
                     </span>
                     <div className="text-text-2 mt-0.5 flex items-center gap-1.5 text-xs">
-                      {entry.changeType === 'added' ? (
+                      {entry.changeType.toLowerCase() === 'added' ? (
                         <span
                           className="text-status-green max-w-[200px] truncate"
                           title={entry.newValue || ''}
                         >
                           {entry.newValue || '—'}
                         </span>
-                      ) : entry.changeType === 'removed' ? (
+                      ) : entry.changeType.toLowerCase() === 'removed' ? (
                         <span
                           className="text-status-red max-w-[200px] truncate line-through"
                           title={entry.oldValue || ''}
@@ -212,7 +208,7 @@ function ChangeTypeBadge({ type, locale }: { type: string; locale: string }) {
     MODIFIED: ['修改', 'Modified', 'bg-status-blue-bg text-status-blue'],
     REMOVED: ['删除', 'Removed', 'bg-status-red-bg text-status-red'],
   };
-  const [zh, en, cls] = labels[type] || ['—', '—', 'bg-status-gray-bg text-status-gray'];
+  const [zh, en, cls] = labels[type.toUpperCase()] || ['—', '—', 'bg-status-gray-bg text-status-gray'];
   return (
     <span
       className={`inline-block flex-shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${cls}`}

@@ -33,6 +33,9 @@ public class WebhookDeliveryLog {
     @TableField("event_id")
     private String eventId;
 
+    @TableField("request_id")
+    private String requestId;
+
     @TableField("request_url")
     private String requestUrl;
 

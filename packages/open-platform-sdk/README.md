@@ -1,5 +1,7 @@
 # AuraBoot Open Platform SDK
 
+Published on npm: `npm install @auraboot/open-platform-sdk`
+
 ```ts
 import { OpenPlatformClient } from "@auraboot/open-platform-sdk";
 
@@ -33,3 +35,7 @@ field aliases, refreshes once after a `401`, preserves write idempotency keys ac
 exposes `status`, `code`, and `requestId` through `OpenPlatformError`.
 List cursors are opaque and resource-bound. Conditional commands require the strong ETag returned by a
 versioned resource read; the SDK never retries `412 precondition_failed`.
+
+## License
+
+Apache-2.0. See [LICENSE](./LICENSE) for the full text. The package license does not grant AuraBoot trademark rights.

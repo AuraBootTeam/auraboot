@@ -2,6 +2,7 @@ package com.auraboot.framework.plugin.extension;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.Locale;
 import java.util.UUID;
 
 /** Business-neutral workflow lifecycle event published by a workflow provider. */
@@ -20,7 +21,7 @@ public class WorkflowEvent {
                          String instanceId, String nodeId, Map<String, Object> payload) {
         this.tenantId = tenantId;
         this.sourceType = sourceType == null ? "workflow" : sourceType;
-        this.eventType = eventType == null ? null : this.sourceType.toLowerCase() + ":" + eventType.toLowerCase();
+        this.eventType = eventType == null ? null : this.sourceType.toLowerCase(Locale.ROOT) + ":" + eventType.toLowerCase(Locale.ROOT);
         this.processKey = processKey;
         this.instanceId = instanceId;
         this.nodeId = nodeId;

@@ -1,3 +1,9 @@
+---
+type: product-doc
+status: active
+updated: 2026-10-04
+---
+
 # AuraBoot — Deployment Guide
 
 ## Quick Start (Docker)
@@ -14,6 +20,11 @@ are technically reachable, but **no additional JDBC drivers are bundled**:
 from the distribution. To run against MySQL you must provide the connector
 jar on the backend classpath yourself (e.g. via your own image build or
 `loader.path`).
+
+The backend test runtime includes the MySQL connector for Testcontainers
+readiness checks and JDBC integration tests. This test-only dependency is
+managed by the Spring Boot BOM and does not add the driver to the production
+runtime classpath or distribution.
 
 ```bash
 # Clone the repository
@@ -52,7 +63,7 @@ Two things differ from macOS/Linux:
 - **Run the shell scripts from a bash environment.** `scripts/quickstart.sh` (the
   mandatory bootstrap step that creates the admin user and imports the plugins), and any
   other `scripts/*.sh`, must be run from a **WSL** shell or **Git Bash**, not
-  PowerShell/cmd. They only need `bash` + `curl` and talk to the published port, so they
+  PowerShell/cmd. The bootstrap script needs `bash`, `curl` and `python3` and talks to the published port, so they
   work unchanged.
 - **Open the app with `start` instead of `open`:** `start http://localhost:3000`.
 
@@ -81,7 +92,9 @@ bash quickstart.sh
 # Open http://localhost:3000  (admin@auraboot.com / Test2026x — change on first login)
 ```
 
-Images pulled (multi-arch `amd64`/`arm64`), from GHCR by default:
+The configuration references these images in GHCR by default. Select a published
+release tag with verified images for your architecture; the default `latest` tag
+is not evidence that the current candidate has been published:
 
 | Image | What it is |
 |-------|-----------|
@@ -89,16 +102,28 @@ Images pulled (multi-arch `amd64`/`arm64`), from GHCR by default:
 | `ghcr.io/aurabootteam/auraboot-frontend` | Frontend (BFF + SSR) |
 | `ghcr.io/aurabootteam/auraboot-postgres` | PostgreSQL 16 (pgvector) + schema seeded on first boot |
 
-**Mainland China** — pull from the Tencent TCR mirror (faster than GHCR) by pointing
-`REGISTRY` at the public `auraboot-oss` namespace:
-
-```bash
-REGISTRY=ccr.ccs.tencentyun.com/auraboot-oss docker compose -f docker-compose.pull.yml up -d
-```
+**Mainland China:** Gitee and Tencent TCR mirrors are deferred. There is no verified
+mainland registry endpoint to substitute here. This configuration defaults to GHCR;
+check access and the availability of all three images for your chosen release tag
+before starting. Current 1.0 readiness evidence does not establish registry
+publication, multi-architecture availability or a complete fresh installation.
 
 Redis / MinIO / monitoring are advanced add-ons — for those, use the source
 `docker-compose.yml` profiles (`--profile cache` / `storage` / `monitoring`). Redis is
 not required for single-instance deployments.
+
+## Core-only artifact deployment session
+
+For a Core-only artifact bundle, initialize its database before running the bundled
+`bin/auraboot-core-env.sh publish` or `verify` command. Set `ADMIN_EMAIL` and
+`ADMIN_PASSWORD` to the administrator created in that database.
+
+These commands log in and select the administrator's business space through the
+production APIs. The platform operator space is excluded. When the administrator
+belongs to multiple business spaces, export `AURA_ADMIN_TENANT_ID` with the exact
+business tenant ID to select; an ambiguous or inaccessible selection fails before
+configuration import. Credentials and session tokens are not written to the command's
+output.
 
 ## Infrastructure Only (Local Development)
 

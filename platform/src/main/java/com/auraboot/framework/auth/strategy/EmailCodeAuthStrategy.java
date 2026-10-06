@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import com.auraboot.framework.user.util.EmailAddressNormalizer;
 
 /**
  * Email verification code (OTP) authentication strategy.
@@ -42,7 +43,7 @@ public class EmailCodeAuthStrategy implements AuthStrategy {
 
     @Override
     public AuthenticationResponse authenticate(AuthStrategyRequest request) {
-        String email = request.getEmail();
+        String email = EmailAddressNormalizer.normalize(request.getEmail());
         String code = request.getCode();
 
         if (email == null || email.isBlank()) {
@@ -85,7 +86,8 @@ public class EmailCodeAuthStrategy implements AuthStrategy {
 
     private User findUserByEmail(String email) {
         QueryWrapper<User> qw = new QueryWrapper<>();
-        qw.eq("email", email);
+        qw.apply("LOWER(BTRIM(email)) = {0}", email);
+        qw.eq("deleted_flag", false);
         return userMapper.selectOne(qw);
     }
 
@@ -113,7 +115,7 @@ public class EmailCodeAuthStrategy implements AuthStrategy {
         user.setFailedLoginAttempts(0);
 
         userMapper.insert(user);
-        log.info("Auto-registered user id={} pid={} for email {}", user.getId(), user.getPid(), email);
+        log.info("Auto-registered passwordless user id={} pid={}", user.getId(), user.getPid());
         return user;
     }
 }

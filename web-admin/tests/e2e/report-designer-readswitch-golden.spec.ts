@@ -1,13 +1,14 @@
 /** Report-definition reads and export contract through a saved report. */
-import { expect, test } from '../../tests/fixtures';
+import { expect, test } from '../fixtures';
 
 test.describe('Report Designer — read switch (ab_report-only reads + export)', () => {
   test('designer save → reads + export resolve from ab_report (loadByPid, by-code, export pdf)', async ({
     page,
   }) => {
-    await page.goto('/report-designer', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByTestId('block-palette')).toBeVisible();
-    await expect(page.getByTestId('report-canvas')).toBeVisible();
+    await page.goto('/report-designer', { waitUntil: 'load' });
+    await expect(page.getByRole('main').getByTestId('block-palette')).toBeVisible();
+    await expect(page.getByRole('main').getByTestId('report-canvas')).toBeVisible();
+    await expect(page.getByRole('main').getByTestId('report-designer-toolbar').getByText(/^(未保存|Unsaved)$/)).toBeVisible();
 
     // Capture the canonical save upsert RESPONSE (PUT /api/report-definitions/{pid}) the designer fires
     // after the canonical page save. Waiting on the response guarantees the saved committed before
@@ -19,7 +20,7 @@ test.describe('Report Designer — read switch (ab_report-only reads + export)',
       { timeout: 20_000 },
     );
 
-    await page.getByRole('button', { name: 'Save' }).click();
+    await page.getByRole('button', { name: /^(保存|Save)$/ }).click();
 
     const savedResp = await savedRespPromise;
     expect(savedResp.status(), 'canonical save upsert PUT should succeed').toBe(200);

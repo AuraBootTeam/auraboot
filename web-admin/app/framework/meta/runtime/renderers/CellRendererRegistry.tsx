@@ -234,19 +234,26 @@ cellRendererRegistry.register('text', ({ value }) => {
 /**
  * Reference/Lookup renderer - shows display name from _display suffix (GAP-124)
  */
-cellRendererRegistry.register('reference', ({ value, record, column }) => {
+cellRendererRegistry.register('reference', ({ value, record, column, locale, t }) => {
   if (!value) return <span className="text-text-3">-</span>;
   // Try _display suffix for resolved display name
   const displayKey = column?.field ? `${column.field}_display` : null;
   const displayValue = displayKey && record?.[displayKey];
   if (displayValue) {
     return (
-      <span className="text-accent" title={String(value)}>
+      <span className="text-accent">
         {String(displayValue)}
       </span>
     );
   }
-  return <span>{String(value)}</span>;
+  const key = 'import.validation.reference';
+  const translated = t?.(key);
+  const unavailable = translated && translated !== key
+    ? translated
+    : locale?.startsWith('zh')
+      ? '关联记录不存在或无权访问'
+      : 'The referenced record does not exist or is not accessible';
+  return <span className="text-text-3">{unavailable}</span>;
 });
 
 /**

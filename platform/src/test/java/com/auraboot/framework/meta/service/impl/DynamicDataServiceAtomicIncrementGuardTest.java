@@ -33,6 +33,29 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class DynamicDataServiceAtomicIncrementGuardTest {
 
+    @Test
+    void commandOnlyDeleteRejectsSingleRawDeleteBeforeReadingOrWritingRecords() {
+        testModel.setExtension(Map.of("commandOnlyDelete", true));
+        service = spy(service);
+        lenient().doThrow(new AssertionError("raw deletion reached record lookup"))
+                .when(service).getById("cr_cj_profile", "rec-1");
+        var error = assertThrows(MetaServiceException.class,
+                () -> service.delete("cr_cj_profile", "rec-1"));
+        assertTrue(error.getMessage().contains("authorized command"));
+        verifyNoInteractions(mapper);
+    }
+
+    @Test
+    void commandOnlyDeleteRejectsBatchRawDeleteBeforeReadingOrWritingRecords() {
+        testModel.setExtension(Map.of("commandOnlyDelete", true));
+        lenient().when(metadataService.getPrimaryKeyField("cr_cj_profile"))
+                .thenThrow(new AssertionError("raw deletion reached primary-key lookup"));
+        var error = assertThrows(MetaServiceException.class,
+                () -> service.batchDelete("cr_cj_profile", List.of("rec-1", "rec-2")));
+        assertTrue(error.getMessage().contains("authorized command"));
+        verifyNoInteractions(mapper);
+    }
+
     @Mock MetaModelService metadataService;
     @Mock DynamicDataMapper mapper;
 

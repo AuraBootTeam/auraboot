@@ -1,0 +1,466 @@
+[
+  {
+    "name": "minimal split",
+    "valid": true,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN"
+    }
+  },
+  {
+    "name": "centered with pale brand",
+    "valid": true,
+    "value": {
+      "version": 1,
+      "template": "centered",
+      "defaultLocale": "zh-CN",
+      "theme": {
+        "accent": "#ffffee",
+        "radius": "square"
+      }
+    }
+  },
+  {
+    "name": "background with focal points",
+    "valid": true,
+    "value": {
+      "version": 1,
+      "template": "background",
+      "defaultLocale": "zh-CN",
+      "images": {
+        "mode": "background",
+        "backgroundUrl": "/brand/campus.webp",
+        "focusX": 50,
+        "focusY": 20,
+        "mobileFocusX": 10,
+        "mobileFocusY": 80,
+        "overlay": 0.5
+      }
+    }
+  },
+  {
+    "name": "custom bilingual content",
+    "valid": true,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN",
+      "content": {
+        "headline": {
+          "mode": "custom",
+          "values": {
+            "zh-CN": "让教学管理更有序",
+            "en-US": "Organize your school day"
+          }
+        },
+        "features": {
+          "mode": "custom",
+          "values": {
+            "zh-CN": [
+              "协作",
+              "教学"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "hidden story",
+    "valid": true,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN",
+      "content": {
+        "badge": {
+          "mode": "hidden"
+        },
+        "headline": {
+          "mode": "hidden"
+        },
+        "features": {
+          "mode": "hidden"
+        }
+      }
+    }
+  },
+  {
+    "name": "illustration and dark logo",
+    "valid": true,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN",
+      "images": {
+        "mode": "illustration",
+        "heroUrl": "https://assets.example.com/a.webp",
+        "darkLogoUrl": "/brand/dark.svg"
+      }
+    }
+  },
+  {
+    "name": "unknown field",
+    "valid": false,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN",
+      "css": "body{display:none}"
+    }
+  },
+  {
+    "name": "unsupported template",
+    "valid": false,
+    "value": {
+      "version": 1,
+      "template": "custom-html",
+      "defaultLocale": "zh-CN"
+    }
+  },
+  {
+    "name": "wrong version",
+    "valid": false,
+    "value": {
+      "version": 2,
+      "template": "split",
+      "defaultLocale": "zh-CN"
+    }
+  },
+  {
+    "name": "unsupported locale",
+    "valid": false,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "fr-FR"
+    }
+  },
+  {
+    "name": "background missing image",
+    "valid": false,
+    "value": {
+      "version": 1,
+      "template": "background",
+      "defaultLocale": "zh-CN"
+    }
+  },
+  {
+    "name": "bad illustration",
+    "valid": false,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN",
+      "images": {
+        "mode": "illustration"
+      }
+    }
+  },
+  {
+    "name": "out of range focus",
+    "valid": false,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN",
+      "images": {
+        "mode": "none",
+        "focusX": 101
+      }
+    }
+  },
+  {
+    "name": "out of range overlay",
+    "valid": false,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN",
+      "images": {
+        "mode": "none",
+        "overlay": 1
+      }
+    }
+  },
+  {
+    "name": "arbitrary style",
+    "valid": false,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN",
+      "theme": {
+        "accent": "var(--evil)"
+      }
+    }
+  },
+  {
+    "name": "short hex",
+    "valid": false,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN",
+      "theme": {
+        "background": "#fff"
+      }
+    }
+  },
+  {
+    "name": "no default language",
+    "valid": false,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN",
+      "content": {
+        "headline": {
+          "mode": "custom",
+          "values": {
+            "en-US": "Hello"
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "hidden content with stale values",
+    "valid": false,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN",
+      "content": {
+        "headline": {
+          "mode": "hidden",
+          "values": {
+            "zh-CN": "Hidden"
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "whitespace title",
+    "valid": false,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN",
+      "content": {
+        "headline": {
+          "mode": "custom",
+          "values": {
+            "zh-CN": "   "
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "oversized lead",
+    "valid": false,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN",
+      "content": {
+        "lead": {
+          "mode": "custom",
+          "values": {
+            "zh-CN": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "duplicate features",
+    "valid": false,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN",
+      "content": {
+        "features": {
+          "mode": "custom",
+          "values": {
+            "zh-CN": [
+              "x",
+              "x"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "empty features",
+    "valid": false,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN",
+      "content": {
+        "features": {
+          "mode": "custom",
+          "values": {
+            "zh-CN": []
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "string feature list",
+    "valid": false,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN",
+      "content": {
+        "features": {
+          "mode": "custom",
+          "values": {
+            "zh-CN": "x"
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "unknown nested key",
+    "valid": false,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN",
+      "images": {
+        "mode": "none",
+        "script": "evil"
+      }
+    }
+  },
+  {
+    "name": "reject unsafe URL javascript:alert(1)",
+    "valid": false,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN",
+      "helpUrl": "javascript:alert(1)"
+    }
+  },
+  {
+    "name": "reject unsafe URL //evil.example/a",
+    "valid": false,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN",
+      "helpUrl": "//evil.example/a"
+    }
+  },
+  {
+    "name": "reject unsafe URL /\\evil.example/a",
+    "valid": false,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN",
+      "helpUrl": "/\\evil.example/a"
+    }
+  },
+  {
+    "name": "reject unsafe URL /hello world",
+    "valid": false,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN",
+      "helpUrl": "/hello world"
+    }
+  },
+  {
+    "name": "reject unsafe URL https://u:p@evil.example/a",
+    "valid": false,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN",
+      "helpUrl": "https://u:p@evil.example/a"
+    }
+  },
+  {
+    "name": "reject unsafe URL https:example.com",
+    "valid": false,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN",
+      "helpUrl": "https:example.com"
+    }
+  },
+  {
+    "name": "reject unsafe URL http://example.com",
+    "valid": false,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN",
+      "helpUrl": "http://example.com"
+    }
+  },
+  {
+    "name": "supported HTTPS port",
+    "valid": true,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN",
+      "helpUrl": "https://assets.example.com:65535/image.webp?size=2"
+    }
+  },
+  {
+    "name": "unsupported IPv6 host",
+    "valid": false,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN",
+      "helpUrl": "https://[::1]/image.png"
+    }
+  },
+  {
+    "name": "invalid host escape",
+    "valid": false,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN",
+      "helpUrl": "https://%/image.png"
+    }
+  },
+  {
+    "name": "out of range port",
+    "valid": false,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN",
+      "helpUrl": "https://assets.example.com:65536/image.png"
+    }
+  },
+  {
+    "name": "invalid hostname space",
+    "valid": false,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN",
+      "helpUrl": "https://asset s.example.com/image.png"
+    }
+  }
+]

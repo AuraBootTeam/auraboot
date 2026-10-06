@@ -1,12 +1,16 @@
 /** B118 high-fidelity report: realistic 48-order dataset, multi-block report, exports, aesthetics captures. */
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { ensureSidebarExpanded } from '../helpers';
 
 test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json', locale: 'zh-CN' });
 
-const EV = process.env.AURA_EVIDENCE_DIR!;
+// Evidence dir must exist even when the env hook is unset (isolated stacks).
+const EV = process.env.AURA_EVIDENCE_DIR || 'test-results/artifacts/report-hifi';
+fs.mkdirSync(EV, { recursive: true });
 const run = `hifi_${randomUUID().replaceAll('-', '').slice(0, 8)}`;
 const STATUSES = ['draft', 'confirmed', 'shipped', 'completed'] as const;
 const TYPES = ['normal', 'urgent', 'bulk'] as const;
@@ -16,7 +20,7 @@ let reportPid = '';
 
 test.describe.configure({ mode: 'serial' });
 
-test('HIFI-00 seed realistic dataset and build the multi-block report', async ({ request }) => {
+test('HIFI-00 seed realistic dataset and build the multi-block report', async ({ page, request }) => {
   test.setTimeout(120000);
   // 48 orders across 4 statuses / 3 types with varied creation dates.
   for (let i = 0; i < 48; i++) {
@@ -46,7 +50,8 @@ test('HIFI-00 seed realistic dataset and build the multi-block report', async ({
   };
   await nq(`${run}_stat`,
     `SELECT count(*) AS total_orders, count(*) FILTER (WHERE e2et_order_urgent) AS urgent_orders,` +
-    ` count(*) FILTER (WHERE e2et_order_status = 'completed') AS completed_orders FROM mt_e2et_order`,
+    ` count(*) FILTER (WHERE e2et_order_status = 'completed') AS completed_orders FROM mt_e2et_order` +
+    ` WHERE e2et_order_title LIKE 'HiFi订单-${run}%'`,
     []);
   await nq(`${run}_detail`,
     `SELECT ROW_NUMBER() OVER (ORDER BY id) AS seq, e2et_order_title AS title, e2et_order_type AS type,` +
@@ -116,7 +121,7 @@ test('HIFI-00 seed realistic dataset and build the multi-block report', async ({
           { field: 'order_date', label: '下单日期', width: 120 },
         ] },
       { id: 'bytype', blockType: 'grouped-table', title: '按类型分组小计', dataSource: 'group',
-        groupByField: 'type',
+        groupByField: 'order_type',
         columns: [{ field: 'order_type', label: '类型' }, { field: 'cnt', label: '订单数' }],
         groupSubtotal: { enabled: true, columns: [{ field: 'cnt', aggregation: 'sum' }] },
         grandTotal: { enabled: true, columns: [{ field: 'cnt', aggregation: 'sum' }] } },
@@ -134,40 +139,108 @@ test('HIFI-00 seed realistic dataset and build the multi-block report', async ({
   reportPid = (await report.json()).data.pid;
   expect(reportPid).toBeTruthy();
 
-  // Cold-stack first use spawns the headless renderer (font load + chrome);
-  // the default 5s API timeout cannot cover it.
-  const pdf = await request.post(`/api/reports/export/pdf`, { data: { reportPid }, timeout: 120_000 });
-  expect(pdf.status(), await pdf.text()).toBe(200);
-  const pdfBody = await pdf.body();
-  expect(pdfBody.subarray(0, 4).toString()).toBe('%PDF');
-  expect(pdfBody.length).toBeGreaterThan(20000);
-  fs.mkdirSync(EV, { recursive: true });
-  fs.writeFileSync(path.join(EV, 'hifi-report.pdf'), pdfBody);
-
-  const json = await request.post(`/api/reports/export/json`, { data: { reportPid } });
-  expect(json.status()).toBe(200);
-  const doc = await json.json();
+  // Fixtures are arranged by API; menu navigation and export actions use the UI.
+  await openReportFromManagement(page);
+  await expect(page.getByRole('main').getByPlaceholder(/^(报表标题|Report Title)$/)).toHaveValue(`订单运营月报 ${run}`);
+  await downloadAndInspectPdf(page, /^(导出 PDF|Export PDF)$/, 'hifi-report-editor.pdf');
+  const jsonRequest = page.waitForResponse(r => r.url().endsWith('/api/reports/export/json') && r.request().method() === 'POST');
+  const jsonDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: /^(导出 JSON|Export JSON)$/ }).click();
+  const response = await jsonRequest;
+  expect(response.request().postDataJSON().reportPid).toBe(reportPid);
+  expect(response.ok()).toBeTruthy();
+  const download = await jsonDownload;
+  expect(download.suggestedFilename()).toBe(`订单运营月报 ${run}.report.json`);
+  const jsonPath = path.join(EV, 'hifi-report.json');
+  await download.saveAs(jsonPath);
+  const doc = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
   const blockTypes = doc.reportDsl.body.map((b: { blockType: string }) => b.blockType);
   expect(blockTypes).toEqual(expect.arrayContaining(['stat-card', 'table', 'grouped-table', 'cross-tab', 'chart']));
-  expect(Object.keys(doc.dataSets)).toEqual(expect.arrayContaining(['stat', 'detail', 'group', 'cross', 'chart']));
-  expect(doc.dataSets.detail.length).toBe(48);
+  expect(doc.dataSets.detail).toHaveLength(48);
+  expect(new Set(doc.dataSets.detail.map((r: { title: string }) => r.title)).size).toBe(48);
+  expect(doc.dataSets.detail.every((r: { title: string }) => r.title.startsWith(`HiFi订单-${run}-`))).toBe(true);
+  expect(doc.dataSets.stat).toHaveLength(1);
+  expect(Number(doc.dataSets.stat[0].total_orders)).toBe(48);
+  expect(Number(doc.dataSets.stat[0].urgent_orders)).toBe(7);
+  expect(Number(doc.dataSets.stat[0].completed_orders)).toBe(12);
+  expect(doc.dataSets.group).toHaveLength(3);
+  expect(doc.dataSets.group.map((r: { order_type: string }) => r.order_type).sort()).toEqual([...TYPES].sort());
+  for (const row of doc.dataSets.group) expect(Number(row.cnt)).toBe(16);
+  expect(doc.dataSets.cross).toHaveLength(12);
+  for (const row of doc.dataSets.cross) expect(Number(row.cnt)).toBe(4);
+  expect(doc.dataSets.chart).toHaveLength(4);
+  expect(doc.dataSets.chart.map((r: { status: string }) => r.status).sort()).toEqual([...STATUSES].sort());
+  for (const row of doc.dataSets.chart) expect(Number(row.cnt)).toBe(12);
+  await page.screenshot({ path: `${EV}/hifi-00-business.png`, fullPage: true });
 });
 
 test('HIFI-01 designer renders every block of the high-fidelity report', async ({ page }) => {
-  await page.goto(`/report-designer/${reportPid}`);
-  await expect(page.getByTestId('report-canvas')).toBeVisible({ timeout: 30000 });
-  await expect(page.getByPlaceholder(/^(报表标题|Report Title)$/)).toHaveValue(`订单运营月报 ${run}`, { timeout: 30000 });
-  await expect(page.getByTestId('report-canvas')).toContainText('订单总数');
-  await expect(page.getByTestId('report-canvas')).toContainText('状态 × 类型 交叉统计');
-  await page.screenshot({ path: `${EV}/hifi-designer.png`, fullPage: true });
+  await openReportFromManagement(page);
+  await expect(page.getByRole('main').getByTestId('report-canvas')).toBeVisible({ timeout: 30000 });
+  await expect(page.getByRole('main').getByPlaceholder(/^(报表标题|Report Title)$/)).toHaveValue(`订单运营月报 ${run}`, { timeout: 30000 });
+  await expect(page.getByRole('main').getByTestId('report-canvas')).toContainText('订单总数');
+  await expect(page.getByRole('main').getByTestId('report-canvas')).toContainText('状态 × 类型 交叉统计');
+  await page.getByRole('main').getByTestId('report-designer-toolbar').getByRole('button', { name: /^(预览|Preview)$/ }).click();
+  await expect(page.getByRole('main').locator('table').first().locator('tbody tr')).toHaveCount(48);
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await page.getByRole('main').getByTestId('report-designer-toolbar').getByRole('button', { name: /^(编辑|Edit)$/ }).click();
+  await expect(page.getByRole('main').getByTestId('report-canvas')).toContainText('按类型分组小计');
+  await page.screenshot({ path: `${EV}/hifi-01-business.png`, fullPage: true });
 });
 
 test('HIFI-02 view page renders the full business report', async ({ page }) => {
   await page.goto(`/reports/view/${run}`);
   await expect(page.locator('table').first()).toContainText('HiFi订单', { timeout: 30000 });
   const detailRows = page.locator('table').first().locator('tbody tr');
-  await expect(detailRows.first()).toBeVisible({ timeout: 30000 });
+  await expect(detailRows).toHaveCount(48, { timeout: 30000 });
+  await expect(detailRows).toContainText(Array.from({ length: 48 }, (_, i) => `HiFi订单-${run}-${String(i + 1).padStart(3, '0')}`));
   await expect(page.getByText('订单总数')).toBeVisible();
   await expect(page.locator('svg').first()).toBeAttached();
-  await page.screenshot({ path: `${EV}/hifi-view-page.png`, fullPage: true });
+  await downloadAndInspectPdf(page, /^(导出 PDF|Export PDF)$/, 'hifi-report-viewer.pdf');
+  await page.screenshot({ path: `${EV}/hifi-02-business.png`, fullPage: true });
 });
+
+async function openReportFromManagement(page: import('@playwright/test').Page) {
+  expect(reportPid).not.toBe('');
+  await page.goto('/');
+  await ensureSidebarExpanded(page);
+  const listResponse = page.waitForResponse(r => new URL(r.url()).pathname === '/api/report-definitions'
+    && r.request().method() === 'GET');
+  await expect(page.locator('nav').getByRole('button', { name: '元数据管理', exact: true })).toBeVisible();
+  await page.locator('nav').getByRole('link', { name: '报表管理', exact: true }).click();
+  await expect(page).toHaveURL(/\/p\/c\/report_management$/);
+  const response = await listResponse;
+  expect(response.ok()).toBeTruthy();
+  const body = await response.json();
+  expect(String(body.code)).toBe('0');
+  expect(body.data).toEqual(expect.arrayContaining([
+    expect.objectContaining({ pid: reportPid, title: `订单运营月报 ${run}` }),
+  ]));
+  // Match the freshly generated title in the management table; navigation must resolve its exact pid.
+  const row = page.getByRole('row').filter({ has: page.getByRole('cell', { name: `订单运营月报 ${run}`, exact: true }) });
+  await expect(row).toHaveCount(1);
+  await expect(row).toContainText(`订单运营月报 ${run}`);
+  await row.getByRole('button', { name: /^(打开|Open)$/ }).click();
+  await expect(page).toHaveURL(new RegExp(`/report-designer/${reportPid}$`));
+}
+
+async function downloadAndInspectPdf(page: import('@playwright/test').Page, button: RegExp, artifact: string) {
+  const responsePromise = page.waitForResponse(r => r.url().endsWith('/api/reports/export/pdf') && r.request().method() === 'POST');
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: button }).click();
+  const response = await responsePromise;
+  expect(response.request().postDataJSON().reportPid).toBe(reportPid);
+  expect(response.ok()).toBeTruthy();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe(`订单运营月报 ${run}.pdf`);
+  fs.mkdirSync(EV, { recursive: true });
+  const pdfPath = path.join(EV, artifact);
+  await download.saveAs(pdfPath);
+  const pdf = fs.readFileSync(pdfPath);
+  expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
+  const text = execFileSync('pdftotext', ['-layout', pdfPath, '-'], { encoding: 'utf8', timeout: 30000 });
+  fs.writeFileSync(`${pdfPath}.txt`, text);
+  const normalized = text.replace(/\s+/g, '');
+  expect(normalized).toContain(`订单运营月报${run}`);
+  for (let i = 0; i < 48; i++) expect(normalized).toContain(`${run}-${String(i + 1).padStart(3, '0')}`);
+}

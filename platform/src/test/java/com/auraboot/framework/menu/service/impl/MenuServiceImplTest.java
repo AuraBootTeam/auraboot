@@ -31,6 +31,80 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class MenuServiceImplTest {
 
+    private MenuServiceImpl releaseService(com.auraboot.framework.menu.mapper.MenuMapper mapper,
+                                           com.auraboot.framework.permission.service.UserPermissionService permissions,
+                                           com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog catalog) {
+        MenuServiceImpl service = new MenuServiceImpl();
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "baseMapper", mapper);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "userPermissionService", permissions);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "applicationRuntimeDefinitionCatalog", catalog);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "applicationRuntimePrimaryEnabled", true);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "defaultApplicationCode", "example");
+        return service;
+    }
+
+    private List<Menu> releaseMenus(boolean visible, ExtensionBean extension) {
+        Menu leaf = new Menu(); leaf.setCode("import"); leaf.setPermissionCode("model.import.create");
+        leaf.setType(1); leaf.setVisible(visible); leaf.setExtension(extension);
+        Menu directory = new Menu(); directory.setCode("classes"); directory.setType(0); directory.setVisible(true);
+        directory.setChildren(List.of(leaf));
+        return List.of(directory);
+    }
+
+    @Test
+    void releasePermissionCheckTracksExistingSessionGrantAndRevocationWithoutSyntheticIds() {
+        var mapper = org.mockito.Mockito.mock(com.auraboot.framework.menu.mapper.MenuMapper.class);
+        var permissions = org.mockito.Mockito.mock(com.auraboot.framework.permission.service.UserPermissionService.class);
+        var catalog = org.mockito.Mockito.mock(com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.class);
+        org.mockito.Mockito.when(catalog.menuTree(42L, "example")).thenAnswer(call -> releaseMenus(true, null));
+        org.mockito.Mockito.when(permissions.getUserPermissionCodes(7L))
+                .thenReturn(java.util.Set.of(), java.util.Set.of("model.import.create"), java.util.Set.of());
+        var service = releaseService(mapper, permissions, catalog);
+        assertFalse(service.hasMenuPermission(7L, "model.import.create", 42L));
+        assertTrue(service.hasMenuPermission(7L, "model.import.create", 42L));
+        assertFalse(service.hasMenuPermission(7L, "model.import.create", 42L));
+        org.mockito.Mockito.verify(mapper, org.mockito.Mockito.times(2)).findByPermissionCode("model.import.create");
+    }
+
+    @Test
+    void releasePermissionCheckDeniesHiddenUnknownAndWrongEnvironmentMenus() {
+        var mapper = org.mockito.Mockito.mock(com.auraboot.framework.menu.mapper.MenuMapper.class);
+        var permissions = org.mockito.Mockito.mock(com.auraboot.framework.permission.service.UserPermissionService.class);
+        var catalog = org.mockito.Mockito.mock(com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.class);
+        org.mockito.Mockito.when(permissions.getUserPermissionCodes(7L)).thenReturn(java.util.Set.of("model.import.create", "unknown"));
+        var service = releaseService(mapper, permissions, catalog);
+        org.mockito.Mockito.when(catalog.menuTree(42L, "example")).thenAnswer(call -> releaseMenus(false, null));
+        assertFalse(service.hasMenuPermission(7L, "model.import.create", 42L));
+        assertFalse(service.hasMenuPermission(7L, "unknown", 42L));
+        ExtensionBean extension = new ExtensionBean();
+        extension.setDynamicProperty("authoringEnvironmentIds", List.of(12L));
+        org.mockito.Mockito.when(catalog.menuTree(42L, "example")).thenAnswer(call -> releaseMenus(true, extension));
+        try {
+            com.auraboot.framework.application.tenant.MetaContext.setEnvironmentId(10L);
+            assertFalse(service.hasMenuPermission(7L, "model.import.create", 42L));
+            com.auraboot.framework.application.tenant.MetaContext.setEnvironmentId(12L);
+            assertTrue(service.hasMenuPermission(7L, "model.import.create", 42L));
+        } finally { com.auraboot.framework.application.tenant.MetaContext.clear(); }
+    }
+
+    @Test
+    void legacyMenuPermissionRetainsSubjectRestriction() {
+        var mapper = org.mockito.Mockito.mock(com.auraboot.framework.menu.mapper.MenuMapper.class);
+        var permissions = org.mockito.Mockito.mock(com.auraboot.framework.permission.service.UserPermissionService.class);
+        var catalog = org.mockito.Mockito.mock(com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.class);
+        var service = releaseService(mapper, permissions, catalog);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "applicationRuntimePrimaryEnabled", false);
+        var subjects = org.mockito.Mockito.mock(com.auraboot.framework.permission.service.SubjectPermissionService.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "subjectPermissionService", subjects);
+        Menu menu = new Menu(); menu.setId(3L);
+        org.mockito.Mockito.when(mapper.findByPermissionCode("platform.read")).thenReturn(menu);
+        org.mockito.Mockito.when(permissions.hasPermission(7L, "platform.read")).thenReturn(true);
+        org.mockito.Mockito.when(subjects.evaluateVisibility("menu", 3L, 7L)).thenReturn(false, true);
+        assertFalse(service.hasMenuPermission(7L, "platform.read", 42L));
+        assertTrue(service.hasMenuPermission(7L, "platform.read", 42L));
+        org.mockito.Mockito.verifyNoInteractions(catalog);
+    }
+
     @Test
     void authorizedLeafRetainsNestedDirectoriesWithoutGrantingSiblingAccess() {
         Menu root = menu(1L, null, 0, "system_management");

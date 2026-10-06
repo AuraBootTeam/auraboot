@@ -1,0 +1,674 @@
+{
+  "recoveryPolicyReadFailed": {
+    "zh-CN": "无法读取企业恢复策略",
+    "en": "Unable to read the enterprise recovery policy"
+  },
+  "resumeNoPermission": {
+    "zh-CN": "当前账号无权恢复配置会话",
+    "en": "The current account is not allowed to restore the configuration session"
+  },
+  "resumeRestoreFailed": {
+    "zh-CN": "无法恢复返回的配置会话",
+    "en": "Unable to restore the returned configuration session"
+  },
+  "recoveryRestoredWithConflicts": {
+    "zh-CN": "已恢复页面中断前的 {remaining} 项本地变更；其中 {conflicts} 项与权威草稿冲突，需先完成 Base / Mine / Latest 裁决。",
+    "en": "Restored {remaining} local change(s) kept from before the page interruption; {conflicts} of them conflict with the authoritative draft and require Base / Mine / Latest adjudication first."
+  },
+  "recoveryPartiallyCommitted": {
+    "zh-CN": "页面中断后已由权威草稿确认 {committed} 项保存成功，并恢复 {remaining} 项未落服变更；请复核后重试。",
+    "en": "After the interruption the authoritative draft confirmed {committed} saved change(s) and restored {remaining} change(s) not yet persisted to the server; review and retry."
+  },
+  "recoveryRestoredPendingReview": {
+    "zh-CN": "已恢复页面中断前的 {remaining} 项本地变更，并确认尚未写入权威草稿；请复核后重试。",
+    "en": "Restored {remaining} local change(s) kept from before the page interruption and confirmed they are not in the authoritative draft yet; review and retry."
+  },
+  "recoveryAllCommitted": {
+    "zh-CN": "页面中断前的 {committed} 项变更已由权威草稿确认保存成功，未重复写入。",
+    "en": "{committed} change(s) from before the page interruption were confirmed saved by the authoritative draft without duplicate writes."
+  },
+  "recoveryDraftUnreadable": {
+    "zh-CN": "权威草稿暂不可读；本地恢复数据仍保留，请联网后重新对账",
+    "en": "The authoritative draft is temporarily unreadable; local recovery data is preserved. Reconnect and reconcile again"
+  },
+  "discardRecoveryConfirm": {
+    "zh-CN": "确定放弃此页面中断前保留的本地未保存变更吗？此操作无法撤销。",
+    "en": "Discard the local unsaved changes kept from before this page interruption? This action cannot be undone."
+  },
+  "enterAuthoringFailed": {
+    "zh-CN": "无法进入配置模式",
+    "en": "Unable to enter configuration mode"
+  },
+  "exitWithoutRecoveryConfirm": {
+    "zh-CN": "浏览器无法保留恢复副本，退出会丢失当前未保存变更。仍要退出吗？",
+    "en": "The browser cannot keep a recovery copy; exiting will lose the current unsaved changes. Exit anyway?"
+  },
+  "handoffFailed": {
+    "zh-CN": "无法移交到应用设计中心",
+    "en": "Unable to hand off to the application design center"
+  },
+  "manifestMissing": {
+    "zh-CN": "未找到 {blockType} 的能力清单，无法保存该变更",
+    "en": "No capability manifest found for {blockType}; this change cannot be saved"
+  },
+  "saveInterruptedWithConflictsCommitted": {
+    "zh-CN": "网络响应中断；已确认 {committed} 项保存成功，剩余变更需要冲突裁决。",
+    "en": "The network response was interrupted; {committed} change(s) confirmed saved and the remaining changes need conflict adjudication."
+  },
+  "saveInterruptedWithConflicts": {
+    "zh-CN": "网络响应中断；权威草稿包含并发变更，剩余变更需要冲突裁决。",
+    "en": "The network response was interrupted; the authoritative draft contains concurrent changes and the remaining changes need conflict adjudication."
+  },
+  "saveCompletedAfterInterrupt": {
+    "zh-CN": "保存已在服务端完成；响应虽中断，当前页面已按权威草稿恢复，未重复写入。",
+    "en": "Saving already completed on the server; although the response was interrupted, this page was restored from the authoritative draft without duplicate writes."
+  },
+  "saveResumingAfterInterrupt": {
+    "zh-CN": "响应中断后已确认 {committed} 项保存成功；正在从最新修订继续保存剩余 {remaining} 项。",
+    "en": "After the interrupted response, {committed} change(s) were confirmed saved; saving the remaining {remaining} change(s) continues from the latest revision."
+  },
+  "saveReconciledPartial": {
+    "zh-CN": "保存已在服务端完成：响应中断的 {reconciled} 项已由权威草稿确认，其余 {others} 项已从最新修订继续保存，未重复写入。",
+    "en": "Saving completed on the server: the {reconciled} change(s) from the interrupted response were confirmed by the authoritative draft, and the remaining {others} were saved continuing from the latest revision without duplicate writes."
+  },
+  "saveReconciledAll": {
+    "zh-CN": "保存已在服务端完成：网络响应中断后已确认 {count} 项成功；当前页面已按最新修订恢复，未重复写入。",
+    "en": "Saving completed on the server: {count} change(s) were confirmed after the network interruption; this page was restored to the latest revision without duplicate writes."
+  },
+  "saveReconciledRemaining": {
+    "zh-CN": "已确认 {count} 项在服务端保存成功；{remaining} 项仍保留在本地。",
+    "en": "{count} change(s) confirmed saved on the server; {remaining} change(s) remain stored locally."
+  },
+  "saveFailedKeepLocal": {
+    "zh-CN": "{message}；本地未保存变更已保留",
+    "en": "{message}; local unsaved changes are preserved"
+  },
+  "saveFailedKeepLocalGeneric": {
+    "zh-CN": "保存失败；本地未保存变更已保留",
+    "en": "Save failed; local unsaved changes are preserved"
+  },
+  "refreshDraftFailed": {
+    "zh-CN": "无法刷新配置草稿",
+    "en": "Unable to refresh the configuration draft"
+  },
+  "submitReviewFailed": {
+    "zh-CN": "无法提交评审",
+    "en": "Unable to submit for review"
+  },
+  "governanceResumeFailed": {
+    "zh-CN": "无法恢复 ChangeSet 编辑",
+    "en": "Unable to resume ChangeSet editing"
+  },
+  "leaseTakeoverCompleted": {
+    "zh-CN": "接管已在服务端完成，当前页面已恢复编辑；本地内容未被覆盖。",
+    "en": "The takeover completed on the server and this page is editable again; local content was not overwritten."
+  },
+  "leaseTakeoverLost": {
+    "zh-CN": "编辑权刚被另一会话取得，已刷新为只读；当前页面未被覆盖。",
+    "en": "Edit authority was just taken by another session and the view refreshed to read-only; this page was not overwritten."
+  },
+  "enteringConfiguration": {
+    "zh-CN": "正在进入配置模式…",
+    "en": "Opening configuration…"
+  },
+  "retryPolicyAndConfigure": {
+    "zh-CN": "重试安全策略并配置",
+    "en": "Retry configuration policy"
+  },
+  "configurePage": {
+    "zh-CN": "配置此页",
+    "en": "Configure page"
+  },
+  "loadingRecoveryPolicy": {
+    "zh-CN": "正在读取恢复策略…",
+    "en": "Loading recovery policy…"
+  },
+  "localRecoveryFoundTitle": {
+    "zh-CN": "发现页面中断前保留的本地变更",
+    "en": "Local changes kept from before the page interruption were found"
+  },
+  "localRecoveryFoundBody": {
+    "zh-CN": "先读取权威草稿并对账，再决定继续保存；恢复过程不会自动重放写请求。",
+    "en": "The authoritative draft is read and reconciled first before deciding to continue saving; recovery never replays write requests automatically."
+  },
+  "localRecoveryMultipleCandidates": {
+    "zh-CN": "本设备发现 {count} 个独立会话候选；当前只处理最新一项，绝不自动合并或覆盖其他会话。",
+    "en": "{count} independent session candidates were found on this device; only the newest one is handled now, and other sessions are never merged or overwritten automatically."
+  },
+  "restoringDraft": {
+    "zh-CN": "正在读取权威草稿…",
+    "en": "Reading the authoritative draft…"
+  },
+  "restoreAndReconcile": {
+    "zh-CN": "恢复并对账",
+    "en": "Restore and reconcile"
+  },
+  "discardLocalRecovery": {
+    "zh-CN": "放弃本地恢复",
+    "en": "Discard local recovery"
+  },
+  "recoveryPolicyPendingNotice": {
+    "zh-CN": "{message}；在策略可确认前不会保存任何恢复副本，也不会进入配置模式。",
+    "en": "{message}; no recovery copy is saved and configuration mode stays closed until the policy can be confirmed."
+  },
+  "newPageExplainTitle": {
+    "zh-CN": "在应用设计中心创建页面",
+    "en": "Create a page in the application design center"
+  },
+  "newPageExplainReason": {
+    "zh-CN": "新页面会改变页面树、路由和发布资源，不属于当前页面的局部展示调整。",
+    "en": "A new page changes the page tree, routes and published resources; it is not a local adjustment of the current page."
+  },
+  "writeBlockedNotice": {
+    "zh-CN": "已拦截真实业务写入；交互预览只保留本地状态。",
+    "en": "Real business writes were intercepted; interaction preview keeps state locally only."
+  },
+  "permissionRevokedNotice": {
+    "zh-CN": "配置权限已收回，当前会话已即时转为只读。浏览器中的未保存差异仍会保留，但不会保存、提交或移交；可退出配置模式，或在权限恢复后继续。",
+    "en": "Configuration permission was revoked and this session immediately became read-only. Unsaved differences in the browser are preserved but will not be saved, submitted or handed off; exit configuration mode or continue after permission is restored."
+  },
+  "conflictMustAdjudicateTitle": {
+    "zh-CN": "并发变更必须在应用设计中心裁决",
+    "en": "Concurrent changes must be adjudicated in the application design center"
+  },
+  "conflictDetail": {
+    "zh-CN": "Base r{baseRevision} / Latest r{latestRevision}；已保留 {pendingCount} 项 Mine。原地配置不会刷新后直接覆盖 Latest。",
+    "en": "Base r{baseRevision} / Latest r{latestRevision}; {pendingCount} Mine change(s) kept. In-place configuration never overwrites Latest by refreshing directly."
+  },
+  "viewConflictResolution": {
+    "zh-CN": "查看 Base / Mine / Latest",
+    "en": "View Base / Mine / Latest"
+  },
+  "closeSidePanels": {
+    "zh-CN": "关闭侧栏",
+    "en": "Close side panels"
+  },
+  "enterStudioTitle": {
+    "zh-CN": "进入应用设计中心",
+    "en": "Enter the application design center"
+  },
+  "configurationMode": {
+    "zh-CN": "配置模式",
+    "en": "Configuration mode"
+  },
+  "isolatedChangeSetSubtitle": {
+    "zh-CN": "安全编辑写入隔离 ChangeSet；不会写入业务数据",
+    "en": "Safe edits write into an isolated ChangeSet; business data is never written"
+  },
+  "outline": {
+    "zh-CN": "大纲",
+    "en": "Outline"
+  },
+  "modeSelect": {
+    "zh-CN": "选择",
+    "en": "Select"
+  },
+  "modeInteractPreview": {
+    "zh-CN": "交互预览",
+    "en": "Interaction preview"
+  },
+  "altTemporarySwitch": {
+    "zh-CN": "Alt 临时切换",
+    "en": "Alt temporary switch"
+  },
+  "roleStructurePreview": {
+    "zh-CN": "角色结构预览",
+    "en": "Role structure preview"
+  },
+  "currentRoleStructure": {
+    "zh-CN": "当前角色结构",
+    "en": "Current role structure"
+  },
+  "newPageMenu": {
+    "zh-CN": "新页面 / 菜单",
+    "en": "New page / menu"
+  },
+  "properties": {
+    "zh-CN": "属性",
+    "en": "Properties"
+  },
+  "exit": {
+    "zh-CN": "退出",
+    "en": "Exit"
+  },
+  "pageOutline": {
+    "zh-CN": "页面大纲",
+    "en": "Page outline"
+  },
+  "propertyInspector": {
+    "zh-CN": "属性检查器",
+    "en": "Property inspector"
+  },
+  "currentObject": {
+    "zh-CN": "当前对象",
+    "en": "Current object"
+  },
+  "statusRisk": {
+    "zh-CN": "风险",
+    "en": "Risk"
+  },
+  "statusPublish": {
+    "zh-CN": "发布",
+    "en": "Publish"
+  },
+  "statusValidation": {
+    "zh-CN": "校验",
+    "en": "Validation"
+  },
+  "statusRevision": {
+    "zh-CN": "修订",
+    "en": "Revision"
+  },
+  "capabilityListNotice": {
+    "zh-CN": "下列能力来自服务端可信清单；就地修改先保存在浏览器，点击“保存”后仅写入隔离 ChangeSet。",
+    "en": "The capabilities below come from a server-trusted manifest; in-place edits are staged in the browser first, and only an isolated ChangeSet is written after clicking “Save”."
+  },
+  "configurableProperties": {
+    "zh-CN": "可配置属性",
+    "en": "Configurable properties"
+  },
+  "noInlineCapabilityNotice": {
+    "zh-CN": "此对象未声明现场配置能力，默认进入应用设计中心。",
+    "en": "This object declares no in-place configuration capability and goes to the application design center by default."
+  },
+  "advancedSettings": {
+    "zh-CN": "高级设置",
+    "en": "Advanced settings"
+  },
+  "advancedSettingsArrow": {
+    "zh-CN": "高级设置 ↗",
+    "en": "Advanced settings ↗"
+  },
+  "roleReviewSuffix": {
+    "zh-CN": " · 保存后需角色复核",
+    "en": " · Role review required after save"
+  },
+  "notSet": {
+    "zh-CN": "未设置",
+    "en": "Not set"
+  },
+  "booleanTrue": {
+    "zh-CN": "显示 / 是",
+    "en": "Show / Yes"
+  },
+  "booleanFalse": {
+    "zh-CN": "隐藏 / 否",
+    "en": "Hide / No"
+  },
+  "reset": {
+    "zh-CN": "重置",
+    "en": "Reset"
+  },
+  "jsonFormatHint": {
+    "zh-CN": "JSON 格式；无效输入不会进入待保存变更。",
+    "en": "JSON format; invalid input never enters the pending changes."
+  },
+  "submitForReview": {
+    "zh-CN": "提交评审",
+    "en": "Submit for review"
+  },
+  "retryImpactAnalysis": {
+    "zh-CN": "重试影响分析",
+    "en": "Retry impact analysis"
+  },
+  "validationAndImpact": {
+    "zh-CN": "校验与影响分析",
+    "en": "Validation and impact analysis"
+  },
+  "unsavedCount": {
+    "zh-CN": "{count} 项未保存",
+    "en": "{count} unsaved"
+  },
+  "draftChangesCount": {
+    "zh-CN": "{count} 项草稿变更",
+    "en": "{count} draft changes"
+  },
+  "validationErrorCount": {
+    "zh-CN": "{count} 个校验错误",
+    "en": "{count} validation errors"
+  },
+  "refreshBaselineKeepLocal": {
+    "zh-CN": "刷新基线并保留本地变更",
+    "en": "Refresh baseline and keep local changes"
+  },
+  "diff": {
+    "zh-CN": "差异",
+    "en": "Diff"
+  },
+  "saving": {
+    "zh-CN": "保存中…",
+    "en": "Saving…"
+  },
+  "save": {
+    "zh-CN": "保存",
+    "en": "Save"
+  },
+  "livePreview": {
+    "zh-CN": "实时预览",
+    "en": "Live preview"
+  },
+  "submitting": {
+    "zh-CN": "提交中…",
+    "en": "Submitting…"
+  },
+  "analyzing": {
+    "zh-CN": "分析中…",
+    "en": "Analyzing…"
+  },
+  "readOnlyPermissionRevoked": {
+    "zh-CN": "权限已收回，当前只读",
+    "en": "Permission revoked; read-only"
+  },
+  "readOnlyConflictPending": {
+    "zh-CN": "并发冲突待专业裁决",
+    "en": "Concurrent conflict pending specialist adjudication"
+  },
+  "leaseExpired": {
+    "zh-CN": "编辑租约已过期",
+    "en": "Writer lease expired"
+  },
+  "readOnlyLeaseHeldElsewhere": {
+    "zh-CN": "编辑权由其他会话持有",
+    "en": "Edit authority held by another session"
+  },
+  "readOnlyFrozen": {
+    "zh-CN": "已冻结，当前只读",
+    "en": "Frozen; read-only"
+  },
+  "pendingDiffTitle": {
+    "zh-CN": "待保存差异",
+    "en": "Pending changes"
+  },
+  "pendingDiffSubtitle": {
+    "zh-CN": "仅展示当前浏览器尚未写入 ChangeSet 的变更。",
+    "en": "Only changes this browser has not written into the ChangeSet yet."
+  },
+  "closeDiff": {
+    "zh-CN": "关闭差异",
+    "en": "Close pending changes"
+  },
+  "beforeLabel": {
+    "zh-CN": "之前",
+    "en": "Before"
+  },
+  "afterLabel": {
+    "zh-CN": "之后",
+    "en": "After"
+  },
+  "noPendingChanges": {
+    "zh-CN": "没有待保存变更",
+    "en": "No pending changes"
+  },
+  "backToConfiguration": {
+    "zh-CN": "返回配置",
+    "en": "Back to configuration"
+  },
+  "targetObject": {
+    "zh-CN": "目标对象：",
+    "en": "Target object: "
+  },
+  "carriedContent": {
+    "zh-CN": "携带内容：",
+    "en": "Carried content: "
+  },
+  "carriedContentValue": {
+    "zh-CN": "当前 ChangeSet、选择对象、返回位置",
+    "en": "current ChangeSet, selected object and return location"
+  },
+  "safetyMethod": {
+    "zh-CN": "安全方式：",
+    "en": "Safety method: "
+  },
+  "safetyMethodValue": {
+    "zh-CN": "10 分钟、本人/本租户/本环境绑定、一次性 contextId",
+    "en": "10 minutes, bound to the actor/tenant/environment, one-time contextId"
+  },
+  "urlPrivacyNote": {
+    "zh-CN": "URL 不包含 pagePid、recordPid 或业务筛选；应用设计中心会重新检查权限。",
+    "en": "The URL contains no pagePid, recordPid or business filters; the application design center re-checks permissions."
+  },
+  "cancel": {
+    "zh-CN": "取消",
+    "en": "Cancel"
+  },
+  "establishingContext": {
+    "zh-CN": "正在建立安全上下文…",
+    "en": "Establishing a secure context…"
+  },
+  "continueToStudio": {
+    "zh-CN": "继续到应用设计中心",
+    "en": "Continue to the application design center"
+  },
+  "closePanelTitle": {
+    "zh-CN": "关闭{title}",
+    "en": "Close {title}"
+  },
+  "objectTypePage": {
+    "zh-CN": "页面",
+    "en": "Page"
+  },
+  "objectTypeList": {
+    "zh-CN": "列表",
+    "en": "List"
+  },
+  "objectTypeTable": {
+    "zh-CN": "表格",
+    "en": "Table"
+  },
+  "objectTypeForm": {
+    "zh-CN": "表单",
+    "en": "Form"
+  },
+  "objectTypeDetail": {
+    "zh-CN": "详情",
+    "en": "Detail"
+  },
+  "objectTypeColumn": {
+    "zh-CN": "字段列",
+    "en": "Column"
+  },
+  "objectTypeField": {
+    "zh-CN": "字段",
+    "en": "Field"
+  },
+  "objectTypeAction": {
+    "zh-CN": "动作",
+    "en": "Action"
+  },
+  "objectTypeDefault": {
+    "zh-CN": "页面对象",
+    "en": "Page object"
+  },
+  "defaultPageLabel": {
+    "zh-CN": "页面",
+    "en": "Page"
+  },
+  "blockTypeTable": {
+    "zh-CN": "表格",
+    "en": "Table"
+  },
+  "blockTypeList": {
+    "zh-CN": "列表",
+    "en": "List"
+  },
+  "blockTypeFilters": {
+    "zh-CN": "筛选区",
+    "en": "Filter area"
+  },
+  "blockTypeToolbar": {
+    "zh-CN": "操作栏",
+    "en": "Toolbar"
+  },
+  "blockTypeForm": {
+    "zh-CN": "表单",
+    "en": "Form"
+  },
+  "blockTypeFormSection": {
+    "zh-CN": "表单分组",
+    "en": "Form group"
+  },
+  "blockTypeDetailSection": {
+    "zh-CN": "详情分组",
+    "en": "Detail group"
+  },
+  "blockTypeChart": {
+    "zh-CN": "图表",
+    "en": "Chart"
+  },
+  "blockTypeTabs": {
+    "zh-CN": "标签页",
+    "en": "Tabs"
+  },
+  "blockTypeDescription": {
+    "zh-CN": "说明",
+    "en": "Description"
+  },
+  "blockTypeRichText": {
+    "zh-CN": "富文本",
+    "en": "Rich text"
+  },
+  "handoffPropertyReason": {
+    "zh-CN": "属性 {propertyPath} 涉及 {effectTags}，需要依赖分析和专业发布治理。",
+    "en": "Property {propertyPath} involves {effectTags} and requires dependency analysis and specialist release governance."
+  },
+  "effectTagsBusinessSemantics": {
+    "zh-CN": "业务语义",
+    "en": "business semantics"
+  },
+  "handoffPageReason": {
+    "zh-CN": "页面级结构、路由和资源关系需要在应用设计中心统一治理。",
+    "en": "Page-level structure, routes and resource relationships need unified governance in the application design center."
+  },
+  "handoffNoInlineReason": {
+    "zh-CN": "此对象未声明可安全就地写入的属性，系统不会猜测影响范围。",
+    "en": "This object declares no property that is safe to write in place; the system never guesses the impact scope."
+  },
+  "routeInline": {
+    "zh-CN": "可就地配置",
+    "en": "Configurable in place"
+  },
+  "routeGuidedInline": {
+    "zh-CN": "引导式配置",
+    "en": "Guided configuration"
+  },
+  "routeHandoffStudio": {
+    "zh-CN": "应用设计中心",
+    "en": "Application design center"
+  },
+  "routeDeny": {
+    "zh-CN": "禁止",
+    "en": "Denied"
+  },
+  "publishDirectAllowed": {
+    "zh-CN": "可直发",
+    "en": "Direct publish"
+  },
+  "publishDefaultReview": {
+    "zh-CN": "默认评审",
+    "en": "Review by default"
+  },
+  "publishRequiredReview": {
+    "zh-CN": "必须评审",
+    "en": "Review required"
+  },
+  "publishStudioApproval": {
+    "zh-CN": "专项审批",
+    "en": "Special approval"
+  },
+  "publishDenied": {
+    "zh-CN": "禁止",
+    "en": "Denied"
+  },
+  "authorityChangeSetState": {
+    "zh-CN": "ChangeSet 已进入 {state} 状态",
+    "en": "the ChangeSet entered the {state} state"
+  },
+  "authorityLeaseTransferred": {
+    "zh-CN": "编辑权已转移到其他会话",
+    "en": "edit authority moved to another session"
+  },
+  "authorityChangedPartial": {
+    "zh-CN": "响应中断后已确认 {committed} 项保存成功；{authority}，剩余 {remaining} 项保留在本地且未重放。",
+    "en": "After the interrupted response, {committed} change(s) were confirmed saved; {authority}, and the remaining {remaining} change(s) stay local without replay."
+  },
+  "authorityChangedCompleted": {
+    "zh-CN": "保存已在服务端完成；{authority}，当前页面已按权威草稿恢复为只读。",
+    "en": "Saving completed on the server; {authority}, and this page was restored to read-only from the authoritative draft."
+  },
+  "authorityChangedIncomplete": {
+    "zh-CN": "保存未完成；{authority}，本地未保存变更已保留且未重放。",
+    "en": "Saving did not complete; {authority}, and local unsaved changes are preserved without replay."
+  },
+  "permissionRevokedPartial": {
+    "zh-CN": "配置权限已收回；已确认 {saved} 项保存成功，剩余 {remaining} 项保留在本地且未重放。",
+    "en": "Configuration permission was revoked; {saved} change(s) confirmed saved and the remaining {remaining} change(s) stay local without replay."
+  },
+  "permissionRevokedCompleted": {
+    "zh-CN": "保存已在服务端完成；配置权限已收回，当前页面已按权威草稿恢复为只读。",
+    "en": "Saving completed on the server; configuration permission was revoked and this page was restored to read-only from the authoritative draft."
+  },
+  "permissionRevokedIncomplete": {
+    "zh-CN": "保存未完成；配置权限已收回，本地未保存变更已保留且未重放。权限恢复后可继续对账，或先退出配置模式。",
+    "en": "Saving did not complete; configuration permission was revoked and local unsaved changes are preserved without replay. Reconcile after permission is restored, or exit configuration mode first."
+  },
+  "propTitle": {
+    "zh-CN": "标题",
+    "en": "Title"
+  },
+  "propLayoutSpan": {
+    "zh-CN": "布局跨度",
+    "en": "Layout span"
+  },
+  "propDisplayName": {
+    "zh-CN": "显示名称",
+    "en": "Display name"
+  },
+  "propVisible": {
+    "zh-CN": "是否显示",
+    "en": "Visible"
+  },
+  "propIcon": {
+    "zh-CN": "图标",
+    "en": "Icon"
+  },
+  "propVariant": {
+    "zh-CN": "按钮样式",
+    "en": "Button variant"
+  },
+  "propDensity": {
+    "zh-CN": "表格密度",
+    "en": "Table density"
+  },
+  "propPageSize": {
+    "zh-CN": "每页条数",
+    "en": "Rows per page"
+  },
+  "propDefaultSort": {
+    "zh-CN": "默认排序",
+    "en": "Default sort"
+  },
+  "propDefaultFilter": {
+    "zh-CN": "默认筛选",
+    "en": "Default filter"
+  },
+  "propContent": {
+    "zh-CN": "内容",
+    "en": "Content"
+  },
+  "propHeight": {
+    "zh-CN": "高度",
+    "en": "Height"
+  },
+  "propDefaultTab": {
+    "zh-CN": "默认标签页",
+    "en": "Default tab"
+  },
+  "diffValueUnset": {
+    "zh-CN": "（未设置）",
+    "en": "(not set)"
+  },
+  "diffValueEmptyString": {
+    "zh-CN": "（空字符串）",
+    "en": "(empty string)"
+  }
+}

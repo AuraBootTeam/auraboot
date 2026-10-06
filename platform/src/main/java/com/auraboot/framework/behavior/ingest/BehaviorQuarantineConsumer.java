@@ -1,6 +1,7 @@
 package com.auraboot.framework.behavior.ingest;
 
 import com.auraboot.framework.behavior.dto.BehaviorEventInput;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.behavior.entity.BehaviorQuarantine;
 import com.auraboot.framework.behavior.mapper.BehaviorQuarantineMapper;
 import com.auraboot.framework.infrastructure.mq.MqProvider;
@@ -72,6 +73,12 @@ public class BehaviorQuarantineConsumer {
     }
 
     void onMessage(String topic, String body, Map<String, String> headers) {
+        // MQ consumer seam runs without MetaContext; envelope carries the tenant
+        // explicitly (tenant-exemption cleanup W3).
+        MetaContext.runWithoutTenantFilter(() -> onMessageScoped(topic, body, headers));
+    }
+
+    void onMessageScoped(String topic, String body, Map<String, String> headers) {
         BehaviorQuarantineEnvelope env;
         try {
             env = objectMapper.readValue(body, BehaviorQuarantineEnvelope.class);

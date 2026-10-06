@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import hashlib
+import hmac
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -40,6 +42,16 @@ class TestAuraBootHookConnection:
         conn = _make_conn(host="https://auraboot.example.com")
         with patch.object(hook, "get_connection", return_value=conn):
             assert hook._get_base_url() == "https://auraboot.example.com"
+
+    def test_scheme_less_host_defaults_to_https_and_caches_the_connection(self):
+        hook = AuraBootHook("auraboot_test")
+        conn = _make_conn(host="auraboot.example.com/")
+        conn.extra = ""
+        conn.extra_dejson = {}
+        with patch.object(hook, "get_connection", return_value=conn) as get_connection:
+            assert hook._get_base_url() == "https://auraboot.example.com"
+            assert hook.get_conn() is conn
+            assert get_connection.call_count == 1
 
     def test_base_url_strips_trailing_slash(self):
         hook = AuraBootHook("auraboot_test")
@@ -172,6 +184,49 @@ class TestAuraBootHookRun:
         with patch.object(hook, "get_connection", return_value=conn):
             result = hook.run("POST", "/api/connector/sync-runs", {})
         assert result == {}
+
+    @responses_lib.activate
+    @pytest.mark.parametrize("body", [None, {}, {"message": "审批 é", "amount": 12.5}])
+    def test_hmac_auth_signs_the_exact_wire_body(self, body):
+        hook = AuraBootHook("auraboot_test")
+        conn = _make_conn(extra={"auth_method": "hmac", "hmac_secret": "fixture-secret"})
+        responses_lib.add(responses_lib.POST, "https://auraboot.example.com/api/webhooks",
+                          json={"accepted": True}, status=200)
+        with patch.object(hook, "get_connection", return_value=conn), patch(
+            "airflow_provider_auraboot.webhooks.sign.time.time", return_value=1700000000
+        ):
+            assert hook.run("post", "/api/webhooks", body, idempotency_key="fixture-id") == {"accepted": True}
+        request = responses_lib.calls[0].request
+        wire_body = request.body or b""
+        if isinstance(wire_body, str):
+            wire_body = wire_body.encode("utf-8")
+        expected = hmac.new(b"fixture-secret", b"1700000000." + wire_body, hashlib.sha256).hexdigest()
+        assert request.headers.get("X-AuraBoot-Signature") == f"t=1700000000,v1={expected}"
+        assert request.headers["X-Idempotency-Key"] == "fixture-id"
+        assert request.headers["Content-Type"] == "application/json"
+        assert "Authorization" not in request.headers
+        if body is not None:
+            assert json.loads(wire_body) == body
+
+    @responses_lib.activate
+    def test_hmac_auth_requires_a_secret_before_sending(self):
+        hook = AuraBootHook("auraboot_test")
+        conn = _make_conn(extra={"auth_method": "hmac"})
+        with patch.object(hook, "get_connection", return_value=conn):
+            with pytest.raises(ValueError, match="hmac_secret"):
+                hook.run("POST", "/api/webhooks", {})
+        assert len(responses_lib.calls) == 0
+
+    def test_missing_connection_extras_fail_with_a_clear_auth_error(self):
+        hook = AuraBootHook("auraboot_test")
+        conn = _make_conn()
+        conn.extra = ""
+        conn.extra_dejson = {}
+        with patch.object(hook, "get_connection", return_value=conn):
+            with pytest.raises(ValueError, match="jwt_token"):
+                hook._get_auth_headers()
+            with pytest.raises(ValueError, match="hmac_secret"):
+                hook.sign_webhook_body(b"body")
 
 
 # ---------------------------------------------------------------------------

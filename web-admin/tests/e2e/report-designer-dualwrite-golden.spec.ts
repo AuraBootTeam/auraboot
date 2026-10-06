@@ -1,6 +1,6 @@
 /** Report definition save/read integration; replaces the retired dual-write contract. */
 import { readFile, writeFile } from 'node:fs/promises';
-import { expect, test } from '../../tests/fixtures';
+import { expect, test } from '../fixtures';
 
 test.use({
   storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
@@ -20,7 +20,7 @@ test('report menu supports save, reopen, version rollback and canonical JSON dow
   await expect(entry).toBeVisible();
   await entry.click();
   await page.getByRole('button', { name: /新建报表|New report/ }).click();
-  await expect(page.getByTestId('report-canvas')).toBeVisible();
+  await expect(page.getByRole('main').getByTestId('report-canvas')).toBeVisible();
   const title = `Analytics report ${Date.now()}`;
   await page.getByPlaceholder('报表标题').fill(title);
   await expect(page.getByPlaceholder('报表标题')).toHaveValue(title);
@@ -37,9 +37,9 @@ test('report menu supports save, reopen, version rollback and canonical JSON dow
   await page.getByRole('button', { name: '取消', exact: true }).click();
   await expect(page.getByRole('heading', { name: '页面设置' })).toHaveCount(0);
 
-  await page.getByRole('button', { name: /Rich Text/ }).click();
-  await page.getByPlaceholder('Enter text content...').fill('Original analysis conclusion');
-  await expect(page.getByTestId('report-canvas')).toContainText('Original analysis conclusion');
+  await page.getByRole('button', { name: /富文本|Rich Text/ }).click();
+  await page.getByPlaceholder(/^(输入文本内容…|Enter text content\.\.\.)$/).fill('Original analysis conclusion');
+  await expect(page.getByRole('main').getByTestId('report-canvas')).toContainText('Original analysis conclusion');
   const pageWrites: string[] = [];
   page.on('request', (request) => {
     if (
@@ -84,7 +84,7 @@ test('report menu supports save, reopen, version rollback and canonical JSON dow
     .getByTestId('report-canvas')
     .getByText('Original analysis conclusion', { exact: true })
     .click();
-  await page.getByPlaceholder('Enter text content...').fill('Revised analysis conclusion');
+  await page.getByPlaceholder(/^(输入文本内容…|Enter text content\.\.\.)$/).fill('Revised analysis conclusion');
   const updatedResponse = page.waitForResponse(
     (r) =>
       r.request().method() === 'PUT' &&
@@ -130,7 +130,7 @@ test('report menu supports save, reopen, version rollback and canonical JSON dow
   });
   await page.getByRole('button', { name: '返回当前报表', exact: true }).click();
   await expect(page.getByPlaceholder('报表标题')).toHaveValue(`${title} unsaved`);
-  await expect(page.getByTestId('report-canvas')).toContainText('Revised analysis conclusion');
+  await expect(page.getByRole('main').getByTestId('report-canvas')).toContainText('Revised analysis conclusion');
   await page.getByRole('button', { name: /^v1\b/ }).click();
   await page.getByRole('button', { name: /^(回滚|Rollback)$/ }).click();
   const rollbackResponse = page.waitForResponse(
@@ -168,6 +168,20 @@ test('report menu previews and exports the same filtered model rows', async ({ p
   const { executeCommandViaApi } = await import('./helpers');
   const title = `ReportData${Date.now()}`;
   const orderTitle = `${title} Order`;
+  // The order references its customer by name; the referenced row must exist
+  // before the order command (runtime reference existence validation).
+  await executeCommandViaApi(
+    page,
+    'e2et:create_customer',
+    {
+      e2et_cust_code: `${title}-CUST`,
+      e2et_cust_name: 'Report Export Customer',
+      e2et_cust_region: 'south',
+      e2et_cust_active: true,
+    },
+    undefined,
+    'create',
+  );
   const createdOrder = await executeCommandViaApi(
     page,
     'e2et:create_order',
@@ -294,6 +308,20 @@ test('report export API applies declared model parameters and rejects missing re
   const { executeCommandViaApi } = await import('./helpers');
   const title = `ReportParams${Date.now()}`;
   for (const suffix of ['A', 'B']) {
+    // Referenced customer must exist before the order command (runtime
+    // reference existence validation).
+    await executeCommandViaApi(
+      page,
+      'e2et:create_customer',
+      {
+        e2et_cust_code: `${title}-CUST-${suffix}`,
+        e2et_cust_name: `Customer ${suffix}`,
+        e2et_cust_region: 'south',
+        e2et_cust_active: true,
+      },
+      undefined,
+      'create',
+    );
     const created = await executeCommandViaApi(
       page,
       'e2et:create_order',
@@ -442,6 +470,20 @@ test('report exports all 201 matching records and rejects an undersized export l
   const { executeCommandViaApi } = await import('./helpers');
   const title = `ReportRows${Date.now()}`;
   const titles = Array.from({ length: 201 }, (_, i) => `${title}-${String(i).padStart(3, '0')}`);
+  // All 201 orders reference the same customer by name; create it first
+  // (runtime reference existence validation).
+  await executeCommandViaApi(
+    page,
+    'e2et:create_customer',
+    {
+      e2et_cust_code: `${title}-CUST`,
+      e2et_cust_name: title,
+      e2et_cust_region: 'south',
+      e2et_cust_active: true,
+    },
+    undefined,
+    'create',
+  );
   for (let offset = 0; offset < titles.length; offset += 4) {
     await Promise.all(
       titles.slice(offset, offset + 4).map(async (orderTitle) => {

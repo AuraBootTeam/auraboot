@@ -39,6 +39,7 @@ import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { uniqueId } from '../helpers';
 import { HeaderPage } from '../../pages/HeaderPage';
 import { BASE_URL } from '../../helpers/environments';
+import { loginViaUI as bootstrapProfileSession } from '../../helpers/auth-fixtures';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -712,32 +713,93 @@ test.describe('User Profile', () => {
     await expect(page.locator('[data-testid="profile-edit-btn"]')).toBeVisible({ timeout: 5000 });
   });
 
-  test('PRF-005: should update nickname successfully', async ({ page }) => {
-    await page.goto('/personal/profile', { waitUntil: 'load' });
-    await expect(page.locator('h1:has-text("个人资料")')).toBeVisible({ timeout: 10000 });
-    const editBtn = page.locator('[data-testid="profile-edit-btn"]');
-    await expect(editBtn).toBeVisible({ timeout: 5000 });
-
-    await editBtn.click();
-    const nickInput = page.locator('input[name="nickName"]');
+  test('PRF-005: should update nickname successfully', async ({ page, browser, baseURL }) => {
+    const roleCode = `profile_${TEST_PREFIX}`.replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 60);
+    const email = `${roleCode.toLowerCase()}@e2e-test.local`;
+    const password = 'Test2026x';
+    const role = await page.request.post('/api/roles', {
+      data: {
+        code: roleCode,
+        name: `Profile ${TEST_PREFIX}`,
+        type: 'custom',
+        status: 'active',
+        scopeType: 'tenant',
+      },
+    });
+    expect(role.status()).toBe(200);
+    expect(String((await role.json()).code)).toBe('0');
+    const provision = await page.request.post('/api/admin/users', {
+      data: {
+        email,
+        displayName: `Profile ${TEST_PREFIX}`,
+        initialPassword: password,
+        roleCodes: [roleCode],
+        sendInviteEmail: false,
+      },
+    });
+    expect(provision.status()).toBe(200);
+    expect(String((await provision.json()).code)).toBe('0');
+    const context = await browser.newContext({
+      baseURL,
+      locale: 'zh-CN',
+      viewport: { width: 1280, height: 1000 },
+      storageState: { cookies: [], origins: [] },
+    });
+    const ownPage = await context.newPage();
     try {
-      await expect(nickInput).toBeVisible({ timeout: 2000 });
-    } catch {
-      await editBtn.click();
+      await bootstrapProfileSession(ownPage, email, password);
+      await expect(ownPage.locator('header[data-hydrated]')).toHaveAttribute(
+        'data-hydrated',
+        'true',
+      );
+      await ownPage.getByTestId('user-menu').locator(':scope > button').click();
+      const profileLink = ownPage.getByTestId('profile-link');
+      await expect(profileLink).toBeVisible();
+      await ownPage.screenshot({
+        path: test.info().outputPath('PRF-005-menu.png'),
+        fullPage: true,
+      });
+      await profileLink.click();
+      await expect(ownPage).toHaveURL(/\/personal\/profile$/);
+      await expect(ownPage.getByRole('heading', { name: '个人资料', exact: true })).toBeVisible();
+      await ownPage.getByTestId('profile-edit-btn').click();
+      const nickInput = ownPage.locator('input[name="nickName"]');
+      await expect(nickInput).toBeVisible();
+      const newNickname = `Profile edited ${TEST_PREFIX}`;
+      await nickInput.fill(newNickname);
+      const saved = ownPage.waitForResponse(
+        (r) =>
+          new URL(r.url()).pathname.startsWith('/personal/profile') &&
+          r.request().method() === 'POST',
+      );
+      await ownPage.getByTestId('profile-save-btn').click();
+      expect((await saved).status()).toBe(200);
+      await expect(ownPage.getByTestId('profile-edit-btn')).toBeVisible();
+      const detail = await ownPage.request.get('/api/user/profile');
+      expect(detail.status()).toBe(200);
+      const persisted = await detail.json();
+      expect(String(persisted.code)).toBe('0');
+      expect(persisted.data.nickName).toBe(newNickname);
+      await ownPage.reload();
+      await expect(
+        ownPage.getByText('昵称', { exact: true }).locator('..').locator('p'),
+      ).toHaveText(newNickname);
+      const emailValue = ownPage.getByText('邮箱', { exact: true }).locator('..').locator('p');
+      await expect(emailValue).toHaveText(email);
+      expect(await emailValue.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+      const registeredAt = ownPage
+        .getByText('注册时间', { exact: true })
+        .locator('..')
+        .locator('p');
+      if (persisted.data.createdAt == null) await expect(registeredAt).toHaveText('未设置');
+      else await expect(registeredAt).not.toContainText('1970');
+      await ownPage.screenshot({
+        path: test.info().outputPath('PRF-005-saved.png'),
+        fullPage: true,
+      });
+    } finally {
+      await context.close();
     }
-    await expect(nickInput).toBeVisible({ timeout: 10000 });
-
-    const newNickname = `Admin ${TEST_PREFIX}`;
-    await page.locator('input[name="nickName"]').fill(newNickname);
-
-    // Profile uses React Router Form (POST to same route, not a separate API PUT)
-    await page.locator('[data-testid="profile-save-btn"]').click();
-
-    // Should revert to view mode after update
-    await expect(page.locator('[data-testid="profile-edit-btn"]')).toBeVisible({ timeout: 10000 });
-
-    // Nickname should be updated in view
-    await expect(page.getByText(newNickname)).toBeVisible();
   });
 
   test('PRF-006: should hide self-service password settings', async ({ page }) => {
@@ -752,7 +814,9 @@ test.describe('User Profile', () => {
     await page.goto('/personal/profile', { waitUntil: 'load' });
     await expect(page.locator('h1:has-text("个人资料")')).toBeVisible({ timeout: 10000 });
 
-    await expect(page.getByText('Social Account Binding')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /^(社交账号绑定|Social Account Binding)$/ }),
+    ).toBeVisible();
     await expect(page.locator('[data-testid="profile-social-links-link"]')).toBeVisible();
   });
 
@@ -760,7 +824,9 @@ test.describe('User Profile', () => {
     await page.goto('/personal/profile', { waitUntil: 'load' });
     await expect(page.locator('h1:has-text("个人资料")')).toBeVisible({ timeout: 10000 });
 
-    await expect(page.getByText('Account Deactivation')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /^(注销账户|Account Deactivation)$/ }),
+    ).toBeVisible();
     await expect(page.locator('[data-testid="profile-deactivation-link"]')).toBeVisible();
   });
 });
@@ -788,26 +854,32 @@ test.describe('Password Change', () => {
 // ===========================================================================
 
 test.describe('Forgot & Reset Password', () => {
-  test.use({ storageState: { cookies: [], origins: [] } });
+  test.use({ locale: 'zh-CN', storageState: { cookies: [], origins: [] } });
 
   test('FP-001: should display admin-managed password notice', async ({ page }) => {
     await page.goto('/forgot-password');
     await expect(page.locator('[data-testid="forgot-password-disabled"]')).toBeVisible();
-    await expect(page.getByText(/tenant administrator/i)).toBeVisible();
+    await expect(page.getByText('请联系管理员设置或重置密码。', { exact: true })).toBeVisible();
+    await expect(page.locator('input[type="password"]')).toHaveCount(0);
+    await page.screenshot({ path: test.info().outputPath('FP-001.png'), fullPage: true });
   });
 
   test('FP-002: should have back to login link', async ({ page }) => {
     await page.goto('/forgot-password', { waitUntil: 'load' });
-    const backLink = page.getByRole('link', { name: 'Back to Login' });
+    const backLink = page.getByRole('link', { name: '返回登录', exact: true });
     await expect(backLink).toBeVisible();
+    await page.screenshot({ path: test.info().outputPath('FP-002.png'), fullPage: true });
     await backLink.click();
-    await expect(page).toHaveURL(/login/);
+    await expect(page).toHaveURL(/\/login(?:\?|$)/);
+    await expect(page.locator('input#identifier')).toBeVisible();
   });
 
   test('RP-001: should display admin-managed password notice', async ({ page }) => {
     await page.goto('/reset-password?token=test-token', { waitUntil: 'load' });
     await expect(page.locator('[data-testid="reset-password-disabled"]')).toBeVisible();
-    await expect(page.getByText(/tenant administrator/i)).toBeVisible();
+    await expect(page.getByText('请联系管理员设置或重置密码。', { exact: true })).toBeVisible();
+    await expect(page.locator('input[type="password"]')).toHaveCount(0);
+    await page.screenshot({ path: test.info().outputPath('RP-001.png'), fullPage: true });
   });
 });
 

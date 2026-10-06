@@ -89,3 +89,38 @@ describe('resolveDecisionActionAvailability', () => {
     });
   });
 });
+
+describe('localized availability presentation', () => {
+  it.each(['en-US', 'en-GB'])(
+    'localizes shared warning labels for %s while preserving provider data',
+    (locale) => {
+      const action: DecisionAction = {
+        actionType: 'WEBHOOK',
+        handlerAvailable: false,
+        providerDependencies: [
+          {
+            providerType: 'WEBHOOK',
+            label: 'User provider $&',
+            required: true,
+            available: false,
+            availabilityReason: 'User-authored failure $&',
+            providerCodes: ['provider_contract'],
+          },
+        ],
+      };
+      expect(resolveDecisionActionAvailability(action, 'EVENT_POLICY', locale)).toEqual({
+        unavailable: true,
+        reason: 'User provider $& unavailable: User-authored failure $&',
+        providerSummary: 'Dependency: User provider $& (provider_contract) · Unavailable',
+      });
+      expect(action.providerDependencies![0].availabilityReason).toBe('User-authored failure $&');
+      expect(
+        resolveDecisionActionAvailability(
+          { actionType: 'NOTIFY', handlerAvailable: false },
+          'EVENT_POLICY',
+          locale,
+        ).reason,
+      ).toBe('Action handler is currently unavailable');
+    },
+  );
+});

@@ -1,0 +1,14 @@
+# Core migration version floor.
+#
+# version: the highest core migration version ever released to databases in
+#   the wild. Every NEW core migration must use a version strictly above it.
+# count: the number of V<version>__*.sql files in db/migration/core when the
+#   floor was last raised.
+#
+# A migration PR must raise both together in the same commit. Adding or
+# removing a migration file without updating this record fails
+# migration-version-floor.test.mjs, which is the guard against re-introducing
+# a backdated version below versions that preserved databases already
+# recorded (the 2026-10-05 V20261003010000 incident).
+version=20261005110000
+count=118

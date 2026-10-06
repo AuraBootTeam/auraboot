@@ -28,7 +28,7 @@ class ValidationServiceSystemUserReferenceTest {
 
     @BeforeEach
     void setUp() {
-        validation = new ValidationServiceImpl(null, userService);
+        validation = new ValidationServiceImpl(null, userService, null);
         ownerField = FieldDefinition.builder()
                 .code("owner")
                 .name("Owner")

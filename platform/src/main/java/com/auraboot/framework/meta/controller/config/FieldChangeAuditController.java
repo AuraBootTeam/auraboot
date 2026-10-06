@@ -195,10 +195,14 @@ public class FieldChangeAuditController {
     ) {}
 
     private List<FieldChangeLogResponse> toResponses(List<FieldChangeLog> changes) {
-        return changes.stream().map(this::toResponse).toList();
+        List<Long> actorIds = changes.stream().map(FieldChangeLog::getActorId)
+                .filter(id -> id != null && id > 0).distinct().toList();
+        Map<Long, String> actorNames =
+                fieldChangeAuditService.findActorDisplayNames(MetaContext.getCurrentTenantId(), actorIds);
+        return changes.stream().map(change -> toResponse(change, actorNames)).toList();
     }
 
-    private FieldChangeLogResponse toResponse(FieldChangeLog change) {
+    private FieldChangeLogResponse toResponse(FieldChangeLog change, Map<Long, String> actorNames) {
         return new FieldChangeLogResponse(
                 change.getRecordPid(),
                 change.getModelCode(),
@@ -209,21 +213,25 @@ public class FieldChangeAuditController {
                 change.getNewValue(),
                 change.getValueType(),
                 change.getChangeType(),
-                change.getActorName(),
+                change.getActorId() != null && change.getActorId() > 0
+                        ? actorNames.get(change.getActorId()) : nonIdentifierActorName(change.getActorName()),
                 change.getChangedAt(),
                 change.getChangeReason()
         );
+    }
+
+    private static String nonIdentifierActorName(String name) {
+        return name != null && name.matches("[0-9A-HJKMNP-TV-Z]{26}") ? null : name;
     }
 
     private Map<String, Object> toResponseReport(Map<String, Object> report) {
         Map<String, Object> response = new LinkedHashMap<>(report);
         Object recentChanges = response.get("recentChanges");
         if (recentChanges instanceof List<?> changes) {
-            response.put("recentChanges", changes.stream()
+            response.put("recentChanges", toResponses(changes.stream()
                     .filter(FieldChangeLog.class::isInstance)
                     .map(FieldChangeLog.class::cast)
-                    .map(this::toResponse)
-                    .toList());
+                    .toList()));
         }
         return response;
     }

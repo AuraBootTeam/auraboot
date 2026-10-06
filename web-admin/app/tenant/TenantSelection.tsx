@@ -33,6 +33,7 @@ import {
 } from '~/services/accessPolicy';
 import { COMMUNITY_BRANDING } from '~/config/branding';
 import { useRootLoaderData } from '~/root-data';
+import { tenantSelectionText, type TenantSelectionMessageKey } from './tenantSelectionText';
 
 interface UserSpace {
   tenantId: number;
@@ -110,7 +111,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (!token) {
     return {
       success: false,
-      error: 'Authentication required. Please sign in again.',
+      error: tenantSelectionText('tenant.select.error.authRequired'),
+      errorKey: 'tenant.select.error.authRequired' as const,
     };
   }
 
@@ -123,14 +125,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (accessPolicyResult.status === 'unavailable') {
     return {
       success: false,
-      error: '服务暂时无法确认当前开通策略，请稍后重试。',
+      error: tenantSelectionText('tenant.select.policy.unavailable'),
+      errorKey: 'tenant.select.policy.unavailable' as const,
     };
   }
 
   if ((action === 'create' || action === 'join') && !canSelfProvisionTenant(accessPolicy)) {
     return {
       success: false,
-      error: '当前环境未开放自助创建或加入组织，请联系平台管理员。',
+      error: tenantSelectionText('tenant.select.policy.managed'),
+      errorKey: 'tenant.select.policy.managed' as const,
     };
   }
 
@@ -170,7 +174,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     if (!response.ok) {
       return {
         success: false,
-        error: `Request failed: ${response.status} ${response.statusText}`,
+        error: tenantSelectionText('tenant.select.error.requestFailed', 'zh-CN', { status: response.status }),
+        errorKey: 'tenant.select.error.requestFailed' as const,
+        errorParams: { status: response.status },
       };
     }
 
@@ -180,7 +186,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       const responseData = result.data as TenantSelectionResponse;
 
       if (responseData.status === 'success' && responseData.jwt) {
-        // 创建租户成功，更新session并重定向
+        // Refresh the session and redirect after creating the tenant.
         return createUserSession({
           request: request,
           token: responseData.jwt,
@@ -188,25 +194,28 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           redirectTo: action === 'create' ? postCreateRedirect : '/',
         });
       } else if (responseData.status === 'pending') {
-        // 加入申请已提交，显示等待审批页面
+        // Show the pending approval state after submitting a join request.
         return { success: true, pending: true, message: responseData.message };
       }
     } else {
       return {
         success: false,
-        error: result.message || result.desc || 'Operation failed',
+        error: result.message || result.desc || tenantSelectionText('tenant.select.error.operationFailed'),
+        ...(!result.message && !result.desc ? { errorKey: 'tenant.select.error.operationFailed' as const } : {}),
       };
     }
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Network request failed',
+      error: error instanceof Error ? error.message : tenantSelectionText('tenant.select.error.networkFailed'),
+      errorKey: 'tenant.select.error.networkFailed' as const,
     };
   }
 
   return {
     success: false,
-    error: 'Operation failed',
+    error: tenantSelectionText('tenant.select.error.operationFailed'),
+    errorKey: 'tenant.select.error.operationFailed' as const,
   };
 };
 
@@ -221,7 +230,9 @@ export default function TenantSelection() {
   const navigate = useNavigate();
   const navigation = useNavigation();
   const revalidator = useRevalidator();
-  const { t } = useI18n();
+  const { t: translate, locale } = useI18n();
+  const t = (key: TenantSelectionMessageKey, params?: Record<string, unknown>) =>
+    translate(key, params, tenantSelectionText(key, locale, params));
   const { formData, errors, setErrors, handleInputChange } = useTenantForm();
   const branding = useRootLoaderData()?.branding ?? COMMUNITY_BRANDING;
   const onboarding = branding.tenantOnboarding;
@@ -234,17 +245,17 @@ export default function TenantSelection() {
   );
 
   const createTitle =
-    onboarding?.createTitle ?? t('tenant.select.create.title', undefined, '创建新租户');
+    onboarding?.createTitle ?? t('tenant.select.create.title');
   const createDescription =
     onboarding?.createDescription ??
-    t('tenant.select.create.desc', undefined, '创建一个新的组织空间，你将成为该组织的管理员。');
-  const createCta = onboarding?.createCta ?? t('tenant.select.create.cta', undefined, '开始创建');
+    t('tenant.select.create.desc');
+  const createCta = onboarding?.createCta ?? t('tenant.select.create.cta');
   const joinTitle =
-    onboarding?.joinTitle ?? t('tenant.select.join.title', undefined, '加入现有租户');
+    onboarding?.joinTitle ?? t('tenant.select.join.title');
   const joinDescription =
     onboarding?.joinDescription ??
-    t('tenant.select.join.desc', undefined, '使用管理员提供的邀请码加入已有组织。');
-  const joinCta = onboarding?.joinCta ?? t('tenant.select.join.cta', undefined, '立即加入');
+    t('tenant.select.join.desc');
+  const joinCta = onboarding?.joinCta ?? t('tenant.select.join.cta');
   const inviteCodeRef = useRef<HTMLInputElement>(null);
   const [errorAction, setErrorAction] = useState<string | null>(null);
 
@@ -263,6 +274,9 @@ export default function TenantSelection() {
     setSelectedAction(nextAction);
   };
   const showError = actionData?.error && errorAction === selectedAction;
+  const actionError = actionData && 'errorKey' in actionData && actionData.errorKey
+    ? t(actionData.errorKey, 'errorParams' in actionData ? actionData.errorParams : undefined)
+    : actionData?.error;
 
   const actionChoices = (compact = false) => (
     <div className={`grid gap-4 ${compact ? 'lg:grid-cols-2' : 'md:grid-cols-2'}`}>
@@ -324,7 +338,7 @@ export default function TenantSelection() {
             <ClockIcon className="h-6 w-6 text-amber-600 dark:text-amber-300" />
           </div>
           <h1 className="text-xl font-semibold text-gray-950 dark:text-white">
-            {t('tenant.select.pending.title', undefined, '申请已提交')}
+            {t('tenant.select.pending.title')}
           </h1>
           <p className="mt-3 text-sm leading-6 text-gray-600 dark:text-gray-300">
             {actionData.message}
@@ -334,7 +348,7 @@ export default function TenantSelection() {
             className="mt-7 w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 focus-visible:ring-4 focus-visible:ring-blue-100 focus-visible:outline-none"
             onClick={() => navigate('/login')}
           >
-            {t('tenant.select.pending.backToLogin', undefined, '返回登录')}
+            {t('tenant.select.pending.backToLogin')}
           </button>
         </div>
       </main>
@@ -363,11 +377,10 @@ export default function TenantSelection() {
                   ? t(
                       'tenant.select.existing.entityTitle',
                       { entityLabel: onboarding.entityLabel },
-                      `选择${onboarding.entityLabel}`,
                     )
-                  : t('tenant.select.existing.title', undefined, '选择工作空间')
+                  : t('tenant.select.existing.title')
                 : (onboarding?.selectionTitle ??
-                  t('tenant.select.choice.title', undefined, '选择你的开始方式'))}
+                  t('tenant.select.choice.title'))}
           </h1>
           <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-gray-600 sm:text-base dark:text-gray-300">
             {selectedAction
@@ -376,14 +389,10 @@ export default function TenantSelection() {
                 : joinDescription
               : hasExistingSpaces
                 ? allowTenantSelfService
-                  ? t(
-                      'tenant.select.existing.lead',
-                      undefined,
-                      '选择已有空间继续，或使用其他方式开始。',
-                    )
-                  : t('tenant.select.existing.only', undefined, '请选择一个已有空间继续。')
+                  ? t('tenant.select.existing.lead')
+                  : t('tenant.select.existing.only')
                 : (onboarding?.selectionLead ??
-                  t('tenant.select.choice.lead', undefined, '创建新组织，或加入已有组织。'))}
+                  t('tenant.select.choice.lead'))}
           </p>
         </header>
 
@@ -397,14 +406,10 @@ export default function TenantSelection() {
                 <ExclamationTriangleIcon className="h-6 w-6 text-red-600 dark:text-red-300" />
               </div>
               <h2 className="mt-5 text-lg font-semibold text-gray-950 dark:text-white">
-                {t('tenant.select.loadError.title', undefined, '暂时无法加载入校信息')}
+                {t('tenant.select.loadError.title')}
               </h2>
               <p className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-300">
-                {t(
-                  'tenant.select.loadError.desc',
-                  undefined,
-                  '服务连接暂时不可用，请重试。你的账号和已有学校不会受到影响。',
-                )}
+                {t('tenant.select.loadError.desc')}
               </p>
               <button
                 type="button"
@@ -413,8 +418,8 @@ export default function TenantSelection() {
                 disabled={revalidator.state === 'loading'}
               >
                 {revalidator.state === 'loading'
-                  ? t('tenant.select.retrying', undefined, '正在重试…')
-                  : t('tenant.select.retry', undefined, '重新加载')}
+                  ? t('tenant.select.retrying')
+                  : t('tenant.select.retry')}
               </button>
             </div>
           ) : !selectedAction && hasExistingSpaces ? (
@@ -442,9 +447,9 @@ export default function TenantSelection() {
                         </span>
                         <span className="mt-1 block text-sm text-gray-500 dark:text-gray-400">
                           {space.spaceType === 'platform'
-                            ? t('tenant.select.space.platform', undefined, '平台管理')
+                            ? t('tenant.select.space.platform')
                             : (onboarding?.entityLabel ??
-                              t('tenant.select.space.business', undefined, '业务空间'))}
+                              t('tenant.select.space.business'))}
                         </span>
                       </span>
                       <ArrowRightIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
@@ -455,7 +460,7 @@ export default function TenantSelection() {
               {allowTenantSelfService && (
                 <div className="mt-8 border-t border-gray-100 pt-7 dark:border-gray-800">
                   <h2 className="mb-4 text-sm font-semibold text-gray-900 dark:text-white">
-                    {t('tenant.select.otherWays', undefined, '其他开始方式')}
+                    {t('tenant.select.otherWays')}
                   </h2>
                   {actionChoices(true)}
                 </div>
@@ -470,27 +475,23 @@ export default function TenantSelection() {
                 <ExclamationTriangleIcon className="h-6 w-6 text-amber-600 dark:text-amber-300" />
               </div>
               <h2 className="mt-5 text-lg font-semibold text-gray-950 dark:text-white">
-                {t('tenant.select.managed.title', undefined, '当前环境由管理员统一开通')}
+                {t('tenant.select.managed.title')}
               </h2>
               <p className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-300">
-                {t(
-                  'tenant.select.managed.desc',
-                  undefined,
-                  '你的账号还没有可用空间，请联系平台管理员确认开通状态。',
-                )}
+                {t('tenant.select.managed.desc')}
               </p>
               <div className="mt-6 flex flex-wrap justify-center gap-3">
                 <a
                   href={branding.supportUrl}
                   className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 focus-visible:ring-4 focus-visible:ring-blue-100 focus-visible:outline-none"
                 >
-                  {t('tenant.select.getHelp', undefined, '获取帮助')}
+                  {t('tenant.select.getHelp')}
                 </a>
                 <Link
                   to="/logout"
                   className="rounded-lg border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 focus-visible:ring-4 focus-visible:ring-gray-100 focus-visible:outline-none dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
                 >
-                  {t('tenant.select.logout', undefined, '退出当前账号')}
+                  {t('tenant.select.logout')}
                 </Link>
               </div>
             </div>
@@ -504,7 +505,7 @@ export default function TenantSelection() {
                 onClick={() => handleSwitchAction(null)}
               >
                 <ArrowLeftIcon className="h-4 w-4" aria-hidden="true" />
-                {t('tenant.select.back', undefined, '返回选择')}
+                {t('tenant.select.back')}
               </button>
 
               {selectedAction === 'create' && (
@@ -516,7 +517,7 @@ export default function TenantSelection() {
                   onSubmit={(event) => {
                     if (!formData.name.trim()) {
                       event.preventDefault();
-                      setErrors((current) => ({ ...current, name: `${onboarding?.entityLabel ?? '租户'}名称不能为空` }));
+                      setErrors((current) => ({ ...current, name: t('tenant.select.create.nameRequired', { entityLabel: onboarding?.entityLabel ?? t('tenant.select.entityLabel') }) }));
                     }
                   }}
                 >
@@ -542,7 +543,6 @@ export default function TenantSelection() {
                         {t(
                           'tenant.select.create.creatorAdmin',
                           { entityLabel: onboarding.entityLabel },
-                          `创建成功后，你将自动成为${onboarding.entityLabel}管理员。`,
                         )}
                       </span>
                     </div>
@@ -552,7 +552,7 @@ export default function TenantSelection() {
                       role="alert"
                       className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200"
                     >
-                      {actionData.error}
+                      {actionError}
                     </div>
                   )}
                   <button
@@ -561,7 +561,7 @@ export default function TenantSelection() {
                     className="w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 focus-visible:ring-4 focus-visible:ring-blue-100 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {isSubmitting
-                      ? t('tenant.select.create.submitting', undefined, '正在创建…')
+                      ? t('tenant.select.create.submitting')
                       : createTitle}
                   </button>
                 </Form>
@@ -586,31 +586,26 @@ export default function TenantSelection() {
                       ))}
                     </ol>
                     <div className="mt-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-100">
-                      {t(
-                        'tenant.select.mini.codeHint',
-                        undefined,
-                        '学校教师码只在微信小程序内填写，本页面不会收集。教师入校后可绑定已有班级，或创建新班级。',
-                      )}
+                      {t('tenant.select.mini.codeHint')}
                     </div>
                   </div>
                   <div className="flex min-w-52 flex-col items-center justify-center rounded-xl bg-gray-50 p-6 text-center dark:bg-gray-800/70">
                     {onboarding.miniProgramQrUrl ? (
                       <img
                         src={onboarding.miniProgramQrUrl}
-                        alt={`${onboarding.miniProgramName ?? branding.productName}微信小程序码`}
+                        alt={t('tenant.select.mini.qrAlt', { productName: onboarding.miniProgramName ?? branding.productName })}
                         className="h-36 w-36 rounded-lg bg-white object-contain p-2"
                       />
                     ) : (
                       <DevicePhoneMobileIcon className="h-14 w-14 text-emerald-600 dark:text-emerald-300" />
                     )}
                     <p className="mt-4 text-sm font-semibold text-gray-900 dark:text-white">
-                      {t('tenant.select.mini.open', undefined, '打开微信小程序')}
+                      {t('tenant.select.mini.open')}
                     </p>
                     <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">
                       {t(
                         'tenant.select.mini.search',
                         { productName: onboarding.miniProgramName ?? branding.productName },
-                        `搜索“${onboarding.miniProgramName ?? branding.productName}”并完成微信登录`,
                       )}
                     </p>
                   </div>
@@ -622,7 +617,7 @@ export default function TenantSelection() {
                   <input type="hidden" name="action" value="join" />
                   <div className="space-y-2">
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      {t('tenant.select.join.inviteCodeLabel', undefined, '邀请码')} *
+                      {t('tenant.select.join.inviteCodeLabel')} *
                     </label>
                     <input
                       ref={inviteCodeRef}
@@ -630,18 +625,10 @@ export default function TenantSelection() {
                       type="text"
                       required
                       className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder-gray-400"
-                      placeholder={t(
-                        'tenant.select.join.inviteCodePlaceholder',
-                        undefined,
-                        '输入邀请码',
-                      )}
+                      placeholder={t('tenant.select.join.inviteCodePlaceholder')}
                     />
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {t(
-                        'tenant.select.join.inviteCodeHint',
-                        undefined,
-                        '请输入组织管理员提供的邀请码。',
-                      )}
+                      {t('tenant.select.join.inviteCodeHint')}
                     </p>
                   </div>
                   {showError && (
@@ -649,7 +636,7 @@ export default function TenantSelection() {
                       role="alert"
                       className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200"
                     >
-                      {actionData.error}
+                      {actionError}
                     </div>
                   )}
                   <button
@@ -658,7 +645,7 @@ export default function TenantSelection() {
                     className="w-full rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 focus-visible:ring-4 focus-visible:ring-emerald-100 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {isSubmitting
-                      ? t('tenant.select.join.submitting', undefined, '正在提交…')
+                      ? t('tenant.select.join.submitting')
                       : joinCta}
                   </button>
                 </Form>
@@ -669,10 +656,10 @@ export default function TenantSelection() {
 
         <footer className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-gray-500 dark:text-gray-400">
           <a className="hover:text-gray-900 dark:hover:text-white" href={branding.supportUrl}>
-            {t('tenant.select.getHelp', undefined, '获取帮助')}
+            {t('tenant.select.getHelp')}
           </a>
           <Link className="hover:text-gray-900 dark:hover:text-white" to="/logout">
-            {t('tenant.select.logout', undefined, '退出当前账号')}
+            {t('tenant.select.logout')}
           </Link>
         </footer>
       </div>

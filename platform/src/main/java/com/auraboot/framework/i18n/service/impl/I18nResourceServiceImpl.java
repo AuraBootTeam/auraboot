@@ -7,6 +7,7 @@ import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.i18n.entity.I18nResource;
 import com.auraboot.framework.i18n.mapper.I18nResourceMapper;
 import com.auraboot.framework.i18n.service.I18nResourceService;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
@@ -62,11 +63,14 @@ public class I18nResourceServiceImpl implements I18nResourceService {
             throw new BusinessException(ResponseCode.BadParam, "I18n resource not found: " + pid);
         }
 
-        existing.setValue(resource.getValue());
-        existing.setSource(resource.getSource());
-        existing.setRefType(resource.getRefType());
-        existing.setRefId(resource.getRefId());
-        existing.setStatus(resource.getStatus());
+        if (resource.getStatus() != null) validateStatus(resource.getStatus());
+        if (resource.getValue() != null) existing.setValue(resource.getValue());
+        if (resource.getSource() != null) existing.setSource(resource.getSource());
+        if (resource.getRefType() != null) existing.setRefType(resource.getRefType());
+        if (resource.getRefId() != null) existing.setRefId(resource.getRefId());
+        if (resource.getStatus() != null) {
+            existing.setStatus(resource.getStatus());
+        }
         existing.setUpdatedAt(Instant.now());
         existing.setUpdatedBy(MetaContext.getCurrentUserId());
 
@@ -165,33 +169,17 @@ public class I18nResourceServiceImpl implements I18nResourceService {
     @Override
     public List<I18nResource> findAllByLang(String lang) {
         Long tenantId = getCurrentTenantId();
-        List<I18nResource> tenantResources = i18nResourceMapper.selectAllByLang(tenantId, lang);
-
-        // Also include system-level resources (tenant_id = 0)
-        if (tenantId != 0L) {
-            List<I18nResource> systemResources = i18nResourceMapper.selectAllByLang(0L, lang);
-            // Merge: tenant resources override system resources
-            Map<String, I18nResource> merged = new LinkedHashMap<>();
-            for (I18nResource resource : systemResources) {
-                merged.put(resource.getI18nKey(), resource);
-            }
-            for (I18nResource resource : tenantResources) {
-                merged.put(resource.getI18nKey(), resource);
-            }
-            return new ArrayList<>(merged.values());
+        List<I18nResource> systemResources = i18nResourceMapper.selectSystemByLang(lang);
+        if (tenantId == 0L) {
+            return systemResources;
         }
 
-        // When tenantId is 0 (unauthenticated request like /api/i18n/{locale}),
-        // also load all tenant-level translations since i18n data is non-sensitive
-        // and the endpoint is public (WhiteList). Without this, plugin-imported
-        // translations (stored under real tenant IDs) would never appear.
-        List<I18nResource> allTenantResources = i18nResourceMapper.selectAllByLangAllTenants(lang);
+        List<I18nResource> tenantResources = i18nResourceMapper.selectAllByLang(tenantId, lang);
         Map<String, I18nResource> merged = new LinkedHashMap<>();
-        for (I18nResource resource : tenantResources) {
+        for (I18nResource resource : systemResources) {
             merged.put(resource.getI18nKey(), resource);
         }
-        // Tenant-level translations override system-level for same key
-        for (I18nResource resource : allTenantResources) {
+        for (I18nResource resource : tenantResources) {
             merged.put(resource.getI18nKey(), resource);
         }
         return new ArrayList<>(merged.values());
@@ -398,6 +386,11 @@ public class I18nResourceServiceImpl implements I18nResourceService {
         resource.setUpdatedAt(Instant.now());
         resource.setUpdatedBy(MetaContext.getCurrentUserId());
         i18nResourceMapper.updateById(resource);
+        // updateById skips null fields (default NOT_NULL strategy), so a previously
+        // rejected draft would keep carrying the stale reason through review.
+        i18nResourceMapper.update(null, new LambdaUpdateWrapper<I18nResource>()
+                .eq(I18nResource::getPid, pid)
+                .set(I18nResource::getRejectReason, null));
         log.info("I18n resource {} submitted for review by user {}", pid, MetaContext.getCurrentUserId());
         return resource;
     }
@@ -421,6 +414,11 @@ public class I18nResourceServiceImpl implements I18nResourceService {
         resource.setUpdatedAt(Instant.now());
         resource.setUpdatedBy(currentUserId);
         i18nResourceMapper.updateById(resource);
+        // updateById skips null fields (default NOT_NULL strategy); the approval must
+        // clear the previous rejection reason so approved rows stop showing it.
+        i18nResourceMapper.update(null, new LambdaUpdateWrapper<I18nResource>()
+                .eq(I18nResource::getPid, pid)
+                .set(I18nResource::getRejectReason, null));
         log.info("I18n resource {} approved by user {}", pid, currentUserId);
         return resource;
     }
@@ -454,13 +452,7 @@ public class I18nResourceServiceImpl implements I18nResourceService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public I18nResource updateStatus(String pid, String newStatus) {
-        if (!StringUtils.hasText(newStatus)) {
-            throw new BusinessException(ResponseCode.BadParam, "Status is required");
-        }
-        if (!Set.of(I18nResource.STATUS_DRAFT, I18nResource.STATUS_REVIEW,
-                    I18nResource.STATUS_APPROVED, I18nResource.STATUS_DEPRECATED).contains(newStatus)) {
-            throw new BusinessException(ResponseCode.BadParam, "Invalid status: " + newStatus);
-        }
+        validateStatus(newStatus);
         I18nResource resource = findByPid(pid);
         if (resource == null) {
             throw new BusinessException(ResponseCode.BadParam, "I18n resource not found: " + pid);
@@ -470,6 +462,16 @@ public class I18nResourceServiceImpl implements I18nResourceService {
         resource.setUpdatedBy(MetaContext.getCurrentUserId());
         i18nResourceMapper.updateById(resource);
         return resource;
+    }
+
+    private void validateStatus(String newStatus) {
+        if (!StringUtils.hasText(newStatus)) {
+            throw new BusinessException(ResponseCode.BadParam, "Status is required");
+        }
+        if (!Set.of(I18nResource.STATUS_DRAFT, I18nResource.STATUS_REVIEW,
+                    I18nResource.STATUS_APPROVED, I18nResource.STATUS_DEPRECATED).contains(newStatus)) {
+            throw new BusinessException(ResponseCode.BadParam, "Invalid status: " + newStatus);
+        }
     }
 
     // ==================== Helper Methods ====================

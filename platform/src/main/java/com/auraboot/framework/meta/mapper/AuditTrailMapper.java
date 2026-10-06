@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.ResultMap;
 
 import java.time.Instant;
 import java.util.List;
@@ -18,6 +19,11 @@ import java.util.List;
  */
 @Mapper
 public interface AuditTrailMapper extends BaseMapper<AuditTrail> {
+
+    /** Serialize the entire tenant chain append, including an empty chain. */
+    @Select("SELECT 1 FROM pg_advisory_xact_lock(" +
+            "hashtextextended('ab_audit_trail:' || CAST(#{tenantId} AS text), 0))")
+    Integer lockTenantChain(@Param("tenantId") Long tenantId);
 
     /**
      * Get the maximum sequence number for a given tenant.
@@ -35,6 +41,7 @@ public interface AuditTrailMapper extends BaseMapper<AuditTrail> {
             "previous_hash, record_hash " +
             "FROM ab_audit_trail WHERE tenant_id = #{tenantId} " +
             "ORDER BY sequence_no DESC LIMIT 1")
+    @ResultMap("mybatis-plus_AuditTrail")
     AuditTrail getLatestByTenant(@Param("tenantId") Long tenantId);
 
     /**
@@ -44,6 +51,7 @@ public interface AuditTrailMapper extends BaseMapper<AuditTrail> {
     @Select("SELECT * FROM ab_audit_trail WHERE tenant_id = #{tenantId} " +
             "AND sequence_no >= #{fromSeq} AND sequence_no <= #{toSeq} " +
             "ORDER BY sequence_no ASC")
+    @ResultMap("mybatis-plus_AuditTrail")
     List<AuditTrail> getBySequenceRange(@Param("tenantId") Long tenantId,
                                          @Param("fromSeq") Long fromSeq,
                                          @Param("toSeq") Long toSeq);
@@ -54,6 +62,7 @@ public interface AuditTrailMapper extends BaseMapper<AuditTrail> {
     @Select("SELECT * FROM ab_audit_trail WHERE tenant_id = #{tenantId} " +
             "AND entity_type = #{entityType} AND entity_id = #{entityId} " +
             "ORDER BY sequence_no ASC")
+    @ResultMap("mybatis-plus_AuditTrail")
     List<AuditTrail> getByEntity(@Param("tenantId") Long tenantId,
                                   @Param("entityType") String entityType,
                                   @Param("entityId") Long entityId);
@@ -64,6 +73,7 @@ public interface AuditTrailMapper extends BaseMapper<AuditTrail> {
     @Select("SELECT * FROM ab_audit_trail WHERE tenant_id = #{tenantId} " +
             "AND entity_type = #{entityType} AND entity_pid = #{entityPid} " +
             "ORDER BY sequence_no ASC")
+    @ResultMap("mybatis-plus_AuditTrail")
     List<AuditTrail> getByEntityPid(@Param("tenantId") Long tenantId,
                                      @Param("entityType") String entityType,
                                      @Param("entityPid") String entityPid);
@@ -75,6 +85,7 @@ public interface AuditTrailMapper extends BaseMapper<AuditTrail> {
             "AND actor_id = #{actorId} " +
             "AND timestamp >= #{startTime} AND timestamp <= #{endTime} " +
             "ORDER BY sequence_no ASC")
+    @ResultMap("mybatis-plus_AuditTrail")
     List<AuditTrail> getByActor(@Param("tenantId") Long tenantId,
                                  @Param("actorId") Long actorId,
                                  @Param("startTime") Instant startTime,
@@ -86,6 +97,7 @@ public interface AuditTrailMapper extends BaseMapper<AuditTrail> {
     @Select("SELECT * FROM ab_audit_trail WHERE tenant_id = #{tenantId} " +
             "AND command_code = #{commandCode} " +
             "ORDER BY sequence_no ASC")
+    @ResultMap("mybatis-plus_AuditTrail")
     List<AuditTrail> getByCommand(@Param("tenantId") Long tenantId,
                                    @Param("commandCode") String commandCode);
 
@@ -95,6 +107,7 @@ public interface AuditTrailMapper extends BaseMapper<AuditTrail> {
     @Select("SELECT * FROM ab_audit_trail WHERE tenant_id = #{tenantId} " +
             "AND timestamp >= #{startTime} AND timestamp <= #{endTime} " +
             "ORDER BY sequence_no ASC")
+    @ResultMap("mybatis-plus_AuditTrail")
     List<AuditTrail> getByTimeRange(@Param("tenantId") Long tenantId,
                                      @Param("startTime") Instant startTime,
                                      @Param("endTime") Instant endTime);
@@ -114,6 +127,7 @@ public interface AuditTrailMapper extends BaseMapper<AuditTrail> {
     @Select("SELECT id, tenant_id, sequence_no, record_hash " +
             "FROM ab_audit_trail WHERE tenant_id = #{tenantId} " +
             "AND sequence_no = #{seqNo} - 1")
+    @ResultMap("mybatis-plus_AuditTrail")
     AuditTrail getPreviousRecord(@Param("tenantId") Long tenantId,
                                   @Param("seqNo") Long seqNo);
 
@@ -133,6 +147,7 @@ public interface AuditTrailMapper extends BaseMapper<AuditTrail> {
         LIMIT #{limit}
         </script>
         """)
+    @ResultMap("mybatis-plus_AuditTrail")
     List<AuditTrail> getRecentFeed(@Param("tenantId") Long tenantId,
                                     @Param("entityType") String entityType,
                                     @Param("beforeId") Long beforeId,

@@ -214,6 +214,12 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       [dataSource, dataSourceDependenciesMet, disabledValue, refetch],
     );
 
+    const accessibleLabel = labelText || st((restProps as React.AriaAttributes)['aria-label']);
+    const clearLabel = st({
+      'zh-CN': accessibleLabel ? `清空${accessibleLabel}` : '清空选项',
+      en: accessibleLabel ? `Clear ${accessibleLabel}` : 'Clear selection',
+    });
+
     // 处理清除
     const handleClearClick = () => {
       const clearedValue = multiple ? [] : '';
@@ -256,7 +262,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
                 fieldSizeStyles[size],
                 fieldInputHeightStyles[size],
                 meta.showError && 'border-red-500 focus:ring-red-500',
-                clearable && currentValue && 'pr-8',
+                clearable && currentValue && 'pr-16',
                 loading && 'opacity-50',
                 className,
               )}
@@ -326,14 +332,16 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           </BaseSelect>
           {/* Clear button overlaid on trigger */}
           {clearable && currentValue && !disabledValue && !loading && (
-            <button
+            <FieldActionButton
               type="button"
+              size="md"
+              iconOnly
               onClick={(e) => {
                 e.stopPropagation();
                 handleClearClick();
               }}
-              className="text-text-3 hover:text-text-2 absolute top-1/2 right-8 -translate-y-1/2 rounded-sm p-0.5"
-              tabIndex={-1}
+              className="absolute top-1/2 right-7 -translate-y-1/2"
+              aria-label={clearLabel}
             >
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -343,7 +351,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
                   d="M6 18L18 6M6 6l12 12"
                 />
               </svg>
-            </button>
+            </FieldActionButton>
           )}
         </div>
       );
@@ -373,7 +381,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         rightSlot={
           <FieldActionGroup>
             {clearable && field.value && !multiple && !disabledValue && !loading && (
-              <FieldActionButton type="button" onClick={handleClearClick} iconOnly>
+              <FieldActionButton type="button" onClick={handleClearClick} aria-label={clearLabel} iconOnly>
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"

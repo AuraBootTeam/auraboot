@@ -1,6 +1,6 @@
 {
   "code": "org:update_department",
-  "displayName:zh-CN": "Update Department",
+  "displayName:zh-CN": "更新部门",
   "displayName:en": "Update Department",
   "description": "Update department information",
   "type": "update",

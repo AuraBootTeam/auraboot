@@ -30,7 +30,7 @@ function inspectModel(code: string, idx: ResourceIndex) {
   }));
   const pages = (idx.pagesByModel.get(code) || []).map((p: any) => ({
     pageKey: p.pageKey,
-    pageType: p.pageType || p.dslSchema?.kind,
+    pageType: p.pageType || p.kind || p.dslSchema?.kind || p.dsl_schema?.kind,
   }));
   const referencedBy = (idx.referenceFields.get(code) || []).map((f: any) => ({
     fieldCode: f.code,
@@ -78,19 +78,18 @@ function inspectPage(key: string, idx: ResourceIndex) {
   const page = idx.pages.get(key);
   if (!page) return null;
 
-  const mc = page.modelCode || page.dslSchema?.modelCode;
+  const dsl = page.dslSchema || page.dsl_schema || page;
+  const mc = page.modelCode || dsl.modelCode;
   const model = mc ? idx.models.get(mc) : null;
 
-  // Extract block types from dslSchema
+  // Inspect canonical flat blocks as well as legacy area containers.
   const blocks: string[] = [];
-  if (page.dslSchema?.areas) {
-    for (const area of Object.values(page.dslSchema.areas) as any[]) {
-      if (area?.blocks) {
+  for (const area of [dsl, ...Object.values(dsl.areas || {})] as any[]) {
+      if (Array.isArray(area?.blocks)) {
         for (const b of area.blocks) {
           blocks.push(b.blockType || b.type || 'unknown');
         }
       }
-    }
   }
 
   return {

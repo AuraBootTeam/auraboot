@@ -140,6 +140,8 @@ const quoteOpsCurrentGatePattern = new RegExp(
 );
 
 const enterpriseScopeDirs = [
+  // Independent AMOS cockpit requires product plugins and governed projections.
+  'amos-lenses',
   'annual-plan',
   'asset-management',
   'construction-process',
@@ -257,7 +259,8 @@ export default defineConfig({
   use: {
     baseURL,
     headless: true,
-    trace: 'on-first-retry',
+    // OSS gates have zero retries; retain the original failing attempt's trace.
+    trace: runProfile === 'oss' ? 'retain-on-failure' : 'on-first-retry',
     screenshot: 'only-on-failure',
     video: process.env.CI ? 'on-first-retry' : 'off',
     actionTimeout: 5000,

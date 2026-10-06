@@ -96,6 +96,32 @@ class FieldMaskServiceImplTest {
         assertThat(service.maskValue("", "phone", null, "*")).isEqualTo("");
     }
 
+    @Test
+    void semanticContextIncludesExportOnlyProtection() {
+        var mapper = mock(FieldMaskConfigMapper.class);
+        var permissions = mock(UserPermissionService.class);
+        var config = phoneMaskExemptByPermission();
+        config.setApplyToList(false);
+        config.setApplyToExport(true);
+        when(mapper.findByModelCode(any(), eq("crm_account_common"))).thenReturn(List.of(config));
+        when(permissions.getUserPermissionCodes(42L)).thenReturn(Set.of());
+        var svc = serviceWith(mapper, permissions);
+        assertThat(svc.getEffectiveConfigs("crm_account_common", 42L, "list")).isEmpty();
+        assertThat(svc.getEffectiveConfigs("crm_account_common", 42L, "semantic"))
+                .extracting(FieldMaskConfig::getFieldCode).containsExactly("phone");
+    }
+
+    @Test
+    void semanticContextHonorsCanonicalPermissionExemption() {
+        var mapper = mock(FieldMaskConfigMapper.class);
+        var permissions = mock(UserPermissionService.class);
+        when(mapper.findByModelCode(any(), eq("crm_account_common")))
+                .thenReturn(List.of(phoneMaskExemptByPermission()));
+        when(permissions.getUserPermissionCodes(42L)).thenReturn(Set.of("crm.account.contact_unmask"));
+        var svc = serviceWith(mapper, permissions);
+        assertThat(svc.getEffectiveConfigs("crm_account_common", 42L, "semantic")).isEmpty();
+    }
+
     // ==================== exempt-by-permission (capability-driven unmask) ====================
 
     private FieldMaskServiceImpl serviceWith(FieldMaskConfigMapper maskConfigMapper,
