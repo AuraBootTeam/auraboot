@@ -11,7 +11,9 @@ export type BootstrapStatus = {
 const BFF_URL =
   typeof process !== 'undefined' && process.env?.BFF_INTERNAL_URL
     ? process.env.BFF_INTERNAL_URL
-    : '';
+    : process.env?.BFF_PORT
+      ? `http://127.0.0.1:${process.env.BFF_PORT}`
+      : '';
 
 export async function fetchBootstrapStatus(): Promise<BootstrapStatus | null> {
   try {

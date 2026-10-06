@@ -6,11 +6,14 @@ import com.auraboot.framework.meta.entity.ReconciliationItem;
 import com.auraboot.framework.meta.entity.ReconciliationProfile;
 import com.auraboot.framework.meta.entity.ReconciliationRun;
 import com.auraboot.framework.meta.exception.MetaServiceException;
-import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.mapper.ReconciliationItemMapper;
 import com.auraboot.framework.meta.mapper.ReconciliationProfileMapper;
 import com.auraboot.framework.meta.mapper.ReconciliationRunMapper;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.meta.service.QueryBuilderReadProtection;
+import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.permission.engine.PermissionEvaluator;
+import org.springframework.security.access.AccessDeniedException;
 import com.auraboot.framework.meta.service.base.BaseMetaService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.RequiredArgsConstructor;
@@ -50,7 +53,8 @@ public class ReconciliationService extends BaseMetaService {
     private final ReconciliationProfileMapper profileMapper;
     private final ReconciliationRunMapper runMapper;
     private final ReconciliationItemMapper itemMapper;
-    private final DynamicDataMapper dynamicDataMapper;
+    private final QueryBuilderReadProtection sourceProtection;
+    private final PermissionEvaluator permissionEvaluator;
     private final MetaModelService metaModelService;
     private final PlatformTransactionManager transactionManager;
 
@@ -267,6 +271,9 @@ public class ReconciliationService extends BaseMetaService {
             }
 
             log.error("Reconciliation run failed: {}", run.getRunCode(), e);
+            if (e instanceof AccessDeniedException denied) {
+                throw denied;
+            }
             throw new MetaServiceException("Reconciliation failed: " + e.getMessage());
         }
 
@@ -687,7 +694,7 @@ public class ReconciliationService extends BaseMetaService {
     // ==================== Internal: Data Loading ====================
 
     /**
-     * Load records from a model's dynamic table using DynamicDataMapper.
+     * Load source records through the existing field and source-scope protection.
      * Resolves the table name from the model code via MetaModelService.
      */
     private List<RecordEntry> loadRecords(
@@ -695,47 +702,66 @@ public class ReconciliationService extends BaseMetaService {
             String amountField, String dateField, String refField,
             LocalDate periodStart, LocalDate periodEnd) {
 
+        ModelDefinition model = metaModelService.getModelDefinition(modelCode)
+                .orElseThrow(() -> new MetaServiceException("Cannot resolve model: " + modelCode));
+        Long memberId = MetaContext.getCurrentMemberId();
+        if (memberId == null) memberId = MetaContext.getCurrentUserId();
+        if (memberId == null || !permissionEvaluator.canAction(memberId, modelCode, "read")) {
+            throw new AccessDeniedException("Access denied for reconciliation source: " + modelCode);
+        }
         String tableName = metaModelService.getTableName(modelCode);
-        if (tableName == null || tableName.isBlank()) {
-            throw new MetaServiceException("Cannot resolve table name for model: " + modelCode);
-        }
-
-        // Build SELECT columns
-        List<String> columns = new ArrayList<>();
-        columns.add("id");
-        columns.add(amountField);
-        if (dateField != null && !dateField.isBlank()) {
-            columns.add(dateField);
-        }
-        if (refField != null && !refField.isBlank()) {
-            columns.add(refField);
-        }
-
-        // Build WHERE clause
-        StringBuilder where = new StringBuilder("tenant_id = " + tenantId);
-        if (dateField != null && !dateField.isBlank()) {
-            if (periodStart != null) {
-                where.append(" AND ").append(dateField).append(" >= '").append(periodStart).append("'");
-            }
-            if (periodEnd != null) {
-                where.append(" AND ").append(dateField).append(" <= '").append(periodEnd).append("'");
+        Map<String, String> columns = new LinkedHashMap<>();
+        if (model.getFields() != null) {
+            for (FieldDefinition field : model.getFields()) {
+                columns.put(field.getCode(), field.getColumnName() == null || field.getColumnName().isBlank()
+                        ? field.getCode() : field.getColumnName());
             }
         }
-
-        List<Map<String, Object>> rows = dynamicDataMapper.queryList(
-                tableName, columns, where.toString(), null, 50000, 0);
+        columns.put("id", "id");
+        List<String> inputs = new ArrayList<>();
+        inputs.add("id");
+        for (String input : Arrays.asList(amountField, dateField, refField)) {
+            if (input == null || input.isBlank()) continue;
+            // Existing profiles may name a physical column, but it must belong to a registered field.
+            if (!columns.containsKey(input) && columns.containsValue(input)) columns.put(input, input);
+            inputs.add(input);
+        }
+        if (amountField == null || amountField.isBlank()) {
+            throw new MetaServiceException("Reconciliation amount field is required");
+        }
+        QueryBuilderReadProtection.Plan plan = sourceProtection.prepareComparison(
+                modelCode, inputs, columns, tableName);
+        String amountColumn = columns.get(amountField);
+        String dateColumn = dateField == null || dateField.isBlank() ? null : columns.get(dateField);
+        String refColumn = refField == null || refField.isBlank() ? null : columns.get(refField);
+        List<String> selected = inputs.stream().map(columns::get).distinct().toList();
+        StringBuilder sql = new StringBuilder("SELECT ").append(String.join(", ", selected))
+                .append(" FROM ").append(tableName).append(" WHERE tenant_id = #{params.tenantId}");
+        Map<String, Object> parameters = new LinkedHashMap<>();
+        parameters.put("tenantId", tenantId);
+        if (model.isSoftDelete()) sql.append(" AND deleted_flag = FALSE");
+        if (dateColumn != null && periodStart != null) {
+            sql.append(" AND ").append(dateColumn).append(" >= #{params.periodStart}");
+            parameters.put("periodStart", periodStart);
+        }
+        if (dateColumn != null && periodEnd != null) {
+            sql.append(" AND ").append(dateColumn).append(" <= #{params.periodEnd}");
+            parameters.put("periodEnd", periodEnd);
+        }
+        sql.append(" LIMIT 50000");
+        List<Map<String, Object>> rows = sourceProtection.execute(plan, sql.toString(), parameters);
 
         // Convert to RecordEntry list
         return rows.stream()
                 .map(row -> {
                     RecordEntry entry = new RecordEntry();
                     entry.recordId = toLong(row.get("id"));
-                    entry.amount = toBigDecimal(row.get(amountField));
-                    if (dateField != null) {
-                        entry.date = toLocalDate(row.get(dateField));
+                    entry.amount = toBigDecimal(row.get(amountColumn));
+                    if (dateColumn != null) {
+                        entry.date = toLocalDate(row.get(dateColumn));
                     }
-                    if (refField != null) {
-                        entry.ref = toString(row.get(refField));
+                    if (refColumn != null) {
+                        entry.ref = toString(row.get(refColumn));
                     }
                     return entry;
                 })

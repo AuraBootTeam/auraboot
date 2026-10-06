@@ -10,6 +10,7 @@ import com.auraboot.framework.meta.service.base.BaseMetaService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.util.Map;
 import java.util.function.Function;
@@ -84,6 +85,9 @@ public class DataAccessAuthorizationHelperImpl extends BaseMetaService implement
         Map<String, Object> record;
         try {
             record = recordLoader.apply(recordId);
+        } catch (AccessDeniedException e) {
+            // A loader may already enforce record access. Preserve its 403 verdict.
+            throw e;
         } catch (Exception e) {
             throw new MetaServiceException("Failed to load record for authorization: " + recordId, e);
         }

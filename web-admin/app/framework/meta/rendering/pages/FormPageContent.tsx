@@ -13,6 +13,7 @@
 
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router';
+import { DynamicPageUnavailable } from './DynamicPageUnavailable';
 import { useUser, usePermissions } from '~/contexts/AuthContext';
 import { usePageRuntime } from '~/framework/meta/rendering/pages/hooks/usePageRuntime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
@@ -768,6 +769,17 @@ export function canRenderFormButton(
   hasPermission: (permissionCode: string) => boolean,
 ): boolean {
   return !button.permissionCode || hasPermission(button.permissionCode);
+}
+
+/** Deny authoring only when every active primary action declares a denied permission. */
+export function isFormAuthoringDenied(
+  activeButtons: Array<{ primary?: boolean; permissionCode?: string }>,
+  hasPermission: (permissionCode: string) => boolean,
+): boolean {
+  const primaryActions = activeButtons.filter((button) => button.primary === true);
+  return primaryActions.length > 0 && primaryActions.every(
+    (button) => !!button.permissionCode && !hasPermission(button.permissionCode),
+  );
 }
 
 /**
@@ -2487,15 +2499,17 @@ export function FormPageContent(props: PageContentProps) {
     'custom',
     'form-buttons',
     'sub-table',
-    // Toolbar blocks render through the kernel ToolbarBlockRenderer (emitting
-    // toolbar-btn-* testids, matching detail pages and e2e). Rendering them
-    // here as well duplicated the same DSL buttons twice on the page.
-    'toolbar',
   ]);
   const miscFormBlocks = allBlocks.filter(
     (block: any) => !FORM_SPECIALIZED_BLOCK_TYPES.has(block.blockType),
   );
   const backLink = resolveFormBackLink(schema, tableName);
+  const activeButtons = (effectiveButtonBlock?.buttons || []).filter(
+    (button: any) => !button.visibleWhen || evaluateCondition(button.visibleWhen, pageContext),
+  );
+  if (isFormAuthoringDenied(activeButtons, hasPermission)) {
+    return <DynamicPageUnavailable message="Access denied" />;
+  }
 
   return (
     <DataSourceProvider manager={dataSourceManager}>

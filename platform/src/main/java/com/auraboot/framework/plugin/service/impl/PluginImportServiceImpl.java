@@ -36,7 +36,6 @@ import com.auraboot.framework.meta.contribution.PageSchemaContributionImportServ
 import com.auraboot.framework.meta.entity.PageSchema;
 import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.auraboot.framework.view.entity.SavedView;
-import com.auraboot.framework.view.entity.ViewConfig;
 import com.auraboot.framework.view.mapper.SavedViewMapper;
 import com.auraboot.framework.plugin.config.PlatformProperties;
 import com.auraboot.framework.plugin.dto.PluginManifest;
@@ -62,15 +61,9 @@ import com.auraboot.framework.meta.dto.SchemaSyncOptions;
 import com.auraboot.framework.meta.dto.SchemaOperationResult;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.SchemaManagementService;
-import com.auraboot.framework.permission.dto.PermissionDTO;
 import com.auraboot.framework.permission.service.AutoPermissionAssignmentService;
-import com.auraboot.framework.permission.service.CommandActionDeriver;
-import com.auraboot.framework.permission.service.PermissionService;
 import com.auraboot.framework.permission.service.UserPermissionService;
-import com.auraboot.framework.rbac.entity.RolePermission;
-import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
-import com.auraboot.framework.rbac.entity.Role;
-import com.auraboot.framework.rbac.service.RoleService;
+import com.auraboot.framework.permission.service.CommandActionDeriver;
 import com.auraboot.framework.semantic.exception.SemanticValidationException;
 import com.auraboot.framework.semantic.exception.SemanticYamlInvalidException;
 import com.auraboot.framework.semantic.service.SemanticPublishService;
@@ -135,10 +128,7 @@ public class PluginImportServiceImpl implements PluginImportService {
     private final com.auraboot.framework.meta.service.FieldMaskService fieldMaskService;
     private final com.auraboot.framework.permission.capability.CapabilityRegistryService capabilityRegistryService;
     private final SchemaManagementService schemaManagementService;
-    private final PermissionService permissionService;
     private final UserPermissionService userPermissionService;
-    private final RoleService roleService;
-    private final RolePermissionMapper rolePermissionMapper;
     private final DistributedLock distributedLock;
     private final I18nResourceService i18nResourceService;
     private final I18nService i18nService;
@@ -164,6 +154,7 @@ public class PluginImportServiceImpl implements PluginImportService {
     private final EventPolicyVersionService eventPolicyVersionService;
     private final SemanticPublishService semanticPublishService;
     private final JdbcTemplate jdbcTemplate;
+    private final IdentifierMappingDataMigrator identifierMappingDataMigrator;
     /** Used by {@link #verifyImportReferenceIntegrity()} to enumerate the tenant's commands. */
     private final com.auraboot.framework.meta.mapper.CommandDefinitionMapper commandDefinitionMapper;
 
@@ -533,188 +524,7 @@ public class PluginImportServiceImpl implements PluginImportService {
     }
 
     private void generateChangePreview(PluginManifestExtended manifest, ImportPreviewResult result, PluginRecord existing) {
-        Long tenantId = MetaContext.getCurrentTenantId();
-
-        // Preview models
-        if (manifest.getModels() != null) {
-            for (ModelDefinitionDTO model : manifest.getModels()) {
-                ResourceAction action = resourceImporter.checkModelExists(tenantId, model.getCode())
-                        ? ResourceAction.UPDATE : ResourceAction.CREATE;
-                result.addChange(ResourceType.MODEL, enrichWithUserModified(tenantId, ResourceType.MODEL, model.getCode(),
-                        ImportPreviewResult.ResourceChange.builder()
-                        .resourceType(ResourceType.MODEL)
-                        .resourceCode(model.getCode())
-                        .resourceName(model.getEffectiveDisplayName())
-                        .action(action)
-                        .build()));
-            }
-        }
-
-        // Preview fields
-        if (manifest.getFields() != null) {
-            for (FieldDefinitionDTO field : manifest.getFields()) {
-                ResourceAction action = resourceImporter.checkFieldExists(tenantId, field.getCode())
-                        ? ResourceAction.UPDATE : ResourceAction.CREATE;
-                result.addChange(ResourceType.FIELD, enrichWithUserModified(tenantId, ResourceType.FIELD, field.getCode(),
-                        ImportPreviewResult.ResourceChange.builder()
-                        .resourceType(ResourceType.FIELD)
-                        .resourceCode(field.getCode())
-                        .resourceName(field.getEffectiveDisplayName())
-                        .action(action)
-                        .build()));
-            }
-        }
-
-        // Preview commands
-        if (manifest.getCommands() != null) {
-            for (CommandDefinitionDTO command : manifest.getCommands()) {
-                ResourceAction action = resourceImporter.checkCommandExists(tenantId, command.getCode())
-                        ? ResourceAction.UPDATE : ResourceAction.CREATE;
-                result.addChange(ResourceType.COMMAND, enrichWithUserModified(tenantId, ResourceType.COMMAND, command.getCode(),
-                        ImportPreviewResult.ResourceChange.builder()
-                        .resourceType(ResourceType.COMMAND)
-                        .resourceCode(command.getCode())
-                        .resourceName(command.getEffectiveDisplayName())
-                        .action(action)
-                        .build()));
-            }
-        }
-
-        // Preview permissions
-        if (manifest.getPermissions() != null) {
-            for (PermissionDefinitionDTO permission : manifest.getPermissions()) {
-                ResourceAction action = resourceImporter.checkPermissionExists(tenantId, permission.getCode())
-                        ? ResourceAction.UPDATE : ResourceAction.CREATE;
-                result.addChange(ResourceType.PERMISSION, enrichWithUserModified(tenantId, ResourceType.PERMISSION, permission.getCode(),
-                        ImportPreviewResult.ResourceChange.builder()
-                        .resourceType(ResourceType.PERMISSION)
-                        .resourceCode(permission.getCode())
-                        .resourceName(permission.getEffectiveName())
-                        .action(action)
-                        .build()));
-            }
-        }
-
-        // Preview roles
-        if (manifest.getRoles() != null) {
-            for (RoleDefinitionDTO role : manifest.getRoles()) {
-                ResourceAction action = resourceImporter.checkRoleExists(tenantId, role.getCode())
-                        ? ResourceAction.UPDATE : ResourceAction.CREATE;
-                result.addChange(ResourceType.ROLE, enrichWithUserModified(tenantId, ResourceType.ROLE, role.getCode(),
-                        ImportPreviewResult.ResourceChange.builder()
-                        .resourceType(ResourceType.ROLE)
-                        .resourceCode(role.getCode())
-                        .resourceName(role.getEffectiveName())
-                        .action(action)
-                        .build()));
-            }
-        }
-
-        // Preview menus
-        if (manifest.getMenus() != null) {
-            for (MenuDefinitionDTO menu : manifest.getMenus()) {
-                ResourceAction action = resourceImporter.checkMenuExists(tenantId, menu.getCode())
-                        ? ResourceAction.UPDATE : ResourceAction.CREATE;
-                result.addChange(ResourceType.MENU, enrichWithUserModified(tenantId, ResourceType.MENU, menu.getCode(),
-                        ImportPreviewResult.ResourceChange.builder()
-                        .resourceType(ResourceType.MENU)
-                        .resourceCode(menu.getCode())
-                        .resourceName(menu.getEffectiveName())
-                        .action(action)
-                        .build()));
-            }
-        }
-
-        // Preview pages
-        if (manifest.getPages() != null) {
-            for (PageSchemaDTO page : manifest.getPages()) {
-                ResourceAction action = resourceImporter.checkPageExists(tenantId, page.getPageKey())
-                        ? ResourceAction.UPDATE : ResourceAction.CREATE;
-                result.addChange(ResourceType.PAGE, enrichWithUserModified(tenantId, ResourceType.PAGE, page.getPageKey(),
-                        ImportPreviewResult.ResourceChange.builder()
-                        .resourceType(ResourceType.PAGE)
-                        .resourceCode(page.getPageKey())
-                        .resourceName(page.getEffectiveName())
-                        .action(action)
-                        .build()));
-            }
-        }
-
-        // Preview dicts
-        if (manifest.getDicts() != null) {
-            for (DictDefinitionDTO dict : manifest.getDicts()) {
-                ResourceAction action = resourceImporter.checkDictExists(tenantId, dict.getCode())
-                        ? ResourceAction.UPDATE : ResourceAction.CREATE;
-                result.addChange(ResourceType.DICT, enrichWithUserModified(tenantId, ResourceType.DICT, dict.getCode(),
-                        ImportPreviewResult.ResourceChange.builder()
-                        .resourceType(ResourceType.DICT)
-                        .resourceCode(dict.getCode())
-                        .resourceName(dict.getEffectiveName())
-                        .action(action)
-                        .build()));
-            }
-        }
-
-        // Preview named queries
-        if (manifest.getNamedQueries() != null) {
-            for (NamedQueryDefinitionDTO namedQuery : manifest.getNamedQueries()) {
-                ResourceAction action = resourceImporter.checkNamedQueryExists(tenantId, namedQuery.getCode())
-                        ? ResourceAction.UPDATE : ResourceAction.CREATE;
-                result.addChange(ResourceType.NAMED_QUERY, enrichWithUserModified(
-                        tenantId, ResourceType.NAMED_QUERY, namedQuery.getCode(),
-                        ImportPreviewResult.ResourceChange.builder()
-                                .resourceType(ResourceType.NAMED_QUERY)
-                                .resourceCode(namedQuery.getCode())
-                                .resourceName(namedQuery.getEffectiveTitle())
-                                .action(action)
-                                .build()));
-            }
-        }
-
-        // Preview agent definitions
-        if (manifest.getAgentDefinitions() != null) {
-            for (AgentDefinitionDTO agentDefinition : manifest.getAgentDefinitions()) {
-                ResourceAction action = resourceImporter.checkAgentDefinitionExists(tenantId, agentDefinition.getAgentCode())
-                        ? ResourceAction.UPDATE : ResourceAction.CREATE;
-                result.addChange(ResourceType.AGENT_DEFINITION, enrichWithUserModified(
-                        tenantId, ResourceType.AGENT_DEFINITION, agentDefinition.getAgentCode(),
-                        ImportPreviewResult.ResourceChange.builder()
-                                .resourceType(ResourceType.AGENT_DEFINITION)
-                                .resourceCode(agentDefinition.getAgentCode())
-                                .resourceName(agentDefinition.getEffectiveName())
-                                .action(action)
-                                .build()));
-            }
-        }
-
-        // Preview saved views
-        if (manifest.getSavedViews() != null) {
-            for (SavedViewDefinitionDTO savedView : manifest.getSavedViews()) {
-                List<SavedView> existingViews = savedViewMapper.findGlobalViews(savedView.getModelCode(), savedView.getPageKey());
-                boolean exists = existingViews.stream()
-                        .anyMatch(v -> matchesPluginSavedView(savedView, v));
-                result.addChange(ResourceType.SAVED_VIEW, ImportPreviewResult.ResourceChange.builder()
-                        .resourceType(ResourceType.SAVED_VIEW)
-                        .resourceCode(savedView.getUniqueKey())
-                        .resourceName(savedView.getName() + " (" + savedView.getViewType() + ")")
-                        .action(exists ? ResourceAction.UPDATE : ResourceAction.CREATE)
-                        .build());
-            }
-        }
-
-        // Preview notification templates
-        if (manifest.getNotificationTemplates() != null) {
-            for (NotificationTemplateDefinitionDTO template : manifest.getNotificationTemplates()) {
-                NotificationTemplate existingTemplate =
-                        notificationTemplateMapper.findByCodeForUpsert(tenantId, template.getCode());
-                result.addChange(ResourceType.NOTIFICATION_TEMPLATE, ImportPreviewResult.ResourceChange.builder()
-                        .resourceType(ResourceType.NOTIFICATION_TEMPLATE)
-                        .resourceCode(template.getCode())
-                        .resourceName(template.getName())
-                        .action(existingTemplate != null ? ResourceAction.UPDATE : ResourceAction.CREATE)
-                        .build());
-            }
-        }
+        pluginImportChangePreview().generateChangePreview(manifest,result,existing);
     }
 
     /**
@@ -724,41 +534,14 @@ public class PluginImportServiceImpl implements PluginImportService {
     private ImportPreviewResult.ResourceChange enrichWithUserModified(
             Long tenantId, ResourceType type, String resourceCode,
             ImportPreviewResult.ResourceChange change) {
-        if (change.getAction() == ResourceAction.UPDATE) {
-            try {
-                PluginResource pr = pluginResourceMapper.findByTypeAndCode(
-                        tenantId, type.name(), resourceCode);
-                if (pr != null && Boolean.TRUE.equals(pr.getUserModified())) {
-                    change.setUserModified(true);
-                    change.setUserModifiedAt(pr.getUserModifiedAt());
-                }
-            } catch (Exception e) {
-                log.debug("Failed to check user-modified status for {} {}: {}",
-                        type, logSafe(resourceCode), logSafe(e.getMessage()));
-            }
-        }
-        return change;
+        return pluginImportChangePreview().enrichWithUserModified(tenantId,type,resourceCode,change);
     }
 
     /**
      * Summarize user-modified resources and add warnings to the preview result.
      */
     private void summarizeUserModifiedConflicts(ImportPreviewResult result) {
-        List<String> modifiedResources = new ArrayList<>();
-        if (result.getChanges() != null) {
-            for (List<ImportPreviewResult.ResourceChange> changes : result.getChanges().values()) {
-                for (ImportPreviewResult.ResourceChange change : changes) {
-                    if (change.isUserModified() && change.getAction() == ResourceAction.UPDATE) {
-                        modifiedResources.add(change.getResourceType() + " " + change.getResourceCode());
-                    }
-                }
-            }
-        }
-        if (!modifiedResources.isEmpty()) {
-            result.addWarning("The following " + modifiedResources.size() +
-                    " resource(s) have been manually modified and will be overwritten: " +
-                    String.join(", ", modifiedResources));
-        }
+        pluginImportChangePreview().summarizeUserModifiedConflicts(result);
     }
 
     // ==================== Preview ====================
@@ -978,6 +761,13 @@ public class PluginImportServiceImpl implements PluginImportService {
             // Import resources in dependency order
             importResources(context, request, result, pluginPid);
 
+            // Plugin rename upgrade contract: when the request carries an
+            // identifier mapping, migrate legacy-identifier physical-table rows
+            // into the freshly imported identifiers before the import commits.
+            // A migration failure fails the whole import so an upgrade is never
+            // half-applied silently.
+            applyIdentifierDataMigration(request, result, tenantId);
+
             // Mark as success
             result.setSuccess(true);
             result.setStatus(ImportStatus.SUCCESS);
@@ -1034,6 +824,38 @@ public class PluginImportServiceImpl implements PluginImportService {
         }
 
         return result;
+    }
+
+    /**
+     * Plugin rename upgrade contract: run the identifier-mapping data migration
+     * when the request declares one, attaching per-model receipts to the result.
+     * Runs inside the import transaction — any failure rolls the whole import back.
+     */
+    private void applyIdentifierDataMigration(ImportRequest request, ImportExecuteResult result, Long tenantId) {
+        String mappingPath = request.getIdentifierMappingPath();
+        if (mappingPath == null || mappingPath.isBlank()) {
+            return;
+        }
+        log.info("Running identifier-mapping data migration for plugin {}: {}",
+                logSafe(result.getPluginId()), logSafe(mappingPath));
+        List<IdentifierMappingDataMigrator.ModelDataMigration> migrations =
+                identifierMappingDataMigrator.migrate(java.nio.file.Path.of(mappingPath), tenantId);
+        if (result.getDataMigrations() == null) {
+            result.setDataMigrations(new ArrayList<>());
+        }
+        for (IdentifierMappingDataMigrator.ModelDataMigration migration : migrations) {
+            result.getDataMigrations().add(ImportExecuteResult.IdentifierDataMigration.builder()
+                    .fromModel(migration.getFromModel())
+                    .toModel(migration.getToModel())
+                    .sourceTable(migration.getSourceTable())
+                    .targetTable(migration.getTargetTable())
+                    .rowsMigrated(migration.getRowsMigrated())
+                    .rowsAlreadyPresent(migration.getRowsAlreadyPresent())
+                    .columnsRenamed(migration.getColumnsRenamed())
+                    .droppedSourceColumns(migration.getDroppedSourceColumns())
+                    .unmappedNewColumns(migration.getUnmappedNewColumns())
+                    .build());
+        }
     }
 
     private void markImportFailedInNewTransaction(String importId, Throwable throwable) {
@@ -1234,7 +1056,7 @@ public class PluginImportServiceImpl implements PluginImportService {
         // ("Permission not found for role binding"), so plugin business roles ended up
         // without model write access on first import. Reconcile now that every generated
         // action resolves; binding is idempotent.
-        reconcileRolePermissionBindings(manifest, tenantId);
+        pluginAccessResourceImporter().reconcileRolePermissionBindings(manifest, tenantId);
 
         // Semantic resources reference imported model/field codes, so publication
         // must run only after model auto-publish and schema synchronization.
@@ -1324,28 +1146,15 @@ public class PluginImportServiceImpl implements PluginImportService {
                 }
 
                 // Ensure hierarchical permissions exist (idempotent — skips if already created)
-                autoPermissionAssignmentService.autoAssignPermissions(modelCode, pluginNamespace, tenantId);
+                autoPermissionAssignmentService.registerPermissions(modelCode, pluginNamespace, tenantId);
             }
         }
     }
 
-    private void reconcileRolePermissionBindings(PluginManifestExtended manifest, Long tenantId) {
-        if (manifest.getRoles() == null || manifest.getRoles().isEmpty()) {
-            return;
-        }
-        for (RoleDefinitionDTO role : manifest.getRoles()) {
-            if (role == null || !role.isValid()) {
-                continue;
-            }
-            try {
-                resourceImporter.reconcileRolePermissions(role, tenantId);
-            } catch (Exception e) {
-                // Per-role best-effort, mirroring updateRolePermissions: one broken role
-                // must not abort the import; the warning keeps the gap visible in logs.
-                log.warn("Role permission reconciliation failed for role {}: {}",
-                        logSafe(role.getCode()), logSafe(e.getMessage()), e);
-            }
-        }
+    @Override
+    @Transactional
+    public int reconcileDirectoryRolePermissions(String directoryPath) {
+        return resourceImporter.reconcileDirectoryRolePermissions(directoryPath, directoryLoader, pluginRecordMapper);
     }
 
     /**
@@ -1395,45 +1204,12 @@ public class PluginImportServiceImpl implements PluginImportService {
 
     private void importDicts(PluginManifestExtended manifest, ImportRequest request,
                              ImportExecuteResult result, String pluginPid, String importId, Long tenantId) {
-        if (manifest.getDicts() == null) return;
-
-        for (DictDefinitionDTO dict : manifest.getDicts()) {
-            if (!dict.isValid()) {
-                log.warn("Skipping invalid dict entry (missing code): index={}", manifest.getDicts().indexOf(dict));
-                continue;
-            }
-            PluginResource resource = resourceImporter.importDict(dict, pluginPid, importId, tenantId, request.getConflictStrategy());
-            if (resource != null) {
-                captureImportSnapshot(resource, dict);
-                saveOrUpdatePluginResource(resource, tenantId);
-                result.incrementResourceCount(ResourceType.DICT, resource.getActionEnum());
-                if (resource.getResourcePid() != null) {
-                    result.addCreatedResource(ResourceType.DICT, resource.getResourcePid());
-                }
-            }
-        }
+        pluginDefinitionResourceImporter().importDicts(manifest,request,result,pluginPid,importId,tenantId);
     }
 
     private void importFields(PluginManifestExtended manifest, ImportRequest request,
                               ImportExecuteResult result, String pluginPid, String importId, Long tenantId) {
-        if (manifest.getFields() == null) return;
-
-        for (FieldDefinitionDTO field : manifest.getFields()) {
-            if (!field.isValid()) {
-                log.warn("Skipping invalid field entry (missing code/dataType): index={}", manifest.getFields().indexOf(field));
-                continue;
-            }
-            PluginResource resource = resourceImporter.importField(field, pluginPid, importId, tenantId,
-                    request.getConflictStrategy(), request.getAutoPublishFields());
-            if (resource != null) {
-                captureImportSnapshot(resource, field);
-                saveOrUpdatePluginResource(resource, tenantId);
-                result.incrementResourceCount(ResourceType.FIELD, resource.getActionEnum());
-                if (resource.getResourcePid() != null) {
-                    result.addCreatedResource(ResourceType.FIELD, resource.getResourcePid());
-                }
-            }
-        }
+        pluginDefinitionResourceImporter().importFields(manifest,request,result,pluginPid,importId,tenantId);
     }
 
     /**
@@ -1441,185 +1217,33 @@ public class PluginImportServiceImpl implements PluginImportService {
      */
     private List<String> importModels(PluginManifestExtended manifest, ImportRequest request,
                               ImportExecuteResult result, String pluginPid, String importId, Long tenantId) {
-        List<String> importedModelCodes = new ArrayList<>();
-        if (manifest.getModels() == null) return importedModelCodes;
-
-        for (ModelDefinitionDTO model : manifest.getModels()) {
-            if (!model.isValid()) {
-                log.warn("Skipping invalid model entry (missing code): index={}", manifest.getModels().indexOf(model));
-                continue;
-            }
-            PluginResource resource = resourceImporter.importModel(model, pluginPid, importId, tenantId,
-                    request.getConflictStrategy(), request.getAutoPublishModels());
-            if (resource != null) {
-                captureImportSnapshot(resource, model);
-                saveOrUpdatePluginResource(resource, tenantId);
-                result.incrementResourceCount(ResourceType.MODEL, resource.getActionEnum());
-                if (resource.getResourcePid() != null) {
-                    result.addCreatedResource(ResourceType.MODEL, resource.getResourcePid());
-                }
-                // Track model codes for post-processing (publish/sync)
-                if (resource.getActionEnum() != ResourceAction.SKIP) {
-                    importedModelCodes.add(model.getCode());
-                }
-            }
-        }
-        return importedModelCodes;
+        return pluginDefinitionResourceImporter().importModels(manifest,request,result,pluginPid,importId,tenantId);
     }
 
     private void importModelFieldBindings(PluginManifestExtended manifest, ImportRequest request,
                                           ImportExecuteResult result, String pluginPid, String importId, Long tenantId) {
-        if (manifest.getModelFieldBindings() == null) return;
-
-        for (ModelFieldBindingDTO binding : manifest.getModelFieldBindings()) {
-            if (!binding.isValid()) {
-                log.warn("Skipping invalid model-field binding (missing modelCode/fieldCode): index={}", manifest.getModelFieldBindings().indexOf(binding));
-                continue;
-            }
-            PluginResource resource = resourceImporter.importModelFieldBinding(binding, pluginPid, importId, tenantId, request.getConflictStrategy());
-            if (resource != null) {
-                captureImportSnapshot(resource, binding);
-                saveOrUpdatePluginResource(resource, tenantId);
-                result.incrementResourceCount(ResourceType.MODEL_FIELD_BINDING, resource.getActionEnum());
-            }
-        }
+        pluginDefinitionResourceImporter().importModelFieldBindings(manifest,request,result,pluginPid,importId,tenantId);
     }
 
     private void importPermissions(PluginManifestExtended manifest, ImportRequest request,
                                    ImportExecuteResult result, String pluginPid, String importId, Long tenantId) {
-        if (manifest.getPermissions() == null) return;
-
-        for (PermissionDefinitionDTO permission : manifest.getPermissions()) {
-            if (!permission.isValid()) {
-                log.warn("Skipping invalid permission entry (missing code): index={}", manifest.getPermissions().indexOf(permission));
-                continue;
-            }
-            PluginResource resource = resourceImporter.importPermission(permission, pluginPid, importId, tenantId, request.getConflictStrategy());
-            if (resource != null) {
-                captureImportSnapshot(resource, permission);
-                saveOrUpdatePluginResource(resource, tenantId);
-                result.incrementResourceCount(ResourceType.PERMISSION, resource.getActionEnum());
-                if (resource.getResourcePid() != null) {
-                    result.addCreatedResource(ResourceType.PERMISSION, resource.getResourcePid());
-                }
-            }
-        }
-
-        generatePermissionI18nRecords(manifest.getPermissions(), tenantId);
-        bindImportedPermissionsToTenantAdmin(manifest.getPermissions(), tenantId);
+        pluginAccessResourceImporter().importPermissions(manifest,request,result,pluginPid,importId,tenantId);
     }
 
-    private void bindImportedPermissionsToTenantAdmin(List<PermissionDefinitionDTO> permissions, Long tenantId) {
-        if (permissions == null || permissions.isEmpty()) return;
-        if (tenantId == null) return;
-
-        Role tenantAdminRole = roleService.findByTenantId(tenantId).stream()
-                .filter(role -> "tenant_admin".equals(role.getCode()))
-                .findFirst()
-                .orElse(null);
-        if (tenantAdminRole == null) {
-            log.warn("tenant_admin role not found, skip binding imported permissions: tenantId={}", tenantId);
-            return;
-        }
-
-        Set<Long> boundPermissionIds = permissionService.findRolePermissions(tenantAdminRole.getId()).stream()
-                .map(PermissionDTO::getId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-
-        for (PermissionDefinitionDTO permission : permissions) {
-            try {
-                PermissionDTO permissionDTO = permissionService.findByCode(permission.getCode());
-                if (permissionDTO == null) {
-                    log.warn("Imported permission not found after import: code={}", logSafe(permission.getCode()));
-                    continue;
-                }
-
-                //todo check logic
-                if (boundPermissionIds.contains(permissionDTO.getId())) {
-                    log.warn("Duplicated permission found: code={}", logSafe(permission.getCode()));
-
-                    continue;
-                }
-                RolePermission binding = new RolePermission();
-                binding.setPid(UniqueIdGenerator.generate());
-                binding.setTenantId(tenantId);
-                binding.setRoleId(tenantAdminRole.getId());
-                binding.setPermissionId(permissionDTO.getId());
-                binding.setGrantType(StatusConstants.GRANT);
-                binding.setPriority(0);
-                binding.setStatus(StatusConstants.ACTIVE);
-                binding.setDeletedFlag(false);
-                binding.setCreatedAt(Instant.now());
-                binding.setUpdatedAt(Instant.now());
-                rolePermissionMapper.insert(binding);
-                boundPermissionIds.add(permissionDTO.getId());
-            } catch (Exception e) {
-                // Duplicate bind and stale edge cases should not fail plugin import.
-                log.debug("Skip binding permission to tenant_admin: code={}, reason={}",
-                        logSafe(permission.getCode()), logSafe(e.getMessage()));
-            }
-        }
-        userPermissionService.evictPermissionDefinitions(tenantId);
-        userPermissionService.evictRoleUsers(tenantId, tenantAdminRole.getId());
-    }
 
     private void importRoles(PluginManifestExtended manifest, ImportRequest request,
                              ImportExecuteResult result, String pluginPid, String importId, Long tenantId) {
-        if (manifest.getRoles() == null) return;
-
-        for (RoleDefinitionDTO role : manifest.getRoles()) {
-            if (!role.isValid()) {
-                log.warn("Skipping invalid role entry (missing code): index={}", manifest.getRoles().indexOf(role));
-                continue;
-            }
-            PluginResource resource = resourceImporter.importRole(role, pluginPid, importId, tenantId, request.getConflictStrategy());
-            if (resource != null) {
-                captureImportSnapshot(resource, role);
-                saveOrUpdatePluginResource(resource, tenantId);
-                result.incrementResourceCount(ResourceType.ROLE, resource.getActionEnum());
-                if (resource.getResourcePid() != null) {
-                    result.addCreatedResource(ResourceType.ROLE, resource.getResourcePid());
-                }
-            }
-        }
+        pluginAccessResourceImporter().importRoles(manifest,request,result,pluginPid,importId,tenantId);
     }
 
     private void importRolePermissions(PluginManifestExtended manifest, ImportRequest request,
                                        ImportExecuteResult result, String pluginPid, String importId, Long tenantId) {
-        // Role-permission bindings are handled within importRoles based on role.permissions list
+        pluginAccessResourceImporter().importRolePermissions(manifest,request,result,pluginPid,importId,tenantId);
     }
 
     private void importMenus(PluginManifestExtended manifest, ImportRequest request,
                              ImportExecuteResult result, String pluginPid, String importId, Long tenantId) {
-        if (manifest.getMenus() == null) return;
-
-        // Clear menu code→id map before processing this batch
-        if (resourceImporter instanceof PluginResourceImporterImpl impl) {
-            impl.clearMenuCodeMap();
-        }
-
-        // Topological sort: ensure parent menus are imported before children
-        List<MenuDefinitionDTO> sorted = topologicalSortMenus(manifest.getMenus());
-
-        for (MenuDefinitionDTO menu : sorted) {
-            if (!menu.isValid()) {
-                log.warn("Skipping invalid menu entry (missing code): index={}", sorted.indexOf(menu));
-                continue;
-            }
-            PluginResource resource = resourceImporter.importMenu(menu, pluginPid, importId, tenantId, request.getConflictStrategy());
-            if (resource != null) {
-                captureImportSnapshot(resource, menu);
-                saveOrUpdatePluginResource(resource, tenantId);
-                result.incrementResourceCount(ResourceType.MENU, resource.getActionEnum());
-                if (resource.getResourcePid() != null) {
-                    result.addCreatedResource(ResourceType.MENU, resource.getResourcePid());
-                }
-            }
-        }
-
-        // Auto-generate menu i18n records from name:zh-CN / name:en fields
-        generateMenuI18nRecords(sorted, tenantId);
+        pluginAccessResourceImporter().importMenus(manifest,request,result,pluginPid,importId,tenantId);
     }
 
     /**
@@ -1627,28 +1251,7 @@ public class PluginImportServiceImpl implements PluginImportService {
      * Key format: menu.{CODE} (matching frontend auto-derivation in transformMenuForUI).
      */
     private void generateMenuI18nRecords(List<MenuDefinitionDTO> menus, Long tenantId) {
-        List<I18nResource> resources = new ArrayList<>();
-        for (MenuDefinitionDTO menu : menus) {
-            if (menu.getCode() == null || menu.getCode().isBlank()) continue;
-            String i18nKey = "menu." + menu.getCode();
-
-            for (Map.Entry<String, String> entry : menu.getAllLocalizedNames().entrySet()) {
-                I18nResource res = new I18nResource();
-                res.setI18nKey(i18nKey);
-                res.setLang(entry.getKey());
-                res.setValue(entry.getValue());
-                res.setSource(I18nResource.SOURCE_IMPORT);
-                res.setRefType("menu");
-                res.setStatus(I18nResource.STATUS_APPROVED);
-                resources.add(res);
-            }
-        }
-
-        if (!resources.isEmpty()) {
-            int count = i18nResourceService.batchUpsert(resources);
-            i18nService.clearCache(null);
-            log.info("Auto-generated {} menu i18n records from localized names", count);
-        }
+        communicationResourceImporter().generateMenuI18nRecords(menus,tenantId);
     }
 
     /**
@@ -1657,35 +1260,11 @@ public class PluginImportServiceImpl implements PluginImportService {
      * matching frontend consumption in routes/enterprise/permission (PermissionTree/PermissionTab).
      */
     private void generatePermissionI18nRecords(List<PermissionDefinitionDTO> permissions, Long tenantId) {
-        List<I18nResource> resources = new ArrayList<>();
-        for (PermissionDefinitionDTO permission : permissions) {
-            if (permission.getCode() == null || permission.getCode().isBlank()) continue;
-            String nameKey = "permission." + permission.getCode();
-            for (Map.Entry<String, String> entry : permission.getAllLocalizedNames().entrySet()) {
-                resources.add(buildImportI18nResource(nameKey, entry.getKey(), entry.getValue(), "permission"));
-            }
-            String descKey = "permission." + permission.getCode() + ".description";
-            for (Map.Entry<String, String> entry : permission.getAllLocalizedDescriptions().entrySet()) {
-                resources.add(buildImportI18nResource(descKey, entry.getKey(), entry.getValue(), "permission"));
-            }
-        }
-
-        if (!resources.isEmpty()) {
-            int count = i18nResourceService.batchUpsert(resources);
-            i18nService.clearCache(null);
-            log.info("Auto-generated {} permission i18n records from localized names/descriptions", count);
-        }
+        communicationResourceImporter().generatePermissionI18nRecords(permissions,tenantId);
     }
 
     private I18nResource buildImportI18nResource(String i18nKey, String lang, String value, String refType) {
-        I18nResource res = new I18nResource();
-        res.setI18nKey(i18nKey);
-        res.setLang(lang);
-        res.setValue(value);
-        res.setSource(I18nResource.SOURCE_IMPORT);
-        res.setRefType(refType);
-        res.setStatus(I18nResource.STATUS_APPROVED);
-        return res;
+        return communicationResourceImporter().buildImportI18nResource(i18nKey,lang,value,refType);
     }
 
     /**
@@ -1694,49 +1273,7 @@ public class PluginImportServiceImpl implements PluginImportService {
      * Menus with no parentCode or with an external parentCode keep their original relative order.
      */
     private List<MenuDefinitionDTO> topologicalSortMenus(List<MenuDefinitionDTO> menus) {
-        Set<String> codesInList = new HashSet<>();
-        for (MenuDefinitionDTO m : menus) {
-            codesInList.add(m.getCode());
-        }
-
-        // Build adjacency: parentCode → children codes (only for in-list references)
-        Map<String, List<MenuDefinitionDTO>> childrenOf = new LinkedHashMap<>();
-        List<MenuDefinitionDTO> roots = new ArrayList<>();
-        for (MenuDefinitionDTO m : menus) {
-            String pc = m.getParentCode();
-            if (pc != null && codesInList.contains(pc)) {
-                childrenOf.computeIfAbsent(pc, k -> new ArrayList<>()).add(m);
-            } else {
-                roots.add(m);
-            }
-        }
-
-        // BFS from roots
-        List<MenuDefinitionDTO> sorted = new ArrayList<>(menus.size());
-        Deque<MenuDefinitionDTO> queue = new ArrayDeque<>(roots);
-        while (!queue.isEmpty()) {
-            MenuDefinitionDTO current = queue.poll();
-            sorted.add(current);
-            List<MenuDefinitionDTO> children = childrenOf.get(current.getCode());
-            if (children != null) {
-                queue.addAll(children);
-            }
-        }
-
-        // Safety: if any menus were missed (circular refs), append them
-        if (sorted.size() < menus.size()) {
-            Set<String> sortedCodes = new HashSet<>();
-            for (MenuDefinitionDTO m : sorted) {
-                sortedCodes.add(m.getCode());
-            }
-            for (MenuDefinitionDTO m : menus) {
-                if (!sortedCodes.contains(m.getCode())) {
-                    sorted.add(m);
-                }
-            }
-        }
-
-        return sorted;
+        return pluginAccessResourceImporter().topologicalSortMenus(menus);
     }
 
     /**
@@ -1745,107 +1282,22 @@ public class PluginImportServiceImpl implements PluginImportService {
      * Plugin-defined commands take precedence (generated commands with duplicate codes are skipped).
      */
     private void generateDocumentTemplateCommands(PluginManifestExtended manifest) {
-        if (manifest.getModels() == null) return;
-
-        // Collect existing command codes for dedup
-        Set<String> existingCodes = new HashSet<>();
-        if (manifest.getCommands() != null) {
-            for (CommandDefinitionDTO cmd : manifest.getCommands()) {
-                if (cmd.getCode() != null) existingCodes.add(cmd.getCode());
-            }
-        }
-
-        List<CommandDefinitionDTO> generated = new ArrayList<>();
-        for (ModelDefinitionDTO model : manifest.getModels()) {
-            if (!"document".equals(model.getModelCategory())) continue;
-
-            var docConfig = com.auraboot.framework.meta.template.dto.DocumentConfig.fromExtension(model.getExtension());
-            if (docConfig == null) continue;
-
-            List<CommandDefinitionDTO> modelCommands = documentCommandGenerator.generateCommands(model, docConfig);
-            for (CommandDefinitionDTO cmd : modelCommands) {
-                if (!existingCodes.contains(cmd.getCode())) {
-                    generated.add(cmd);
-                    existingCodes.add(cmd.getCode());
-                    log.debug("Document template generated command: {}", logSafe(cmd.getCode()));
-                } else {
-                    log.debug("Document template skipped (plugin-defined): {}", logSafe(cmd.getCode()));
-                }
-            }
-        }
-
-        if (!generated.isEmpty()) {
-            log.info("Document template generated {} commands for {} plugin",
-                    generated.size(), logSafe(manifest.getPluginId()));
-            if (manifest.getCommands() == null) {
-                manifest.setCommands(new ArrayList<>(generated));
-            } else {
-                manifest.getCommands().addAll(generated);
-            }
-        }
+        pluginDefinitionResourceImporter().generateDocumentTemplateCommands(manifest);
     }
 
     private void importCommands(PluginManifestExtended manifest, ImportRequest request,
                                 ImportExecuteResult result, String pluginPid, String importId, Long tenantId) {
-        if (manifest.getCommands() == null) return;
-
-        for (CommandDefinitionDTO command : manifest.getCommands()) {
-            if (!command.isValid()) {
-                log.warn("Skipping invalid command entry (missing code/modelCode): index={}", manifest.getCommands().indexOf(command));
-                continue;
-            }
-            PluginResource resource = resourceImporter.importCommand(command, pluginPid, importId, tenantId, request.getConflictStrategy(), request.getAutoPublishCommands());
-            if (resource != null) {
-                captureImportSnapshot(resource, command);
-                saveOrUpdatePluginResource(resource, tenantId);
-                result.incrementResourceCount(ResourceType.COMMAND, resource.getActionEnum());
-                if (resource.getResourcePid() != null) {
-                    result.addCreatedResource(ResourceType.COMMAND, resource.getResourcePid());
-                }
-            }
-        }
+        pluginDefinitionResourceImporter().importCommands(manifest,request,result,pluginPid,importId,tenantId);
     }
 
     private void importBindingRules(PluginManifestExtended manifest, ImportRequest request,
                                     ImportExecuteResult result, String pluginPid, String importId, Long tenantId) {
-        // Binding rules are imported with their commands
-        if (manifest.getBindingRules() == null) return;
-
-        for (BindingRuleDTO rule : manifest.getBindingRules()) {
-            if (!rule.isValid()) {
-                log.warn("Skipping invalid binding rule (missing commandCode): index={}", manifest.getBindingRules().indexOf(rule));
-                continue;
-            }
-            PluginResource resource = resourceImporter.importBindingRule(rule, pluginPid, importId, tenantId, request.getConflictStrategy());
-            if (resource != null) {
-                captureImportSnapshot(resource, rule);
-                saveOrUpdatePluginResource(resource, tenantId);
-                result.incrementResourceCount(ResourceType.BINDING_RULE, resource.getActionEnum());
-            }
-        }
+        pluginDefinitionResourceImporter().importBindingRules(manifest,request,result,pluginPid,importId,tenantId);
     }
 
     private void importPages(PluginManifestExtended manifest, ImportRequest request,
                              ImportExecuteResult result, String pluginPid, String importId, Long tenantId) {
-        if (manifest.getPages() == null) return;
-
-        for (PageSchemaDTO page : manifest.getPages()) {
-            if (!page.isValid()) {
-                String pageKey = page != null && page.getPageKey() != null ? page.getPageKey() : "<unknown>";
-                throw new PluginException("Invalid page '" + pageKey + "': page JSON must use the latest V2 flat " +
-                        "format with top-level kind/layout/blocks, and layout/blocks cannot be empty.");
-            }
-            PluginResource resource = resourceImporter.importPage(page, pluginPid, importId, tenantId,
-                    request.getConflictStrategy(), request.getAutoPublishPages());
-            if (resource != null) {
-                captureImportSnapshot(resource, page);
-                saveOrUpdatePluginResource(resource, tenantId);
-                result.incrementResourceCount(ResourceType.PAGE, resource.getActionEnum());
-                if (resource.getResourcePid() != null) {
-                    result.addCreatedResource(ResourceType.PAGE, resource.getResourcePid());
-                }
-            }
-        }
+        pluginDefinitionResourceImporter().importPages(manifest,request,result,pluginPid,importId,tenantId);
     }
 
     /**
@@ -1855,75 +1307,17 @@ public class PluginImportServiceImpl implements PluginImportService {
      */
     private void importDashboards(PluginManifestExtended manifest, ImportRequest request,
                                   ImportExecuteResult result, String pluginPid, String importId, Long tenantId) {
-        if (manifest.getDashboards() == null || manifest.getDashboards().isEmpty()) return;
-
-        for (com.auraboot.framework.plugin.dto.imports.DashboardDefinitionDTO dto : manifest.getDashboards()) {
-            if (!dto.isValid()) {
-                log.warn("Skipping invalid dashboard definition: code={}", logSafe(dto.getCode()));
-                continue;
-            }
-            PluginResource resource = resourceImporter.importDashboard(dto, pluginPid, importId, tenantId,
-                    request.getConflictStrategy());
-            if (resource != null) {
-                captureImportSnapshot(resource, dto);
-                saveOrUpdatePluginResource(resource, tenantId);
-                result.incrementResourceCount(ResourceType.PAGE, resource.getActionEnum());
-                if (resource.getResourcePid() != null) {
-                    result.addCreatedResource(ResourceType.PAGE, resource.getResourcePid());
-                }
-            }
-        }
+        pluginDefinitionResourceImporter().importDashboards(manifest,request,result,pluginPid,importId,tenantId);
     }
 
     private void importNamedQueries(PluginManifestExtended manifest, ImportRequest request,
                                     ImportExecuteResult result, String pluginPid, String importId, Long tenantId) {
-        if (manifest.getNamedQueries() == null) return;
-
-        for (NamedQueryDefinitionDTO namedQuery : manifest.getNamedQueries()) {
-            if (!namedQuery.isValid()) {
-                log.warn("Skipping invalid named query entry (missing code/fromSql): index={}", manifest.getNamedQueries().indexOf(namedQuery));
-                continue;
-            }
-            // Plugin-imported NQs default to PUBLISHED (same rationale as autoPublishModels).
-            // JSON without explicit status deserializes to null (Jackson ignores @Builder.Default),
-            // and normalizeNamedQueryStatus maps null → "draft". Override to PUBLISHED.
-            if (namedQuery.getStatus() == null || "draft".equalsIgnoreCase(namedQuery.getStatus())) {
-                namedQuery.setStatus(StatusConstants.PUBLISHED);
-            }
-            PluginResource resource = resourceImporter.importNamedQuery(
-                    namedQuery, pluginPid, importId, tenantId, request.getConflictStrategy());
-            if (resource != null) {
-                captureImportSnapshot(resource, namedQuery);
-                saveOrUpdatePluginResource(resource, tenantId);
-                result.incrementResourceCount(ResourceType.NAMED_QUERY, resource.getActionEnum());
-                if (resource.getResourcePid() != null) {
-                    result.addCreatedResource(ResourceType.NAMED_QUERY, resource.getResourcePid());
-                }
-            }
-        }
+        pluginDefinitionResourceImporter().importNamedQueries(manifest,request,result,pluginPid,importId,tenantId);
     }
 
     private void importAgentDefinitions(PluginManifestExtended manifest, ImportRequest request,
                                         ImportExecuteResult result, String pluginPid, String importId, Long tenantId) {
-        if (manifest.getAgentDefinitions() == null) return;
-
-        for (AgentDefinitionDTO agentDefinition : manifest.getAgentDefinitions()) {
-            if (!agentDefinition.isValid()) {
-                log.warn("Skipping invalid agent definition entry (missing agentCode/name): index={}",
-                        manifest.getAgentDefinitions().indexOf(agentDefinition));
-                continue;
-            }
-            PluginResource resource = resourceImporter.importAgentDefinition(
-                    agentDefinition, pluginPid, importId, tenantId, request.getConflictStrategy());
-            if (resource != null) {
-                captureImportSnapshot(resource, agentDefinition);
-                saveOrUpdatePluginResource(resource, tenantId);
-                result.incrementResourceCount(ResourceType.AGENT_DEFINITION, resource.getActionEnum());
-                if (resource.getResourcePid() != null) {
-                    result.addCreatedResource(ResourceType.AGENT_DEFINITION, resource.getResourcePid());
-                }
-            }
-        }
+        pluginDefinitionResourceImporter().importAgentDefinitions(manifest,request,result,pluginPid,importId,tenantId);
     }
 
     private PluginRuleSeedImporter ruleSeedImporter() {
@@ -1944,63 +1338,19 @@ public class PluginImportServiceImpl implements PluginImportService {
     }
 
     private void importAutomations(PluginManifestExtended manifest) {
-        if (manifest.getAutomations() == null || manifest.getAutomations().isEmpty()) return;
-        int imported = 0;
-        for (AutomationDefinitionDTO dto : manifest.getAutomations()) {
-            if (!dto.isValid()) {
-                log.warn("Skipping invalid automation seed (missing key/name/model/trigger): index={}",
-                        manifest.getAutomations().indexOf(dto));
-                continue;
-            }
-            importAutomation(dto);
-            imported++;
-        }
-        if (imported > 0) {
-            log.info("Imported {} automation seed(s) for plugin {}", imported, logSafe(manifest.getPluginId()));
-        }
+        pluginDefinitionResourceImporter().importAutomations(manifest);
     }
 
     private void importAutomation(AutomationDefinitionDTO dto) {
-        AutomationDTO existing = findExistingAutomation(dto);
-        if (existing == null) {
-            automationService.create(toAutomationCreateRequest(dto));
-            return;
-        }
-        AutomationUpdateRequest request = new AutomationUpdateRequest();
-        request.setName(dto.getName());
-        request.setDescription(dto.getDescription());
-        request.setTriggerType(dto.getTriggerType());
-        request.setTriggerConfig(dto.getTriggerConfig());
-        request.setTriggerCondition(dto.getTriggerCondition());
-        request.setActions(dto.getActions());
-        request.setFlowConfig(dto.getFlowConfig());
-        request.setEnabled(dto.getEnabled());
-        automationService.update(existing.getPid(), request);
+        pluginDefinitionResourceImporter().importAutomation(dto);
     }
 
     private AutomationDTO findExistingAutomation(AutomationDefinitionDTO dto) {
-        List<AutomationDTO> automations = automationService.getByModelCode(dto.getModelCode());
-        if (automations == null || automations.isEmpty()) {
-            return null;
-        }
-        return automations.stream()
-                .filter(existing -> Objects.equals(existing.getName(), dto.getName()))
-                .findFirst()
-                .orElse(null);
+        return pluginDefinitionResourceImporter().findExistingAutomation(dto);
     }
 
     private AutomationCreateRequest toAutomationCreateRequest(AutomationDefinitionDTO dto) {
-        AutomationCreateRequest request = new AutomationCreateRequest();
-        request.setName(dto.getName());
-        request.setDescription(dto.getDescription());
-        request.setModelCode(dto.getModelCode());
-        request.setTriggerType(dto.getTriggerType());
-        request.setTriggerConfig(dto.getTriggerConfig());
-        request.setTriggerCondition(dto.getTriggerCondition());
-        request.setActions(dto.getActions());
-        request.setFlowConfig(dto.getFlowConfig());
-        request.setEnabled(dto.getEnabled());
-        return request;
+        return pluginDefinitionResourceImporter().toAutomationCreateRequest(dto);
     }
 
     /**
@@ -2008,35 +1358,7 @@ public class PluginImportServiceImpl implements PluginImportService {
      * (tenant, model, field) via FieldMaskService.saveConfig, so re-import is additive/idempotent.
      */
     private void importFieldMasks(PluginManifestExtended manifest) {
-        if (manifest.getFieldMasks() == null || manifest.getFieldMasks().isEmpty()) return;
-        int created = 0;
-        for (FieldMaskDefinitionDTO dto : manifest.getFieldMasks()) {
-            if (!dto.isValid()) {
-                log.warn("Skipping invalid field-mask config (missing modelCode/fieldCode/maskType): index={}",
-                        manifest.getFieldMasks().indexOf(dto));
-                continue;
-            }
-            com.auraboot.framework.meta.entity.FieldMaskConfig config =
-                    new com.auraboot.framework.meta.entity.FieldMaskConfig();
-            config.setModelCode(dto.getModelCode());
-            config.setFieldCode(dto.getFieldCode());
-            config.setMaskType(dto.getMaskType());
-            config.setMaskPattern(dto.getMaskPattern());
-            if (dto.getReplacementChar() != null) {
-                config.setReplacementChar(dto.getReplacementChar());
-            }
-            config.setApplyToList(dto.getApplyToList());
-            config.setApplyToDetail(dto.getApplyToDetail());
-            config.setApplyToExport(dto.getApplyToExport());
-            config.setEnabled(dto.getEnabled());
-            config.setExemptRoles(dto.getExemptRoles());
-            config.setExemptPermissionCodes(dto.getExemptPermissionCodes());
-            fieldMaskService.saveConfig(config);
-            created++;
-        }
-        if (created > 0) {
-            log.info("Imported {} field-mask config(s) for plugin {}", created, logSafe(manifest.getPluginId()));
-        }
+        pluginAccessResourceImporter().importFieldMasks(manifest);
     }
 
     /**
@@ -2044,207 +1366,23 @@ public class PluginImportServiceImpl implements PluginImportService {
      * capability registry. Upserts by (tenant, code), so re-import is additive/idempotent.
      */
     private void importCapabilities(PluginManifestExtended manifest) {
-        if (manifest.getCapabilities() == null || manifest.getCapabilities().isEmpty()) return;
-        int created = 0;
-        for (CapabilityDefinitionDTO dto : manifest.getCapabilities()) {
-            if (!dto.isValid()) {
-                log.warn("Skipping invalid capability (missing code/includes): index={}",
-                        manifest.getCapabilities().indexOf(dto));
-                continue;
-            }
-            capabilityRegistryService.saveDefinition(dto);
-            created++;
-        }
-        if (created > 0) {
-            log.info("Imported {} capability declaration(s) for plugin {}", created, logSafe(manifest.getPluginId()));
-        }
+        pluginAccessResourceImporter().importCapabilities(manifest);
     }
 
     private void importI18nResources(PluginManifestExtended manifest, ImportExecuteResult result, Long tenantId) {
-        if (manifest.getI18nResources() == null || manifest.getI18nResources().isEmpty()) return;
+        communicationResourceImporter().importI18nResources(manifest,result,tenantId);
+    }
 
-        List<I18nResource> resources = new ArrayList<>();
-        for (I18nDefinitionDTO dto : manifest.getI18nResources()) {
-            if (!dto.isValid()) continue;
-
-            for (Map.Entry<String, String> entry : dto.getAllTranslations().entrySet()) {
-                I18nResource resource = new I18nResource();
-                resource.setI18nKey(dto.getKey());
-                resource.setLang(entry.getKey());
-                resource.setValue(entry.getValue());
-                resource.setSource(dto.getSource() != null ? dto.getSource() : I18nResource.SOURCE_IMPORT);
-                resource.setRefType(dto.getRefType());
-                resource.setStatus(I18nResource.STATUS_APPROVED);
-                resources.add(resource);
-            }
-        }
-
-        if (!resources.isEmpty()) {
-            int count = i18nResourceService.batchUpsert(resources);
-            for (int i = 0; i < count; i++) {
-                result.incrementResourceCount(ResourceType.I18N, ResourceAction.CREATE);
-            }
-            log.info("Imported {} i18n resources ({} translations)", manifest.getI18nResources().size(), count);
-
-            // Auto-compile i18n JSON after import
-            i18nCompiler.compileAll();
-            log.info("i18n compilation completed after plugin import");
-        }
+    private PluginSavedViewImporter savedViewImporter() {
+        return new PluginSavedViewImporter(savedViewMapper, pageSchemaMapper, objectMapper);
     }
 
     private void importSavedViews(PluginManifestExtended manifest, ImportExecuteResult result, Long tenantId) {
-        if (manifest.getSavedViews() == null || manifest.getSavedViews().isEmpty()) return;
-
-        for (SavedViewDefinitionDTO dto : manifest.getSavedViews()) {
-            if (!dto.isValid()) {
-                log.warn("Skipping invalid saved view: {}", logSafe(dto.getName()));
-                continue;
-            }
-
-            String scope = dto.getScope() != null ? dto.getScope() : "global";
-            String pageKey = dto.getPageKey();
-
-            // Validate pageKey references an existing page in ab_page_schema.
-            // A SavedView with a dangling pageKey will be permanently invisible to users
-            // because useSavedViews does a strict-equals match on pageKey.
-            if (pageKey != null && !pageKey.isBlank()) {
-                PageSchema page = pageSchemaMapper.selectAnyByPageKey(pageKey);
-                if (page == null) {
-                    String msg = "[S-SAVED-VIEW] pageKey '" + logSafe(pageKey) + "' does not exist in ab_page_schema; "
-                            + "define it as config/pages/" + logSafe(pageKey) + ".json in your plugin before declaring a SavedView";
-                    log.warn("Skipping saved view '{}': {}", logSafe(dto.getName()), msg);
-                    result.addWarning(msg);
-                    continue;
-                }
-            }
-
-            // Check if a plugin preset already exists. Stable viewKey takes precedence
-            // so plugin upgrades can rename presets without creating duplicates.
-            List<SavedView> existing = savedViewMapper.findGlobalViews(dto.getModelCode(), pageKey);
-            SavedView existingView = existing.stream()
-                    .filter(v -> matchesPluginSavedView(dto, v))
-                    .findFirst()
-                    .orElse(null);
-
-            if (existingView != null) {
-                // Update existing view config
-                ViewConfig viewConfig = buildPluginSavedViewConfig(dto);
-                existingView.setName(dto.getName());
-                existingView.setViewConfig(viewConfig);
-                existingView.setDescription(dto.getDescription());
-                existingView.setViewType(dto.getViewType());
-                existingView.setUpdatedAt(Instant.now());
-                if (dto.getIsDefault() != null) existingView.setIsDefault(dto.getIsDefault());
-                if (dto.getSortOrder() != null) existingView.setSortOrder(dto.getSortOrder());
-                savedViewMapper.updateSavedView(existingView);
-                result.incrementResourceCount(ResourceType.SAVED_VIEW, ResourceAction.UPDATE);
-                log.info("Updated saved view: {} ({})", logSafe(dto.getName()), logSafe(dto.getViewType()));
-            } else {
-                // Create new saved view
-                SavedView savedView = new SavedView();
-                savedView.setPid(UlidGenerator.generate());
-                savedView.setTenantId(tenantId);
-                savedView.setName(dto.getName());
-                savedView.setDescription(dto.getDescription());
-                savedView.setModelCode(dto.getModelCode());
-                savedView.setPageKey(pageKey);
-                savedView.setScope(scope);
-                savedView.setViewType(dto.getViewType());
-                ViewConfig viewConfig = buildPluginSavedViewConfig(dto);
-                savedView.setViewConfig(viewConfig);
-                savedView.setIsDefault(dto.getIsDefault() != null ? dto.getIsDefault() : false);
-                savedView.setSortOrder(dto.getSortOrder() != null ? dto.getSortOrder() : 0);
-                savedView.setDeletedFlag(false);
-                savedView.setCreatedAt(Instant.now());
-                savedView.setUpdatedAt(Instant.now());
-                savedViewMapper.insertSavedView(savedView);
-                result.incrementResourceCount(ResourceType.SAVED_VIEW, ResourceAction.CREATE);
-                log.info("Created saved view: {} ({})", logSafe(dto.getName()), logSafe(dto.getViewType()));
-            }
-        }
+        savedViewImporter().importSavedViews(manifest, result, tenantId);
     }
 
     private boolean matchesPluginSavedView(SavedViewDefinitionDTO dto, SavedView savedView) {
-        if (dto == null || savedView == null) {
-            return false;
-        }
-
-        String incomingKey = resolvePluginSavedViewKey(dto);
-        String existingKey = getSavedViewMetaKey(savedView);
-        if (!isBlank(incomingKey) && !isBlank(existingKey)) {
-            return Objects.equals(incomingKey, existingKey);
-        }
-
-        return Objects.equals(savedView.getName(), dto.getName())
-                && Objects.equals(savedView.getViewType(), dto.getViewType());
-    }
-
-    private ViewConfig buildPluginSavedViewConfig(SavedViewDefinitionDTO dto) {
-        Map<String, Object> rawConfig = dto.getViewConfig() != null ? dto.getViewConfig() : Collections.emptyMap();
-        ViewConfig viewConfig = objectMapper.convertValue(rawConfig, ViewConfig.class);
-        if (viewConfig == null) {
-            viewConfig = new ViewConfig();
-        }
-
-        ViewConfig.Meta incomingMeta = viewConfig.getMeta();
-        viewConfig.setMeta(ViewConfig.Meta.builder()
-                .viewKey(resolvePluginSavedViewKey(dto))
-                .managedBy(firstNonBlank(dto.getManagedBy(), incomingMeta != null ? incomingMeta.getManagedBy() : null, "plugin"))
-                .locked(firstNonNull(dto.getLocked(), incomingMeta != null ? incomingMeta.getLocked() : null, true))
-                .allowUserCopy(firstNonNull(dto.getAllowUserCopy(), incomingMeta != null ? incomingMeta.getAllowUserCopy() : null, true))
-                .allowUserOverride(firstNonNull(dto.getAllowUserOverride(), incomingMeta != null ? incomingMeta.getAllowUserOverride() : null, true))
-                .originViewPid(incomingMeta != null ? incomingMeta.getOriginViewPid() : null)
-                .capabilityStatus(incomingMeta != null ? incomingMeta.getCapabilityStatus() : null)
-                .pinnedAsQuickFilter(firstNonNull(dto.getPinAsQuickFilter(),
-                        incomingMeta != null ? incomingMeta.getPinnedAsQuickFilter() : null))
-                .quickFilterIcon(firstNonBlank(dto.getQuickFilterIcon(),
-                        incomingMeta != null ? incomingMeta.getQuickFilterIcon() : null))
-                .quickFilterOrder(firstNonNull(dto.getQuickFilterOrder(),
-                        incomingMeta != null ? incomingMeta.getQuickFilterOrder() : null))
-                .build());
-        return viewConfig;
-    }
-
-    private String resolvePluginSavedViewKey(SavedViewDefinitionDTO dto) {
-        if (dto == null) {
-            return null;
-        }
-        if (!isBlank(dto.getViewKey())) {
-            return dto.getViewKey().trim();
-        }
-        return dto.getUniqueKey();
-    }
-
-    private String getSavedViewMetaKey(SavedView savedView) {
-        if (savedView == null || savedView.getViewConfig() == null || savedView.getViewConfig().getMeta() == null) {
-            return null;
-        }
-        return savedView.getViewConfig().getMeta().getViewKey();
-    }
-
-    @SafeVarargs
-    private final <T> T firstNonNull(T... values) {
-        if (values == null) {
-            return null;
-        }
-        for (T value : values) {
-            if (value != null) {
-                return value;
-            }
-        }
-        return null;
-    }
-
-    private String firstNonBlank(String... values) {
-        if (values == null) {
-            return null;
-        }
-        for (String value : values) {
-            if (!isBlank(value)) {
-                return value.trim();
-            }
-        }
-        return null;
+        return savedViewImporter().matchesPluginSavedView(dto, savedView);
     }
 
     /**
@@ -2255,45 +1393,7 @@ public class PluginImportServiceImpl implements PluginImportService {
      * "template not found, skipping".
      */
     private void importNotificationTemplates(PluginManifestExtended manifest, ImportExecuteResult result, Long tenantId) {
-        if (manifest.getNotificationTemplates() == null || manifest.getNotificationTemplates().isEmpty()) return;
-
-        for (NotificationTemplateDefinitionDTO dto : manifest.getNotificationTemplates()) {
-            if (!dto.isValid()) {
-                log.warn("Skipping invalid notification template: {}", logSafe(dto.getCode()));
-                continue;
-            }
-
-            NotificationTemplate existing = notificationTemplateMapper.findByCodeForUpsert(tenantId, dto.getCode());
-            if (existing != null) {
-                existing.setName(dto.getName());
-                existing.setChannel(dto.getChannel());
-                if (dto.getChannels() != null) existing.setChannels(dto.getChannels());
-                if (dto.getCategory() != null) existing.setCategory(dto.getCategory());
-                existing.setSubjectTemplate(dto.getSubjectTemplate());
-                existing.setBodyTemplate(dto.getBodyTemplate());
-                existing.setVariables(dto.getVariables());
-                existing.setEnabled(dto.isEnabledOrDefault());
-                notificationTemplateMapper.updateById(existing);
-                result.incrementResourceCount(ResourceType.NOTIFICATION_TEMPLATE, ResourceAction.UPDATE);
-                log.info("Updated notification template: {}", logSafe(dto.getCode()));
-            } else {
-                NotificationTemplate template = new NotificationTemplate();
-                template.setPid(UlidGenerator.generate());
-                template.setTenantId(tenantId);
-                template.setCode(dto.getCode());
-                template.setName(dto.getName());
-                template.setChannel(dto.getChannel());
-                if (dto.getChannels() != null) template.setChannels(dto.getChannels());
-                if (dto.getCategory() != null) template.setCategory(dto.getCategory());
-                template.setSubjectTemplate(dto.getSubjectTemplate());
-                template.setBodyTemplate(dto.getBodyTemplate());
-                template.setVariables(dto.getVariables());
-                template.setEnabled(dto.isEnabledOrDefault());
-                notificationTemplateMapper.insert(template);
-                result.incrementResourceCount(ResourceType.NOTIFICATION_TEMPLATE, ResourceAction.CREATE);
-                log.info("Created notification template: {}", logSafe(dto.getCode()));
-            }
-        }
+        communicationResourceImporter().importNotificationTemplates(manifest,result,tenantId);
     }
 
     // ==================== Rollback ====================
@@ -2468,21 +1568,7 @@ public class PluginImportServiceImpl implements PluginImportService {
      * a not-yet-resolved cross-plugin reference would otherwise leave permanently unrecoverable).
      */
     private <T> List<T> loadImportedResourceSnapshots(Long tenantId, ResourceType resourceType, Class<T> dtoClass) {
-        List<PluginResource> resources = pluginResourceMapper.findByTenantAndType(tenantId, resourceType.code());
-        Map<String, T> byCode = new LinkedHashMap<>();
-        for (PluginResource resource : resources) {
-            if (resource == null || resource.getImportSnapshot() == null || isBlank(resource.getResourceCode())) {
-                continue;
-            }
-            try {
-                T dto = objectMapper.convertValue(resource.getImportSnapshot(), dtoClass);
-                byCode.put(resource.getResourceCode(), dto);
-            } catch (Exception e) {
-                log.warn("Failed to reconstruct {} snapshot for code={}: {}",
-                        resourceType.code(), logSafe(resource.getResourceCode()), logSafe(e.getMessage()));
-            }
-        }
-        return new ArrayList<>(byCode.values());
+        return pluginImportAssessment().loadImportedResourceSnapshots(tenantId,resourceType,dtoClass);
     }
 
     /**
@@ -2501,74 +1587,7 @@ public class PluginImportServiceImpl implements PluginImportService {
      */
     @Override
     public List<String> verifyImportReferenceIntegrity() {
-        Long tenantId = MetaContext.getCurrentTenantId();
-        if (tenantId == null) {
-            throw new PluginException("Tenant context is required for reference-integrity verification");
-        }
-
-        List<com.auraboot.framework.meta.entity.CommandDefinition> commands = commandDefinitionMapper.selectList(
-                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<com.auraboot.framework.meta.entity.CommandDefinition>()
-                        .eq("tenant_id", tenantId)
-                        .eq("is_current", true)
-                        .eq("deleted_flag", false));
-
-        List<CommandDefinitionDTO> commandDtos = new ArrayList<>();
-        Set<String> providedModels = new HashSet<>();
-        for (com.auraboot.framework.meta.entity.CommandDefinition cmd : commands) {
-            CommandDefinitionDTO dto = new CommandDefinitionDTO();
-            dto.setCode(cmd.getCode());
-            dto.setModelCode(cmd.getModelCode());
-            commandDtos.add(dto);
-            if (!isBlank(cmd.getModelCode()) && resourceImporter.checkModelExists(tenantId, cmd.getModelCode())) {
-                providedModels.add(cmd.getModelCode());
-            }
-        }
-
-        List<String> dangling = new ArrayList<>(findDanglingCommandModelRefs(commandDtos, providedModels));
-
-        List<MenuDefinitionDTO> menuDtos = loadImportedResourceSnapshots(tenantId, ResourceType.MENU, MenuDefinitionDTO.class);
-        List<RoleDefinitionDTO> roleDtos = loadImportedResourceSnapshots(tenantId, ResourceType.ROLE, RoleDefinitionDTO.class);
-
-        Set<String> providedMenus = new HashSet<>();
-        for (MenuDefinitionDTO menu : menuDtos) {
-            if (menu != null && !isBlank(menu.getCode())
-                    && resourceImporter.checkMenuExists(tenantId, menu.getCode())) {
-                providedMenus.add(menu.getCode());
-            }
-        }
-
-        Set<String> permissionCodesToCheck = new HashSet<>();
-        for (MenuDefinitionDTO menu : menuDtos) {
-            if (menu != null && !isBlank(menu.getPermissionCode())) {
-                permissionCodesToCheck.add(menu.getPermissionCode());
-            }
-        }
-        for (RoleDefinitionDTO role : roleDtos) {
-            if (role == null) {
-                continue;
-            }
-            if (role.getPermissions() != null) {
-                permissionCodesToCheck.addAll(role.getPermissions());
-            }
-            if (role.getPermissionPolicies() != null) {
-                for (RolePermissionPolicyDefinitionDTO policy : role.getPermissionPolicies()) {
-                    if (policy != null && !isBlank(policy.getPermissionCode())) {
-                        permissionCodesToCheck.add(policy.getPermissionCode());
-                    }
-                }
-            }
-        }
-        Set<String> providedPermissions = new HashSet<>();
-        for (String code : permissionCodesToCheck) {
-            if (!isBlank(code) && resourceImporter.checkPermissionExists(tenantId, code)) {
-                providedPermissions.add(code);
-            }
-        }
-
-        dangling.addAll(findDanglingMenuParentRefs(menuDtos, providedMenus));
-        dangling.addAll(findDanglingPermissionRefs(menuDtos, roleDtos, providedPermissions));
-
-        return dangling;
+        return pluginImportAssessment().verifyImportReferenceIntegrity();
     }
 
     /**
@@ -2577,174 +1596,28 @@ public class PluginImportServiceImpl implements PluginImportService {
      * that would cause DB constraint violations or runtime failures.
      */
     private String normalizeCode(String value) {
-        return isBlank(value) ? null : value.trim();
+        return pluginImportAssessment().normalizeCode(value);
     }
 
     private boolean isBlank(String value) {
-        return value == null || value.isBlank();
+        return pluginImportAssessment().isBlank(value);
     }
 
     /**
      * Build validation context and run the pre-flight pipeline.
      */
     private PluginValidationResult runValidationPipeline(PluginManifestExtended manifest, boolean validateReferences) {
-        return runValidationPipeline(manifest, validateReferences, false);
+        return pluginImportAssessment().runValidationPipeline(manifest,validateReferences);
     }
 
     private PluginValidationResult runValidationPipeline(PluginManifestExtended manifest, boolean validateReferences,
                                                          boolean deferReferenceValidation) {
-        Long tenantId = MetaContext.getCurrentTenantId();
-
-        // Collect installed plugin dependencies for cycle detection
-        Map<String, List<String>> installedPluginDeps = new HashMap<>();
-        Set<String> installedPluginIds = new HashSet<>();
-        try {
-            List<PluginRecord> allPlugins = pluginRecordMapper.selectList(
-                    new LambdaQueryWrapper<PluginRecord>().eq(PluginRecord::getTenantId, tenantId));
-            for (PluginRecord p : allPlugins) {
-                installedPluginIds.add(p.getPluginId());
-                if (p.getManifest() != null && p.getManifest().getDependencies() != null) {
-                    installedPluginDeps.put(p.getPluginId(), p.getManifest().getDependencies());
-                }
-            }
-        } catch (Exception e) {
-            log.debug("Could not load installed plugins for validation: {}", logSafe(e.getMessage()));
-        }
-
-        // Load installed resource codes from DB for cross-plugin reference validation
-        Set<String> installedModelCodes = new HashSet<>();
-        Set<String> installedFieldCodes = new HashSet<>();
-        Set<String> installedPermissionCodes = new HashSet<>();
-        Set<String> installedCommandCodes = new HashSet<>();
-        Set<String> installedNamedQueryCodes = new HashSet<>();
-        try {
-            // Collect all model codes and field codes from the manifest's referenced models
-            // that exist in the tenant (checking via resourceImporter)
-            Set<String> referencedModels = new HashSet<>();
-            Set<String> referencedFields = new HashSet<>();
-            Set<String> referencedPermissions = new HashSet<>();
-            if (manifest.getCommands() != null) {
-                manifest.getCommands().forEach(cmd -> {
-                    if (cmd != null && cmd.getModelCode() != null) referencedModels.add(cmd.getModelCode());
-                });
-            }
-            if (manifest.getModelFieldBindings() != null) {
-                manifest.getModelFieldBindings().forEach(b -> {
-                    if (b != null) {
-                        if (b.getModelCode() != null) referencedModels.add(b.getModelCode());
-                        if (b.getFieldCode() != null) referencedFields.add(b.getFieldCode());
-                    }
-                });
-            }
-            if (manifest.getMenus() != null) {
-                manifest.getMenus().forEach(menu -> {
-                    if (menu != null && !isBlank(menu.getPermissionCode())) {
-                        referencedPermissions.add(menu.getPermissionCode());
-                    }
-                });
-            }
-            // Only check external references (not in the manifest's own resources)
-            Set<String> manifestModelCodes = new HashSet<>();
-            if (manifest.getModels() != null) {
-                manifest.getModels().forEach(m -> { if (m != null && m.getCode() != null) manifestModelCodes.add(m.getCode()); });
-            }
-            Set<String> manifestFieldCodes = new HashSet<>();
-            if (manifest.getFields() != null) {
-                manifest.getFields().forEach(f -> { if (f != null && f.getCode() != null) manifestFieldCodes.add(f.getCode()); });
-            }
-            Set<String> manifestPermissionCodes = new HashSet<>();
-            if (manifest.getPermissions() != null) {
-                manifest.getPermissions().forEach(p -> {
-                    if (p != null && !isBlank(p.getCode())) manifestPermissionCodes.add(p.getCode());
-                });
-            }
-            for (String modelCode : referencedModels) {
-                if (!manifestModelCodes.contains(modelCode) && resourceImporter.checkModelExists(tenantId, modelCode)) {
-                    installedModelCodes.add(modelCode);
-                }
-            }
-            for (String fieldCode : referencedFields) {
-                if (!manifestFieldCodes.contains(fieldCode) && resourceImporter.checkFieldExists(tenantId, fieldCode)) {
-                    installedFieldCodes.add(fieldCode);
-                }
-            }
-            for (String permissionCode : referencedPermissions) {
-                if (!manifestPermissionCodes.contains(permissionCode)
-                        && resourceImporter.checkPermissionExists(tenantId, permissionCode)) {
-                    installedPermissionCodes.add(permissionCode);
-                }
-            }
-            // Collect installed command/NQ codes for capability dependency validation
-            if (manifest.getRequires() != null) {
-                for (var req : manifest.getRequires()) {
-                    if (req == null || req.getCode() == null) continue;
-                    if ("model".equals(req.getType()) && resourceImporter.checkModelExists(tenantId, req.getCode())) {
-                        installedModelCodes.add(req.getCode());
-                    } else if ("command".equals(req.getType()) && resourceImporter.checkCommandExists(tenantId, req.getCode())) {
-                        installedCommandCodes.add(req.getCode());
-                    } else if ("query".equals(req.getType()) && resourceImporter.checkNamedQueryExists(tenantId, req.getCode())) {
-                        installedNamedQueryCodes.add(req.getCode());
-                    }
-                }
-            }
-        } catch (Exception e) {
-            log.debug("Could not load installed resources for validation: {}", logSafe(e.getMessage()));
-        }
-
-        PluginValidationContext ctx = PluginValidationContext.builder()
-                .pluginId(manifest.getPluginId())
-                .namespace(manifest.getNamespace())
-                .manifest(manifest)
-                .validateReferences(validateReferences)
-                .deferReferenceValidation(deferReferenceValidation)
-                .installedModelCodes(installedModelCodes)
-                .installedFieldCodes(installedFieldCodes)
-                .installedPermissionCodes(installedPermissionCodes)
-                .installedCommandCodes(installedCommandCodes)
-                .installedNamedQueryCodes(installedNamedQueryCodes)
-                .installedPluginIds(installedPluginIds)
-                .installedPluginDependencies(installedPluginDeps)
-                .build();
-
-        return validationPipeline.validate(ctx);
+        return pluginImportAssessment().runValidationPipeline(manifest,validateReferences,deferReferenceValidation);
     }
 
     @Override
     public List<ImportPreviewResult.ResourceConflict> checkConflicts(PluginManifestExtended manifest) {
-        List<ImportPreviewResult.ResourceConflict> conflicts = new ArrayList<>();
-        if (!MetaContext.exists()) {
-            return conflicts;
-        }
-        Long tenantId = MetaContext.getCurrentTenantId();
-        if (tenantId == null || manifest == null) {
-            return conflicts;
-        }
-
-        String importingPluginId = manifest.getPluginId();
-        collectConflicts(conflicts, importingPluginId, tenantId, ResourceType.MODEL, manifest.getModels(),
-                ModelDefinitionDTO::getCode, "Model");
-        collectConflicts(conflicts, importingPluginId, tenantId, ResourceType.FIELD, manifest.getFields(),
-                FieldDefinitionDTO::getCode, "Field");
-        collectConflicts(conflicts, importingPluginId, tenantId, ResourceType.COMMAND, manifest.getCommands(),
-                CommandDefinitionDTO::getCode, "Command");
-        collectConflicts(conflicts, importingPluginId, tenantId, ResourceType.PERMISSION, manifest.getPermissions(),
-                PermissionDefinitionDTO::getCode, "Permission");
-        collectConflicts(conflicts, importingPluginId, tenantId, ResourceType.ROLE, manifest.getRoles(),
-                RoleDefinitionDTO::getCode, "Role");
-        collectConflicts(conflicts, importingPluginId, tenantId, ResourceType.MENU, manifest.getMenus(),
-                MenuDefinitionDTO::getCode, "Menu");
-        collectConflicts(conflicts, importingPluginId, tenantId, ResourceType.PAGE, manifest.getPages(),
-                PageSchemaDTO::getPageKey, "Page");
-        collectConflicts(conflicts, importingPluginId, tenantId, ResourceType.DICT, manifest.getDicts(),
-                DictDefinitionDTO::getCode, "Dictionary");
-        collectConflicts(conflicts, importingPluginId, tenantId, ResourceType.AGENT_DEFINITION,
-                manifest.getAgentDefinitions(), AgentDefinitionDTO::getAgentCode, "AgentDefinition");
-        collectConflicts(conflicts, importingPluginId, tenantId, ResourceType.MODEL_FIELD_BINDING,
-                manifest.getModelFieldBindings(), b -> b.getModelCode() + "." + b.getFieldCode(), "ModelFieldBinding");
-        collectConflicts(conflicts, importingPluginId, tenantId, ResourceType.I18N, manifest.getI18nResources(),
-                I18nDefinitionDTO::getKey, "I18n");
-
-        return conflicts;
+        return pluginImportAssessment().checkConflicts(manifest);
     }
 
     private <T> void collectConflicts(
@@ -2755,98 +1628,14 @@ public class PluginImportServiceImpl implements PluginImportService {
             List<T> resources,
             Function<T, String> codeExtractor,
             String label) {
-        if (resources == null || resources.isEmpty()) {
-            return;
-        }
-
-        for (T resource : resources) {
-            String code = codeExtractor.apply(resource);
-            if (code == null || code.isBlank()) {
-                continue;
-            }
-
-            PluginResource existing;
-            try {
-                existing = pluginResourceMapper.findByTypeAndCode(
-                        tenantId, resourceType.name(), code);
-            } catch (Exception ex) {
-                // Conflict preview must be best-effort; duplicated historical rows should not block import.
-                log.warn("Skip conflict check for {} {} due to lookup error: {}",
-                        resourceType, logSafe(code), logSafe(ex.getMessage()));
-                continue;
-            }
-            if (existing == null) {
-                continue;
-            }
-
-            String ownerPluginId = resolveOwnerPluginId(existing.getPluginPid());
-            if (ownerPluginId != null && ownerPluginId.equals(importingPluginId)) {
-                continue;
-            }
-
-            conflicts.add(ImportPreviewResult.ResourceConflict.builder()
-                    .resourceType(resourceType)
-                    .resourceCode(code)
-                    .conflictType("different_plugin")
-                    .ownerPluginId(ownerPluginId != null ? ownerPluginId : existing.getPluginPid())
-                    .description(label + " owned by different plugin")
-                    .build());
-        }
+        pluginImportAssessment().collectConflicts(conflicts,importingPluginId,tenantId,resourceType,resources,codeExtractor,label);
     }
 
-    private String resolveOwnerPluginId(String pluginPid) {
-        if (pluginPid == null || pluginPid.isBlank()) {
-            return null;
-        }
-        PluginRecord ownerRecord = pluginRecordMapper.findByPid(pluginPid);
-        if (ownerRecord != null && ownerRecord.getPluginId() != null && !ownerRecord.getPluginId().isBlank()) {
-            return ownerRecord.getPluginId();
-        }
-        return pluginPid;
-    }
+
 
     @Override
     public ImportPreviewResult.DependencyAnalysis analyzeDependencies(PluginManifestExtended manifest) {
-        List<String> missingDependencies = new ArrayList<>();
-        List<ImportPreviewResult.PluginDependency> pluginDeps = new ArrayList<>();
-
-        Long tenantId = MetaContext.getCurrentTenantId();
-
-        // Use structured dependency specs (supports version constraints)
-        List<PluginManifest.PluginDependencySpec> specs = manifest.getEffectiveDependencySpecs();
-        for (PluginManifest.PluginDependencySpec spec : specs) {
-            String depPluginId = spec.getPluginId();
-            String requiredRange = spec.getVersionRange();
-
-            PluginRecord dep = pluginRecordMapper.findByTenantAndPluginId(depPluginId);
-            if (dep == null) {
-                missingDependencies.add("Plugin: " + depPluginId
-                        + (!"*".equals(requiredRange) ? " " + requiredRange : ""));
-                pluginDeps.add(ImportPreviewResult.PluginDependency.builder()
-                        .pluginId(depPluginId)
-                        .requiredVersion(requiredRange)
-                        .satisfied(false)
-                        .build());
-            } else {
-                boolean versionSatisfied = SemverMatcher.matches(dep.getVersion(), requiredRange);
-                if (!versionSatisfied) {
-                    missingDependencies.add("Plugin: " + depPluginId
-                            + " requires " + requiredRange + ", installed: " + dep.getVersion());
-                }
-                pluginDeps.add(ImportPreviewResult.PluginDependency.builder()
-                        .pluginId(depPluginId)
-                        .requiredVersion(requiredRange)
-                        .installedVersion(dep.getVersion())
-                        .satisfied(versionSatisfied)
-                        .build());
-            }
-        }
-
-        return ImportPreviewResult.DependencyAnalysis.builder()
-                .pluginDependencies(pluginDeps)
-                .missingDependencies(missingDependencies)
-                .satisfied(missingDependencies.isEmpty())
-                .build();
+        return pluginImportAssessment().analyzeDependencies(manifest);
     }
 
     // ==================== Helper Methods ====================
@@ -2971,5 +1760,25 @@ public class PluginImportServiceImpl implements PluginImportService {
             this.previewResult = previewResult;
             this.additionalFiles = new HashMap<>();
         }
+    }
+
+    private PluginCommunicationResourceImporter communicationResourceImporter() {
+        return new PluginCommunicationResourceImporter(i18nCompiler, i18nResourceService, i18nService, notificationTemplateMapper);
+    }
+
+    private PluginAccessResourceImporter pluginAccessResourceImporter() {
+        return new PluginAccessResourceImporter(resourceImporter, fieldMaskService, capabilityRegistryService, userPermissionService, this::generateMenuI18nRecords, this::generatePermissionI18nRecords, this::saveOrUpdatePluginResource, this::captureImportSnapshot);
+    }
+
+    private PluginDefinitionResourceImporter pluginDefinitionResourceImporter() {
+        return new PluginDefinitionResourceImporter(resourceImporter, documentCommandGenerator, automationService, this::saveOrUpdatePluginResource, this::captureImportSnapshot);
+    }
+
+    private PluginImportAssessment pluginImportAssessment() {
+        return new PluginImportAssessment(pluginRecordMapper, pluginResourceMapper, resourceImporter, validationPipeline, commandDefinitionMapper, objectMapper, this::findDanglingCommandModelRefs, this::findDanglingMenuParentRefs, this::findDanglingPermissionRefs);
+    }
+
+    private PluginImportChangePreview pluginImportChangePreview() {
+        return new PluginImportChangePreview(pluginResourceMapper, resourceImporter, savedViewMapper, notificationTemplateMapper, this::matchesPluginSavedView);
     }
 }

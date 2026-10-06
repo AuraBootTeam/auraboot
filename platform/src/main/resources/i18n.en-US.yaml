@@ -839,6 +839,13 @@ workbench:
     copyTaskDesc: Work items assigned to you that still need action.
     copyMentionTitle: Mentions
     copyMentionDesc: Messages where a teammate @mentioned you.
+    markedRead: Item marked as read
+    markReadFailed: Failed to mark item as read
+    dismissed: Item dismissed
+    dismissFailed: Failed to dismiss item
+    allMarkedRead: All inbox items marked as read
+    markAllReadFailed: Failed to mark all items as read
+    approvalCompleted: Approval action completed
   notificationCenter:
     title: Notifications
     unreadCount: "{count} unread"
@@ -1736,6 +1743,34 @@ openPlatform:
   replayConfirmTitle: Replay this delivery?
   replayConfirmBody: The original signed payload will be delivered again and may repeat downstream side effects.
   confirmReplay: Confirm replay
+  eventCatalog: Event catalog
+  eventCatalogHint: Only explicitly published partner events can be selected by installed applications.
+  noPublishedEvents: No partner events published
+  supportedVersions: Compatible versions
+  webhookHealth: Webhook compatibility & signing
+  webhookHealthHint: Rotate signing secrets every 90 days and keep subscriptions on a supported schema.
+  noInstalledWebhooks: No webhooks for this installation
+  compatible: Compatible
+  actionRequired: Action required
+  eventSchema: Schema
+  catalogVersion: Catalog
+  signing: Signing
+  rotateBy: Rotate by
+  chooseSupportedEventVersion: Choose a supported event version.
+  rotateSigningSecretNow: Rotate the signing secret now.
+  addSigningSecretBeforeDelivery: Add a signing secret before enabling delivery.
+  deliveryState:
+    dead_letter: Dead letter
+    failed: Failed
+    pending: Pending
+    success: Success
+  signingState:
+    healthy: Healthy
+    due: Due
+    overdue: Overdue
+    missing: Missing
+  eventClassification:
+    partner: Partner
   status:
     active: Active
     disabled: Disabled
@@ -2355,3 +2390,77 @@ list_sample:
   loading: "Loading..."
   loaded: "Loaded {count} records"
   failed: "Could not load sample data. Try again."
+"admin.permission.advanced.coverageSummary": "{total} actions · {exceptions} granted actions without business capability coverage"
+"admin.permission.advanced.coverageBanner": "Use business capabilities for everyday changes. This table shows individual actions and which capabilities include them. Coverage does not prove the source of a grant."
+"admin.permission.advanced.coverageOnlyUncovered": "Actions without business capability coverage"
+"admin.permission.advanced.coverageCapability": "Included in “{name}”"
+"admin.permission.advanced.coverageAbsent": "No business capability coverage"
+"admin.permission.advanced.coverageLegend": "Coverage means a declared capability includes the action. Uncovered means no such declaration exists. Neither label proves the source of a grant."
+"admin.permission.effective.coverageSummary": "{total} granted actions · {exceptions} not covered by business capabilities"
+"admin.permission.scope.team": "My teams"
+"admin.permission.scope.not_configured": "Not configured"
+"admin.permission.scope.invalid": "Invalid scope configuration"
+"admin.permission.scope.no_grants": "No granted actions"
+"admin.permission.scope.unavailable": "Scope unavailable"
+"admin.permission.scope.actual": "Current granted action scopes"
+"admin.permission.scope.default": "Role default scope"
+"admin.permission.scope.loadError": "Could not load role default scope"
+"admin.permission.scope.verifyError": "Scope was submitted but could not be verified. Reload before continuing."
+"admin.permission.editor.loadError": "Could not load role permissions. Retry to continue."
+"admin.permission.editor.capabilities": "Business capabilities"
+"admin.permission.editor.search": "Search business capabilities"
+"admin.permission.editor.empty": "No matching business capabilities"
+"admin.permission.editor.selection": "{selected} selected of {total}"
+"admin.permission.editor.draft": "{count} pending changes. Save or discard before editing data scope or advanced permissions."
+"admin.permission.editor.discard": "Discard changes"
+"admin.permission.editor.reviewSave": "Review and save"
+"admin.permission.editor.preview": "Review permission changes"
+"admin.permission.editor.add": "Grant"
+"admin.permission.editor.remove": "Revoke"
+"admin.permission.editor.discardTitle": "Discard unsaved permission changes?"
+"admin.permission.editor.discardNote": "Your draft has not been saved. Continue to discard it, or cancel to keep editing."
+"admin.permission.role.recommendedHint": "Set up separate administrator, sales, procurement and engineering roles according to responsibilities."
+"admin.permission.policy.loadError": "Could not load permission policy. Retry to continue."
+"admin.permission.editor.roleHint": "Select business capabilities, then review and save. Data scope controls which records can be accessed."
+"admin.permission.editor.readOnlyHint": "Read-only role access. Changes require the corresponding administration permission."
+"admin.permission.advanced.colCoverage": "Capability coverage"
+"admin.permission.capability.partialV2": "Some actions granted"
+"admin.permission.capability.partialActionsV2": "Actions {granted}/{total}"
+"admin.permission.capability.partialGuidanceV2": "Some actions may be shared dependencies of other capabilities. Partial actions do not grant the complete capability. Select to complete; review revocation effects before saving."
+"admin.permission.capability.noneV2": "Not granted"
+"admin.permission.capability.fullV2": "Fully granted"
+"admin.permission.capability.relatedMenusV2": "Related menus"
+"admin.permission.diagnostics.titleV2": "Permission diagnostics · read only"
+"admin.permission.diagnostics.noteV2": "{total} actions; {uncovered} granted actions without declared capability coverage. Coverage does not identify grant origin or effective user access."
+"admin.permission.diagnostics.searchV2": "Search permission diagnostics"
+"admin.permission.diagnostics.actionV2": "Action"
+"admin.permission.diagnostics.stateV2": "Role grant"
+"admin.permission.diagnostics.scopeV2": "Record scope"
+"admin.permission.diagnostics.capabilitiesV2": "Related capabilities"
+"admin.permission.diagnostics.codeV2": "Technical identifier"
+"admin.permission.diagnostics.grantedV2": "Granted"
+"admin.permission.diagnostics.noneV2": "Not granted"
+"admin.permission.diagnostics.unmappedV2": "No declared capability"
+"admin.permission.diagnostics.emptyV2": "No matching actions"
+"admin.permission.editor.readbackErrorV2": "Permissions were saved, but the result could not be loaded. Reload before continuing."
+"admin.permission.editor.previewErrorV2": "Could not calculate permission changes. Your draft is preserved."
+"admin.permission.editor.atomicDiffV2": "Add {added} actions, remove {removed}; {preserved} existing actions remain unchanged."
+"admin.permission.editor.roleLocalV2": "This changes this role only. Other roles, record scopes and sharing still determine user access."
+"admin.permission.editor.draftV2": "{count} pending changes. Save or discard before editing data scope."
+"admin.permission.capability.scopeV2": "Record scope"
+"admin.permission.capability.scopeNoteV2": "Adjust existing record grants for this capability. Shared actions also affect other capabilities; use the checklist to grant or revoke access."
+"admin.permission.capability.noScopesV2": "No granted record actions to configure."
+"admin.permission.capability.scopeFailureV2": "Scope changes could not be verified. Some changes may have been saved; reload before continuing."
+"admin.permission.capability.revokePartialV2": "Revoke existing grants"
+"admin.permission.capability.undoRevokeV2": "Pending revocation · undo"
+"admin.permission.capability.scopeNamesErrorV2": "Could not load business names. Close and reopen to try again."
+"admin.permission.capability.teamUnavailableV2": "This record type has no team association configured, so My teams cannot be selected. An existing My teams scope grants no records by itself; other roles or valid shares may still allow access."
+"admin.permission.members.temporary": "Time-bounded access"
+"admin.permission.members.effectiveDate": "Effective date"
+"admin.permission.members.expiryDate": "Expiry date"
+"admin.permission.members.colValidity": "Validity"
+"admin.permission.members.permanent": "Permanent"
+"cloudConfig.save.readbackPending": "Configuration saved. Reload it before making further changes."
+"cloudConfig.save.retryReadback": "Retry loading"
+"admin.permission.editor.impactStateDetailsV2": "Review related capability states, menus and action details"
+"admin.permission.editor.previewStateCountsV2": "Related capabilities after saving: {full} fully granted · {partial} with partial actions · {none} not granted"

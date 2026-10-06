@@ -2,6 +2,13 @@
 
 # Validate a Web Admin node_modules view before reusing it in another checkout.
 # The caller supplies the node_modules directory, not the Web Admin root.
+web_admin_node_modules_matches_checkout() {
+  local candidate="$1" target="$2" helper_dir
+  web_admin_node_modules_usable "$candidate" || return 1
+  helper_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" || return 1
+  node "$helper_dir/web-admin-lock-contract.mjs" "$candidate" "$target" >/dev/null 2>&1
+}
+
 web_admin_node_modules_usable() {
   local candidate="$1"
   local candidate_real checkout_root checkout_node_modules_real entry entry_real

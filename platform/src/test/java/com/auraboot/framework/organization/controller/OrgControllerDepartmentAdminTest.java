@@ -1,7 +1,9 @@
 package com.auraboot.framework.organization.controller;
 
 import com.auraboot.framework.exception.RootUnCheckedException;
+import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.meta.dto.PaginationResult;
+import com.auraboot.framework.meta.dto.DynamicQueryRequest;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.organization.dto.DepartmentAdminRequests;
 import com.auraboot.framework.organization.dto.DepartmentTreeNode;
@@ -13,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
@@ -40,6 +43,60 @@ class OrgControllerDepartmentAdminTest {
 
     @InjectMocks
     private OrgController controller;
+
+    @Test
+    void employeeReadAndAccountOpeningDeclareSeparatePermissions() throws Exception {
+        assertThat(OrgController.class.getMethod("getEmployeesByTenant", int.class, int.class, String.class)
+            .getAnnotation(RequirePermission.class).value()).isEqualTo("model.org_employee.read");
+        assertThat(OrgController.class.getMethod("getEmployeesByDept", String.class, boolean.class,
+            int.class, int.class, String.class).getAnnotation(RequirePermission.class).value())
+            .isEqualTo("model.org_employee.read");
+        assertThat(OrgController.class.getMethod("getEmployeeProvisionOptions", int.class, int.class,
+            String.class).getAnnotation(RequirePermission.class).value())
+            .isEqualTo("model.tenant_member.provision_member_from_employee");
+        assertThat(OrgController.class.getMethod("getUnlinkedMembers", String.class)
+            .getAnnotation(RequirePermission.class).value()).isEqualTo("org.hr.manage");
+    }
+
+    @Test
+    void accountOpeningOptionsProjectOnlyIdentityAndPreserveScopedQuery() {
+        when(dynamicDataService.list(eq("org_employee"), any())).thenReturn(PaginationResult.of(
+            List.of(Map.of("pid", "employee-1", "org_emp_name", "Employee One",
+                "org_emp_email", "private@example.test", "org_emp_phone", "13912345678",
+                "org_emp_user_id", "private-user", "org_emp_dept_id", "private-department")),
+            12L, 2, 5));
+
+        var result = controller.getEmployeeProvisionOptions(2, 5, "Employee").getData();
+        var query = ArgumentCaptor.forClass(DynamicQueryRequest.class);
+        verify(dynamicDataService).list(eq("org_employee"), query.capture());
+        assertThat(query.getValue().getPageNum()).isEqualTo(2);
+        assertThat(query.getValue().getPageSize()).isEqualTo(5);
+        assertThat(query.getValue().getKeyword()).isEqualTo("Employee");
+        assertThat(result.getRecords()).containsExactly(
+            new OrgController.EmployeeProvisionOption("employee-1", "Employee One"));
+        assertThat(result.getTotal()).isEqualTo(12L);
+        assertThat(result.getPage()).isEqualTo(2);
+        assertThat(result.getPageSize()).isEqualTo(5);
+        var fields = java.util.Arrays.stream(OrgController.EmployeeProvisionOption.class.getRecordComponents())
+            .map(java.lang.reflect.RecordComponent::getName).toList();
+        assertThat(fields).containsExactly("pid", "name");
+    }
+
+    @Test
+    void departmentWriteEndpointsRequireHrManagementWithoutTeamManagement() {
+        var writeMethods = List.of("createDepartment", "updateDepartment", "deleteDepartment",
+            "sortDepartments", "setDepartmentCommander");
+        var handlers = java.util.Arrays.stream(OrgController.class.getDeclaredMethods())
+            .filter(method -> writeMethods.contains(method.getName()))
+            .toList();
+        assertThat(handlers).hasSize(writeMethods.size());
+        for (var handler : handlers) {
+            var guard = handler.getAnnotation(RequirePermission.class);
+            assertThat(guard).as("%s must declare its write permission", handler.getName()).isNotNull();
+            assertThat(guard.value()).as("%s belongs to organization maintenance, not team maintenance",
+                handler.getName()).isEqualTo("org.hr.manage");
+        }
+    }
 
     private void mockDepartmentExists(String pid) {
         when(dynamicDataService.getById("org_department", pid))

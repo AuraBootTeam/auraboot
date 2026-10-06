@@ -1,11 +1,21 @@
 #!/usr/bin/env python3
-"""Release-image HTTP probe: seed, install two real plugins, provision OAuth, then exercise v1."""
+"""Release-image HTTP probe: bootstrap, install two real plugins, provision OAuth, then exercise v1."""
+
+import importlib.util
+from pathlib import Path
 
 import json
+import importlib.util
+from pathlib import Path
 import os
 import urllib.parse
 
 from open_platform_http import Client, data
+
+bootstrap_spec = importlib.util.spec_from_file_location(
+    "release_bootstrap", Path(__file__).with_name("release-bootstrap.py"))
+bootstrap_module = importlib.util.module_from_spec(bootstrap_spec)
+bootstrap_spec.loader.exec_module(bootstrap_module)
 
 BASE = os.environ.get("BASE_URL", "http://app:6443").rstrip("/")
 ARTIFACT = os.environ.get("CREDENTIAL_ARTIFACT", "/artifacts/open-platform-credentials.json")
@@ -13,9 +23,7 @@ ARTIFACT = os.environ.get("CREDENTIAL_ARTIFACT", "/artifacts/open-platform-crede
 
 def main():
     request = Client(BASE).request
-    _, seed, _ = request("/api/test/seed?testRunId=open-platform-release-image", method="POST", body={})
-    jwt = data(seed)["jwt"]
-    admin = {"Authorization": f"Bearer {jwt}"}
+    admin = bootstrap_module.bootstrap_admin(request)
 
     for template in ("asset-management", "simple-inventory"):
         _, installed, _ = request(f"/api/templates/{template}/install", method="POST", body={}, headers=admin)

@@ -67,8 +67,8 @@ const ISO_DATETIME_RE = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/;
  * which kind. Mirrors the inference used by the list cell renderer so every
  * display surface classifies datetimes the same way:
  *   1. explicit column.valueType (datetime/date/time)
- *   2. field-name suffix (_at -> datetime, _date -> date, _time -> time)
- *   3. value shape (ISO-8601 datetime string)
+ *   2. date-bearing field suffix or ISO-8601 timestamp value
+ *   3. time-only field-name suffix (_time)
  * Returns null when the value is not temporal.
  */
 export function resolveTemporalType(
@@ -76,16 +76,17 @@ export function resolveTemporalType(
   valueType: string | undefined,
   value: unknown,
 ): TemporalType | null {
-  if (valueType === 'datetime' || valueType === 'date' || valueType === 'time') {
-    return valueType;
+  const declaredType = valueType?.toLowerCase();
+  if (declaredType === 'datetime' || declaredType === 'date' || declaredType === 'time') {
+    return declaredType;
   }
   const f = field || '';
   if (f.endsWith('_at')) return 'datetime';
   if (f.endsWith('_date')) return 'date';
-  if (f.endsWith('_time')) return 'time';
   if (typeof value === 'string' && ISO_DATETIME_RE.test(value)) {
     return 'datetime';
   }
+  if (f.endsWith('_time')) return 'time';
   return null;
 }
 

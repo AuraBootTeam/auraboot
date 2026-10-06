@@ -142,6 +142,47 @@ describe('useDesignerDocument', () => {
     expect(result.current.currentSnapshot).toBe(serializeDocument(reloaded));
   });
 
+  it('preserves non-history metadata across body undo and redo without adding entries', () => {
+    const onChange = vi.fn();
+    const { result } = renderHook(() => useDesignerDocument({ initialDocument: { title: 'Original', blocks: [] as string[] }, onChange }));
+    act(() => result.current.update((d: { title: string; blocks: string[] }) => ({ ...d, blocks: ['block'] })));
+    act(() => result.current.mutateNoHistory((d: { title: string; blocks: string[] }) => ({ ...d, title: 'Renamed' })));
+    act(() => result.current.undo());
+    expect(result.current.document).toEqual({ title: 'Renamed', blocks: [] });
+    expect(result.current.canUndo).toBe(false);
+    expect(result.current.canRedo).toBe(true);
+    act(() => result.current.redo());
+    expect(result.current.document).toEqual({ title: 'Renamed', blocks: ['block'] });
+    expect(onChange).toHaveBeenCalledTimes(4);
+  });
+
+  it('keeps non-history edits when traversing an existing redo branch', () => {
+    const { result } = renderHook(() => useDesignerDocument({ initialDocument: { parameters: ['initial'], blocks: [] as string[] } }));
+    act(() => result.current.update((d: { parameters: string[]; blocks: string[] }) => ({ ...d, blocks: ['first'] })));
+    act(() => result.current.update((d: { parameters: string[]; blocks: string[] }) => ({ ...d, blocks: ['first', 'second'] })));
+    act(() => result.current.undo());
+    act(() => result.current.mutateNoHistory((d: { parameters: string[]; blocks: string[] }) => ({ ...d, parameters: ['edited'] })));
+    expect(result.current.canRedo).toBe(true);
+    act(() => result.current.redo());
+    expect(result.current.document).toEqual({ parameters: ['edited'], blocks: ['first', 'second'] });
+    act(() => result.current.undo());
+    act(() => result.current.undo());
+    expect(result.current.document).toEqual({ parameters: ['edited'], blocks: [] });
+    expect(result.current.canUndo).toBe(false);
+  });
+
+  it('does not notify or change traversal for a no-op non-history edit', () => {
+    const onChange = vi.fn();
+    const { result } = renderHook(() => useDesignerDocument({ initialDocument: baseDoc(), onChange }));
+    act(() => result.current.update((d: PageSchemaV3) => ({ ...d, id: 'edited' })));
+    onChange.mockClear();
+    act(() => result.current.mutateNoHistory((d: PageSchemaV3) => ({ ...d })));
+    expect(onChange).not.toHaveBeenCalled();
+    expect(result.current.canUndo).toBe(true);
+    act(() => result.current.undo());
+    expect(result.current.document.id).toBe('p1');
+  });
+
   it('exposes stable mutator identities across re-renders', () => {
     const { result, rerender } = renderHook(
       ({ doc }: { doc: PageSchemaV3 }) => useDesignerDocument({ initialDocument: doc }),

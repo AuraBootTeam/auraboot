@@ -12,12 +12,57 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PageSchemaValidatorTest {
 
     private final PageSchemaValidator validator = new PageSchemaValidator();
+
+    @Test
+    void registeredRenderProfileIsScopedAndKeepsVersionIdAndI18nChecks() {
+        var profile = new PageSchemaRenderProfile("storefront", Set.of("plp"), Set.of("product-grid"));
+        var registered = new PageSchemaValidator(List.of(profile));
+        var manifest = new PluginManifestExtended();
+        var p = page("commerce_plp", "plp", null,
+                List.of(Map.of("id", "products", "blockType", "product-grid")));
+        p.setProfile("storefront");
+        manifest.setPages(List.of(p));
+        var ctx = PluginValidationContext.builder().pluginId("commerce").namespace("commerce")
+                .manifest(manifest).build();
+        assertTrue(registered.validate(ctx).isEmpty());
+        assertHasError(validator.validate(ctx), "S-PAGE-KIND-UNKNOWN", "pages[0].kind");
+        assertHasError(validator.validate(ctx), "S-PAGE-BLOCK-TYPE", "pages[0].blocks[0].blockType");
+
+        p.setProfile("admin");
+        assertHasError(registered.validate(ctx), "S-PAGE-KIND-UNKNOWN", "pages[0].kind");
+        assertHasError(registered.validate(ctx), "S-PAGE-BLOCK-TYPE", "pages[0].blocks[0].blockType");
+        p.setProfile("storefront");
+        p.setKind("list");
+        assertHasError(registered.validate(ctx), "S-PAGE-KIND-UNKNOWN", "pages[0].kind");
+        p.setKind("plp");
+        p.setBlocks(validTable());
+        assertHasError(registered.validate(ctx), "S-PAGE-BLOCK-TYPE", "pages[0].blocks[0].blockType");
+
+        p.setSchemaVersion(3);
+        p.setBlocks(List.of(Map.of("blockType", "product-grid", "title", "商品")));
+        var violations = registered.validate(ctx);
+        assertHasError(violations, "S-PAGE-VERSION", "pages[0].schemaVersion");
+        assertHasError(violations, "S-PAGE-BLOCK-ID", "pages[0].blocks[0].id");
+        assertHasError(violations, "S-PAGE-I18N", "pages[0].blocks[0].title");
+    }
+
+    @Test
+    void duplicateOrInvalidRenderProfileRegistrationFailsClosed() {
+        var profile = new PageSchemaRenderProfile("storefront", Set.of("plp"), Set.of("product-grid"));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                () -> new PageSchemaValidator(List.of(profile, profile)));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                () -> new PageSchemaRenderProfile("admin", Set.of("plp"), Set.of("product-grid")));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                () -> new PageSchemaRenderProfile("storefront", Set.of(), Set.of("product-grid")));
+    }
 
     @Test
     void tableBlockWithoutIdIsRejected() {

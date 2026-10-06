@@ -13,12 +13,16 @@ class JdbcDriverRuntimeTest {
 
     @Test
     void mysqlDriverIsDiscoverableAndAcceptsTheContainerJdbcUrl() throws Exception {
-        String driverClass = new MySqlTestContainer("mysql:8.0.39").getDriverClassName();
-        Class.forName(driverClass);
+        String containerDriverClass = new MySqlTestContainer("mysql:8.0.39").getDriverClassName();
+        Class.forName(containerDriverClass);
         String url = "jdbc:mysql://127.0.0.1:3306/test?permitMysqlScheme=true";
         Driver driver = DriverManager.getDriver(url);
 
-        assertThat(driver.getClass().getName()).isEqualTo(driverClass);
+        // The runtime ships both the MariaDB and the MySQL drivers, so DriverManager
+        // may resolve either for jdbc:mysql: URLs; the readiness precondition is a
+        // discoverable driver that actually accepts the connector URL, not a
+        // specific vendor.
+        assertThat(driver.getClass().getName()).isIn(containerDriverClass, "com.mysql.cj.jdbc.Driver");
         assertThat(driver.acceptsURL(url)).isTrue();
     }
 }

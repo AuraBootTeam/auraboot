@@ -5,7 +5,7 @@
  * can reuse the same building blocks.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   PencilIcon,
   TrashIcon,
@@ -15,6 +15,7 @@ import {
   EyeSlashIcon,
 } from '@heroicons/react/24/outline';
 import { useToastContext } from '~/contexts/ToastContext';
+import { useI18n } from '~/contexts/I18nContext';
 import { get, post, del } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 
@@ -436,6 +437,8 @@ export interface UseCloudConfigsReturn {
   setShowEditor: (v: boolean) => void;
   editingConfig: CloudConfig | null;
   testingPid: string | null;
+  saveReadbackPending: boolean;
+  retrySaveReadback: () => Promise<boolean>;
   loadConfigs: () => Promise<void>;
   handleCreate: () => void;
   handleEdit: (config: CloudConfig) => void;
@@ -449,22 +452,27 @@ export interface UseCloudConfigsReturn {
     config: Record<string, string>;
     enabled: boolean;
     priority: number;
-  }) => Promise<void>;
+    pid?: string;
+  }) => Promise<boolean>;
 }
 
-export function useCloudConfigs(): UseCloudConfigsReturn {
+export function useCloudConfigs(options: { apiBase?: string; initialLevel?: ConfigLevel } = {}): UseCloudConfigsReturn {
+  const apiBase = options.apiBase ?? '/api/admin/cloud-config';
   const { showSuccessToast, showErrorToast } = useToastContext();
+  const { t } = useI18n();
   const [configs, setConfigs] = useState<CloudConfig[]>([]);
   const [loading, setLoading] = useState(true);
-  const [level, setLevel] = useState<ConfigLevel>('platform');
+  const [level, setLevel] = useState<ConfigLevel>(options.initialLevel ?? 'platform');
   const [showEditor, setShowEditor] = useState(false);
   const [editingConfig, setEditingConfig] = useState<CloudConfig | null>(null);
   const [testingPid, setTestingPid] = useState<string | null>(null);
+  const [saveReadbackPending, setSaveReadbackPending] = useState(false);
+  const pendingSave = useRef<{ level: ConfigLevel; updated: boolean } | null>(null);
 
-  const loadConfigs = useCallback(async () => {
+  const readConfigs = useCallback(async (requestedLevel: ConfigLevel = level) => {
     setLoading(true);
     try {
-      const result = await get<CloudConfig[]>('/api/admin/cloud-config', { level });
+      const result = await get<CloudConfig[]>(apiBase, { level: requestedLevel });
       if (ResultHelper.isSuccess(result) && result.data) {
         setConfigs(
           result.data.map((item) => ({
@@ -473,15 +481,31 @@ export function useCloudConfigs(): UseCloudConfigsReturn {
             configLevel: String(item.configLevel).toLowerCase() as ConfigLevel,
           })),
         );
+        return true;
       } else {
-        showErrorToast(result.desc || '加载配置失败');
+        showErrorToast(result.message || result.desc || '加载配置失败');
       }
     } catch (e: any) {
       showErrorToast(e.message || '加载配置失败');
     } finally {
       setLoading(false);
     }
-  }, [level, showErrorToast]);
+    return false;
+  }, [apiBase, level, showErrorToast]);
+
+  const loadConfigs = useCallback(async () => { await readConfigs(); }, [readConfigs]);
+
+  const retrySaveReadback = async () => {
+    const saved = pendingSave.current;
+    if (!saved) return false;
+    if (!await readConfigs(saved.level)) return false;
+    setLevel(saved.level);
+    pendingSave.current = null;
+    setSaveReadbackPending(false);
+    setShowEditor(false);
+    showSuccessToast(saved.updated ? '配置已更新' : '配置已创建');
+    return true;
+  };
 
   useEffect(() => {
     loadConfigs();
@@ -501,7 +525,7 @@ export function useCloudConfigs(): UseCloudConfigsReturn {
     const providerLabel = PROVIDER_LABELS[config.providerCode] || config.providerCode;
     if (!window.confirm(`确定要删除「${providerLabel}」的配置吗?`)) return;
     try {
-      const result = await del('/api/admin/cloud-config/{pid}', { pid: config.pid });
+      const result = await del(`${apiBase}/{pid}`, { pid: config.pid });
       if (ResultHelper.isSuccess(result)) {
         showSuccessToast('配置已删除');
         loadConfigs();
@@ -516,11 +540,13 @@ export function useCloudConfigs(): UseCloudConfigsReturn {
   const handleTest = async (config: CloudConfig) => {
     setTestingPid(config.pid);
     try {
-      const result = await post('/api/admin/cloud-config/{pid}/test', { pid: config.pid });
-      if (ResultHelper.isSuccess(result)) {
+      const result = await post<{ status: string; message: string }>(
+        '/api/admin/cloud-config/{pid}/test', { pid: config.pid },
+      );
+      if (ResultHelper.isSuccess(result) && result.data?.status === 'ok') {
         showSuccessToast('连接测试成功');
       } else {
-        showErrorToast(result.desc || '连接测试失败');
+        showErrorToast(ResultHelper.isSuccess(result) ? '连接测试失败' : result.desc || '连接测试失败');
       }
     } catch (e: any) {
       showErrorToast(e.message || '连接测试失败');
@@ -532,7 +558,7 @@ export function useCloudConfigs(): UseCloudConfigsReturn {
   const handleToggleEnabled = async (config: CloudConfig) => {
     try {
       const parsed = safeParseJSON(config.config);
-      const result = await post('/api/admin/cloud-config', {
+      const result = await post(apiBase, {
         ...config,
         configLevel: config.configLevel,
         serviceType: config.serviceType,
@@ -557,7 +583,13 @@ export function useCloudConfigs(): UseCloudConfigsReturn {
     config: Record<string, string>;
     enabled: boolean;
     priority: number;
+    pid?: string;
   }) => {
+    if (pendingSave.current) {
+      showErrorToast(t('cloudConfig.save.readbackPending', undefined,
+        'Configuration saved. Reload it before making further changes.'));
+      return false;
+    }
     try {
       const body: any = {
         configLevel: data.configLevel,
@@ -567,20 +599,21 @@ export function useCloudConfigs(): UseCloudConfigsReturn {
         enabled: data.enabled,
         priority: data.priority,
       };
-      if (editingConfig) {
-        body.pid = editingConfig.pid;
+      if (data.pid || editingConfig) {
+        body.pid = data.pid ?? editingConfig?.pid;
       }
-      const result = await post('/api/admin/cloud-config', body);
+      const result = await post(apiBase, body);
       if (ResultHelper.isSuccess(result)) {
-        showSuccessToast(editingConfig ? '配置已更新' : '配置已创建');
-        setShowEditor(false);
-        loadConfigs();
+        pendingSave.current = { level: data.configLevel, updated: !!body.pid };
+        setSaveReadbackPending(true);
+        return await retrySaveReadback();
       } else {
         showErrorToast(result.desc || '保存失败');
       }
     } catch (e: any) {
       showErrorToast(e.message || '保存失败');
     }
+    return false;
   };
 
   return {
@@ -592,6 +625,8 @@ export function useCloudConfigs(): UseCloudConfigsReturn {
     setShowEditor,
     editingConfig,
     testingPid,
+    saveReadbackPending,
+    retrySaveReadback,
     loadConfigs,
     handleCreate,
     handleEdit,
@@ -633,6 +668,7 @@ export function ConfigCard({
           : 'border-gray-100 bg-gray-50 dark:border-gray-700/50 dark:bg-gray-800/50'
       }`}
       data-testid={`cloud-config-card-${config.providerCode}`}
+      data-config-pid={config.pid}
     >
       <div className="flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-3">
@@ -737,6 +773,20 @@ export function ConfigCard({
 // ConfigEditorModal component
 // ---------------------------------------------------------------------------
 
+export function SaveReadbackNotice({ onRetry }: { onRetry: () => Promise<boolean> }) {
+  const { t } = useI18n();
+  const [retrying, setRetrying] = useState(false);
+  return (
+    <div role="alert" className="m-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200" data-testid="config-save-readback-notice">
+      <p>{t('cloudConfig.save.readbackPending', undefined, 'Configuration saved. Reload it before making further changes.')}</p>
+      <button type="button" disabled={retrying} data-testid="config-save-readback-retry" className="mt-2 font-medium underline disabled:opacity-50"
+        onClick={async () => { setRetrying(true); try { await onRetry(); } finally { setRetrying(false); } }}>
+        {t('cloudConfig.save.retryReadback', undefined, 'Retry loading')}
+      </button>
+    </div>
+  );
+}
+
 export function ConfigEditorModal({
   config,
   currentLevel,
@@ -744,6 +794,8 @@ export function ConfigEditorModal({
   serviceTypes,
   onClose,
   onSave,
+  saveReadbackPending = false,
+  onRetryReadback,
 }: {
   config: CloudConfig | null;
   currentLevel: ConfigLevel;
@@ -751,6 +803,8 @@ export function ConfigEditorModal({
   /** Which service types to show in the dropdown. Defaults to all SERVICE_TYPES. */
   serviceTypes?: { key: ServiceType; label: string }[];
   onClose: () => void;
+  saveReadbackPending?: boolean;
+  onRetryReadback?: () => Promise<boolean>;
   onSave: (data: {
     configLevel: ConfigLevel;
     serviceType: ServiceType;
@@ -841,7 +895,9 @@ export function ConfigEditorModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 p-6">
+        {saveReadbackPending && onRetryReadback && <SaveReadbackNotice onRetry={onRetryReadback} />}
+        <form onSubmit={handleSubmit} className="p-6">
+          <fieldset disabled={saveReadbackPending} className="space-y-4">
           {/* Level */}
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -1031,6 +1087,7 @@ export function ConfigEditorModal({
               {saving ? '保存中...' : isEdit ? '保存更改' : '创建'}
             </button>
           </div>
+          </fieldset>
         </form>
       </div>
     </div>

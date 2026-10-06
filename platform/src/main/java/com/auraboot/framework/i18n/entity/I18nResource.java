@@ -5,6 +5,8 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -33,12 +35,16 @@ import java.time.Instant;
 public class I18nResource {
 
     @TableId(value = "id", type = IdType.AUTO)
+    // Snowflake identifiers exceed the JS double-precision mantissa; serialize as strings.
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
 
     @TableField("pid")
     private String pid;
 
     @TableField("tenant_id")
+    // Snowflake identifiers exceed the JS double-precision mantissa; serialize as strings.
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long tenantId;
 
     /**
@@ -89,6 +95,8 @@ public class I18nResource {
      * Referenced entity ID
      */
     @TableField("ref_id")
+    // Snowflake identifiers exceed the JS double-precision mantissa; serialize as strings.
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long refId;
 
     /**
@@ -111,6 +119,8 @@ public class I18nResource {
      * User ID who approved or rejected the translation
      */
     @TableField("reviewed_by")
+    // Snowflake identifiers exceed the JS double-precision mantissa; serialize as strings.
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long reviewedBy;
 
     /**
@@ -126,9 +136,13 @@ public class I18nResource {
     private Instant updatedAt;
 
     @TableField("created_by")
+    // Snowflake identifiers exceed the JS double-precision mantissa; serialize as strings.
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long createdBy;
 
     @TableField("updated_by")
+    // Snowflake identifiers exceed the JS double-precision mantissa; serialize as strings.
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long updatedBy;
 
     @TableField("deleted_flag")

@@ -3,6 +3,7 @@
  */
 
 import React from 'react';
+import { useSmartText } from '~/utils/i18n';
 import type { StatCardBlock, ReportDataSource } from '../types';
 
 interface StatCardBlockEditorProps {
@@ -16,29 +17,34 @@ export const StatCardBlockEditor: React.FC<StatCardBlockEditorProps> = ({
   dataSources,
   onChange,
 }) => {
+  const text = useSmartText();
   const dsKeys = Object.keys(dataSources);
 
   return (
     <div className="space-y-4">
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Label</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          {text({ zh: '显示名称', en: 'Label' })}
+        </label>
         <input
           type="text"
           value={block.label || ''}
           onChange={(e) => onChange({ label: e.target.value })}
           className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-          placeholder="e.g. Total Revenue"
+          placeholder={text({ zh: '例如：总收入', en: 'e.g. Total Revenue' })}
         />
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Data Source</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          {text({ zh: '数据源', en: 'Data Source' })}
+        </label>
         <select
           value={block.dataSource}
           onChange={(e) => onChange({ dataSource: e.target.value })}
           className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
         >
-          <option value="">Select data source</option>
+          <option value="">{text({ zh: '选择数据源', en: 'Select data source' })}</option>
           {dsKeys.map((key) => (
             <option key={key} value={key}>
               {key}
@@ -48,18 +54,22 @@ export const StatCardBlockEditor: React.FC<StatCardBlockEditorProps> = ({
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Value Field</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          {text({ zh: '数值字段', en: 'Value Field' })}
+        </label>
         <input
           type="text"
           value={block.valueField || ''}
           onChange={(e) => onChange({ valueField: e.target.value })}
           className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-          placeholder="Field name"
+          placeholder={text({ zh: '字段名称', en: 'Field name' })}
         />
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Aggregation</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          {text({ zh: '聚合方式', en: 'Aggregation' })}
+        </label>
         <select
           value={block.aggregation}
           onChange={(e) =>
@@ -67,29 +77,33 @@ export const StatCardBlockEditor: React.FC<StatCardBlockEditorProps> = ({
           }
           className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
         >
-          <option value="sum">SUM</option>
-          <option value="avg">AVG</option>
-          <option value="count">COUNT</option>
-          <option value="min">MIN</option>
-          <option value="max">MAX</option>
+          <option value="sum">{text({ zh: '求和', en: 'SUM' })}</option>
+          <option value="avg">{text({ zh: '平均值', en: 'AVG' })}</option>
+          <option value="count">{text({ zh: '计数', en: 'COUNT' })}</option>
+          <option value="min">{text({ zh: '最小值', en: 'MIN' })}</option>
+          <option value="max">{text({ zh: '最大值', en: 'MAX' })}</option>
         </select>
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Format</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          {text({ zh: '格式', en: 'Format' })}
+        </label>
         <select
           value={block.format || ''}
           onChange={(e) => onChange({ format: e.target.value || undefined })}
           className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
         >
-          <option value="">Number</option>
-          <option value="currency">Currency (¥)</option>
-          <option value="percent">Percent (%)</option>
+          <option value="">{text({ zh: '数字', en: 'Number' })}</option>
+          <option value="currency">{text({ zh: '金额（¥）', en: 'Currency (¥)' })}</option>
+          <option value="percent">{text({ zh: '百分比（%）', en: 'Percent (%)' })}</option>
         </select>
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Color</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          {text({ zh: '颜色', en: 'Color' })}
+        </label>
         <div className="flex flex-wrap gap-2">
           {['blue', 'green', 'orange', 'red', 'purple', 'gray'].map((color) => (
             <button

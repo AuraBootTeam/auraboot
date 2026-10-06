@@ -314,6 +314,10 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
             triggerPayload.put("eventType", eventType);
             triggerPayload.put("eventId", eventId);
             triggerPayload.put("sourceCode", sourceCode);
+            String requestId = org.slf4j.MDC.get("requestId");
+            if (requestId != null && !requestId.isBlank()) {
+                triggerPayload.put("requestId", requestId);
+            }
             triggerPayload.put("subject", subject);
             triggerPayload.put("data", payload);
             Map<String, Object> matchedPayload = buildMatchedTriggerPayload(automation, triggerPayload);

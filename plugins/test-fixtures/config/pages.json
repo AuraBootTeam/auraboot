@@ -1,1973 +1,2187 @@
 [
-  {
-    "pageKey": "e2et_order_list",
-    "name:zh-CN": "测试订单列表",
-    "name:en": "Test Order List",
-    "modelCode": "e2et_order",
-    "description": "Order list with status tabs, toolbar, row actions with conditional visibility",
-    "kind": "list",
-    "schemaVersion": 4,
-    "layout": {
-      "type": "grid",
-      "cols": 12
-    },
-    "blocks": [
-      {
-        "id": "block_order_tabs",
-        "blockType": "tabs",
-        "tabs": [
-          {
-            "key": "all",
-            "label": {
-              "zh-CN": "全部",
-              "en-US": "All"
-            },
-            "filter": null
-          },
-          {
-            "key": "draft",
-            "label": {
-              "zh-CN": "草稿",
-              "en-US": "Draft"
-            },
-            "filter": {
-              "field": "e2et_order_status",
-              "operator": "EQ",
-              "value": "draft",
-              "dictCode": "e2et_order_status"
-            }
-          },
-          {
-            "key": "submitted",
-            "label": {
-              "zh-CN": "已提交",
-              "en-US": "Submitted"
-            },
-            "filter": {
-              "field": "e2et_order_status",
-              "operator": "EQ",
-              "value": "submitted",
-              "dictCode": "e2et_order_status"
-            }
-          },
-          {
-            "key": "approved",
-            "label": {
-              "zh-CN": "已审批",
-              "en-US": "Approved"
-            },
-            "filter": {
-              "field": "e2et_order_status",
-              "operator": "EQ",
-              "value": "approved",
-              "dictCode": "e2et_order_status"
-            }
-          },
-          {
-            "key": "completed",
-            "label": {
-              "zh-CN": "已完成",
-              "en-US": "Completed"
-            },
-            "filter": {
-              "field": "e2et_order_status",
-              "operator": "EQ",
-              "value": "completed",
-              "dictCode": "e2et_order_status"
-            }
-          },
-          {
-            "key": "cancelled",
-            "label": {
-              "zh-CN": "已取消",
-              "en-US": "Cancelled"
-            },
-            "filter": {
-              "field": "e2et_order_status",
-              "operator": "EQ",
-              "value": "cancelled",
-              "dictCode": "e2et_order_status"
-            }
-          }
-        ]
+ {
+  "pageKey": "e2et_order_list",
+  "name:zh-CN": "测试订单列表",
+  "name:en": "Test Order List",
+  "modelCode": "e2et_order",
+  "description": "Order list with status tabs, toolbar, row actions with conditional visibility",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+   "type": "grid",
+   "cols": 12
+  },
+  "blocks": [
+   {
+    "id": "block_order_tabs",
+    "blockType": "tabs",
+    "tabs": [
+     {
+      "key": "all",
+      "label": {
+       "zh-CN": "全部",
+       "en-US": "All"
       },
-      {
-        "id": "block_order_toolbar",
-        "blockType": "toolbar",
-        "buttons": [
-          {
-            "code": "create",
-            "primary": true,
-            "icon": "Plus",
-            "permissionCode": "e2et.order.manage",
-            "label": {
-              "zh-CN": "新建",
-              "en": "Create"
-            },
-            "action": {
-              "type": "navigate",
-              "to": "e2et_order_form",
-              "command": "e2et:create_order"
-            }
-          }
-        ]
+      "filter": null
+     },
+     {
+      "key": "draft",
+      "label": {
+       "zh-CN": "草稿",
+       "en-US": "Draft"
       },
-      {
-        "id": "block_order_table",
-        "blockType": "table",
-        "columns": [
-          {
-            "field": "e2et_order_no",
-            "width": 180,
-            "fixed": "left"
-          },
-          {
-            "field": "e2et_order_title",
-            "width": 200
-          },
-          {
-            "field": "e2et_order_type",
-            "width": 100,
-            "dictCode": "e2et_order_type"
-          },
-          {
-            "field": "e2et_order_status",
-            "width": 100,
-            "dictCode": "e2et_order_status"
-          },
-          {
-            "field": "e2et_order_customer",
-            "width": 150
-          },
-          {
-            "field": "e2et_order_amount",
-            "width": 120,
-            "align": "right"
-          },
-          {
-            "field": "e2et_order_qty",
-            "width": 80,
-            "align": "right"
-          },
-          {
-            "field": "e2et_order_date",
-            "width": 120
-          },
-          {
-            "field": "e2et_order_urgent",
-            "width": 80,
-            "align": "center"
-          }
-        ],
-        "rowActions": [
-          {
-            "code": "detail",
-            "icon": "Eye",
-            "permissionCode": "e2et.order.read",
-            "label": {
-              "zh-CN": "查看",
-              "en": "View"
-            },
-            "action": {
-              "type": "navigate",
-              "to": "e2et_order_detail"
-            }
-          },
-          {
-            "code": "edit",
-            "icon": "Edit",
-            "visibleWhen": "['draft','rejected'].includes(row.e2et_order_status)",
-            "permissionCode": "e2et.order.manage",
-            "label": {
-              "zh-CN": "编辑",
-              "en": "Edit"
-            },
-            "action": {
-              "type": "navigate",
-              "to": "e2et_order_form",
-              "command": "e2et:update_order"
-            }
-          },
-          {
-            "code": "submit",
-            "icon": "Send",
-            "visibleWhen": "['draft','rejected'].includes(row.e2et_order_status)",
-            "permissionCode": "e2et.order.manage",
-            "label": {
-              "zh-CN": "提交",
-              "en": "Submit"
-            },
-            "confirm": "submit.confirm",
-            "action": {
-              "type": "command",
-              "command": "e2et:submit_order"
-            }
-          },
-          {
-            "code": "approve",
-            "icon": "Check",
-            "visibleWhen": "row.e2et_order_status === 'submitted'",
-            "permissionCode": "e2et.order.approve",
-            "label": {
-              "zh-CN": "通过",
-              "en": "Approve"
-            },
-            "confirm": "approve.confirm",
-            "action": {
-              "type": "command",
-              "command": "e2et:approve_order"
-            }
-          },
-          {
-            "code": "reject",
-            "icon": "X",
-            "visibleWhen": "row.e2et_order_status === 'submitted'",
-            "permissionCode": "e2et.order.approve",
-            "label": {
-              "zh-CN": "拒绝",
-              "en": "Reject"
-            },
-            "confirm": "reject.confirm",
-            "action": {
-              "type": "command",
-              "command": "e2et:reject_order"
-            }
-          },
-          {
-            "code": "complete",
-            "icon": "CheckCircle",
-            "visibleWhen": "row.e2et_order_status === 'approved'",
-            "permissionCode": "e2et.order.manage",
-            "label": {
-              "zh-CN": "完成",
-              "en": "Complete"
-            },
-            "confirm": "complete.confirm",
-            "action": {
-              "type": "command",
-              "command": "e2et:complete_order"
-            }
-          },
-          {
-            "code": "cancel",
-            "icon": "XCircle",
-            "visibleWhen": "['draft','submitted'].includes(row.e2et_order_status)",
-            "permissionCode": "e2et.order.manage",
-            "label": {
-              "zh-CN": "取消",
-              "en": "Cancel"
-            },
-            "confirm": "cancel.confirm",
-            "action": {
-              "type": "command",
-              "command": "e2et:cancel_order"
-            }
-          },
-          {
-            "code": "delete",
-            "icon": "Trash2",
-            "danger": true,
-            "visibleWhen": "row.e2et_order_status === 'draft'",
-            "permissionCode": "e2et.order.manage",
-            "label": {
-              "zh-CN": "删除",
-              "en": "Delete"
-            },
-            "confirm": "delete.confirm",
-            "action": {
-              "type": "command",
-              "command": "e2et:delete_order"
-            }
-          }
-        ],
-        "defaultSort": {
-          "field": "created_at",
-          "order": "desc"
-        },
-        "searchFields": [
-          "e2et_order_title",
-          "e2et_order_no",
-          "e2et_order_type",
-          "e2et_order_status",
-          "e2et_order_customer"
-        ]
+      "filter": {
+       "field": "e2et_order_status",
+       "operator": "EQ",
+       "value": "draft",
+       "dictCode": "e2et_order_status"
       }
+     },
+     {
+      "key": "submitted",
+      "label": {
+       "zh-CN": "已提交",
+       "en-US": "Submitted"
+      },
+      "filter": {
+       "field": "e2et_order_status",
+       "operator": "EQ",
+       "value": "submitted",
+       "dictCode": "e2et_order_status"
+      }
+     },
+     {
+      "key": "approved",
+      "label": {
+       "zh-CN": "已审批",
+       "en-US": "Approved"
+      },
+      "filter": {
+       "field": "e2et_order_status",
+       "operator": "EQ",
+       "value": "approved",
+       "dictCode": "e2et_order_status"
+      }
+     },
+     {
+      "key": "completed",
+      "label": {
+       "zh-CN": "已完成",
+       "en-US": "Completed"
+      },
+      "filter": {
+       "field": "e2et_order_status",
+       "operator": "EQ",
+       "value": "completed",
+       "dictCode": "e2et_order_status"
+      }
+     },
+     {
+      "key": "cancelled",
+      "label": {
+       "zh-CN": "已取消",
+       "en-US": "Cancelled"
+      },
+      "filter": {
+       "field": "e2et_order_status",
+       "operator": "EQ",
+       "value": "cancelled",
+       "dictCode": "e2et_order_status"
+      }
+     }
+    ]
+   },
+   {
+    "id": "block_order_toolbar",
+    "blockType": "toolbar",
+    "buttons": [
+     {
+      "code": "create",
+      "primary": true,
+      "icon": "Plus",
+      "permissionCode": "e2et.order.manage",
+      "label": {
+       "zh-CN": "新建",
+       "en": "Create"
+      },
+      "action": {
+       "type": "navigate",
+       "to": "e2et_order_form",
+       "command": "e2et:create_order"
+      }
+     }
+    ]
+   },
+   {
+    "id": "block_order_table",
+    "blockType": "table",
+    "columns": [
+     {
+      "field": "e2et_order_no",
+      "width": 180,
+      "fixed": "left"
+     },
+     {
+      "field": "e2et_order_title",
+      "width": 200
+     },
+     {
+      "field": "e2et_order_type",
+      "width": 100,
+      "dictCode": "e2et_order_type"
+     },
+     {
+      "field": "e2et_order_status",
+      "width": 100,
+      "dictCode": "e2et_order_status"
+     },
+     {
+      "field": "e2et_order_customer",
+      "width": 150
+     },
+     {
+      "field": "e2et_order_amount",
+      "width": 120,
+      "align": "right"
+     },
+     {
+      "field": "e2et_order_qty",
+      "width": 80,
+      "align": "right"
+     },
+     {
+      "field": "e2et_order_date",
+      "width": 120
+     },
+     {
+      "field": "e2et_order_urgent",
+      "width": 80,
+      "align": "center"
+     }
     ],
-    "extension": {
-      "import": {
-        "enabled": true,
-        "permissionCode": "model.e2et_order.import",
-        "modes": [
-          "insert"
-        ]
+    "rowActions": [
+     {
+      "code": "detail",
+      "icon": "Eye",
+      "permissionCode": "e2et.order.read",
+      "label": {
+       "zh-CN": "查看",
+       "en": "View"
       },
-      "options": {
-        "detailNavigation": "page"
-      },
-      "calendarConfig": {
-        "dateField": "e2et_order_date",
-        "titleField": "e2et_order_title"
-      },
-      "enableMultiView": true,
-      "galleryConfig": {
-        "titleField": "e2et_order_title",
-        "subtitleField": "e2et_order_status",
-        "columns": 2
-      },
-      "kanbanConfig": {
-        "groupByField": "e2et_order_status",
-        "titleField": "e2et_order_title",
-        "subtitleField": "e2et_order_amount"
-      },
-      "views": [
-        "table",
-        "kanban",
-        "calendar",
-        "gallery"
-      ]
-    }
-  },
-  {
-    "pageKey": "e2et_order_form",
-    "name:zh-CN": "测试订单编辑",
-    "name:en": "Test Order Form",
-    "modelCode": "e2et_order",
-    "description": "Order form with 2-column grid, sub-table block, conditional visibility (linkage)",
-    "kind": "form",
-    "schemaVersion": 4,
-    "layout": {
-      "type": "stack"
-    },
-    "blocks": [
-      {
-        "id": "section_basic",
-        "blockType": "form-section",
-        "title": {
-          "zh-CN": "基本信息",
-          "en-US": "Basic Information"
-        },
-        "columns": 2,
-        "fields": [
-          {
-            "field": "e2et_order_title",
-            "span": 1,
-            "readOnlyWhen": "!!form.e2et_order_status && !['draft','rejected'].includes(form.e2et_order_status)",
-            "required": true
-          },
-          {
-            "field": "e2et_order_no",
-            "span": 1,
-            "readOnly": true
-          },
-          {
-            "field": "e2et_order_type",
-            "span": 1,
-            "dictCode": "e2et_order_type"
-          },
-          {
-            "field": "e2et_order_customer",
-            "span": 1,
-            "allowCreate": true,
-            "createCommand": "e2et:create_customer",
-            "createPageKey": "e2et_customer_form",
-            "createPermission": "e2et.customer.manage"
-          },
-          {
-            "field": "e2et_order_date",
-            "span": 1
-          },
-          {
-            "field": "e2et_order_urgent",
-            "span": 1
-          },
-          {
-            "field": "e2et_order_discount",
-            "span": 1,
-            "visibleWhen": "form.e2et_order_type === 'bulk'"
-          },
-          {
-            "field": "e2et_order_remark",
-            "span": 2,
-            "visibleWhen": "form.e2et_order_urgent === true"
-          },
-          {
-            "field": "e2et_order_desc",
-            "span": 2
-          },
-          {
-            "field": "e2et_order_status",
-            "span": 1,
-            "readOnly": true,
-            "dictCode": "e2et_order_status"
-          },
-          {
-            "field": "e2et_order_amount",
-            "span": 1,
-            "readOnly": true
-          },
-          {
-            "field": "e2et_order_qty",
-            "span": 1,
-            "readOnly": true
-          }
-        ]
-      },
-      {
-        "id": "section_items",
-        "blockType": "sub-table",
-        "title": {
-          "zh-CN": "订单明细",
-          "en-US": "Order Items"
-        },
-        "subTable": {
-          "childModel": "e2et_order_item",
-          "parentField": "e2et_order_id",
-          "readOnly": false,
-          "commands": {
-            "create": "e2et:create_order_item",
-            "update": "e2et:update_order_item",
-            "delete": "e2et:delete_order_item"
-          },
-          "editableWhen": "['draft','rejected'].includes(record.e2et_order_status)",
-          "columns": [
-            {
-              "field": "e2et_item_name",
-              "width": 200
-            },
-            {
-              "field": "e2et_item_spec",
-              "width": 120,
-              "dictCode": "e2et_item_spec"
-            },
-            {
-              "field": "e2et_item_qty",
-              "width": 100,
-              "align": "right"
-            },
-            {
-              "field": "e2et_item_price",
-              "width": 120,
-              "align": "right"
-            },
-            {
-              "field": "e2et_item_subtotal",
-              "width": 140,
-              "align": "right"
-            }
-          ],
-          "summary": {
-            "fields": [
-              {
-                "field": "e2et_item_subtotal",
-                "aggregation": "sum",
-                "label": {
-                  "zh-CN": "合计",
-                  "en-US": "Total"
-                }
-              },
-              {
-                "field": "e2et_item_qty",
-                "aggregation": "sum",
-                "label": {
-                  "zh-CN": "总数量",
-                  "en-US": "Total Qty"
-                }
-              }
-            ]
-          }
-        }
-      },
-      {
-        "id": "block_form_buttons",
-        "blockType": "form-buttons",
-        "buttons": [
-          {
-            "code": "save_draft",
-            "visibleWhen": "!form.e2et_order_status || form.e2et_order_status === 'draft'",
-            "label": {
-              "zh-CN": "保存草稿",
-              "en": "Save draft"
-            },
-            "action": {
-              "type": "command",
-              "command": "e2et:update_order"
-            }
-          },
-          {
-            "code": "submit",
-            "primary": true,
-            "visibleWhen": "!form.e2et_order_status || ['draft','rejected'].includes(form.e2et_order_status)",
-            "label": {
-              "zh-CN": "提交",
-              "en": "Submit"
-            },
-            "confirm": "submit.confirm",
-            "action": {
-              "type": "command",
-              "command": "e2et:submit_order"
-            }
-          },
-          {
-            "code": "cancel",
-            "label": {
-              "zh-CN": "取消",
-              "en": "Cancel"
-            }
-          }
-        ]
+      "action": {
+       "type": "navigate",
+       "to": "e2et_order_detail"
       }
-    ]
-  },
-  {
-    "pageKey": "e2et_order_detail",
-    "name:zh-CN": "测试订单详情",
-    "name:en": "Test Order Detail",
-    "modelCode": "e2et_order",
-    "description": "Order detail view with basic info, items sub-table (read-only), and audit logs",
-    "kind": "detail",
-    "schemaVersion": 4,
-    "layout": {
-      "type": "grid",
-      "cols": 12
-    },
-    "blocks": [
-      {
-        "id": "block_detail_tabs",
-        "blockType": "tabs",
-        "tabs": [
-          {
-            "key": "basic",
-            "label": {
-              "zh-CN": "基本信息",
-              "en-US": "Basic Info"
-            },
-            "blocks": [
-              {
-                "id": "block_detail_basic",
-                "blockType": "form-section",
-                "columns": 2,
-                "fields": [
-                  {
-                    "field": "e2et_order_no",
-                    "span": 1
-                  },
-                  {
-                    "field": "e2et_order_title",
-                    "span": 1
-                  },
-                  {
-                    "field": "e2et_order_type",
-                    "span": 1,
-                    "dictCode": "e2et_order_type"
-                  },
-                  {
-                    "field": "e2et_order_status",
-                    "span": 1,
-                    "dictCode": "e2et_order_status"
-                  },
-                  {
-                    "field": "e2et_order_customer",
-                    "span": 1
-                  },
-                  {
-                    "field": "e2et_order_date",
-                    "span": 1
-                  },
-                  {
-                    "field": "e2et_order_urgent",
-                    "span": 1
-                  },
-                  {
-                    "field": "e2et_order_discount",
-                    "span": 1
-                  },
-                  {
-                    "field": "e2et_order_amount",
-                    "span": 1
-                  },
-                  {
-                    "field": "e2et_order_qty",
-                    "span": 1
-                  },
-                  {
-                    "field": "e2et_order_remark",
-                    "span": 2
-                  },
-                  {
-                    "field": "e2et_order_desc",
-                    "span": 2
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "key": "items",
-            "label": {
-              "zh-CN": "订单明细",
-              "en-US": "Order Items"
-            },
-            "blocks": [
-              {
-                "id": "block_detail_items",
-                "blockType": "sub-table",
-                "subTable": {
-                  "childModel": "e2et_order_item",
-                  "parentField": "e2et_order_id",
-                  "readOnly": true,
-                  "columns": [
-                    {
-                      "field": "e2et_item_name",
-                      "width": 200
-                    },
-                    {
-                      "field": "e2et_item_spec",
-                      "width": 120,
-                      "dictCode": "e2et_item_spec"
-                    },
-                    {
-                      "field": "e2et_item_qty",
-                      "width": 100,
-                      "align": "right"
-                    },
-                    {
-                      "field": "e2et_item_price",
-                      "width": 120,
-                      "align": "right"
-                    },
-                    {
-                      "field": "e2et_item_subtotal",
-                      "width": 140,
-                      "align": "right"
-                    }
-                  ],
-                  "summary": {
-                    "fields": [
-                      {
-                        "field": "e2et_item_subtotal",
-                        "aggregation": "sum",
-                        "label": {
-                          "zh-CN": "合计",
-                          "en-US": "Total"
-                        }
-                      },
-                      {
-                        "field": "e2et_item_qty",
-                        "aggregation": "sum",
-                        "label": {
-                          "zh-CN": "总数量",
-                          "en-US": "Total Qty"
-                        }
-                      }
-                    ]
-                  }
-                }
-              }
-            ]
-          },
-          {
-            "key": "logs",
-            "label": {
-              "zh-CN": "操作日志",
-              "en-US": "Audit Logs"
-            },
-            "blocks": [
-              {
-                "id": "block_detail_logs",
-                "blockType": "sub-table",
-                "subTable": {
-                  "childModel": "e2et_order_log",
-                  "parentField": "e2et_log_order_id",
-                  "readOnly": true,
-                  "columns": [
-                    {
-                      "field": "e2et_log_action",
-                      "width": 120
-                    },
-                    {
-                      "field": "e2et_log_operator",
-                      "width": 150
-                    },
-                    {
-                      "field": "e2et_log_time",
-                      "width": 150
-                    },
-                    {
-                      "field": "e2et_log_remark",
-                      "width": 300
-                    }
-                  ],
-                  "defaultSort": {
-                    "field": "e2et_log_time",
-                    "order": "desc"
-                  }
-                }
-              }
-            ]
-          }
-        ]
+     },
+     {
+      "code": "edit",
+      "icon": "Edit",
+      "visibleWhen": "['draft','rejected'].includes(row.e2et_order_status)",
+      "permissionCode": "e2et.order.manage",
+      "label": {
+       "zh-CN": "编辑",
+       "en": "Edit"
       },
-      {
-        "id": "block_detail_actions",
-        "blockType": "toolbar",
-        "buttons": [
-          {
-            "code": "edit",
-            "icon": "Edit",
-            "visibleWhen": "['draft','rejected'].includes(record.e2et_order_status)",
-            "permissionCode": "e2et.order.manage",
-            "label": {
-              "zh-CN": "编辑",
-              "en": "Edit"
-            },
-            "action": {
-              "type": "navigate",
-              "to": "e2et_order_form"
-            }
-          },
-          {
-            "code": "submit",
-            "primary": true,
-            "icon": "Send",
-            "visibleWhen": "['draft','rejected'].includes(record.e2et_order_status)",
-            "permissionCode": "e2et.order.manage",
-            "label": {
-              "zh-CN": "提交",
-              "en": "Submit"
-            },
-            "confirm": "submit.confirm",
-            "action": {
-              "type": "command",
-              "command": "e2et:submit_order"
-            }
-          },
-          {
-            "code": "approve",
-            "primary": true,
-            "icon": "Check",
-            "visibleWhen": "record.e2et_order_status === 'submitted'",
-            "permissionCode": "e2et.order.approve",
-            "label": {
-              "zh-CN": "通过",
-              "en": "Approve"
-            },
-            "confirm": "approve.confirm",
-            "action": {
-              "type": "command",
-              "command": "e2et:approve_order"
-            }
-          },
-          {
-            "code": "reject",
-            "icon": "X",
-            "visibleWhen": "record.e2et_order_status === 'submitted'",
-            "permissionCode": "e2et.order.approve",
-            "label": {
-              "zh-CN": "拒绝",
-              "en": "Reject"
-            },
-            "confirm": "reject.confirm",
-            "action": {
-              "type": "command",
-              "command": "e2et:reject_order"
-            }
-          },
-          {
-            "code": "complete",
-            "icon": "CheckCircle",
-            "visibleWhen": "record.e2et_order_status === 'approved'",
-            "permissionCode": "e2et.order.manage",
-            "label": {
-              "zh-CN": "完成",
-              "en": "Complete"
-            },
-            "confirm": "complete.confirm",
-            "action": {
-              "type": "command",
-              "command": "e2et:complete_order"
-            }
-          },
-          {
-            "code": "cancel",
-            "icon": "XCircle",
-            "visibleWhen": "['draft','submitted'].includes(record.e2et_order_status)",
-            "permissionCode": "e2et.order.manage",
-            "label": {
-              "zh-CN": "取消",
-              "en": "Cancel"
-            },
-            "confirm": "cancel.confirm",
-            "action": {
-              "type": "command",
-              "command": "e2et:cancel_order"
-            }
-          }
-        ]
+      "action": {
+       "type": "navigate",
+       "to": "e2et_order_form",
+       "command": "e2et:update_order"
       }
-    ]
-  },
-  {
-    "pageKey": "e2et_customer_list",
-    "name:zh-CN": "客户列表",
-    "name:en": "Customer List",
-    "modelCode": "e2et_customer",
-    "description": "Customer list with search fields and data table",
-    "kind": "list",
-    "schemaVersion": 4,
-    "extension": {
-      "import": {
-        "enabled": true,
-        "permissionCode": "model.e2et_customer.import",
-        "modes": [
-          "insert"
-        ]
-      }
-    },
-    "layout": {
-      "type": "grid",
-      "cols": 12
-    },
-    "blocks": [
-      {
-        "id": "block_customer_toolbar",
-        "blockType": "toolbar",
-        "buttons": [
-          {
-            "code": "create",
-            "primary": true,
-            "icon": "Plus",
-            "permissionCode": "e2et.customer.manage",
-            "label": {
-              "zh-CN": "新建",
-              "en": "Create"
-            },
-            "action": {
-              "type": "navigate",
-              "to": "e2et_customer_form",
-              "command": "e2et:create_customer"
-            }
-          }
-        ]
+     },
+     {
+      "code": "submit",
+      "icon": "Send",
+      "visibleWhen": "['draft','rejected'].includes(row.e2et_order_status)",
+      "permissionCode": "e2et.order.manage",
+      "label": {
+       "zh-CN": "提交",
+       "en": "Submit"
       },
-      {
-        "id": "block_customer_table",
-        "blockType": "table",
-        "columns": [
-          {
-            "field": "e2et_cust_code",
-            "width": 150
-          },
-          {
-            "field": "e2et_cust_name",
-            "width": 200
-          },
-          {
-            "field": "e2et_cust_region",
-            "width": 120,
-            "dictCode": "e2et_region"
-          },
-          {
-            "field": "e2et_cust_contact",
-            "width": 150
-          },
-          {
-            "field": "e2et_cust_email",
-            "width": 200
-          },
-          {
-            "field": "e2et_cust_active",
-            "width": 80,
-            "align": "center"
-          }
-        ],
-        "rowActions": [
-          {
-            "code": "edit",
-            "icon": "Edit",
-            "permissionCode": "e2et.customer.manage",
-            "label": {
-              "zh-CN": "编辑",
-              "en": "Edit"
-            },
-            "action": {
-              "type": "navigate",
-              "to": "e2et_customer_form",
-              "command": "e2et:update_customer"
-            }
-          },
-          {
-            "code": "delete",
-            "icon": "Trash2",
-            "danger": true,
-            "permissionCode": "e2et.customer.manage",
-            "label": {
-              "zh-CN": "删除",
-              "en": "Delete"
-            },
-            "confirm": "delete.confirm",
-            "action": {
-              "type": "command",
-              "command": "e2et:delete_customer"
-            }
-          }
-        ],
-        "defaultSort": {
-          "field": "created_at",
-          "order": "desc"
-        },
-        "searchFields": [
-          "e2et_cust_code",
-          "e2et_cust_name",
-          "e2et_cust_region",
-          "e2et_cust_active"
-        ]
+      "confirm": "submit.confirm",
+      "action": {
+       "type": "command",
+       "command": "e2et:submit_order"
       }
-    ]
-  },
-  {
-    "pageKey": "e2et_customer_form",
-    "name:zh-CN": "客户编辑",
-    "name:en": "Customer Form",
-    "modelCode": "e2et_customer",
-    "description": "Customer form with UNIQUE_COMPOSITE validation",
-    "kind": "form",
-    "schemaVersion": 4,
-    "layout": {
-      "type": "stack"
-    },
-    "blocks": [
-      {
-        "id": "section_customer_basic",
-        "blockType": "form-section",
-        "title": {
-          "zh-CN": "客户信息",
-          "en-US": "Customer Information"
-        },
-        "columns": 2,
-        "fields": [
-          {
-            "field": "e2et_cust_code",
-            "span": 1,
-            "required": true
-          },
-          {
-            "field": "e2et_cust_name",
-            "span": 1,
-            "required": true
-          },
-          {
-            "field": "e2et_cust_region",
-            "span": 1,
-            "required": true,
-            "dictCode": "e2et_region"
-          },
-          {
-            "field": "e2et_cust_active",
-            "span": 1
-          },
-          {
-            "field": "e2et_cust_contact",
-            "span": 1
-          },
-          {
-            "field": "e2et_cust_email",
-            "span": 1
-          }
-        ]
+     },
+     {
+      "code": "approve",
+      "icon": "Check",
+      "visibleWhen": "row.e2et_order_status === 'submitted'",
+      "permissionCode": "e2et.order.approve",
+      "label": {
+       "zh-CN": "通过",
+       "en": "Approve"
       },
-      {
-        "id": "block_customer_form_buttons",
-        "blockType": "form-buttons",
-        "buttons": [
-          {
-            "code": "save",
-            "primary": true,
-            "label": {
-              "zh-CN": "保存",
-              "en": "Save"
-            },
-            "action": {
-              "type": "command",
-              "command": "e2et:create_customer"
-            }
-          },
-          {
-            "code": "cancel",
-            "label": {
-              "zh-CN": "取消",
-              "en": "Cancel"
-            }
-          }
-        ]
+      "confirm": "approve.confirm",
+      "action": {
+       "type": "command",
+       "command": "e2et:approve_order"
       }
-    ]
-  },
-  {
-    "pageKey": "e2et_payment_list",
-    "name:zh-CN": "付款列表",
-    "name:en": "Payment List",
-    "modelCode": "e2et_payment",
-    "description": "Payment list with 5 status tabs and REFERENCE column rendering",
-    "kind": "list",
-    "schemaVersion": 4,
-    "layout": {
-      "type": "grid",
-      "cols": 12
-    },
-    "blocks": [
-      {
-        "id": "block_payment_tabs",
-        "blockType": "tabs",
-        "tabs": [
-          {
-            "key": "all",
-            "label": {
-              "zh-CN": "全部",
-              "en-US": "All"
-            },
-            "filter": null
-          },
-          {
-            "key": "draft",
-            "label": {
-              "zh-CN": "草稿",
-              "en-US": "Draft"
-            },
-            "filter": {
-              "field": "e2et_pay_status",
-              "operator": "EQ",
-              "value": "draft",
-              "dictCode": "e2et_pay_status"
-            }
-          },
-          {
-            "key": "pending",
-            "label": {
-              "zh-CN": "待审批",
-              "en-US": "Pending"
-            },
-            "filter": {
-              "field": "e2et_pay_status",
-              "operator": "EQ",
-              "value": "pending",
-              "dictCode": "e2et_pay_status"
-            }
-          },
-          {
-            "key": "approved",
-            "label": {
-              "zh-CN": "已审批",
-              "en-US": "Approved"
-            },
-            "filter": {
-              "field": "e2et_pay_status",
-              "operator": "EQ",
-              "value": "approved",
-              "dictCode": "e2et_pay_status"
-            }
-          },
-          {
-            "key": "paid",
-            "label": {
-              "zh-CN": "已付款",
-              "en-US": "Paid"
-            },
-            "filter": {
-              "field": "e2et_pay_status",
-              "operator": "EQ",
-              "value": "paid",
-              "dictCode": "e2et_pay_status"
-            }
-          }
-        ]
+     },
+     {
+      "code": "reject",
+      "icon": "X",
+      "visibleWhen": "row.e2et_order_status === 'submitted'",
+      "permissionCode": "e2et.order.approve",
+      "label": {
+       "zh-CN": "拒绝",
+       "en": "Reject"
       },
-      {
-        "id": "block_payment_toolbar",
-        "blockType": "toolbar",
-        "buttons": [
-          {
-            "code": "create",
-            "primary": true,
-            "icon": "Plus",
-            "permissionCode": "e2et.payment.manage",
-            "label": {
-              "zh-CN": "新建",
-              "en": "Create"
-            },
-            "action": {
-              "type": "navigate",
-              "to": "e2et_payment_form",
-              "command": "e2et:create_payment"
-            }
-          }
-        ]
+      "confirm": "reject.confirm",
+      "action": {
+       "type": "command",
+       "command": "e2et:reject_order"
+      }
+     },
+     {
+      "code": "complete",
+      "icon": "CheckCircle",
+      "visibleWhen": "row.e2et_order_status === 'approved'",
+      "permissionCode": "e2et.order.manage",
+      "label": {
+       "zh-CN": "完成",
+       "en": "Complete"
       },
-      {
-        "id": "block_payment_table",
-        "blockType": "table",
-        "columns": [
-          {
-            "field": "e2et_pay_no",
-            "width": 180,
-            "fixed": "left"
-          },
-          {
-            "field": "e2et_pay_order_id",
-            "width": 200
-          },
-          {
-            "field": "e2et_pay_amount",
-            "width": 120,
-            "align": "right"
-          },
-          {
-            "field": "e2et_pay_method",
-            "width": 120,
-            "dictCode": "e2et_pay_method"
-          },
-          {
-            "field": "e2et_pay_status",
-            "width": 100,
-            "dictCode": "e2et_pay_status"
-          },
-          {
-            "field": "e2et_pay_date",
-            "width": 120
-          },
-          {
-            "field": "e2et_pay_approver",
-            "width": 120
-          }
-        ],
-        "rowActions": [
-          {
-            "code": "detail",
-            "icon": "Eye",
-            "permissionCode": "e2et.payment.manage",
-            "label": {
-              "zh-CN": "查看",
-              "en": "View"
-            },
-            "action": {
-              "type": "navigate",
-              "to": "e2et_payment_detail"
-            }
-          },
-          {
-            "code": "submit",
-            "icon": "Send",
-            "visibleWhen": "row.e2et_pay_status === 'draft'",
-            "permissionCode": "e2et.payment.manage",
-            "label": {
-              "zh-CN": "提交",
-              "en": "Submit"
-            },
-            "confirm": "submit.confirm",
-            "action": {
-              "type": "command",
-              "command": "e2et:submit_payment"
-            }
-          },
-          {
-            "code": "approve",
-            "icon": "Check",
-            "visibleWhen": "row.e2et_pay_status === 'pending'",
-            "permissionCode": "e2et.payment.approve",
-            "label": {
-              "zh-CN": "通过",
-              "en": "Approve"
-            },
-            "confirm": "approve.confirm",
-            "action": {
-              "type": "command",
-              "command": "e2et:approve_payment"
-            }
-          },
-          {
-            "code": "reject",
-            "icon": "X",
-            "visibleWhen": "row.e2et_pay_status === 'pending'",
-            "permissionCode": "e2et.payment.approve",
-            "label": {
-              "zh-CN": "拒绝",
-              "en": "Reject"
-            },
-            "confirm": "reject.confirm",
-            "action": {
-              "type": "command",
-              "command": "e2et:reject_payment"
-            }
-          },
-          {
-            "code": "pay",
-            "icon": "CreditCard",
-            "visibleWhen": "row.e2et_pay_status === 'approved'",
-            "permissionCode": "e2et.payment.manage",
-            "label": {
-              "zh-CN": "付款",
-              "en": "Pay"
-            },
-            "confirm": "pay.confirm",
-            "action": {
-              "type": "command",
-              "command": "e2et:pay_payment"
-            }
-          }
-        ],
-        "defaultSort": {
-          "field": "created_at",
-          "order": "desc"
-        },
-        "searchFields": [
-          "e2et_pay_no",
-          "e2et_pay_status",
-          "e2et_pay_method"
-        ]
+      "confirm": "complete.confirm",
+      "action": {
+       "type": "command",
+       "command": "e2et:complete_order"
       }
-    ]
-  },
-  {
-    "pageKey": "e2et_payment_form",
-    "name:zh-CN": "付款编辑",
-    "name:en": "Payment Form",
-    "modelCode": "e2et_payment",
-    "description": "Payment form with REFERENCE dropdown for order selection",
-    "kind": "form",
-    "schemaVersion": 4,
-    "layout": {
-      "type": "stack"
-    },
-    "blocks": [
-      {
-        "id": "section_payment_basic",
-        "blockType": "form-section",
-        "title": {
-          "zh-CN": "付款信息",
-          "en-US": "Payment Information"
-        },
-        "columns": 2,
-        "fields": [
-          {
-            "field": "e2et_pay_no",
-            "span": 1,
-            "readOnly": true
-          },
-          {
-            "field": "e2et_pay_order_id",
-            "span": 1,
-            "required": true
-          },
-          {
-            "field": "e2et_pay_amount",
-            "span": 1,
-            "required": true
-          },
-          {
-            "field": "e2et_pay_method",
-            "span": 1,
-            "dictCode": "e2et_pay_method"
-          },
-          {
-            "field": "e2et_pay_status",
-            "span": 1,
-            "readOnly": true,
-            "dictCode": "e2et_pay_status"
-          },
-          {
-            "field": "e2et_pay_remark",
-            "span": 2
-          }
-        ]
+     },
+     {
+      "code": "cancel",
+      "icon": "XCircle",
+      "visibleWhen": "['draft','submitted'].includes(row.e2et_order_status)",
+      "permissionCode": "e2et.order.manage",
+      "label": {
+       "zh-CN": "取消",
+       "en": "Cancel"
       },
-      {
-        "id": "block_payment_form_buttons",
-        "blockType": "form-buttons",
-        "buttons": [
-          {
-            "code": "save",
-            "primary": true,
-            "label": {
-              "zh-CN": "保存",
-              "en": "Save"
-            },
-            "action": {
-              "type": "command",
-              "command": "e2et:create_payment"
-            }
-          },
-          {
-            "code": "cancel",
-            "label": {
-              "zh-CN": "取消",
-              "en": "Cancel"
-            }
-          }
-        ]
+      "confirm": "cancel.confirm",
+      "action": {
+       "type": "command",
+       "command": "e2et:cancel_order"
       }
-    ]
-  },
-  {
-    "pageKey": "e2et_payment_detail",
-    "name:zh-CN": "付款详情",
-    "name:en": "Payment Detail",
-    "modelCode": "e2et_payment",
-    "description": "Payment detail with conditional toolbar buttons",
-    "kind": "detail",
-    "schemaVersion": 4,
-    "layout": {
-      "type": "grid",
-      "cols": 12
-    },
-    "blocks": [
-      {
-        "id": "block_payment_detail_basic",
-        "blockType": "form-section",
-        "columns": 2,
-        "fields": [
-          {
-            "field": "e2et_pay_no",
-            "span": 1
-          },
-          {
-            "field": "e2et_pay_order_id",
-            "span": 1
-          },
-          {
-            "field": "e2et_pay_amount",
-            "span": 1
-          },
-          {
-            "field": "e2et_pay_method",
-            "span": 1,
-            "dictCode": "e2et_pay_method"
-          },
-          {
-            "field": "e2et_pay_status",
-            "span": 1,
-            "dictCode": "e2et_pay_status"
-          },
-          {
-            "field": "e2et_pay_date",
-            "span": 1
-          },
-          {
-            "field": "e2et_pay_approver",
-            "span": 1
-          },
-          {
-            "field": "e2et_pay_remark",
-            "span": 2
-          }
-        ]
+     },
+     {
+      "code": "delete",
+      "icon": "Trash2",
+      "danger": true,
+      "visibleWhen": "row.e2et_order_status === 'draft'",
+      "permissionCode": "e2et.order.manage",
+      "label": {
+       "zh-CN": "删除",
+       "en": "Delete"
       },
-      {
-        "id": "block_payment_detail_actions",
-        "blockType": "toolbar",
-        "buttons": [
-          {
-            "code": "submit",
-            "primary": true,
-            "icon": "Send",
-            "visibleWhen": "record.e2et_pay_status === 'draft'",
-            "permissionCode": "e2et.payment.manage",
-            "label": {
-              "zh-CN": "提交",
-              "en": "Submit"
-            },
-            "confirm": "submit.confirm",
-            "action": {
-              "type": "command",
-              "command": "e2et:submit_payment"
-            }
-          },
-          {
-            "code": "approve",
-            "primary": true,
-            "icon": "Check",
-            "visibleWhen": "record.e2et_pay_status === 'pending'",
-            "permissionCode": "e2et.payment.approve",
-            "label": {
-              "zh-CN": "通过",
-              "en": "Approve"
-            },
-            "confirm": "approve.confirm",
-            "action": {
-              "type": "command",
-              "command": "e2et:approve_payment"
-            }
-          },
-          {
-            "code": "reject",
-            "icon": "X",
-            "visibleWhen": "record.e2et_pay_status === 'pending'",
-            "permissionCode": "e2et.payment.approve",
-            "label": {
-              "zh-CN": "拒绝",
-              "en": "Reject"
-            },
-            "confirm": "reject.confirm",
-            "action": {
-              "type": "command",
-              "command": "e2et:reject_payment"
-            }
-          },
-          {
-            "code": "pay",
-            "icon": "CreditCard",
-            "visibleWhen": "record.e2et_pay_status === 'approved'",
-            "permissionCode": "e2et.payment.manage",
-            "label": {
-              "zh-CN": "付款",
-              "en": "Pay"
-            },
-            "confirm": "pay.confirm",
-            "action": {
-              "type": "command",
-              "command": "e2et:pay_payment"
-            }
-          }
-        ]
+      "confirm": "delete.confirm",
+      "action": {
+       "type": "command",
+       "command": "e2et:delete_order"
       }
-    ]
-  },
-  {
-    "pageKey": "e2et_record_list",
-    "name:zh-CN": "E2E测试记录列表",
-    "name:en": "E2E Test Record List",
-    "modelCode": "e2et_record",
-    "description": "Simple record list for Android E2E tests",
-    "kind": "list",
-    "schemaVersion": 4,
-    "layout": {
-      "type": "stack"
-    },
-    "blocks": [
-      {
-        "id": "block_record_table",
-        "blockType": "table",
-        "columns": [
-          {
-            "field": "e2et_name"
-          },
-          {
-            "field": "e2et_status",
-            "dictCode": "e2et_record_status"
-          },
-          {
-            "field": "e2et_count"
-          },
-          {
-            "field": "e2et_due_date"
-          }
-        ],
-        "searchFields": [
-          "e2et_name",
-          "e2et_status"
-        ]
-      }
-    ]
-  },
-  {
-    "pageKey": "e2et_record_detail",
-    "name:zh-CN": "E2E测试记录详情",
-    "name:en": "E2E Test Record Detail",
-    "modelCode": "e2et_record",
-    "description": "Simple detail page for e2et_record — shows all fields with i18n labels",
-    "kind": "detail",
-    "schemaVersion": 4,
-    "layout": {
-      "type": "stack"
-    },
-    "blocks": [
-      {
-        "id": "block_record_basic",
-        "blockType": "form-section",
-        "columns": 2,
-        "fields": [
-          {
-            "field": "e2et_name",
-            "span": 2
-          },
-          {
-            "field": "e2et_status",
-            "span": 1,
-            "dictCode": "e2et_record_status"
-          },
-          {
-            "field": "e2et_count",
-            "span": 1
-          },
-          {
-            "field": "e2et_due_date",
-            "span": 1
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "pageKey": "e2et_field_zoo_list",
-    "name:zh-CN": "字段动物园列表",
-    "name:en": "Field Zoo List",
-    "modelCode": "e2et_field_zoo",
-    "description": "List with toolbar search, filters block, create action and multi-view switcher (table/kanban/gallery) — serves FORM-FIELDS, FILTER-SORT, BATCH-MODE and MULTIVIEW families",
-    "kind": "list",
-    "schemaVersion": 4,
-    "layout": {
-      "type": "grid",
-      "cols": 12
-    },
-    "blocks": [
-      {
-        "id": "block_zoo_filter",
-        "blockType": "filters",
-        "title": {
-          "zh-CN": "筛选",
-          "en-US": "Filters"
-        },
-        "filters": [
-          {
-            "field": "e2et_zoo_select",
-            "operator": "EQ",
-            "dictCode": "e2et_zoo_option",
-            "label": {
-              "zh-CN": "选项",
-              "en-US": "Option"
-            }
-          },
-          {
-            "field": "e2et_zoo_switch",
-            "operator": "EQ",
-            "label": {
-              "zh-CN": "仅启用",
-              "en-US": "Enabled only"
-            }
-          }
-        ]
-      },
-      {
-        "id": "block_zoo_toolbar",
-        "blockType": "toolbar",
-        "title": {
-          "zh-CN": "工具栏",
-          "en-US": "Toolbar"
-        },
-        "actions": [
-          {
-            "code": "create",
-            "label": {
-              "zh-CN": "新建",
-              "en-US": "New"
-            },
-            "action": {
-              "type": "navigate",
-              "to": "e2et_field_zoo_form"
-            }
-          },
-          {
-            "code": "batch_mode",
-            "label": {
-              "zh-CN": "批量",
-              "en-US": "Batch"
-            },
-            "action": {
-              "type": "command",
-              "command": "batch_mode"
-            }
-          }
-        ]
-      },
-      {
-        "id": "block_zoo_selection_info",
-        "blockType": "selection-info",
-        "title": {
-          "zh-CN": "已选记录",
-          "en-US": "Selection"
-        },
-        "selection": {
-          "bind": "selectedRows"
-        }
-      }
+     }
     ],
-    "extension": {
-      "defaultView": "table",
-      "views": [
-        "table",
-        "kanban",
-        "gallery"
-      ],
-      "kanbanConfig": {
-        "groupByField": "e2et_zoo_select",
-        "titleField": "e2et_zoo_name"
-      },
-      "galleryConfig": {
-        "titleField": "e2et_zoo_name",
-        "imageField": "e2et_zoo_photo"
-      }
-    }
-  },
-  {
-    "pageKey": "e2et_field_zoo_form",
-    "name:zh-CN": "字段动物园表单",
-    "name:en": "Field Zoo Form",
-    "modelCode": "e2et_field_zoo",
-    "description": "Create/edit form enumerating every supported widget type",
-    "kind": "form",
-    "schemaVersion": 4,
-    "layout": {
-      "type": "stack"
+    "defaultSort": {
+     "field": "created_at",
+     "order": "desc"
     },
-    "blocks": [
-      {
-        "id": "section_zoo_basic",
-        "blockType": "form-section",
-        "title": {
-          "zh-CN": "全部控件",
-          "en-US": "Every Widget"
-        },
-        "columns": 2,
-        "fields": [
-          {
-            "field": "e2et_zoo_name",
-            "span": 2,
-            "required": true
-          },
-          {
-            "field": "e2et_zoo_select",
-            "span": 1
-          },
-          {
-            "field": "e2et_zoo_reference",
-            "span": 1
-          },
-          {
-            "field": "e2et_zoo_date",
-            "span": 1
-          },
-          {
-            "field": "e2et_zoo_switch",
-            "span": 1
-          },
-          {
-            "field": "e2et_zoo_number",
-            "span": 1
-          },
-          {
-            "field": "e2et_zoo_photo",
-            "span": 1
-          },
-          {
-            "field": "e2et_zoo_signature",
-            "span": 2
-          }
-        ]
-      }
+    "searchFields": [
+     "e2et_order_title",
+     "e2et_order_no",
+     "e2et_order_type",
+     "e2et_order_status",
+     "e2et_order_customer"
     ]
-  },
-  {
-    "pageKey": "e2et_field_zoo_detail",
-    "name:zh-CN": "字段动物园详情",
-    "name:en": "Field Zoo Detail",
-    "modelCode": "e2et_field_zoo",
-    "description": "Read-only detail with edit/delete actions in the action bar",
-    "kind": "detail",
-    "schemaVersion": 4,
-    "layout": {
-      "type": "grid",
-      "cols": 12
-    },
-    "blocks": [
-      {
-        "id": "section_zoo_detail",
-        "blockType": "form-section",
-        "title": {
-          "zh-CN": "基本信息",
-          "en-US": "Basic Info"
-        },
-        "columns": 2,
-        "fields": [
-          {
-            "field": "e2et_zoo_name",
-            "span": 2
-          },
-          {
-            "field": "e2et_zoo_select",
-            "span": 1
-          },
-          {
-            "field": "e2et_zoo_reference",
-            "span": 1
-          },
-          {
-            "field": "e2et_zoo_date",
-            "span": 1
-          },
-          {
-            "field": "e2et_zoo_switch",
-            "span": 1
-          },
-          {
-            "field": "e2et_zoo_number",
-            "span": 1
-          },
-          {
-            "field": "e2et_zoo_photo",
-            "span": 1
-          },
-          {
-            "field": "e2et_zoo_signature",
-            "span": 2
-          }
-        ]
-      }
+   }
+  ],
+  "extension": {
+   "import": {
+    "enabled": true,
+    "permissionCode": "model.e2et_order.import",
+    "modes": [
+     "insert"
     ]
-  },
-  {
-    "pageKey": "e2et_golden_workbench",
-    "name:zh-CN": "Golden 测试工作台",
-    "name:en": "Golden Test Workbench",
-    "modelCode": "e2et_field_zoo",
-    "kind": "list",
-    "schemaVersion": 4,
-    "layout": {
-      "type": "grid",
-      "cols": 12
-    },
-    "description": "Deterministic golden screenshot target: toolbar + filters + selection-info + table view. Fixed field set and stable data pattern.",
-    "blocks": [
-      {
-        "id": "block_golden_filter",
-        "blockType": "filters",
-        "title": {
-          "zh-CN": "筛选",
-          "en-US": "Filters"
-        },
-        "filters": [
-          {
-            "field": "e2et_zoo_select",
-            "operator": "EQ",
-            "dictCode": "e2et_zoo_option",
-            "label": {
-              "zh-CN": "选项",
-              "en-US": "Option"
-            }
-          }
-        ]
-      },
-      {
-        "id": "block_golden_toolbar",
-        "blockType": "toolbar",
-        "title": {
-          "zh-CN": "工具栏",
-          "en-US": "Toolbar"
-        },
-        "actions": [
-          {
-            "code": "create",
-            "label": {
-              "zh-CN": "新建",
-              "en-US": "New"
-            },
-            "action": {
-              "type": "navigate",
-              "to": "e2et_field_zoo_form"
-            }
-          },
-          {
-            "code": "batch_mode",
-            "label": {
-              "zh-CN": "批量",
-              "en-US": "Batch"
-            },
-            "action": {
-              "type": "command",
-              "command": "batch_mode"
-            }
-          }
-        ]
-      },
-      {
-        "id": "block_golden_selection_info",
-        "blockType": "selection-info",
-        "title": {
-          "zh-CN": "已选记录",
-          "en-US": "Selection"
-        },
-        "selection": {
-          "bind": "selectedRows"
-        }
-      }
-    ]
-  },
-  {
-    "pageKey": "e2et_stage_record_detail",
-    "name:zh-CN": "阶段记录详情",
-    "name:en": "Stage Record Detail",
-    "modelCode": "e2et_stage_record",
-    "description": "Platform stage-rail golden fixture backed by a neutral staged record.",
-    "kind": "detail",
-    "schemaVersion": 4,
-    "layout": {
-      "type": "grid",
-      "cols": 12
-    },
-    "blocks": [
-      {
-        "id": "stage_record_rail",
-        "blockType": "stage-rail",
-        "detailPlacement": "header",
-        "context": "${record}",
-        "stageField": "e2et_stage_record_stage",
-        "title": {
-          "zh-CN": "销售阶段",
-          "en-US": "Sales Stage"
-        },
-        "stages": [
-          {
-            "value": "discovery",
-            "label": {
-              "zh-CN": "需求发现",
-              "en-US": "Discovery"
-            }
-          },
-          {
-            "value": "qualification",
-            "label": {
-              "zh-CN": "资格确认",
-              "en-US": "Qualification"
-            }
-          },
-          {
-            "value": "proposal",
-            "label": {
-              "zh-CN": "方案报价",
-              "en-US": "Proposal"
-            }
-          },
-          {
-            "value": "negotiation",
-            "label": {
-              "zh-CN": "商务谈判",
-              "en-US": "Negotiation"
-            }
-          },
-          {
-            "value": "closed_won",
-            "label": {
-              "zh-CN": "赢单",
-              "en-US": "Won"
-            }
-          }
-        ],
-        "terminalStages": [
-          {
-            "value": "closed_lost",
-            "label": {
-              "zh-CN": "已丢单",
-              "en-US": "Lost"
-            },
-            "tone": "red"
-          }
-        ]
-      },
-      {
-        "id": "section_opp_detail",
-        "blockType": "form-section",
-        "title": {
-          "zh-CN": "基本信息",
-          "en-US": "Basic Info"
-        },
-        "columns": 2,
-        "fields": [
-          {
-            "field": "e2et_stage_record_name",
-            "span": 2
-          },
-          {
-            "field": "e2et_stage_record_stage",
-            "span": 1
-          },
-          {
-            "field": "e2et_stage_record_amount",
-            "span": 1
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "pageKey": "e2et_stage_record_list",
-    "name:zh-CN": "阶段记录列表",
-    "name:en": "Stage Record List",
-    "modelCode": "e2et_stage_record",
-    "description": "List page for the stage-rail golden fixture model; rows deep-link into e2et_stage_record_detail.",
-    "kind": "list",
-    "schemaVersion": 4,
-    "layout": {
-      "type": "grid",
-      "cols": 12
-    },
-    "blocks": [
-      {
-        "id": "block_opp_toolbar",
-        "blockType": "toolbar",
-        "title": {
-          "zh-CN": "工具栏",
-          "en-US": "Toolbar"
-        },
-        "actions": [
-          {
-            "code": "create",
-            "label": {
-              "zh-CN": "新建",
-              "en-US": "New"
-            },
-            "action": {
-              "type": "navigate",
-              "to": "e2et_stage_record_form"
-            }
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "pageKey": "e2et_stage_record_form",
-    "name:zh-CN": "阶段记录表单",
-    "name:en": "Stage Record Form",
-    "modelCode": "e2et_stage_record",
-    "description": "Create/edit form for the stage-rail fixture model.",
-    "kind": "form",
-    "schemaVersion": 4,
-    "layout": {
-      "type": "stack"
-    },
-    "blocks": [
-      {
-        "id": "section_opp_basic",
-        "blockType": "form-section",
-        "title": {
-          "zh-CN": "基本信息",
-          "en-US": "Basic Info"
-        },
-        "columns": 2,
-        "fields": [
-          {
-            "field": "e2et_stage_record_name",
-            "span": 2,
-            "required": true
-          },
-          {
-            "field": "e2et_stage_record_stage",
-            "span": 1,
-            "required": true
-          },
-          {
-            "field": "e2et_stage_record_amount",
-            "span": 1
-          }
-        ]
-      }
-    ]
+   },
+   "options": {
+    "detailNavigation": "page"
+   },
+   "calendarConfig": {
+    "dateField": "e2et_order_date",
+    "titleField": "e2et_order_title"
+   },
+   "enableMultiView": true,
+   "galleryConfig": {
+    "titleField": "e2et_order_title",
+    "subtitleField": "e2et_order_status",
+    "columns": 2
+   },
+   "kanbanConfig": {
+    "groupByField": "e2et_order_status",
+    "titleField": "e2et_order_title",
+    "subtitleField": "e2et_order_amount"
+   },
+   "views": [
+    "table",
+    "kanban",
+    "calendar",
+    "gallery"
+   ]
   }
+ },
+ {
+  "pageKey": "e2et_order_form",
+  "name:zh-CN": "测试订单编辑",
+  "name:en": "Test Order Form",
+  "modelCode": "e2et_order",
+  "description": "Order form with 2-column grid, sub-table block, conditional visibility (linkage)",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+   "type": "stack"
+  },
+  "blocks": [
+   {
+    "id": "section_basic",
+    "blockType": "form-section",
+    "title": {
+     "zh-CN": "基本信息",
+     "en-US": "Basic Information"
+    },
+    "columns": 2,
+    "fields": [
+     {
+      "field": "e2et_order_title",
+      "span": 1,
+      "readOnlyWhen": "!!form.e2et_order_status && !['draft','rejected'].includes(form.e2et_order_status)",
+      "required": true
+     },
+     {
+      "field": "e2et_order_no",
+      "span": 1,
+      "readOnly": true
+     },
+     {
+      "field": "e2et_order_type",
+      "span": 1,
+      "dictCode": "e2et_order_type"
+     },
+     {
+      "field": "e2et_order_customer",
+      "span": 1,
+      "allowCreate": true,
+      "createCommand": "e2et:create_customer",
+      "createPageKey": "e2et_customer_form",
+      "createPermission": "e2et.customer.manage"
+     },
+     {
+      "field": "e2et_order_date",
+      "span": 1
+     },
+     {
+      "field": "e2et_order_urgent",
+      "span": 1
+     },
+     {
+      "field": "e2et_order_discount",
+      "span": 1,
+      "visibleWhen": "form.e2et_order_type === 'bulk'"
+     },
+     {
+      "field": "e2et_order_remark",
+      "span": 2,
+      "visibleWhen": "form.e2et_order_urgent === true"
+     },
+     {
+      "field": "e2et_order_desc",
+      "span": 2
+     },
+     {
+      "field": "e2et_order_status",
+      "span": 1,
+      "readOnly": true,
+      "dictCode": "e2et_order_status"
+     },
+     {
+      "field": "e2et_order_amount",
+      "span": 1,
+      "readOnly": true
+     },
+     {
+      "field": "e2et_order_qty",
+      "span": 1,
+      "readOnly": true
+     }
+    ]
+   },
+   {
+    "id": "section_items",
+    "blockType": "sub-table",
+    "title": {
+     "zh-CN": "订单明细",
+     "en-US": "Order Items"
+    },
+    "subTable": {
+     "childModel": "e2et_order_item",
+     "parentField": "e2et_order_id",
+     "readOnly": false,
+     "commands": {
+      "create": "e2et:create_order_item",
+      "update": "e2et:update_order_item",
+      "delete": "e2et:delete_order_item"
+     },
+     "editableWhen": "['draft','rejected'].includes(record.e2et_order_status)",
+     "columns": [
+      {
+       "field": "e2et_item_name",
+       "width": 200
+      },
+      {
+       "field": "e2et_item_spec",
+       "width": 120,
+       "dictCode": "e2et_item_spec"
+      },
+      {
+       "field": "e2et_item_qty",
+       "width": 100,
+       "align": "right"
+      },
+      {
+       "field": "e2et_item_price",
+       "width": 120,
+       "align": "right"
+      },
+      {
+       "field": "e2et_item_subtotal",
+       "width": 140,
+       "align": "right"
+      }
+     ],
+     "summary": {
+      "fields": [
+       {
+        "field": "e2et_item_subtotal",
+        "aggregation": "sum",
+        "label": {
+         "zh-CN": "合计",
+         "en-US": "Total"
+        }
+       },
+       {
+        "field": "e2et_item_qty",
+        "aggregation": "sum",
+        "label": {
+         "zh-CN": "总数量",
+         "en-US": "Total Qty"
+        }
+       }
+      ]
+     }
+    }
+   },
+   {
+    "id": "block_form_buttons",
+    "blockType": "form-buttons",
+    "buttons": [
+     {
+      "code": "save_draft",
+      "visibleWhen": "!form.e2et_order_status || form.e2et_order_status === 'draft'",
+      "label": {
+       "zh-CN": "保存草稿",
+       "en": "Save draft"
+      },
+      "action": {
+       "type": "command",
+       "command": "e2et:update_order"
+      }
+     },
+     {
+      "code": "submit",
+      "primary": true,
+      "visibleWhen": "!form.e2et_order_status || ['draft','rejected'].includes(form.e2et_order_status)",
+      "label": {
+       "zh-CN": "提交",
+       "en": "Submit"
+      },
+      "confirm": "submit.confirm",
+      "action": {
+       "type": "command",
+       "command": "e2et:submit_order"
+      }
+     },
+     {
+      "code": "cancel",
+      "label": {
+       "zh-CN": "取消",
+       "en": "Cancel"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pageKey": "e2et_order_detail",
+  "name:zh-CN": "测试订单详情",
+  "name:en": "Test Order Detail",
+  "modelCode": "e2et_order",
+  "description": "Order detail view with basic info, items sub-table (read-only), and audit logs",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+   "type": "grid",
+   "cols": 12
+  },
+  "blocks": [
+   {
+    "id": "block_detail_tabs",
+    "blockType": "tabs",
+    "tabs": [
+     {
+      "key": "basic",
+      "label": {
+       "zh-CN": "基本信息",
+       "en-US": "Basic Info"
+      },
+      "blocks": [
+       {
+        "id": "block_detail_basic",
+        "blockType": "form-section",
+        "columns": 2,
+        "fields": [
+         {
+          "field": "e2et_order_no",
+          "span": 1
+         },
+         {
+          "field": "e2et_order_title",
+          "span": 1
+         },
+         {
+          "field": "e2et_order_type",
+          "span": 1,
+          "dictCode": "e2et_order_type"
+         },
+         {
+          "field": "e2et_order_status",
+          "span": 1,
+          "dictCode": "e2et_order_status"
+         },
+         {
+          "field": "e2et_order_customer",
+          "span": 1
+         },
+         {
+          "field": "e2et_order_date",
+          "span": 1
+         },
+         {
+          "field": "e2et_order_urgent",
+          "span": 1
+         },
+         {
+          "field": "e2et_order_discount",
+          "span": 1
+         },
+         {
+          "field": "e2et_order_amount",
+          "span": 1
+         },
+         {
+          "field": "e2et_order_qty",
+          "span": 1
+         },
+         {
+          "field": "e2et_order_remark",
+          "span": 2
+         },
+         {
+          "field": "e2et_order_desc",
+          "span": 2
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "key": "items",
+      "label": {
+       "zh-CN": "订单明细",
+       "en-US": "Order Items"
+      },
+      "blocks": [
+       {
+        "id": "block_detail_items",
+        "blockType": "sub-table",
+        "subTable": {
+         "childModel": "e2et_order_item",
+         "parentField": "e2et_order_id",
+         "readOnly": true,
+         "columns": [
+          {
+           "field": "e2et_item_name",
+           "width": 200
+          },
+          {
+           "field": "e2et_item_spec",
+           "width": 120,
+           "dictCode": "e2et_item_spec"
+          },
+          {
+           "field": "e2et_item_qty",
+           "width": 100,
+           "align": "right"
+          },
+          {
+           "field": "e2et_item_price",
+           "width": 120,
+           "align": "right"
+          },
+          {
+           "field": "e2et_item_subtotal",
+           "width": 140,
+           "align": "right"
+          }
+         ],
+         "summary": {
+          "fields": [
+           {
+            "field": "e2et_item_subtotal",
+            "aggregation": "sum",
+            "label": {
+             "zh-CN": "合计",
+             "en-US": "Total"
+            }
+           },
+           {
+            "field": "e2et_item_qty",
+            "aggregation": "sum",
+            "label": {
+             "zh-CN": "总数量",
+             "en-US": "Total Qty"
+            }
+           }
+          ]
+         }
+        }
+       }
+      ]
+     },
+     {
+      "key": "logs",
+      "label": {
+       "zh-CN": "操作日志",
+       "en-US": "Audit Logs"
+      },
+      "blocks": [
+       {
+        "id": "block_detail_logs",
+        "blockType": "sub-table",
+        "subTable": {
+         "childModel": "e2et_order_log",
+         "parentField": "e2et_log_order_id",
+         "readOnly": true,
+         "columns": [
+          {
+           "field": "e2et_log_action",
+           "width": 120
+          },
+          {
+           "field": "e2et_log_operator",
+           "width": 150
+          },
+          {
+           "field": "e2et_log_time",
+           "width": 150
+          },
+          {
+           "field": "e2et_log_remark",
+           "width": 300
+          }
+         ],
+         "defaultSort": {
+          "field": "e2et_log_time",
+          "order": "desc"
+         }
+        }
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "block_detail_actions",
+    "blockType": "toolbar",
+    "buttons": [
+     {
+      "code": "edit",
+      "icon": "Edit",
+      "visibleWhen": "['draft','rejected'].includes(record.e2et_order_status)",
+      "permissionCode": "e2et.order.manage",
+      "label": {
+       "zh-CN": "编辑",
+       "en": "Edit"
+      },
+      "action": {
+       "type": "navigate",
+       "to": "e2et_order_form"
+      }
+     },
+     {
+      "code": "submit",
+      "primary": true,
+      "icon": "Send",
+      "visibleWhen": "['draft','rejected'].includes(record.e2et_order_status)",
+      "permissionCode": "e2et.order.manage",
+      "label": {
+       "zh-CN": "提交",
+       "en": "Submit"
+      },
+      "confirm": "submit.confirm",
+      "action": {
+       "type": "command",
+       "command": "e2et:submit_order"
+      }
+     },
+     {
+      "code": "approve",
+      "primary": true,
+      "icon": "Check",
+      "visibleWhen": "record.e2et_order_status === 'submitted'",
+      "permissionCode": "e2et.order.approve",
+      "label": {
+       "zh-CN": "通过",
+       "en": "Approve"
+      },
+      "confirm": "approve.confirm",
+      "action": {
+       "type": "command",
+       "command": "e2et:approve_order"
+      }
+     },
+     {
+      "code": "reject",
+      "icon": "X",
+      "visibleWhen": "record.e2et_order_status === 'submitted'",
+      "permissionCode": "e2et.order.approve",
+      "label": {
+       "zh-CN": "拒绝",
+       "en": "Reject"
+      },
+      "confirm": "reject.confirm",
+      "action": {
+       "type": "command",
+       "command": "e2et:reject_order"
+      }
+     },
+     {
+      "code": "complete",
+      "icon": "CheckCircle",
+      "visibleWhen": "record.e2et_order_status === 'approved'",
+      "permissionCode": "e2et.order.manage",
+      "label": {
+       "zh-CN": "完成",
+       "en": "Complete"
+      },
+      "confirm": "complete.confirm",
+      "action": {
+       "type": "command",
+       "command": "e2et:complete_order"
+      }
+     },
+     {
+      "code": "cancel",
+      "icon": "XCircle",
+      "visibleWhen": "['draft','submitted'].includes(record.e2et_order_status)",
+      "permissionCode": "e2et.order.manage",
+      "label": {
+       "zh-CN": "取消",
+       "en": "Cancel"
+      },
+      "confirm": "cancel.confirm",
+      "action": {
+       "type": "command",
+       "command": "e2et:cancel_order"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pageKey": "e2et_customer_list",
+  "name:zh-CN": "客户列表",
+  "name:en": "Customer List",
+  "modelCode": "e2et_customer",
+  "description": "Customer list with search fields and data table",
+  "kind": "list",
+  "schemaVersion": 4,
+  "extension": {
+   "import": {
+    "enabled": true,
+    "permissionCode": "model.e2et_customer.import",
+    "modes": [
+     "insert"
+    ]
+   }
+  },
+  "layout": {
+   "type": "grid",
+   "cols": 12
+  },
+  "blocks": [
+   {
+    "id": "block_customer_toolbar",
+    "blockType": "toolbar",
+    "buttons": [
+     {
+      "code": "create",
+      "primary": true,
+      "icon": "Plus",
+      "permissionCode": "e2et.customer.manage",
+      "label": {
+       "zh-CN": "新建",
+       "en": "Create"
+      },
+      "action": {
+       "type": "navigate",
+       "to": "e2et_customer_form",
+       "command": "e2et:create_customer"
+      }
+     }
+    ]
+   },
+   {
+    "id": "block_customer_table",
+    "blockType": "table",
+    "columns": [
+     {
+      "field": "e2et_cust_code",
+      "width": 150
+     },
+     {
+      "field": "e2et_cust_name",
+      "width": 200
+     },
+     {
+      "field": "e2et_cust_region",
+      "width": 120,
+      "dictCode": "e2et_region"
+     },
+     {
+      "field": "e2et_cust_contact",
+      "width": 150
+     },
+     {
+      "field": "e2et_cust_email",
+      "width": 200
+     },
+     {
+      "field": "e2et_cust_active",
+      "width": 80,
+      "align": "center"
+     }
+    ],
+    "rowActions": [
+     {
+      "code": "edit",
+      "icon": "Edit",
+      "permissionCode": "e2et.customer.manage",
+      "label": {
+       "zh-CN": "编辑",
+       "en": "Edit"
+      },
+      "action": {
+       "type": "navigate",
+       "to": "e2et_customer_form",
+       "command": "e2et:update_customer"
+      }
+     },
+     {
+      "code": "delete",
+      "icon": "Trash2",
+      "danger": true,
+      "permissionCode": "e2et.customer.manage",
+      "label": {
+       "zh-CN": "删除",
+       "en": "Delete"
+      },
+      "confirm": "delete.confirm",
+      "action": {
+       "type": "command",
+       "command": "e2et:delete_customer"
+      }
+     }
+    ],
+    "defaultSort": {
+     "field": "created_at",
+     "order": "desc"
+    },
+    "searchFields": [
+     "e2et_cust_code",
+     "e2et_cust_name",
+     "e2et_cust_region",
+     "e2et_cust_active"
+    ]
+   }
+  ]
+ },
+ {
+  "pageKey": "e2et_customer_form",
+  "name:zh-CN": "客户编辑",
+  "name:en": "Customer Form",
+  "modelCode": "e2et_customer",
+  "description": "Customer form with UNIQUE_COMPOSITE validation",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+   "type": "stack"
+  },
+  "blocks": [
+   {
+    "id": "section_customer_basic",
+    "blockType": "form-section",
+    "title": {
+     "zh-CN": "客户信息",
+     "en-US": "Customer Information"
+    },
+    "columns": 2,
+    "fields": [
+     {
+      "field": "e2et_cust_code",
+      "span": 1,
+      "required": true
+     },
+     {
+      "field": "e2et_cust_name",
+      "span": 1,
+      "required": true
+     },
+     {
+      "field": "e2et_cust_region",
+      "span": 1,
+      "required": true,
+      "dictCode": "e2et_region"
+     },
+     {
+      "field": "e2et_cust_active",
+      "span": 1
+     },
+     {
+      "field": "e2et_cust_contact",
+      "span": 1
+     },
+     {
+      "field": "e2et_cust_email",
+      "span": 1
+     }
+    ]
+   },
+   {
+    "id": "block_customer_form_buttons",
+    "blockType": "form-buttons",
+    "buttons": [
+     {
+      "code": "save",
+      "primary": true,
+      "label": {
+       "zh-CN": "保存",
+       "en": "Save"
+      },
+      "action": {
+       "type": "command",
+       "command": "e2et:create_customer"
+      }
+     },
+     {
+      "code": "cancel",
+      "label": {
+       "zh-CN": "取消",
+       "en": "Cancel"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pageKey": "e2et_payment_list",
+  "name:zh-CN": "付款列表",
+  "name:en": "Payment List",
+  "modelCode": "e2et_payment",
+  "description": "Payment list with 5 status tabs and REFERENCE column rendering",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+   "type": "grid",
+   "cols": 12
+  },
+  "blocks": [
+   {
+    "id": "block_payment_tabs",
+    "blockType": "tabs",
+    "tabs": [
+     {
+      "key": "all",
+      "label": {
+       "zh-CN": "全部",
+       "en-US": "All"
+      },
+      "filter": null
+     },
+     {
+      "key": "draft",
+      "label": {
+       "zh-CN": "草稿",
+       "en-US": "Draft"
+      },
+      "filter": {
+       "field": "e2et_pay_status",
+       "operator": "EQ",
+       "value": "draft",
+       "dictCode": "e2et_pay_status"
+      }
+     },
+     {
+      "key": "pending",
+      "label": {
+       "zh-CN": "待审批",
+       "en-US": "Pending"
+      },
+      "filter": {
+       "field": "e2et_pay_status",
+       "operator": "EQ",
+       "value": "pending",
+       "dictCode": "e2et_pay_status"
+      }
+     },
+     {
+      "key": "approved",
+      "label": {
+       "zh-CN": "已审批",
+       "en-US": "Approved"
+      },
+      "filter": {
+       "field": "e2et_pay_status",
+       "operator": "EQ",
+       "value": "approved",
+       "dictCode": "e2et_pay_status"
+      }
+     },
+     {
+      "key": "paid",
+      "label": {
+       "zh-CN": "已付款",
+       "en-US": "Paid"
+      },
+      "filter": {
+       "field": "e2et_pay_status",
+       "operator": "EQ",
+       "value": "paid",
+       "dictCode": "e2et_pay_status"
+      }
+     }
+    ]
+   },
+   {
+    "id": "block_payment_toolbar",
+    "blockType": "toolbar",
+    "buttons": [
+     {
+      "code": "create",
+      "primary": true,
+      "icon": "Plus",
+      "permissionCode": "e2et.payment.manage",
+      "label": {
+       "zh-CN": "新建",
+       "en": "Create"
+      },
+      "action": {
+       "type": "navigate",
+       "to": "e2et_payment_form",
+       "command": "e2et:create_payment"
+      }
+     }
+    ]
+   },
+   {
+    "id": "block_payment_table",
+    "blockType": "table",
+    "columns": [
+     {
+      "field": "e2et_pay_no",
+      "width": 180,
+      "fixed": "left"
+     },
+     {
+      "field": "e2et_pay_order_id",
+      "width": 200
+     },
+     {
+      "field": "e2et_pay_amount",
+      "width": 120,
+      "align": "right"
+     },
+     {
+      "field": "e2et_pay_method",
+      "width": 120,
+      "dictCode": "e2et_pay_method"
+     },
+     {
+      "field": "e2et_pay_status",
+      "width": 100,
+      "dictCode": "e2et_pay_status"
+     },
+     {
+      "field": "e2et_pay_date",
+      "width": 120
+     },
+     {
+      "field": "e2et_pay_approver",
+      "width": 120
+     }
+    ],
+    "rowActions": [
+     {
+      "code": "detail",
+      "icon": "Eye",
+      "permissionCode": "e2et.payment.manage",
+      "label": {
+       "zh-CN": "查看",
+       "en": "View"
+      },
+      "action": {
+       "type": "navigate",
+       "to": "e2et_payment_detail"
+      }
+     },
+     {
+      "code": "submit",
+      "icon": "Send",
+      "visibleWhen": "row.e2et_pay_status === 'draft'",
+      "permissionCode": "e2et.payment.manage",
+      "label": {
+       "zh-CN": "提交",
+       "en": "Submit"
+      },
+      "confirm": "submit.confirm",
+      "action": {
+       "type": "command",
+       "command": "e2et:submit_payment"
+      }
+     },
+     {
+      "code": "approve",
+      "icon": "Check",
+      "visibleWhen": "row.e2et_pay_status === 'pending'",
+      "permissionCode": "e2et.payment.approve",
+      "label": {
+       "zh-CN": "通过",
+       "en": "Approve"
+      },
+      "confirm": "approve.confirm",
+      "action": {
+       "type": "command",
+       "command": "e2et:approve_payment"
+      }
+     },
+     {
+      "code": "reject",
+      "icon": "X",
+      "visibleWhen": "row.e2et_pay_status === 'pending'",
+      "permissionCode": "e2et.payment.approve",
+      "label": {
+       "zh-CN": "拒绝",
+       "en": "Reject"
+      },
+      "confirm": "reject.confirm",
+      "action": {
+       "type": "command",
+       "command": "e2et:reject_payment"
+      }
+     },
+     {
+      "code": "pay",
+      "icon": "CreditCard",
+      "visibleWhen": "row.e2et_pay_status === 'approved'",
+      "permissionCode": "e2et.payment.manage",
+      "label": {
+       "zh-CN": "付款",
+       "en": "Pay"
+      },
+      "confirm": "pay.confirm",
+      "action": {
+       "type": "command",
+       "command": "e2et:pay_payment"
+      }
+     }
+    ],
+    "defaultSort": {
+     "field": "created_at",
+     "order": "desc"
+    },
+    "searchFields": [
+     "e2et_pay_no",
+     "e2et_pay_status",
+     "e2et_pay_method"
+    ]
+   }
+  ]
+ },
+ {
+  "pageKey": "e2et_payment_form",
+  "name:zh-CN": "付款编辑",
+  "name:en": "Payment Form",
+  "modelCode": "e2et_payment",
+  "description": "Payment form with REFERENCE dropdown for order selection",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+   "type": "stack"
+  },
+  "blocks": [
+   {
+    "id": "section_payment_basic",
+    "blockType": "form-section",
+    "title": {
+     "zh-CN": "付款信息",
+     "en-US": "Payment Information"
+    },
+    "columns": 2,
+    "fields": [
+     {
+      "field": "e2et_pay_no",
+      "span": 1,
+      "readOnly": true
+     },
+     {
+      "field": "e2et_pay_order_id",
+      "span": 1,
+      "required": true
+     },
+     {
+      "field": "e2et_pay_amount",
+      "span": 1,
+      "required": true
+     },
+     {
+      "field": "e2et_pay_method",
+      "span": 1,
+      "dictCode": "e2et_pay_method"
+     },
+     {
+      "field": "e2et_pay_status",
+      "span": 1,
+      "readOnly": true,
+      "dictCode": "e2et_pay_status"
+     },
+     {
+      "field": "e2et_pay_remark",
+      "span": 2
+     }
+    ]
+   },
+   {
+    "id": "block_payment_form_buttons",
+    "blockType": "form-buttons",
+    "buttons": [
+     {
+      "code": "save",
+      "primary": true,
+      "label": {
+       "zh-CN": "保存",
+       "en": "Save"
+      },
+      "action": {
+       "type": "command",
+       "command": "e2et:create_payment"
+      }
+     },
+     {
+      "code": "cancel",
+      "label": {
+       "zh-CN": "取消",
+       "en": "Cancel"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pageKey": "e2et_payment_detail",
+  "name:zh-CN": "付款详情",
+  "name:en": "Payment Detail",
+  "modelCode": "e2et_payment",
+  "description": "Payment detail with conditional toolbar buttons",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+   "type": "grid",
+   "cols": 12
+  },
+  "blocks": [
+   {
+    "id": "block_payment_detail_basic",
+    "blockType": "form-section",
+    "columns": 2,
+    "fields": [
+     {
+      "field": "e2et_pay_no",
+      "span": 1
+     },
+     {
+      "field": "e2et_pay_order_id",
+      "span": 1
+     },
+     {
+      "field": "e2et_pay_amount",
+      "span": 1
+     },
+     {
+      "field": "e2et_pay_method",
+      "span": 1,
+      "dictCode": "e2et_pay_method"
+     },
+     {
+      "field": "e2et_pay_status",
+      "span": 1,
+      "dictCode": "e2et_pay_status"
+     },
+     {
+      "field": "e2et_pay_date",
+      "span": 1
+     },
+     {
+      "field": "e2et_pay_approver",
+      "span": 1
+     },
+     {
+      "field": "e2et_pay_remark",
+      "span": 2
+     }
+    ]
+   },
+   {
+    "id": "block_payment_detail_actions",
+    "blockType": "toolbar",
+    "buttons": [
+     {
+      "code": "submit",
+      "primary": true,
+      "icon": "Send",
+      "visibleWhen": "record.e2et_pay_status === 'draft'",
+      "permissionCode": "e2et.payment.manage",
+      "label": {
+       "zh-CN": "提交",
+       "en": "Submit"
+      },
+      "confirm": "submit.confirm",
+      "action": {
+       "type": "command",
+       "command": "e2et:submit_payment"
+      }
+     },
+     {
+      "code": "approve",
+      "primary": true,
+      "icon": "Check",
+      "visibleWhen": "record.e2et_pay_status === 'pending'",
+      "permissionCode": "e2et.payment.approve",
+      "label": {
+       "zh-CN": "通过",
+       "en": "Approve"
+      },
+      "confirm": "approve.confirm",
+      "action": {
+       "type": "command",
+       "command": "e2et:approve_payment"
+      }
+     },
+     {
+      "code": "reject",
+      "icon": "X",
+      "visibleWhen": "record.e2et_pay_status === 'pending'",
+      "permissionCode": "e2et.payment.approve",
+      "label": {
+       "zh-CN": "拒绝",
+       "en": "Reject"
+      },
+      "confirm": "reject.confirm",
+      "action": {
+       "type": "command",
+       "command": "e2et:reject_payment"
+      }
+     },
+     {
+      "code": "pay",
+      "icon": "CreditCard",
+      "visibleWhen": "record.e2et_pay_status === 'approved'",
+      "permissionCode": "e2et.payment.manage",
+      "label": {
+       "zh-CN": "付款",
+       "en": "Pay"
+      },
+      "confirm": "pay.confirm",
+      "action": {
+       "type": "command",
+       "command": "e2et:pay_payment"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pageKey": "e2et_record_list",
+  "name:zh-CN": "E2E测试记录列表",
+  "name:en": "E2E Test Record List",
+  "modelCode": "e2et_record",
+  "description": "Simple record list for Android E2E tests",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+   "type": "stack"
+  },
+  "blocks": [
+   {
+    "id": "block_record_table",
+    "blockType": "table",
+    "columns": [
+     {
+      "field": "e2et_name"
+     },
+     {
+      "field": "e2et_status",
+      "dictCode": "e2et_record_status"
+     },
+     {
+      "field": "e2et_count"
+     },
+     {
+      "field": "e2et_due_date"
+     }
+    ],
+    "searchFields": [
+     "e2et_name",
+     "e2et_status"
+    ]
+   }
+  ]
+ },
+ {
+  "pageKey": "e2et_record_detail",
+  "name:zh-CN": "E2E测试记录详情",
+  "name:en": "E2E Test Record Detail",
+  "modelCode": "e2et_record",
+  "description": "Simple detail page for e2et_record — shows all fields with i18n labels",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+   "type": "stack"
+  },
+  "blocks": [
+   {
+    "id": "block_record_basic",
+    "blockType": "form-section",
+    "columns": 2,
+    "fields": [
+     {
+      "field": "e2et_name",
+      "span": 2
+     },
+     {
+      "field": "e2et_status",
+      "span": 1,
+      "dictCode": "e2et_record_status"
+     },
+     {
+      "field": "e2et_count",
+      "span": 1
+     },
+     {
+      "field": "e2et_due_date",
+      "span": 1
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pageKey": "e2et_field_zoo_list",
+  "name:zh-CN": "字段动物园列表",
+  "name:en": "Field Zoo List",
+  "modelCode": "e2et_field_zoo",
+  "description": "List with toolbar search, filters block, create action and multi-view switcher (table/kanban/gallery) — serves FORM-FIELDS, FILTER-SORT, BATCH-MODE and MULTIVIEW families",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+   "type": "grid",
+   "cols": 12
+  },
+  "blocks": [
+   {
+    "id": "block_zoo_filter",
+    "blockType": "filters",
+    "title": {
+     "zh-CN": "筛选",
+     "en-US": "Filters"
+    },
+    "filters": [
+     {
+      "field": "e2et_zoo_select",
+      "operator": "EQ",
+      "dictCode": "e2et_zoo_option",
+      "label": {
+       "zh-CN": "选项",
+       "en-US": "Option"
+      }
+     },
+     {
+      "field": "e2et_zoo_switch",
+      "operator": "EQ",
+      "label": {
+       "zh-CN": "仅启用",
+       "en-US": "Enabled only"
+      }
+     }
+    ]
+   },
+   {
+    "id": "block_zoo_toolbar",
+    "blockType": "toolbar",
+    "title": {
+     "zh-CN": "工具栏",
+     "en-US": "Toolbar"
+    },
+    "actions": [
+     {
+      "code": "create",
+      "label": {
+       "zh-CN": "新建",
+       "en-US": "New"
+      },
+      "action": {
+       "type": "navigate",
+       "to": "e2et_field_zoo_form"
+      }
+     },
+     {
+      "code": "batch_mode",
+      "label": {
+       "zh-CN": "批量",
+       "en-US": "Batch"
+      },
+      "action": {
+       "type": "command",
+       "command": "batch_mode"
+      }
+     }
+    ]
+   },
+   {
+    "id": "block_zoo_selection_info",
+    "blockType": "selection-info",
+    "title": {
+     "zh-CN": "已选记录",
+     "en-US": "Selection"
+    },
+    "selection": {
+     "bind": "selectedRows"
+    }
+   }
+  ],
+  "extension": {
+   "defaultView": "table",
+   "views": [
+    "table",
+    "kanban",
+    "gallery"
+   ],
+   "kanbanConfig": {
+    "groupByField": "e2et_zoo_select",
+    "titleField": "e2et_zoo_name"
+   },
+   "galleryConfig": {
+    "titleField": "e2et_zoo_name",
+    "imageField": "e2et_zoo_photo"
+   }
+  }
+ },
+ {
+  "pageKey": "e2et_field_zoo_form",
+  "name:zh-CN": "字段动物园表单",
+  "name:en": "Field Zoo Form",
+  "modelCode": "e2et_field_zoo",
+  "description": "Create/edit form enumerating every supported widget type",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+   "type": "stack"
+  },
+  "blocks": [
+   {
+    "id": "section_zoo_basic",
+    "blockType": "form-section",
+    "title": {
+     "zh-CN": "全部控件",
+     "en-US": "Every Widget"
+    },
+    "columns": 2,
+    "fields": [
+     {
+      "field": "e2et_zoo_name",
+      "span": 2,
+      "required": true
+     },
+     {
+      "field": "e2et_zoo_select",
+      "span": 1
+     },
+     {
+      "field": "e2et_zoo_reference",
+      "span": 1
+     },
+     {
+      "field": "e2et_zoo_date",
+      "span": 1
+     },
+     {
+      "field": "e2et_zoo_switch",
+      "span": 1
+     },
+     {
+      "field": "e2et_zoo_number",
+      "span": 1
+     },
+     {
+      "field": "e2et_zoo_photo",
+      "span": 1
+     },
+     {
+      "field": "e2et_zoo_signature",
+      "span": 2
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pageKey": "e2et_field_zoo_detail",
+  "name:zh-CN": "字段动物园详情",
+  "name:en": "Field Zoo Detail",
+  "modelCode": "e2et_field_zoo",
+  "description": "Read-only detail with edit/delete actions in the action bar",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+   "type": "grid",
+   "cols": 12
+  },
+  "blocks": [
+   {
+    "id": "section_zoo_detail",
+    "blockType": "form-section",
+    "title": {
+     "zh-CN": "基本信息",
+     "en-US": "Basic Info"
+    },
+    "columns": 2,
+    "fields": [
+     {
+      "field": "e2et_zoo_name",
+      "span": 2
+     },
+     {
+      "field": "e2et_zoo_select",
+      "span": 1
+     },
+     {
+      "field": "e2et_zoo_reference",
+      "span": 1
+     },
+     {
+      "field": "e2et_zoo_date",
+      "span": 1
+     },
+     {
+      "field": "e2et_zoo_switch",
+      "span": 1
+     },
+     {
+      "field": "e2et_zoo_number",
+      "span": 1
+     },
+     {
+      "field": "e2et_zoo_photo",
+      "span": 1
+     },
+     {
+      "field": "e2et_zoo_signature",
+      "span": 2
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pageKey": "e2et_golden_workbench",
+  "name:zh-CN": "Golden 测试工作台",
+  "name:en": "Golden Test Workbench",
+  "modelCode": "e2et_field_zoo",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+   "type": "grid",
+   "cols": 12
+  },
+  "description": "Deterministic golden screenshot target: toolbar + filters + selection-info + table view. Fixed field set and stable data pattern.",
+  "blocks": [
+   {
+    "id": "block_golden_filter",
+    "blockType": "filters",
+    "title": {
+     "zh-CN": "筛选",
+     "en-US": "Filters"
+    },
+    "filters": [
+     {
+      "field": "e2et_zoo_select",
+      "operator": "EQ",
+      "dictCode": "e2et_zoo_option",
+      "label": {
+       "zh-CN": "选项",
+       "en-US": "Option"
+      }
+     }
+    ]
+   },
+   {
+    "id": "block_golden_toolbar",
+    "blockType": "toolbar",
+    "title": {
+     "zh-CN": "工具栏",
+     "en-US": "Toolbar"
+    },
+    "actions": [
+     {
+      "code": "create",
+      "label": {
+       "zh-CN": "新建",
+       "en-US": "New"
+      },
+      "action": {
+       "type": "navigate",
+       "to": "e2et_field_zoo_form"
+      }
+     },
+     {
+      "code": "batch_mode",
+      "label": {
+       "zh-CN": "批量",
+       "en-US": "Batch"
+      },
+      "action": {
+       "type": "command",
+       "command": "batch_mode"
+      }
+     }
+    ]
+   },
+   {
+    "id": "block_golden_selection_info",
+    "blockType": "selection-info",
+    "title": {
+     "zh-CN": "已选记录",
+     "en-US": "Selection"
+    },
+    "selection": {
+     "bind": "selectedRows"
+    }
+   }
+  ]
+ },
+ {
+  "pageKey": "e2et_stage_record_detail",
+  "name:zh-CN": "阶段记录详情",
+  "name:en": "Stage Record Detail",
+  "modelCode": "e2et_stage_record",
+  "description": "Platform stage-rail golden fixture backed by a neutral staged record.",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+   "type": "grid",
+   "cols": 12
+  },
+  "blocks": [
+   {
+    "id": "stage_record_rail",
+    "blockType": "stage-rail",
+    "detailPlacement": "header",
+    "context": "${record}",
+    "stageField": "e2et_stage_record_stage",
+    "title": {
+     "zh-CN": "销售阶段",
+     "en-US": "Sales Stage"
+    },
+    "stages": [
+     {
+      "value": "discovery",
+      "label": {
+       "zh-CN": "需求发现",
+       "en-US": "Discovery"
+      }
+     },
+     {
+      "value": "qualification",
+      "label": {
+       "zh-CN": "资格确认",
+       "en-US": "Qualification"
+      }
+     },
+     {
+      "value": "proposal",
+      "label": {
+       "zh-CN": "方案报价",
+       "en-US": "Proposal"
+      }
+     },
+     {
+      "value": "negotiation",
+      "label": {
+       "zh-CN": "商务谈判",
+       "en-US": "Negotiation"
+      }
+     },
+     {
+      "value": "closed_won",
+      "label": {
+       "zh-CN": "赢单",
+       "en-US": "Won"
+      }
+     }
+    ],
+    "terminalStages": [
+     {
+      "value": "closed_lost",
+      "label": {
+       "zh-CN": "已丢单",
+       "en-US": "Lost"
+      },
+      "tone": "red"
+     }
+    ]
+   },
+   {
+    "id": "section_opp_detail",
+    "blockType": "form-section",
+    "title": {
+     "zh-CN": "基本信息",
+     "en-US": "Basic Info"
+    },
+    "columns": 2,
+    "fields": [
+     {
+      "field": "e2et_stage_record_name",
+      "span": 2
+     },
+     {
+      "field": "e2et_stage_record_stage",
+      "span": 1
+     },
+     {
+      "field": "e2et_stage_record_amount",
+      "span": 1
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pageKey": "e2et_stage_record_list",
+  "name:zh-CN": "阶段记录列表",
+  "name:en": "Stage Record List",
+  "modelCode": "e2et_stage_record",
+  "description": "List page for the stage-rail golden fixture model; rows deep-link into e2et_stage_record_detail.",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+   "type": "grid",
+   "cols": 12
+  },
+  "blocks": [
+   {
+    "id": "block_opp_toolbar",
+    "blockType": "toolbar",
+    "title": {
+     "zh-CN": "工具栏",
+     "en-US": "Toolbar"
+    },
+    "actions": [
+     {
+      "code": "create",
+      "label": {
+       "zh-CN": "新建",
+       "en-US": "New"
+      },
+      "action": {
+       "type": "navigate",
+       "to": "e2et_stage_record_form"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pageKey": "e2et_stage_record_form",
+  "name:zh-CN": "阶段记录表单",
+  "name:en": "Stage Record Form",
+  "modelCode": "e2et_stage_record",
+  "description": "Create/edit form for the stage-rail fixture model.",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+   "type": "stack"
+  },
+  "blocks": [
+   {
+    "id": "section_opp_basic",
+    "blockType": "form-section",
+    "title": {
+     "zh-CN": "基本信息",
+     "en-US": "Basic Info"
+    },
+    "columns": 2,
+    "fields": [
+     {
+      "field": "e2et_stage_record_name",
+      "span": 2,
+      "required": true
+     },
+     {
+      "field": "e2et_stage_record_stage",
+      "span": 1,
+      "required": true
+     },
+     {
+      "field": "e2et_stage_record_amount",
+      "span": 1
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pageKey": "e2et_crm_opp_list",
+  "name:zh-CN": "商机列表",
+  "name:en": "Opportunity List",
+  "modelCode": "e2et_crm_opp",
+  "description": "Stage-rail opportunity golden fixture: searchable list with dict stage chips, multi-view (table/kanban/calendar/gallery) and deep-link into e2et_crm_opp_detail.",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+   "type": "grid",
+   "cols": 12
+  },
+  "blocks": [
+   {
+    "id": "block_crm_opp_toolbar",
+    "blockType": "toolbar",
+    "title": {
+     "zh-CN": "工具栏",
+     "en-US": "Toolbar"
+    },
+    "actions": [
+     {
+      "code": "create",
+      "label": {
+       "zh-CN": "新建",
+       "en-US": "New"
+      },
+      "action": {
+       "type": "navigate",
+       "to": "e2et_crm_opp_form"
+      }
+     }
+    ]
+   },
+   {
+    "id": "block_crm_opp_table",
+    "blockType": "table",
+    "columns": [
+     {
+      "field": "e2et_crm_opp_name",
+      "width": 220
+     },
+     {
+      "field": "e2et_crm_opp_stage",
+      "width": 120,
+      "dictCode": "e2et_crm_opp_stage"
+     },
+     {
+      "field": "e2et_crm_opp_amount",
+      "width": 120,
+      "align": "right"
+     }
+    ]
+   }
+  ],
+  "extension": {
+   "options": {
+    "detailNavigation": "page"
+   },
+   "enableMultiView": true,
+   "views": [
+    "table",
+    "kanban",
+    "calendar",
+    "gallery"
+   ],
+   "kanbanConfig": {
+    "groupByField": "e2et_crm_opp_stage",
+    "titleField": "e2et_crm_opp_name",
+    "subtitleField": "e2et_crm_opp_amount"
+   },
+   "calendarConfig": {
+    "dateField": "created_at",
+    "titleField": "e2et_crm_opp_name"
+   },
+   "galleryConfig": {
+    "titleField": "e2et_crm_opp_name",
+    "subtitleField": "e2et_crm_opp_stage",
+    "columns": 2
+   }
+  }
+ },
+ {
+  "pageKey": "e2et_crm_opp_detail",
+  "name:zh-CN": "商机详情",
+  "name:en": "Opportunity Detail",
+  "modelCode": "e2et_crm_opp",
+  "description": "Opportunity detail with the verbatim CRM pipeline stage rail over the e2et_crm_opp_stage dict.",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+   "type": "grid",
+   "cols": 12
+  },
+  "blocks": [
+   {
+    "id": "crm_opp_rail",
+    "blockType": "stage-rail",
+    "detailPlacement": "header",
+    "context": "${record}",
+    "stageField": "e2et_crm_opp_stage",
+    "title": {
+     "zh-CN": "销售阶段",
+     "en-US": "Sales Stage"
+    },
+    "stages": [
+     {
+      "value": "discovery",
+      "label": {
+       "zh-CN": "需求发现",
+       "en-US": "Discovery"
+      }
+     },
+     {
+      "value": "qualification",
+      "label": {
+       "zh-CN": "资格确认",
+       "en-US": "Qualification"
+      }
+     },
+     {
+      "value": "proposal",
+      "label": {
+       "zh-CN": "方案报价",
+       "en-US": "Proposal"
+      }
+     },
+     {
+      "value": "negotiation",
+      "label": {
+       "zh-CN": "商务谈判",
+       "en-US": "Negotiation"
+      }
+     },
+     {
+      "value": "closed_won",
+      "label": {
+       "zh-CN": "赢单",
+       "en-US": "Won"
+      }
+     },
+     {
+      "value": "closed_lost",
+      "label": {
+       "zh-CN": "已丢单",
+       "en-US": "Lost"
+      }
+     }
+    ]
+   },
+   {
+    "id": "section_crm_opp_detail",
+    "blockType": "form-section",
+    "title": {
+     "zh-CN": "基本信息",
+     "en-US": "Basic Info"
+    },
+    "columns": 2,
+    "fields": [
+     {
+      "field": "e2et_crm_opp_name",
+      "span": 2
+     },
+     {
+      "field": "e2et_crm_opp_stage",
+      "span": 1
+     },
+     {
+      "field": "e2et_crm_opp_amount",
+      "span": 1
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pageKey": "e2et_crm_opp_form",
+  "name:zh-CN": "商机编辑",
+  "name:en": "Opportunity Form",
+  "modelCode": "e2et_crm_opp",
+  "description": "Create/edit form for the stage-rail opportunity fixture model.",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+   "type": "stack"
+  },
+  "blocks": [
+   {
+    "id": "section_crm_opp_basic",
+    "blockType": "form-section",
+    "title": {
+     "zh-CN": "基本信息",
+     "en-US": "Basic Info"
+    },
+    "columns": 2,
+    "fields": [
+     {
+      "field": "e2et_crm_opp_name",
+      "span": 2,
+      "required": true
+     },
+     {
+      "field": "e2et_crm_opp_stage",
+      "span": 1,
+      "required": true
+     },
+     {
+      "field": "e2et_crm_opp_amount",
+      "span": 1
+     }
+    ]
+   }
+  ]
+ }
 ]

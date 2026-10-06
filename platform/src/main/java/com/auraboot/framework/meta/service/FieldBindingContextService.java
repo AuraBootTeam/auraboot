@@ -46,6 +46,10 @@ public interface FieldBindingContextService {
      */
     BindingConfiguration updateBindingConfiguration(Long bindingId, BindingConfigRequest request);
 
+    /** Update a binding only when it belongs to the requested model. */
+    BindingConfiguration updateBindingConfiguration(String modelPid, Long bindingId, BindingConfigRequest request);
+
+
     /**
      * Validate binding configuration
      * Ensures configuration is valid and overrides are more restrictive

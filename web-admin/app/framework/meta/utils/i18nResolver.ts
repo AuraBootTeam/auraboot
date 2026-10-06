@@ -117,7 +117,10 @@ export function resolveButtonLabel(button: DslButton, t: TranslateFunction): str
   // Legacy: if content starts with $i18n:, resolve it
   if (button.content?.startsWith('$i18n:')) {
     const key = button.content.slice(6);
-    return t(key);
+    const label = t(key);
+    if (label !== key) {
+      return label;
+    }
   }
 
   // Fallback to content or code
@@ -151,7 +154,10 @@ export function resolveFieldLabel(
   // Legacy: if label exists and starts with $i18n:, resolve it
   if (typeof field === 'object' && field.label?.startsWith('$i18n:')) {
     const key = field.label.slice(6);
-    return t(key);
+    const resolved = t(key);
+    if (resolved !== key) {
+      return resolved;
+    }
   }
 
   // Try model-specific key first
@@ -200,10 +206,15 @@ export function resolveFieldPlaceholder(
 ): string {
   const fieldCode = typeof field === 'string' ? field : field.field;
 
-  // Legacy: if placeholder exists in props and starts with $i18n:, resolve it
+  // Legacy: if placeholder exists in props and starts with $i18n:, resolve it.
+  // A missing dictionary entry must fall through to the label-based default —
+  // returning t(key) verbatim leaked raw `$i18n:` keys into the UI.
   if (typeof field === 'object' && field.props?.placeholder?.startsWith('$i18n:')) {
     const key = field.props.placeholder.slice(6);
-    return t(key);
+    const resolved = t(key);
+    if (resolved !== key) {
+      return resolved;
+    }
   }
 
   // Try model-specific placeholder key
@@ -248,7 +259,10 @@ export function resolveColumnLabel(
   // Legacy: if label starts with $i18n:, resolve it
   if (column.label?.startsWith('$i18n:')) {
     const key = column.label.slice(6);
-    return t(key);
+    const resolved = t(key);
+    if (resolved !== key) {
+      return resolved;
+    }
   }
 
   // Resolve as field label

@@ -4,6 +4,8 @@
  */
 
 import { create } from 'zustand';
+import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
+import { widgetText } from '../widgets/widgetText';
 import { immer } from 'zustand/middleware/immer';
 import { subscribeWithSelector } from 'zustand/middleware';
 import type {
@@ -361,7 +363,11 @@ export const useDashboardStore = create<DashboardStore>()(
           y: widget.y + 1,
           config: {
             ...widget.config,
-            title: `${widget.config.title} (副本)`,
+            title: typeof widget.config.title === 'string'
+              ? `${widget.config.title} (${widgetText('panel.copySuffix')['zh-CN']})`
+              : Object.fromEntries(Object.entries(widget.config.title).map(([locale, title]) =>
+                [locale, `${title} (${getLocalizedText(widgetText('panel.copySuffix'), locale)})`],
+              )),
           },
         };
 
@@ -478,14 +484,20 @@ export const useDashboardStore = create<DashboardStore>()(
           }
 
           // Check data source
-          if (!widget.config.dataSource) {
+          // SmartTableChart also supports dynamic model rows without a chart data source.
+          const hasModelTableSource = widget.type === 'smart-table-chart'
+            && typeof widget.config.modelCode === 'string'
+            && widget.config.modelCode.trim().length > 0
+            && Array.isArray(widget.config.table?.columns)
+            && widget.config.table.columns.length > 0;
+          if (!widget.config.dataSource && !hasModelTableSource) {
             errors.push({
               widgetId: widget.id,
               field: 'dataSource',
               message: `组件 "${widget.config.title || widget.id}" 缺少数据源配置`,
               type: 'error',
             });
-          } else {
+          } else if (widget.config.dataSource) {
             const ds = widget.config.dataSource;
             if (ds.type === 'aggregate') {
               if (!hasAggregateModel(ds)) {

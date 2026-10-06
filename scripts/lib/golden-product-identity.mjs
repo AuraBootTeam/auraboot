@@ -11,7 +11,7 @@ const requireIdentity = (condition, message) => { if (!condition) throw new Erro
 // Compare independent live observations. Never include credentials or raw commands in evidence.
 export function verifyGoldenProduct({ report, repo, environments, commands, token, database, health }) {
   requireIdentity(report.verdict === 'ok', 'Workspace identity verification failed');
-  const source = report.sources.find(item => item.key === 'auraboot');
+  const source = report.sources.find(item => ['auraboot', 'core'].includes(item.key));
   requireIdentity(source?.status === 'ok' && source.expected.root === repo, 'OSS source identity mismatch');
   const artifact = report.artifacts.find(item => item.key === 'backend');
   requireIdentity(artifact?.status === 'ok' && artifact.expected.sourceCommit === source.expected.commit,

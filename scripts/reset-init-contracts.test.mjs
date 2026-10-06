@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import test from 'node:test';
+import { spawnSync } from 'node:child_process';
 
 function read(path) {
   return readFileSync(path, 'utf8');
@@ -322,7 +323,35 @@ test('OSS golden stack stages manifest-declared backend jars from explicit roots
 test('OSS golden stack applies explicit product migrations only to a fresh database before backend startup', () => {
   const stack = read('scripts/oss-golden-stack.sh');
 
-  assert.match(stack, /--product-migration-root requires --fresh-db/);
+  // Execute the actual preflight fragment, without invoking runtime or database tools.
+  const guardStart = stack.indexOf('  [ "$fresh_db$require_new_db" != "11" ]');
+  const guardEnd = stack.indexOf('  case "$runtime_mode" in', guardStart);
+  assert.ok(guardStart >= 0 && guardEnd > guardStart, 'freshness preflight must exist');
+  const guard = stack.slice(guardStart, guardEnd);
+  const cases = [
+    { fresh: '0', absent: '0', products: '0', allowed: true },
+    { fresh: '0', absent: '0', products: '1', allowed: false },
+    { fresh: '1', absent: '0', products: '1', allowed: true },
+    { fresh: '0', absent: '1', products: '1', allowed: true },
+    { fresh: '1', absent: '1', products: '1', allowed: false },
+    { fresh: '1', absent: '1', products: '0', allowed: false },
+  ];
+  for (const row of cases) {
+    const result = spawnSync('bash', ['-c', `
+      set -euo pipefail
+      die() { printf '%s\\n' "$*" >&2; exit 1; }
+      fresh_db="$1"; require_new_db="$2"
+      product_migration_roots=()
+      [ "$3" = "0" ] || product_migration_roots+=(/fixture/product-migrations)
+      ${guard}
+    `, 'freshness-contract', row.fresh, row.absent, row.products], { encoding: 'utf8' });
+    assert.equal(result.error, undefined);
+    assert.equal(result.status, row.allowed ? 0 : 1, JSON.stringify(row));
+    if (!row.allowed) assert.match(result.stderr, /mutually exclusive|requires/);
+  }
+
+  assert.match(stack, /--product-migration-root requires a fresh database flag/);
+  assert.match(stack, /\[ "\$\{#product_migration_roots\[@\]\}" -eq 0 \] \|\| \[ "\$fresh_db" = "1" \] \|\| \[ "\$require_new_db" = "1" \]/);
   assert.match(stack, /find "\$product_root" -maxdepth 1 -type f -name 'V\*\.sql'/);
   assert.match(stack, /psql -v ON_ERROR_STOP=1[\s\S]{0,240}-f "\$migration_file"/);
   assert.match(stack, /product-migrations\.tsv/);
@@ -338,8 +367,11 @@ test('OSS golden stack rejects dependency capsules with dangling required-packag
   assert.match(golden, /source "\$SCRIPT_DIR\/lib\/web-admin-node-modules\.sh"/);
   assert.match(
     golden,
-    /if ! web_admin_node_modules_usable "\$REPO_ROOT\/web-admin\/node_modules"/,
+    /if ! web_admin_node_modules_matches_checkout "\$REPO_ROOT\/web-admin\/node_modules" "\$REPO_ROOT"/,
   );
+  const helper = read('scripts/lib/web-admin-node-modules.sh');
+  assert.match(helper, /web_admin_node_modules_usable "\$candidate" \|\| return 1/);
+  assert.match(helper, /web-admin-lock-contract\.mjs/);
   assert.match(golden, /refusing to replace a real directory/);
 });
 
@@ -566,8 +598,8 @@ test('plugin import seeds BOM defaults when bom-standardization is imported', ()
     'BOM defaults must be seeded after cross-plugin references are verified',
   );
   assert.ok(
-    tail.indexOf('seed_bom_defaults_if_imported') < tail.indexOf('verify_latest_import_statuses'),
-    'BOM defaults must not be blocked by the post-import history audit',
+    tail.indexOf('seed_bom_defaults_if_imported') < tail.lastIndexOf('verify_latest_import_statuses'),
+    'BOM defaults must precede the final post-import history audit',
   );
 });
 

@@ -5,6 +5,7 @@ import com.auraboot.framework.automation.entity.AutomationLog;
 import com.auraboot.framework.automation.entity.TriggerConfig;
 import com.auraboot.framework.automation.mapper.AutomationMapper;
 import com.auraboot.framework.automation.trigger.AutomationTriggerService;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -50,7 +51,11 @@ public class AutomationWebhookController {
 
         log.info("Received webhook for automation: pid={}", automationPid);
 
-        Automation automation = automationMapper.findByPid(automationPid);
+        // External webhooks arrive before a tenant context exists. Suppress the tenant
+        // filter only for this exact-PID lookup; validation must still succeed before
+        // executeAutomation establishes the stored rule's tenant/actor context.
+        Automation automation = MetaContext.runWithoutTenantFilter(
+                () -> automationMapper.findByPid(automationPid));
         if (automation == null) {
             return ApiResponse.error("Automation not found: " + automationPid);
         }

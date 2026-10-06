@@ -28,7 +28,7 @@ public class CloudConfig {
     @TableField("config_level")
     private String configLevel;
 
-    @TableField("tenant_id")
+    @TableField(value = "tenant_id", insertStrategy = FieldStrategy.ALWAYS)
     private Long tenantId;
 
     /** sms | email | oauth | storage | cdn | llm */

@@ -5,12 +5,16 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-final class PermissionCodeCandidates {
+/**
+ * Candidate permission-code spellings for a resource/action pair. Shared with the
+ * enterprise permission explainer, which composes the same lookup downstream.
+ */
+public final class PermissionCodeCandidates {
 
     private PermissionCodeCandidates() {
     }
 
-    static List<String> forResourceAction(String resource, String action) {
+    public static List<String> forResourceAction(String resource, String action) {
         if (resource == null || resource.isBlank() || action == null || action.isBlank()) {
             return List.of();
         }

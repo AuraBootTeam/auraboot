@@ -66,6 +66,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
       cardFields: viewConfig.cardFields?.map((cf) => ({
         field: cf.field,
         label: cf.label,
+        dictCode: cf.dictCode,
         type: cf.type as 'text' | 'number' | 'date' | 'tag' | 'avatar' | undefined,
       })),
       aggregations: viewConfig.kanbanAggregations?.map((agg) => ({

@@ -8,6 +8,10 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { cn } from '~/utils/cn';
 import { ResultHelper } from '~/utils/type';
+import { useSmartText } from '~/utils/i18n';
+import { useI18n } from '~/contexts/I18nContext';
+import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
+import AI_FIELD_TEXT from './AiField.i18n.json';
 
 export type AiOperation = 'generate' | 'summarize' | 'translate' | 'classify' | 'extract';
 
@@ -98,12 +102,12 @@ export interface AiFieldProps {
   imageInput?: boolean;
 }
 
-const OPERATION_LABELS: Record<AiOperation, { label: string; icon: string }> = {
-  generate: { label: 'Generate', icon: 'M' },
-  summarize: { label: 'Summarize', icon: 'S' },
-  translate: { label: 'Translate', icon: 'T' },
-  classify: { label: 'Classify', icon: 'C' },
-  extract: { label: 'Extract', icon: 'E' },
+const OPERATION_ICONS: Record<AiOperation, string> = {
+  generate: 'M',
+  summarize: 'S',
+  translate: 'T',
+  classify: 'C',
+  extract: 'E',
 };
 
 /**
@@ -120,10 +124,21 @@ export const AiField: React.FC<AiFieldProps> = ({
   modelCode,
   recordPid,
   readOnly = false,
-  placeholder = 'AI-generated content will appear here...',
+  placeholder,
   className,
   imageInput = false,
 }) => {
+  const { locale } = useI18n();
+  const smartText = useSmartText();
+  const aiText = useCallback(
+    (key: keyof typeof AI_FIELD_TEXT) => getLocalizedText(AI_FIELD_TEXT[key], locale),
+    [locale],
+  );
+  // `$i18n:` placeholders from field metadata resolve here; a missing entry
+  // falls back to the localized default instead of leaking the raw key.
+  const resolvedPlaceholder = placeholder
+    ? smartText(placeholder, aiText('defaultPlaceholder'))
+    : aiText('defaultPlaceholder');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showOperations, setShowOperations] = useState(false);
@@ -232,16 +247,16 @@ export const AiField: React.FC<AiFieldProps> = ({
         } else if (result.data?.error) {
           setError(result.data.error);
         } else {
-          setError('Failed to generate content');
+          setError(aiText('failedToGenerate'));
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'AI generation failed');
+        setError(err instanceof Error ? err.message : aiText('failedToGenerate'));
       } finally {
         setLoading(false);
         setShowOperations(false);
       }
     },
-    [aiConfig, sourceValues, modelCode, recordPid, onChange, attachments],
+    [aiConfig, sourceValues, modelCode, recordPid, onChange, attachments, aiText],
   );
 
   if (readOnly) {
@@ -273,7 +288,7 @@ export const AiField: React.FC<AiFieldProps> = ({
         <textarea
           value={value}
           onChange={(e) => onChange?.(e.target.value)}
-          placeholder={placeholder}
+          placeholder={resolvedPlaceholder}
           rows={3}
           className={cn(
             'rounded-control border-border-strong w-full resize-y border px-3 py-2 text-sm',
@@ -337,7 +352,7 @@ export const AiField: React.FC<AiFieldProps> = ({
               {loading ? (
                 <>
                   <span className="rounded-pill h-3 w-3 animate-spin border-2 border-white/30 border-t-white" />
-                  Generating...
+                  {aiText('generating')}
                 </>
               ) : (
                 <>
@@ -354,7 +369,7 @@ export const AiField: React.FC<AiFieldProps> = ({
                       d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z"
                     />
                   </svg>
-                  AI {OPERATION_LABELS[aiConfig?.operation || 'generate'].label}
+                  AI {aiText(aiConfig?.operation || 'generate')}
                 </>
               )}
             </button>
@@ -375,7 +390,7 @@ export const AiField: React.FC<AiFieldProps> = ({
                   type="button"
                   onClick={handleAttachClick}
                   disabled={loading}
-                  title="Attach image"
+                  title={aiText('attachImage')}
                   data-testid="aifield-attach-image"
                   className={cn(
                     'rounded-control text-text-3 hover:text-text-2 p-1',
@@ -418,12 +433,7 @@ export const AiField: React.FC<AiFieldProps> = ({
 
               {showOperations && (
                 <div className="rounded-control border-border bg-panel absolute bottom-full left-0 z-10 mb-1 min-w-[160px] border shadow-lg">
-                  {(
-                    Object.entries(OPERATION_LABELS) as [
-                      AiOperation,
-                      { label: string; icon: string },
-                    ][]
-                  ).map(([op, config]) => (
+                  {(Object.entries(OPERATION_ICONS) as [AiOperation, string][]).map(([op, icon]) => (
                     <button
                       key={op}
                       type="button"
@@ -434,9 +444,9 @@ export const AiField: React.FC<AiFieldProps> = ({
                       )}
                     >
                       <span className="rounded-control flex h-5 w-5 items-center justify-center bg-purple-100 text-[10px] font-bold text-purple-600">
-                        {config.icon}
+                        {icon}
                       </span>
-                      {config.label}
+                      {aiText(op)}
                     </button>
                   ))}
                 </div>

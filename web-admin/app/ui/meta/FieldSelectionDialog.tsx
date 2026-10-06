@@ -16,6 +16,7 @@ import { FieldPreviewPanel } from './FieldPreviewPanel';
 import { FieldBindingConfigForm } from './FieldBindingConfigForm';
 import { FieldCreationForm, type FieldCreationFormData } from './FieldCreationForm';
 import { useToastContext } from '~/contexts/ToastContext';
+import { PermissionGuard } from '~/ui/PermissionGuard';
 
 interface FieldSelectionDialogProps {
   isOpen: boolean;
@@ -75,13 +76,13 @@ export function FieldSelectionDialog({
 
   // Debounced search
   useEffect(() => {
-    if (activeTab === 'select') {
+    if (isOpen && activeTab === 'select') {
       const timer = setTimeout(() => {
         searchFields();
       }, 300);
       return () => clearTimeout(timer);
     }
-  }, [searchKeyword, baseTypeFilter, semanticTypeFilter, activeTab]);
+  }, [isOpen, searchKeyword, baseTypeFilter, semanticTypeFilter, activeTab]);
 
   const loadRecommendations = async () => {
     try {
@@ -295,17 +296,19 @@ export function FieldSelectionDialog({
               >
                 选择已有字段
               </button>
-              <button
-                data-testid="field-selection-tab-create"
-                onClick={() => setActiveTab('create')}
-                className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
-                  activeTab === 'create'
-                    ? 'text-accent border-accent'
-                    : 'text-text-2 hover:text-text-2 border-transparent'
-                }`}
-              >
-                创建新字段
-              </button>
+              <PermissionGuard allPermissions={['meta.model.update', 'meta.field.update']}>
+                <button
+                  data-testid="field-selection-tab-create"
+                  onClick={() => setActiveTab('create')}
+                  className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
+                    activeTab === 'create'
+                      ? 'text-accent border-accent'
+                      : 'text-text-2 hover:text-text-2 border-transparent'
+                  }`}
+                >
+                  创建新字段
+                </button>
+              </PermissionGuard>
             </div>
           </div>
 
@@ -423,6 +426,7 @@ export function FieldSelectionDialog({
                         {fields.map((field) => (
                           <div
                             key={field.pid}
+                            data-testid={`field-selection-field-${field.pid}`}
                             onClick={() => handleFieldClick(field)}
                             className={`rounded-control cursor-pointer px-3 py-3 transition-colors ${
                               selectedField?.pid === field.pid
@@ -532,6 +536,7 @@ export function FieldSelectionDialog({
                   </button>
                 ) : (
                   <button
+                    data-testid="field-selection-bind"
                     onClick={handleSingleBind}
                     disabled={binding || !selectedField || !showConfig || !isConfigValid}
                     className="rounded-control bg-accent hover:bg-accent-hover flex items-center px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
@@ -544,17 +549,19 @@ export function FieldSelectionDialog({
                 )}
               </>
             ) : (
-              <button
-                data-testid="field-selection-create-bind"
-                onClick={handleCreateField}
-                disabled={creating || !isCreationFormValid}
-                className="rounded-control flex items-center bg-green-600 px-4 py-2 text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {creating && (
-                  <div className="rounded-pill mr-2 h-4 w-4 animate-spin border-b-2 border-white"></div>
-                )}
-                创建并绑定字段
-              </button>
+              <PermissionGuard allPermissions={['meta.model.update', 'meta.field.update']}>
+                <button
+                  data-testid="field-selection-create-bind"
+                  onClick={handleCreateField}
+                  disabled={creating || !isCreationFormValid}
+                  className="rounded-control flex items-center bg-green-600 px-4 py-2 text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {creating && (
+                    <div className="rounded-pill mr-2 h-4 w-4 animate-spin border-b-2 border-white"></div>
+                  )}
+                  创建并绑定字段
+                </button>
+              </PermissionGuard>
             )}
           </div>
         </div>

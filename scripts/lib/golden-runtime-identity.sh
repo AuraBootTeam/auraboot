@@ -41,8 +41,8 @@ golden_runtime_bind_sources() {
 
 # Use the immutable Workspace copy rather than a mutable build output.
 golden_runtime_stage_backend() {
-  local name="$1" jar="$2" staged
-  "$DEV" runtime artifact stage "$name" --key backend --source auraboot --file "$jar" >/dev/null || return 1
+  local name="$1" jar="$2" source_key="${3:-auraboot}" staged
+  "$DEV" runtime artifact stage "$name" --key backend --source "$source_key" --file "$jar" >/dev/null || return 1
   staged="$("$DEV" runtime artifact path "$name" backend)" || return 1
   [ -f "$staged" ] || { echo 'golden identity: staged backend is missing' >&2; return 1; }
   printf '%s\n' "$staged"

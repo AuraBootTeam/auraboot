@@ -297,6 +297,7 @@ public class PermissionController {
      * @return List of permissions
      */
     @GetMapping("/model/{modelCode}")
+    @RequirePermission(MetaPermission.MODEL_READ)
     public ApiResponse<List<PermissionDTO>> getModelPermissions(
             @PathVariable @NotNull String modelCode) {
         

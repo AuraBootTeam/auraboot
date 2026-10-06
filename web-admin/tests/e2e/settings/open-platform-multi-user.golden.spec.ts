@@ -11,7 +11,7 @@ const EVIDENCE_DIR = path.join(
   process.env.AURA_EVIDENCE_ROOT || '/tmp',
   'open-platform-multi-user-20260927',
 );
-const RUN_TAG = process.env.OP_MULTIUSER_RUN_TAG || 'r1';
+const RUN_TAG = process.env.OP_MULTIUSER_RUN_TAG || `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 const PASSWORD = 'Closure2026x!';
 const ACCOUNTS = {
   admin: { email: 'admin@auraboot.com', password: 'Test2026x' },

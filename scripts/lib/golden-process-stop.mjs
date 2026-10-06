@@ -6,20 +6,56 @@ import { join, basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { liveEnvironment } from './golden-product-identity.mjs';
 
-const need = (condition, message) => { if (!condition) throw new Error(message); };
+const need = (condition, message) => {
+  if (!condition) {
+    const error = new Error(message);
+    // Only our fixed predicate messages become diagnostics; never print process/env payloads.
+    error.goldenStopReason = message.toUpperCase().replace(/[^A-Z0-9]+/g, '_');
+    throw error;
+  }
+};
 const hash = value => createHash('sha256').update(value).digest('hex');
 function run(file, args) {
   try { return execFileSync(file, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }); }
-  catch { throw new Error('Owned process identity probe failed'); }
+  catch {
+    const error = new Error('Owned process identity probe failed');
+    // Classify the public probe without logging its arguments (which may carry a token).
+    error.goldenStopReason = args[0] === 'runtime'
+      ? ({ show: 'WORKSPACE_RUNTIME_SHOW_FAILED', process: args[2] === 'check'
+          ? 'WORKSPACE_PROCESS_CHECK_FAILED' : 'WORKSPACE_PROCESS_REGISTER_FAILED' }[args[1]]
+          ?? 'WORKSPACE_RUNTIME_PROBE_FAILED')
+      : ({ ps: 'PROCESS_METADATA_PROBE_FAILED', lsof: 'PROCESS_CWD_PROBE_FAILED',
+          node: 'LISTENER_LIVENESS_PROBE_FAILED' }[basename(file)] ?? 'OWNED_IDENTITY_PROBE_FAILED');
+    throw error;
+  }
 }
 function alive(pid) {
-  try { process.kill(pid, 0); return true; } catch (error) {
+  try {
+    process.kill(pid, 0);
+    if (process.platform === 'linux') {
+      try {
+        const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
+        if (['Z', 'X'].includes(stat.slice(stat.lastIndexOf(')') + 2, stat.lastIndexOf(')') + 3))) return false;
+      } catch (error) { if (error.code === 'ENOENT') return false; throw error; }
+    }
+    return true;
+  } catch (error) {
     if (error.code === 'ESRCH') return false;
     throw new Error('Cannot establish owned process liveness');
   }
 }
-function snapshot(pid) {
-  if (!alive(pid)) return null;
+/** A process may exit between liveness and metadata probes during owned shutdown. */
+export function readGoldenProcessSnapshot(pid, readMetadata = processMetadata, isAlive = alive) {
+  if (!isAlive(pid)) return null;
+  try { return readMetadata(pid); }
+  catch (error) {
+    // Never suppress metadata errors for a process that is still alive.
+    if (!isAlive(pid)) return null;
+    throw error;
+  }
+}
+const snapshot = readGoldenProcessSnapshot;
+function processMetadata(pid) {
   const cwd = process.platform === 'linux' ? realpathSync(`/proc/${pid}/cwd`) :
     realpathSync(run('lsof', ['-a', '-p', String(pid), '-d', 'cwd', '-Fn']).split('\n').find(line => line.startsWith('n'))?.slice(1));
   const env = liveEnvironment(pid);
@@ -36,13 +72,18 @@ export function planGoldenStop({ runtime, repo, token, roots, snapshots, listene
   need(roots.every(pid => Number.isSafeInteger(pid) && pid > 1), 'Invalid owned root PID');
   const byPid = new Map(snapshots.map(item => [item.pid, item]));
   need(byPid.size === snapshots.length, 'Duplicate process snapshot');
-  const bridges = snapshots.filter(item => item.runtime === undefined && item.token === undefined &&
-    item.executable === 'sh' && !roots.includes(item.pid) && !listeners.includes(item.pid));
+  const inheritedOwnership = new Set();
   for (const item of snapshots) {
     need(Number.isSafeInteger(item.pid) && item.pid > 1 && item.pid !== process.pid,
       'Invalid stop target PID');
-    need(bridges.includes(item) || (item.runtime === runtime && item.token === token),
-      'Foreign process runtime ownership');
+    const owned = item.runtime === runtime && item.token === token;
+    // The managed command wrapper can insert a shell before exporting the
+    // runtime environment to its child. It must remain inside the fully
+    // authenticated ancestry, never a launch root or application listener.
+    const shellBridge = item.executable === 'sh' && item.runtime === undefined
+      && item.token === undefined && !roots.includes(item.pid) && !listeners.includes(item.pid);
+    need(owned || shellBridge, 'Foreign process runtime ownership');
+    if (shellBridge) inheritedOwnership.add(item.pid);
     need([join(repo, 'platform'), join(repo, 'web-admin')].includes(item.cwd), 'Foreign process cwd');
     need(Boolean(item.startedAt) && Boolean(item.commandHash), 'Missing process generation identity');
     let current = item.pid;
@@ -55,27 +96,15 @@ export function planGoldenStop({ runtime, repo, token, roots, snapshots, listene
   }
   for (const pid of listeners) need(byPid.has(pid), 'Unknown listener: refusing stop');
   // Supervisors first prevents concurrently from respawning children during shutdown.
-  const targets = snapshots.filter(item => !bridges.includes(item));
-  const order = [...new Set([...roots.filter(pid => byPid.has(pid)), ...targets.map(item => item.pid)])];
-  const plan = order.map(pid => {
+  const order = [...new Set([...roots.filter(pid => byPid.has(pid)), ...snapshots.map(item => item.pid)])];
+  return order.map(pid => {
     const { token: _token, ...identity } = byPid.get(pid);
-    return identity;
+    return { ...identity, inheritedOwnership: inheritedOwnership.has(pid) };
   });
-  // Bridges establish ancestry only. They are never authorized signal targets.
-  Object.defineProperty(plan, 'bridges', { value: bridges.map(item => ({ ...item })) });
-  return plan;
 }
 
 /** Recheck the full process generation immediately before each signal. */
 export function executeGoldenStop(plan, readSnapshot, signal) {
-  // Validate the structural chain before stopping its supervisor changes parentage.
-  for (const bridge of plan.bridges ?? []) {
-    const actual = readSnapshot(bridge.pid);
-    need(actual, 'Shell bridge disappeared before stop');
-    for (const key of ['pid', 'parent', 'cwd', 'commandHash', 'startedAt', 'executable', 'runtime', 'token']) {
-      need(actual[key] === bridge[key], 'Shell bridge identity changed before stop');
-    }
-  }
   for (const expected of plan) {
     const actual = readSnapshot(expected.pid);
     if (!actual) continue;
@@ -85,6 +114,14 @@ export function executeGoldenStop(plan, readSnapshot, signal) {
     need(actual.ownershipVerified === true, 'Process ownership changed before stop');
     signal(expected.pid, 'SIGKILL');
   }
+}
+
+export function verifyGoldenStopOwnership(current, expected, token) {
+  if (!current || !expected) return false;
+  if (expected.inheritedOwnership) {
+    return current.executable === 'sh' && current.runtime === undefined && current.token === undefined;
+  }
+  return current.runtime === expected.runtime && current.token === token;
 }
 
 export function stableGoldenLaunch(current, previous, { runtime, token, cwd, executable }) {
@@ -97,7 +134,7 @@ export async function registerGoldenLaunch(name, repo, cli, pid, key) {
   const cwd = key === 'frontend-launch' ? 'web-admin' : 'platform';
   const executable = key === 'frontend-launch' ? 'node' : 'java';
   const report = JSON.parse(run(cli, ['runtime', 'show', name, '--json']));
-  need(report.runtime === name && report.sources?.find(item => item.key === 'auraboot')?.expected.root === realpathSync(repo),
+  need(report.runtime === name && report.sources?.find(item => ['auraboot', 'core'].includes(item.key))?.expected.root === realpathSync(repo),
     'Launch source owner mismatch');
   const token = readFileSync(join(report.stateDir, 'runtimes', name, 'processes', 'ownership.token'), 'utf8').trim();
   let current, previous, ready = false;
@@ -121,7 +158,7 @@ export const registerGoldenSupervisor = (name, repo, cli, pid) => registerGolden
 export function stopGoldenProcesses(name, repo, cli) {
   repo = realpathSync(repo);
   const report = JSON.parse(run(cli, ['runtime', 'show', name, '--json']));
-  need(report.runtime === name && report.sources?.find(item => item.key === 'auraboot')?.expected.root === repo,
+  need(report.runtime === name && report.sources?.find(item => ['auraboot', 'core'].includes(item.key))?.expected.root === repo,
     'Registered source root mismatch');
   const token = readFileSync(join(report.stateDir, 'runtimes', name, 'processes', 'ownership.token'), 'utf8').trim();
   const sd = goldenStackState(report.stateDir, name);
@@ -167,7 +204,8 @@ export function stopGoldenProcesses(name, repo, cli) {
   const plan = planGoldenStop({ runtime: name, repo, token, roots, snapshots, listeners: listenerPids() });
   executeGoldenStop(plan, pid => {
     const current = snapshot(pid);
-    return current && { ...current, ownershipVerified: current.token === token };
+    const expected = plan.find(item => item.pid === pid);
+    return current && { ...current, ownershipVerified: verifyGoldenStopOwnership(current, expected, token) };
   }, (pid, signal) => {
     try { process.kill(pid, signal); } catch (error) { if (error.code !== 'ESRCH') throw new Error('Owned stop signal failed'); }
   });
@@ -183,5 +221,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     else if (action === 'register-backend') await registerGoldenLaunch(name, repo, cli, Number(pid), 'backend-launch');
     else if (action === 'stop') console.log(JSON.stringify({ runtime: name, stopped: stopGoldenProcesses(name, repo, cli), retained: ['allocation', 'database', 'evidence'] }));
     else throw new Error('Unknown owned process action');
-  } catch { console.error('Owned golden process operation refused; inspect runtime process identity'); process.exitCode = 1; }
+  } catch (error) {
+    const reason = error.goldenStopReason ??
+      (['ENOENT', 'EACCES', 'ESRCH', 'EPERM'].includes(error.code) ? error.code : 'UNCLASSIFIED_PROBE_FAILURE');
+    console.error(`Owned golden process operation refused; inspect runtime process identity; reason=${reason}`);
+    process.exitCode = 1;
+  }
 }

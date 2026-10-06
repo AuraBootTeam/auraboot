@@ -15,8 +15,9 @@
 #   bash quickstart.sh                 # creates the admin, imports the plugins (NOT optional)
 #   # open http://localhost:3000  (admin@auraboot.com / Test2026x)
 #
-# Usage (mainland China / Tencent TCR mirror) — same, but point REGISTRY at TCR:
-#   REGISTRY=ccr.ccs.tencentyun.com/auraboot-oss docker compose -f docker-compose.pull.yml up -d
+# Mainland China: Gitee/TCR mirrors are deferred; no verified mirror is offered.
+# Choose a verified published TAG and check all three images for your architecture.
+# This configuration does not establish publication of the current 1.0 candidate.
 #
 # Redis / MinIO / monitoring are advanced add-ons; use the source docker-compose.yml
 # profiles for those. Redis is not required for single-instance deployments.
@@ -81,6 +82,8 @@ services:
       NODE_ENV: production
       BFF_PORT: "3000"
       SPRING_BOOT_URL: http://backend:6443
+      # SSR must use the Compose service address, independent of the published host port.
+      BFF_INTERNAL_URL: http://backend:6443
       CORS_ALLOWED_ORIGINS: http://localhost:${AURABOOT_PORT:-3000}
       SESSION_SECRET: ${SESSION_SECRET:-docker-eval-session-secret-change-in-production-min-32-chars}
     depends_on:

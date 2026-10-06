@@ -7,9 +7,11 @@ import com.auraboot.framework.cloudconfig.entity.CloudConfig;
 import com.auraboot.framework.cloudconfig.mapper.CloudConfigMapper;
 import com.auraboot.framework.cloudconfig.service.CloudConfigService;
 import com.auraboot.framework.common.crypto.FieldEncryptionService;
+import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.util.UlidGenerator;
 import com.auraboot.framework.exception.BusinessException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
@@ -68,26 +70,34 @@ public class CloudConfigServiceImpl implements CloudConfigService {
     @Transactional
     public void saveConfig(CloudConfigSaveRequest request) {
         String configLevel = normalize(request.getConfigLevel());
+        validateConfigLevel(configLevel);
+        Long tenantId = MetaContext.getCurrentTenantId();
+        if ("tenant".equals(configLevel) && tenantId == null) {
+            throw new BusinessException("Tenant context is required for tenant cloud config");
+        }
         String serviceType = normalize(request.getServiceType());
-        String encryptedConfig = encryptConfigJson(request.getConfig());
 
         if (request.getPid() != null && !request.getPid().isBlank()) {
             // Update existing
-            CloudConfig existing = cloudConfigMapper.findByPid(request.getPid());
+            CloudConfig existing = cloudConfigMapper.findByPid(request.getPid(), tenantId);
             if (existing == null) {
                 throw new BusinessException("Cloud config not found: " + request.getPid());
             }
 
-            existing.setConfigLevel(configLevel);
+            if (!configLevel.equals(existing.getConfigLevel())) {
+                throw new BusinessException("Cloud config level cannot be changed");
+            }
             existing.setServiceType(serviceType);
             existing.setProviderCode(request.getProviderCode());
-            existing.setConfig(encryptedConfig);
+            existing.setConfig(encryptConfigJson(request.getConfig(), existing.getConfig()));
             existing.setEnabled(request.getEnabled());
             existing.setPriority(request.getPriority() != null ? request.getPriority() : 0);
             existing.setUpdatedAt(Instant.now());
             existing.setUpdatedBy(MetaContext.getCurrentUserPid());
 
-            cloudConfigMapper.updateById(existing);
+            if (cloudConfigMapper.updateScoped(existing, tenantId) != 1) {
+                throw new BusinessException("Cloud config update did not affect exactly one visible config");
+            }
             log.info("Updated cloud config: pid={}, serviceType={}, providerCode={}",
                     existing.getPid(), serviceType, request.getProviderCode());
         } else {
@@ -97,7 +107,7 @@ public class CloudConfigServiceImpl implements CloudConfigService {
             entity.setConfigLevel(configLevel);
             entity.setServiceType(serviceType);
             entity.setProviderCode(request.getProviderCode());
-            entity.setConfig(encryptedConfig);
+            entity.setConfig(encryptConfigJson(request.getConfig(), null));
             entity.setEnabled(request.getEnabled());
             entity.setPriority(request.getPriority() != null ? request.getPriority() : 0);
             entity.setCreatedAt(Instant.now());
@@ -109,10 +119,12 @@ public class CloudConfigServiceImpl implements CloudConfigService {
             if ("platform".equals(configLevel)) {
                 entity.setTenantId(null);
             } else {
-                entity.setTenantId(MetaContext.getCurrentTenantId());
+                entity.setTenantId(tenantId);
             }
 
-            cloudConfigMapper.insert(entity);
+            if (cloudConfigMapper.insert(entity) != 1) {
+                throw new BusinessException("Cloud config create did not affect exactly one config");
+            }
             log.info("Created cloud config: pid={}, level={}, serviceType={}, providerCode={}",
                     entity.getPid(), entity.getConfigLevel(), serviceType, request.getProviderCode());
         }
@@ -120,7 +132,7 @@ public class CloudConfigServiceImpl implements CloudConfigService {
 
     @Override
     public CloudConfigResponse getConfigMasked(String pid) {
-        CloudConfig config = cloudConfigMapper.findByPid(pid);
+        CloudConfig config = cloudConfigMapper.findByPid(pid, MetaContext.getCurrentTenantId());
         if (config == null) {
             return null;
         }
@@ -136,19 +148,23 @@ public class CloudConfigServiceImpl implements CloudConfigService {
         // branches. Passing the documented `PLATFORM` through raw therefore matched
         // nothing AND skipped scoping — an empty list that reads as "nothing is
         // configured", which is how duplicate provider rows get created.
-        List<CloudConfig> configs = cloudConfigMapper.listByLevel(normalize(configLevel), tenantId);
+        String normalizedLevel = normalize(configLevel);
+        validateConfigLevel(normalizedLevel);
+        List<CloudConfig> configs = cloudConfigMapper.listByLevel(normalizedLevel, tenantId);
         return configs.stream().map(this::toMaskedResponse).toList();
     }
 
     @Override
     @Transactional
     public void deleteConfig(String pid) {
-        CloudConfig config = cloudConfigMapper.findByPid(pid);
+        Long tenantId = MetaContext.getCurrentTenantId();
+        CloudConfig config = cloudConfigMapper.findByPid(pid, tenantId);
         if (config == null) {
             throw new BusinessException("Cloud config not found: " + pid);
         }
-        // Soft delete via MyBatis Plus @TableLogic
-        cloudConfigMapper.deleteById(config.getId());
+        if (cloudConfigMapper.softDeleteScoped(pid, tenantId, Instant.now(), MetaContext.getCurrentUserPid()) != 1) {
+            throw new BusinessException("Cloud config delete did not affect exactly one visible config");
+        }
         log.info("Soft-deleted cloud config: pid={}, serviceType={}, providerCode={}",
                 pid, config.getServiceType(), config.getProviderCode());
     }
@@ -162,7 +178,7 @@ public class CloudConfigServiceImpl implements CloudConfigService {
 
     @Override
     public CloudConfig getByPidDecrypted(String pid) {
-        CloudConfig config = cloudConfigMapper.findByPid(pid);
+        CloudConfig config = cloudConfigMapper.findByPid(pid, MetaContext.getCurrentTenantId());
         if (config != null) {
             config.setConfig(decryptConfigJson(config.getConfig()));
         }
@@ -171,12 +187,37 @@ public class CloudConfigServiceImpl implements CloudConfigService {
 
     // ==================== Private helpers ====================
 
+    /** Retain stored ciphertext when an editor sends back its unchanged masked value. */
+    private String preserveMaskedSecrets(String submitted, String encrypted, String stored) {
+        if (submitted == null || submitted.isBlank() || stored == null || stored.isBlank()) {
+            return encrypted;
+        }
+        try {
+            JsonNode input = objectMapper.readTree(submitted);
+            JsonNode previous = objectMapper.readTree(stored);
+            JsonNode result = objectMapper.readTree(encrypted);
+            if (!input.isObject() || !previous.isObject() || !result.isObject()) {
+                return encrypted;
+            }
+            ObjectNode updated = (ObjectNode) result;
+            for (String field : SENSITIVE_FIELDS) {
+                if (input.path(field).isTextual() && previous.path(field).isTextual()
+                        && input.path(field).asText().equals(fieldEncryptionService.mask(previous.path(field).asText()))) {
+                    updated.set(field, previous.get(field));
+                }
+            }
+            return objectMapper.writeValueAsString(updated);
+        } catch (JsonProcessingException exception) {
+            throw new BusinessException(ResponseCode.BadParam, "Cloud configuration must be valid JSON", exception);
+        }
+    }
+
     /**
      * Encrypt sensitive fields in the config JSON string.
      * Iterates all top-level fields; if the field name is in SENSITIVE_FIELDS,
      * encrypts the value using FieldEncryptionService.
      */
-    private String encryptConfigJson(String configJson) {
+    private String encryptConfigJson(String configJson, String existingConfigJson) {
         if (configJson == null || configJson.isBlank()) {
             return configJson;
         }
@@ -184,8 +225,9 @@ public class CloudConfigServiceImpl implements CloudConfigService {
         try {
             JsonNode root = objectMapper.readTree(configJson);
             if (!root.isObject()) {
-                return configJson;
+                throw new BusinessException("Cloud config JSON must be an object");
             }
+            JsonNode existing = existingConfigJson == null ? null : objectMapper.readTree(existingConfigJson);
 
             ObjectNode obj = (ObjectNode) root;
             Iterator<Map.Entry<String, JsonNode>> fields = obj.fields();
@@ -193,14 +235,20 @@ public class CloudConfigServiceImpl implements CloudConfigService {
                 Map.Entry<String, JsonNode> entry = fields.next();
                 if (SENSITIVE_FIELDS.contains(entry.getKey()) && entry.getValue().isTextual()) {
                     String plainValue = entry.getValue().asText();
-                    obj.put(entry.getKey(), fieldEncryptionService.encrypt(plainValue));
+                    JsonNode previous = existing == null ? null : existing.get(entry.getKey());
+                    if (previous != null && previous.isTextual()
+                            && plainValue.equals(fieldEncryptionService.mask(previous.asText()))) {
+                        // Masked admin responses round-trip without replacing the stored secret.
+                        obj.set(entry.getKey(), previous);
+                    } else {
+                        obj.put(entry.getKey(), fieldEncryptionService.encrypt(plainValue));
+                    }
                 }
             }
 
             return objectMapper.writeValueAsString(obj);
-        } catch (Exception e) {
-            log.warn("Failed to encrypt config JSON fields, storing as-is: {}", e.getMessage());
-            return configJson;
+        } catch (JsonProcessingException e) {
+            throw new BusinessException("Invalid cloud config JSON", e);
         }
     }
 
@@ -231,9 +279,8 @@ public class CloudConfigServiceImpl implements CloudConfigService {
             }
 
             return objectMapper.writeValueAsString(obj);
-        } catch (Exception e) {
-            log.warn("Failed to decrypt config JSON fields: {}", e.getMessage());
-            return configJson;
+        } catch (JsonProcessingException e) {
+            throw new BusinessException("Invalid stored cloud config JSON", e);
         }
     }
 
@@ -253,6 +300,12 @@ public class CloudConfigServiceImpl implements CloudConfigService {
         response.setCreatedAt(config.getCreatedAt());
         response.setUpdatedAt(config.getUpdatedAt());
         return response;
+    }
+
+    private void validateConfigLevel(String level) {
+        if (!"platform".equals(level) && !"tenant".equals(level)) {
+            throw new BusinessException("Cloud config level must be platform or tenant");
+        }
     }
 
     private String normalize(String value) {

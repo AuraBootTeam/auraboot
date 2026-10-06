@@ -25,6 +25,49 @@ function Harness() {
 }
 
 describe('DecisionTableEditor', () => {
+  it('keeps an opened picker and its search when persisted input identities replace template ids', () => {
+    const onChange = vi.fn();
+    const fields: import('../ConditionBuilder').FieldOption[] = [
+      { scope: 'record', path: 'data.wd_req_type', label: '请假类型', dataType: 'dict', options: ['annual', 'sick'] },
+    ];
+    const initial = base();
+    const { rerender } = render(<DecisionTableEditor value={initial} onChange={onChange} fieldOptions={fields} />);
+    fireEvent.click(screen.getByTestId('dt-input-field-picker-0'));
+    fireEvent.change(screen.getByLabelText('input-field-search-0'), { target: { value: '请假' } });
+    const restored: DecisionTable = {
+      ...initial,
+      inputs: [{ ...initial.inputs[0], id: 'persisted_amount' }, initial.inputs[1]],
+      rules: [{ ruleId: 'saved-rule', priority: 1,
+        when: { persisted_amount: { operator: 'EQ', value: 3 } }, then: { route: 'manager' } }],
+    };
+    rerender(<DecisionTableEditor value={restored} onChange={onChange} fieldOptions={fields} />);
+    expect(screen.getByTestId('dt-input-field-picker-panel-0')).toBeVisible();
+    expect(screen.getByLabelText('input-field-search-0')).toHaveValue('请假');
+    fireEvent.click(screen.getByTestId('dt-input-field-option-0-record-data_wd_req_type'));
+    const saved = onChange.mock.calls[0][0] as DecisionTable;
+    expect(saved.inputs[0]).toMatchObject({ id: 'record_data_wd_req_type', path: 'data.wd_req_type', label: '请假类型' });
+    expect(saved.rules[0].when).toEqual({ record_data_wd_req_type: { operator: 'EQ', value: 3 } });
+    expect(screen.queryByTestId('dt-input-field-picker-panel-0')).not.toBeInTheDocument();
+  });
+
+  it('closes a positional picker when columns move or are removed', () => {
+    function PickerHarness() {
+      const [value, onChange] = useState(base());
+      return <DecisionTableEditor value={value} onChange={onChange}
+        fieldOptions={[{ scope: 'record', path: 'data.amount', label: '金额', dataType: 'decimal' }]} />;
+    }
+    render(<PickerHarness />);
+    fireEvent.click(screen.getByTestId('dt-input-field-picker-0'));
+    expect(screen.getByTestId('dt-input-field-picker-panel-0')).toBeVisible();
+    fireEvent.click(screen.getByLabelText('move-input-down-0'));
+    expect(screen.queryByTestId('dt-input-field-picker-panel-0')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('dt-input-field-picker-1'));
+    expect(screen.getByTestId('dt-input-field-picker-panel-1')).toBeVisible();
+    fireEvent.click(screen.getByLabelText('delete-input-0'));
+    expect(screen.queryByTestId('dt-input-field-picker-panel-0')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('dt-input-field-picker-panel-1')).not.toBeInTheDocument();
+  });
+
   it('renders input/output headers and empty placeholder', () => {
     render(<Harness />);
     expect(screen.getByTestId('dt-in-amount')).toHaveTextContent('金额');

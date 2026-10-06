@@ -11,10 +11,19 @@ import { selectSavedViewByName, uniqueId } from '../helpers';
 import { navigateToOrderViaSidebar } from './helpers';
 
 import { acquireSavedViewLock, releaseSavedViewLock } from './_saved-view-lock';
+import { sweepStaleSavedViews } from './_saved-view-helpers';
 
 // Serialize e2et_order saved-view specs — they share the model's per-user view
 // state (active view / created views) under the shared admin storageState.
-test.beforeAll(async () => { await acquireSavedViewLock('saved-view-management'); });
+test.beforeAll(async ({ browser }) => {
+  await acquireSavedViewLock('saved-view-management');
+  // Sweep leftovers from earlier runs (explicit personal views count
+  // toward the backend's 10-view cap) while holding the file lock.
+  const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
+  const page = await ctx.newPage();
+  await sweepStaleSavedViews(page, MODEL_CODE, PAGE_KEY);
+  await ctx.close();
+});
 test.afterAll(() => { releaseSavedViewLock('saved-view-management'); });
 
 const MODEL_CODE = 'e2et_order';
@@ -238,10 +247,11 @@ test.describe.serial('SavedView Personal-only management', () => {
     const selector = page.getByRole('listbox', { name: /选择视图|Select View/ });
     await expect(selector).toContainText('个人视图');
     await expect(selector).toContainText(personalName);
-    await expect(selector).not.toContainText(globalName);
-    await expect(selector).not.toContainText(
-      /团队共享|全员视图|Team Views|Global Views|New View|Manage Views/,
-    );
+    // Feishu-style selector redesign: global (全员) views render in their own
+    // labelled group instead of being hidden; team views still never appear.
+    await expect(selector).toContainText('全员视图');
+    await expect(selector).toContainText(globalName);
+    await expect(selector).not.toContainText(/团队共享|Team Views|New View|Manage Views/);
     await page.getByTestId('view-selector-search').fill('选择器');
     await expect(page.getByTestId(`view-option-${personalPid}`)).toBeVisible();
     await page.screenshot({ path: `${SHOTS}/02-personal-selector.png`, fullPage: true });
@@ -252,6 +262,7 @@ test.describe.serial('SavedView Personal-only management', () => {
     await expect(panel).toContainText('管理视图');
     await expect(panel).toContainText('新建个人视图');
     await expect(panel).toContainText(personalName);
+    // The management panel remains personal-only: global views stay out.
     await expect(panel).not.toContainText(globalName);
     await expect(panel).not.toContainText(
       /View Management|New View|Configure|Skip|Done|Team Views|Global Views/,
@@ -355,7 +366,7 @@ test.describe.serial('SavedView Personal-only management', () => {
     expect(copied.viewConfig?.rowHeight).toBe('extra-tall');
   });
 
-  test('SV-PER-003b: discard restores the selected personal view state and clears transient sort URL', async ({
+  test('SV-PER-003b: explicit sort deep link overrides the view baseline and survives hydration', async ({
     page,
   }) => {
     const sourceName = `${RUN_PREFIX}-放弃排序`;
@@ -364,21 +375,22 @@ test.describe.serial('SavedView Personal-only management', () => {
       viewConfig: { rowHeight: 'medium', sorts: [] },
     });
 
-    // URL-specific regression: a shared link may carry both an explicit view and
-    // a transient sort. Discard must restore the saved view, not restage the URL sort.
+    // #1746 contract (docs/system-reference/web/list-url-savedview-state.md):
+    // a deep link carrying ?sort= silently OVERRIDES the SavedView baseline —
+    // it is not staged as a personal-view draft, and hydration must not
+    // rewrite the URL param or touch the saved viewConfig.
     await page.goto(`/p/e2et_order?view=${sourcePid}&sort=e2et_order_amount%3Adesc`);
     await expect(page.getByTestId('dynamic-list')).toBeVisible();
     await expect(page.getByTestId('view-selector-trigger')).toHaveAttribute(
       'data-current-view-name',
       sourceName,
     );
-    await expect(page.getByTestId('personal-view-draft-banner')).toBeVisible();
-    await expect(page.getByTestId('personal-view-draft-banner')).toContainText('排序 1 项');
-
-    await page.getByTestId('personal-view-discard-draft').click();
-
-    await expect(page).not.toHaveURL(/sort=/);
+    // Applied as the active sort, not staged as a pending draft.
+    await expect(page.getByRole('button', { name: /排序 1|Sort 1/ })).toBeVisible();
     await expect(page.getByTestId('personal-view-draft-banner')).toHaveCount(0);
+    await expect(page).toHaveURL(/sort=e2et_order_amount/i);
+
+    // The saved view itself stays untouched by the deep link.
     expect((await getView(page, sourcePid)).viewConfig?.sorts ?? []).toEqual([]);
 
     await page.reload();
@@ -386,8 +398,8 @@ test.describe.serial('SavedView Personal-only management', () => {
       'data-current-view-name',
       sourceName,
     );
-    await expect(page.getByTestId('personal-view-draft-banner')).toHaveCount(0);
-    await expect(page).not.toHaveURL(/sort=/);
+    await expect(page).toHaveURL(/sort=e2et_order_amount/i);
+    await expect(page.getByRole('button', { name: /排序 1|Sort 1/ })).toBeVisible();
   });
 
   test('SV-PER-003c: default view column context hide updates immediately and persists', async ({

@@ -1,8 +1,8 @@
 /**
- * i18n工具 - 重新导出统一实现
+ * i18n utilities: re-export the canonical implementation
  *
- * 此文件已重构为统一实现的导出层，不再包含任何i18n逻辑。
- * 所有i18n功能位于: app/meta/runtime/expression/i18n-renderer.ts
+ * This module re-exports the canonical implementation without duplicating i18n logic.
+ * The implementation lives in framework/meta/runtime/expression/i18n-renderer.ts.
  */
 
 import { useI18n } from '~/contexts/I18nContext';
@@ -12,7 +12,7 @@ import {
   type LocalizedText,
 } from '~/framework/meta/runtime/expression/i18n-renderer';
 
-// 重新导出统一实现的类型和函数
+// Re-export the canonical types and functions.
 export {
   getLocalizedText,
   translateArray,
@@ -22,9 +22,9 @@ export {
 } from '~/framework/meta/runtime/expression/i18n-renderer';
 
 /**
- * React Hook：自动获取 t 函数并提供翻译权限
+ * React hook that binds translation and locale from the current i18n context.
  *
- * @returns 本地化文本处理函数
+ * @returns A locale-aware text resolver.
  *
  * @example
  * function MyComponent({ title }) {
@@ -36,7 +36,7 @@ export function useLocalizedText() {
   const { t, locale } = useI18n();
 
   return useCallback(
-    (text: string | null | undefined) => {
+    (text: Parameters<typeof getLocalizedTextImpl>[0]) => {
       return getLocalizedTextImpl(text, locale, t);
     },
     [t, locale],

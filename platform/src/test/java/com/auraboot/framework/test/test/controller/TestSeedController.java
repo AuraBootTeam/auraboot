@@ -323,6 +323,16 @@ public class TestSeedController {
                         "../../auraboot/plugins/test-fixtures",
                         "../plugins/test-fixtures"
                 );
+                // The iOS golden C12 scene asserts the REAL CRM vertical's lead-pool
+                // menu and dynamic list inside Browse All. Import the CRM plugin when
+                // its checkout is reachable; standalone hosts without it keep the
+                // same tolerant skip contract as the showcase/org plugins above.
+                importFirstAvailableTestPlugin(
+                        tenant.getId(),
+                        "crm",
+                        "../aura-crm/plugin-aura/crm",
+                        "../../aura-crm/plugin-aura/crm"
+                );
             } catch (Exception e) {
                 log.warn("test-fixtures plugin install threw exception for tenant {}: {}",
                         tenant.getId(), e.getMessage());

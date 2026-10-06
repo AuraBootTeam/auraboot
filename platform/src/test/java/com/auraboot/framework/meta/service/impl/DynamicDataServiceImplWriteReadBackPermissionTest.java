@@ -2,6 +2,8 @@ package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.file.service.FileService;
+import com.auraboot.framework.meta.exception.MetaServiceException;
+import org.springframework.security.access.AccessDeniedException;
 import com.auraboot.framework.meta.ddl.TableMetadataService;
 import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.dto.ModelDefinition;
@@ -263,5 +265,49 @@ class DynamicDataServiceImplWriteReadBackPermissionTest {
 
         verify(dynamicDataMapper, never()).deleteByQuery(anyString(), anyMap());
         verify(dynamicDataMapper, never()).selectByQuery(anyString(), anyMap());
+    }
+
+    @Test
+    void update_preservesPermissionDenialAndDoesNotWrite() {
+        stubReadVerdict(false);
+        assertThatThrownBy(() -> service.update(MODEL_CODE, RECORD_ID, Map.of("name", "denied")))
+                .isInstanceOf(AccessDeniedException.class);
+        verify(dynamicDataMapper, never()).updateByQuery(anyString(), anyMap());
+    }
+
+    @Test
+    void update_wrapsOrdinaryReadFailureAndDoesNotWrite() {
+        IllegalStateException failure = new IllegalStateException("database unavailable");
+        when(dynamicDataMapper.selectByQuery(anyString(), anyMap())).thenThrow(failure);
+        assertThatThrownBy(() -> service.update(MODEL_CODE, RECORD_ID, Map.of("name", "denied")))
+                .isInstanceOf(MetaServiceException.class).hasCause(failure);
+        verify(dynamicDataMapper, never()).updateByQuery(anyString(), anyMap());
+    }
+
+    @Test
+    void update_writeSqlUsesUpdateScopeIndependentlyOfRead() {
+        stubReadVerdict(true);
+        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, "update", USER_ID))
+                .thenReturn("AND created_by = 42");
+        when(dynamicDataMapper.updateByQuery(anyString(), anyMap())).thenReturn(1);
+        service.update(MODEL_CODE, RECORD_ID, Map.of("name", "changed"));
+        verify(dynamicDataMapper).updateByQuery(argThat(sql -> sql.contains("AND created_by = 42")), anyMap());
+    }
+
+    @Test
+    void delete_softAndHardUseDeleteScope() {
+        stubReadVerdict(true);
+        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, "delete", USER_ID))
+                .thenReturn("AND created_by = 42");
+        when(dynamicDataMapper.deleteByQuery(anyString(), anyMap())).thenReturn(1);
+        when(dynamicDataMapper.updateByQuery(anyString(), anyMap())).thenReturn(1);
+        model.setSoftDelete(false);
+        service.delete(MODEL_CODE, RECORD_ID);
+        model.setSoftDelete(true);
+        service.delete(MODEL_CODE, RECORD_ID);
+        verify(dynamicDataMapper).deleteByQuery(argThat(sql -> sql.contains("AND created_by = 42")), anyMap());
+        verify(dynamicDataMapper).updateByQuery(argThat(sql -> sql.contains("AND created_by = 42")), anyMap());
+        verify(dataPermissionEngine, times(2)).buildRowFilter(TENANT_ID, MODEL_CODE, "delete", USER_ID);
+        verify(dataPermissionEngine, never()).buildRowFilter(TENANT_ID, MODEL_CODE, "update", USER_ID);
     }
 }

@@ -30,13 +30,14 @@
 #                   startup, recording path + SHA-256 in the runtime state directory.
 #       --extra-plugin-root: repeatable explicit fallback after this checkout's OSS plugins;
 #                            sibling plugin repositories are never guessed implicitly.
+#       --source key=path: explicit owner for each external plugin root; Core binds itself.
 #       --workspace-source-root: bind the immutable `workspace` source identity from this
-#                   clean frozen checkout instead of the moving control root. The
-#                   management entry (canonical aura CLI) is unaffected; only the frozen
-#                   source-set is pinned, so shared-main advances no longer invalidate the
-#                   runtime. Required for re-uping a runtime whose source-set was bound
-#                   this way; rejected checkouts (missing, non-git, dirty, or the control
-#                   root itself) fail closed before any registration changes.
+#                   clean frozen checkout instead of leaving the shared control root
+#                   unbound. The management entry (canonical aura CLI) is unaffected; the
+#                   frozen source-set is pinned, so shared-main advances no longer
+#                   invalidate the runtime. Re-uping a runtime whose source-set was bound
+#                   this way requires the flag again; rejected checkouts (missing,
+#                   non-git, dirty, or the control root itself) fail closed.
 #       --report-renderer: wire the WYSIWYG PDF report renderer (DDR-2026-06-21) into the
 #                   backend via a registered receipt (report-renderer.env in the runtime
 #                   state dir; suspend/resume replays it). Fails closed when tsx, cli.ts
@@ -104,6 +105,7 @@ die() { printf '\033[31m[golden-stack] FATAL:\033[0m %s\n' "$*" >&2; exit 1; }
 # lock across build → backend health so golden-stack runs serialize per checkout. CI
 # suites that don't take the lock are covered separately by spawning from a copied jar.
 GOLDEN_STACK_LOCK_DIR=""
+STACK_OPERATION_COMPLETE=0
 
 golden_stack_lock_dir() {
   local key; key="$(printf '%s' "$REPO_ROOT" | cksum | cut -d' ' -f1)"
@@ -130,7 +132,7 @@ acquire_stack_lock() {
   fi
   printf '%s\n' "$$" >"$lock_dir/pid"
   GOLDEN_STACK_LOCK_DIR="$lock_dir"
-  trap release_stack_lock EXIT
+  trap 'status=$?; release_stack_lock; if [ "$status" -eq 0 ] && [ "$STACK_OPERATION_COMPLETE" != 1 ]; then status=1; fi; exit "$status"' EXIT
 }
 
 state_dir() {
@@ -182,12 +184,12 @@ runtime_env() {
 web_admin_node_modules_seed() {
   local candidate
   for candidate in "$CANONICAL/web-admin/node_modules" "$REPO_ROOT/web-admin/node_modules"; do
-    web_admin_node_modules_usable "$candidate" && { echo "$candidate"; return 0; }
+    web_admin_node_modules_matches_checkout "$candidate" "$REPO_ROOT" && { echo "$candidate"; return 0; }
   done
 
   while IFS= read -r candidate; do
     candidate="$candidate/web-admin/node_modules"
-    web_admin_node_modules_usable "$candidate" && { echo "$candidate"; return 0; }
+    web_admin_node_modules_matches_checkout "$candidate" "$REPO_ROOT" && { echo "$candidate"; return 0; }
   done < <(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree /{print substr($0,10)}')
 
   return 1
@@ -358,17 +360,32 @@ PY
 # ---- up ------------------------------------------------------------------------------
 cmd_up() {
   local name="$1"; shift
+  local requested_args=("$@") source_specs=("core=$REPO_ROOT")
+  local workspace_source_root="" report_renderer=0 renderer_env_args=()
   local slot="" ttl="6h" runtime_mode="development" system_mode="single" frontend=1 warm=1 fresh_db=0 require_new_db=0
   local plugin_profile="" import_plugins=() extra_plugin_roots=() product_migration_roots=()
   local parallel_reason=""
-  local workspace_source_root=""
-  local report_renderer=0 renderer_env_args=()
   local extra_root migration_root plugin_item
   while [ $# -gt 0 ]; do case "$1" in
     --slot) slot="$2"; shift 2;;
     --ttl) ttl="$2"; shift 2;;
     --runtime-mode) runtime_mode="$2"; shift 2;;
     --parallel-reason) parallel_reason="$2"; shift 2;;
+    --source) source_specs+=("${2:?--source requires key=path}"); shift 2;;
+    --workspace-source-root)
+      [ $# -ge 2 ] || die "--workspace-source-root requires a path"
+      workspace_source_root="$2"
+      shift 2
+      ;;
+    --workspace-source-root=*)
+      workspace_source_root="${1#--workspace-source-root=}"
+      [ -n "$workspace_source_root" ] || die "--workspace-source-root requires a path"
+      shift
+      ;;
+    --report-renderer)
+      report_renderer=1
+      shift
+      ;;
     --system-mode) system_mode="${2:-}"; [ $# -ge 2 ] || die "--system-mode requires a value"; shift 2;;
     --no-frontend) frontend=0; shift;;
     --no-warm) warm=0; shift;;
@@ -394,20 +411,6 @@ cmd_up() {
       extra_root="${1#--extra-plugin-root=}"
       [ -d "$extra_root" ] || die "extra plugin root does not exist: $extra_root"
       extra_plugin_roots+=("$(cd "$extra_root" && pwd)")
-      shift
-      ;;
-    --workspace-source-root)
-      [ $# -ge 2 ] || die "--workspace-source-root requires a path"
-      workspace_source_root="$2"
-      shift 2
-      ;;
-    --workspace-source-root=*)
-      workspace_source_root="${1#--workspace-source-root=}"
-      [ -n "$workspace_source_root" ] || die "--workspace-source-root requires a path"
-      shift
-      ;;
-    --report-renderer)
-      report_renderer=1
       shift
       ;;
     --plugin-profile) plugin_profile="$2"; shift 2;;
@@ -436,6 +439,7 @@ cmd_up() {
   if [ -n "$workspace_source_root" ]; then
     workspace_source_root="$(golden_workspace_dependency_root "$workspace_source_root" "$WORKSPACE")" \
       || die "frozen workspace dependency checkout rejected (see diagnostic above)"
+    source_specs+=("workspace=$workspace_source_root")
   fi
   # Toolchain preflight: the backend is launched with bare `java` from this PATH. A broken
   # shim (e.g. a removed version manager) otherwise kills the JVM instantly and surfaces as
@@ -447,6 +451,8 @@ Repair the shell environment (e.g. export PATH=\"\$JAVA_HOME/bin:\$PATH\") and r
   fi
 
   local sd; sd="$(state_dir "$name")" || return 1
+  node "$SCRIPT_DIR/lib/oss-stack-lifecycle.mjs" validate "$name" "$REPO_ROOT" "$sd" "${requested_args[@]}" \
+    || die "explicit plugin source ownership validation failed"
   # Refuse to overwrite a running jar or reset a database served by a live stack.
   assert_stack_stopped "$name"
 
@@ -489,18 +495,10 @@ PYLOG
     log "    WYSIWYG report renderer wired (${#renderer_env_args[@]} env keys; receipt $sd/report-renderer.env)"
   fi
 
-  local runtime_source_args=("$name" "$REPO_ROOT" "${workspace_source_root:-$WORKSPACE}")
-  if [ -n "$workspace_source_root" ]; then
-    log "    frozen workspace dependency: $workspace_source_root @$(git -C "$workspace_source_root" rev-parse HEAD)"
-  fi
-  if [ "${#extra_plugin_roots[@]}" -gt 0 ]; then
-    runtime_source_args+=("${extra_plugin_roots[@]}")
-  fi
-  if [ "${#product_migration_roots[@]}" -gt 0 ]; then
-    runtime_source_args+=("${product_migration_roots[@]}")
-  fi
-  golden_runtime_bind_sources "${runtime_source_args[@]}" \
-    || die "immutable runtime sources could not be bound"
+  local binding_args=(runtime lifecycle bind "$name" --handler "$SCRIPT_DIR/oss-golden-lifecycle.sh")
+  local source_spec
+  for source_spec in "${source_specs[@]}"; do binding_args+=(--source "$source_spec"); done
+  "$DEV" "${binding_args[@]}" >/dev/null || die "immutable runtime sources could not be bound"
 
   local server_port vite_port bff_port pg_db redis_db pg_host pg_port pg_user pg_pass
   server_port="$(runtime_env "$name" SERVER_PORT)"
@@ -608,7 +606,7 @@ PYLOG
   local jar; jar="$(ls "$REPO_ROOT"/platform/build/libs/*-boot.jar 2>/dev/null | head -1)"
   [ -n "$jar" ] || die "boot jar not found after build"
   local run_jar runtime_token
-  run_jar="$(golden_runtime_stage_backend "$name" "$jar")" \
+  run_jar="$(golden_runtime_stage_backend "$name" "$jar" core)" \
     || die "backend artifact registration failed"
   runtime_token="$("$DEV" runtime process token "$name")" \
     || die "runtime ownership token could not be obtained"
@@ -645,7 +643,7 @@ XML
   log "5/9 start backend (java -jar) on $server_port"
   mkdir -p "$sd/pf4j-plugins"
   spawn_detached "$sd/backend.pid" "$REPO_ROOT/platform" "$sd/logs/backend-console.log" \
-    env AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" LOGGING_CONFIG="file:$sd/backend-logback.xml" LOGGING_FILE_NAME="$sd/logs/backend.log" SERVER_PORT="$server_port" SERVER_ADDRESS=127.0.0.1 \
+    env MANAGEMENT_HEALTH_DB_ENABLED=false AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" LOGGING_CONFIG="file:$sd/backend-logback.xml" LOGGING_FILE_NAME="$sd/logs/backend.log" SERVER_PORT="$server_port" SERVER_ADDRESS=127.0.0.1 \
       SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:5432/${pg_db}?charSet=UTF8" \
       SPRING_DATASOURCE_USERNAME=auraboot SPRING_DATASOURCE_PASSWORD=auraboot \
       SPRING_DATA_REDIS_HOST=127.0.0.1 SPRING_DATA_REDIS_PORT=6379 SPRING_DATA_REDIS_DATABASE="$redis_db" \
@@ -716,14 +714,7 @@ XML
 
   if [ "$frontend" -eq 1 ]; then
     log "7/9 frontend: reuse or provision node_modules + start Vite+BFF"
-    # Readability alone is not executability: .bin shims use $0-relative paths, so a
-    # symlinked view from a checkout with a different workspace-store layout fails at
-    # supervisor startup. Probe the supervisor bins before trusting any view.
-    web_admin_view_executable() {
-      web_admin_node_modules_usable "$REPO_ROOT/web-admin/node_modules" \
-        && web_admin_supervisor_bins_executable "$REPO_ROOT/web-admin/node_modules"
-    }
-    if ! web_admin_view_executable; then
+    if ! web_admin_node_modules_matches_checkout "$REPO_ROOT/web-admin/node_modules" "$REPO_ROOT"; then
       if [ -L "$REPO_ROOT/web-admin/node_modules" ]; then
         rm -f "$REPO_ROOT/web-admin/node_modules"
       elif [ -e "$REPO_ROOT/web-admin/node_modules" ]; then
@@ -733,13 +724,7 @@ XML
       node_modules_seed="$(web_admin_node_modules_seed || true)"
       if [ -n "$node_modules_seed" ]; then
         ln -sfn "$node_modules_seed" "$REPO_ROOT/web-admin/node_modules"
-        if ! web_admin_view_executable; then
-          rm -f "$REPO_ROOT/web-admin/node_modules"
-          log "    seeded view cannot execute supervisor bins; installing from lockfile"
-          node_modules_seed=""
-        fi
-      fi
-      if [ -z "$node_modules_seed" ]; then
+      else
         log "    no reusable node_modules found; installing from lockfile with the runtime pnpm store"
         local npm_registry="${NPM_CONFIG_REGISTRY:-https://registry.npmmirror.com}"
         local pnpm_version="${AURA_PNPM_VERSION:-9.15.9}"
@@ -755,7 +740,7 @@ XML
             pnpm --filter auraboot-app install --frozen-lockfile --reporter=append-only \
             >"$sd/logs/frontend-dependencies.log" 2>&1 \
           || die "web-admin dependency install failed — see $sd/logs/frontend-dependencies.log"
-        web_admin_node_modules_usable "$REPO_ROOT/web-admin/node_modules" \
+        web_admin_node_modules_matches_checkout "$REPO_ROOT/web-admin/node_modules" "$REPO_ROOT" \
           || die "web-admin dependency install completed without usable runtime packages"
       fi
     fi
@@ -902,77 +887,56 @@ cmd_import() {
 }
 
 # ---- warm (setup → auth storageState → pre-warm heavy routes) ------------------------
-# Makes the FIRST golden run after 'up' reliable:
-#   1. Run the Playwright `setup` project (00-bootstrap + 01-multi-role-users) so the
-#      isolated stack has a selectable business space + admin membership. The script's
-#      inline minimal bootstrap (companyName "AuraBoot Dev") already creates a business
-#      tenant, but running the canonical setup specs is the contract auth.setup expects
-#      and is idempotent. Loop up to 5× to absorb cold-start hiccups.
-#   2. Run `auth --no-deps` until tests/storage/admin.json exists (storageState the
-#      chromium golden project depends on). Loop up to 5×.
-#   3. Pre-warm /report-designer + /dashboard with a real authenticated headless nav so
-#      the client lazy chunk + Vite client deps are hot before any golden run.
+# Execute canonical setup, authentication and route readiness exactly once.
+# A successful exit must include nonempty execution evidence with no skips/retries.
 cmd_warm() {
   local name="$1" sd; sd="$(state_dir "$name")" || return 1
   [ -f "$sd/ports" ] || die "no running stack for '$name' (run 'up' first)"
   local fe="$REPO_ROOT/web-admin"
   local admin_json="$fe/tests/storage/admin.json"
   local env_exports; env_exports="$(cmd_env "$name")"
+  eval "$env_exports"
+  local evidence_root="$AURA_EVIDENCE_ROOT"
+  mkdir -p "$evidence_root/playwright" "$sd/logs"
 
-  # 1) setup project — creates business space + multi-role users (idempotent).
-  local i=0 setup_ok=0
-  while [ "$i" -lt 5 ]; do
-    i=$((i+1))
-    log "    warm[setup] attempt $i/5"
-    if ( cd "$fe" && eval "$env_exports" \
-         && npx playwright test --project=setup --no-deps \
-              tests/api/setup/00-bootstrap.spec.ts \
-              tests/api/setup/01-multi-role-users.spec.ts \
-              --reporter=line ) >>"$sd/logs/warm.log" 2>&1; then
-      setup_ok=1; break
-    fi
-    sleep 3
-  done
-  [ "$setup_ok" -eq 1 ] || die "warm: setup project failed after 5 attempts — see $sd/logs/warm.log"
+  log "    warm[setup] complete canonical OSS project, once without retries"
+  ( cd "$fe" && eval "$env_exports" \
+    && PW_PROFILE=oss PW_RESULTS_JSON="$evidence_root/playwright/setup-results.json" \
+       PLAYWRIGHT_JSON_OUTPUT_FILE="$evidence_root/playwright/setup-results.json" \
+       pnpm exec playwright test --project=setup --no-deps --workers=1 --retries=0 --reporter=line,json \
+  ) >>"$sd/logs/warm.log" 2>&1 || die "warm: setup failed; see $sd/logs/warm.log"
+  node "$SCRIPT_DIR/dev/oss-gate-results.mjs" "$evidence_root/playwright/setup-results.json" \
+    >>"$sd/logs/warm.log" 2>&1 || die "warm: setup execution evidence incomplete"
 
-  # 2) auth project — produces tests/storage/admin.json (storageState).
-  i=0
-  rm -f "$admin_json" 2>/dev/null || true
-  while [ "$i" -lt 5 ]; do
-    i=$((i+1))
-    log "    warm[auth] attempt $i/5"
-    ( cd "$fe" && eval "$env_exports" \
-        && npx playwright test --project=auth --no-deps \
-             --reporter=line ) >>"$sd/logs/warm.log" 2>&1 || true
-    # Require a NON-EMPTY admin.json with a __session cookie (empty {cookies:[]}
-    # means login failed — never accept that as ready).
-    if [ -s "$admin_json" ] && grep -q '__session' "$admin_json" 2>/dev/null; then
-      log "    warm[auth] admin.json ready (has __session)"
-      break
-    fi
-    sleep 3
-  done
-  if ! { [ -s "$admin_json" ] && grep -q '__session' "$admin_json" 2>/dev/null; }; then
-    die "warm: admin.json never got a working session after 5 attempts — see $sd/logs/warm.log"
-  fi
+  rm -f "$admin_json"
+  ( cd "$fe" && eval "$env_exports" \
+    && PW_PROFILE=oss PW_RESULTS_JSON="$evidence_root/playwright/auth-results.json" \
+       PLAYWRIGHT_JSON_OUTPUT_FILE="$evidence_root/playwright/auth-results.json" \
+       pnpm exec playwright test --project=auth --no-deps --workers=1 --retries=0 --reporter=line,json \
+  ) >>"$sd/logs/warm.log" 2>&1 || die "warm: auth failed; see $sd/logs/warm.log"
+  node "$SCRIPT_DIR/dev/oss-gate-results.mjs" "$evidence_root/playwright/auth-results.json" \
+    >>"$sd/logs/warm.log" 2>&1 || die "warm: auth execution evidence incomplete"
+  node -e 'const s=JSON.parse(require("fs").readFileSync(process.argv[1])); if(!s.cookies?.some(c=>c.name==="__session" && c.value)) process.exit(1)' "$admin_json" \
+    || die "warm: auth produced no session cookie; see $sd/logs/warm.log"
 
-  # 3) pre-warm the heavy lazy routes with a real authenticated headless nav.
-  log "    warm[routes] navigating /report-designer + /dashboard + custom form (real auth)"
-  if ( cd "$fe" && eval "$env_exports" \
-       && npx playwright test --project=chromium --no-deps \
-            tests/e2e/_golden-stack-warm.spec.ts \
-            --reporter=line ) >>"$sd/logs/warm.log" 2>&1; then
-    log "    warm[routes] heavy routes hot ✓"
-  else
-    die "warm: declared route readiness failed — see $sd/logs/warm.log"
-  fi
-  log "    warm OK"
+  log "    warm[routes] authenticated report and dashboard smoke"
+  ( cd "$fe" && eval "$env_exports" \
+    && PW_PROFILE=full PW_RESULTS_JSON="$evidence_root/playwright/warm-route-results.json" \
+       PLAYWRIGHT_JSON_OUTPUT_FILE="$evidence_root/playwright/warm-route-results.json" \
+       pnpm exec playwright test --project=chromium --no-deps --workers=1 --retries=0 \
+         tests/e2e/_golden-stack-warm.spec.ts --reporter=line,json \
+  ) >>"$sd/logs/warm.log" 2>&1 || die "warm: route smoke failed; see $sd/logs/warm.log"
+  node "$SCRIPT_DIR/dev/oss-gate-results.mjs" "$evidence_root/playwright/warm-route-results.json" \
+    >>"$sd/logs/warm.log" 2>&1 || die "warm: route execution evidence incomplete"
+  log "    warm OK (setup, auth and route execution verified)"
 }
 
 # ---- env -----------------------------------------------------------------------------
 cmd_verify_artifacts() {
   node "$SCRIPT_DIR/lib/golden-product-identity.mjs" "$1" "$REPO_ROOT" "$DEV" \
     || die "product artifact verification failed"
+  node "$SCRIPT_DIR/lib/oss-stack-identity.mjs" "$WORKSPACE" "$REPO_ROOT" "$1" "$(state_dir "$1")" \
+    || die "PF4J/source artifact verification failed"
   node "$SCRIPT_DIR/lib/golden-resume-state.mjs" record "$1" "$REPO_ROOT" "$DEV" \
     || die "retained launch recipe registration failed"
 }
@@ -991,6 +955,7 @@ cmd_env() {
     evidence_root="$(runtime_env "$name" AURA_EVIDENCE_ROOT)"
   fi
   [ -n "$evidence_root" ] || die "runtime env lacks AURA_EVIDENCE_ROOT; deploy the workspace runtime lifecycle before running this gate"
+  mkdir -p "$evidence_root/playwright/evidence" "$evidence_root/logs/seed"
   cat <<EOF
 # Playwright env contract for golden specs against '$name' (run from web-admin/):
 export PLAYWRIGHT_BASE_URL=http://127.0.0.1:$vite_port
@@ -1000,6 +965,8 @@ export BFF_PORT=$bff_port
 export PW_SKIP_WEBSERVER=1
 export NO_PROXY=localhost,127.0.0.1
 export AURA_EVIDENCE_ROOT=$evidence_root
+export AURA_EVIDENCE_DIR=$evidence_root/playwright/evidence
+export SEED_LOG_DIR=$evidence_root/logs/seed
 export PW_ARTIFACT_DIR=$evidence_root/playwright/artifacts
 export PW_REPORT_DIR=$evidence_root/playwright/report
 export PW_RESULTS_JSON=$evidence_root/playwright/report/results.json
@@ -1074,18 +1041,18 @@ cmd_resume_retained() {
     while IFS= read -r line; do renderer_env_args+=("$line"); done <"$sd/report-renderer.env"
   fi
   spawn_detached "$sd/backend.pid" "$REPO_ROOT/platform" "$sd/backend.log" \
-    env "${logging_args[@]}" AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" SERVER_PORT="$server_port" SERVER_ADDRESS=127.0.0.1 \
+    env "${logging_args[@]}" MANAGEMENT_HEALTH_DB_ENABLED=false AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" SERVER_PORT="$server_port" SERVER_ADDRESS=127.0.0.1 \
       SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:5432/${pg_db}?charSet=UTF8" \
       SPRING_DATASOURCE_USERNAME=auraboot SPRING_DATASOURCE_PASSWORD=auraboot \
       SPRING_DATA_REDIS_HOST=127.0.0.1 SPRING_DATA_REDIS_PORT=6379 SPRING_DATA_REDIS_DATABASE="$redis_db" \
       SPRING_KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:9092 \
       AURA_PLUGINS_DIR="$sd/pf4j-plugins" \
-      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_META_MAPPER=DEBUG \
-      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_PERMISSION_MAPPER=DEBUG \
-      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_TENANT_MAPPER=DEBUG \
-      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_VIEW_MAPPER=DEBUG \
-      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_USER_MAPPER=DEBUG \
-      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_OBSERVABILITY_MAPPER=DEBUG \
+      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_META_MAPPER="${AURA_GOLDEN_MAPPER_LOG_LEVEL:-INFO}" \
+      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_PERMISSION_MAPPER="${AURA_GOLDEN_MAPPER_LOG_LEVEL:-INFO}" \
+      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_TENANT_MAPPER="${AURA_GOLDEN_MAPPER_LOG_LEVEL:-INFO}" \
+      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_VIEW_MAPPER="${AURA_GOLDEN_MAPPER_LOG_LEVEL:-INFO}" \
+      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_USER_MAPPER="${AURA_GOLDEN_MAPPER_LOG_LEVEL:-INFO}" \
+      LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_OBSERVABILITY_MAPPER="${AURA_GOLDEN_MAPPER_LOG_LEVEL:-INFO}" \
       AURA_BUILTIN_PLUGINS_DIR="$REPO_ROOT/plugins" \
       AGENT_LLM_STUB_MODE="$llm_stub_mode" \
       ${renderer_env_args[@]+"${renderer_env_args[@]}"} \
@@ -1181,3 +1148,5 @@ case "$sub" in
   destroy) cmd_destroy "$name";;
   *) die "unknown subcommand: $sub (up|import|warm|env|status|verify-artifacts|suspend|resume|down|destroy)";;
 esac
+
+STACK_OPERATION_COMPLETE=1

@@ -17,7 +17,7 @@
  * ```
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { FieldConfig, DataSourceConfig } from '~/framework/meta/schemas/types';
 import type { ExpressionContext } from '~/framework/meta/runtime/expression/context';
 import { evaluateCondition } from '~/framework/meta/runtime/expression/evaluator';
@@ -344,6 +344,20 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
   const allowCreate =
     Boolean(field.allowCreate) && fieldKind === 'reference' && !!refTargetModel && hasCreatePerm;
   const [createOpen, setCreateOpen] = useState(false);
+  const creationAuthorization = useRef({ allowed: allowCreate, generation: 0 });
+  if (creationAuthorization.current.allowed !== allowCreate) {
+    creationAuthorization.current = {
+      allowed: allowCreate,
+      generation: creationAuthorization.current.generation + 1,
+    };
+  }
+  const creationGeneration = creationAuthorization.current.generation;
+  const canApplyCreation = () =>
+    creationAuthorization.current.allowed &&
+    creationGeneration === creationAuthorization.current.generation;
+  useEffect(() => {
+    if (!allowCreate) setCreateOpen(false);
+  }, [allowCreate]);
   const dataSourceManager = useDataSourceManagerOptional();
   const { executeCommand } = useActionHandler({
     runtime: null,
@@ -356,6 +370,7 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
   });
 
   const handleCreated = (selected: { value: string; label: string }) => {
+    if (!canApplyCreation()) return;
     const nextValue = Array.isArray(value)
       ? value.some((item) => String(item) === String(selected.value))
         ? value
@@ -367,6 +382,7 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
         ? (dataSourceManager as any).getDataSourceIdsByModel(refTargetModel)
         : [];
     const pinCreatedOption = () => {
+      if (!canApplyCreation()) return;
       if (
         typeof (dataSourceManager as any)?.getState !== 'function' ||
         typeof (dataSourceManager as any)?.setData !== 'function'
@@ -416,15 +432,30 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
 
   if (!visible) return null;
 
+  // A $i18n placeholder key missing from the served dictionary must degrade to
+  // no placeholder — the component's own localized default then applies —
+  // instead of surfacing the raw key (P2 raw-key leak, team-members picker).
+  // The key may arrive on the metadata field or in the page DSL's field props;
+  // either way the raw string never reaches component props unguarded.
+  const { placeholder: dslPlaceholder, ...restDslProps } = (field.props || {}) as Record<string, any>;
+  const rawPlaceholder = dslPlaceholder !== undefined ? dslPlaceholder : field.placeholder;
+  let resolvedPlaceholder: string | undefined;
+  if (typeof rawPlaceholder === 'string' && rawPlaceholder.startsWith('$i18n:')) {
+    const placeholderKey = rawPlaceholder.slice(6);
+    const translated = t(placeholderKey);
+    resolvedPlaceholder = translated !== placeholderKey ? translated : undefined;
+  } else if (rawPlaceholder !== undefined) {
+    resolvedPlaceholder =
+      getLocalizedText(rawPlaceholder as any, context.locale || 'zh-CN', t) || undefined;
+  }
+
   const componentProps: Record<string, any> = {
     // Inferred presentation defaults may be overridden by an explicit DSL/component option.
     ...(componentLower === 'smartdatepicker' && fieldKind === 'datetime'
       ? { dateType: 'datetime-local' }
       : {}),
-    ...(field.placeholder !== undefined
-      ? { placeholder: getLocalizedText(field.placeholder, context.locale || 'zh-CN', t) }
-      : {}),
-    ...field.props,
+    ...restDslProps,
+    ...(resolvedPlaceholder ? { placeholder: resolvedPlaceholder } : {}),
     // Controlled identity, state, and governance resolved by this wrapper are authoritative and
     // must never be shadowed by metadata extension keys.
     name: field.field,
@@ -521,7 +552,9 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
 
   if (allowCreate) {
     componentProps.canCreateNew = true;
-    componentProps.onCreateNew = () => setCreateOpen(true);
+    componentProps.onCreateNew = () => {
+      if (canApplyCreation()) setCreateOpen(true);
+    };
   }
 
   // 处理布局
@@ -583,7 +616,9 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
           initialValues={resolveCreateInitialValues(field.createInitialValues, context)}
           executeCommand={executeCommand}
           onCreated={handleCreated}
-          onClose={() => setCreateOpen(false)}
+          onClose={() => {
+            if (canApplyCreation()) setCreateOpen(false);
+          }}
         />
       )}
     </>

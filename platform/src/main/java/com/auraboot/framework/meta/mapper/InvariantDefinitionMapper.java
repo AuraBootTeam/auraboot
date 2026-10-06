@@ -32,8 +32,8 @@ public interface InvariantDefinitionMapper extends BaseMapper<InvariantDefinitio
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insertIdempotent(InvariantDefinition definition);
 
-    @Select("SELECT * FROM ab_invariant_definition WHERE pid = #{pid} AND deleted_flag = false")
-    InvariantDefinition findByPid(@Param("pid") String pid);
+    @Select("SELECT * FROM ab_invariant_definition WHERE tenant_id = #{tenantId} AND pid = #{pid} AND deleted_flag = false")
+    InvariantDefinition findByPid(@Param("tenantId") Long tenantId, @Param("pid") String pid);
 
     @Select("""
         SELECT * FROM ab_invariant_definition
@@ -82,10 +82,10 @@ public interface InvariantDefinitionMapper extends BaseMapper<InvariantDefinitio
     @Update("""
         UPDATE ab_invariant_definition
         SET is_current = TRUE, status = #{status}, updated_at = NOW()
-        WHERE id = #{id}
+        WHERE tenant_id = #{tenantId} AND id = #{id}
         """)
-    int publishById(@Param("id") Long id, @Param("status") String status);
+    int publishById(@Param("tenantId") Long tenantId, @Param("id") Long id, @Param("status") String status);
 
-    @Update("UPDATE ab_invariant_definition SET deleted_flag = TRUE, updated_at = NOW() WHERE pid = #{pid}")
-    int softDelete(@Param("pid") String pid);
+    @Update("UPDATE ab_invariant_definition SET deleted_flag = TRUE, updated_at = NOW() WHERE tenant_id = #{tenantId} AND pid = #{pid}")
+    int softDelete(@Param("tenantId") Long tenantId, @Param("pid") String pid);
 }

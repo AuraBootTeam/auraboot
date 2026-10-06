@@ -63,7 +63,7 @@ public class OrgController {
      * Create a new department.
      */
     @PostMapping("/departments")
-    @RequirePermission("org.team.manage")
+    @RequirePermission("org.hr.manage")
     public ApiResponse<Map<String, Object>> createDepartment(@RequestBody @jakarta.validation.constraints.NotEmpty Map<String, Object> data) {
         Map<String, Object> created = dynamicDataService.create(MODEL_ORG_DEPARTMENT, data);
         return ApiResponse.success(created);
@@ -73,7 +73,7 @@ public class OrgController {
      * Update a department by PID.
      */
     @PutMapping("/departments/{pid}")
-    @RequirePermission("org.team.manage")
+    @RequirePermission("org.hr.manage")
     public ApiResponse<Void> updateDepartment(
             @PathVariable String pid,
             @RequestBody @jakarta.validation.constraints.NotEmpty Map<String, Object> data) {
@@ -86,7 +86,7 @@ public class OrgController {
      * Validates no child departments and no employees exist before deletion.
      */
     @DeleteMapping("/departments/{pid}")
-    @RequirePermission("org.team.manage")
+    @RequirePermission("org.hr.manage")
     public ApiResponse<Void> deleteDepartment(@PathVariable String pid) {
         requireDepartmentExists(pid);
 
@@ -139,7 +139,7 @@ public class OrgController {
      * Batch reorder departments. Each item is applied independently.
      */
     @PostMapping("/departments/sort")
-    @RequirePermission("org.team.manage")
+    @RequirePermission("org.hr.manage")
     public ApiResponse<Void> sortDepartments(
             @Valid @RequestBody DepartmentAdminRequests.SortRequest request) {
         for (DepartmentAdminRequests.SortItem item : request.items()) {
@@ -155,7 +155,7 @@ public class OrgController {
      * user by the approver resolver.
      */
     @PostMapping("/departments/{pid}/set-commander")
-    @RequirePermission("org.team.manage")
+    @RequirePermission("org.hr.manage")
     public ApiResponse<Void> setDepartmentCommander(
             @PathVariable String pid,
             @Valid @RequestBody DepartmentAdminRequests.SetCommanderRequest request) {
@@ -182,6 +182,7 @@ public class OrgController {
      * List employees in a department, optionally including sub-departments.
      */
     @GetMapping("/employees")
+    @RequirePermission("model.org_employee.read")
     public ApiResponse<PaginationResult<OrgEmployeeDTO>> getEmployeesByTenant(
             @RequestParam(defaultValue = "1") int pageNum,
             @RequestParam(defaultValue = "20") int pageSize,
@@ -195,6 +196,7 @@ public class OrgController {
      * List employees in a department, optionally including sub-departments.
      */
     @GetMapping("/departments/{pid}/employees")
+    @RequirePermission("model.org_employee.read")
     public ApiResponse<PaginationResult<OrgEmployeeDTO>> getEmployeesByDept(
             @PathVariable String pid,
             @RequestParam(defaultValue = "true") boolean recursive,
@@ -206,11 +208,35 @@ public class OrgController {
         return ApiResponse.success(result);
     }
 
+    /** Tenant-scoped identities for the explicitly authorized account-opening operation. */
+    @GetMapping("/employees/provision-options")
+    @RequirePermission("model.tenant_member.provision_member_from_employee")
+    public ApiResponse<PaginationResult<EmployeeProvisionOption>> getEmployeeProvisionOptions(
+            @RequestParam(defaultValue = "1") int pageNum,
+            @RequestParam(defaultValue = "20") int pageSize,
+            @RequestParam(required = false) String keyword) {
+        DynamicQueryRequest request = DynamicQueryRequest.builder()
+            .pageNum(pageNum)
+            .pageSize(pageSize)
+            .keyword(keyword)
+            .build();
+        PaginationResult<Map<String, Object>> result = dynamicDataService.list("org_employee", request);
+        List<EmployeeProvisionOption> options = result.getRecords().stream()
+            .map(record -> new EmployeeProvisionOption(
+                Objects.toString(record.get("pid"), null),
+                Objects.toString(record.get("org_emp_name"), null)))
+            .toList();
+        return ApiResponse.success(PaginationResult.of(
+            options, result.getTotal(), result.getPage(), result.getPageSize()));
+    }
+
+    public record EmployeeProvisionOption(String pid, String name) {}
+
     /**
      * One-stop employee creation: creates user + member + employee with bidirectional linking.
      */
     @PostMapping("/employees")
-    @RequirePermission("org.team.manage")
+    @RequirePermission("org.hr.manage")
     public ApiResponse<OrgEmployeeDTO> createEmployee(@Valid @RequestBody CreateEmployeeRequest request) {
         OrgEmployeeDTO employee = orgEmployeeService.createWithUser(request);
         return ApiResponse.success(employee);
@@ -220,7 +246,7 @@ public class OrgController {
      * Link an existing tenant member to a new employee record.
      */
     @PostMapping("/employees/link")
-    @RequirePermission("org.team.manage")
+    @RequirePermission("org.hr.manage")
     public ApiResponse<OrgEmployeeDTO> linkMember(@Valid @RequestBody LinkMemberRequest request) {
         OrgEmployeeDTO employee = orgEmployeeService.linkMember(request);
         return ApiResponse.success(employee);
@@ -230,7 +256,7 @@ public class OrgController {
      * Update an employee record via dynamic data service.
      */
     @PutMapping("/employees/{pid}")
-    @RequirePermission("org.team.manage")
+    @RequirePermission("org.hr.manage")
     public ApiResponse<Void> updateEmployee(
             @PathVariable String pid,
             @RequestBody @jakarta.validation.constraints.NotEmpty Map<String, Object> data) {
@@ -242,7 +268,7 @@ public class OrgController {
      * Transfer an employee to a new department and/or position.
      */
     @PutMapping("/employees/{pid}/transfer")
-    @RequirePermission("org.team.manage")
+    @RequirePermission("org.hr.manage")
     public ApiResponse<Void> transferEmployee(
             @PathVariable String pid,
             @Valid @RequestBody TransferRequest request) {
@@ -254,7 +280,7 @@ public class OrgController {
      * Batch transfer multiple employees to a new department and/or position.
      */
     @PutMapping("/employees/batch-transfer")
-    @RequirePermission("org.team.manage")
+    @RequirePermission("org.hr.manage")
     public ApiResponse<Void> batchTransferEmployees(@Valid @RequestBody BatchTransferRequest request) {
         TransferRequest transferRequest = new TransferRequest();
         transferRequest.setNewDeptPid(request.newDeptPid());
@@ -270,6 +296,7 @@ public class OrgController {
      * These members can be linked to org employees via the /employees/link endpoint.
      */
     @GetMapping("/members/unlinked")
+    @RequirePermission("org.hr.manage")
     public ApiResponse<List<Map<String, Object>>> getUnlinkedMembers(
             @RequestParam(required = false) String keyword) {
         return ApiResponse.success(orgEmployeeService.getUnlinkedMembers(keyword));

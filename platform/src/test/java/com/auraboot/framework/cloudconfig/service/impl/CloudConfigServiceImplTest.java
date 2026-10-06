@@ -48,6 +48,8 @@ class CloudConfigServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        MetaContext.setContext(100L, 200L, "user-pid", "tester");
+        lenient().when(cloudConfigMapper.insert(any(CloudConfig.class))).thenReturn(1);
         sampleConfig = new CloudConfig();
         sampleConfig.setId(1L);
         sampleConfig.setPid("test-pid-001");
@@ -131,7 +133,7 @@ class CloudConfigServiceImplTest {
 
     @Test
     void getConfigMasked_found_returnsMaskedResponse() {
-        when(cloudConfigMapper.findByPid("test-pid-001")).thenReturn(sampleConfig);
+        when(cloudConfigMapper.findByPid("test-pid-001", 100L)).thenReturn(sampleConfig);
         when(fieldEncryptionService.maskJsonFields(anyString(), any())).thenReturn("{\"appId\":\"12345\"}");
 
         CloudConfigResponse result = cloudConfigService.getConfigMasked("test-pid-001");
@@ -149,7 +151,7 @@ class CloudConfigServiceImplTest {
         sampleConfig.setServiceType("llm");
         sampleConfig.setProviderCode("anthropic");
         sampleConfig.setConfig("{\"apiKey\":\"sk-live-secret\",\"baseUrl\":\"https://api.anthropic.com\"}");
-        when(cloudConfigMapper.findByPid("test-pid-001")).thenReturn(sampleConfig);
+        when(cloudConfigMapper.findByPid("test-pid-001", 100L)).thenReturn(sampleConfig);
         when(fieldEncryptionService.maskJsonFields(anyString(), anySet()))
                 .thenReturn("{\"apiKey\":\"****cret\"}");
         @SuppressWarnings({"unchecked", "rawtypes"})
@@ -164,7 +166,7 @@ class CloudConfigServiceImplTest {
 
     @Test
     void getConfigMasked_notFound_returnsNull() {
-        when(cloudConfigMapper.findByPid("nonexistent")).thenReturn(null);
+        when(cloudConfigMapper.findByPid("nonexistent", 100L)).thenReturn(null);
 
         CloudConfigResponse result = cloudConfigService.getConfigMasked("nonexistent");
         assertThat(result).isNull();
@@ -190,7 +192,7 @@ class CloudConfigServiceImplTest {
     @Test
     void getByPidDecrypted_found_decryptsAndReturns() {
         sampleConfig.setConfig("{\"secretKey\":\"ENC:abc123\"}");
-        when(cloudConfigMapper.findByPid("test-pid-001")).thenReturn(sampleConfig);
+        when(cloudConfigMapper.findByPid("test-pid-001", 100L)).thenReturn(sampleConfig);
         when(fieldEncryptionService.isEncrypted("ENC:abc123")).thenReturn(true);
         when(fieldEncryptionService.decrypt("ENC:abc123")).thenReturn("plain-secret");
 
@@ -202,7 +204,7 @@ class CloudConfigServiceImplTest {
 
     @Test
     void getByPidDecrypted_notFound_returnsNull() {
-        when(cloudConfigMapper.findByPid("missing")).thenReturn(null);
+        when(cloudConfigMapper.findByPid("missing", 100L)).thenReturn(null);
 
         CloudConfig result = cloudConfigService.getByPidDecrypted("missing");
         assertThat(result).isNull();
@@ -222,7 +224,7 @@ class CloudConfigServiceImplTest {
         request.setConfig("{\"appId\":\"99\"}");
         request.setEnabled(true);
 
-        when(cloudConfigMapper.findByPid("nonexistent-pid")).thenReturn(null);
+        when(cloudConfigMapper.findByPid("nonexistent-pid", 100L)).thenReturn(null);
 
         assertThatThrownBy(() -> cloudConfigService.saveConfig(request))
                 .isInstanceOf(BusinessException.class)
@@ -235,7 +237,7 @@ class CloudConfigServiceImplTest {
 
     @Test
     void deleteConfig_notFound_throwsBusinessException() {
-        when(cloudConfigMapper.findByPid("missing-pid")).thenReturn(null);
+        when(cloudConfigMapper.findByPid("missing-pid", 100L)).thenReturn(null);
 
         assertThatThrownBy(() -> cloudConfigService.deleteConfig("missing-pid"))
                 .isInstanceOf(BusinessException.class)
@@ -243,12 +245,13 @@ class CloudConfigServiceImplTest {
     }
 
     @Test
-    void deleteConfig_found_callsDeleteById() {
-        when(cloudConfigMapper.findByPid("test-pid-001")).thenReturn(sampleConfig);
+    void deleteConfig_found_callsScopedSoftDelete() {
+        when(cloudConfigMapper.findByPid("test-pid-001", 100L)).thenReturn(sampleConfig);
 
+        when(cloudConfigMapper.softDeleteScoped(eq("test-pid-001"), eq(100L), any(Instant.class), eq("user-pid"))).thenReturn(1);
         cloudConfigService.deleteConfig("test-pid-001");
 
-        verify(cloudConfigMapper).deleteById(1L);
+        verify(cloudConfigMapper).softDeleteScoped(eq("test-pid-001"), eq(100L), any(Instant.class), eq("user-pid"));
     }
 
     // =========================================================
@@ -264,14 +267,7 @@ class CloudConfigServiceImplTest {
         request.setConfig(null);
         request.setEnabled(true);
 
-        // Should not throw even with null config
-        // (will try to call MetaContext which returns null in test env — that's ok,
-        //  the test only verifies no NPE in the encrypt logic)
-        try {
-            cloudConfigService.saveConfig(request);
-        } catch (Exception e) {
-            // MetaContext might fail — that's expected in unit test
-        }
+        assertThatCode(() -> cloudConfigService.saveConfig(request)).doesNotThrowAnyException();
     }
 
     @Test
@@ -296,6 +292,22 @@ class CloudConfigServiceImplTest {
     }
 
     @Test
+    void saveConfigEncryptionFailureDoesNotPersistPlaintext() {
+        CloudConfigSaveRequest request = new CloudConfigSaveRequest();
+        request.setServiceType("llm");
+        request.setProviderCode("fixture");
+        request.setConfigLevel("tenant");
+        request.setConfig("{\"apiKey\":\"test-secret\"}");
+        request.setEnabled(false);
+        MetaContext.setContext(100L, 200L, "user-pid", "tester");
+        when(fieldEncryptionService.encrypt("test-secret")).thenThrow(new IllegalStateException("Encryption unavailable"));
+
+        assertThatThrownBy(() -> cloudConfigService.saveConfig(request))
+                .isInstanceOf(IllegalStateException.class).hasMessage("Encryption unavailable");
+        verifyNoInteractions(cloudConfigMapper);
+    }
+
+    @Test
     void listConfigs_normalizesLevelSoTheDocumentedUppercaseValueWorks() {
         // The public contract is documented as `?level=PLATFORM|TENANT`, writes store it
         // lower-cased, and listByLevel matches lowercase literals in its WHERE clause and
@@ -314,16 +326,47 @@ class CloudConfigServiceImplTest {
     }
 
     @Test
-    void listConfigs_tolerantOfMixedCaseAndNull() {
+    void listConfigs_normalizesMixedCaseAndRejectsAbsentLevel() {
         MetaContext.setContext(100L, 200L, "user-pid", "tester");
         when(cloudConfigMapper.listByLevel(any(), any())).thenReturn(List.of());
 
         cloudConfigService.listConfigs("Tenant");
-        cloudConfigService.listConfigs(null);
+        assertThatThrownBy(() -> cloudConfigService.listConfigs(null)).isInstanceOf(BusinessException.class);
 
         ArgumentCaptor<String> level = ArgumentCaptor.forClass(String.class);
-        verify(cloudConfigMapper, times(2)).listByLevel(level.capture(), any());
-        assertThat(level.getAllValues()).containsExactly("tenant", null);
+        verify(cloudConfigMapper).listByLevel(level.capture(), any());
+        assertThat(level.getValue()).isEqualTo("tenant");
+    }
+
+    @Test
+    void saveConfig_encryptionFailureDoesNotPersistPlaintext() {
+        CloudConfigSaveRequest request = new CloudConfigSaveRequest();
+        request.setConfigLevel("tenant");
+        request.setServiceType("llm");
+        request.setProviderCode("fixture");
+        request.setConfig("{\"apiKey\":\"fixture-key\"}");
+        when(fieldEncryptionService.encrypt("fixture-key")).thenThrow(new IllegalStateException("Encryption unavailable"));
+        assertThatThrownBy(() -> cloudConfigService.saveConfig(request)).isInstanceOf(IllegalStateException.class);
+        verify(cloudConfigMapper, never()).insert(any(CloudConfig.class));
+    }
+
+    @Test
+    void saveConfig_zeroAffectedRowsRejectsFalseUpdateSuccess() {
+        CloudConfigSaveRequest request = new CloudConfigSaveRequest();
+        request.setPid("test-pid-001");
+        request.setConfigLevel("tenant");
+        request.setServiceType("sms");
+        request.setProviderCode("tencent_sms");
+        request.setConfig("{}");
+        when(cloudConfigMapper.findByPid("test-pid-001", 100L)).thenReturn(sampleConfig);
+        when(cloudConfigMapper.updateScoped(sampleConfig, 100L)).thenReturn(0);
+        assertThatThrownBy(() -> cloudConfigService.saveConfig(request)).isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void deleteConfig_zeroAffectedRowsRejectsFalseDeleteSuccess() {
+        when(cloudConfigMapper.findByPid("test-pid-001", 100L)).thenReturn(sampleConfig);
+        assertThatThrownBy(() -> cloudConfigService.deleteConfig("test-pid-001")).isInstanceOf(BusinessException.class);
     }
 
 }

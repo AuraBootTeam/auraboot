@@ -1,9 +1,23 @@
+import {
+  useDecisionConditionText,
+  decisionConditionText,
+  decisionConditionOperatorLabel,
+  type DecisionConditionTextKey,
+} from './decisionConditionText';
 import { useEffect, useMemo, useState } from 'react';
 import { Database, Search, UserRound, X } from 'lucide-react';
 import {
-  type ConditionNode, type GroupNode, type CompareNode, type Operator, type DataType,
-  type PathOperand, cmp, path, lit,
-  not, operatorLabel, UNARY_OPERATORS,
+  type ConditionNode,
+  type GroupNode,
+  type CompareNode,
+  type Operator,
+  type DataType,
+  type PathOperand,
+  cmp,
+  path,
+  lit,
+  not,
+  UNARY_OPERATORS,
 } from '../ast/conditionAst';
 
 /**
@@ -60,7 +74,13 @@ const OPERATORS_BY_TYPE: Partial<Record<DataType, Operator[]>> = {
   datetime: ['GT', 'GTE', 'LT', 'LTE', 'BETWEEN', 'IS_NULL', 'IS_NOT_NULL'],
 };
 
-const UNARY: ReadonlySet<Operator> = new Set<Operator>(['IS_NULL', 'IS_NOT_NULL', 'IS_EMPTY', 'IS_NOT_EMPTY', 'CHANGED']);
+const UNARY: ReadonlySet<Operator> = new Set<Operator>([
+  'IS_NULL',
+  'IS_NOT_NULL',
+  'IS_EMPTY',
+  'IS_NOT_EMPTY',
+  'CHANGED',
+]);
 const COLLECTION_OPERATORS: ReadonlySet<Operator> = new Set<Operator>(['IN', 'NOT_IN']);
 
 type ValueLabelMap = Record<string, string>;
@@ -93,34 +113,29 @@ function idFor(pathParts: number[]): string {
   return pathParts.length === 0 ? '' : `-${pathParts.join('-')}`;
 }
 
-const SCOPE_LABELS: Record<PathOperand['scope'], string> = {
-  meta: '元数据',
-  event: '事件',
-  record: '业务记录',
-  before: '变更前',
-  after: '变更后',
-  process: '流程',
-  task: '任务',
-  sla: 'SLA',
-  actor: '操作者',
-  tenant: '租户',
-  time: '时间',
-  env: '环境',
+const SCOPE_LABEL_KEYS: Record<PathOperand['scope'], DecisionConditionTextKey> = {
+  meta: 'scopeMeta',
+  event: 'scopeEvent',
+  record: 'scopeRecord',
+  before: 'scopeBefore',
+  after: 'scopeAfter',
+  process: 'scopeProcess',
+  task: 'scopeTask',
+  sla: 'scopeSLA',
+  actor: 'scopeActor',
+  tenant: 'scopeTenant',
+  time: 'scopeTime',
+  env: 'scopeEnvironment',
 };
 
-function fieldGroupLabel(field: FieldOption): string {
-  return field.modelName || SCOPE_LABELS[field.scope] || field.scope;
+function fieldGroupLabel(field: FieldOption, locale: string): string {
+  return (
+    field.modelName || decisionConditionText(SCOPE_LABEL_KEYS[field.scope], locale) || field.scope
+  );
 }
 
 function fieldSearchText(field: FieldOption): string {
-  return [
-    field.label,
-    field.path,
-    field.scope,
-    field.modelCode,
-    field.modelName,
-    field.dataType,
-  ]
+  return [field.label, field.path, field.scope, field.modelCode, field.modelName, field.dataType]
     .filter(Boolean)
     .join(' ')
     .toLowerCase();
@@ -132,10 +147,13 @@ function filterFields(fields: FieldOption[], query: string): FieldOption[] {
   return fields.filter((field) => fieldSearchText(field).includes(normalized));
 }
 
-function groupFields(fields: FieldOption[]): Array<{ label: string; fields: FieldOption[] }> {
+function groupFields(
+  fields: FieldOption[],
+  locale: string,
+): Array<{ label: string; fields: FieldOption[] }> {
   const groups = new Map<string, FieldOption[]>();
   fields.forEach((field) => {
-    const label = fieldGroupLabel(field);
+    const label = fieldGroupLabel(field, locale);
     groups.set(label, [...(groups.get(label) ?? []), field]);
   });
   return Array.from(groups, ([label, groupFields]) => ({ label, fields: groupFields }));
@@ -144,7 +162,11 @@ function groupFields(fields: FieldOption[]): Array<{ label: string; fields: Fiel
 function firstCompare(fields: FieldOption[]): CompareNode | null {
   const f = fields[0];
   if (!f) return null;
-  return cmp(path(f.scope, f.path, f.dataType), operatorsForDataType(f.dataType)[0], lit('', f.dataType));
+  return cmp(
+    path(f.scope, f.path, f.dataType),
+    operatorsForDataType(f.dataType)[0],
+    lit('', f.dataType),
+  );
 }
 
 function firstGroup(fields: FieldOption[]): GroupNode | null {
@@ -175,16 +197,22 @@ function literalScalarValue(row: CompareNode): string {
 }
 
 function splitCollectionInput(value: string): string[] {
-  return value.split(',').map((item) => item.trim()).filter(Boolean);
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
+    ? (value as Record<string, unknown>)
     : null;
 }
 
-function firstString(record: Record<string, unknown> | null | undefined, keys: string[]): string | undefined {
+function firstString(
+  record: Record<string, unknown> | null | undefined,
+  keys: string[],
+): string | undefined {
   if (!record) return undefined;
   for (const key of keys) {
     const value = record[key];
@@ -216,12 +244,13 @@ async function fetchJson(url: string): Promise<unknown | null> {
 function normalizeUserOption(value: unknown): ReferenceOption | null {
   const record = asRecord(value);
   const user = asRecord(record?.user);
-  const optionValue = firstString(record, ['pid', 'id', 'userPid'])
-    ?? firstString(user, ['pid', 'id']);
+  const optionValue =
+    firstString(record, ['pid', 'id', 'userPid']) ?? firstString(user, ['pid', 'id']);
   if (!optionValue) return null;
-  const label = firstString(record, ['displayName', 'name', 'realName', 'username', 'email'])
-    ?? firstString(user, ['displayName', 'name', 'realName', 'username', 'email'])
-    ?? optionValue;
+  const label =
+    firstString(record, ['displayName', 'name', 'realName', 'username', 'email']) ??
+    firstString(user, ['displayName', 'name', 'realName', 'username', 'email']) ??
+    optionValue;
   const email = firstString(record, ['email']) ?? firstString(user, ['email']);
   const department = firstString(record, ['department']) ?? firstString(user, ['department']);
   return {
@@ -245,10 +274,12 @@ function normalizeDynamicOption(value: unknown): ReferenceOption | null {
 function isUserReference(field: FieldOption | undefined): boolean {
   if (!field) return false;
   const target = String(field.reference?.targetEntity ?? '').toLowerCase();
-  return field.dataType === 'user'
-    || target.includes('user')
-    || target === 'sys_user'
-    || target === 'ab_user';
+  return (
+    field.dataType === 'user' ||
+    target.includes('user') ||
+    target === 'sys_user' ||
+    target === 'ab_user'
+  );
 }
 
 function isReferenceValueField(field: FieldOption | undefined): field is FieldOption {
@@ -261,9 +292,11 @@ function fieldCodeFromPath(fieldPath: string): string {
   return parts[parts.length - 1] || fieldPath;
 }
 
-function referenceTargetLabel(field: FieldOption): string {
-  if (isUserReference(field)) return '用户';
-  return field.reference?.targetEntity || field.modelName || '引用对象';
+function referenceTargetLabel(field: FieldOption, locale: string): string {
+  if (isUserReference(field)) return decisionConditionText('user', locale);
+  return (
+    field.reference?.targetEntity || field.modelName || decisionConditionText('reference', locale)
+  );
 }
 
 function mergeLabelsFromOptions(options: ReferenceOption[]): ValueLabelMap {
@@ -275,7 +308,9 @@ async function loadReferenceOptions(field: FieldOption, query: string): Promise<
     const payload = await fetchJson(
       `/api/admin/users/search?keyword=${encodeURIComponent(query)}&size=20`,
     );
-    return dataArray(payload).map(normalizeUserOption).filter((item): item is ReferenceOption => item !== null);
+    return dataArray(payload)
+      .map(normalizeUserOption)
+      .filter((item): item is ReferenceOption => item !== null);
   }
   if (!field.modelCode) return [];
   const fieldName = fieldCodeFromPath(field.path);
@@ -283,7 +318,9 @@ async function loadReferenceOptions(field: FieldOption, query: string): Promise<
   const payload = await fetchJson(
     `/api/dynamic/${encodeURIComponent(field.modelCode)}/field-options/${encodeURIComponent(fieldName)}${suffix}`,
   );
-  return dataArray(payload).map(normalizeDynamicOption).filter((item): item is ReferenceOption => item !== null);
+  return dataArray(payload)
+    .map(normalizeDynamicOption)
+    .filter((item): item is ReferenceOption => item !== null);
 }
 
 function optionFromUserPayload(payload: unknown, fallbackValue: string): ReferenceOption | null {
@@ -300,21 +337,31 @@ function optionFromDynamicRecord(
   const record = asRecord(data);
   if (!record) return { value: fallbackValue, label: fallbackValue };
   const displayField = field.reference?.displayField;
-  const label = displayField && record[displayField] != null
-    ? String(record[displayField])
-    : firstString(record, ['displayName', 'name', 'title', 'code', 'pid', 'id']) ?? fallbackValue;
+  const label =
+    displayField && record[displayField] != null
+      ? String(record[displayField])
+      : (firstString(record, ['displayName', 'name', 'title', 'code', 'pid', 'id']) ??
+        fallbackValue);
   return { value: fallbackValue, label };
 }
 
-async function resolveReferenceOption(field: FieldOption, value: string): Promise<ReferenceOption | null> {
+async function resolveReferenceOption(
+  field: FieldOption,
+  value: string,
+): Promise<ReferenceOption | null> {
   if (!value) return null;
   if (isUserReference(field)) {
-    return optionFromUserPayload(await fetchJson(`/api/admin/users/${encodeURIComponent(value)}`), value);
+    return optionFromUserPayload(
+      await fetchJson(`/api/admin/users/${encodeURIComponent(value)}`),
+      value,
+    );
   }
   const targetEntity = field.reference?.targetEntity;
   if (!targetEntity) return { value, label: value };
   return optionFromDynamicRecord(
-    await fetchJson(`/api/dynamic/${encodeURIComponent(targetEntity)}/${encodeURIComponent(value)}`),
+    await fetchJson(
+      `/api/dynamic/${encodeURIComponent(targetEntity)}/${encodeURIComponent(value)}`,
+    ),
     field,
     value,
   );
@@ -339,19 +386,25 @@ function ReferenceValuePicker({
   onChange,
   onValueLabelsChange,
 }: ReferenceValuePickerProps) {
-  const selectedValues = useMemo(() => (
-    Array.isArray(value) ? value.map(String) : value ? [String(value)] : []
-  ), [value]);
+  const { locale, text } = useDecisionConditionText();
+  const selectedValues = useMemo(
+    () => (Array.isArray(value) ? value.map(String) : value ? [String(value)] : []),
+    [value],
+  );
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [options, setOptions] = useState<ReferenceOption[]>([]);
   const selectedKey = selectedValues.join('\u0001');
-  const mergedLabels = useMemo<ValueLabelMap>(() => ({
-    ...(field.valueLabels ?? {}),
-    ...(runtimeValueLabels ?? {}),
-    ...mergeLabelsFromOptions(options),
-  }), [field.valueLabels, options, runtimeValueLabels]);
+  const mergedLabels = useMemo<ValueLabelMap>(
+    () => ({
+      ...(field.valueLabels ?? {}),
+      ...(runtimeValueLabels ?? {}),
+      ...mergeLabelsFromOptions(options),
+    }),
+    [field.valueLabels, options, runtimeValueLabels],
+  );
 
   const rememberOptions = (nextOptions: ReferenceOption[]) => {
     const labels = mergeLabelsFromOptions(nextOptions);
@@ -364,6 +417,7 @@ function ReferenceValuePicker({
     if (!open) return;
     let cancelled = false;
     setLoading(true);
+    setLoadFailed(false);
     loadReferenceOptions(field, query)
       .then((loaded) => {
         if (cancelled) return;
@@ -371,7 +425,10 @@ function ReferenceValuePicker({
         rememberOptions(loaded);
       })
       .catch(() => {
-        if (!cancelled) setOptions([]);
+        if (!cancelled) {
+          setOptions([]);
+          setLoadFailed(true);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -403,7 +460,7 @@ function ReferenceValuePicker({
 
   const labelOf = (item: string) => mergedLabels[item] ?? item;
   const selectedSet = new Set(selectedValues);
-  const targetLabel = referenceTargetLabel(field);
+  const targetLabel = referenceTargetLabel(field, locale);
 
   const commit = (option: ReferenceOption) => {
     if (option.disabled) return;
@@ -438,7 +495,9 @@ function ReferenceValuePicker({
             {isUserReference(field) ? <UserRound size={14} /> : <Database size={14} />}
           </span>
           <span className="cb-reference-values">
-            {selectedValues.length > 0 ? selectedValues.map(labelOf).join('、') : `选择${targetLabel}`}
+            {selectedValues.length > 0
+              ? selectedValues.map(labelOf).join(text('listSeparator'))
+              : text('selectReference', { target: targetLabel })}
           </span>
         </button>
         {selectedValues.length > 0 && (
@@ -458,7 +517,11 @@ function ReferenceValuePicker({
           {selectedValues.map((item) => (
             <span key={item} className="cb-reference-chip">
               {labelOf(item)}
-              <button type="button" aria-label={`remove-value-${id}-${item}`} onClick={() => remove(item)}>
+              <button
+                type="button"
+                aria-label={`remove-value-${id}-${item}`}
+                onClick={() => remove(item)}
+              >
                 <X size={10} />
               </button>
             </span>
@@ -474,7 +537,7 @@ function ReferenceValuePicker({
               aria-label={`reference-search-${id}`}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder={`搜索${targetLabel}`}
+              placeholder={text('searchReference', { target: targetLabel })}
             />
           </label>
           <div className="cb-reference-meta" data-testid={`reference-value-meta-${id}`}>
@@ -484,23 +547,29 @@ function ReferenceValuePicker({
           </div>
           <div className="cb-reference-options">
             {loading ? (
-              <div className="cb-reference-empty">加载中...</div>
+              <div className="cb-reference-empty">{text('loading')}</div>
+            ) : loadFailed ? (
+              <div className="cb-reference-empty is-error" role="alert">
+                {text('loadFailed')}
+              </div>
             ) : options.length === 0 ? (
-              <div className="cb-reference-empty">没有匹配项</div>
-            ) : options.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                disabled={option.disabled}
-                data-testid={`reference-value-option-${id}-${option.value}`}
-                className="cb-reference-option"
-                aria-pressed={selectedSet.has(option.value)}
-                onClick={() => commit(option)}
-              >
-                <span>{option.label}</span>
-                {option.subtitle && <small>{option.subtitle}</small>}
-              </button>
-            ))}
+              <div className="cb-reference-empty">{text('noMatches')}</div>
+            ) : (
+              options.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  disabled={option.disabled}
+                  data-testid={`reference-value-option-${id}-${option.value}`}
+                  className="cb-reference-option"
+                  aria-pressed={selectedSet.has(option.value)}
+                  onClick={() => commit(option)}
+                >
+                  <span>{option.label}</span>
+                  {option.subtitle && <small>{option.subtitle}</small>}
+                </button>
+              ))
+            )}
           </div>
         </div>
       )}
@@ -508,7 +577,11 @@ function ReferenceValuePicker({
   );
 }
 
-function replaceChild(children: ConditionNode[], index: number, next: ConditionNode): ConditionNode[] {
+function replaceChild(
+  children: ConditionNode[],
+  index: number,
+  next: ConditionNode,
+): ConditionNode[] {
   return children.map((child, childIndex) => (childIndex === index ? next : child));
 }
 
@@ -533,6 +606,7 @@ function CompareEditor({
   updateRow,
   deleteRow,
 }: CompareEditorProps) {
+  const { locale, text } = useDecisionConditionText();
   const left = row.left as PathOperand;
   const curKey = fieldKey(left.scope, left.path);
   const fieldOpt = fieldByKey.get(curKey);
@@ -542,7 +616,10 @@ function CompareEditor({
     const hasCurrent = fields.some((field) => fieldKey(field.scope, field.path) === curKey);
     return hasCurrent || !fieldOpt ? fields : [fieldOpt, ...fields];
   }, [curKey, fieldOpt, fields]);
-  const groupedFields = useMemo(() => groupFields(selectableFields), [selectableFields]);
+  const groupedFields = useMemo(
+    () => groupFields(selectableFields, locale),
+    [selectableFields, locale],
+  );
   const showValue = !UNARY.has(row.operator);
   const id = idPath.join('-');
   const rowValueLabels = runtimeValueLabels[curKey];
@@ -593,11 +670,15 @@ function CompareEditor({
         value={row.operator}
         onChange={(e) => onOperatorChange(e.target.value as Operator)}
       >
-        {ops.map((op) => <option key={op} value={op}>{operatorLabel(op)}</option>)}
+        {ops.map((op) => (
+          <option key={op} value={op}>
+            {decisionConditionOperatorLabel(op, locale)}
+          </option>
+        ))}
       </select>
 
-      {showValue && (
-        fieldOpt?.options ? (
+      {showValue &&
+        (fieldOpt?.options ? (
           COLLECTION_OPERATORS.has(row.operator) ? (
             <select
               aria-label={`value-${id}`}
@@ -605,7 +686,9 @@ function CompareEditor({
               size={Math.min(4, Math.max(2, fieldOpt.options.length))}
               value={literalArrayValue(row)}
               onChange={(e) =>
-                onValueChange(Array.from(e.currentTarget.selectedOptions).map((option) => option.value))
+                onValueChange(
+                  Array.from(e.currentTarget.selectedOptions).map((option) => option.value),
+                )
               }
             >
               {fieldOpt.options.map((o) => (
@@ -632,9 +715,11 @@ function CompareEditor({
           <ReferenceValuePicker
             id={id}
             field={fieldOpt}
-            value={COLLECTION_OPERATORS.has(row.operator)
-              ? literalArrayValue(row)
-              : literalScalarValue(row)}
+            value={
+              COLLECTION_OPERATORS.has(row.operator)
+                ? literalArrayValue(row)
+                : literalScalarValue(row)
+            }
             multiple={COLLECTION_OPERATORS.has(row.operator)}
             runtimeValueLabels={rowValueLabels}
             onChange={onValueChange}
@@ -643,19 +728,24 @@ function CompareEditor({
         ) : (
           <input
             aria-label={`value-${id}`}
-            value={COLLECTION_OPERATORS.has(row.operator)
-              ? literalArrayValue(row).join(', ')
-              : literalScalarValue(row)}
+            value={
+              COLLECTION_OPERATORS.has(row.operator)
+                ? literalArrayValue(row).join(', ')
+                : literalScalarValue(row)
+            }
             onChange={(e) =>
-              onValueChange(COLLECTION_OPERATORS.has(row.operator)
-                ? splitCollectionInput(e.target.value)
-                : e.target.value)
+              onValueChange(
+                COLLECTION_OPERATORS.has(row.operator)
+                  ? splitCollectionInput(e.target.value)
+                  : e.target.value,
+              )
             }
           />
-        )
-      )}
+        ))}
 
-      <button type="button" aria-label={`delete-${id}`} onClick={deleteRow}>删除</button>
+      <button type="button" aria-label={`delete-${id}`} onClick={deleteRow}>
+        {text('delete')}
+      </button>
     </div>
   );
 }
@@ -681,6 +771,7 @@ function NodeEditor({
   updateNode,
   deleteNode,
 }: NodeEditorProps) {
+  const { locale, text } = useDecisionConditionText();
   if (node.type === 'compare') {
     return (
       <CompareEditor
@@ -701,10 +792,10 @@ function NodeEditor({
     return (
       <div className="cb-not" data-testid={`cb-not-${id}`}>
         <div className="cb-not-header">
-          <strong>非(NOT)</strong>
+          <strong>{text('notHeading')}</strong>
           {deleteNode && (
             <button type="button" aria-label={`delete-not-${id}`} onClick={deleteNode}>
-              删除
+              {text('delete')}
             </button>
           )}
         </div>
@@ -756,6 +847,7 @@ function GroupEditor({
   updateNode,
   deleteNode,
 }: GroupEditorProps) {
+  const { locale, text } = useDecisionConditionText();
   const suffix = idFor(idPath);
   const addRow = () => {
     const next = firstCompare(fields);
@@ -774,13 +866,20 @@ function GroupEditor({
   };
 
   return (
-    <div className="cb-group" data-testid={idPath.length === 0 ? 'cb-group-root' : `cb-group${suffix}`}>
+    <div
+      className="cb-group"
+      data-testid={idPath.length === 0 ? 'cb-group-root' : `cb-group${suffix}`}
+    >
       {idPath.length > 0 && (
         <div className="cb-group-header">
-          <strong>条件组</strong>
+          <strong>{text('groupHeading')}</strong>
           {deleteNode && (
-            <button type="button" aria-label={`delete-group-${idPath.join('-')}`} onClick={deleteNode}>
-              删除
+            <button
+              type="button"
+              aria-label={`delete-group-${idPath.join('-')}`}
+              onClick={deleteNode}
+            >
+              {text('delete')}
             </button>
           )}
         </div>
@@ -792,17 +891,23 @@ function GroupEditor({
           data-testid={idPath.length === 0 ? 'op-and' : `op-and${suffix}`}
           aria-pressed={node.op === 'AND'}
           onClick={() => updateNode({ ...node, op: 'AND' })}
-        >全部满足</button>
+        >
+          {text('allMatch')}
+        </button>
         <button
           type="button"
           data-testid={idPath.length === 0 ? 'op-or' : `op-or${suffix}`}
           aria-pressed={node.op === 'OR'}
           onClick={() => updateNode({ ...node, op: 'OR' })}
-        >任一满足</button>
+        >
+          {text('anyMatch')}
+        </button>
       </div>
 
       {node.children.length === 0 && (
-        <div data-testid={idPath.length === 0 ? 'cb-empty' : `cb-empty${suffix}`}>暂无条件</div>
+        <div data-testid={idPath.length === 0 ? 'cb-empty' : `cb-empty${suffix}`}>
+          {text('noConditions')}
+        </div>
       )}
 
       {node.children.map((child, childIndex) => (
@@ -833,7 +938,7 @@ function GroupEditor({
           onClick={addRow}
           disabled={fields.length === 0}
         >
-          添加条件
+          {text('addCondition')}
         </button>
         <button
           type="button"
@@ -841,7 +946,7 @@ function GroupEditor({
           onClick={addGroup}
           disabled={fields.length === 0}
         >
-          添加条件组
+          {text('addGroup')}
         </button>
         <button
           type="button"
@@ -849,7 +954,7 @@ function GroupEditor({
           onClick={addNot}
           disabled={fields.length === 0}
         >
-          添加 NOT
+          {text('addNot')}
         </button>
       </div>
     </div>
@@ -857,6 +962,7 @@ function GroupEditor({
 }
 
 export function ConditionBuilder({ value, fields, onChange }: ConditionBuilderProps) {
+  const { locale, text } = useDecisionConditionText();
   const [fieldQuery, setFieldQuery] = useState('');
   const [runtimeValueLabels, setRuntimeValueLabels] = useState<Record<string, ValueLabelMap>>({});
   const filteredFields = useMemo(() => filterFields(fields, fieldQuery), [fieldQuery, fields]);
@@ -880,13 +986,18 @@ export function ConditionBuilder({ value, fields, onChange }: ConditionBuilderPr
   const labelOf = (o: PathOperand): string =>
     fieldByKey.get(fieldKey(o.scope, o.path))?.label ?? `${o.scope}.${o.path}`;
 
-  const operandPreview = (operand: CompareNode['left'] | CompareNode['right'], leftField?: FieldOption): string => {
+  const operandPreview = (
+    operand: CompareNode['left'] | CompareNode['right'],
+    leftField?: FieldOption,
+  ): string => {
     if (!operand) return '';
     if (operand.type === 'path') return labelOf(operand);
     if (operand.type === 'literal') {
       if (Array.isArray(operand.value)) {
         const labels = leftField ? runtimeValueLabels[fieldOptionKey(leftField)] : undefined;
-        return operand.value.map((item) => optionLabel(leftField, item, labels)).join('、');
+        return operand.value
+          .map((item) => optionLabel(leftField, item, labels))
+          .join(text('listSeparator'));
       }
       const labels = leftField ? runtimeValueLabels[fieldOptionKey(leftField)] : undefined;
       return optionLabel(leftField, operand.value, labels);
@@ -896,30 +1007,33 @@ export function ConditionBuilder({ value, fields, onChange }: ConditionBuilderPr
 
   const previewNode = (node: ConditionNode): string => {
     if (node.type === 'compare') {
-      const leftField = node.left.type === 'path'
-        ? fieldByKey.get(fieldKey(node.left.scope, node.left.path))
-        : undefined;
+      const leftField =
+        node.left.type === 'path'
+          ? fieldByKey.get(fieldKey(node.left.scope, node.left.path))
+          : undefined;
       const left = operandPreview(node.left, leftField);
-      const right = UNARY_OPERATORS.has(node.operator) ? '' : ` ${operandPreview(node.right, leftField)}`;
-      return `【${left} ${operatorLabel(node.operator)}${right}】`;
+      const right = UNARY_OPERATORS.has(node.operator)
+        ? ''
+        : ` ${operandPreview(node.right, leftField)}`;
+      return `【${left} ${decisionConditionOperatorLabel(node.operator, locale)}${right}】`;
     }
-    if (node.type === 'not') return `非(${previewNode(node.child)})`;
+    if (node.type === 'not') return text('negated', { condition: previewNode(node.child) });
     const parts = node.children
       .filter((child) => !(child.type === 'compare' && child.enabled === false))
       .map(previewNode);
-    return `(${parts.join(node.op === 'AND' ? ' 并且 ' : ' 或 ')})`;
+    return `(${parts.join(node.op === 'AND' ? text('andSeparator') : text('orSeparator'))})`;
   };
 
   return (
     <div data-testid="condition-builder">
       <div className="cb-field-tools">
         <label>
-          字段搜索
+          {text('fieldSearch')}
           <input
             aria-label="condition-field-search"
             value={fieldQuery}
             onChange={(event) => setFieldQuery(event.target.value)}
-            placeholder="搜索字段、模型或路径"
+            placeholder={text('fieldSearchHint')}
           />
         </label>
         <span data-testid="cb-field-result-count">
@@ -929,7 +1043,7 @@ export function ConditionBuilder({ value, fields, onChange }: ConditionBuilderPr
 
       {fieldQuery.trim() && filteredFields.length === 0 && (
         <div className="cb-field-empty" data-testid="cb-field-empty">
-          没有匹配字段
+          {text('noFields')}
         </div>
       )}
 

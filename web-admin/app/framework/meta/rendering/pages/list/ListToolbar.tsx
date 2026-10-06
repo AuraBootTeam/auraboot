@@ -19,6 +19,8 @@ type QuickFilterKey = QuickFilterPresetKey;
 export interface ListToolbarProps {
   /** Current keyword search value */
   keyword: string;
+  /** Localized search guidance supplied by the table configuration. */
+  searchPlaceholder?: string;
   onKeywordChange: (keyword: string) => void;
   onSearch: () => void;
 
@@ -76,6 +78,7 @@ export interface ListToolbarProps {
 
 export function ListToolbar({
   keyword,
+  searchPlaceholder,
   onKeywordChange,
   onSearch,
   chips,
@@ -142,7 +145,7 @@ export function ListToolbar({
             value={keyword}
             onChange={(e) => onKeywordChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={t('common.search', undefined, 'Search') + '...'}
+            placeholder={searchPlaceholder || t('common.search', undefined, 'Search') + '...'}
             className="rounded-control border-border bg-subtle text-text-2 focus:bg-panel focus-visible:shadow-focus h-9 w-full border pr-3 pl-9 text-sm placeholder-gray-400 focus:outline-none sm:w-[280px]"
             data-testid="list-search-input"
           />

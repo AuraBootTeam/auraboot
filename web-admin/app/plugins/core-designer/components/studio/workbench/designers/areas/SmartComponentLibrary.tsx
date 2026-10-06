@@ -1,3 +1,6 @@
+import { useLocalizedText } from '~/utils/i18n';
+import { componentText } from '~/framework/meta/registry/components/componentText';
+import { COMPONENT_CATEGORIES } from '~/framework/meta/registry/components/ComponentConfig';
 /**
  * Smart Component Library
  *
@@ -19,15 +22,10 @@ export interface SmartComponentLibraryProps {
 /**
  * Category display configuration
  */
-const CATEGORY_CONFIG: Record<string, { label: string; icon: string }> = {
-  all: { label: '全部', icon: '' },
-  form: { label: '表单', icon: '📝' },
-  display: { label: '展示', icon: '📊' },
-  interaction: { label: '交互', icon: '🎯' },
-  layout: { label: '布局', icon: '📐' },
-  datetime: { label: '日期', icon: '📅' },
-  chart: { label: '图表', icon: '📈' },
-};
+const CATEGORY_CONFIG = Object.fromEntries([
+  ['all', { label: componentText('ui.all'), icon: '' }],
+  ...COMPONENT_CATEGORIES.map(category => [category.id, { label: category.name, icon: category.icon }]),
+]);
 
 /**
  * Draggable component item
@@ -38,6 +36,7 @@ interface DraggableComponentItemProps {
 }
 
 const DraggableComponentItem: React.FC<DraggableComponentItemProps> = ({ config, disabled }) => {
+  const lt = useLocalizedText();
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `smart-component:${config.type}`,
     disabled,
@@ -76,8 +75,8 @@ const DraggableComponentItem: React.FC<DraggableComponentItemProps> = ({ config,
     >
       <span className="flex-shrink-0 text-lg">{config.icon}</span>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-gray-800">{config.name}</div>
-        <div className="truncate text-[10px] text-gray-400">{config.description}</div>
+        <div className="truncate text-sm font-medium text-gray-800">{lt(config.name)}</div>
+        <div className="truncate text-[10px] text-gray-400">{lt(config.description)}</div>
       </div>
       {/* Badge for drag behavior */}
       <span
@@ -87,7 +86,7 @@ const DraggableComponentItem: React.FC<DraggableComponentItemProps> = ({ config,
             : 'bg-blue-50 text-blue-600'
         }`}
       >
-        {config.category === 'form' || config.category === 'datetime' ? '字段' : '组件'}
+        {config.category === 'form' || config.category === 'datetime' ? lt(componentText('ui.field')) : lt(componentText('ui.component'))}
       </span>
     </div>
   );
@@ -109,6 +108,7 @@ const SearchInput: React.FC<SearchInputProps> = ({
   placeholder,
   'data-testid': testId,
 }) => {
+  const lt = useLocalizedText();
   return (
     <div className="relative">
       <svg
@@ -128,7 +128,7 @@ const SearchInput: React.FC<SearchInputProps> = ({
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder || '搜索组件...'}
+        placeholder={placeholder || lt(componentText('ui.search'))}
         data-testid={testId}
         className="w-full rounded-lg border border-gray-200 py-2 pr-3 pl-8 text-sm placeholder-gray-400 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none"
       />
@@ -161,6 +161,7 @@ interface CategoryTabsProps {
 }
 
 const CategoryTabs: React.FC<CategoryTabsProps> = ({ categories, selected, onSelect }) => {
+  const lt = useLocalizedText();
   return (
     <div className="flex flex-wrap gap-1">
       {categories.map((cat) => (
@@ -174,7 +175,7 @@ const CategoryTabs: React.FC<CategoryTabsProps> = ({ categories, selected, onSel
           }`}
         >
           {CATEGORY_CONFIG[cat]?.icon && <span className="mr-1">{CATEGORY_CONFIG[cat].icon}</span>}
-          {CATEGORY_CONFIG[cat]?.label || cat}
+          {lt(CATEGORY_CONFIG[cat]?.label || cat)}
         </button>
       ))}
     </div>
@@ -182,6 +183,7 @@ const CategoryTabs: React.FC<CategoryTabsProps> = ({ categories, selected, onSel
 };
 
 export const SmartComponentLibrary: React.FC<SmartComponentLibraryProps> = ({ readonly }) => {
+  const lt = useLocalizedText();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isInitialized, setIsInitialized] = useState(false);
@@ -221,8 +223,8 @@ export const SmartComponentLibrary: React.FC<SmartComponentLibraryProps> = ({ re
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
       components = components.filter((config) => {
-        const nameMatch = config.name.toLowerCase().includes(query);
-        const descMatch = (config.description || '').toLowerCase().includes(query);
+        const nameMatch = lt(config.name).toLowerCase().includes(query);
+        const descMatch = lt(config.description).toLowerCase().includes(query);
         const typeMatch = config.type.toLowerCase().includes(query);
         const tagMatch = config.tags?.some((tag) => tag.toLowerCase().includes(query));
         return nameMatch || descMatch || typeMatch || tagMatch;
@@ -230,7 +232,7 @@ export const SmartComponentLibrary: React.FC<SmartComponentLibraryProps> = ({ re
     }
 
     return components;
-  }, [allComponents, searchQuery, selectedCategory]);
+  }, [allComponents, searchQuery, selectedCategory, lt]);
 
   // Group components by category for display
   const groupedComponents = useMemo(() => {
@@ -256,7 +258,7 @@ export const SmartComponentLibrary: React.FC<SmartComponentLibraryProps> = ({ re
         <SearchInput
           value={searchQuery}
           onChange={setSearchQuery}
-          placeholder="搜索组件..."
+          placeholder={lt(componentText('ui.search'))}
           data-testid="library-search"
         />
         <CategoryTabs
@@ -283,7 +285,7 @@ export const SmartComponentLibrary: React.FC<SmartComponentLibraryProps> = ({ re
                 d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
-            <p className="text-sm">{searchQuery ? '未找到匹配的组件' : '暂无可用组件'}</p>
+            <p className="text-sm">{lt(componentText(searchQuery ? 'ui.noMatch' : 'ui.empty'))}</p>
           </div>
         ) : selectedCategory === 'all' ? (
           // Show grouped components
@@ -292,7 +294,7 @@ export const SmartComponentLibrary: React.FC<SmartComponentLibraryProps> = ({ re
               <div key={category}>
                 <h4 className="mb-2 flex items-center gap-1 text-xs font-medium tracking-wider text-gray-500 uppercase">
                   <span>{CATEGORY_CONFIG[category]?.icon}</span>
-                  <span>{CATEGORY_CONFIG[category]?.label || category}</span>
+                  <span>{lt(CATEGORY_CONFIG[category]?.label || category)}</span>
                   <span className="text-gray-400">({components.length})</span>
                 </h4>
                 <div className="space-y-1.5">
@@ -318,15 +320,15 @@ export const SmartComponentLibrary: React.FC<SmartComponentLibraryProps> = ({ re
         className="space-y-1 border-t border-gray-100 px-3 py-2 text-xs text-gray-400"
         data-testid="library-count"
       >
-        <div>共 {filteredComponents.length} 个组件</div>
+        <div>{lt(componentText('ui.count')).replace('{count}', String(filteredComponents.length))}</div>
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1">
             <span className="h-2 w-2 rounded-full bg-green-400"></span>
-            字段 - 添加到表单
+            {lt(componentText('ui.fieldHint'))}
           </span>
           <span className="inline-flex items-center gap-1">
             <span className="h-2 w-2 rounded-full bg-blue-400"></span>
-            组件 - 创建 Block
+            {lt(componentText('ui.componentHint'))}
           </span>
         </div>
       </div>

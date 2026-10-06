@@ -1,6 +1,14 @@
 package com.auraboot.framework.application.web.handler;
 
 import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.common.constant.ResponseCode;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.DataAccessResourceFailureException;
+import com.auraboot.framework.meta.controller.CommandPipelineController;
+import com.auraboot.framework.meta.service.impl.CommandPhaseRegistry;
+import com.auraboot.framework.meta.exception.MetaApiExceptionHandler;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import com.auraboot.framework.i18n.service.I18nService;
 import com.auraboot.framework.i18n.util.I18nLocaleResolver;
 import jakarta.servlet.http.HttpServletRequest;
@@ -12,6 +20,10 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -83,6 +95,55 @@ class GlobalExceptionHandlerI18nTest {
     @Test
     void nullMessagePassesThrough() {
         assertThat(handler.localizeI18nMessage(null, request)).isNull();
+    }
+
+    @Test
+    void duplicateBusinessFailureDoesNotExposePersistenceCauseInDevResponse() {
+        ReflectionTestUtils.setField(handler, "activeProfile", "dev");
+        when(localeResolver.resolveLocale(request)).thenReturn("zh-CN");
+        when(i18nService.getValue("zh-CN", "meta_record.duplicate"))
+                .thenReturn("记录已存在，请检查唯一字段后再保存");
+        DuplicateKeyException cause = new DuplicateKeyException("INSERT INTO private_table: duplicate key");
+        BusinessException failure = new BusinessException(
+                ResponseCode.BadParam, "$i18n:meta_record.duplicate", cause);
+
+        var response = handler.handleBusinessException(failure, request);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(400);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getContext()).isInstanceOfSatisfying(Map.class, context -> {
+            assertThat(context.get("detail")).isEqualTo("记录已存在，请检查唯一字段后再保存");
+            assertThat(context).doesNotContainKey("cause");
+            assertThat(context.toString()).doesNotContain("private_table", "INSERT INTO", "DuplicateKeyException");
+        });
+        assertThat(failure.getCause()).isSameAs(cause);
+    }
+
+    @Test
+    void metaAdviceDoesNotOverrideBusinessFailureWithItsPersistenceCause() throws Exception {
+        ReflectionTestUtils.setField(handler, "activeProfile", "dev");
+        when(localeResolver.resolveLocale(any())).thenReturn("zh-CN");
+        when(i18nService.getValue("zh-CN", "meta_record.duplicate"))
+                .thenReturn("记录已存在，请检查唯一字段后再保存");
+        CommandPhaseRegistry registry = mock(CommandPhaseRegistry.class);
+        BusinessException businessFailure = new BusinessException(ResponseCode.BadParam,
+                "$i18n:meta_record.duplicate", new DuplicateKeyException("INSERT INTO private_table"));
+        when(registry.getAllPhases()).thenThrow(businessFailure)
+                .thenThrow(new DataAccessResourceFailureException("Database private_connection unavailable"));
+        var mvc = MockMvcBuilders.standaloneSetup(new CommandPipelineController(registry))
+                .setMessageConverters(new MappingJackson2HttpMessageConverter())
+                .setControllerAdvice(new MetaApiExceptionHandler(), handler).build();
+
+        var rejected = mvc.perform(get("/api/meta/command-phases"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.context.detail").value("记录已存在，请检查唯一字段后再保存"))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(rejected).doesNotContain("INSERT INTO", "private_table", "DuplicateKeyException");
+
+        var unavailable = mvc.perform(get("/api/meta/command-phases"))
+                .andExpect(status().isInternalServerError())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(unavailable).doesNotContain("private_connection", "meta_record.duplicate");
     }
 
     @Test

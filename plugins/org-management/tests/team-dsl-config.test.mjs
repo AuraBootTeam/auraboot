@@ -41,9 +41,23 @@ test('team list/form/detail pages are present and route to the platform team mod
     .find((block) => block.id === 'team_toolbar')
     .buttons.find((button) => button.code === 'create');
   assert.equal(createButton.action.to, '/organization/teams/new');
-  assert.equal(createButton.action.command, 'org:create_team');
+  assert.equal(createButton.action.type, 'navigate');
+  assert.equal(createButton.action.command, undefined,
+    'standard team creation must use the form convention instead of a redundant command override');
+  const createCommand = readJson('config/commands/org_create_team.json');
+  assert.equal(createCommand.code, 'org:create_team');
+  assert.equal(createCommand.type, 'create');
+  assert.equal(createCommand.modelCode, listPage.modelCode);
 
   const formPage = pages[1];
+  const save = formPage.blocks.find((block) => block.id === 'team_actions').buttons
+    .find((button) => button.code === 'save');
+  assert.equal(save.action.type, 'command');
+  assert.equal(save.action.command, undefined);
+  assert.equal(save.permissionCode, 'org.team.manage',
+    'direct create/edit routes must declare the same authoring guard as both team commands');
+  assert.ok(createCommand.permissions.includes(save.permissionCode));
+  assert.ok(readJson('config/commands/org_update_team.json').permissions.includes(save.permissionCode));
   const formFields = formPage.blocks.find((block) => block.id === 'team_basic').fields;
   assert.equal(
     formFields.find((field) => field.field === 'status')?.required,

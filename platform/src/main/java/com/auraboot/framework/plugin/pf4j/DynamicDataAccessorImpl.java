@@ -167,6 +167,15 @@ public class DynamicDataAccessorImpl implements DataAccessor {
     }
 
     @Override
+    public void compareAndSetBatch(String modelCode, String fieldCode,
+            List<com.auraboot.framework.plugin.extension.CompareAndSetUpdate> updates) {
+        withCommandAuthority(() -> {
+            dynamicDataService.compareAndSetBatch(modelCode, fieldCode, updates);
+            return null;
+        });
+    }
+
+    @Override
     public List<Map<String, Object>> batchCreate(String modelCode, List<Map<String, Object>> dataList) {
         log.debug("Plugin DataAccessor: batchCreate({}, {} records)", modelCode, dataList != null ? dataList.size() : 0);
         List<Map<String, Object>> safeData = mutableCopies(dataList);

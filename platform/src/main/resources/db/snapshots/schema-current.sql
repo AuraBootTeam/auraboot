@@ -13588,7 +13588,8 @@ CREATE TABLE public.ab_permission_capability (
     order_no integer DEFAULT 100 NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    display_group_order integer
+    display_group_order integer,
+    description_en text
 );
 
 
@@ -17173,7 +17174,8 @@ CREATE TABLE public.ab_webhook_delivery_log (
     installation_pid character varying(26),
     replay_count integer DEFAULT 0 NOT NULL,
     last_replayed_at timestamp with time zone,
-    last_replayed_by_pid character varying(64)
+    last_replayed_by_pid character varying(64),
+    request_id character varying(128)
 );
 
 
@@ -17182,6 +17184,13 @@ CREATE TABLE public.ab_webhook_delivery_log (
 --
 
 COMMENT ON TABLE public.ab_webhook_delivery_log IS 'Webhook delivery attempt logs';
+
+
+--
+-- Name: COLUMN ab_webhook_delivery_log.request_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_webhook_delivery_log.request_id IS 'Originating request ID captured before asynchronous delivery; unchanged by retry/replay';
 
 
 --
@@ -17563,7 +17572,9 @@ CREATE TABLE public.mt_org_employee (
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_by bigint,
     deleted_flag boolean DEFAULT false NOT NULL,
-    row_version integer DEFAULT 1 NOT NULL
+    row_version integer DEFAULT 1 NOT NULL,
+    org_emp_code character varying(50),
+    org_emp_hire_date date
 );
 
 
@@ -17584,6 +17595,47 @@ CREATE SEQUENCE public.mt_org_employee_id_seq
 --
 
 ALTER SEQUENCE public.mt_org_employee_id_seq OWNED BY public.mt_org_employee.id;
+
+
+--
+-- Name: mt_org_position; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.mt_org_position (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    org_pos_code character varying(50),
+    org_pos_name character varying(100) NOT NULL,
+    org_pos_dept_id character varying(26) NOT NULL,
+    org_pos_level character varying(20) NOT NULL,
+    org_pos_status character varying(20) DEFAULT 'active'::character varying,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    created_by bigint,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_by bigint,
+    deleted_flag boolean DEFAULT false NOT NULL,
+    row_version integer DEFAULT 1 NOT NULL
+);
+
+
+--
+-- Name: mt_org_position_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.mt_org_position_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: mt_org_position_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.mt_org_position_id_seq OWNED BY public.mt_org_position.id;
 
 
 --
@@ -18495,6 +18547,13 @@ ALTER TABLE ONLY public.mt_org_department ALTER COLUMN id SET DEFAULT nextval('p
 --
 
 ALTER TABLE ONLY public.mt_org_employee ALTER COLUMN id SET DEFAULT nextval('public.mt_org_employee_id_seq'::regclass);
+
+
+--
+-- Name: mt_org_position id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mt_org_position ALTER COLUMN id SET DEFAULT nextval('public.mt_org_position_id_seq'::regclass);
 
 
 --
@@ -23335,6 +23394,22 @@ ALTER TABLE ONLY public.mt_org_employee
 
 
 --
+-- Name: mt_org_position mt_org_position_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mt_org_position
+    ADD CONSTRAINT mt_org_position_pid_key UNIQUE (pid);
+
+
+--
+-- Name: mt_org_position mt_org_position_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mt_org_position
+    ADD CONSTRAINT mt_org_position_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: mt_tax_einvoice_line mt_tax_einvoice_line_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -28001,6 +28076,27 @@ CREATE INDEX idx_mp_status ON public.ab_marketplace_plugin USING btree (status) 
 --
 
 CREATE INDEX idx_mp_version_tenant ON public.ab_marketplace_version USING btree (tenant_id);
+
+
+--
+-- Name: idx_mt_org_employee_org_emp_code_tenant_unique; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_mt_org_employee_org_emp_code_tenant_unique ON public.mt_org_employee USING btree (tenant_id, org_emp_code);
+
+
+--
+-- Name: idx_mt_org_position_org_pos_code_tenant_unique; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_mt_org_position_org_pos_code_tenant_unique ON public.mt_org_position USING btree (tenant_id, org_pos_code);
+
+
+--
+-- Name: idx_mt_org_position_tenant_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_mt_org_position_tenant_id ON public.mt_org_position USING btree (tenant_id);
 
 
 --

@@ -104,6 +104,36 @@ describe('SubTableViewer', () => {
     toolbarRendererMock.mockReset();
   });
 
+  it.each([
+    { code: '403', message: 'Approval history access denied', data: null },
+    { code: '1', message: 'Approval history unavailable', data: null },
+    { code: '403', message: 'Approval history access denied', data: { records: [{ pid: 'forbidden-row', taskName: 'Private task' }] } },
+  ])('shows the datasource error instead of an empty or unauthorized collection ($code)', async (result) => {
+    fetchResultMock.mockResolvedValue(result);
+    render(
+      <SubTableViewer
+        config={{ ...buildConfig(), dataSource: { kind: 'namedQuery', queryCode: 'wd_leave_request_approval_history' } } as any}
+        parentRecordPid="leave-1"
+      />,
+    );
+    await expect(screen.findByRole('alert')).resolves.toHaveTextContent(result.message);
+    expect(screen.queryByTestId('subtable-empty-state')).not.toBeInTheDocument();
+    expect(screen.queryByText('Private task')).not.toBeInTheDocument();
+  });
+
+  it('rejects a successful datasource envelope with a malformed records payload', async () => {
+    fetchResultMock.mockResolvedValue({ code: '0', data: { records: { private: 'not a collection' } } });
+    render(
+      <SubTableViewer
+        config={{ ...buildConfig(), dataSource: { kind: 'namedQuery', queryCode: 'wd_leave_request_approval_history' } } as any}
+        parentRecordPid="leave-1"
+        t={(key) => key === 'common.loadDataFailed' ? 'Unable to load data' : key}
+      />,
+    );
+    await expect(screen.findByRole('alert')).resolves.toHaveTextContent('Unable to load data');
+    expect(screen.queryByTestId('subtable-empty-state')).not.toBeInTheDocument();
+  });
+
   it('renders parent-scoped toolbar actions above an empty child collection', async () => {
     fetchResultMock.mockResolvedValue({ code: '0', data: { records: [] } });
 
@@ -126,6 +156,8 @@ describe('SubTableViewer', () => {
     );
 
     await expect(screen.findByTestId('subtable-empty-state')).resolves.toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: '节点' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: '状态' })).toBeInTheDocument();
     expect(screen.getByTestId('subtable-toolbar-actions')).toBeInTheDocument();
     expect(screen.getByTestId('mock-subtable-toolbar')).toBeInTheDocument();
     const renderedBlock = toolbarRendererMock.mock.calls.at(-1)?.[0]?.block;

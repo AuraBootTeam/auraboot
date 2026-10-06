@@ -1,3 +1,4 @@
+import { useLocalizedText } from '~/utils/i18n';
 /**
  * Bindable Property Input Component
  *
@@ -91,6 +92,7 @@ export const BindablePropertyInput: React.FC<BindablePropertyInputProps> = ({
   compact = true,
 }) => {
   // Parse value into bindable format
+  const lt = useLocalizedText();
   const bindableValue = useMemo(() => toBindableValue(value), [value]);
   const [mode, setMode] = useState<BindingMode>(bindableValue.mode);
 
@@ -154,7 +156,7 @@ export const BindablePropertyInput: React.FC<BindablePropertyInputProps> = ({
           htmlFor={property.key}
           className="flex items-center gap-1.5 text-sm font-medium text-gray-700"
         >
-          {property.label}
+          {lt(property.label)}
           {property.required && <span className="text-red-500">*</span>}
           {mode === 'expression' && <BindingIndicator mode={mode} />}
         </label>
@@ -188,7 +190,7 @@ export const BindablePropertyInput: React.FC<BindablePropertyInputProps> = ({
 
       {/* Description */}
       {property.description && !error && (
-        <p className="text-xs text-gray-500">{property.description}</p>
+        <p className="text-xs text-gray-500">{lt(property.description)}</p>
       )}
 
       {/* Error */}

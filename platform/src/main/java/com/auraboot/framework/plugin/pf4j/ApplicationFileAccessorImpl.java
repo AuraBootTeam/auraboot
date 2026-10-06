@@ -31,12 +31,19 @@ public class ApplicationFileAccessorImpl implements FileAccessor {
         return delegate().isLinkedTo(fileId, entityType, entityId, fieldName);
     }
     @Override public boolean retain(String fileId) { return delegate().retain(fileId); }
+    @Override public void linkExisting(String fileId, String entityType, String entityId, String fieldName) {
+        delegate().linkExisting(fileId, entityType, entityId, fieldName);
+    }
     @Override public SavedFile save(String originalName, String contentType, byte[] bytes) {
         return delegate().save(originalName, contentType, bytes);
     }
     @Override public SavedFile saveAndLink(String originalName, String contentType, byte[] bytes,
                                            String entityType, String entityId, String fieldName) {
         return delegate().saveAndLink(originalName, contentType, bytes, entityType, entityId, fieldName);
+    }
+    @Override public SavedFile saveAndAppendLink(String originalName, String contentType, byte[] bytes,
+                                                 String entityType, String entityId, String fieldName) {
+        return delegate().saveAndAppendLink(originalName, contentType, bytes, entityType, entityId, fieldName);
     }
     @Override public List<FileMetadata> listLinked(String entityType, String entityId, String fieldName) {
         List<FileEntity> files = fileService.getFilesByEntityAndField(entityType, entityId, fieldName);

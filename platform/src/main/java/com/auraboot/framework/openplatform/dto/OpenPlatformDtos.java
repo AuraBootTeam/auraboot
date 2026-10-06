@@ -72,7 +72,7 @@ public final class OpenPlatformDtos {
     public record CallAuditView(String requestId, String method, String path, Integer status,
                                 Long durationMs, Instant occurredAt) { }
 
-    public record WebhookDeliveryView(String pid, String subscriptionName, String eventId,
+    public record WebhookDeliveryView(String pid, String subscriptionName, String eventId, String requestId,
                                       String status, Integer retryCount, Integer maxRetries,
                                       Integer responseStatus, String failureReason,
                                       Instant nextRetryAt, Instant lastAttemptAt, Instant deliveredAt,

@@ -73,12 +73,17 @@ public class CapabilityResolver {
                             .code(d.getCode())
                             .group(displayMeta.group())
                             .label(label(d))
+                            .localizedLabels(localizedLabels(d))
+                            .description(d.getDescription())
+                            .localizedDescriptions(localizedDescriptions(d))
                             .sensitive(Boolean.TRUE.equals(d.getSensitive()) || displayMeta.sensitive())
                             .tier(d.getTier())
                             .displayGroupOrder(displayMeta.groupOrder())
                             .displayOrder(displayMeta.order())
                             .includes(d.getIncludes())
                             .granted(granted.containsAll(d.getIncludes()))
+                            .authorizationState(authorizationState(d.getIncludes(), granted))
+                            .missingCodes(d.getIncludes().stream().filter(code -> !granted.contains(code)).toList())
                             .conventionDerived(false)
                             .build();
                     byGroup.computeIfAbsent(displayMeta.group(), g -> new ArrayList<>()).add(cap);
@@ -111,6 +116,8 @@ public class CapabilityResolver {
                     .displayOrder(displayMeta.order())
                     .includes(includes)
                     .granted(granted.containsAll(includes))
+                    .authorizationState(authorizationState(includes, granted))
+                    .missingCodes(includes.stream().filter(code -> !granted.contains(code)).toList())
                     .conventionDerived(true)
                     .build();
             byGroup.computeIfAbsent(displayMeta.group(), g -> new ArrayList<>()).add(cap);
@@ -119,6 +126,11 @@ public class CapabilityResolver {
         List<CapabilityGroup> result = new ArrayList<>();
         byGroup.forEach((group, caps) -> result.add(new CapabilityGroup(group, caps)));
         return result;
+    }
+
+    private String authorizationState(List<String> includes, Set<String> granted) {
+        long count = includes.stream().filter(granted::contains).count();
+        return count == includes.size() ? "full" : count == 0 ? "none" : "partial";
     }
 
     public Set<String> expandToPermissionCodes(Set<String> selectedCapabilityCodes,
@@ -213,6 +225,18 @@ public class CapabilityResolver {
         return chosen != null ? chosen : rawResource;
     }
 
+    private Map<String, String> localizedLabels(CapabilityDefinitionDTO declaration) {
+        Map<String, String> labels = new LinkedHashMap<>();
+        if (declaration.getNameZhCN() != null && !declaration.getNameZhCN().isBlank()) {
+            labels.put("zh-CN", declaration.getNameZhCN());
+        }
+        if (declaration.getNameEn() != null && !declaration.getNameEn().isBlank()) {
+            // The declaration uses generic English, so all English region variants can resolve it.
+            labels.put("en", declaration.getNameEn());
+        }
+        return Map.copyOf(labels);
+    }
+
     private String label(CapabilityDefinitionDTO d) {
         if (d.getNameZhCN() != null && !d.getNameZhCN().isBlank()) {
             return d.getNameZhCN();
@@ -221,6 +245,20 @@ public class CapabilityResolver {
             return d.getNameEn();
         }
         return d.getCode();
+    }
+
+    private Map<String, String> localizedDescriptions(CapabilityDefinitionDTO declaration) {
+        // A legacy description has no declared locale. Keep it in the legacy field;
+        // only bilingual declarations associate their source description with zh-CN.
+        if (declaration.getDescriptionEn() == null || declaration.getDescriptionEn().isBlank()) {
+            return Map.of();
+        }
+        Map<String, String> descriptions = new LinkedHashMap<>();
+        descriptions.put("en", declaration.getDescriptionEn());
+        if (declaration.getDescription() != null && !declaration.getDescription().isBlank()) {
+            descriptions.put("zh-CN", declaration.getDescription());
+        }
+        return Map.copyOf(descriptions);
     }
 
     private record DisplayMeta(String group, Integer groupOrder, Integer order, boolean sensitive) {}

@@ -3,6 +3,7 @@ package com.auraboot.framework.billing.quota.controller;
 import com.auraboot.framework.billing.quota.spi.QuotaService;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.annotation.RequirePlatformAdmin;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -21,6 +22,7 @@ import java.util.stream.Collectors;
  */
 @Tag(name = "Billing Quota", description = "Quota bucket balance queries")
 @RestController
+@RequirePlatformAdmin
 @RequestMapping("/api/billing/quota")
 @RequiredArgsConstructor
 public class QuotaBucketController {

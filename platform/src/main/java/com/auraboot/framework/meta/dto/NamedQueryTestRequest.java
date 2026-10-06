@@ -21,6 +21,9 @@ public class NamedQueryTestRequest {
      */
     private Map<String, Object> parameters;
 
+    /** Free-text search over explicitly searchable query fields. */
+    private String keyword;
+
     /**
      * WHERE条件
      */

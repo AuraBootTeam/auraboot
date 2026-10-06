@@ -16,7 +16,9 @@ vi.mock('~/shared/services/http-client', () => ({
 }));
 
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
+import * as confirmations from '~/utils/confirmDialog';
 import * as promptUpload from '~/framework/meta/utils/promptUpload';
+import * as actionRegistry from '~/framework/meta/runtime/actions/ActionRegistry';
 import type { ButtonConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 
@@ -39,6 +41,45 @@ function makeRuntime(overrides: Record<string, unknown> = {}): SchemaRuntime {
     getFlowRunner: () => null,
   } as unknown as SchemaRuntime;
 }
+
+describe('useActionHandler - offboarding action propagation', () => {
+  it.each(['suspend', 'deactivate', 'remove'])('uses the same %s action for impact and recipient lookup', async action => {
+    fetchResultMock.mockReset();
+    fetchResultMock.mockResolvedValue({ code: '0', data: { transferRequired: true, ownedResourceCount: 1 } });
+    const input = vi.spyOn(actionRegistry, 'promptInputForm').mockRejectedValue(new Error('cancelled'));
+    try {
+      const { result } = renderHook(() => useActionHandler({
+        runtime: makeRuntime(),
+        navigate: vi.fn() as any,
+        tableName: 'tenant_member',
+        locale: 'en-US',
+        t: key => key,
+      }));
+      await act(async () => {
+        await result.current.handleAction({
+          code: 'member-offboarding',
+          action: { type: 'command', command: 'admin:suspend_member', offboardingAction: action },
+        } as unknown as ButtonConfig, { pid: 'MEMBER-1' });
+      });
+      expect(fetchResultMock).toHaveBeenCalledWith(
+        '/api/tenant/members/MEMBER-1/offboarding-impact',
+        expect.objectContaining({ method: 'get', params: { action } }),
+      );
+      expect(input).toHaveBeenCalledWith(
+        expect.arrayContaining([expect.objectContaining({
+          field: 'targetMemberPid',
+          dataSource: expect.objectContaining({
+            endpoint: `/api/tenant/members/\${record.pid}/offboarding-candidates?action=${action}`,
+          }),
+        })]),
+        expect.anything(), expect.anything(), undefined, expect.anything(),
+      );
+      expect(fetchResultMock).toHaveBeenCalledTimes(1);
+    } finally {
+      input.mockRestore();
+    }
+  });
+});
 
 describe('useActionHandler - handlerParams.async polling', () => {
   beforeEach(() => { fetchResultMock.mockReset(); confirmMock.mockReset(); });
@@ -1728,5 +1769,33 @@ describe('useActionHandler - handlerParams.async polling', () => {
         }),
       }),
     );
+  });
+});
+
+
+describe('useActionHandler - explicit confirmation style', () => {
+  it.each([
+    [undefined, 'danger'],
+    ['default', 'default'],
+    ['danger', 'danger'],
+  ] as const)('uses %s confirmation style and preserves cancellation', async (variant, expected) => {
+    fetchResultMock.mockReset();
+    const confirm = vi.spyOn(confirmations, 'confirmDialog').mockResolvedValue(false);
+    try {
+      const { result } = renderHook(() => useActionHandler({
+        runtime: makeRuntime(), navigate: vi.fn() as any, tableName: 'tenant_member',
+        locale: 'en-US', t: key => key,
+      }));
+      await act(async () => {
+        await result.current.handleAction({
+          code: 'restore', confirm: 'Restore this member?', confirmVariant: variant,
+          action: { type: 'command', command: 'admin:restore_member' },
+        } as ButtonConfig, { pid: 'MEMBER-1' });
+      });
+      expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ variant: expected }));
+      expect(fetchResultMock).not.toHaveBeenCalled();
+    } finally {
+      confirm.mockRestore();
+    }
   });
 });

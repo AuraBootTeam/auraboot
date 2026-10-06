@@ -210,216 +210,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Observed(name = "dynamic_data.list", contextualName = "dynamic-data-list")
     public PaginationResult<Map<String, Object>> list(String modelCode, DynamicQueryRequest request) {
-        validateModelCode(modelCode);
-        logOperation("list", modelCode, request);
-
-        // 获取模型定义
-        ModelDefinition model = getModelDefinition(modelCode);
-
-        // Phase 1 virtual-model dispatch: if the model has a non-physical sourceType
-        // AND an executor is registered for it, delegate. Otherwise fall through to
-        // the existing physical-table inline path (preserves full backward compatibility).
-        Optional<ModelDataExecutor> executorOpt = executorRegistry.resolve(model.getSourceType());
-        if (executorOpt.isPresent()) {
-            return executorOpt.get().list(modelCode, request);
-        }
-
-        // VIEW models have no physical table — delegate to NamedQuery
-        if ("view".equals(model.getModelType())) {
-            return listFromNamedQuery(resolveViewNamedQueryCode(modelCode), request);
-        }
-
-        // 构建查询
-        QueryBuilderService.QueryBuilder queryBuilder = queryBuilderService.buildConditionQuery(
-                model, request.getConditions());
-
-        // Keyset pagination flag — when cursor is present, sort is forced to ORDER BY pid ASC
-        boolean useCursor = request.getCursor() != null;
-
-        // 添加排序 (skipped in cursor mode — cursor pagination requires ORDER BY pid ASC)
-        if (!useCursor) {
-            if (request.getSortFields() != null && !request.getSortFields().isEmpty()) {
-                List<SortField> mappedSortFields = mapSortFields(model, request.getSortFields());
-                queryBuilder = queryBuilderService.buildOrderQuery(queryBuilder, mappedSortFields, model);
-            } else {
-                queryBuilder.addOrderBy(DEFAULT_LIST_SORT_COLUMN, DEFAULT_LIST_SORT_DIRECTION);
-            }
-        }
-
-        // 添加租户条件
-        Long tenantId = getCurrentTenantId();
-        queryBuilder.addCondition("tenant_id", QueryCondition.Operator.EQ.name(), tenantId);
-
-        Long userId = getCurrentUserId();
-        String permitRowFilter = CommandPermitDataAccess.rowFilter(modelCode, userId);
-        boolean commandPermitInForce = permitRowFilter != null;
-        String scopedRowFilter = null;
-        String scopedDomainFilter = null;
-        if (commandPermitInForce) {
-            scopedRowFilter = permitRowFilter;
-            if (!scopedRowFilter.isBlank()) {
-                queryBuilder.addRawCondition(scopedRowFilter);
-            }
-        } else {
-            // 添加数据权限行级过滤 — fail-secure: exception = deny all
-            try {
-                scopedRowFilter = DynamicDataQueryScope.rowFilter(tenantId, modelCode, userId,
-                        () -> dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId));
-                if (scopedRowFilter != null && !scopedRowFilter.isBlank()) {
-                    queryBuilder.addRawCondition(scopedRowFilter);
-                }
-            } catch (Exception e) {
-                // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
-                log.error("Failed to apply row-level data permission for model {} — returning empty result for security", logSafe(modelCode), e);
-                throw new MetaServiceException("Data permission evaluation failed for model: " + modelCode, e);
-            }
-        }
-
-        if (!commandPermitInForce) {
-            // Apply data domain isolation filter (D5) — fail-secure
-            try {
-                scopedDomainFilter = DynamicDataQueryScope.domainFilter(tenantId, modelCode, userId,
-                        () -> dataDomainService.buildDomainFilter(modelCode, userId));
-                if (scopedDomainFilter != null && !scopedDomainFilter.isBlank()) {
-                    queryBuilder.addRawCondition(scopedDomainFilter);
-                }
-            } catch (Exception e) {
-                // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
-                log.error("Failed to apply domain filter for model {} — returning empty result for security", logSafe(modelCode), e);
-                throw new MetaServiceException("Data domain filter evaluation failed for model: " + modelCode, e);
-            }
-        }
-
-        // Add keyword search across searchable fields
-        if (request.getKeyword() != null && !request.getKeyword().isBlank()) {
-            queryBuilder = queryBuilderService.buildKeywordSearch(queryBuilder, request.getKeyword(), model);
-        }
-
-        // Keyset (cursor-based) pagination: when cursor is provided, use WHERE pid > cursor
-        // instead of OFFSET for O(1) deep pagination performance.
-        if (useCursor) {
-            queryBuilder.addCondition("pid", "GT", request.getCursor());
-            // Force ORDER BY pid ASC for consistent public cursor traversal
-            queryBuilder.addOrderBy("pid", "ASC");
-            queryBuilder.setLimit(Math.min(request.getPageSize(), 1000));
-        } else {
-            // Traditional offset pagination
-            PaginationRequest pageRequest = new PaginationRequest(
-                    request.getPageNum(),
-                    request.getPageSize(),
-                    request.getKeyword()
-            );
-            queryBuilder = queryBuilderService.buildPaginationQuery(queryBuilder, pageRequest);
-        }
-
-        // 验证查询安全性
-        QueryValidationResult validation = queryBuilderService.validateQuery(queryBuilder);
-        if (!validation.isValid()) {
-            throw new MetaServiceException("Query validation failed: " + validation.getErrorMessage());
-        }
-
-        // 手动添加租户ID条件到SQL和参数中
-        String sql = queryBuilder.getSql();
-        Map<String, Object> paramMap = queryBuilder.getParameterMap();
-
-        // 执行查询
-        List<Map<String, Object>> records = dynamicDataMapper.selectByQuery(sql, paramMap);
-
-        // Read-shape contract: json/jsonb fields leave as JSON strings, never PGobject.
-        JsonbFieldHelper.normalizeJsonReadValues(model, records);
-
-        // Build count query with same filters (including row-level data permission)
-        QueryBuilderService.QueryBuilder countBuilder = queryBuilderService.buildConditionQuery(
-                model, request.getConditions());
-        countBuilder.addCondition("tenant_id", QueryCondition.Operator.EQ.name(), tenantId);
-
-        // Reuse the exact row-level filter from the data query so count cannot drift and
-        // the same request does not re-run permission lookup for the count builder.
-        if (scopedRowFilter != null && !scopedRowFilter.isBlank()) {
-            countBuilder.addRawCondition(scopedRowFilter);
-        }
-
-        // Reuse the exact domain filter from the data query for count consistency and to
-        // avoid duplicate domain metadata lookup in one list request.
-        if (scopedDomainFilter != null && !scopedDomainFilter.isBlank()) {
-            countBuilder.addRawCondition(scopedDomainFilter);
-        }
-
-        // Apply the same keyword search to count query for consistency
-        if (request.getKeyword() != null && !request.getKeyword().isBlank()) {
-            queryBuilderService.buildKeywordSearch(countBuilder, request.getKeyword(), model);
-        }
-
-        // Rewrite to count SQL
-        String countSql = secureSqlRewriter.rewriteForCount(countBuilder.getSql());
-        Map<String, Object> countParamMap = countBuilder.getParameterMap();
-
-        Long total = dynamicDataMapper.countByQuery(countSql, countParamMap);
-
-        if (!commandPermitInForce) {
-            // 应用列级字段脱敏 (policy-based) — fail-secure: masking failure = deny access
-            try {
-                List<FieldMaskRule> maskRules = dataPermissionEngine.getFieldMaskRules(tenantId, modelCode, userId);
-                if (maskRules != null && !maskRules.isEmpty()) {
-                    records = dataPermissionEngine.applyFieldMasking(records, maskRules);
-                }
-            } catch (Exception e) {
-                // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
-                log.error("Failed to apply field masking for model {} — returning empty result for security", logSafe(modelCode), e);
-                throw new MetaServiceException("Field masking evaluation failed for model: " + modelCode, e);
-            }
-        }
-
-        if (!commandPermitInForce) {
-            // Apply configurable field masking (A9) — fail-secure
-            try {
-                records = fieldMaskService.applyMaskingForList(modelCode, records, userId);
-            } catch (Exception e) {
-                // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
-                log.error("Failed to apply configurable field masking for model {} — returning empty result for security", logSafe(modelCode), e);
-                throw new MetaServiceException("Configurable field masking failed for model: " + modelCode, e);
-            }
-        }
-
-        if (!commandPermitInForce) {
-            // Resolve requested audit actors while the canonical created_by / updated_by IDs are
-            // still available, then let field permissions remove those raw internal IDs. The
-            // public controller exposes only the safe `<field>_display` projection.
-            records = enrichAuditUsersBeforeFieldPermissionFilter(
-                    modelCode, records, request.getAuditUserDisplayFields());
-        }
-
-        // Command handlers consume canonical stored values (ids/codes), not presentation-only
-        // `<field>_display` projections. Their permit boundary was already evaluated by the
-        // command pipeline, so target-reference authorization/enrichment here is both redundant
-        // and a large N+1 multiplier for multi-step commands.
-        if (!commandPermitInForce) {
-            records = enrichListRecords(modelCode, records);
-        }
-
-        if (useCursor) {
-            // Extract nextCursor from the last record's public pid.
-            String nextCursor = null;
-            if (!records.isEmpty()) {
-                Object lastPid = records.get(records.size() - 1).get("pid");
-                if (lastPid instanceof String pid && !pid.isBlank()) {
-                    nextCursor = pid;
-                }
-            }
-            return PaginationResult.ofCursor(
-                    records,
-                    total,
-                    request.getPageSize(),
-                    nextCursor
-            );
-        }
-
-        return PaginationResult.of(
-                records,
-                total,
-                request.getPageNum(),
-                request.getPageSize()
-        );
+        return dynamicDataListingSupport().list(modelCode,request);
     }
 
     /**
@@ -594,6 +385,130 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         return updated == 1;
     }
 
+    @Override
+    @Transactional
+    public void compareAndSetBatch(String modelCode, String fieldCode,
+            List<com.auraboot.framework.plugin.extension.CompareAndSetUpdate> updates) {
+        validateModelCode(modelCode);
+        assertWritable(modelCode);
+        if (updates == null || updates.isEmpty() || fieldCode == null || fieldCode.isBlank()) {
+            throw new MetaServiceException("CAS batch and compare field cannot be empty");
+        }
+        ModelDefinition model = getModelDefinition(modelCode);
+        ModelMutationGuard.assertMutable(model, "updated");
+        FieldDefinition compareField = DynamicDataValueMapper.findFieldDefinition(model, fieldCode);
+        assertBatchCasField(compareField, fieldCode);
+        Set<String> ids = new HashSet<>();
+        List<Map<String, Object>> rows = new ArrayList<>();
+        List<Object> expectedValues = new ArrayList<>();
+        List<Long> versions = new ArrayList<>();
+        Set<String> columns = null;
+        java.sql.Timestamp now = java.sql.Timestamp.from(Instant.now());
+        for (var update : updates) {
+            if (update == null || !ids.add(update.recordId())) {
+                throw new MetaServiceException("CAS batch contains a null or duplicate record");
+            }
+            Map<String, Object> data = new LinkedHashMap<>(update.nextValues());
+            stripNonWritableFields(modelCode, data);
+            if (data.size() != update.nextValues().size()) {
+                throw new MetaServiceException("CAS batch contains a non-writable field");
+            }
+            for (String code : data.keySet()) {
+                assertBatchCasField(DynamicDataValueMapper.findFieldDefinition(model, code), code);
+            }
+            FieldWriterGuard.assertFieldsAllowed(model, new ArrayList<>(data.keySet()));
+            payloadTemporalNormalizer.normalize(data, model);
+            validationService.validateAndThrow(model, data, ValidationContext.UPDATE);
+            data = convertDataTypes(model, data);
+            data.put("updated_at", now);
+            data.put("updated_by", getCurrentUserId());
+            filterVirtualFields(model, data);
+            Map<String, Object> physical = toColumnData(model, data);
+            if (columns == null) columns = new LinkedHashSet<>(physical.keySet());
+            else if (!columns.equals(physical.keySet())) {
+                throw new MetaServiceException("CAS batch requires identical stored field sets");
+            }
+            rows.add(physical);
+            Map<String, Object> expected = new LinkedHashMap<>();
+            expected.put(fieldCode, update.expectedValue());
+            payloadTemporalNormalizer.normalize(expected, model);
+            expectedValues.add(convertDataTypes(model, expected).get(fieldCode));
+            versions.add(MetaContext.getCommandExpectedVersion(modelCode, update.recordId()));
+        }
+        FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
+        String pk = SqlSafetyUtils.requireIdentifier(primaryKey.getColumnName() != null
+                ? primaryKey.getColumnName() : primaryKey.getCode(), "primary key column");
+        String compare = SqlSafetyUtils.requireIdentifier(compareField.getColumnName() != null
+                ? compareField.getColumnName() : compareField.getCode(), "compare column");
+        String table = SqlSafetyUtils.requireIdentifier(model.getTableName(), "table name");
+        Set<String> jsonbColumns = JsonbFieldHelper.getJsonbHostColumns(model);
+        Map<String, Object> params = new LinkedHashMap<>();
+        StringBuilder sql = new StringBuilder("UPDATE ").append(table).append(" SET ");
+        int columnIndex = 0;
+        for (String rawColumn : columns) {
+            String column = SqlSafetyUtils.requireIdentifier(rawColumn, "column name");
+            if (columnIndex > 0) sql.append(", ");
+            // Audit values are identical across the batch. Bind them as ordinary assignments:
+            // configured Release tables may store actor IDs as VARCHAR while legacy tables use
+            // BIGINT; PostgreSQL assignment coercion handles both, CASE type unification does not.
+            if ("updated_at".equals(column) || "updated_by".equals(column)) {
+                String sharedKey = "shared" + columnIndex;
+                sql.append(column).append(" = #{params.").append(sharedKey).append("}");
+                params.put(sharedKey, rows.get(0).get(column));
+                columnIndex++;
+                continue;
+            }
+            sql.append(column).append(" = CASE ").append(pk);
+            for (int i = 0; i < updates.size(); i++) {
+                String valueKey = "value" + columnIndex + "_" + i;
+                sql.append(" WHEN #{params.id").append(i).append("} THEN #{params.").append(valueKey);
+                Object value = rows.get(i).get(column);
+                if (jsonbColumns.contains(column)) {
+                    sql.append(",jdbcType=OTHER,typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler}::jsonb");
+                    if (value != null && !(value instanceof String)) value = JsonbFieldHelper.toJsonString(value);
+                } else sql.append("}");
+                params.put(valueKey, value);
+            }
+            sql.append(" ELSE ").append(column).append(" END");
+            columnIndex++;
+        }
+        if (table.startsWith(SystemFieldConstants.DYNAMIC_TABLE_PREFIX)) {
+            sql.append(", row_version = row_version + 1");
+        }
+        Long tenantId = getCurrentTenantId();
+        params.put("tenantId", tenantId);
+        sql.append(" WHERE tenant_id = #{params.tenantId} AND (");
+        for (int i = 0; i < updates.size(); i++) {
+            if (i > 0) sql.append(" OR ");
+            params.put("id" + i, updates.get(i).recordId());
+            params.put("expected" + i, expectedValues.get(i));
+            sql.append("(").append(pk).append(" = #{params.id").append(i).append("} AND ")
+                    .append(compare).append(" IS NOT DISTINCT FROM #{params.expected").append(i).append("}");
+            if (versions.get(i) != null) {
+                params.put("version" + i, versions.get(i));
+                sql.append(" AND row_version = #{params.version").append(i).append("}");
+            }
+            sql.append(")");
+        }
+        sql.append(")");
+        appendAggregateBindingGuard(sql, params, model);
+        appendScopedWriteGuards(sql, tenantId, modelCode, getCurrentUserId(), "update");
+        int affected = dynamicDataMapper.updateByQuery(sql.toString(), params);
+        if (affected != updates.size()) {
+            throw new MetaServiceException("CAS batch conflict: no partial batch may commit");
+        }
+        for (int i = 0; i < updates.size(); i++) {
+            if (versions.get(i) != null) MetaContext.advanceCommandExpectedVersion(modelCode, updates.get(i).recordId());
+        }
+    }
+
+    private static void assertBatchCasField(FieldDefinition field, String code) {
+        if (field.isPrimaryKey() || field.isJsonbVirtual() || field.isVirtual()
+                || field.isImmutable() || field.getImmutableWhen() != null) {
+            throw new MetaServiceException("CAS batch requires writable mutable stored fields: " + code);
+        }
+    }
+
     /**
      * Resolve a field code to its physical column name, asserting it is numeric.
      * Throws {@link IllegalArgumentException} (NOT {@link MetaServiceException}) so the
@@ -654,23 +569,11 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
     @Override
     public PaginationResult<Map<String, Object>> listByQueryCode(String queryCode, DynamicQueryRequest request) {
-        log.info("List by NamedQuery data source: queryCode={}", logSafe(queryCode));
-        return listFromNamedQuery(queryCode, request);
+        return dynamicDataListingSupport().listByQueryCode(queryCode,request);
     }
 
     private String resolveViewNamedQueryCode(String modelCode) {
-        var modelEntity = metaModelMapper.findCurrentByCode(modelCode);
-        if (modelEntity == null) {
-            return modelCode;
-        }
-        Object namedQuery = modelEntity.getExtension() != null
-                ? modelEntity.getExtension().get("namedQuery")
-                : null;
-        if (namedQuery == null) {
-            return modelCode;
-        }
-        String code = namedQuery.toString().trim();
-        return code.isEmpty() ? modelCode : code;
+        return dynamicDataListingSupport().resolveViewNamedQueryCode(modelCode);
     }
 
     /**
@@ -678,49 +581,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
      * Passes through filter conditions and sort fields from the dynamic query request.
      */
     private PaginationResult<Map<String, Object>> listFromNamedQuery(String queryCode, DynamicQueryRequest request) {
-        // codeql[java/log-injection] Named query codes are validated metadata identifiers and are logged as structured parameters only.
-        log.debug("NamedQuery list: code={}", logSafe(queryCode));
-        NamedQueryTestRequest nqRequest = new NamedQueryTestRequest();
-        nqRequest.setPage(request.getPageNum());
-        nqRequest.setSize(request.getPageSize());
-        nqRequest.setExecuteQuery(true);
-
-        ObjectMapper mapper = new ObjectMapper();
-
-        // Pass through filter conditions
-        if (request.getConditions() != null && !request.getConditions().isEmpty()) {
-            var whereArray = mapper.createArrayNode();
-            for (QueryCondition cond : request.getConditions()) {
-                var node = mapper.createObjectNode();
-                node.put("field", cond.getFieldName());
-                node.put("operator", cond.getOperator().name().toLowerCase());
-                if (cond.getOperator() == QueryCondition.Operator.IN || cond.getOperator() == QueryCondition.Operator.NOT_IN) {
-                    node.set("value", mapper.valueToTree(cond.getValues() != null ? cond.getValues() : List.of()));
-                } else if (cond.getOperator() == QueryCondition.Operator.BETWEEN) {
-                    node.set("value", mapper.valueToTree(cond.getValues() != null ? cond.getValues() : List.of()));
-                } else {
-                    node.set("value", mapper.valueToTree(cond.getValue()));
-                }
-                whereArray.add(node);
-            }
-            nqRequest.setWhereConditions(whereArray);
-        }
-
-        // Pass through sort fields
-        if (request.getSortFields() != null && !request.getSortFields().isEmpty()) {
-            var orderArray = mapper.createArrayNode();
-            for (SortField sf : request.getSortFields()) {
-                var node = mapper.createObjectNode();
-                node.put("field", sf.getFieldName());
-                node.put("direction", sf.getDirection().name());
-                orderArray.add(node);
-            }
-            nqRequest.setOrderConditions(orderArray);
-        }
-
-        PaginationResult<Map<String, Object>> result = namedQueryService.executeQuery(queryCode, nqRequest);
-        enrichAuditUserDisplayFields(result.getRecords(), request.getAuditUserDisplayFields());
-        return result;
+        return dynamicDataListingSupport().listFromNamedQuery(queryCode,request);
     }
 
     @Override
@@ -1210,7 +1071,6 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             // or a real refusal that must not be delivered silently.
             assertNoDeniedFieldWrites(modelCode, inputData, strippedNonWritable, existingRecord);
 
-
             // Normalize temporal string values to typed objects (LocalDate/Instant) before validation
             payloadTemporalNormalizer.normalize(data, model);
             // 使用验证服务的严格模式进行验证
@@ -1334,6 +1194,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
             return updatedRecord;
 
+        } catch (AccessDeniedException e) {
+            throw e;
         } catch (RecordVersionConflictException e) {
             // Pass the wire-stable 409/40900 contract through unwrapped: mobile
             // offline replay keys on this status to branch into conflict resolution.
@@ -1377,7 +1239,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             updateData.put("updated_at", java.time.Instant.now());
             updateData.put("updated_by", getCurrentUserId());
             result = executeScopedUpdate(
-                    model, modelCode, primaryKeyColumn, recordId, updateData, Set.of(), planExpectedVersion);
+                    model, modelCode, primaryKeyColumn, recordId, updateData, Set.of(), planExpectedVersion, "delete");
         } else {
             // Hard delete: DELETE FROM (default behavior)
             result = executeScopedDelete(
@@ -1416,16 +1278,15 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             Map<String, Object> columnData,
             Set<String> jsonbColumns,
             Object expectedVersion) {
-        return executeScopedUpdate(
-                model,
-                modelCode,
-                primaryKeyColumn,
-                recordId,
-                columnData,
-                jsonbColumns,
-                expectedVersion,
-                null,
-                null);
+        return dynamicScopedWriteSupport().executeScopedUpdate(model,modelCode,primaryKeyColumn,recordId,columnData,jsonbColumns,expectedVersion);
+    }
+
+    private int executeScopedUpdate(
+            ModelDefinition model, String modelCode, String primaryKeyColumn, String recordId,
+            Map<String, Object> columnData, Set<String> jsonbColumns, Object expectedVersion,
+            String permissionOperation) {
+        return executeScopedUpdate(model, modelCode, primaryKeyColumn, recordId, columnData,
+                jsonbColumns, expectedVersion, null, null, permissionOperation);
     }
 
     private int executeScopedUpdate(
@@ -1438,77 +1299,11 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             Object expectedVersion,
             String compareColumn,
             Object compareValue) {
-        if (columnData == null || columnData.isEmpty()) {
-            throw new MetaServiceException("Update data cannot be empty");
-        }
+        return dynamicScopedWriteSupport().executeScopedUpdate(model,modelCode,primaryKeyColumn,recordId,columnData,jsonbColumns,expectedVersion,compareColumn,compareValue);
+    }
 
-        String tableName = SqlSafetyUtils.requireIdentifier(model.getTableName(), "table name");
-        String pkColumn = SqlSafetyUtils.requireIdentifier(primaryKeyColumn, "primary key column");
-        Long tenantId = getCurrentTenantId();
-        Long userId = getCurrentUserId();
-
-        Map<String, Object> params = new LinkedHashMap<>();
-        StringBuilder sql = new StringBuilder("UPDATE ")
-                .append(tableName)
-                .append(" SET ");
-        int index = 0;
-        for (Map.Entry<String, Object> entry : columnData.entrySet()) {
-            String columnName = SqlSafetyUtils.requireIdentifier(entry.getKey(), "column name");
-            if (index > 0) {
-                sql.append(", ");
-            }
-            String paramName = "set" + index;
-            if (jsonbColumns != null && jsonbColumns.contains(columnName)) {
-                sql.append(columnName).append(" = #{params.").append(paramName)
-                        .append(",jdbcType=OTHER,typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler}::jsonb");
-            } else {
-                sql.append(columnName).append(" = #{params.").append(paramName).append("}");
-            }
-            Object parameterValue = entry.getValue();
-            // The SQL cast alone is not enough: MyBatis sees a Map first and
-            // asks PostgreSQL for its hstore handler. Serialize every structured
-            // JSONB value at this final binding chokepoint so regular JSON fields
-            // and values produced by virtual-field merging behave identically.
-            if (jsonbColumns != null && jsonbColumns.contains(columnName)
-                    && parameterValue != null && !(parameterValue instanceof String)) {
-                parameterValue = JsonbFieldHelper.toJsonString(parameterValue);
-            }
-            params.put(paramName, parameterValue);
-            index++;
-        }
-        if (tableName.startsWith(SystemFieldConstants.DYNAMIC_TABLE_PREFIX)) {
-            if (index > 0) {
-                sql.append(", ");
-            }
-            // Every successful dynamic-model mutation advances the public optimistic token,
-            // including legacy callers that do not yet submit an expectedVersion. When a trusted
-            // expectedVersion is present the WHERE predicate below additionally turns this into
-            // compare-and-swap. Externally managed ab_* tables retain their own version contracts.
-            sql.append("row_version = row_version + 1");
-        }
-
-        params.put("recordId", recordId);
-        params.put("tenantId", tenantId);
-        sql.append(" WHERE ")
-                .append(pkColumn)
-                .append(" = #{params.recordId}")
-                .append(" AND tenant_id = #{params.tenantId}");
-        if (expectedVersion != null) {
-            params.put("expectedVersion", expectedVersion);
-            sql.append(" AND row_version = #{params.expectedVersion}");
-        }
-        if (compareColumn != null) {
-            String guardedColumn = SqlSafetyUtils.requireIdentifier(
-                    compareColumn, "compare-and-set column");
-            params.put("compareValue", compareValue);
-            sql.append(" AND ")
-                    .append(guardedColumn)
-                    .append(" IS NOT DISTINCT FROM #{params.compareValue}");
-        }
-        appendAggregateBindingGuard(sql, params, model);
-        appendScopedWriteGuards(sql, tenantId, modelCode, userId, "update");
-
-        return dynamicDataMapper.updateByQuery(sql.toString(), params);
+    private int executeScopedUpdate(ModelDefinition model, String modelCode, String primaryKeyColumn, String recordId, Map<String,Object> columnData, Set<String> jsonbColumns, Object expectedVersion, String compareColumn, Object compareValue, String permissionOperation) {
+        return dynamicScopedWriteSupport().executeScopedUpdate(model, modelCode, primaryKeyColumn, recordId, columnData, jsonbColumns, expectedVersion, compareColumn, compareValue, permissionOperation);
     }
 
     private int executeScopedDelete(
@@ -1517,28 +1312,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             String primaryKeyColumn,
             String recordId,
             Long expectedVersion) {
-        String tableName = SqlSafetyUtils.requireIdentifier(model.getTableName(), "table name");
-        String pkColumn = SqlSafetyUtils.requireIdentifier(primaryKeyColumn, "primary key column");
-        Long tenantId = getCurrentTenantId();
-        Long userId = getCurrentUserId();
-        Map<String, Object> params = new LinkedHashMap<>();
-        params.put("recordId", recordId);
-        params.put("tenantId", tenantId);
-
-        StringBuilder sql = new StringBuilder("DELETE FROM ")
-                .append(tableName)
-                .append(" WHERE ")
-                .append(pkColumn)
-                .append(" = #{params.recordId}")
-                .append(" AND tenant_id = #{params.tenantId}");
-        if (expectedVersion != null) {
-            params.put("expectedVersion", expectedVersion);
-            sql.append(" AND row_version = #{params.expectedVersion}");
-        }
-        appendAggregateBindingGuard(sql, params, model);
-        appendScopedWriteGuards(sql, tenantId, modelCode, userId, "delete");
-
-        return dynamicDataMapper.deleteByQuery(sql.toString(), params);
+        return dynamicScopedWriteSupport().executeScopedDelete(model,modelCode,primaryKeyColumn,recordId,expectedVersion);
     }
 
     /**
@@ -1555,17 +1329,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     // write, including under an authoritative command plan) is directly tested, and the guard depends on no
     // instance state.
     static void appendAggregateBindingGuard(StringBuilder sql, Map<String, Object> params, ModelDefinition model) {
-        String aggregateId = MetaContext.getCommandAggregateId();
-        if (aggregateId == null || model == null) {
-            return;
-        }
-        ModelDefinition.AggregateBinding binding = model.getAggregateBinding();
-        if (binding == null || binding.getLocalField() == null || binding.getLocalField().isBlank()) {
-            return;
-        }
-        String column = resolveBindingColumn(model, binding.getLocalField());
-        params.put("authorizedAggregateId", aggregateId);
-        sql.append(" AND ").append(column).append(" = #{params.authorizedAggregateId}");
+        DynamicScopedWriteSupport.appendAggregateBindingGuard(sql,params,model);
     }
 
     /**
@@ -1573,17 +1337,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
      * when the model declares no explicit column, which is the common case.
      */
     private static String resolveBindingColumn(ModelDefinition model, String fieldCode) {
-        String column = fieldCode;
-        if (model.getFields() != null) {
-            for (FieldDefinition field : model.getFields()) {
-                if (fieldCode.equals(field.getCode()) && field.getColumnName() != null
-                        && !field.getColumnName().isBlank()) {
-                    column = field.getColumnName();
-                    break;
-                }
-            }
-        }
-        return SqlSafetyUtils.requireIdentifier(column, "aggregate binding column");
+        return DynamicScopedWriteSupport.resolveBindingColumn(model,fieldCode);
     }
 
     /**
@@ -1613,108 +1367,21 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             String modelCode,
             Long userId,
             String operation) {
-        String permitFilter = CommandPermitDataAccess.rowFilter(modelCode, userId);
-        if (permitFilter != null) {
-            appendScopedBulkFilter(sql, permitFilter);
-            return;
-        }
-
-        try {
-            String rowFilter = resolveWriteRowFilter(tenantId, modelCode, userId);
-            appendScopedBulkFilter(sql, rowFilter);
-        } catch (Exception e) {
-            log.error("Failed to apply row-level data permission for {} on model {} — denying access",
-                    operation, logSafe(modelCode), e);
-            throw new MetaServiceException("Data permission evaluation failed for model: " + modelCode, e);
-        }
-
-        try {
-            String domainFilter = DynamicDataQueryScope.domainFilter(tenantId, modelCode, userId,
-                    () -> dataDomainService.buildDomainFilter(modelCode, userId));
-            appendScopedBulkFilter(sql, domainFilter);
-        } catch (Exception e) {
-            log.error("Failed to apply domain filter for {} on model {} — denying access",
-                    operation, logSafe(modelCode), e);
-            throw new MetaServiceException("Data domain filter evaluation failed for model: " + modelCode, e);
-        }
+        dynamicScopedWriteSupport().appendScopedWriteGuards(sql,tenantId,modelCode,userId,operation);
     }
 
     /**
      * The row filter for a guarded write. A command plan executes its authoritative grade directly:
      * ALL contributes no predicate and SELF contributes the owner predicate. Without a command plan,
-     * direct callers retain the existing engine path.
+     * direct callers use the existing engine with the actual write action.
      */
     private String resolveWriteRowFilter(Long tenantId, String modelCode, Long userId) {
-        String permitFilter = CommandPermitDataAccess.rowFilter(modelCode, userId);
-        if (permitFilter != null) {
-            return permitFilter;
-        }
-        return DynamicDataQueryScope.rowFilter(tenantId, modelCode, userId,
-                () -> dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId));
+        return dynamicScopedWriteSupport().resolveWriteRowFilter(tenantId,modelCode,userId);
     }
 
     @Override
     public DynamicBatchResponse batchCreate(String modelCode, List<Map<String, Object>> dataList) {
-        validateModelCode(modelCode);
-        assertWritable(modelCode);
-        if (dataList == null || dataList.isEmpty()) {
-            throw new MetaServiceException("Data list cannot be null or empty");
-        }
-
-        logOperation("batchCreate", modelCode, dataList.size());
-
-        ModelDefinition model = getModelDefinition(modelCode);
-        ModelMutationGuard.assertCreateAllowed(model);
-        FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
-
-        DynamicBatchResponse response = new DynamicBatchResponse();
-        response.setTotal(dataList.size());
-
-        int successCount = 0;
-        int failedCount = 0;
-        List<String> errors = new ArrayList<>();
-
-        // No outer @Transactional — each create() runs in its own transaction
-        for (int i = 0; i < dataList.size(); i++) {
-            try {
-                Map<String, Object> data = dataList.get(i);
-
-                // Check if record already exists (idempotent behavior)
-                Object primaryKeyValue = data.get(primaryKey.getCode());
-                if (primaryKeyValue != null) {
-                    try {
-                        Map<String, Object> existingRecord = getById(modelCode, primaryKeyValue.toString());
-                        if (existingRecord != null) {
-                            log.info("Record with primary key {} already exists, skipping creation", logSafe(primaryKeyValue));
-                            successCount++;
-                            continue;
-                        }
-                    } catch (MetaServiceException e) {
-                        if (!isRecordNotFound(e)) {
-                            throw e;
-                        }
-                        // Record does not exist, proceed with creation.
-                    }
-                }
-
-                create(modelCode, data);
-                successCount++;
-            } catch (org.springframework.dao.DuplicateKeyException e) {
-                // Reliable duplicate key detection via exception type, not string matching
-                log.info("Duplicate key detected for row {}, treating as success", i + 1);
-                successCount++;
-            } catch (Exception e) {
-                failedCount++;
-                errors.add("Row " + (i + 1) + ": " + e.getMessage());
-                log.warn("Batch create failed for row {}: {}", i + 1, logSafe(e.getMessage()), e);
-            }
-        }
-
-        response.setSuccess(successCount);
-        response.setFailed(failedCount);
-        response.setErrors(errors);
-
-        return response;
+        return dynamicDataBatchSupport().batchCreate(modelCode,dataList);
     }
 
     /**
@@ -1732,216 +1399,31 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional
     public List<Map<String, Object>> bulkCreate(String modelCode, List<Map<String, Object>> dataList) {
-        validateModelCode(modelCode);
-        assertWritable(modelCode);
-        if (dataList == null || dataList.isEmpty()) {
-            throw new MetaServiceException("Data list cannot be null or empty");
-        }
-
-        logOperation("bulkCreate", modelCode, dataList.size());
-
-        ModelDefinition model = getModelDefinition(modelCode);
-        ModelMutationGuard.assertCreateAllowed(model);
-        ensureTableExists(modelCode);
-        FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
-        Set<String> jsonbColumns = JsonbFieldHelper.getJsonbHostColumns(model);
-
-        Object currentUserId = getCurrentUserId();
-        Object currentTenantId = getCurrentTenantId();
-        java.time.Instant now = java.time.Instant.now();
-
-        List<Map<String, Object>> columnDataList = new ArrayList<>(dataList.size());
-        List<Map<String, Object>> createdRecords = new ArrayList<>(dataList.size());
-
-        for (Map<String, Object> input : dataList) {
-            if (input == null || input.isEmpty()) {
-                throw new MetaServiceException("Data cannot be null or empty");
-            }
-            // Per-row prefix identical to create(): strip → normalize → validate → enrich → PK →
-            // convert types → filter virtual → toColumnData. Work on a copy so caller maps stay intact.
-            Map<String, Object> data = new HashMap<>(input);
-            FieldWriterGuard.assertCreateAllowed(model, data);
-            stripNonWritableFields(modelCode, data);
-            payloadTemporalNormalizer.normalize(data, model);
-            validationService.validateAndThrow(model, data, ValidationContext.CREATE);
-
-            Map<String, Object> enrichedData = new HashMap<>(data);
-            enrichedData.put("created_at", now);
-            enrichedData.put("created_by", currentUserId);
-            enrichedData.put("updated_at", now);
-            enrichedData.put("updated_by", currentUserId);
-            enrichedData.put("tenant_id", currentTenantId);
-
-            if (!enrichedData.containsKey(primaryKey.getCode())) {
-                enrichedData.put(primaryKey.getCode(), typeSystemManager.generatePrimaryKey(primaryKey));
-            }
-
-            enrichedData = convertDataTypes(model, enrichedData);
-            filterVirtualFields(model, enrichedData);
-
-            columnDataList.add(toColumnData(model, enrichedData));
-            createdRecords.add(enrichedData); // carries generated PK, in input order
-        }
-
-        int inserted = jsonbColumns.isEmpty()
-                ? dynamicDataMapper.batchInsert(model.getTableName(), columnDataList)
-                : dynamicDataMapper.batchInsertWithJsonb(model.getTableName(), columnDataList, jsonbColumns);
-        if (inserted != dataList.size()) {
-            throw new MetaServiceException(
-                    "Bulk create expected " + dataList.size() + " rows inserted but got " + inserted);
-        }
-
-        return createdRecords;
+        return dynamicDataBatchSupport().bulkCreate(modelCode,dataList);
     }
 
     private boolean isRecordNotFound(MetaServiceException e) {
-        String message = e.getMessage();
-        return message != null && message.startsWith("Record not found:");
+        return dynamicDataBatchSupport().isRecordNotFound(e);
     }
 
     @Override
     @Transactional
     public DynamicBatchResponse batchUpdate(String modelCode, List<Map<String, Object>> dataList) {
-        validateModelCode(modelCode);
-        assertWritable(modelCode);
-        if (dataList == null || dataList.isEmpty()) {
-            throw new MetaServiceException("Data list cannot be null or empty");
-        }
-
-        logOperation("batchUpdate", modelCode, dataList.size());
-
-        ModelDefinition model = getModelDefinition(modelCode);
-        ModelMutationGuard.assertMutable(model, "batch updated");
-        FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
-
-        DynamicBatchResponse response = new DynamicBatchResponse();
-        response.setTotal(dataList.size());
-
-        int successCount = 0;
-        int failedCount = 0;
-        List<String> errors = new ArrayList<>();
-
-        for (int i = 0; i < dataList.size(); i++) {
-            try {
-                Map<String, Object> data = dataList.get(i);
-                Object recordId = data.get(primaryKey.getCode());
-                if (recordId == null) {
-                    throw new MetaServiceException("Primary key is required for update");
-                }
-
-                update(modelCode, recordId.toString(), data);
-                successCount++;
-            } catch (Exception e) {
-                failedCount++;
-                errors.add("Row " + (i + 1) + ": " + e.getMessage());
-                log.warn("Batch update failed for row {}: {}", i + 1, logSafe(e.getMessage()), e);
-            }
-        }
-
-        response.setSuccess(successCount);
-        response.setFailed(failedCount);
-        response.setErrors(errors);
-
-        return response;
+        return dynamicDataBatchSupport().batchUpdate(modelCode,dataList);
     }
 
     @Override
     @Transactional
     public void batchDelete(String modelCode, List<String> recordIds) {
-        validateModelCode(modelCode);
-        assertWritable(modelCode);
-        if (recordIds == null || recordIds.isEmpty()) {
-            throw new MetaServiceException("Record IDs cannot be null or empty");
-        }
-
-        logOperation("batchDelete", modelCode, recordIds.size());
-
-        ModelDefinition model = getModelDefinition(modelCode);
-        ModelMutationGuard.assertDeleteAllowed(model);
-        FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
-        String tableName = SqlSafetyUtils.requireIdentifier(model.getTableName(), "table name");
-        String primaryKeyColumn = SqlSafetyUtils.requireIdentifier(
-                primaryKey.getColumnName() != null ? primaryKey.getColumnName() : primaryKey.getCode(),
-                "primary key column");
-
-        Long tenantId = getCurrentTenantId();
-        Long userId = getCurrentUserId();
-        Map<String, Object> params = new LinkedHashMap<>();
-        params.put("tenantId", tenantId);
-        StringBuilder sql = new StringBuilder("DELETE FROM ")
-                .append(tableName)
-                .append(" WHERE tenant_id = #{params.tenantId}")
-                .append(" AND ")
-                .append(primaryKeyColumn)
-                .append(" IN (");
-        for (int i = 0; i < recordIds.size(); i++) {
-            String recordId = recordIds.get(i);
-            if (recordId == null || recordId.isBlank()) {
-                throw new MetaServiceException("Record ID cannot be null or empty");
-            }
-            if (i > 0) {
-                sql.append(", ");
-            }
-            String paramName = "id" + i;
-            sql.append("#{params.").append(paramName).append("}");
-            params.put(paramName, recordId);
-        }
-        sql.append(")");
-
-        String permitFilter = CommandPermitDataAccess.rowFilter(modelCode, userId);
-        if (permitFilter != null) {
-            appendScopedBulkFilter(sql, permitFilter);
-        } else {
-            try {
-                String rowFilter = dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId);
-                appendScopedBulkFilter(sql, rowFilter);
-            } catch (Exception e) {
-                log.error("Failed to apply row-level data permission for batch delete on model {} — denying access",
-                        logSafe(modelCode), e);
-                throw new MetaServiceException("Data permission evaluation failed for model: " + modelCode, e);
-            }
-
-            try {
-                String domainFilter = dataDomainService.buildDomainFilter(modelCode, userId);
-                appendScopedBulkFilter(sql, domainFilter);
-            } catch (Exception e) {
-                log.error("Failed to apply domain filter for batch delete on model {} — denying access",
-                        logSafe(modelCode), e);
-                throw new MetaServiceException("Data domain filter evaluation failed for model: " + modelCode, e);
-            }
-        }
-
-        int affected = dynamicDataMapper.deleteByQuery(sql.toString(), params);
-        if (affected != recordIds.size()) {
-            throw new MetaServiceException(
-                    "Batch delete denied: only " + affected + " of " + recordIds.size()
-                            + " requested records matched tenant and data scope");
-        }
-
-        log.info("Batch deleted {} records from model: {}", recordIds.size(), logSafe(modelCode));
+        dynamicDataBatchSupport().batchDelete(modelCode,recordIds);
     }
 
     private void appendScopedBulkFilter(StringBuilder sql, String filter) {
-        if (filter == null || filter.isBlank()) {
-            return;
-        }
-        String normalized = filter.trim();
-        if (normalized.regionMatches(true, 0, "AND ", 0, 4)) {
-            normalized = normalized.substring(4).trim();
-        } else if (normalized.regionMatches(true, 0, "WHERE ", 0, 6)) {
-            normalized = normalized.substring(6).trim();
-        }
-        if (normalized.isBlank()) {
-            return;
-        }
-        rejectStatementInjectionMarkers(normalized);
-        sql.append(" AND ").append(normalized);
+        dynamicScopedWriteSupport().appendScopedBulkFilter(sql,filter);
     }
 
     private void rejectStatementInjectionMarkers(String filter) {
-        if (filter.contains(";") || filter.contains("--") || filter.contains("/*") || filter.contains("*/")) {
-            throw new MetaServiceException("Unsafe data scope filter for batch delete");
-        }
+        dynamicScopedWriteSupport().rejectStatementInjectionMarkers(filter);
     }
 
     // ==================== Custom Query ====================
@@ -1949,16 +1431,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional(readOnly = true)
     public List<Map<String, Object>> executeCustomQuery(String modelCode, String queryName, Map<String, Object> queryParams) {
-        validateModelCode(modelCode);
-        logOperation("executeCustomQuery", modelCode, queryName);
-
-        NamedQueryTestRequest testRequest = new NamedQueryTestRequest();
-        testRequest.setParameters(queryParams != null ? queryParams : Collections.emptyMap());
-        testRequest.setSize(1000);
-        testRequest.setPage(1);
-
-        PaginationResult<Map<String, Object>> result = namedQueryService.executeQuery(queryName, testRequest);
-        return result.getRecords() != null ? result.getRecords() : Collections.emptyList();
+        return dynamicDataListingSupport().executeCustomQuery(modelCode,queryName,queryParams);
     }
 
     // ==================== Aggregate ====================
@@ -1966,79 +1439,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional(readOnly = true)
     public Map<String, Object> aggregate(String modelCode, AggregateRequest aggregateRequest) {
-        validateModelCode(modelCode);
-        logOperation("aggregate", modelCode, aggregateRequest);
-
-        ModelDefinition model = getModelDefinition(modelCode);
-
-        // Build aggregate query
-        QueryBuilderService.QueryBuilder queryBuilder = queryBuilderService.buildAggregateQuery(model, aggregateRequest);
-
-        // Add conditions if present
-        if (aggregateRequest.getConditions() != null) {
-            for (QueryCondition condition : aggregateRequest.getConditions()) {
-                queryBuilder.addCondition(condition.getFieldName(), condition.getOperator().name(), condition.getValue());
-            }
-        }
-
-        // Add tenant isolation
-        Long tenantId = getCurrentTenantId();
-        Long userId = getCurrentUserId();
-        queryBuilder.addCondition("tenant_id", QueryCondition.Operator.EQ.name(), tenantId);
-
-        // Row-level permission filter (fail-secure)
-        try {
-            String rowFilter = dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId);
-            if (rowFilter != null && !rowFilter.isBlank()) {
-                queryBuilder.addRawCondition(rowFilter);
-            }
-        } catch (Exception e) {
-            log.error("Failed to apply row-level data permission in aggregate for model {} — denying access", logSafe(modelCode), e);
-            throw new MetaServiceException("Data permission evaluation failed for aggregate: " + modelCode, e);
-        }
-
-        // Domain isolation filter (fail-secure)
-        try {
-            String domainFilter = dataDomainService.buildDomainFilter(modelCode, userId);
-            if (domainFilter != null && !domainFilter.isBlank()) {
-                queryBuilder.addRawCondition(domainFilter);
-            }
-        } catch (Exception e) {
-            log.error("Failed to apply domain filter in aggregate for model {} — denying access", logSafe(modelCode), e);
-            throw new MetaServiceException("Data domain filter evaluation failed for aggregate: " + modelCode, e);
-        }
-
-        // Add GROUP BY if present
-        String sql = queryBuilder.getSql();
-        if (aggregateRequest.getGroupByFields() != null && !aggregateRequest.getGroupByFields().isEmpty()) {
-            List<String> groupColumns = aggregateRequest.getGroupByFields().stream()
-                    .map(f -> DynamicDataValueMapper.resolveColumnName(model, f))
-                    .collect(Collectors.toList());
-            sql = sql + " GROUP BY " + String.join(", ", groupColumns);
-        }
-
-        // Add limit
-        if (aggregateRequest.getLimit() != null && aggregateRequest.getLimit() > 0) {
-            sql = sql + " LIMIT " + aggregateRequest.getLimit();
-        }
-
-        Map<String, Object> paramMap = queryBuilder.getParameterMap();
-        List<Map<String, Object>> results = dynamicDataMapper.selectByQuery(sql, paramMap);
-
-        if (results == null || results.isEmpty()) {
-            return Collections.emptyMap();
-        }
-
-        // If no GROUP BY, return the single aggregate row
-        if (aggregateRequest.getGroupByFields() == null || aggregateRequest.getGroupByFields().isEmpty()) {
-            return results.get(0);
-        }
-
-        // With GROUP BY, return all results in a wrapper
-        Map<String, Object> response = new HashMap<>();
-        response.put("groups", results);
-        response.put("groupCount", results.size());
-        return response;
+        return dynamicDataListingSupport().aggregate(modelCode,aggregateRequest);
     }
 
     // ==================== Stats ====================
@@ -2046,50 +1447,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional(readOnly = true)
     public Map<String, Object> getStats(String modelCode, Map<String, Object> statsParams) {
-        validateModelCode(modelCode);
-        logOperation("getStats", modelCode, statsParams);
-
-        // Parse stats params
-        @SuppressWarnings("unchecked")
-        List<String> fields = statsParams != null ? (List<String>) statsParams.get("fields") : null;
-        @SuppressWarnings("unchecked")
-        List<String> functions = statsParams != null ? (List<String>) statsParams.get("functions") : null;
-
-        // Build AggregateRequest
-        List<AggregateRequest.AggregateField> aggregateFields = new ArrayList<>();
-
-        // Default: count all records
-        aggregateFields.add(AggregateRequest.AggregateField.builder()
-                .fieldName("*")
-                .function(AggregateRequest.AggregateFunction.COUNT)
-                .alias("total_count")
-                .build());
-
-        // Add requested field/function combinations
-        if (fields != null && functions != null) {
-            for (String field : fields) {
-                for (String function : functions) {
-                    String alias = function.toLowerCase() + "_" + field;
-                    AggregateRequest.AggregateFunction aggFunc =
-                            AggregateRequest.AggregateFunction.valueOf(function.toUpperCase());
-                    aggregateFields.add(AggregateRequest.AggregateField.builder()
-                            .fieldName(field)
-                            .function(aggFunc)
-                            .alias(alias)
-                            .build());
-                }
-            }
-        }
-
-        @SuppressWarnings("unchecked")
-        List<String> groupByFields = statsParams != null ? (List<String>) statsParams.get("groupBy") : null;
-
-        AggregateRequest aggregateRequest = AggregateRequest.builder()
-                .aggregateFields(aggregateFields)
-                .groupByFields(groupByFields)
-                .build();
-
-        return aggregate(modelCode, aggregateRequest);
+        return dynamicDataListingSupport().getStats(modelCode,statsParams);
     }
 
     private DynamicDataRelationSupport relationSupport() {
@@ -2142,207 +1500,16 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
     // ==================== Field Options ====================
 
-    private record ReferenceOptionTarget(
-            String targetModelCode,
-            String targetTable,
-            String valueColumn,
-            String displayExpression,
-            String displayAlias,
-            String groupColumn) {
-    }
 
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> rawRefTargetMap(FieldDefinition fieldDef) {
-        Map<String, Object> extra = fieldDef == null ? null : fieldDef.getExtraProps();
-        if (extra == null || extra.isEmpty()) {
-            return null;
-        }
-        Object raw = extra.get("refTarget");
-        if (!(raw instanceof Map<?, ?>) && extra.get("extension") instanceof Map<?, ?> extension) {
-            raw = extension.get("refTarget");
-        }
-        return raw instanceof Map<?, ?> map ? (Map<String, Object>) map : null;
-    }
 
-    private ReferenceOptionTarget resolveReferenceOptionTarget(FieldDefinition fieldDef) {
-        FieldDefinition.RefTarget canonical = fieldDef == null ? null : fieldDef.getRefTarget();
-        Map<String, Object> raw = rawRefTargetMap(fieldDef);
 
-        String targetModelCode = firstText(
-                canonical == null ? null : canonical.getTargetEntity(),
-                readMapText(raw, "targetEntity", "targetModel", "targetModelCode", "modelCode", "refModelCode"));
-        String targetTable = firstText(
-                canonical == null ? null : canonical.getTargetTable(),
-                readMapText(raw, "targetTable", "table"));
-        String valueField = firstText(
-                canonical == null ? null : canonical.getValueField(),
-                readMapText(raw, "valueField", "targetValueField"),
-                "pid");
-        String displayField = firstText(
-                canonical == null ? null : canonical.getDisplayField(),
-                readMapText(raw, "displayField", "refDisplayField", "targetField", "fieldCode"),
-                "name");
 
-        if (!hasText(targetModelCode) && !hasText(targetTable)) {
-            return null;
-        }
 
-        // System aliases are fixed platform tables, not meta models. Probing their known-absent
-        // model definition for every reference field creates a negative-lookup N+1.
-        Optional<ModelDefinition> targetModelOpt = hasText(targetModelCode)
-                && resolveSystemTable(targetModelCode) == null
-                ? metadataService.getModelDefinition(targetModelCode)
-                : Optional.empty();
-        String resolvedTargetTable = firstText(
-                targetTable,
-                targetModelOpt.map(ModelDefinition::getTableName).orElse(null),
-                resolveSystemTable(targetModelCode));
-        if (!hasText(resolvedTargetTable)) {
-            return null;
-        }
-
-        String valueColumn = resolveReferenceValueColumn(targetModelOpt.orElse(null), valueField);
-        String[] displayColumn = resolveDisplayColumnExpression(targetModelOpt, targetModelCode, displayField);
-        String groupColumn = resolveReferenceValueColumn(
-                targetModelOpt.orElse(null),
-                firstText(readMapText(raw, "groupField"), "group_code"));
-        return new ReferenceOptionTarget(
-                targetModelCode,
-                resolvedTargetTable,
-                valueColumn,
-                displayColumn[0],
-                displayColumn[1],
-                groupColumn);
-    }
-
-    private String resolveReferenceValueColumn(ModelDefinition targetModel, String configuredValueField) {
-        String valueField = hasText(configuredValueField) ? configuredValueField : "pid";
-        if (targetModel != null && targetModel.getFields() != null) {
-            for (FieldDefinition field : targetModel.getFields()) {
-                String columnName = field.getColumnName() != null ? field.getColumnName() : field.getCode();
-                if (valueField.equals(field.getCode()) || valueField.equals(columnName)) {
-                    return columnName;
-                }
-            }
-        }
-        return valueField;
-    }
-
-    private String readMapText(Map<String, Object> source, String... keys) {
-        if (source == null || keys == null) {
-            return null;
-        }
-        for (String key : keys) {
-            Object value = source.get(key);
-            if (value != null && hasText(String.valueOf(value))) {
-                return String.valueOf(value);
-            }
-        }
-        return null;
-    }
-
-    private String firstText(String... values) {
-        if (values == null) {
-            return null;
-        }
-        for (String value : values) {
-            if (hasText(value)) {
-                return value;
-            }
-        }
-        return null;
-    }
-
-    private boolean hasText(String value) {
-        return value != null && !value.isBlank();
-    }
 
     @Override
     @Transactional(readOnly = true)
     public List<FieldOption> getFieldOptions(String modelCode, String fieldCode, FieldOptionRequest optionRequest) {
-        validateModelCode(modelCode);
-        logOperation("getFieldOptions", modelCode, fieldCode);
-
-        ModelDefinition model = getModelDefinition(modelCode);
-        FieldDefinition fieldDef = DynamicDataValueMapper.findFieldDefinition(model, fieldCode);
-        ReferenceOptionTarget target = resolveReferenceOptionTarget(fieldDef);
-        if (target == null) {
-            return Collections.emptyList();
-        }
-
-        // Security: validate SQL identifiers to prevent injection
-        java.util.regex.Pattern NAME_PATTERN = java.util.regex.Pattern.compile("^[a-zA-Z_][a-zA-Z0-9_]*$");
-        if (!NAME_PATTERN.matcher(target.targetTable()).matches()
-                || !NAME_PATTERN.matcher(target.valueColumn()).matches()
-                || !NAME_PATTERN.matcher(target.displayAlias()).matches()) {
-            log.warn("Invalid SQL identifier in refTarget config: table={}, value={}, display={}",
-                    logSafe(target.targetTable()), logSafe(target.valueColumn()), logSafe(target.displayAlias()));
-            return Collections.emptyList();
-        }
-
-        Long tenantId = getCurrentTenantId();
-        Long userId = getCurrentUserId();
-        int limit = optionRequest != null && optionRequest.getLimit() != null ? optionRequest.getLimit() : 50;
-        int offset = optionRequest != null && optionRequest.getOffset() != null ? optionRequest.getOffset() : 0;
-
-        DynamicDataReadSupport.ReferenceReadAccess targetAccess = evaluateReferenceReadAccess(
-                tenantId, userId, target.targetModelCode());
-        if (!targetAccess.allowed()) {
-            throw new BusinessException(
-                    ResponseCode.FORBIDDEN,
-                    "Read permission is required for reference target model: "
-                            + target.targetModelCode());
-        }
-
-        // Build query
-        StringBuilder sql = new StringBuilder();
-        sql.append("SELECT ").append(target.valueColumn()).append(", ")
-                .append(target.displayExpression()).append(" AS ").append(target.displayAlias());
-        sql.append(" FROM ").append(target.targetTable());
-        sql.append(" WHERE tenant_id = #{params.tenantId}");
-
-        Map<String, Object> params = new HashMap<>();
-        params.put("tenantId", tenantId);
-
-        if (!targetAccess.rowFilter().isBlank()) {
-            sql.append(" ").append(targetAccess.rowFilter());
-        }
-
-        // Add keyword filter
-        if (optionRequest != null && optionRequest.getKeyword() != null && !optionRequest.getKeyword().isBlank()) {
-            sql.append(" AND ").append(target.displayExpression()).append(" ILIKE #{params.keyword}");
-            params.put("keyword", "%" + optionRequest.getKeyword() + "%");
-        }
-
-        // Add group filter
-        if (optionRequest != null && optionRequest.getGroup() != null && !optionRequest.getGroup().isBlank()) {
-            String groupField = target.groupColumn();
-            if (!hasText(groupField) || !NAME_PATTERN.matcher(groupField).matches()) {
-                log.warn("Invalid SQL identifier for groupField: {}", logSafe(groupField));
-                return Collections.emptyList();
-            }
-            sql.append(" AND ").append(groupField).append(" = #{params.groupValue}");
-            params.put("groupValue", optionRequest.getGroup());
-        }
-
-        sql.append(" ORDER BY ").append(target.displayAlias());
-        sql.append(" LIMIT ").append(limit);
-        sql.append(" OFFSET ").append(offset);
-
-        List<Map<String, Object>> results = dynamicDataMapper.selectByQuery(sql.toString(), params);
-
-        // Convert to FieldOption list
-        List<FieldOption> options = new ArrayList<>();
-        int sortOrder = offset;
-        for (Map<String, Object> row : results) {
-            options.add(FieldOption.builder()
-                    .value(row.get(target.valueColumn()) != null ? row.get(target.valueColumn()).toString() : null)
-                    .label(row.get(target.displayAlias()) != null ? row.get(target.displayAlias()).toString() : null)
-                    .sortOrder(sortOrder++)
-                    .build());
-        }
-
-        return options;
+        return referenceOptionsQuery().getFieldOptions(modelCode,fieldCode,optionRequest);
     }
 
     // ==================== Export ====================
@@ -2350,181 +1517,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional(readOnly = true)
     public ExportResult exportData(String modelCode, DataExportRequest exportRequest) {
-        validateModelCode(modelCode);
-        logOperation("exportData", modelCode, exportRequest);
-
-        Instant startTime = Instant.now();
-        ModelDefinition model = getModelDefinition(modelCode);
-
-        // Permission checks BEFORE outer try — failures must NOT be swallowed
-        Long tenantId = getCurrentTenantId();
-        Long userId = getCurrentUserId();
-
-        String rowFilter;
-        try {
-            rowFilter = dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId);
-        } catch (Exception e) {
-            log.error("Failed to apply row-level data permission in export for model {} — denying access", logSafe(modelCode), e);
-            throw new MetaServiceException("Data permission evaluation failed for export: " + modelCode, e);
-        }
-
-        String domainFilter;
-        try {
-            domainFilter = dataDomainService.buildDomainFilter(modelCode, userId);
-        } catch (Exception e) {
-            log.error("Failed to apply domain filter in export for model {} — denying access", logSafe(modelCode), e);
-            throw new MetaServiceException("Data domain filter failed for export: " + modelCode, e);
-        }
-
-        try {
-            // Build query for export data
-            List<QueryCondition> conditions = exportRequest.getConditions() != null
-                    ? exportRequest.getConditions() : Collections.emptyList();
-            QueryBuilderService.QueryBuilder queryBuilder = queryBuilderService.buildConditionQuery(model, conditions);
-            if (exportRequest.getKeyword() != null && !exportRequest.getKeyword().isBlank()) {
-                queryBuilder = queryBuilderService.buildKeywordSearch(
-                        queryBuilder,
-                        exportRequest.getKeyword().trim(),
-                        model);
-            }
-            queryBuilder.addCondition("tenant_id", QueryCondition.Operator.EQ.name(), tenantId);
-
-            // Apply row-level permission filter
-            if (rowFilter != null && !rowFilter.isBlank()) {
-                queryBuilder.addRawCondition(rowFilter);
-            }
-
-            // Apply domain isolation filter
-            if (domainFilter != null && !domainFilter.isBlank()) {
-                queryBuilder.addRawCondition(domainFilter);
-            }
-
-            // Add sort
-            if (exportRequest.getSortFields() != null && !exportRequest.getSortFields().isEmpty()) {
-                List<SortField> mappedSortFields = mapSortFields(model, exportRequest.getSortFields());
-                queryBuilder = queryBuilderService.buildOrderQuery(queryBuilder, mappedSortFields, model);
-            }
-
-            // Add limit
-            if (exportRequest.getLimit() != null && exportRequest.getLimit() > 0) {
-                queryBuilder.setLimit(exportRequest.getLimit());
-            }
-
-            String sql = queryBuilder.getSql();
-            Map<String, Object> paramMap = queryBuilder.getParameterMap();
-            List<Map<String, Object>> data = dynamicDataMapper.selectByQuery(sql, paramMap);
-
-            // Apply policy-based field masking (fail-secure)
-            try {
-                List<FieldMaskRule> maskRules = dataPermissionEngine.getFieldMaskRules(tenantId, modelCode, userId);
-                if (maskRules != null && !maskRules.isEmpty()) {
-                    data = dataPermissionEngine.applyFieldMasking(data, maskRules);
-                }
-            } catch (Exception e) {
-                log.error("Failed to apply policy-based masking in export for model {} — denying access", logSafe(modelCode), e);
-                throw new MetaServiceException("Policy-based masking failed for export: " + modelCode, e);
-            }
-
-            // Apply configurable field masking for export (A9)
-            try {
-                data = fieldMaskService.applyMaskingForExport(modelCode, data, userId);
-            } catch (Exception e) {
-                log.error("Failed to apply configurable masking in export for model {} — denying access",
-                        logSafe(modelCode), e);
-                throw new MetaServiceException(
-                        "Configurable field masking failed for export: " + modelCode, e);
-            }
-
-            // Export is another read surface. Apply the same field-level visibility contract as
-            // list/detail before choosing columns so a hidden field cannot leak as either a value
-            // or a header merely because the client requested its code.
-            data = applyFieldPermissionFilter(modelCode, data);
-
-            // Resolve reference display names so the export shows names, not pids (same as list/detail).
-            enrichReferenceDisplayFields(modelCode, data);
-
-            // Determine export fields
-            List<String> exportFields = exportRequest.getFields();
-            Set<String> allowedExportFields = model.getFields().stream()
-                    .map(FieldDefinition::getCode)
-                    .filter(Objects::nonNull)
-                    .filter(field -> !Set.of("id", "tenant_id", "row_version", "deleted", "deleted_flag")
-                            .contains(field))
-                    .collect(Collectors.toCollection(LinkedHashSet::new));
-            FieldPermissionSet exportFieldPermissions = fieldPermissionService.getFieldPermissions(
-                    currentMemberIdForFieldPermissions(), modelCode);
-            allowedExportFields.removeAll(exportFieldPermissions.hiddenFields());
-            if (exportFields == null || exportFields.isEmpty()) {
-                // A normal roster/export starts with business columns. Explicit
-                // authorized audit exports can still request these fields.
-                exportFields = allowedExportFields.stream()
-                        .filter(field -> !Set.of("pid", "created_at", "updated_at", "created_by", "updated_by").contains(field))
-                        .toList();
-            } else {
-                List<String> forbiddenFields = exportFields.stream()
-                        .filter(field -> !allowedExportFields.contains(field))
-                        .distinct()
-                        .toList();
-                if (!forbiddenFields.isEmpty()) {
-                    throw new MetaServiceException("Export fields are not allowed: "
-                            + String.join(",", forbiddenFields));
-                }
-                exportFields = exportFields.stream().distinct().toList();
-            }
-
-            Set<String> requestedExportFields = new LinkedHashSet<>(exportFields);
-            Set<String> referenceExportFields = model.getFields().stream()
-                    .filter(field -> requestedExportFields.contains(field.getCode()))
-                    .filter(field -> resolveEnrichmentTarget(field) != null)
-                    .map(FieldDefinition::getCode)
-                    .collect(Collectors.toCollection(LinkedHashSet::new));
-            data = materializeReferenceDisplayValues(data, referenceExportFields);
-
-            // Build field code → display label map for human-readable headers
-            Map<String, String> fieldLabelMap = buildFieldLabelMap(model.getFields());
-
-            // Generate export file
-            DataExportRequest.ExportFormat format = exportRequest.getFormat() != null
-                    ? exportRequest.getFormat() : DataExportRequest.ExportFormat.CSV;
-            String fileName = exportRequest.getFileName() != null
-                    ? exportRequest.getFileName()
-                    : modelCode + "_export_" + System.currentTimeMillis();
-
-            Path tempFile;
-            switch (format) {
-                case EXCEL:
-                    tempFile = exportAsExcel(data, exportFields, fieldLabelMap, fileName, exportRequest.getIncludeHeader());
-                    break;
-                case JSON:
-                    tempFile = exportAsJson(data, exportFields, fieldLabelMap, fileName);
-                    break;
-                case CSV:
-                default:
-                    tempFile = exportAsCsv(data, exportFields, fieldLabelMap, fileName, exportRequest.getIncludeHeader());
-                    break;
-            }
-
-            long fileSize = Files.size(tempFile);
-            return ExportResult.builder()
-                    .success(true)
-                    .filePath(tempFile.toString())
-                    .recordCount((long) data.size())
-                    .fileSize(fileSize)
-                    .format(format.name())
-                    .rowSetDigest(NamedQueryRowSetDigest.digest(data, exportFields))
-                    .exportTime(startTime)
-                    .build();
-
-        } catch (MetaServiceException e) {
-            throw e; // Never swallow permission failures
-        } catch (Exception e) {
-            log.error("Export failed for model {}: {}", logSafe(modelCode), logSafe(e.getMessage()), e);
-            return ExportResult.builder()
-                    .success(false)
-                    .errorMessage("Export failed: " + e.getMessage())
-                    .format(exportRequest.getFormat() != null ? exportRequest.getFormat().name() : "csv")
-                    .build();
-        }
+        return dynamicDataTransferSupport().exportData(modelCode,exportRequest);
     }
 
     // ==================== Import ====================
@@ -2532,104 +1525,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional
     public ImportResult importData(String modelCode, DataImportRequest importRequest) {
-        validateModelCode(modelCode);
-        assertWritable(modelCode);
-        logOperation("importData", modelCode, importRequest);
-
-        Instant startTime = Instant.now();
-        ModelDefinition model = getModelDefinition(modelCode);
-        ModelMutationGuard.assertCreateAllowed(model);
-
-        try {
-            // Validate file exists
-            Path filePath = Paths.get(importRequest.getFilePath());
-            if (!Files.exists(filePath)) {
-                return ImportResult.builder()
-                        .success(false)
-                        .summary("Import file not found: " + importRequest.getFilePath())
-                        .build();
-            }
-
-            // Parse file to data list
-            List<Map<String, Object>> records;
-            DataImportRequest.ImportFormat format = importRequest.getFormat() != null
-                    ? importRequest.getFormat() : DataImportRequest.ImportFormat.CSV;
-
-            switch (format) {
-                case JSON:
-                    records = parseJsonImport(filePath);
-                    break;
-                case CSV:
-                default:
-                    records = parseCsvImport(filePath, importRequest.getSkipFirstRow());
-                    break;
-            }
-
-            // Apply field mapping
-            Map<String, String> fieldMapping = importRequest.getFieldMapping();
-            if (fieldMapping != null && !fieldMapping.isEmpty()) {
-                records = records.stream()
-                        .map(row -> applyFieldMapping(row, fieldMapping))
-                        .collect(Collectors.toList());
-            }
-
-            // Batch insert
-            int batchSize = importRequest.getBatchSize() != null ? importRequest.getBatchSize() : 100;
-            int successCount = 0;
-            int failedCount = 0;
-            List<ImportResult.ImportError> errors = new ArrayList<>();
-            Long tenantId = getCurrentTenantId();
-
-            for (int i = 0; i < records.size(); i += batchSize) {
-                int end = Math.min(i + batchSize, records.size());
-                List<Map<String, Object>> batch = records.subList(i, end);
-
-                for (int j = 0; j < batch.size(); j++) {
-                    int rowIndex = i + j;
-                    try {
-                        Map<String, Object> record = batch.get(j);
-                        FieldWriterGuard.assertCreateAllowed(model, record);
-                        // Add system columns
-                        Map<String, Object> columnData = toColumnData(model, record);
-                        columnData.put("tenant_id", tenantId);
-                        columnData.put("created_at", Instant.now());
-                        columnData.put("created_by", getCurrentUserId());
-
-                        Set<String> batchJsonbCols = JsonbFieldHelper.getJsonbHostColumns(model);
-                        if (batchJsonbCols.isEmpty()) {
-                            dynamicDataMapper.insert(model.getTableName(), columnData);
-                        } else {
-                            dynamicDataMapper.insertWithJsonb(model.getTableName(), columnData, batchJsonbCols);
-                        }
-                        successCount++;
-                    } catch (Exception e) {
-                        failedCount++;
-                        errors.add(ImportResult.ImportError.builder()
-                                .rowNumber(rowIndex + 1)
-                                .fieldName(null)
-                                .errorMessage(e.getMessage())
-                                .build());
-                    }
-                }
-            }
-
-            return ImportResult.builder()
-                    .success(failedCount == 0)
-                    .totalCount(records.size())
-                    .successCount(successCount)
-                    .failedCount(failedCount)
-                    .errors(errors)
-                    .importTime(startTime)
-                    .summary(String.format("Imported %d/%d records", successCount, records.size()))
-                    .build();
-
-        } catch (Exception e) {
-            log.error("Import failed for model {}: {}", logSafe(modelCode), logSafe(e.getMessage()), e);
-            return ImportResult.builder()
-                    .success(false)
-                    .summary("Import failed: " + e.getMessage())
-                    .build();
-        }
+        return dynamicDataTransferSupport().importData(modelCode,importRequest);
     }
 
     // ==================== Custom Action ====================
@@ -2637,83 +1533,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional
     public ActionExecutionResult executeCustomAction(String modelCode, String actionName, Map<String, Object> actionParams) {
-        validateModelCode(modelCode);
-        logOperation("executeCustomAction", modelCode, actionName);
-
-        Instant startTime = Instant.now();
-        ModelDefinition model = getModelDefinition(modelCode);
-
-        try {
-            Map<String, Object> resultData = new HashMap<>();
-
-            switch (actionName) {
-                case "count": {
-                    Long tenantId = getCurrentTenantId();
-                    Long userId = getCurrentUserId();
-                    StringBuilder sql = new StringBuilder("SELECT COUNT(*) as cnt FROM ")
-                            .append(model.getTableName())
-                            .append(" WHERE tenant_id = #{params.tenantId}");
-                    Map<String, Object> params = new HashMap<>();
-                    params.put("tenantId", tenantId);
-
-                    String permitFilter = CommandPermitDataAccess.rowFilter(modelCode, userId);
-                    if (permitFilter != null) {
-                        appendScopedBulkFilter(sql, permitFilter);
-                    } else {
-                        String rowFilter = dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId);
-                        if (rowFilter != null && !rowFilter.isBlank()) {
-                            sql.append(" ").append(rowFilter);
-                        }
-                        String domainFilter = dataDomainService.buildDomainFilter(modelCode, userId);
-                        if (domainFilter != null && !domainFilter.isBlank()) {
-                            sql.append(" ").append(domainFilter);
-                        }
-                    }
-
-                    List<Map<String, Object>> results = dynamicDataMapper.selectByQuery(sql.toString(), params);
-                    long count = results.isEmpty() ? 0 : ((Number) results.get(0).get("cnt")).longValue();
-                    resultData.put("count", count);
-                    break;
-                }
-                case "truncate": {
-                    return ActionExecutionResult.builder()
-                            .success(false)
-                            .actionName(actionName)
-                            .errorMessage("Unsupported action: " + actionName)
-                            .executionTime(startTime)
-                            .duration(java.time.Duration.between(startTime, Instant.now()).toMillis())
-                            .build();
-                }
-                default:
-                    return ActionExecutionResult.builder()
-                            .success(false)
-                            .actionName(actionName)
-                            .errorMessage("Unsupported action: " + actionName)
-                            .executionTime(startTime)
-                            .duration(java.time.Duration.between(startTime, Instant.now()).toMillis())
-                            .build();
-            }
-
-            return ActionExecutionResult.builder()
-                    .success(true)
-                    .actionName(actionName)
-                    .resultData(resultData)
-                    .message("Action '" + actionName + "' executed successfully")
-                    .executionTime(startTime)
-                    .duration(java.time.Duration.between(startTime, Instant.now()).toMillis())
-                    .build();
-
-        } catch (Exception e) {
-            log.error("Custom action '{}' failed for model {}: {}",
-                    logSafe(actionName), logSafe(modelCode), logSafe(e.getMessage()), e);
-            return ActionExecutionResult.builder()
-                    .success(false)
-                    .actionName(actionName)
-                    .errorMessage("Action failed: " + e.getMessage())
-                    .executionTime(startTime)
-                    .duration(java.time.Duration.between(startTime, Instant.now()).toMillis())
-                    .build();
-        }
+        return dynamicDataTransferSupport().executeCustomAction(modelCode,actionName,actionParams);
     }
 
     // 私有辅助方法
@@ -2759,38 +1579,38 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     private DynamicDataFileCodec fileCodec() {
-        return new DynamicDataFileCodec(objectMapper);
+        return dynamicDataTransferSupport().fileCodec();
     }
 
     private Path exportAsExcel(List<Map<String, Object>> data, List<String> fields,
                               Map<String, String> labels, String name, Boolean header) throws IOException {
-        return fileCodec().exportAsExcel(data, fields, labels, name, header);
+        return dynamicDataTransferSupport().exportAsExcel(data,fields,labels,name,header);
     }
 
     private Path exportAsCsv(List<Map<String, Object>> data, List<String> fields,
                             Map<String, String> labels, String name, Boolean header) throws IOException {
-        return fileCodec().exportAsCsv(data, fields, labels, name, header);
+        return dynamicDataTransferSupport().exportAsCsv(data,fields,labels,name,header);
     }
 
     private Path exportAsJson(List<Map<String, Object>> data, List<String> fields,
                              Map<String, String> labels, String name) throws IOException {
-        return fileCodec().exportAsJson(data, fields, labels, name);
+        return dynamicDataTransferSupport().exportAsJson(data,fields,labels,name);
     }
 
     private List<Map<String, Object>> parseJsonImport(Path path) throws IOException {
-        return fileCodec().parseJsonImport(path);
+        return dynamicDataTransferSupport().parseJsonImport(path);
     }
 
     private List<Map<String, Object>> parseCsvImport(Path path, Boolean skipFirstRow) throws IOException {
-        return fileCodec().parseCsvImport(path, skipFirstRow);
+        return dynamicDataTransferSupport().parseCsvImport(path,skipFirstRow);
     }
 
     private Map<String, Object> applyFieldMapping(Map<String, Object> row, Map<String, String> mapping) {
-        return fileCodec().applyFieldMapping(row, mapping);
+        return dynamicDataTransferSupport().applyFieldMapping(row,mapping);
     }
 
     private List<SortField> mapSortFields(ModelDefinition model, List<SortField> sortFields) {
-        return DynamicDataValueMapper.mapSortFields(model, sortFields);
+        return dynamicDataListingSupport().mapSortFields(model,sortFields);
     }
 
     // ==================== Joint Sub-Table Save ====================
@@ -2798,193 +1618,44 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional
     public JointSubTableSaveResponse saveWithRelations(String modelCode, JointSubTableSaveRequest request) {
-        validateModelCode(modelCode);
-        assertWritable(modelCode);
-        if (request == null || request.getMasterData() == null) {
-            throw new MetaServiceException("Request and master data cannot be null");
-        }
-
-        long startTime = System.currentTimeMillis();
-        logOperation("saveWithRelations", modelCode, request.getMasterData().keySet());
-
-        ModelDefinition masterModel = getModelDefinition(modelCode);
-        FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
-        String pkField = primaryKey.getCode();
-
-        List<String> errors = new ArrayList<>();
-        Map<String, Integer> subTableCounts = new HashMap<>();
-        Map<String, List<Map<String, Object>>> savedRecords = new HashMap<>();
-        Map<String, List<JointSubTableSaveResponse.SubTableError>> subTableErrors = new HashMap<>();
-
-        try {
-            // Step 1: Determine if this is create or update
-            Object existingPkValue = request.getMasterData().get(pkField);
-            boolean isUpdate = existingPkValue != null && !existingPkValue.toString().trim().isEmpty();
-            JointSubTableSaveResponse.OperationType opType;
-            Map<String, Object> savedMaster;
-            String masterId;
-
-            // Step 2: Save master record
-            if (isUpdate) {
-                opType = JointSubTableSaveResponse.OperationType.UPDATE;
-                masterId = existingPkValue.toString();
-                savedMaster = update(modelCode, masterId, request.getMasterData());
-                log.info("Updated master record: model={}, id={}", logSafe(modelCode), logSafe(masterId));
-            } else {
-                opType = JointSubTableSaveResponse.OperationType.CREATE;
-                savedMaster = create(modelCode, request.getMasterData());
-                masterId = savedMaster.get(pkField).toString();
-                log.info("Created master record: model={}, id={}", logSafe(modelCode), logSafe(masterId));
-            }
-
-            // Step 3: Process each sub-table
-            if (request.getTables() != null && !request.getTables().isEmpty()) {
-                for (Map.Entry<String, List<Map<String, Object>>> entry : request.getTables().entrySet()) {
-                    String tableKey = entry.getKey();
-                    List<Map<String, Object>> childRows = entry.getValue();
-
-                    if (childRows == null) {
-                        continue;
-                    }
-
-                    // Resolve relation name
-                    String relationName = tableKey;
-                    if (request.getRelationMappings() != null && request.getRelationMappings().containsKey(tableKey)) {
-                        relationName = request.getRelationMappings().get(tableKey);
-                    }
-
-                    try {
-                        // Find relation definition
-                        RelationDefinition relation = findRelationByName(masterModel, relationName);
-                        if (relation == null) {
-                            errors.add("Relation '" + relationName + "' not found in model " + modelCode);
-                            continue;
-                        }
-
-                        // Get target model
-                        String targetModelCode = relation.getTargetModel();
-                        ModelDefinition targetModel = getModelDefinition(targetModelCode);
-
-                        // Delete existing child records if replace mode
-                        if (Boolean.TRUE.equals(request.getReplaceExisting()) && isUpdate) {
-                            ModelMutationGuard.assertMutable(targetModel, "replaced");
-                            deleteExistingChildRecords(relation, masterId);
-                        }
-
-                        // Save child records
-                        List<Map<String, Object>> savedChildren = new ArrayList<>();
-                        List<JointSubTableSaveResponse.SubTableError> rowErrors = new ArrayList<>();
-                        int successCount = 0;
-
-                        for (int i = 0; i < childRows.size(); i++) {
-                            Map<String, Object> childData = new HashMap<>(childRows.get(i));
-
-                            try {
-                                // Inject foreign key
-                                String fkField = relation.getTargetField();
-                                childData.put(fkField, masterId);
-
-                                // Create child record
-                                Map<String, Object> savedChild = create(targetModelCode, childData);
-                                savedChildren.add(savedChild);
-                                successCount++;
-                        } catch (Exception e) {
-                            log.warn("Failed to save child record at index {} for relation {}: {}",
-                                    i, logSafe(relationName), logSafe(e.getMessage()), e);
-                                rowErrors.add(JointSubTableSaveResponse.SubTableError.builder()
-                                        .rowIndex(i)
-                                        .message(e.getMessage())
-                                        .data(childData)
-                                        .build());
-                            }
-                        }
-
-                        subTableCounts.put(relationName, successCount);
-                        savedRecords.put(relationName, savedChildren);
-
-                        if (!rowErrors.isEmpty()) {
-                            subTableErrors.put(relationName, rowErrors);
-                            errors.add("Sub-table '" + relationName + "' had " + rowErrors.size() + " errors");
-                        }
-
-                        log.info("Saved {} records for relation: {}", successCount, logSafe(relationName));
-
-                    } catch (Exception e) {
-                        log.error("Failed to process sub-table {}: {}", logSafe(tableKey), logSafe(e.getMessage()), e);
-                        errors.add("Sub-table '" + tableKey + "': " + e.getMessage());
-                    }
-                }
-            }
-
-            long duration = System.currentTimeMillis() - startTime;
-
-            return JointSubTableSaveResponse.builder()
-                    .success(errors.isEmpty())
-                    .masterId(masterId)
-                    .masterRecord(savedMaster)
-                    .subTableCounts(subTableCounts)
-                    .savedRecords(savedRecords)
-                    .subTableErrors(subTableErrors)
-                    .errors(errors)
-                    .duration(duration)
-                    .operationType(opType)
-                    .build();
-
-        } catch (Exception e) {
-            log.error("Joint save failed for model {}: {}", logSafe(modelCode), logSafe(e.getMessage()), e);
-            long duration = System.currentTimeMillis() - startTime;
-            errors.add("Master save failed: " + e.getMessage());
-            return JointSubTableSaveResponse.failure(errors, duration);
-        }
+        return dynamicJointSaveSupport().saveWithRelations(modelCode,request);
     }
 
     /**
      * Find relation by name (supports both relation name and target model code)
      */
     private RelationDefinition findRelationByName(ModelDefinition model, String relationName) {
-        if (model.getRelations() == null || model.getRelations().isEmpty()) {
-            return null;
-        }
-
-        // First try exact name match
-        for (RelationDefinition relation : model.getRelations()) {
-            if (relationName.equals(relation.getName())) {
-                return relation;
-            }
-        }
-
-        // Try target model code match
-        for (RelationDefinition relation : model.getRelations()) {
-            if (relationName.equals(relation.getTargetModel())) {
-                return relation;
-            }
-        }
-
-        return null;
+        return dynamicJointSaveSupport().findRelationByName(model,relationName);
     }
 
     /**
      * Delete existing child records for a relation
      */
     private void deleteExistingChildRecords(RelationDefinition relation, String masterId) {
-        Long tenantId = getCurrentTenantId();
+        dynamicJointSaveSupport().deleteExistingChildRecords(relation,masterId);
+    }
 
-        if (relation.getRelationType() == RelationDefinition.RelationType.MANY_TO_MANY) {
-            // For M2M, delete from join table
-            Map<String, Object> conditions = new HashMap<>();
-            conditions.put(relation.getSourceField(), masterId);
-            conditions.put("tenant_id", tenantId);
-            dynamicDataMapper.delete(relation.getJoinTable(), conditions);
-            log.debug("Deleted existing M2M relations from {} for master {}",
-                    logSafe(relation.getJoinTable()), logSafe(masterId));
-        } else if (relation.getRelationType() == RelationDefinition.RelationType.ONE_TO_MANY) {
-            // For O2M, delete from target table
-            Map<String, Object> conditions = new HashMap<>();
-            conditions.put(relation.getTargetField(), masterId);
-            conditions.put("tenant_id", tenantId);
-            dynamicDataMapper.delete(relation.getTargetTable(), conditions);
-            log.debug("Deleted existing child records from {} for master {}",
-                    logSafe(relation.getTargetTable()), logSafe(masterId));
-        }
+    private DynamicReferenceOptionsQuery referenceOptionsQuery() {
+        return new DynamicReferenceOptionsQuery(dynamicDataMapper, metadataService, readSupport(), this::getModelDefinition);
+    }
+
+    private DynamicScopedWriteSupport dynamicScopedWriteSupport() {
+        return new DynamicScopedWriteSupport(dynamicDataMapper, dataPermissionEngine, dataDomainService);
+    }
+
+    private DynamicDataTransferSupport dynamicDataTransferSupport() {
+        return new DynamicDataTransferSupport(queryBuilderService, dynamicDataMapper, objectMapper, dataPermissionEngine, fieldMaskService, dataDomainService, fieldPermissionService, DynamicDataServiceImpl::buildFieldLabelMap, DynamicDataServiceImpl::materializeReferenceDisplayValues, this::applyFieldPermissionFilter, this::currentMemberIdForFieldPermissions, this::resolveEnrichmentTarget, this::enrichReferenceDisplayFields, this::appendScopedBulkFilter, this::getModelDefinition, this::assertWritable, this::toColumnData, this::mapSortFields);
+    }
+
+    private DynamicJointSaveSupport dynamicJointSaveSupport() {
+        return new DynamicJointSaveSupport(metadataService, dynamicDataMapper, this::create, this::update, this::getModelDefinition, this::assertWritable);
+    }
+
+    private DynamicDataBatchSupport dynamicDataBatchSupport() {
+        return new DynamicDataBatchSupport(metadataService, validationService, typeSystemManager, dynamicDataMapper, dataPermissionEngine, dataDomainService, payloadTemporalNormalizer, this::getById, this::create, this::convertDataTypes, this::filterVirtualFields, this::stripNonWritableFields, this::ensureTableExists, this::update, this::appendScopedBulkFilter, this::getModelDefinition, this::assertWritable, this::toColumnData);
+    }
+
+    private DynamicDataListingSupport dynamicDataListingSupport() {
+        return new DynamicDataListingSupport(queryBuilderService, namedQueryService, secureSqlRewriter, dynamicDataMapper, dataPermissionEngine, fieldMaskService, dataDomainService, metaModelMapper, executorRegistry, this::enrichAuditUsersBeforeFieldPermissionFilter, this::enrichListRecords, this::enrichAuditUserDisplayFields, this::getModelDefinition);
     }
 }

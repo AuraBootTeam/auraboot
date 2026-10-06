@@ -505,7 +505,7 @@ record_share:
   remove: 移除协作成员
   removed: 协作成员已移除
   remove_failed: 移除协作成员失败
-  notification_title: 客户协作权限已更新
+  notification_title: 记录协作权限已更新
   notification_content: 你已获得一条共享记录的{0}权限，请从对应的协作视图查看。
   notification_permission_read: 仅查看
   notification_permission_collaborate: 可协作
@@ -1330,6 +1330,13 @@ workbench:
     copyTaskDesc: 指派给你、仍需处理的工作项。
     copyMentionTitle: 提及
     copyMentionDesc: 同事在消息中 @ 你的内容。
+    markedRead: 待办已标为已读
+    markReadFailed: 待办标为已读失败
+    dismissed: 待办已忽略
+    dismissFailed: 忽略待办失败
+    allMarkedRead: 所有待办已标为已读
+    markAllReadFailed: 全部待办标为已读失败
+    approvalCompleted: 审批操作已完成
   notificationCenter:
     title: 通知中心
     unreadCount: "{count} 条未读通知"
@@ -2040,6 +2047,34 @@ openPlatform:
   replayConfirmTitle: 重放此投递？
   replayConfirmBody: 原始签名载荷将再次投递，可能重复触发下游副作用。
   confirmReplay: 确认重放
+  eventCatalog: 事件目录
+  eventCatalogHint: 仅已明确发布的合作事件可供已安装应用订阅。
+  noPublishedEvents: 暂无已发布的合作事件
+  supportedVersions: 兼容版本
+  webhookHealth: Webhook 兼容性与签名
+  webhookHealthHint: 每90天轮换签名密钥，并使用受支持的事件版本。
+  noInstalledWebhooks: 此安装暂无 Webhook 订阅
+  compatible: 兼容
+  actionRequired: 需要处理
+  eventSchema: 事件版本
+  catalogVersion: 目录版本
+  signing: 签名状态
+  rotateBy: 轮换截止时间
+  chooseSupportedEventVersion: 请选择受支持的事件版本。
+  rotateSigningSecretNow: 请立即轮换签名密钥。
+  addSigningSecretBeforeDelivery: 启用投递前请添加签名密钥。
+  deliveryState:
+    dead_letter: 死信
+    failed: 失败
+    pending: 待投递
+    success: 成功
+  signingState:
+    healthy: 正常
+    due: 即将到期
+    overdue: 已过期
+    missing: 未配置
+  eventClassification:
+    partner: 合作事件
   status:
     active: 已启用
     disabled: 已停用
@@ -2659,3 +2694,77 @@ list_sample:
   loading: "加载中..."
   loaded: "已加载 {count} 条"
   failed: "样例数据加载失败，请重试。"
+"admin.permission.advanced.coverageSummary": "共 {total} 个动作 · {exceptions} 项已授权动作未被业务能力覆盖"
+"admin.permission.advanced.coverageBanner": "日常授权请使用上方业务能力。此表用于查看单个动作及包含它的能力；覆盖关系不能证明授权来源。"
+"admin.permission.advanced.coverageOnlyUncovered": "仅看未被业务能力覆盖的动作"
+"admin.permission.advanced.coverageCapability": "能力「{name}」包含"
+"admin.permission.advanced.coverageAbsent": "无业务能力覆盖"
+"admin.permission.advanced.coverageLegend": "“能力包含”表示该动作被某个已声明能力收录；“无覆盖”表示没有对应声明。二者都不代表实际授权来源。"
+"admin.permission.effective.coverageSummary": "已授权动作 {total} 项 · {exceptions} 项未被业务能力覆盖"
+"admin.permission.scope.team": "所属团队"
+"admin.permission.scope.not_configured": "未配置"
+"admin.permission.scope.invalid": "范围配置无效"
+"admin.permission.scope.no_grants": "暂无已授权动作"
+"admin.permission.scope.unavailable": "范围不可用"
+"admin.permission.scope.actual": "当前已授权动作范围"
+"admin.permission.scope.default": "角色默认范围"
+"admin.permission.scope.loadError": "角色默认范围加载失败"
+"admin.permission.scope.verifyError": "范围已提交，但未能确认保存结果，请重新加载后继续"
+"admin.permission.editor.loadError": "角色权限加载失败，请重试"
+"admin.permission.editor.capabilities": "业务能力"
+"admin.permission.editor.search": "搜索业务能力"
+"admin.permission.editor.empty": "没有匹配的业务能力"
+"admin.permission.editor.selection": "已选 {selected} / {total} 项"
+"admin.permission.editor.draft": "有 {count} 项待保存变更。请先保存或撤销草稿，再修改数据范围或高级权限。"
+"admin.permission.editor.discard": "撤销变更"
+"admin.permission.editor.reviewSave": "预览并保存"
+"admin.permission.editor.preview": "确认权限变更"
+"admin.permission.editor.add": "授予"
+"admin.permission.editor.remove": "移除"
+"admin.permission.editor.discardTitle": "放弃未保存的权限变更？"
+"admin.permission.editor.discardNote": "草稿尚未保存。继续将放弃草稿，取消则保留并继续编辑。"
+"admin.permission.role.recommendedHint": "按职责分别设置管理员、销售、采购和工程岗位角色。"
+"admin.permission.policy.loadError": "权限策略加载失败，请重试"
+"admin.permission.editor.roleHint": "选择业务能力，核对变更后保存；数据范围决定能访问哪些记录。"
+"admin.permission.editor.readOnlyHint": "当前仅可查看角色；修改需具备对应的管理权限。"
+"admin.permission.advanced.colCoverage": "能力覆盖"
+"admin.permission.capability.partialV2": "部分动作已授权"
+"admin.permission.capability.partialActionsV2": "部分动作 {granted}/{total}"
+"admin.permission.capability.partialGuidanceV2": "部分动作可能来自其他能力的共享依赖，不代表该能力已完整可用。勾选可补齐，撤销影响以保存前预览为准。"
+"admin.permission.capability.noneV2": "未授权"
+"admin.permission.capability.fullV2": "完整授权"
+"admin.permission.capability.relatedMenusV2": "相关菜单"
+"admin.permission.diagnostics.titleV2": "权限诊断 · 只读"
+"admin.permission.diagnostics.noteV2": "共 {total} 个动作；{uncovered} 项已授权动作未关联声明能力。此处展示声明覆盖关系，不代表授权来源或用户最终访问结果。"
+"admin.permission.diagnostics.searchV2": "搜索权限名称或标识"
+"admin.permission.diagnostics.actionV2": "动作"
+"admin.permission.diagnostics.stateV2": "本角色授权"
+"admin.permission.diagnostics.scopeV2": "记录范围"
+"admin.permission.diagnostics.capabilitiesV2": "关联能力"
+"admin.permission.diagnostics.codeV2": "技术标识"
+"admin.permission.diagnostics.grantedV2": "已授权"
+"admin.permission.diagnostics.noneV2": "未授权"
+"admin.permission.diagnostics.unmappedV2": "未关联声明能力"
+"admin.permission.diagnostics.emptyV2": "没有匹配动作"
+"admin.permission.editor.readbackErrorV2": "权限已保存，但读取结果失败。请重新加载后继续。"
+"admin.permission.editor.previewErrorV2": "无法计算变更影响，草稿已保留。"
+"admin.permission.editor.atomicDiffV2": "新增 {added} 个动作，移除 {removed} 个动作；另有 {preserved} 个现有动作保持不变。"
+"admin.permission.editor.roleLocalV2": "变更仅作用于当前角色。用户访问仍受其他角色、记录范围和共享关系共同影响。"
+"admin.permission.editor.draftV2": "有 {count} 项待保存变更。请保存或放弃后再修改数据范围。"
+"admin.permission.capability.scopeV2": "调整记录范围"
+"admin.permission.capability.scopeNoteV2": "仅调整此能力已有授权的记录动作。同一个动作被多个能力包含时，范围调整会共同生效；新增和撤销授权请使用上方能力选择。"
+"admin.permission.capability.noScopesV2": "没有已授权的记录动作可配置。"
+"admin.permission.capability.scopeFailureV2": "无法确认范围变更结果，部分变更可能已保存。请重新加载后继续。"
+"admin.permission.capability.revokePartialV2": "撤销已有授权"
+"admin.permission.capability.undoRevokeV2": "待撤销 · 取消撤销"
+"admin.permission.capability.scopeNamesErrorV2": "无法加载业务名称，请关闭后重新打开。"
+"admin.permission.capability.teamUnavailableV2": "此类记录未配置团队关联，不能选择“我的团队”。已有该范围本身不提供记录访问；其他角色授权或有效共享仍可能生效。"
+"admin.permission.members.temporary": "限时授权"
+"admin.permission.members.effectiveDate": "生效日期"
+"admin.permission.members.expiryDate": "到期日期"
+"admin.permission.members.colValidity": "有效期"
+"admin.permission.members.permanent": "长期有效"
+"cloudConfig.save.readbackPending": "配置已保存，请重新读取后继续修改。"
+"cloudConfig.save.retryReadback": "重试读取"
+"admin.permission.editor.impactStateDetailsV2": "查看关联能力状态、菜单及动作明细"
+"admin.permission.editor.previewStateCountsV2": "关联能力保存后状态：完整授权 {full} 项 · 部分动作 {partial} 项 · 未授权 {none} 项"

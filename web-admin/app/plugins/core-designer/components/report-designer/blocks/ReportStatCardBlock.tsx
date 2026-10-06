@@ -2,8 +2,8 @@
  * ReportStatCardBlock — KPI stat card for report headers
  */
 
+import { useSmartText } from '~/utils/i18n';
 import React from 'react';
-import { useI18n } from '~/contexts/I18nContext';
 import type { StatCardBlock } from '../types';
 
 interface ReportStatCardBlockProps {
@@ -54,31 +54,26 @@ export const ReportStatCardBlock: React.FC<ReportStatCardBlockProps> = ({
   mode,
   data = [],
 }) => {
-  const { t } = useI18n();
+  const text = useSmartText();
   const colors = COLOR_MAP[block.color || 'blue'] || COLOR_MAP.blue;
-  const designMode = mode === 'design';
-  const value = designMode ? 12345 : computeValue(data, block.valueField, block.aggregation);
+  const value = mode === 'design' ? 12345 : computeValue(data, block.valueField, block.aggregation);
 
   return (
     <div
       className={`inline-block min-w-[140px] rounded-lg border p-4 ${colors.bg} ${colors.border}`}
     >
       <div className="mb-1 text-xs tracking-wider text-gray-500 uppercase">
-        {block.label || block.title || 'Metric'}
+        {block.label || block.title || text({ zh: '指标', en: 'Metric' })}
       </div>
-      {/* The authoring placeholder must never look like a real business value:
-          render it dimmed with an explicit sample marker. */}
-      <div className={`text-2xl font-bold ${designMode ? 'text-gray-400' : colors.text}`}>
-        {formatValue(value, block.format)}
-      </div>
-      {designMode && (
-        <div className="mt-1 text-xs text-amber-500">
-          {t('report.designer.sample_value', undefined, '示意值 · 预览以真实数据为准')}
+      <div className={`text-2xl font-bold ${colors.text}`}>{formatValue(value, block.format)}</div>
+      {mode === 'design' && (
+        <div className="mt-1 text-xs text-gray-500" data-testid="report-stat-design-preview">
+          {text({ zh: '示例数据', en: 'Sample data' })}
         </div>
       )}
-      {designMode && !block.valueField && (
+      {mode === 'design' && !block.valueField && (
         <div className="mt-1 text-xs text-amber-500">
-          {t('report.designer.configure_value_field', undefined, '请配置取值字段')}
+          {text({ zh: '请配置数值字段', en: 'Configure value field' })}
         </div>
       )}
     </div>

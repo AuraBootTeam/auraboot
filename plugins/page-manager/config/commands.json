@@ -1,6 +1,7 @@
 [
   {
     "code": "pgm:create_page_schema",
+    "permissions": ["model.page_schema.create"],
     "displayName:zh-CN": "新建页面",
     "displayName:en": "Create Page",
     "type": "create",
@@ -9,6 +10,7 @@
   },
   {
     "code": "pgm:update_page_schema",
+    "permissions": ["model.page_schema.update"],
     "displayName:zh-CN": "更新页面",
     "displayName:en": "Update Page",
     "type": "update",
@@ -17,6 +19,7 @@
   },
   {
     "code": "pgm:delete_page_schema",
+    "permissions": ["model.page_schema.delete"],
     "displayName:zh-CN": "删除页面",
     "displayName:en": "Delete Page",
     "type": "delete",
@@ -28,6 +31,7 @@
   },
   {
     "code": "pgm:publish_page_schema",
+    "permissions": ["model.page_schema.publish"],
     "displayName:zh-CN": "发布",
     "displayName:en": "Publish",
     "type": "state_transition",
@@ -42,6 +46,7 @@
   },
   {
     "code": "pgm:archive_page_schema",
+    "permissions": ["model.page_schema.archive"],
     "displayName:zh-CN": "归档",
     "displayName:en": "Archive",
     "type": "state_transition",
@@ -56,6 +61,7 @@
   },
   {
     "code": "pgm:duplicate_page_schema",
+    "permissions": ["model.page_schema.duplicate"],
     "displayName:zh-CN": "复制页面",
     "displayName:en": "Duplicate Page",
     "type": "custom",

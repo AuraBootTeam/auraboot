@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useAuth } from '~/contexts/AuthContext';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
@@ -1766,13 +1767,32 @@ function DrawerEditForm({
   const [preview, setPreview] = useState<Record<string, any> | null>(null);
   const [selectedPreviewId, setSelectedPreviewId] = useState('');
 
+  const { hasPermission } = useAuth();
+  const canEdit = !config?.permissionCode || hasPermission(config.permissionCode);
+  const canEditRef = useRef(canEdit);
+  canEditRef.current = canEdit;
+  const permissionEpoch = useRef({ allowed: canEdit, generation: 0 });
+  if (permissionEpoch.current.allowed !== canEdit) {
+    permissionEpoch.current = { allowed: canEdit, generation: permissionEpoch.current.generation + 1 };
+  }
+  useEffect(() => {
+    if (canEdit) return;
+    setOpen(false);
+    setValues({});
+    setPreview(null);
+    setSelectedPreviewId('');
+    setError(null);
+    onOpenChange?.(false);
+  }, [canEdit, onOpenChange]);
+
   const isTwoPhase = Boolean(config?.previewCommand && config?.confirmCommand);
   if (fields.length === 0 || (!config?.command && !isTwoPhase))
     return <div data-testid="review-drawer-edit-form-empty" />;
   const recordPid = record ? String(record.pid ?? '') : '';
-  const disabled = !recordPid;
+  const disabled = !recordPid || !canEdit;
 
   function begin() {
+    if (disabled) return;
     const seed: Record<string, string> = {};
     for (const f of fields) {
       const raw = Object.prototype.hasOwnProperty.call(f, 'defaultValue')
@@ -1806,6 +1826,8 @@ function DrawerEditForm({
   }
 
   async function submit() {
+    if (!canEditRef.current) return;
+    const permissionGeneration = permissionEpoch.current.generation;
     // A field marked required must not be cleared: a non-standard BOM's description is Yunhan's
     // search key, so submitting it blank would re-price against nothing.
     const missing = fields.find((f: any) => f.required && (values[f.field] ?? '').trim() === '');
@@ -1836,6 +1858,7 @@ function DrawerEditForm({
           reload: isTwoPhase ? [] : Array.isArray(config.reload) ? config.reload : [],
         },
       });
+      if (!canEditRef.current || permissionGeneration !== permissionEpoch.current.generation) return;
       if (isTwoPhase) {
         if (!result || typeof result !== 'object') {
           throw new Error(
@@ -1870,6 +1893,7 @@ function DrawerEditForm({
         onOpenChange?.(false);
       }
     } catch (e: any) {
+      if (!canEditRef.current || permissionGeneration !== permissionEpoch.current.generation) return;
       setError(e?.message || String(e));
     } finally {
       setSaving(false);
@@ -1877,7 +1901,8 @@ function DrawerEditForm({
   }
 
   async function confirmPreview() {
-    if (!preview || !isTwoPhase) return;
+    if (!canEditRef.current || !preview || !isTwoPhase) return;
+    const permissionGeneration = permissionEpoch.current.generation;
     const previewIdField = config.preview?.previewIdField || 'previewId';
     const candidateRows = Array.isArray(readPath(preview, config.preview?.candidatesField))
       ? readPath(preview, config.preview?.candidatesField)
@@ -1908,6 +1933,7 @@ function DrawerEditForm({
           reload: Array.isArray(config.reload) ? config.reload : [],
         },
       });
+      if (!canEditRef.current || permissionGeneration !== permissionEpoch.current.generation) return;
       // A delayed reload must not reopen a closed drawer or replace a newly selected row.
       if (isRecordSelected && !isRecordSelected()) return;
       for (const selection of Array.isArray(config.afterConfirmSelections)
@@ -1925,6 +1951,7 @@ function DrawerEditForm({
       setOpen(false);
       onOpenChange?.(false);
     } catch (e: any) {
+      if (!canEditRef.current || permissionGeneration !== permissionEpoch.current.generation) return;
       setError(e?.message || String(e));
     } finally {
       setSaving(false);
@@ -2310,7 +2337,7 @@ function DrawerEditForm({
                 <button
                   type="button"
                   data-testid="review-drawer-edit-confirm"
-                  disabled={saving}
+                  disabled={saving || !canEdit}
                   onClick={() => void confirmPreview()}
                   className="rounded-control bg-accent px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
                 >
@@ -2414,7 +2441,7 @@ function DrawerEditForm({
             <button
               type="button"
               data-testid="review-drawer-edit-submit"
-              disabled={saving}
+              disabled={saving || !canEdit}
               onClick={() => void submit()}
               className="rounded-control bg-accent px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
             >
@@ -2438,6 +2465,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
   runtime,
 }) => {
   const context = runtime.getContext();
+  const { hasPermission } = useAuth();
   const locale = context.locale || 'zh-CN';
   const t = context.t || ((key: string) => key);
   const evaluator = runtime.getEvaluator();
@@ -2569,6 +2597,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
   }, [selectedRecordKey]);
 
   const runAction = async (actionConfig: any, source: 'candidate' | 'export') => {
+    if (actionConfig.permissionCode && !hasPermission(actionConfig.permissionCode)) return;
     const code = String(actionConfig.code || actionConfig.id || actionConfig.label);
     setRunningAction(`${source}:${code}`);
     try {
@@ -2771,8 +2800,9 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
     selectedCandidate,
   };
   const isActionVisible = (actionConfig: any) =>
-    !actionConfig.visibleWhen ||
-    evaluator.evaluateCondition(actionConfig.visibleWhen, actionContext);
+    (!actionConfig.permissionCode || hasPermission(actionConfig.permissionCode)) &&
+    (!actionConfig.visibleWhen ||
+      evaluator.evaluateCondition(actionConfig.visibleWhen, actionContext));
   const isActionDisabledByCondition = (actionConfig: any) =>
     actionConfig.disabledWhen
       ? evaluator.evaluateCondition(actionConfig.disabledWhen, actionContext)

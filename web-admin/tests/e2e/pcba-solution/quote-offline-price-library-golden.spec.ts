@@ -1,4 +1,5 @@
 import { test, expect } from '../../fixtures';
+import { ensureSidebarExpanded } from '../helpers';
 import {
   cleanupRows,
   dynamicCreate,
@@ -57,18 +58,33 @@ test.describe('PCBA quote offline price library golden', () => {
       // UI:关键字筛选只中本批次行,单元格数值与 API/DB 值一致
       await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
       const listPath = '/p/qo_offline_material_price_common';
-      await page.goto(listPath, { waitUntil: 'domcontentloaded' });
+      await ensureSidebarExpanded(page);
+      const libraryLink = page.getByTestId('sidebar').locator(`a[href="${listPath}"]`);
+      await expect(libraryLink).toHaveCount(1);
+      await expect(libraryLink).toBeVisible();
+      await libraryLink.click();
+      await expect(page).toHaveURL(new RegExp(`${listPath}$`));
       const search = page.getByTestId('list-search-input');
       await expect(search).toBeVisible({ timeout: 20_000 });
       await search.fill(seeded[0].mpn);
       await search.press('Enter');
-      const row = page.getByRole('row').filter({ hasText: seeded[0].mpn }).first();
+      const row = page.getByRole('row').filter({ hasText: seeded[0].mpn });
+      await expect(row).toHaveCount(1);
       await expect(row).toBeVisible({ timeout: 20_000 });
       const uiText = await row.innerText();
       expect(uiText).toContain(seeded[0].price);
       expect(uiText).toContain('E2E Offline Supplier');
       // 其他两行不在当前筛选结果里
       await expect(page.getByRole('row').filter({ hasText: seeded[1].mpn })).toHaveCount(0);
+
+      // Imported evidence is inspected in this list; row clicks must not open a missing detail.
+      await expect(page).toHaveURL(url => url.pathname === listPath && url.searchParams.get('keyword') === seeded[0].mpn);
+      const filteredUrl = page.url();
+      await row.click();
+      expect(page.url()).toBe(filteredUrl);
+      await expect(row).toBeVisible();
+      await expect(search).toHaveValue(seeded[0].mpn);
+      await expect(page.locator('main')).not.toContainText(/Page Unavailable|页面不可用|加载失败/);
 
       // API 单条回读(DB 值,与列表同源):单价/币种/供应商与 UI 一致
       const apiRows = await queryDynamicRecords(page, 'qo_offline_material_price_common', [

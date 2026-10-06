@@ -3,6 +3,7 @@
  */
 
 import React from 'react';
+import { useSmartText } from '~/utils/i18n';
 import type { WatermarkBlock } from '../types';
 
 interface WatermarkBlockEditorProps {
@@ -11,22 +12,25 @@ interface WatermarkBlockEditorProps {
 }
 
 export const WatermarkBlockEditor: React.FC<WatermarkBlockEditorProps> = ({ block, onChange }) => {
+  const text = useSmartText();
   return (
     <div className="space-y-4">
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Text</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          {text({ zh: '文本', en: 'Text' })}
+        </label>
         <input
           type="text"
           value={block.text || ''}
           onChange={(e) => onChange({ text: e.target.value })}
           className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-          placeholder="e.g. CONFIDENTIAL"
+          placeholder={text({ zh: '例如：机密', en: 'e.g. CONFIDENTIAL' })}
         />
       </div>
 
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">
-          Rotation ({block.rotation ?? -30}&deg;)
+          {text({ zh: '旋转角度', en: 'Rotation' })} ({block.rotation ?? -30}&deg;)
         </label>
         <input
           type="range"
@@ -46,7 +50,7 @@ export const WatermarkBlockEditor: React.FC<WatermarkBlockEditorProps> = ({ bloc
 
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">
-          Opacity ({Math.round((block.opacity ?? 0.1) * 100)}%)
+          {text({ zh: '不透明度', en: 'Opacity' })} ({Math.round((block.opacity ?? 0.1) * 100)}%)
         </label>
         <input
           type="range"
@@ -65,7 +69,9 @@ export const WatermarkBlockEditor: React.FC<WatermarkBlockEditorProps> = ({ bloc
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Font Size</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          {text({ zh: '字号', en: 'Font Size' })}
+        </label>
         <input
           type="number"
           value={block.fontSize ?? 16}
@@ -77,7 +83,9 @@ export const WatermarkBlockEditor: React.FC<WatermarkBlockEditorProps> = ({ bloc
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Color</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          {text({ zh: '颜色', en: 'Color' })}
+        </label>
         <div className="flex items-center gap-2">
           <input
             type="color"
@@ -104,7 +112,7 @@ export const WatermarkBlockEditor: React.FC<WatermarkBlockEditorProps> = ({ bloc
           className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
         />
         <label htmlFor="watermarkRepeat" className="text-sm text-gray-700">
-          Repeat pattern
+          {text({ zh: '重复水印', en: 'Repeat pattern' })}
         </label>
       </div>
     </div>

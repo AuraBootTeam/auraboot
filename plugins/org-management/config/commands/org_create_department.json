@@ -18,7 +18,5 @@
       "pattern": "DEPT-{yyyyMMdd}-{seq}"
     }
   },
-  "permissions": [
-    "ORG.hr.manage"
-  ]
+  "permissions": ["org.hr.manage"]
 }

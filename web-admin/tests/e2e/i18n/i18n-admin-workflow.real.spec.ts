@@ -46,7 +46,11 @@ async function openResources(page: Page) {
 async function filter(page: Page, prefix: string) {
   await page.getByLabel('lang', { exact: true }).selectOption('zh-CN');
   await page.getByPlaceholder(/^(key 前缀，如 menu\.|key prefix, e\.g\. menu\.)$/).fill(prefix);
+  // Deterministically wait for the filtered list response; asserting the table
+  // before it lands races the async fetch and reads the unfiltered page.
+  const list = page.waitForResponse(r => r.url().includes('/api/admin/i18n/resources?') && r.request().method() === 'GET');
   await page.getByRole('button', { name: /^(查询|Search)$/ }).click();
+  await list;
 }
 function row(page: Page, key: string) {
   return page.getByTestId('i18n-resources-table').getByRole('row').filter({ has: page.getByRole('cell', { name: key, exact: true }) });
@@ -253,6 +257,26 @@ test.describe('i18n admin real workflow', () => {
     let member: Awaited<ReturnType<typeof openAsRole>> | undefined;
     try {
       await ensureRoleUser(admin.page, user);
+      // A fresh runtime seeds no menu for the member's L1 read codes, which renders no
+      // sidebar at all (LeftSidebar returns null on an empty menu tree) and would make the
+      // negative-navigation assertions below vacuous. Provision one real read-only entry
+      // through the admin menu API so the member sidebar is a genuinely filtered nonempty
+      // tree; admin-tier entries must still stay hidden.
+      const memberMenuPath = '/meta/models';
+      // ab_menu.pid is NOT NULL UNIQUE with no generator on the create path, so the
+      // fixture supplies its own 26-character identifier; the create envelope echoes it.
+      const memberMenuPid = `m${Date.now()}${info.workerIndex}membermenu`.padEnd(26, '0').slice(0, 26);
+      const memberMenu = await accepted<{ pid: string }>(await admin.page.request.post('/api/menu/create', { data: {
+        pid: memberMenuPid,
+        code: `e2e.ios-handover.${suffix}.member-models`,
+        name: 'Member Baseline Models',
+        path: memberMenuPath,
+        type: 1,
+        permissionCode: 'meta.model.read',
+        visible: true,
+        orderNo: 900,
+      } }));
+      expect(memberMenu.pid).toBeTruthy();
       const resource = await accepted<Resource>(await admin.page.request.post('/api/admin/i18n/resources', { data: {
         key: `e2e.ios-handover.${suffix}.permission`, lang: 'zh-CN', value: 'Permission fixture',
       } }));
@@ -271,6 +295,10 @@ test.describe('i18n admin real workflow', () => {
       const loadedSnapshot = await fetchRoleSnapshot(member.page);
       expect(loadedSnapshot.roleCodes).toEqual(['tenant_member']);
       expect(loadedSnapshot.menuPaths.length).toBeGreaterThan(0);
+      // The provisioned L1 entry proves the member sidebar is a positively filtered
+      // menu tree, not an accidental empty shell that merely lacks admin links.
+      expect(loadedSnapshot.menuPaths, `member menu must resolve ${memberMenuPath}`).toContain(memberMenuPath);
+      await expect(member.page.locator(`nav a[href="${memberMenuPath}"]`)).toHaveCount(1);
       for (const path of ['/i18n-resources', '/settings/i18n-workflow']) {
         expect(loadedSnapshot.menuPaths, `member menu must exclude ${path}`).not.toContain(path);
         await expect(member.page.locator(`nav a[href="${path}"]`)).toHaveCount(0);
@@ -379,6 +407,9 @@ test.describe('i18n admin real workflow', () => {
       expect(Number.isFinite(Date.parse(rejected.reviewedAt!))).toBe(true);
       await info.attach('rejected-original', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
       await openSidebarPage(page, '/settings/i18n-workflow');
+      // The workflow table filters by locale (page default ja-JP); the fixture resource
+      // was created as zh-CN, so a real reviewer selects the matching locale first.
+      await page.locator('select').filter({ has: page.locator('option[value="zh-CN"]') }).selectOption('zh-CN');
       await page.locator('select').filter({ has: page.locator('option[value="draft"]') }).selectOption('draft');
       await page.getByPlaceholder('Search by key or value…', { exact: true }).fill(key);
       await page.getByRole('button', { name: 'Search', exact: true }).click();

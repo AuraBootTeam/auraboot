@@ -3,9 +3,7 @@ package com.auraboot.framework.view.service;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.DataNotFoundException;
 import com.auraboot.framework.exception.ValidationException;
-import com.auraboot.framework.view.entity.SavedView;
 import com.auraboot.framework.view.mapper.SavedViewMapper;
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -29,13 +27,13 @@ import java.util.Objects;
 public class ViewShareService {
 
     private final SavedViewMapper savedViewMapper;
+    private final SavedViewService savedViewService;
 
     /**
      * Create a public share link for a view.
      */
     public Map<String, Object> createShareLink(String viewPid, String password, Integer expireHours) {
-        // findViewByPid to verify existence, but use raw JSON to get config
-        findViewByPid(viewPid);
+        savedViewService.checkPublicShareAccess(viewPid);
 
         String token = UUID.randomUUID().toString().replace("-", "");
         Instant expiresAt = expireHours != null
@@ -73,7 +71,7 @@ public class ViewShareService {
      * Revoke share link for a view.
      */
     public void revokeShareLink(String viewPid) {
-        findViewByPid(viewPid); // verify exists
+        savedViewService.checkPublicShareAccess(viewPid);
         String rawJson = savedViewMapper.selectRawViewConfigJson(viewPid);
         Map<String, Object> config = parseRawJson(rawJson);
         config.remove("__share");
@@ -86,6 +84,7 @@ public class ViewShareService {
      * Uses raw JSON query to avoid losing __share metadata during ViewConfig deserialization.
      */
     public Map<String, Object> getShareStatus(String viewPid) {
+        savedViewService.checkPublicShareAccess(viewPid);
         // Use raw JSON to preserve __share key (not mapped in ViewConfig class)
         String rawJson = savedViewMapper.selectRawViewConfigJson(viewPid);
         Map<String, Object> config = parseRawJson(rawJson);
@@ -148,13 +147,6 @@ public class ViewShareService {
         cleanConfig.remove("__share");
         result.put("viewConfig", cleanConfig);
         return result;
-    }
-
-    private SavedView findViewByPid(String pid) {
-        SavedView view = savedViewMapper.selectOne(
-                new QueryWrapper<SavedView>().eq("pid", pid));
-        if (view == null) throw new RuntimeException("View not found: " + pid);
-        return view;
     }
 
     @SuppressWarnings("unchecked")

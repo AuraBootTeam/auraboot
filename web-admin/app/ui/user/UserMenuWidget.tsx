@@ -318,6 +318,17 @@ export function UserMenuWidget({
           {user && (
             <div className="border-b border-gray-200 py-1 dark:border-gray-700">
               <Link
+                to="/personal/profile"
+                data-testid="profile-link"
+                className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                onClick={() => setShowUserDropdown(false)}
+              >
+                <IdentificationIcon className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                <span>
+                  {t('user.profile', undefined, locale.startsWith('zh') ? '个人资料' : 'Profile')}
+                </span>
+              </Link>
+              <Link
                 to="/settings/api-docs"
                 data-testid="open-platform-link"
                 className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"

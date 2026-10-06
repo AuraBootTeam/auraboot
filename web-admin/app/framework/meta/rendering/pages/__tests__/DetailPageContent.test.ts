@@ -29,6 +29,7 @@ import {
   canRenderDetailToolbarButton,
   unwrapDetailRecord,
   isDetailRecordAccessDenied,
+  isDetailRecordNotFound,
 } from '../DetailPageContent';
 
 describe('detail record access-denied feedback', () => {
@@ -40,6 +41,14 @@ describe('detail record access-denied feedback', () => {
   it('does not classify a missing record or a network failure as access denial', () => {
     expect(isDetailRecordAccessDenied({ httpStatus: 404, code: '403' })).toBe(false);
     expect(isDetailRecordAccessDenied({ code: 'NETWORK_ERROR' })).toBe(false);
+  });
+
+  it('localizes only confirmed missing records and preserves HTTP-status precedence', () => {
+    expect(isDetailRecordNotFound({ httpStatus: 404, code: 'NOT_FOUND' })).toBe(true);
+    expect(isDetailRecordNotFound({ code: '404' })).toBe(true);
+    expect(isDetailRecordNotFound({ httpStatus: 403, code: '404' })).toBe(false);
+    expect(isDetailRecordNotFound({ code: 'NETWORK_ERROR' })).toBe(false);
+    expect(isDetailRecordNotFound({ httpStatus: 500 })).toBe(false);
   });
 });
 

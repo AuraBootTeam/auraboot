@@ -329,7 +329,11 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
           ? 'grid-cols-2'
           : effectiveCards.length === 3
             ? 'grid-cols-2 md:grid-cols-3'
-            : 'grid-cols-2 md:grid-cols-3 xl:grid-cols-6';
+            : effectiveCards.length === 4
+              ? 'grid-cols-2 xl:grid-cols-4'
+              : effectiveCards.length === 5
+                ? 'grid-cols-2 md:grid-cols-3 xl:grid-cols-5'
+                : 'grid-cols-2 md:grid-cols-3 xl:grid-cols-6';
 
     return (
       <div className={cn('grid h-full gap-3', cardGridClass, className)} style={style}>

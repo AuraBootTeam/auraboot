@@ -1,3 +1,8 @@
+import type { LocalizedText } from '~/framework/meta/schemas/types';
+import { componentText } from './componentText';
+
+export type ComponentText = string | LocalizedText;
+
 /**
  * 组件配置接口定义
  * 用于统一管理Smart组件的配置信息
@@ -5,7 +10,7 @@
 
 export interface PropertySchema {
   key: string;
-  label: string;
+  label: ComponentText;
   type:
     | 'string'
     | 'number'
@@ -22,9 +27,9 @@ export interface PropertySchema {
     | 'model-select'
     | 'field-select';
   defaultValue?: any;
-  options?: Array<{ label: string; value: any }>;
+  options?: Array<{ label: ComponentText; value: any }>;
   required?: boolean;
-  description?: string;
+  description?: ComponentText;
   group?:
     | 'basic'
     | 'validation'
@@ -44,15 +49,15 @@ export interface PropertySchema {
 export interface ValidationRule {
   type: 'required' | 'minLength' | 'maxLength' | 'pattern' | 'custom' | 'min' | 'max';
   value?: any;
-  message: string;
+  message: ComponentText;
 }
 
 export interface ComponentConfig {
   type: string;
-  name: string;
+  name: ComponentText;
   category: 'form' | 'display' | 'interaction' | 'layout' | 'datetime' | 'chart';
   icon: string;
-  description: string;
+  description: ComponentText;
   defaultProps: Record<string, any>;
   propertySchema: PropertySchema[];
   validation?: ValidationRule[];
@@ -66,53 +71,53 @@ export interface ComponentConfig {
 
 export interface ComponentCategory {
   id: string;
-  name: string;
+  name: ComponentText;
   icon: string;
-  description: string;
+  description: ComponentText;
   order: number;
 }
 
 export const COMPONENT_CATEGORIES: ComponentCategory[] = [
   {
     id: 'form',
-    name: '表单组件',
+    name: componentText('category.form'),
     icon: '📝',
-    description: '用于数据输入和表单构建的组件',
+    description: componentText('category.formDescription'),
     order: 1,
   },
   {
     id: 'display',
-    name: '展示组件',
+    name: componentText('category.display'),
     icon: '📊',
-    description: '用于数据展示和信息呈现的组件',
+    description: componentText('category.displayDescription'),
     order: 2,
   },
   {
     id: 'interaction',
-    name: '交互组件',
+    name: componentText('category.interaction'),
     icon: '🎯',
-    description: '用于用户交互和操作的组件',
+    description: componentText('category.interactionDescription'),
     order: 3,
   },
   {
     id: 'layout',
-    name: '布局组件',
+    name: componentText('category.layout'),
     icon: '📐',
-    description: '用于页面布局和结构组织的组件',
+    description: componentText('category.layoutDescription'),
     order: 4,
   },
   {
     id: 'datetime',
-    name: '日期时间',
+    name: componentText('category.datetime'),
     icon: '📅',
-    description: '用于日期时间选择和显示的组件',
+    description: componentText('category.datetimeDescription'),
     order: 5,
   },
   {
     id: 'chart',
-    name: '图表组件',
+    name: componentText('category.chart'),
     icon: '📈',
-    description: '用于数据可视化和图表展示的组件',
+    description: componentText('category.chartDescription'),
     order: 6,
   },
 ];

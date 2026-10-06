@@ -54,4 +54,24 @@ describe('LocalizedTextInput', () => {
 
     expect(screen.queryByTestId('title-toggle')).not.toBeInTheDocument();
   });
+  it('preserves English content when collapsed and when Chinese is edited afterward', () => {
+    const onChange = vi.fn();
+    const value = { 'zh-CN': '标题', 'en-US': 'Title' };
+    const view = render(<LocalizedTextInput value={value} onChange={onChange} testId="title" />);
+    fireEvent.click(screen.getByTestId('title-toggle'));
+    expect(onChange).toHaveBeenLastCalledWith(value);
+    expect(screen.queryByTestId('title-en')).toBeNull();
+    view.rerender(<LocalizedTextInput value={value} onChange={onChange} testId="title" />);
+    fireEvent.change(screen.getByTestId('title-zh'), { target: { value: '新标题' } });
+    expect(onChange).toHaveBeenLastCalledWith({ 'zh-CN': '新标题', 'en-US': 'Title' });
+  });
+
+  it('keeps the legacy string shape when collapsing a Chinese-only value', () => {
+    const onChange = vi.fn();
+    render(<LocalizedTextInput value={{ 'zh-CN': '标题' }} onChange={onChange} testId="title" />);
+    fireEvent.click(screen.getByTestId('title-toggle'));
+    fireEvent.click(screen.getByTestId('title-toggle'));
+    expect(onChange).toHaveBeenLastCalledWith('标题');
+  });
+
 });

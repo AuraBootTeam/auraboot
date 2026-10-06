@@ -406,14 +406,18 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
             params,
             token,
           });
-          // Support both paginated (data.records) and direct array (data) responses
-          const rawData = result.data;
-          const resultRecords = Array.isArray(rawData) ? rawData : (rawData?.records ?? []);
-          if (ResultHelper.isSuccess(result) && Array.isArray(resultRecords)) {
-            setRows(resultRecords);
-          } else {
+          if (!ResultHelper.isSuccess(result)) {
             setRows([]);
+            throw new Error(result.message || t('common.loadDataFailed'));
           }
+          // Only a valid empty collection is an empty state; failures are errors.
+          const rawData = result.data;
+          const resultRecords = Array.isArray(rawData) ? rawData : rawData?.records;
+          if (!Array.isArray(resultRecords)) {
+            setRows([]);
+            throw new Error(t('common.loadDataFailed'));
+          }
+          setRows(resultRecords);
           setLoading(false);
           return;
         } else if (config.resolveVia) {
@@ -439,12 +443,16 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
             token,
           });
 
-          const intermediateRecords = intermediateRes.data?.records ?? [];
-          if (
-            !ResultHelper.isSuccess(intermediateRes) ||
-            !Array.isArray(intermediateRecords) ||
-            intermediateRecords.length === 0
-          ) {
+          if (!ResultHelper.isSuccess(intermediateRes)) {
+            setRows([]);
+            throw new Error(intermediateRes.message || t('common.loadDataFailed'));
+          }
+          const intermediateRecords = intermediateRes.data?.records;
+          if (!Array.isArray(intermediateRecords)) {
+            setRows([]);
+            throw new Error(t('common.loadDataFailed'));
+          }
+          if (intermediateRecords.length === 0) {
             setRows([]);
             setLoading(false);
             return;
@@ -479,12 +487,16 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
           token,
         });
 
-        const resultRecords = result.data?.records ?? [];
-        if (ResultHelper.isSuccess(result) && Array.isArray(resultRecords)) {
-          setRows(resultRecords);
-        } else {
+        if (!ResultHelper.isSuccess(result)) {
           setRows([]);
+          throw new Error(result.message || t('common.loadDataFailed'));
         }
+        const resultRecords = result.data?.records;
+        if (!Array.isArray(resultRecords)) {
+          setRows([]);
+          throw new Error(t('common.loadDataFailed'));
+        }
+        setRows(resultRecords);
       } catch (err) {
         console.error('[SubTableViewer] Failed to load data:', err);
         setError(err instanceof Error ? err.message : 'Failed to load data');
@@ -1282,8 +1294,44 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
   }
 
   if (error) {
-    return <div className="text-status-red py-4 text-center text-sm">{error}</div>;
+    return <div role="alert" className="text-status-red py-4 text-center text-sm">{error}</div>;
   }
+
+  const tableHeader = (
+    <thead className="bg-subtle">
+      <tr>
+        {isSortable && <th className="text-text-3 w-10 px-1 py-2.5 text-xs font-medium"></th>}
+        {effectiveColumns.map((col: EnrichedColumnConfig) => (
+          <th
+            key={col.field}
+            className={`text-text-2 px-4 py-2.5 text-xs font-medium tracking-wider whitespace-nowrap uppercase ${
+              col.align === 'right'
+                ? 'text-right'
+                : col.align === 'center'
+                  ? 'text-center'
+                  : 'text-left'
+            }`}
+            style={
+              col.width
+                ? {
+                    width: typeof col.width === 'number' ? `${col.width}px` : col.width,
+                    minWidth: typeof col.width === 'number' ? `${col.width}px` : col.width,
+                  }
+                : undefined
+            }
+          >
+            {col.label ? getLocalizedText(col.label, locale, t) : resolveColumnLabel(col.field)}
+            {col.required && <span className="text-status-red ml-0.5">*</span>}
+          </th>
+        ))}
+        {hasActions && (
+          <th className="text-text-2 w-28 px-4 py-2.5 text-center text-xs font-medium">
+            {t('common.actions') !== 'common.actions' ? t('common.actions') : 'Actions'}
+          </th>
+        )}
+      </tr>
+    </thead>
+  );
 
   return (
     <div
@@ -1313,63 +1361,38 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
       )}
 
       {displayRows.length === 0 && !isAdding ? (
-        <div
-          className="flex flex-col items-center justify-center px-6 py-10 text-center"
-          data-testid="subtable-empty-state"
-        >
-          <div className="text-text-2 text-sm font-medium">{emptyStateTitle}</div>
-          {emptyStateDescription ? (
-            <div className="text-text-2 mt-2 max-w-md text-sm leading-6">
-              {emptyStateDescription}
-            </div>
-          ) : null}
-          {isEditable && config.commands?.create ? (
-            <button
-              onClick={() => setIsAdding(true)}
-              data-testid="subtable-empty-action"
-              className="rounded-control bg-accent-weak text-accent border-border hover:bg-hover mt-5 border px-4 py-2 text-sm font-medium transition-colors"
-            >
-              {emptyStateActionLabel}
-            </button>
-          ) : null}
-        </div>
+        <table className="divide-border min-w-full divide-y" data-testid="subtable-table">
+          {tableHeader}
+          <tbody>
+            <tr>
+              <td colSpan={effectiveColumns.length + extraColCount}>
+                <div
+                  className="flex flex-col items-center justify-center px-6 py-10 text-center"
+                  data-testid="subtable-empty-state"
+                >
+                  <div className="text-text-2 text-sm font-medium">{emptyStateTitle}</div>
+                  {emptyStateDescription ? (
+                    <div className="text-text-2 mt-2 max-w-md text-sm leading-6">
+                      {emptyStateDescription}
+                    </div>
+                  ) : null}
+                  {isEditable && config.commands?.create ? (
+                    <button
+                      onClick={() => setIsAdding(true)}
+                      data-testid="subtable-empty-action"
+                      className="rounded-control bg-accent-weak text-accent border-border hover:bg-hover mt-5 border px-4 py-2 text-sm font-medium transition-colors"
+                    >
+                      {emptyStateActionLabel}
+                    </button>
+                  ) : null}
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       ) : (
         <table className="divide-border min-w-full divide-y" data-testid="subtable-table">
-          <thead className="bg-subtle">
-            <tr>
-              {isSortable && <th className="text-text-3 w-10 px-1 py-2.5 text-xs font-medium"></th>}
-              {effectiveColumns.map((col: EnrichedColumnConfig) => (
-                <th
-                  key={col.field}
-                  className={`text-text-2 px-4 py-2.5 text-xs font-medium tracking-wider whitespace-nowrap uppercase ${
-                    col.align === 'right'
-                      ? 'text-right'
-                      : col.align === 'center'
-                        ? 'text-center'
-                        : 'text-left'
-                  }`}
-                  style={
-                    col.width
-                      ? {
-                          width: typeof col.width === 'number' ? `${col.width}px` : col.width,
-                          minWidth: typeof col.width === 'number' ? `${col.width}px` : col.width,
-                        }
-                      : undefined
-                  }
-                >
-                  {col.label
-                    ? getLocalizedText(col.label, locale, t)
-                    : resolveColumnLabel(col.field)}
-                  {col.required && <span className="text-status-red ml-0.5">*</span>}
-                </th>
-              ))}
-              {hasActions && (
-                <th className="text-text-2 w-28 px-4 py-2.5 text-center text-xs font-medium">
-                  {t('common.actions') !== 'common.actions' ? t('common.actions') : 'Actions'}
-                </th>
-              )}
-            </tr>
-          </thead>
+          {tableHeader}
           <tbody className="bg-panel divide-border divide-y">
             <DndSubTableWrapper
               items={dndItems}

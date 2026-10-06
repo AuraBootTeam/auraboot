@@ -1,6 +1,8 @@
 package com.auraboot.framework.p1demo;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.meta.ai.AiFieldLockSupport;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,13 +44,17 @@ public class WdLeaveAiController {
     private final AcpAiAnnotationRepository annotationRepository;
 
     @PostMapping("/ai-fill")
-    public ResponseEntity<AiFillResponse> aiFill(@RequestBody AiFillRequest req) {
+    public ResponseEntity<ApiResponse<AiFillResponse>> aiFill(@RequestBody AiFillRequest req) {
         if (req == null || req.nlInput() == null || req.nlInput().isBlank()) {
-            return ResponseEntity.badRequest().body(AiFillResponse.error("ai.fill.nl_input_required"));
+            return ResponseEntity.badRequest().body(ApiResponse.error(
+                    ResponseCode.CommonValidationFailed, "$i18n:ai.fill.nl_input_required",
+                    AiFillResponse.error("ai.fill.nl_input_required")));
         }
         Long tenantId = MetaContext.getCurrentTenantId();
         if (tenantId == null) {
-            return ResponseEntity.status(401).body(AiFillResponse.error("ai.fill.tenant_required"));
+            return ResponseEntity.status(401).body(ApiResponse.error(
+                    ResponseCode.UserNotLoginInOrAccessTokenInvalid, "$i18n:ai.fill.tenant_required",
+                    AiFillResponse.error("ai.fill.tenant_required")));
         }
         String currentDate = req.currentDate() != null ? req.currentDate() : LocalDate.now().toString();
 
@@ -65,9 +71,9 @@ public class WdLeaveAiController {
                 tenantId, TARGET_MODEL_CODE, targetId, result.turnId(),
                 req.nlInput(), fields);
 
-        return ResponseEntity.ok(new AiFillResponse(
+        return ResponseEntity.ok(ApiResponse.success(new AiFillResponse(
                 result.turnId(), fields, annotationId, result.totalTokens(),
-                result.totalDollars(), null));
+                result.totalDollars(), null)));
     }
 
     @PostMapping("/safety-check")

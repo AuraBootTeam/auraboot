@@ -1,8 +1,16 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EventPolicyDesignerWorkflow } from '../EventPolicyDesignerWorkflow';
 import type { DecisionApi, EventPolicySummary } from '../../api/decisionApi';
 import type { FieldOption } from '../ConditionBuilder';
+
+const language = vi.hoisted(() => ({ locale: 'zh-CN' }));
+vi.mock('~/contexts/I18nContext', () => ({
+  useI18n: () => ({ locale: language.locale, t: (key: string) => key }),
+}));
+beforeEach(() => {
+  language.locale = 'zh-CN';
+});
 
 const FIELDS: FieldOption[] = [
   {
@@ -457,10 +465,7 @@ describe('EventPolicyDesignerWorkflow', () => {
     expect(executionResults).toHaveTextContent('幂等键 已记录');
     expect(executionResults).not.toHaveTextContent('complaint:001:R-1:NOTIFY');
     const actionRow = await screen.findByTestId('epd-action-execution-0');
-    expect(actionRow.querySelector('[title]')).toHaveAttribute(
-      'title',
-      'complaint:001:R-1:NOTIFY',
-    );
+    expect(actionRow.querySelector('[title]')).toHaveAttribute('title', 'complaint:001:R-1:NOTIFY');
     expect(payload).toHaveTextContent('通道');
     expect(payload).toHaveTextContent('in_app');
     expect(payload).toHaveTextContent('接收对象');
@@ -1041,6 +1046,132 @@ describe('EventPolicyDesignerWorkflow', () => {
           }),
         ],
       }),
+    );
+  });
+});
+
+describe('EventPolicy locale presentation', () => {
+  it.each(['en-US', 'en-GB'])(
+    'localizes tabs and enum labels for %s without changing values',
+    (locale) => {
+      language.locale = locale;
+      render(<EventPolicyDesignerWorkflow api={api()} fields={FIELDS} selectedPolicy={POLICY} />);
+      expect(screen.getByTestId('epd-step-trigger')).toHaveTextContent('Trigger');
+      expect(screen.getByTestId('epd-trigger-context')).toHaveTextContent(POLICY.policyName!);
+      const phase = screen.getByLabelText('Execution phase') as HTMLSelectElement;
+      expect(phase.value).toBe('AFTER_COMMIT');
+      expect(Array.from(phase.options).map((option) => option.text)).toEqual([
+        'Check before submission',
+        'Execute after commit',
+        'Execute asynchronously',
+      ]);
+      fireEvent.click(screen.getByTestId('epd-step-publish'));
+      expect(screen.getByTestId('epd-save-draft')).toHaveTextContent('Save draft');
+      expect(screen.getByLabelText('Failure strategy')).toHaveValue('FAIL_FAST');
+    },
+  );
+
+  it('preserves edited payload and selected tab across locale changes and saves identical policy data', async () => {
+    const fakeApi = api();
+    const { rerender } = render(
+      <EventPolicyDesignerWorkflow api={fakeApi} fields={FIELDS} selectedPolicy={POLICY} />,
+    );
+    await waitFor(() => expect(fakeApi.getActionCatalog).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByTestId('epd-step-actions'));
+    fireEvent.click(screen.getByTestId('epd-add-action'));
+    fireEvent.change(screen.getByLabelText('action-target-0'), {
+      target: { value: 'ROLE:locale_contract' },
+    });
+    fireEvent.change(screen.getByLabelText('action-payload-0'), {
+      target: { value: '{"title":"User-authored title","content":"User-authored body"}' },
+    });
+    const originalDraft = JSON.parse(screen.getByTestId('epd-draft-json').textContent!);
+    language.locale = 'en-GB';
+    rerender(<EventPolicyDesignerWorkflow api={fakeApi} fields={FIELDS} selectedPolicy={POLICY} />);
+    expect(screen.getByTestId('epd-step-actions')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('epd-add-action')).toHaveTextContent('Add action');
+    expect(screen.getByLabelText('action-type-0')).toHaveDisplayValue('Send in-app notification');
+    expect(screen.getByLabelText('action-target-0')).toHaveValue('ROLE:locale_contract');
+    expect(JSON.parse(screen.getByTestId('epd-draft-json').textContent!)).toEqual(originalDraft);
+    expect(fakeApi.listPolicyVersions).toHaveBeenCalledOnce();
+    language.locale = 'zh-CN';
+    rerender(<EventPolicyDesignerWorkflow api={fakeApi} fields={FIELDS} selectedPolicy={POLICY} />);
+    expect(JSON.parse(screen.getByTestId('epd-draft-json').textContent!)).toEqual(originalDraft);
+    fireEvent.click(screen.getByTestId('epd-step-publish'));
+    fireEvent.click(screen.getByTestId('epd-save-draft'));
+    await waitFor(() => expect(fakeApi.createPolicyDraftVersion).toHaveBeenCalledOnce());
+    const { rules, ...settings } = originalDraft;
+    expect(fakeApi.createPolicyDraftVersion).toHaveBeenCalledWith(POLICY.policyCode, {
+      ...settings,
+      rulesJson: rules,
+    });
+  });
+
+  it('localizes execution evidence while preserving opaque identifiers and unknown user content', async () => {
+    language.locale = 'en-US';
+    const fakeApi = api();
+    vi.mocked(fakeApi.runAndExecutePolicy).mockResolvedValue({
+      policy: { status: 'MATCHED', correlationId: 'locale-correlation' },
+      execution: {
+        overallStatus: 'ALL_SUCCESS',
+        actions: [
+          {
+            type: 'NOTIFY',
+            status: 'SUCCESS',
+            ruleCode: 'R-1',
+            idempotencyKey: 'opaque-key',
+            resultPayload: {
+              sentCount: 1,
+              recipientType: 'ROLE',
+              dispatchAccepted: true,
+              message: 'User-authored body',
+            },
+          },
+        ],
+      },
+    } as never);
+    render(<EventPolicyDesignerWorkflow api={fakeApi} fields={FIELDS} selectedPolicy={POLICY} />);
+    fireEvent.click(screen.getByTestId('epd-step-test'));
+    fireEvent.click(screen.getByTestId('epd-run-published'));
+    await waitFor(() =>
+      expect(screen.getByTestId('epd-action-execution-results')).toHaveTextContent('All succeeded'),
+    );
+    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('Sent count');
+    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('Role');
+    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('Yes');
+    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent(
+      'User-authored body',
+    );
+    expect(screen.getByTitle('opaque-key')).toHaveTextContent('Idempotency key recorded');
+    expect(screen.getByTestId('epd-open-trace')).toHaveTextContent('Open unified Trace');
+    expect(fakeApi.runAndExecutePolicy).toHaveBeenCalledWith({
+      eventType: POLICY.eventType,
+      targetType: POLICY.targetType,
+      targetKey: POLICY.targetKey,
+      context: { record: { data: {} } },
+    });
+    expect(screen.getByTestId('epd-open-trace')).toHaveAttribute(
+      'href',
+      expect.stringContaining('correlationId=locale-correlation'),
+    );
+  });
+
+  it('localizes fallback actions and unavailable badges after a catalog failure', async () => {
+    language.locale = 'en-US';
+    const fakeApi = api();
+    vi.mocked(fakeApi.getActionCatalog).mockRejectedValue(new Error('Catalog fixture unavailable'));
+    render(<EventPolicyDesignerWorkflow api={fakeApi} fields={FIELDS} selectedPolicy={POLICY} />);
+    fireEvent.click(screen.getByTestId('epd-step-actions'));
+    await waitFor(() =>
+      expect(screen.getByTestId('epd-action-catalog-error')).toHaveTextContent(
+        'Action catalog unavailable',
+      ),
+    );
+    fireEvent.click(screen.getByTestId('epd-add-action'));
+    fireEvent.change(screen.getByLabelText('action-type-0'), { target: { value: 'SEND_SMS' } });
+    expect(screen.getByLabelText('action-type-0')).toHaveDisplayValue('Send SMS (unavailable)');
+    expect(screen.getByTestId('epd-action-availability-0')).toHaveTextContent(
+      'No live SMS provider is configured in this environment',
     );
   });
 });

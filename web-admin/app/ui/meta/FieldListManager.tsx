@@ -23,6 +23,9 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import type { ModelFieldBinding } from '~/types/model';
 import { FieldSelectionDialog } from './FieldSelectionDialog';
+import { PermissionGuard } from '~/ui/PermissionGuard';
+import { usePermissions } from '~/contexts/AuthContext';
+import { useSmartText } from '~/utils/i18n';
 
 interface FieldListManagerProps {
   fields: ModelFieldBinding[];
@@ -46,8 +49,10 @@ interface SortableFieldItemProps {
  * Sortable Field Item Component
  */
 function SortableFieldItem({ field, onConfigure, onUnbind, onDictConfig }: SortableFieldItemProps) {
+  const { hasPermission } = usePermissions();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: field.id,
+    disabled: !hasPermission('meta.model.update'),
   });
 
   const style = {
@@ -64,25 +69,28 @@ function SortableFieldItem({ field, onConfigure, onUnbind, onDictConfig }: Sorta
     >
       {/* Drag Handle */}
       <td className="px-4 py-4 whitespace-nowrap">
-        <button
-          {...attributes}
-          {...listeners}
-          className="text-text-3 hover:text-text-2 cursor-move"
-          title="拖动排序"
-        >
-          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 8h16M4 16h16"
-            />
-          </svg>
-        </button>
+        <PermissionGuard permission="meta.model.update">
+          <button
+            data-testid="model-field-reorder"
+            {...attributes}
+            {...listeners}
+            className="text-text-3 hover:text-text-2 cursor-move"
+            title="拖动排序"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 8h16M4 16h16"
+              />
+            </svg>
+          </button>
+        </PermissionGuard>
       </td>
 
       {/* Field Code */}
-      <td className="text-text px-6 py-4 font-mono text-sm whitespace-nowrap">
+      <td className="text-text max-w-48 px-6 py-4 break-all font-mono text-sm whitespace-normal">
         {field.code || field.fieldCode}
       </td>
 
@@ -130,33 +138,37 @@ function SortableFieldItem({ field, onConfigure, onUnbind, onDictConfig }: Sorta
           <div className="flex items-center gap-2">
             <span className="text-text font-mono">{field.dictCode}</span>
             {onDictConfig && (
-              <button
-                onClick={onDictConfig}
-                className="text-accent hover:text-blue-800"
-                title="配置字典"
-              >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                  />
-                </svg>
-              </button>
+              <PermissionGuard permission="meta.field.update">
+                <button
+                  onClick={onDictConfig}
+                  className="text-accent hover:text-blue-800"
+                  title="配置字典"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                    />
+                  </svg>
+                </button>
+              </PermissionGuard>
             )}
           </div>
         ) : (
           <div className="flex items-center gap-2">
             <span className="text-text-3">-</span>
             {onDictConfig && (
-              <button
-                onClick={onDictConfig}
-                className="text-accent text-xs hover:text-blue-800"
-                title="配置字典"
-              >
-                配置
-              </button>
+              <PermissionGuard permission="meta.field.update">
+                <button
+                  onClick={onDictConfig}
+                  className="text-accent text-xs hover:text-blue-800"
+                  title="配置字典"
+                >
+                  配置
+                </button>
+              </PermissionGuard>
             )}
           </div>
         )}
@@ -167,12 +179,24 @@ function SortableFieldItem({ field, onConfigure, onUnbind, onDictConfig }: Sorta
 
       {/* Actions */}
       <td className="px-6 py-4 text-sm whitespace-nowrap">
-        <button onClick={onConfigure} className="text-accent mr-3 hover:text-blue-900">
-          配置
-        </button>
-        <button onClick={onUnbind} className="text-status-red hover:text-red-900">
-          移除
-        </button>
+        <PermissionGuard permission="meta.model.update">
+          <button
+            data-testid="model-field-configure"
+            onClick={onConfigure}
+            className="text-accent mr-3 hover:text-blue-900"
+          >
+            配置
+          </button>
+        </PermissionGuard>
+        <PermissionGuard permission="meta.model.update">
+          <button
+            data-testid="model-field-unbind"
+            onClick={onUnbind}
+            className="text-status-red hover:text-red-900"
+          >
+            移除
+          </button>
+        </PermissionGuard>
       </td>
     </tr>
   );
@@ -191,6 +215,8 @@ export function FieldListManager({
   onFieldBound,
   onDictConfig,
 }: FieldListManagerProps) {
+  const smartText = useSmartText();
+  const { hasPermission } = usePermissions();
   const [localFields, setLocalFields] = useState(fields);
   const [isReordering, setIsReordering] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -220,6 +246,7 @@ export function FieldListManager({
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
+    if (!hasPermission('meta.model.update')) return;
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
@@ -269,26 +296,28 @@ export function FieldListManager({
           <h3 className="text-text mt-2 text-sm font-medium">暂无字段</h3>
           <p className="text-text-2 mt-1 text-sm">开始为模型添加字段</p>
           <div className="mt-6">
-            <button
-              data-testid="model-fields-add-button"
-              onClick={handleOpenDialog}
-              className="rounded-control bg-accent hover:bg-accent-hover focus-visible:shadow-focus inline-flex items-center border border-transparent px-4 py-2 text-sm font-medium text-white shadow-sm focus:outline-none"
-            >
-              <svg
-                className="mr-2 -ml-1 h-5 w-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            <PermissionGuard allPermissions={['meta.model.update', 'meta.field.read']}>
+              <button
+                data-testid="model-fields-add-button"
+                onClick={handleOpenDialog}
+                className="rounded-control bg-accent hover:bg-accent-hover focus-visible:shadow-focus inline-flex items-center border border-transparent px-4 py-2 text-sm font-medium text-white shadow-sm focus:outline-none"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 4v16m8-8H4"
-                />
-              </svg>
-              添加字段
-            </button>
+                <svg
+                  className="mr-2 -ml-1 h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+                添加字段
+              </button>
+            </PermissionGuard>
           </div>
         </div>
 
@@ -310,28 +339,39 @@ export function FieldListManager({
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h3 className="text-text text-lg font-medium">字段列表</h3>
-            <p className="text-text-2 mt-1 text-sm">拖动字段可调整显示顺序</p>
+            <p data-testid="model-fields-guidance" className="text-text-2 mt-1 text-sm">
+              {smartText(
+                hasPermission('meta.model.update')
+                  ? {
+                      'zh-CN': '拖动字段可调整显示顺序',
+                      en: 'Drag fields to change their display order',
+                    }
+                  : { 'zh-CN': '字段配置仅供查看', en: 'Field configuration is read-only' },
+              )}
+            </p>
           </div>
-          <button
-            data-testid="model-fields-add-button"
-            onClick={handleOpenDialog}
-            className="rounded-control bg-accent hover:bg-accent-hover focus-visible:shadow-focus inline-flex items-center border border-transparent px-4 py-2 text-sm font-medium text-white shadow-sm focus:outline-none"
-          >
-            <svg
-              className="mr-2 -ml-1 h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          <PermissionGuard allPermissions={['meta.model.update', 'meta.field.read']}>
+            <button
+              data-testid="model-fields-add-button"
+              onClick={handleOpenDialog}
+              className="rounded-control bg-accent hover:bg-accent-hover focus-visible:shadow-focus inline-flex items-center border border-transparent px-4 py-2 text-sm font-medium text-white shadow-sm focus:outline-none"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
-            添加字段
-          </button>
+              <svg
+                className="mr-2 -ml-1 h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 4v16m8-8H4"
+                />
+              </svg>
+              添加字段
+            </button>
+          </PermissionGuard>
         </div>
 
         {/* Loading Indicator */}
@@ -354,31 +394,31 @@ export function FieldListManager({
             <table className="divide-border min-w-full divide-y">
               <thead className="bg-subtle">
                 <tr>
-                  <th className="text-text-2 px-4 py-3 text-left text-xs font-medium tracking-wider uppercase">
+                  <th className="text-text-2 px-4 py-3 text-left text-xs font-medium tracking-wider whitespace-nowrap uppercase">
                     排序
                   </th>
-                  <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
+                  <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider whitespace-nowrap uppercase">
                     字段编码
                   </th>
-                  <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
+                  <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider whitespace-nowrap uppercase">
                     数据类型
                   </th>
-                  <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
+                  <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider whitespace-nowrap uppercase">
                     必填
                   </th>
-                  <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
+                  <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider whitespace-nowrap uppercase">
                     只读
                   </th>
-                  <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
+                  <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider whitespace-nowrap uppercase">
                     可见
                   </th>
-                  <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
+                  <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider whitespace-nowrap uppercase">
                     字典
                   </th>
-                  <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
+                  <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider whitespace-nowrap uppercase">
                     顺序
                   </th>
-                  <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
+                  <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider whitespace-nowrap uppercase">
                     操作
                   </th>
                 </tr>

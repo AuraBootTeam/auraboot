@@ -1,6 +1,6 @@
 import { test, expect, type Browser, type Page } from '@playwright/test';
 import { createCookieSessionStorage } from 'react-router';
-import { uniqueId } from '../helpers';
+import { uniqueId, ensureSidebarExpanded } from '../helpers';
 
 /**
  * X03-04 team data-scope runtime (browser leg).
@@ -54,7 +54,7 @@ test.describe('Team data scope runtime (X03-04)', () => {
     page,
     browser,
     baseURL,
-  }) => {
+  }, info) => {
     const resolvedBaseURL = baseURL ?? DEFAULT_BASE_URL;
     const uid = uniqueId('team_scope');
     const roleCode = `e2e_team_${uid.replace(/[^a-zA-Z0-9_]/g, '_')}`.slice(0, 60);
@@ -78,6 +78,25 @@ test.describe('Team data scope runtime (X03-04)', () => {
 
     const rolePid = await createTeamScopedRole(page, roleCode);
 
+    // Grant only the declared query entry capability; preserve fixture model grants and TEAM scope.
+    await page.goto('/home');
+    await ensureSidebarExpanded(page);
+    await page.getByTestId('sidebar').locator('a[href="/enterprise/permissions"]').click();
+    await page.getByTestId('role-search-input').fill(roleCode);
+    await page.getByTestId(`role-item-${roleCode}`).click();
+    await expect(page.getByTestId('capability-role-editor')).toHaveAttribute('data-role-pid', rolePid);
+    await page.getByTestId('capability-checkbox-sys.cap.query_builder').check();
+    await page.getByTestId('capability-save').click();
+    await expect(page.getByTestId('confirm-dialog')).toBeVisible();
+    const capabilitiesSaved = page.waitForResponse(response =>
+      response.request().method() === 'PUT' && response.url().includes('/api/permission/capabilities?'));
+    await page.getByTestId('confirm-ok').click();
+    const saved = await capabilitiesSaved;
+    expect(saved.status()).toBe(200);
+    expect(String((await saved.json()).code)).toBe('0');
+    expect(saved.request().postDataJSON()).toEqual(['sys.cap.query_builder']);
+    await expect(page.getByTestId('capability-save')).toBeDisabled();
+
     const member: TestUser = {
       email: `${roleCode}_a@e2e.local`,
       displayName: `Team Member ${uid}`,
@@ -100,6 +119,46 @@ test.describe('Team data scope runtime (X03-04)', () => {
     const outsiderPage = await outsiderContext.newPage();
 
     try {
+      const queryEvidence: Array<Record<string, unknown>> = [];
+      async function expectScopedQuery(actor: Page, label: string, expectedTitles: string[]) {
+        const filters = [{ fieldName: TITLE_FIELD, operator: 'IN', value: [recordOne, recordTwo] }];
+        async function execute(extra: Record<string, unknown>) {
+          const payload = { modelCode: MODEL_CODE, filters, ...extra };
+          const response = await actor.request.post('/api/query-builder/execute', { data: payload });
+          const body = await response.json();
+          queryEvidence.push({ label, payload, status: response.status(), body });
+          expect(response.status(), `${label} query must execute with entry and model read`).toBe(200);
+          expect(String(body.code)).toBe('0');
+          expect(Array.isArray(body.data)).toBe(true);
+          return body.data as Array<Record<string, unknown>>;
+        }
+        const rows = await execute({ fields: [TITLE_FIELD, TEAM_FIELD], sortField: TITLE_FIELD, sortOrder: 'ASC' });
+        expect(rows.map(row => row[TITLE_FIELD]).sort()).toEqual([...expectedTitles].sort());
+        const counts = await execute({ aggregations: [{ fieldCode: TITLE_FIELD, function: 'COUNT', alias: 'record_count' }] });
+        expect(counts).toHaveLength(1);
+        expect(Number(counts[0].record_count)).toBe(expectedTitles.length);
+        const groups = await execute({ groupBy: [TEAM_FIELD],
+          aggregations: [{ fieldCode: TITLE_FIELD, function: 'COUNT', alias: 'record_count' }] });
+        const expectedTeams = expectedTitles.map(title => title === recordOne ? teamOnePid : teamTwoPid).sort();
+        expect(groups.map(row => row[TEAM_FIELD]).sort()).toEqual(expectedTeams);
+        for (const group of groups) expect(Number(group.record_count)).toBe(1);
+      }
+
+      await expectScopedQuery(memberPage, 'member-before-removal', [recordOne]);
+      await expectScopedQuery(outsiderPage, 'outsider', []);
+      await expectScopedQuery(page, 'tenant-admin', [recordOne, recordTwo]);
+      // Query entry access must not grant read access to an unrelated model.
+      for (const endpoint of ['/api/query-builder/execute', '/api/query-builder/models/api_connector/fields']) {
+        const response = endpoint.endsWith('/execute')
+          ? await memberPage.request.post(endpoint, { data: { modelCode: 'api_connector', fields: ['name'] } })
+          : await memberPage.request.get(endpoint);
+        const body = await response.json();
+        queryEvidence.push({ label: 'unrelated-model-denied', endpoint, status: response.status(), body });
+        expect(response.status()).toBe(403);
+        expect(String(body.code)).toBe('403');
+        expect(body.context).toBe('Query builder model read access denied');
+      }
+
       // API legs first: deterministic row visibility through the scoped list query.
       await expectListRows(memberPage, [recordOne], [recordTwo]);
       await expectListRows(outsiderPage, [], [recordOne, recordTwo]);
@@ -119,6 +178,11 @@ test.describe('Team data scope runtime (X03-04)', () => {
       // the team-member service evicts the dataScopeCondition cache (#2102).
       await removeTeamMember(page, teamOnePid, member.email);
       await expectListRows(memberPage, [], [recordOne, recordTwo]);
+      await expectScopedQuery(memberPage, 'same-session-after-removal', []);
+      await info.attach('query-builder-team-scope', {
+        body: JSON.stringify({ rolePid, modelCode: MODEL_CODE, teamOnePid, teamTwoPid, queryEvidence }),
+        contentType: 'application/json',
+      });
 
       await openDynamicList(memberPage, resolvedBaseURL);
       await expectRowAbsent(memberPage, recordOne);

@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
 import net from 'node:net';
-import { planGoldenStop, executeGoldenStop, stopGoldenProcesses, stableGoldenLaunch, registerGoldenSupervisor } from '../lib/golden-process-stop.mjs';
+import { planGoldenStop, executeGoldenStop, stopGoldenProcesses, stableGoldenLaunch, registerGoldenSupervisor, verifyGoldenStopOwnership, readGoldenProcessSnapshot } from '../lib/golden-process-stop.mjs';
 
 // Workspace API is mocked; OS fixtures belong only to this test, with no product runtime.
 const supervisor = 1000000010, backend = 1000000020, child = 1000000011;
@@ -57,10 +57,53 @@ for (const key of ['pid', 'cwd', 'commandHash', 'startedAt', 'runtime', 'ownersh
     assert.deepEqual(calls, []);
   });
 }
+test('ignores a metadata probe failure only after the target has actually exited', () => {
+  let live = true;
+  const result = readGoldenProcessSnapshot(child, () => {
+    live = false;
+    throw new Error('ps exited while the owned child was disappearing');
+  }, () => live);
+  assert.equal(result, null);
+});
+test('retains a live process when its metadata probe fails', () => {
+  const calls = [];
+  const failure = new Error('live ps permission failure');
+  assert.throws(() => executeGoldenStop(planGoldenStop(fixture()),
+    pid => readGoldenProcessSnapshot(pid, () => { throw failure; }, () => true),
+    (...args) => calls.push(args)), error => error === failure);
+  assert.deepEqual(calls, []);
+});
+test('never probes or signals an already exited target', () => {
+  let probes = 0;
+  assert.equal(readGoldenProcessSnapshot(child, () => { probes++; }, () => false), null);
+  assert.equal(probes, 0);
+});
+
 test('does not signal a disappeared process', () => {
   const calls = [];
   executeGoldenStop(planGoldenStop(fixture()), () => null, (...args) => calls.push(args));
   assert.deepEqual(calls, []);
+});
+test('admits an unmarked intermediate shell only through complete owned ancestry', () => {
+  const f = fixture();
+  f.snapshots[0] = { ...f.snapshots[0], runtime: undefined, token: undefined, executable: 'sh' };
+  f.listeners = [backend];
+  const plan = planGoldenStop(f);
+  assert.equal(plan.find(item => item.pid === child).inheritedOwnership, true);
+  for (const change of [
+    { runtime: 'foreign' }, { token: 'foreign' }, { executable: 'node' },
+    { parent: 999 }, { cwd: '/foreign' },
+  ]) {
+    const altered = { ...f, snapshots: f.snapshots.map(item => item.pid === child ? { ...item, ...change } : item) };
+    assert.throws(() => planGoldenStop(altered));
+  }
+  assert.throws(() => planGoldenStop({ ...f, roots: [child, backend] }));
+  assert.throws(() => planGoldenStop({ ...f, listeners: [child, backend] }));
+  const expected = plan.find(item => item.pid === child);
+  assert.equal(verifyGoldenStopOwnership(f.snapshots[0], expected, f.token), true);
+  for (const change of [{ runtime: 'foreign' }, { token: 'foreign' }, { token: f.token }, { executable: 'node' }]) {
+    assert.equal(verifyGoldenStopOwnership({ ...f.snapshots[0], ...change }, expected, f.token), false);
+  }
 });
 test('never signals a recycled child PID after already stopping its owned supervisor', () => {
   const f = fixture(); const calls = []; const plan = planGoldenStop(f);
@@ -69,44 +112,6 @@ test('never signals a recycled child PID after already stopping its owned superv
   (...args) => calls.push(args)));
   assert.deepEqual(calls, [[supervisor, 'SIGKILL'], [backend, 'SIGKILL']]);
 });
-
-function shellBridgeFixture() {
-  const f = fixture(), bridge = 1000000030;
-  f.snapshots[0].parent = bridge;
-  f.snapshots.push({ pid: bridge, parent: supervisor, cwd: '/owned/oss/web-admin',
-    executable: 'sh', startedAt: 'shell-start', commandHash: 'shell-command' });
-  return { f, bridge };
-}
-test('verifies an unlabelled shell bridge but never signals it', () => {
-  const { f, bridge } = shellBridgeFixture(), calls = [];
-  const plan = planGoldenStop(f);
-  assert.equal(plan.some(item => item.pid === bridge), false);
-  executeGoldenStop(plan, pid => ({ ...f.snapshots.find(item => item.pid === pid),
-    ownershipVerified: pid !== bridge }), (...args) => calls.push(args));
-  assert.deepEqual(calls, [[supervisor, 'SIGKILL'], [backend, 'SIGKILL'], [child, 'SIGKILL']]);
-});
-for (const key of ['parent', 'cwd', 'startedAt', 'commandHash', 'runtime', 'token']) {
-  test(`refuses a changed shell bridge ${key} before any signal`, () => {
-    const { f, bridge } = shellBridgeFixture(), calls = [], plan = planGoldenStop(f);
-    assert.throws(() => executeGoldenStop(plan, pid => {
-      const item = { ...f.snapshots.find(item => item.pid === pid), ownershipVerified: pid !== bridge };
-      if (pid === bridge) item[key] = key === 'parent' ? 999 : 'foreign';
-      return item;
-    }, (...args) => calls.push(args)));
-    assert.deepEqual(calls, []);
-  });
-}
-for (const kind of ['listener', 'root', 'foreign-token', 'foreign-runtime', 'not-shell']) {
-  test(`refuses an unlabelled shell used as ${kind}`, () => {
-    const { f, bridge } = shellBridgeFixture(), shell = f.snapshots.at(-1);
-    if (kind === 'listener') f.listeners.push(bridge);
-    if (kind === 'root') f.roots.push(bridge);
-    if (kind === 'foreign-token') shell.token = 'foreign';
-    if (kind === 'foreign-runtime') shell.runtime = 'foreign';
-    if (kind === 'not-shell') shell.executable = 'node';
-    assert.throws(() => planGoldenStop(f));
-  });
-}
 
 async function processFixture(t, runtime, workdir = 'platform') {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'golden-stop-boundary-'));

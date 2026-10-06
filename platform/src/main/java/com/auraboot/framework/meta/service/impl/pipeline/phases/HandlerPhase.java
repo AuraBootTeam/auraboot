@@ -4,6 +4,8 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.plugin.extension.DataAccessorException;
+import com.auraboot.framework.plugin.extension.DataAccessErrorCode;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.file.service.FileService;
 import com.auraboot.framework.infrastructure.storage.StorageProvider;
@@ -35,6 +37,7 @@ import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
 import com.auraboot.framework.meta.service.impl.pipeline.RecordSnapshotReader;
 import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
+import com.auraboot.framework.plugin.extension.PluginCommandRejectionException;
 import com.auraboot.framework.plugin.pf4j.BiTemporalAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
 import com.auraboot.framework.plugin.pf4j.AsyncTaskAccessorImpl;
@@ -705,12 +708,23 @@ public class HandlerPhase implements CommandPhase {
             if (e instanceof AccessDeniedException accessDeniedException) {
                 throw accessDeniedException;
             }
+            if (e instanceof DataAccessorException dataAccess
+                    && dataAccess.code() == DataAccessErrorCode.PERMISSION_DENIED) {
+                throw new AccessDeniedException("Plugin source data access denied", dataAccess);
+            }
             // Plugin handlers use stable, transport-neutral error keys because
             // the plugin API must not depend on host web exceptions. Preserve
             // the optimistic-concurrency semantic at the host boundary so DSL
             // clients receive HTTP 409 and can offer reload/retry recovery.
             if (e.getMessage() != null && e.getMessage().contains("iot.error.version_conflict")) {
                 throw new com.auraboot.framework.exception.ConflictException(e.getMessage(), e);
+            }
+            // Classification is a public SPI contract, independent of diagnostic text or locale.
+            if (e instanceof PluginCommandRejectionException rejection) {
+                ResponseCode responseCode = switch (rejection.code()) {
+                    case INVALID_ARGUMENT, BUSINESS_RULE_BLOCKED -> ResponseCode.BadParam;
+                };
+                throw new BusinessException(responseCode, "$i18n:" + rejection.messageKey(), rejection);
             }
             throw new BusinessException(ResponseCode.BadParam, "Plugin handler execution failed: " + e.getMessage());
         } finally {

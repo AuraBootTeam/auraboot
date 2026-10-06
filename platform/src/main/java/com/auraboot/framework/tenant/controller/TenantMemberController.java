@@ -14,6 +14,7 @@ import com.auraboot.framework.tenant.controller.request.BatchMemberStatusRequest
 import com.auraboot.framework.tenant.controller.request.MemberLifecycleRequest;
 import com.auraboot.framework.tenant.dto.MemberQueryRequest;
 import com.auraboot.framework.tenant.dto.MemberResponse;
+import com.auraboot.framework.tenant.dto.MemberSearchOption;
 import com.auraboot.framework.tenant.dto.TenantMemberOffboardingImpactResponse;
 import com.auraboot.framework.tenant.dto.TenantMemberOffboardingCandidate;
 import com.auraboot.framework.tenant.service.CurrentUserTeamResolver;
@@ -41,11 +42,11 @@ public class TenantMemberController {
 
     @PostMapping("/search")
     @ResponseBody
-    public ApiResponse<PaginationResult<MemberResponse>> searchMembers(
+    public ApiResponse<PaginationResult<MemberSearchOption>> searchMembers(
             @RequestBody MemberQueryRequest request,
             @CurrentUserId Long userId) {
         
-        PaginationResult<MemberResponse> result = memberApplicationService.searchMembers(request, userId);
+        PaginationResult<MemberSearchOption> result = memberApplicationService.searchMembers(request, userId);
         return ApiResponse.success(result);
     }
 
@@ -104,7 +105,6 @@ public class TenantMemberController {
     }
 
     @GetMapping("/{memberPid}/offboarding-impact")
-    @RequirePermission(MetaPermission.TENANT_MEMBER_MANAGE)
     public ApiResponse<TenantMemberOffboardingImpactResponse> inspectOffboardingImpact(
             @PathVariable String memberPid,
             @RequestParam(required = false) String targetMemberPid,
@@ -115,11 +115,11 @@ public class TenantMemberController {
     }
 
     @GetMapping("/{memberPid}/offboarding-candidates")
-    @RequirePermission(MetaPermission.TENANT_MEMBER_MANAGE)
     public ApiResponse<List<TenantMemberOffboardingCandidate>> listOffboardingCandidates(
             @PathVariable String memberPid,
+            @RequestParam(defaultValue = "remove") String action,
             @CurrentUserId Long userId) {
-        return ApiResponse.success(memberApplicationService.listOffboardingCandidates(memberPid, userId));
+        return ApiResponse.success(memberApplicationService.listOffboardingCandidates(memberPid, action, userId));
     }
 
     @GetMapping("/{memberPid}/teams")

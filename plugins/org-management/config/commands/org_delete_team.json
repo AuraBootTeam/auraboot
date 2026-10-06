@@ -7,5 +7,8 @@
   "extension": {
     "confirmMessage:zh-CN": "确认删除该团队？删除后团队成员关系也将不可见。",
     "confirmMessage:en": "Delete this team? Team memberships will no longer be visible."
-  }
+  },
+  "permissions": [
+    "org.team.manage"
+  ]
 }

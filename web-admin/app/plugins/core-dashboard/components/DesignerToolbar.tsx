@@ -6,6 +6,7 @@ import { useI18n } from '~/contexts/I18nContext';
  */
 
 import React from 'react';
+import { useSmartText } from '~/utils/i18n';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useDashboardStore } from '../store/useDashboardStore';
 import { ExportPdfButton } from '~/framework/smart/components/data-tools/ExportPdfButton';
@@ -37,6 +38,7 @@ export const DesignerToolbar: React.FC<DashboardToolbarProps> = ({
   onPresentation,
 }) => {
   const { t } = useI18n();
+  const st = useSmartText();
   const { showSuccessToast, showErrorToast } = useToastContext();
   const { dashboard, isDirty, isSaving, canUndo, canRedo, undo, redo, validate } =
     useDashboardStore();
@@ -55,9 +57,9 @@ export const DesignerToolbar: React.FC<DashboardToolbarProps> = ({
 
   const statusText =
     dashboard?.status === 'published'
-      ? '已发布'
+      ? st({ zh: '已发布', en: 'Published' })
       : dashboard?.status === 'draft'
-        ? '草稿'
+        ? st({ zh: '草稿', en: 'Draft' })
         : undefined;
 
   return (

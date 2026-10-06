@@ -1,3 +1,4 @@
+import { resolveTemporalType } from '~/shared/services/dateTimeFormatService';
 /**
  * ListPageContent — Extracted rendering logic from dynamic.$tableName.tsx
  *
@@ -21,6 +22,7 @@ import { usePageRuntime } from '~/framework/meta/rendering/pages/hooks/usePageRu
 import { buildApiEndpoint, getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '~/ui/ui/dialog';
 import { createExpressionContext } from '~/framework/meta/runtime/expression/context';
 import { evaluateCondition } from '~/framework/meta/runtime/expression/evaluator';
 import type {
@@ -1018,6 +1020,48 @@ export function resolveListMiscBlocksPosition(
   return schema?.extension?.miscBlocksPosition === 'beforeTable' ? 'beforeTable' : 'afterTable';
 }
 
+const INVITE_LABELS = {
+  title: { 'zh-CN': '成员邀请', en: 'Member Invite' },
+  close: { 'zh-CN': '关闭', en: 'Close' },
+  current: { 'zh-CN': '当前邀请码', en: 'Current Invite Code' },
+  expires: { 'zh-CN': '有效期至', en: 'Expires at' },
+  generate: { 'zh-CN': '生成邀请码', en: 'Generate Invite Code' },
+  newCode: { 'zh-CN': '生成新邀请码', en: 'Generate New Invite Code' },
+  revoke: { 'zh-CN': '撤销当前邀请码', en: 'Revoke Current Invite Code' },
+  empty: {
+    'zh-CN': '当前没有有效邀请码，可生成邀请码邀请成员加入企业。',
+    en: 'No active invite code. Generate one to invite members into this tenant.',
+  },
+  policy: {
+    'zh-CN': '生成新邀请码不会自动撤销已有邀请码；撤销仅影响当前显示的邀请码。',
+    en: 'Generating a new code does not revoke existing codes. Revocation affects only the displayed code.',
+  },
+  loading: { 'zh-CN': '正在读取邀请码…', en: 'Loading invite code\u2026' },
+  retry: { 'zh-CN': '重新读取', en: 'Retry Read' },
+  readFailed: {
+    'zh-CN': '邀请码读取失败，请重新读取后再操作。',
+    en: 'Unable to load the invite code. Retry before making changes.',
+  },
+  generatedReadFailed: {
+    'zh-CN': '邀请码已生成，但读取当前状态失败。请重新读取，避免重复生成。',
+    en: 'The invite code was generated, but its current state could not be read. Retry the read to avoid generating another code.',
+  },
+  revokedReadFailed: {
+    'zh-CN': '当前邀请码已撤销，但读取剩余邀请码失败。请重新读取。',
+    en: 'The displayed code was revoked, but remaining codes could not be read. Retry the read.',
+  },
+  generated: { 'zh-CN': '邀请码已生成', en: 'Invite code generated' },
+  revoked: { 'zh-CN': '当前邀请码已撤销', en: 'Current invite code revoked' },
+  generateFailed: {
+    'zh-CN': '邀请码生成失败，请稍后重试。',
+    en: 'Unable to generate an invite code. Try again later.',
+  },
+  revokeFailed: {
+    'zh-CN': '邀请码撤销失败，请稍后重试。',
+    en: 'Unable to revoke the invite code. Try again later.',
+  },
+} as const;
+
 interface InviteCodeData {
   code: string;
   expiredAt?: string;
@@ -1454,6 +1498,10 @@ function ListPageContentInner(props: PageContentProps) {
         : undefined,
     };
   }, [locale, t, tableBlock]);
+  const tableSearchPlaceholder = useMemo(() => {
+    const configured = (tableBlock as any)?.searchPlaceholder ?? (tableBlock as any)?.table?.searchPlaceholder;
+    return configured ? getLocalizedText(configured, locale, t) : undefined;
+  }, [locale, t, tableBlock]);
   const navigateAwayFromList = useCallback(
     ((toOrDelta: To | number, options?: NavigateOptions) => {
       // List URL state effects (SavedView sorts, filters and pagination) can still be queued
@@ -1519,7 +1567,12 @@ function ListPageContentInner(props: PageContentProps) {
   const [activeViewType, setActiveViewType] = useState<ViewType>('table');
   const [startCreateViewMode, setStartCreateViewMode] = useState(false);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const inviteTriggerRef = useRef<HTMLElement | null>(null);
   const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteReadLoading, setInviteReadLoading] = useState(false);
+  const [inviteReadError, setInviteReadError] = useState<string | null>(null);
+  const inviteReadSeqRef = useRef(0);
+  const inviteContextRef = useRef({ allowed: false, open: false });
   const [inviteCodeData, setInviteCodeData] = useState<InviteCodeData | null>(null);
   const [memberImportDialogOpen, setMemberImportDialogOpen] = useState(false);
   const [bulkActionResult, setBulkActionResult] = useState<BulkActionResult | null>(null);
@@ -1549,6 +1602,8 @@ function ListPageContentInner(props: PageContentProps) {
   const pageKey = resolveListSavedViewPageKey(schema, tableName);
   const isTenantMemberPage = modelCode === 'tenant_member' || pageKey === 'tenant_member';
   const canManageMemberAccounts = isTenantMemberPage && hasPermission('org.role.update');
+  const canInviteMembers = isTenantMemberPage && hasPermission('org.tenant.invite.manage');
+  inviteContextRef.current = { allowed: canInviteMembers, open: inviteDialogOpen };
   const hideSavedViews =
     listExtensions?.hideSavedViews ?? Boolean(schemaExtension.hideSavedViews || skipListData);
   // Quick filters live only in the toolbar. They apply to default view mode and
@@ -2383,7 +2438,7 @@ function ListPageContentInner(props: PageContentProps) {
   // Use unified action handler hook
   // IMPORTANT: Must be declared before any useEffect that references handleAction
   // to avoid temporal dead zone ("Cannot access 'handleAction' before initialization").
-  const { handleAction } = useActionHandler({
+  const { handleAction, error: actionError, setError: setActionError } = useActionHandler({
     runtime,
     navigate: navigateAwayFromList,
     tableName,
@@ -2399,14 +2454,10 @@ function ListPageContentInner(props: PageContentProps) {
     t,
     token: token || undefined,
     showToast,
-    // A failed row/toolbar ACTION (e.g. a command rejected by a business rule such as the FR-05
-    // startup interlock) must surface as a toast only — useActionHandler already calls notifyToast.
-    // Do NOT route it into the page-level `error` state: that replaces the whole list with the
-    // full-page "加载失败" ErrorAlert (which is reserved for data/schema load failures), forcing a
-    // reload to recover. Blocking a single row's action should never blank the table.
+    // Action failures retain the table and render separately from data/schema load errors.
     onError: (err) => {
       if (import.meta.env?.DEV)
-        console.warn('[ListPageContent] action error (shown via toast):', err.message);
+        console.warn('[ListPageContent] action error:', err.message);
     },
   });
 
@@ -3228,22 +3279,15 @@ function ListPageContentInner(props: PageContentProps) {
       if (byRenderComponent) {
         return byRenderComponent;
       }
+      const declaredTemporalType = resolveTemporalType(undefined, modelFieldMap.get(field)?.dataType, undefined);
+      if (declaredTemporalType) return declaredTemporalType;
       // REFERENCE field: either ends with _id, or has a {field}_display sibling in the record
       if (field.endsWith('_id') || (record && record[`${field}_display`] !== undefined)) {
         return 'reference';
       }
-      if (field.endsWith('_at')) {
-        return 'datetime';
-      }
-      if (field.endsWith('_date')) {
-        return 'date';
-      }
-      if (field.endsWith('_time')) {
-        return 'time';
-      }
-      if (typeof value === 'string' && /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) {
-        return 'datetime';
-      }
+      const declaredDataType = modelFieldMap.get(field)?.dataType;
+      const temporalType = resolveTemporalType(field, declaredDataType, value);
+      if (temporalType) return temporalType;
       // Detect boolean values (native boolean or string "true"/"false")
       if (typeof value === 'boolean' || value === 'true' || value === 'false') {
         return 'boolean' as any;
@@ -4685,76 +4729,132 @@ function ListPageContentInner(props: PageContentProps) {
     await ensureViewAndUpdateConfig({ filters: [...formFilters, ...chipFilters] });
   }, [filters, chipFilters, ensureViewAndUpdateConfig]);
 
-  const loadCurrentInviteCode = useCallback(async () => {
-    if (!isTenantMemberPage) return;
-    try {
-      const result = await fetchResult<InviteCodeData | null>('/api/tenant/invite-code/current', {
-        method: 'get',
-        token: token || undefined,
-      });
-      if (ResultHelper.isSuccess(result)) {
+  const inviteText = useCallback(
+    (key: keyof typeof INVITE_LABELS) => getLocalizedText(INVITE_LABELS[key], locale, t),
+    [locale, t],
+  );
+
+  const loadCurrentInviteCode = useCallback(
+    async (
+      failureKey: 'readFailed' | 'generatedReadFailed' | 'revokedReadFailed' = 'readFailed',
+      expectedCode?: string,
+    ): Promise<boolean> => {
+      if (!inviteContextRef.current.allowed || !inviteContextRef.current.open) return false;
+      const sequence = ++inviteReadSeqRef.current;
+      setInviteReadLoading(true);
+      setInviteReadError(null);
+      try {
+        const result = await fetchResult<InviteCodeData | null>('/api/tenant/invite-code/current', {
+          method: 'get',
+          token: token || undefined,
+        });
+        if (
+          !ResultHelper.isSuccess(result) ||
+          (result.data != null && typeof result.data.code !== 'string') ||
+          (expectedCode && result.data?.code !== expectedCode)
+        ) {
+          throw new Error('Invalid current invite response');
+        }
+        if (sequence !== inviteReadSeqRef.current) return false;
         setInviteCodeData(result.data ?? null);
+        return true;
+      } catch {
+        if (sequence !== inviteReadSeqRef.current) return false;
+        setInviteCodeData(null);
+        setInviteReadError(inviteText(failureKey));
+        return false;
+      } finally {
+        if (sequence === inviteReadSeqRef.current) setInviteReadLoading(false);
       }
-    } catch {
-      setInviteCodeData(null);
-    }
-  }, [isTenantMemberPage, token]);
+    },
+    [canInviteMembers, inviteDialogOpen, inviteText, token],
+  );
 
   useEffect(() => {
+    if (!canInviteMembers || !inviteDialogOpen) {
+      setInviteCodeData(null);
+      setInviteReadError(null);
+      setInviteReadLoading(false);
+      if (!canInviteMembers) setInviteDialogOpen(false);
+      return;
+    }
     void loadCurrentInviteCode();
-  }, [loadCurrentInviteCode]);
+    return () => {
+      inviteReadSeqRef.current += 1;
+    };
+  }, [canInviteMembers, inviteDialogOpen, loadCurrentInviteCode]);
 
   const handleGenerateInviteCode = useCallback(async () => {
+    if (!canInviteMembers || inviteLoading || inviteReadLoading || inviteReadError) return;
     setInviteLoading(true);
     try {
       const result = await fetchResult<string>('/api/tenant/invite-code/generate?expiryDays=7', {
         method: 'post',
         token: token || undefined,
       });
-      if (!ResultHelper.isSuccess(result) || !result.data) {
-        throw new Error(result.desc || result.message || 'Failed to generate invite code');
+      if (!ResultHelper.isSuccess(result) || typeof result.data !== 'string' || !result.data) {
+        showErrorToast(inviteText('generateFailed'));
+        return;
       }
-      const current = await fetchResult<InviteCodeData | null>('/api/tenant/invite-code/current', {
-        method: 'get',
-        token: token || undefined,
-      });
-      if (ResultHelper.isSuccess(current) && current.data) {
-        setInviteCodeData(current.data);
-      } else {
-        setInviteCodeData({ code: result.data });
+      if (await loadCurrentInviteCode('generatedReadFailed', result.data)) {
+        showSuccessToast(inviteText('generated'));
       }
-      showSuccessToast('Invite code generated');
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to generate invite code';
-      showErrorToast(message);
+    } catch {
+      showErrorToast(inviteText('generateFailed'));
     } finally {
       setInviteLoading(false);
     }
-  }, [showErrorToast, showSuccessToast, token]);
+  }, [
+    canInviteMembers,
+    inviteLoading,
+    inviteReadError,
+    inviteReadLoading,
+    inviteText,
+    loadCurrentInviteCode,
+    showErrorToast,
+    showSuccessToast,
+    token,
+  ]);
 
   const handleRevokeInviteCode = useCallback(async () => {
-    if (!inviteCodeData?.code) return;
+    if (
+      !canInviteMembers ||
+      !inviteCodeData?.code ||
+      inviteLoading ||
+      inviteReadLoading ||
+      inviteReadError
+    )
+      return;
     setInviteLoading(true);
     try {
       const result = await fetchResult<boolean>(
         `/api/tenant/invite-code/revoke?code=${encodeURIComponent(inviteCodeData.code)}`,
-        {
-          method: 'post',
-          token: token || undefined,
-        },
+        { method: 'post', token: token || undefined },
       );
       if (!ResultHelper.isSuccess(result) || result.data !== true) {
-        throw new Error(result.desc || result.message || 'Failed to revoke invite code');
+        showErrorToast(inviteText('revokeFailed'));
+        return;
       }
-      setInviteCodeData(null);
-      showSuccessToast('Invite code revoked');
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to revoke invite code';
-      showErrorToast(message);
+      if (await loadCurrentInviteCode('revokedReadFailed')) {
+        showSuccessToast(inviteText('revoked'));
+      }
+    } catch {
+      showErrorToast(inviteText('revokeFailed'));
     } finally {
       setInviteLoading(false);
     }
-  }, [inviteCodeData?.code, showErrorToast, showSuccessToast, token]);
+  }, [
+    canInviteMembers,
+    inviteCodeData?.code,
+    inviteLoading,
+    inviteReadError,
+    inviteReadLoading,
+    inviteText,
+    loadCurrentInviteCode,
+    showErrorToast,
+    showSuccessToast,
+    token,
+  ]);
 
   const listTabsBlock = useMemo(() => {
     const found = allBlocks.find((block: any) => block.blockType === 'tabs');
@@ -4803,7 +4903,7 @@ function ListPageContentInner(props: PageContentProps) {
           )}
           {hasPendingViewConfig && currentView && (
             <div
-              className="absolute top-2 right-3 z-10 flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-900 shadow-sm"
+              className="m-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"
               role="status"
               data-testid={
                 hasPendingPersonalViewConfig
@@ -4912,11 +5012,22 @@ function ListPageContentInner(props: PageContentProps) {
           {/* Page title, view selector, and action buttons */}
           <ListPageHeader
             title={
-              schema.title
-                ? getLocalizedText(schema.title, locale, t)
-                : schema.name && schema.name.trim()
-                  ? schema.name
-                  : tableName
+              (() => {
+                // Import writes page titles into the tenant i18n bundle as
+                // page.<pageKey>.title (en + zh-CN). Prefer that key so the title
+                // follows the UI locale; schema.title/schema.name are stored as
+                // plain zh strings and would otherwise pin the title to zh.
+                const listPageKey = schema.pageKey || tableName;
+                const keyedTitle = t(`page.${listPageKey}.title`);
+                if (keyedTitle && keyedTitle !== `page.${listPageKey}.title`) {
+                  return keyedTitle;
+                }
+                if (schema.title) return getLocalizedText(schema.title, locale, t);
+                if (schema.name && schema.name.trim()) {
+                  return getLocalizedText(schema.name, locale, t);
+                }
+                return tableName;
+              })()
             }
             modelCode={modelCode}
             savedViews={savedViews}
@@ -4952,7 +5063,15 @@ function ListPageContentInner(props: PageContentProps) {
             onExport={handleExport}
             exportFilters={exportFilterConditions}
             isTenantMemberPage={isTenantMemberPage}
-            onInvite={() => setInviteDialogOpen(true)}
+            onInvite={
+              canInviteMembers
+                ? () => {
+                    inviteTriggerRef.current =
+                      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+                    setInviteDialogOpen(true);
+                  }
+                : undefined
+            }
             onImportMembers={
               canManageMemberAccounts ? () => setMemberImportDialogOpen(true) : undefined
             }
@@ -4976,6 +5095,29 @@ function ListPageContentInner(props: PageContentProps) {
             }
           />
 
+          {actionError && (
+            <div
+              className="print-hide rounded-control bg-status-red-bg text-status-red border-status-red mx-6 mt-4 border px-4 py-3 text-sm"
+              role="alert"
+              data-testid={deriveTestId('list', modelCode, 'action-error')}
+              data-print="hide"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="font-medium">{translateCommon('common.actionFailed', 'Action failed')}</div>
+                  <div className="mt-1 break-words">{actionError}</div>
+                </div>
+                <button
+                  type="button"
+                  className="text-status-red hover:bg-status-red-bg shrink-0 rounded px-2 py-1 text-xs font-medium"
+                  onClick={() => setActionError(null)}
+                >
+                  {translateCommon('common.close', 'Close')}
+                </button>
+              </div>
+            </div>
+          )}
+
           {canManageMemberAccounts && (
             <TenantMemberAccountImportDialog
               open={memberImportDialogOpen}
@@ -4991,37 +5133,57 @@ function ListPageContentInner(props: PageContentProps) {
             />
           )}
 
-          {isTenantMemberPage && inviteDialogOpen && (
-            <div
-              role="dialog"
-              aria-modal="true"
-              data-testid="invite-dialog"
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-            >
-              <div className="rounded-card bg-panel w-full max-w-md p-6 shadow-xl">
-                <div className="mb-4 flex items-center justify-between">
-                  <h3 className="text-text text-lg font-semibold">Member Invite</h3>
-                  <button
-                    type="button"
-                    onClick={() => setInviteDialogOpen(false)}
-                    className="text-text-2 hover:text-text-2 text-sm"
-                  >
-                    Close
-                  </button>
-                </div>
+          {canInviteMembers && (
+            <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+              <DialogContent
+                data-testid="invite-dialog"
+                closeLabel={inviteText('close')}
+                className="max-h-[calc(100dvh_-_2rem)] w-[calc(100%_-_2rem)] max-w-md overflow-y-auto"
+                onCloseAutoFocus={(event) => {
+                  event.preventDefault();
+                  if (inviteTriggerRef.current?.isConnected) inviteTriggerRef.current.focus();
+                }}
+              >
+                <DialogTitle>{inviteText('title')}</DialogTitle>
+                <DialogDescription>{inviteText('policy')}</DialogDescription>
                 <div className="space-y-4">
-                  {inviteCodeData?.code ? (
+                  {inviteReadLoading ? (
+                    <div role="status" data-testid="invite-loading" className="text-text-2 text-sm">
+                      {inviteText('loading')}
+                    </div>
+                  ) : inviteReadError ? (
+                    <div className="space-y-3">
+                      <p
+                        role="alert"
+                        data-testid="invite-read-error"
+                        className="text-sm text-red-600"
+                      >
+                        {inviteReadError}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => void loadCurrentInviteCode()}
+                        className="rounded-control bg-accent hover:bg-accent-hover px-3 py-2 text-sm font-medium text-white"
+                      >
+                        {inviteText('retry')}
+                      </button>
+                    </div>
+                  ) : inviteCodeData?.code ? (
                     <>
                       <div className="rounded-control bg-subtle p-3">
                         <div className="text-text-2 mb-1 text-xs font-medium">
-                          Current Invite Code
+                          {inviteText('current')}
                         </div>
-                        <div className="text-text font-mono text-lg tracking-wider">
+                        <div
+                          data-testid="invite-code-value"
+                          className="text-text font-mono text-lg tracking-wider"
+                        >
                           {inviteCodeData.code}
                         </div>
                         {inviteCodeData.expiredAt && (
                           <div className="text-text-2 mt-1 text-xs">
-                            Expires at {new Date(inviteCodeData.expiredAt).toLocaleString()}
+                            {inviteText('expires')}{' '}
+                            {new Date(inviteCodeData.expiredAt).toLocaleString(locale)}
                           </div>
                         )}
                       </div>
@@ -5032,7 +5194,7 @@ function ListPageContentInner(props: PageContentProps) {
                           disabled={inviteLoading}
                           className="rounded-control bg-accent hover:bg-accent-hover flex-1 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
                         >
-                          Refresh
+                          {inviteText('newCode')}
                         </button>
                         <button
                           type="button"
@@ -5040,14 +5202,14 @@ function ListPageContentInner(props: PageContentProps) {
                           disabled={inviteLoading}
                           className="rounded-control flex-1 bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
                         >
-                          Revoke
+                          {inviteText('revoke')}
                         </button>
                       </div>
                     </>
                   ) : (
                     <div className="space-y-3">
                       <div className="rounded-control bg-status-amber-bg p-3 text-sm text-amber-800">
-                        No active invite code. Generate one to invite members into this tenant.
+                        {inviteText('empty')}
                       </div>
                       <button
                         type="button"
@@ -5055,13 +5217,13 @@ function ListPageContentInner(props: PageContentProps) {
                         disabled={inviteLoading}
                         className="rounded-control bg-accent hover:bg-accent-hover w-full px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
                       >
-                        Generate Invite Code
+                        {inviteText('generate')}
                       </button>
                     </div>
                   )}
                 </div>
-              </div>
-            </div>
+              </DialogContent>
+            </Dialog>
           )}
 
           {/* List Tabs */}
@@ -5280,6 +5442,7 @@ function ListPageContentInner(props: PageContentProps) {
               {!schemaExtension.hideListToolbar && (
                 <ListToolbar
                   keyword={keyword}
+                  searchPlaceholder={tableSearchPlaceholder}
                   onKeywordChange={setKeyword}
                   onSearch={() => {
                     // Enter is an explicit commit. Do not rely on flush(): the

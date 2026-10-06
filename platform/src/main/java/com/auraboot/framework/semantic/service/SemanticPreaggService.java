@@ -155,12 +155,13 @@ public class SemanticPreaggService {
     private long refreshInTransaction(AbSemanticPreagg preagg) {
         long[] refreshedRows = new long[1];
         // Isolate creator authority, then restore every caller ThreadLocal, including
-        // the lexical command permit, on this same thread.
+        // the lexical command permit, on this same thread. The model lookup runs inside
+        // the snapshot too: scheduler threads arrive with no initialized MetaContext,
+        // and meta mappers require one (refreshAllDue previously failed on every sweep).
         MetaContext.Snapshot creatorIdentity = new MetaContext.Snapshot(
                 preagg.getTenantId(), preagg.getCreatedBy(), "semantic-preagg",
                 "semantic-preagg-refresher", java.util.Set.of(), null, null, null, null);
         MetaContext.runWithSnapshot(creatorIdentity, () -> {
-            // Tenant-line interception also governs the model lookup on scheduler threads.
             AbSemanticModel model = modelMapper.findByPid(preagg.getTenantId(), preagg.getSemanticModelPid());
             if (model == null) {
                 throw new SemanticValidationException("SEMANTIC_PREAGG_MODEL_MISSING",

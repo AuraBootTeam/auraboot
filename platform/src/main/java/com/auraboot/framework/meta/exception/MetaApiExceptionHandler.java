@@ -1,6 +1,10 @@
 package com.auraboot.framework.meta.exception;
 
 import com.auraboot.framework.common.constant.ResponseCode;
+import com.auraboot.framework.application.web.handler.GlobalExceptionHandler;
+import com.auraboot.framework.exception.BusinessException;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Autowired;
 import com.auraboot.framework.common.dto.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
@@ -23,6 +27,25 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @Order(1)
 @RestControllerAdvice(basePackages = "com.auraboot.framework.meta.controller")
 public class MetaApiExceptionHandler {
+
+    @Autowired
+    private GlobalExceptionHandler globalExceptionHandler;
+
+    /** Preserve the host's business classification before matching lower-level causes. */
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<ApiResponse<Object>> handleBusinessException(
+            BusinessException exception, HttpServletRequest request) {
+        return globalExceptionHandler.handleBusinessException(exception, request);
+    }
+
+    /** Keep absent records distinct from invalid business operations. */
+    @ExceptionHandler(MetaRecordNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMetaRecordNotFoundException(
+            MetaRecordNotFoundException e) {
+        log.debug("Meta record lookup found no accessible record");
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error(ResponseCode.NOT_FOUND, "Record not found", null));
+    }
 
     /**
      * Handle Meta service exceptions (business logic errors).
@@ -64,21 +87,6 @@ public class MetaApiExceptionHandler {
         ApiResponse<Void> response = ApiResponse.error(ResponseCode.FORBIDDEN, "Access denied");
 
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
-    }
-
-    /**
-     * Handle SQL exception — do not expose database details.
-     */
-    @ExceptionHandler(org.springframework.dao.DataAccessException.class)
-    public ResponseEntity<ApiResponse<Void>> handleDataAccessException(
-            org.springframework.dao.DataAccessException e) {
-
-        log.error("Data access exception: {}", e.getMessage(), e);
-
-        ApiResponse<Void> response = ApiResponse.error(
-            ResponseCode.SystemError, "An unexpected error occurred. Please try again later.");
-
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
 
     /**

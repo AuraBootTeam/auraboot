@@ -115,11 +115,55 @@ public class FileAccessorImpl implements FileAccessor {
         return saved;
     }
 
+    @Override
+    public SavedFile saveAndAppendLink(String originalName, String contentType, byte[] bytes,
+                                      String entityType, String entityId, String fieldName) {
+        requireText(entityType, "entityType");
+        requireText(entityId, "entityId");
+        requireText(fieldName, "fieldName");
+        SavedFile saved = save(originalName, contentType, bytes);
+        FileRelationRequestDTO relation = new FileRelationRequestDTO();
+        relation.setEntityType(entityType);
+        relation.setEntityId(entityId);
+        relation.setFieldName(fieldName);
+        relation.setFileIds(new String[]{saved.fileId()});
+        if (!fileService.appendFileRelation(relation, userId)) {
+            throw new IllegalStateException("additional file relation was not persisted");
+        }
+        return saved;
+    }
+
     private static String firstText(String first, String second) {
         if (StringUtils.hasText(first)) {
             return first;
         }
         return StringUtils.hasText(second) ? second : null;
+    }
+
+    @Override
+    public void linkExisting(String fileId, String entityType, String entityId, String fieldName) {
+        FileEntity file = requirePublicFile(fileId);
+        requireText(entityType, "entityType");
+        requireText(entityId, "entityId");
+        requireText(fieldName, "fieldName");
+        if (!"success".equalsIgnoreCase(file.getStatus())) {
+            throw new IllegalArgumentException("File upload is not finalized: " + fileId);
+        }
+        if (isLinkedTo(fileId, entityType, entityId, fieldName)) {
+            return;
+        }
+        // Validate before createFileRelation replaces a field's existing relationships.
+        if (userId == null || !userId.equals(file.getCreatedBy())) {
+            throw new IllegalArgumentException("Only the file owner can create a relation");
+        }
+        FileRelationRequestDTO relation = new FileRelationRequestDTO();
+        relation.setEntityType(entityType);
+        relation.setEntityId(entityId);
+        relation.setFieldName(fieldName);
+        relation.setFileIds(new String[]{fileId});
+        if (!fileService.createFileRelation(relation, userId)) {
+            throw new IllegalStateException("uploaded file relation was not persisted");
+        }
     }
 
     private FileEntity requirePublicFile(String fileId) {

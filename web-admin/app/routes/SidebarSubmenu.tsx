@@ -95,6 +95,7 @@ export default function SidebarSubmenu({
           expand/collapse to instant removes the race window without
           changing the visible end-states. */}
       <div
+        hidden={!isExpanded}
         className={`overflow-hidden ${isExpanded ? 'max-h-none opacity-100' : 'max-h-0 opacity-0'}`}
       >
         <div className={`${paddingLeft} space-y-1`}>

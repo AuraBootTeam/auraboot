@@ -280,6 +280,8 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
         // it the WHERE clause matches nothing and the chart shows an empty state. Mirrors
         // NamedQueryServiceImpl (the datasource/list executor).
         params.put("currentUserId", currentUserId != null ? currentUserId.toString() : null);
+        // Public user identity is server-owned, matching the datasource/list executor.
+        params.put("currentUserPid", MetaContext.getCurrentUserPid());
 
         log.debug("Executing named query aggregate: code={}, SQL={}, params={}", queryCode, sql, params);
 
@@ -1265,14 +1267,22 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
         if (hasExplicitProjection) {
             return buildMeta(request);
         }
-        // Identity passthrough — meta.metrics derives from named query whitelist
+        // Identity passthrough — chart semantics derive from the named query's declared
+        // field data types: string/date fields are dimensions, number fields are metrics.
+        // Treating every whitelist column as a metric left dimension-less charts that
+        // rendered the grouping column as a legend series instead of an axis.
         AggregateQueryResponse.QueryMeta meta = new AggregateQueryResponse.QueryMeta();
-        meta.setDimensions(java.util.Collections.emptyList());
-        List<String> fieldCodes = fieldMap.values().stream()
-                .map(NamedQueryField::getFieldCode)
-                .sorted()
+        java.util.List<NamedQueryField> sortedFields = fieldMap.values().stream()
+                .sorted(java.util.Comparator.comparing(NamedQueryField::getFieldCode))
                 .collect(Collectors.toList());
-        meta.setMetrics(fieldCodes);
+        meta.setDimensions(sortedFields.stream()
+                .filter(f -> !"number".equalsIgnoreCase(f.getDataType()))
+                .map(NamedQueryField::getFieldCode)
+                .collect(Collectors.toList()));
+        meta.setMetrics(sortedFields.stream()
+                .filter(f -> "number".equalsIgnoreCase(f.getDataType()))
+                .map(NamedQueryField::getFieldCode)
+                .collect(Collectors.toList()));
         return meta;
     }
 

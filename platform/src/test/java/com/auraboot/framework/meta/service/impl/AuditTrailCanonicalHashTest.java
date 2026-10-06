@@ -60,7 +60,7 @@ class AuditTrailCanonicalHashTest {
 
     @Test
     void writerUsesVersionTwoAndMicrosecondsBeforeComputingHash() {
-        AuditTrail saved = service.doRecordAudit(AuditTrailEvent.builder()
+        AuditTrail saved = service.recordAudit(AuditTrailEvent.builder()
                 .tenantId(11L).actorId(17L).eventType("command_executed")
                 .entityType("fixture").entityPid("row_pid").commandCode("fixture:approve")
                 .operationType("UPDATE").build());

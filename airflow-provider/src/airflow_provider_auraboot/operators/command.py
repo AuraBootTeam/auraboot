@@ -45,10 +45,12 @@ class AuraBootCommandOperator(BaseOperator):
         self.log.info(
             "Triggering AuraBoot command '%s' with params=%s", self.command_code, self.params
         )
+        # Airflow hands `params` over as ParamsDict (a MutableMapping), which
+        # requests' JSON encoder cannot serialize — normalize to a plain dict.
         result = hook.run(
             "POST",
             "/api/commands/run",
-            {"code": self.command_code, "params": self.params},
+            {"code": self.command_code, "params": dict(self.params)},
         )
         self.log.info(
             "Command '%s' returned commandRunPid=%s status=%s",

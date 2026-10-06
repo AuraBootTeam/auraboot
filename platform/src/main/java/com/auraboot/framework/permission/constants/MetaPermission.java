@@ -337,6 +337,9 @@ public final class MetaPermission {
      */
     public static final String VIEW_READ = "dashboard.saved_view.read";
 
+    /** Public SavedView link generation, revocation and token-bearing status. */
+    public static final String VIEW_PUBLIC_SHARE = "dashboard.manage";
+
     // ==================== AUTOMATION permissions ====================
 
     /**

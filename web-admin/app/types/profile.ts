@@ -8,7 +8,7 @@ export interface UserProfile {
   signature?: string;
   avatarUrl?: string;
   imgId?: string; // 如果后端返回头像文件ID
-  createdAt: string | number | Date;
+  createdAt: string | number | Date | null;
   lastSignInAt?: string | number | Date;
 }
 

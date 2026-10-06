@@ -496,6 +496,37 @@ describe('useDashboardStore', () => {
       expect(dsError).toBeDefined();
     });
 
+    it('accepts the supported model-table source and persists its filters and columns', async () => {
+      findByPidMock.mockResolvedValue(minimalDashboard());
+      updateDashboardMock.mockResolvedValue(minimalDashboard());
+      await useDashboardStore.getState().loadDashboard('dash-1');
+      const config = {
+        title: 'Recent opportunities',
+        modelCode: 'crm_opportunity_common',
+        table: { columns: [{ field: 'crm_opp_name', label: 'Opportunity' }] },
+        filters: [{ field: 'crm_opp_account_id', operator: 'eq' as const, value: '${recordPid}' }],
+        defaultSort: { field: 'created_at', order: 'desc' as const },
+      };
+      useDashboardStore.getState().addWidget(widgetData({ type: 'smart-table-chart', config }));
+      expect(useDashboardStore.getState().validate().valid).toBe(true);
+      await useDashboardStore.getState().saveDashboard();
+      expect(updateDashboardMock.mock.calls[0][1].widgets[0].config).toEqual(config);
+    });
+
+    it.each([
+      { type: 'smart-table-chart' as const, modelCode: '', columns: [{ field: 'name' }] },
+      { type: 'smart-table-chart' as const, modelCode: 'crm_account_common', columns: [] },
+      { type: 'smart-number-card' as const, modelCode: 'crm_account_common', columns: [{ field: 'name' }] },
+    ])('rejects incomplete or unsupported model-table sources: %j', ({ type, modelCode, columns }) => {
+      useDashboardStore.getState().createDashboard('Board');
+      useDashboardStore.getState().addWidget(widgetData({
+        type, config: { title: 'Widget', modelCode, table: { columns } },
+      }));
+      expect(useDashboardStore.getState().validate().errors).toEqual(expect.arrayContaining([
+        expect.objectContaining({ field: 'dataSource', type: 'error' }),
+      ]));
+    });
+
     it('adds warning for widget missing title', () => {
       useDashboardStore.getState().createDashboard('Board');
       useDashboardStore.getState().addWidget(widgetData({ config: { title: '' } }));

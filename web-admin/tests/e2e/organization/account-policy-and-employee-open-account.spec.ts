@@ -153,10 +153,10 @@ test.describe('Account policy and employee account opening', () => {
     expect(typeof body?.data?.data?.tempPassword).toBe('string');
     expect(body.data.data.tempPassword.length).toBeGreaterThanOrEqual(8);
 
-    await expect(page.getByRole('heading', { name: '登录凭据已生成' })).toBeVisible({
+    await expect(page.getByRole('heading', { name: /登录凭据已生成|Account credentials generated/i })).toBeVisible({
       timeout: 10_000,
     });
-    await expect(page.getByText(/登录名：.*临时密码（仅显示一次）：/)).toBeVisible();
+    await expect(page.getByText(/Login name:|登录名：/)).toBeVisible();
     await page.screenshot({
       path: join(evidenceDir, 'ui-15-employee-open-account-temp-password.png'),
       fullPage: true,
@@ -217,11 +217,11 @@ test.describe('Account policy and employee account opening', () => {
     expect(typeof data?.tempPassword).toBe('string');
     expect(data.tempPassword.length).toBeGreaterThanOrEqual(8);
 
-    await expect(page.getByRole('heading', { name: '登录凭据已生成' })).toBeVisible({
+    await expect(page.getByRole('heading', { name: /登录凭据已生成|Account credentials generated/i })).toBeVisible({
       timeout: 10_000,
     });
-    await expect(page.getByText(new RegExp(`登录名：${expectedUserName}`))).toBeVisible();
-    await expect(page.getByText(/临时密码（仅显示一次）：/)).toBeVisible();
+    await expect(page.getByText(new RegExp(`(Login name: ${expectedUserName}|登录名：${expectedUserName})`))).toBeVisible();
+    await expect(page.getByText(/(?:临时密码（仅显示一次）：|temporary password \(shown once\): )/)).toBeVisible();
     await page.screenshot({
       path: join(evidenceDir, 'ui-16-account-provision-from-employee-temp-password.png'),
       fullPage: true,

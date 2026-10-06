@@ -25,6 +25,66 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class FileAccessorImplTest {
 
+    @Test
+    void linkExisting_persists_uploaded_file_relation_without_copying_bytes() {
+        FileEntity entity = file("upload-pid", "stored.xlsx", "upload.xlsx");
+        entity.setCreatedBy(42L);
+        entity.setStatus("success");
+        when(fileService.getFileById("upload-pid")).thenReturn(entity);
+        when(fileService.createFileRelation(org.mockito.ArgumentMatchers.any(), eq(42L))).thenReturn(true);
+
+        new FileAccessorImpl(fileService, storageProvider, 42L)
+                .linkExisting("upload-pid", "qo_quote_common", "quote-pid", "source_file_upload-pid");
+
+        ArgumentCaptor<FileRelationRequestDTO> relation = ArgumentCaptor.forClass(FileRelationRequestDTO.class);
+        verify(fileService).createFileRelation(relation.capture(), eq(42L));
+        assertThat(relation.getValue().getFileIds()).containsExactly("upload-pid");
+        assertThat(relation.getValue().getEntityType()).isEqualTo("qo_quote_common");
+        assertThat(relation.getValue().getEntityId()).isEqualTo("quote-pid");
+        assertThat(relation.getValue().getFieldName()).isEqualTo("source_file_upload-pid");
+        org.mockito.Mockito.verifyNoInteractions(storageProvider);
+    }
+
+    @Test
+    void linkExisting_rejects_another_owner_before_replacing_any_relation() {
+        FileEntity entity = file("upload-pid", "stored.xlsx", "upload.xlsx");
+        entity.setCreatedBy(7L);
+        entity.setStatus("success");
+        when(fileService.getFileById("upload-pid")).thenReturn(entity);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                new FileAccessorImpl(fileService, storageProvider, 42L)
+                        .linkExisting("upload-pid", "qo_quote_common", "quote-pid", "source_file_upload-pid"))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Only the file owner");
+        verify(fileService, org.mockito.Mockito.never()).createFileRelation(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void linkExisting_is_idempotent_for_an_already_linked_upload() {
+        FileEntity entity = file("upload-pid", "stored.xlsx", "upload.xlsx");
+        entity.setCreatedBy(42L);
+        entity.setStatus("success");
+        when(fileService.getFileById("upload-pid")).thenReturn(entity);
+        when(fileService.getFilesByEntityAndField("qo_quote_common", "quote-pid", "source_file_upload-pid"))
+                .thenReturn(List.of(entity));
+
+        new FileAccessorImpl(fileService, storageProvider, 42L)
+                .linkExisting("upload-pid", "qo_quote_common", "quote-pid", "source_file_upload-pid");
+        verify(fileService, org.mockito.Mockito.never()).createFileRelation(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void linkExisting_fails_when_the_public_file_is_not_visible() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                new FileAccessorImpl(fileService, storageProvider, 42L)
+                        .linkExisting("missing-pid", "qo_quote_common", "quote-pid", "source_file_missing-pid"))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("File not found");
+        verify(fileService, org.mockito.Mockito.never()).createFileRelation(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
     @Mock
     private FileService fileService;
 
@@ -221,6 +281,33 @@ class FileAccessorImplTest {
                         "qtr_recall_exercise", "exercise-pid", "qtr_re_report_ref"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("relation");
+    }
+
+    @Test
+    void saveAndAppendLink_neverUsesTheReplacingRelationOperation() {
+        var response = new FileUploadResponseDTO(); response.setFileId("new-file-pid");
+        response.setOriginalName("合同.txt"); response.setFileSize(3L);
+        when(fileService.uploadFile(org.mockito.ArgumentMatchers.any(MultipartFile.class), eq(42L))).thenReturn(response);
+        when(fileService.appendFileRelation(org.mockito.ArgumentMatchers.any(FileRelationRequestDTO.class), eq(42L))).thenReturn(true);
+        var accessor = new FileAccessorImpl(fileService, storageProvider, 42L);
+        var saved = accessor.saveAndAppendLink("合同.txt", "text/plain", new byte[]{1,2,3}, "BPM_TASK", "task-1", "attachment");
+        assertThat(saved.fileId()).isEqualTo("new-file-pid");
+        var relation = ArgumentCaptor.forClass(FileRelationRequestDTO.class);
+        verify(fileService).appendFileRelation(relation.capture(), eq(42L));
+        assertThat(relation.getValue().getFileIds()).containsExactly("new-file-pid");
+        assertThat(relation.getValue().getEntityId()).isEqualTo("task-1");
+        org.mockito.Mockito.verify(fileService, org.mockito.Mockito.never()).createFileRelation(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void saveAndAppendLink_failsClosedWhenAppendIsUnavailable() {
+        var response = new FileUploadResponseDTO(); response.setFileId("new-file-pid");
+        response.setOriginalName("合同.txt"); response.setFileSize(1L);
+        when(fileService.uploadFile(org.mockito.ArgumentMatchers.any(MultipartFile.class), eq(42L))).thenReturn(response);
+        var accessor = new FileAccessorImpl(fileService, storageProvider, 42L);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> accessor.saveAndAppendLink(
+                "合同.txt", "text/plain", new byte[]{1}, "BPM_TASK", "task-1", "attachment"))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("relation");
     }
 
     private static FileEntity file(String pid, String storageKey, String originalName) {

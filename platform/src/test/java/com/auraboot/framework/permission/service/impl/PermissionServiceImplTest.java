@@ -104,6 +104,8 @@ class PermissionServiceImplTest {
         verify(permissionConverter, never()).toDTO(any());
     }
 
+
+
     private PermissionCreateRequest createRequest(String code) {
         PermissionCreateRequest req = new PermissionCreateRequest();
         req.setCode(code);
@@ -285,6 +287,14 @@ class PermissionServiceImplTest {
 
         assertThat(service.findByPid("permission-pid")).isSameAs(dto);
         verify(permissionMapper).findByPids(List.of("permission-pid"));
+    }
+
+    @Test
+    void findByPidReturnsNullForMissingRecord() {
+        when(permissionMapper.findByPids(List.of("missing"))).thenReturn(List.of());
+
+        assertThat(service.findByPid("missing")).isNull();
+        verify(permissionConverter, never()).toDTO(any());
     }
 
     @Test

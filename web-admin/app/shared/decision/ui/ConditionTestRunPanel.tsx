@@ -1,13 +1,25 @@
+import {
+  useDecisionConditionText,
+  decisionConditionText,
+  decisionConditionOperatorLabel,
+  type DecisionConditionTextKey,
+} from './decisionConditionText';
 import { useMemo, useState } from 'react';
 import {
-  type ConditionNode, type CompareNode, type Operand, type ScopedContext, type Truth, type PathOperand,
-  evaluatePreview, operatorLabel, UNARY_OPERATORS,
+  type ConditionNode,
+  type CompareNode,
+  type Operand,
+  type ScopedContext,
+  type Truth,
+  type PathOperand,
+  evaluatePreview,
+  UNARY_OPERATORS,
 } from '../ast/conditionAst';
 import type { FieldOption } from './ConditionBuilder';
 import { valueLabel } from './displayLabels';
 
 /**
- * DecisionOps client-side test-run preview (mockup "测试运行" step, docs/1.md §17.2): evaluate a
+ * DecisionOps client-side test-run preview (test-run mockup step, docs/1.md §17.2): evaluate a
  * Condition AST against named sample contexts and show the three-valued result (TRUE/FALSE/UNKNOWN).
  * Preview only — the backend test-run/evaluate remains authoritative (front-end never decides).
  */
@@ -26,8 +38,16 @@ export interface ConditionTestRunPanelProps {
   emptyPreviewLabel?: string;
 }
 
-const TRUTH_LABEL: Record<Truth, string> = { TRUE: '命中', FALSE: '未命中', UNKNOWN: '未知' };
-const TRUTH_CLASS: Record<Truth, string> = { TRUE: 'truth-true', FALSE: 'truth-false', UNKNOWN: 'truth-unknown' };
+const TRUTH_LABEL: Record<Truth, DecisionConditionTextKey> = {
+  TRUE: 'truthTrue',
+  FALSE: 'truthFalse',
+  UNKNOWN: 'truthUnknown',
+};
+const TRUTH_CLASS: Record<Truth, string> = {
+  TRUE: 'truth-true',
+  FALSE: 'truth-false',
+  UNKNOWN: 'truth-unknown',
+};
 
 function fieldKey(scope: string, path: string): string {
   return `${scope}:${path}`;
@@ -55,14 +75,21 @@ function operandPreview(
   fieldByKey: Map<string, FieldOption>,
   labelOf?: (o: PathOperand) => string,
   leftField?: FieldOption,
+  locale: string = 'zh-CN',
 ): string {
   if (!operand) return '';
   if (operand.type === 'path') {
-    return labelOf?.(operand) ?? fieldByKey.get(fieldKey(operand.scope, operand.path))?.label ?? `${operand.scope}.${operand.path}`;
+    return (
+      labelOf?.(operand) ??
+      fieldByKey.get(fieldKey(operand.scope, operand.path))?.label ??
+      `${operand.scope}.${operand.path}`
+    );
   }
   if (operand.type === 'literal') {
     if (Array.isArray(operand.value)) {
-      return operand.value.map((item) => valueLabel(item, leftField?.valueLabels)).join('、');
+      return operand.value
+        .map((item) => valueLabel(item, leftField?.valueLabels))
+        .join(decisionConditionText('listSeparator', locale));
     }
     return valueLabel(operand.value, leftField?.valueLabels);
   }
@@ -73,23 +100,28 @@ function previewNode(
   node: ConditionNode,
   fieldByKey: Map<string, FieldOption>,
   labelOf?: (o: PathOperand) => string,
+  locale: string = 'zh-CN',
 ): string {
   if (node.type === 'compare') {
     const compare = node as CompareNode;
-    const leftField = compare.left.type === 'path'
-      ? fieldByKey.get(fieldKey(compare.left.scope, compare.left.path))
-      : undefined;
-    const left = operandPreview(compare.left, fieldByKey, labelOf, leftField);
+    const leftField =
+      compare.left.type === 'path'
+        ? fieldByKey.get(fieldKey(compare.left.scope, compare.left.path))
+        : undefined;
+    const left = operandPreview(compare.left, fieldByKey, labelOf, leftField, locale);
     const right = UNARY_OPERATORS.has(compare.operator)
       ? ''
-      : ` ${operandPreview(compare.right, fieldByKey, labelOf, leftField)}`;
-    return `【${left} ${operatorLabel(compare.operator)}${right}】`;
+      : ` ${operandPreview(compare.right, fieldByKey, labelOf, leftField, locale)}`;
+    return `【${left} ${decisionConditionOperatorLabel(compare.operator, locale)}${right}】`;
   }
-  if (node.type === 'not') return `非(${previewNode(node.child, fieldByKey, labelOf)})`;
+  if (node.type === 'not')
+    return decisionConditionText('negated', locale, {
+      condition: previewNode(node.child, fieldByKey, labelOf, locale),
+    });
   const parts = node.children
     .filter((child) => !(child.type === 'compare' && child.enabled === false))
-    .map((child) => previewNode(child, fieldByKey, labelOf));
-  return `(${parts.join(node.op === 'AND' ? ' 并且 ' : ' 或 ')})`;
+    .map((child) => previewNode(child, fieldByKey, labelOf, locale));
+  return `(${parts.join(node.op === 'AND' ? decisionConditionText('andSeparator', locale) : decisionConditionText('orSeparator', locale))})`;
 }
 
 export function ConditionTestRunPanel({
@@ -99,6 +131,7 @@ export function ConditionTestRunPanel({
   labelOf,
   emptyPreviewLabel,
 }: ConditionTestRunPanelProps) {
+  const { locale, text } = useDecisionConditionText();
   const [selected, setSelected] = useState(0);
   const sample = samples[selected];
   const fieldByKey = useMemo(() => {
@@ -106,7 +139,7 @@ export function ConditionTestRunPanel({
     fields.forEach((field) => next.set(fieldKey(field.scope, field.path), field));
     return next;
   }, [fields]);
-  const naturalLanguage = previewNode(condition, fieldByKey, labelOf);
+  const naturalLanguage = previewNode(condition, fieldByKey, labelOf, locale);
   const useEmptyPreviewLabel = Boolean(emptyPreviewLabel) && naturalLanguage.trim() === '()';
   const result: Truth | null =
     sample && !useEmptyPreviewLabel ? evaluatePreview(condition, sample.context) : null;
@@ -124,7 +157,9 @@ export function ConditionTestRunPanel({
             data-testid={`sample-${i}`}
             aria-pressed={i === selected}
             onClick={() => setSelected(i)}
-          >{s.label}</button>
+          >
+            {s.label}
+          </button>
         ))}
       </div>
 
@@ -148,9 +183,13 @@ export function ConditionTestRunPanel({
           data-testid="trp-result"
           data-truth={result}
           className={`trp-result ${TRUTH_CLASS[result]}`}
-        >{TRUTH_LABEL[result]}</div>
+        >
+          {text(TRUTH_LABEL[result])}
+        </div>
       )}
-      <div data-testid="trp-note" className="trp-note">预览仅辅助,以后端 test-run 为准</div>
+      <div data-testid="trp-note" className="trp-note">
+        {text('previewNote')}
+      </div>
     </div>
   );
 }

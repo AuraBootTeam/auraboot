@@ -19,6 +19,7 @@ import com.auraboot.framework.permission.service.FieldPermissionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.util.StringUtils;
 
 import com.auraboot.framework.common.util.JsonUtil;
@@ -348,9 +349,15 @@ public class CommandFieldMapExecutor {
                 columnData.putIfAbsent("created_by", auditUserId);
                 columnData.putIfAbsent("updated_by", auditUserId);
             }
-            int inserted = jsonbColumns.isEmpty()
-                    ? dynamicDataMapper.insert(tableName, columnData)
-                    : dynamicDataMapper.insertWithJsonb(tableName, columnData, jsonbColumns);
+            int inserted;
+            try {
+                inserted = jsonbColumns.isEmpty()
+                        ? dynamicDataMapper.insert(tableName, columnData)
+                        : dynamicDataMapper.insertWithJsonb(tableName, columnData, jsonbColumns);
+            } catch (DuplicateKeyException duplicate) {
+                // Preserve rollback and server diagnostics without exposing constraint or SQL text.
+                throw new BusinessException(ResponseCode.BadParam, "$i18n:meta_record.duplicate", duplicate);
+            }
             results.put(modelCode + "_inserted", inserted);
             results.put("recordPid", newPid);
             log.info("Implicit FIELD_MAP INSERT: {} rows in {} (pid={}, command={})", inserted, modelCode, newPid, command.getCode());

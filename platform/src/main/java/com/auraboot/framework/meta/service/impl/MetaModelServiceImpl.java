@@ -71,7 +71,7 @@ import com.auraboot.framework.common.constant.StatusConstants;
 
 /**
  * 模型元数据服务实现
- * 
+ *
  * @author AuraBoot Team
  * @since 2.0.0
  */
@@ -205,7 +205,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     @Override
     public Optional<ModelDefinition> getModelDefinitionFromDb(String modelCode) {
         validateModelCode(modelCode);
-        
+
         // 清除缓存后重新获取
         evictModelCache(modelCode);
         return getModelDefinition(modelCode);
@@ -253,7 +253,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     @Override
     public FieldDefinition getFieldDefinition(String modelCode, String fieldCode) {
         validateFieldCode(fieldCode);
-        
+
         List<FieldDefinition> fields = getModelFields(modelCode);
         return fields.stream()
                 .filter(field -> field.getCode().equals(fieldCode))
@@ -297,13 +297,13 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     @Override
     public RelationDefinition getReverseRelation(String modelCode, String relationName) {
         RelationDefinition relation = getRelationDefinition(modelCode, relationName);
-        
+
         // 查找反向关联
         String targetModel = relation.getTargetModel();
         List<RelationDefinition> targetRelations = getModelRelations(targetModel);
-        
+
         return targetRelations.stream()
-                .filter(rel -> rel.getTargetModel().equals(modelCode) && 
+                .filter(rel -> rel.getTargetModel().equals(modelCode) &&
                               rel.getSourceField().equals(relation.getTargetField()) &&
                               rel.getTargetField().equals(relation.getSourceField()))
                 .findFirst()
@@ -313,24 +313,24 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     @Override
     public List<IndexDefinition> getModelIndexes(String modelCode) {
         Optional<ModelDefinition> modelOpt = getModelDefinition(modelCode);
-        
+
         if (modelOpt.isPresent()) {
             // TODO: 从数据库加载索引定义
             return Collections.emptyList();
         }
-        
+
         return Collections.emptyList();
     }
 
     @Override
     public List<ConstraintDefinition> getModelConstraints(String modelCode) {
         Optional<ModelDefinition> modelOpt = getModelDefinition(modelCode);
-        
+
         if (modelOpt.isPresent()) {
             // TODO: 从数据库加载约束定义
             return Collections.emptyList();
         }
-        
+
         return Collections.emptyList();
     }
 
@@ -345,7 +345,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     public QueryBuilderService.QueryBuilder buildBaseQuery(String modelCode, QueryBuilderService.QueryType queryType) {
         ModelDefinition model = getModelDefinition(modelCode)
                 .orElseThrow(() -> new MetaServiceException("Model not found: " + modelCode));
-        
+
         return queryBuilderService.buildBaseQuery(model, queryType);
     }
 
@@ -354,7 +354,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     public QueryBuilderService.QueryBuilder buildConditionQuery(String modelCode, List<QueryCondition> conditions) {
         ModelDefinition model = getModelDefinition(modelCode)
                 .orElseThrow(() -> new MetaServiceException("Model not found: " + modelCode));
-        
+
         return queryBuilderService.buildConditionQuery(model, conditions);
     }
 
@@ -364,13 +364,13 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         if (sortFields == null || sortFields.isEmpty()) {
             return "";
         }
-        
+
         // 验证排序字段是否存在于模型中
         List<FieldDefinition> modelFields = getModelFields(modelCode);
         Set<String> validFields = modelFields.stream()
                 .map(FieldDefinition::getCode)
                 .collect(Collectors.toSet());
-        
+
         List<String> orderClauses = sortFields.stream()
                 .filter(sort -> validFields.contains(sort.getFieldName()))
                 .map(sort -> {
@@ -378,7 +378,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                     return columnName + " " + sort.getDirection();
                 })
                 .collect(Collectors.toList());
-        
+
         return String.join(", ", orderClauses);
     }
 
@@ -388,11 +388,11 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         if (pageRequest == null) {
             return baseQuery;
         }
-        
+
         int pageSize = Math.min(pageRequest.getPageSize(), 1000); // 限制最大页面大小
         int pageNum = Math.max(1, pageRequest.getPageNum());
         int offset = (pageNum - 1) * pageSize;
-        
+
         return baseQuery + " LIMIT " + pageSize + " OFFSET " + offset;
     }
 
@@ -423,9 +423,9 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         if (modelCodes == null || modelCodes.isEmpty()) {
             return;
         }
-        
+
         log.info("Preloading models: {} for tenant: {}", logSafe(modelCodes), getCurrentTenantId());
-        
+
         for (String modelCode : modelCodes) {
             try {
                 getModelDefinition(modelCode);
@@ -441,7 +441,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     public MetadataValidationResult validateModelMetadata(String modelCode) {
         try {
             Optional<ModelDefinition> modelOpt = getModelDefinition(modelCode);
-            
+
             if (modelOpt.isEmpty()) {
                 return MetadataValidationResult.builder()
                         .valid(false)
@@ -450,29 +450,29 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                         .summary("Model validation failed")
                         .build();
             }
-            
+
             ModelDefinition model = modelOpt.get();
             List<String> errors = new ArrayList<>();
             List<String> warnings = new ArrayList<>();
-            
+
             // 验证模型基本信息
             if (model.getTableName() == null || model.getTableName().trim().isEmpty()) {
                 errors.add("Table name is required");
             }
-            
+
             // 验证字段定义
             if (model.getFields() == null || model.getFields().isEmpty()) {
                 warnings.add("No fields defined for model");
             } else {
                 validateFields(model.getFields(), errors, warnings);
             }
-            
+
             // 验证主键
             boolean hasPrimaryKey = model.getFields().stream().anyMatch(FieldDefinition::isPrimaryKey);
             if (!hasPrimaryKey) {
                 errors.add("Primary key field is required");
             }
-            
+
             return MetadataValidationResult.builder()
                     .valid(errors.isEmpty())
                     .modelCode(modelCode)
@@ -480,7 +480,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                     .warnings(warnings)
                     .summary(errors.isEmpty() ? "Model validation passed" : "Model validation failed")
                     .build();
-                    
+
         } catch (Exception e) {
             // §P4 wrap-as-result variant: validateModel is invoked from import flows
             // and DDL preview where a thrown exception would collapse a batch. Surface
@@ -531,15 +531,12 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         if (request == null) {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "创建请求不能为空");
         }
-        
-
 
             return createDirectly(request);
 
     }
-    
 
-    
+
     /**
      * Create a model row plus the auto-bound system fields.
      *
@@ -571,23 +568,23 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         if (!isCodeUnique(request.getCode(), null)) {
             throw new IllegalArgumentException("Model code already exists: " + request.getCode());
         }
-        
+
         // Create Model entity
         Model model = new Model();
         model.setPid(UniqueIdGenerator.generate());
         model.setTenantId(getCurrentTenantId());
 
         model.setCode(request.getCode());
-        
+
         // Merge extension data: start from request.extension (preserves softDelete, etc.)
         Map<String, Object> extensionData = request.getExtension() != null
             ? new HashMap<>(request.getExtension()) : new HashMap<>();
         extensionData.put("displayName", request.getDisplayName());
         extensionData.put("description", request.getDescription());
         extensionData.put("modelType", request.getModelType());
-        
+
         // Create ExtensionBean object and set it
-        com.auraboot.framework.meta.entity.payload.ExtensionBean extension = 
+        com.auraboot.framework.meta.entity.payload.ExtensionBean extension =
             new com.auraboot.framework.meta.entity.payload.ExtensionBean();
         extension.setExtension(extensionData);
         extension.validate();
@@ -634,7 +631,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         if (result <= 0) {
             throw new MetaServiceException("Failed to create model");
         }
-        
+
         log.info("模型创建成功: {}", logSafe(model.getPid()));
 
         // Auto-bind system fields (id, pid, created_at, updated_at)
@@ -642,14 +639,18 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
 
         // Convert to DTO
         MetaModelDTO dto = convertToMetaModelDTO(model);
-        
+
         // 自动分配 permissions
-        autoPermissionAssignmentService.autoAssignPermissions(request.getCode(), null);
+        if (StringUtils.hasText(model.getPluginPid())) {
+            autoPermissionAssignmentService.registerPermissions(model.getCode(), null, model.getTenantId());
+        } else {
+            autoPermissionAssignmentService.autoAssignPermissions(request.getCode(), null);
+        }
         log.info("Auto permission assignment completed for model: {}", logSafe(request.getCode()));
-        
+
         return dto;
     }
-    
+
     /**
      * Auto-bind system fields to a newly created model.
      * System fields: id, pid, created_at, updated_at
@@ -716,7 +717,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             throw new ValidationException(ResponseCode.CommonValidationFailed, "模型显示名称不能为空");
         }
     }
-    
+
     /**
      * 验证编码唯一性
      * For versioning system: only check if CURRENT version with this code exists
@@ -744,7 +745,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         throw new ValidationException(ResponseCode.CommonValidationFailed,
             "模型编码已存在: " + code);
     }
-    
+
     /**
      * Lookup the current version of a model by code.
      *
@@ -786,8 +787,6 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
 
         log.debug("查询模型: pid={}", logSafe(pid));
 
-
-
         try {
             // 使用租户上下文验证查找
             Model model = findEntityByPid(pid);
@@ -814,8 +813,6 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
 
         log.info("删除模型: {}", logSafe(pid));
 
-
-
         // 查找现有记录（带租户上下文验证）
         Model model = findEntityByPid(pid);
 
@@ -824,24 +821,23 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
 
         deleteDirectly(model);
     }
-    
 
-    
+
     private void deleteDirectly(Model model) {
         log.info("直接删除模型(非Git-First): {}", logSafe(model.getCode()));
-        
+
         // 软删除
         int result = metaModelMapper.deleteById(model.getId());
         if (result <= 0) {
             throw new MetaServiceException("Failed to delete model");
         }
-        
+
         // 清除缓存
         refreshModelCache(model.getCode());
-        
+
         log.info("模型删除成功: {}", logSafe(model.getPid()));
     }
-    
+
     /**
      * 验证是否可以删除
      */
@@ -855,7 +851,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                 "Cannot delete model with bound fields. Found " + boundFieldCount + " bound fields.");
         }
     }
-    
+
     /**
      * 根据 PID 查找实体（带租户上下文验证）
      */
@@ -869,8 +865,6 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             throw new ValidationException(ResponseCode.CommonValidationFailed,
                 "模型不存在: " + pid);
         }
-        
-
 
         return model;
     }
@@ -885,42 +879,18 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                 excludeId = excludeModel.getId();
             }
         }
-        
+
         int count = metaModelMapper.countByCode(code, excludeId);
         return count == 0;
     }
 
     // 私有辅助方法
-    
+
     /**
      * 将MetaModel实体转换为ModelDefinition DTO
      */
     private ModelDefinition convertToModelDefinition(Model model) {
-        Map<String, Object> flatExt = flattenExtension(model);
-        String primaryKey = flatExt != null ? (String) flatExt.get("primaryKey") : null;
-        return ModelDefinition.builder()
-                .id(model.getId())
-                .code(model.getCode())
-                .name(model.getCode()) // 使用code作为name
-                .displayName(model.getDisplayName())
-                .description(model.getDescription())
-                .tableName(resolveTableName(model))
-                .modelType(model.getModelType())
-                .modelCategory(model.getEffectiveModelCategory())
-                .sourceType(model.getSourceType() != null ? model.getSourceType() : "physical")
-                .sourceRef(model.getSourceRef())
-                .capabilities(parseCapabilities(model.getCapabilities()))
-                .primaryKey(primaryKey)
-                .version(model.getVersion())
-                .status(model.getStatus() != null ? model.getStatus() : null)
-                .createdAt(DateUtil.toUtcLocalDateTime(model.getCreatedAt()))
-                .updatedAt(DateUtil.toUtcLocalDateTime(model.getUpdatedAt()))
-                .softDelete(resolveSoftDelete(model))
-                .immutable(resolveImmutable(model))
-                .commandOnlyCreate(resolveCommandOnlyCreate(model))
-                .rules(loadCrossFieldRules(model))
-                .extension(flatExt)
-                .build();
+        return modelDefinitionProjection().convertToModelDefinition(model);
     }
 
     /**
@@ -928,15 +898,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
      * Empty / null → ModelCapabilities.empty().
      */
     private ModelCapabilities parseCapabilities(String json) {
-        if (json == null || json.isBlank()) {
-            return ModelCapabilities.empty();
-        }
-        try {
-            return objectMapper.readValue(json, ModelCapabilities.class);
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            throw new MetaServiceException(
-                "Failed to parse capabilities JSON for model; data corruption: " + e.getMessage(), e);
-        }
+        return modelDefinitionProjection().parseCapabilities(json);
     }
 
     /**
@@ -947,29 +909,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
      * Any caller-supplied whitelist is OVERRIDDEN here.
      */
     private ModelCapabilities normalizeCapabilities(ModelDefinition def) {
-        ModelCapabilities raw;
-        if (def.getCapabilities() != null) {
-            raw = def.getCapabilities();
-        } else {
-            String st = def.getSourceType();
-            raw = (st == null || "physical".equals(st))
-                ? ModelCapabilities.fullPhysical()
-                : ModelCapabilities.empty();
-        }
-
-        java.util.List<String> sortable = new java.util.ArrayList<>();
-        java.util.List<String> filterable = new java.util.ArrayList<>();
-        if (def.getFields() != null) {
-            for (FieldDefinition f : def.getFields()) {
-                if (Boolean.TRUE.equals(f.getSortable())) sortable.add(f.getCode());
-                if (Boolean.TRUE.equals(f.getFilterable())) filterable.add(f.getCode());
-            }
-        }
-
-        return raw.toBuilder()
-            .sortableFields(sortable)       // override any caller-supplied value
-            .filterableFields(filterable)   // override any caller-supplied value
-            .build();
+        return modelDefinitionProjection().normalizeCapabilities(def);
     }
 
     @Override
@@ -1115,29 +1055,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
      */
     @SuppressWarnings("unchecked")
     private List<CrossFieldRule> loadCrossFieldRules(Model model) {
-        if (model.getExtension() == null) return null;
-        // Try flat: {"rules": [...]} then nested: {"extension": {"rules": [...]}}
-        Object rulesObj = model.getExtension().get("rules");
-        if (rulesObj == null) {
-            Object nested = model.getExtension().get("extension");
-            if (nested instanceof Map<?, ?> nestedMap) {
-                rulesObj = nestedMap.get("rules");
-            }
-        }
-        if (rulesObj == null) return null;
-        if (rulesObj instanceof List<?> rawList) {
-            try {
-                return objectMapper.convertValue(rawList,
-                    objectMapper.getTypeFactory().constructCollectionType(List.class, CrossFieldRule.class));
-            } catch (Exception e) {
-                // §P2 best-effort: malformed cross-field-rule JSON should not block
-                // model load. Caller treats null as "no rules"; warn log surfaces
-                // the bad config for the model owner to fix.
-                log.warn("Failed to parse cross-field rules for model {}: {}", logSafe(model.getCode()), logSafe(e.getMessage()), e);
-                return null;
-            }
-        }
-        return null;
+        return modelDefinitionProjection().loadCrossFieldRules(model);
     }
 
     /**
@@ -1146,10 +1064,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
      * 2. generated default "ab_dyn_{code}"
      */
     private String resolveTableName(Model model) {
-        if (model.getTableName() != null && !model.getTableName().trim().isEmpty()) {
-            return model.getTableName().trim();
-        }
-        return generateTableName(model.getCode());
+        return modelDefinitionProjection().resolveTableName(model);
     }
 
     /**
@@ -1160,26 +1075,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
      */
     @SuppressWarnings("unchecked")
     private Map<String, Object> flattenExtension(Model model) {
-        ExtensionBean ext = model.getExtension();
-        if (ext == null) {
-            return null;
-        }
-        Map<String, Object> result = new HashMap<>();
-        // Nested: ExtensionBean.extension field
-        Map<String, Object> nested = ext.getExtension();
-        if (nested != null) {
-            result.putAll(nested);
-        }
-        // Flat dynamic props (from @JsonAnySetter) take precedence over nested.
-        Map<String, Object> dynamic = ext.getDynamicProperties();
-        if (dynamic != null) {
-            for (Map.Entry<String, Object> e : dynamic.entrySet()) {
-                if (!"extension".equals(e.getKey())) {
-                    result.put(e.getKey(), e.getValue());
-                }
-            }
-        }
-        return result.isEmpty() ? null : result;
+        return modelDefinitionProjection().flattenExtension(model);
     }
 
     /**
@@ -1188,135 +1084,31 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
      * and queries automatically filter out soft-deleted records.
      */
     private boolean resolveSoftDelete(Model model) {
-        if (model.getExtension() != null) {
-            Object sd = model.getExtension().get("softDelete");
-            return Boolean.TRUE.equals(sd) || "true".equals(String.valueOf(sd));
-        }
-        return false;
+        return modelDefinitionProjection().resolveSoftDelete(model);
     }
 
     /** Resolve the append-only invariant from extension.immutable. */
     private boolean resolveImmutable(Model model) {
-        if (model.getExtension() != null) {
-            Object immutable = model.getExtension().get("immutable");
-            return Boolean.TRUE.equals(immutable) || "true".equals(String.valueOf(immutable));
-        }
-        return false;
+        return modelDefinitionProjection().resolveImmutable(model);
     }
 
     /** Resolve the command-only creation invariant from extension.commandOnlyCreate. */
     private boolean resolveCommandOnlyCreate(Model model) {
-        if (model.getExtension() != null) {
-            Object value = model.getExtension().get("commandOnlyCreate");
-            return Boolean.TRUE.equals(value) || "true".equals(String.valueOf(value));
-        }
-        return false;
+        return modelDefinitionProjection().resolveCommandOnlyCreate(model);
     }
-    
+
     /**
      * 加载字段定义（优化版 - 批量查询避免N+1问题）
      * 自动补充系统字段：id, pid, created_at, updated_at, tenant_id 等
      */
     private List<FieldDefinition> loadFieldDefinitions(Long modelId) {
-        try {
-            // 1. 查询模型字段绑定关系
-            List<ModelFieldBinding> bindings = fieldBindingMapper.findByModelId(modelId);
-            log.info("Found {} field bindings for model ID: {}", bindings.size(), modelId);
-
-            List<FieldDefinition> fieldDefinitions = new ArrayList<>();
-            Set<String> existingFieldCodes = new HashSet<>();
-
-            if (!bindings.isEmpty()) {
-                // 2. 提取所有fieldId并批量查询（避免N+1）
-                List<Long> fieldIds = bindings.stream()
-                    .map(ModelFieldBinding::getFieldId)
-                    .toList();
-                log.debug("Field IDs to load: {}", fieldIds);
-
-                List<Field> fieldEntities = metaFieldMapper.findByIds(fieldIds);
-                log.info("Loaded {} field entities from database for model ID: {}", fieldEntities.size(), modelId);
-
-                if (!fieldEntities.isEmpty()) {
-                    // 3. 构建fieldId到fieldOrder的映射
-                    Map<Long, ModelFieldBinding> bindingMap = bindings.stream()
-                        .collect(Collectors.toMap(
-                            ModelFieldBinding::getFieldId,
-                            binding -> binding
-                        ));
-
-                    // 4. 组装FieldDefinition列表
-                    for (Field fieldEntity : fieldEntities) {
-                        ModelFieldBinding binding = bindingMap.get(fieldEntity.getId());
-                        Integer fieldOrder = binding != null ? binding.getFieldOrder() : null;
-                        FieldDefinition fd = convertToFieldDefinition(fieldEntity, fieldOrder);
-                        // GAP-265: required-ness is a per-binding concept (one field can be
-                        // required in model_A but optional in model_B). Binding is the authoritative
-                        // source after GAP-259 stopped propagating constraints.required to the global
-                        // FieldFeatureBean. Override field-level required with binding value (both
-                        // directions), so all downstream readers of FieldDefinition.isRequired()
-                        // (DDL emission, validation, Excel template, BPM form metadata, page meta,
-                        // plugin generator) automatically honor the per-binding required flag.
-                        if (binding != null) {
-                            fd.setRequired(Boolean.TRUE.equals(binding.getRequired()));
-                        }
-                        if (binding != null && Boolean.TRUE.equals(binding.getSearchable())) {
-                            fd.setSearchable(true);
-                        }
-                        fieldDefinitions.add(fd);
-                        existingFieldCodes.add(fd.getCode());
-                    }
-                }
-            }
-
-            // 5. 自动补充系统字段（如果不存在）
-            appendSystemFieldsIfMissing(fieldDefinitions, existingFieldCodes);
-
-            // 6. 按排序顺序排列
-            fieldDefinitions.sort((a, b) -> Integer.compare(
-                a.getSortOrder() != null ? a.getSortOrder() : 0,
-                b.getSortOrder() != null ? b.getSortOrder() : 0
-            ));
-
-            log.info("Loaded {} field definitions (including system fields) for model ID: {}",
-                     fieldDefinitions.size(), modelId);
-            return fieldDefinitions;
-
-        } catch (Exception e) {
-            log.error("Failed to load field definitions for model ID: {}", modelId, e);
-            throw new MetaServiceException("Failed to load field definitions for model ID: " + modelId, e);
-        }
+        return fieldDefinitionAssembler().loadFieldDefinitions(modelId);
     }
 
     private List<FieldDefinition> mergeDeclaredExtensionFields(
             ModelDefinition modelDefinition,
             List<FieldDefinition> boundFields) {
-        if (modelDefinition == null
-                || modelDefinition.getExtension() == null
-                || !(modelDefinition.getExtension().get("fields") instanceof List<?> declared)
-                || declared.isEmpty()) {
-            return boundFields;
-        }
-        List<FieldDefinition> merged = new ArrayList<>();
-        Set<String> existingCodes = new LinkedHashSet<>();
-        if (boundFields != null) {
-            for (FieldDefinition field : boundFields) {
-                if (field == null || !StringUtils.hasText(field.getCode())) {
-                    continue;
-                }
-                merged.add(field);
-                existingCodes.add(field.getCode());
-            }
-        }
-        for (Object raw : declared) {
-            FieldDefinition field = raw instanceof FieldDefinition fieldDefinition
-                    ? fieldDefinition
-                    : objectMapper.convertValue(raw, FieldDefinition.class);
-            if (field == null || !StringUtils.hasText(field.getCode()) || !existingCodes.add(field.getCode())) {
-                continue;
-            }
-            merged.add(field);
-        }
-        return merged;
+        return fieldDefinitionAssembler().mergeDeclaredExtensionFields(modelDefinition,boundFields);
     }
 
     /**
@@ -1324,89 +1116,9 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
      * 系统字段包括：id, pid, created_at, updated_at, created_by, updated_by, tenant_id
      */
     private void appendSystemFieldsIfMissing(List<FieldDefinition> fields, Set<String> existingCodes) {
-        // id - 数据库物理主键（自增），系统自动生成，不要求用户提供
-        if (!existingCodes.contains("id")) {
-            fields.add(FieldDefinition.builder()
-                    .code("id")
-                    .name("id")
-                    .columnName("id")
-                    .dataType("long")
-                    .primaryKey(false)  // 业务层不作为主键
-                    .required(false)    // 系统自动生成
-                    .sortOrder(-1000)
-                    .build());
-        }
-
-        // pid - 业务主键（UUID），系统自动生成，不要求用户提供
-        if (!existingCodes.contains("pid")) {
-            fields.add(FieldDefinition.builder()
-                    .code("pid")
-                    .name("pid")
-                    .columnName("pid")
-                    .dataType("string")
-                    .primaryKey(true)   // 业务主键
-                    .required(false)    // 系统自动生成
-                    .sortOrder(-999)
-                    .build());
-        }
-
-        // created_at - 创建时间
-        if (!existingCodes.contains("created_at")) {
-            fields.add(FieldDefinition.builder()
-                    .code("created_at")
-                    .name("created_at")
-                    .columnName("created_at")
-                    .dataType("datetime")
-                    .sortOrder(-998)
-                    .build());
-        }
-
-        // updated_at - 更新时间
-        if (!existingCodes.contains("updated_at")) {
-            fields.add(FieldDefinition.builder()
-                    .code("updated_at")
-                    .name("updated_at")
-                    .columnName("updated_at")
-                    .dataType("datetime")
-                    .sortOrder(-997)
-                    .build());
-        }
-
-        // created_by - 创建人
-        if (!existingCodes.contains("created_by")) {
-            fields.add(FieldDefinition.builder()
-                    .code("created_by")
-                    .name("created_by")
-                    .columnName("created_by")
-                    .dataType("long")
-                    .sortOrder(-996)
-                    .build());
-        }
-
-        // updated_by - 更新人
-        if (!existingCodes.contains("updated_by")) {
-            fields.add(FieldDefinition.builder()
-                    .code("updated_by")
-                    .name("updated_by")
-                    .columnName("updated_by")
-                    .dataType("long")
-                    .sortOrder(-995)
-                    .build());
-        }
-
-        // tenant_id - 租户ID，从上下文自动获取，不要求用户提供
-        if (!existingCodes.contains("tenant_id")) {
-            fields.add(FieldDefinition.builder()
-                    .code("tenant_id")
-                    .name("tenant_id")
-                    .columnName("tenant_id")
-                    .dataType("long")
-                    .required(false)    // 系统自动获取
-                    .sortOrder(-994)
-                    .build());
-        }
+        fieldDefinitionAssembler().appendSystemFieldsIfMissing(fields,existingCodes);
     }
-    
+
     /**
      * 加载模型关联关系
      */
@@ -1421,27 +1133,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
      * {@code createRelations} / {@code saveWithRelations} / inverse-field sync) reachable.
      */
     private List<RelationDefinition> loadModelRelations(Long modelId) {
-        Model model = metaModelMapper.selectById(modelId);
-        if (model == null) {
-            return Collections.emptyList();
-        }
-        List<ModelFieldBinding> bindings = fieldBindingMapper.findByModelId(modelId);
-        if (bindings == null || bindings.isEmpty()) {
-            return Collections.emptyList();
-        }
-        List<Long> fieldIds = bindings.stream()
-                .map(ModelFieldBinding::getFieldId)
-                .collect(Collectors.toList());
-        List<Field> fields = metaFieldMapper.findByIds(fieldIds);
-        if (fields == null || fields.isEmpty()) {
-            return Collections.emptyList();
-        }
-        String sourceModel = model.getCode();
-        String sourceTable = generateTableName(sourceModel);
-        return fields.stream()
-                .map(field -> buildRelationDefinition(field, sourceModel, sourceTable))
-                .filter(relation -> relation != null)
-                .collect(Collectors.toList());
+        return modelDefinitionProjection().loadModelRelations(modelId);
     }
 
     /**
@@ -1449,112 +1141,34 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
      * field does not declare a bidirectional relation (target entity + parseable relation type).
      */
     private RelationDefinition buildRelationDefinition(Field field, String sourceModel, String sourceTable) {
-        FieldRefTargetBean refTarget = field.getRefTarget();
-        if (refTarget == null || !StringUtils.hasText(refTarget.getTargetEntity())) {
-            return null;
-        }
-        FieldRefTargetBean.BidirectionalConfig bidi = refTarget.getBidirectional();
-        if (bidi == null) {
-            return null;
-        }
-        RelationDefinition.RelationType relationType = parseRelationType(bidi.getRelationType());
-        if (relationType == null) {
-            return null;
-        }
-        String targetModel = refTarget.getTargetEntity();
-        RelationDefinition.RelationDefinitionBuilder builder = RelationDefinition.builder()
-                .name(field.getCode())
-                .sourceModel(sourceModel)
-                .targetModel(targetModel)
-                .sourceTable(sourceTable)
-                .targetTable(StringUtils.hasText(refTarget.getTargetTable())
-                        ? refTarget.getTargetTable() : generateTableName(targetModel))
-                .relationType(relationType)
-                .lazy(bidi.getLazyFetch() == null || Boolean.TRUE.equals(bidi.getLazyFetch()));
-        if (relationType == RelationDefinition.RelationType.MANY_TO_MANY) {
-            builder.joinTable(bidi.getJunctionTable())
-                    .sourceField(bidi.getJunctionSourceColumn())
-                    .targetField(bidi.getJunctionTargetColumn());
-        } else {
-            builder.sourceField(field.getCode())
-                    .targetField(StringUtils.hasText(refTarget.getTargetField())
-                            ? refTarget.getTargetField() : "pid");
-        }
-        return builder.build();
+        return modelDefinitionProjection().buildRelationDefinition(field,sourceModel,sourceTable);
     }
 
     private RelationDefinition.RelationType parseRelationType(String raw) {
-        if (!StringUtils.hasText(raw)) {
-            return null;
-        }
-        try {
-            return RelationDefinition.RelationType.valueOf(raw.trim().toUpperCase());
-        } catch (IllegalArgumentException e) {
-            log.warn("Unknown relation type '{}' in field bidirectional config; relation skipped", raw);
-            return null;
-        }
+        return modelDefinitionProjection().parseRelationType(raw);
     }
-    
+
     /**
      * 根据模型编码生成表名
      * 使用独立表模式，每个模型对应一个独立的表
      */
     private String generateTableName(String modelCode) {
-        return SystemFieldConstants.generateTableName(modelCode);
+        return modelDefinitionProjection().generateTableName(modelCode);
     }
-
-
 
     /**
      * 将MetaModel实体转换为MetaModelDTO
      */
     private MetaModelDTO convertToMetaModelDTO(Model model) {
-        Integer fieldCount = model.getId() != null
-                ? fieldBindingMapper.countUserFieldsByModelId(model.getId())
-                : 0;
-        return convertToMetaModelDTO(model, fieldCount);
+        return modelDefinitionProjection().convertToMetaModelDTO(model);
     }
 
     private MetaModelDTO convertToMetaModelDTO(Model model, Integer fieldCount) {
-        return MetaModelDTO.builder()
-                .id(model.getId())
-                .pid(model.getPid())
-                .tenantId(model.getTenantId())
-
-                .code(model.getCode())
-                .displayName(model.getDisplayName())
-                .description(model.getDescription())
-                .modelType(model.getModelType())
-                .modelCategory(model.getEffectiveModelCategory())
-                .tableName(resolveTableName(model))
-                .sourceType(model.getSourceType())
-                .sourceRef(model.getSourceRef())
-                .extension(convertExtensionToMap(model.getExtension()))
-                .fieldCount(fieldCount != null ? fieldCount : 0)
-                .version(model.getVersion())
-                .isCurrent(model.getIsCurrent())
-                .status(model.getStatus() != null ? model.getStatus() : null)
-                .createdAt(DateUtil.toUtcLocalDateTime(model.getCreatedAt()))
-                .updatedAt(DateUtil.toUtcLocalDateTime(model.getUpdatedAt()))
-                .build();
+        return modelDefinitionProjection().convertToMetaModelDTO(model,fieldCount);
     }
 
     private Map<Long, Integer> loadUserFieldCountsByModelId(List<Model> models) {
-        List<Long> modelIds = models.stream()
-                .map(Model::getId)
-                .filter(Objects::nonNull)
-                .distinct()
-                .toList();
-        if (modelIds.isEmpty()) {
-            return Collections.emptyMap();
-        }
-        return fieldBindingMapper.countUserFieldsByModelIds(modelIds).stream()
-                .filter(row -> row.getModelId() != null)
-                .collect(Collectors.toMap(
-                        MetaModelFieldBindingMapper.ModelFieldCount::getModelId,
-                        row -> row.getFieldCount() != null ? row.getFieldCount() : 0,
-                        (left, right) -> right
-                ));
+        return modelDefinitionProjection().loadUserFieldCountsByModelId(models);
     }
 
     /**
@@ -1562,15 +1176,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
      * Merges nested "extension" sub-map and top-level dynamic properties.
      */
     private Map<String, Object> convertExtensionToMap(ExtensionBean bean) {
-        if (bean == null) return null;
-        Map<String, Object> result = new HashMap<>();
-        if (bean.getExtension() != null) {
-            result.putAll(bean.getExtension());
-        }
-        if (bean.getDynamicProperties() != null) {
-            result.putAll(bean.getDynamicProperties());
-        }
-        return result.isEmpty() ? null : result;
+        return fieldDefinitionAssembler().convertExtensionToMap(bean);
     }
 
     /**
@@ -1584,266 +1190,81 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
      */
     @SuppressWarnings("unchecked")
     private Map<String, Object> flattenFieldExtension(ExtensionBean bean) {
-        Map<String, Object> result = new HashMap<>();
-        if (bean == null) {
-            return result;
-        }
-        if (bean.getExtension() != null) {
-            Object nested = bean.getExtension().get("extension");
-            if (nested instanceof Map<?, ?> nestedMap) {
-                result.putAll((Map<String, Object>) nestedMap);
-            }
-            for (Map.Entry<String, Object> entry : bean.getExtension().entrySet()) {
-                if (!"extension".equals(entry.getKey())) {
-                    result.put(entry.getKey(), entry.getValue());
-                }
-            }
-        }
-        Map<String, Object> dynamic = bean.getDynamicProperties();
-        if (dynamic != null) {
-            Object nested = dynamic.get("extension");
-            if (nested instanceof Map<?, ?> nestedMap) {
-                result.putAll((Map<String, Object>) nestedMap);
-            }
-            for (Map.Entry<String, Object> entry : dynamic.entrySet()) {
-                if (!"extension".equals(entry.getKey())) {
-                    result.put(entry.getKey(), entry.getValue());
-                }
-            }
-        }
-        return result;
+        return fieldDefinitionAssembler().flattenFieldExtension(bean);
     }
 
     /**
      * 将FieldEntity转换为FieldDefinition
      */
     private FieldDefinition convertToFieldDefinition(Field field, Integer sortOrder) {
-        if (field == null) {
-            return null;
-        }
-
-        // 从feature中提取字段属性
-        FieldFeatureBean feature = field.getFeature();
-        Map<String, Object> extensionMap = flattenFieldExtension(field.getExtension());
-        Map<String, Object> constraintsMap = extractNestedMap(extensionMap.get("constraints"));
-        
-        return FieldDefinition.builder()
-                .code(field.getCode())
-                .name(field.getCode())
-                .displayName((String) extensionMap.get("displayName"))
-                .description((String) extensionMap.get("description"))
-                .dataType(field.getDataType())
-                .columnName(resolveColumnName(field.getCode(), extensionMap))
-                .required(feature != null ? Boolean.TRUE.equals(feature.getRequired()) : false)
-                .primaryKey(Boolean.TRUE.equals(extensionMap.get("primaryKey")) || Boolean.TRUE.equals(extensionMap.get("isPrimaryKey")))
-                .unique(feature != null ? Boolean.TRUE.equals(feature.getUnique()) : false)
-                .displayField(Boolean.TRUE.equals(extensionMap.get("displayField")))
-                .defaultValue(feature != null ? feature.getDefaultValue() : null)
-                .maxLength(readInteger(extensionMap, constraintsMap, "maxLength"))
-                .minLength(readInteger(extensionMap, constraintsMap, "minLength"))
-                .maxValue(readValue(extensionMap, constraintsMap, "maxValue", "max"))
-                .minValue(readValue(extensionMap, constraintsMap, "minValue", "min"))
-                .format((String) extensionMap.get("format"))
-                .precision(readInteger(extensionMap, constraintsMap, "precision"))
-                .scale(readInteger(extensionMap, constraintsMap, "scale"))
-                .sortOrder(sortOrder)
-                .dataTypeMapping(createDataTypeMapping(field.getDataType()))
-                .validationRules(Collections.emptyList()) // TODO: 实现验证规则转换
-                .virtualType(feature != null ? feature.getVirtualType() : null)
-                .computeExpression(feature != null ? feature.getComputeExpression() : null)
-                .computeDependencies(feature != null ? feature.getComputeDependencies() : null)
-                .jsonbColumn((String) extensionMap.get("jsonbColumn"))
-                .jsonbPath((String) extensionMap.get("jsonbPath"))
-                .refTarget(convertRefTargetBeanToDto(field.getRefTarget()))
-                .immutable(Boolean.TRUE.equals(extensionMap.get("immutable")))
-                .immutableWhen(readImmutableWhen(extensionMap.get("immutableWhen")))
-                .allowedWriterCommands(readAllowedWriterCommands(extensionMap))
-                .extraProps(extensionMap)
-                .build();
+        return fieldDefinitionAssembler().convertToFieldDefinition(field,sortOrder);
     }
 
     private FieldDefinition.ImmutableWhen readImmutableWhen(Object raw) {
-        if (!(raw instanceof Map<?, ?> map)) {
-            return null;
-        }
-        Object field = map.get("field");
-        Object states = map.get("in");
-        List<String> in = states instanceof Collection<?> collection
-                ? collection.stream()
-                .filter(Objects::nonNull)
-                .map(String::valueOf)
-                .toList()
-                : null;
-        return FieldDefinition.ImmutableWhen.builder()
-                .field(field == null ? null : String.valueOf(field))
-                .in(in)
-                .build();
+        return fieldDefinitionAssembler().readImmutableWhen(raw);
     }
 
     /** Missing declaration is unrestricted; malformed persisted metadata denies every writer. */
     private List<String> readAllowedWriterCommands(Map<String, Object> extensionMap) {
-        if (!extensionMap.containsKey("allowedWriterCommands")) {
-            return null;
-        }
-        Object raw = extensionMap.get("allowedWriterCommands");
-        if (!(raw instanceof Collection<?> collection)) {
-            return List.of();
-        }
-        if (collection.stream().anyMatch(value -> !(value instanceof String code) || code.isBlank())) {
-            return List.of();
-        }
-        return collection.stream().map(String.class::cast).toList();
+        return fieldDefinitionAssembler().readAllowedWriterCommands(extensionMap);
     }
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> extractNestedMap(Object raw) {
-        if (raw instanceof Map<?, ?> map) {
-            return (Map<String, Object>) map;
-        }
-        return Collections.emptyMap();
+        return fieldDefinitionAssembler().extractNestedMap(raw);
     }
 
     private Integer readInteger(Map<String, Object> primary, Map<String, Object> constraints, String key) {
-        Object raw = readValue(primary, constraints, key, key);
-        if (raw instanceof Integer integer) {
-            return integer;
-        }
-        if (raw instanceof Number number) {
-            return number.intValue();
-        }
-        return null;
+        return fieldDefinitionAssembler().readInteger(primary,constraints,key);
     }
 
     private Object readValue(Map<String, Object> primary, Map<String, Object> constraints, String primaryKey, String fallbackKey) {
-        if (primary.containsKey(primaryKey)) {
-            return primary.get(primaryKey);
-        }
-        return constraints.get(fallbackKey);
+        return fieldDefinitionAssembler().readValue(primary,constraints,primaryKey,fallbackKey);
     }
-    
+
     private FieldDefinition.RefTarget convertRefTargetBeanToDto(FieldRefTargetBean bean) {
-        if (bean == null || bean.getTargetEntity() == null) return null;
-        return FieldDefinition.RefTarget.builder()
-                .targetEntity(bean.getTargetEntity())
-                .targetTable(bean.getTargetTable())
-                .valueField(bean.getValueField())
-                .targetField(bean.getTargetField())
-                .displayField(bean.getDisplayField())
-                .importMatchFields(bean.getImportMatchFields())
-                .build();
+        return fieldDefinitionAssembler().convertRefTargetBeanToDto(bean);
     }
 
     /**
      * 根据字段键生成列名
      */
     private String generateColumnName(String code) {
-        // 简单的列名生成规则，将驼峰转换为下划线
-        return code.replaceAll("([a-z])([A-Z])", "$1_$2").toLowerCase();
+        return fieldDefinitionAssembler().generateColumnName(code);
     }
 
     private String resolveColumnName(String fieldCode, Map<String, Object> extension) {
-        Object configured = extension.get("columnName");
-        if (configured instanceof String columnName && !columnName.isBlank()) {
-            return columnName;
-        }
-        return generateColumnName(fieldCode);
+        return fieldDefinitionAssembler().resolveColumnName(fieldCode,extension);
     }
-    
+
     /**
      * 创建数据类型映射
      */
     private DataTypeMapping createDataTypeMapping(String dataType) {
-        if (dataType == null) {
-            return null;
-        }
-        
-        // 简单的数据类型映射
-        return DataTypeMapping.builder()
-                .javaType(mapToJavaType(dataType))
-                .jdbcType(mapToJdbcType(dataType))
-                .dbType(mapToPhysicalType(dataType))
-                .nullable(true)
-                .build();
+        return fieldDefinitionAssembler().createDataTypeMapping(dataType);
     }
-    
+
     /**
      * 映射到Java类型
      */
     private String mapToJavaType(String logicalType) {
-        switch (logicalType.toLowerCase(java.util.Locale.ROOT)) {
-            case "string":
-                return "String";
-            case "integer":
-                return "Integer";
-            case "long":
-                return "Long";
-            case "decimal":
-                return "BigDecimal";
-            case "date":
-                return "LocalDate";
-            case "datetime":
-                return "LocalDateTime";
-            case "boolean":
-                return "Boolean";
-            case "text":
-                return "String";
-            default:
-                return "String";
-        }
+        return fieldDefinitionAssembler().mapToJavaType(logicalType);
     }
-    
+
     /**
      * 映射到物理类型
      */
     private String mapToPhysicalType(String logicalType) {
-        switch (logicalType.toLowerCase(java.util.Locale.ROOT)) {
-            case "string":
-                return "varchar";
-            case "integer":
-                return "integer";
-            case "long":
-                return "bigint";
-            case "decimal":
-                return "decimal";
-            case "date":
-                return "date";
-            case "datetime":
-                return "timestamp";
-            case "boolean":
-                return "boolean";
-            case "text":
-                return "text";
-            default:
-                return "varchar";
-        }
+        return fieldDefinitionAssembler().mapToPhysicalType(logicalType);
     }
-    
+
     /**
      * 映射到JDBC类型
      */
     private String mapToJdbcType(String logicalType) {
-        switch (logicalType.toLowerCase(java.util.Locale.ROOT)) {
-            case "string":
-                return "varchar";
-            case "integer":
-                return "integer";
-            case "long":
-                return "bigint";
-            case "decimal":
-                return "decimal";
-            case "date":
-                return "date";
-            case "datetime":
-                return "timestamp";
-            case "boolean":
-                return "boolean";
-            case "text":
-                return "clob";
-            default:
-                return "varchar";
-        }
+        return fieldDefinitionAssembler().mapToJdbcType(logicalType);
     }
-    
+
     private void evictModelCache(String modelCode) {
         refreshModelCache(modelCode);
     }
@@ -1851,31 +1272,29 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     private void validateFields(List<FieldDefinition> fields, List<String> errors, List<String> warnings) {
         Set<String> fieldCodes = new HashSet<>();
         Set<String> columnNames = new HashSet<>();
-        
+
         for (FieldDefinition field : fields) {
             // 检查字段编码重复
             if (!fieldCodes.add(field.getCode())) {
                 errors.add("Duplicate field code: " + field.getCode());
             }
-            
+
             // 检查列名重复
             if (!columnNames.add(field.getColumnName())) {
                 errors.add("Duplicate column name: " + field.getColumnName());
             }
-            
+
             // 检查字段名称
             if (field.getName() == null || field.getName().trim().isEmpty()) {
                 warnings.add("Field name is empty for field: " + field.getCode());
             }
-            
+
             // 检查数据类型
             if (field.getDataTypeMapping() == null) {
                 errors.add("Data type mapping is required for field: " + field.getCode());
             }
         }
     }
-
-
 
     // ==================== 字段绑定管理实现 ====================
 
@@ -1906,13 +1325,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
 
     @Override
     public boolean isFieldBoundToModel(Long modelId, Long fieldId) {
-        try {
-            return fieldBindingMapper.countByModelAndField(modelId, fieldId) > 0;
-        } catch (Exception e) {
-            // exists-check semantics: see existsModelById above for full pattern note.
-            log.error("检查字段绑定关系失败: modelId={}, fieldId={}, error={}", modelId, fieldId, logSafe(e.getMessage()), e);
-            return false;
-        }
+        return modelFieldBindingSupport().isFieldBoundToModel(modelId,fieldId);
     }
 
     @Override
@@ -1927,65 +1340,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     public ModelFieldBinding bindFieldToModel(Long modelId, Long fieldId, Integer fieldOrder,
                                               Boolean required, Boolean visible, Boolean editable, String defaultValue,
                                               String validationRules, String displayConfig, String remarks) {
-        
-        logMetaOperation("bindFieldToModel", "modelId=" + modelId + ", fieldId=" + fieldId);
-        
-        try {
-            // 验证模型是否存在
-            if (!isModelExists(modelId)) {
-                throw new MetaServiceException("模型不存在: " + modelId);
-            }
-            
-            // 验证字段是否存在
-            if (!isFieldExists(fieldId)) {
-                throw new MetaServiceException("字段不存在: " + fieldId);
-            }
-            
-            // 检查是否已经绑定
-            if (isFieldBoundToModel(modelId, fieldId)) {
-                throw new MetaServiceException("字段已经绑定到该模型: modelId=" + modelId + ", fieldId=" + fieldId);
-            }
-            
-            ModelFieldBinding binding = new ModelFieldBinding();
-            binding.setModelId(modelId);
-            binding.setFieldId(fieldId);
-            binding.setFieldOrder(fieldOrder != null ? fieldOrder : 0);
-            binding.setRequired(required != null ? required : false);
-            binding.setVisible(visible != null ? visible : true);
-            binding.setEditable(editable != null ? editable : true);
-            binding.setDefaultValue(defaultValue);
-            binding.setValidationRules(validationRules);
-            binding.setDisplayConfig(displayConfig);
-            binding.setRemarks(remarks);
-            binding.setTenantId(MetaContext.getCurrentTenantId());
-
-            binding.setCreatedAt(Instant.now());
-            binding.setUpdatedAt(Instant.now());
-            
-            int result = fieldBindingMapper.insert(binding);
-            if (result <= 0) {
-                throw new MetaServiceException("绑定字段到模型失败");
-            }
-            
-            log.info("字段绑定成功: bindingId={}, modelId={}, fieldId={}", binding.getId(), modelId, fieldId);
-
-            // If the model is already PUBLISHED, execute ALTER TABLE ADD COLUMN
-            Model model = metaModelMapper.selectById(modelId);
-            if (model != null && model.isPublished()) {
-                Field field = metaFieldMapper.selectById(fieldId);
-                if (field != null) {
-                    log.info("模型已发布，执行 ALTER TABLE ADD COLUMN: modelCode={}, fieldCode={}",
-                            logSafe(model.getCode()), logSafe(field.getCode()));
-                    schemaManagementService.addFieldToModel(model.getCode(), field.getCode());
-                }
-            }
-
-            return binding;
-
-        } catch (Exception e) {
-            log.error("绑定字段到模型失败: modelId={}, fieldId={}, error={}", modelId, fieldId, logSafe(e.getMessage()), e);
-            throw new MetaServiceException("绑定字段到模型失败: " + e.getMessage(), e);
-        }
+        return modelFieldBindingSupport().bindFieldToModel(modelId,fieldId,fieldOrder,required,visible,editable,defaultValue,validationRules,displayConfig,remarks);
     }
 
     @Override
@@ -1998,78 +1353,18 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             "viewModelSummary"
     }, allEntries = true)
     public boolean unbindFieldFromModel(Long modelId, Long fieldId) {
-        logMetaOperation("unbindFieldFromModel", "modelId=" + modelId + ", fieldId=" + fieldId);
-
-        try {
-            // Check if this is a system binding - system fields cannot be unbound
-            ModelFieldBinding existingBinding = fieldBindingMapper.findByModelAndField(
-                modelId, fieldId, MetaContext.getCurrentTenantId());
-            if (existingBinding != null && Boolean.TRUE.equals(existingBinding.getIsSystemBinding())) {
-                throw new MetaServiceException("Cannot unbind system field, it is required by the system");
-            }
-
-            // If the model is already PUBLISHED, execute ALTER TABLE DROP COLUMN before unbinding
-            Model model = metaModelMapper.selectById(modelId);
-            if (model != null && model.isPublished()) {
-                Field field = metaFieldMapper.selectById(fieldId);
-                if (field != null) {
-                    log.info("模型已发布，执行 ALTER TABLE DROP COLUMN: modelCode={}, fieldCode={}",
-                            logSafe(model.getCode()), logSafe(field.getCode()));
-                    schemaManagementService.removeFieldFromModel(model.getCode(), field.getCode());
-                }
-            }
-
-            int result = fieldBindingMapper.deleteByModelAndField(modelId, fieldId);
-            boolean success = result > 0;
-            
-            if (success) {
-                log.info("字段解绑成功: modelId={}, fieldId={}", modelId, fieldId);
-            } else {
-                log.warn("字段解绑失败，可能绑定关系不存在: modelId={}, fieldId={}", modelId, fieldId);
-            }
-            
-            return success;
-            
-        } catch (Exception e) {
-            log.error("解绑字段失败: modelId={}, fieldId={}, error={}", modelId, fieldId, logSafe(e.getMessage()), e);
-            throw new MetaServiceException("解绑字段失败: " + e.getMessage(), e);
-        }
+        return modelFieldBindingSupport().unbindFieldFromModel(modelId,fieldId);
     }
 
     @Override
     @Cacheable(value = "modelFieldBindings", key = "#modelId + '_' + #includeDetails + '_' + T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix()")
     public List<ModelFieldBinding> getModelFieldBindings(Long modelId, Boolean includeDetails) {
-        logMetaOperation("getModelFieldBindings", "modelId=" + modelId + ", includeDetails=" + includeDetails);
-        
-        try {
-            List<ModelFieldBinding> bindings = fieldBindingMapper.findByModelId(modelId);
-            
-            if (includeDetails != null && includeDetails) {
-                // 如果需要详细信息，可以在这里加载字段的详细信息
-                // 这里简化处理，直接返回绑定关系
-            }
-            
-            log.debug("获取模型字段绑定成功: modelId={}, count={}", modelId, bindings.size());
-            return bindings;
-            
-        } catch (Exception e) {
-            log.error("获取模型字段绑定失败: modelId={}, error={}", modelId, logSafe(e.getMessage()), e);
-            throw new MetaServiceException("获取模型字段绑定失败: " + e.getMessage(), e);
-        }
+        return modelFieldBindingSupport().getModelFieldBindings(modelId,includeDetails);
     }
 
     @Override
     public Optional<ModelFieldBinding> getFieldBinding(Long modelId, Long fieldId) {
-        logMetaOperation("getFieldBinding", "modelId=" + modelId + ", fieldId=" + fieldId);
-        
-        try {
-            ModelFieldBinding binding = fieldBindingMapper.selectByModelAndField(modelId, fieldId);
-            return Optional.ofNullable(binding);
-            
-        } catch (Exception e) {
-            log.error("获取字段绑定关系失败: modelId={}, fieldId={}, error={}", modelId, fieldId, logSafe(e.getMessage()), e);
-            throw new MetaServiceException("获取字段绑定关系失败: " + e.getMessage(), e);
-        }
+        return modelFieldBindingSupport().getFieldBinding(modelId,fieldId);
     }
 
     @Override
@@ -2082,29 +1377,12 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             "viewModelSummary"
     }, allEntries = true)
     public ModelFieldBinding updateFieldBinding(ModelFieldBinding binding) {
-        logMetaOperation("updateFieldBinding", "bindingId=" + binding.getId());
-        
-        try {
-            binding.setUpdatedAt(Instant.now());
-            
-            int result = fieldBindingMapper.updateById(binding);
-            if (result <= 0) {
-                throw new MetaServiceException("更新字段绑定关系失败");
-            }
-            
-            log.info("字段绑定关系更新成功: bindingId={}", binding.getId());
-            return binding;
-            
-        } catch (Exception e) {
-            log.error("更新字段绑定关系失败: bindingId={}, error={}", binding.getId(), logSafe(e.getMessage()), e);
-            throw new MetaServiceException("更新字段绑定关系失败: " + e.getMessage(), e);
-        }
+        return modelFieldBindingSupport().updateFieldBinding(binding);
     }
 
 
-    
     // ==================== Git-First 辅助方法 ====================
-    
+
     /**
      * 构建 DSL 文件路径
      *
@@ -2115,97 +1393,22 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         return String.format("tenant-%d/dsl/models/%s.json",
             MetaContext.getCurrentTenantId(), code);
     }
-    
-
 
     // ==================== 版本管理实现 ====================
 
     @Override
     public List<MetaModelDTO> getVersionHistory(String code) {
-        log.info("获取模型版本历史: code={}", logSafe(code));
-        
-        // 查询所有版本
-        List<Model> versions = metaModelMapper.findAllVersionsByCode(code);
-        
-        // 转换为DTO
-        return versions.stream()
-                .map(this::convertToMetaModelDTO)
-                .collect(Collectors.toList());
+        return modelHistoryQuerySupport().getVersionHistory(code);
     }
 
     @Override
     public MetaModelDTO getVersionDetail(String code, Integer version) {
-        log.info("获取模型版本详情: code={}, version={}", logSafe(code), version);
-        
-        Model model = metaModelMapper.findByCodeAndVersion(code, version);
-        if (model == null) {
-            throw new MetaServiceException("模型版本不存在: code=" + code + ", version=" + version);
-        }
-        
-        return convertToMetaModelDTO(model);
+        return modelHistoryQuerySupport().getVersionDetail(code,version);
     }
 
     @Override
     public Map<String, Object> compareVersions(String code, Integer v1, Integer v2) {
-        log.info("对比模型版本: code={}, v1={}, v2={}", logSafe(code), v1, v2);
-        
-        // 获取两个版本的模型
-        Model model1 = metaModelMapper.findByCodeAndVersion(code, v1);
-        Model model2 = metaModelMapper.findByCodeAndVersion(code, v2);
-        
-        if (model1 == null || model2 == null) {
-            throw new MetaServiceException("版本不存在");
-        }
-        
-        // 构建差异对象
-        Map<String, Object> diff = new HashMap<>();
-        diff.put("code", code);
-        diff.put("v1", v1);
-        diff.put("v2", v2);
-        
-        // 对比基本信息
-        List<Map<String, Object>> changes = new ArrayList<>();
-        
-        // 对比显示名称
-        if (!Objects.equals(model1.getDisplayName(), model2.getDisplayName())) {
-            changes.add(Map.of(
-                "field", "displayName",
-                "oldValue", model1.getDisplayName() != null ? model1.getDisplayName() : "",
-                "newValue", model2.getDisplayName() != null ? model2.getDisplayName() : ""
-            ));
-        }
-        
-        // 对比描述
-        if (!Objects.equals(model1.getDescription(), model2.getDescription())) {
-            changes.add(Map.of(
-                "field", "description",
-                "oldValue", model1.getDescription() != null ? model1.getDescription() : "",
-                "newValue", model2.getDescription() != null ? model2.getDescription() : ""
-            ));
-        }
-        
-        // 对比模型类型
-        if (!Objects.equals(model1.getModelType(), model2.getModelType())) {
-            changes.add(Map.of(
-                "field", "modelType",
-                "oldValue", model1.getModelType() != null ? model1.getModelType() : "",
-                "newValue", model2.getModelType() != null ? model2.getModelType() : ""
-            ));
-        }
-        
-        // 对比状态
-        if (!Objects.equals(model1.getStatus(), model2.getStatus())) {
-            changes.add(Map.of(
-                "field", "status",
-                "oldValue", model1.getStatus() != null ? model1.getStatus() : "",
-                "newValue", model2.getStatus() != null ? model2.getStatus() : ""
-            ));
-        }
-        
-        diff.put("changes", changes);
-        diff.put("hasChanges", !changes.isEmpty());
-
-        return diff;
+        return modelHistoryQuerySupport().compareVersions(code,v1,v2);
     }
 
     @Override
@@ -2248,152 +1451,19 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
 
     @Override
     public Map<String, Object> getStatistics() {
-        log.info("获取模型统计信息");
-        
-        // 查询所有当前版本的模型
-        List<Model> currentModels = metaModelMapper.findCurrentByTenant();
-        
-        // 统计总数
-        long totalModels = currentModels.size();
-        
-        // 按状态统计
-        Map<String, Long> byStatus = currentModels.stream()
-                .collect(Collectors.groupingBy(
-                    m -> m.getStatus() != null ? m.getStatus() : "unknown",
-                    Collectors.counting()
-                ));
-        
-        // 按类型统计
-        Map<String, Long> byType = currentModels.stream()
-                .collect(Collectors.groupingBy(
-                    m -> m.getModelType() != null ? m.getModelType() : "unknown",
-                    Collectors.counting()
-                ));
-        
-        // 统计活跃模型（已发布状态）
-        long activeModels = currentModels.stream()
-                .filter(m -> StatusConstants.PUBLISHED.equals(m.getStatus()))
-                .count();
-        
-        Map<String, Object> statistics = new HashMap<>();
-        statistics.put("totalModels", totalModels);
-        statistics.put("activeModels", activeModels);
-        statistics.put("modelsByStatus", byStatus);
-        statistics.put("modelsByType", byType);
-        statistics.put("timestamp", Instant.now().toString());
-
-        return statistics;
+        return modelHistoryQuerySupport().getStatistics();
     }
 
     @Override
     public PageResult<MetaModelDTO> searchModels(
             Integer page, Integer size, String keyword, String code, String displayName,
             String modelType, String status, String sourceType, String sortField, String sortOrder, Boolean currentOnly) {
-
-        log.info(
-                "分页查询模型列表: page={}, size={}, keyword={}, code={}, displayName={}, modelType={}, status={}, sourceType={}, sortField={}, sortOrder={}",
-                page, size, logSafe(keyword), logSafe(code), logSafe(displayName), logSafe(modelType),
-                logSafe(status), logSafe(sourceType), logSafe(sortField), logSafe(sortOrder)
-        );
-
-        // Validate and set defaults
-        if (page == null || page < 1) page = 1;
-        if (size == null || size < 1) size = 20;
-        if (size > 1000) size = 1000; // Max size limit
-        if (currentOnly == null) currentOnly = true;
-
-        // If keyword is provided, use it for generic search; otherwise use specific filters
-        String searchKeyword = keyword;
-        if (searchKeyword == null || searchKeyword.trim().isEmpty()) {
-            // Build keyword from code or displayName if provided
-            if (code != null && !code.trim().isEmpty()) {
-                searchKeyword = code;
-            } else if (displayName != null && !displayName.trim().isEmpty()) {
-                searchKeyword = displayName;
-            }
-        }
-
-        // Calculate offset
-        long offset = (long) (page - 1) * size;
-
-        // Get total count
-        long total = metaModelMapper.countByKeyword(
-                searchKeyword, modelType, status, sourceType, currentOnly
-        );
-
-        // Get page data
-        List<Model> models = metaModelMapper.searchByKeyword(
-                searchKeyword, modelType, status, sourceType, sortField, sortOrder, currentOnly, offset, size
-        );
-
-        Map<Long, Integer> fieldCountsByModelId = loadUserFieldCountsByModelId(models);
-
-        // Convert to DTOs
-        List<MetaModelDTO> dtos = models.stream()
-                .map(model -> convertToMetaModelDTO(
-                        model,
-                        model.getId() != null ? fieldCountsByModelId.getOrDefault(model.getId(), 0) : 0
-                ))
-                .collect(Collectors.toList());
-
-        // Build page result
-        PageResult<MetaModelDTO> result = new PageResult<>();
-        result.setRecords(dtos);
-        result.setPageInfo(total, (long) size, (long) page);
-
-        log.info("模型列表查询完成: total={}, page={}, size={}", total, page, size);
-        return result;
+        return modelHistoryQuerySupport().searchModels(page,size,keyword,code,displayName,modelType,status,sourceType,sortField,sortOrder,currentOnly);
     }
 
     @Override
     public Map<String, Object> validateModelData(Map<String, Object> modelData) {
-        log.info("验证模型数据");
-        
-        Map<String, Object> result = new HashMap<>();
-        Map<String, String> errors = new HashMap<>();
-        
-        // 验证必填字段
-        if (!modelData.containsKey("code") || modelData.get("code") == null || 
-            modelData.get("code").toString().trim().isEmpty()) {
-            errors.put("code", "模型编码不能为空");
-        }
-        
-        if (!modelData.containsKey("displayName") || modelData.get("displayName") == null || 
-            modelData.get("displayName").toString().trim().isEmpty()) {
-            errors.put("displayName", "显示名称不能为空");
-        }
-        
-        // 验证编码格式（只能包含字母、数字和下划线）
-        if (modelData.containsKey("code") && modelData.get("code") != null) {
-            String code = modelData.get("code").toString();
-            if (!code.matches("^[a-zA-Z][a-zA-Z0-9_]*$")) {
-                errors.put("code", "模型编码格式不正确，必须以字母开头，只能包含字母、数字和下划线");
-            }
-        }
-        
-        // 验证编码唯一性
-        if (modelData.containsKey("code") && modelData.get("code") != null) {
-            String code = modelData.get("code").toString();
-            String excludePid = modelData.containsKey("pid") ? modelData.get("pid").toString() : null;
-            
-            if (!isCodeUnique(code, excludePid)) {
-                errors.put("code", "模型编码已存在: " + code);
-            }
-        }
-        
-        // 验证模型类型
-        if (modelData.containsKey("modelType") && modelData.get("modelType") != null) {
-            String modelType = modelData.get("modelType").toString();
-            List<String> validTypes = Arrays.asList("entity", "view", "aggregate", "value_object");
-            if (!validTypes.contains(modelType)) {
-                errors.put("modelType", "无效的模型类型: " + modelType);
-            }
-        }
-        
-        result.put("valid", errors.isEmpty());
-        result.put("errors", errors);
-
-        return result;
+        return modelHistoryQuerySupport().validateModelData(modelData);
     }
 
     // ==================== Publish/Unpublish ====================
@@ -2502,7 +1572,11 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         log.info("Model published successfully: pid={}, code={}", logSafe(pid), logSafe(model.getCode()));
 
         // Auto-create hierarchical permissions for the published model
-        autoPermissionAssignmentService.autoAssignPermissions(model.getCode(), null);
+        if (StringUtils.hasText(model.getPluginPid())) {
+            autoPermissionAssignmentService.registerPermissions(model.getCode(), null, model.getTenantId());
+        } else {
+            autoPermissionAssignmentService.autoAssignPermissions(model.getCode(), null);
+        }
         log.info("Hierarchical permissions created for model: {}", logSafe(model.getCode()));
 
         // Invalidate roll-up field registry (model fields may include rollUp config)
@@ -2651,5 +1725,21 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
 
     private void recordModelPublishAcknowledgement(Model model, ModelPublishGovernanceDTO governance, String note) {
         publishGovernanceSupport().recordModelPublishAcknowledgement(model, governance, note);
+    }
+
+    private ModelFieldDefinitionAssembler fieldDefinitionAssembler() {
+        return new ModelFieldDefinitionAssembler(fieldBindingMapper, metaFieldMapper, objectMapper);
+    }
+
+    private ModelDefinitionProjection modelDefinitionProjection() {
+        return new ModelDefinitionProjection(metaModelMapper, metaFieldMapper, fieldBindingMapper, objectMapper, this::convertExtensionToMap);
+    }
+
+    private ModelFieldBindingSupport modelFieldBindingSupport() {
+        return new ModelFieldBindingSupport(metaModelMapper, metaFieldMapper, fieldBindingMapper, schemaManagementService, this::isModelExists, this::isFieldExists, this::isModelExists, this::isFieldExists);
+    }
+
+    private ModelHistoryQuerySupport modelHistoryQuerySupport() {
+        return new ModelHistoryQuerySupport(metaModelMapper, this::isCodeUnique, this::convertToMetaModelDTO, this::convertToMetaModelDTO, this::loadUserFieldCountsByModelId);
     }
 }

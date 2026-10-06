@@ -1,6 +1,6 @@
 import { getPublishText, buildPermissionReplayContext, buildSlaNodeReplayContext, buildWorkflowReplayContext } from './modelPublishSampleContext';
 import { getPolicyHeading, getMigrationPlanMessage, getHistoricalPolicyMessage } from './modelPublishPolicyMessages';
-import { useI18n } from '~/contexts/I18nContext';
+import { useModelDetailText, type ModelDetailTextFn, type ModelDetailTextKey } from './modelDetailText';
 import { ModelPublishReplayResultCard } from './ModelPublishReplayResultCard';
 /**
  * Model详情页面
@@ -15,7 +15,7 @@ import { ModelPublishReplayResultCard } from './ModelPublishReplayResultCard';
  * - 版本管理
  */
 
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   useNavigate,
   useParams,
@@ -39,7 +39,9 @@ import { FieldListManager } from '~/ui/meta/FieldListManager';
 import { FieldConfigDialog } from '~/ui/meta/FieldConfigDialog';
 import { DictConfigDialog } from '~/ui/meta/DictConfigDialog';
 import { SourceTypeBadge } from '~/shared/components/SourceTypeBadge';
-import type { ModelFieldBinding, Permission, ModelVersion } from '~/types/model';
+import { PermissionGuard } from '~/ui/PermissionGuard';
+import { useSmartText, type LocalizedText } from '~/utils/i18n';
+import type { MetaModelDTO, ModelFieldBinding, Permission, ModelVersion } from '~/types/model';
 
 /**
  * Check whether the given model is a virtual model (non-physical sourceType).
@@ -48,23 +50,25 @@ function isVirtualModel(model: { sourceType?: string }): boolean {
   return !!model.sourceType && model.sourceType !== 'physical';
 }
 
+const CAPABILITY_LABEL_KEYS: Record<string, ModelDetailTextKey> = {
+  list: 'capabilityList',
+  detail: 'capabilityDetail',
+  sort: 'capabilitySort',
+  filter: 'capabilityFilter',
+  create: 'capabilityCreate',
+  update: 'capabilityUpdate',
+  delete: 'capabilityDelete',
+  export: 'capabilityExport',
+  search: 'capabilitySearch',
+  paginate: 'capabilityPaginate',
+};
+
 /**
- * Human-readable label for a capability flag key.
+ * Human-readable label for a capability flag key. Unknown keys fall back to the raw code.
  */
-function capabilityLabel(key: string): string {
-  const LABELS: Record<string, string> = {
-    list: '可列表',
-    detail: '可详情',
-    sort: '可排序',
-    filter: '可过滤',
-    create: '可新建',
-    update: '可更新',
-    delete: '可删除',
-    export: '可导出',
-    search: '可搜索',
-    paginate: '可分页',
-  };
-  return LABELS[key] ?? key;
+function capabilityLabel(key: string, text: ModelDetailTextFn): string {
+  const entry = CAPABILITY_LABEL_KEYS[key];
+  return entry ? text(entry) : key;
 }
 
 /**
@@ -81,12 +85,12 @@ function formatDateLabel(value?: string): string {
   return new Date(timestamp).toLocaleString();
 }
 
-function getPageStatus(page: RelatedPage | null | undefined): string {
+function getPageStatus(page: RelatedPage | null | undefined, text: ModelDetailTextFn): string {
   const status = page && typeof page.status === 'string' ? page.status.toLowerCase() : '';
-  if (status === 'published') return '已发布';
-  if (status === 'draft') return '草稿';
-  if (status === 'archived') return '已归档';
-  return page ? '未标记' : '未创建';
+  if (status === 'published') return text('statusPublished');
+  if (status === 'draft') return text('statusDraft');
+  if (status === 'archived') return text('statusArchived');
+  return page ? text('statusUnmarked') : text('statusNotCreated');
 }
 
 function getPageStatusClass(page: RelatedPage | null | undefined): string {
@@ -97,8 +101,8 @@ function getPageStatusClass(page: RelatedPage | null | undefined): string {
   return page ? 'bg-sky-100 text-sky-800' : 'bg-gray-100 text-gray-500';
 }
 
-function getRelatedPageTitle(page: RelatedPage | null | undefined): string {
-  if (!page) return '暂无页面';
+function getRelatedPageTitle(page: RelatedPage | null | undefined, text: ModelDetailTextFn): string {
+  if (!page) return text('pageEmpty');
   const parseLocalizedString = (value: string): string | null => {
     const trimmed = value.trim();
     if (!trimmed) return null;
@@ -135,7 +139,7 @@ function getRelatedPageTitle(page: RelatedPage | null | undefined): string {
     page.pageKey ||
     page.code ||
     page.name ||
-    '未命名页面'
+    text('pageUnnamed')
   );
 }
 
@@ -191,7 +195,21 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
  * Model详情页面组件
  */
 export default function ModelDetailPage() {
-  const { locale } = useI18n();
+  const { locale, text } = useModelDetailText();
+  const smartText = useSmartText();
+  const statusLabels: Record<string, LocalizedText> = {
+    published: { 'zh-CN': '已发布', en: 'Published' },
+    draft: { 'zh-CN': '草稿', en: 'Draft' },
+    archived: { 'zh-CN': '已归档', en: 'Archived' },
+  };
+  const sourceLabels: Record<string, LocalizedText> = {
+    physical: { 'zh-CN': '物理表', en: 'Physical table' },
+    namedQuery: { 'zh-CN': '命名查询', en: 'Named query' },
+    endpoint: { 'zh-CN': '接口数据', en: 'Endpoint data' },
+    sqlView: { 'zh-CN': '数据库视图', en: 'Database view' },
+  };
+  const statusLabel = (value: string) => smartText(statusLabels[value] ?? { 'zh-CN': '未知状态', en: 'Unknown status' });
+  const sourceLabel = (value?: string) => smartText(sourceLabels[value || 'physical'] ?? { 'zh-CN': '其他来源', en: 'Other source' });
   const navigate = useNavigate();
   const location = useLocation();
   const { pid } = useParams();
@@ -222,7 +240,18 @@ export default function ModelDetailPage() {
   const [fields, setFields] = useState<ModelFieldBinding[]>(initialFields);
   const [permissions] = useState<Permission[]>(initialPermissions);
   const [versions] = useState<ModelVersion[]>(initialVersions);
+  const [viewedVersion, setViewedVersion] = useState<MetaModelDTO | null>(null);
+  const [viewingVersion, setViewingVersion] = useState<number | null>(null);
+  const [versionReadError, setVersionReadError] = useState<string | null>(null);
+  const versionReadGeneration = useRef(0);
   const [pages, setPages] = useState<any[]>(initialPages);
+
+  useEffect(() => {
+    setViewedVersion(null);
+    setViewingVersion(null);
+    setVersionReadError(null);
+    return () => { versionReadGeneration.current += 1; };
+  }, [model.code]);
 
   // 加载状态
   const [loading, setLoading] = useState(false);
@@ -348,19 +377,19 @@ export default function ModelDetailPage() {
           credentials: 'include',
         });
         if (res.status === 404 || res.status === 405) {
-          showErrorToast('暂未支持自动重新检测,P1 backend 未实现该 endpoint');
+          showErrorToast(text('redetectUnsupported'));
           return;
         }
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}`);
         }
-        showSuccessToast('重新检测已触发');
+        showSuccessToast(text('redetectTriggered'));
       } catch (err) {
         console.error('Redetect failed:', err);
-        showErrorToast('暂未支持自动重新检测,P1 backend 未实现该 endpoint');
+        showErrorToast(text('redetectUnsupported'));
       }
     },
-    [showSuccessToast, showErrorToast],
+    [showSuccessToast, showErrorToast, text],
   );
 
   /**
@@ -373,17 +402,17 @@ export default function ModelDetailPage() {
       });
       if (res.ok) {
         setConnectivityStatus({ ok: true });
-        showSuccessToast('数据源连通正常');
+        showSuccessToast(text('connectivityOk'));
       } else {
         setConnectivityStatus({ ok: false, message: `HTTP ${res.status}` });
-        showErrorToast(`连通性检查失败: HTTP ${res.status}`);
+        showErrorToast(text('connectivityFailed', { message: `HTTP ${res.status}` }));
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setConnectivityStatus({ ok: false, message: msg });
-      showErrorToast(`连通性检查失败: ${msg}`);
+      showErrorToast(text('connectivityFailed', { message: msg }));
     }
-  }, [model.code, showSuccessToast, showErrorToast]);
+  }, [model.code, showSuccessToast, showErrorToast, text]);
 
   /**
    * 虚拟 Model: 加载样本数据
@@ -400,10 +429,10 @@ export default function ModelDetailPage() {
       setSampleData(json);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      showErrorToast(`加载样本失败: ${msg}`);
+      showErrorToast(text('sampleLoadFailed', { message: msg }));
       setSampleData({ error: msg });
     }
-  }, [model.code, showErrorToast]);
+  }, [model.code, showErrorToast, text]);
 
   /**
    * Sync activeTab with URL hash changes (browser back/forward)
@@ -427,14 +456,14 @@ export default function ModelDetailPage() {
         }));
         await modelService.updateFieldsOrder(pid!, orderUpdates);
         setFields(reorderedFields);
-        showSuccessToast('字段顺序已更新');
+        showSuccessToast(text('fieldOrderUpdated'));
       } catch (error) {
         console.error('Failed to reorder fields:', error);
-        showErrorToast('更新字段顺序失败');
+        showErrorToast(text('fieldOrderUpdateFailed'));
         throw error;
       }
     },
-    [pid, showSuccessToast, showErrorToast],
+    [pid, showSuccessToast, showErrorToast, text],
   );
 
   /**
@@ -463,17 +492,17 @@ export default function ModelDetailPage() {
         if (!fieldCode) throw new Error('Missing field code for binding update');
         await modelService.updateFieldBinding(pid!, fieldCode, binding);
 
-        // 更新本地状态
-        setFields(fields.map((f) => (f.id === configField.id ? { ...f, ...binding } : f)));
+        const savedFields = await modelService.getModelFields(pid!);
+        setFields(savedFields);
 
-        showSuccessToast('字段配置已更新');
+        showSuccessToast(text('fieldConfigUpdated'));
       } catch (error) {
         console.error('Failed to update field config:', error);
-        showErrorToast('更新字段配置失败');
+        showErrorToast(text('fieldConfigUpdateFailed'));
         throw error;
       }
     },
-    [configField, fields, pid, showSuccessToast, showErrorToast],
+    [configField, fields, pid, showSuccessToast, showErrorToast, text],
   );
 
   /**
@@ -492,11 +521,11 @@ export default function ModelDetailPage() {
         if (dictCode) {
           // Bind dictionary
           await modelService.bindDictToField(fieldPid, dictCode);
-          showSuccessToast('字典绑定成功');
+          showSuccessToast(text('dictBindSuccess'));
         } else {
           // Unbind dictionary
           await modelService.unbindDictFromField(fieldPid);
-          showSuccessToast('字典解绑成功');
+          showSuccessToast(text('dictUnbindSuccess'));
         }
 
         // Reload fields to get updated dictionary info
@@ -504,11 +533,11 @@ export default function ModelDetailPage() {
         setFields(updatedFields);
       } catch (error) {
         console.error('Failed to update dict config:', error);
-        showErrorToast('更新字典配置失败');
+        showErrorToast(text('dictConfigUpdateFailed'));
         throw error;
       }
     },
-    [dictConfigField, pid, showSuccessToast, showErrorToast],
+    [dictConfigField, pid, showSuccessToast, showErrorToast, text],
   );
 
   /**
@@ -517,7 +546,7 @@ export default function ModelDetailPage() {
   const handleFieldUnbind = useCallback(
     async (field: ModelFieldBinding) => {
       const confirmed = await confirmDialog({
-        content: `确定要从模型中移除字段 "${field.fieldName || field.fieldCode}" 吗？`,
+        content: text('unbindFieldConfirm', { name: field.fieldName || field.fieldCode }),
         variant: 'danger',
       });
 
@@ -527,14 +556,14 @@ export default function ModelDetailPage() {
         await modelService.unbindField(pid!, field.fieldCode);
 
         setFields(fields.filter((f) => f.id !== field.id));
-        showSuccessToast('字段已移除');
+        showSuccessToast(text('fieldRemoved'));
       } catch (error) {
         console.error('Failed to unbind field:', error);
-        showErrorToast('移除字段失败');
+        showErrorToast(text('fieldRemoveFailed'));
         throw error;
       }
     },
-    [fields, pid, showSuccessToast, showErrorToast],
+    [fields, pid, showSuccessToast, showErrorToast, text],
   );
 
   /**
@@ -545,11 +574,11 @@ export default function ModelDetailPage() {
     try {
       const updatedFields = await modelService.getModelFields(pid!);
       setFields(updatedFields);
-      showSuccessToast('字段绑定成功');
+      showSuccessToast(text('fieldBoundSuccess'));
     } catch (error) {
       console.error('Failed to reload fields:', error);
     }
-  }, [pid, showSuccessToast]);
+  }, [pid, showSuccessToast, text]);
 
   /**
    * 切换Tab
@@ -576,7 +605,7 @@ export default function ModelDetailPage() {
    */
   const handleDelete = useCallback(async () => {
     const confirmed = await confirmDialog({
-      content: `确定要删除模型 "${model.displayName}" 吗？此操作不可恢复。`,
+      content: text('deleteModelConfirm', { name: model.displayName }),
       variant: 'danger',
     });
 
@@ -585,15 +614,15 @@ export default function ModelDetailPage() {
     setLoading(true);
     try {
       await modelService.delete(pid!);
-      showSuccessToast('删除Model成功');
+      showSuccessToast(text('deleteModelSuccess'));
       navigate('/meta/models');
     } catch (error) {
       console.error('Failed to delete model:', error);
-      showErrorToast('删除Model失败');
+      showErrorToast(text('deleteModelFailed'));
     } finally {
       setLoading(false);
     }
-  }, [pid, model, navigate, showSuccessToast, showErrorToast]);
+  }, [pid, model, navigate, showSuccessToast, showErrorToast, text]);
 
   /**
    * 刷新缓存
@@ -602,14 +631,14 @@ export default function ModelDetailPage() {
     setLoading(true);
     try {
       await modelService.refreshCache(pid!);
-      showSuccessToast('刷新缓存成功');
+      showSuccessToast(text('refreshCacheSuccess'));
     } catch (error) {
       console.error('Failed to refresh cache:', error);
-      showErrorToast('刷新缓存失败');
+      showErrorToast(text('refreshCacheFailed'));
     } finally {
       setLoading(false);
     }
-  }, [pid, showSuccessToast, showErrorToast]);
+  }, [pid, showSuccessToast, showErrorToast, text]);
 
   /**
    * 发布模型 - 先预览DDL
@@ -801,22 +830,22 @@ export default function ModelDetailPage() {
    */
   const handleUnpublish = useCallback(async () => {
     const confirmed = await confirmDialog({
-      content: '确定要取消发布此模型吗？数据库表将保留，但模型状态会变为 deprecated。',
+      content: text('unpublishConfirm'),
     });
     if (!confirmed) return;
 
     setLoading(true);
     try {
       await modelService.unpublish(pid!);
-      showSuccessToast('模型已取消发布');
+      showSuccessToast(text('unpublishSuccess'));
       window.location.reload();
     } catch (error) {
       console.error('Failed to unpublish model:', error);
-      showErrorToast('取消发布失败');
+      showErrorToast(text('unpublishFailed'));
     } finally {
       setLoading(false);
     }
-  }, [pid, showSuccessToast, showErrorToast]);
+  }, [pid, showSuccessToast, showErrorToast, text]);
 
   /**
    * 打开CRUD向导
@@ -884,8 +913,8 @@ export default function ModelDetailPage() {
       handleOpenPage(standardPages.form);
       return;
     }
-    showSuccessToast('暂无可预览页面，先生成或创建页面');
-  }, [handleOpenPage, showSuccessToast, standardPages.detail, standardPages.form, standardPages.list]);
+    showSuccessToast(text('noPreviewablePage'));
+  }, [handleOpenPage, showSuccessToast, text, standardPages.detail, standardPages.form, standardPages.list]);
 
   /**
    * 关闭CRUD向导
@@ -899,7 +928,7 @@ export default function ModelDetailPage() {
    */
   const handleCrudWizardComplete = useCallback(async () => {
     setShowCrudWizard(false);
-    showSuccessToast('CRUD页面生成成功');
+    showSuccessToast(text('crudPagesGenerated'));
 
     // 重新加载关联页面
     try {
@@ -911,17 +940,29 @@ export default function ModelDetailPage() {
     } catch (error) {
       console.error('Failed to reload pages:', error);
     }
-  }, [pid, showSuccessToast]);
+  }, [pid, showSuccessToast, text]);
 
   /**
    * 查看版本详情
    */
   const handleViewVersion = useCallback(
-    (version: number) => {
-      // TODO: 实现版本详情查看
-      showSuccessToast(`查看版本 ${version} 功能开发中`);
+    async (version: number) => {
+      const generation = ++versionReadGeneration.current;
+      setViewedVersion(null);
+      setVersionReadError(null);
+      setViewingVersion(version);
+      try {
+        const detail = await modelService.getVersionDetail(model.code, version);
+        if (generation === versionReadGeneration.current) setViewedVersion(detail);
+      } catch {
+        if (generation === versionReadGeneration.current) {
+          setVersionReadError(smartText({ 'zh-CN': '无法读取版本详情，请重试。', en: 'Could not read this version. Please try again.' }));
+        }
+      } finally {
+        if (generation === versionReadGeneration.current) setViewingVersion(null);
+      }
     },
-    [showSuccessToast],
+    [model.code, smartText],
   );
 
   /**
@@ -930,7 +971,7 @@ export default function ModelDetailPage() {
   const handleRollbackToVersion = useCallback(
     async (version: number) => {
       const confirmed = await confirmDialog({
-        content: `确定要回滚到版本 ${version} 吗？`,
+        content: text('rollbackConfirm', { version }),
       });
 
       if (!confirmed) return;
@@ -938,24 +979,24 @@ export default function ModelDetailPage() {
       setLoading(true);
       try {
         await modelService.rollbackToVersion(model.code, version);
-        showSuccessToast(`回滚到版本 ${version} 成功`);
+        showSuccessToast(text('rollbackSuccess', { version }));
         // 重新加载页面
         window.location.reload();
       } catch (error) {
         console.error('Failed to rollback version:', error);
-        showErrorToast('版本回滚失败');
+        showErrorToast(text('rollbackFailed'));
       } finally {
         setLoading(false);
       }
     },
-    [model, showSuccessToast, showErrorToast],
+    [model, showSuccessToast, showErrorToast, text],
   );
 
   return (
-    <div className="mx-auto max-w-7xl p-6">
+    <div className="mx-auto w-full min-w-0 max-w-7xl p-6">
       <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-4">
+          <div className="min-w-0 flex-1 space-y-4">
             <div>
               <div className="mb-2 flex flex-wrap items-center gap-2">
                 <span
@@ -967,34 +1008,34 @@ export default function ModelDetailPage() {
                         : 'bg-gray-100 text-gray-800'
                   }`}
                 >
-                  {model.status === 'published' && '已发布'}
-                  {model.status === 'draft' && '草稿'}
-                  {model.status === 'archived' && '已归档'}
+                  {model.status === 'published' && text('statusPublished')}
+                  {model.status === 'draft' && text('statusDraft')}
+                  {model.status === 'archived' && text('statusArchived')}
                 </span>
                 <SourceTypeBadge sourceType={model.sourceType} />
               </div>
-              <h1 className="text-2xl font-bold text-gray-900">{model.displayName}</h1>
-              <p className="mt-1 text-sm text-gray-500">
-                模型编码: <span className="font-mono text-blue-600">{model.code}</span>
+              <h1 className="break-words text-2xl font-bold text-gray-900">{model.displayName}</h1>
+              <p className="mt-1 break-words text-sm text-gray-500">
+                模型编码: <span className="break-all font-mono text-blue-600">{model.code}</span>
                 {model.description && ` · ${model.description}`}
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-                <div className="text-xs uppercase tracking-wide text-gray-500">字段</div>
+                <div className="text-xs uppercase tracking-wide text-gray-500">{text('statFields')}</div>
                 <div className="mt-1 text-lg font-semibold text-gray-900">{fields.length}</div>
               </div>
               <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-                <div className="text-xs uppercase tracking-wide text-gray-500">页面</div>
+                <div className="text-xs uppercase tracking-wide text-gray-500">{text('statPages')}</div>
                 <div className="mt-1 text-lg font-semibold text-gray-900">{pages.length}</div>
               </div>
               <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-                <div className="text-xs uppercase tracking-wide text-gray-500">版本</div>
+                <div className="text-xs uppercase tracking-wide text-gray-500">{text('statVersions')}</div>
                 <div className="mt-1 text-lg font-semibold text-gray-900">{model.version || 'N/A'}</div>
               </div>
               <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-                <div className="text-xs uppercase tracking-wide text-gray-500">最近更新</div>
+                <div className="text-xs uppercase tracking-wide text-gray-500">{text('statLastUpdated')}</div>
                 <div className="mt-1 text-sm font-medium text-gray-900">
                   {new Date(model.updatedAt).toLocaleDateString()}
                 </div>
@@ -1002,82 +1043,85 @@ export default function ModelDetailPage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 lg:max-w-md lg:justify-end">
-            <button
+          <div className="flex min-w-0 flex-wrap items-center gap-2 lg:max-w-md lg:justify-end">
+            <PermissionGuard permission={hasGeneratedPages ? "page.page.manage" : "meta.page.update"}><button
               data-testid="model-primary-page-action"
               onClick={handlePrimaryPageAction}
               className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
             >
               {hasGeneratedPages ? '打开页面设计' : '生成基础 CRUD'}
-            </button>
+            </button></PermissionGuard>
             {hasGeneratedPages && (
               <button
                 data-testid="model-primary-page-preview"
                 onClick={handlePrimaryPreview}
                 className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 focus:outline-none"
               >
-                预览主页面
+                {text('actionPreviewMainPage')}
               </button>
             )}
-            <button
-              onClick={handleEdit}
-              className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 focus:outline-none"
-              disabled={loading}
-            >
-              编辑模型
-            </button>
-            <details className="group relative">
-              <summary
-                data-testid="model-more-actions"
-                className="list-none rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 focus:outline-none"
+            <PermissionGuard permission="meta.model.update">
+              <button
+                data-testid="model-edit-action"
+                onClick={handleEdit}
+                className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 focus:outline-none"
+                disabled={loading}
               >
-                更多
-              </summary>
-              <div className="absolute right-0 z-10 mt-2 w-44 rounded-xl border border-gray-200 bg-white p-2 shadow-lg">
-                {model.status === 'draft' && (
+                编辑模型
+              </button>
+              <details className="group relative">
+                <summary
+                  data-testid="model-more-actions"
+                  className="list-none rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 focus:outline-none"
+                >
+                  更多
+                </summary>
+                <div className="absolute right-0 z-10 mt-2 w-44 rounded-xl border border-gray-200 bg-white p-2 shadow-lg">
+                  {model.status === 'draft' && (
+                    <button
+                      data-testid="model-publish-action"
+                      onClick={handlePublishClick}
+                      className="block w-full rounded-lg px-3 py-2 text-left text-sm text-green-700 hover:bg-green-50"
+                      disabled={loading || publishLoading}
+                    >
+                      {publishLoading ? '加载中...' : '发布模型'}
+                    </button>
+                  )}
+                  {model.status === 'published' && (
+                    <button
+                      onClick={handleUnpublish}
+                      className="block w-full rounded-lg px-3 py-2 text-left text-sm text-amber-700 hover:bg-amber-50"
+                      disabled={loading}
+                    >
+                      取消发布
+                    </button>
+                  )}
                   <button
-                    data-testid="model-publish-action"
-                    onClick={handlePublishClick}
-                    className="block w-full rounded-lg px-3 py-2 text-left text-sm text-green-700 hover:bg-green-50"
-                    disabled={loading || publishLoading}
-                  >
-                    {publishLoading ? '加载中...' : '发布模型'}
-                  </button>
-                )}
-                {model.status === 'published' && (
-                  <button
-                    onClick={handleUnpublish}
-                    className="block w-full rounded-lg px-3 py-2 text-left text-sm text-amber-700 hover:bg-amber-50"
+                    onClick={handleRefreshCache}
+                    className="block w-full rounded-lg px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
                     disabled={loading}
                   >
-                    取消发布
+                    刷新缓存
                   </button>
-                )}
-                <button
-                  onClick={handleRefreshCache}
-                  className="block w-full rounded-lg px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-                  disabled={loading}
-                >
-                  刷新缓存
-                </button>
-                {isVirtualModel(model) && (
+                  {isVirtualModel(model) && (
+                    <button
+                      className="block w-full rounded-lg px-3 py-2 text-left text-sm text-blue-700 hover:bg-blue-50"
+                      onClick={() => triggerRedetection(model.pid)}
+                      data-testid="redetect-btn"
+                    >
+                      重新检测
+                    </button>
+                  )}
                   <button
-                    className="block w-full rounded-lg px-3 py-2 text-left text-sm text-blue-700 hover:bg-blue-50"
-                    onClick={() => triggerRedetection(model.pid)}
-                    data-testid="redetect-btn"
+                    onClick={handleDelete}
+                    className="block w-full rounded-lg px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50"
+                    disabled={loading}
                   >
-                    重新检测
+                    删除模型
                   </button>
-                )}
-                <button
-                  onClick={handleDelete}
-                  className="block w-full rounded-lg px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50"
-                  disabled={loading}
-                >
-                  删除模型
-                </button>
-              </div>
-            </details>
+                </div>
+              </details>
+            </PermissionGuard>
           </div>
         </div>
       </div>
@@ -1094,7 +1138,7 @@ export default function ModelDetailPage() {
                   : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
               }`}
             >
-              概览
+              {text('tabOverview')}
             </button>
             <button
               onClick={() => handleTabChange('fields')}
@@ -1104,7 +1148,7 @@ export default function ModelDetailPage() {
                   : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
               }`}
             >
-              字段 ({fields.length})
+              {text('tabFieldsWithCount', { count: fields.length })}
             </button>
             <button
               onClick={() => handleTabChange('pages')}
@@ -1114,7 +1158,7 @@ export default function ModelDetailPage() {
                   : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
               }`}
             >
-              页面 ({pages.length})
+              {text('tabPagesWithCount', { count: pages.length })}
             </button>
             <button
               onClick={() => handleTabChange('versions')}
@@ -1124,7 +1168,7 @@ export default function ModelDetailPage() {
                   : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
               }`}
             >
-              版本 ({versions.length})
+              {text('tabVersionsWithCount', { count: versions.length })}
             </button>
             <button
               onClick={() => handleTabChange('runtime')}
@@ -1134,7 +1178,7 @@ export default function ModelDetailPage() {
                   : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
               }`}
             >
-              运行时验证
+              {text('tabRuntime')}
             </button>
             <button
               onClick={() => handleTabChange('advanced')}
@@ -1144,7 +1188,7 @@ export default function ModelDetailPage() {
                   : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
               }`}
             >
-              高级
+              {text('tabAdvanced')}
             </button>
           </nav>
         </div>
@@ -1178,7 +1222,7 @@ export default function ModelDetailPage() {
                               key={k}
                               className="rounded border border-blue-200 bg-white px-2 py-0.5 text-xs text-blue-700"
                             >
-                              {capabilityLabel(k)}
+                              {capabilityLabel(k, text)}
                             </span>
                           ))}
                       </div>
@@ -1188,56 +1232,56 @@ export default function ModelDetailPage() {
               )}
               <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
                 <div className="rounded-xl border border-gray-200 p-5">
-                  <h2 className="mb-4 text-sm font-semibold tracking-wide text-gray-900">模型信息</h2>
+                  <h2 className="mb-4 text-sm font-semibold tracking-wide text-gray-900">{text('sectionModelInfo')}</h2>
                   <div className="grid grid-cols-2 gap-5">
                     <div>
                       <label className="mb-1 block text-sm font-medium text-gray-700">模型编码</label>
-                      <div className="font-mono text-sm text-gray-900">{model.code}</div>
+                      <div className="break-all font-mono text-sm text-gray-900">{model.code}</div>
                     </div>
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">显示名称</label>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">{text('labelDisplayName')}</label>
                       <div className="text-sm text-gray-900">{model.displayName}</div>
                     </div>
                     <div>
                       <label className="mb-1 block text-sm font-medium text-gray-700">状态</label>
-                      <div className="text-sm text-gray-900">{model.status}</div>
+                      <div className="text-sm text-gray-900">{statusLabel(model.status)}</div>
                     </div>
                     <div>
                       <label className="mb-1 block text-sm font-medium text-gray-700">来源</label>
-                      <div className="text-sm text-gray-900">{model.sourceType || 'physical'}</div>
+                      <div className="text-sm text-gray-900">{sourceLabel(model.sourceType)}</div>
                     </div>
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">命名空间</label>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">{text('labelNamespace')}</label>
                       <div className="text-sm text-gray-900">{model.namespace || '-'}</div>
                     </div>
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">环境</label>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">{text('labelEnv')}</label>
                       <div className="text-sm text-gray-900">{model.env || '-'}</div>
                     </div>
                     <div className="col-span-2">
-                      <label className="mb-1 block text-sm font-medium text-gray-700">描述</label>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">{text('labelDescription')}</label>
                       <div className="text-sm text-gray-900">{model.description || '-'}</div>
                     </div>
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">更新时间</label>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">{text('labelUpdatedAt')}</label>
                       <div className="text-sm text-gray-900">{new Date(model.updatedAt).toLocaleString()}</div>
                     </div>
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">更新人</label>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">{text('labelUpdatedBy')}</label>
                       <div className="text-sm text-gray-900">{model.updatedBy}</div>
                     </div>
                   </div>
                 </div>
 
                 <div className="rounded-xl border border-gray-200 p-5">
-                  <h2 className="mb-4 text-sm font-semibold tracking-wide text-gray-900">设计联动摘要</h2>
+                  <h2 className="mb-4 text-sm font-semibold tracking-wide text-gray-900">{text('sectionDesignSummary')}</h2>
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <div className="text-xs uppercase tracking-wide text-gray-500">页面覆盖情况</div>
+                      <div className="text-xs uppercase tracking-wide text-gray-500">{text('labelPageCoverage')}</div>
                       {(['list', 'detail', 'form'] as StandardPageKind[]).map((kind) => {
                         const page = standardPages[kind];
                         const label =
-                          kind === 'list' ? '列表页' : kind === 'detail' ? '详情页' : '表单页';
+                          kind === 'list' ? text('pageKindList') : kind === 'detail' ? text('pageKindDetail') : text('pageKindForm');
                         return (
                           <div
                             key={kind}
@@ -1245,31 +1289,31 @@ export default function ModelDetailPage() {
                           >
                             <span className="text-gray-700">{label}</span>
                             <span className={page ? 'text-green-700' : 'text-gray-400'}>
-                              {page ? '已创建' : '未创建'}
+                              {page ? text('statusCreated') : text('statusNotCreated')}
                             </span>
                           </div>
                         );
                       })}
                     </div>
                     <div className="rounded-lg bg-gray-50 p-3">
-                      <div className="text-xs uppercase tracking-wide text-gray-500">最近编辑页面</div>
+                      <div className="text-xs uppercase tracking-wide text-gray-500">{text('labelLatestEditedPage')}</div>
                       <div className="mt-1 text-sm font-medium text-gray-900">
-                        {getRelatedPageTitle(latestPage)}
+                        {getRelatedPageTitle(latestPage, text)}
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <button
+                      <PermissionGuard permission={hasGeneratedPages ? "page.page.manage" : "meta.page.update"}><button
                         onClick={handlePrimaryPageAction}
                         className="rounded-md bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700"
                       >
                         {hasGeneratedPages ? '打开页面设计' : '生成基础 CRUD'}
-                      </button>
+                      </button></PermissionGuard>
                       <button
                         data-testid="overview-page-workbench-link"
                         onClick={() => handleTabChange('pages')}
                         className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
                       >
-                        查看页面工作台
+                        {text('actionViewPageWorkbench')}
                       </button>
                     </div>
                   </div>
@@ -1286,21 +1330,21 @@ export default function ModelDetailPage() {
                   data-testid="fields-page-impact-notice"
                   className="mb-3 flex items-center justify-between rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900"
                 >
-                  <span>此模型已有 {pages.length} 个关联页面，字段变更可能影响页面配置。</span>
+                  <span>{text('fieldsPageImpactNotice', { count: pages.length })}</span>
                   <div className="flex gap-2">
                     <button
                       data-testid="fields-impact-view-pages"
                       onClick={() => handleTabChange('pages')}
                       className="rounded border border-sky-300 bg-white px-3 py-1.5 text-xs text-sky-700 hover:bg-sky-100"
                     >
-                      查看关联页面
+                      {text('actionViewRelatedPages')}
                     </button>
                     <button
                       data-testid="fields-impact-open-designer"
                       onClick={handleOpenPageDesigner}
                       className="rounded border border-sky-300 bg-white px-3 py-1.5 text-xs text-sky-700 hover:bg-sky-100"
                     >
-                      打开页面设计
+                      {text('actionOpenPageDesign')}
                     </button>
                   </div>
                 </div>
@@ -1310,8 +1354,7 @@ export default function ModelDetailPage() {
                   className="mb-3 rounded bg-amber-50 p-3 text-xs text-amber-800"
                   data-testid="virtual-fields-notice"
                 >
-                  🔒 虚拟 Model 的字段名 / 类型只读(来自 detection 快照)。仅允许改 label / sortable
-                  / filterable。
+                  {text('virtualFieldsReadonly')}
                 </div>
               )}
               <FieldListManager
@@ -1330,9 +1373,10 @@ export default function ModelDetailPage() {
           {/* 版本Tab */}
           {activeTab === 'versions' && (
             <div>
+              {versionReadError && <p role="alert" data-testid="model-version-read-error" className="mb-3 text-sm text-red-700">{versionReadError}</p>}
               {versions.length === 0 ? (
                 <div className="py-12 text-center">
-                  <p className="text-gray-500">暂无版本历史</p>
+                  <p className="text-gray-500">{text('noVersionHistory')}</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -1342,11 +1386,11 @@ export default function ModelDetailPage() {
                         <div>
                           <div className="flex items-center gap-2">
                             <h3 className="text-sm font-medium text-gray-900">
-                              版本 {version.version}
+                              {text('versionLabel', { version: version.version })}
                             </h3>
                             {version.isCurrent && (
                               <span className="inline-flex rounded bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
-                                当前版本
+                                {text('currentVersionBadge')}
                               </span>
                             )}
                             <span
@@ -1358,11 +1402,11 @@ export default function ModelDetailPage() {
                                     : 'bg-gray-100 text-gray-800'
                               }`}
                             >
-                              {version.status}
+                              {statusLabel(version.status)}
                             </span>
                           </div>
                           <p className="mt-1 text-sm text-gray-500">
-                            {version.versionNote || '无说明'}
+                            {version.versionNote || text('noVersionNote')}
                           </p>
                           <p className="mt-1 text-xs text-gray-400">
                             {new Date(version.createdAt).toLocaleString()} · {version.createdBy}
@@ -1370,21 +1414,35 @@ export default function ModelDetailPage() {
                         </div>
                         <div className="flex gap-2">
                           <button
+                            data-testid={`model-version-view-${version.version}`}
                             onClick={() => handleViewVersion(version.version)}
-                            className="text-sm text-blue-600 hover:text-blue-900"
+                            disabled={viewingVersion === version.version}
+                            className="text-sm text-blue-600 hover:text-blue-900 disabled:opacity-50"
                           >
-                            查看
+                            {viewingVersion === version.version
+                              ? smartText({ 'zh-CN': '读取中…', en: 'Loading…' })
+                              : smartText({ 'zh-CN': '查看', en: 'View' })}
                           </button>
                           {!version.isCurrent && (
-                            <button
-                              onClick={() => handleRollbackToVersion(version.version)}
-                              className="text-sm text-orange-600 hover:text-orange-900"
-                            >
-                              回滚
-                            </button>
+                            <PermissionGuard permission="meta.model.update">
+                              <button
+                                onClick={() => handleRollbackToVersion(version.version)}
+                                className="text-sm text-orange-600 hover:text-orange-900"
+                              >
+                                回滚
+                              </button>
+                            </PermissionGuard>
                           )}
                         </div>
                       </div>
+                      {viewedVersion?.version === version.version && (
+                        <dl data-testid="model-version-detail" data-version={viewedVersion.version} className="border-border bg-subtle mt-3 grid grid-cols-1 gap-3 rounded-lg border p-3 text-sm sm:grid-cols-2">
+                          <div><dt className="text-text-2">{smartText({ 'zh-CN': '名称', en: 'Name' })}</dt><dd className="break-words font-medium">{viewedVersion.displayName}</dd></div>
+                          <div><dt className="text-text-2">{smartText({ 'zh-CN': '版本', en: 'Version' })}</dt><dd>{viewedVersion.version}</dd></div>
+                          <div><dt className="text-text-2">{smartText({ 'zh-CN': '状态', en: 'Status' })}</dt><dd>{statusLabel(viewedVersion.status)}</dd></div>
+                          <div><dt className="text-text-2">{smartText({ 'zh-CN': '说明', en: 'Description' })}</dt><dd className="whitespace-pre-wrap break-words">{viewedVersion.description || smartText({ 'zh-CN': '暂无说明', en: 'No description' })}</dd></div>
+                        </dl>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1396,33 +1454,33 @@ export default function ModelDetailPage() {
           {activeTab === 'pages' && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">页面工作台</h2>
-                <p className="mt-1 text-sm text-gray-500">先补齐页面，再直接进入设计器调整细节。</p>
+                <h2 className="text-lg font-semibold text-gray-900">{text('pageTitleWorkbench')}</h2>
+                <p className="mt-1 text-sm text-gray-500">{text('pagesWorkbenchHint')}</p>
               </div>
 
               {!hasStandardPages && (
                 <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-5 py-5">
                   <div className="flex flex-wrap items-center justify-between gap-4">
                     <div>
-                      <h3 className="text-sm font-semibold text-gray-900">还没有标准页面</h3>
+                      <h3 className="text-sm font-semibold text-gray-900">{text('noStandardPagesTitle')}</h3>
                       <p className="mt-1 text-sm text-gray-500">
-                        可以一键生成基础 CRUD 页面，或按页面类型逐个创建。
+                        {text('noStandardPagesHint')}
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <button
+                      <PermissionGuard permission="meta.page.update"><button
                         data-testid="pages-empty-generate-crud"
                         onClick={handleOpenCrudWizard}
                         className="rounded-md bg-green-600 px-3 py-2 text-sm text-white hover:bg-green-700"
                       >
                         一键生成 CRUD
-                      </button>
+                      </button></PermissionGuard>
                       <button
                         data-testid="pages-empty-create-page"
                         onClick={() => handleCreatePage()}
                         className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-white"
                       >
-                        手动选择页面
+                        {text('actionPickPageManually')}
                       </button>
                     </div>
                   </div>
@@ -1433,7 +1491,7 @@ export default function ModelDetailPage() {
                 {(['list', 'detail', 'form'] as StandardPageKind[]).map((kind) => {
                   const page = standardPages[kind];
                   const label =
-                    kind === 'list' ? '列表页' : kind === 'detail' ? '详情页' : '表单页';
+                    kind === 'list' ? text('pageKindList') : kind === 'detail' ? text('pageKindDetail') : text('pageKindForm');
                   return (
                     <div
                       key={kind}
@@ -1449,29 +1507,29 @@ export default function ModelDetailPage() {
                               : 'bg-gray-100 text-gray-500'
                           }`}
                         >
-                          {page ? '已创建' : '未创建'}
+                          {page ? text('statusCreated') : text('statusNotCreated')}
                         </span>
                       </div>
                       <div className="mb-4 min-h-16 text-sm text-gray-500">
                         {page ? (
                           <>
                             <div className="font-medium text-gray-900">
-                              {getRelatedPageTitle(page)}
+                              {getRelatedPageTitle(page, text)}
                             </div>
                             <div className="mt-1 font-mono text-xs text-gray-500">{page.code}</div>
                             <div className="mt-3 flex flex-wrap items-center gap-2">
                               <span
                                 className={`rounded-full px-2 py-1 text-xs font-medium ${getPageStatusClass(page)}`}
                               >
-                                {getPageStatus(page)}
+                                {getPageStatus(page, text)}
                               </span>
                               <span className="text-xs text-gray-500">
-                                更新于 {formatDateLabel(typeof page.updatedAt === 'string' ? page.updatedAt : undefined)}
+                                {text('updatedAtIndex', { date: formatDateLabel(typeof page.updatedAt === 'string' ? page.updatedAt : undefined) })}
                               </span>
                             </div>
                           </>
                         ) : (
-                          '还没有此类标准页面'
+                          text('noSuchStandardPage')
                         )}
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -1482,14 +1540,14 @@ export default function ModelDetailPage() {
                               onClick={() => handleEditPage(page)}
                               className="rounded-md border border-blue-300 px-3 py-2 text-sm text-blue-700 hover:bg-blue-50"
                             >
-                              编辑设计
+                              {text('actionEditDesign')}
                             </button>
                             <button
                               data-testid={`standard-page-${kind}-preview`}
                               onClick={() => handleOpenPage(page)}
                               className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
                             >
-                              预览
+                              {text('actionPreview')}
                             </button>
                           </>
                         ) : (
@@ -1498,7 +1556,7 @@ export default function ModelDetailPage() {
                             onClick={() => handleCreatePage(kind)}
                             className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
                           >
-                            创建
+                            {text('actionCreate')}
                           </button>
                         )}
                       </div>
@@ -1509,13 +1567,13 @@ export default function ModelDetailPage() {
 
               <div className="rounded-xl border border-gray-200 p-5">
                 <div className="mb-4 flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-gray-900">其他页面</h3>
+                  <h3 className="text-sm font-semibold text-gray-900">{text('sectionOtherPages')}</h3>
                   <Link to="/p/page_schema" className="text-sm text-blue-600 hover:text-blue-800">
-                    打开 Page Schema 列表
+                    {text('actionOpenPageSchemaList')}
                   </Link>
                 </div>
                 {customPages.length === 0 ? (
-                  <p className="text-sm text-gray-500">暂无其他自定义页面</p>
+                  <p className="text-sm text-gray-500">{text('noCustomPages')}</p>
                 ) : (
                   <div className="space-y-3">
                     {customPages.map((page) => (
@@ -1525,17 +1583,17 @@ export default function ModelDetailPage() {
                       >
                         <div>
                           <div className="text-sm font-medium text-gray-900">
-                            {getRelatedPageTitle(page)}
+                            {getRelatedPageTitle(page, text)}
                           </div>
                           <div className="mt-1 text-xs text-gray-500">{resolvePageRoute(page)}</div>
                           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                             <span
                               className={`rounded-full px-2 py-1 font-medium ${getPageStatusClass(page)}`}
                             >
-                              {getPageStatus(page)}
+                              {getPageStatus(page, text)}
                             </span>
                             <span className="text-gray-500">
-                              更新于 {formatDateLabel(typeof page.updatedAt === 'string' ? page.updatedAt : undefined)}
+                              {text('updatedAtIndex', { date: formatDateLabel(typeof page.updatedAt === 'string' ? page.updatedAt : undefined) })}
                             </span>
                           </div>
                         </div>
@@ -1544,13 +1602,13 @@ export default function ModelDetailPage() {
                             onClick={() => handleOpenPage(page)}
                             className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
                           >
-                            打开
+                            {text('actionOpen')}
                           </button>
                           <button
                             onClick={() => handleEditPage(page)}
                             className="rounded-md border border-blue-300 px-3 py-1.5 text-sm text-blue-700 hover:bg-blue-50"
                           >
-                            编辑设计
+                            {text('actionEditDesign')}
                           </button>
                         </div>
                       </div>
@@ -1569,11 +1627,11 @@ export default function ModelDetailPage() {
                   className="mb-4 rounded border p-4"
                   data-testid="virtual-runtime-check"
                 >
-                  <h3 className="mb-3 text-sm font-medium">虚拟 Model 运行时检查</h3>
+                  <h3 className="mb-3 text-sm font-medium">{text('runtimeCheckTitle')}</h3>
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center justify-between">
                       <span>
-                        数据源连通性
+                        {text('labelDataSourceConnectivity')}
                         {connectivityStatus && (
                           <span
                             className={`ml-2 text-xs ${
@@ -1581,8 +1639,10 @@ export default function ModelDetailPage() {
                             }`}
                           >
                             {connectivityStatus.ok
-                              ? '✅ 正常'
-                              : `❌ ${connectivityStatus.message ?? '失败'}`}
+                              ? text('runtimeStatusOk')
+                              : text('runtimeStatusFail', {
+                                  message: connectivityStatus.message ?? text('runtimeStatusFailDefault'),
+                                })}
                           </span>
                         )}
                       </span>
@@ -1591,17 +1651,17 @@ export default function ModelDetailPage() {
                         className="rounded border px-2 py-1 text-xs"
                         data-testid="check-connectivity-btn"
                       >
-                        检查
+                        {text('actionCheck')}
                       </button>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span>样本数据预览</span>
+                      <span>{text('labelSamplePreview')}</span>
                       <button
                         onClick={loadSample}
                         className="rounded border px-2 py-1 text-xs"
                         data-testid="load-sample-btn"
                       >
-                        加载 3 条样本
+                        {text('actionLoadSamples')}
                       </button>
                     </div>
                   </div>
@@ -1626,9 +1686,9 @@ export default function ModelDetailPage() {
           {activeTab === 'advanced' && (
             <div className="space-y-6">
               <div className="rounded-xl border border-gray-200 p-5">
-                <h2 className="mb-4 text-sm font-semibold tracking-wide text-gray-900">权限点</h2>
+                <h2 className="mb-4 text-sm font-semibold tracking-wide text-gray-900">{text('sectionPermissions')}</h2>
                 {permissions.length === 0 ? (
-                  <div className="py-8 text-center text-sm text-gray-500">暂无权限点</div>
+                  <div className="py-8 text-center text-sm text-gray-500">{text('noPermissions')}</div>
                 ) : (
                   <div className="space-y-4">
                     {permissions.map((permission) => (
@@ -1649,7 +1709,7 @@ export default function ModelDetailPage() {
                             </div>
                           </div>
                           <button className="text-sm text-blue-600 hover:text-blue-900">
-                            查看引用
+                            {text('actionViewReferences')}
                           </button>
                         </div>
                       </div>
@@ -1659,26 +1719,26 @@ export default function ModelDetailPage() {
               </div>
 
               <div className="rounded-xl border border-gray-200 p-5">
-                <h2 className="mb-4 text-sm font-semibold tracking-wide text-gray-900">技术元数据</h2>
+                <h2 className="mb-4 text-sm font-semibold tracking-wide text-gray-900">{text('sectionTechMetadata')}</h2>
                 <div className="grid grid-cols-2 gap-5">
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">模型类型</label>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">{text('labelModelType')}</label>
                     <div className="text-sm text-gray-900">
-                      {model.modelType === 'entity' && '实体'}
-                      {model.modelType === 'view' && '视图'}
-                      {model.modelType === 'aggregate' && '聚合'}
+                      {model.modelType === 'entity' && text('modelTypeEntity')}
+                      {model.modelType === 'view' && text('modelTypeView')}
+                      {model.modelType === 'aggregate' && text('modelTypeAggregate')}
                     </div>
                   </div>
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">是否当前版本</label>
-                    <div className="text-sm text-gray-900">{model.isCurrent ? '是' : '否'}</div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">{text('labelIsCurrent')}</label>
+                    <div className="text-sm text-gray-900">{model.isCurrent ? text('yesLabel') : text('noLabel')}</div>
                   </div>
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">创建时间</label>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">{text('labelCreatedAt')}</label>
                     <div className="text-sm text-gray-900">{new Date(model.createdAt).toLocaleString()}</div>
                   </div>
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">创建人</label>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">{text('labelCreatedBy')}</label>
                     <div className="text-sm text-gray-900">{model.createdBy}</div>
                   </div>
                   {model.releaseId && (

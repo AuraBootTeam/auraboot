@@ -102,7 +102,7 @@ function materializeAndBuildCoreWeb({ repoRoot, output, webShell, npmArtifacts }
 
     cpSync(resolve(repoRoot, 'scripts/application'), resolve(output, 'bin/application'), {
       recursive: true,
-      filter: (candidate) => !/\.(?:test|spec)\.mjs$/.test(candidate),
+      filter: (candidate) => !/\.(?:test|spec)\.(?:mjs|py)$/.test(candidate),
     });
     cpSync(resolve(repoRoot, 'distribution/application'), resolve(output, 'distribution/application'), {
       recursive: true,

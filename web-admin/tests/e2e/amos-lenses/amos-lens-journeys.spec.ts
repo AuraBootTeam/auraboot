@@ -1,4 +1,5 @@
-import { test, expect } from '../../fixtures';
+import { test, expect, type Page } from '../../fixtures';
+import { writeFileSync } from 'node:fs';
 
 /**
  * AMOS lens journeys — browser scenario slice for the S12 matrix (pages:
@@ -76,8 +77,62 @@ const LENSES = [
   },
 ];
 
-function isProductError(text: string): boolean {
-  return /Outdated Optimize Dep|Failed to fetch dynamically imported module|504 |Loading chunk|entry\.client|Importing a module script failed|HMR|[Vv]ite|websocket/i.test(text);
+const JOURNEYS: Record<string, { group: string; menu: string; queries: string[] }> = {
+  amos_overview_dashboard: { group: '总览与治理', menu: '经营总览', queries: ['amos_kpi_totals', 'amos_overview_exec_summary', 'amos_settlement_summary', 'amos_allocation_summary', 'amos_risk_summary', 'amos_eac_margin_query', 'amos_governance_lenses_query', 'amos_metrics_values_chart', 'amos_value_state_dist'] },
+  amos_metric_governance: { group: '总览与治理', menu: '指标治理', queries: ['amos_metric_definitions_query', 'amos_query_results_query', 'amos_eac_margin_query'] },
+  amos_data_trust: { group: '总览与治理', menu: '数据可信度', queries: ['amos_governance_lenses_query', 'amos_lineage_query'] },
+  amos_risks: { group: '总览与治理', menu: '经营风险', queries: ['amos_risk_counts_query', 'amos_risk_summary'] },
+  amos_supply_allocation: { group: '供应与交付', menu: '供应分配', queries: ['amos_allocation_totals_query', 'amos_allocation_summary'] },
+  amos_closeout: { group: '经营闭环', menu: '关闭周期', queries: ['amos_closeout_state_query'] },
+  amos_group: { group: '财务与资金', menu: '集团合并', queries: ['amos_group_state_query', 'amos_grp_entity_revenue_query', 'amos_grp_eliminations_query', 'amos_grp_kpi_query'] },
+  amos_demand_funnel: { group: '客户与需求', menu: '需求漏斗', queries: ['amos_funnel_state_query', 'amos_funnel_chart'] },
+};
+
+// The frozen DSL declares these queries. A title alone is never a loaded-page proof.
+async function openSettledLens(page: Page, code: string) {
+  const journey = JOURNEYS[code];
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  await page.goto('/home', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
+  if ((page.viewportSize()?.width ?? 1440) < 768) {
+    await page.getByTestId('header-sidebar-toggle').click();
+  }
+  const menu = page.getByRole('link', { name: journey.menu, exact: true });
+  const group = page.getByRole('button', { name: journey.group, exact: true });
+  if (!(await menu.isVisible())) {
+    if (!(await group.isVisible())) {
+      await page.getByRole('button', { name: 'AMOS 经营驾驶舱', exact: true }).click();
+    }
+    if (!(await menu.isVisible())) await group.click();
+  }
+  const pending = journey.queries.map(queryCode => page.waitForResponse(response =>
+    new URL(response.url()).pathname === '/api/meta/chart-data'
+      && response.request().method() === 'POST'
+      && response.request().postDataJSON()?.queryCode === queryCode));
+  await menu.click();
+  await expect(page).toHaveURL(new RegExp(`/dashboards/view/${code}$`));
+  const responses = await Promise.all(pending);
+  const records = [];
+  for (const response of responses) {
+    const payload = response.request().postDataJSON();
+    expect(new URL(response.url()).origin).toBe(new URL(page.url()).origin);
+    expect(response.status(), payload.queryCode).toBe(200);
+    expect(payload).toMatchObject({ type: 'namedQuery', filters: [] });
+    const body = await response.json();
+    expect(body.code, payload.queryCode).toBe('0');
+    expect(Array.isArray(body.data?.rows), payload.queryCode).toBe(true);
+    records.push({ target: response.url(), payload, body });
+  }
+  const blocks = page.locator('[data-testid^="dashboard-block-"]');
+  await expect(blocks.first()).toBeVisible();
+  await expect(blocks.getByText(/^(Loading\.\.\.|加载中.*)$/)).toHaveCount(0);
+  await expect(blocks.locator('[role="progressbar"], [aria-busy="true"]')).toHaveCount(0);
+  await expect(blocks.getByText('...', { exact: true })).toHaveCount(0);
+  await expect(blocks.getByText(/^(Error|Failed to load data|加载失败)$/)).toHaveCount(0);
+  expect(errors, 'all page and console errors retained without an allowlist').toEqual([]);
+  writeFileSync(test.info().outputPath('journey-network.json'), JSON.stringify({ code, records }, null, 2));
 }
 
 const consoleErrors: string[] = [];
@@ -95,7 +150,7 @@ test.describe('AMOS lens journeys (S12 browser slice)', () => {
 
   for (const lens of LENSES) {
     test(`lens journey: ${lens.code}`, async ({ page }) => {
-      await page.goto(`/dashboards/view/${lens.code}`, { waitUntil: 'domcontentloaded' });
+      await openSettledLens(page, lens.code);
       await page.getByRole('heading', { name: lens.heading }).waitFor({ state: 'visible', timeout: 20_000 });
 
       // business assertions before capture
@@ -126,8 +181,7 @@ test.describe('AMOS lens journeys (S12 browser slice)', () => {
 
       await page.screenshot({ path: `test-results/artifacts/${lens.shot}` });
 
-      const productErrors = consoleErrors.filter(isProductError);
-      expect(productErrors, `0 product console errors on ${lens.code}`).toEqual([]);
+      expect(consoleErrors, `0 product console errors on ${lens.code}`).toEqual([]);
     });
   }
 });
@@ -140,39 +194,44 @@ test.describe('AMOS lens state/layout/focus journeys', () => {
   for (const lens of LENSES) {
     test(`layout mobile: ${lens.code}`, async ({ page }) => {
       await page.setViewportSize({ width: 390, height: 844 });
-      await page.goto(`/dashboards/view/${lens.code}`, { waitUntil: 'domcontentloaded' });
+      await openSettledLens(page, lens.code);
       await expect(
         page.getByRole('heading', { name: lens.heading }),
         `${lens.heading} renders at mobile width`,
       ).toBeVisible();
-      await page.screenshot({ path: `test-results/artifacts/${lens.shot.replace('.png', '-mobile.png')}` });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
+        'mobile page overflow is confined to its intentional table scroll areas').toBe(true);
+      await page.screenshot({ path: `test-results/artifacts/${lens.shot.replace('.png', '-mobile.png')}`, fullPage: true });
     });
 
     test(`layout compact: ${lens.code}`, async ({ page }) => {
       await page.setViewportSize({ width: 1280, height: 720 });
-      await page.goto(`/dashboards/view/${lens.code}`, { waitUntil: 'domcontentloaded' });
+      await openSettledLens(page, lens.code);
       await expect(
         page.getByRole('heading', { name: lens.heading }),
         `${lens.heading} renders at compact width`,
       ).toBeVisible();
-      await page.screenshot({ path: `test-results/artifacts/${lens.shot.replace('.png', '-compact.png')}` });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
+        'compact dashboard fits the viewport').toBe(true);
+      await page.screenshot({ path: `test-results/artifacts/${lens.shot.replace('.png', '-compact.png')}`, fullPage: true });
     });
 
     test(`keyboard focus: ${lens.code}`, async ({ page }) => {
-      await page.goto(`/dashboards/view/${lens.code}`, { waitUntil: 'domcontentloaded' });
+      await openSettledLens(page, lens.code);
       await page.keyboard.press('Tab');
       await page.keyboard.press('Tab');
       const focused = await page.evaluate(() => {
         const el = document.activeElement;
         return el ? `${el.tagName}:${(el.getAttribute('data-aura-element-id') || el.textContent || '').slice(0, 40)}` : 'none';
       });
-      expect(focused, 'keyboard navigation reaches an interactive element').not.toBe('none');
+      expect(focused, 'keyboard navigation reaches an interactive element').not.toMatch(/^(none|BODY:|HTML:)/);
+      await expect(page.locator(':focus')).toBeVisible();
     });
 
     test(`query empty: ${lens.code}`, async ({ page }) => {
       // Governance empty-state expression: tables render their headers and
       // zero-row state (or governed state rows) — never a blank canvas.
-      await page.goto(`/dashboards/view/${lens.code}`, { waitUntil: 'domcontentloaded' });
+      await openSettledLens(page, lens.code);
       await expect(
         page.getByRole('heading', { name: lens.heading }),
       ).toBeVisible();

@@ -8,7 +8,9 @@ import { ensureSidebarExpanded, navigateToMenuByClick } from '../helpers';
 
 test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json', locale: 'zh-CN' });
 
-const EV = process.env.AURA_EVIDENCE_DIR!;
+// Evidence dir must exist even when the env hook is unset (isolated stacks).
+const EV = process.env.AURA_EVIDENCE_DIR || 'test-results/artifacts/report-hifi';
+fs.mkdirSync(EV, { recursive: true });
 const run = `hifi_${randomUUID().replaceAll('-', '').slice(0, 8)}`;
 const STATUSES = ['draft', 'confirmed', 'shipped', 'completed'] as const;
 const TYPES = ['normal', 'urgent', 'bulk'] as const;
@@ -140,7 +142,7 @@ test('HIFI-00 seed realistic dataset and build the multi-block report', async ({
 
   // Fixtures are arranged by API; menu navigation and export actions use the UI.
   await openReportFromManagement(page);
-  await expect(page.getByPlaceholder(/^(报表标题|Report Title)$/)).toHaveValue(`订单运营月报 ${run}`);
+  await expect(page.getByRole('main').getByPlaceholder(/^(报表标题|Report Title)$/)).toHaveValue(`订单运营月报 ${run}`);
   await downloadAndInspectPdf(page, /^(导出 PDF|Export PDF)$/, 'hifi-report-editor.pdf');
   const jsonRequest = page.waitForResponse(r => r.url().endsWith('/api/reports/export/json') && r.request().method() === 'POST');
   const jsonDownload = page.waitForEvent('download');
@@ -175,15 +177,15 @@ test('HIFI-00 seed realistic dataset and build the multi-block report', async ({
 
 test('HIFI-01 designer renders every block of the high-fidelity report', async ({ page }) => {
   await openReportFromManagement(page);
-  await expect(page.getByTestId('report-canvas')).toBeVisible({ timeout: 30000 });
-  await expect(page.getByPlaceholder(/^(报表标题|Report Title)$/)).toHaveValue(`订单运营月报 ${run}`, { timeout: 30000 });
-  await expect(page.getByTestId('report-canvas')).toContainText('订单总数');
-  await expect(page.getByTestId('report-canvas')).toContainText('状态 × 类型 交叉统计');
-  await page.getByTestId('report-designer-toolbar').getByRole('button', { name: /^(预览|Preview)$/ }).click();
-  await expect(page.locator('table').first().locator('tbody tr')).toHaveCount(48);
+  await expect(page.getByRole('main').getByTestId('report-canvas')).toBeVisible({ timeout: 30000 });
+  await expect(page.getByRole('main').getByPlaceholder(/^(报表标题|Report Title)$/)).toHaveValue(`订单运营月报 ${run}`, { timeout: 30000 });
+  await expect(page.getByRole('main').getByTestId('report-canvas')).toContainText('订单总数');
+  await expect(page.getByRole('main').getByTestId('report-canvas')).toContainText('状态 × 类型 交叉统计');
+  await page.getByRole('main').getByTestId('report-designer-toolbar').getByRole('button', { name: /^(预览|Preview)$/ }).click();
+  await expect(page.getByRole('main').locator('table').first().locator('tbody tr')).toHaveCount(48);
   await expect(page.getByRole('alert')).toHaveCount(0);
-  await page.getByTestId('report-designer-toolbar').getByRole('button', { name: /^(编辑|Edit)$/ }).click();
-  await expect(page.getByTestId('report-canvas')).toContainText('按类型分组小计');
+  await page.getByRole('main').getByTestId('report-designer-toolbar').getByRole('button', { name: /^(编辑|Edit)$/ }).click();
+  await expect(page.getByRole('main').getByTestId('report-canvas')).toContainText('按类型分组小计');
   await page.screenshot({ path: `${EV}/hifi-01-business.png`, fullPage: true });
 });
 
@@ -195,7 +197,7 @@ test('HIFI-02 view page renders the full business report', async ({ page }) => {
   await expect(detailRows).toContainText(Array.from({ length: 48 }, (_, i) => `HiFi订单-${run}-${String(i + 1).padStart(3, '0')}`));
   await expect(page.getByText('订单总数')).toBeVisible();
   await expect(page.locator('svg').first()).toBeAttached();
-  await downloadAndInspectPdf(page, /^Export PDF$/, 'hifi-report-viewer.pdf');
+  await downloadAndInspectPdf(page, /^(导出 PDF|Export PDF)$/, 'hifi-report-viewer.pdf');
   await page.screenshot({ path: `${EV}/hifi-02-business.png`, fullPage: true });
 });
 
@@ -205,7 +207,8 @@ async function openReportFromManagement(page: import('@playwright/test').Page) {
   await ensureSidebarExpanded(page);
   const listResponse = page.waitForResponse(r => new URL(r.url()).pathname === '/api/report-definitions'
     && r.request().method() === 'GET');
-  await navigateToMenuByClick(page, ['元数据管理', '报表管理']);
+  await expect(page.locator('nav').getByRole('button', { name: '元数据管理', exact: true })).toBeVisible();
+  await page.locator('nav').getByRole('link', { name: '报表管理', exact: true }).click();
   await expect(page).toHaveURL(/\/p\/c\/report_management$/);
   const response = await listResponse;
   expect(response.ok()).toBeTruthy();

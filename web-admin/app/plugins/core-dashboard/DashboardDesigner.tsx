@@ -22,6 +22,8 @@ import type { WidgetType, DashboardScope } from './types';
 import { widgetRegistry } from './widgets/widgetRegistry';
 import { useToast } from '~/contexts/ToastContext';
 import { useI18n } from '~/contexts/I18nContext';
+import { usePermissions } from '~/contexts/AuthContext';
+import { RouteAccessDenied } from '~/ui/PermissionGuard';
 import { useVersioning, VersionHistoryPanel, dashboardVersionService } from '~/shared/versioning';
 import { fetchCurrentUserTeams, type TeamOption } from '~/shared/services/teamService';
 import { useHydrated } from '~/hooks/useHydrated';
@@ -41,7 +43,23 @@ interface DashboardDesignerProps {
   onClose?: () => void;
 }
 
-export const DashboardDesigner: React.FC<DashboardDesignerProps> = ({
+export const DashboardDesigner: React.FC<DashboardDesignerProps> = (props) => {
+  const { hasPermission } = usePermissions();
+  const { locale, t } = useI18n();
+  if (!hasPermission('dashboard.update')) {
+    return (
+      <RouteAccessDenied
+        title={t('dashboard.designer.accessDeniedTitle', undefined,
+          locale === 'zh-CN' ? '无权编辑仪表盘' : 'Dashboard editing unavailable')}
+        message={t('dashboard.designer.accessDeniedMessage', undefined,
+          locale === 'zh-CN' ? '当前账号没有仪表盘管理权限，请联系管理员。' : 'Contact an administrator for dashboard management access.')}
+      />
+    );
+  }
+  return <AuthorizedDashboardDesigner {...props} />;
+};
+
+const AuthorizedDashboardDesigner: React.FC<DashboardDesignerProps> = ({
   dashboardId,
   initialTitle,
   onSaveComplete,

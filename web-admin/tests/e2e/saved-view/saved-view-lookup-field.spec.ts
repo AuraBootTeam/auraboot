@@ -9,10 +9,19 @@ import { test, expect, type Page } from '@playwright/test';
 import { uniqueId } from '../helpers';
 
 import { acquireSavedViewLock, releaseSavedViewLock } from './_saved-view-lock';
+import { sweepStaleSavedViews } from './_saved-view-helpers';
 
 // Serialize e2et_order saved-view specs — they share the model's per-user view
 // state (active view / created views) under the shared admin storageState.
-test.beforeAll(async () => { await acquireSavedViewLock('saved-view-lookup-field'); });
+test.beforeAll(async ({ browser }) => {
+  await acquireSavedViewLock('saved-view-lookup-field');
+  // Long-lived campaign databases accumulate explicit personal views
+  // past the backend's 10-view cap; sweep under the lock before seeding.
+  const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
+  const page = await ctx.newPage();
+  await sweepStaleSavedViews(page, 'e2et_order', 'e2et_order_list');
+  await ctx.close();
+});
 test.afterAll(() => { releaseSavedViewLock('saved-view-lookup-field'); });
 
 const SAVED_VIEW_PAGE_KEY = 'e2et_order_list';

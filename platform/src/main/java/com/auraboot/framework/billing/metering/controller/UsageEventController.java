@@ -4,6 +4,7 @@ import com.auraboot.framework.billing.metering.model.UsageEvent;
 import com.auraboot.framework.billing.metering.spi.MeteringService;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.annotation.RequirePlatformAdmin;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -24,6 +25,7 @@ import java.util.List;
  */
 @Tag(name = "Billing Metering", description = "Usage event queries")
 @RestController
+@RequirePlatformAdmin
 @RequestMapping("/api/billing/usage")
 @RequiredArgsConstructor
 public class UsageEventController {

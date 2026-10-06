@@ -1,181 +1,343 @@
 /**
- * Enterprise Member Invite Flow E2E Tests
- *
- * Tests the invite code generation, display, and revocation for tenant member management.
- *
- * MI-01: Generate invite code via API, verify returned code
- * MI-02: Invite code visible in management UI
- * MI-03: Invite code expiry validation
- * MI-04: Revoke invite code
- *
- * Prerequisites:
- * - Backend running, platform-admin plugin imported
- * - Logged in as tenant admin
- *
- * @since 4.0.0
+ * Existing invitation acceptance cases, driven through the member menu and
+ * native invitation dialog. Requests stay on the configured BFF runtime.
  */
-
+import type { Page, TestInfo } from '@playwright/test';
 import { test, expect } from '../../fixtures';
-import { BASE_URL } from '../../helpers/playwright-env';
-const BACKEND_URL = 'http://127.0.0.1:6443';
+import { BASE_URL } from '../../helpers/environments';
+
+test.use({ locale: 'zh-CN' });
+test.describe.configure({ mode: 'serial' });
+
+const endpoint = '/api/tenant/invite-code/';
+const matches =
+  (path: string, method: string) => (response: import('@playwright/test').Response) => {
+    const url = new URL(response.url());
+    return (
+      url.origin === new URL(BASE_URL).origin &&
+      url.pathname === `${endpoint}${path}` &&
+      response.request().method() === method
+    );
+  };
+
+async function openMembers(page: Page) {
+  await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
+  await page.evaluate(() => localStorage.removeItem('sidebar-collapsed'));
+  await page.reload();
+  const link = page.locator('nav a[href="/p/tenant_member"]');
+  if (!(await link.isVisible())) {
+    await page.locator('nav button').filter({ hasText: '组织管理' }).first().click();
+  }
+  await expect(link).toBeVisible();
+  await link.click();
+  await expect(page).toHaveURL(/\/p\/tenant_member/);
+  await expect(page.getByTestId('invite-section')).toBeVisible();
+}
+
+async function openInvite(page: Page) {
+  const response = page.waitForResponse(matches('current', 'GET'));
+  await page.getByTestId('invite-section').click();
+  const current = await response;
+  expect(current.status()).toBe(200);
+  const body = await current.json();
+  expect(body.code).toBe('0');
+  const dialog = page.getByTestId('invite-dialog');
+  await expect(dialog.getByRole('heading')).toHaveText('成员邀请');
+  await expect(page.getByTestId('invite-loading')).toHaveCount(0);
+  await expect(page.getByTestId('invite-read-error')).toHaveCount(0);
+  await assertCurrent(page, body.data);
+  return dialog;
+}
+
+async function assertCurrent(page: Page, current: { code: string; expiredAt: string } | null) {
+  if (current) {
+    await expect(page.getByTestId('invite-code-value')).toHaveText(current.code);
+    await expect(page.getByTestId('invite-dialog')).toContainText('有效期至');
+    expect(Number.isFinite(Date.parse(current.expiredAt))).toBe(true);
+  } else {
+    await expect(page.getByTestId('invite-code-value')).toHaveCount(0);
+    await expect(page.getByTestId('invite-dialog')).toContainText('当前没有有效邀请码');
+  }
+}
+
+async function generateThroughDialog(page: Page) {
+  const generated = page.waitForResponse(matches('generate', 'POST'));
+  const loaded = page.waitForResponse(matches('current', 'GET'));
+  const startedAt = Date.now();
+  await page
+    .getByTestId('invite-dialog')
+    .getByRole('button', { name: /^生成(新)?邀请码$/ })
+    .click();
+  const response = await generated;
+  expect(response.status()).toBe(200);
+  expect(new URL(response.url()).searchParams.get('expiryDays')).toBe('7');
+  const body = await response.json();
+  expect(body.code).toBe('0');
+  expect(body.data).toMatch(/^[a-z0-9]{8}$/);
+  const current = await loaded;
+  expect(current.status()).toBe(200);
+  const readback = await current.json();
+  expect(readback.code).toBe('0');
+  expect(readback.data.code).toBe(body.data);
+  const expiresAt = Date.parse(readback.data.expiredAt);
+  expect(expiresAt).toBeGreaterThanOrEqual(startedAt + 7 * 86400000 - 1000);
+  expect(expiresAt).toBeLessThanOrEqual(Date.now() + 7 * 86400000 + 1000);
+  await assertCurrent(page, readback.data);
+  await expect(page.getByTestId('invite-read-error')).toHaveCount(0);
+  await expect(page.getByTestId('invite-dialog')).toContainText(
+    '生成新邀请码不会自动撤销已有邀请码',
+  );
+  return body.data as string;
+}
+
+async function validate(page: Page, code: string, expected: boolean) {
+  const response = await page.request.get(`${endpoint}validate?code=${encodeURIComponent(code)}`);
+  expect(new URL(response.url()).origin).toBe(new URL(BASE_URL).origin);
+  expect(response.status()).toBe(200);
+  const body = await response.json();
+  expect(body.code).toBe('0');
+  expect(body.data).toBe(expected);
+}
+
+async function capture(page: Page, info: TestInfo, name: string) {
+  const path = info.outputPath(`${name}.png`);
+  await page.screenshot({ path, fullPage: true });
+  await info.attach(name, { path, contentType: 'image/png' });
+}
 
 test.describe('Member Invite Flow', () => {
-  let backendJwt: string | null = null;
+  test('MI-01: should generate invite code through the management UI @smoke', async ({
+    page,
+  }, info) => {
+    await openMembers(page);
+    const dialog = await openInvite(page);
+    for (let i = 0; i < 5; i += 1) {
+      await page.keyboard.press('Tab');
+      expect(
+        await dialog.evaluate((node) => node.contains(document.activeElement)),
+        'Tab focus stays within invitation dialog',
+      ).toBe(true);
+    }
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByTestId('invite-section')).toBeFocused();
+    await openInvite(page);
+    if ((await page.getByTestId('invite-code-value').count()) === 0) {
+      await capture(page, info, 'invite-empty');
+    }
+    const code = await generateThroughDialog(page);
+    await validate(page, code, true);
+    await capture(page, info, 'invite-generated');
+  });
 
-  const getBackendJwt = async (page: import('@playwright/test').Page): Promise<string> => {
-    if (backendJwt) return backendJwt;
-    const resp = await page.request.post(`${BACKEND_URL}/api/auth/login`, {
-      data: { email: 'admin@auraboot.com', password: 'Test2026x' },
+  test('MI-02: should persist a new invite code and recover a failed read without another write', async ({
+    page,
+  }, info) => {
+    let initialWrites = 0;
+    page.on('request', (request) => {
+      if (new URL(request.url()).pathname === `${endpoint}generate` && request.method() === 'POST')
+        initialWrites += 1;
     });
-    if (!resp.ok()) {
-      throw new Error(`Failed to obtain backend JWT: HTTP ${resp.status()}`);
-    }
-    const body = await resp.json().catch(() => null);
-    const jwt = body?.data?.jwt;
-    if (!jwt) throw new Error('Failed to obtain backend JWT: jwt missing');
-    backendJwt = jwt;
-    return jwt;
-  };
-
-  const requestWithBackendFallback = async (
-    page: import('@playwright/test').Page,
-    method: 'get' | 'post' | 'delete',
-    path: string,
-    data?: Record<string, unknown>,
-  ) => {
-    const bffResp = await page.request
-      .fetch(`${BASE_URL}${path}`, { method, data })
-      .catch(() => null);
-    if (bffResp && bffResp.ok()) return bffResp;
-    const bffBody = bffResp ? await bffResp.text().catch(() => '') : '';
-    const isProxy500 = bffResp?.status() === 500 && bffBody.includes('Proxy Error');
-    if (bffResp && !isProxy500) return bffResp;
-
-    const jwt = await getBackendJwt(page);
-    return page.request.fetch(`${BACKEND_URL}${path}`, {
-      method,
-      data,
-      headers: { Authorization: `Bearer ${jwt}` },
+    await openMembers(page);
+    let releaseRead!: () => void;
+    const readGate = new Promise<void>((resolve) => {
+      releaseRead = resolve;
     });
-  };
-
-  const generateInviteCode = async (
-    page: import('@playwright/test').Page,
-    expiryDays: number,
-  ): Promise<string> => {
-    const resp = await requestWithBackendFallback(
-      page,
-      'post',
-      `/api/tenant/invite-code/generate?expiryDays=${expiryDays}`,
-    );
-    if (!resp.ok()) {
-      throw new Error(`Invite API returned ${resp.status()}`);
+    await page.route(`**${endpoint}current`, async (route) => {
+      await readGate;
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: '503',
+          message: 'Controlled initial read outage',
+          data: null,
+        }),
+      });
+    });
+    const initialRead = page.waitForResponse(matches('current', 'GET'));
+    await page.getByTestId('invite-section').click();
+    try {
+      await expect(page.getByTestId('invite-loading')).toHaveText('正在读取邀请码…');
+      await expect(page.getByTestId('invite-code-value')).toHaveCount(0);
+      await expect(
+        page.getByTestId('invite-dialog').getByRole('button', { name: /^生成(新)?邀请码$/ }),
+      ).toHaveCount(0);
+      await capture(page, info, 'invite-loading');
+    } finally {
+      releaseRead();
     }
-    const body = await resp.json();
-    return body?.data || body?.inviteCode || body?.code;
-  };
+    expect((await initialRead).status()).toBe(503);
+    await expect(page.getByTestId('invite-read-error')).toHaveText(
+      '邀请码读取失败，请重新读取后再操作。',
+    );
+    expect(initialWrites).toBe(0);
+    await capture(page, info, 'invite-initial-read-failed');
+    await page.unroute(`**${endpoint}current`);
+    const initialRecovery = page.waitForResponse(matches('current', 'GET'));
+    await page.getByRole('button', { name: '重新读取', exact: true }).click();
+    const recoveredInitial = await initialRecovery;
+    expect(recoveredInitial.status()).toBe(200);
+    const recoveredInitialBody = await recoveredInitial.json();
+    expect(recoveredInitialBody.code).toBe('0');
+    await assertCurrent(page, recoveredInitialBody.data);
+    expect(initialWrites).toBe(0);
+    const original = await generateThroughDialog(page);
+    await page
+      .getByTestId('invite-dialog')
+      .getByRole('button', { name: '关闭', exact: true })
+      .click();
+    await page.reload();
+    await openInvite(page);
+    await expect(page.getByTestId('invite-code-value')).toHaveText(original);
 
-  /**
-   * MI-01: Generate invite code — call API and verify a code is returned.
-   */
-  test('MI-01: should generate invite code via API @smoke', async ({ page }) => {
-    const code = await generateInviteCode(page, 7);
-    expect(code).toBeTruthy();
-    expect(typeof code).toBe('string');
-    expect(code.length).toBeGreaterThan(4);
+    let writes = 0;
+    page.on('request', (request) => {
+      if (new URL(request.url()).pathname === `${endpoint}generate` && request.method() === 'POST')
+        writes += 1;
+    });
+    await page.route(`**${endpoint}current`, (route) =>
+      route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: '503', message: 'Controlled read outage', data: null }),
+      }),
+    );
+    const generated = page.waitForResponse(matches('generate', 'POST'));
+    const failedRead = page.waitForResponse(matches('current', 'GET'));
+    await page
+      .getByTestId('invite-dialog')
+      .getByRole('button', { name: '生成新邀请码', exact: true })
+      .click();
+    const created = await generated;
+    expect(created.status()).toBe(200);
+    const body = await created.json();
+    expect(body.code).toBe('0');
+    expect(body.data).toMatch(/^[a-z0-9]{8}$/);
+    expect(body.data).not.toBe(original);
+    expect((await failedRead).status()).toBe(503);
+    await expect(page.getByTestId('invite-read-error')).toHaveText(
+      '邀请码已生成，但读取当前状态失败。请重新读取，避免重复生成。',
+    );
+    await expect(
+      page.getByTestId('invite-dialog').getByRole('button', { name: /^生成(新)?邀请码$/ }),
+    ).toHaveCount(0);
+    await expect(page.getByTestId('invite-code-value')).toHaveCount(0);
+    expect(writes).toBe(1);
+    await capture(page, info, 'invite-read-failed');
+    await page.unroute(`**${endpoint}current`);
+    const recovered = page.waitForResponse(matches('current', 'GET'));
+    await page.getByRole('button', { name: '重新读取', exact: true }).click();
+    const readback = await recovered;
+    expect(readback.status()).toBe(200);
+    const current = await readback.json();
+    expect(current.code).toBe('0');
+    expect(current.data.code).toBe(body.data);
+    await assertCurrent(page, current.data);
+    expect(writes, 'read retry must not repeat generation').toBe(1);
+    await validate(page, original, true);
+    await validate(page, body.data, true);
+    await capture(page, info, 'invite-read-recovered');
   });
 
-  /**
-   * MI-02: Invite code is visible on the management page.
-   */
-  test('MI-02: should display invite code in management UI', async ({ page }) => {
-    // Generate an invite code first
-    const code = await generateInviteCode(page, 7);
-
-    // Navigate to member management page
-    await page.goto('/p/tenant_member');
-    await page.waitForLoadState('domcontentloaded');
-    await expect(page.locator('table, [role="table"]').first()).toBeVisible({ timeout: 15000 });
-
-    // Look for invite-related UI element (button/section)
-    const inviteSection = page.locator(
-      '[data-testid="invite-section"], button:has-text("invite"), button:has-text("邀请")',
-    );
-    const hasInviteUI = await inviteSection
-      .first()
-      .isVisible({ timeout: 5000 })
-      .catch(() => false);
-
-    if (!hasInviteUI) {
-      throw new Error(String('Invite UI not present on member management page'));
-      return;
-    }
-
-    await inviteSection.first().click();
-    // Verify code or invite dialog is shown
-    const dialog = page.locator('[role="dialog"], [data-testid="invite-dialog"]');
-    await expect(dialog).toBeVisible({ timeout: 5000 });
-    const codeVisible = await page
-      .getByText(String(code))
-      .isVisible({ timeout: 3000 })
-      .catch(() => false);
-    expect(codeVisible || (await dialog.first().isVisible())).toBe(true);
+  // The UI fixes expiry at seven days. This existing API case checks the explicit
+  // one-day endpoint contract, then observes that same persisted code in the UI.
+  test('MI-03: should create invite code with the requested expiry', async ({ page }, info) => {
+    const startedAt = Date.now();
+    const response = await page.request.post(`${endpoint}generate?expiryDays=1`);
+    expect(new URL(response.url()).origin).toBe(new URL(BASE_URL).origin);
+    expect(response.status()).toBe(200);
+    const body = await response.json();
+    expect(body.code).toBe('0');
+    expect(body.data).toMatch(/^[a-z0-9]{8}$/);
+    const current = await page.request.get(`${endpoint}current`);
+    expect(current.status()).toBe(200);
+    const readback = await current.json();
+    expect(readback.code).toBe('0');
+    expect(readback.data.code).toBe(body.data);
+    const expiry = Date.parse(readback.data.expiredAt);
+    expect(expiry).toBeGreaterThanOrEqual(startedAt + 86400000 - 1000);
+    expect(expiry).toBeLessThanOrEqual(Date.now() + 86400000 + 1000);
+    await openMembers(page);
+    await openInvite(page);
+    await expect(page.getByTestId('invite-code-value')).toHaveText(body.data);
+    await capture(page, info, 'invite-one-day');
   });
 
-  /**
-   * MI-03: Invite code expiry — verify code has expected validity period.
-   */
-  test('MI-03: should create invite code with correct expiry', async ({ page }) => {
-    await generateInviteCode(page, 1);
-    const currentResp = await requestWithBackendFallback(
-      page,
-      'get',
-      '/api/tenant/invite-code/current',
+  test('MI-04: should revoke the displayed code and show actual remaining state', async ({
+    page,
+  }, info) => {
+    await openMembers(page);
+    await openInvite(page);
+    const code = await generateThroughDialog(page);
+    let revokeWrites = 0;
+    page.on('request', (request) => {
+      if (new URL(request.url()).pathname === `${endpoint}revoke` && request.method() === 'POST')
+        revokeWrites += 1;
+    });
+    await page.route(`**${endpoint}revoke?**`, (route) =>
+      route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: '503', message: 'Controlled revoke outage', data: false }),
+      }),
     );
-    if (!currentResp.ok()) {
-      throw new Error(`Invite current API unavailable: ${currentResp.status()}`);
-    }
-    const currentBody = await currentResp.json();
-    const expiresAt =
-      currentBody?.data?.expiredAt || currentBody?.data?.expiresAt || currentBody?.data?.expireDate;
-
-    if (!expiresAt) {
-      const code = currentBody?.data?.code;
-      expect(code).toBeTruthy();
-      return;
-    }
-
-    // Verify expiry is within ~24-48 hours from now
-    const expiryDate = new Date(expiresAt);
-    const now = new Date();
-    const diffHours = (expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60);
-    expect(diffHours).toBeGreaterThan(0);
-    expect(diffHours).toBeLessThan(50); // ~2 days tolerance
-  });
-
-  /**
-   * MI-04: Revoke invite code.
-   */
-  test('MI-04: should revoke invite code', async ({ page }) => {
-    const code = await generateInviteCode(page, 7);
-    if (!code) throw new Error('No invite code returned — cannot test revocation');
-
-    // Revoke the invite code
-    const revokeResp = await requestWithBackendFallback(
-      page,
-      'post',
-      `/api/tenant/invite-code/revoke?code=${encodeURIComponent(code)}`,
+    const failedWrite = page.waitForResponse(matches('revoke', 'POST'));
+    await page.getByRole('button', { name: '撤销当前邀请码', exact: true }).click();
+    expect((await failedWrite).status()).toBe(503);
+    await expect(page.getByText('邀请码撤销失败，请稍后重试。', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('invite-code-value')).toHaveText(code);
+    await validate(page, code, true);
+    await capture(page, info, 'invite-revoke-failed');
+    await page.unroute(`**${endpoint}revoke?**`);
+    await page.route(`**${endpoint}current`, (route) =>
+      route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: '503',
+          message: 'Controlled post-revoke read outage',
+          data: null,
+        }),
+      }),
     );
-
-    expect(revokeResp.ok()).toBe(true);
-
-    const validateResp = await requestWithBackendFallback(
-      page,
-      'get',
-      `/api/tenant/invite-code/validate?code=${encodeURIComponent(code)}`,
+    const revoked = page.waitForResponse(matches('revoke', 'POST'));
+    const failedRead = page.waitForResponse(matches('current', 'GET'));
+    await page.getByRole('button', { name: '撤销当前邀请码', exact: true }).click();
+    const response = await revoked;
+    expect(response.status()).toBe(200);
+    expect(new URL(response.url()).searchParams.get('code')).toBe(code);
+    const body = await response.json();
+    expect(body.code).toBe('0');
+    expect(body.data).toBe(true);
+    expect((await failedRead).status()).toBe(503);
+    await expect(page.getByTestId('invite-read-error')).toHaveText(
+      '当前邀请码已撤销，但读取剩余邀请码失败。请重新读取。',
     );
-    expect(validateResp.ok()).toBe(true);
-    const validateBody = await validateResp.json();
-    expect(validateBody?.data).toBe(false);
+    await expect(page.getByTestId('invite-code-value')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '撤销当前邀请码', exact: true })).toHaveCount(0);
+    await validate(page, code, false);
+    expect(revokeWrites).toBe(2);
+    await capture(page, info, 'invite-revoked-read-failed');
+    await page.unroute(`**${endpoint}current`);
+    const loaded = page.waitForResponse(matches('current', 'GET'));
+    await page.getByRole('button', { name: '重新读取', exact: true }).click();
+    const current = await loaded;
+    expect(current.status()).toBe(200);
+    const readback = await current.json();
+    expect(readback.code).toBe('0');
+    expect(readback.data?.code).not.toBe(code);
+    await assertCurrent(page, readback.data);
+    expect(revokeWrites, 'read retry must not repeat revocation').toBe(2);
+    await validate(page, code, false);
+    await capture(page, info, 'invite-revoked');
+    await page
+      .getByTestId('invite-dialog')
+      .getByRole('button', { name: '关闭', exact: true })
+      .click();
+    await page.reload();
+    await openInvite(page);
+    await assertCurrent(page, readback.data);
+    await validate(page, code, false);
   });
 });

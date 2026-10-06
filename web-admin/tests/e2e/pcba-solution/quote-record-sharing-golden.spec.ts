@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { readFileSync } from 'node:fs';
 import { test, expect } from '../../fixtures';
 import { ensureQuoteRoleUser, makeQuoteRoleUser, openQuoteRolePage, openQuoteDetailFromList,
   seedBomPriceManualReviewQuote, seedDownloadableQuote, type QuoteRoleUser } from './quote-e2e-helpers';
@@ -12,7 +13,7 @@ const recipients: QuoteRoleUser[] = [
 ];
 
 test('quote sharing release gate: multiple members, role access and revocation through UI', async ({ page, browser }, testInfo) => {
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
   const quote = await seedBomPriceManualReviewQuote(page);
   for (const user of recipients) await ensureQuoteRoleUser(page, user);
   const viewers: Awaited<ReturnType<typeof openQuoteRolePage>>[] = [];
@@ -42,15 +43,13 @@ test('quote sharing release gate: multiple members, role access and revocation t
       // Quote collaboration grants every quote tab for this exact shared root only.
       expect(response.status()).toBe(allowed ? 200 : 403);
     }
-    // 文件腿(Q15-05):文件授权跟随关联记录的 read 授权(记录共享行面延伸到文件)。
-    // 授权成员:200;未授权:拒绝(403;若 PermissionInterceptor 缺权限映射为 500,
-    // 亦视为拒绝态,映射缺陷单独立产品发现)。
+    // File access follows the related record's read authorization and returns an exact 403 on denial.
     const sharedFileProbe = await client.request.get(`/api/file/${sharedQuoteFileId}`);
     const sharedFileStatus = sharedFileProbe.status();
     if (allowed) {
       expect(sharedFileStatus, `authorized file access must pass, got ${sharedFileStatus}`).toBe(200);
     } else {
-      expect([403, 500], `unauthorized file access must be rejected, got ${sharedFileStatus}`).toContain(sharedFileStatus);
+      expect(sharedFileStatus, `unauthorized file access must be rejected, got ${sharedFileStatus}`).toBe(403);
     }
     const capability = await client.request.get(`/api/record-share/manage-capability?${shareParams}`);
     expect(capability.status()).toBe(allowed ? 200 : 403);
@@ -101,12 +100,14 @@ test('quote sharing release gate: multiple members, role access and revocation t
   for (const tabName of ['资料上传','BOM价格计算','加工点数','Gerber校验','报价Excel']) {
     await expect(viewers[0].page.getByRole('tab',{name:tabName,exact:true})).toBeVisible();
   }
-  await viewers[0].page.screenshot({path:testInfo.outputPath('quote-collaborator-all-tabs.png'), fullPage:true});
   await expect(viewers[0].page.getByTestId('ab:detail:qo_quote_common:share-btn')).toHaveCount(0);
   await viewers[0].page.getByRole('tab',{name:'BOM价格计算',exact:true}).click();
   const sharedLine = viewers[0].page.getByTestId(`table-row-${quote.lineId}`);
   await expect(sharedLine).toContainText(quote.mpn, {timeout: 20_000});
   await expect(sharedLine).toContainText(/1\.1111|1\.111|1\.11/);
+  await expect(viewers[0].page.locator('main')).not.toContainText(/加载中\.\.\.|Loading\.\.\./);
+  await expect(viewers[0].page.getByTestId('metric-strip-item-customer_code').locator('span').last()).toHaveText('-');
+  await viewers[0].page.screenshot({path:testInfo.outputPath('quote-collaborator-all-tabs.png'), fullPage:true});
   expect((await viewers[0].page.request.put(root,{data:{qo_quote_customer:'Denied shared edit'}})).status()).toBe(403);
   const reader = viewers[0].page;
   await reader.getByRole('button',{name:/修改套数/}).click();
@@ -173,7 +174,13 @@ test('quote sharing release gate: multiple members, role access and revocation t
   await completion.getByRole('button',{name:'关闭',exact:true}).last().click();
   await expect.poll(async () => (await (await page.request.get(root)).json()).data.qo_quote_set_count).toBe(3);
   await probe(0,false);
-  await dialog.getByRole('heading',{name:'添加协作成员',exact:true}).scrollIntoViewIfNeeded();
+  const shareSave = dialog.getByRole('button', { name: '保存协作成员', exact: true });
+  await shareSave.scrollIntoViewIfNeeded();
+  const saveBounds = await shareSave.boundingBox();
+  const dialogBounds = await dialog.getByRole('dialog').boundingBox();
+  expect(saveBounds).not.toBeNull();
+  expect(dialogBounds).not.toBeNull();
+  expect(saveBounds!.y + saveBounds!.height, 'the entire save button stays inside the scrollable dialog').toBeLessThanOrEqual(dialogBounds!.y + dialogBounds!.height);
   await page.screenshot({path:testInfo.outputPath('quote-role-sharing.png'), fullPage:true});
   await dialog.getByTestId('record-share-dialog-close').click();
   await page.reload();
@@ -189,6 +196,125 @@ test('quote sharing release gate: multiple members, role access and revocation t
   await viewers[2].page.goto('/p/qo_quote_common');
   await procListLoad;
   await expect(viewers[2].page.getByText(quote.quoteCode, { exact: false })).toHaveCount(0);
+  // Use the public test-profile initializer to create a real second tenant.
+  const seed = await page.request.post('/api/test/seed', {
+    params: { testRunId: `quote-sharing-tenant-${Date.now()}` }, timeout: 90_000,
+  });
+  expect(seed.status(), await seed.text()).toBe(200);
+  const foreign = await openQuoteRolePage(browser, {
+    key: 'foreign-tenant', email: 'e2e@test.local', displayName: 'E2E Test User',
+    password: 'E2eTestPass2026!', roleCodes: ['tenant_admin'],
+  });
+  try {
+    const ownerIdentity = await page.request.get('/api/auth/me');
+    const foreignIdentity = await foreign.page.request.get('/api/auth/me');
+    expect(ownerIdentity.status()).toBe(200);
+    expect(foreignIdentity.status()).toBe(200);
+    const ownerMe = (await ownerIdentity.json()).data;
+    const foreignMe = (await foreignIdentity.json()).data;
+    expect(foreignMe.user.email).toBe('e2e@test.local');
+    expect(foreignMe.user.tenantId).toBeTruthy();
+    expect(String(foreignMe.user.tenantId)).not.toBe(String(ownerMe.user.tenantId));
+    expect(foreignMe.permissions.roles.map((role: { code: string }) => role.code)).toContain('tenant_admin');
+    // /api/test/seed installs test-fixtures only. The foreign tenant needs the
+    // same product page before this journey can exercise the record boundary.
+    const quoteRoot = process.env.AURA_QUOTE_ROOT;
+    expect(quoteRoot, 'The gate must provide its manifest-bound AURA_QUOTE_ROOT').toBeTruthy();
+    expect(path.isAbsolute(quoteRoot!)).toBe(true);
+    const crmRoot = process.env.AURA_CRM_ROOT;
+    const pluginsRoot = process.env.AURA_PLUGINS_PROJECT_ROOT;
+    for (const sourceRoot of [crmRoot, pluginsRoot]) {
+      expect(sourceRoot, 'The gate must provide each manifest-bound dependency root').toBeTruthy();
+      expect(path.isAbsolute(sourceRoot!)).toBe(true);
+    }
+    const dependencies = [
+      [path.join(crmRoot!, 'plugin-aura', 'crm'), 'com.auraboot.crm'],
+      [path.join(pluginsRoot!, 'pcba-crm'), 'com.auraboot.pcba-crm'],
+      [path.join(quoteRoot!, 'plugin-aura', 'quote-core'), 'com.auraboot.quote-core'],
+    ];
+    for (const [pluginPath, pluginId] of dependencies) {
+      const manifest = JSON.parse(readFileSync(path.join(pluginPath, 'plugin.json'), 'utf8'));
+      expect(manifest.pluginId).toBe(pluginId);
+      const imported = await foreign.page.request.post('/api/plugins/import/import-directory-sync', {
+        data: {
+          path: pluginPath,
+          conflictStrategy: 'OVERWRITE',
+          autoPublishModels: true,
+          autoPublishFields: true,
+          autoPublishCommands: true,
+          autoPublishPages: true,
+          deferReferenceValidation: true,
+        },
+        timeout: 90_000,
+      });
+      expect(imported.status(), pluginId).toBe(200);
+      expect((await imported.json()).success, pluginId).toBe(true);
+    }
+    const foreignSchema = await foreign.page.request.get('/api/pages/key/qo_quote_common_detail');
+    expect(foreignSchema.status()).toBe(200);
+    expect(String((await foreignSchema.json()).code)).toBe('0');
+    // Registration does not grant newly imported actions. Give the foreign fixture
+    // only the declared read surfaces needed to reach the tenant record boundary.
+    const foreignRoles = await foreign.page.request.get('/api/roles?keyword=tenant_admin&pageNum=1&pageSize=50');
+    expect(foreignRoles.status()).toBe(200);
+    const foreignAdminRole = (await foreignRoles.json()).data.records.find((role: { code: string }) => role.code === 'tenant_admin');
+    expect(foreignAdminRole?.pid).toBeTruthy();
+    const capabilityUrl = `/api/permission/capabilities?rolePid=${foreignAdminRole.pid}`;
+    const foreignCapabilities = await foreign.page.request.get(capabilityUrl);
+    expect(foreignCapabilities.status()).toBe(200);
+    const declared = (await foreignCapabilities.json()).data.flatMap((group: { capabilities: Array<{ code: string; granted: boolean; conventionDerived: boolean }> }) => group.capabilities)
+      .filter((capability: { conventionDerived: boolean }) => !capability.conventionDerived);
+    const readSurfaces = ['qo.cap.quote_view', 'qo.cap.surface_bom_price', 'qo.cap.surface_process_fee'];
+    for (const code of readSurfaces) expect(declared.some((capability: { code: string }) => capability.code === code), code).toBe(true);
+    const explicitRead = await foreign.page.request.put(capabilityUrl, { data: [...new Set([
+      ...declared.filter((capability: { granted: boolean }) => capability.granted).map((capability: { code: string }) => capability.code),
+      ...readSurfaces,
+    ])] });
+    expect(explicitRead.status()).toBe(200);
+    expect(String((await explicitRead.json()).code)).toBe('0');
+    const deniedRecord = foreign.page.waitForResponse(response =>
+      new URL(response.url()).pathname === root && response.request().method() === 'GET');
+    await foreign.page.goto(new URL(`/p/qo_quote_common/view/${quote.quoteId}`, page.url()).href);
+    // Tenant filtering deliberately makes a foreign record indistinguishable
+    // from an absent record; it must not query other tenants to return 403.
+    const foreignRecord = await deniedRecord;
+    expect(foreignRecord.status()).toBe(404);
+    expect(await foreignRecord.json()).toMatchObject({
+      code: '404', message: 'Resource not found', data: null, context: null,
+    });
+    await expect(foreign.page.getByText('请求的记录不存在或已不可用。', { exact: true })).toBeVisible();
+    await expect(foreign.page.getByText('Resource not found', { exact: true })).toHaveCount(0);
+    const absentRecord = await foreign.page.request.get('/api/dynamic/qo_quote_common/01NONEXISTENTQUOTE000000000');
+    expect(absentRecord.status()).toBe(404);
+    expect(await absentRecord.json()).toMatchObject({
+      code: '404', message: 'Resource not found', data: null, context: null,
+    });
+    await expect(foreign.page.getByTestId('ab:detail:qo_quote_common:container')
+      .getByRole('heading', { level: 2 })).toHaveText(/记录不存在|未找到记录|Record not found/);
+    await expect(foreign.page.getByText(quote.quoteCode, { exact: false })).toHaveCount(0);
+    await expect(foreign.page.getByTestId(`table-row-${quote.lineId}`)).toHaveCount(0);
+    for (const query of ['qo_quote_bom_price_metrics', 'qo_quote_process_fee_unassigned_facts']) {
+      const deniedQuery = await foreign.page.request.post(`/api/meta/named-queries/${query}/execute`, {
+        data: { parameters: { quoteId: quote.quoteId } },
+      });
+      expect(deniedQuery.status()).toBe(404);
+      expect(await deniedQuery.json()).toMatchObject({
+        code: '404', message: 'Resource not found', data: null, context: null,
+      });
+    }
+    const foreignFile = await foreign.page.request.get(`/api/file/${sharedQuoteFileId}`);
+    expect(foreignFile.status()).toBe(404);
+    expect(await foreignFile.json()).toMatchObject({
+      code: '404', message: 'Resource not found', data: null, context: null,
+    });
+    const missingFile = await foreign.page.request.get('/api/file/01NONEXISTENTFILE0000000000');
+    expect(missingFile.status()).toBe(404);
+    expect(await missingFile.json()).toMatchObject({
+      code: '404', message: 'Resource not found', data: null, context: null,
+    });
+    expect((await foreign.page.request.get(`/api/file/download/${sharedQuoteFileId}`)).status()).toBe(404);
+    await foreign.page.screenshot({ path: testInfo.outputPath('quote-cross-tenant-denied.png'), fullPage: true });
+  } finally { await foreign.context.close(); }
   for(const viewer of viewers) await viewer.context.close();
 });
 
@@ -241,13 +367,14 @@ test('quote sharing release gate: collaborator full processing, record isolation
   for (const tabName of ['资料上传','BOM价格计算','加工点数','Gerber校验','报价Excel']) {
     await expect(memberPage.getByRole('tab',{name:tabName,exact:true})).toBeVisible();
   }
-  await memberPage.screenshot({path:testInfo.outputPath('shared-full-tabs.png'), fullPage:true});
 
   // 资料上传 tab renders the quote materials surface for the collaborator. The seed quote
   // has no materials yet, so the table shows its headers without rows.
   await memberPage.getByRole('tab',{name:'资料上传',exact:true}).click();
   await expect(memberPage.getByRole('columnheader', { name: '资料类型' })).toBeVisible();
   await expect(memberPage.getByRole('columnheader', { name: '文件名' })).toBeVisible();
+  await expect(memberPage.locator('main')).not.toContainText(/加载中\.\.\.|Loading\.\.\./);
+  await memberPage.screenshot({path:testInfo.outputPath('shared-full-tabs.png'), fullPage:true});
 
   // 报价Excel tab: generate, download and parse the workbook as the collaborator, before the
   // process-fee recalculation step below changes the quote's fee accounting. The workbook
@@ -294,6 +421,12 @@ test('quote sharing release gate: collaborator full processing, record isolation
   const gerberSurface = memberPage.getByTestId('gerber-viewer');
   const gerberEmpty = memberPage.locator('[data-testid^="runtime-gerber-viewer-empty"]');
   await expect(gerberSurface.or(gerberEmpty).first()).toBeVisible();
+  await expect(memberPage.getByTestId('evidence-panel-section-status')).toContainText('草稿');
+  await expect(memberPage.getByTestId('evidence-panel-section-status')).not.toContainText('draft');
+  for (const notification of await memberPage.getByRole('button', { name: 'Close notification', exact: true }).all()) {
+    await notification.click();
+  }
+  await expect(memberPage.getByRole('button', { name: 'Close notification', exact: true })).toHaveCount(0);
   await memberPage.screenshot({path:testInfo.outputPath('shared-gerber-tab.png'), fullPage:true});
 
   // The grant is record-scoped: another tenant quote stays invisible on API and UI level.

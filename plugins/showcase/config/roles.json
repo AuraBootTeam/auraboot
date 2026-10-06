@@ -7,7 +7,13 @@
     "permissions": [
       "sc.showcase.manage",
       "sc.showcase.read",
-      "meta.command.execute"
+      "meta.command.execute",
+      "model.showcase_all_fields.read",
+      "model.showcase_all_fields.create",
+      "model.showcase_all_fields.update",
+      "model.sc_monthly_metric.read",
+      "model.sc_monthly_metric.create",
+      "model.sc_monthly_metric.update"
     ]
   }
 ]
