@@ -113,8 +113,13 @@ else
   # AURA_GOLDEN_REPORT_RENDERER=1 wires the WYSIWYG PDF renderer into the fresh stack.
   renderer_args=()
   [[ -z "${AURA_GOLDEN_REPORT_RENDERER:-}" ]] || renderer_args=(--report-renderer)
+  # On the shared CI host every fresh run legitimately stacks next to the other
+  # auraboot nightly runtimes of past campaigns, so the task-owner rule needs the
+  # explicit parallel reason; local runs keep the strict single-task protection.
+  parallel_args=()
+  [[ -z "${AURA_CI_JOB_ID:-}" ]] || parallel_args=(--parallel-reason "ci fresh stack for job ${AURA_CI_JOB_ID}")
   "$GS" up "$NAME" --slot "$SLOT" --ttl 12h --runtime-mode verification --require-new-db --plugin-profile demo \
-    "${workspace_source_args[@]}" "${renderer_args[@]}" \
+    "${workspace_source_args[@]}" "${renderer_args[@]}" "${parallel_args[@]}" \
     || die_env 'stack bring-up failed; inspect retained golden-stack logs'
 fi
 log '3/6 import test-fixtures'
