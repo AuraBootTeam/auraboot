@@ -38,6 +38,16 @@ public class DecisionImpactServiceImpl implements DecisionImpactService {
             "CHANGE_PERMISSION",
             "CHANGE_VIRTUAL_SOURCE");
 
+    /**
+     * Stable i18n key emitted as the non-blocking impact summary when a decision has no
+     * downstream consumers. The service layer has no request locale, so it emits the
+     * {@code $i18n:} key (see {@code BusinessException.i18n} doctrine); the controller
+     * boundary ({@code DecisionRuntimeController#getDecisionImpact}) resolves it through
+     * {@code I18nLocaleResolver} + {@code I18nService} before the DTO is serialized.
+     */
+    public static final String NO_DOWNSTREAM_CONSUMERS_KEY =
+            "$i18n:decision.impact.no_downstream_consumers";
+
     private final DecisionUsageIndexService usageIndexService;
     private final DecisionImpactAckService impactAckService;
 
@@ -55,7 +65,7 @@ public class DecisionImpactServiceImpl implements DecisionImpactService {
         dto.setDecisionCode(decisionCode);
         dto.setIncoming(incoming);
         dto.setOutgoing(outgoing);
-        dto.setRisk(buildRisk(incoming, "No downstream consumers"));
+        dto.setRisk(buildRisk(incoming, NO_DOWNSTREAM_CONSUMERS_KEY));
         return dto;
     }
 

@@ -2,6 +2,7 @@ package com.auraboot.framework.application.web.handler;
 
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.common.constant.ResponseCode;
+import com.auraboot.framework.exception.ValidationException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.DataAccessResourceFailureException;
 import com.auraboot.framework.meta.controller.CommandPipelineController;
@@ -9,6 +10,9 @@ import com.auraboot.framework.meta.service.impl.CommandPhaseRegistry;
 import com.auraboot.framework.meta.exception.MetaApiExceptionHandler;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.validation.BeanPropertyBindingResult;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.multipart.MultipartException;
 import com.auraboot.framework.i18n.service.I18nService;
 import com.auraboot.framework.i18n.util.I18nLocaleResolver;
 import jakarta.servlet.http.HttpServletRequest;
@@ -219,5 +223,62 @@ class GlobalExceptionHandlerI18nTest {
         var response = handler.handleBusinessException(ex, request);
 
         assertThat(response.getBody().getContext()).isEqualTo("剩余年假不足，无法提交该申请");
+    }
+
+    // ---- 35000 BadParam envelope localization (C1 bare-string fix) ----
+
+    @Test
+    void badParamEnvelopeResolvesToChineseForZhLocale() {
+        when(localeResolver.resolveLocale(request)).thenReturn("zh-CN");
+        when(i18nService.getValue("zh-CN", "common.error.badParam")).thenReturn("参数错误");
+        MethodArgumentNotValidException ex = mock(MethodArgumentNotValidException.class);
+        when(ex.getBindingResult()).thenReturn(new BeanPropertyBindingResult(new Object(), "form"));
+
+        var response = handler.handleValidationExceptions(ex, request);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(400);
+        assertThat(response.getBody()).isNotNull();
+        // Same contract: code 35000, message field, structured context — only the copy is localized.
+        assertThat(response.getBody().getCode()).isEqualTo("35000");
+        assertThat(response.getBody().getMessage()).isEqualTo("参数错误");
+        assertThat(response.getBody().getContext()).isInstanceOf(Map.class);
+    }
+
+    @Test
+    void badParamEnvelopeResolvesToEnglishForEnLocale() {
+        when(localeResolver.resolveLocale(request)).thenReturn("en-US");
+        when(i18nService.getValue("en-US", "common.error.badParam")).thenReturn("Bad parameter");
+
+        var response = handler.handleMultipartException(new MultipartException("not multipart"), request);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(400);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getCode()).isEqualTo("35000");
+        assertThat(response.getBody().getMessage()).isEqualTo("Bad parameter");
+    }
+
+    @Test
+    void badParamEnvelopeFallsBackToBaseLocaleThenLegacyDesc() {
+        when(localeResolver.resolveLocale(request)).thenReturn("ja-JP");
+        when(i18nService.getValue(anyString(), eq("common.error.badParam"))).thenReturn(null);
+
+        var response = handler.handleMultipartException(new MultipartException("boom"), request);
+
+        // Catalog gaps must never leak the raw key into the envelope — legacy desc is the floor.
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getMessage()).isEqualTo("Bad parameter");
+    }
+
+    @Test
+    void businessValidationEnvelopeCarriesLocalizedBadParamMessage() {
+        when(localeResolver.resolveLocale(request)).thenReturn("zh-CN");
+        when(i18nService.getValue("zh-CN", "common.error.badParam")).thenReturn("参数错误");
+
+        var response = handler.handleValidationException(
+                new ValidationException(ResponseCode.CommonValidationFailed, "field is required"), request);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(422);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getMessage()).isEqualTo("参数错误");
     }
 }

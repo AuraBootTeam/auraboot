@@ -65,6 +65,14 @@ import java.util.stream.Collectors;
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
+    /**
+     * Catalog key for the generic 35000 envelope message. {@link ResponseCode.BadParam}'s desc
+     * ("Bad parameter") used to flow into every validation-failure envelope untranslated; the
+     * message is now resolved per request locale at this boundary (zh-CN "参数错误", en-US
+     * "Bad parameter"). See {@code seed/i18n-base.json} for the catalog entry.
+     */
+    private static final String BAD_PARAM_MESSAGE_KEY = "common.error.badParam";
+
     @Value("${spring.profiles.active:prod}")
     private String activeProfile;
 
@@ -141,13 +149,35 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Build a 35000 (BadParam) envelope whose user-facing message is resolved to the request
+     * locale via the i18n catalog, keeping the response contract unchanged (same code, same
+     * fields, same status). Falls back to zh-CN, then to the legacy enum desc.
+     */
+    private <T> ResponseEntity<ApiResponse<T>> badParamResponse(
+            HttpStatus status, T context, HttpServletRequest request) {
+        ApiResponse<T> response = ApiResponse.error(
+                ResponseCode.BadParam, localizedBadParamMessage(request), context);
+        return ResponseEntity.status(status).body(response);
+    }
+
+    private String localizedBadParamMessage(HttpServletRequest request) {
+        String locale = i18nLocaleResolver.resolveLocale(request);
+        String value = i18nService.getValue(locale, BAD_PARAM_MESSAGE_KEY);
+        if (value == null) {
+            value = i18nService.getValue("zh-CN", BAD_PARAM_MESSAGE_KEY); // base-locale fallback
+        }
+        return value != null ? value : ResponseCode.BadParam.getDesc();
+    }
+
+    /**
      * Handle @Valid annotation validation failures.
      * Returns HTTP 400 Bad Request.
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseBody
     public ResponseEntity<ApiResponse<Map<String, String>>> handleValidationExceptions(
-            MethodArgumentNotValidException ex) {
+            MethodArgumentNotValidException ex,
+            HttpServletRequest request) {
 
         Map<String, String> errors = new HashMap<>();
         ex.getBindingResult().getAllErrors().forEach((error) -> {
@@ -157,8 +187,7 @@ public class GlobalExceptionHandler {
         });
 
         log.warn("Parameter validation failed: {}", errors);
-        ApiResponse<Map<String, String>> response = ApiResponse.errorWithContext(ResponseCode.BadParam, errors);
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        return badParamResponse(HttpStatus.BAD_REQUEST, errors, request);
     }
 
     /**
@@ -168,7 +197,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ConstraintViolationException.class)
     @ResponseBody
     public ResponseEntity<ApiResponse<Map<String, String>>> handleConstraintViolationException(
-            ConstraintViolationException ex) {
+            ConstraintViolationException ex,
+            HttpServletRequest request) {
         Map<String, String> errors = ex.getConstraintViolations()
                 .stream()
                 .collect(Collectors.toMap(
@@ -178,8 +208,7 @@ public class GlobalExceptionHandler {
                 ));
 
         log.error("Constraint violation: {}", errors);
-        ApiResponse<Map<String, String>> response = ApiResponse.errorWithContext(ResponseCode.BadParam, errors);
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        return badParamResponse(HttpStatus.BAD_REQUEST, errors, request);
     }
 
     /**
@@ -188,7 +217,9 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(BindException.class)
     @ResponseBody
-    public ResponseEntity<ApiResponse<Map<String, String>>> handleBindException(BindException ex) {
+    public ResponseEntity<ApiResponse<Map<String, String>>> handleBindException(
+            BindException ex,
+            HttpServletRequest request) {
         Map<String, String> errors = new HashMap<>();
         ex.getBindingResult().getAllErrors().forEach((error) -> {
             String fieldName = ((FieldError) error).getField();
@@ -197,8 +228,7 @@ public class GlobalExceptionHandler {
         });
 
         log.error("Form binding failed: {}", errors);
-        ApiResponse<Map<String, String>> response = ApiResponse.errorWithContext(ResponseCode.BadParam, errors);
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        return badParamResponse(HttpStatus.BAD_REQUEST, errors, request);
     }
 
     /**
@@ -207,13 +237,14 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(TemporalParseException.class)
     @ResponseBody
-    public ResponseEntity<ApiResponse<Object>> handleTemporalParseException(TemporalParseException ex) {
+    public ResponseEntity<ApiResponse<Object>> handleTemporalParseException(
+            TemporalParseException ex,
+            HttpServletRequest request) {
         log.warn("Temporal parse error: field={}, value={}, expected={}",
             ex.getField(), ex.getRawValue(), ex.getExpected());
         String message = String.format("Field '%s': invalid temporal value '%s'. Expected: %s",
             ex.getField(), ex.getRawValue(), ex.getExpected());
-        ApiResponse<Object> response = ApiResponse.errorWithContext(ResponseCode.BadParam, message);
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        return badParamResponse(HttpStatus.BAD_REQUEST, message, request);
     }
 
     /**
@@ -222,13 +253,14 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(ValidationException.class)
     @ResponseBody
-    public ResponseEntity<ApiResponse<Map<String, String>>> handleValidationException(ValidationException ex) {
+    public ResponseEntity<ApiResponse<Map<String, String>>> handleValidationException(
+            ValidationException ex,
+            HttpServletRequest request) {
         Map<String, String> errors = new HashMap<>();
         errors.put("error", ex.getMessage());
 
         log.warn("Business validation failed: {}", ex.getMessage());
-        ApiResponse<Map<String, String>> response = ApiResponse.errorWithContext(ResponseCode.BadParam, errors);
-        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(response);
+        return badParamResponse(HttpStatus.UNPROCESSABLE_ENTITY, errors, request);
     }
 
     /**
@@ -447,7 +479,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     @ResponseBody
     public ResponseEntity<ApiResponse<Object>> handleHttpMessageNotReadable(
-            HttpMessageNotReadableException ex) {
+            HttpMessageNotReadableException ex,
+            HttpServletRequest request) {
         log.warn("Malformed request body: {}", ex.getMessage());
 
         // Prefer the most specific message available. Spring wraps Jackson
@@ -472,8 +505,7 @@ public class GlobalExceptionHandler {
             detail = message;
         }
 
-        ApiResponse<Object> response = ApiResponse.errorWithContext(ResponseCode.BadParam, detail);
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        return badParamResponse(HttpStatus.BAD_REQUEST, detail, request);
     }
 
     /**
@@ -483,11 +515,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     @ResponseBody
     public ResponseEntity<ApiResponse<Object>> handleMethodNotSupported(
-            HttpRequestMethodNotSupportedException ex) {
+            HttpRequestMethodNotSupportedException ex,
+            HttpServletRequest request) {
         log.warn("HTTP method not supported: method={}, supported={}",
                 ex.getMethod(), ex.getSupportedHttpMethods());
-        ApiResponse<Object> response = ApiResponse.errorWithContext(ResponseCode.BadParam, ex.getMessage());
-        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(response);
+        return badParamResponse(HttpStatus.METHOD_NOT_ALLOWED, ex.getMessage(), request);
     }
 
     /**
@@ -497,10 +529,10 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
     @ResponseBody
     public ResponseEntity<ApiResponse<Object>> handleMediaTypeNotAcceptable(
-            HttpMediaTypeNotAcceptableException ex) {
+            HttpMediaTypeNotAcceptableException ex,
+            HttpServletRequest request) {
         log.warn("HTTP media type not acceptable: {}", ex.getMessage());
-        ApiResponse<Object> response = ApiResponse.errorWithContext(ResponseCode.BadParam, ex.getMessage());
-        return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).body(response);
+        return badParamResponse(HttpStatus.NOT_ACCEPTABLE, ex.getMessage(), request);
     }
 
     /**
@@ -509,10 +541,11 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(MultipartException.class)
     @ResponseBody
-    public ResponseEntity<ApiResponse<Object>> handleMultipartException(MultipartException ex) {
+    public ResponseEntity<ApiResponse<Object>> handleMultipartException(
+            MultipartException ex,
+            HttpServletRequest request) {
         log.warn("Multipart request error: {}", ex.getMessage());
-        ApiResponse<Object> response = ApiResponse.errorWithContext(ResponseCode.BadParam, ex.getMessage());
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        return badParamResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
     }
 
     /**

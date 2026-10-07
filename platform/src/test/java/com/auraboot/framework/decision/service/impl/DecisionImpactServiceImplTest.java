@@ -1,5 +1,6 @@
 package com.auraboot.framework.decision.service.impl;
 
+import com.auraboot.framework.decision.dto.DecisionImpactDTO;
 import com.auraboot.framework.decision.dto.DecisionImpactRefDTO;
 import com.auraboot.framework.decision.dto.DecisionFieldPreflightDTO;
 import com.auraboot.framework.decision.dto.DecisionFieldPreflightRequest;
@@ -25,6 +26,38 @@ class DecisionImpactServiceImplTest {
     private final DecisionImpactAckService impactAckService = mock(DecisionImpactAckService.class);
     private final DecisionImpactServiceImpl service =
             new DecisionImpactServiceImpl(usageIndexService, impactAckService);
+
+    @Test
+    void getDecisionImpactEmitsStableI18nKeyInsteadOfBareEnglishWhenNoConsumers() {
+        when(usageIndexService.findIncomingDecisionRefs("approval_routing")).thenReturn(List.of());
+        when(usageIndexService.findOutgoingDecisionRefs("approval_routing")).thenReturn(List.of());
+
+        DecisionImpactDTO impact = service.getDecisionImpact("approval_routing");
+
+        assertThat(impact.getDecisionCode()).isEqualTo("approval_routing");
+        assertThat(impact.getRisk().getBlocking()).isFalse();
+        // The service layer has no request locale, so the empty-consumers summary is the
+        // stable $i18n: key; DecisionRuntimeController resolves it at the response boundary.
+        assertThat(impact.getRisk().getSummary())
+                .isEqualTo(DecisionImpactServiceImpl.NO_DOWNSTREAM_CONSUMERS_KEY);
+        assertThat(impact.getRisk().getSummary()).doesNotContain("No downstream consumers");
+        verify(usageIndexService).rebuild();
+    }
+
+    @Test
+    void getDecisionImpactKeepsUsedBySummaryForDownstreamConsumers() {
+        DecisionImpactRefDTO ref = new DecisionImpactRefDTO();
+        ref.setSourceType("AUTOMATION");
+        ref.setSourceCode("auto-1");
+        when(usageIndexService.findIncomingDecisionRefs("approval_routing")).thenReturn(List.of(ref));
+        when(usageIndexService.findOutgoingDecisionRefs("approval_routing")).thenReturn(List.of());
+
+        DecisionImpactDTO impact = service.getDecisionImpact("approval_routing");
+
+        assertThat(impact.getRisk().getBlocking()).isTrue();
+        // Non-key summaries stay verbatim so the controller boundary passes them through untouched.
+        assertThat(impact.getRisk().getSummary()).isEqualTo("Used by 1 automation");
+    }
 
     @Test
     void getIntegrationImpactReturnsConnectorConsumersAndManagementUrl() {

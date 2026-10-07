@@ -52,11 +52,14 @@ import com.auraboot.framework.decision.service.DecisionUsageIndexService;
 import com.auraboot.framework.decision.service.DrtDefinitionService;
 import com.auraboot.framework.decision.service.DecisionEvaluationService;
 import com.auraboot.framework.decision.service.DecisionVersionService;
+import com.auraboot.framework.i18n.service.I18nService;
+import com.auraboot.framework.i18n.util.I18nLocaleResolver;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
@@ -96,6 +99,8 @@ public class DecisionRuntimeController {
     private final DecisionTableDmnXmlService tableDmnXmlService;
     private final ConditionFragmentService conditionFragmentService;
     private final DecisionActionCatalogService actionCatalogService;
+    private final I18nService i18nService;
+    private final I18nLocaleResolver i18nLocaleResolver;
 
     // ==================== Stateless validation + evaluation ====================
 
@@ -215,9 +220,38 @@ public class DecisionRuntimeController {
             description = "Returns downstream consumers and outgoing field/function/sub-decision references.")
     @RequirePermission(MetaPermission.DRT_DEFINITION_READ)
     public ApiResponse<DecisionImpactDTO> getDecisionImpact(
-            @Parameter(description = "Decision code") @PathVariable @NotBlank String code) {
+            @Parameter(description = "Decision code") @PathVariable @NotBlank String code,
+            HttpServletRequest request) {
         log.info("Getting decision impact: code={}", code);
-        return ApiResponse.success(impactService.getDecisionImpact(code));
+        DecisionImpactDTO impact = impactService.getDecisionImpact(code);
+        localizeImpactRiskSummary(impact, request);
+        return ApiResponse.success(impact);
+    }
+
+    /**
+     * Resolve any {@code $i18n:<key>} placeholder in the impact risk summary to the request
+     * locale (query param > X-Locale > Accept-Language > zh-CN), mirroring
+     * {@code TenantSelectionController#localize} and
+     * {@code GlobalExceptionHandler#localizeI18nMessage}. The service layer has no request
+     * locale, so it emits the stable key ({@code DecisionImpactServiceImpl#NO_DOWNSTREAM_CONSUMERS_KEY});
+     * resolution happens on the way out. Non-{@code $i18n:} summaries (e.g. "Used by 2 automations")
+     * pass through unchanged — no contract change, same response shape.
+     */
+    private void localizeImpactRiskSummary(DecisionImpactDTO impact, HttpServletRequest request) {
+        if (impact == null || impact.getRisk() == null) {
+            return;
+        }
+        String summary = impact.getRisk().getSummary();
+        if (summary == null || !summary.startsWith("$i18n:")) {
+            return;
+        }
+        String key = summary.substring("$i18n:".length());
+        String locale = i18nLocaleResolver.resolveLocale(request);
+        String value = i18nService.getValue(locale, key);
+        if (value == null) {
+            value = i18nService.getValue("zh-CN", key); // base-locale fallback (ja/ko gaps)
+        }
+        impact.getRisk().setSummary(value != null ? value : key);
     }
 
     @PostMapping("/definitions/{code}/rollouts")
