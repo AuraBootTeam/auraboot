@@ -781,8 +781,8 @@ export default function LoginPage() {
         </>
       )}
 
-      {/* Social / SSO login (conditional); in wechat-only mode only the non-WeChat extras render here — the QR is embedded above */}
-      {socialOptions.length > 0 && (
+      {/* Pure-WeChat deployments use only the embedded QR above. */}
+      {!wechatOnly && socialOptions.length > 0 && (
         <div className="mt-6">
           <div className="flex items-center gap-3.5 text-[12.5px] text-[#a3ad9c] dark:text-gray-500">
             <span className="h-px flex-1 bg-[#e5ebdf] dark:bg-gray-700" />
