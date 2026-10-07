@@ -6090,5 +6090,19 @@
     "key": "common.saved_view_public_share_subtitle",
     "zh-CN": "管理个人视图与获授权的公开链接",
     "en-US": "Manage personal views and authorized public links"
+  },
+  {
+    "key": "common.error.badParam",
+    "zh-CN": "参数错误",
+    "en-US": "Bad parameter",
+    "ja-JP": "パラメータエラー",
+    "ko-KR": "파라미터 오류"
+  },
+  {
+    "key": "decision.impact.no_downstream_consumers",
+    "zh-CN": "无下游引用方",
+    "en-US": "No downstream consumers",
+    "ja-JP": "下流の参照先はありません",
+    "ko-KR": "다운스트림 소비자가 없습니다"
   }
 ]

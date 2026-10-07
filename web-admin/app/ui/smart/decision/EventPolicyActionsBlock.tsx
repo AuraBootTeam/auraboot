@@ -8,6 +8,7 @@ import {
   type EventPolicySummary,
   type HttpClient,
 } from '~/shared/decision/api/decisionApi';
+import { useEventPolicyFormText } from '~/shared/decision/ui/eventPolicyFormText';
 
 interface EventPolicyActionsBlockProps {
   block?: {
@@ -84,6 +85,7 @@ export function EventPolicyActionsBlock({ block, runtime }: EventPolicyActionsBl
   const location = useLocation();
   const params = useParams();
   const api = useMemo(() => createApi(), []);
+  const { text } = useEventPolicyFormText();
   const props = block?.props ?? {};
   const record = recordFromRuntime(runtime);
   const routePolicyCode =
@@ -257,14 +259,14 @@ export function EventPolicyActionsBlock({ block, runtime }: EventPolicyActionsBl
           <input
             aria-label="policy-code"
             data-testid="epa-policy-code"
-            placeholder="policyCode"
+            placeholder={text('placeholderPolicyCode')}
             value={draft.policyCode}
             onChange={(e) => updateDraft('policyCode', e.target.value)}
           />
           <input
             aria-label="policy-name"
             data-testid="epa-policy-name"
-            placeholder="policyName"
+            placeholder={text('placeholderPolicyName')}
             value={draft.policyName}
             onChange={(e) => updateDraft('policyName', e.target.value)}
           />
@@ -273,21 +275,21 @@ export function EventPolicyActionsBlock({ block, runtime }: EventPolicyActionsBl
               <input
                 aria-label="policy-event-type"
                 data-testid="epa-policy-event-type"
-                placeholder="eventType"
+                placeholder={text('placeholderEventType')}
                 value={draft.eventType}
                 onChange={(e) => updateDraft('eventType', e.target.value)}
               />
               <input
                 aria-label="policy-target-type"
                 data-testid="epa-policy-target-type"
-                placeholder="targetType"
+                placeholder={text('placeholderTargetType')}
                 value={draft.targetType}
                 onChange={(e) => updateDraft('targetType', e.target.value)}
               />
               <input
                 aria-label="policy-target-key"
                 data-testid="epa-policy-target-key"
-                placeholder="targetKey"
+                placeholder={text('placeholderTargetKey')}
                 value={draft.targetKey}
                 onChange={(e) => updateDraft('targetKey', e.target.value)}
               />

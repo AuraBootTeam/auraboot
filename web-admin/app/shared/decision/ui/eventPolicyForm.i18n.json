@@ -1,0 +1,22 @@
+{
+  "placeholderPolicyCode": {
+    "zh-CN": "策略编码",
+    "en": "Policy code"
+  },
+  "placeholderPolicyName": {
+    "zh-CN": "策略名称",
+    "en": "Policy name"
+  },
+  "placeholderEventType": {
+    "zh-CN": "事件类型",
+    "en": "Event type"
+  },
+  "placeholderTargetType": {
+    "zh-CN": "目标类型",
+    "en": "Target type"
+  },
+  "placeholderTargetKey": {
+    "zh-CN": "目标键",
+    "en": "Target key"
+  }
+}
