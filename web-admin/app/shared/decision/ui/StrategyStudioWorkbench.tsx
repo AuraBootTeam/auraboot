@@ -20,6 +20,12 @@ import { useSmartText } from '~/utils/i18n'
 import { dataTypeLabel, scenarioScopeLabel, scopeLabel } from './displayLabels'
 import { downloadDmnXml } from './dmnDownload'
 import {
+  clearStudioDraft,
+  loadStudioDraft,
+  saveStudioDraft,
+  STUDIO_WORKBENCH_DRAFT_SCOPE,
+} from './designerDraftStorage'
+import {
   strategyStudioText,
   useStrategyStudioText,
   type StrategyStudioTextFn,
@@ -1011,6 +1017,16 @@ export function StrategyStudioWorkbench({
     useState<Record<string, ConditionFragment>>({})
   const [ruleBindingDrafts, setRuleBindingDrafts] =
     useState<Record<string, RuleConsumerBindingDraft>>({})
+  // Binding keys whose drafts were saved to the backend during this session;
+  // the session archive skips them so a remount never resurrects stale edits
+  // over the persisted version.
+  const [persistedBindingKeys, setPersistedBindingKeys] = useState<Set<string>>(
+    () => new Set<string>(),
+  )
+  // Draft-store gate: stays empty until the mount restore has read the session
+  // archive, so the mirror effect below cannot overwrite the archive with the
+  // default (empty) drafts before restoration happens.
+  const [draftStoreScope, setDraftStoreScope] = useState('')
   const [catalogActions, setCatalogActions] = useState<DecisionAction[]>([])
   const [tableDrafts, setTableDrafts] = useState<Record<StrategyScenarioKey, DecisionTable>>(
     initialScenarioTables,
@@ -1082,6 +1098,38 @@ export function StrategyStudioWorkbench({
     () => scenarioDecisionOptions(decisionOptions, activeScenario, scenarioTable),
     [activeScenario, decisionOptions, scenarioTable],
   )
+
+  // Mirror the unsaved mapping-row drafts into sessionStorage so a locale
+  // switch (I18nContext.handleSetLocale reloads the page) or any other full
+  // remount restores renamed mapping rows and field selections instead of
+  // dropping them back to defaults. Entries already saved to the backend are
+  // skipped, and the archive is dropped entirely once nothing unsaved remains.
+  useEffect(() => {
+    if (!draftStoreScope) return
+    const pending: Record<string, RuleConsumerBindingDraft> = {}
+    for (const [bindingKey, binding] of Object.entries(ruleBindingDrafts)) {
+      if (!persistedBindingKeys.has(bindingKey)) pending[bindingKey] = binding
+    }
+    if (Object.keys(pending).length === 0) {
+      clearStudioDraft(draftStoreScope)
+      return
+    }
+    saveStudioDraft(draftStoreScope, { bindings: pending })
+  }, [draftStoreScope, persistedBindingKeys, ruleBindingDrafts])
+
+  useEffect(() => {
+    // Restore the unsaved mapping drafts archived before a locale switch (the
+    // I18nContext reloads the page) or any other full remount. The archive wins
+    // over the built-in scenario defaults below: it captures newer edits that
+    // were never saved to the backend.
+    const archived = loadStudioDraft(STUDIO_WORKBENCH_DRAFT_SCOPE)
+    if (archived?.bindings) {
+      setRuleBindingDrafts(archived.bindings as Record<string, RuleConsumerBindingDraft>)
+    }
+    setDraftStoreScope(STUDIO_WORKBENCH_DRAFT_SCOPE)
+    // Run once per mount: the workbench owns the whole session archive.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -1187,6 +1235,28 @@ export function StrategyStudioWorkbench({
       ...current,
       [activeRuleBindingKey]: next,
     }))
+    // The binding was edited again after its backend save, so the session
+    // archive must pick the newer unsaved version up again.
+    setPersistedBindingKeys((current) => {
+      if (!current.has(activeRuleBindingKey)) return current
+      const next = new Set(current)
+      next.delete(activeRuleBindingKey)
+      return next
+    })
+  }
+
+  const markBindingDraftsPersisted = (bindingKeys: string[]) => {
+    setPersistedBindingKeys((current) => {
+      let changed = false
+      const next = new Set(current)
+      for (const bindingKey of bindingKeys) {
+        if (bindingKey && !next.has(bindingKey)) {
+          next.add(bindingKey)
+          changed = true
+        }
+      }
+      return changed ? next : current
+    })
   }
 
   const refreshImpact = async () => {
@@ -1451,6 +1521,10 @@ export function StrategyStudioWorkbench({
       ...current,
       [ruleBindingKey(target, saved)]: binding,
     }))
+    // The mapping rows now live in the backend fragment version — both the
+    // pre-save and the re-keyed binding entries served their purpose and must
+    // not resurrect from the session archive after a remount.
+    markBindingDraftsPersisted([bindingKey, ruleBindingKey(target, saved)])
     return saved.pid ?? null
   }
 
