@@ -2102,6 +2102,154 @@ describe('DecisionOpsConsole', () => {
     expect(screen.getByTestId('epd-step-publish')).toBeInTheDocument();
   });
 
+  it('loads unified fact catalog fields into the designer field picker with search and entity groups', async () => {
+    const getFactCatalog = vi.fn(async () => ({
+      entities: [
+        {
+          entityCode: 'wd_leave_request',
+          modelCode: 'wd_leave_request',
+          label: '请假申请',
+          facts: [
+            {
+              scope: 'record',
+              path: 'record.data.wd_req_days',
+              label: '请假天数',
+              dataType: 'decimal',
+            },
+          ],
+        },
+        {
+          entityCode: 'agent_memory',
+          modelCode: 'agent_memory',
+          label: 'Agent 记忆',
+          facts: [
+            {
+              scope: 'record',
+              path: 'record.data.access_count',
+              label: '访问次数',
+              dataType: 'integer',
+            },
+          ],
+        },
+      ],
+    }));
+    const getModelFields = vi.fn(async () => {
+      throw new Error('designer must use the unified fact catalog before legacy model fields');
+    });
+
+    renderConsole('designer', {
+      getFactCatalog,
+      getModelFields,
+    } as unknown as Partial<DecisionApi>);
+
+    await waitFor(() => expect(getFactCatalog).toHaveBeenCalledOnce());
+    expect(getModelFields).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId('epd-step-rules'));
+    fireEvent.click(screen.getByTestId('cb-add'));
+
+    const fieldPicker = (await screen.findByLabelText('field-0')) as HTMLSelectElement;
+    await waitFor(() =>
+      expect(fieldPicker.querySelector('option[value="record:data.wd_req_days"]')).toBeTruthy(),
+    );
+    expect(fieldPicker).toHaveTextContent('请假天数');
+    expect(fieldPicker).toHaveTextContent('访问次数');
+    expect(fieldPicker).toHaveTextContent('优先级');
+
+    const groupLabels = Array.from(fieldPicker.querySelectorAll('optgroup')).map((group) =>
+      group.getAttribute('label'),
+    );
+    expect(groupLabels).toEqual(expect.arrayContaining(['请假申请', 'Agent 记忆']));
+
+    fireEvent.change(screen.getByLabelText('condition-field-search'), {
+      target: { value: '请假' },
+    });
+    expect(screen.getByTestId('cb-field-result-count')).toHaveTextContent('1 / 4');
+    expect(fieldPicker).toHaveTextContent('请假天数');
+    expect(fieldPicker).not.toHaveTextContent('访问次数');
+
+    fireEvent.change(screen.getByLabelText('condition-field-search'), { target: { value: '' } });
+    fireEvent.change(fieldPicker, { target: { value: 'record:data.access_count' } });
+    expect(screen.getByLabelText('field-0')).toHaveValue('record:data.access_count');
+  });
+
+  it('renders default samples in the designer three-value preview with constructible hit and miss', async () => {
+    const getFactCatalog = vi.fn(async () => ({
+      entities: [
+        {
+          entityCode: 'complaint',
+          modelCode: 'complaint',
+          label: '投诉',
+          facts: [
+            {
+              scope: 'record',
+              path: 'record.data.priority',
+              label: '优先级',
+              dataType: 'enum',
+              allowedValues: [
+                { value: 'HIGH', label: '高' },
+                { value: 'LOW', label: '低' },
+              ],
+            },
+          ],
+        },
+      ],
+    }));
+
+    renderConsole('designer', {
+      getFactCatalog,
+    } as unknown as Partial<DecisionApi>);
+
+    await waitFor(() => expect(getFactCatalog).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByTestId('epd-step-rules'));
+    fireEvent.click(screen.getByTestId('cb-add'));
+
+    const fieldPicker = (await screen.findByLabelText('field-0')) as HTMLSelectElement;
+    await waitFor(() =>
+      expect(fieldPicker.querySelector('option[value="record:data.priority"]')).toBeTruthy(),
+    );
+    fireEvent.change(fieldPicker, { target: { value: 'record:data.priority' } });
+    expect(screen.getByLabelText('field-0')).toHaveValue('record:data.priority');
+    fireEvent.change(screen.getByLabelText('value-0'), { target: { value: 'HIGH' } });
+
+    fireEvent.click(screen.getByTestId('epd-step-test'));
+
+    expect(screen.getByTestId('condition-testrun')).toBeInTheDocument();
+    expect(screen.getByTestId('sample-0')).toHaveTextContent('默认样例');
+    expect(screen.getByTestId('trp-context')).toHaveTextContent('高');
+    expect(screen.getByTestId('trp-result')).toHaveAttribute('data-truth', 'TRUE');
+
+    fireEvent.click(screen.getByTestId('epd-step-rules'));
+    fireEvent.change(screen.getByLabelText('value-0'), { target: { value: 'LOW' } });
+    fireEvent.click(screen.getByTestId('epd-step-test'));
+    expect(screen.getByTestId('trp-result')).toHaveAttribute('data-truth', 'FALSE');
+  });
+
+  it('prefers host-provided samples over generated defaults in the designer', () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <MemoryRouter>
+        <QueryClientProvider client={client}>
+          <DecisionOpsConsole
+            api={api()}
+            fields={FIELDS}
+            initialTab="designer"
+            samples={[
+              {
+                label: '主机样例',
+                context: { record: { data: { amount: 1 } } },
+              },
+            ]}
+          />
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByTestId('epd-step-test'));
+    expect(screen.getByTestId('sample-0')).toHaveTextContent('主机样例');
+    expect(screen.queryByText('默认样例')).not.toBeInTheDocument();
+  });
+
   it('switches to Decision Tables tab and edits the DMN table draft', () => {
     renderConsole();
     fireEvent.click(screen.getByTestId('doc-tab-tables'));
