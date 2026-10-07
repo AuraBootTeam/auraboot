@@ -131,6 +131,16 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
             );
             log.info("模板Permission分配完成: count={}", templatePermissionsAssigned);
 
+            // 7.5 A role bound to the "*" wildcard must keep a materialized wildcard grant:
+            // the bootstrap only creates the template's own codes, while plugin imports
+            // register codes later. The permission check treats a granted "*" permission as
+            // match-all for this tenant, so roles holding the template wildcard keep
+            // administering codes registered after bootstrap.
+            int wildcardAssigned = assignWildcardPermissionToWildcardRoles(
+                roleMap, template.getRolePermissionBindings()
+            );
+            log.info("通配Permission分配完成: count={}", wildcardAssigned);
+
             // 8. 创建菜单
             List<Menu> menus = createMenus(tenantId, template.getMenus(), userId);
             log.info("菜单创建完成: count={}", menus.size());
@@ -695,6 +705,66 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
         }
 
         return totalAssigned;
+    }
+
+    /**
+     * Materialize the template's "*" wildcard binding as a real tenant-scoped permission
+     * row granted to every role whose binding references it. Plugin imports register new
+     * codes after the bootstrap, and the permission check treats a granted "*" permission
+     * as match-all within the tenant — so roles holding the template wildcard keep
+     * administering codes that did not exist at bootstrap time.
+     */
+    private int assignWildcardPermissionToWildcardRoles(
+            Map<String, Role> roleMap,
+            List<com.auraboot.framework.tenant.dto.bootstrap.RolePermissionBinding> bindings) {
+        if (bindings == null || bindings.isEmpty()) {
+            return 0;
+        }
+        boolean wildcardUsed = bindings.stream()
+                .filter(java.util.Objects::nonNull)
+                .anyMatch(binding -> binding.getPermissionCodes() != null
+                        && binding.getPermissionCodes().contains("*"));
+        if (!wildcardUsed) {
+            return 0;
+        }
+
+        Long tenantId = com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId();
+        Permission wildcard = permissionMapper.findByTenantIdAndCode(tenantId, "*");
+        if (wildcard == null) {
+            wildcard = new Permission();
+            wildcard.setPid(com.auraboot.framework.common.util.UniqueIdGenerator.generate());
+            wildcard.setTenantId(tenantId);
+            wildcard.setCode("*");
+            wildcard.setName("\u5168\u90e8\u6743\u9650\uff08\u6a21\u677f\u901a\u914d\uff09");
+            wildcard.setDescription("Tenant bootstrap wildcard: match-all for permissions registered after bootstrap.");
+            wildcard.setStatus(com.auraboot.framework.common.constant.StatusConstants.ACTIVE);
+            wildcard.setDeletedFlag(false);
+            try {
+                permissionMapper.insert(wildcard);
+            } catch (Exception e) {
+                log.warn("通配Permission创建失败(可能已存在): {}", e.getMessage());
+                Permission existing = permissionMapper.findByTenantIdAndCode(tenantId, "*");
+                if (existing == null) {
+                    throw e;
+                }
+                wildcard = existing;
+            }
+        }
+
+        int assigned = 0;
+        for (com.auraboot.framework.tenant.dto.bootstrap.RolePermissionBinding binding : bindings) {
+            if (binding == null || binding.getPermissionCodes() == null
+                    || !binding.getPermissionCodes().contains("*")) {
+                continue;
+            }
+            Role role = roleMap.get(binding.getRoleCode());
+            if (role == null) {
+                continue;
+            }
+            rolePermissionService.assignPermissionsToRole(role.getId(), List.of(wildcard.getId()));
+            assigned++;
+        }
+        return assigned;
     }
 
     /**

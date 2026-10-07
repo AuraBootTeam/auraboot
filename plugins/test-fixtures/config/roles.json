@@ -14,7 +14,15 @@
       "e2et.customer.manage",
       "e2et.customer.read",
       "e2et.payment.manage",
-      "e2et.payment.approve"
+      "e2et.payment.approve",
+      "model.e2et_order.create",
+      "model.e2et_order.read",
+      "model.e2et_order.update",
+      "model.e2et_order.delete",
+      "model.e2et_customer.create",
+      "model.e2et_customer.read",
+      "model.e2et_customer.update",
+      "model.e2et_customer.delete"
     ]
   },
   {

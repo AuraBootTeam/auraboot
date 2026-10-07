@@ -86,16 +86,28 @@ class UserPermissionServiceImplTest {
     }
 
     @Test
-    void permissionCodeResolutionIncludesBoundReleaseRoleDeclarations() {
-        com.auraboot.framework.rbac.entity.Role role = new com.auraboot.framework.rbac.entity.Role();
-        role.setCode("xy_school_admin");
-        when(roleMapper.findByMemberIdAndTenantId(5L, 100L)).thenReturn(List.of(role));
-        when(applicationRuntimeDefinitionCatalog.permissionsForRoles(
-                100L, "aura-edu", Set.of("xy_school_admin"))).thenReturn(Set.of("xy.school.manage"));
-        ReflectionTestUtils.setField(service, "defaultApplicationCode", "aura-edu");
-        ReflectionTestUtils.setField(service, "applicationRuntimePrimaryEnabled", true);
+    void wildcardBootstrapGrantAuthorizesCodesRegisteredAfterBootstrap() {
+        // tenant_admin holds the materialized "*" wildcard, not the post-bootstrap code.
+        when(permissionSnapshotCache.resolvePermissionId(100L, "model.page_schema.read"))
+                .thenReturn(51L);
+        when(permissionSnapshotCache.resolvePermissionId(100L, "*"))
+                .thenReturn(7L);
+        when(permissionSnapshotCache.getEffectivePermissionIds(100L, 1L, 5L))
+                .thenReturn(Set.of(7L));
 
-        assertThat(service.hasPermission(1L, "xy.school.manage")).isTrue();
+        assertThat(service.hasPermission(1L, "model.page_schema.read")).isTrue();
+    }
+
+    @Test
+    void withoutAWildcardGrantThePostBootstrapCodeStaysDenied() {
+        when(permissionSnapshotCache.resolvePermissionId(100L, "model.page_schema.read"))
+                .thenReturn(51L);
+        when(permissionSnapshotCache.resolvePermissionId(100L, "*"))
+                .thenReturn(7L);
+        when(permissionSnapshotCache.getEffectivePermissionIds(100L, 1L, 5L))
+                .thenReturn(Set.of(50L));
+
+        assertThat(service.hasPermission(1L, "model.page_schema.read")).isFalse();
     }
 
     @Test

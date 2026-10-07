@@ -579,6 +579,22 @@ public class GlobalExceptionHandler {
      * Handle all other uncaught exceptions.
      * Returns HTTP 500 Internal Server Error.
      */
+    /**
+     * Argument-binding failures (missing @RequestHeader/@PathVariable, type
+     * mismatches) are client errors: Spring MVC answers them 400 by default, and
+     * this catch-all must not upgrade them to 500 for composed hosts.
+     */
+    @ExceptionHandler(org.springframework.web.bind.ServletRequestBindingException.class)
+    @ResponseBody
+    public ResponseEntity<ApiResponse<Object>> handleServletRequestBinding(
+            org.springframework.web.bind.ServletRequestBindingException ex) {
+        log.warn("Request binding failed: {}", ex.getMessage());
+        ApiResponse<Object> response = ApiResponse.errorWithContext(
+                ResponseCode.CommonValidationFailed,
+                ex.getMessage() == null ? "Invalid request binding" : ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
     @ExceptionHandler(Exception.class)
     @ResponseBody
     public ResponseEntity<ApiResponse<Object>> handleGenericException(Exception ex) {
