@@ -21,6 +21,7 @@ import {
 import { useI18n } from '~/contexts/I18nContext';
 import { createEventPolicyPresentation } from './eventPolicyPresentation';
 import { recordOf, stringOr, parsePayload } from './eventPolicyValues';
+import { clearDesignerDraft, loadDesignerDraft, saveDesignerDraft } from './designerDraftStorage';
 import {
   DecisionRuleBindingBlock,
   type DecisionOption,
@@ -363,6 +364,11 @@ export function EventPolicyDesignerWorkflow({
   const [runResult, setRunResult] = useState<unknown>(null);
   const [catalogActions, setCatalogActions] = useState<DecisionAction[]>([]);
   const [catalogError, setCatalogError] = useState('');
+  // Policy code whose session archive the current render's draft belongs to. Set
+  // by the init effect only after restore-or-default state is queued, so the
+  // persist effect below never writes a stale (previous-policy) snapshot under
+  // the new policy's key.
+  const [draftStoreCode, setDraftStoreCode] = useState('');
 
   const currentRuleIdx = selectedRuleIndex(rulesValue, selectedRuleCode);
   const currentRule = rulesValue.rules[currentRuleIdx];
@@ -447,6 +453,15 @@ export function EventPolicyDesignerWorkflow({
     [conflictStrategy, dedupStrategy, executionMode, failureStrategy, phase, rulesValue],
   );
 
+  // Mirror the unsaved draft into sessionStorage, scoped per policy code, so a
+  // locale switch (I18nContext.handleSetLocale reloads the page) or any other
+  // full remount restores rule names, condition ASTs and decision-mapping rows
+  // instead of dropping them back to defaults (EP-14/EP-23).
+  useEffect(() => {
+    if (!draftStoreCode) return;
+    saveDesignerDraft(draftStoreCode, draftJson);
+  }, [draftStoreCode, draftJson]);
+
   useEffect(() => {
     let cancelled = false;
     setCatalogError('');
@@ -472,18 +487,41 @@ export function EventPolicyDesignerWorkflow({
     const fallbackRules = defaultRules(selectedPolicy?.matchMode);
     let cancelled = false;
 
-    setPhase(fallbackPhase);
-    setExecutionMode('ORDERED');
-    setFailureStrategy('FAIL_FAST');
-    setConflictStrategy('REJECT_ON_CONFLICT');
-    setDedupStrategy('BY_IDEMPOTENCY_KEY');
-    setRulesValue(fallbackRules);
-    setSelectedRuleCode(fallbackRules.rules[0]?.ruleCode ?? '');
+    // Restore the unsaved designer draft archived before a locale switch (the
+    // I18nContext reloads the page) or any other full remount. The archive wins
+    // over the stored version below: it captures newer edits that were never
+    // saved to the backend.
+    const archivedDraft = policyCode ? loadDesignerDraft(policyCode) : null;
+    const restoredRules = archivedDraft
+      ? hydrateRules(
+          archivedDraft.rules,
+          stringOr(archivedDraft.matchMode, selectedPolicy?.matchMode ?? ''),
+        )
+      : fallbackRules;
+
+    if (archivedDraft) {
+      setPhase(enumOr(archivedDraft.phase, POLICY_PHASES, fallbackPhase));
+      setExecutionMode(enumOr(archivedDraft.executionMode, EXECUTION_MODES, 'ORDERED'));
+      setFailureStrategy(enumOr(archivedDraft.failureStrategy, FAILURE_STRATEGIES, 'FAIL_FAST'));
+      setConflictStrategy(
+        enumOr(archivedDraft.conflictStrategy, CONFLICT_STRATEGIES, 'REJECT_ON_CONFLICT'),
+      );
+      setDedupStrategy(enumOr(archivedDraft.dedupStrategy, DEDUP_STRATEGIES, 'BY_IDEMPOTENCY_KEY'));
+    } else {
+      setPhase(fallbackPhase);
+      setExecutionMode('ORDERED');
+      setFailureStrategy('FAIL_FAST');
+      setConflictStrategy('REJECT_ON_CONFLICT');
+      setDedupStrategy('BY_IDEMPOTENCY_KEY');
+    }
+    setRulesValue(restoredRules);
+    setSelectedRuleCode(restoredRules.rules[0]?.ruleCode ?? '');
     setDraftPid(selectedPolicy?.latestVersionPid ?? '');
     setPublishStatus(selectedPolicy?.status ?? 'UNSAVED');
     setError('');
     setVersionError('');
     setRunResult(null);
+    setDraftStoreCode(policyCode ?? '');
 
     if (!policyCode) {
       setVersionLoading(false);
@@ -499,6 +537,9 @@ export function EventPolicyDesignerWorkflow({
         if (cancelled) return;
         const version = latestVersion(versions, selectedPolicy?.latestVersionPid);
         if (!version) return;
+        setDraftPid(version.pid);
+        setPublishStatus(version.status ?? selectedPolicy?.status ?? 'UNSAVED');
+        if (archivedDraft) return;
         const hydratedRules = hydrateRules(
           version.rulesJson,
           version.matchMode ?? selectedPolicy?.matchMode,
@@ -512,8 +553,6 @@ export function EventPolicyDesignerWorkflow({
         setDedupStrategy(enumOr(version.dedupStrategy, DEDUP_STRATEGIES, 'BY_IDEMPOTENCY_KEY'));
         setRulesValue(hydratedRules);
         setSelectedRuleCode(hydratedRules.rules[0]?.ruleCode ?? '');
-        setDraftPid(version.pid);
-        setPublishStatus(version.status ?? selectedPolicy?.status ?? 'UNSAVED');
       })
       .catch((e) => {
         if (!cancelled) setVersionError(e instanceof Error ? e.message : String(e));
@@ -596,6 +635,9 @@ export function EventPolicyDesignerWorkflow({
       });
       setDraftPid(result.pid);
       setPublishStatus(result.status ?? 'DRAFT');
+      // The draft now lives in a backend version — the session archive for this
+      // policy served its purpose and must not resurrect older edits later.
+      clearDesignerDraft(selectedPolicy.policyCode);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
