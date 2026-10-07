@@ -78,6 +78,7 @@ public class PlatformTenantPluginController {
         MetaContext.setContext(tenant.getId(), previous.getUserId(), previous.getUserPid(), previous.getUsername());
         MetaContext.clearMemberId();
         try {
+            MetaContext.authorizePlatformPluginUpgrade();
             var preview = imports.parseDirectory(directory.toString(), true);
             if (!preview.isValid()) {
                 throw new IllegalArgumentException("Invalid deployment plugin: " + String.join(", ", preview.getErrors()));
@@ -94,6 +95,7 @@ public class PlatformTenantPluginController {
             success = result.isSuccess();
             return ApiResponse.success(result);
         } finally {
+            MetaContext.clearPlatformPluginUpgrade();
             MetaContext.setContext(previous.getTenantId(), previous.getUserId(), previous.getUserPid(),
                     previous.getUsername(), previousRoles);
             MetaContext.setMemberId(previousMember);

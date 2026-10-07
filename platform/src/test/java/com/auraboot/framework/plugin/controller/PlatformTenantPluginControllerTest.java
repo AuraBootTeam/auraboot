@@ -53,12 +53,14 @@ class PlatformTenantPluginControllerTest {
         when(imports.parseDirectory("/app/plugins/edu-core", true)).thenAnswer(call -> {
             assertThat(MetaContext.getCurrentTenantId()).isEqualTo(2L);
             assertThat(MetaContext.getCurrentMemberId()).isNull();
+            assertThat(MetaContext.isPlatformPluginUpgrade()).isTrue();
             return ImportPreviewResult.builder().valid(true).importId("preview").build();
         });
         when(imports.execute(eq("preview"), any())).thenReturn(ImportExecuteResult.builder().success(true).build());
         controller.upgrade(request);
         assertThat(MetaContext.getCurrentTenantId()).isEqualTo(1L);
         assertThat(MetaContext.getCurrentMemberId()).isEqualTo(9L);
+        assertThat(MetaContext.isPlatformPluginUpgrade()).isFalse();
         verify(audit).record(argThat(log -> log.getSuccess() && log.getActorUserId().equals(7L)
                 && log.getResourcePid().equals("school")));
     }

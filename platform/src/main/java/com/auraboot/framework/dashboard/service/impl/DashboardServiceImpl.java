@@ -859,6 +859,12 @@ public class DashboardServiceImpl implements DashboardService {
         }
 
         if (dashboard.isGlobal()) {
+            // The audited deployment operation upgrades only server-declared plugin definitions.
+            // It must not require changing the school's memberships or impersonating its creator.
+            if (MetaContext.isPlatformPluginUpgrade()
+                    && java.util.Objects.equals(dashboard.getTenantId(), MetaContext.getCurrentTenantId())) {
+                return;
+            }
             if (currentUserPid.equals(dashboard.getCreatedBy())) {
                 return; // Creator can always modify
             }

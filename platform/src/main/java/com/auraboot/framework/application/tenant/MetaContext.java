@@ -24,6 +24,25 @@ public class MetaContext {
     private static final ThreadLocal<String> COMMAND_AUTHORITY = new ThreadLocal<>();
     /** Server-published machine command permission; never propagated across async boundaries. */
     private static final ThreadLocal<String> EXTERNAL_COMMAND_PERMISSION = new ThreadLocal<>();
+    // Foreground-only permit established after platform role and deployment-path validation.
+    private static final ThreadLocal<PluginUpgradePermit> PLUGIN_UPGRADE_PERMIT = new ThreadLocal<>();
+    private record PluginUpgradePermit(Long tenantId, Long userId) {}
+
+    public static void authorizePlatformPluginUpgrade() {
+        if (!"platform".equals(getCurrentExecutionScope()) || isImpersonating()) {
+            throw new IllegalStateException("Platform execution scope required for plugin upgrade");
+        }
+        PLUGIN_UPGRADE_PERMIT.set(new PluginUpgradePermit(getCurrentTenantId(), getCurrentUserId()));
+    }
+
+    public static boolean isPlatformPluginUpgrade() {
+        PluginUpgradePermit permit = PLUGIN_UPGRADE_PERMIT.get();
+        return permit != null && "platform".equals(getCurrentExecutionScope()) && !isImpersonating()
+                && java.util.Objects.equals(permit.tenantId(), getCurrentTenantId())
+                && java.util.Objects.equals(permit.userId(), getCurrentUserId());
+    }
+
+    public static void clearPlatformPluginUpgrade() { PLUGIN_UPGRADE_PERMIT.remove(); }
     /** Exact command code whose permit plan authorized the current mutation stages. */
     private static final ThreadLocal<String> AUTHORIZED_COMMAND_CODE = new ThreadLocal<>();
     /** Aggregate root (master document) the current command was authorized against. */
@@ -118,6 +137,7 @@ public class MetaContext {
         LOCK_GUARD_BYPASSED.remove();
         COMMAND_AUTHORITY.remove();
         EXTERNAL_COMMAND_PERMISSION.remove();
+        PLUGIN_UPGRADE_PERMIT.remove();
         AUTHORIZED_COMMAND_CODE.remove();
         COMMAND_AGGREGATE.remove();
         COMMAND_PERMIT.remove();
