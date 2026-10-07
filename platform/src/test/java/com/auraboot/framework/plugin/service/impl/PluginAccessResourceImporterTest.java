@@ -1,4 +1,5 @@
 package com.auraboot.framework.plugin.service.impl;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.plugin.dto.imports.*;
 import com.auraboot.framework.plugin.entity.PluginResource;
 import com.auraboot.framework.meta.service.FieldMaskService;
@@ -11,6 +12,8 @@ import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import org.junit.jupiter.api.Test;
 import java.util.*;
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.*;
 
 /** Permission imports keep role bindings tenant-scoped and invalidate authorization caches. */
@@ -18,6 +21,7 @@ class PluginAccessResourceImporterTest {
     final PluginResourceImporter resources=mock(PluginResourceImporter.class);
     final FieldMaskService masks=mock(FieldMaskService.class);
     final CapabilityRegistryService capabilities=mock(CapabilityRegistryService.class);
+    final PluginAccessResourceImporter.BindImportedPermissionCodesOperation bindCodes=mock(PluginAccessResourceImporter.BindImportedPermissionCodesOperation.class);
     final PermissionService permissions=mock(PermissionService.class);
     final UserPermissionService users=mock(UserPermissionService.class);
     final RoleService roles=mock(RoleService.class);
@@ -26,7 +30,7 @@ class PluginAccessResourceImporterTest {
     final PluginAccessResourceImporter.GeneratePermissionI18nRecordsOperation1 permissionI18n=mock(PluginAccessResourceImporter.GeneratePermissionI18nRecordsOperation1.class);
     final PluginAccessResourceImporter.SaveOrUpdatePluginResourceOperation save=mock(PluginAccessResourceImporter.SaveOrUpdatePluginResourceOperation.class);
     final PluginAccessResourceImporter.CaptureImportSnapshotOperation snapshot=mock(PluginAccessResourceImporter.CaptureImportSnapshotOperation.class);
-    final PluginAccessResourceImporter importer=new PluginAccessResourceImporter(resources,masks,capabilities,users,menuI18n,permissionI18n,save,snapshot);
+    final PluginAccessResourceImporter importer=new PluginAccessResourceImporter(resources,masks,capabilities,bindCodes,users,menuI18n,permissionI18n,save,snapshot);
     PermissionDefinitionDTO permission(String code) { return PermissionDefinitionDTO.builder().code(code).build(); }
     @Test void declarationsRegisterWithoutGrantingOrRestoringRevokedBindings() {
         var manifest = new PluginManifestExtended();
@@ -34,6 +38,7 @@ class PluginAccessResourceImporterTest {
         importer.importPermissions(manifest, new ImportRequest(), new ImportExecuteResult(), "p", "i", 42L);
         verify(resources).importPermission(eq(manifest.getPermissions().get(0)), eq("p"), eq("i"), eq(42L), any());
         verify(users).evictPermissionDefinitions(42L);
+        verify(bindCodes).execute(List.of("invoice.read"), null); // manifest.pluginId unset in this fixture
         verifyNoInteractions(bindings, permissions, roles);
     }
     @Test void absentDeclarationsDoNotTouchGrantsOrAuthorizationCaches() {
@@ -76,5 +81,49 @@ class PluginAccessResourceImporterTest {
         importer.importCapabilities(m);
         verify(masks).saveConfig(argThat(c -> c.getModelCode().equals("invoice") && c.getFieldCode().equals("amount") && c.getReplacementChar().equals("#") && !c.getApplyToExport() && c.getExemptRoles().equals("finance_admin") && c.getExemptPermissionCodes().equals("invoice.unmask")));
         verify(capabilities).saveDefinition(capability);
+    }
+}
+
+/** The binder materializes imported codes onto wildcard roles (fresh-stack admin path). */
+class ImportedPermissionWildcardBinderTest {
+    final com.auraboot.framework.rbac.mapper.RolePermissionMapper bindings=mock(com.auraboot.framework.rbac.mapper.RolePermissionMapper.class);
+    final PermissionService permissions=mock(PermissionService.class);
+    final UserPermissionService users=mock(UserPermissionService.class);
+    final ImportedPermissionWildcardBinder binder=new ImportedPermissionWildcardBinder(bindings, permissions, users);
+
+    @org.junit.jupiter.api.Test
+    void materializesImportedCodesOntoWildcardRoles() {
+        MetaContext.setContext(100L, 1L, "u-pid", "tester");
+        MetaContext.setMemberId(5L);
+        try {
+            var role = new com.auraboot.framework.rbac.entity.Role();
+            role.setId(9L); role.setCode("tenant_admin");
+            when(bindings.findWildcardRoles(100L)).thenReturn(List.of(role));
+            var dto = new PermissionDTO(); dto.setId(51L); dto.setCode("model.page_schema.read");
+            when(permissions.findByCode("model.page_schema.read")).thenReturn(dto);
+            when(permissions.findRolePermissions(9L)).thenReturn(List.of());
+
+            binder.bind(List.of("model.page_schema.read"), "fixture");
+
+            verify(bindings).insert(any(com.auraboot.framework.rbac.entity.RolePermission.class));
+            verify(users).evictPermissionDefinitions(100L);
+            verify(users).evictRoleUsers(100L, 9L);
+        } finally { MetaContext.clear(); }
+    }
+    @org.junit.jupiter.api.Test
+    void skipsCodesNotYetRegisteredWithoutFailingTheImport() {
+        MetaContext.setContext(100L, 1L, "u-pid", "tester");
+        MetaContext.setMemberId(5L);
+        try {
+            var role = new com.auraboot.framework.rbac.entity.Role();
+            role.setId(9L); role.setCode("tenant_admin");
+            when(bindings.findWildcardRoles(100L)).thenReturn(List.of(role));
+            when(permissions.findByCode("later.plugin.code")).thenReturn(null);
+
+            binder.bind(List.of("later.plugin.code"), "fixture");
+
+            verify(bindings, never()).insert(any(com.auraboot.framework.rbac.entity.RolePermission.class));
+            verify(users, never()).evictPermissionDefinitions(any());
+        } finally { MetaContext.clear(); }
     }
 }

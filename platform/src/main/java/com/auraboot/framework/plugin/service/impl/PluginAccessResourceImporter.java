@@ -29,6 +29,8 @@ final class PluginAccessResourceImporter {
 
     private final com.auraboot.framework.permission.capability.CapabilityRegistryService capabilityRegistryService;
 
+    private final BindImportedPermissionCodesOperation bindImportedPermissionCodesOperation;
+
 
     private final UserPermissionService userPermissionService;
 
@@ -53,6 +55,9 @@ final class PluginAccessResourceImporter {
 
     @FunctionalInterface
     interface CaptureImportSnapshotOperation { void execute(PluginResource resource, Object manifestDto); }
+
+    @FunctionalInterface
+    interface BindImportedPermissionCodesOperation { void execute(Collection<String> codes, String pluginId); }
 
     private void generateMenuI18nRecords(List<MenuDefinitionDTO> menus, Long tenantId) { generateMenuI18nRecordsOperation0.execute(menus,tenantId); }
 
@@ -103,6 +108,9 @@ final class PluginAccessResourceImporter {
 
         generatePermissionI18nRecords(manifest.getPermissions(), tenantId);
         userPermissionService.evictPermissionDefinitions(tenantId);
+        bindImportedPermissionCodesOperation.execute(manifest.getPermissions().stream()
+                .map(PermissionDefinitionDTO::getCode)
+                .collect(Collectors.toList()), manifest.getPluginId());
     }
 
     void importRoles(PluginManifestExtended manifest, ImportRequest request,
@@ -245,6 +253,7 @@ final class PluginAccessResourceImporter {
         if (manifest.getCapabilities() == null || manifest.getCapabilities().isEmpty()) return;
         int created = 0;
         Set<String> codes = new java.util.HashSet<>();
+        Set<String> includedPermissionCodes = new java.util.LinkedHashSet<>();
         for (CapabilityDefinitionDTO dto : manifest.getCapabilities()) {
             if (!codes.add(dto.getCode()) || !dto.isValid()) throw new IllegalArgumentException("Invalid or duplicate capability declaration: " + dto.getCode());
         }
@@ -255,10 +264,16 @@ final class PluginAccessResourceImporter {
                 continue;
             }
             capabilityRegistryService.saveDefinition(dto);
+            if (dto.getIncludes() != null) {
+                includedPermissionCodes.addAll(dto.getIncludes());
+            }
             created++;
         }
         if (created > 0) {
             log.info("Imported {} capability declaration(s) for plugin {}", created, logSafe(manifest.getPluginId()));
+            // Capability-declared families are the explicit authorization unit: their
+            // included codes must reach the wildcard roles alongside permission resources.
+            bindImportedPermissionCodesOperation.execute(includedPermissionCodes, manifest.getPluginId());
         }
     }
 

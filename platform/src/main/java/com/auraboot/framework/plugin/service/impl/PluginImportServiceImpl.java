@@ -119,6 +119,7 @@ public class PluginImportServiceImpl implements PluginImportService {
     private final PluginRecordMapper pluginRecordMapper;
     private final PluginResourceMapper pluginResourceMapper;
     private final PluginResourceImporter resourceImporter;
+    private final ImportedPermissionWildcardBinder importedPermissionWildcardBinder;
     private final PlatformTransactionManager transactionManager;
     private final PluginDirectoryLoader directoryLoader;
     private final MenuMapper menuMapper;
@@ -1767,7 +1768,7 @@ public class PluginImportServiceImpl implements PluginImportService {
     }
 
     private PluginAccessResourceImporter pluginAccessResourceImporter() {
-        return new PluginAccessResourceImporter(resourceImporter, fieldMaskService, capabilityRegistryService, userPermissionService, this::generateMenuI18nRecords, this::generatePermissionI18nRecords, this::saveOrUpdatePluginResource, this::captureImportSnapshot);
+        return new PluginAccessResourceImporter(resourceImporter, fieldMaskService, capabilityRegistryService, importedPermissionWildcardBinder::bind, userPermissionService, this::generateMenuI18nRecords, this::generatePermissionI18nRecords, this::saveOrUpdatePluginResource, this::captureImportSnapshot);
     }
 
     private PluginDefinitionResourceImporter pluginDefinitionResourceImporter() {
