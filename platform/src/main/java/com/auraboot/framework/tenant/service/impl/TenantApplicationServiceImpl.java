@@ -198,7 +198,8 @@ public class TenantApplicationServiceImpl implements TenantApplicationService {
             throw new RootUnCheckedException(ResponseCode.FORBIDDEN,
                     "Tenant self-provisioning is disabled for this deployment");
         }
-        Long requestScopeTenantId = MetaContext.exists() ? MetaContext.getCurrentTenantId() : 0L;
+        Long currentTenantId = MetaContext.exists() ? MetaContext.getCurrentTenantId() : null;
+        Long requestScopeTenantId = currentTenantId == null ? 0L : currentTenantId;
         String operationCode = "tenant.create.user." + user.getId();
         Map<String, Object> requestIntent = tenantCreationIntent(request, user.getId());
         Map<String, Object> replay = request.getClientRequestId() == null || request.getClientRequestId().isBlank()

@@ -208,6 +208,29 @@ class TenantApplicationServiceImplTest {
     }
 
     @Test
+    @DisplayName("first-school creation replays safely with an authenticated tenantless context")
+    void createForTenantlessUserReplaysCommittedOutcome() {
+        when(systemModeService.isTenantSelfProvisioningAllowed()).thenReturn(true);
+        metaContextMock = Mockito.mockStatic(MetaContext.class);
+        metaContextMock.when(MetaContext::exists).thenReturn(true);
+        metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(null);
+        TenantSelectionRequest req = new TenantSelectionRequest();
+        req.setTenantName("first-school");
+        req.setDisplayName("First School");
+        req.setClientRequestId("first-school-create-001");
+        when(idempotencyService.claimScopedIdempotency(
+                eq("first-school-create-001"), eq("tenant.create.user.7"), any(), eq(0L)))
+                .thenReturn(Map.of("status", "success", "tenantId", 99L,
+                        "tenantName", "first-school", "jwt", "committed-jwt", "needsApproval", false));
+
+        TenantSelectionResponse replay = service.createTenantForUser(req, user(7L, "u@x.com"));
+
+        assertEquals(99L, replay.getTenantId());
+        assertEquals("committed-jwt", replay.getJwt());
+        verify(tenantService, never()).createTenant(any());
+    }
+
+    @Test
     @DisplayName("createTenantForUser bootstraps tenant + assigns admin")
     void createForUserOk() {
         when(systemModeService.isTenantSelfProvisioningAllowed()).thenReturn(true);
