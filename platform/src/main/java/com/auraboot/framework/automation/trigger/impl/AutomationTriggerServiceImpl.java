@@ -93,12 +93,31 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
         this.automationProcessRuntimeProvider = automationProcessRuntimeProvider;
     }
 
+    /**
+     * Resolve enabled automations for a trigger fan-out. The @Async fan-out methods
+     * run on worker threads whose submitting thread may carry no MetaContext at all
+     * (external-event consumers, BPM action workers, scheduler paths) — the tenant-line
+     * interceptor then throws "MetaContext not initialized" and the whole automation
+     * evaluation is silently lost. The event payload carries no tenant either, so the
+     * context-less case deliberately queries across tenants for the one model code;
+     * each match is still executed under its own automation's tenant scope by
+     * {@link #executeAutomation}. Callers with a live context keep the exact
+     * tenant-filtered behavior they had before.
+     */
+    private List<Automation> findAutomationsForTrigger(String modelCode, String triggerType) {
+        if (MetaContext.exists()) {
+            return automationMapper.findEnabledByModelCodeAndTriggerType(modelCode, triggerType);
+        }
+        return MetaContext.runWithoutTenantFilter(() ->
+                automationMapper.findEnabledByModelCodeAndTriggerType(modelCode, triggerType));
+    }
+
     @Override
     @Async("eventTaskExecutor")
     public void onRecordCreate(String modelCode, String recordPid, Map<String, Object> recordData) {
         log.debug("Record create event: modelCode={}, recordPid={}", modelCode, recordPid);
 
-        List<Automation> automations = automationMapper.findEnabledByModelCodeAndTriggerType(
+        List<Automation> automations = findAutomationsForTrigger(
                 modelCode, "on_record_create");
 
         for (Automation automation : automations) {
@@ -124,7 +143,7 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
                                Map<String, Object> beforeData, Map<String, Object> afterData) {
         log.debug("Record update event: modelCode={}, recordPid={}", modelCode, recordPid);
 
-        List<Automation> automations = automationMapper.findEnabledByModelCodeAndTriggerType(
+        List<Automation> automations = findAutomationsForTrigger(
                 modelCode, "on_record_update");
 
         for (Automation automation : automations) {
@@ -166,7 +185,7 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
         log.debug("Field change event: modelCode={}, recordPid={}, field={}",
                 modelCode, recordPid, fieldCode);
 
-        List<Automation> automations = automationMapper.findEnabledByModelCodeAndTriggerType(
+        List<Automation> automations = findAutomationsForTrigger(
                 modelCode, "on_field_change");
 
         for (Automation automation : automations) {
@@ -210,7 +229,7 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
         log.debug("State change event: modelCode={}, recordPid={}, {} -> {}",
                 modelCode, recordPid, fromState, toState);
 
-        List<Automation> automations = automationMapper.findEnabledByModelCodeAndTriggerType(
+        List<Automation> automations = findAutomationsForTrigger(
                 modelCode, "on_state_change");
 
         for (Automation automation : automations) {
@@ -253,7 +272,7 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
 
         // SmartEngine task events can carry "processKey:version"; automation rules store the bare process key.
         String automationModelCode = normalizeBpmProcessKey(processKey);
-        List<Automation> automations = automationMapper.findEnabledByModelCodeAndTriggerType(
+        List<Automation> automations = findAutomationsForTrigger(
                 automationModelCode, "on_workflow_event");
 
         for (Automation automation : automations) {
@@ -301,7 +320,7 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
     @Override
     public void onExternalEvent(String sourceCode, String eventType, String eventId,
                                 String subject, Map<String, Object> payload) {
-        List<Automation> automations = automationMapper.findEnabledByModelCodeAndTriggerType(
+        List<Automation> automations = findAutomationsForTrigger(
                 sourceCode, "external_event");
         for (Automation automation : automations) {
             TriggerConfig config = automation.getTriggerConfig();
