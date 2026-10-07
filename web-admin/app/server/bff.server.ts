@@ -264,7 +264,7 @@ app.post('/api/auth/session-renew', async (req, res, next) => {
   }
 });
 
-app.post('/login', express.urlencoded({ extended: true, limit: '100kb' }), async (req, res, next) => {
+app.post(['/login', '/admin-login'], express.urlencoded({ extended: true, limit: '100kb' }), async (req, res, next) => {
   try {
     const redirectTo = safeLoginRedirect(req.body?.redirectTo);
     const remember = req.body?.remember === 'on';
@@ -294,6 +294,7 @@ app.post('/login', express.urlencoded({ extended: true, limit: '100kb' }), async
       return res.redirect(
         303,
         buildLoginFailureRedirect(redirectTo, {
+          loginPath: req.path === '/admin-login' ? '/admin-login' : '/login',
           channelCode,
           error: 'unsupportedLoginMethod',
         }),
@@ -310,6 +311,7 @@ app.post('/login', express.urlencoded({ extended: true, limit: '100kb' }), async
       return res.redirect(
         303,
         buildLoginFailureRedirect(redirectTo, {
+          loginPath: req.path === '/admin-login' ? '/admin-login' : '/login',
           channelCode,
           error: 'invalidCredentials',
         }),
@@ -323,6 +325,7 @@ app.post('/login', express.urlencoded({ extended: true, limit: '100kb' }), async
       return res.redirect(
         303,
         buildLoginFailureRedirect(redirectTo, {
+          loginPath: req.path === '/admin-login' ? '/admin-login' : '/login',
           channelCode,
           error: 'invalidCredentials',
         }),
