@@ -12,7 +12,10 @@ import com.auraboot.framework.meta.dto.PageSchemaVersionCreateRequest;
 import com.auraboot.framework.meta.dto.PageSchemaVersionDTO;
 import com.auraboot.framework.meta.dto.PaginationRequest;
 import com.auraboot.framework.meta.dto.PaginationResult;
+import com.auraboot.framework.i18n.service.I18nResourceService;
+import com.auraboot.framework.i18n.util.I18nLocaleResolver;
 import com.auraboot.framework.meta.service.CommandService;
+import com.auraboot.framework.meta.service.impl.PageSchemaLocalizationHelper;
 import com.auraboot.framework.meta.service.PageSchemaService;
 import com.auraboot.framework.meta.service.PageSchemaVersionService;
 import com.auraboot.framework.application.annotation.CurrentUserId;
@@ -60,6 +63,12 @@ public class PageSchemaController {
 
     @Autowired
     private CommandService commandService;
+
+    @Autowired
+    private I18nResourceService i18nResourceService;
+
+    @Autowired
+    private I18nLocaleResolver i18nLocaleResolver;
 
     private static String logSafe(Object value) {
         return LogSanitizer.safe(value);
@@ -461,10 +470,29 @@ public class PageSchemaController {
                description = "统一运行态页面获取端点。仅返回已发布基线，并在存在 active authoring release 时解析不可变快照。")
     @RequirePermission(MetaPermission.PAGE_SCHEMA_READ)
     public ApiResponse<PageSchemaDTO> getByPageKey(
-            @Parameter(description = "页面唯一标识，如 device_list, dashboard_main") @PathVariable String pageKey) {
+            @Parameter(description = "页面唯一标识，如 device_list, dashboard_main") @PathVariable String pageKey,
+            jakarta.servlet.http.HttpServletRequest request) {
         log.info("获取页面Schema: pageKey={}", logSafe(pageKey));
         PageSchemaDTO schema = pageSchemaService.findByPageKey(pageKey);
+        localizeSchemaName(pageKey, schema, request);
         return runtimeResponse(schema);
+    }
+
+    /**
+     * Resolve the runtime page title per the request locale. Plugin import writes
+     * the page display name into the tenant i18n bundle as
+     * "page.<pageKey>.title" (en-US + zh-CN); the stored schema.name keeps only
+     * one locale, so serve the localized value when a record exists and keep the
+     * stored name otherwise.
+     */
+    private void localizeSchemaName(String pageKey, PageSchemaDTO schema,
+                                    jakarta.servlet.http.HttpServletRequest request) {
+        if (schema == null) {
+            return;
+        }
+        String locale = i18nLocaleResolver.resolveLocale(request);
+        schema.setName(PageSchemaLocalizationHelper.resolveLocalizedName(
+                i18nResourceService, schema, "page." + pageKey + ".title", locale));
     }
 
     private ApiResponse<PageSchemaDTO> runtimeResponse(PageSchemaDTO schema) {

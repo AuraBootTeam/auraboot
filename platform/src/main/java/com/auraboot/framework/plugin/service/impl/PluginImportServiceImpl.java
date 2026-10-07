@@ -62,8 +62,12 @@ import com.auraboot.framework.meta.dto.SchemaOperationResult;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.SchemaManagementService;
 import com.auraboot.framework.permission.service.AutoPermissionAssignmentService;
+import com.auraboot.framework.permission.service.PermissionService;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.permission.service.CommandActionDeriver;
+import com.auraboot.framework.rbac.entity.RolePermission;
+import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
+import com.auraboot.framework.rbac.service.RoleService;
 import com.auraboot.framework.semantic.exception.SemanticValidationException;
 import com.auraboot.framework.semantic.exception.SemanticYamlInvalidException;
 import com.auraboot.framework.semantic.service.SemanticPublishService;
@@ -119,7 +123,6 @@ public class PluginImportServiceImpl implements PluginImportService {
     private final PluginRecordMapper pluginRecordMapper;
     private final PluginResourceMapper pluginResourceMapper;
     private final PluginResourceImporter resourceImporter;
-    private final ImportedPermissionWildcardBinder importedPermissionWildcardBinder;
     private final PlatformTransactionManager transactionManager;
     private final PluginDirectoryLoader directoryLoader;
     private final MenuMapper menuMapper;
@@ -129,7 +132,10 @@ public class PluginImportServiceImpl implements PluginImportService {
     private final com.auraboot.framework.meta.service.FieldMaskService fieldMaskService;
     private final com.auraboot.framework.permission.capability.CapabilityRegistryService capabilityRegistryService;
     private final SchemaManagementService schemaManagementService;
+    private final PermissionService permissionService;
     private final UserPermissionService userPermissionService;
+    private final RoleService roleService;
+    private final RolePermissionMapper rolePermissionMapper;
     private final DistributedLock distributedLock;
     private final I18nResourceService i18nResourceService;
     private final I18nService i18nService;
@@ -1768,7 +1774,7 @@ public class PluginImportServiceImpl implements PluginImportService {
     }
 
     private PluginAccessResourceImporter pluginAccessResourceImporter() {
-        return new PluginAccessResourceImporter(resourceImporter, fieldMaskService, capabilityRegistryService, importedPermissionWildcardBinder::bind, userPermissionService, this::generateMenuI18nRecords, this::generatePermissionI18nRecords, this::saveOrUpdatePluginResource, this::captureImportSnapshot);
+        return new PluginAccessResourceImporter(resourceImporter, fieldMaskService, capabilityRegistryService, permissionService, userPermissionService, roleService, rolePermissionMapper, this::generateMenuI18nRecords, this::generatePermissionI18nRecords, this::saveOrUpdatePluginResource, this::captureImportSnapshot);
     }
 
     private PluginDefinitionResourceImporter pluginDefinitionResourceImporter() {

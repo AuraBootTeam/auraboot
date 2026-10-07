@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { DecisionDefinitionListPage, type DefinitionSummary } from './DecisionDefinitionListPage';
 import { DecisionTableEditor } from './DecisionTableEditor';
@@ -14,7 +14,8 @@ import { StrategyStudioWorkbench } from './StrategyStudioWorkbench';
 import { ExecutionLogTraceBlock } from '~/ui/smart/decision/ExecutionLogTraceBlock';
 import { type FieldOption } from './ConditionBuilder';
 import { type TestSample } from './ConditionTestRunPanel';
-import { factCatalogToFieldOptions, modelFieldsToFieldOptions } from './factCatalogAdapter';
+import { useDefaultTestSamples } from './defaultTestSamples';
+import { factCatalogToFieldOptions, mergeFieldOptions, modelFieldsToFieldOptions } from './factCatalogAdapter';
 import { useSmartText } from '~/utils/i18n';
 import type { DecisionTable } from '../table/decisionTable';
 import type {
@@ -50,7 +51,7 @@ export type ConsoleTab =
 
 export interface DecisionOpsConsoleProps {
   api: DecisionApi;
-  fields: FieldOption[];
+  fields?: FieldOption[];
   modelFields?: ModelField[];
   samples?: TestSample[];
   logs?: ExecLogEntry[];
@@ -125,7 +126,7 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
     api,
     fields,
     modelFields,
-    samples = [],
+    samples: hostSamples = [],
     connectors,
     permissionGrants,
     dashboard,
@@ -163,7 +164,8 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
   const factCatalogQuery = useQuery({
     queryKey: ['decision-fact-catalog'],
     queryFn: () => api.getFactCatalog(),
-    enabled: (tab === 'studio' || tab === 'tables') && canLoadFactCatalog,
+    enabled:
+      (tab === 'studio' || tab === 'tables' || tab === 'designer') && canLoadFactCatalog,
   });
   const modelFieldQuery = useQuery({
     queryKey: ['decision-model-fields'],
@@ -184,7 +186,19 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
       ? factCatalogFields
       : legacyStrategyFields.length > 0
         ? legacyStrategyFields
-        : fields;
+        : (fields ?? []);
+  // The designer tab gets the unified fact catalog merged with the host-provided default
+  // fields, so the field picker is not capped at the host's narrow initial set.
+  const designerFields = useMemo(
+    () =>
+      mergeFieldOptions(
+        factCatalogFields.length > 0 ? factCatalogFields : legacyStrategyFields,
+        fields ?? [],
+      ),
+    [factCatalogFields, legacyStrategyFields, fields],
+  );
+  const generatedSamples = useDefaultTestSamples(selectedPolicy);
+  const designerSamples = hostSamples.length > 0 ? hostSamples : generatedSamples;
   const connectorQuery = useQuery({
     queryKey: ['decision-connectors'],
     queryFn: () => api.listConnectors(),
@@ -393,8 +407,8 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
             {tab === 'designer' && (
               <EventPolicyDesignerWorkflow
                 api={api}
-                fields={fields}
-                samples={samples}
+                fields={designerFields}
+                samples={designerSamples}
                 selectedPolicy={selectedPolicy}
               />
             )}

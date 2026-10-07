@@ -29,12 +29,13 @@ final class PluginAccessResourceImporter {
 
     private final com.auraboot.framework.permission.capability.CapabilityRegistryService capabilityRegistryService;
 
-    private final BindImportedPermissionCodesOperation bindImportedPermissionCodesOperation;
-
+    private final PermissionService permissionService;
 
     private final UserPermissionService userPermissionService;
 
+    private final RoleService roleService;
 
+    private final RolePermissionMapper rolePermissionMapper;
 
     private final GenerateMenuI18nRecordsOperation0 generateMenuI18nRecordsOperation0;
 
@@ -55,9 +56,6 @@ final class PluginAccessResourceImporter {
 
     @FunctionalInterface
     interface CaptureImportSnapshotOperation { void execute(PluginResource resource, Object manifestDto); }
-
-    @FunctionalInterface
-    interface BindImportedPermissionCodesOperation { void execute(Collection<String> codes, String pluginId); }
 
     private void generateMenuI18nRecords(List<MenuDefinitionDTO> menus, Long tenantId) { generateMenuI18nRecordsOperation0.execute(menus,tenantId); }
 
@@ -90,6 +88,7 @@ final class PluginAccessResourceImporter {
                                    ImportExecuteResult result, String pluginPid, String importId, Long tenantId){
         if (manifest.getPermissions() == null) return;
 
+        List<PluginResource> createdPermissions = new ArrayList<>();
         for (PermissionDefinitionDTO permission : manifest.getPermissions()) {
             if (!permission.isValid()) {
                 log.warn("Skipping invalid permission entry (missing code): index={}", manifest.getPermissions().indexOf(permission));
@@ -103,14 +102,83 @@ final class PluginAccessResourceImporter {
                 if (resource.getResourcePid() != null) {
                     result.addCreatedResource(ResourceType.PERMISSION, resource.getResourcePid());
                 }
+                if (resource.getActionEnum() == ResourceAction.CREATE) {
+                    createdPermissions.add(resource);
+                }
             }
         }
 
         generatePermissionI18nRecords(manifest.getPermissions(), tenantId);
         userPermissionService.evictPermissionDefinitions(tenantId);
-        bindImportedPermissionCodesOperation.execute(manifest.getPermissions().stream()
-                .map(PermissionDefinitionDTO::getCode)
-                .collect(Collectors.toList()), manifest.getPluginId());
+        bindCreatedPermissionsToTenantAdmin(createdPermissions, tenantId);
+    }
+
+    /**
+     * Fresh-install bootstrap invariant: permission declarations a plugin import CREATED
+     * must reach the tenant's tenant_admin role, otherwise even the installing
+     * administrator cannot invoke the plugin's own commands (fresh stacks would 403 on
+     * plugin seed commands such as bom:seed_defaults). Binding is restricted to
+     * permissions created by this import — re-imports that merely UPDATE or SKIP existing
+     * declarations never grant, so grants deliberately revoked through explicit
+     * capability authorization (#2157) are not restored by synchronization.
+     */
+    void bindCreatedPermissionsToTenantAdmin(List<PluginResource> createdPermissions, Long tenantId){
+        if (createdPermissions == null || createdPermissions.isEmpty() || tenantId == null) return;
+
+        Role tenantAdminRole = roleService.findByTenantId(tenantId).stream()
+                .filter(role -> "tenant_admin".equals(role.getCode()))
+                .findFirst()
+                .orElse(null);
+        if (tenantAdminRole == null) {
+            log.warn("tenant_admin role not found, skip binding imported permissions: tenantId={}", tenantId);
+            return;
+        }
+
+        Set<Long> boundPermissionIds = permissionService.findRolePermissions(tenantAdminRole.getId()).stream()
+                .map(PermissionDTO::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        boolean anyBound = false;
+        for (PluginResource resource : createdPermissions) {
+            try {
+                Long permissionId = resource.getResourceId();
+                if (permissionId == null) {
+                    permissionId = Optional.ofNullable(permissionService.findByCode(resource.getResourceCode()))
+                            .map(PermissionDTO::getId)
+                            .orElse(null);
+                }
+                if (permissionId == null) {
+                    log.warn("Imported permission not found after import: code={}", logSafe(resource.getResourceCode()));
+                    continue;
+                }
+                if (!boundPermissionIds.add(permissionId)) {
+                    continue;
+                }
+                RolePermission binding = new RolePermission();
+                binding.setPid(UniqueIdGenerator.generate());
+                binding.setTenantId(tenantId);
+                binding.setRoleId(tenantAdminRole.getId());
+                binding.setPermissionId(permissionId);
+                binding.setGrantType(StatusConstants.GRANT);
+                binding.setPriority(0);
+                binding.setStatus(StatusConstants.ACTIVE);
+                binding.setDeletedFlag(false);
+                binding.setCreatedAt(Instant.now());
+                binding.setUpdatedAt(Instant.now());
+                rolePermissionMapper.insert(binding);
+                anyBound = true;
+            } catch (Exception e) {
+                // Duplicate bind and stale edge cases should not fail plugin import; the
+                // warning keeps the gap visible in logs.
+                log.warn("Skip binding imported permission to tenant_admin: code={}, reason={}",
+                        logSafe(resource.getResourceCode()), logSafe(e.getMessage()));
+            }
+        }
+        if (anyBound) {
+            userPermissionService.evictPermissionDefinitions(tenantId);
+            userPermissionService.evictRoleUsers(tenantId, tenantAdminRole.getId());
+        }
     }
 
     void importRoles(PluginManifestExtended manifest, ImportRequest request,
@@ -253,7 +321,6 @@ final class PluginAccessResourceImporter {
         if (manifest.getCapabilities() == null || manifest.getCapabilities().isEmpty()) return;
         int created = 0;
         Set<String> codes = new java.util.HashSet<>();
-        Set<String> includedPermissionCodes = new java.util.LinkedHashSet<>();
         for (CapabilityDefinitionDTO dto : manifest.getCapabilities()) {
             if (!codes.add(dto.getCode()) || !dto.isValid()) throw new IllegalArgumentException("Invalid or duplicate capability declaration: " + dto.getCode());
         }
@@ -264,16 +331,10 @@ final class PluginAccessResourceImporter {
                 continue;
             }
             capabilityRegistryService.saveDefinition(dto);
-            if (dto.getIncludes() != null) {
-                includedPermissionCodes.addAll(dto.getIncludes());
-            }
             created++;
         }
         if (created > 0) {
             log.info("Imported {} capability declaration(s) for plugin {}", created, logSafe(manifest.getPluginId()));
-            // Capability-declared families are the explicit authorization unit: their
-            // included codes must reach the wildcard roles alongside permission resources.
-            bindImportedPermissionCodesOperation.execute(includedPermissionCodes, manifest.getPluginId());
         }
     }
 
