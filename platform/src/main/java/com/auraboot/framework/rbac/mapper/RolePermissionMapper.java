@@ -1,6 +1,7 @@
 package com.auraboot.framework.rbac.mapper;
 
 import com.auraboot.framework.rbac.entity.RolePermission;
+import com.auraboot.framework.rbac.entity.Role;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.*;
 import java.time.LocalDate;
@@ -24,6 +25,22 @@ import java.util.Set;
  */
 @Mapper
 public interface RolePermissionMapper extends BaseMapper<RolePermission> {
+
+    /**
+     * Roles holding the tenant bootstrap "*" wildcard grant. Plugin imports register
+     * permission codes after the bootstrap, and list/join consumers (sidebar menus,
+     * permission matrices) resolve concrete role_permission rows only — so every newly
+     * registered code must be materialized onto these roles at import time.
+     */
+    @Select("""
+        SELECT DISTINCT r.* FROM ab_role r
+          JOIN ab_role_permission rp ON rp.role_id = r.id
+          JOIN ab_permission p ON p.id = rp.permission_id
+         WHERE r.tenant_id = #{tenantId}
+           AND p.code = '*'
+           AND (r.deleted_flag = false OR r.deleted_flag IS NULL)
+        """)
+    List<Role> findWildcardRoles(@Param("tenantId") Long tenantId);
 
     /**
      * Find all permission bindings for a role
