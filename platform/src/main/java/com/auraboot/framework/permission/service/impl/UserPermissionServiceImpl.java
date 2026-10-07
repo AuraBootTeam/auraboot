@@ -276,12 +276,24 @@ public class UserPermissionServiceImpl implements UserPermissionService {
             return false;
         }
 
-        boolean granted = permissionSnapshotCache
-                .getEffectivePermissionIds(tenantId, userId, memberId)
-                .contains(permissionId);
-        log.debug("Permission check result: userId={}, permissionCode={}, hasPermission={}",
-            userId, permissionCode, granted);
-        return granted;
+        Set<Long> effective = permissionSnapshotCache
+                .getEffectivePermissionIds(tenantId, userId, memberId);
+        if (effective.contains(permissionId)) {
+            log.debug("Permission check result: userId={}, permissionCode={}, hasPermission=true",
+                userId, permissionCode);
+            return true;
+        }
+        // A role granted the bootstrap "*" wildcard (tenant template match-all) keeps
+        // administering codes that plugin imports registered after the bootstrap.
+        Long wildcardId = permissionSnapshotCache.resolvePermissionId(tenantId, "*");
+        if (wildcardId != null && effective.contains(wildcardId)) {
+            log.debug("Permission check result: userId={}, permissionCode={}, hasPermission=true (wildcard)",
+                userId, permissionCode);
+            return true;
+        }
+        log.debug("Permission check result: userId={}, permissionCode={}, hasPermission=false",
+            userId, permissionCode);
+        return false;
     }
 
     /**
