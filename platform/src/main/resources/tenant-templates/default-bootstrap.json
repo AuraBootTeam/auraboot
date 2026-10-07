@@ -345,6 +345,16 @@
       "resourceType": "function"
     },
     {
+      "code": "org.hr.manage",
+      "name": "HR Manage",
+      "description": "Manage departments, employee links and HR member administration",
+      "type": "function",
+      "module": "org",
+      "resource": "org:hr",
+      "action": "manage",
+      "resourceType": "function"
+    },
+    {
       "code": "audit.field_audit.read",
       "name": "Audit field_audit read",
       "description": "Audit field_audit — read",
