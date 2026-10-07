@@ -615,6 +615,43 @@ class AutomationTriggerServiceImplTest {
         assertThat(log.getStatus()).isEqualTo("success");
     }
 
+    // =========================================================
+    // context-less fan-out — record events on bare worker threads
+    // =========================================================
+
+    @Test
+    void onRecordCreate_withoutMetaContext_queriesAcrossTenantsInsteadOfThrowing() {
+        // Simulates the production failure: the @Async fan-out lands on a worker
+        // thread whose submitting thread carried no MetaContext, so the tenant-line
+        // interceptor used to throw "MetaContext not initialized" and the whole
+        // automation evaluation was lost.
+        Automation automation = buildAutomation("auto-x", "model-x", null, null, List.of());
+        when(automationMapper.findEnabledByModelCodeAndTriggerType("model-x", "on_record_create"))
+                .thenReturn(List.of(automation));
+        when(automationProcessRuntime.run(eq(automation), eq("rec-x"), any(), any()))
+                .thenReturn(List.of());
+
+        service.onRecordCreate("model-x", "rec-x", Map.of("name", "x"));
+
+        verify(automationMapper, atLeastOnce()).findEnabledByModelCodeAndTriggerType("model-x", "on_record_create");
+        verify(automationProcessRuntime).run(eq(automation), eq("rec-x"), any(), any());
+    }
+
+    @Test
+    void onRecordCreate_withMetaContext_keepsTenantFilteredQuery() {
+        Automation automation = buildAutomation("auto-t", "model-t", null, null, List.of());
+        when(automationMapper.findEnabledByModelCodeAndTriggerType("model-t", "on_record_create"))
+                .thenReturn(List.of(automation));
+        when(automationProcessRuntime.run(eq(automation), eq("rec-t"), any(), any()))
+                .thenReturn(List.of());
+        com.auraboot.framework.application.tenant.MetaContext.setContext(42L, 7L, "u", "user");
+
+        service.onRecordCreate("model-t", "rec-t", Map.of("name", "t"));
+
+        verify(automationMapper).findEnabledByModelCodeAndTriggerType("model-t", "on_record_create");
+        verify(automationProcessRuntime).run(eq(automation), eq("rec-t"), any(), any());
+    }
+
     private Automation buildAutomation(String pid, String modelCode, String condition,
                                         TriggerConfig triggerConfig, List<AutomationAction> actions) {
         Automation automation = new Automation();
