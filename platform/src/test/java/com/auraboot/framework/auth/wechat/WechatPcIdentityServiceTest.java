@@ -14,6 +14,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -41,7 +43,7 @@ class WechatPcIdentityServiceTest {
     void existingWebIdentityLogsInWithoutCreatingAccount() {
         when(wechatPcClient.exchange("code")).thenReturn(new WxWebUser("OPEN-1", null, null, null));
         AuthIdentity identity = identity(101L, "OPEN-1", null);
-        when(authIdentityMapper.selectOne(any())).thenReturn(identity);
+        when(authIdentityMapper.selectList(any())).thenReturn(List.of(identity));
         User user = user(101L);
         when(userMapper.selectById(101L)).thenReturn(user);
 
@@ -53,7 +55,7 @@ class WechatPcIdentityServiceTest {
     @Test
     void unionidAttachesWebOpenidToExistingMiniAccount() {
         when(wechatPcClient.exchange("code")).thenReturn(new WxWebUser("OPEN-WEB", "UNION-1", null, null));
-        when(authIdentityMapper.selectOne(any())).thenReturn(null, identity(101L, "OPEN-MINI", "UNION-1"));
+        when(authIdentityMapper.selectList(any())).thenReturn(List.of(), List.of(identity(101L, "OPEN-MINI", "UNION-1")));
         User user = user(101L);
         when(userMapper.selectById(101L)).thenReturn(user);
 
