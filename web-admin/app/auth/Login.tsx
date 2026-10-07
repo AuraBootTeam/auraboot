@@ -454,13 +454,17 @@ export default function LoginPage() {
   // WeChat PC QR login (open-platform website app). Gated by a public flag so the
   // button only renders when the backend reports the channel as available.
   const [wechatQrEnabled, setWechatQrEnabled] = useState(false);
+  const [wechatQrStatus, setWechatQrStatus] = useState<'loading' | 'unavailable' | 'error' | 'ready'>('loading');
   useEffect(() => {
     let cancelled = false;
     fetchResult<{ enabled: boolean }>('/api/auth/login/wechat-pc/status', { method: 'get' })
       .then((r) => {
-        if (!cancelled && ResultHelper.isSuccess(r) && r.data?.enabled) setWechatQrEnabled(true);
+        if (cancelled) return;
+        if (!ResultHelper.isSuccess(r)) { setWechatQrStatus('error'); return; }
+        setWechatQrEnabled(r.data?.enabled === true);
+        setWechatQrStatus(r.data?.enabled ? 'loading' : 'unavailable');
       })
-      .catch(() => {});
+      .catch(() => { if (!cancelled) setWechatQrStatus('error'); });
     return () => {
       cancelled = true;
     };
@@ -543,16 +547,18 @@ export default function LoginPage() {
       params: { redirectUri: `${origin}/login/social/wechat_web/callback` },
     })
       .then((result) => {
-        if (cancelled || !ResultHelper.isSuccess(result) || !result.data?.url) return;
+        if (cancelled) return;
+        if (!ResultHelper.isSuccess(result) || !result.data?.url) { setWechatQrStatus('error'); return; }
         const parsed = new URL(result.data.url);
         const appid = parsed.searchParams.get('appid');
         const redirectUri = parsed.searchParams.get('redirect_uri');
         const state = result.data.state;
-        if (!appid || !redirectUri) return;
+        if (!appid || !redirectUri) { setWechatQrStatus('error'); return; }
         window.sessionStorage.setItem(loginOAuthStateKey('wechat_web'), state);
         setWechatQrSrc(buildWechatPcQrConnectUrl({ appid, redirectUri, state }));
+        setWechatQrStatus('ready');
       })
-      .catch(() => {});
+      .catch(() => { if (!cancelled) setWechatQrStatus('error'); });
     return () => {
       cancelled = true;
     };
@@ -663,20 +669,34 @@ export default function LoginPage() {
       {wechatOnly ? (
         <div>
           <div className="rounded-[13px] border border-[#e0e6d8] bg-white p-4 text-[14px] leading-relaxed text-[#52604d] dark:border-gray-600 dark:bg-gray-700/40 dark:text-gray-300">
-            请使用微信扫码登录。首次使用请先在小程序内输入学校教师码完成绑定。
+            {t('auth.wechatOnly.lead', undefined, locale.startsWith('zh') ? '请使用微信扫码登录。登录后可创建学校，或前往小程序使用学校教师码加入学校。' : 'Sign in with WeChat. Then create a school or join one using a teacher code in the mini program.')}
           </div>
           <div className="mt-4 flex min-h-[300px] items-center justify-center overflow-hidden rounded-[13px] border border-[#e5ebdf] bg-white dark:border-gray-600">
             {wechatQrSrc ? (
               <iframe
                 src={wechatQrSrc}
-                title="微信登录二维码"
+                title={t('auth.wechatOnly.qrTitle', undefined, locale.startsWith('zh') ? '微信登录二维码' : 'WeChat sign-in QR code')}
                 scrolling="no"
                 frameBorder="0"
                 className="h-[300px] w-full"
               />
             ) : (
-              <span className="text-[13px] text-[#819184]">二维码加载中…</span>
+              <span role="status" className="px-5 text-center text-[13px] leading-relaxed text-[#52604d] dark:text-gray-300">
+                {wechatQrStatus === 'unavailable'
+                  ? t('auth.wechatOnly.unavailable', undefined, locale.startsWith('zh') ? '当前环境尚未配置微信扫码登录，请联系平台管理员。' : 'WeChat sign-in is not configured in this environment. Please contact the platform administrator.')
+                  : wechatQrStatus === 'error'
+                    ? t('auth.wechatOnly.error', undefined, locale.startsWith('zh') ? '微信登录二维码加载失败，请刷新页面重试。' : 'Unable to load the WeChat sign-in QR code. Refresh the page to try again.')
+                    : t('auth.wechatOnly.loading', undefined, locale.startsWith('zh') ? '二维码加载中…' : 'Loading QR code…')}
+              </span>
             )}
+          </div>
+          <div className="mt-5 text-center">
+            <Link
+              to={`/admin-login${searchParams.toString() ? `?${searchParams.toString()}` : ''}`}
+              className="inline-block rounded px-2 py-2 text-xs text-[#68776b] underline-offset-4 hover:text-[#35745b] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 dark:text-gray-400 dark:hover:text-gray-200"
+            >
+              {t('auth.wechatOnly.adminLogin', undefined, locale.startsWith('zh') ? '平台管理员登录' : 'Platform administrator sign-in')}
+            </Link>
           </div>
         </div>
       ) : (
