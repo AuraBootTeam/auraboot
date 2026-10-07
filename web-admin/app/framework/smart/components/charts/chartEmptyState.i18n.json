@@ -1,0 +1,14 @@
+{
+  "awaitingData": {
+    "zh-CN": "等待数据",
+    "en": "Awaiting data"
+  },
+  "noDataYet": {
+    "zh-CN": "暂无数据",
+    "en": "No data yet"
+  },
+  "emptyHint": {
+    "zh-CN": "数据源已连接，录入数据后图表将在此展示。",
+    "en": "Data source is connected. Add records to populate this widget."
+  }
+}

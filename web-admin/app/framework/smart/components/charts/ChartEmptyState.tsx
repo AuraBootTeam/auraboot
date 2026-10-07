@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '~/utils/cn';
+import { useChartEmptyStateText } from './chartEmptyStateText';
 
 type ChartEmptyVariant = 'bar' | 'line' | 'pie' | 'metric';
 
@@ -61,10 +62,11 @@ function EmptyIllustration({ variant }: { variant: ChartEmptyVariant }) {
 
 export const ChartEmptyState: React.FC<ChartEmptyStateProps> = ({
   title,
-  description = 'Data source is connected. Add records to populate this widget.',
+  description,
   variant = 'bar',
   className,
 }) => {
+  const { text } = useChartEmptyStateText();
   return (
     <div
       className={cn(
@@ -78,10 +80,12 @@ export const ChartEmptyState: React.FC<ChartEmptyStateProps> = ({
       <div className="flex max-w-[280px] flex-col items-center">
         <EmptyIllustration variant={variant} />
         <div className="mt-4 inline-flex items-center rounded-full border border-sky-100 bg-white/80 px-2.5 py-1 text-[11px] font-semibold tracking-[0.14em] text-sky-700 uppercase">
-          Awaiting Data
+          {text('awaitingData')}
         </div>
-        <div className="mt-3 text-sm font-semibold text-slate-900">{title || 'No data yet'}</div>
-        <div className="mt-1 text-xs leading-5 text-slate-500">{description}</div>
+        <div className="mt-3 text-sm font-semibold text-slate-900">{title || text('noDataYet')}</div>
+        <div className="mt-1 text-xs leading-5 text-slate-500">
+          {description ?? text('emptyHint')}
+        </div>
       </div>
     </div>
   );

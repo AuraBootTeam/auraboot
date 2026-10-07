@@ -5,6 +5,7 @@ import type {
   EventPolicyDefinitionRequest,
   EventPolicySummary,
 } from '../api/decisionApi';
+import { useEventPolicyFormText } from './eventPolicyFormText';
 
 /**
  * DecisionOps Event Policy list (mockup F2): searchable/filterable entry point into policy design.
@@ -122,6 +123,7 @@ function statusTone(statusValue: unknown): string {
 
 export function EventPolicyListPage({ api, onOpenDesigner, onOpenLogs }: EventPolicyListPageProps) {
   const queryClient = useQueryClient();
+  const { text } = useEventPolicyFormText();
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<PolicyStatusFilter>('ALL');
   const [eventType, setEventType] = useState('ALL');
@@ -283,21 +285,21 @@ export function EventPolicyListPage({ api, onOpenDesigner, onOpenLogs }: EventPo
           <input
             aria-label="policy-code"
             data-testid="epl-policy-code"
-            placeholder="policyCode"
+            placeholder={text('placeholderPolicyCode')}
             value={draft.policyCode}
             onChange={(e) => updateDraft('policyCode', e.target.value)}
           />
           <input
             aria-label="policy-name"
             data-testid="epl-policy-name"
-            placeholder="policyName"
+            placeholder={text('placeholderPolicyName')}
             value={draft.policyName}
             onChange={(e) => updateDraft('policyName', e.target.value)}
           />
           <input
             aria-label="policy-event-type"
             data-testid="epl-policy-event-type"
-            placeholder="eventType"
+            placeholder={text('placeholderEventType')}
             value={draft.eventType}
             disabled={editingMode === 'copy'}
             onChange={(e) => updateDraft('eventType', e.target.value)}
@@ -305,7 +307,7 @@ export function EventPolicyListPage({ api, onOpenDesigner, onOpenLogs }: EventPo
           <input
             aria-label="policy-target-type"
             data-testid="epl-policy-target-type"
-            placeholder="targetType"
+            placeholder={text('placeholderTargetType')}
             value={draft.targetType}
             disabled={editingMode === 'copy'}
             onChange={(e) => updateDraft('targetType', e.target.value)}
@@ -313,7 +315,7 @@ export function EventPolicyListPage({ api, onOpenDesigner, onOpenLogs }: EventPo
           <input
             aria-label="policy-target-key"
             data-testid="epl-policy-target-key"
-            placeholder="targetKey"
+            placeholder={text('placeholderTargetKey')}
             value={draft.targetKey}
             disabled={editingMode === 'copy'}
             onChange={(e) => updateDraft('targetKey', e.target.value)}
