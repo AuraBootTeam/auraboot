@@ -1142,7 +1142,6 @@ function EmailPasswordForm({
   return (
     <Form
       method="post"
-      action="/login"
       reloadDocument
       onSubmit={(e) => {
         if (typeof window === 'undefined') return;
@@ -1307,7 +1306,7 @@ function LdapLoginForm({
   t: (key: string, params?: Record<string, any>, fallback?: string) => string;
 }) {
   return (
-    <Form method="post" action="/login" reloadDocument className="space-y-5">
+    <Form method="post" reloadDocument className="space-y-5">
       <input type="hidden" name="channelCode" value={provider} />
       <input type="hidden" name="authKind" value="ldap" />
       <input type="hidden" name="redirectTo" value={redirectTo} />
@@ -1399,7 +1398,7 @@ function SmsLoginForm({
   }, [mobile]);
 
   return (
-    <Form method="post" action="/login" reloadDocument className="space-y-5">
+    <Form method="post" reloadDocument className="space-y-5">
       <input type="hidden" name="channelCode" value="sms" />
       <input type="hidden" name="redirectTo" value={redirectTo} />
 
@@ -1534,7 +1533,7 @@ function EmailCodeLoginForm({
   }, [email]);
 
   return (
-    <Form method="post" action="/login" reloadDocument className="space-y-5">
+    <Form method="post" reloadDocument className="space-y-5">
       <input type="hidden" name="channelCode" value="email_code" />
       <input type="hidden" name="redirectTo" value={redirectTo} />
 
