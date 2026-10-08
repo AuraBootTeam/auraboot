@@ -39,6 +39,38 @@ class MenuServiceImplTest {
         return List.of(directory);
     }
 
+    private Menu navigationLeaf(long id, String code, String path, String permission) {
+        Menu menu = new Menu();
+        menu.setId(id); menu.setCode(code); menu.setType(1); menu.setVisible(true);
+        menu.setPath(path); menu.setPermissionCode(permission);
+        return menu;
+    }
+
+    @Test
+    void combinedNavigationDeduplicatesLegacyAndReleaseRoutesAfterPermissionFiltering() {
+        var mapper = org.mockito.Mockito.mock(com.auraboot.framework.menu.mapper.MenuMapper.class);
+        var permissions = org.mockito.Mockito.mock(com.auraboot.framework.permission.service.UserPermissionService.class);
+        var catalog = org.mockito.Mockito.mock(com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.class);
+        var subjects = org.mockito.Mockito.mock(com.auraboot.framework.permission.service.SubjectPermissionService.class);
+        var service = releaseService(mapper, permissions, catalog);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "subjectPermissionService", subjects);
+        org.mockito.Mockito.when(permissions.getUserPermissionCodes(7L)).thenReturn(java.util.Set.of("members.read"));
+        org.mockito.Mockito.when(mapper.findVisibleDirectoriesAndMenus()).thenReturn(List.of(
+                navigationLeaf(1, "roles", "/enterprise/permissions", null),
+                navigationLeaf(2, "permission-relations", "/enterprise/permissions", null),
+                navigationLeaf(3, "denied-member", "/p/tenant_member", "members.manage"),
+                navigationLeaf(4, "subject-denied-child", "/xy/child", null)));
+        org.mockito.Mockito.when(subjects.batchEvaluateVisibility("menu", List.of(1L, 2L, 3L, 4L), 7L))
+                .thenReturn(java.util.Map.of(4L, false));
+        org.mockito.Mockito.when(catalog.menuTree(42L, "example")).thenAnswer(call -> List.of(
+                navigationLeaf(5, "customer-accounts", "/p/tenant_member", "members.read"),
+                navigationLeaf(6, "release-roles", "/enterprise/permissions", null),
+                navigationLeaf(7, "child", "/xy/child", null)));
+        List<Menu> navigation = service.getUserMenuTree(7L, 42L);
+        assertEquals(List.of("roles", "customer-accounts", "child"), navigation.stream().map(Menu::getCode).toList());
+        assertEquals(3, navigation.stream().map(Menu::getPath).distinct().count());
+    }
+
     @Test
     void releasePermissionCheckTracksExistingSessionGrantAndRevocationWithoutSyntheticIds() {
         var mapper = org.mockito.Mockito.mock(com.auraboot.framework.menu.mapper.MenuMapper.class);
