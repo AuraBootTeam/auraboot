@@ -108,7 +108,7 @@ class TenantApplicationServiceImplTest {
     @Test
     @DisplayName("getCurrentTenantInfo throws when no MetaContext")
     void getCurrentNoContext() {
-        metaContextMock = Mockito.mockStatic(MetaContext.class);
+        metaContextMock = Mockito.mockStatic(MetaContext.class, Mockito.CALLS_REAL_METHODS);
         metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(null);
 
         assertThrows(ValidationException.class, () -> service.getCurrentTenantInfo(7L));
@@ -117,7 +117,7 @@ class TenantApplicationServiceImplTest {
     @Test
     @DisplayName("getCurrentTenantInfo throws when tenant missing")
     void getCurrentTenantMissing() {
-        metaContextMock = Mockito.mockStatic(MetaContext.class);
+        metaContextMock = Mockito.mockStatic(MetaContext.class, Mockito.CALLS_REAL_METHODS);
         metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(99L);
         when(tenantService.getById(99L)).thenReturn(null);
 
@@ -127,7 +127,7 @@ class TenantApplicationServiceImplTest {
     @Test
     @DisplayName("getCurrentTenantInfo returns response when found")
     void getCurrentTenantOk() {
-        metaContextMock = Mockito.mockStatic(MetaContext.class);
+        metaContextMock = Mockito.mockStatic(MetaContext.class, Mockito.CALLS_REAL_METHODS);
         metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(99L);
         when(tenantService.getById(99L)).thenReturn(tenant(99L, "Acme"));
 
@@ -182,7 +182,7 @@ class TenantApplicationServiceImplTest {
     @DisplayName("createTenantForUser replays the committed response after a client timeout")
     void createForUserReplaysCommittedOutcome() {
         when(systemModeService.isTenantSelfProvisioningAllowed()).thenReturn(true);
-        metaContextMock = Mockito.mockStatic(MetaContext.class);
+        metaContextMock = Mockito.mockStatic(MetaContext.class, Mockito.CALLS_REAL_METHODS);
         metaContextMock.when(MetaContext::exists).thenReturn(true);
         metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(1L);
         TenantSelectionRequest req = new TenantSelectionRequest();
@@ -204,6 +204,29 @@ class TenantApplicationServiceImplTest {
         assertEquals(99L, replay.getTenantId());
         assertEquals("committed-jwt", replay.getJwt());
         verify(tenantService, never()).findByName(anyString());
+        verify(tenantService, never()).createTenant(any());
+    }
+
+    @Test
+    @DisplayName("first-school creation replays safely with an authenticated tenantless context")
+    void createForTenantlessUserReplaysCommittedOutcome() {
+        when(systemModeService.isTenantSelfProvisioningAllowed()).thenReturn(true);
+        metaContextMock = Mockito.mockStatic(MetaContext.class, Mockito.CALLS_REAL_METHODS);
+        metaContextMock.when(MetaContext::exists).thenReturn(true);
+        metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(null);
+        TenantSelectionRequest req = new TenantSelectionRequest();
+        req.setTenantName("first-school");
+        req.setDisplayName("First School");
+        req.setClientRequestId("first-school-create-001");
+        when(idempotencyService.claimScopedIdempotency(
+                eq("first-school-create-001"), eq("tenant.create.user.7"), any(), eq(0L)))
+                .thenReturn(Map.of("status", "success", "tenantId", 99L,
+                        "tenantName", "first-school", "jwt", "committed-jwt", "needsApproval", false));
+
+        TenantSelectionResponse replay = service.createTenantForUser(req, user(7L, "u@x.com"));
+
+        assertEquals(99L, replay.getTenantId());
+        assertEquals("committed-jwt", replay.getJwt());
         verify(tenantService, never()).createTenant(any());
     }
 

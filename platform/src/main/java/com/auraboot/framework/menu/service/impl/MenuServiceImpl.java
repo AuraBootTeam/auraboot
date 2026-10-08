@@ -90,7 +90,8 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
         // 4. 构建树结构，并移除权限过滤后没有任何可见子项的空目录
         List<Menu> result = new ArrayList<>(pruneEmptyDirectories(buildMenuTree(visibleMenus)));
         result.addAll(releaseMenus);
-        return result;
+        // Deduplicate the combined navigation only after both sources have passed authorization.
+        return ApplicationNavigationPolicy.deduplicateVisible(result);
     }
     
     @Override

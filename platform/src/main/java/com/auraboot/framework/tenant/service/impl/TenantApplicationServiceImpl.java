@@ -198,13 +198,14 @@ public class TenantApplicationServiceImpl implements TenantApplicationService {
             throw new RootUnCheckedException(ResponseCode.FORBIDDEN,
                     "Tenant self-provisioning is disabled for this deployment");
         }
-        Long requestScopeTenantId = MetaContext.exists() ? MetaContext.getCurrentTenantId() : 0L;
+        Long currentTenantId = MetaContext.exists() ? MetaContext.getCurrentTenantId() : null;
+        Long requestScopeTenantId = currentTenantId == null ? 0L : currentTenantId;
         String operationCode = "tenant.create.user." + user.getId();
         Map<String, Object> requestIntent = tenantCreationIntent(request, user.getId());
         Map<String, Object> replay = request.getClientRequestId() == null || request.getClientRequestId().isBlank()
                 ? null
-                : idempotencyService.claimScopedIdempotency(
-                        request.getClientRequestId(), operationCode, requestIntent, requestScopeTenantId);
+                : MetaContext.runWithoutTenantFilter(() -> idempotencyService.claimScopedIdempotency(
+                        request.getClientRequestId(), operationCode, requestIntent, requestScopeTenantId));
         if (replay != null) {
             return tenantCreationResponse(replay);
         }
@@ -317,9 +318,11 @@ public class TenantApplicationServiceImpl implements TenantApplicationService {
         response.setNeedsApproval(false);
 
         if (request.getClientRequestId() != null && !request.getClientRequestId().isBlank()) {
-            idempotencyService.recordScopedOutcome(
+            // Both mapper operations explicitly constrain the original tenant and user operation.
+            // A tenantless caller uses scope 0, which differs from the ambient empty-tenant filter.
+            MetaContext.runWithoutTenantFilter(() -> idempotencyService.recordScopedOutcome(
                     request.getClientRequestId(), operationCode, requestIntent,
-                    tenantCreationOutcome(response), requestScopeTenantId);
+                    tenantCreationOutcome(response), requestScopeTenantId));
         }
 
         return response;

@@ -5,6 +5,7 @@ export function buildLoginFailureRedirect(
   options: {
     error: LoginFailureCode;
     channelCode?: string | null;
+    loginPath?: '/login' | '/admin-login';
   },
 ) {
   const params = new URLSearchParams();
@@ -16,5 +17,5 @@ export function buildLoginFailureRedirect(
     params.set('channelCode', channelCode);
   }
 
-  return `/login?${params.toString()}`;
+  return `${options.loginPath === '/admin-login' ? '/admin-login' : '/login'}?${params.toString()}`;
 }

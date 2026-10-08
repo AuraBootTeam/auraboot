@@ -8,6 +8,7 @@ import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.mapper.UserMapper;
 import com.auraboot.framework.user.service.UserService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import org.springframework.beans.factory.annotation.Value;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -34,16 +35,22 @@ public class WechatMiniIdentityService {
     private final WechatMiniProperties wechatMiniProperties;
     private final UserService userService;
 
+    @Value("${aura.wechat.pc.app-id:}")
+    private String webAppId = "";
+
     /** Resolve the platform user for a wx.login code, or null when unbound. */
+    @Transactional
     public User resolveLoginUser(String jsCode) {
         WechatMiniClient.WxSession session = wechatMiniClient.code2Session(jsCode);
         return resolveLoginUserBySession(session);
     }
 
     /** Resolve the platform user behind an already-exchanged session (null when unbound). */
+    @Transactional
     public User resolveLoginUserBySession(WechatMiniClient.WxSession session) {
-        AuthIdentity identity = findByOpenid(session.openid());
-        if (identity != null) {
+        var resolution = lookup(session);
+        AuthIdentity identity = resolution.identity();
+        if (resolution.openidMatched()) {
             // Backfill: identities created before the app joined the WeChat open
             // platform carry no unionid; once logins start delivering it, persist it
             // on first sight so cross-app resolution (PC scan ↔ mini) works for the
@@ -55,17 +62,11 @@ public class WechatMiniIdentityService {
             touchLastLogin(identity);
             return userMapper.selectById(identity.getUserId());
         }
-        if (!isBlank(session.unionid())) {
-            AuthIdentity byUnion = findByUnionid(session.unionid());
-            if (byUnion != null) {
-                // Same physical WeChat account seen through a second app: materialize
-                // the new openid so future logins resolve directly and never depend on
-                // the unionid claim continuing to arrive (mirrors WechatPcIdentityService).
-                AuthIdentity attached = createIdentity(byUnion.getUserId(), session, session.unionid());
-                touchLastLogin(attached);
-                log.info("WeChat mini identity attached via unionid: userId={}", byUnion.getUserId());
-                return userMapper.selectById(byUnion.getUserId());
-            }
+        if (identity != null) {
+            AuthIdentity attached = createIdentity(identity.getUserId(), session, session.unionid());
+            touchLastLogin(attached);
+            log.info("WeChat mini identity attached via unionid: userId={}", identity.getUserId());
+            return userMapper.selectById(identity.getUserId());
         }
         return null;
     }
@@ -99,13 +100,18 @@ public class WechatMiniIdentityService {
     @Transactional
     public void bindToUser(String jsCode, Long userId) {
         WechatMiniClient.WxSession session = wechatMiniClient.code2Session(jsCode);
-        AuthIdentity existing = findByOpenid(session.openid());
+        var resolution = lookup(session);
+        AuthIdentity existing = resolution.identity();
         if (existing != null) {
             if (!existing.getUserId().equals(userId)) {
                 throw new RootUnCheckedException(ResponseCode.BadParam,
                         "This WeChat account is already bound to another user");
             }
-            touchLastLogin(existing);
+            if (!resolution.openidMatched()) {
+                createIdentity(userId, session, session.unionid());
+            } else {
+                touchLastLogin(existing);
+            }
             return;
         }
         createIdentity(userId, session, session.unionid());
@@ -114,31 +120,27 @@ public class WechatMiniIdentityService {
     /** Attach an identity from an already-exchanged session (join flow). */
     @Transactional
     public void attachIdentity(Long userId, WechatMiniClient.WxSession session) {
-        AuthIdentity existing = findByOpenid(session.openid());
+        var resolution = lookup(session);
+        AuthIdentity existing = resolution.identity();
         if (existing != null) {
             if (!existing.getUserId().equals(userId)) {
                 throw new RootUnCheckedException(ResponseCode.BadParam,
                         "This WeChat account is already bound to another user");
             }
-            touchLastLogin(existing);
+            if (!resolution.openidMatched()) {
+                createIdentity(userId, session, session.unionid());
+            } else {
+                touchLastLogin(existing);
+            }
             return;
         }
         createIdentity(userId, session, session.unionid());
     }
 
-    private AuthIdentity findByOpenid(String openid) {
-        return authIdentityMapper.selectOne(new QueryWrapper<AuthIdentity>()
-                .eq("provider", PROVIDER_WECHAT_MINI)
-                .eq("openid", openid)
-                .last("LIMIT 1"));
-    }
-
-    private AuthIdentity findByUnionid(String unionid) {
-        return authIdentityMapper.selectOne(new QueryWrapper<AuthIdentity>()
-                .eq("provider", PROVIDER_WECHAT_MINI)
-                .eq("unionid", unionid)
-                .isNotNull("unionid")
-                .last("LIMIT 1"));
+    private WechatIdentityLookup.Resolution lookup(WechatMiniClient.WxSession session) {
+        return WechatIdentityLookup.resolve(authIdentityMapper, PROVIDER_WECHAT_MINI,
+                wechatMiniProperties.getAppId(), session.openid(), session.unionid(),
+                wechatMiniProperties.getAppId(), webAppId);
     }
 
     private AuthIdentity createIdentity(Long userId, WechatMiniClient.WxSession session, String unionid) {

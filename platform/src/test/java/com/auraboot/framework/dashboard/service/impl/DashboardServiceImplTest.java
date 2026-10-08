@@ -71,6 +71,26 @@ class DashboardServiceImplTest {
     }
 
     @Test
+    void platformPluginUpgradeCanPublishOnlyCurrentTenantsGlobalDashboard() {
+        Dashboard dashboard = new Dashboard();
+        dashboard.setScope("global"); dashboard.setTenantId(10L); dashboard.setCreatedBy("school-owner");
+        assertThrows(ValidationException.class, () -> org.springframework.test.util.ReflectionTestUtils
+                .invokeMethod(service, "validateWriteAccess", dashboard));
+        MetaContext.setSessionContext(null, null, "platform", null, null, "platform", 1);
+        MetaContext.authorizePlatformPluginUpgrade();
+        org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "validateWriteAccess", dashboard);
+        dashboard.setTenantId(11L);
+        assertThrows(ValidationException.class, () -> org.springframework.test.util.ReflectionTestUtils
+                .invokeMethod(service, "validateWriteAccess", dashboard));
+        dashboard.setTenantId(10L); dashboard.setScope("personal"); dashboard.setOwnerId("school-owner");
+        assertThrows(ValidationException.class, () -> org.springframework.test.util.ReflectionTestUtils
+                .invokeMethod(service, "validateWriteAccess", dashboard));
+        dashboard.setScope("global"); MetaContext.clearPlatformPluginUpgrade();
+        assertThrows(ValidationException.class, () -> org.springframework.test.util.ReflectionTestUtils
+                .invokeMethod(service, "validateWriteAccess", dashboard));
+    }
+
+    @Test
     void boundDashboardAndWorkbenchUseReleaseWithoutLocalMetadataWrites() {
         var catalog = org.mockito.Mockito.mock(com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.class);
         org.springframework.test.util.ReflectionTestUtils.setField(service, "applicationRuntimeDefinitionCatalog", catalog);

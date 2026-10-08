@@ -3,6 +3,15 @@ import { describe, expect, it } from 'vitest';
 import { buildLoginFailureRedirect } from '../login-failure';
 
 describe('buildLoginFailureRedirect', () => {
+  it('keeps operator failures on their independent login page with the original target', () => {
+    const url = new URL(buildLoginFailureRedirect('/xy/display/class', {
+      error: 'invalidCredentials', channelCode: 'email_password', loginPath: '/admin-login',
+    }), 'https://example.test');
+    expect(url.pathname).toBe('/admin-login');
+    expect(url.searchParams.get('redirectTo')).toBe('/xy/display/class');
+    expect(url.searchParams.get('error')).toBe('invalidCredentials');
+  });
+
   it('redirects failed browser login posts back to the login page with structured error state', () => {
     const location = buildLoginFailureRedirect('/p/bom_material_sync_state?from=menu', {
       channelCode: 'email_password',

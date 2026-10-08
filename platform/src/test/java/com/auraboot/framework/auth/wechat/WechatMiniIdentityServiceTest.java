@@ -15,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -77,7 +78,7 @@ class WechatMiniIdentityServiceTest {
     @Test
     void openidHitLogsThatUserIn() {
         stubSession("OPEN-A", null);
-        when(authIdentityMapper.selectOne(any())).thenReturn(identity(USER_A, "OPEN-A", null));
+        when(authIdentityMapper.selectList(any())).thenReturn(List.of(identity(USER_A, "OPEN-A", null)));
         stubUser(USER_A);
 
         User user = service.resolveLoginUser("jscode");
@@ -92,7 +93,7 @@ class WechatMiniIdentityServiceTest {
         // that now carries the claim must persist it on the existing row so
         // cross-app (PC scan ↔ mini) resolution starts working for it.
         stubSession("OPEN-A", "UNION-9");
-        when(authIdentityMapper.selectOne(any())).thenReturn(identity(USER_A, "OPEN-A", null));
+        when(authIdentityMapper.selectList(any())).thenReturn(List.of(identity(USER_A, "OPEN-A", null)));
         stubUser(USER_A);
 
         service.resolveLoginUser("jscode");
@@ -109,9 +110,9 @@ class WechatMiniIdentityServiceTest {
         // Stage-2b: the unionid match resolves to the SAME user AND materializes the new
         // openid (createIdentity, mirroring WechatPcIdentityService) so future logins
         // resolve directly without depending on the unionid claim.
-        when(authIdentityMapper.selectOne(any()))
-                .thenReturn(null)                    // openid lookup
-                .thenReturn(identity(USER_A, "OPEN-A", "UNION-1")); // unionid lookup
+        when(authIdentityMapper.selectList(any()))
+                .thenReturn(List.of())                    // openid lookup
+                .thenReturn(List.of(identity(USER_A, "OPEN-A", "UNION-1"))); // unionid lookup
         stubUser(USER_A);
 
         User user = service.resolveLoginUser("jscode");
@@ -127,7 +128,7 @@ class WechatMiniIdentityServiceTest {
     @Test
     void unboundWechatResolvesToNull() {
         stubSession("OPEN-NEW", null);
-        when(authIdentityMapper.selectOne(any())).thenReturn(null);
+        when(authIdentityMapper.selectList(any())).thenReturn(List.of());
 
         assertThat(service.resolveLoginUser("jscode")).isNull();
         verify(authIdentityMapper, never()).insert(any(AuthIdentity.class));
@@ -136,8 +137,8 @@ class WechatMiniIdentityServiceTest {
     @Test
     void bindConflictRejected() {
         stubSession("OPEN-B", null);
-        when(authIdentityMapper.selectOne(any()))
-                .thenReturn(identity(USER_A, "OPEN-B", null));
+        when(authIdentityMapper.selectList(any()))
+                .thenReturn(List.of(identity(USER_A, "OPEN-B", null)));
 
         assertThatThrownBy(() -> service.bindToUser("jscode", USER_B))
                 .isInstanceOf(RootUnCheckedException.class)
@@ -148,8 +149,8 @@ class WechatMiniIdentityServiceTest {
     @Test
     void bindToOwnUserIsIdempotent() {
         stubSession("OPEN-A", null);
-        when(authIdentityMapper.selectOne(any()))
-                .thenReturn(identity(USER_A, "OPEN-A", null));
+        when(authIdentityMapper.selectList(any()))
+                .thenReturn(List.of(identity(USER_A, "OPEN-A", null)));
 
         service.bindToUser("jscode", USER_A);
 
@@ -159,7 +160,7 @@ class WechatMiniIdentityServiceTest {
     @Test
     void bindCreatesIdentityForUser() throws Exception {
         stubSession("OPEN-C", "UNION-2");
-        when(authIdentityMapper.selectOne(any())).thenReturn(null);
+        when(authIdentityMapper.selectList(any())).thenReturn(List.of());
 
         service.bindToUser("jscode", USER_B);
 

@@ -15,6 +15,16 @@ class PostgresDdlDialectTest {
     private final PostgresDdlDialect dialect = new PostgresDdlDialect();
 
     @Test
+    void preservesImageUrlsDuringLegacyPluginSchemaPublication() {
+        assertEquals("VARCHAR(2048)", dialect.mapDataType(FieldDefinition.builder()
+                .code("class_image").dataType("IMAGE").maxLength(2048).build()));
+        assertEquals("VARCHAR(255)", dialect.mapDataType(FieldDefinition.builder()
+                .code("class_image").dataType("image").build()));
+        assertEquals("'/static/class/owner''s-image.png'",
+                dialect.formatDefaultValue("/static/class/owner's-image.png", "IMAGE"));
+    }
+
+    @Test
     void preservesExistingPluginFileIdentifiersAsStringColumns() {
         assertEquals("VARCHAR(32)", dialect.mapDataType(FieldDefinition.builder()
                 .code("source_file").dataType("file").maxLength(32).build()));
