@@ -472,5 +472,47 @@
   "en-US": "Opportunity List",
   "source": "import",
   "refType": "menu"
+ },
+ {
+  "key": "dict.e2et_crm_opp_stage.discovery.label",
+  "zh-CN": "需求发现",
+  "en-US": "Discovery",
+  "source": "import",
+  "refType": "dict"
+ },
+ {
+  "key": "dict.e2et_crm_opp_stage.qualification.label",
+  "zh-CN": "资格确认",
+  "en-US": "Qualification",
+  "source": "import",
+  "refType": "dict"
+ },
+ {
+  "key": "dict.e2et_crm_opp_stage.proposal.label",
+  "zh-CN": "方案报价",
+  "en-US": "Proposal",
+  "source": "import",
+  "refType": "dict"
+ },
+ {
+  "key": "dict.e2et_crm_opp_stage.negotiation.label",
+  "zh-CN": "商务谈判",
+  "en-US": "Negotiation",
+  "source": "import",
+  "refType": "dict"
+ },
+ {
+  "key": "dict.e2et_crm_opp_stage.closed_won.label",
+  "zh-CN": "赢单",
+  "en-US": "Won",
+  "source": "import",
+  "refType": "dict"
+ },
+ {
+  "key": "dict.e2et_crm_opp_stage.closed_lost.label",
+  "zh-CN": "已丢单",
+  "en-US": "Lost",
+  "source": "import",
+  "refType": "dict"
  }
 ]

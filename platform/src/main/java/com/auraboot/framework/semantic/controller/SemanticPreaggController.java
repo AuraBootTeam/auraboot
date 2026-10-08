@@ -35,8 +35,11 @@ public class SemanticPreaggController {
             @RequestParam String metricCode,
             @RequestParam(required = false) List<String> dimensionCodes,
             @RequestParam(defaultValue = "60") int refreshMinutes) {
+        // Normalize the omitted parameter to an empty list so the service contract
+        // is "no grouping dimensions" rather than a null the caller must unpack.
         return ApiResponse.success(preaggService.create(
-                name, semanticModelPid, metricCode, dimensionCodes, refreshMinutes));
+                name, semanticModelPid, metricCode,
+                dimensionCodes == null ? List.of() : dimensionCodes, refreshMinutes));
     }
 
     @GetMapping
