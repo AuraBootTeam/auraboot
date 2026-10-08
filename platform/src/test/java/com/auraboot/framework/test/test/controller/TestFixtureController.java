@@ -1164,7 +1164,7 @@ public class TestFixtureController {
                     ? List.of(userId, chatUserId)
                     : List.of(userId);
             Object dmConv = invokeCreateConversation(createConv, conversationService,
-                    tenantId, "direct", "dm_" + runId, userId, dmParticipants);
+                    tenantId, "direct", "E2E Direct Chat " + runId, userId, dmParticipants);
             String dmId = extractStringId(dmConv);
             int dmUnreadCount = 0;
             if (dmId != null) {
@@ -1181,7 +1181,7 @@ public class TestFixtureController {
             // The 2 messages from chatUserId will appear as "unread" for the test user.
             List<Long> groupMembers = Arrays.asList(userId, chatUserId);
             Object groupConv = invokeCreateConversation(createConv, conversationService,
-                    tenantId, "group", "grp_" + runId, userId, groupMembers);
+                    tenantId, "group", "E2E Group Chat " + runId, userId, groupMembers);
             String groupId = extractStringId(groupConv);
             int groupUnreadCount = 0;
             if (groupId != null) {
