@@ -10,5 +10,5 @@
 # migration-version-floor.test.mjs, which is the guard against re-introducing
 # a backdated version below versions that preserved databases already
 # recorded (the 2026-10-05 V20261003010000 incident).
-version=20261005110000
-count=118
+version=20261006190000
+count=119
