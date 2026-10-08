@@ -10,6 +10,7 @@ import type {
   PageSchemaV3Kind,
 } from '../types';
 import { createUniqueBlockId, toStableBlockId } from '../utils/blockIds';
+import { PASSTHROUGH_BLOCK_TYPES } from '../persistence/flatPageSerializer';
 
 interface NormalizedRef {
   id?: string;
@@ -222,7 +223,7 @@ function migrateGenericBlock(block: LegacyDslBlockV2, kind?: PageSchemaV3Kind): 
   }
 
   const blockId = block.id || toStableBlockId(block.blockType);
-  return {
+  const migrated = {
     id: blockId,
     blockType: block.blockType,
     region: block.region,
@@ -233,6 +234,24 @@ function migrateGenericBlock(block: LegacyDslBlockV2, kind?: PageSchemaV3Kind): 
     blocks: block.blocks?.map((child) => migrateGenericBlock(child, kind)),
     extension: normalizeExtension(block),
   };
+  // Passthrough display blocks (metric-strip, status-banner, description, …)
+  // are rendered from the BLOCK TOP LEVEL by the platform renderers and bound
+  // there by the inspector — keep their legacy keys at the top level instead
+  // of letting normalizeProps sweep them into props (which orphans them on the
+  // next inspector bind).
+  if (PASSTHROUGH_BLOCK_TYPES.has(migrated.blockType) && migrated.props) {
+    const { ...hoisted } = migrated.props as Record<string, unknown>;
+    for (const [key, value] of Object.entries(hoisted)) {
+      if (migrated[key as keyof typeof migrated] === undefined) {
+        (migrated as Record<string, unknown>)[key] = value;
+        delete (migrated.props as Record<string, unknown>)[key];
+      }
+    }
+    if (Object.keys(migrated.props as Record<string, unknown>).length === 0) {
+      delete migrated.props;
+    }
+  }
+  return migrated;
 }
 
 function migrateTabsBlock(block: LegacyDslBlockV2, kind?: PageSchemaV3Kind): DslBlockV3 {

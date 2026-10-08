@@ -32,7 +32,7 @@ const DESIGNER_ONLY_BLOCK_TYPES = new Set([
 ]);
 
 /** Block types serialized generically: props + nested blocks pass through unchanged. */
-const PASSTHROUGH_BLOCK_TYPES = new Set([
+export const PASSTHROUGH_BLOCK_TYPES = new Set([
   'repeater',
   'subform',
   'columns',
