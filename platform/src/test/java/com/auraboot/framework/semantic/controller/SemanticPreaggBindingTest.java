@@ -19,7 +19,9 @@ class SemanticPreaggBindingTest {
                 .perform(post("/api/semantic/preaggs").param("name", "Orders")
                         .param("semanticModelPid", "model").param("metricCode", "count"))
                 .andExpect(status().isOk());
-        verify(service).create("Orders", "model", "count", null, 60);
+        // The controller normalizes the omitted parameter to an empty list before
+        // the service boundary (never a null, never a literal bracket dimension).
+        verify(service).create("Orders", "model", "count", java.util.List.of(), 60);
     }
 
     @Test
