@@ -1,5 +1,6 @@
 package com.auraboot.framework.plugin.pf4j;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.plugin.extension.BackgroundTenantAccessor;
 import com.auraboot.framework.tenant.dao.entity.Tenant;
 import com.auraboot.framework.tenant.service.TenantService;
@@ -30,10 +31,14 @@ public class BackgroundTenantAccessorImpl implements BackgroundTenantAccessor {
     @Override
     public List<Long> listActiveTenantIds() {
         try {
-            return tenantService.getActiveTenants().stream()
+            // Background threads run outside any tenant context; without this
+            // escape the tenant-line interceptor narrows the listing to the
+            // default system tenant and plugin schedulers silently lose every
+            // other tenant.
+            return MetaContext.runWithoutTenantFilter(() -> tenantService.getActiveTenants().stream()
                     .map(Tenant::getId)
                     .filter(Objects::nonNull)
-                    .toList();
+                    .toList());
         } catch (RuntimeException e) {
             log.warn("[tenant-accessor] listActiveTenantIds failed: {}", e.getMessage());
             return Collections.emptyList();
