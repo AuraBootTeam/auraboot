@@ -197,8 +197,9 @@ test('quote sharing release gate: multiple members, role access and revocation t
   await procListLoad;
   await expect(viewers[2].page.getByText(quote.quoteCode, { exact: false })).toHaveCount(0);
   // Create a real isolated tenant through the same public company flow as host-first users.
-  // Keep its cookies in a separate context so the owner's tenant remains unchanged.
-  const foreignContext = await browser.newContext({ storageState: await page.context().storageState() });
+  // Company changes invalidate that user's old credentials. Use an independent
+  // fixture actor so provisioning cannot invalidate the owner's session.
+  const foreignContext = await browser.newContext({ storageState: await viewers[0].context.storageState() });
   const foreign = { context: foreignContext, page: await foreignContext.newPage() };
   const tenantResponse = await foreign.page.request.post('/api/tenant-selection/process', {
     data: { action: 'create', tenantName: `quote-sharing-${Date.now()}`, displayName: 'Quote sharing isolation' },
@@ -220,7 +221,7 @@ test('quote sharing release gate: multiple members, role access and revocation t
     expect(foreignIdentity.status()).toBe(200);
     const ownerMe = (await ownerIdentity.json()).data;
     const foreignMe = (await foreignIdentity.json()).data;
-    expect(foreignMe.user.email).toBe(ownerMe.user.email);
+    expect(foreignMe.user.email).not.toBe(ownerMe.user.email);
     expect(foreignMe.user.tenantId).toBeTruthy();
     expect(String(foreignMe.user.tenantId)).not.toBe(String(ownerMe.user.tenantId));
     expect(foreignMe.permissions.roles.map((role: { code: string }) => role.code)).toContain('tenant_admin');
