@@ -169,6 +169,64 @@ async function tableHeaders(page: Page): Promise<string[]> {
 test.describe('PCBA quote minimal create regression', () => {
   test.describe.configure({ timeout: 120_000 });
 
+  test('Q01-02 creates customer and linked project inside quote reference dropdowns', async ({ page }, testInfo) => {
+    const suffix = `${Date.now()}${Math.random().toString(16).slice(2, 8)}`;
+    const accountName = `内联客户 ${suffix}`;
+    const projectName = `内联项目 ${suffix}`;
+    const created: CreatedRows = { quoteId: '', quoteCode: '', rows: [] };
+    try {
+      await openQuoteCreateFormFromList(page);
+      await waitForFormReady(page, 20_000);
+      await page.getByTestId('select-trigger-qo_quote_crm_account_id').click();
+      await page.getByTestId('select-create-new-qo_quote_crm_account_id').click();
+      const customerDialog = page.getByRole('dialog', { name: '新建', exact: true });
+      await expect(customerDialog).toBeVisible();
+      await customerDialog.getByTestId('form-field-crm_acc_name').locator('input').fill(accountName);
+      const customerResponse = page.waitForResponse((response) =>
+        response.request().method() === 'POST' && response.url().includes('/api/meta/commands/execute/crm:create_account'));
+      await customerDialog.getByTestId('form-btn-submit').click();
+      const customerCreated = await customerResponse;
+      expect(customerCreated.ok()).toBe(true);
+      const customerBody = await customerCreated.json();
+      expect(String(customerBody.code)).toBe('0');
+      const customerData = await unwrapCommandResponseData(page, customerBody);
+      const accountId = String(customerData.recordId ?? customerData.pid ?? customerData.id ?? '');
+      expect(accountId).toBeTruthy();
+      created.rows.push({ model: 'crm_account_common', pid: accountId });
+      await expect(customerDialog).toHaveCount(0);
+      await expect(page.getByTestId('select-trigger-qo_quote_crm_account_id')).toContainText(accountName);
+      expect((await readDynamicRecord(page, 'crm_account_common', accountId)).crm_acc_name).toBe(accountName);
+
+      await page.getByTestId('select-trigger-qo_quote_project_id').click();
+      await page.getByTestId('select-create-new-qo_quote_project_id').click();
+      const projectDialog = page.getByRole('dialog', { name: '新建', exact: true });
+      await expect(projectDialog).toBeVisible();
+      await expect(projectDialog.getByTestId('select-trigger-bom_project_customer_id')).toContainText(accountName);
+      await projectDialog.getByTestId('form-field-bom_project_name').locator('input').fill(projectName);
+      const projectResponse = page.waitForResponse((response) =>
+        response.request().method() === 'POST' && response.url().includes('/api/meta/commands/execute/bom:create_project'));
+      await projectDialog.getByTestId('form-btn-create').click();
+      const projectCreated = await projectResponse;
+      expect(projectCreated.ok()).toBe(true);
+      const projectPayload = projectCreated.request().postDataJSON();
+      expect((projectPayload.payload ?? projectPayload.params?.payload).bom_project_customer_id).toBe(accountId);
+      const projectBody = await projectCreated.json();
+      expect(String(projectBody.code)).toBe('0');
+      const projectData = await unwrapCommandResponseData(page, projectBody);
+      const projectId = String(projectData.recordId ?? projectData.pid ?? projectData.projectId ?? '');
+      expect(projectId).toBeTruthy();
+      created.rows.push({ model: 'req_requirement_set_pcba_bom', pid: projectId });
+      await expect(projectDialog).toHaveCount(0);
+      await expect(page.getByTestId('select-trigger-qo_quote_project_id')).toContainText(projectName);
+      const persistedProject = await readDynamicRecord(page, 'req_requirement_set_pcba_bom', projectId);
+      expect(persistedProject.bom_project_customer_id).toBe(accountId);
+      expect(persistedProject.bom_project_name).toBe(projectName);
+      await page.screenshot({ path: testInfo.outputPath('quote-inline-customer-project-selected.png'), fullPage: true });
+    } finally {
+      await cleanupRows(page, created);
+    }
+  });
+
   test('creates a quote from customer, linked BOM project and converted BOM while preserving hidden RFQ links', async ({
     page,
   }, testInfo) => {
