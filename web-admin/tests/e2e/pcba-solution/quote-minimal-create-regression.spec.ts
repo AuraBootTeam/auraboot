@@ -152,7 +152,7 @@ async function unwrapCommandResponseData(
   page: Page,
   body: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
-  const commandData = ((body as any).data?.data ?? {}) as Record<string, unknown>;
+  const commandData = ((body as any).data?.data ?? body.data ?? {}) as Record<string, unknown>;
   if (commandData.async === true && typeof commandData.taskCode === 'string') {
     return pollAsyncTaskResult(page, commandData.taskCode);
   }
@@ -246,6 +246,7 @@ test.describe('PCBA quote minimal create regression', () => {
     const notes = `Minimal quote note ${suffix}`;
     const workbookPath = createCorrectedBomWorkbook(
       testInfo.outputPath('create-quote-converted-bom.xlsx'),
+      'GRM188R71C104KA01D',
     );
     const created: CreatedRows = { quoteId: '', quoteCode: '', rows: [] };
 
@@ -293,7 +294,7 @@ test.describe('PCBA quote minimal create regression', () => {
       const validUntil = new Date(Date.now() + 7 * 24 * 3600 * 1000)
         .toISOString()
         .slice(0, 10);
-      for (const mpn of ['RC0603FR-0710KL', 'STM32F103C8T6']) {
+      for (const mpn of ['RC0603FR-0710KL', 'STM32F103C8T6', 'GRM188R71C104KA01D']) {
         await dynamicCreate(
           page,
           'qo_price_evidence_common',
@@ -472,13 +473,16 @@ test.describe('PCBA quote minimal create regression', () => {
       const quoteLines = await queryDynamicRecords(page, 'qo_quote_line_common', [
         { fieldName: 'qo_ql_quote_id', operator: 'EQ', value: quoteId },
       ]);
-      // The standard fixture contains three material rows, including one without an MPN.
-      // A partial import must not pass merely because one valid row survived.
+      // This standard-import journey supplies three valid material rows.
+      // Missing-MPN provenance remains covered by the existing invalid/quick import specialists.
       expect(quoteLines, 'all three standard BOM rows must create quote lines').toHaveLength(3);
       const importRows = await queryDynamicRecords(page, 'qo_bom_import_row_common', [
         { fieldName: 'qo_bir_quote_id', operator: 'EQ', value: quoteId },
       ]);
       expect(importRows, 'all three standard BOM rows must retain import provenance').toHaveLength(3);
+      expect(importRows.filter((row) => row.qo_bir_validation_status === 'error')).toHaveLength(0);
+      expect(importRows.filter((row) => row.qo_bir_validation_status === 'valid').map((row) => row.qo_bir_quote_line_id).sort())
+        .toEqual(quoteLines.map((row) => row.pid).sort());
       const importHeaders = await queryDynamicRecords(page, 'qo_bom_import_common', [
         { fieldName: 'qo_bi_quote_id', operator: 'EQ', value: quoteId },
       ]);

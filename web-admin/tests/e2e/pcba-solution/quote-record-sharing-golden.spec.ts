@@ -196,15 +196,21 @@ test('quote sharing release gate: multiple members, role access and revocation t
   await viewers[2].page.goto('/p/qo_quote_common');
   await procListLoad;
   await expect(viewers[2].page.getByText(quote.quoteCode, { exact: false })).toHaveCount(0);
-  // Use the public test-profile initializer to create a real second tenant.
-  const seed = await page.request.post('/api/test/seed', {
-    params: { testRunId: `quote-sharing-tenant-${Date.now()}` }, timeout: 90_000,
+  // Create a real isolated tenant through the same public company flow as host-first users.
+  // Keep its cookies in a separate context so the owner's tenant remains unchanged.
+  const foreignContext = await browser.newContext({ storageState: await page.context().storageState() });
+  const foreign = { context: foreignContext, page: await foreignContext.newPage() };
+  const tenantResponse = await foreign.page.request.post('/api/tenant-selection/process', {
+    data: { action: 'create', tenantName: `quote-sharing-${Date.now()}`, displayName: 'Quote sharing isolation' },
+    timeout: 90_000,
   });
-  expect(seed.status(), await seed.text()).toBe(200);
-  const foreign = await openQuoteRolePage(browser, {
-    key: 'foreign-tenant', email: 'e2e@test.local', displayName: 'E2E Test User',
-    password: 'E2eTestPass2026!', roleCodes: ['tenant_admin'],
+  expect(tenantResponse.status(), await tenantResponse.text()).toBe(200);
+  const tenant = (await tenantResponse.json()).data;
+  expect(tenant.tenantId).toBeTruthy();
+  const switched = await foreign.page.request.post('/api/switch-space', {
+    form: { tenantId: String(tenant.tenantId), redirectTo: '/' },
   });
+  expect(switched.ok()).toBe(true);
   try {
     const ownerIdentity = await page.request.get('/api/auth/me');
     const foreignIdentity = await foreign.page.request.get('/api/auth/me');
@@ -212,11 +218,11 @@ test('quote sharing release gate: multiple members, role access and revocation t
     expect(foreignIdentity.status()).toBe(200);
     const ownerMe = (await ownerIdentity.json()).data;
     const foreignMe = (await foreignIdentity.json()).data;
-    expect(foreignMe.user.email).toBe('e2e@test.local');
+    expect(foreignMe.user.email).toBe(ownerMe.user.email);
     expect(foreignMe.user.tenantId).toBeTruthy();
     expect(String(foreignMe.user.tenantId)).not.toBe(String(ownerMe.user.tenantId));
     expect(foreignMe.permissions.roles.map((role: { code: string }) => role.code)).toContain('tenant_admin');
-    // /api/test/seed installs test-fixtures only. The foreign tenant needs the
+    // The freshly created foreign tenant needs the
     // same product page before this journey can exercise the record boundary.
     const quoteRoot = process.env.AURA_QUOTE_ROOT;
     expect(quoteRoot, 'The gate must provide its manifest-bound AURA_QUOTE_ROOT').toBeTruthy();

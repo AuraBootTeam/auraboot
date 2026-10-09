@@ -51,12 +51,14 @@ test.describe('X governance gap fill golden', () => {
       };
       page.on('request', observe);
       await page.getByTestId('form-btn-submit').click();
-      await expect(page.locator('#crm_ct_name-error')).toBeVisible();
+      await expect(page.getByTestId('form-field-crm_ct_name').getByText('请填写联系人姓名', { exact: true })).toBeVisible();
       expect(creates, 'required-empty must not dispatch a create command').toHaveLength(0);
       page.off('request', observe);
       await name.fill(contactName);
       await page.getByTestId('form-field-crm_ct_phone').locator('input').fill('13800000000');
       await page.getByTestId('form-field-crm_ct_title').locator('input').fill('采购经理');
+      await page.getByTestId('select-trigger-crm_ct_owner').click();
+      await page.getByRole('option', { name: 'Admin User', exact: false }).click();
       const createPayload = await save('crm:create_contact');
       expect((createPayload.payload ?? createPayload.params?.payload).crm_ct_account_id).toBe(accountId);
       const contacts = await queryDynamicRecords(page, 'crm_contact_common', [{ fieldName: 'crm_ct_account_id', operator: 'EQ', value: accountId }]);

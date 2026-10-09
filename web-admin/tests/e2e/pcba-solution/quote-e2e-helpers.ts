@@ -920,7 +920,7 @@ export async function ensureTenantAdminModelPermissions(
   ).toBe(true);
 }
 
-export function createCorrectedBomWorkbook(filePath: string): string {
+export function createCorrectedBomWorkbook(filePath: string, thirdMpn = ''): string {
   mkdirSync(path.dirname(filePath), { recursive: true });
   const workbook = XLSXUtils.book_new();
   // Standard BOM shape (matches StandardBomTemplateWriter / ImportCorrectedBomHandler's
@@ -960,7 +960,7 @@ export function createCorrectedBomWorkbook(filePath: string): string {
       '',
     ],
     ['2', '1', 'STM32F103C8T6', 'MCU', 'LQFP48 MCU', 'pcs', 200, 'U1', '', '', '', ''],
-    ['3', '1', '', 'missing mpn row', '0603', 'pcs', 10, 'C1', '', '', '', ''],
+    ['3', '1', thirdMpn, thirdMpn ? 'MLCC capacitor' : 'missing mpn row', '0603', 'pcs', 10, 'C1', '', '', '', ''],
   ]);
   XLSXUtils.book_append_sheet(workbook, worksheet, 'BOM');
   const bytes = write(workbook, { bookType: 'xlsx', type: 'buffer' });

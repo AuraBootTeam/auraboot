@@ -115,16 +115,21 @@ async function expectFourCharts(page: Page, path: string): Promise<void> {
     const samples = rendered.points.slice(1).flatMap((end: number[], i: number) =>
       [0.25, 0.5, 0.75].map((fraction) => [
         rendered.points[i][0] + (end[0] - rendered.points[i][0]) * fraction,
-        rendered.points[i][1] + (end[1] - rendered.points[i][1]) * fraction,
+        Math.min(rendered.points[i][1], end[1]),
+        Math.max(rendered.points[i][1], end[1]),
       ]));
     await expect.poll(() => chart.evaluate((element, positions: number[][]) => {
       const canvases = [...element.querySelectorAll('canvas')];
-      return positions.filter(([x, y]) => canvases.some((canvas) => {
+      // Smooth series follow curves rather than the straight chord between data points.
+      // Inspect a narrow interior x strip across each segment's y range; marker-only
+      // rendering still fails because samples exclude both endpoints and area fill.
+      return positions.filter(([x, minY, maxY]) => canvases.some((canvas) => {
         const scaleX = canvas.width / canvas.clientWidth;
         const scaleY = canvas.height / canvas.clientHeight;
         const left = Math.max(0, Math.round(x * scaleX) - 3);
-        const top = Math.max(0, Math.round(y * scaleY) - 3);
-        const pixels = canvas.getContext('2d')!.getImageData(left, top, 7, 7).data;
+        const top = Math.max(0, Math.round(minY * scaleY) - 3);
+        const height = Math.min(canvas.height - top, Math.ceil((maxY - minY) * scaleY) + 7);
+        const pixels = canvas.getContext('2d')!.getImageData(left, top, 7, height).data;
         for (let i = 0; i < pixels.length; i += 4) {
           if (pixels[i + 2] > pixels[i] + 40 && pixels[i + 2] > pixels[i + 1] + 30 && pixels[i + 3] > 100) return true;
         }
