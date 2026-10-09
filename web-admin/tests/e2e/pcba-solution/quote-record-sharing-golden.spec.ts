@@ -129,6 +129,8 @@ test('quote sharing release gate: multiple members, role access and revocation t
   await revokeAll();
   for(let i=0;i<3;i++) await probe(i,false);
   await refreshRevokedViewer(0);
+  await viewers[1].page.goto(`/p/qo_quote_common/view/${quote.quoteId}`);
+  await refreshRevokedViewer(1);
   await dialog.getByRole('button',{name:'指定角色',exact:true}).click();
   const options = await page.request.get(`/api/record-share/roles?${shareParams}`);
   expect(options.ok()).toBe(true);

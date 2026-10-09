@@ -229,6 +229,8 @@ test.describe('Quote and BOM operations dashboard @smoke', () => {
     await expectFourCharts(page, DASHBOARD_PATH);
     await expect(page.getByText('查看报价与 BOM 的创建趋势及人员贡献。', { exact: true })).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('dashboard-weekly-order.png'), fullPage: true });
+    await page.locator('canvas').nth(3).scrollIntoViewIfNeeded();
+    await page.screenshot({ path: testInfo.outputPath('dashboard-personnel-count.png'), fullPage: true });
 
     for (const code of TREND_QUERIES) {
       const records = await queryRecords(page, code);
@@ -250,7 +252,7 @@ test.describe('Quote and BOM operations dashboard @smoke', () => {
 
   test('ordinary employee sees home contribution without admin menu and personnel data is self-only', async ({
     browser,
-  }) => {
+  }, testInfo) => {
     await withUserPage(browser, ordinaryUser, async (page) => {
       await expectFourCharts(page, '/home');
       await ensureSidebarExpanded(page);
@@ -267,6 +269,8 @@ test.describe('Quote and BOM operations dashboard @smoke', () => {
         // This freshly provisioned employee owns no seeded quote or BOM; admin seeds must stay excluded.
         expect(Number(records[0]?.quote_count ?? records[0]?.created_count)).toBe(0);
       }
+      await expectFourCharts(page, '/home');
+      await page.screenshot({ path: testInfo.outputPath('home-ordinary-self-only.png'), fullPage: true });
     });
   });
 });
