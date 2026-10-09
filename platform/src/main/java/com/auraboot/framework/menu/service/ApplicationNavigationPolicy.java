@@ -63,9 +63,15 @@ public final class ApplicationNavigationPolicy {
     private static List<Menu> deduplicate(List<Menu> menus, Set<String> seen) {
         List<Menu> result = new ArrayList<>();
         for (Menu menu : menus) {
-            if (Integer.valueOf(1).equals(menu.getType()) && menu.getPath() != null
+            List<Menu> children = menu.getChildren();
+            // A directory renders as an expander, never as a navigable link to its
+            // own path — so it must not consume the path slot that a declared child
+            // page (e.g. the DecisionOps Strategy Studio entry under Rule Center)
+            // needs to stay visible.
+            boolean directory = children != null && !children.isEmpty();
+            if (!directory && Integer.valueOf(1).equals(menu.getType()) && menu.getPath() != null
                     && !menu.getPath().isBlank() && !seen.add(menu.getPath())) continue;
-            if (menu.getChildren() != null) menu.setChildren(deduplicate(menu.getChildren(), seen));
+            if (children != null) menu.setChildren(deduplicate(children, seen));
             if (Integer.valueOf(0).equals(menu.getType())
                     && (menu.getChildren() == null || menu.getChildren().isEmpty())) continue;
             result.add(menu);

@@ -35,7 +35,7 @@ class InboxWorkflowDecisionTest {
         try (MockedStatic<MetaContext> context = mockStatic(MetaContext.class)) {
             context.when(MetaContext::getCurrentUserId).thenReturn(20L);
             context.when(MetaContext::getCurrentTenantId).thenReturn(10L);
-            var detail = new InboxController(inbox, workflow).getApprovalDetail(18L).getData();
+            var detail = new InboxController(inbox, workflow, org.mockito.Mockito.mock(com.auraboot.framework.user.service.UserService.class)).getApprovalDetail(18L).getData();
             assertEquals(18L, detail.get("id")); assertEquals("task-18", detail.get("taskId"));
             assertEquals("Alice", detail.get("submittedBy"));
             assertEquals(Map.of("Reason", "Actual request"), detail.get("sourceRecordFields"));
@@ -50,12 +50,12 @@ class InboxWorkflowDecisionTest {
         try (MockedStatic<MetaContext> context = mockStatic(MetaContext.class)) {
             context.when(MetaContext::getCurrentUserId).thenReturn(20L);
             context.when(MetaContext::getCurrentTenantId).thenReturn(10L);
-            assertFalse(new InboxController(inbox, workflow).getApprovalDetail(18L).isSuccess());
+            assertFalse(new InboxController(inbox, workflow, org.mockito.Mockito.mock(com.auraboot.framework.user.service.UserService.class)).getApprovalDetail(18L).isSuccess());
             verifyNoInteractions(workflow);
             InboxItem item = new InboxItem(); item.setSourceType("workflow"); item.setSourceId("task-18");
             when(inbox.getItem(18L, 20L, 10L)).thenReturn(item);
             when(workflow.execute(eq("task.approval-detail"), any())).thenThrow(new IllegalStateException("provider unavailable"));
-            assertThrows(IllegalStateException.class, () -> new InboxController(inbox, workflow).getApprovalDetail(18L));
+            assertThrows(IllegalStateException.class, () -> new InboxController(inbox, workflow, org.mockito.Mockito.mock(com.auraboot.framework.user.service.UserService.class)).getApprovalDetail(18L));
         }
     }
 
@@ -70,7 +70,7 @@ class InboxWorkflowDecisionTest {
         try (MockedStatic<MetaContext> context = mockStatic(MetaContext.class)) {
             context.when(MetaContext::getCurrentUserId).thenReturn(20L);
             context.when(MetaContext::getCurrentTenantId).thenReturn(10L);
-            new InboxController(inbox, workflow).submitApprovalAction(
+            new InboxController(inbox, workflow, org.mockito.Mockito.mock(com.auraboot.framework.user.service.UserService.class)).submitApprovalAction(
                     18L, Map.of("action", "approve"), null, null);
             var order = inOrder(workflow, inbox);
             order.verify(inbox).getItem(18L, 20L, 10L);
@@ -92,7 +92,7 @@ class InboxWorkflowDecisionTest {
         try (MockedStatic<MetaContext> context = mockStatic(MetaContext.class)) {
             context.when(MetaContext::getCurrentUserId).thenReturn(20L);
             context.when(MetaContext::getCurrentTenantId).thenReturn(10L);
-            assertThrows(IllegalStateException.class, () -> new InboxController(inbox, workflow)
+            assertThrows(IllegalStateException.class, () -> new InboxController(inbox, workflow, org.mockito.Mockito.mock(com.auraboot.framework.user.service.UserService.class))
                     .submitApprovalAction(19L, Map.of("action", "reject", "comment", "Date conflict"), null, null));
             verify(inbox, never()).recordCompletedWorkflowAction(anyLong(), anyLong(), anyLong(), anyString(), anyString());
             verify(inbox, never()).markActed(anyLong(), anyLong(), anyLong(), anyString());
