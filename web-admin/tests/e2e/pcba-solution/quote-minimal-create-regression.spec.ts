@@ -195,7 +195,7 @@ test.describe('PCBA quote minimal create regression', () => {
       const customerBody = await customerCreated.json();
       expect(String(customerBody.code)).toBe('0');
       const customerData = await unwrapCommandResponseData(page, customerBody);
-      const accountId = String(customerData.recordId ?? customerData.pid ?? customerData.id ?? '');
+      const accountId = String(customerData.recordId ?? customerData.recordPid ?? customerData.pid ?? customerData.id ?? '');
       expect(accountId).toBeTruthy();
       created.rows.push({ model: 'crm_account_common', pid: accountId });
       await expect(customerDialog).toHaveCount(0);
@@ -218,7 +218,7 @@ test.describe('PCBA quote minimal create regression', () => {
       const projectBody = await projectCreated.json();
       expect(String(projectBody.code)).toBe('0');
       const projectData = await unwrapCommandResponseData(page, projectBody);
-      const projectId = String(projectData.recordId ?? projectData.pid ?? projectData.projectId ?? '');
+      const projectId = String(projectData.recordId ?? projectData.recordPid ?? projectData.pid ?? projectData.projectId ?? '');
       expect(projectId).toBeTruthy();
       created.rows.push({ model: 'req_requirement_set_pcba_bom', pid: projectId });
       await expect(projectDialog).toHaveCount(0);
@@ -288,7 +288,7 @@ test.describe('PCBA quote minimal create regression', () => {
       created.rows.push({ model: 'req_requirement_set_pcba_bom', pid: projectId });
 
       // This golden owns the create/RFQ linkage contract, not the external-source contract. Seed
-      // fresh unbound Yunhan evidence (the quote-line binding is optional) for the workbook's two MPNs so the create task deterministically
+      // fresh unbound Yunhan evidence (the quote-line binding is optional) for all three MPNs so the create task deterministically
       // exercises cache reuse and does not consume Yunhan's shared 1-call/minute batch allowance.
       // Dedicated Yunhan goldens below this suite still exercise the real upload/search lanes.
       const validUntil = new Date(Date.now() + 7 * 24 * 3600 * 1000)
