@@ -685,7 +685,8 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
     async (button: ButtonConfig, record?: Record<string, any>) => {
       const normalizedButton = normalizeButtonProps(button);
       const actionDef = normalizeAction(normalizedButton);
-      const confirmVariant = normalizedButton.danger || normalizedButton.variant === 'danger' ? 'danger' : 'default';
+      const confirmVariant = normalizedButton.confirmVariant
+        ?? (normalizedButton.danger || normalizedButton.variant === 'danger' ? 'danger' : 'default');
       const confirmKey = (normalizedButton as any).confirm || normalizedButton.confirmMessageKey;
 
       try {

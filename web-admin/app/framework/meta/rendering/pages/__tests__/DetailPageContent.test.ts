@@ -30,9 +30,15 @@ import {
   unwrapDetailRecord,
   isDetailRecordAccessDenied,
   isDetailRecordNotFound,
+  resolveDetailMissingRecordTitle,
 } from '../DetailPageContent';
 
 describe('detail record access-denied feedback', () => {
+  it('localizes a missing-record title even when the tenant dictionary has no translation', () => {
+    const untranslated = (key: string) => key;
+    expect(resolveDetailMissingRecordTitle('zh-CN', untranslated)).toBe('记录不存在');
+    expect(resolveDetailMissingRecordTitle('en-US', untranslated)).toBe('Record not found');
+  });
   it('uses the HTTP status even when the backend supplies a semantic error code', () => {
     expect(isDetailRecordAccessDenied({ httpStatus: 403, code: 'ACCESS_FORBIDDEN' })).toBe(true);
     expect(isDetailRecordAccessDenied({ code: '403' })).toBe(true);
