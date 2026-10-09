@@ -6,10 +6,11 @@ import { ensureQuoteRoleUser, makeQuoteRoleUser, openQuoteRolePage, openQuoteDet
 import { saveWorkbookDownload } from './workbook-download-evidence';
 import { validateQuoteWorkbook } from './quote-workbook-assertions';
 
+const sharingUid = Date.now().toString();
 const recipients: QuoteRoleUser[] = [
-  {key:'share_a', email:'share-a@e2e.local', displayName:'Sharing Sales A', password:'Test2026x', roleCodes:['qo_sales']},
-  {key:'share_b', email:'share-b@e2e.local', displayName:'Sharing Sales B', password:'Test2026x', roleCodes:['qo_sales']},
-  {key:'share_proc', email:'share-proc@e2e.local', displayName:'Sharing Procurement', password:'Test2026x', roleCodes:['qo_procurement']},
+  makeQuoteRoleUser('share_a', sharingUid, ['qo_sales']),
+  makeQuoteRoleUser('share_b', sharingUid, ['qo_sales']),
+  makeQuoteRoleUser('share_proc', sharingUid, ['qo_procurement']),
 ];
 
 test('quote sharing release gate: multiple members, role access and revocation through UI', async ({ page, browser }, testInfo) => {

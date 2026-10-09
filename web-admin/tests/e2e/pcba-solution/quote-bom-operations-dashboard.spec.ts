@@ -269,7 +269,19 @@ test.describe('Quote and BOM operations dashboard @smoke', () => {
         // This freshly provisioned employee owns no seeded quote or BOM; admin seeds must stay excluded.
         expect(Number(records[0]?.quote_count ?? records[0]?.created_count)).toBe(0);
       }
-      await expectFourCharts(page, '/home');
+      await expect(page.locator('canvas')).toHaveCount(4);
+      for (const index of [2, 3]) {
+        const chart = page.locator('[_echarts_instance_]').nth(index);
+        await expect.poll(() => chart.evaluate((element) => {
+          const fiberKey = Object.keys(element).find((key) => key.startsWith('__reactFiber'));
+          let fiber = (element as any)[fiberKey!];
+          while (fiber && !fiber.stateNode?.getEchartsInstance) fiber = fiber.return;
+          if (!fiber) throw new Error('Personnel chart instance missing');
+          const option = fiber.stateNode.getEchartsInstance().getOption();
+          return { names: option.xAxis[0].data, values: option.series[0].data };
+        })).toEqual({ names: [ordinaryUser.displayName], values: [0] });
+      }
+      await page.locator('canvas').nth(3).scrollIntoViewIfNeeded();
       await page.screenshot({ path: testInfo.outputPath('home-ordinary-self-only.png'), fullPage: true });
     });
   });
