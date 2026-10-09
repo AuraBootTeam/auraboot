@@ -209,8 +209,10 @@ test('quote sharing release gate: multiple members, role access and revocation t
   expect(tenant.tenantId).toBeTruthy();
   const switched = await foreign.page.request.post('/api/switch-space', {
     form: { tenantId: String(tenant.tenantId), redirectTo: '/' },
+    maxRedirects: 0,
   });
-  expect(switched.ok()).toBe(true);
+  expect(switched.status(), await switched.text()).toBe(302);
+  expect(switched.headers()['location']).toBe('/');
   try {
     const ownerIdentity = await page.request.get('/api/auth/me');
     const foreignIdentity = await foreign.page.request.get('/api/auth/me');
