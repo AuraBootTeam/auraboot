@@ -407,7 +407,7 @@ export interface ButtonConfig {
   // Unified action definition (new DSL format)
   /** Confirmation prompt i18n key — shown before executing the action. */
   confirm?: string | LocalizedText;
-  /** Confirmation style; omitted preserves the legacy danger presentation. */
+  /** Explicit confirmation style; omitted follows the button danger/variant intent. */
   confirmVariant?: 'default' | 'danger';
 
   // Business shortcut properties (legacy — migrate to action: ActionDef)
