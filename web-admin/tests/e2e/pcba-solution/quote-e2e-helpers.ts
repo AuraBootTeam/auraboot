@@ -846,6 +846,37 @@ async function fetchModelPermissionPids(page: Page, modelCodes: string[], action
   return [...out];
 }
 
+export async function ensureTenantAdminRegisteredPermissions(page: Page, codes: string[]): Promise<void> {
+  const treeResponse = await page.request.get('/api/permissions/tree');
+  expect(treeResponse.ok(), 'registered permission tree must be readable').toBe(true);
+  const tree = await treeResponse.json();
+  const byCode = new Map<string, string>();
+  const collect = (value: unknown): void => {
+    if (Array.isArray(value)) return value.forEach(collect);
+    if (!value || typeof value !== 'object') return;
+    const node = value as Record<string, unknown>;
+    if (node.code && node.pid) byCode.set(String(node.code), String(node.pid));
+    Object.values(node).forEach(collect);
+  };
+  collect(tree.data);
+  const required = codes.map((code) => {
+    expect(byCode.has(code), `${code} must be imported; fixtures cannot invent it`).toBe(true);
+    return byCode.get(code)!;
+  });
+  const role = await fetchTenantAdminRole(page);
+  const endpoint = `/api/roles/${encodeURIComponent(String(role.pid))}/permissions`;
+  const currentResponse = await page.request.get(endpoint);
+  expect(currentResponse.ok()).toBe(true);
+  const current = (await currentResponse.json()).data;
+  expect(Array.isArray(current)).toBe(true);
+  const existing = current.map(String) as string[];
+  const missing = required.filter((pid) => !existing.includes(pid));
+  if (!missing.length) return;
+  const response = await page.request.post(endpoint, { data: [...existing, ...missing] });
+  expect(response.ok(), 'prepare the authorized admin fixture through the role API').toBe(true);
+  expect(String((await response.json()).code)).toBe('0');
+}
+
 export async function ensureTenantAdminModelPermissions(
   page: Page,
   modelCodes: string[] = BOM_INTERNAL_FIXTURE_MODELS,

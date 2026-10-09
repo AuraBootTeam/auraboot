@@ -9,6 +9,7 @@ import {
   createCorrectedBomWorkbook,
   dynamicCreate,
   executeCommand,
+  ensureTenantAdminRegisteredPermissions,
   openQuoteCreateFormFromList,
   openQuoteDetailFromList,
   queryDynamicRecords,
@@ -169,6 +170,10 @@ async function tableHeaders(page: Page): Promise<string[]> {
 test.describe('PCBA quote minimal create regression', () => {
   test.describe.configure({ timeout: 120_000 });
 
+  test.beforeEach(async ({ page }) => {
+    await ensureTenantAdminRegisteredPermissions(page, ['qo.quote.read', 'qo.quote.create', 'qo.quote.manage', 'qo.price.manage']);
+  });
+
   test('Q01-02 creates customer and linked project inside quote reference dropdowns', async ({ page }, testInfo) => {
     const suffix = `${Date.now()}${Math.random().toString(16).slice(2, 8)}`;
     const accountName = `内联客户 ${suffix}`;
@@ -282,7 +287,7 @@ test.describe('PCBA quote minimal create regression', () => {
       created.rows.push({ model: 'req_requirement_set_pcba_bom', pid: projectId });
 
       // This golden owns the create/RFQ linkage contract, not the external-source contract. Seed
-      // fresh Yunhan evidence for the workbook's two MPNs so the create task deterministically
+      // fresh unbound Yunhan evidence (the quote-line binding is optional) for the workbook's two MPNs so the create task deterministically
       // exercises cache reuse and does not consume Yunhan's shared 1-call/minute batch allowance.
       // Dedicated Yunhan goldens below this suite still exercise the real upload/search lanes.
       const validUntil = new Date(Date.now() + 7 * 24 * 3600 * 1000)
@@ -293,7 +298,6 @@ test.describe('PCBA quote minimal create regression', () => {
           page,
           'qo_price_evidence_common',
           {
-            qo_pe_quote_line_id: `GOLDEN-MINIMAL-CREATE-CACHE-${suffix}-${mpn}`,
             qo_pe_part_no: mpn,
             qo_pe_source: 'yunhan',
             qo_pe_source_ref: 'golden:minimal-create-cache',
