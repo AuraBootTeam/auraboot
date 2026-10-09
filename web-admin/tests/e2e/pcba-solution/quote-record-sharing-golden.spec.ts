@@ -289,14 +289,14 @@ test('quote sharing release gate: multiple members, role access and revocation t
     const foreignRecord = await deniedRecord;
     expect(foreignRecord.status()).toBe(404);
     expect(await foreignRecord.json()).toMatchObject({
-      code: '404', message: 'Resource not found', data: null, context: null,
+      code: '404', message: 'Record not found', data: null, context: null,
     });
     await expect(foreign.page.getByText('请求的记录不存在或已不可用。', { exact: true })).toBeVisible();
-    await expect(foreign.page.getByText('Resource not found', { exact: true })).toHaveCount(0);
+    await expect(foreign.page.getByText(/^(Resource|Record) not found$/)).toHaveCount(0);
     const absentRecord = await foreign.page.request.get('/api/dynamic/qo_quote_common/01NONEXISTENTQUOTE000000000');
     expect(absentRecord.status()).toBe(404);
     expect(await absentRecord.json()).toMatchObject({
-      code: '404', message: 'Resource not found', data: null, context: null,
+      code: '404', message: 'Record not found', data: null, context: null,
     });
     await expect(foreign.page.getByTestId('ab:detail:qo_quote_common:container')
       .getByRole('heading', { level: 2 })).toHaveText(/记录不存在|未找到记录|Record not found/);
@@ -308,7 +308,7 @@ test('quote sharing release gate: multiple members, role access and revocation t
       });
       expect(deniedQuery.status()).toBe(404);
       expect(await deniedQuery.json()).toMatchObject({
-        code: '404', message: 'Resource not found', data: null, context: null,
+        code: '404', message: 'Record not found', data: null, context: null,
       });
     }
     const foreignFile = await foreign.page.request.get(`/api/file/${sharedQuoteFileId}`);
