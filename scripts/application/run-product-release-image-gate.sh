@@ -248,6 +248,9 @@ docker run --rm --network "$NETWORK" \
   -locations=filesystem:/flyway/core,filesystem:/flyway/product \
   -table=ab_flyway_schema_history -baselineOnMigrate=false -validateMigrationNaming=true -cleanDisabled=true migrate \
   >"$ARTIFACTS/logs/product-test-flyway.log" 2>&1 || fail 'product test database migration failed'
+TEST_EXPECTED_DATABASE=aura_product_build_ci \
+TEST_DATABASE_URL="jdbc:postgresql://127.0.0.1:$BUILD_PG_PORT/aura_product_build_ci" \
+TEST_DATABASE_USERNAME=auraboot TEST_DATABASE_PASSWORD=auraboot_ci \
 SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:$BUILD_PG_PORT/aura_product_build_ci" \
 SPRING_DATASOURCE_USERNAME=auraboot SPRING_DATASOURCE_PASSWORD=auraboot_ci \
 AURA_OCI_BUILDER=docker node "$PRODUCT_ROOT/scripts/build-application.mjs" \
