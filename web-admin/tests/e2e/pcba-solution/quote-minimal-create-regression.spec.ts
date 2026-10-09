@@ -410,12 +410,13 @@ test.describe('PCBA quote minimal create regression', () => {
       const quoteLines = await queryDynamicRecords(page, 'qo_quote_line_common', [
         { fieldName: 'qo_ql_quote_id', operator: 'EQ', value: quoteId },
       ]);
-      expect(quoteLines.length, 'converted BOM upload should create quote lines').toBeGreaterThan(
-        0,
-      );
+      // The standard fixture contains three material rows, including one without an MPN.
+      // A partial import must not pass merely because one valid row survived.
+      expect(quoteLines, 'all three standard BOM rows must create quote lines').toHaveLength(3);
       const importRows = await queryDynamicRecords(page, 'qo_bom_import_row_common', [
         { fieldName: 'qo_bir_quote_id', operator: 'EQ', value: quoteId },
       ]);
+      expect(importRows, 'all three standard BOM rows must retain import provenance').toHaveLength(3);
       const importHeaders = await queryDynamicRecords(page, 'qo_bom_import_common', [
         { fieldName: 'qo_bi_quote_id', operator: 'EQ', value: quoteId },
       ]);
@@ -485,6 +486,17 @@ test.describe('PCBA quote minimal create regression', () => {
       expect(page.url()).toBe(detailUrlBeforeDownload);
       expect(page.context().pages()).toHaveLength(openPagesBeforeDownload);
       await page.screenshot({ path: testInfo.outputPath('created-quote-upload-readback.png'), fullPage: true });
+
+      await page.getByRole('tab', { name: /BOM价格计算|BOM Price/i }).click();
+      const priceTable = page.getByTestId('table-block').filter({
+        has: page.getByTestId(`table-row-${String(quoteLines[0].pid)}`),
+      });
+      await expect(priceTable, 'price workbench must contain the complete imported BOM').toHaveCount(1);
+      await expect(priceTable.locator('[data-testid^="table-row-"]')).toHaveCount(3);
+      for (const line of quoteLines) {
+        await expect(priceTable.getByTestId(`table-row-${String(line.pid)}`)).toBeVisible();
+      }
+      await page.screenshot({ path: testInfo.outputPath('created-quote-price-full-row-count.png'), fullPage: true });
 
       // Materials upload is create-only now: the detail toolbar keeps only the
       // pricing-input mutation, and no upload buttons may reappear.

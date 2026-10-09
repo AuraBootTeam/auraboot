@@ -258,7 +258,9 @@ test.describe('Quote and BOM operations dashboard @smoke', () => {
       for (const code of PEOPLE_QUERIES) {
         const records = await queryRecords(page, code);
         expect(records, `${code} ordinary employee must receive only one self row`).toHaveLength(1);
-        expect(String(records[0]?.creator_name ?? '')).toBeTruthy();
+        expect(String(records[0]?.creator_name ?? ''), `${code} must identify the authenticated employee`).toBe(ordinaryUser.displayName);
+        // This freshly provisioned employee owns no seeded quote or BOM; admin seeds must stay excluded.
+        expect(Number(records[0]?.quote_count ?? records[0]?.created_count)).toBe(0);
       }
     });
   });
