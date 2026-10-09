@@ -105,6 +105,11 @@ export function isDetailRecordNotFound(result: { httpStatus?: unknown; code?: un
   return Number(result.httpStatus ?? result.code) === 404;
 }
 
+export function resolveDetailMissingRecordTitle(locale: string, t: (key: string) => string): string {
+  return resolveTextFallback(t, 'common.recordNotFound',
+    getLocalizedText({ 'zh-CN': '记录不存在', en: 'Record not found' }, locale, t));
+}
+
 export function resolveDetailReturnTarget(search: string): string | null {
   const routeContext = decodeRouteContextFromSearch(search);
   const returnTo = String(routeContext?.returnTo || '').trim();
@@ -1276,7 +1281,7 @@ function DetailPageContentInner(props: PageContentProps) {
             <h2 className="text-text text-lg font-semibold">
               {recordAccessDenied
                 ? getLocalizedText({ 'zh-CN': '无法访问此记录', en: 'Cannot access this record' }, locale, t)
-                : resolveTextFallback(t, 'common.recordNotFound', 'Record not found')}
+                : resolveDetailMissingRecordTitle(locale, t)}
             </h2>
             <p className="text-text-2 text-sm">{recordAccessDenied
               ? getLocalizedText({ 'zh-CN': '当前账号没有访问权限，请联系记录负责人。', en: 'Your account does not have access. Contact the record owner.' }, locale, t)

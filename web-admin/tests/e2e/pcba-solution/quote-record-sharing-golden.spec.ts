@@ -202,7 +202,7 @@ test('quote sharing release gate: multiple members, role access and revocation t
   // Create a real isolated tenant through the same public company flow as host-first users.
   // Company changes invalidate that user's old credentials. Use an independent
   // fixture actor so provisioning cannot invalidate the owner's session.
-  const foreignContext = await browser.newContext({ storageState: await viewers[0].context.storageState() });
+  const foreignContext = await browser.newContext({ storageState: await viewers[0].context.storageState(), locale: 'zh-CN' });
   const foreign = { context: foreignContext, page: await foreignContext.newPage() };
   const tenantResponse = await foreign.page.request.post('/api/tenant-selection/process', {
     data: { action: 'create', tenantName: `quote-sharing-${Date.now()}`, displayName: 'Quote sharing isolation' },
