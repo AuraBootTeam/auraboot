@@ -60,7 +60,7 @@ class AggregateSideEffectTest {
 
     @BeforeEach
     void setUp() {
-        executor = new CommandSideEffectExecutor(dynamicDataMapper, dynamicDataService, metaModelService, spelEvaluator, documentFlowService, objectMapper);
+        executor = new CommandSideEffectExecutor(dynamicDataMapper, dynamicDataService, metaModelService, spelEvaluator, documentFlowService, objectMapper, org.mockito.Mockito.mock(CommandModelMutationSupport.class));
     }
 
     @AfterEach
@@ -127,7 +127,7 @@ class AggregateSideEffectTest {
                 documentFlowService,
                 objectMapper,
                 dataPermissionEngine,
-                dataDomainService);
+                dataDomainService, org.mockito.Mockito.mock(CommandModelMutationSupport.class));
         when(metaModelService.getTableName("pm_order_line")).thenReturn("mt_pm_order_line");
         when(metaModelService.getTableName("pm_order")).thenReturn("mt_pm_order");
         when(dynamicDataMapper.selectByQuery(anyString(), anyMap()))

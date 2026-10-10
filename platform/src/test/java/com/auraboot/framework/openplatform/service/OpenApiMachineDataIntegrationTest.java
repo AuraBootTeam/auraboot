@@ -65,6 +65,8 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
     @Autowired private com.auraboot.framework.meta.service.impl.CommandFieldMapExecutor fieldMap;
     @Autowired private com.auraboot.framework.meta.service.impl.CommandStateCheckExecutor stateCheck;
 
+    @Autowired private com.auraboot.framework.meta.service.impl.CommandSideEffectExecutor sideEffects;
+
     private OpenApiResourceContract contract;
     private MachinePrincipal principal;
     private String credentialPid;
@@ -387,6 +389,67 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
         assertThat(sourceEvents()).isEmpty();
         assertThat(MetaContext.runWithCommandPermitScope("ALL", () -> data.getById(contract.modelCode(), allowedPid)))
                 .containsEntry("name", "Visible");
+    }
+
+    @Test void commandSideEffectOriginsShareVersionsAndOwnerRollback() {
+        publishEvents();
+        MetaContext.runWithCommandPermitScope("ALL", () -> {
+            var single = Map.<String, Object>of("sideEffects", List.of(Map.of("action", "update_record", "targetModel", contract.modelCode(),
+                    "targetIdField", "target", "fieldMapping", Map.of("name", "Side effect"))));
+            sideEffects.executeSideEffectPhase(single, Map.of("target", allowedPid), principal.tenantId(), MetaContext.getCurrentUserId(), null, null, null);
+            assertThat(data.getById(contract.modelCode(), allowedPid)).containsEntry("name", "Side effect");
+            assertThat(sourceEvents()).hasSize(1);
+            var batch = Map.<String, Object>of("sideEffects", List.of(Map.of("action", "batch_update_record", "targetModel", contract.modelCode(),
+                    "sourceField", "items", "targetIdField", "target", "fieldMapping", Map.of("name", "${item.name}"))));
+            sideEffects.executeSideEffectPhase(batch, Map.of("items", List.of(Map.of("target", allowedPid, "name", "Batch side"),
+                    Map.of("target", deniedPid, "name", "Other side"))), principal.tenantId(), MetaContext.getCurrentUserId(), null, null, null);
+            assertThat(sourceEvents()).hasSize(3);
+            assertThat(sourceEvents().stream().filter(row -> allowedPid.equals(row.get("subject")))
+                    .map(row -> ((Number) row.get("event_sequence")).longValue()).toList()).containsExactly(2L, 3L);
+            data.create(contract.modelCode(), new HashMap<>(Map.of("name", "Aggregate child one", "zone", "A", "counter", 2, "related", allowedPid)));
+            data.create(contract.modelCode(), new HashMap<>(Map.of("name", "Aggregate child two", "zone", "A", "counter", 3, "related", allowedPid)));
+            var aggregate = Map.<String, Object>of("sideEffects", List.of(Map.of("action", "aggregate", "targetModel", contract.modelCode(),
+                    "childModel", contract.modelCode(), "childField", "counter", "parentField", "counter", "parentFk", "related", "function", "sum")));
+            sideEffects.executeSideEffectPhase(aggregate, Map.of("related", allowedPid), principal.tenantId(), MetaContext.getCurrentUserId(), null, null, null);
+            assertThat(((Number) data.getById(contract.modelCode(), allowedPid).get("counter")).intValue()).isEqualTo(5);
+            assertThat(sourceEvents()).hasSize(6);
+            assertThat(sourceEvents().stream().filter(row -> allowedPid.equals(row.get("subject")))
+                    .map(row -> ((Number) row.get("event_sequence")).longValue()).toList()).containsExactly(2L, 3L, 4L);
+            var nested = new org.springframework.transaction.support.TransactionTemplate(eventTransactions);
+            nested.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_NESTED);
+            try {
+                eventFaultObserver.fail = true;
+                assertThatThrownBy(() -> nested.execute(status -> {
+                    sideEffects.executeSideEffectPhase(single, Map.of("target", allowedPid), principal.tenantId(), MetaContext.getCurrentUserId(), null, null, null);
+                    return null;
+                })).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+            } finally { eventFaultObserver.fail = false; }
+            assertThat(data.getById(contract.modelCode(), allowedPid)).containsEntry("name", "Batch side");
+            assertThat(sourceEvents()).hasSize(6);
+            return null;
+        });
+    }
+
+    @Test void machineSideEffectsCannotExpandFieldOrProspectiveRowAuthority() {
+        publishEvents();
+        var previous = MetaContext.snapshot();
+        MetaContext.setContext(principal.tenantId(), null, principal.subjectPid(), "machine");
+        try (var machine = MachineDataAccessContext.begin(principal);
+             var permission = authorizer.authorize(principal, contract.code(), Operation.UPDATE).openScope()) {
+            var allowed = Map.<String, Object>of("sideEffects", List.of(Map.of("action", "update_record", "targetModel", contract.modelCode(),
+                    "targetIdField", "target", "fieldMapping", Map.of("name", "Machine side"))));
+            sideEffects.executeSideEffectPhase(allowed, Map.of("target", allowedPid), principal.tenantId(), null, null, null, null);
+            assertThat(sourceEvents()).hasSize(1);
+            for (var mapping : List.of(Map.of("secret", "Must not change"), Map.of("zone", "B"))) {
+                var denied = Map.<String, Object>of("sideEffects", List.of(Map.of("action", "update_record", "targetModel", contract.modelCode(),
+                        "targetIdField", "target", "fieldMapping", mapping)));
+                assertThatThrownBy(() -> sideEffects.executeSideEffectPhase(denied, Map.of("target", allowedPid), principal.tenantId(), null, null, null, null))
+                        .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+            }
+            assertThat(sourceEvents()).hasSize(1);
+            assertThat(eventJdbc.queryForMap("SELECT name, zone, secret FROM mt_" + contract.modelCode() + " WHERE pid = ? AND tenant_id = ?",
+                    allowedPid, principal.tenantId())).containsEntry("name", "Machine side").containsEntry("zone", "A").containsEntry("secret", "Private");
+        } finally { MetaContext.restore(previous); }
     }
 
     @Test void softBatchDeleteKeepsTombstonesAndRollsBackPartialFailure() {
