@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { renderToString } from 'react-dom/server';
+import { hydrateRoot } from 'react-dom/client';
 import { MemoryRouter } from 'react-router';
 import WorkbenchPage from '../index';
 
@@ -80,6 +82,25 @@ describe('WorkbenchPage header', () => {
     renderPage();
     expect(await screen.findByRole('heading', { name: 'workbench.title' })).toBeInTheDocument();
     expect(screen.getByTestId('workbench-subline').textContent).toMatch(/\d/);
+  });
+
+  it('hydrates without a date mismatch when server and browser calendar days differ', async () => {
+    const dateLabel = vi.spyOn(Date.prototype, 'toLocaleDateString').mockReturnValue('服务端10月11日');
+    const page = <MemoryRouter><WorkbenchPage /></MemoryRouter>;
+    const host = document.createElement('div');
+    host.innerHTML = renderToString(page);
+    const errors: unknown[] = [];
+    let root: ReturnType<typeof hydrateRoot> | undefined;
+    try {
+      expect(host.querySelector('[data-testid="workbench-subline"]')?.textContent).not.toContain('服务端10月11日');
+      dateLabel.mockReturnValue('客户端10月10日');
+      await act(async () => { root = hydrateRoot(host, page, { onRecoverableError: error => errors.push(error) }); });
+      await waitFor(() => expect(host.querySelector('[data-testid="workbench-subline"]')?.textContent).toContain('客户端10月10日'));
+      expect(errors).toEqual([]);
+    } finally {
+      if (root) await act(async () => root?.unmount());
+      dateLabel.mockRestore();
+    }
   });
 
   it('renders Open-in-Dashboard / Export / New actions', async () => {
