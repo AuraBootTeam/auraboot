@@ -259,7 +259,16 @@ public class PageSchemaValidator implements PluginValidator {
         );
 
         if ("table".equals(blockType)) {
-            validateTableBlock(pageKey, blockPath, block, effectiveModelCode, modelIndex, messages);
+            // ListPageContent loads the primary table from the page datasource. An
+            // extension API projection is not the plugin's partial model binding set.
+            boolean inheritsPageSource = "list".equals(page.getKind())
+                    && Objects.equals(effectiveModelCode, page.getModelCode())
+                    && !block.containsKey("dataSource")
+                    && !tableContract(blockPath, block).source().containsKey("dataSource")
+                    && page.getExtension() != null
+                    && usesExternalDataSource(page.getExtension());
+            validateTableBlock(pageKey, blockPath, block, effectiveModelCode, modelIndex, messages,
+                    inheritsPageSource);
             return;
         }
 
@@ -316,8 +325,20 @@ public class PageSchemaValidator implements PluginValidator {
                                     String modelCode,
                                     PageModelIndex modelIndex,
                                     List<PluginValidationMessage> messages) {
+        validateTableBlock(pageKey, blockPath, block, modelCode, modelIndex, messages, false);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void validateTableBlock(String pageKey,
+                                    String blockPath,
+                                    Map<String, Object> block,
+                                    String modelCode,
+                                    PageModelIndex modelIndex,
+                                    List<PluginValidationMessage> messages,
+                                    boolean inheritsExternalPageSource) {
         TableContract tableContract = tableContract(blockPath, block);
-        boolean modelBoundTable = !usesExternalDataSource(block) && !usesExternalDataSource(tableContract.source());
+        boolean modelBoundTable = !inheritsExternalPageSource
+                && !usesExternalDataSource(block) && !usesExternalDataSource(tableContract.source());
         Object columnsObj = tableContract.source().get("columns");
         if (!(columnsObj instanceof List<?> columns) || columns.isEmpty()) {
             messages.add(error("S-PAGE-TABLE-COLUMNS", category(), tableContract.path() + ".columns",
