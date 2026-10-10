@@ -55,7 +55,7 @@ public class OpenApiPublicationValidator {
         boolean writes = contract.operations().stream().anyMatch(Set.of(
                 OpenApiResourceContract.Operation.CREATE, OpenApiResourceContract.Operation.UPDATE,
                 OpenApiResourceContract.Operation.DELETE)::contains);
-        if (writes) {
+        if (writes || !contract.events().isEmpty()) {
             require(model.getSourceType() == null || "physical".equals(model.getSourceType()), "Virtual models are read-only");
             require(!"view".equalsIgnoreCase(model.getModelType()), "View models are read-only");
         }
@@ -81,6 +81,8 @@ public class OpenApiPublicationValidator {
             FieldDefinition source = fields.get(publicField.source());
             require(source != null, "Published source field does not exist: " + entry.getKey());
             require(!source.isTransientField(), "Transient fields cannot be published");
+            require(contract.events().isEmpty() || !publicField.readable() || !source.isJsonbVirtual(),
+                    "Published events require physical source fields");
             require(!publicField.writable() || !source.isComputedReadonly(), "Computed field is read-only");
             require(!publicField.writable() || !Boolean.TRUE.equals(source.getPrimaryKey()), "Record identity is read-only");
             require(!publicField.sortable() || capabilities.canSortBy(source.getCode()), "Sort exceeds model capabilities");

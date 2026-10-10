@@ -38,6 +38,9 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
     @Autowired private CommandExecutor executor;
     @Autowired private OpenApiLegacyAuthority legacy;
 
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate eventJdbc;
+    @Autowired private org.springframework.transaction.PlatformTransactionManager eventTransactions;
+
     private OpenApiResourceContract contract;
     private MachinePrincipal principal;
     private String credentialPid;
@@ -85,6 +88,110 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
                 new HashMap<>(Map.of("name", "Visible", "zone", "A", "secret", "Private")))).get("pid").toString();
         deniedPid = MetaContext.runWithCommandPermitScope("ALL", () -> data.create(modelCode,
                 new HashMap<>(Map.of("name", "Hidden", "zone", "B", "secret", "Other")))).get("pid").toString();
+    }
+
+    private void publishEvents() {
+        contract = new OpenApiResourceContract(contract.code(), contract.modelCode(), 2, contract.operations(),
+                contract.scopes(), contract.dataPolicy(), contract.fields(), 50, 8, 5000,
+                Set.of("created", "updated", "deleted"));
+        publications.saveDraft(contract.code(), new OpenApiPublicationService.DraftRequest(1, contract));
+        publications.publish(contract.code(), 2);
+    }
+
+    private List<Map<String, Object>> sourceEvents() {
+        return eventJdbc.queryForList("SELECT event_id, event_type, event_sequence, payload::text AS payload FROM ab_outbox"
+                + " WHERE tenant_id = ? AND ordering_key LIKE ? ORDER BY id", principal.tenantId(),
+                "open.resource:" + contract.code() + ":%");
+    }
+
+    @Test void modelEventsShareCrudTransactionAndIdempotentReplay() throws Exception {
+        publishEvents();
+        // Writer cannot read name; the trusted source still captures it for separately authorized consumers.
+        publications.grant(principal.installationPid(), contract.code(), new OpenApiInstallationPolicy(contract.operations(),
+                Set.of("pid", "zone"), Set.of("name", "zone"),
+                List.of(new OpenApiInstallationPolicy.RowConstraint("zone", List.of("A")))));
+        var previous = MetaContext.snapshot();
+        MetaContext.setContext(principal.tenantId(), null, principal.subjectPid(), "machine");
+        try (var machine = MachineDataAccessContext.begin(principal)) {
+            var created = resources.write(principal, contract.code(), Operation.CREATE, null, "event-create-key1", null,
+                    Map.of("name", "Captured", "zone", "A"));
+            assertThat(created.body()).doesNotContainKey("name");
+            assertThat(resources.write(principal, contract.code(), Operation.CREATE, null, "event-create-key1", null,
+                    Map.of("name", "Captured", "zone", "A")).replay()).isTrue();
+            String pid = created.body().get("pid").toString();
+            var changed = resources.write(principal, contract.code(), Operation.UPDATE, pid, "event-update-key1",
+                    created.headers().get("ETag"), Map.of("name", "Changed"));
+            resources.write(principal, contract.code(), Operation.DELETE, pid, "event-delete-key1", changed.headers().get("ETag"), null);
+            var events = sourceEvents();
+            assertThat(events).hasSize(3);
+            assertThat(events.stream().map(row -> row.get("event_id")).distinct()).hasSize(3);
+            assertThat(events.stream().map(row -> ((Number) row.get("event_sequence")).longValue()).toList())
+                    .isSorted().doesNotHaveDuplicates();
+            var first = json.readTree(events.getFirst().get("payload").toString());
+            assertThat(first.path("source").path("name").asText()).isEqualTo("Captured");
+            assertThat(first.path("source").has("secret")).isFalse();
+            assertThat(first.path("source").has("tenant_id")).isFalse();
+            var deleted = json.readTree(events.getLast().get("payload").toString());
+            assertThat(deleted.path("source").path("name").asText()).isEqualTo("Changed");
+            assertThat(deleted.path("schemaVersion").asInt()).isEqualTo(2);
+        } finally { MetaContext.restore(previous); }
+    }
+
+    @Test void humanSingleCrudUsesTheSamePublishedSourceEventHook() {
+        publishEvents();
+        MetaContext.runWithCommandPermitScope("ALL", () -> {
+            String pid = data.create(contract.modelCode(), new HashMap<>(Map.of("name", "Human", "zone", "A")))
+                    .get("pid").toString();
+            data.update(contract.modelCode(), pid, new HashMap<>(Map.of("name", "Human update")));
+            data.delete(contract.modelCode(), pid);
+            return null;
+        });
+        assertThat(sourceEvents()).hasSize(3);
+    }
+
+    @Test void guardedDeleteFailureRollsBackItsBeforeDeleteEvent() {
+        publishEvents();
+        var nested = new org.springframework.transaction.support.TransactionTemplate(eventTransactions);
+        nested.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_NESTED);
+        var previous = MetaContext.snapshot();
+        MetaContext.setContext(principal.tenantId(), null, principal.subjectPid(), "machine");
+        try (var machine = MachineDataAccessContext.begin(principal);
+             var permission = authorizer.authorize(principal, contract.code(), Operation.DELETE).openScope()) {
+            var row = data.getById(contract.modelCode(), allowedPid);
+            long invalidVersion = ((Number) row.get("row_version")).longValue() + 10;
+            assertThatThrownBy(() -> nested.execute(status -> {
+                try (var version = MachineDataAccessContext.withExpectedVersion(contract.modelCode(), allowedPid, invalidVersion)) {
+                    data.delete(contract.modelCode(), allowedPid);
+                }
+                return null;
+            })).isInstanceOf(com.auraboot.framework.exception.ConflictException.class);
+            assertThat(sourceEvents()).isEmpty();
+            assertThat(data.getById(contract.modelCode(), allowedPid)).containsEntry("pid", allowedPid);
+        } finally { MetaContext.restore(previous); }
+    }
+
+    @Test void modelMutationRollbackRemovesSourceEventAndIdempotencyClaim() {
+        publishEvents();
+        var nested = new org.springframework.transaction.support.TransactionTemplate(eventTransactions);
+        nested.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_NESTED);
+        var previous = MetaContext.snapshot();
+        MetaContext.setContext(principal.tenantId(), null, principal.subjectPid(), "machine");
+        try (var machine = MachineDataAccessContext.begin(principal)) {
+            String pid = nested.execute(status -> {
+                var result = resources.write(principal, contract.code(), Operation.CREATE, null, "event-rollback-key", null,
+                        Map.of("name", "Rolled back", "zone", "A"));
+                assertThat(sourceEvents()).hasSize(1);
+                status.setRollbackOnly();
+                return result.body().get("pid").toString();
+            });
+            assertThat(sourceEvents()).isEmpty();
+            assertThat(eventJdbc.queryForObject("SELECT COUNT(*) FROM " + models.getModelDefinition(contract.modelCode())
+                    .orElseThrow().getTableName() + " WHERE tenant_id = ? AND pid = ?", Long.class, principal.tenantId(), pid)).isZero();
+            var retry = resources.write(principal, contract.code(), Operation.CREATE, null, "event-rollback-key", null,
+                    Map.of("name", "Rolled back", "zone", "A"));
+            assertThat(retry.replay()).isFalse();
+            assertThat(sourceEvents()).hasSize(1);
+        } finally { MetaContext.restore(previous); }
     }
 
     @Test void liveGrantBoundsSingleReadsListsCountsAndFieldInference() {

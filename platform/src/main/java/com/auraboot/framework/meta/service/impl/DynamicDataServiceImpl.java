@@ -841,6 +841,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         // Materialize computed fields after insert
         String recordIdValue = enrichedData.get(primaryKey.getCode()).toString();
         virtualFieldEngine.materialize(modelCode, recordIdValue, changedFields);
+        notifyModelMutation(model, recordIdValue, ModelMutationObserver.Operation.CREATED);
 
         // Record change log.
         //
@@ -1178,6 +1179,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
             // Materialize computed fields after update
             virtualFieldEngine.materialize(modelCode, recordId, changedFields);
+            notifyModelMutation(model, recordId, ModelMutationObserver.Operation.UPDATED);
 
             // Record change log. Same platform-internal read-back as create():
             // the caller's read permissions must not gate the row we just wrote.
@@ -1251,6 +1253,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 ? primaryKey.getColumnName()
                 : primaryKey.getCode();
 
+        // Capture the delete snapshot while the source row still exists. The outbox
+        // insert shares this transaction and rolls back if the guarded delete fails.
+        notifyModelMutation(model, recordId, ModelMutationObserver.Operation.DELETED);
         int result;
         if (model.isSoftDelete()) {
             // Soft delete: UPDATE deleted_flag = true
@@ -1288,6 +1293,13 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             log.error("Failed to record change log for delete: model={}, id={}: {}",
                     logSafe(modelCode), logSafe(recordId), logSafe(e.getMessage()), e);
         }
+    }
+
+    private void notifyModelMutation(ModelDefinition model, String pid, ModelMutationObserver.Operation operation) {
+        // Lazy resolution prevents model services and publication validators from forming a cycle.
+        // Observer failures deliberately propagate: a published event is part of the business fact.
+        applicationContext.getBeansOfType(ModelMutationObserver.class).values()
+                .forEach(observer -> observer.observe(model, pid, operation));
     }
 
     private int executeScopedUpdate(
