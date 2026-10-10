@@ -320,7 +320,7 @@ test.describe('Dynamic installation authority journey', () => {
     await editor.getByLabel('授权合同', { exact: true }).selectOption(`resource:${resourceCode}`);
     await expect(editor).toContainText('此安装尚未获此合同的数据授权');
     for (const name of ['列表查询', '详情读取', '创建记录', '修改记录', '删除记录']) await editor.getByLabel(name, { exact: true }).check();
-    for (const alias of ['name', 'zone']) { await editor.getByLabel(`读取 ${alias}`, { exact: true }).check(); await editor.getByLabel(new RegExp(`^写入 ${alias}`)).check(); }
+    for (const alias of ['name', 'zone']) { await editor.getByLabel(`读取 ${alias}`, { exact: true }).check(); await editor.getByRole('checkbox', { name: `写入 ${alias} (创建必填)`, exact: true }).check(); }
     await expect(editor.getByLabel('读取 secret', { exact: true })).not.toBeChecked();
     await editor.getByRole('button', { name: '添加行约束', exact: true }).click();
     const constraint = editor.getByTestId('grant-constraint-0'); await constraint.getByLabel('约束公共字段', { exact: true }).selectOption('zone'); await constraint.getByLabel('允许值（每行一个）', { exact: true }).fill('A');
