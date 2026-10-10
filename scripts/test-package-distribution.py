@@ -74,5 +74,32 @@ class ArchiveContract(unittest.TestCase):
             self.check({"package/package.json": '{"name":"@auraboot/fixture", "version":"1.0.0", "license":"Apache-2.0", "private":true}'})
 
 
+class ConsumerExecutionContract(unittest.TestCase):
+    def output(self, rows):
+        return "CONSUMER_RESULTS " + json.dumps(rows)
+
+    def rows(self):
+        return [{"name": f"case-{index}", "status": "passed"} for index in range(14)]
+
+    def test_actual_execution_ledger(self):
+        self.assertEqual(len(gate.validate_consumer_output(self.output(self.rows()))), 14)
+
+    def test_summary_cannot_replace_execution(self):
+        with self.assertRaisesRegex(ValueError, "execution ledger"):
+            gate.validate_consumer_output("SUMMARY pass=14 fail=0")
+
+    def test_empty_missing_and_duplicate_cases(self):
+        for rows in [[], self.rows()[:-1], self.rows()[:-1] + [self.rows()[0]]]:
+            with self.subTest(rows=rows):
+                with self.assertRaisesRegex(ValueError, "fourteen distinct"):
+                    gate.validate_consumer_output(self.output(rows))
+
+    def test_failed_and_skipped_cases_are_rejected(self):
+        for status in ["failed", "skipped", "did_not_run"]:
+            rows = self.rows(); rows[-1]["status"] = status
+            with self.assertRaisesRegex(ValueError, "incomplete or failed"):
+                gate.validate_consumer_output(self.output(rows))
+
+
 if __name__ == "__main__":
     unittest.main()
