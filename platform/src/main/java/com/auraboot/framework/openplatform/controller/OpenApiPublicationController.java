@@ -27,6 +27,19 @@ public class OpenApiPublicationController {
         return ApiResponse.success(publications.list());
     }
 
+    @GetMapping("/publications/{code}/openapi")
+    public java.util.Map<String, Object> document(@PathVariable String code) {
+        return com.auraboot.framework.openplatform.service.OpenApiContractArtifacts.resource(publications.publishedForAdministration(code));
+    }
+
+    @GetMapping("/publications/{code}/types")
+    public org.springframework.http.ResponseEntity<String> types(@PathVariable String code) {
+        var contract = publications.publishedForAdministration(code);
+        return org.springframework.http.ResponseEntity.ok().contentType(org.springframework.http.MediaType.parseMediaType("text/plain;charset=UTF-8"))
+                .header("Content-Disposition", org.springframework.http.ContentDisposition.attachment().filename(contract.code() + ".d.ts", java.nio.charset.StandardCharsets.UTF_8).build().toString())
+                .body(com.auraboot.framework.openplatform.service.OpenApiContractArtifacts.resourceTypes(contract));
+    }
+
     @PutMapping("/publications/{code}/draft")
     public ApiResponse<OpenApiPublicationService.PublicationView> save(
             @PathVariable String code, @RequestBody OpenApiPublicationService.DraftRequest request) {

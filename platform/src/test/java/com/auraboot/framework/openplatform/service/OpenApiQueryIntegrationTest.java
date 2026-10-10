@@ -36,6 +36,7 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
     @Autowired private com.fasterxml.jackson.databind.ObjectMapper json;
     @Autowired private com.auraboot.framework.openplatform.mapper.OpenApiPublicationMapper publicationMapper;
     @Autowired private org.springframework.transaction.PlatformTransactionManager transactions;
+    @Autowired private com.auraboot.framework.openplatform.controller.OpenApiQueryPublicationController documents;
     private OpenApiResourceContract root,child;
     private OpenApiQueryContract rows,summary;
     private NamedQueryDTO rowsDefinition;
@@ -251,4 +252,18 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest());
         assertThat(MachineDataAccessContext.isActive()).isFalse();
     }
+    @Test void queryDocumentsAndDeclarationsUsePublishedAliasesAndHumanAdministration() {
+        var document = documents.document(summary.code());
+        assertThat(document).containsEntry("x-schema-version", summary.schemaVersion());
+        assertThat(json.valueToTree(document).toString()).contains("count").doesNotContain(summary.queryCode(), root.modelCode(), child.modelCode());
+        assertThat(documents.types(summary.code()).getBody()).contains("QueryParameters", "QueryItem", "\"count\"?: number").doesNotContain(summary.queryCode());
+        var context = MetaContext.snapshot();
+        try {
+            MetaContext.setContext(principalA.tenantId(), null, principalA.subjectPid(), "machine");
+            assertThatThrownBy(() -> documents.document(summary.code())).isInstanceOf(AccessDeniedException.class);
+        } finally { MetaContext.restore(context); }
+        publications.withdraw(summary.code(), 1);
+        assertThatThrownBy(() -> documents.types(summary.code())).isInstanceOf(IllegalArgumentException.class);
+    }
+
 }

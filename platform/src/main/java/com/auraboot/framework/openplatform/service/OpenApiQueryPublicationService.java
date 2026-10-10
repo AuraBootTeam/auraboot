@@ -71,6 +71,10 @@ public class OpenApiQueryPublicationService {
         if(installation==null)throw new IllegalArgumentException("Installation not found");mapper.revoke(tenant(),installation.getId(),key(code));
         mapper.audit(tenant(),key(code),installation.getId(),"revoke",actor(),0);
     }
+    public OpenApiQueryContract publishedForAdministration(String code) {
+        requireAdmin();
+        return active(tenant(), code).orElseThrow(() -> new IllegalArgumentException("Published query required"));
+    }
     public Optional<OpenApiQueryContract> active(Long tenant, String code) {
         String value=mapper.active(tenant,key(code));return value==null?Optional.empty():Optional.of(decode(value,OpenApiQueryContract.class));
     }

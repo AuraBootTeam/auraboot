@@ -30,6 +30,8 @@ class OpenApiPublicationIntegrationTest extends BaseIntegrationTest {
     @Autowired private OpenPlatformManagementService management;
     @Autowired private ApplicationInstallationMapper installations;
 
+    @Autowired private com.auraboot.framework.openplatform.controller.OpenApiPublicationController documents;
+
     @BeforeEach void authorizeAdministrator() {
         grantCommittedPermissionToTestRole("sys.connector.update", "system", "connector", "update", "Manage Open Platform");
     }
@@ -123,4 +125,32 @@ class OpenApiPublicationIntegrationTest extends BaseIntegrationTest {
         try { assertThatThrownBy(publications::list).isInstanceOf(AccessDeniedException.class); }
         finally { applyTestMetaContext(); }
     }
+    @Test void downloadableArtifactsUseActiveSnapshotAndRejectDraftWithdrawnMachineAndOtherTenant() {
+        var definition = fixture();
+        publications.saveDraft(definition.code(), new OpenApiPublicationService.DraftRequest(0, definition));
+        assertThatThrownBy(() -> documents.document(definition.code())).isInstanceOf(IllegalArgumentException.class);
+        publications.publish(definition.code(), 1);
+        assertThat(documents.document(definition.code())).containsEntry("x-schema-version", 1);
+        var types = documents.types(definition.code());
+        assertThat(types.getStatusCode().value()).isEqualTo(200);
+        assertThat(types.getHeaders().getFirst("Content-Disposition")).contains(definition.code(), ".d.ts");
+        assertThat(types.getBody()).contains("schema 1", "export type Resource").doesNotContain(definition.modelCode());
+        var next = new OpenApiResourceContract(definition.code(), definition.modelCode(), 2, definition.operations(), definition.scopes(),
+                definition.dataPolicy(), definition.fields(), 50, 8, 5000, Set.of());
+        publications.saveDraft(definition.code(), new OpenApiPublicationService.DraftRequest(1, next));
+        assertThat(documents.document(definition.code())).containsEntry("x-schema-version", 1);
+        assertThat(documents.types(definition.code()).getBody()).contains("schema 1").doesNotContain("schema 2");
+        var context = MetaContext.snapshot();
+        try {
+            MetaContext.setCurrentTenantId(getTestTenant().getId() + 1000000L);
+            assertThatThrownBy(() -> documents.document(definition.code())).isInstanceOfAny(IllegalArgumentException.class, AccessDeniedException.class);
+            MetaContext.setContext(getTestTenant().getId(), null, "machine-token", "machine");
+            assertThatThrownBy(() -> documents.types(definition.code())).isInstanceOf(AccessDeniedException.class);
+        } finally { MetaContext.restore(context); }
+        publications.publish(definition.code(), 2);
+        assertThat(documents.document(definition.code())).containsEntry("x-schema-version", 2);
+        publications.withdraw(definition.code(), 2);
+        assertThatThrownBy(() -> documents.document(definition.code())).isInstanceOf(IllegalArgumentException.class);
+    }
+
 }

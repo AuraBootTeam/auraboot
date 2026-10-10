@@ -115,6 +115,12 @@ public class OpenApiPublicationService {
         mapper.audit(tenant(), code, installation.getId(), "revoke", actor(), 0);
     }
 
+    /** Administrative artifacts use the active immutable snapshot, never the editable draft. */
+    public OpenApiResourceContract publishedForAdministration(String code) {
+        requireAdmin();
+        return active(tenant(), code).orElseThrow(() -> new IllegalArgumentException("Published resource required"));
+    }
+
     public Optional<OpenApiResourceContract> active(Long tenantId, String code) {
         String definition = mapper.active(tenantId, code);
         return definition == null ? Optional.empty() : Optional.of(decode(definition, OpenApiResourceContract.class));
