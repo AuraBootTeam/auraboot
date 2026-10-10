@@ -12,6 +12,9 @@ import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.impl.CommandExecutorUtils;
 import com.auraboot.framework.meta.service.impl.CommandSpelEvaluator;
 import com.auraboot.framework.meta.service.impl.FieldWriterGuard;
+import com.auraboot.framework.meta.service.impl.CommandFieldMapExecutor;
+import com.auraboot.framework.meta.service.impl.RecordCommandWriterGuard;
+import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.meta.service.impl.ModelMutationGuard;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
@@ -37,6 +40,7 @@ public class ComputedFieldsPhase implements CommandPhase {
     private final DynamicDataMapper dynamicDataMapper;
     private final ChangeTracker changeTracker;
     private final RecordSnapshotReader snapshotReader;
+    private final CommandFieldMapExecutor fieldMapExecutor;
 
     @Override public String name() { return "computed_fields"; }
 
@@ -79,6 +83,12 @@ public class ComputedFieldsPhase implements CommandPhase {
         Map<String, Object> combinedContext = buildComputedContext(
                 payload, fieldMapResults, tenantId, command, request);
 
+        // The persisted field map is typed; JSON decimal strings must not replace its numeric semantics.
+        for (FieldDefinition field : fieldDefs) {
+            Object value = combinedContext.get(field.getCode());
+            if (value != null) combinedContext.put(field.getCode(), fieldMapExecutor.convertFieldValue(field.getDataType(), value));
+        }
+
         Map<String, Object> computedValues = new HashMap<>();
         for (Map.Entry<String, String> entry : sortedFields) {
             String fieldCode = entry.getKey();
@@ -94,8 +104,7 @@ public class ComputedFieldsPhase implements CommandPhase {
                     log.debug("COMPUTED: {} = {} (expr={})", fieldCode, result, expression);
                 }
             } catch (Exception e) {
-                log.warn("Failed to compute field '{}' with expression '{}': {}",
-                        fieldCode, expression, e.getMessage());
+                throw new MetaServiceException("COMPUTED_FIELD_FAILED: cannot evaluate field '" + fieldCode + "'", e);
             }
         }
 
@@ -115,12 +124,20 @@ public class ComputedFieldsPhase implements CommandPhase {
             if (rows != null && !rows.isEmpty()) {
                 Long dbId = ((Number) rows.get(0).get("id")).longValue();
                 Map<String, Object> conditions = Map.of("tenant_id", tenantId, "id", dbId);
-                dynamicDataMapper.update(tableName, computedValues, conditions);
+                conditions = RecordCommandWriterGuard.guardLegacyConditions(dynamicDataMapper, modelDef,
+                        tableName, conditions, "update", computedValues,
+                        code -> metaModelService.getModelDefinition(code).orElse(null));
+                int affected = dynamicDataMapper.update(tableName, computedValues, conditions);
+                if (affected != 1) throw new MetaServiceException("Computed field target is missing or changed");
                 log.debug("COMPUTED: wrote {} fields to {} (pid={})", computedValues.size(), tableName, recordIdStr);
             } else {
                 var fallbackEntry = CommandExecutorUtils.resolveRecordIdColumn(recordIdStr);
                 Map<String, Object> conditions = Map.of("tenant_id", tenantId, fallbackEntry.getKey(), fallbackEntry.getValue());
-                dynamicDataMapper.update(tableName, computedValues, conditions);
+                conditions = RecordCommandWriterGuard.guardLegacyConditions(dynamicDataMapper, modelDef,
+                        tableName, conditions, "update", computedValues,
+                        code -> metaModelService.getModelDefinition(code).orElse(null));
+                int affected = dynamicDataMapper.update(tableName, computedValues, conditions);
+                if (affected != 1) throw new MetaServiceException("Computed field target is missing or changed");
             }
         }
     }

@@ -58,7 +58,7 @@ class RecordCommandWriterPostgresIT {
 
     private void fixture(Runnable assertions) {
         transaction.executeWithoutResult(status->{
-            jdbc.execute("CREATE TEMP TABLE "+TABLE+" (id bigint PRIMARY KEY, pid text UNIQUE NOT NULL, tenant_id bigint NOT NULL, managed_flag boolean, order_pid text, amount integer NOT NULL, row_version bigint NOT NULL DEFAULT 0, deleted_flag boolean NOT NULL DEFAULT FALSE) ON COMMIT DROP");
+            jdbc.execute("CREATE TEMP TABLE "+TABLE+" (id bigint PRIMARY KEY, pid text UNIQUE NOT NULL, tenant_id bigint NOT NULL, managed_flag boolean, order_pid text, created_at timestamptz, created_by bigint, amount integer NOT NULL, row_version bigint NOT NULL DEFAULT 0, deleted_flag boolean NOT NULL DEFAULT FALSE) ON COMMIT DROP");
             jdbc.update("INSERT INTO "+TABLE+" (id,pid,tenant_id,managed_flag,amount) VALUES (1,'owned',1,TRUE,10),(2,'ordinary',1,FALSE,20),(3,'foreign',2,FALSE,30)");
             assertions.run();
         });
@@ -166,6 +166,54 @@ class RecordCommandWriterPostgresIT {
             assertThatThrownBy(() -> RecordCommandWriterGuard.guardLegacyConditions(mapper,model,TABLE,
                 Map.of("order_pid","parent-owned"),"delete",null,code -> parent)).hasMessageContaining("RECORD_WRITER_DENIED");
             assertThat(jdbc.queryForObject("SELECT count(*) FROM " + TABLE + " WHERE pid='ordinary'",Long.class)).isEqualTo(1);
+        });
+    }
+
+    @Test void realFileImportRejectsManagedParentAndInsertsOnlyOrdinaryParentChild() {
+        parentFixture(() -> {
+            var parent=RecordCommandWriterParentTest.parentModel("mt_procurement_parent_it");
+            var support=new DynamicDataTransferSupport(null,mapper,new com.fasterxml.jackson.databind.ObjectMapper(),null,null,null,null,
+                null,null,null,null,null,null,null,code -> code.equals("order") ? parent : model,code -> {},
+                (definition,data) -> new HashMap<>(data),(definition,sort) -> sort);
+            java.nio.file.Path file;
+            try { file=java.nio.file.Files.createTempFile("procurement-parent-it-",".json");
+                java.nio.file.Files.writeString(file,"[{\"id\":4,\"pid\":\"import-owned\",\"order_pid\":\"parent-owned\",\"amount\":40},{\"id\":5,\"pid\":\"import-ordinary\",\"order_pid\":\"parent-ordinary\",\"amount\":50}]");
+            } catch (java.io.IOException e) { throw new java.io.UncheckedIOException(e); }
+            try {
+                var result=support.importData("line",com.auraboot.framework.meta.dto.DataImportRequest.builder()
+                    .filePath(file.toString()).format(com.auraboot.framework.meta.dto.DataImportRequest.ImportFormat.JSON).build());
+                assertThat(result.getSuccessCount()).isEqualTo(1);assertThat(result.getFailedCount()).isEqualTo(1);
+                assertThat(result.getErrors().get(0).getErrorMessage()).contains("RECORD_WRITER_DENIED");
+                assertThat(jdbc.queryForObject("SELECT count(*) FROM " + TABLE + " WHERE pid='import-owned'",Long.class)).isZero();
+                assertThat(jdbc.queryForObject("SELECT amount FROM " + TABLE + " WHERE pid='import-ordinary'",Integer.class)).isEqualTo(50);
+            } finally { try { java.nio.file.Files.deleteIfExists(file); } catch(java.io.IOException e) { throw new java.io.UncheckedIOException(e); } }
+        });
+    }
+    @Test void realComputedWriteCannotBypassManagedParentAndExactWriterCanCompute() {
+        parentFixture(() -> {
+            var fields=new java.util.ArrayList<>(model.getFields());
+            fields.add(FieldDefinition.builder().code("qty").dataType("decimal").build());
+            fields.add(FieldDefinition.builder().code("price").dataType("decimal").build());
+            fields.add(FieldDefinition.builder().code("amount").dataType("decimal").build());model.setFields(fields);
+            var parent=RecordCommandWriterParentTest.parentModel("mt_procurement_parent_it");
+            var metadata=mock(com.auraboot.framework.meta.service.MetaModelService.class);
+            when(metadata.getModelDefinition("line")).thenReturn(java.util.Optional.of(model));
+            when(metadata.getModelDefinition("order")).thenReturn(java.util.Optional.of(parent));
+            when(metadata.getTableName("line")).thenReturn(TABLE);
+            var command=new com.auraboot.framework.meta.entity.CommandDefinition();command.setCode("app:save");command.setModelCode("line");
+            var context=com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext.builder()
+                .command(command).tenantId(1L).userId(7L).request(new com.auraboot.framework.meta.dto.CommandExecuteRequest())
+                .fieldMapResults(new HashMap<>(Map.of("recordPid","ordinary")))
+                .payload(new HashMap<>(Map.of("qty","2","price","3")))
+                .execConfig(Map.of("computedFields",Map.of("amount","qty * price"))).build();
+            var phase=new com.auraboot.framework.meta.service.impl.pipeline.phases.ComputedFieldsPhase(metadata,
+                new CommandSpelEvaluator(),mapper,mock(com.auraboot.framework.meta.service.ChangeTracker.class),
+                mock(com.auraboot.framework.meta.service.impl.pipeline.RecordSnapshotReader.class),
+                new CommandFieldMapExecutor(mapper,metadata,null,null,null));
+            assertThatThrownBy(() -> phase.execute(context)).hasMessageContaining("RECORD_WRITER_DENIED");
+            assertThat(jdbc.queryForObject("SELECT amount FROM " + TABLE + " WHERE pid='ordinary'",Integer.class)).isEqualTo(20);
+            exact(() -> phase.execute(context));
+            assertThat(jdbc.queryForObject("SELECT amount FROM " + TABLE + " WHERE pid='ordinary'",Integer.class)).isEqualTo(6);
         });
     }
 

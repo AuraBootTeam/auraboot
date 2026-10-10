@@ -359,6 +359,8 @@ final class DynamicDataTransferSupport extends BaseMetaService {
                         columnData.put("tenant_id", tenantId);
                         columnData.put("created_at", Instant.now());
                         columnData.put("created_by", getCurrentUserId());
+                        RecordCommandWriterGuard.guardParentInput(dynamicDataMapper, model,
+                                getModelDefinitionOperation::execute, columnData);
 
                         Set<String> batchJsonbCols = JsonbFieldHelper.getJsonbHostColumns(model);
                         if (batchJsonbCols.isEmpty()) {

@@ -29,6 +29,7 @@ import com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutor;
 import com.auraboot.framework.meta.service.impl.CommandExecutorUtils;
 import com.auraboot.framework.meta.service.impl.ModelMutationGuard;
 import com.auraboot.framework.meta.service.impl.FieldWriterGuard;
+import com.auraboot.framework.meta.service.impl.RecordCommandWriterGuard;
 import com.auraboot.framework.plugin.extension.WorkflowCapability;
 import com.auraboot.framework.plugin.pf4j.WorkflowCapabilityRegistry;
 import com.auraboot.framework.meta.service.impl.DynamicDataQueryScope;
@@ -279,6 +280,9 @@ public class HandlerPhase implements CommandPhase {
         ModelMutationGuard.assertMutableOrInsertedInThisCommand(
                 modelDef, "updated by handler result persistence", fieldMapResults, recordIdStr);
         FieldWriterGuard.assertFieldsAllowed(modelDef, persistable.keySet());
+        RecordCommandWriterGuard.assertInputAllowed(modelDef, persistable, "update");
+        RecordCommandWriterGuard.guardParentInput(dynamicDataMapper, modelDef,
+                code -> metaModelService.getModelDefinition(code).orElse(null), persistable);
 
         String tableName = metaModelService.getTableName(modelCode);
         CommandExecutorUtils.validateSqlIdentifier(tableName, "handler field tableName");
@@ -308,7 +312,7 @@ public class HandlerPhase implements CommandPhase {
         // in the data map. (Distinct from OSS #398, which only covered the
         // CommandSideEffectExecutor UPDATE_RECORD + partial-CRUD paths.)
         Set<String> jsonbColumns = resolveJsonbColumns(modelDef, tableName);
-        if (shouldUseScopedWrite()) {
+        if (shouldUseScopedWrite() || RecordCommandWriterGuard.hasPolicy(modelDef)) {
             executeScopedUpdate(
                     tableName, modelCode, recordIdStr, idEntry, persistable, tenantId, jsonbColumns);
         } else if (jsonbColumns.isEmpty()) {
@@ -397,10 +401,14 @@ public class HandlerPhase implements CommandPhase {
             params.put("expectedVersion", expectedVersion);
             sql.append(" AND row_version = #{params.expectedVersion}");
         }
+        ModelDefinition writerModel = metaModelService.getModelDefinition(modelCode).orElse(null);
+        RecordCommandWriterGuard.appendStoredPredicate(sql, writerModel, "update",
+                code -> metaModelService.getModelDefinition(code).orElse(null));
+        RecordCommandWriterGuard.appendMarkerInvariant(sql, writerModel, data);
         appendScopedWriteGuards(sql, tenantId, modelCode);
 
         int updated = dynamicDataMapper.updateByQuery(sql.toString(), params);
-        if (updated <= 0 && expectedVersion != null) {
+        if (updated <= 0 && (expectedVersion != null || RecordCommandWriterGuard.hasPolicy(writerModel))) {
             throw new com.auraboot.framework.exception.ConflictException(
                     "Handler result write failed: target changed after command authorization");
         }

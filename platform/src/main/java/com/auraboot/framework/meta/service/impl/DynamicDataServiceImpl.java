@@ -1482,6 +1482,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         validateModelCode(modelCode);
         logOperation("createRelations", modelCode, relationName);
         RelationDefinition relation = DynamicDataValueMapper.findRelation(getModelDefinition(modelCode), relationName);
+        ModelDefinition sourceModel = getModelDefinition(modelCode);
+        RecordCommandWriterGuard.guardLegacyConditions(dynamicDataMapper, sourceModel,
+                sourceModel.getTableName(), Map.of("id", recordId), "update", null,
+                code -> metadataService.getModelDefinition(code).orElse(null));
         return relationSupport().createRelations(relation, recordId, targetRecordIds, getCurrentTenantId());
     }
 
@@ -1492,6 +1496,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         validateModelCode(modelCode);
         logOperation("removeRelations", modelCode, relationName);
         RelationDefinition relation = DynamicDataValueMapper.findRelation(getModelDefinition(modelCode), relationName);
+        ModelDefinition sourceModel = getModelDefinition(modelCode);
+        RecordCommandWriterGuard.guardLegacyConditions(dynamicDataMapper, sourceModel,
+                sourceModel.getTableName(), Map.of("id", recordId), "update", null,
+                code -> metadataService.getModelDefinition(code).orElse(null));
         return relationSupport().removeRelations(relation, recordId, targetRecordIds, getCurrentTenantId());
     }
 

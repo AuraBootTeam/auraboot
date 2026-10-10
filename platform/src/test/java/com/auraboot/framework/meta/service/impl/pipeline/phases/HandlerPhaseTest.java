@@ -710,6 +710,33 @@ class HandlerPhaseTest {
         org.assertj.core.api.Assertions.assertThat(ctx.getHandlerResults()).isEmpty();
     }
 
+
+    @Test
+    void handlerReturnedFieldsRetainParentAndRecordSqlProtection() throws Exception {
+        MetaContext.setContext(1L,null,null,"system");
+        var handler=new RecordingFullRowHandler(BUSINESS_COMMAND_CODE);
+        when(extensionRegistry.getCommandHandler(BUSINESS_COMMAND_CODE)).thenReturn(Optional.of(handler));
+        var marker=com.auraboot.framework.meta.dto.FieldDefinition.builder().code("managed").columnName("managed_flag").dataType("boolean").immutable(true).build();
+        var reference=new com.auraboot.framework.meta.dto.FieldDefinition.RefTarget();reference.setTargetEntity("parent");reference.setValueField("pid");
+        var link=com.auraboot.framework.meta.dto.FieldDefinition.builder().code("order_link").columnName("order_pid").refTarget(reference).build();
+        var policy=Map.of("field","managed","commands",Map.of("create",List.of(),"update",List.of("app:save"),"delete",List.of()));
+        var model=com.auraboot.framework.meta.dto.ModelDefinition.builder().code("line").tableName("mt_line")
+            .fields(List.of(marker,link,com.auraboot.framework.meta.dto.FieldDefinition.builder().code("cr_cj_status").dataType("string").build()))
+            .extension(Map.of("recordCommandWriters",policy,"parentModel","parent","parentField","order_link")).build();
+        var parent=com.auraboot.framework.meta.dto.ModelDefinition.builder().code("parent").tableName("mt_parent")
+            .fields(List.of(marker)).extension(Map.of("recordCommandWriters",policy)).build();
+        when(metaModelService.getModelDefinition("line")).thenReturn(Optional.of(model));
+        when(metaModelService.getModelDefinition("parent")).thenReturn(Optional.of(parent));
+        when(metaModelService.getTableName("line")).thenReturn("mt_line");
+        when(dynamicDataMapper.selectByQuery(any(),any())).thenReturn(List.of(Map.of("id",42L)));
+        assertThatThrownBy(() -> phase.execute(buildContext(BUSINESS_COMMAND_CODE,"line",Map.of("type","custom"))))
+            .isInstanceOf(com.auraboot.framework.exception.ConflictException.class);
+        var sql=ArgumentCaptor.forClass(String.class);verify(dynamicDataMapper).updateByQuery(sql.capture(),any());
+        assertThat(sql.getValue()).contains("managed_flag IS DISTINCT FROM TRUE","NOT EXISTS",
+            "record_writer_parent.pid = mt_line.order_pid","record_writer_parent.tenant_id = mt_line.tenant_id");
+        verify(dynamicDataMapper,never()).update(any(),any(),any());
+    }
+
     private CommandPipelineContext buildContext(String commandCode, String modelCode, Map<String, Object> execConfig) {
         CommandDefinition command = new CommandDefinition();
         command.setCode(commandCode);
