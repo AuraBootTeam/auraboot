@@ -246,7 +246,7 @@ test.describe('Dynamic query publication journey', () => {
       const downloaded = page.waitForEvent('download'); await page.getByRole('button', { name: button, exact: true }).click();
       const artifact = await downloaded; expect(artifact.suggestedFilename()).toBe(publicCode + extension); const location = await artifact.path(); expect(location).toBeTruthy();
       const content = await readFile(location!, 'utf8'); expect(content).toContain('contactName'); expect(content).not.toContain(modelCode); expect(content).not.toContain(queryCode); expect(content).not.toContain('contact_name'); expect(content).not.toContain('dop_q_name');
-      if (extension === '.openapi.json') { const document = JSON.parse(content); expect(document.openapi).toBe('3.1.0'); expect(document['x-schema-version']).toBe(1); expect(document.paths[`/api/open/v1/queries/${publicCode}`].post).toBeDefined(); }
+      if (extension === '.openapi.json') { const document = JSON.parse(content); expect(document.openapi).toBe('3.1.0'); expect(document['x-schema-version']).toBe(1); expect(document.paths[`/api/open/v1/queries/${publicCode}:execute`].post).toBeDefined(); }
       else { expect(content).toContain('export type QueryParameters'); expect(content).toContain('export type QueryItem'); }
       await artifact.saveAs(path.join(screenshotRoot, publicCode + extension)); await snapshot(extension === '.openapi.json' ? 'query-openapi' : 'query-types');
     }
