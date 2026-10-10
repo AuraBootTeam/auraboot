@@ -18,6 +18,8 @@ RELEASE_MUTATION="${AURA_OPEN_PLATFORM_RELEASE_MUTATION:-}"
 : "${AURA_CI_JOB_ID:?AURA_CI_JOB_ID is required}"
 : "${AURA_CI_BUILDER_ID:?AURA_CI_BUILDER_ID is required}"
 : "${AURA_REGRESSION_ARTIFACTS:?AURA_REGRESSION_ARTIFACTS is required}"
+[[ "${AURA_CI_SOURCE_SET_DIGEST:-}" =~ ^[0-9a-f]{64}$ ]] \
+  || fatal "exact frozen source-set digest is required"
 [[ "$(uname -s)" == "Linux" ]] || fatal "release images must be verified on the admitted Linux CI host"
 [[ "$(uname -m)" == "x86_64" ]] || fatal "release image builder must be x86_64"
 for command_name in docker git openssl python3 timeout; do need "$command_name"; done
@@ -311,6 +313,7 @@ if [[ "$DRAINED" != 1 && "$RELEASE_MUTATION" == "webhook-backlog" ]]; then
   python3 - "$ARTIFACTS/mutation-receipt.json" <<PY
 import json, sys
 json.dump({"mutation": "webhook-backlog", "verdict": "EXPECTED_RED", "backlog": int("$BACKLOG"),
+           "guard": "webhook-queue-drain", "sourceSetDigest": "$AURA_CI_SOURCE_SET_DIGEST",
            "ref": "$REF_SHA", "releaseReceiptCreated": False}, open(sys.argv[1], "w"), indent=2)
 PY
   fail "EXPECTED_RED: Webhook backlog mutation was rejected; backlog=$BACKLOG"
@@ -322,6 +325,7 @@ python3 - "$ARTIFACTS/release-image-receipt.json" <<PY
 import json, sys
 json.dump({
   "ref": "$REF_SHA", "image": "$IMAGE", "digest": "$DIGEST", "health": "UP",
+  "sourceSetDigest": "$AURA_CI_SOURCE_SET_DIGEST",
   "protocolProbe": "assets+inventory+cursor+etag+catalog+dynamic-crud+named-query+fresh-sdk+model-event-recovery", "dynamicCases": 16, "sdkCases": 13, "modelEventCases": 18, "slo": "production-thresholds-ok",
   "sdkArchive": json.load(open("$ARTIFACTS/sdk-archive.json")), "sdkNodeImage": "$SDK_NODE_IMAGE",
   "webhookDrainBacklog": 0, "registryPush": "disabled", "builder": "$AURA_CI_BUILDER_ID",

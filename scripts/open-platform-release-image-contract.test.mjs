@@ -40,6 +40,7 @@ assert.match(gate, /webhookDrainBacklog/);
 assert.match(gate, /AURA_OPEN_PLATFORM_RELEASE_MUTATION/);
 assert.match(gate, /EXPECTED_RED: Webhook backlog mutation was rejected/);
 assert.match(gate, /releaseReceiptCreated.*False/);
+assert.match(gate, /exact frozen source-set digest is required/);
 assert.doesNotMatch(probe, /\/api\/test\//);
 assert.match(probe, /bootstrap_module\.bootstrap_admin\(request\)/);
 assert.match(probe, /release-bootstrap\.py/);
@@ -79,6 +80,36 @@ const sampler = fs.readFileSync(new URL('./ci/sample-open-platform-db.sh', impor
 assert.match(sampler, /pg_blocking_pids/);
 assert.doesNotMatch(sampler, /SELECT \*|usename|query,|query AS|client_addr/);
 console.log('open-platform release-image contract: PASS');
+
+// Execute the production expected-red receipt block without a Docker lifecycle.
+const sourceIdentityCheck = gate.slice(gate.indexOf('[[ "${AURA_CI_SOURCE_SET_DIGEST:-}"'),
+  gate.indexOf('[[ "$(uname -s)"'));
+const mutationReceipt = gate.slice(gate.indexOf('if [[ "$DRAINED" != 1 &&'),
+  gate.indexOf('[[ "$DRAINED" == 1 ]]'));
+const failures = gate.slice(gate.indexOf('fatal() {'), gate.indexOf('info() {'));
+for (const sourceDigest of ['a'.repeat(64), '', 'main']) {
+  const artifacts = fs.mkdtempSync(path.join(os.tmpdir(), 'open-platform-mutation-receipt-'));
+  try {
+    const result = spawnSync('bash', ['-c', `set -Eeuo pipefail\n${failures}\n${sourceIdentityCheck}\n${mutationReceipt}`], {
+      encoding:'utf8', env:{...process.env, ARTIFACTS:artifacts, AURA_CI_SOURCE_SET_DIGEST:sourceDigest,
+        BACKLOG:'1', DRAINED:'0', RELEASE_MUTATION:'webhook-backlog', REF_SHA:'b'.repeat(40)}
+    });
+    assert.equal(result.status, sourceDigest.length === 64 ? 1 : 2, result.stderr);
+    assert.equal(fs.existsSync(path.join(artifacts, 'release-image-receipt.json')), false);
+    const receiptFile = path.join(artifacts, 'mutation-receipt.json');
+    if (sourceDigest.length === 64) {
+      const receipt = JSON.parse(fs.readFileSync(receiptFile, 'utf8'));
+      assert.equal(receipt.sourceSetDigest, sourceDigest);
+      assert.equal(receipt.guard, 'webhook-queue-drain');
+      assert.equal(receipt.mutation, 'webhook-backlog');
+      assert.equal(receipt.verdict, 'EXPECTED_RED');
+      assert.equal(receipt.backlog, 1);
+      assert.equal(receipt.ref, 'b'.repeat(40));
+      assert.equal(receipt.releaseReceiptCreated, false);
+    } else assert.equal(fs.existsSync(receiptFile), false);
+  } finally { fs.rmSync(artifacts, {recursive:true}); }
+}
+console.log('open-platform expected-red receipt: 3 executable cases PASS');
 
 // Exercise the actual exit handler without starting a container runtime.
 const exitHandler = gate.slice(gate.indexOf('cleanup() {'), gate.indexOf('trap cleanup EXIT'));
