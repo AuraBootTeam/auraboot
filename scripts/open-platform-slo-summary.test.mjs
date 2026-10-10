@@ -137,3 +137,24 @@ test('actual Python SLO verifier rejects missing samples, false green and wrong 
     }
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
+
+test('actual standalone shell prevents k6 automatic setup-data export and keeps secrets out of argv', async () => {
+  const { mkdtempSync, writeFileSync, readFileSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { spawnSync } = await import('node:child_process');
+  const directory = mkdtempSync(join(tmpdir(), 'slo-environment-'));
+  const calls = join(directory, 'calls');
+  const summary = join(directory, 'summary.json');
+  writeFileSync(join(directory, 'k6'), '#!/bin/bash\nprintf "%s\\n" "${K6_SUMMARY_EXPORT-unset}" "$@" > "$CALLS"\nexit 17\n', { mode: 0o700 });
+  try {
+    const result = spawnSync('bash', [new URL('./run-open-platform-slo-gate.sh', import.meta.url).pathname, 'smoke'],
+      { encoding: 'utf8', env: { ...process.env, PATH: directory + ':' + process.env.PATH, CALLS: calls,
+        CLIENT_ID: 'private-client-sentinel', CLIENT_SECRET: 'private-secret-sentinel', K6_SUMMARY_EXPORT: summary } });
+    assert.equal(result.status, 17, result.stderr);
+    const actual = readFileSync(calls, 'utf8');
+    assert.match(actual, /^unset\nrun\n/);
+    assert.ok(actual.includes('SUMMARY_PATH=' + summary));
+    assert.doesNotMatch(actual + result.stdout + result.stderr, /private-.*-sentinel/);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
