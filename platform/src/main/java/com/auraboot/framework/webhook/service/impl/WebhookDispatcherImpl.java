@@ -213,6 +213,10 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
             return;
         }
         try {
+            boolean modelEvent = OpenApiEventCatalog.isModelEvent(subscription.getEventType());
+            if (modelEvent && (subscription.getSecret() == null || subscription.getSecret().isBlank())) {
+                throw new IllegalArgumentException("Published model notifications require a signing secret");
+            }
             String body = delivery.getRequestBody();
             if (OpenApiEventCatalog.isModelEvent(subscription.getEventType())) {
                 body = serializePayload(preparePublished(subscription, delivery, Map.of()));
@@ -241,11 +245,13 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
                     .header("X-Webhook-Timestamp", timestamp)
                     .header("X-Webhook-Delivery", delivery.getPid());
 
-            // Add HMAC signature if secret is configured
+            String signature = null;
             if (subscription.getSecret() != null && !subscription.getSecret().isBlank()) {
                 String decryptedSecret = fieldEncryptionService.decrypt(subscription.getSecret());
-                String signature = webhookSignature.sign(decryptedSecret, timestamp, body);
-                requestBuilder.header("X-Webhook-Signature", signature);
+                if (modelEvent && (decryptedSecret == null || decryptedSecret.isBlank())) {
+                    throw new IllegalArgumentException("Published model notifications require a signing secret");
+                }
+                signature = webhookSignature.sign(decryptedSecret, timestamp, body);
             }
 
             // Add custom headers
@@ -255,6 +261,15 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
                         objectMapper.getTypeFactory().constructMapType(Map.class, String.class, String.class));
                 customHeaders.forEach(requestBuilder::header);
             }
+
+            // Protocol identity and signatures cannot be replaced or duplicated by subscription headers.
+            requestBuilder.setHeader("Content-Type", "application/json");
+            requestBuilder.setHeader("X-Webhook-Event", subscription.getEventType());
+            requestBuilder.setHeader("X-Webhook-Event-Version",
+                    String.valueOf(subscription.getEventVersion() == null ? 1 : subscription.getEventVersion()));
+            requestBuilder.setHeader("X-Webhook-Timestamp", timestamp);
+            requestBuilder.setHeader("X-Webhook-Delivery", delivery.getPid());
+            if (signature != null) requestBuilder.setHeader("X-Webhook-Signature", signature);
 
             // A subscription header cannot replace the persisted originating ID.
             if (delivery.getRequestId() != null && !delivery.getRequestId().isBlank()) {

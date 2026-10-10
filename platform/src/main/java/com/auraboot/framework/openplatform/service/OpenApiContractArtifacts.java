@@ -66,12 +66,12 @@ public final class OpenApiContractArtifacts {
             schemas.put("ModelEvent", modelEvent(contract));
             var webhooks = new TreeMap<String, Object>();
             for (String operation : contract.events()) webhooks.put("open.resource." + contract.code() + "." + operation,
-                    Map.of("post", Map.of("security", List.of(), "description", "When a subscription secret is configured, verify the HMAC over the raw HTTP bytes before parsing; deduplicate event ID and compare recordVersion",
+                    Map.of("post", Map.of("security", List.of(), "description", "Verify the mandatory HMAC over the timestamp and raw HTTP bytes before parsing; deduplicate event ID and compare recordVersion",
                             "parameters", List.of(parameter("X-Webhook-Event", "header", true, Map.of("type", "string")),
                                     parameter("X-Webhook-Event-Version", "header", true, Map.of("type", "string")),
                                     parameter("X-Webhook-Timestamp", "header", true, Map.of("type", "string")),
                                     parameter("X-Webhook-Delivery", "header", true, Map.of("type", "string")),
-                                    parameter("X-Webhook-Signature", "header", false, Map.of("type", "string", "description", "Present when a subscription secret is configured; HMAC over the timestamp and raw payload bytes"))),
+                                    parameter("X-Webhook-Signature", "header", true, Map.of("type", "string", "description", "Mandatory HMAC over the timestamp and raw payload bytes"))),
                             "requestBody", Map.of("required", true, "content", content(ref("ModelEvent"))),
                             "responses", Map.of("200", Map.of("description", "Notification accepted")))));
             result.put("webhooks", webhooks);

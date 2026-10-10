@@ -55,6 +55,7 @@ public class WebhookServiceImpl implements WebhookService {
         entity.setEventVersion(validateEventVersion(entity.getInstallationPid(), request));
         entity.setModelCode(request.getModelCode());
         entity.setFilterExpression(request.getFilterExpression());
+        requireModelSigningSecret(entity.getEventType(), request.getSecret());
         entity.setSecret(fieldEncryptionService.encrypt(request.getSecret()));
         entity.setSecretRotatedAt(hasSecret(request.getSecret()) ? now : null);
         entity.setHeaders(request.getHeaders());
@@ -106,6 +107,8 @@ public class WebhookServiceImpl implements WebhookService {
         existing.setFilterExpression(request.getFilterExpression());
         // If masked value sent back, keep existing encrypted secret
         String newSecret = request.getSecret();
+        requireModelSigningSecret(existing.getEventType(),
+                newSecret != null && newSecret.startsWith("****") ? existing.getSecret() : newSecret);
         if (newSecret != null && newSecret.startsWith("****")) {
             // Client sent back masked value — keep DB value unchanged
         } else {
@@ -197,6 +200,12 @@ public class WebhookServiceImpl implements WebhookService {
             eventCatalog.requireExternal(request.getEventType(), version);
         }
         return version;
+    }
+
+    private void requireModelSigningSecret(String eventType, String secret) {
+        if (OpenApiEventCatalog.isModelEvent(eventType) && !hasSecret(secret)) {
+            throw new IllegalArgumentException("Published model notifications require a signing secret");
+        }
     }
 
     private boolean hasSecret(String value) {

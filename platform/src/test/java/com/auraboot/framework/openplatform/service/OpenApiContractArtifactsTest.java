@@ -66,8 +66,8 @@ class OpenApiContractArtifactsTest {
         assertThat(doc.path("webhooks").size()).isEqualTo(3);
         var notification = doc.path("webhooks").elements().next().path("post");
         assertThat(notification.path("parameters").get(4).path("name").asText()).isEqualTo("X-Webhook-Signature");
-        assertThat(notification.path("parameters").get(4).path("required").asBoolean()).isFalse();
-        assertThat(notification.path("description").asText()).contains("subscription secret is configured");
+        assertThat(notification.path("parameters").get(4).path("required").asBoolean()).isTrue();
+        assertThat(notification.path("description").asText()).contains("mandatory HMAC");
         assertThat(doc.path("components").path("schemas").path("ModelEvent").path("properties").path("schemaVersion").path("const").asInt()).isEqualTo(3);
     }
     @Test void queryArtifactsHideSourceBindingsAndKeepRequiredTypedParametersAndBudget() {

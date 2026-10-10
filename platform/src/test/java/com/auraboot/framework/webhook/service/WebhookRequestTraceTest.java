@@ -23,6 +23,43 @@ import static org.mockito.Mockito.*;
 /** Hermetic transport test: loopback is explicitly admitted only for this fixture. */
 class WebhookRequestTraceTest {
     @Test
+    void unsignedPersistedModelSubscriptionIsRejectedBeforeTransport() throws Exception {
+        List<String> received = new CopyOnWriteArrayList<>();
+        HttpServer receiver = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        receiver.createContext("/receive", exchange -> {
+            received.add("received"); exchange.sendResponseHeaders(200, -1); exchange.close();
+        });
+        String oldAllowlist = System.getProperty("AURA_SSRF_ALLOWED_PRIVATE_HOSTS");
+        System.setProperty("AURA_SSRF_ALLOWED_PRIVATE_HOSTS", "127.0.0.1"); receiver.start();
+        try {
+            var subscriptions = mock(WebhookSubscriptionMapper.class);
+            var deliveries = mock(WebhookDeliveryLogMapper.class);
+            var subscription = new WebhookSubscription();
+            subscription.setPid("legacy-unsigned"); subscription.setTenantId(42L);
+            subscription.setInstallationPid("installation-1"); subscription.setEnabled(true);
+            subscription.setEventType("open.resource.fixture.created");
+            subscription.setTargetUrl("http://127.0.0.1:" + receiver.getAddress().getPort() + "/receive");
+            when(subscriptions.findByPid(42L, subscription.getPid())).thenReturn(subscription);
+            var policy = mock(WebhookDeliveryPolicy.class);
+            when(policy.supports(subscription.getEventType())).thenReturn(true);
+            var dispatcher = new WebhookDispatcherImpl(subscriptions, deliveries, new ObjectMapper(),
+                    mock(FieldEncryptionService.class), new WebhookSignature(), new OpenApiEventCatalog());
+            dispatcher.setDeliveryPolicies(List.of(policy));
+            var delivery = new WebhookDeliveryLog(); delivery.setId(7L); delivery.setTenantId(42L);
+            delivery.setSubscriptionPid(subscription.getPid()); delivery.setPid("delivery-1"); delivery.setLeaseToken("lease-1");
+            when(policy.prepare(subscription, delivery)).thenReturn(Map.of("id", "event-1"));
+            dispatcher.processClaimed(delivery);
+            assertThat(received).isEmpty();
+            verify(deliveries).markPermanentFailure(eq(7L), eq("lease-1"), contains("signing secret"));
+            verify(deliveries, never()).markSuccess(anyLong(), anyString(), anyInt(), any());
+        } finally {
+            receiver.stop(0);
+            if (oldAllowlist == null) System.clearProperty("AURA_SSRF_ALLOWED_PRIVATE_HOSTS");
+            else System.setProperty("AURA_SSRF_ALLOWED_PRIVATE_HOSTS", oldAllowlist);
+        }
+    }
+
+    @Test
     void queuedOriginSurvivesWorkerContextAndCustomHeaderOnEveryAttempt() throws Exception {
         List<String> receivedIds = new CopyOnWriteArrayList<>();
         List<String> receivedBodies = new CopyOnWriteArrayList<>();

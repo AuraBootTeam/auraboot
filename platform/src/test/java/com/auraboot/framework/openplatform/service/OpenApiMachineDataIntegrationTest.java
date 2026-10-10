@@ -193,16 +193,45 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void publishedModelSubscriptionsRequireSecretAndCannotClearIt() {
+        publishEvents();
+        var nested = new org.springframework.transaction.support.TransactionTemplate(eventTransactions);
+        nested.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_NESTED);
+        assertThatThrownBy(() -> nested.execute(status -> eventSubscription(principal.installationPid(),
+                "https://example.com/model-events", null))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> nested.execute(status -> eventSubscription(principal.installationPid(),
+                "https://example.com/model-events", "  "))).isInstanceOf(IllegalArgumentException.class);
+        var subscription = eventSubscription(principal.installationPid(), "https://example.com/model-events", "valid-model-secret");
+        var request = new com.auraboot.framework.webhook.dto.WebhookCreateRequest();
+        request.setName("Changed model subscription"); request.setInstallationPid(principal.installationPid());
+        request.setEventType(subscription.getEventType()); request.setEventVersion(2); request.setTargetUrl(subscription.getTargetUrl());
+        request.setSecret("****");
+        webhooks.update(subscription.getPid(), request);
+        String persistedSecret = webhooks.getByPid(subscription.getPid()).getSecret();
+        request.setSecret(null);
+        assertThatThrownBy(() -> nested.execute(status -> webhooks.update(subscription.getPid(), request)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(webhooks.getByPid(subscription.getPid()).getSecret()).isEqualTo(persistedSecret);
+    }
+
+    @Test
     @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     void durableModelConsumerProjectsEachInstallationAndRechecksQueuedAuthority() throws Exception {
         publishEvents();
         var received = new java.util.concurrent.CopyOnWriteArrayList<String>();
         var signatures = new java.util.concurrent.CopyOnWriteArrayList<String>();
         var signedAt = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        var signatureHeaders = new java.util.concurrent.CopyOnWriteArrayList<List<String>>();
+        var protocolHeaders = new java.util.concurrent.CopyOnWriteArrayList<Map<String, List<String>>>();
         var receiver = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
         receiver.createContext("/receive", exchange -> {
             received.add(new String(exchange.getRequestBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
             signatures.add(exchange.getRequestHeaders().getFirst("X-Webhook-Signature"));
+            signatureHeaders.add(exchange.getRequestHeaders().get("X-Webhook-Signature"));
+            var headers = new HashMap<String, List<String>>();
+            for (var header : List.of("X-Webhook-Event", "X-Webhook-Event-Version", "X-Webhook-Delivery", "X-Webhook-Timestamp", "Content-Type"))
+                headers.put(header, exchange.getRequestHeaders().get(header));
+            protocolHeaders.add(headers);
             signedAt.add(exchange.getRequestHeaders().getFirst("X-Webhook-Timestamp"));
             exchange.sendResponseHeaders(200, -1); exchange.close();
         });
@@ -213,6 +242,13 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
         try {
             String url = "http://127.0.0.1:" + receiver.getAddress().getPort() + "/receive";
             var a = eventSubscription(principal.installationPid(), url, "model-fixture-secret"); subscriptions.add(a);
+            var headerRequest = new com.auraboot.framework.webhook.dto.WebhookCreateRequest();
+            headerRequest.setName(a.getName()); headerRequest.setInstallationPid(a.getInstallationPid());
+            headerRequest.setEventType(a.getEventType()); headerRequest.setEventVersion(a.getEventVersion());
+            headerRequest.setTargetUrl(url); headerRequest.setSecret("****");
+            headerRequest.setHeaders(json.writeValueAsString(Map.of("x-webhook-signature", "forged", "x-webhook-event", "forged",
+                    "x-webhook-event-version", "999", "x-webhook-delivery", "forged", "x-webhook-timestamp", "1", "content-type", "text/plain")));
+            webhooks.update(a.getPid(), headerRequest);
             var application = management.createApplication(new CreateApplicationRequest("Second model event installation", "Isolation"));
             var b = management.install(application.pid(), new InstallApplicationRequest("staging", new HashSet<>(contract.scopes().values()), 600));
             secondInstallation = b.pid();
@@ -243,6 +279,12 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
             webhookDispatcher.processClaimed(claimed);
             assertThat(received).hasSize(1); assertThat(new com.auraboot.framework.webhook.service.WebhookSignature().verify("model-fixture-secret",
                     signedAt.getFirst(), received.getFirst(), signatures.getFirst(), Instant.now(), java.time.Duration.ofMinutes(1))).isTrue();
+            assertThat(signatureHeaders.getFirst()).containsExactly(signatures.getFirst());
+            assertThat(protocolHeaders.getFirst()).containsEntry("X-Webhook-Event", List.of(a.getEventType()))
+                    .containsEntry("X-Webhook-Event-Version", List.of("2"))
+                    .containsEntry("X-Webhook-Delivery", List.of(claimed.getPid()))
+                    .containsEntry("X-Webhook-Timestamp", List.of(signedAt.getFirst()))
+                    .containsEntry("Content-Type", List.of("application/json"));
             var publicEvent = json.readTree(received.getFirst());
             assertThat(publicEvent.path("id").asText()).isEqualTo(source.eventId());
             assertThat(publicEvent.path("recordVersion").asLong()).isEqualTo(source.sequence());
