@@ -186,6 +186,8 @@ public class OpenPlatformFacadeController {
                 .orElseThrow(() -> new IllegalArgumentException("Command is not published"));
         Object target = body.get("targetPid");
         Object input = body.get("input");
+        com.auraboot.framework.openplatform.security.OpenApiBusinessAudit.attempt(
+                publication.resultResourceCode(), "execute", target instanceof String pid ? pid : null);
         if (target == null || String.valueOf(target).isBlank() || !(input instanceof Map<?, ?> rawInput)) {
             throw new IllegalArgumentException("targetPid and input are required");
         }

@@ -54,6 +54,18 @@ class OpenApiBusinessAuditTest {
         assertThat(details.path("idempotentReplay").booleanValue()).isFalse();
     }
 
+    @Test void commandAttemptKeepsPublicTargetWithoutInventingSuccessOrReplay() {
+        var request = request("POST", "/api/open/v1/commands/assets.assign:execute", "assets.assign");
+        OpenApiBusinessAudit.attempt("assets", "execute", "asset-pid");
+        var details = OpenApiBusinessAudit.details(request);
+        assertThat(details.path("resource").asText()).isEqualTo("assets");
+        assertThat(details.path("recordPid").asText()).isEqualTo("asset-pid");
+        assertThat(details.has("idempotentReplay")).isFalse();
+        request = request("POST", "/api/open/v1/commands/assets.assign:execute", "assets.assign");
+        OpenApiBusinessAudit.attempt("assets", "execute", "1234");
+        assertThat(OpenApiBusinessAudit.details(request).has("recordPid")).isFalse();
+    }
+
     @Test void resultOutsideHttpDoesNotCreateAThreadLocalActor() {
         OpenApiBusinessAudit.result("example.parts", "create", "record-pid", false);
         assertThat(RequestContextHolder.getRequestAttributes()).isNull();

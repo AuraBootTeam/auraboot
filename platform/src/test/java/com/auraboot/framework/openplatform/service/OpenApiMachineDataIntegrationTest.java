@@ -1052,6 +1052,55 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void rejectedCommandHttpAuditKeepsPublishedTargetAndStableFailure() throws Exception {
+        management.updateScopes(principal.installationPid(),
+                new com.auraboot.framework.openplatform.dto.OpenPlatformDtos.UpdateInstallationScopesRequest(Set.of("assets.manage")));
+        var credential = management.createCredential(principal.installationPid());
+        String commandToken = tokens.issue("client_credentials", credential.clientId(), credential.clientSecret(), null).accessToken();
+        String origin = "command-audit-" + UniqueIdGenerator.generate();
+        String path = "/api/open/v1/commands/assets.assign:execute";
+        try {
+            for (String kind : List.of("missing-etag", "unknown-input", "malformed-input")) {
+                Map<String, Object> input = kind.equals("unknown-input") ? Map.of("privateField", "private-value")
+                        : Map.of("assignee", "private-value");
+                Object bodyInput = kind.equals("malformed-input") ? "private-value" : input;
+                var response = http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(path)
+                        .header("Authorization", "Bearer " + commandToken).header("X-Request-Id", origin + "-" + kind)
+                        .header("X-Actor-Kind", "human").header("Idempotency-Key", origin + "-" + kind)
+                        .contentType("application/json").content(json.writeValueAsString(Map.of("targetPid", allowedPid, "input", bodyInput))))
+                        .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status()
+                                .is(kind.equals("missing-etag") ? 412 : 400)).andReturn().getResponse();
+                assertThat(json.readTree(response.getContentAsString()).path("code").asText())
+                        .isEqualTo(kind.equals("missing-etag") ? "precondition_failed" : "invalid_request");
+                applyTestMetaContext();
+                var audits = management.listCallAudits(principal.installationPid(), origin + "-" + kind, null, 20);
+                assertThat(audits).hasSize(1);
+                var audit = audits.getFirst();
+                assertThat(audit.actorKind()).isEqualTo("machine");
+                assertThat(audit.applicationPid()).isEqualTo(principal.applicationPid());
+                assertThat(audit.installationPid()).isEqualTo(principal.installationPid());
+                assertThat(audit.capability()).isEqualTo("assets.assign");
+                assertThat(audit.resource()).isEqualTo("assets");
+                assertThat(audit.recordPid()).isEqualTo(allowedPid);
+                assertThat(audit.operation()).isEqualTo("execute");
+                assertThat(audit.status()).isEqualTo(response.getStatus());
+                assertThat(audit.idempotentReplay()).isNull();
+                assertThat(json.writeValueAsString(audit)).doesNotContain(commandToken, "privateField", "private-value", "tokenPid", "tenantId");
+                String persisted = eventJdbc.queryForObject("SELECT business_details::text FROM ab_open_api_call_audit WHERE tenant_id=? AND installation_pid=? AND request_id=?",
+                        String.class, principal.tenantId(), principal.installationPid(), origin + "-" + kind);
+                assertThat(json.readTree(persisted).path("resource").asText()).isEqualTo("assets");
+                assertThat(persisted).doesNotContain(commandToken, "privateField", "private-value");
+            }
+            var row = MetaContext.runWithCommandPermitScope("ALL", () -> data.getById(contract.modelCode(), allowedPid));
+            assertThat(row).containsEntry("name", "Visible").containsEntry("zone", "A");
+            assertThat(((Number) row.get("row_version")).longValue()).isEqualTo(1);
+            assertThat(eventJdbc.queryForObject("SELECT COUNT(*) FROM ab_idempotency_record WHERE tenant_id=? AND client_request_id LIKE ?",
+                    Long.class, principal.tenantId(), "%" + origin + "%")).isZero();
+        } finally { cleanupCommittedFixture(); }
+    }
+
+    @Test
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     void customPhysicalTablePreservesPublicHttpCrudVersions() throws Exception {
         // Reuse the bearer/row-policy/CAS/replay assertions against a non-mt_ physical table.
         publicHttpCrudTraversesBearerFilterPublicationPolicyAndStableErrors();

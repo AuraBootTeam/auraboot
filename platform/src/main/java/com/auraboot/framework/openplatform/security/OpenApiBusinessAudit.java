@@ -30,14 +30,22 @@ public final class OpenApiBusinessAudit {
         request.setAttribute(ATTRIBUTE, details);
     }
 
-    public static void result(String resource, String operation, String pid, boolean replay) {
+    public static void attempt(String resource, String operation, String pid) {
         if (!(RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes)) return;
         Object captured = attributes.getRequest().getAttribute(ATTRIBUTE);
         if (!(captured instanceof com.fasterxml.jackson.databind.node.ObjectNode details)) return;
         details.put("resource", resource);
         details.put("operation", operation);
         if (publicPid(pid)) details.put("recordPid", pid);
-        details.put("idempotentReplay", replay);
+    }
+
+    public static void result(String resource, String operation, String pid, boolean replay) {
+        attempt(resource, operation, pid);
+        if (!(RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes)) return;
+        Object captured = attributes.getRequest().getAttribute(ATTRIBUTE);
+        if (captured instanceof com.fasterxml.jackson.databind.node.ObjectNode details) {
+            details.put("idempotentReplay", replay);
+        }
     }
 
     public static JsonNode details(HttpServletRequest request) {

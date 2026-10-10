@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from open_platform_dynamic_probe import CASES, run_dynamic_probe, run_sdk_consumer, verify_report, verify_release_report
+from open_platform_dynamic_probe import CASES, run_dynamic_probe, run_sdk_consumer, verify_report, verify_release_report, verify_command_audits
 from open_platform_http import ProtocolError
 
 
@@ -36,7 +36,34 @@ def passed():
             "applicationPid": "app-pid", "installationPid": "install-pid"}
 
 
+def command_passed():
+    report = {"applicationPid": "app-pid", "installationPid": "install-pid", "assetPid": "asset-pid", "stockInPid": "stock-pid", "auditProofs": []}
+    for case, command, resource, status, replay, pid in [
+        ("asset-assign", "assets.assign", "assets", 200, False, "asset-pid"),
+        ("asset-stale", "assets.assign", "assets", 412, None, "asset-pid"),
+        ("inventory-confirm", "inventory.stock-ins.confirm", "inventory.stock-ins", 200, False, "stock-pid")]:
+        report["auditProofs"].append({"id": case, "requestId": "release-command-" + case, "actorKind": "machine",
+            "applicationPid": "app-pid", "installationPid": "install-pid", "capability": command,
+            "resource": resource, "operation": "execute", "recordPid": pid, "idempotentReplay": replay,
+            "status": status, "method": "POST", "path": "/api/open/v1/commands/" + command + ":execute",
+            "durationMs": 1, "occurredAt": "2026-10-11T00:00:00Z"})
+    return report
+
+
 class DynamicProbeTests(unittest.TestCase):
+    def test_command_audit_requires_exact_public_actor_target_and_denied_status(self):
+        self.assertEqual(verify_command_audits(command_passed()), command_passed())
+        for change in [lambda r: r["auditProofs"].pop(), lambda r: r["auditProofs"].reverse(),
+                       lambda r: r.__setitem__("applicationPid", "foreign-app")]:
+            report = command_passed(); change(report)
+            with self.assertRaises(ProtocolError): verify_command_audits(report)
+        for key, value in [("resource", None), ("recordPid", "wrong-pid"), ("status", 200),
+                           ("idempotentReplay", False), ("capability", "internal-command"),
+                           ("tenantId", 42), ("durationMs", True)]:
+            report = command_passed(); report["auditProofs"][1][key] = value
+            with self.subTest(key=key):
+                with self.assertRaises(ProtocolError): verify_command_audits(report)
+
     def test_fixed_complete_report(self):
         self.assertEqual(verify_report(passed()), passed())
 
@@ -151,7 +178,9 @@ class SdkReportTests(unittest.TestCase):
         with self.assertRaises(ProtocolError): verify_release_report({"dynamic": passed()})
         with self.assertRaises(ProtocolError):
             verify_release_report({"dynamic": passed(), "sdk": sdk}, model_event_secret=SECRET)
-        self.assertEqual(verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": model_passed()},
+        with self.assertRaises(ProtocolError):
+            verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": model_passed()}, model_event_secret=SECRET)
+        self.assertEqual(verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": model_passed(), "commandAudits": command_passed()},
                                               model_event_secret=SECRET)["sdk"], sdk)
 
     def test_consumer_private_stdin_and_fixed_safe_ledger(self):

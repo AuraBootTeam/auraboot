@@ -29,6 +29,59 @@ AUDIT_CASES = (
 )
 
 
+
+COMMAND_AUDIT_CASES = (
+    ("asset-assign", "assets.assign", "assets", 200, False),
+    ("asset-stale", "assets.assign", "assets", 412, None),
+    ("inventory-confirm", "inventory.stock-ins.confirm", "inventory.stock-ins", 200, False),
+)
+
+
+def verify_command_audits(report):
+    if not isinstance(report, dict): raise ProtocolError("command audit report missing")
+    rows = report.get("auditProofs")
+    if not isinstance(rows, list) or len(rows) != len(COMMAND_AUDIT_CASES):
+        raise ProtocolError("command audit denominator invalid")
+    if [row.get("id") for row in rows if isinstance(row, dict)] != [case[0] for case in COMMAND_AUDIT_CASES]:
+        raise ProtocolError("command audit identity/order invalid")
+    for key in ["applicationPid", "installationPid", "assetPid", "stockInPid"]:
+        value = report.get(key)
+        if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", value) or value.isdigit():
+            raise ProtocolError("command audit public identity invalid")
+    fields = {"id", "requestId", "method", "path", "status", "durationMs", "occurredAt", "actorKind",
+              "applicationPid", "installationPid", "capability", "resource", "operation", "recordPid", "idempotentReplay"}
+    for row, (case, command, resource, status, replay) in zip(rows, COMMAND_AUDIT_CASES):
+        if (set(row) - fields or row.get("actorKind") != "machine"
+                or any(row.get(key) != report[key] for key in ["applicationPid", "installationPid"])
+                or row.get("requestId") != "release-command-" + case or row.get("capability") != command
+                or row.get("resource") != resource or row.get("operation") != "execute"
+                or row.get("recordPid") != report["assetPid" if resource == "assets" else "stockInPid"]
+                or row.get("method") != "POST" or row.get("path") != "/api/open/v1/commands/" + command + ":execute"
+                or type(row.get("status")) is not int or row["status"] != status
+                or row.get("idempotentReplay") is not replay
+                or type(row.get("durationMs")) is not int or row["durationMs"] < 0
+                or not isinstance(row.get("occurredAt"), str) or not row["occurredAt"]):
+            raise ProtocolError("command audit public identity/result invalid")
+    return report
+
+
+def audited_command(request, admin, report, case, path, *, body, headers, expected=(200,)):
+    """Join an existing command request to its production installation audit."""
+    request_id = "release-command-" + case
+    result = request(path, method="POST", body=body, headers=dict(headers, **{"X-Request-Id": request_id}), expected=expected)
+    deadline = time.monotonic() + 5
+    while True:
+        _, response, _ = request(f"/api/open-platform/installations/{report['installationPid']}/audits?requestId={request_id}", headers=admin)
+        from open_platform_http import data
+        audits = data(response)
+        if audits or time.monotonic() >= deadline: break
+        time.sleep(.1)
+    if not isinstance(audits, list) or len(audits) != 1:
+        raise ProtocolError("command business audit missing or duplicated")
+    report["auditProofs"].append(dict(audits[0], id=case))
+    return result
+
+
 def verify_audits(report):
     proofs = report.get("auditProofs")
     if (not isinstance(proofs, list) or len(proofs) != len(AUDIT_CASES)
@@ -131,6 +184,7 @@ def verify_release_report(report, *, model_event_secret=None):
     verify_report(report.get("dynamic"))
     verify_sdk_report(report.get("sdk"))
     verify_model_event_report(report.get("modelEvents"), secret=model_event_secret)
+    verify_command_audits(report.get("commandAudits"))
     return report
 
 
