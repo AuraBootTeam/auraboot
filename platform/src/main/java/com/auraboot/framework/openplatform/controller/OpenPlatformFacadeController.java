@@ -54,19 +54,25 @@ public class OpenPlatformFacadeController {
     private final OpenApiProtocolTokenCodec tokenCodec;
     private final OpenApiEventCatalog eventCatalog;
     private final OpenApiEventPublisher eventPublisher;
+    private final com.auraboot.framework.openplatform.service.OpenApiResourceService dynamicResources;
+    private final com.auraboot.framework.openplatform.service.OpenApiLegacyAuthority legacyAuthority;
 
     public OpenPlatformFacadeController(OpenApiPublicationRegistry publications,
                                         DynamicDataService dataService,
                                         CommandExecutor commandExecutor,
                                         OpenApiProtocolTokenCodec tokenCodec,
                                         OpenApiEventCatalog eventCatalog,
-                                        OpenApiEventPublisher eventPublisher) {
+                                        OpenApiEventPublisher eventPublisher,
+                                        com.auraboot.framework.openplatform.service.OpenApiResourceService dynamicResources,
+                                        com.auraboot.framework.openplatform.service.OpenApiLegacyAuthority legacyAuthority) {
         this.publications = publications;
         this.dataService = dataService;
         this.commandExecutor = commandExecutor;
         this.tokenCodec = tokenCodec;
         this.eventCatalog = eventCatalog;
         this.eventPublisher = eventPublisher;
+        this.dynamicResources = dynamicResources;
+        this.legacyAuthority = legacyAuthority;
     }
 
     @GetMapping("/event-catalog")
@@ -85,7 +91,15 @@ public class OpenPlatformFacadeController {
     })
     public Map<String, Object> listResources(@PathVariable String resourceCode,
                                              @RequestParam(defaultValue = "50") int limit,
-                                             @RequestParam(required = false) String cursor) {
+                                             @RequestParam(required = false) String cursor,
+                                             @RequestParam(required = false) String filters,
+                                             @RequestParam(required = false) String sort,
+                                             @RequestParam(required = false) String direction) {
+        if (publications.resource(resourceCode).isEmpty()) {
+            return dynamicResources.list(com.auraboot.framework.application.security.MachineDataAccessContext.principal(),
+                    resourceCode, limit, cursor, filters, sort, direction);
+        }
+        if (filters != null || sort != null || direction != null) throw new IllegalArgumentException("Query options are not published for this fixed resource");
         ResourcePublication publication = publications.resource(resourceCode)
                 .orElseThrow(() -> new IllegalArgumentException("Resource is not published"));
         int boundedLimit = Math.max(1, Math.min(limit, 100));
@@ -94,8 +108,8 @@ public class OpenPlatformFacadeController {
                 : tokenCodec.decodeCursor(cursor, publication.code(), publication.schemaVersion());
         DynamicQueryRequest request = DynamicQueryRequest.builder()
                 .pageNum(1).pageSize(boundedLimit + 1).cursor(internalCursor).build();
-        PaginationResult<Map<String, Object>> page = MetaContext.runWithCommandPermitScope("ALL",
-                () -> dataService.list(publication.modelCode(), request));
+        PaginationResult<Map<String, Object>> page = legacyAuthority.read(publication, () -> MetaContext.runWithCommandPermitScope("ALL",
+                () -> dataService.list(publication.modelCode(), request)));
         List<Map<String, Object>> source = page.getRecords() == null ? List.of() : page.getRecords();
         boolean hasMore = source.size() > boundedLimit;
         List<Map<String, Object>> selected = source.stream().limit(boundedLimit).toList();
@@ -115,6 +129,10 @@ public class OpenPlatformFacadeController {
         return response;
     }
 
+    public Map<String, Object> listResources(String resourceCode, int limit, String cursor) {
+        return listResources(resourceCode, limit, cursor, null, null, null);
+    }
+
     @GetMapping("/resources/{resourceCode}/{recordPid}")
     @Operation(summary = "Get an explicitly published resource")
     @ApiResponses({
@@ -125,12 +143,16 @@ public class OpenPlatformFacadeController {
     })
     public ResponseEntity<Map<String, Object>> getResource(@PathVariable String resourceCode,
                                                             @PathVariable String recordPid) {
+        if (publications.resource(resourceCode).isEmpty()) {
+            return dynamicResources.get(com.auraboot.framework.application.security.MachineDataAccessContext.principal(),
+                    resourceCode, recordPid).response();
+        }
         ResourcePublication publication = publications.resource(resourceCode)
                 .orElseThrow(() -> new IllegalArgumentException("Resource is not published"));
         Map<String, Object> record;
         try {
-            record = MetaContext.runWithCommandPermitScope("ALL",
-                    () -> dataService.getById(publication.modelCode(), recordPid));
+            record = legacyAuthority.read(publication, () -> MetaContext.runWithCommandPermitScope("ALL",
+                    () -> dataService.getById(publication.modelCode(), recordPid)));
         } catch (MetaRecordNotFoundException ex) {
             // Tenant interceptor scopes the lookup to the installation's tenant;
             // a cross-tenant pid must surface as 404, never as a system error.
@@ -178,12 +200,13 @@ public class OpenPlatformFacadeController {
                 + commandCode + ":" + idempotencyKey);
         request.setAuditContext(Map.of("channel", "open_api", "installationPid", principal.installationPid()));
 
-        CommandExecuteResult result = MetaContext.runWithExternalCommandPermission(publication.permission(),
-                () -> commandExecutor.execute(publication.commandCode(), request));
         ResourcePublication resultResource = publications.resource(publication.resultResourceCode())
                 .orElseThrow(() -> new IllegalStateException("Published command result resource is missing"));
-        Map<String, Object> record = MetaContext.runWithCommandPermitScope("ALL",
-                () -> dataService.getById(resultResource.modelCode(), String.valueOf(target)));
+        CommandExecuteResult result = legacyAuthority.command(publication, resultResource, String.valueOf(target),
+                () -> MetaContext.runWithExternalCommandPermission(publication.permission(),
+                    () -> commandExecutor.execute(publication.commandCode(), request)));
+        Map<String, Object> record = legacyAuthority.read(resultResource, () -> MetaContext.runWithCommandPermitScope("ALL",
+                () -> dataService.getById(resultResource.modelCode(), String.valueOf(target))));
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("command", publication.code());
         response.put("idempotentReplay", result.isIdempotentReplay());

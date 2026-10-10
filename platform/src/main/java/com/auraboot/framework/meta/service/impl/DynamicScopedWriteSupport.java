@@ -1,4 +1,5 @@
 package com.auraboot.framework.meta.service.impl;
+import com.auraboot.framework.application.security.MachineDataAccessContext;
 
 import com.auraboot.framework.meta.service.base.BaseMetaService;
 import com.auraboot.framework.meta.service.*;
@@ -129,7 +130,7 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
                     .append(" IS NOT DISTINCT FROM #{params.compareValue}");
         }
         appendAggregateBindingGuard(sql, params, model);
-        appendScopedWriteGuards(sql, tenantId, modelCode, userId, permissionOperation);
+        appendScopedWriteGuards(sql, tenantId, modelCode, userId, permissionOperation, params);
 
         return dynamicDataMapper.updateByQuery(sql.toString(), params);
     }
@@ -159,7 +160,7 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
             sql.append(" AND row_version = #{params.expectedVersion}");
         }
         appendAggregateBindingGuard(sql, params, model);
-        appendScopedWriteGuards(sql, tenantId, modelCode, userId, "delete");
+        appendScopedWriteGuards(sql, tenantId, modelCode, userId, "delete", params);
 
         return dynamicDataMapper.deleteByQuery(sql.toString(), params);
     }
@@ -198,6 +199,9 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
             String modelCode,
             Long userId,
             String operation){
+        if (MachineDataAccessContext.isActive()) {
+            throw new org.springframework.security.access.AccessDeniedException("Machine write requires bound policy parameters");
+        }
         String permitFilter = CommandPermitDataAccess.rowFilter(modelCode, userId);
         if (permitFilter != null) {
             appendScopedBulkFilter(sql, permitFilter);
@@ -226,6 +230,15 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
 
     String resolveWriteRowFilter(Long tenantId, String modelCode, Long userId){
         return resolveWriteRowFilter(tenantId, modelCode, userId, "update");
+    }
+
+    private void appendScopedWriteGuards(StringBuilder sql, Long tenantId, String modelCode,
+                                        Long userId, String operation, Map<String, Object> parameters) {
+        if (MachineDataAccessContext.isActive()) {
+            sql.append(" AND (").append(MachineDataAccessGuards.predicate(modelCode, operation, parameters, "machine_scope")).append(")");
+            return;
+        }
+        appendScopedWriteGuards(sql, tenantId, modelCode, userId, operation);
     }
 
     String resolveWriteRowFilter(Long tenantId, String modelCode, Long userId, String operation){

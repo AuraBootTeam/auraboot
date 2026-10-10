@@ -10,12 +10,20 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /** Fail-closed registry for externally published routes. */
 @Component
 public class OpenApiCapabilityRegistry {
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
     private final List<Capability> capabilities;
+    private OpenApiPublicationService dynamicPublications;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public OpenApiCapabilityRegistry(List<OpenApiCapabilityContributor> contributors, OpenApiPublicationService publications) {
+        this(contributors);
+        this.dynamicPublications = publications;
+    }
 
     public OpenApiCapabilityRegistry(List<OpenApiCapabilityContributor> contributors) {
         List<Capability> published = new ArrayList<>();
@@ -55,7 +63,47 @@ public class OpenApiCapabilityRegistry {
     }
 
     public List<Capability> list() {
-        return capabilities;
+        if (dynamicPublications == null || !com.auraboot.framework.application.tenant.MetaContext.exists()) return capabilities;
+        Long tenantId = com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId();
+        if (dynamicPublications == null || tenantId == null) return capabilities;
+        List<Capability> published = new ArrayList<>(capabilities);
+        dynamicPublications.publishedContracts(tenantId).forEach(contract -> published.addAll(resourceCapabilities(contract)));
+        assertUnique(published);
+        return List.copyOf(published);
+    }
+
+    /** Uses the fixed contribution registry as the single source of reserved public routes. */
+    public void requireAvailableResourceRoutes(OpenApiResourceContract contract) {
+        for (Capability candidate : resourceCapabilities(contract)) {
+            if (resolve(candidate.method().name(), candidate.pathPattern()).isPresent()) {
+                throw new IllegalArgumentException("Publication route is already reserved: " + candidate.pathPattern());
+            }
+        }
+    }
+
+    public Optional<Capability> resolve(Long tenantId, String method, String path) {
+        Optional<Capability> fixed = resolve(method, path);
+        if (fixed.isPresent() || dynamicPublications == null) return fixed;
+        String[] segments = path.split("/", -1);
+        if (segments.length < 6 || segments.length > 7 || !"resources".equals(segments[4])) return Optional.empty();
+        return dynamicPublications.active(tenantId, segments[5]).stream().flatMap(contract -> resourceCapabilities(contract).stream())
+                .filter(capability -> capability.method().matches(method) && pathMatcher.match(capability.pathPattern(), path)).findFirst();
+    }
+
+    private List<Capability> resourceCapabilities(OpenApiResourceContract contract) {
+        return contract.operations().stream().map(operation -> {
+            String path = "/api/open/v1/resources/" + contract.code();
+            HttpMethod method = switch (operation) {
+                case LIST, GET -> HttpMethod.GET;
+                case CREATE -> HttpMethod.POST;
+                case UPDATE -> HttpMethod.PATCH;
+                case DELETE -> HttpMethod.DELETE;
+            };
+            if (Set.of(OpenApiResourceContract.Operation.GET, OpenApiResourceContract.Operation.UPDATE,
+                    OpenApiResourceContract.Operation.DELETE).contains(operation)) path += "/{recordPid}";
+            return new Capability("resource." + contract.code() + "." + operation.code(), method, path,
+                    contract.scopes().get(operation), contract.dataPolicy().code(), contract.schemaVersion());
+        }).toList();
     }
 
     private void assertUnique(List<Capability> published) {

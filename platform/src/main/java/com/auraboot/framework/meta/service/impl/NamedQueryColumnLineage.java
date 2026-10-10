@@ -14,6 +14,8 @@ import java.util.*;
 /** Resolves SQL output dependencies without pretending unresolved sources are unprotected. */
 final class NamedQueryColumnLineage {
     private final Map<String, String> views;
+    private boolean inspectConsumption;
+    private final Set<PhysicalColumn> consumed = new LinkedHashSet<>();
     NamedQueryColumnLineage() { this(Map.of()); }
     NamedQueryColumnLineage(Map<String, String> views) { this.views = Map.copyOf(views); }
 
@@ -26,6 +28,14 @@ final class NamedQueryColumnLineage {
         default List<Origin> ordered() { throw unresolved("CTE column aliases require explicit projections"); }
     }
     private record Source(String qualifier, Projection projection) { }
+
+    /** Includes predicate, join, grouping and ordering dependencies, not just serialized outputs. */
+    Set<PhysicalColumn> resolveConsumed(String fromSql, List<NamedQueryField> fields) {
+        inspectConsumption = true;
+        consumed.clear();
+        resolve(fromSql, fields).values().forEach(origin -> consumed.addAll(origin.columns()));
+        return Set.copyOf(consumed);
+    }
 
     Map<String, Origin> resolve(String fromSql, List<NamedQueryField> fields) {
         try {
@@ -84,6 +94,19 @@ final class NamedQueryColumnLineage {
         List<Source> sources = new ArrayList<>();
         if (plain.getFromItem() != null) sources.add(source(plain.getFromItem(), ctes));
         if (plain.getJoins() != null) for (Join join : plain.getJoins()) sources.add(source(join.getRightItem(), ctes));
+        if (inspectConsumption) {
+            consume(plain.getWhere(), sources);
+            consume(plain.getHaving(), sources);
+            if (plain.getGroupBy() != null && plain.getGroupBy().getGroupByExpressionList() != null)
+                for (Object item : plain.getGroupBy().getGroupByExpressionList()) consume((Expression) item, sources);
+            if (plain.getOrderByElements() != null)
+                plain.getOrderByElements().forEach(order -> consume(order.getExpression(), sources));
+            if (plain.getJoins() != null) for (Join join : plain.getJoins()) {
+                if (join.getUsingColumns() != null && !join.getUsingColumns().isEmpty())
+                    throw unresolved("Machine joins require explicit column lineage");
+                if (join.getOnExpressions() != null) join.getOnExpressions().forEach(on -> consume(on, sources));
+            }
+        }
         Map<String, Origin> outputs = new LinkedHashMap<>();
         List<String> wildcards = new ArrayList<>();
         for (SelectItem<?> item : plain.getSelectItems()) {
@@ -99,7 +122,9 @@ final class NamedQueryColumnLineage {
             String alias = item.getAlias() != null ? identifier(item.getAlias().getName())
                     : expression instanceof Column column ? identifier(column.getColumnName()) : null;
             if (alias == null) throw unresolved("Computed projection requires an alias");
-            if (outputs.putIfAbsent(alias, expression(expression, sources)) != null)
+            Origin origin = expression(expression, sources);
+            if (inspectConsumption) consumed.addAll(origin.columns());
+            if (outputs.putIfAbsent(alias, origin) != null)
                 throw unresolved("Ambiguous output alias: " + alias);
         }
         return new Projection() {
@@ -114,6 +139,10 @@ final class NamedQueryColumnLineage {
                 return List.copyOf(outputs.values());
             }
         };
+    }
+
+    private void consume(Expression value, List<Source> sources) {
+        if (value != null) consumed.addAll(expression(value, sources).columns());
     }
 
     private Source source(FromItem item, Map<String, Projection> ctes) {

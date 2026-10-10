@@ -33,6 +33,18 @@ class OpenApiPublicationValidatorTest {
                 .doesNotThrowAnyException();
     }
 
+    @Test void reservedFixedAndContributorRoutesCannotBeShadowed() {
+        var base = contract(Set.of(Operation.GET), false, true);
+        var reserved = new OpenApiResourceContract("assets", base.modelCode(), 1, base.operations(), base.scopes(),
+                base.dataPolicy(), base.fields(), 50, 8, 5000, Set.of());
+        assertThatThrownBy(() -> validator.validate(reserved, model())).hasMessageContaining("reserved");
+        var contributor = (OpenApiCapabilityContributor) () -> List.of(new OpenApiCapabilityRegistry.Capability(
+                "plugin.customer.get", org.springframework.http.HttpMethod.GET,
+                "/api/open/v1/resources/customers/{recordPid}", "customers.get", "tenant-wide", 1));
+        assertThatThrownBy(() -> new OpenApiPublicationValidator(null, List.of(contributor)).validate(base, model()))
+                .hasMessageContaining("reserved");
+    }
+
     @Test void cannotPublishGenericWritesForVirtualImmutableOrCommandOnlyModels() {
         var contract = contract(Set.of(Operation.CREATE, Operation.UPDATE, Operation.DELETE), true, false);
         var model = model();

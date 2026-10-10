@@ -31,6 +31,7 @@ public class OpenApiPublicationService {
                                   Integer activeVersion, String status) { }
     public record DraftRequest(long expectedRevision, OpenApiResourceContract definition) { }
     public record RevisionRequest(long expectedRevision) { }
+    public record AuthorizedPublication(OpenApiResourceContract contract, OpenApiInstallationPolicy policy, Long installationId) { }
 
     public List<PublicationView> list() {
         requireAdmin();
@@ -61,6 +62,15 @@ public class OpenApiPublicationService {
         var row = requireLocked(code, expectedRevision);
         OpenApiResourceContract contract = decode(row.draft(), OpenApiResourceContract.class);
         validator.validate(contract);
+        for (var field : contract.fields().values()) {
+            if (field.referenceResource() == null) continue;
+            var target = code.equals(field.referenceResource()) ? contract : active(tenant(), field.referenceResource())
+                    .orElseThrow(() -> new IllegalArgumentException("Reference target resource must be published"));
+            if (!target.operations().contains(OpenApiResourceContract.Operation.GET)
+                    || !target.modelCode().equals(validator.referenceTargetModel(contract, field))) {
+                throw new IllegalArgumentException("Reference target requires GET on its declared model");
+            }
+        }
         if (row.activeVersion() != null) {
             OpenApiResourceContract previous = decode(mapper.snapshot(tenant(), code, row.activeVersion()), OpenApiResourceContract.class);
             contract.requireCompatibleWith(previous);
@@ -108,6 +118,19 @@ public class OpenApiPublicationService {
     public Optional<OpenApiResourceContract> active(Long tenantId, String code) {
         String definition = mapper.active(tenantId, code);
         return definition == null ? Optional.empty() : Optional.of(decode(definition, OpenApiResourceContract.class));
+    }
+
+    public List<OpenApiResourceContract> publishedContracts(Long tenantId) {
+        return mapper.activeDefinitions(tenantId).stream().map(value -> decode(value, OpenApiResourceContract.class)).toList();
+    }
+
+    public Optional<AuthorizedPublication> currentAuthority(
+            com.auraboot.framework.application.security.ExternalMachineAuthenticator.MachinePrincipal principal,
+            String code, OpenApiResourceContract.Operation operation) {
+        var authority = mapper.authority(principal.tenantId(), principal.installationPid(), principal.tokenPid(), code, operation.code());
+        if (authority == null) return Optional.empty();
+        return Optional.of(new AuthorizedPublication(decode(authority.definition(), OpenApiResourceContract.class),
+                decode(authority.policy(), OpenApiInstallationPolicy.class), authority.installationId()));
     }
 
     public OpenApiInstallationPolicy requirePolicy(Long tenantId, Long installationId, OpenApiResourceContract contract) {

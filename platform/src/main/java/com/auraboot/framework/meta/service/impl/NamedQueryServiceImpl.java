@@ -1,4 +1,5 @@
 package com.auraboot.framework.meta.service.impl;
+import com.auraboot.framework.application.security.MachineDataAccessContext;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.PaginationSafetyUtils;
@@ -772,6 +773,12 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         boolean aggregateRootGrant = collaboratorGrant || rootRecordGrant;
 
         NamedQueryFieldProtection.Plan protection = fieldProtection.prepare(query, fields, "list", aggregateRootGrant);
+        if (MachineDataAccessContext.isActive()) {
+            protection.parameters().forEach((key, value) -> {
+                if (params.containsKey(key)) throw new AccessDeniedException("Reserved machine named query parameter");
+                params.put(key, value);
+            });
+        }
         // Masked values must not be inferable through keyword matching or result counts.
         Set<String> maskedAliases = protection.protections().stream()
                 .flatMap(group -> group.aliases().keySet().stream()).collect(Collectors.toSet());
@@ -849,6 +856,11 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             Map<String, Object> params) {
         String resourceCode = trimToNull(query.getResourceCode());
         String actionCode = trimToNull(query.getActionCode());
+        if (MachineDataAccessContext.isActive()) {
+            if (resourceCode == null || actionCode == null) throw new AccessDeniedException("Machine query source authority required");
+            MachineDataAccessContext.requireDecision(resourceCode).requireAction(actionCode);
+            return;
+        }
         if (resourceCode == null || actionCode == null) {
             return;
         }

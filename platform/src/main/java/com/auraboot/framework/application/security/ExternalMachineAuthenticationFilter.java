@@ -70,10 +70,11 @@ public class ExternalMachineAuthenticationFilter extends OncePerRequestFilter {
                 principal, null, authorities);
         SecurityContextHolder.getContext().setAuthentication(authentication);
         MetaContext.setContext(principal.tenantId(), null, principal.subjectPid(), principal.subjectName());
+        MetaContext.setMemberId(null);
         request.setAttribute(AUTHENTICATED_ATTRIBUTE, Boolean.TRUE);
         MDC.put("tenantId", String.valueOf(principal.tenantId()));
 
-        try {
+        try (var machineScope = MachineDataAccessContext.begin(principal)) {
             filterChain.doFilter(request, response);
         } finally {
             long durationMillis = (System.nanoTime() - startedAt) / 1_000_000L;

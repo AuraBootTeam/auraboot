@@ -41,6 +41,7 @@ public class CommandStateCheckExecutor {
     private final StateTransitionEngine stateTransitionEngine;
     private final StateGraphService stateGraphService;
     private final CommandSpelEvaluator spelEvaluator;
+    private final org.springframework.beans.factory.ObjectProvider<com.auraboot.framework.meta.service.DynamicDataService> dataService;
 
     @SuppressWarnings("unchecked")
     public String executeStateCheckPhase(CommandDefinition command,
@@ -163,6 +164,10 @@ public class CommandStateCheckExecutor {
 
     public String readCurrentState(Long tenantId, String modelCode,
                              String recordId, String stateField) {
+        if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()) {
+            Object value = dataService.getObject().getById(modelCode, recordId).get(stateField);
+            return value == null ? null : value.toString();
+        }
         try {
             // Security: validate stateField and tableName to prevent SQL injection
             CommandExecutorUtils.validateSqlIdentifier(stateField, "stateField");
@@ -211,6 +216,11 @@ public class CommandStateCheckExecutor {
 
     private void writeStateTransition(Long tenantId, String modelCode, String recordId,
                                        String stateField, String newState) {
+        if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()) {
+            // The common write path keeps installation policy, CAS, invariants and owner-transaction events together.
+            dataService.getObject().update(modelCode, recordId, new LinkedHashMap<>(Map.of(stateField, newState)));
+            return;
+        }
         try {
             String tableName = metaModelService.getTableName(modelCode);
             Optional<ModelDefinition> modelOpt = metaModelService.getModelDefinition(modelCode);

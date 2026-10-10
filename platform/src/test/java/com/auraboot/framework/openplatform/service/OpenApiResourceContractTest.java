@@ -42,6 +42,19 @@ class OpenApiResourceContractTest {
                 .containsExactlyInAnyOrderEntriesOf(Map.of("pid", "customer-pid", "name", "Alice"));
         assertThatThrownBy(() -> definition.project(Map.of("pid", 9007199254740993L))).hasMessageContaining("String");
         assertThatThrownBy(() -> definition.project(Map.of("pid", "9007199254740993"))).hasMessageContaining("public PID");
+        assertThatThrownBy(() -> definition.project(Map.of("pid", "record\nheader"))).hasMessageContaining("public PID");
+    }
+
+    @Test void temporalContractAcceptsJdbcValuesAndRejectsInvalidClientDates() {
+        var fields = new LinkedHashMap<>(fields());
+        fields.put("date", field("crm_date", Type.DATE, true, false, true));
+        fields.put("time", field("crm_time", Type.DATETIME, true, false, true));
+        var definition = contract(fields);
+        assertThat(definition.project(Map.of("crm_date", java.sql.Date.valueOf("2026-10-10"),
+                "crm_time", java.sql.Timestamp.from(java.time.Instant.parse("2026-10-10T10:00:00Z")))))
+                .containsEntry("date", "2026-10-10").containsEntry("time", "2026-10-10T10:00:00Z");
+        assertThatThrownBy(() -> definition.mapWrite(Map.of("date", "2026-13-40"), false)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> definition.mapWrite(Map.of("time", "tomorrow"), false)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test void cannotPublishInternalFieldUnderAnInnocentAlias() {

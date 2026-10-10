@@ -16,9 +16,16 @@ import java.util.Set;
 @Component
 public class OpenApiPublicationValidator {
     private final MetaModelService models;
+    private final OpenApiCapabilityRegistry fixedRoutes;
 
     public OpenApiPublicationValidator(MetaModelService models) {
+        this(models, List.of());
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public OpenApiPublicationValidator(MetaModelService models, List<OpenApiCapabilityContributor> contributors) {
         this.models = models;
+        this.fixedRoutes = new OpenApiCapabilityRegistry(contributors);
     }
 
     public ModelDefinition validate(OpenApiResourceContract contract) {
@@ -29,6 +36,7 @@ public class OpenApiPublicationValidator {
     }
 
     public void validate(OpenApiResourceContract contract, ModelDefinition model) {
+        fixedRoutes.requireAvailableResourceRoutes(contract);
         require(model != null && contract.modelCode().equals(model.getCode()), "Publication source mismatch");
         require(StatusConstants.PUBLISHED.equals(model.getStatus()) || StatusConstants.ACTIVE.equals(model.getStatus()),
                 "Publication requires an active model");
@@ -67,6 +75,8 @@ public class OpenApiPublicationValidator {
         }
         for (var entry : contract.fields().entrySet()) {
             var publicField = entry.getValue();
+            publicField.properties().values().forEach(this::requireNoNestedReference);
+            if (publicField.items() != null) requireNoNestedReference(publicField.items());
             if ("pid".equals(publicField.source())) continue;
             FieldDefinition source = fields.get(publicField.source());
             require(source != null, "Published source field does not exist: " + entry.getKey());
@@ -83,6 +93,10 @@ public class OpenApiPublicationValidator {
                         "Reference fields require a public PID resource binding");
                 String valueField = source.getRefTarget().getValueField();
                 require(valueField == null || "pid".equals(valueField), "Internal-ID references cannot be published");
+                require(source.getRefTarget().getTargetEntity() != null && !source.getRefTarget().getTargetEntity().isBlank(),
+                        "Reference target model must be declared");
+            } else {
+                require(publicField.referenceResource() == null, "Public reference requires a model reference binding");
             }
         }
         if (contract.operations().contains(OpenApiResourceContract.Operation.CREATE)) {
@@ -94,6 +108,21 @@ public class OpenApiPublicationValidator {
                 require(declared, "Required model input is absent from the create contract");
             }
         }
+    }
+
+    public String referenceTargetModel(OpenApiResourceContract contract, OpenApiResourceContract.Field field) {
+        var model = validate(contract);
+        var source = model.getFields().stream().filter(value -> field.source().equals(value.getCode())).findFirst()
+                .orElseThrow(() -> invalid("Reference source field unavailable"));
+        require(field.referenceResource() != null && source.getRefTarget() != null,
+                "Public reference binding required");
+        return source.getRefTarget().getTargetEntity();
+    }
+
+    private void requireNoNestedReference(OpenApiResourceContract.Field field) {
+        require(field.referenceResource() == null, "Nested relationship references are not supported");
+        field.properties().values().forEach(this::requireNoNestedReference);
+        if (field.items() != null) requireNoNestedReference(field.items());
     }
 
     private boolean typeMatches(OpenApiResourceContract.Type type, String rawType) {

@@ -1,4 +1,5 @@
 package com.auraboot.framework.meta.service.impl;
+import com.auraboot.framework.application.security.MachineDataAccessContext;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.FieldMaskRule;
@@ -26,7 +27,11 @@ public class NamedQueryFieldProtection {
     public record Protection(Map<String, String> aliases,
                              List<FieldMaskRule> policies, List<FieldMaskConfig> configs) { }
     public record Plan(JsonNode evidence, List<Protection> protections, Map<String, String> sourceScopes,
-                       Map<String, String> views, Set<String> scopedReadModels) {
+                       Map<String, String> views, Set<String> scopedReadModels, Map<String, Object> parameters) {
+        public Plan(JsonNode evidence, List<Protection> protections, Map<String, String> sourceScopes,
+                    Map<String, String> views, Set<String> scopedReadModels) {
+            this(evidence, protections, sourceScopes, views, scopedReadModels, Map.of());
+        }
         public Plan(JsonNode evidence, List<Protection> protections, Map<String, String> sourceScopes) {
             this(evidence, protections, sourceScopes, Map.of(), Set.of());
         }
@@ -50,6 +55,7 @@ public class NamedQueryFieldProtection {
 
     public Plan prepare(NamedQuery query, List<NamedQueryField> fields, String context, boolean aggregateRootGrant) {
         var resolved = sources.resolvePlan(MetaContext.getCurrentTenantId(), query.getFromSql(), fields);
+        if (MachineDataAccessContext.isActive()) return prepareMachine(query, fields, resolved);
         var sourceModels = resolved.models();
         Long memberId = MetaContext.getCurrentMemberId();
         if (memberId == null) memberId = MetaContext.getCurrentUserId();
@@ -185,6 +191,38 @@ public class NamedQueryFieldProtection {
         }
         evidence.set("aliases", JSON.valueToTree(aliases));
         return new Plan(evidence, List.of(new Protection(Map.copyOf(aliases), List.copyOf(rules), List.copyOf(configs))), Map.of());
+    }
+
+    private Plan prepareMachine(NamedQuery query, List<NamedQueryField> fields, NamedQuerySourceModels.Sources resolved) {
+        Map<String, String> scopes = new TreeMap<>();
+        Map<String, Object> parameters = new LinkedHashMap<>();
+        Map<String, Set<String>> readableColumns = new HashMap<>();
+        for (var source : resolved.models().entrySet()) {
+            var decision = MachineDataAccessContext.requireDecision(source.getValue());
+            String prefix = "machine_nq_" + scopes.size();
+            String predicate = MachineDataAccessGuards.predicate(source.getValue(), "read", parameters, prefix);
+            String tenantKey = prefix + "_tenant";
+            parameters.put(tenantKey, decision.tenantId());
+            scopes.put(source.getKey(), "tenant_id = #{params." + tenantKey + "} AND (" + predicate + ")");
+            Set<String> columns = new HashSet<>();
+            for (String field : decision.readableFields()) {
+                columns.add(com.auraboot.framework.meta.security.SqlSafetyUtils.requireIdentifier(
+                        models.getColumnName(source.getValue(), field), "machine query readable column"));
+            }
+            readableColumns.put(NamedQuerySourceModels.identity(source.getKey()), Set.copyOf(columns));
+        }
+        var consumed = new NamedQueryColumnLineage(resolved.views()).resolveConsumed(query.getFromSql(), fields);
+        consumed.forEach(column -> {
+            Set<String> allowed = readableColumns.get(NamedQuerySourceModels.identity(column.table()));
+            if (allowed == null || !allowed.contains(column.column())) {
+                throw new AccessDeniedException("Named query depends on a non-public machine field");
+            }
+        });
+        var evidence = JSON.createObjectNode();
+        evidence.put("actorType", "machine");
+        evidence.set("sourceModels", JSON.valueToTree(resolved.models()));
+        return new Plan(evidence, List.of(), Map.copyOf(scopes), resolved.views(),
+                Set.copyOf(resolved.models().values()), Map.copyOf(parameters));
     }
 
     public String rewrite(Plan plan, String sql) {

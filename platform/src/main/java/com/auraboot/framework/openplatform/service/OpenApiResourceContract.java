@@ -46,7 +46,7 @@ public record OpenApiResourceContract(
 
     public OpenApiResourceContract {
         identifier(code, "resource code", "[a-z][a-z0-9.-]{1,99}");
-        identifier(modelCode, "model code", "[A-Za-z][A-Za-z0-9_]{0,159}");
+        identifier(modelCode, "model code", "[A-Za-z][A-Za-z0-9_]{0,127}");
         require(schemaVersion > 0, "Positive schema version required");
         operations = Set.copyOf(operations == null ? Set.of() : operations);
         scopes = Map.copyOf(scopes == null ? Map.of() : scopes);
@@ -77,13 +77,15 @@ public record OpenApiResourceContract(
                         boolean sortable, String referenceResource, Map<String, Field> properties,
                         Field items) {
         public Field {
-            identifier(source, "source field", "[A-Za-z][A-Za-z0-9_]{0,159}");
+            identifier(source, "source field", "[A-Za-z][A-Za-z0-9_]{0,127}");
             require(type != null && (readable || writable), "Field type and access required");
             operators = Set.copyOf(operators == null ? Set.of() : operators);
             properties = Map.copyOf(properties == null ? Map.of() : properties);
             require(Set.of("EQ", "NE", "GT", "GE", "LT", "LE", "IN", "LIKE", "IS_NULL")
                     .containsAll(operators), "Unknown filter operator");
             require((operators.isEmpty() && !sortable) || readable, "Query fields must be readable");
+            require((operators.isEmpty() && !sortable) || (type != Type.OBJECT && type != Type.ARRAY),
+                    "Structured fields cannot declare scalar filters or sorting");
             require(type == Type.OBJECT || properties.isEmpty(), "Only object fields declare properties");
             require(type != Type.OBJECT || !properties.isEmpty(), "Object property whitelist required");
             require((type == Type.ARRAY) == (items != null), "Array item schema required only for arrays");
@@ -104,6 +106,13 @@ public record OpenApiResourceContract(
     public Map<String, Object> project(Map<String, Object> record) {
         require(record != null, "Resource record required");
         return projectObject(fields, record, 0);
+    }
+
+    public Object validateFilterValue(String alias, Object value) {
+        Field field = fields.get(alias);
+        require(field != null && field.readable() && field.type() != Type.OBJECT && field.type() != Type.ARRAY,
+                "Scalar public query field required");
+        return validateValue(field, value, false, 1);
     }
 
     private static Map<String, Object> mapObject(Map<String, Field> schema, Map<?, ?> input,
@@ -142,8 +151,8 @@ public record OpenApiResourceContract(
         switch (field.type()) {
             case STRING -> require(value instanceof String && ((String) value).length() <= 65536,
                     "String value required");
-            case PID -> require(value instanceof String && !((String) value).isBlank()
-                    && ((String) value).length() <= 64 && !((String) value).matches("[0-9]+"), "String public PID required");
+            case PID -> require(value instanceof String && ((String) value).matches("[A-Za-z0-9_-]{1,64}")
+                    && !((String) value).matches("[0-9]+"), "String public PID required");
             case INTEGER -> {
                 require(value instanceof Number, "Integer value required");
                 try { new BigDecimal(value.toString()).toBigIntegerExact(); }
@@ -157,8 +166,14 @@ public record OpenApiResourceContract(
                 catch (NumberFormatException exception) { throw new IllegalArgumentException("Finite decimal value required", exception); }
             }
             case BOOLEAN -> require(value instanceof Boolean, "Boolean value required");
-            case DATE -> LocalDate.parse(value.toString());
-            case DATETIME -> Instant.parse(value.toString());
+            case DATE -> {
+                try { return (value instanceof java.sql.Date date ? date.toLocalDate() : LocalDate.parse(value.toString())).toString(); }
+                catch (java.time.DateTimeException invalid) { throw new IllegalArgumentException("ISO date value required", invalid); }
+            }
+            case DATETIME -> {
+                try { return (value instanceof java.sql.Timestamp timestamp ? timestamp.toInstant() : Instant.parse(value.toString())).toString(); }
+                catch (java.time.DateTimeException invalid) { throw new IllegalArgumentException("ISO instant value required", invalid); }
+            }
             case OBJECT -> {
                 require(value instanceof Map<?, ?>, "Object value required");
                 return write ? mapObject(field.properties(), (Map<?, ?>) value, true, depth)

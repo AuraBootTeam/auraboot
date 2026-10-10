@@ -82,6 +82,28 @@ class OpenApiPublicationIntegrationTest extends BaseIntegrationTest {
         assertThat(mapper.snapshot(getTestTenant().getId(), definition.code(), 2)).isNull();
     }
 
+    @Test void referencePublicationRejectsAResourceBoundToAnotherModel() {
+        var target = fixture();
+        publications.saveDraft(target.code(), new OpenApiPublicationService.DraftRequest(0, target));
+        publications.publish(target.code(), 1);
+        String suffix = UniqueIdGenerator.generate().toLowerCase();
+        String modelCode = "open_ref_" + suffix;
+        // Deliberately bind the model field to the owner while the public alias names the other resource.
+        models.saveDefinition(ModelDefinition.builder().code(modelCode).tableName("mt_" + modelCode)
+                .displayName("Reference binding fixture").status("published").sourceType("physical").primaryKey("id")
+                .capabilities(ModelCapabilities.fullPhysical()).fields(List.of(FieldDefinition.builder()
+                        .code("name").displayName("Reference").dataType("REFERENCE")
+                        .refTarget(FieldDefinition.RefTarget.builder().targetEntity(modelCode).valueField("pid").build()).build())).build());
+        var fields = new LinkedHashMap<>(target.fields());
+        fields.put("name", new Field("name", Type.PID, true, false, false, true, Set.of(), false,
+                target.code(), Map.of(), null));
+        var reference = new OpenApiResourceContract("fixture." + suffix, modelCode, 1, target.operations(), target.scopes(),
+                target.dataPolicy(), fields, 50, 8, 5000, Set.of());
+        publications.saveDraft(reference.code(), new OpenApiPublicationService.DraftRequest(0, reference));
+        assertThatThrownBy(() -> publications.publish(reference.code(), 1)).hasMessageContaining("declared model");
+        assertThat(mapper.snapshot(getTestTenant().getId(), reference.code(), 1)).isNull();
+    }
+
     @Test void installationGrantIsExplicitAndRevocationAndMachineAdministrationFailClosed() {
         var definition = fixture();
         publications.saveDraft(definition.code(), new OpenApiPublicationService.DraftRequest(0, definition));

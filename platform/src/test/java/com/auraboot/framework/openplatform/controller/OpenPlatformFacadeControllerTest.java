@@ -38,7 +38,10 @@ class OpenPlatformFacadeControllerTest {
             "unit-test-open-platform-signing-key-at-least-32-bytes", "test", Clock.systemUTC());
     private final OpenApiEventPublisher eventPublisher = mock(OpenApiEventPublisher.class);
     private final OpenPlatformFacadeController controller = new OpenPlatformFacadeController(
-            publications, dataService, commandExecutor, tokenCodec, new OpenApiEventCatalog(), eventPublisher);
+            publications, dataService, commandExecutor, tokenCodec, new OpenApiEventCatalog(), eventPublisher,
+            mock(com.auraboot.framework.openplatform.service.OpenApiResourceService.class),
+            new com.auraboot.framework.openplatform.service.OpenApiLegacyAuthority(
+                mock(com.auraboot.framework.meta.service.CommandService.class), new com.fasterxml.jackson.databind.ObjectMapper()));
 
     @Test
     void commandUsesInstallationScopedIdempotencyAndNarrowMachineGrant() {

@@ -1,4 +1,5 @@
 package com.auraboot.framework.meta.service.impl;
+import com.auraboot.framework.application.security.MachineDataAccessContext;
 
 import com.auraboot.framework.meta.service.*;
 import com.auraboot.framework.application.tenant.MetaContext;
@@ -365,7 +366,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         String compareColumn = compareField.getColumnName() != null
                 ? compareField.getColumnName()
                 : compareField.getCode();
-        Long planExpectedVersion = MetaContext.getCommandExpectedVersion(modelCode, recordId);
+        Long planExpectedVersion = expectedWriteVersion(modelCode, recordId);
         int updated = executeScopedUpdate(
                 model,
                 modelCode,
@@ -379,7 +380,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         if (updated > 1) {
             throw new MetaServiceException("compareAndSet updated more than one record");
         }
-        if (updated == 1 && planExpectedVersion != null) {
+        if (updated == 1 && MetaContext.getCommandExpectedVersion(modelCode, recordId) != null) {
             MetaContext.advanceCommandExpectedVersion(modelCode, recordId);
         }
         return updated == 1;
@@ -588,6 +589,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Observed(name = "dynamic_data.get_by_id", contextualName = "dynamic-data-get-by-id")
     public Map<String, Object> getById(String modelCode, String recordId) {
         validateModelCode(modelCode);
+        if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()) {
+            com.auraboot.framework.application.security.MachineDataAccessContext.requireDecision(modelCode).requireAction("read");
+        }
         if (recordId == null || recordId.trim().isEmpty()) {
             throw new MetaServiceException("Record ID cannot be null or empty");
         }
@@ -624,6 +628,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 .build());
 
         QueryBuilderService.QueryBuilder queryBuilder = queryBuilderService.buildConditionQuery(model, conditions);
+        MachineDataAccessGuards.constrain(modelCode, queryBuilder);
 
         String sql = queryBuilder.getSql();
         Map<String, Object> paramMap = queryBuilder.getParameterMap();
@@ -638,7 +643,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         // Read-shape contract: json/jsonb fields leave as JSON strings, never PGobject.
         JsonbFieldHelper.normalizeJsonReadValues(model, record);
 
-        boolean commandPermitInForce = MetaContext.hasCommandPermitScopeFor(modelCode);
+        boolean commandPermitInForce = MetaContext.hasCommandPermitScopeFor(modelCode) || MachineDataAccessContext.isActive();
         if (commandPermitInForce
                 && !CommandPermitDataAccess.permitsRecord(modelCode, record, getCurrentUserId())) {
             throw new AccessDeniedException("Access denied: command permit scope does not include this record");
@@ -722,8 +727,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             }
         }
 
-        if (!commandPermitInForce) {
-            // Apply field-level permission filtering — remove hidden fields
+        if (!commandPermitInForce || MachineDataAccessContext.isActive()) {
+            // Human and machine field policies are independent of command permit grades.
             record = applyFieldPermissionFilterSingle(modelCode, record);
         }
 
@@ -765,6 +770,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional
     public Map<String, Object> create(String modelCode, Map<String, Object> data) {
+        if (MachineDataAccessContext.isActive()) MachineDataAccessContext.requireDecision(modelCode).requireAction("create");
         validateModelCode(modelCode);
         assertWritable(modelCode);
         if (data == null || data.isEmpty()) {
@@ -811,6 +817,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         // 数据类型转换
         enrichedData = convertDataTypes(model, enrichedData);
+        if (MachineDataAccessContext.isActive() && !MachineDataAccessContext.requireDecision(modelCode).permits(enrichedData)) {
+            throw new AccessDeniedException("Machine creation exceeds the installation row policy");
+        }
 
         // Filter out non-writable virtual fields (COMPUTED_READONLY, TRANSIENT)
         List<String> changedFields = new ArrayList<>(enrichedData.keySet());
@@ -946,6 +955,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
      */
     private Set<String> stripNonWritableFields(String modelCode, Map<String, Object> data) {
         if (data == null || data.isEmpty()) {
+            return Collections.emptySet();
+        }
+        if (MachineDataAccessContext.isActive()) {
+            MachineDataAccessGuards.requireWritable(modelCode, data);
             return Collections.emptySet();
         }
         if (MetaContext.hasCommandPermitScopeFor(modelCode)) {
@@ -1094,6 +1107,13 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             // permissions: admin and system handlers are bound by them, and a command that
             // inherited an aggregate's authority does not get to waive them.
             validationService.validateImmutabilityAndThrow(model, data, existingRecord);
+            if (MachineDataAccessContext.isActive()) {
+                Map<String, Object> prospective = new LinkedHashMap<>(existingRecord);
+                prospective.putAll(data);
+                if (!MachineDataAccessContext.requireDecision(modelCode).permits(prospective)) {
+                    throw new AccessDeniedException("Machine update exceeds the installation row policy");
+                }
+            }
             // Validation intentionally works with java.time domain types. Convert
             // them to JDBC-native values only afterwards, matching the CREATE
             // path and preventing MyBatis from binding Instant as an untyped
@@ -1130,7 +1150,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             // authorization boundary. Direct non-command callers retain the legacy payload
             // contract for compatibility.
             Object clientExpectedVersion = enrichedData.remove("_expectedVersion");
-            Long planExpectedVersion = MetaContext.getCommandExpectedVersion(modelCode, recordId);
+            Long planExpectedVersion = expectedWriteVersion(modelCode, recordId);
             Object expectedVersion =
                     planExpectedVersion != null ? planExpectedVersion : clientExpectedVersion;
 
@@ -1152,7 +1172,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 }
                 throw new MetaServiceException("Failed to update record");
             }
-            if (planExpectedVersion != null) {
+            if (MetaContext.getCommandExpectedVersion(modelCode, recordId) != null) {
                 MetaContext.advanceCommandExpectedVersion(modelCode, recordId);
             }
 
@@ -1223,7 +1243,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         // Get record before deletion for change tracking
         Map<String, Object> existingRecord = getById(modelCode, recordId);
-        Long planExpectedVersion = MetaContext.getCommandExpectedVersion(modelCode, recordId);
+        Long planExpectedVersion = expectedWriteVersion(modelCode, recordId);
 
         // 构建删除条件
         FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
@@ -1279,6 +1299,11 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             Set<String> jsonbColumns,
             Object expectedVersion) {
         return dynamicScopedWriteSupport().executeScopedUpdate(model,modelCode,primaryKeyColumn,recordId,columnData,jsonbColumns,expectedVersion);
+    }
+
+    private Long expectedWriteVersion(String modelCode, String recordPid) {
+        Long machineVersion = MachineDataAccessContext.expectedVersion(modelCode, recordPid);
+        return machineVersion == null ? MetaContext.getCommandExpectedVersion(modelCode, recordPid) : machineVersion;
     }
 
     private int executeScopedUpdate(

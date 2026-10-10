@@ -6,6 +6,7 @@ import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.openplatform.entity.OpenApiCallAudit;
 import com.auraboot.framework.openplatform.mapper.OpenApiCallAuditMapper;
 import com.auraboot.framework.openplatform.mapper.OpenApiRateLimitMapper;
+import com.auraboot.framework.openplatform.mapper.OpenPlatformAuthMapper;
 import com.auraboot.framework.openplatform.service.OpenApiCapabilityRegistry;
 import com.auraboot.framework.openplatform.service.OpenPlatformSecretCodec;
 import com.auraboot.framework.openplatform.service.OpenPlatformTokenService;
@@ -31,6 +32,7 @@ public class OpenPlatformBearerAuthenticator implements ExternalMachineAuthentic
     private final OpenApiCapabilityRegistry capabilityRegistry;
     private final OpenPlatformSecretCodec secretCodec;
     private final ObjectMapper objectMapper;
+    private final OpenPlatformAuthMapper authMapper;
 
     @Override
     public boolean supports(HttpServletRequest request) {
@@ -40,9 +42,10 @@ public class OpenPlatformBearerAuthenticator implements ExternalMachineAuthentic
     @Override
     @Transactional
     public MachinePrincipal authenticate(HttpServletRequest request) {
-        OpenApiCapabilityRegistry.Capability capability = capabilityRegistry
-                .resolve(request.getMethod(), request.getRequestURI())
-                .orElseThrow(() -> new ExternalMachineAuthException(404, "open_api_capability_not_found"));
+        OpenApiCapabilityRegistry.Capability capability = capabilityRegistry.resolve(request.getMethod(), request.getRequestURI()).orElse(null);
+        if (capability == null && !request.getRequestURI().matches("/api/open/v1/resources/[a-z][a-z0-9.-]{1,99}(?:/[^/]+)?")) {
+            throw new ExternalMachineAuthException(404, "open_api_capability_not_found");
+        }
         String authorization = request.getHeader("Authorization");
         if (authorization == null || !authorization.startsWith(BEARER)
                 || authorization.length() <= BEARER.length()) {
@@ -50,7 +53,17 @@ public class OpenPlatformBearerAuthenticator implements ExternalMachineAuthentic
         }
         String rawToken = authorization.substring(BEARER.length()).trim();
         Instant usedAt = Instant.now();
-        var token = rateLimitMapper.authenticate(secretCodec.sha256(rawToken),
+        String tokenHash = secretCodec.sha256(rawToken);
+        if (capability == null) {
+            // Dynamic route authority is selected only from the authenticated token's tenant.
+            var identity = authMapper.findToken(tokenHash, OpenPlatformTokenService.AUDIENCE, usedAt);
+            if (identity == null || !"active".equals(identity.installationStatus()) || !"active".equals(identity.applicationStatus())) {
+                throw new ExternalMachineAuthException(401, "invalid_token");
+            }
+            capability = capabilityRegistry.resolve(identity.tenantId(), request.getMethod(), request.getRequestURI())
+                    .orElseThrow(() -> new ExternalMachineAuthException(404, "open_api_capability_not_found"));
+        }
+        var token = rateLimitMapper.authenticate(tokenHash,
                 OpenPlatformTokenService.AUDIENCE, usedAt,
                 usedAt.truncatedTo(ChronoUnit.MINUTES), capability.requiredScope());
         if (token == null || !"active".equals(token.installationStatus())

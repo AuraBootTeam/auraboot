@@ -8,7 +8,31 @@ import java.util.List;
 @Mapper
 @InterceptorIgnore(tenantLine = "true")
 public interface OpenApiPublicationMapper {
+    @Select("SELECT set_config('statement_timeout', #{timeout}, true)")
+    String setStatementTimeout(@Param("timeout") String timeout);
     record PublicationRow(String code, String draft, long draftRevision, Integer activeVersion, String status) { }
+    record ResourceAuthority(String definition, String policy, Long installationId) { }
+
+    @Select("""
+        SELECT s.definition::text, g.policy::text, i.id AS installation_id
+        FROM ab_open_api_publication p
+        JOIN ab_open_api_publication_snapshot s ON s.tenant_id = p.tenant_id
+            AND s.code = p.code AND s.schema_version = p.active_version
+        JOIN ab_open_api_resource_grant g ON g.tenant_id = p.tenant_id AND g.resource_code = p.code
+        JOIN ab_application_installation i ON i.tenant_id = g.tenant_id AND i.id = g.installation_id
+        JOIN ab_external_application a ON a.id = i.application_id
+        JOIN ab_application_access_token t ON t.tenant_id = i.tenant_id AND t.installation_id = i.id
+        WHERE p.tenant_id = #{tenantId} AND p.code = #{code} AND p.status = 'published'
+            AND i.pid = #{installationPid} AND i.status = 'active' AND a.status = 'active'
+            AND t.pid = #{tokenPid} AND t.revoked_at IS NULL AND t.expires_at > NOW()
+            AND t.audience = 'auraboot-open-api'
+            AND t.scopes @> jsonb_build_array(s.definition->'scopes'->>#{operation})
+            AND EXISTS (SELECT 1 FROM ab_application_scope_grant sg
+                WHERE sg.tenant_id = i.tenant_id AND sg.installation_id = i.id
+                    AND sg.scope_code = s.definition->'scopes'->>#{operation})
+        """)
+    ResourceAuthority authority(@Param("tenantId") Long tenantId, @Param("installationPid") String installationPid,
+                                @Param("tokenPid") String tokenPid, @Param("code") String code, @Param("operation") String operation);
 
     @Select("""
         SELECT code, draft::text, draft_revision, active_version, status
@@ -52,6 +76,14 @@ public interface OpenApiPublicationMapper {
         WHERE p.tenant_id = #{tenantId} AND p.code = #{code} AND p.status = 'published'
         """)
     String active(@Param("tenantId") Long tenantId, @Param("code") String code);
+
+    @Select("""
+        SELECT s.definition::text FROM ab_open_api_publication p
+        JOIN ab_open_api_publication_snapshot s ON s.tenant_id = p.tenant_id
+            AND s.code = p.code AND s.schema_version = p.active_version
+        WHERE p.tenant_id = #{tenantId} AND p.status = 'published' ORDER BY p.code
+        """)
+    List<String> activeDefinitions(@Param("tenantId") Long tenantId);
 
     @Insert("""
         INSERT INTO ab_open_api_publication_snapshot(tenant_id, code, schema_version, definition, published_by_pid)
