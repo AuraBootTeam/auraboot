@@ -69,13 +69,15 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
     private String deniedPid;
     private String rawToken;
 
-    @BeforeEach void fixture() {
+    @BeforeEach void fixture(org.junit.jupiter.api.TestInfo testInfo) {
         grantCommittedPermissionToTestRole("sys.connector.update", "system", "connector", "update", "Manage Open Platform");
         String suffix = UniqueIdGenerator.generate().toLowerCase();
         String modelCode = "open_machine_" + suffix;
         var reference = FieldDefinition.RefTarget.builder().targetEntity(modelCode).valueField("pid").build();
         models.saveDefinition(ModelDefinition.builder().code(modelCode).tableName("mt_" + modelCode)
                 .displayName("Machine permission fixture").status("published").sourceType("physical").primaryKey("id")
+                .extension(Map.of("softDelete", testInfo.getTestMethod().orElseThrow().getName()
+                        .equals("softBatchDeleteKeepsTombstonesAndRollsBackPartialFailure")))
                 .capabilities(ModelCapabilities.fullPhysical().toBuilder()
                         .filterableFields(List.of("name", "zone", "secret")).sortableFields(List.of("name", "zone", "secret")).build())
                 .fields(List.of(FieldDefinition.builder().code("name").columnName("name").dataType("STRING").displayName("Name").sortable(true).filterable(true).build(),
@@ -298,6 +300,34 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
             assertThat(sourceEvents()).hasSize(8);
             assertThat(sourceEvents().stream().filter(row -> first.equals(row.get("subject")))
                     .map(row -> ((Number) row.get("event_sequence")).longValue()).toList()).containsExactly(1L, 2L, 3L, 4L, 5L);
+            return null;
+        });
+    }
+
+    @Test void softBatchDeleteKeepsTombstonesAndRollsBackPartialFailure() {
+        var definition = models.getModelDefinition(contract.modelCode()).orElseThrow();
+        assertThat(definition.isSoftDelete()).isTrue();
+        publishEvents();
+        MetaContext.runWithCommandPermitScope("ALL", () -> {
+            var nested = new org.springframework.transaction.support.TransactionTemplate(eventTransactions);
+            nested.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_NESTED);
+            assertThatThrownBy(() -> nested.execute(status -> {
+                data.batchDelete(contract.modelCode(), List.of(allowedPid, UniqueIdGenerator.generate()));
+                return null;
+            })).isInstanceOf(com.auraboot.framework.meta.exception.MetaRecordNotFoundException.class);
+            assertThat(sourceEvents()).isEmpty();
+            assertThat(data.getById(contract.modelCode(), allowedPid)).containsEntry("name", "Visible");
+            data.batchDelete(contract.modelCode(), List.of(allowedPid, deniedPid));
+            assertThat(sourceEvents()).hasSize(2);
+            var tombstones = eventJdbc.queryForList("SELECT pid, deleted_flag, row_version FROM " + definition.getTableName()
+                    + " WHERE tenant_id = ? ORDER BY pid", principal.tenantId());
+            assertThat(tombstones).hasSize(2).allSatisfy(row -> {
+                assertThat(row.get("deleted_flag")).isEqualTo(true);
+                assertThat(((Number) row.get("row_version")).longValue()).isEqualTo(2L);
+            });
+            assertThat(data.list(contract.modelCode(), DynamicQueryRequest.builder().pageNum(1).pageSize(100).build()).getTotal()).isZero();
+            assertThat(sourceEvents().stream().map(row -> ((Number) row.get("event_sequence")).longValue()).toList())
+                    .containsExactly(2L, 2L);
             return null;
         });
     }

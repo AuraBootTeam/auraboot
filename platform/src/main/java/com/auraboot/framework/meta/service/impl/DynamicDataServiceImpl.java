@@ -1701,7 +1701,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     private DynamicDataBatchSupport dynamicDataBatchSupport() {
-        return new DynamicDataBatchSupport(metadataService, validationService, typeSystemManager, dynamicDataMapper, dataPermissionEngine, dataDomainService, payloadTemporalNormalizer, this::getById, (code, input) -> inRowTransaction(() -> create(code, input)), this::convertDataTypes, this::filterVirtualFields, this::stripNonWritableFields, this::ensureTableExists, (code, inputId, input) -> inRowTransaction(() -> update(code, inputId, input)), this::appendScopedBulkFilter, this::getModelDefinition, this::assertWritable, this::toColumnData, this::notifyModelMutation);
+        return new DynamicDataBatchSupport(metadataService, validationService, typeSystemManager, dynamicDataMapper, dataPermissionEngine, dataDomainService, payloadTemporalNormalizer, this::getById, (code, input) -> inRowTransaction(() -> create(code, input)), this::convertDataTypes, this::filterVirtualFields, this::stripNonWritableFields, this::ensureTableExists, (code, inputId, input) -> inRowTransaction(() -> update(code, inputId, input)), this::appendScopedBulkFilter, this::getModelDefinition, this::assertWritable, this::toColumnData, this::notifyModelMutation, this::delete);
     }
 
     private DynamicDataListingSupport dynamicDataListingSupport() {

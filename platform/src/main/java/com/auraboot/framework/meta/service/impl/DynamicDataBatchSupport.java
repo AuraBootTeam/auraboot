@@ -60,6 +60,8 @@ final class DynamicDataBatchSupport extends BaseMetaService {
 
     private final ModelMutationObserver mutationObserver;
 
+    private final java.util.function.BiConsumer<String, String> deleteOperation;
+
     @FunctionalInterface
     interface GetByIdOperation { Map<String, Object> execute(String modelCode, String recordId); }
 
@@ -307,6 +309,15 @@ final class DynamicDataBatchSupport extends BaseMetaService {
 
         ModelDefinition model = getModelDefinition(modelCode);
         ModelMutationGuard.assertDeleteAllowed(model);
+        if (new HashSet<>(recordIds).size() != recordIds.size()) {
+            throw new MetaServiceException("Batch delete cannot contain duplicate record IDs");
+        }
+        if (model.isSoftDelete()) {
+            // The owning batch transaction covers all rows. Reuse the guarded single
+            // delete so tombstones, row versions and before-delete events stay aligned.
+            recordIds.forEach(recordId -> deleteOperation.accept(modelCode, recordId));
+            return;
+        }
         FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
         String tableName = SqlSafetyUtils.requireIdentifier(model.getTableName(), "table name");
         String primaryKeyColumn = SqlSafetyUtils.requireIdentifier(

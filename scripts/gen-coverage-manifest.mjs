@@ -297,7 +297,7 @@ export function buildManifest({
       const hits = coverageFor(pluginDir, code, uiIndex);
       total += 1;
 
-      // The strongest evidence present decides how the row is described: a
+      // Test references determine the intended axes, never an execution verdict. A
       // command exercised through the browser is a `ui/real-stack/browser`
       // row even if it also has a unit test.
       const order = ['web-e2e', 'backend-it', 'backend-unit', 'contract'];
@@ -306,7 +306,7 @@ export function buildManifest({
       const hasUi = hits.some((h) => h.probe === 'web-e2e');
 
       let verdict = 'untested';
-      if (hits.length > 0) verdict = hasUi ? 'pass' : 'partial';
+      if (hits.length > 0) verdict = 'partial';
       if (verdict === 'untested') untested += 1;
 
       return {
@@ -315,9 +315,9 @@ export function buildManifest({
         ...(best?.axes ?? { surface: 'ui', dependencies: 'real-stack', driver: 'browser' }),
         evidence: hits.map((h) => h.file),
         assertion: hasUi
-          ? 'driven through the UI'
+          ? 'browser test reference registered; execution and assertions not verified'
           : hits.length > 0
-            ? 'covered below the UI only — no browser evidence'
+            ? 'test reference registered below the UI; execution not verified'
             : 'no test references this command',
         verdict,
         ...(reachable ? {} : { note: 'no UI entry point: no page/menu DSL references it' }),
@@ -342,9 +342,9 @@ export function buildManifest({
         driver: 'browser',
         evidence: evidenceFiles,
         assertion: evidenceFiles.length > 0
-          ? 'a browser spec reaches this page'
+          ? 'browser page reference registered; execution and assertions not verified'
           : 'no browser spec names this page or its route',
-        verdict: evidenceFiles.length > 0 ? 'pass' : 'untested',
+        verdict: evidenceFiles.length > 0 ? 'partial' : 'untested',
         note: `kind=${p.kind}${p.modelCode ? ` model=${p.modelCode}` : ''}`,
       };
     });
@@ -373,9 +373,9 @@ export function buildManifest({
         driver: 'browser',
         evidence,
         assertion: evidence.length > 0
-          ? 'a browser spec navigates to this route'
+          ? 'browser route reference registered; execution and assertions not verified'
           : 'no browser spec navigates to this route',
-        verdict: evidence.length > 0 ? 'pass' : 'untested',
+        verdict: evidence.length > 0 ? 'partial' : 'untested',
         note: `plugin=${pp.plugin} file=${pp.file}`,
       };
     });
@@ -383,7 +383,7 @@ export function buildManifest({
   }
 
   return {
-    run: { id: runId, target, commit: gitCommit(repoRoot),
+    run: { id: runId, target, commit: gitCommit(repoRoot), evidenceKind: 'static-registration', executed: 0,
            generator: 'scripts/gen-coverage-manifest.mjs' },
     groups,
     stats: { commands: total, untested, pages: pageTotal, pagesUntested: pageUntested,
