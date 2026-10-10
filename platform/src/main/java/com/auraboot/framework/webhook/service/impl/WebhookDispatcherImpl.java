@@ -11,6 +11,7 @@ import com.auraboot.framework.webhook.mapper.WebhookSubscriptionMapper;
 import com.auraboot.framework.webhook.service.WebhookDispatchResult;
 import com.auraboot.framework.webhook.service.WebhookDispatcher;
 import com.auraboot.framework.webhook.service.WebhookSignature;
+import com.auraboot.framework.webhook.service.WebhookRetryPolicy;
 import com.auraboot.framework.openplatform.service.OpenApiEventCatalog;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +45,7 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
 
     private static final int DEFAULT_CONNECT_TIMEOUT_MS = 5_000;
     private static final int DEFAULT_READ_TIMEOUT_MS = 10_000;
+    private static final WebhookRetryPolicy RETRY_POLICY = new WebhookRetryPolicy();
 
     /**
      * Shared JDK HTTP client for webhook delivery (P3-E DNS-rebinding
@@ -300,8 +302,7 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
                     truncate(exception.getMessage()));
         } catch (Exception exception) {
             int retryCount = delivery.getRetryCount() == null ? 0 : delivery.getRetryCount();
-            long backoffSeconds = Math.min(3600L, 1L << Math.min(retryCount, 12));
-            Instant nextRetryAt = Instant.now().plusSeconds(backoffSeconds);
+            Instant nextRetryAt = Instant.now().plus(RETRY_POLICY.delayForRetry(retryCount));
             Integer status = exception instanceof ResponseFailure failure ? failure.status : null;
             String body = exception instanceof ResponseFailure failure ? failure.body : null;
             deliveryLogMapper.markFailure(delivery.getId(), delivery.getLeaseToken(), status, body,

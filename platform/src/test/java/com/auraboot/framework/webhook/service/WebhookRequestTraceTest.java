@@ -14,6 +14,7 @@ import org.mockito.ArgumentCaptor;
 import org.slf4j.MDC;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -22,6 +23,52 @@ import static org.mockito.Mockito.*;
 
 /** Hermetic transport test: loopback is explicitly admitted only for this fixture. */
 class WebhookRequestTraceTest {
+    @Test
+    void transportFailureSchedulesBoundedRetryAndPreservesFailure() throws Exception {
+        List<String> bodies = new CopyOnWriteArrayList<>();
+        HttpServer receiver = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        receiver.createContext("/receive", exchange -> {
+            bodies.add(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            byte[] error = "receiver unavailable".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(503, error.length);
+            exchange.getResponseBody().write(error);
+            exchange.close();
+        });
+        String oldAllowlist = System.getProperty("AURA_SSRF_ALLOWED_PRIVATE_HOSTS");
+        System.setProperty("AURA_SSRF_ALLOWED_PRIVATE_HOSTS", "127.0.0.1");
+        receiver.start();
+        try {
+            var subscriptions = mock(WebhookSubscriptionMapper.class);
+            var deliveries = mock(WebhookDeliveryLogMapper.class);
+            var subscription = new WebhookSubscription();
+            subscription.setPid("retry-subscription"); subscription.setTenantId(42L);
+            subscription.setEnabled(true); subscription.setEventType("assets.assignment.changed");
+            subscription.setTargetUrl("http://127.0.0.1:" + receiver.getAddress().getPort() + "/receive");
+            when(subscriptions.findByPid(42L, subscription.getPid())).thenReturn(subscription);
+            var delivery = new WebhookDeliveryLog();
+            delivery.setId(9L); delivery.setTenantId(42L); delivery.setPid("retry-delivery");
+            delivery.setSubscriptionPid(subscription.getPid()); delivery.setLeaseToken("retry-lease");
+            delivery.setRequestBody("{\"id\":\"retry-source\"}"); delivery.setRetryCount(1);
+            var dispatcher = new WebhookDispatcherImpl(subscriptions, deliveries, new ObjectMapper(),
+                    mock(FieldEncryptionService.class), new WebhookSignature(), new OpenApiEventCatalog());
+            Instant before = Instant.now();
+            dispatcher.processClaimed(delivery);
+            Instant after = Instant.now();
+            var nextAttempt = ArgumentCaptor.forClass(Instant.class);
+            verify(deliveries).markFailure(eq(9L), eq("retry-lease"), eq(503),
+                    eq("receiver unavailable"), anyString(), nextAttempt.capture());
+            assertThat(nextAttempt.getValue()).isAfterOrEqualTo(before.plusSeconds(1));
+            assertThat(nextAttempt.getValue()).isBefore(after.plusSeconds(2));
+            assertThat(bodies).containsExactly(delivery.getRequestBody());
+            verify(deliveries, never()).markSuccess(anyLong(), anyString(), anyInt(), any());
+            verify(deliveries, never()).markPermanentFailure(any(), any(), any());
+        } finally {
+            receiver.stop(0);
+            if (oldAllowlist == null) System.clearProperty("AURA_SSRF_ALLOWED_PRIVATE_HOSTS");
+            else System.setProperty("AURA_SSRF_ALLOWED_PRIVATE_HOSTS", oldAllowlist);
+        }
+    }
+
     @Test
     void unsignedPersistedModelSubscriptionIsRejectedBeforeTransport() throws Exception {
         List<String> received = new CopyOnWriteArrayList<>();

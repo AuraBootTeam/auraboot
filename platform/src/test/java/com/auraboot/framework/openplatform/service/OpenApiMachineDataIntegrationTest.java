@@ -216,6 +216,78 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void failedModelNotificationPersistsJitteredRetryAndRecovers() throws Exception {
+        publishEvents();
+        var received = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        var signatures = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        var timestamps = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        var receiver = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        receiver.createContext("/receive", exchange -> {
+            received.add(new String(exchange.getRequestBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+            signatures.add(exchange.getRequestHeaders().getFirst("X-Webhook-Signature"));
+            timestamps.add(exchange.getRequestHeaders().getFirst("X-Webhook-Timestamp"));
+            exchange.sendResponseHeaders(received.size() == 1 ? 503 : 200, -1);
+            exchange.close();
+        });
+        String previousHosts = System.getProperty("AURA_SSRF_ALLOWED_PRIVATE_HOSTS");
+        System.setProperty("AURA_SSRF_ALLOWED_PRIVATE_HOSTS", "127.0.0.1");
+        receiver.start();
+        String subscriptionPid = null;
+        try {
+            var subscription = eventSubscription(principal.installationPid(),
+                    "http://127.0.0.1:" + receiver.getAddress().getPort() + "/receive", "jitter-fixture-secret");
+            subscriptionPid = subscription.getPid();
+            MetaContext.runWithCommandPermitScope("ALL", () -> data.create(contract.modelCode(),
+                    new HashMap<>(Map.of("name", "Jittered retry", "zone", "A", "secret", "Never public"))));
+            var source = sourceEnvelope();
+            eventDelivery.deliver(source, modelEvents, "jitter-consumer-lease");
+            var claimed = deliveries.claimReady(50, "jitter-worker", "jitter-first-claim", Instant.now().plusSeconds(30))
+                    .stream().filter(log -> source.eventId().equals(log.getEventId())).findFirst().orElseThrow();
+            Instant before = Instant.now();
+            webhookDispatcher.processClaimed(claimed);
+            Instant after = Instant.now();
+            var failed = deliveries.selectById(claimed.getId());
+            assertThat(failed.getDeliveryStatus()).isEqualTo("pending");
+            assertThat(failed.getRetryCount()).isEqualTo(1);
+            assertThat(failed.getResponseStatus()).isEqualTo(503);
+            assertThat(failed.getNextRetryAt()).isAfterOrEqualTo(before.plusMillis(500)).isBefore(after.plusSeconds(1));
+            assertThat(failed.getLeaseToken()).isNull();
+            var recoveredClaim = new java.util.concurrent.atomic.AtomicReference<com.auraboot.framework.webhook.entity.WebhookDeliveryLog>();
+            org.awaitility.Awaitility.await().pollInSameThread().atMost(java.time.Duration.ofSeconds(5)).until(() -> {
+                deliveries.claimReady(50, "jitter-worker", "jitter-second-claim", Instant.now().plusSeconds(30))
+                        .stream().filter(log -> source.eventId().equals(log.getEventId())).findFirst().ifPresent(recoveredClaim::set);
+                return recoveredClaim.get() != null;
+            });
+            webhookDispatcher.processClaimed(recoveredClaim.get());
+            var success = deliveries.selectById(claimed.getId());
+            assertThat(success.getDeliveryStatus()).isEqualTo("success");
+            assertThat(success.getRetryCount()).isEqualTo(1);
+            assertThat(success.getResponseStatus()).isEqualTo(200);
+            assertThat(success.getEventId()).isEqualTo(source.eventId());
+            assertThat(received).hasSize(2);
+            assertThat(received.getLast()).isEqualTo(received.getFirst());
+            var payload = json.readTree(received.getFirst());
+            assertThat(payload.path("id").asText()).isEqualTo(source.eventId());
+            assertThat(payload.path("data").path("name").asText()).isEqualTo("Jittered retry");
+            assertThat(payload.path("data").has("secret")).isFalse();
+            for (int attempt = 0; attempt < 2; attempt++) {
+                assertThat(new com.auraboot.framework.webhook.service.WebhookSignature().verify("jitter-fixture-secret",
+                        timestamps.get(attempt), received.get(attempt), signatures.get(attempt),
+                        Instant.now(), java.time.Duration.ofMinutes(1))).isTrue();
+            }
+            assertThat(eventJdbc.queryForObject("SELECT COUNT(*) FROM ab_webhook_delivery_log WHERE tenant_id = ? AND event_id = ?",
+                    Long.class, principal.tenantId(), source.eventId())).isEqualTo(1);
+        } finally {
+            receiver.stop(0);
+            if (previousHosts == null) System.clearProperty("AURA_SSRF_ALLOWED_PRIVATE_HOSTS");
+            else System.setProperty("AURA_SSRF_ALLOWED_PRIVATE_HOSTS", previousHosts);
+            if (subscriptionPid != null) webhooks.delete(subscriptionPid);
+            cleanupCommittedFixture();
+        }
+    }
+
+    @Test
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     void durableModelConsumerProjectsEachInstallationAndRechecksQueuedAuthority() throws Exception {
         publishEvents();
         var received = new java.util.concurrent.CopyOnWriteArrayList<String>();
