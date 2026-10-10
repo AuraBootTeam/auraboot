@@ -43,7 +43,8 @@ Load `scripts/vendor/wechat-mini-runtime/tools/index.cjs` outside the mini-progr
 - `prepareProject({source,out,config,mode,identity,purpose})`: separate owned output, excludes node_modules/tests/golden, fingerprints source, records fixture/real-stack identity. Test purpose rejects production; explicit release-build permits offline release preparation.
 - `preflight({cli,project,port})`: checks project file, bridge port shape and CLI login. It does not terminate occupied ports or establish process ownership.
 - `verifyBridge(mp,expectedConfig)`: checks the connected app's miniRuntimeIdentity against origin/runtime/target/version/data mode/source digest. The app must expose that config on launch. A reachable bridge alone is insufficient.
-- `monitorConsole(mp,{allow})`: retains redacted records and rejects unallowlisted runtime errors through assertClean; expected platform refusals require a narrow explicit allow predicate.
+- `waitForPage(mp,route,{monitor})`: waits for the expected top page after a native tap, with a bounded timeout; it does not replace the tap.
+- `monitorConsole(mp,{allow})`: listens to console and exception events, bounds both retained lists, retains redacted records and rejects unallowlisted runtime errors through assertClean; expected platform refusals require a narrow explicit allow predicate.
 - `captureEvidence(mp,{directory,scenario,identity,mode,monitor})`: captures a screenshot and SHA-256/console/mode manifest. Its verdict is captured and visualReview is pending, not accepted. It calls assertClean after writing failure evidence.
 
 Screenshots may contain real product data and require appropriate evidence access and retention. The console redactor does not modify screenshot pixels. Products retain their existing journey catalog and real-tap assertions.

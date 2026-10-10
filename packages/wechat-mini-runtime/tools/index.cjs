@@ -136,9 +136,14 @@ function monitorConsole(mp, { allow = () => false, limit = 500 } = {}) {
     };
     if (records.length < limit) records.push(entry);
     else overflow = true;
-    if (failure && !entry.allowed) errors.push(entry);
+    if (failure && !entry.allowed) {
+      if (errors.length < limit) errors.push(entry);
+      else overflow = true;
+    }
   };
+  const exceptionHandler = (value) => handler({ type: "error", args: [value] });
   mp.on("console", handler);
+  mp.on("exception", exceptionHandler);
   return {
     records,
     errors,
@@ -149,7 +154,10 @@ function monitorConsole(mp, { allow = () => false, limit = 500 } = {}) {
         );
     },
     detach() {
-      if (mp.off) mp.off("console", handler);
+      if (mp.off) {
+        mp.off("console", handler);
+        mp.off("exception", exceptionHandler);
+      }
     },
   };
 }
@@ -187,6 +195,17 @@ async function captureEvidence(
   if (monitor) monitor.assertClean();
   return manifest;
 }
+// A native tap resolves before route transition finishes. Reacquire the top page.
+async function waitForPage(mp, route, { timeoutMs = 15000, intervalMs = 100, monitor } = {}) {
+  const deadline = Date.now() + timeoutMs;
+  do {
+    if (monitor) monitor.assertClean();
+    const page = await mp.currentPage();
+    if (page && page.path === route.replace(/^\//, "")) return page;
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  } while (Date.now() < deadline);
+  throw new Error(`Mini page transition timed out: ${route}`);
+}
 async function verifyBridge(mp, expected) {
   const actual = await mp.evaluate(() => {
     const app = getApp();
@@ -215,6 +234,7 @@ module.exports = {
   prepareProject,
   preflight,
   verifyBridge,
+  waitForPage,
   monitorConsole,
   captureEvidence,
 };

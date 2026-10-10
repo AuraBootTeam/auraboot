@@ -175,3 +175,22 @@ test("generator resolves output parent symlinks before checking source overlap",
   );
   assert.equal(fs.existsSync(path.join(f.source, "nested-output")), false);
 });
+
+test("console gate captures exception events, bounds flood memory and detaches both listeners", () => {
+  const mp = new EventEmitter();
+  const monitor = tools.monitorConsole(mp, { limit: 2 });
+  for (let i = 0; i < 5; i++) mp.emit("exception", { message: "private-user-value", token: "secret" });
+  assert.equal(monitor.records.length, 2);
+  assert.equal(monitor.errors.length, 2);
+  assert.doesNotMatch(JSON.stringify(monitor.records), /private-user-value|secret/);
+  assert.throws(() => monitor.assertClean(), /overflow=true/);
+  monitor.detach();
+  assert.equal(mp.listenerCount("console"), 0);
+  assert.equal(mp.listenerCount("exception"), 0);
+});
+test("route waiting reacquires the top page and rejects a missing transition", async () => {
+  let calls = 0;
+  const mp = { currentPage: async () => ({ path: ++calls < 3 ? "pages/list/index" : "pages/detail/index" }) };
+  assert.equal((await tools.waitForPage(mp, "/pages/detail/index", { intervalMs: 1 })).path, "pages/detail/index");
+  await assert.rejects(tools.waitForPage({ currentPage: async () => ({ path: "pages/list/index" }) }, "pages/detail/index", { timeoutMs: 2, intervalMs: 1 }), /transition timed out/);
+});
