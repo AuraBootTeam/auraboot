@@ -108,9 +108,13 @@ class SdkReportTests(unittest.TestCase):
         with self.assertRaises(ProtocolError): self.verify(report)
 
     def test_release_requires_sdk_in_addition_to_dynamic_http(self):
+        from test_open_platform_model_event_probe import passed as model_passed, SECRET
         sdk = self.report()
         with self.assertRaises(ProtocolError): verify_release_report({"dynamic": passed()})
-        self.assertEqual(verify_release_report({"dynamic": passed(), "sdk": sdk})["sdk"], sdk)
+        with self.assertRaises(ProtocolError):
+            verify_release_report({"dynamic": passed(), "sdk": sdk}, model_event_secret=SECRET)
+        self.assertEqual(verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": model_passed()},
+                                              model_event_secret=SECRET)["sdk"], sdk)
 
     def test_consumer_private_stdin_and_fixed_safe_ledger(self):
         import subprocess

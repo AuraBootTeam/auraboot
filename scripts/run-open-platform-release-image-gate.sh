@@ -32,6 +32,9 @@ EXPECTED_REF="${AURA_CI_EXPECTED_REF:-$REF_SHA}"
 ARTIFACTS="$(cd "$AURA_REGRESSION_ARTIFACTS" && pwd)"
 mkdir -p "$ARTIFACTS/logs"
 CREDENTIAL_ARTIFACT="$ARTIFACTS/open-platform-credentials.json"
+MODEL_EVENT_SECRET_FILE="$ARTIFACTS/model-event-secret.key"
+[[ ! -e "$MODEL_EVENT_SECRET_FILE" && ! -L "$MODEL_EVENT_SECRET_FILE" ]] \
+  || fatal "model event private key path already exists"
 WORK_PARENT="${AURA_CI_RELEASE_WORK_ROOT:-/opt/aura-ci/state/release-image-work}"
 LOCK_PARENT="${AURA_CI_RELEASE_LOCK_ROOT:-/opt/aura-ci/state/locks}"
 mkdir -p "$WORK_PARENT" "$LOCK_PARENT"
@@ -71,6 +74,7 @@ cleanup() {
     wait "$DB_SAMPLE_PID" || true
   fi
   rm -f "$CREDENTIAL_ARTIFACT"
+  if [[ -n "${MODEL_EVENT_SECRET_FILE:-}" ]]; then rm -f "$MODEL_EVENT_SECRET_FILE"; fi
   if docker inspect "$APP" >/dev/null 2>&1; then
     docker logs "$APP" > "$ARTIFACTS/logs/app.log" 2>&1 || true
   fi
@@ -170,7 +174,11 @@ DIGEST="$(docker image inspect "$IMAGE" --format '{{.Id}}')"
 source "$SCRIPT_DIR/ci/isolated-release-network.sh"
 create_isolated_release_network "$NET" "$ARTIFACTS/network-allocation.tsv" \
   || fatal "isolated release network unavailable"
-docker run -d --name "$PG" --network "$NET" -e POSTGRES_USER=auraboot \
+NETWORK_GATEWAY="$(docker network inspect "$NET" --format '{{(index .IPAM.Config 0).Gateway}}')"
+python3 -c 'import ipaddress,sys; a=ipaddress.ip_address(sys.argv[1]); assert a.version == 4 and a in ipaddress.ip_network("10.247.0.0/16")' "$NETWORK_GATEWAY" \
+  || fatal "model receiver gateway outside owned release pool"
+docker run -d --name "$PG" --network "$NET" \
+  --label "aura.job-id=$AURA_CI_JOB_ID" --label "aura.source-ref=$REF_SHA" -e POSTGRES_USER=auraboot \
   -e POSTGRES_PASSWORD=open_platform_ci -e POSTGRES_DB=open_platform_ci "$PGVECTOR_IMAGE" \
   -c shared_preload_libraries=pg_stat_statements \
   -c track_io_timing=on -c track_wal_io_timing=on >/dev/null
@@ -195,6 +203,7 @@ JWT_KEY="$(openssl rand -base64 64 | tr -d '\n')"
 # since #2037 AuraPluginManager fails fast on undescribed paths instead of
 # skipping them. The image pre-creates the empty jar root /app/pf4j-plugins.
 docker run -d --name "$APP" --network "$NET" \
+  --label "aura.job-id=$AURA_CI_JOB_ID" --label "aura.source-ref=$REF_SHA" \
   -p 127.0.0.1::6443 \
   -v "$STAGE/plugins":/plugins:ro \
   -e SERVER_PORT=6443 -e SPRING_PROFILES_ACTIVE=community \
@@ -204,6 +213,7 @@ docker run -d --name "$APP" --network "$NET" \
   -e REDIS_HOST="$REDIS" -e REDIS_PORT=6379 \
   -e AURA_BUILTIN_PLUGINS_DIR=/app/plugins \
   -e AURA_PLUGINS_DIR=/app/pf4j-plugins \
+  -e AURA_SSRF_ALLOWED_PRIVATE_HOSTS="$NETWORK_GATEWAY" \
   -e OPEN_PLATFORM_PROTOCOL_SIGNING_KEY="$PROTOCOL_KEY" "$IMAGE" >/dev/null
 for attempt in $(seq 1 90); do
   HEALTH="$(docker exec "$APP" wget -q -O - http://localhost:6443/actuator/health 2>/dev/null || true)"
@@ -223,11 +233,17 @@ APP_BIND="$(docker port "$APP" 6443/tcp)"
 BASE_URL="http://$APP_BIND" CREDENTIAL_ARTIFACT="$CREDENTIAL_ARTIFACT" \
 SDK_RUNNER_USER="$RUNNER_UID:$RUNNER_GID" SDK_NETWORK="$NET" SDK_CONSUMER_ROOT="$SDK_ROOT/consumer" \
 SDK_NODE_IMAGE="$SDK_NODE_IMAGE" SDK_BASE_URL="http://$APP:6443" \
+MODEL_APP="$APP" MODEL_POSTGRES="$PG" MODEL_SOURCE_REF="$REF_SHA" MODEL_IMAGE_DIGEST="$DIGEST" \
+AURA_CI_JOB_ID="$AURA_CI_JOB_ID" \
+MODEL_RECEIVER_HOST="$NETWORK_GATEWAY" \
+MODEL_EVENT_SECRET_FILE="$MODEL_EVENT_SECRET_FILE" \
 python3 "$STAGE/scripts/ci/open-platform-release-probe.py" \
   > "$ARTIFACTS/protocol-probe.json" 2> "$ARTIFACTS/logs/protocol-probe.log" \
   || fail "two-domain HTTP protocol probe failed"
 python3 "$STAGE/scripts/ci/open_platform_dynamic_probe.py" --verify-release-report "$ARTIFACTS/protocol-probe.json" \
+  --model-event-secret-file "$MODEL_EVENT_SECRET_FILE" \
   || fail "dynamic business case reconciliation failed"
+rm -f "$MODEL_EVENT_SECRET_FILE"
 CLIENT_ID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["clientId"])' "$CREDENTIAL_ARTIFACT")"
 CLIENT_SECRET="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["clientSecret"])' "$CREDENTIAL_ARTIFACT")"
 
@@ -306,7 +322,7 @@ python3 - "$ARTIFACTS/release-image-receipt.json" <<PY
 import json, sys
 json.dump({
   "ref": "$REF_SHA", "image": "$IMAGE", "digest": "$DIGEST", "health": "UP",
-  "protocolProbe": "assets+inventory+cursor+etag+catalog+dynamic-crud+named-query+fresh-sdk", "dynamicCases": 16, "sdkCases": 13, "slo": "production-thresholds-ok",
+  "protocolProbe": "assets+inventory+cursor+etag+catalog+dynamic-crud+named-query+fresh-sdk+model-event-recovery", "dynamicCases": 16, "sdkCases": 13, "modelEventCases": 18, "slo": "production-thresholds-ok",
   "sdkArchive": json.load(open("$ARTIFACTS/sdk-archive.json")), "sdkNodeImage": "$SDK_NODE_IMAGE",
   "webhookDrainBacklog": 0, "registryPush": "disabled", "builder": "$AURA_CI_BUILDER_ID",
   "job": "$AURA_CI_JOB_ID"

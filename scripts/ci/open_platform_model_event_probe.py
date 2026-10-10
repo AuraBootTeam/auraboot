@@ -1,0 +1,340 @@
+"""Fixed model-notification journey for the existing release-image protocol gate.
+
+The infrastructure adapter owns exact-identity process recovery and read-only
+database observations. Fixture writes use production HTTP routes exclusively.
+"""
+import ipaddress
+import base64
+import json
+import os
+import secrets
+import stat
+import threading
+import time
+from http.server import HTTPServer
+from pathlib import Path
+from queue import Queue
+
+from open_platform_http import ProtocolError
+from open_platform_receiver import Receiver, handler
+from open_platform_webhook_evidence import read_delivery, verify_delivery
+
+CASES = (
+    "publication", "installation-subscription", "normal-poll-barrier",
+    "machine-create-and-replay", "source-pending-before-crash", "owned-process-crash",
+    "source-persisted-without-consumer", "new-process-same-runtime",
+    "source-consumed-after-restart", "retry-recovers", "independent-raw-retry-proof",
+    "bounded-dead-letter", "independent-dead-letter-proof", "owner-replay-success",
+    "same-source-identity-on-replay", "independent-replay-proof",
+    "no-extra-source-or-consumer", "tampered-real-evidence-rejected",
+)
+
+
+def require(condition, message):
+    if not condition:
+        raise ProtocolError(message)
+
+
+def read_secret(path):
+    path = Path(path)
+    info = path.lstat()
+    require(stat.S_ISREG(info.st_mode) and not info.st_mode & 0o077 and 32 <= info.st_size <= 4096,
+            "model event secret must be a private regular file")
+    return path.read_bytes().rstrip(b"\r\n")
+
+
+def verify_report(report, *, secret=None):
+    require(isinstance(secret, bytes) and bool(secret), "independent model event signature key missing")
+    require(isinstance(report, dict) and type(report.get("schemaVersion")) is int and report["schemaVersion"] == 1,
+            "model event report schema invalid")
+    rows = report.get("cases")
+    require(type(report.get("registered")) is int and report["registered"] == len(CASES),
+            "model event registration denominator invalid")
+    require(isinstance(rows, list) and len(rows) == len(CASES)
+            and [row.get("id") for row in rows if isinstance(row, dict)] == list(CASES),
+            "model event case denominator invalid")
+    require(all(row.get("status") == "passed" for row in rows)
+            and type(report.get("executed")) is int and report["executed"] == len(CASES)
+            and type(report.get("passed")) is int and report["passed"] == len(CASES),
+            "model event cases failed or unexecuted")
+    expected = {"events": 1, "receipts": 1, "deliveries": 1}
+    require(report.get("sourceProof") == expected and report.get("deadLetterProof") == expected,
+            "model event durable cardinality invalid")
+    require(all(type(value) is int for name in ["sourceProof", "deadLetterProof"] for value in report[name].values()),
+            "model event durable counts must be integers")
+    before, after = report.get("beforeRestart"), report.get("afterRestart")
+    require(isinstance(before, dict) and isinstance(after, dict)
+            and all(isinstance(before.get(key), str) and before[key] for key in
+                    ["runtimeId", "artifactDigest", "generation"])
+            and before["runtimeId"] == after.get("runtimeId")
+            and before["artifactDigest"] == after.get("artifactDigest")
+            and isinstance(after.get("generation"), str) and bool(after["generation"])
+            and before["generation"] != after["generation"], "model event process recovery identity invalid")
+    proofs = report.get("deliveryProofs")
+    require(isinstance(proofs, list) and len(proofs) == 3
+            and [proof.get("statuses") for proof in proofs if isinstance(proof, dict)]
+            == [[503, 200], [503, 503, 503], [200]], "model event raw attempt denominator invalid")
+    require(proofs[1].get("eventId") == proofs[2].get("eventId")
+            and proofs[1].get("deliveryPid") == proofs[2].get("deliveryPid")
+            and proofs[0].get("eventId") != proofs[1].get("eventId"),
+            "model event replay source identity invalid")
+    names = ["Pending source before restart", "Bounded delivery failure", "Bounded delivery failure"]
+    origins = ["release-model-pending-source", "release-model-dead-letter", "release-model-dead-letter"]
+    for proof, statuses, name, origin in zip(proofs, [[503, 200], [503, 503, 503], [200]], names, origins):
+        require(all(isinstance(proof.get(key), str) and bool(proof[key]) for key in ["deliveryPid", "eventId", "subjectPid"]),
+                "model event raw source identity missing")
+        require(type(proof.get("attempts")) is int and proof["attempts"] == len(statuses) and isinstance(proof.get("rawEvidence"), list)
+                and len(proof["rawEvidence"]) == len(statuses)
+                and [row.get("responseStatus") for row in proof["rawEvidence"] if isinstance(row, dict)] == statuses,
+                "model event raw proof missing")
+        actual = []
+        for row in proof["rawEvidence"]:
+            require(type(row.get("responseStatus")) is int and type(row.get("duplicate")) is bool
+                    and type(row.get("sequence")) is int and row["sequence"] >= 1,
+                    "model event raw receipt types invalid")
+            try:
+                raw = base64.b64decode(row.get("rawBodyBase64"), validate=True)
+            except (ValueError, TypeError):
+                raise ProtocolError("model event raw body encoding invalid") from None
+            actual.append({"raw_body": raw, "timestamp_text": row.get("timestamp"), "received_at": row.get("receivedAt"),
+                "signature": row.get("signature"), "signature_valid": 1, "delivery_id": proof.get("deliveryPid"),
+                "event_id": proof.get("eventId"), "response_status": row.get("responseStatus"),
+                "request_id": row.get("requestId"), "body_sha": row.get("bodySha256"),
+                "sequence": row.get("sequence"), "duplicate": row.get("duplicate")})
+        verify_delivery(actual, secret=secret, delivery_pid=proof.get("deliveryPid"), event_id=proof.get("eventId"),
+            subject_pid=proof.get("subjectPid"), statuses=statuses, originating_request_id=origin,
+            event_type="open.resource.release.model-event.parts.created", subject_type="release.model-event.parts",
+            schema_version=1, projections=[{"pid": proof.get("subjectPid"), "name": name, "zone": "A"}] * len(statuses))
+        require(all(json.loads(row["raw_body"])["recordVersion"] == 1
+                    and json.loads(row["raw_body"])["correlationId"] == origin for row in actual),
+                "model event raw source metadata invalid")
+    return report
+
+
+class Receivers:
+    """SQLite and its HTTP server run on the same owned thread."""
+    def __init__(self, directory, host, secret):
+        address = ipaddress.ip_address(host)
+        require(address.version == 4 and address.is_private and not address.is_unspecified
+                and not address.is_multicast, "model receiver bind must be a specific private IPv4 address")
+        self.directory, self.host, self.secret, self.servers = Path(directory), host, secret, []
+
+    def start(self, label, mode):
+        store = self.directory / (label + ".sqlite")
+        require(not store.exists() and not store.is_symlink(), "model receiver store already exists")
+        run_id, ready = "release-model-" + label, Queue()
+
+        def serve():
+            sink = server = None
+            try:
+                sink = Receiver(store, self.secret, run_id, mode=mode, failures=1)
+                server = HTTPServer((self.host, 0), handler(sink))
+                ready.put(server)
+                server.serve_forever()
+            except (OSError, ValueError):
+                ready.put(None)
+            finally:
+                if server is not None:
+                    server.server_close()
+                if sink is not None:
+                    sink.close()
+
+        thread = threading.Thread(target=serve, daemon=True)
+        thread.start()
+        server = ready.get(timeout=10)
+        require(server is not None, "model receiver failed to bind")
+        self.servers.append((server, thread))
+        return {"store": store, "runId": run_id, "mode": mode,
+                "url": f"http://{self.host}:{server.server_port}/webhooks/{run_id}"}
+
+    def close(self):
+        for server, thread in self.servers:
+            server.shutdown()
+            thread.join(timeout=5)
+            require(not thread.is_alive(), "model receiver thread did not stop")
+
+
+def observe(callback, seconds=75):
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        value = callback()
+        if value:
+            return value
+        time.sleep(.25)
+    raise ProtocolError("model event bounded observation expired")
+
+
+def run_model_event_probe(request, admin, infrastructure, *, evidence_path, receiver_host, secret_file):
+    evidence_path = Path(evidence_path)
+    require(not evidence_path.exists() and not evidence_path.is_symlink(), "model event report already exists")
+    evidence_path.parent.mkdir(parents=True, exist_ok=True)
+    rows = [{"id": case, "status": "did_not_run"} for case in CASES]
+    report = {"schemaVersion": 1, "registered": len(CASES), "cases": rows, "executed": 0, "passed": 0, "requests": 0}
+    secret = secrets.token_urlsafe(32).encode()
+    receivers = None
+
+    def call(*args, **kwargs):
+        report["requests"] += 1
+        require(report["requests"] <= 200, "model event request budget exhausted")
+        return request(*args, **kwargs)
+
+    def human(path, method="GET", body=None):
+        _, response, _ = call(path, method, body=body, headers=admin)
+        require(isinstance(response, dict) and str(response.get("code")) == "0",
+                "model event administration failed")
+        return response.get("data")
+
+    def record(case, condition=True):
+        row = next(row for row in rows if row["id"] == case)
+        require(row["status"] == "did_not_run", "model event case repeated")
+        row["status"] = "passed" if condition else "failed"
+        require(condition, "model event assertion failed: " + case)
+
+    def field(source, writable=False, required=False):
+        return {"source": source, "type": "string", "readable": True, "writable": writable,
+                "required": required, "nullable": not required, "operators": [], "sortable": False,
+                "referenceResource": None, "properties": {}, "items": None}
+
+    model, resource = "release_model_event_parts", "release.model-event.parts"
+    event_type = "open.resource." + resource + ".created"
+    operations = ["list", "get", "create", "update", "delete"]
+    scopes = {operation: "release.model-event:" + operation for operation in operations}
+    try:
+        fd = os.open(secret_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "wb") as private:
+            private.write(secret)
+        receivers = Receivers(evidence_path.parent, receiver_host, secret)
+        model_row = human("/api/meta/models", "POST", {
+            "code": model, "tableName": model, "displayName": "Release model event parts",
+            "modelType": "entity", "sourceType": "physical",
+            "capabilities": {key: True for key in ["list", "detail", "create", "update", "delete", "filter", "sort", "paginate"]},
+            "fields": [{"code": "rel_name", "columnName": "rel_name", "displayName": "Name", "dataType": "string", "required": True, "editable": True},
+                       {"code": "rel_zone", "columnName": "rel_zone", "displayName": "Zone", "dataType": "string", "required": True, "editable": True, "filterable": True},
+                       {"code": "rel_private", "columnName": "rel_private", "displayName": "Private", "dataType": "string", "editable": True}]})
+        human(f"/api/meta/models/{model_row['pid']}/publish", "POST", {"impactAcknowledged": True})
+        definition = {"code": resource, "modelCode": model, "schemaVersion": 1, "operations": operations,
+            "scopes": scopes, "dataPolicy": "installation_filter", "fields": {
+                "pid": dict(field("pid"), type="pid", nullable=False), "name": field("rel_name", True, True),
+                "zone": dict(field("rel_zone", True, True), operators=["EQ"]), "secret": field("rel_private")},
+            "maxPageSize": 50, "maxConditions": 8, "timeoutMs": 5000, "events": ["created"]}
+        human(f"/api/open-platform/publications/{resource}/draft", "PUT", {"expectedRevision": 0, "definition": definition})
+        published = human(f"/api/open-platform/publications/{resource}/publish", "POST", {"expectedRevision": 1})
+        record("publication", published.get("activeVersion") == 1)
+        application = human("/api/open-platform/applications", "POST", {"name": "Release model event consumer", "description": "Exact-image gate"})
+        installation = human(f"/api/open-platform/applications/{application['pid']}/installations", "POST",
+                             {"environment": "staging", "scopes": list(scopes.values()), "rateLimitPerMinute": 600})
+        human(f"/api/open-platform/installations/{installation['pid']}/resources/{resource}", "PUT",
+              {"operations": operations, "readableFields": ["pid", "name", "zone"], "writableFields": ["name", "zone"],
+               "rowConstraints": [{"field": "zone", "values": ["A"]}]})
+        credentials = human(f"/api/open-platform/installations/{installation['pid']}/credentials", "POST", {})
+        _, token, _ = call("/oauth2/token", "POST", form={"grant_type": "client_credentials",
+                          "client_id": credentials["clientId"], "client_secret": credentials["clientSecret"]})
+        machine = {"Authorization": "Bearer " + token["access_token"]}
+        retry = receivers.start("retry", "fail-first")
+        dead = receivers.start("dead", "fail-all")
+        replay = receivers.start("replay", "accept")
+        subscription_body = {"name": "Signed model release recovery", "installationPid": installation['pid'],
+            "targetUrl": retry["url"], "eventType": event_type, "eventVersion": 1, "secret": secret.decode(),
+            "maxRetries": 3, "timeoutMs": 10000}
+        subscription = human("/api/webhooks", "POST", subscription_body)
+        record("installation-subscription", subscription.get("installationPid") == installation["pid"])
+        tenant = subscription["tenantId"]
+
+        def source(subject):
+            return infrastructure.source(tenant, event_type, subject)
+
+        def counts(event_id):
+            return infrastructure.counts(tenant, event_id)
+
+        def delivery(subject, status):
+            def find():
+                event_id = source(subject)["eventId"]
+                matches = [item for item in human(f"/api/webhooks/{subscription['pid']}/deliveries")
+                           if item.get("eventId") == event_id and item.get("deliveryStatus") == status]
+                require(len(matches) <= 1, "model event duplicate delivery rows")
+                return matches[0] if matches else None
+            return observe(find)
+
+        proofs = []
+        report["deliveryProofs"] = proofs
+
+        def verify(sink, log, subject, statuses, intent, origin):
+            actual = read_delivery(sink["store"], log["pid"], secret=secret, run_id=sink["runId"], mode=sink["mode"], failures=1)
+            proof = verify_delivery(actual, secret=secret, delivery_pid=log["pid"], event_id=log["eventId"],
+                subject_pid=subject, statuses=statuses, originating_request_id=origin, event_type=event_type,
+                subject_type=resource, schema_version=1, projections=[dict(intent, pid=subject)] * len(statuses))
+            snapshot = source(subject)
+            require(all(json.loads(row["raw_body"])["recordVersion"] == snapshot["sequence"]
+                        and json.loads(row["raw_body"])["correlationId"] == origin for row in actual),
+                    "model event source version/correlation mismatch")
+            proofs.append(proof)
+            return actual
+
+        report["beforeRestart"] = infrastructure.identity()
+        marker = infrastructure.poll_marker()
+        observe(lambda: infrastructure.poll_marker() != marker, seconds=15)
+        record("normal-poll-barrier")
+        path, origin = "/api/open/v1/resources/" + resource, "release-model-pending-source"
+        intent = {"name": "Pending source before restart", "zone": "A"}
+        headers = dict(machine, **{"Idempotency-Key": "release-model-create-1", "X-Request-Id": origin})
+        _, created, _ = call(path, "POST", body=intent, headers=headers, expected=(201,))
+        _, repeated, _ = call(path, "POST", body=intent, headers=headers, expected=(201,))
+        record("machine-create-and-replay", created == repeated)
+        pending = source(created["pid"])
+        record("source-pending-before-crash", pending["status"] == "pending"
+               and counts(pending["eventId"]) == {"events": 1, "receipts": 0, "deliveries": 0})
+        infrastructure.crash(report["beforeRestart"])
+        record("owned-process-crash")
+        record("source-persisted-without-consumer", source(created["pid"]) == pending
+               and counts(pending["eventId"]) == {"events": 1, "receipts": 0, "deliveries": 0})
+        infrastructure.resume()
+        report["afterRestart"] = infrastructure.identity()
+        before, after = report["beforeRestart"], report["afterRestart"]
+        record("new-process-same-runtime", before["runtimeId"] == after["runtimeId"]
+               and before["artifactDigest"] == after["artifactDigest"] and before["generation"] != after["generation"])
+        recovered = delivery(created["pid"], "success")
+        report["sourceProof"] = counts(pending["eventId"])
+        record("source-consumed-after-restart", source(created["pid"])["status"] == "delivered"
+               and report["sourceProof"] == {"events": 1, "receipts": 1, "deliveries": 1})
+        record("retry-recovers", recovered["retryCount"] == 1 and recovered["responseStatus"] == 200)
+        actual = verify(retry, recovered, created["pid"], [503, 200], intent, origin)
+        record("independent-raw-retry-proof")
+        subscription_body["targetUrl"] = dead["url"]
+        human("/api/webhooks/" + subscription["pid"], "PUT", subscription_body)
+        dead_intent, dead_origin = {"name": "Bounded delivery failure", "zone": "A"}, "release-model-dead-letter"
+        _, dead_created, _ = call(path, "POST", body=dead_intent,
+            headers=dict(machine, **{"Idempotency-Key": "release-model-create-2", "X-Request-Id": dead_origin}), expected=(201,))
+        dead_log = delivery(dead_created["pid"], "dead_letter")
+        record("bounded-dead-letter", dead_log["retryCount"] == 3 and dead_log["responseStatus"] == 503 and dead_log["replayCount"] == 0)
+        dead_raw = verify(dead, dead_log, dead_created["pid"], [503, 503, 503], dead_intent, dead_origin)
+        record("independent-dead-letter-proof")
+        subscription_body["targetUrl"] = replay["url"]
+        human("/api/webhooks/" + subscription["pid"], "PUT", subscription_body)
+        human(f"/api/open-platform/installations/{installation['pid']}/webhook-deliveries/{dead_log['pid']}/replay", "POST", {})
+        done = delivery(dead_created["pid"], "success")
+        record("owner-replay-success", done["replayCount"] == 1 and done["retryCount"] == 0 and done["responseStatus"] == 200)
+        record("same-source-identity-on-replay", done["pid"] == dead_log["pid"] and done["eventId"] == dead_log["eventId"])
+        accepted = verify(replay, done, dead_created["pid"], [200], dead_intent, dead_origin)
+        record("independent-replay-proof", accepted[0]["raw_body"] == dead_raw[0]["raw_body"])
+        report["deadLetterProof"] = counts(dead_log["eventId"])
+        record("no-extra-source-or-consumer", report["deadLetterProof"] == {"events": 1, "receipts": 1, "deliveries": 1}
+               and counts(pending["eventId"]) == report["sourceProof"])
+        corrupted = [dict(row) for row in actual]
+        corrupted[0]["signature"] = "sha256=" + "0" * 64
+        try:
+            verify_delivery(corrupted, secret=secret, delivery_pid=recovered["pid"], event_id=recovered["eventId"],
+                subject_pid=created["pid"], statuses=[503, 200], originating_request_id=origin, event_type=event_type,
+                subject_type=resource, schema_version=1, projections=[dict(intent, pid=created["pid"])] * 2)
+        except ProtocolError:
+            record("tampered-real-evidence-rejected")
+        else:
+            record("tampered-real-evidence-rejected", False)
+    finally:
+        try:
+            if receivers is not None:
+                receivers.close()
+        finally:
+            report["executed"] = sum(row["status"] != "did_not_run" for row in rows)
+            report["passed"] = sum(row["status"] == "passed" for row in rows)
+            evidence_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    return verify_report(report, secret=secret)

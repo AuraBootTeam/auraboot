@@ -10,6 +10,8 @@ import urllib.parse
 
 from open_platform_http import Client, data
 from open_platform_dynamic_probe import run_dynamic_probe, run_sdk_consumer
+from open_platform_model_event_probe import run_model_event_probe
+from open_platform_model_event_runtime import DockerInfrastructure
 
 bootstrap_spec = importlib.util.spec_from_file_location(
     "release_bootstrap", Path(__file__).with_name("release-bootstrap.py"))
@@ -136,6 +138,13 @@ def main():
 
     dynamic = run_dynamic_probe(request, admin, evidence_path=Path(ARTIFACT).with_name("dynamic-probe.json"),
                                 consumer=consume)
+    infrastructure = DockerInfrastructure(app=os.environ["MODEL_APP"], postgres=os.environ["MODEL_POSTGRES"],
+        network=os.environ["SDK_NETWORK"], job_id=os.environ["AURA_CI_JOB_ID"],
+        source_ref=os.environ["MODEL_SOURCE_REF"], image_digest=os.environ["MODEL_IMAGE_DIGEST"],
+        base_url=BASE, receiver_host=os.environ["MODEL_RECEIVER_HOST"])
+    model_events = run_model_event_probe(request, admin, infrastructure,
+        evidence_path=Path(ARTIFACT).parent / "model-events" / "result.json",
+        receiver_host=os.environ["MODEL_RECEIVER_HOST"], secret_file=os.environ["MODEL_EVENT_SECRET_FILE"])
 
     with open(ARTIFACT, "w", encoding="utf-8") as handle:
         json.dump({"clientId": credential["clientId"], "clientSecret": credential["clientSecret"]}, handle)
@@ -143,6 +152,7 @@ def main():
     print(json.dumps({
         "assetPid": asset1["pid"], "stockInPid": stock_in["pid"],
         "cursorOpaque": True, "staleWriteStatus": 412, "catalogCount": len(catalog), "dynamic": dynamic, "sdk": sdk,
+        "modelEvents": model_events,
     }, sort_keys=True))
 
 

@@ -8,6 +8,7 @@ import subprocess
 from pathlib import Path
 
 from open_platform_http import ProtocolError
+from open_platform_model_event_probe import read_secret, verify_report as verify_model_event_report
 
 CASES = (
     "publication-snapshot", "resource-no-grant", "query-no-grant",
@@ -81,11 +82,12 @@ def run_sdk_consumer(fixture, command, *, base_url, evidence_path):
     return verify_sdk_report(safe)
 
 
-def verify_release_report(report):
+def verify_release_report(report, *, model_event_secret=None):
     if not isinstance(report, dict):
         raise ProtocolError("release protocol report invalid")
     verify_report(report.get("dynamic"))
     verify_sdk_report(report.get("sdk"))
+    verify_model_event_report(report.get("modelEvents"), secret=model_event_secret)
     return report
 
 
@@ -225,6 +227,6 @@ def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None):
 
 if __name__ == "__main__":
     import sys
-    if len(sys.argv) != 3 or sys.argv[1] != "--verify-release-report":
-        raise SystemExit("usage: open_platform_dynamic_probe.py --verify-release-report REPORT")
-    verify_release_report(json.loads(Path(sys.argv[2]).read_text(encoding="utf-8")))
+    if len(sys.argv) != 5 or sys.argv[1] != "--verify-release-report" or sys.argv[3] != "--model-event-secret-file":
+        raise SystemExit("usage: open_platform_dynamic_probe.py --verify-release-report REPORT --model-event-secret-file PRIVATE_KEY")
+    verify_release_report(json.loads(Path(sys.argv[2]).read_text(encoding="utf-8")), model_event_secret=read_secret(sys.argv[4]))
