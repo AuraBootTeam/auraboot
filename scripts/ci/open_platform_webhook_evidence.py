@@ -36,9 +36,17 @@ def read_delivery(store, delivery_pid, *, secret, run_id, mode, failures):
             'SELECT * FROM deliveries WHERE delivery_id=? ORDER BY sequence', (delivery_pid,))]
 
 
-def verify_delivery(rows, *, secret, delivery_pid, event_id, subject_pid, statuses, originating_request_id=None):
+def verify_delivery(rows, *, secret, delivery_pid, event_id, subject_pid, statuses, originating_request_id=None,
+                    event_type='assets.assignment.changed', subject_type='assets', schema_version=1,
+                    projections=None):
     require(len(rows) == len(statuses) and bool(rows), 'receiver attempt denominator mismatch')
-    bodies, proofs = [], []
+    require(isinstance(event_type, str) and bool(event_type)
+            and isinstance(subject_type, str) and bool(subject_type)
+            and type(schema_version) is int and schema_version >= 1, 'expected event contract invalid')
+    require(projections is None or (isinstance(projections, list) and len(projections) == len(rows)
+            and all(isinstance(projection, dict) for projection in projections)),
+            'expected projection denominator mismatch')
+    bodies, proofs, envelopes = [], [], []
     for row, status in zip(rows, statuses):
         raw = row.get('raw_body')
         require(isinstance(raw, bytes) and len(raw) <= 1024 * 1024, 'raw delivery bytes missing')
@@ -64,16 +72,32 @@ def verify_delivery(rows, *, secret, delivery_pid, event_id, subject_pid, status
         body_sha = hashlib.sha256(raw).hexdigest()
         require(row.get('body_sha') == body_sha, 'raw delivery checksum mismatch')
         payload = json.loads(raw)
-        require(payload.get('id') == event_id and payload.get('type') == 'assets.assignment.changed'
-                and payload.get('schemaVersion') == 1
-                and payload.get('subject') == {'type': 'assets', 'pid': subject_pid},
+        require(payload.get('id') == event_id and payload.get('type') == event_type
+                and type(payload.get('schemaVersion')) is int and payload.get('schemaVersion') == schema_version
+                and payload.get('subject') == {'type': subject_type, 'pid': subject_pid},
                 'receiver envelope does not match the fresh command')
+        if projections is not None:
+            require(payload.get('data') == projections[len(bodies)], 'receiver projection mismatch')
+        if event_type.startswith('open.resource.'):
+            require(set(payload) == {'id', 'type', 'schemaVersion', 'occurredAt', 'subject',
+                                     'recordVersion', 'correlationId', 'data'}
+                    and type(payload.get('recordVersion')) is int and payload['recordVersion'] >= 1
+                    and isinstance(payload.get('occurredAt'), str) and bool(payload['occurredAt'])
+                    and isinstance(payload.get('correlationId'), str) and bool(payload['correlationId']),
+                    'model event envelope exposes invalid or internal fields')
+        envelopes.append({key: value for key, value in payload.items() if key != 'data'})
         bodies.append(raw)
         proofs.append({'sequence': row['sequence'], 'receivedAt': received_at,
                        'timestamp': timestamp, 'signature': signature, 'responseStatus': status,
                        'requestId': row.get('request_id'),
                        'duplicate': bool(row['duplicate']), 'rawBodyBase64': base64.b64encode(raw).decode(),
                        'bodySha256': body_sha})
-    require(len(set(bodies)) == 1, 'retry/replay changed raw event bytes')
+    # Without an explicit per-attempt projection contract, retries must preserve
+    # identical bytes. Model authorization may narrow a projected retry body.
+    if projections is None:
+        require(len(set(bodies)) == 1, 'retry/replay changed raw event bytes')
+    else:
+        require(all(envelope == envelopes[0] for envelope in envelopes),
+                'retry/replay changed source event identity or metadata')
     return {'deliveryPid': delivery_pid, 'eventId': event_id, 'subjectPid': subject_pid,
             'attempts': len(rows), 'statuses': statuses, 'rawEvidence': proofs}
