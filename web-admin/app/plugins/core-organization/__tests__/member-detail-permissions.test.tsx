@@ -14,11 +14,12 @@ async function loadMember(status = 'active', linkedUser = false) {
     pid: 'MEMBER-1', status, user: linkedUser ? { pid: 'USER-1', username: 'customer', email: 'customer@example.test', phone: null, realName: 'Customer', avatar: null } : null, joinDate: null, leaveDate: null,
     createdAt: '2026-10-03T00:00:00Z', updatedAt: '2026-10-03T00:00:00Z',
   } }));
-  render(<MemberDetailPage />);
+  const view = render(<MemberDetailPage />);
   await screen.findByTestId('action-bar');
+  return view;
 }
 describe('native member lifecycle authorization', () => {
-  beforeEach(() => { vi.clearAllMocks(); mocks.permissions.clear(); });
+  beforeEach(() => { vi.resetAllMocks(); mocks.permissions.clear(); });
   afterEach(cleanup);
   it.each([
     [403, '403', 'forbidden', '无权查看此成员'],
@@ -61,6 +62,48 @@ describe('native member lifecycle authorization', () => {
     await loadMember(status, linked);
     expect(screen.queryByRole('button', { name: '代客户登录', exact: true })).not.toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+  it('loads and localizes the selected member audit history', async () => {
+    mocks.permissions.add('admin.customer.impersonate');
+    await loadMember('active', true);
+    mocks.get.mockResolvedValueOnce({ code: '0', data: [{ sessionPid: 'SESSION-1', operatorDisplayName: 'Operator', authorizationMethod: 'offline', reason: '协助核对订单', reference: null, status: 'ended', startedAt: '2026-10-03T00:00:00Z' }] });
+    fireEvent.click(screen.getByRole('button', { name: '代登录记录', exact: true }));
+    expect(await screen.findByText('协助核对订单')).toBeVisible();
+    expect(mocks.get).toHaveBeenCalledWith('/api/impersonation-sessions/history', { targetMemberPid: 'MEMBER-1', limit: '50' });
+    expect(screen.getByText('线下授权')).toBeVisible();
+    expect(screen.getByText('已结束')).toBeVisible();
+  });
+  it('renders a successful empty audit separately from loading', async () => {
+    mocks.permissions.add('admin.customer.impersonate');
+    await loadMember('active', true);
+    mocks.get.mockResolvedValueOnce({ code: '0', data: [] });
+    fireEvent.click(screen.getByRole('button', { name: '代登录记录', exact: true }));
+    expect(await screen.findByText('暂无代登录记录')).toBeVisible();
+    expect(screen.queryByText('正在加载…')).not.toBeInTheDocument();
+  });
+  it.each(['http', 'transport'])('shows an explicit audit error on %s failure', async (failure) => {
+    mocks.permissions.add('admin.customer.impersonate');
+    await loadMember('active', true);
+    if (failure === 'http') mocks.get.mockResolvedValueOnce({ code: '1', data: null, desc: 'internal diagnostic' });
+    else mocks.get.mockRejectedValueOnce(new TypeError('network unavailable'));
+    fireEvent.click(screen.getByRole('button', { name: '代登录记录', exact: true }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('无法加载代登录记录');
+    expect(screen.queryByText('暂无代登录记录')).not.toBeInTheDocument();
+    expect(screen.queryByText('正在加载…')).not.toBeInTheDocument();
+    expect(screen.queryByText('internal diagnostic')).not.toBeInTheDocument();
+  });
+  it('discards a pending audit response after read authorization is revoked', async () => {
+    mocks.permissions.add('admin.customer.impersonate');
+    const view = await loadMember('active', true);
+    let complete!: (value: unknown) => void;
+    mocks.get.mockImplementationOnce(() => new Promise(resolve => { complete = resolve; }));
+    fireEvent.click(screen.getByRole('button', { name: '代登录记录', exact: true }));
+    await waitFor(() => expect(complete).toBeTypeOf('function'));
+    mocks.permissions.clear(); view.rerender(<MemberDetailPage />);
+    complete({ code: '0', data: [{ reason: '旧权限私密记录', sessionPid: 'STALE' }] });
+    await waitFor(() => expect(screen.queryByRole('button', { name: '代登录记录' })).not.toBeInTheDocument());
+    expect(screen.queryByText('旧权限私密记录')).not.toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
   it('hosts the shared lifecycle input dialog on the native detail route', async () => {
     await loadMember();

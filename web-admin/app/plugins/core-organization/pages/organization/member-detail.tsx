@@ -118,6 +118,7 @@ export default function MemberDetailPage() {
   const [activeTab, setActiveTab] = useState<'basic' | 'org' | 'teams' | 'accessHistory'>('basic');
   const [accessHistory, setAccessHistory] = useState<ImpersonationAuditRecord[]>([]);
   const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [historyFailed, setHistoryFailed] = useState(false);
   const [showImpersonationDialog, setShowImpersonationDialog] = useState(false);
   const [reasonRequired, setReasonRequired] = useState(false);
 
@@ -181,6 +182,34 @@ export default function MemberDetailPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const canReadAccessHistory = Boolean(member?.pid === memberPid && member?.user && hasPermission('admin.customer.impersonate'));
+  useEffect(() => {
+    setAccessHistory([]);
+    setHistoryLoaded(false);
+    setHistoryFailed(false);
+    if (!memberPid || activeTab !== 'accessHistory' || !canReadAccessHistory) return;
+    let current = true;
+    void (async () => {
+      try {
+        const result = await get<ImpersonationAuditRecord[]>('/api/impersonation-sessions/history', {
+          targetMemberPid: memberPid,
+          limit: '50',
+        });
+        if (!current) return;
+        if (!ResultHelper.isSuccess(result) || !Array.isArray(result.data)) {
+          setHistoryFailed(true);
+          return;
+        }
+        setAccessHistory(result.data);
+      } catch {
+        if (current) setHistoryFailed(true);
+      } finally {
+        if (current) setHistoryLoaded(true);
+      }
+    })();
+    return () => { current = false; };
+  }, [activeTab, memberPid, canReadAccessHistory]);
 
   // Existing native detail delegates to the same action pipeline as the DSL list.
   const { handleAction, loading: actionLoading } = useActionHandler({
@@ -292,7 +321,7 @@ export default function MemberDetailPage() {
     { key: 'basic' as const, label: l('基本信息', 'Basic Info'), icon: UserIcon },
     { key: 'org' as const, label: l('组织信息', 'Organization'), icon: BuildingOfficeIcon },
     { key: 'teams' as const, label: l('团队', 'Teams'), icon: UserGroupIcon, count: teams.length },
-    ...(member.user && hasPermission('admin.customer.impersonate')
+    ...(canReadAccessHistory
       ? [{ key: 'accessHistory' as const, label: l('代登录记录', 'Access history'), icon: ClockIcon }]
       : []),
   ];
@@ -540,8 +569,8 @@ export default function MemberDetailPage() {
         {activeTab === 'basic' && <BasicInfoTab member={member} displayName={displayName} l={l} />}
         {activeTab === 'org' && <OrgInfoTab employee={employee} l={l} />}
         {activeTab === 'teams' && <TeamsTab teams={teams} l={l} navigate={navigate} />}
-        {activeTab === 'accessHistory' && (
-          <AccessHistoryTab records={accessHistory} loaded={historyLoaded} l={l} />
+        {activeTab === 'accessHistory' && canReadAccessHistory && (
+          <AccessHistoryTab records={accessHistory} loaded={historyLoaded} failed={historyFailed} l={l} />
         )}
       </div>
       <FormDialog />
@@ -552,12 +581,17 @@ export default function MemberDetailPage() {
 function AccessHistoryTab({
   records,
   loaded,
+  failed,
   l,
 }: {
   records: ImpersonationAuditRecord[];
   loaded: boolean;
+  failed: boolean;
   l: (zh: string, en: string) => string;
 }) {
+  if (failed) {
+    return <div role="alert" className="p-6 py-12 text-center text-red-600 dark:text-red-400">{l('无法加载代登录记录，请刷新页面后重试。', 'Could not load customer-access history. Refresh the page to try again.')}</div>;
+  }
   if (!loaded) {
     return <div className="p-6 py-12 text-center text-gray-500 dark:text-gray-400">{l('正在加载…', 'Loading…')}</div>;
   }
