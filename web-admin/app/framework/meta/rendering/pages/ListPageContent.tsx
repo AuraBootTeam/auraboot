@@ -2032,6 +2032,14 @@ function ListPageContentInner(props: PageContentProps) {
   }, [modelCode, skipModelFieldMeta]);
 
   const [modelFieldMap, setModelFieldMap] = useState<Map<string, any>>(new Map());
+  // Call-time mirror of modelFieldMap: loadData / handleTabChange read it when a
+  // request fires, so a filter request that waited on fieldMetaReadyRef sees the
+  // settled metadata even though its closure was created before the re-render.
+  const modelFieldMapRef = useRef<Map<string, any>>(new Map());
+  // Resolves once the field metadata for the current model has settled (loaded
+  // or failed). The initial list load awaits it when URL-sourced filters are
+  // present, so their operators are typed before the first request.
+  const fieldMetaReadyRef = useRef<Promise<void>>(Promise.resolve());
   const [referenceDisplayCache, setReferenceDisplayCache] = useState<
     Record<string, Record<string, string>>
   >({});
@@ -2040,11 +2048,13 @@ function ListPageContentInner(props: PageContentProps) {
     let cancelled = false;
     const pageKey = schema?.modelCode || tableName;
     if (!pageKey || skipModelFieldMeta) {
+      modelFieldMapRef.current = new Map();
       setModelFieldMap(new Map());
+      fieldMetaReadyRef.current = Promise.resolve();
       return;
     }
 
-    async function loadModelFields(): Promise<void> {
+    const ready = (async () => {
       try {
         const fieldsRes = await fetchResult<any[]>(`/api/dynamic/${pageKey}/field-meta`, {
           method: 'get',
@@ -2052,6 +2062,7 @@ function ListPageContentInner(props: PageContentProps) {
         });
         if (cancelled) return;
         if (!ResultHelper.isSuccess(fieldsRes) || !fieldsRes.data) {
+          modelFieldMapRef.current = new Map();
           setModelFieldMap(new Map());
           return;
         }
@@ -2059,16 +2070,17 @@ function ListPageContentInner(props: PageContentProps) {
         for (const field of fieldsRes.data) {
           if (field?.code) map.set(field.code, field);
         }
+        modelFieldMapRef.current = map;
         setModelFieldMap(map);
       } catch (error) {
         if (!cancelled) {
+          modelFieldMapRef.current = new Map();
           setModelFieldMap(new Map());
           console.warn('[ListPageContent] Failed to load model field metadata:', error);
         }
       }
-    }
-
-    loadModelFields();
+    })();
+    fieldMetaReadyRef.current = ready;
     return () => {
       cancelled = true;
     };
@@ -2418,7 +2430,7 @@ function ListPageContentInner(props: PageContentProps) {
             tabCondition,
             params?.filters,
             params?.chipFilters ?? chipFiltersRef.current,
-            modelFieldMap,
+            modelFieldMapRef.current,
           );
           if (filtersParam) {
             queryParams.filters = filtersParam;
@@ -2528,7 +2540,6 @@ function ListPageContentInner(props: PageContentProps) {
       auditUserDisplayFields,
       activeSorts,
       skipListData,
-      modelFieldMap,
     ],
   );
 
@@ -2631,26 +2642,41 @@ function ListPageContentInner(props: PageContentProps) {
   // Pass current filters (which may include URL filter_* params) for the first load
   useEffect(() => {
     if (schema && !skipListData) {
-      // Restore an active preset view from ?preset= so it survives reload —
-      // a SavedView (?view=) takes precedence and carries its own filters.
-      const initialPreset = urlViewPid ? null : urlPreset;
-      if (initialPreset) {
-        const presetFilters =
-          buildQuickFilterPreset(initialPreset, { userId: user?.id, now: new Date() }) ?? {};
-        setActiveQuickFilter(initialPreset);
-        setFilters(presetFilters);
-        // The debounced sort/filter effect would otherwise re-fetch once on
-        // mount with the still-empty `filters` state and clobber this preset
-        // load — skip exactly that first run so the preset filter wins.
-        skipFirstSortFilterEffectRef.current = true;
-        loadDataRef.current?.({
-          page: pagination.current - 1,
-          size: pagination.pageSize,
-          filters: presetFilters,
+      const runInitialLoad = () => {
+        // Restore an active preset view from ?preset= so it survives reload —
+        // a SavedView (?view=) takes precedence and carries its own filters.
+        const initialPreset = urlViewPid ? null : urlPreset;
+        if (initialPreset) {
+          const presetFilters =
+            buildQuickFilterPreset(initialPreset, { userId: user?.id, now: new Date() }) ?? {};
+          setActiveQuickFilter(initialPreset);
+          setFilters(presetFilters);
+          // The debounced sort/filter effect would otherwise re-fetch once on
+          // mount with the still-empty `filters` state and clobber this preset
+          // load — skip exactly that first run so the preset filter wins.
+          skipFirstSortFilterEffectRef.current = true;
+          loadDataRef.current?.({
+            page: pagination.current - 1,
+            size: pagination.pageSize,
+            filters: presetFilters,
+          });
+        } else {
+          loadDataRef.current?.({ page: pagination.current - 1, size: pagination.pageSize, filters });
+        }
+      };
+      // URL-sourced filters (filter_* / drill-down bare params) are typed by the
+      // model field metadata; awaiting it here prevents the first request from
+      // going out with the un-typed legacy operator (e.g. LIKE on a date).
+      if (Object.keys(urlFilters).length > 0) {
+        let cancelled = false;
+        void fieldMetaReadyRef.current.then(() => {
+          if (!cancelled) runInitialLoad();
         });
-      } else {
-        loadDataRef.current?.({ page: pagination.current - 1, size: pagination.pageSize, filters });
+        return () => {
+          cancelled = true;
+        };
       }
+      runInitialLoad();
     }
     // Intentionally only react to schema changes.
     // Pagination or filter updates are handled by explicit user actions.
@@ -2745,7 +2771,7 @@ function ListPageContentInner(props: PageContentProps) {
               queryParams.sortOrder = String(tableBlock.defaultSort.order || 'desc').toLowerCase();
             }
           } else {
-            const filtersParam = buildFiltersParam(tabCondition, filters, chipFilters, modelFieldMap);
+            const filtersParam = buildFiltersParam(tabCondition, filters, chipFilters, modelFieldMapRef.current);
             if (filtersParam) {
               queryParams.filters = filtersParam;
             }
@@ -2815,7 +2841,6 @@ function ListPageContentInner(props: PageContentProps) {
       tableBlock,
       auditUserDisplayFields,
       skipListData,
-      modelFieldMap,
     ],
   );
 
