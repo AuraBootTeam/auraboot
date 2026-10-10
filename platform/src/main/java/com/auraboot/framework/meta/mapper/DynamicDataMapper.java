@@ -109,7 +109,10 @@ public interface DynamicDataMapper {
             @Param("delta") long delta,
             @Param("recordId") String recordId,
             @Param("tenantId") long tenantId,
-            @Param("currentUserId") Long currentUserId);
+            @Param("currentUserId") Long currentUserId,
+            @Param("versioned") boolean versioned,
+            @Param("scopePredicate") String scopePredicate,
+            @Param("scopeParameters") Map<String, Object> scopeParameters);
 
     /**
      * PostgreSQL-native bounded lease claim. Tenant isolation is explicit in both the candidate

@@ -548,6 +548,15 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         ModelDefinition model = getModelDefinition(modelCode);
         ModelMutationGuard.assertMutable(model, "incremented");
         FieldWriterGuard.assertFieldWriteAllowed(model, counterCode);
+        if (MachineDataAccessContext.isActive()) {
+            var decision = MachineDataAccessContext.requireDecision(modelCode);
+            decision.requireAction("update");
+            MachineDataAccessGuards.requireWritable(modelCode, Map.of(counterCode, delta));
+            if (!decision.readableFields().contains(counterCode)
+                    || (capCode != null && !decision.readableFields().contains(capCode))) {
+                throw new AccessDeniedException("Machine counter and cap fields must be readable");
+            }
+        }
         String counterCol = resolveNumericColumn(model, counterCode);
         String capCol = null;
         if (capCode != null) {
@@ -559,9 +568,38 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 pkField.getColumnName(), "primary key column");
         long tenantId = getCurrentTenantId();
         Long currentUserId = getCurrentUserId();
+        var scopeParameters = new LinkedHashMap<String, Object>();
+        var scopePredicate = new StringBuilder("1 = 1");
+        appendAggregateBindingGuard(scopePredicate, scopeParameters, model);
+        dynamicScopedWriteSupport().appendScopedWriteGuards(scopePredicate, tenantId, modelCode,
+                currentUserId, "update", scopeParameters);
+        if (MachineDataAccessContext.isActive()) {
+            var decision = MachineDataAccessContext.requireDecision(modelCode);
+            // An increment cannot move the row outside its current installation authority.
+            int constraintIndex = 0;
+            for (var constraint : decision.constraints()) {
+                int guardIndex = constraintIndex++;
+                if (!counterCode.equals(constraint.field())) continue;
+                scopePredicate.append(" AND COALESCE(").append(counterCol).append(", 0) + #{delta} IN (");
+                for (int index = 0; index < constraint.values().size(); index++) {
+                    if (index > 0) scopePredicate.append(", ");
+                    String key = "atomic_future_" + guardIndex + "_" + index;
+                    scopeParameters.put(key, constraint.values().get(index));
+                    scopePredicate.append("#{params.").append(key).append("}");
+                }
+                scopePredicate.append(")");
+            }
+            Long expected = MachineDataAccessContext.expectedVersion(modelCode, recordId);
+            if (expected != null) {
+                scopeParameters.put("atomic_expected_version", expected);
+                scopePredicate.append(" AND row_version = #{params.atomic_expected_version}");
+            }
+        }
         List<Map<String, Object>> rows = dynamicDataMapper.atomicIncrementReturning(
                 model.getTableName(), counterCol, capCol, pkColumn,
-                softDeleteClause, delta, recordId, tenantId, currentUserId);
+                softDeleteClause, delta, recordId, tenantId, currentUserId,
+                PhysicalRowVersionSupport.isVersioned(model, dynamicDataMapper),
+                scopePredicate.toString().replace("#{params.", "#{scopeParameters."), scopeParameters);
         if (rows == null || rows.isEmpty()) {
             return Optional.empty();
         }

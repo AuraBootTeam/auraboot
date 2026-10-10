@@ -83,7 +83,7 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
         String modelCode = "open_machine_" + suffix;
         var reference = FieldDefinition.RefTarget.builder().targetEntity(modelCode).valueField("pid").build();
         String tablePrefix = testInfo.getTestMethod().orElseThrow().getName()
-                .matches("customPhysicalTablePreservesPublicHttpCrudVersions|humanCustomTableMutationInvalidatesMachineEtagAndEmitsEvent") ? "custom_" : "mt_";
+                .matches("customPhysicalTablePreservesPublicHttpCrudVersions|humanCustomTableMutationInvalidatesMachineEtagAndEmitsEvent|atomicCustomTableAdvancesVersionAndEmitsEvent") ? "custom_" : "mt_";
         models.saveDefinition(ModelDefinition.builder().code(modelCode).tableName(tablePrefix + modelCode)
                 .displayName("Machine permission fixture").status("published").sourceType("physical").primaryKey("id")
                 .extension(Map.of("softDelete", testInfo.getTestMethod().orElseThrow().getName()
@@ -93,7 +93,7 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
                 .fields(List.of(FieldDefinition.builder().code("name").columnName("name").dataType("STRING").displayName("Name").sortable(true).filterable(true).build(),
                         FieldDefinition.builder().code("zone").columnName("zone").dataType("STRING").displayName("Zone").sortable(true).filterable(true).build(),
                         FieldDefinition.builder().code("secret").columnName("secret").dataType("STRING").displayName("Secret").sortable(true).filterable(true).build(),
-                        FieldDefinition.builder().code("counter").columnName("counter").dataType("INTEGER").displayName("Counter").build(),
+                        FieldDefinition.builder().code("counter").columnName("counter").dataType("INTEGER").displayName("Counter").filterable(true).build(),
                         FieldDefinition.builder().code("cap").columnName("cap").dataType("INTEGER").displayName("Cap").build(),
                         FieldDefinition.builder().code("related").columnName("related").dataType("REFERENCE").displayName("Related").refTarget(reference).build())).build());
         var schema = schemas.createTableByModel(modelCode);
@@ -911,6 +911,97 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
         assertThat(sourceEvents()).hasSize(1);
         assertThat(eventJdbc.queryForObject("SELECT name FROM " + models.getModelDefinition(contract.modelCode()).orElseThrow().getTableName()
                 + " WHERE pid = ?", String.class, allowedPid)).isEqualTo("Human changed");
+    }
+
+    private void publishCounterEvents(boolean writable) {
+        var fields = new LinkedHashMap<>(contract.fields());
+        fields.put("counter", new Field("counter", Type.INTEGER, true, true, false, true, Set.of("EQ"), false, null, Map.of(), null));
+        fields.put("cap", new Field("cap", Type.INTEGER, true, false, false, true, Set.of(), false, null, Map.of(), null));
+        contract = new OpenApiResourceContract(contract.code(), contract.modelCode(), 2, contract.operations(),
+                contract.scopes(), contract.dataPolicy(), fields, 50, 8, 5000, Set.of("created", "updated", "deleted"));
+        publications.saveDraft(contract.code(), new OpenApiPublicationService.DraftRequest(1, contract));
+        publications.publish(contract.code(), 2);
+        publications.grant(principal.installationPid(), contract.code(), new OpenApiInstallationPolicy(contract.operations(),
+                fields.keySet(), writable ? Set.of("name", "zone", "counter") : Set.of("name", "zone"),
+                List.of(new OpenApiInstallationPolicy.RowConstraint("zone", List.of("A")))));
+    }
+
+    @Test void atomicCustomTableAdvancesVersionAndEmitsEvent() throws Exception {
+        publishCounterEvents(true);
+        assertThat(MetaContext.runWithCommandPermitScope("ALL", () ->
+                data.incrementWithinCap(contract.modelCode(), allowedPid, "counter", 1, null))).contains(1L);
+        assertThat(eventJdbc.queryForObject("SELECT row_version FROM " + models.getModelDefinition(contract.modelCode())
+                .orElseThrow().getTableName() + " WHERE pid = ?", Long.class, allowedPid)).isEqualTo(2L);
+        assertThat(sourceEvents()).hasSize(1);
+        assertThat(json.readTree(sourceEvents().getFirst().get("payload").toString()).path("source").path("counter").asInt()).isEqualTo(1);
+    }
+
+    @Test void machineAtomicIncrementRejectsUnwritableCounter() {
+        publishCounterEvents(false);
+        MetaContext.setContext(principal.tenantId(), null, principal.subjectPid(), "machine");
+        try (var machine = MachineDataAccessContext.begin(principal);
+             var permission = authorizer.authorize(principal, contract.code(), Operation.UPDATE).openScope()) {
+            assertThatThrownBy(() -> data.incrementWithinCap(contract.modelCode(), allowedPid, "counter", 1, null))
+                    .isInstanceOf(AccessDeniedException.class);
+        } finally { applyTestMetaContext(); }
+        assertThat(MetaContext.runWithCommandPermitScope("ALL", () -> data.getById(contract.modelCode(), allowedPid)).get("counter")).isNull();
+        assertThat(sourceEvents()).isEmpty();
+    }
+
+    @Test void machineAtomicIncrementCannotMutateOutsideInstallationRows() {
+        publishCounterEvents(true);
+        MetaContext.setContext(principal.tenantId(), null, principal.subjectPid(), "machine");
+        try (var machine = MachineDataAccessContext.begin(principal);
+             var permission = authorizer.authorize(principal, contract.code(), Operation.UPDATE).openScope()) {
+            assertThat(data.incrementWithinCap(contract.modelCode(), deniedPid, "counter", 1, null)).isEmpty();
+        } finally { applyTestMetaContext(); }
+        assertThat(MetaContext.runWithCommandPermitScope("ALL", () -> data.getById(contract.modelCode(), deniedPid)).get("counter")).isNull();
+        assertThat(sourceEvents()).isEmpty();
+    }
+
+    @Test void machineAtomicIncrementRespectsCapVersionProspectiveScopeAndRollback() {
+        MetaContext.runWithCommandPermitScope("ALL", () -> data.update(contract.modelCode(), allowedPid,
+                new HashMap<>(Map.of("counter", 0, "cap", 5))));
+        publishCounterEvents(true);
+        MetaContext.setContext(principal.tenantId(), null, principal.subjectPid(), "machine");
+        try (var machine = MachineDataAccessContext.begin(principal);
+             var permission = authorizer.authorize(principal, contract.code(), Operation.UPDATE).openScope()) {
+            assertThat(data.incrementWithinCap(contract.modelCode(), allowedPid, "counter", 2, "cap")).contains(2L);
+            assertThat(data.incrementWithinCap(contract.modelCode(), allowedPid, "counter", 100, "cap")).isEmpty();
+            try (var stale = MachineDataAccessContext.withExpectedVersion(contract.modelCode(), allowedPid, 2)) {
+                assertThat(data.incrementWithinCap(contract.modelCode(), allowedPid, "counter", 1, null)).isEmpty();
+            }
+        } finally { applyTestMetaContext(); }
+        assertThat(sourceEvents()).hasSize(1);
+        var constrained = new OpenApiInstallationPolicy(contract.operations(), contract.fields().keySet(), Set.of("counter"),
+                List.of(new OpenApiInstallationPolicy.RowConstraint("zone", List.of("A")),
+                        new OpenApiInstallationPolicy.RowConstraint("counter", List.of("2"))));
+        publications.grant(principal.installationPid(), contract.code(), constrained);
+        MetaContext.setContext(principal.tenantId(), null, principal.subjectPid(), "machine");
+        try (var machine = MachineDataAccessContext.begin(principal);
+             var permission = authorizer.authorize(principal, contract.code(), Operation.UPDATE).openScope()) {
+            assertThat(data.incrementWithinCap(contract.modelCode(), allowedPid, "counter", 1, null)).isEmpty();
+        } finally { applyTestMetaContext(); }
+        var nested = new org.springframework.transaction.support.TransactionTemplate(eventTransactions);
+        nested.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_NESTED);
+        var readable = new HashSet<>(contract.fields().keySet()); readable.remove("cap");
+        publications.grant(principal.installationPid(), contract.code(), new OpenApiInstallationPolicy(contract.operations(),
+                readable, Set.of("counter"), List.of(new OpenApiInstallationPolicy.RowConstraint("zone", List.of("A")))));
+        MetaContext.setContext(principal.tenantId(), null, principal.subjectPid(), "machine");
+        try (var machine = MachineDataAccessContext.begin(principal);
+             var permission = authorizer.authorize(principal, contract.code(), Operation.UPDATE).openScope()) {
+            assertThatThrownBy(() -> nested.execute(status -> data.incrementWithinCap(contract.modelCode(), allowedPid, "counter", 1, "cap")))
+                    .isInstanceOf(AccessDeniedException.class);
+        } finally { applyTestMetaContext(); }
+        eventFaultObserver.fail = true;
+        try {
+            assertThatThrownBy(() -> nested.execute(status -> MetaContext.runWithCommandPermitScope("ALL", () ->
+                    data.incrementWithinCap(contract.modelCode(), allowedPid, "counter", 1, null))))
+                    .isInstanceOf(IllegalStateException.class);
+        } finally { eventFaultObserver.fail = false; }
+        var current = MetaContext.runWithCommandPermitScope("ALL", () -> data.getById(contract.modelCode(), allowedPid));
+        assertThat(current).containsEntry("counter", 2).containsEntry("row_version", 3);
+        assertThat(sourceEvents()).hasSize(1);
     }
 
     private void cleanupCommittedFixture() {

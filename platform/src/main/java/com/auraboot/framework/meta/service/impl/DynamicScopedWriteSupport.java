@@ -231,7 +231,7 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
         return resolveWriteRowFilter(tenantId, modelCode, userId, "update");
     }
 
-    private void appendScopedWriteGuards(StringBuilder sql, Long tenantId, String modelCode,
+    void appendScopedWriteGuards(StringBuilder sql, Long tenantId, String modelCode,
                                         Long userId, String operation, Map<String, Object> parameters) {
         if (MachineDataAccessContext.isActive()) {
             sql.append(" AND (").append(MachineDataAccessGuards.predicate(modelCode, operation, parameters, "machine_scope")).append(")");

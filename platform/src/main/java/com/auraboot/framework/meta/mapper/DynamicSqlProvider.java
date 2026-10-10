@@ -164,7 +164,10 @@ public class DynamicSqlProvider {
      * they are re-validated here as defence-in-depth. {@code softDeleteClause}
      * is a trusted platform constant (from DynamicDataServiceImpl#buildSoftDeleteClause)
      * appended verbatim. Values (delta, recordId, tenantId, currentUserId) are
-     * bound as #{} parameters. Cap predicate omitted when capCol is null (uncapped).
+     * bound as #{} parameters. The scope predicate is compiled by the platform write
+     * guards; its values must use the scopeParameters binding namespace. The version
+     * flag comes from the physical schema contract. Cap predicate is omitted when
+     * capCol is null (uncapped).
      */
     public static String atomicIncrementReturning(Map<String, Object> params) {
         String tableName  = requireName((String) params.get("tableName"), "table name");
@@ -172,11 +175,19 @@ public class DynamicSqlProvider {
         String pkColumn   = requireName((String) params.get("pkColumn"), "primary key column");
         Object capColObj  = params.get("capCol");
         String softDelete = (String) params.getOrDefault("softDeleteClause", "");
+        Object versioned = params.get("versioned");
+        String scope = (String) params.get("scopePredicate");
+        if (!(versioned instanceof Boolean) || scope == null || scope.isBlank()
+                || !(params.get("scopeParameters") instanceof Map)
+                || scope.contains(";") || scope.contains("--") || scope.contains("/*")
+                || scope.contains("*/") || scope.contains("${") || scope.contains("#{params.")) {
+            throw new IllegalArgumentException("Bound atomic write authority and version contract required");
+        }
 
         StringBuilder sql = new StringBuilder();
         sql.append("UPDATE ").append(tableName).append(" SET ")
            .append(counterCol).append(" = COALESCE(").append(counterCol).append(", 0) + #{delta}");
-        if (tableName.startsWith(com.auraboot.framework.meta.constant.SystemFieldConstants.DYNAMIC_TABLE_PREFIX)) {
+        if (Boolean.TRUE.equals(versioned)) {
             sql.append(", row_version = row_version + 1");
         }
         sql
@@ -184,6 +195,7 @@ public class DynamicSqlProvider {
            .append(", updated_by = #{currentUserId}")
            .append(" WHERE ").append(pkColumn).append(" = #{recordId}")
            .append(" AND tenant_id = #{tenantId}");
+        sql.append(" AND (").append(scope).append(")");
         if (capColObj != null) {
             String capCol = requireName((String) capColObj, "cap column");
             sql.append(" AND COALESCE(").append(counterCol).append(", 0) + #{delta} <= ").append(capCol);
