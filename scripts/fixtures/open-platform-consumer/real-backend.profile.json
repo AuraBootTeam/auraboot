@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "id": "dynamic-sdk-real-backend-v1",
+  "requirements": ["DOP-02", "DOP-03", "DOP-04", "DOP-05", "DOP-09", "DOP-10"],
+  "cases": ["scoped-list", "versioned-read", "hidden-record", "create-metadata", "idempotent-replay", "idempotent-conflict", "query-source-projection", "update-version", "stale-write", "outside-create", "prospective-row-denial", "delete-empty-body", "cached-real-token"]
+}

@@ -32,7 +32,26 @@ def verify_report(report):
     return report
 
 
-def run_dynamic_probe(request, admin, *, evidence_path=None):
+def verify_sdk_report(report):
+    profile = json.loads((Path(__file__).resolve().parents[1] /
+                          "fixtures/open-platform-consumer/real-backend.profile.json").read_text())
+    if not isinstance(report, dict) or report.get("schemaVersion") != 1 or report.get("profile") != profile["id"]:
+        raise ProtocolError("SDK real backend report identity invalid")
+    rows = report.get("cases")
+    if not isinstance(rows, list) or len(rows) != len(profile["cases"]):
+        raise ProtocolError("SDK real backend denominator invalid")
+    if [row.get("id") for row in rows if isinstance(row, dict)] != profile["cases"]:
+        raise ProtocolError("SDK real backend case identity/order invalid")
+    if any(row.get("status") != "passed" for row in rows):
+        raise ProtocolError("SDK real backend cases failed or unexecuted")
+    if report.get("executed") != len(rows) or report.get("passed") != len(rows):
+        raise ProtocolError("SDK real backend totals invalid")
+    if report.get("requests") != 17 or report.get("tokenExchanges") != 1:
+        raise ProtocolError("SDK real transport/cache budget invalid")
+    return report
+
+
+def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None):
     rows = [{"id": case, "status": "did_not_run"} for case in CASES]
 
     def record(case, condition=True):
@@ -126,6 +145,10 @@ def run_dynamic_probe(request, admin, *, evidence_path=None):
         _, query_a, _ = request(query_path, "POST", body={"parameters": {"zone": "A"}, "limit": 10}, headers=machine)
         _, query_b, _ = request(query_path, "POST", body={"parameters": {"zone": "B"}, "limit": 10}, headers=machine)
         record("query-source-row-projection", query_a.get("items") == [{"pid": a["pid"], "name": "Allowed A"}] and query_b.get("items") == [])
+        if consumer is not None:
+            consumer({"clientId": credentials["clientId"], "clientSecret": credentials["clientSecret"],
+                      "scopes": list(scopes.values()) + [query_scope], "resourceCode": resource,
+                      "queryCode": query, "allowedPid": a["pid"], "hiddenPid": b["pid"]})
         intent = {"name": "Machine created", "zone": "A"}
         create_headers = dict(machine, **{"Idempotency-Key": "dynamic-release-create"})
         _, created, created_headers = request(path, "POST", body=intent, headers=create_headers, expected=(201,))

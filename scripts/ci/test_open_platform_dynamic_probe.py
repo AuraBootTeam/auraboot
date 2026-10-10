@@ -72,5 +72,41 @@ class DynamicProbeTests(unittest.TestCase):
             importlib.reload(open_platform_dynamic_probe)
 
 
+class SdkReportTests(unittest.TestCase):
+    def report(self):
+        from open_platform_dynamic_probe import verify_sdk_report
+        self.verify = verify_sdk_report
+        profile = json.loads((Path(__file__).resolve().parents[1] /
+                             "fixtures/open-platform-consumer/real-backend.profile.json").read_text())
+        return {"schemaVersion": 1, "profile": profile["id"], "cases": [
+            {"id": case, "status": "passed"} for case in profile["cases"]],
+            "executed": 13, "passed": 13, "requests": 17, "tokenExchanges": 1}
+
+    def test_actual_fixed_sdk_report(self):
+        report = self.report(); self.assertEqual(self.verify(report), report)
+
+    def test_missing_sdk_case(self):
+        report = self.report(); report["cases"].pop()
+        with self.assertRaises(ProtocolError): self.verify(report)
+
+    def test_duplicate_sdk_case(self):
+        report = self.report(); report["cases"][1] = report["cases"][0]
+        with self.assertRaises(ProtocolError): self.verify(report)
+
+    def test_failed_skipped_registered_sdk_cases(self):
+        for status in ["failed", "skipped", "registered", "did_not_run"]:
+            report = self.report(); report["cases"][0]["status"] = status
+            with self.assertRaises(ProtocolError): self.verify(report)
+
+    def test_fake_sdk_totals(self):
+        for key, value in [("executed", 0), ("passed", 12), ("requests", 0), ("tokenExchanges", 0), ("tokenExchanges", 2)]:
+            report = self.report(); report[key] = value
+            with self.assertRaises(ProtocolError): self.verify(report)
+
+    def test_wrong_sdk_profile(self):
+        report = self.report(); report["profile"] = "loopback-fixture"
+        with self.assertRaises(ProtocolError): self.verify(report)
+
+
 if __name__ == "__main__":
     unittest.main()
