@@ -50,8 +50,9 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
 
     static class EventFaultObserver implements ModelMutationObserver {
         boolean fail;
+        int failAfter = -1;
         @Override public void observe(ModelDefinition model, String pid, Operation operation) {
-            if (fail) throw new IllegalStateException("Fixture event persistence failure");
+            if (fail || failAfter == 0 || (failAfter > 0 && --failAfter == 0)) throw new IllegalStateException("Fixture event persistence failure");
         }
     }
 
@@ -66,6 +67,8 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
     @Autowired private com.auraboot.framework.meta.service.impl.CommandStateCheckExecutor stateCheck;
 
     @Autowired private com.auraboot.framework.meta.service.impl.CommandSideEffectExecutor sideEffects;
+
+    @Autowired private com.auraboot.framework.meta.service.impl.CommandCascadeDeleteExecutor cascadeDeletes;
 
     private OpenApiResourceContract contract;
     private MachinePrincipal principal;
@@ -82,7 +85,7 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
         models.saveDefinition(ModelDefinition.builder().code(modelCode).tableName("mt_" + modelCode)
                 .displayName("Machine permission fixture").status("published").sourceType("physical").primaryKey("id")
                 .extension(Map.of("softDelete", testInfo.getTestMethod().orElseThrow().getName()
-                        .equals("softBatchDeleteKeepsTombstonesAndRollsBackPartialFailure")))
+                        .matches("softBatchDeleteKeepsTombstonesAndRollsBackPartialFailure|softCascadeDeletesKeepTombstonesAndOwnerEvents")))
                 .capabilities(ModelCapabilities.fullPhysical().toBuilder()
                         .filterableFields(List.of("name", "zone", "secret")).sortableFields(List.of("name", "zone", "secret")).build())
                 .fields(List.of(FieldDefinition.builder().code("name").columnName("name").dataType("STRING").displayName("Name").sortable(true).filterable(true).build(),
@@ -450,6 +453,65 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
             assertThat(eventJdbc.queryForMap("SELECT name, zone, secret FROM mt_" + contract.modelCode() + " WHERE pid = ? AND tenant_id = ?",
                     allowedPid, principal.tenantId())).containsEntry("name", "Machine side").containsEntry("zone", "A").containsEntry("secret", "Private");
         } finally { MetaContext.restore(previous); }
+    }
+
+    @Test void cascadeDeletesAreTenantBoundRecursiveAndAtomic() {
+        verifyCascade(false);
+    }
+
+    @Test void softCascadeDeletesKeepTombstonesAndOwnerEvents() {
+        verifyCascade(true);
+    }
+
+    private void verifyCascade(boolean softDelete) {
+        publishEvents();
+        var definition = models.getModelDefinition(contract.modelCode()).orElseThrow();
+        assertThat(definition.isSoftDelete()).isEqualTo(softDelete);
+        MetaContext.runWithCommandPermitScope("ALL", () -> {
+            String child = data.create(contract.modelCode(), new HashMap<>(Map.of("name", "Child", "zone", "A", "related", allowedPid))).get("pid").toString();
+            String sibling = data.create(contract.modelCode(), new HashMap<>(Map.of("name", "Sibling", "zone", "A", "related", allowedPid))).get("pid").toString();
+            String grandchild = data.create(contract.modelCode(), new HashMap<>(Map.of("name", "Grandchild", "zone", "A", "related", child))).get("pid").toString();
+            String foreignPid = UniqueIdGenerator.generate();
+            eventJdbc.update("INSERT INTO " + definition.getTableName() + " (pid, tenant_id, name, zone, related) VALUES (?, ?, ?, ?, ?)",
+                    foreignPid, principal.tenantId() + 1000000L, "Other tenant", "A", child);
+            var leaf = Map.<String, Object>of("childModel", contract.modelCode(), "parentField", "related");
+            var config = Map.<String, Object>of("cascadeDelete", List.of(Map.of("childModel", contract.modelCode(),
+                    "parentField", "related", "cascadeDelete", List.of(leaf))));
+            var request = new CommandExecuteRequest(); request.setTargetRecordId(allowedPid);
+            assertThatThrownBy(() -> cascadeDeletes.executeCascadeDeletePhase(config, principal.tenantId() + 1, request))
+                    .isInstanceOf(AccessDeniedException.class);
+            assertThat(sourceEvents()).hasSize(3);
+            var nested = new org.springframework.transaction.support.TransactionTemplate(eventTransactions);
+            nested.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_NESTED);
+            try {
+                eventFaultObserver.failAfter = 2;
+                assertThatThrownBy(() -> nested.execute(status -> {
+                    cascadeDeletes.executeCascadeDeletePhase(config, principal.tenantId(), request); return null;
+                })).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+            } finally { eventFaultObserver.failAfter = -1; }
+            assertThat(sourceEvents()).hasSize(3);
+            for (String pid : List.of(child, sibling, grandchild)) assertThat(data.getById(contract.modelCode(), pid)).containsEntry("pid", pid);
+            cascadeDeletes.executeCascadeDeletePhase(config, principal.tenantId(), request);
+            assertThat(sourceEvents()).hasSize(6);
+            assertThat(sourceEvents().subList(3, 6)).allSatisfy(row -> {
+                assertThat(row.get("event_type")).isEqualTo("open.resource." + contract.code() + ".deleted");
+                assertThat(((Number) row.get("event_sequence")).longValue()).isEqualTo(2L);
+            });
+            for (String pid : List.of(child, sibling, grandchild)) {
+                if (softDelete) {
+                    var tombstone = eventJdbc.queryForMap("SELECT deleted_flag, row_version FROM " + definition.getTableName() + " WHERE pid = ?", pid);
+                    assertThat(tombstone).containsEntry("deleted_flag", true);
+                    assertThat(((Number) tombstone.get("row_version")).longValue()).isEqualTo(2L);
+                }
+                else assertThat(eventJdbc.queryForObject("SELECT COUNT(*) FROM " + definition.getTableName() + " WHERE pid = ?", Long.class, pid)).isZero();
+            }
+            assertThat(eventJdbc.queryForObject("SELECT COUNT(*) FROM " + definition.getTableName() + " WHERE pid = ?", Long.class, foreignPid)).isEqualTo(1L);
+            assertThat(data.getById(contract.modelCode(), allowedPid)).containsEntry("name", "Visible");
+            // Repeating a soft cascade ignores tombstones and must not emit duplicate deletes.
+            cascadeDeletes.executeCascadeDeletePhase(config, principal.tenantId(), request);
+            assertThat(sourceEvents()).hasSize(6);
+            return null;
+        });
     }
 
     @Test void softBatchDeleteKeepsTombstonesAndRollsBackPartialFailure() {
