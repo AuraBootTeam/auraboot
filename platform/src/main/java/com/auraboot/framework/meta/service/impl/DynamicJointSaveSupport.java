@@ -228,6 +228,8 @@ final class DynamicJointSaveSupport extends BaseMetaService {
             Map<String, Object> conditions = new HashMap<>();
             conditions.put(relation.getTargetField(), masterId);
             conditions.put("tenant_id", tenantId);
+            conditions = RecordCommandWriterGuard.guardLegacyConditions(dynamicDataMapper,
+                    getModelDefinition(relation.getTargetModel()), relation.getTargetTable(), conditions, "delete");
             dynamicDataMapper.delete(relation.getTargetTable(), conditions);
             log.debug("Deleted existing child records from {} for master {}",
                     logSafe(relation.getTargetTable()), logSafe(masterId));

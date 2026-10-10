@@ -355,6 +355,7 @@ final class DynamicDataBatchSupport extends BaseMetaService {
             }
         }
 
+        RecordCommandWriterGuard.appendStoredPredicate(sql, model, "delete");
         int affected = dynamicDataMapper.deleteByQuery(sql.toString(), params);
         if (affected != recordIds.size()) {
             throw new MetaServiceException(

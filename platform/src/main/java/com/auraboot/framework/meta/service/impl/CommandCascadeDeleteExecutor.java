@@ -109,6 +109,8 @@ public class CommandCascadeDeleteExecutor {
                     } catch (NumberFormatException e) {
                         conditions.put(parentField, parentId);
                     }
+                    conditions = RecordCommandWriterGuard.guardLegacyConditions(dynamicDataMapper,
+                            metaModelService.getModelDefinition(childModel).orElse(null), childTable, conditions, "delete");
                     totalDeleted += dynamicDataMapper.delete(childTable, conditions);
                 }
                 log.info("CASCADE_DELETE: deleted {} records from {} where {} IN [{}]",

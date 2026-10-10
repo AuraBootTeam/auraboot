@@ -61,6 +61,7 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
     }
 
     int executeScopedUpdate(ModelDefinition model, String modelCode, String primaryKeyColumn, String recordId, Map<String,Object> columnData, Set<String> jsonbColumns, Object expectedVersion, String compareColumn, Object compareValue, String permissionOperation){
+        RecordCommandWriterGuard.assertInputAllowed(model, columnData, "update");
         if (columnData == null || columnData.isEmpty()) {
             throw new MetaServiceException("Update data cannot be empty");
         }
@@ -129,6 +130,7 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
                     .append(" IS NOT DISTINCT FROM #{params.compareValue}");
         }
         appendAggregateBindingGuard(sql, params, model);
+        RecordCommandWriterGuard.appendStoredPredicate(sql, model, permissionOperation);
         appendScopedWriteGuards(sql, tenantId, modelCode, userId, permissionOperation);
 
         return dynamicDataMapper.updateByQuery(sql.toString(), params);
@@ -159,6 +161,7 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
             sql.append(" AND row_version = #{params.expectedVersion}");
         }
         appendAggregateBindingGuard(sql, params, model);
+        RecordCommandWriterGuard.appendStoredPredicate(sql, model, "delete");
         appendScopedWriteGuards(sql, tenantId, modelCode, userId, "delete");
 
         return dynamicDataMapper.deleteByQuery(sql.toString(), params);

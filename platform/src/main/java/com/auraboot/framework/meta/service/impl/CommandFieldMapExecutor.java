@@ -114,6 +114,7 @@ public class CommandFieldMapExecutor {
                 injectExistingJsonbData(tableName, request.getTargetRecordId(), tenantId, jsonbCols, data);
             }
 
+            RecordCommandWriterGuard.assertInputAllowed(modelDef, data, "create".equalsIgnoreCase(request.getOperationType()) ? "create" : "update");
             Map<String, Object> columnData = prepareColumnData(modelDef, data, jsonbCols);
 
             // Determine operation type - use actual table name for database operations
@@ -289,6 +290,7 @@ public class CommandFieldMapExecutor {
             injectExistingJsonbData(tableName, request.getTargetRecordId(), tenantId, jsonbColumns, data);
         }
 
+        RecordCommandWriterGuard.assertInputAllowed(modelDef, data, "create".equalsIgnoreCase(operationType) ? "create" : "update");
         Map<String, Object> columnData = prepareColumnData(modelDef, data, jsonbColumns);
 
         // Execute the database operation
@@ -422,6 +424,8 @@ public class CommandFieldMapExecutor {
             params.put("expectedVersion", expectedVersion);
             sql.append(" AND row_version = #{params.expectedVersion}");
         }
+        RecordCommandWriterGuard.appendStoredPredicate(sql, metaModelService.getModelDefinition(modelCode).orElse(null),
+                Boolean.TRUE.equals(data.get("deleted_flag")) ? "delete" : "update");
         appendScopedWriteGuards(sql, tenantId, modelCode, "update");
 
         int updated = dynamicDataMapper.updateByQuery(sql.toString(), params);
@@ -458,6 +462,7 @@ public class CommandFieldMapExecutor {
             params.put("expectedVersion", expectedVersion);
             sql.append(" AND row_version = #{params.expectedVersion}");
         }
+        RecordCommandWriterGuard.appendStoredPredicate(sql, metaModelService.getModelDefinition(modelCode).orElse(null), "delete");
         appendScopedWriteGuards(sql, tenantId, modelCode, "delete");
 
         int deleted = dynamicDataMapper.deleteByQuery(sql.toString(), params);

@@ -408,6 +408,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             if (update == null || !ids.add(update.recordId())) {
                 throw new MetaServiceException("CAS batch contains a null or duplicate record");
             }
+            RecordCommandWriterGuard.assertInputAllowed(model, update.nextValues(), "update");
             Map<String, Object> data = new LinkedHashMap<>(update.nextValues());
             stripNonWritableFields(modelCode, data);
             if (data.size() != update.nextValues().size()) {
@@ -492,6 +493,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         }
         sql.append(")");
         appendAggregateBindingGuard(sql, params, model);
+        RecordCommandWriterGuard.appendStoredPredicate(sql, model, "update");
         appendScopedWriteGuards(sql, tenantId, modelCode, getCurrentUserId(), "update");
         int affected = dynamicDataMapper.updateByQuery(sql.toString(), params);
         if (affected != updates.size()) {
@@ -548,7 +550,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         if (capCode != null) {
             capCol = resolveNumericColumn(model, capCode);
         }
-        String softDeleteClause = buildSoftDeleteClause(model);
+        StringBuilder guardedClause = new StringBuilder(buildSoftDeleteClause(model));
+        RecordCommandWriterGuard.appendStoredPredicate(guardedClause, model, "update");
+        String softDeleteClause = guardedClause.toString();
         FieldDefinition pkField = metadataService.getPrimaryKeyField(modelCode);
         String pkColumn = SqlSafetyUtils.requireIdentifier(
                 pkField.getColumnName(), "primary key column");
@@ -1223,6 +1227,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         // Get record before deletion for change tracking
         Map<String, Object> existingRecord = getById(modelCode, recordId);
+        RecordCommandWriterGuard.assertStoredAllowed(model, existingRecord, "delete");
         Long planExpectedVersion = MetaContext.getCommandExpectedVersion(modelCode, recordId);
 
         // 构建删除条件

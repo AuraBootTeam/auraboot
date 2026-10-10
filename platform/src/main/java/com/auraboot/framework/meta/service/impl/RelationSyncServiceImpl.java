@@ -275,6 +275,8 @@ public class RelationSyncServiceImpl implements RelationSyncService {
             Map<String, Object> conditions = new HashMap<>();
             conditions.put("id", targetId);
 
+            conditions = RecordCommandWriterGuard.guardLegacyConditions(dynamicDataMapper,
+                    metaModelService.getModelDefinition(targetModel).orElse(null), targetTable, conditions, "update");
             dynamicDataMapper.update(targetTable, data, conditions);
             log.debug("ONE_TO_ONE: Cleared reference on target record {}", targetId);
         }
@@ -287,6 +289,8 @@ public class RelationSyncServiceImpl implements RelationSyncService {
             Map<String, Object> conditions = new HashMap<>();
             conditions.put("id", targetId);
 
+            conditions = RecordCommandWriterGuard.guardLegacyConditions(dynamicDataMapper,
+                    metaModelService.getModelDefinition(targetModel).orElse(null), targetTable, conditions, "update");
             dynamicDataMapper.update(targetTable, data, conditions);
             log.debug("ONE_TO_ONE: Set reference on target record {} to {}", targetId, recordId);
         }
@@ -311,6 +315,8 @@ public class RelationSyncServiceImpl implements RelationSyncService {
             Map<String, Object> conditions = new HashMap<>();
             conditions.put("id", targetId);
 
+            conditions = RecordCommandWriterGuard.guardLegacyConditions(dynamicDataMapper,
+                    metaModelService.getModelDefinition(targetModel).orElse(null), targetTable, conditions, "update");
             dynamicDataMapper.update(targetTable, data, conditions);
             log.debug("ONE_TO_MANY: Removed FK from target record {}", targetId);
         }
@@ -323,6 +329,8 @@ public class RelationSyncServiceImpl implements RelationSyncService {
             Map<String, Object> conditions = new HashMap<>();
             conditions.put("id", targetId);
 
+            conditions = RecordCommandWriterGuard.guardLegacyConditions(dynamicDataMapper,
+                    metaModelService.getModelDefinition(targetModel).orElse(null), targetTable, conditions, "update");
             dynamicDataMapper.update(targetTable, data, conditions);
             log.debug("ONE_TO_MANY: Set FK on target record {} to {}", targetId, recordId);
         }
@@ -346,6 +354,13 @@ public class RelationSyncServiceImpl implements RelationSyncService {
             return;
         }
 
+        var writerModel = metaModelService.getModelDefinition(targetModel).orElse(null);
+        if (RecordCommandWriterGuard.hasPolicy(writerModel)) {
+            Set<String> targetIds = new java.util.TreeSet<>(toAdd);
+            targetIds.addAll(toRemove);
+            for (String targetId : targetIds) RecordCommandWriterGuard.guardLegacyConditions(
+                    dynamicDataMapper, writerModel, metaModelService.getTableName(targetModel), Map.of("id", targetId), "update");
+        }
         // Delete removed relations
         for (String targetId : toRemove) {
             Map<String, Object> conditions = new HashMap<>();
