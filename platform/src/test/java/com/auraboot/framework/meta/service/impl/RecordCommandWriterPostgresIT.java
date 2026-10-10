@@ -58,7 +58,7 @@ class RecordCommandWriterPostgresIT {
 
     private void fixture(Runnable assertions) {
         transaction.executeWithoutResult(status->{
-            jdbc.execute("CREATE TEMP TABLE "+TABLE+" (id bigint PRIMARY KEY, pid text UNIQUE NOT NULL, tenant_id bigint NOT NULL, managed_flag boolean, amount integer NOT NULL, row_version bigint NOT NULL DEFAULT 0, deleted_flag boolean NOT NULL DEFAULT FALSE) ON COMMIT DROP");
+            jdbc.execute("CREATE TEMP TABLE "+TABLE+" (id bigint PRIMARY KEY, pid text UNIQUE NOT NULL, tenant_id bigint NOT NULL, managed_flag boolean, order_pid text, amount integer NOT NULL, row_version bigint NOT NULL DEFAULT 0, deleted_flag boolean NOT NULL DEFAULT FALSE) ON COMMIT DROP");
             jdbc.update("INSERT INTO "+TABLE+" (id,pid,tenant_id,managed_flag,amount) VALUES (1,'owned',1,TRUE,10),(2,'ordinary',1,FALSE,20),(3,'foreign',2,FALSE,30)");
             assertions.run();
         });
@@ -126,6 +126,46 @@ class RecordCommandWriterPostgresIT {
                 "mt_procurement_guard_links_it","parent_pid","bid_pid","parent-b");
             assertThat(mapper.delete("mt_procurement_guard_links_it",Map.of("parent_pid","parent-b","tenant_id",1L))).isEqualTo(1);
             assertThat(jdbc.queryForObject("SELECT count(*) FROM mt_procurement_guard_links_it",Long.class)).isEqualTo(2);
+        });
+    }
+
+    private void parentFixture(Runnable assertions) {
+        fixture(() -> {
+            jdbc.execute("CREATE TEMP TABLE mt_procurement_parent_it (id bigint PRIMARY KEY, pid text UNIQUE NOT NULL, tenant_id bigint NOT NULL, managed_flag boolean) ON COMMIT DROP");
+            jdbc.update("INSERT INTO mt_procurement_parent_it VALUES (1,'parent-owned',1,TRUE),(2,'parent-ordinary',1,FALSE),(3,'parent-foreign',2,FALSE)");
+            jdbc.update("UPDATE " + TABLE + " SET order_pid=CASE WHEN pid='ordinary' THEN 'parent-owned' ELSE 'parent-ordinary' END");
+            var parent = RecordCommandWriterParentTest.parentModel("mt_procurement_parent_it");
+            model = RecordCommandWriterParentTest.childModel(TABLE);
+            var metadata = mock(com.auraboot.framework.meta.service.MetaModelService.class);
+            when(metadata.getModelDefinition("order")).thenReturn(java.util.Optional.of(parent));
+            writer = new DynamicScopedWriteSupport(mapper, mock(DataPermissionEngine.class), mock(DataDomainService.class), metadata);
+            assertions.run();
+        });
+    }
+    @Test void unmarkedChildOfManagedParentIsProtectedByActualUpdateAndDeleteSql() {
+        parentFixture(() -> {
+            assertThat(update("ordinary", Map.of("amount",99))).isZero();
+            assertThat(writer.executeScopedDelete(model,"line","pid","ordinary",null)).isZero();
+            assertThat(jdbc.queryForObject("SELECT amount FROM " + TABLE + " WHERE pid='ordinary'",Integer.class)).isEqualTo(20);
+            assertThat(jdbc.queryForObject("SELECT row_version FROM " + TABLE + " WHERE pid='ordinary'",Long.class)).isZero();
+            exact(() -> assertThat(update("ordinary",Map.of("amount",21))).isEqualTo(1));
+        });
+    }
+    @Test void actualParentTransferRejectsManagedAndForeignButAllowsOrdinaryParent() {
+        parentFixture(() -> {
+            assertThatThrownBy(() -> update("ordinary",Map.of("order_pid","parent-owned"))).hasMessageContaining("RECORD_WRITER_DENIED");
+            assertThatThrownBy(() -> update("ordinary",Map.of("order_pid","parent-foreign"))).hasMessageContaining("current tenant");
+            exact(() -> assertThat(update("ordinary",Map.of("order_pid","parent-ordinary"))).isEqualTo(1));
+            assertThat(update("ordinary",Map.of("amount",22))).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT order_pid FROM " + TABLE + " WHERE pid='ordinary'",String.class)).isEqualTo("parent-ordinary");
+        });
+    }
+    @Test void legacyBulkDeleteLocksParentAndCannotRemoveItsUnmarkedChild() {
+        parentFixture(() -> {
+            var parent = RecordCommandWriterParentTest.parentModel("mt_procurement_parent_it");
+            assertThatThrownBy(() -> RecordCommandWriterGuard.guardLegacyConditions(mapper,model,TABLE,
+                Map.of("order_pid","parent-owned"),"delete",null,code -> parent)).hasMessageContaining("RECORD_WRITER_DENIED");
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM " + TABLE + " WHERE pid='ordinary'",Long.class)).isEqualTo(1);
         });
     }
 

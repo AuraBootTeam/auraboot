@@ -409,6 +409,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 throw new MetaServiceException("CAS batch contains a null or duplicate record");
             }
             RecordCommandWriterGuard.assertInputAllowed(model, update.nextValues(), "update");
+            RecordCommandWriterGuard.guardParentInput(dynamicDataMapper, model, code -> metadataService.getModelDefinition(code).orElse(null), update.nextValues());
             Map<String, Object> data = new LinkedHashMap<>(update.nextValues());
             stripNonWritableFields(modelCode, data);
             if (data.size() != update.nextValues().size()) {
@@ -493,7 +494,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         }
         sql.append(")");
         appendAggregateBindingGuard(sql, params, model);
-        RecordCommandWriterGuard.appendStoredPredicate(sql, model, "update");
+        RecordCommandWriterGuard.appendStoredPredicate(sql, model, "update", code -> metadataService.getModelDefinition(code).orElse(null));
         appendScopedWriteGuards(sql, tenantId, modelCode, getCurrentUserId(), "update");
         int affected = dynamicDataMapper.updateByQuery(sql.toString(), params);
         if (affected != updates.size()) {
@@ -551,7 +552,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             capCol = resolveNumericColumn(model, capCode);
         }
         StringBuilder guardedClause = new StringBuilder(buildSoftDeleteClause(model));
-        RecordCommandWriterGuard.appendStoredPredicate(guardedClause, model, "update");
+        RecordCommandWriterGuard.appendStoredPredicate(guardedClause, model, "update", code -> metadataService.getModelDefinition(code).orElse(null));
         String softDeleteClause = guardedClause.toString();
         FieldDefinition pkField = metadataService.getPrimaryKeyField(modelCode);
         String pkColumn = SqlSafetyUtils.requireIdentifier(
@@ -802,6 +803,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         // Same reason as the fields above: a derived row created under a command authorized for one
         // aggregate belongs to that aggregate, not to whichever one the payload names.
         injectAggregateBinding(model, enrichedData);
+        RecordCommandWriterGuard.guardParentInput(dynamicDataMapper, model, code -> metadataService.getModelDefinition(code).orElse(null), enrichedData);
 
         // 生成主键（如果需要）
         FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
@@ -1645,7 +1647,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     private DynamicScopedWriteSupport dynamicScopedWriteSupport() {
-        return new DynamicScopedWriteSupport(dynamicDataMapper, dataPermissionEngine, dataDomainService);
+        return new DynamicScopedWriteSupport(dynamicDataMapper, dataPermissionEngine, dataDomainService, metadataService);
     }
 
     private DynamicDataTransferSupport dynamicDataTransferSupport() {

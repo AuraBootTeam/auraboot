@@ -110,7 +110,7 @@ public class CommandCascadeDeleteExecutor {
                         conditions.put(parentField, parentId);
                     }
                     conditions = RecordCommandWriterGuard.guardLegacyConditions(dynamicDataMapper,
-                            metaModelService.getModelDefinition(childModel).orElse(null), childTable, conditions, "delete");
+                            metaModelService.getModelDefinition(childModel).orElse(null), childTable, conditions, "delete", null, code -> metaModelService.getModelDefinition(code).orElse(null));
                     totalDeleted += dynamicDataMapper.delete(childTable, conditions);
                 }
                 log.info("CASCADE_DELETE: deleted {} records from {} where {} IN [{}]",

@@ -19,7 +19,7 @@ import static org.mockito.Mockito.*;
 class RecordCommandWriterSqlBoundaryTest {
     @AfterEach void clear() { MetaContext.clear(); org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(false); }
     private ModelDefinition model() {
-        return ModelDefinition.builder().code("shared_bid").tableName("mt_shared_bid")
+        return ModelDefinition.builder().code("shared_bid").tableName("mt_shared_bid").softDelete(true)
             .fields(List.of(FieldDefinition.builder().code("managed").columnName("managed_flag").dataType("boolean").immutable(true).build()))
             .extension(Map.of("recordCommandWriters",Map.of("field","managed","commands",
                 Map.of("create",List.of("app:dispatch"),"update",List.of("app:save"),"delete",List.of())))).build();

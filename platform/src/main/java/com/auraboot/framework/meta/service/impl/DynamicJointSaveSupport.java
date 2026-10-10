@@ -219,7 +219,7 @@ final class DynamicJointSaveSupport extends BaseMetaService {
             // Junction replacement changes target relations without deleting the target rows.
             RecordCommandWriterGuard.guardRelationReplacement(dynamicDataMapper,
                     getModelDefinition(relation.getTargetModel()), relation.getTargetTable(), relation.getJoinTable(),
-                    relation.getSourceField(), relation.getTargetField(), masterId);
+                    relation.getSourceField(), relation.getTargetField(), masterId, code -> metadataService.getModelDefinition(code).orElse(null));
             Map<String, Object> conditions = new HashMap<>();
             conditions.put(relation.getSourceField(), masterId);
             conditions.put("tenant_id", tenantId);
@@ -232,7 +232,7 @@ final class DynamicJointSaveSupport extends BaseMetaService {
             conditions.put(relation.getTargetField(), masterId);
             conditions.put("tenant_id", tenantId);
             conditions = RecordCommandWriterGuard.guardLegacyConditions(dynamicDataMapper,
-                    getModelDefinition(relation.getTargetModel()), relation.getTargetTable(), conditions, "delete");
+                    getModelDefinition(relation.getTargetModel()), relation.getTargetTable(), conditions, "delete", null, code -> metadataService.getModelDefinition(code).orElse(null));
             dynamicDataMapper.delete(relation.getTargetTable(), conditions);
             log.debug("Deleted existing child records from {} for master {}",
                     logSafe(relation.getTargetTable()), logSafe(masterId));

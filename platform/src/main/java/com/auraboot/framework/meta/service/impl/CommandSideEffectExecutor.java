@@ -360,6 +360,7 @@ public class CommandSideEffectExecutor {
             Map<String, Object> legacyConditions) {
         ModelDefinition writerModel = metaModelService.getModelDefinition(modelCode).orElse(null);
         RecordCommandWriterGuard.assertInputAllowed(writerModel, data, "update");
+        RecordCommandWriterGuard.guardParentInput(dynamicDataMapper, writerModel, code -> metaModelService.getModelDefinition(code).orElse(null), data);
         if (!shouldUseScopedWrite() && !RecordCommandWriterGuard.hasPolicy(writerModel)) {
             return jsonbColumns == null || jsonbColumns.isEmpty()
                     ? dynamicDataMapper.update(tableName, data, legacyConditions)
@@ -404,7 +405,7 @@ public class CommandSideEffectExecutor {
                 .append(" = #{params.recordId}")
                 .append(" AND tenant_id = #{params.tenantId}");
         RecordCommandWriterGuard.appendStoredPredicate(sql, writerModel,
-                Boolean.TRUE.equals(data.get("deleted_flag")) ? "delete" : "update");
+                Boolean.TRUE.equals(data.get("deleted_flag")) ? "delete" : "update", code -> metaModelService.getModelDefinition(code).orElse(null));
         RecordCommandWriterGuard.appendMarkerInvariant(sql, writerModel, data);
         appendScopedWriteGuards(sql, tenantId, modelCode, "update");
 

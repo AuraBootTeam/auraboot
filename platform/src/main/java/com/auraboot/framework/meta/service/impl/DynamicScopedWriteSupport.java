@@ -27,6 +27,12 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
 
     private final DataDomainService dataDomainService;
 
+    private final MetaModelService metadataService;
+
+    DynamicScopedWriteSupport(DynamicDataMapper mapper, DataPermissionEngine permissions, DataDomainService domains) {
+        this(mapper, permissions, domains, null);
+    }
+
     int executeScopedUpdate(
             ModelDefinition model,
             String modelCode,
@@ -62,6 +68,7 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
 
     int executeScopedUpdate(ModelDefinition model, String modelCode, String primaryKeyColumn, String recordId, Map<String,Object> columnData, Set<String> jsonbColumns, Object expectedVersion, String compareColumn, Object compareValue, String permissionOperation){
         RecordCommandWriterGuard.assertInputAllowed(model, columnData, "update");
+        RecordCommandWriterGuard.guardParentInput(dynamicDataMapper, model, metadataService == null ? null : code -> metadataService.getModelDefinition(code).orElse(null), columnData);
         if (columnData == null || columnData.isEmpty()) {
             throw new MetaServiceException("Update data cannot be empty");
         }
@@ -130,7 +137,7 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
                     .append(" IS NOT DISTINCT FROM #{params.compareValue}");
         }
         appendAggregateBindingGuard(sql, params, model);
-        RecordCommandWriterGuard.appendStoredPredicate(sql, model, permissionOperation);
+        RecordCommandWriterGuard.appendStoredPredicate(sql, model, permissionOperation, metadataService == null ? null : code -> metadataService.getModelDefinition(code).orElse(null));
         RecordCommandWriterGuard.appendMarkerInvariant(sql, model, columnData);
         appendScopedWriteGuards(sql, tenantId, modelCode, userId, permissionOperation);
 
@@ -162,7 +169,7 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
             sql.append(" AND row_version = #{params.expectedVersion}");
         }
         appendAggregateBindingGuard(sql, params, model);
-        RecordCommandWriterGuard.appendStoredPredicate(sql, model, "delete");
+        RecordCommandWriterGuard.appendStoredPredicate(sql, model, "delete", metadataService == null ? null : code -> metadataService.getModelDefinition(code).orElse(null));
         appendScopedWriteGuards(sql, tenantId, modelCode, userId, "delete");
 
         return dynamicDataMapper.deleteByQuery(sql.toString(), params);

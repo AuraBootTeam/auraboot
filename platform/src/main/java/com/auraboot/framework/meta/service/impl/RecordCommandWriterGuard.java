@@ -68,8 +68,93 @@ public final class RecordCommandWriterGuard {
 
     /** Added to the final SQL WHERE to preserve ownership under concurrent marker changes. */
     public static void appendStoredPredicate(StringBuilder sql, ModelDefinition model, String operation) {
+        appendStoredPredicate(sql, model, operation, null);
+    }
+
+    private static void appendOwnStoredPredicate(StringBuilder sql, ModelDefinition model, String operation) {
         Policy policy = policy(model);
         if (policy != null && !authorized(policy, operation)) sql.append(" AND ").append(column(policy.marker())).append(" IS DISTINCT FROM TRUE");
+    }
+
+    private record Parent(ModelDefinition model, FieldDefinition link, Policy policy) {}
+
+    private static Parent parent(ModelDefinition child, java.util.function.Function<String, ModelDefinition> resolver) {
+        if (policy(child) == null) return null;
+        Object parentCode = child.getExtension().get("parentModel");
+        if (parentCode == null) return null;
+        if (!(parentCode instanceof String code) || code.isBlank() || resolver == null)
+            throw new MetaServiceException("Record writer parent requires model resolution");
+        ModelDefinition model = resolver.apply(code);
+        if (model == null || !code.equals(model.getCode()))
+            throw new MetaServiceException("Record writer parent model is missing");
+        Policy ownership = policy(model);
+        if (ownership == null) return null;
+        Object fieldCode = child.getExtension().get("parentField");
+        FieldDefinition link = child.getFields().stream()
+            .filter(f -> f != null && f.getCode().equals(fieldCode)).findFirst().orElse(null);
+        if (link == null || link.isVirtual() || link.isJsonbVirtual() || link.getRefTarget() == null
+                || !code.equals(link.getRefTarget().getTargetEntity())
+                || (link.getRefTarget().getValueField() != null && !"pid".equals(link.getRefTarget().getValueField())))
+            throw new MetaServiceException("Record writer parent must use a physical PID reference");
+        SqlSafetyUtils.requireIdentifier(model.getTableName(), "record writer parent table");
+        SqlSafetyUtils.requireIdentifier(child.getTableName(), "record writer child table");
+        SqlSafetyUtils.requireIdentifier(column(link), "record writer parent reference column");
+        return new Parent(model, link, ownership);
+    }
+
+    /** The submitted parent is locked by its stored PID, never by a display label or numeric alias. */
+    public static void guardParentInput(com.auraboot.framework.meta.mapper.DynamicDataMapper mapper,
+            ModelDefinition child, java.util.function.Function<String, ModelDefinition> resolver, Map<String,Object> input) {
+        Parent parent = parent(child, resolver);
+        if (parent == null || input == null) return;
+        String code = parent.link().getCode();
+        String physical = column(parent.link());
+        if (input.containsKey(code) && input.containsKey(physical)
+                && !java.util.Objects.equals(input.get(code), input.get(physical)))
+            throw new MetaServiceException("Conflicting record writer parent aliases");
+        Object identity = input.containsKey(code) ? input.get(code) : input.get(physical);
+        if (identity == null) return;
+        checkParent(mapper, parent, identity);
+    }
+
+    private static void checkParent(com.auraboot.framework.meta.mapper.DynamicDataMapper mapper, Parent parent, Object identity) {
+        if (!(identity instanceof String pid) || pid.isBlank())
+            throw new MetaServiceException("Record writer parent requires a stored PID");
+        Long tenant = relationTenant();
+        Map<String,Object> conditions = new java.util.LinkedHashMap<>();
+        conditions.put("tenant_id", tenant);
+        conditions.put("pid", pid);
+        if (parent.model().isSoftDelete()) conditions.put("deleted_flag", false);
+        List<Map<String,Object>> rows = mapper.selectRecordWriterTargetsForUpdate(parent.model().getTableName(),
+                column(parent.policy().marker()), parent.policy().marker().getCode(), conditions);
+        if (rows == null || rows.size() != 1)
+            throw new MetaServiceException("Record writer parent is missing or ambiguous in the current tenant");
+        assertStoredAllowed(parent.model(), rows.get(0), "update");
+    }
+
+    /** Protect the existing parent even when the child's own marker is false. */
+    public static void appendStoredPredicate(StringBuilder sql, ModelDefinition model, String operation,
+            java.util.function.Function<String, ModelDefinition> resolver) {
+        appendOwnStoredPredicate(sql, model, operation);
+        Parent parent = parent(model, resolver);
+        if (parent == null || authorized(parent.policy(), "update")) return;
+        sql.append(" AND NOT EXISTS (SELECT 1 FROM ").append(parent.model().getTableName())
+            .append(" record_writer_parent WHERE record_writer_parent.pid = ").append(model.getTableName())
+            .append('.').append(column(parent.link()))
+            .append(" AND record_writer_parent.tenant_id = ").append(model.getTableName()).append(".tenant_id")
+            .append(" AND record_writer_parent.").append(column(parent.policy().marker())).append(" IS TRUE)");
+    }
+
+    private static void guardStoredParents(com.auraboot.framework.meta.mapper.DynamicDataMapper mapper,
+            ModelDefinition child, java.util.function.Function<String, ModelDefinition> resolver, Map<String,Object> conditions) {
+        Parent parent = parent(child, resolver);
+        if (parent == null) return;
+        List<Map<String,Object>> rows = mapper.selectRecordWriterTargetsForUpdate(child.getTableName(),
+                column(parent.link()), "record_writer_parent_pid", conditions);
+        if (rows != null) for (Map<String,Object> row : rows) {
+            Object pid = row.get("record_writer_parent_pid");
+            if (pid != null) checkParent(mapper, parent, pid);
+        }
     }
 
     /** Same-value round trips are allowed; ownership never transfers after creation. */
@@ -129,7 +214,15 @@ public final class RecordCommandWriterGuard {
     public static Map<String,Object> guardLegacyConditions(
             com.auraboot.framework.meta.mapper.DynamicDataMapper mapper, ModelDefinition model,
             String table, Map<String,Object> conditions, String operation, Map<String,Object> values) {
+        return guardLegacyConditions(mapper, model, table, conditions, operation, values, null);
+    }
+
+    public static Map<String,Object> guardLegacyConditions(
+            com.auraboot.framework.meta.mapper.DynamicDataMapper mapper, ModelDefinition model,
+            String table, Map<String,Object> conditions, String operation, Map<String,Object> values,
+            java.util.function.Function<String, ModelDefinition> resolver) {
         assertLegacyMarkerUntouched(model, values);
+        guardParentInput(mapper, model, resolver, values);
         Policy policy = policy(model);
         if (policy == null) return conditions;
         if (!org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive())
@@ -140,6 +233,7 @@ public final class RecordCommandWriterGuard {
         Object declaredTenant = scoped.putIfAbsent("tenant_id", tenant);
         if (declaredTenant != null && !tenant.toString().equals(declaredTenant.toString())) throw denied(model);
         scoped.put("tenant_id", tenant);
+        guardStoredParents(mapper, model, resolver, scoped);
         List<Map<String,Object>> rows = mapper.selectRecordWriterTargetsForUpdate(
                 table, column(policy.marker()), policy.marker().getCode(), scoped);
         if (scoped.containsKey("id") || scoped.containsKey("pid")) {
@@ -159,17 +253,31 @@ public final class RecordCommandWriterGuard {
     public static void guardRelationTargets(
             com.auraboot.framework.meta.mapper.DynamicDataMapper mapper, ModelDefinition model,
             String table, java.util.Collection<String> identities, String operation) {
+        guardRelationTargets(mapper, model, table, identities, operation, null);
+    }
+
+    public static void guardRelationTargets(
+            com.auraboot.framework.meta.mapper.DynamicDataMapper mapper, ModelDefinition model,
+            String table, java.util.Collection<String> identities, String operation,
+            java.util.function.Function<String, ModelDefinition> resolver) {
+        Parent parent = parent(model, resolver);
         Policy policy = policy(model);
         if (policy == null) return;
         Long tenant = relationTenant();
         if (identities == null || identities.stream().anyMatch(identity -> identity == null || identity.isBlank()))
             throw new MetaServiceException("Record writer relation target is missing");
         for (String identity : new java.util.TreeSet<>(identities)) {
+            Map<String,Object> conditions = new java.util.LinkedHashMap<>();
+            conditions.put("tenant_id", tenant);
+            conditions.put("id", identity);
+            if (model.isSoftDelete()) conditions.put("deleted_flag", false);
             List<Map<String,Object>> rows = mapper.selectRecordWriterTargetsForUpdate(table, column(policy.marker()),
-                    policy.marker().getCode(), Map.of("tenant_id", tenant, "id", identity, "deleted_flag", false));
+                    policy.marker().getCode(), conditions);
             if (rows == null || rows.size() != 1)
                 throw new MetaServiceException("Record writer relation target is missing or ambiguous in the current tenant");
             assertStoredAllowed(model, rows.get(0), operation);
+            if (parent != null) guardStoredParents(mapper, model, resolver,
+                    Map.of("tenant_id", tenant, "pid", rows.get(0).get("pid")));
         }
     }
 
@@ -177,6 +285,14 @@ public final class RecordCommandWriterGuard {
     public static void guardRelationReplacement(
             com.auraboot.framework.meta.mapper.DynamicDataMapper mapper, ModelDefinition model,
             String targetTable, String junctionTable, String sourceColumn, String targetColumn, String sourceIdentity) {
+        guardRelationReplacement(mapper, model, targetTable, junctionTable, sourceColumn, targetColumn, sourceIdentity, null);
+    }
+
+    public static void guardRelationReplacement(
+            com.auraboot.framework.meta.mapper.DynamicDataMapper mapper, ModelDefinition model,
+            String targetTable, String junctionTable, String sourceColumn, String targetColumn, String sourceIdentity,
+            java.util.function.Function<String, ModelDefinition> resolver) {
+        parent(model, resolver);
         if (policy(model) == null) return;
         Long tenant = relationTenant();
         List<Map<String,Object>> links = mapper.selectRelationTargetsForUpdate(
@@ -187,7 +303,7 @@ public final class RecordCommandWriterGuard {
             if (identity == null) throw new MetaServiceException("Record writer relation target is missing");
             identities.add(identity.toString());
         }
-        guardRelationTargets(mapper, model, targetTable, identities, "update");
+        guardRelationTargets(mapper, model, targetTable, identities, "update", resolver);
     }
 
     private static Long relationTenant() {

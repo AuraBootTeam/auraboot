@@ -115,6 +115,7 @@ public class CommandFieldMapExecutor {
             }
 
             RecordCommandWriterGuard.assertInputAllowed(modelDef, data, "create".equalsIgnoreCase(request.getOperationType()) ? "create" : "update");
+            RecordCommandWriterGuard.guardParentInput(dynamicDataMapper, modelDef, code -> metaModelService.getModelDefinition(code).orElse(null), data);
             Map<String, Object> columnData = prepareColumnData(modelDef, data, jsonbCols);
 
             // Determine operation type - use actual table name for database operations
@@ -291,6 +292,7 @@ public class CommandFieldMapExecutor {
         }
 
         RecordCommandWriterGuard.assertInputAllowed(modelDef, data, "create".equalsIgnoreCase(operationType) ? "create" : "update");
+        RecordCommandWriterGuard.guardParentInput(dynamicDataMapper, modelDef, code -> metaModelService.getModelDefinition(code).orElse(null), data);
         Map<String, Object> columnData = prepareColumnData(modelDef, data, jsonbColumns);
 
         // Execute the database operation
@@ -426,7 +428,7 @@ public class CommandFieldMapExecutor {
         }
         ModelDefinition writerModel = metaModelService.getModelDefinition(modelCode).orElse(null);
         RecordCommandWriterGuard.appendStoredPredicate(sql, writerModel,
-                Boolean.TRUE.equals(data.get("deleted_flag")) ? "delete" : "update");
+                Boolean.TRUE.equals(data.get("deleted_flag")) ? "delete" : "update", code -> metaModelService.getModelDefinition(code).orElse(null));
         RecordCommandWriterGuard.appendMarkerInvariant(sql, writerModel, data);
         appendScopedWriteGuards(sql, tenantId, modelCode, "update");
 
@@ -464,7 +466,7 @@ public class CommandFieldMapExecutor {
             params.put("expectedVersion", expectedVersion);
             sql.append(" AND row_version = #{params.expectedVersion}");
         }
-        RecordCommandWriterGuard.appendStoredPredicate(sql, metaModelService.getModelDefinition(modelCode).orElse(null), "delete");
+        RecordCommandWriterGuard.appendStoredPredicate(sql, metaModelService.getModelDefinition(modelCode).orElse(null), "delete", code -> metaModelService.getModelDefinition(code).orElse(null));
         appendScopedWriteGuards(sql, tenantId, modelCode, "delete");
 
         int deleted = dynamicDataMapper.deleteByQuery(sql.toString(), params);
