@@ -92,7 +92,10 @@ public class CommandServiceImpl implements CommandService {
             entity.setPluginPid(request.getPluginPid());
         }
 
-        commandDefinitionMapper.insertIdempotent(entity);
+        if (commandDefinitionMapper.insertIdempotent(entity) != 1) {
+            throw new BusinessException(ResponseCode.BadParam,
+                    "Command code was concurrently created: " + request.getCode());
+        }
         commandMetadataCache.evictCommandDefinitions();
 
         return toDTO(entity);
