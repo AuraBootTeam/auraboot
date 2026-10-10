@@ -82,6 +82,17 @@ test.describe('Dynamic resource publication journey', () => {
     await detailsField.getByLabel('对外属性名称', { exact: true }).fill('contactName');
     await page.getByLabel('创建通知', { exact: true }).check();
     await snapshot('publication-fields');
+    await page.getByTestId('publication-editor').locator('section').filter({ has: detailsField }).screenshot({ path: path.join(screenshotRoot, 'publication-fields-region.png') });
+    const saveButton = page.getByRole('button', { name: '保存并校验草稿', exact: true });
+    await saveButton.hover();
+    const saveContrast = await saveButton.evaluate(element => {
+      const luminance = (color: string) => (color.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number)
+        .map(channel => channel / 255).map(channel => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4)
+        .reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index], 0);
+      const style = getComputedStyle(element); const foreground = luminance(style.color); const background = luminance(style.backgroundColor);
+      return (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
+    });
+    expect(saveContrast).toBeGreaterThanOrEqual(4.5);
     const savedResponse = page.waitForResponse(response => response.url().endsWith(`/publications/${resourceCode}/draft`) && response.request().method() === 'PUT');
     await page.getByRole('button', { name: '保存并校验草稿', exact: true }).click();
     const savedHttp = await savedResponse; expect(savedHttp.status()).toBe(200);
@@ -90,6 +101,7 @@ test.describe('Dynamic resource publication journey', () => {
     expect(saved.data.draft.fields.details).toMatchObject({ source: 'dop_ui_details', type: 'object', properties: { contactName: { source: 'contact_name', type: 'string' } } });
     expect(saved.data.draftRevision).toBe(1); expect(saved.data.activeVersion).toBeNull();
     await expect(page.getByTestId('publication-editor').getByRole('status')).toContainText('草稿已保存并通过来源校验');
+    await expect(page.getByTestId('publication-editor').getByRole('status')).toBeInViewport();
     await snapshot('publication-draft');
 
     const otherEditor = await page.context().newPage();
@@ -105,6 +117,7 @@ test.describe('Dynamic resource publication journey', () => {
     await page.getByRole('button', { name: '保存并校验草稿', exact: true }).click(); await conflictResponse;
     await expect(page.getByTestId('publication-editor').getByRole('alert')).toContainText('你的修改已保留');
     await expect(page.getByLabel('查询超时（毫秒）', { exact: true })).toHaveValue('7000');
+    await expect(page.getByTestId('publication-editor').getByRole('alert')).toBeInViewport();
     await snapshot('publication-conflict');
     await page.getByRole('button', { name: '关闭编辑', exact: true }).click();
     await page.getByRole('group', { name: '操作确认', exact: true }).getByRole('button', { name: '确认', exact: true }).click();
@@ -114,6 +127,7 @@ test.describe('Dynamic resource publication journey', () => {
     await page.getByRole('button', { name: '发布合同', exact: true }).click();
     await page.getByRole('group', { name: '操作确认', exact: true }).getByRole('button', { name: '确认', exact: true }).click();
     await expect(page.getByTestId('publication-editor').getByRole('status')).toContainText('已发布');
+    await expect(page.getByTestId('publication-editor').getByRole('status')).toBeInViewport();
     await snapshot('publication-publish');
     for (const [button, extension] of [['下载 OpenAPI', '.openapi.json'], ['下载类型声明', '.d.ts']] as const) {
       const downloaded = page.waitForEvent('download'); await page.getByRole('button', { name: button, exact: true }).click();
@@ -129,7 +143,9 @@ test.describe('Dynamic resource publication journey', () => {
       await snapshot(extension === '.openapi.json' ? 'publication-openapi' : 'publication-types');
     }
     await page.getByRole('button', { name: '停用资源', exact: true }).click();
+    await expect(page.getByRole('group', { name: '操作确认', exact: true })).toBeInViewport();
     await snapshot('publication-withdrawdialog');
+    await page.getByRole('group', { name: '操作确认', exact: true }).screenshot({ path: path.join(screenshotRoot, 'publication-withdrawdialog-region.png') });
     await page.getByRole('group', { name: '操作确认', exact: true }).getByRole('button', { name: '确认', exact: true }).click();
     await expect(page.getByTestId('publication-editor').getByRole('status')).toContainText('已停用');
     await expect(page.getByRole('button', { name: '下载 OpenAPI', exact: true })).toBeDisabled();
@@ -138,6 +154,7 @@ test.describe('Dynamic resource publication journey', () => {
     expect(finalState.status()).toBe(200);
     const final = await finalState.json(); expect(String(final.code)).toBe('0');
     expect(final.data.find((view: { code: string }) => view.code === resourceCode)).toMatchObject({ status: 'withdrawn', activeVersion: 1, draftRevision: 2 });
+    await expect(page.getByTestId('publication-editor').getByRole('status')).toBeInViewport();
     await snapshot('publication-withdraw');
   });
 });

@@ -42,6 +42,8 @@ export function OpenApiPublicationEditor() {
   const [notice, setNotice] = useState('');
   const [denied, setDenied] = useState(false);
   const [confirm, setConfirm] = useState<'publish' | 'withdraw' | 'discard' | null>(null);
+  const confirmationRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (confirm) { confirmationRef.current?.scrollIntoView({ block: 'nearest' }); confirmationRef.current?.querySelector<HTMLButtonElement>('button')?.focus(); } }, [confirm]);
   const requestId = useRef(0);
   const modelRequestId = useRef(0);
   const errorText = (cause: unknown) => cause instanceof PublicationApiError && cause.status === 409
@@ -122,11 +124,10 @@ export function OpenApiPublicationEditor() {
   const input = (name: string, child: LabeledControl, help?: string) => <PublicationField name={name} child={child} help={help} />;
   const status = (row: PublicationView) => row.status === 'published' ? label('live', '已发布', 'Published') : row.status === 'withdrawn' ? label('disabled', '已停用', 'Withdrawn') : label('draft', '草稿', 'Draft');
   return <div data-testid="publication-editor" className="space-y-5">
-    <header className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="text-xl font-semibold text-text">{label('title', '公共资源发布', 'Public resource publications')}</h1>
-      <p className="mt-1 text-sm text-text-2">{label('intro', '选择业务模型，明确对外字段和操作，再按安装授予最小权限。', 'Choose a business model, declare public fields and operations, then grant minimum installation permissions.')}</p></div>
+    <header className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-sm text-text-2">{label('intro', '选择业务模型，明确对外字段和操作，再按安装授予最小权限。', 'Choose a business model, declare public fields and operations, then grant minimum installation permissions.')}</p></div>
       <Link className={BUTTON} to="/settings/api-docs">{label('installations', '应用、凭据与投递', 'Applications, credentials and deliveries')}</Link></header>
-    {error && <div role="alert" className="rounded-control border border-danger bg-danger-weak p-3 text-sm text-danger">{error}</div>}
-    {notice && <p role="status" className="text-sm text-success">{notice}</p>}
+    {error && (!editing || denied) && <div role="alert" className="rounded-control border border-danger bg-danger-weak p-3 text-sm text-danger">{error}</div>}
+    {notice && (!editing || denied) && <p role="status" className="text-sm text-success">{notice}</p>}
     {loading ? <p role="status" className="animate-pulse rounded-card bg-subtle p-5 text-text-2">{label('loading', '正在加载发布配置…', 'Loading publications…')}</p>
       : denied ? <button type="button" className={BUTTON} onClick={() => void load()}>{label('retry', '重新加载', 'Reload')}</button>
         : <div className="space-y-4">
@@ -146,7 +147,7 @@ export function OpenApiPublicationEditor() {
             label('codeHelp', '用于第三方 API 路径，如 sales.orders；发布后保持稳定。', 'Used in external API paths, for example sales.orders. Keep it stable after publication.'))}
           {input(label('version', '合同版本', 'Schema version'), <input required type="number" min={1} step={1} className={CONTROL} value={draft.schemaVersion} onChange={event => change({ ...draft, schemaVersion: Number(event.target.value) })} />,
             label('versionHelp', '每次发布新快照需大于当前版本；现有字段和权限不能破坏兼容。', 'Each new snapshot needs a greater version. Existing fields and scopes must remain compatible.'))}
-          <div className="md:col-span-2 space-y-2"><div className="flex gap-2">{input(label('modelSearch', '查找业务模型', 'Find business model'), <input className={CONTROL} value={search} placeholder={label('searchHint', '按业务名称查找', 'Search by business name')} onChange={event => setSearch(event.target.value)} />)}
+          <div className="md:col-span-2 space-y-2"><div className="flex items-end gap-2">{input(label('modelSearch', '查找业务模型', 'Find business model'), <input className={CONTROL} value={search} placeholder={label('searchHint', '按业务名称查找', 'Search by business name')} onChange={event => setSearch(event.target.value)} />)}
             <button type="button" className={BUTTON} onClick={() => void loadModels()}>{label('search', '查找', 'Search')}</button></div>
             {input(label('source', '业务模型', 'Business model'), <select required className={CONTROL} value={draft.modelCode} disabled={!!view?.activeVersion} onChange={event => void chooseSource(event.target.value)}>
               <option value="">{label('chooseModel', '选择已发布的业务模型', 'Choose a published business model')}</option>
@@ -196,14 +197,17 @@ export function OpenApiPublicationEditor() {
             {(['created', 'updated', 'deleted'] as const).map(event => <label key={event} className="mr-4 inline-flex items-center gap-2 text-sm"><input type="checkbox" checked={draft.events.includes(event)} disabled={!draft.events.includes(event) && (!source?.eventsAllowed || Object.values(draft.fields).some(field => field.readable && source.fields.some(meta => meta.code === field.source && !meta.eventReadable)))}
               onChange={changeEvent => change({ ...draft, events: changeEvent.target.checked ? [...draft.events, event] : draft.events.filter(value => value !== event) })} />{event === 'created' ? label('created', '创建通知', 'Created') : event === 'updated' ? label('updated', '修改通知', 'Updated') : label('deleted', '删除通知', 'Deleted')}</label>)}</div>
         </div>)}
-        <div className="flex flex-wrap gap-2"><button type="submit" className={`${BUTTON} border-accent bg-accent text-white`} disabled={!source || !draft.operations.length || !dirty}>{busy ? label('working', '正在处理…', 'Working…') : label('save', '保存并校验草稿', 'Save and validate draft')}</button>
+        <div className="sticky bottom-0 space-y-3 border-t border-border bg-panel py-3">
+          {error && <div role="alert" className="rounded-control border border-danger bg-danger-weak p-3 text-sm text-danger">{error}</div>}
+          {notice && <p role="status" className="text-sm text-success">{notice}</p>}
+          <div className="flex flex-wrap gap-2"><button type="submit" className={`${BUTTON.replace('bg-panel', 'bg-accent').replace('hover:bg-hover', 'hover:bg-accent-hover').replace('text-text', 'text-white')} border-accent`} disabled={!source || !draft.operations.length || !dirty}>{busy ? label('working', '正在处理…', 'Working…') : label('save', '保存并校验草稿', 'Save and validate draft')}</button>
           <button type="button" className={BUTTON} disabled={!view || dirty || view.draft.schemaVersion <= (view.activeVersion ?? 0)} onClick={() => setConfirm('publish')}>{label('publish', '发布合同', 'Publish contract')}</button>
           <button type="button" className={BUTTON} disabled={view?.status !== 'published'} onClick={() => void download('openapi')}>{label('openapi', '下载 OpenAPI', 'Download OpenAPI')}</button>
           <button type="button" className={BUTTON} disabled={view?.status !== 'published'} onClick={() => void download('types')}>{label('types', '下载类型声明', 'Download types')}</button>
-          <button type="button" className={`${BUTTON} text-danger`} disabled={view?.status !== 'published' || dirty} onClick={() => setConfirm('withdraw')}>{label('withdraw', '停用资源', 'Withdraw resource')}</button>
-          <button type="button" className={BUTTON} onClick={() => dirty ? setConfirm('discard') : setEditing(false)}>{label('close', '关闭编辑', 'Close editor')}</button></div>
+          <button type="button" className={BUTTON.replace('text-text', 'text-danger')} disabled={view?.status !== 'published' || dirty} onClick={() => setConfirm('withdraw')}>{label('withdraw', '停用资源', 'Withdraw resource')}</button>
+          <button type="button" className={BUTTON} onClick={() => dirty ? setConfirm('discard') : setEditing(false)}>{label('close', '关闭编辑', 'Close editor')}</button></div></div>
       </fieldset>
-      {confirm && <div role="group" aria-label={label('confirmation', '操作确认', 'Confirm operation')} className="space-y-3 rounded-control border border-border-strong bg-subtle p-4"><p className="text-sm text-text">{confirm === 'withdraw'
+      {confirm && <div ref={confirmationRef} role="group" aria-label={label('confirmation', '操作确认', 'Confirm operation')} className="space-y-3 rounded-control border border-border-strong bg-subtle p-4"><p className="text-sm text-text">{confirm === 'withdraw'
         ? label('withdrawConfirm', '停用将立即关闭此资源的外部访问、通知授权和合同下载。确认停用？', 'Withdrawal closes external access, event authority and downloads. Withdraw this resource?')
         : confirm === 'discard' ? label('discardConfirm', '放弃尚未保存的修改并关闭编辑？', 'Discard unsaved edits and close the editor?')
           : label('publishConfirm', '发布会创建不可变快照；服务端将检查来源和与当前版本的兼容性。确认发布？', 'Publishing creates an immutable snapshot. The server checks source validity and compatibility. Publish?')}</p>
