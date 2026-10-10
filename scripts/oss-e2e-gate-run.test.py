@@ -57,7 +57,7 @@ import json,os
 from pathlib import Path
 profile=json.loads(Path('../scripts/gates/oss-e2e-gate-profile.json').read_text())
 collection=os.environ['PW_FIXTURE_COLLECTION']=='1'
-n=len(profile['tests']) if collection else int(os.environ.get('REPORT_COUNT','12'))
+n=len(profile['tests']) if collection else int(os.environ.get('REPORT_COUNT',str(len(profile['tests']))))
 rows=profile['tests'][:n]
 tests=[{'file':row['file'],'title':row['title'],'tests':[{'projectName':row['project'],'expectedStatus':'passed','status':'expected','results':[] if collection else [{'status':'passed','retry':int(os.environ.get('REPORT_RETRY','0'))}]}]} for row in rows]
 report={'stats':{'expected':n,'unexpected':0,'skipped':int(os.environ.get('REPORT_SKIPPED','0')),'flaky':0},'errors':[],'config':{'projects':[{'name':'oss','retries':0}]},'suites':[{'specs':tests}]}
@@ -96,12 +96,15 @@ esac
         r = self.run_gate()
         self.assertEqual(r.returncode, 0, r.stderr)
         calls = self.calls()
-        self.assertNotIn('destroy', calls)
-        self.assertNotIn('down', calls)
+        commands = [line.split()[0] for line in calls.splitlines() if line.strip()]
+        self.assertNotIn('destroy', commands)
+        self.assertNotIn('down', commands)
         self.assertIn('--require-new-db', calls)
         self.assertNotIn('--fresh-db', calls)
         self.assertIn('--project=oss --project=oss-deep --no-deps --repeat-each=1 --retries=0', calls)
-        self.assertEqual(calls.count('.spec.ts'), 8)
+        self.assertEqual(calls.count('.spec.ts'), 10)
+        self.assertIn('--grep', calls)
+        self.assertIn('persists resource and query grants', calls)
         self.assertIn('--list --reporter=json', calls)
         self.assertIn('--reporter=line,json', calls)
 

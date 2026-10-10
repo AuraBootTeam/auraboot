@@ -107,6 +107,7 @@ SLICE_DIRS=(
   tests/e2e/showcase/runtime-rendering-e2e.spec.ts
   tests/e2e/saved-view/saved-view-gantt.spec.ts
   tests/e2e/saved-view/saved-view-kanban.spec.ts
+  tests/e2e/settings/open-platform.golden.spec.ts
 )
 
 C_INFO=$'\033[36m'; C_OK=$'\033[32m'; C_ERR=$'\033[31m'; C_OFF=$'\033[0m'
@@ -253,7 +254,9 @@ if [[ "$SCOPE_MODE" == slice ]]; then
   PROFILE="$REPO_ROOT/scripts/gates/oss-e2e-gate-profile.json"
   AUDIT="$REPO_ROOT/scripts/gates/hifi-golden-results.mjs"
   [[ -f "$PROFILE" && -f "$AUDIT" ]] || die_env "fixed slice contract is missing"
+  SLICE_GREP="$(node "$AUDIT" "$PROFILE" - selection)" || die_env "fixed slice selection is invalid"
   PW_PROFILE=oss pnpm exec playwright test "${RUN_PATHS[@]}" --project=oss --no-deps \
+    --grep "$SLICE_GREP" \
     --repeat-each="$REPEAT" --list --reporter=json >"$AURA_EVIDENCE_ROOT/collection.json" \
     2>"$AURA_EVIDENCE_ROOT/collection.stderr.log" || exit 1
   node "$AUDIT" "$PROFILE" "$AURA_EVIDENCE_ROOT/collection.json" collection "$REPEAT" \
@@ -263,6 +266,7 @@ log "3/4 run gate: PW_PROFILE=oss --project=oss --project=oss-deep --no-deps (x$
 PW_ARGS=(--project=oss --project=oss-deep --no-deps --repeat-each="$REPEAT" --retries=0 --reporter=line,json)
 [[ -n "$WORKERS" ]] && PW_ARGS+=(--workers="$WORKERS")
 [[ ${#RUN_PATHS[@]} -gt 0 ]] && PW_ARGS+=("${RUN_PATHS[@]}")
+[[ "$SCOPE_MODE" != slice ]] || PW_ARGS+=(--grep "$SLICE_GREP")
 set +e
 if [[ "$SCOPE_MODE" == full ]]; then
   # The empty-application journey needs the pristine bootstrap tenant. Run it
@@ -273,7 +277,7 @@ if [[ "$SCOPE_MODE" == full ]]; then
   COLLECTION_RC=$?
   [[ "$COLLECTION_RC" == 0 ]] || die_env "full catalog collection failed; see $REPORT_ROOT/collection.log"
   PLAYWRIGHT_JSON_OUTPUT_FILE="$REPORT_ROOT/pristine.json" PW_PROFILE=oss NO_PROXY=localhost,127.0.0.1 \
-    pnpm exec playwright test "${PW_ARGS[@]}" tests/e2e/settings/open-platform.golden.spec.ts 2>&1 | tee "$LOG"
+    pnpm exec playwright test "${PW_ARGS[@]}" tests/e2e/settings/open-platform.golden.spec.ts --grep 'Open Platform golden journey' 2>&1 | tee "$LOG"
   PRISTINE_RC=${PIPESTATUS[0]}
   PLAYWRIGHT_JSON_OUTPUT_FILE="$REPORT_ROOT/remaining.json" PW_PROFILE=oss NO_PROXY=localhost,127.0.0.1 \
     pnpm exec playwright test "${PW_ARGS[@]}" --grep-invert 'Open Platform golden journey' 2>&1 | tee -a "$LOG"
@@ -294,7 +298,7 @@ fi
 set -e 2>/dev/null || true
 # Both validators inspect the same original Playwright JSON report.
 if [[ "$GATE_RC" == 0 ]]; then
-  python3 - "$PW_RESULTS_JSON" "$SCOPE_MODE" "$REPEAT" <<'REPORT_PY' || GATE_RC=1
+  python3 - "$PW_RESULTS_JSON" "$SCOPE_MODE" "$REPEAT" "$REPO_ROOT/scripts/gates/oss-e2e-gate-profile.json" <<'REPORT_PY' || GATE_RC=1
 import json
 import sys
 from pathlib import Path
@@ -311,8 +315,10 @@ if not isinstance(stats.get("expected"), int) or stats["expected"] <= 0 or repor
 projects = report.get("config", {}).get("projects", [])
 if not projects or any(project.get("retries") != 0 for project in projects):
     raise SystemExit("OSS gate failed: retries must remain zero")
-if sys.argv[2] == "slice" and stats["expected"] != 12 * int(sys.argv[3]):
-    raise SystemExit("OSS gate failed: original slice execution count changed")
+if sys.argv[2] == "slice":
+    profile = json.loads(Path(sys.argv[4]).read_text())
+    if stats["expected"] != len(profile["tests"]) * int(sys.argv[3]):
+        raise SystemExit("OSS gate failed: fixed profile execution count changed")
 tests = []
 def walk(suites):
     for suite in suites:
