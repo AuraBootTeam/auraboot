@@ -200,6 +200,35 @@ test("global handlers capture error category and source location without raw err
     /Alice|13812345678|secret|private/,
   );
 });
+test("custom exception names never enter console, realtime, or retained logs", () => {
+  const local = [],
+    remote = [];
+  const logger = runtime.createLogger({
+    consoleApi: { error: (_, entry) => local.push(entry) },
+    wxApi: {
+      getRealtimeLogManager: () => ({ error: (entry) => remote.push(entry) }),
+    },
+  });
+  const error = new Error("private-payload");
+  error.name = "Customer Alice: account opaque-secret";
+  error.stack = "Customer Alice: private-payload";
+  logger.capture("uncaught", error);
+  logger.capture(
+    "unhandled-rejection",
+    "Customer Alice TypeError private-payload",
+  );
+  logger.capture("uncaught", "RangeError: private-payload");
+  assert.deepEqual(
+    logger.snapshot().map((entry) => entry.type),
+    ["Error", "Error", "RangeError"],
+  );
+  assert.equal(local.length, 3);
+  assert.equal(remote.length, 3);
+  assert.doesNotMatch(
+    JSON.stringify({ local, remote, retained: logger.snapshot() }),
+    /Alice|opaque-secret|private-payload/,
+  );
+});
 test("device configuration rejects loopback and unverified connectivity", () => {
   for (const host of ["localhost", "127.0.0.1", "127.1", "0.0.0.0", "[::1]"])
     assert.throws(

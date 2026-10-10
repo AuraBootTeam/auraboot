@@ -1,6 +1,16 @@
 // Log values are summaries by default; secrets never enter either sink.
 const PRIVATE =
   /token|authorization|password|secret|cookie|phone|mobile|email|name|address|payload|body|data|context|message|stack|reason/i;
+const ERROR_TYPES = new Set([
+  "Error",
+  "TypeError",
+  "ReferenceError",
+  "SyntaxError",
+  "RangeError",
+  "URIError",
+  "EvalError",
+  "AggregateError",
+]);
 function text(value) {
   return String(value)
     .replace(/Bearer\s+\S+/gi, "Bearer [redacted]")
@@ -93,11 +103,17 @@ function createLogger({
     capture: (kind, error) => {
       const value = (error && error.stack) || String(error || "");
       const frame = value.match(/(?:at\s+.*?\()?([^\s/()]+\.js:\d+:\d+)\)?/);
-      const type =
-        (error && error.name) ||
-        (/TypeError|ReferenceError|SyntaxError/.exec(value) || [
-          typeof error,
-        ])[0];
+      // Custom error names are arbitrary application data, not safe metadata.
+      const name = error && error.name;
+      const category =
+        /^(TypeError|ReferenceError|SyntaxError|RangeError|URIError|EvalError|AggregateError|Error)(?=:|$)/.exec(
+          value,
+        );
+      const type = ERROR_TYPES.has(name)
+        ? name
+        : category
+          ? category[1]
+          : "Error";
       return emit("error", "global:error", {
         kind,
         type,
