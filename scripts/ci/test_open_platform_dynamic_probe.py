@@ -66,11 +66,12 @@ class DynamicProbeTests(unittest.TestCase):
 
     def test_slo_fixture_uses_active_query_and_private_independent_load_installation(self):
         calls = []
-        contract = {"code": "release.dynamic.by-zone", "maxConcurrent": 2, "sourceFingerprint": "source-fingerprint", "scopes": {"execute": "release.dynamic:query"}}
+        contract = {"code": "release.dynamic.by-zone", "queryCode": "release_dynamic_by_zone", "maxConcurrent": 2, "sourceFingerprint": "source-fingerprint", "scopes": {"execute": "release.dynamic:query"}}
         def request(path, *, method="GET", body=None, headers=None):
             calls.append((path, method, body))
             result = [{"code": "release.dynamic.by-zone", "contract": contract}] if path.endswith("/queries") else {}
             if path == "/api/open-platform/applications": result = {"pid": "load-app"}
+            if path.startswith("/api/meta/named-queries/by-code/"): result = {"policy": {"rateLimitPerMinute": 100000}}
             if path.endswith("/installations"): result = {"pid": "load-install"}
             if path.endswith("/credentials"): result = {"clientId": "private-client", "clientSecret": "private-secret"}
             return 200, {"code": 0, "data": result}, {}
@@ -83,10 +84,10 @@ class DynamicProbeTests(unittest.TestCase):
             self.assertEqual(private["queryCode"], "release.slo.by-zone")
             self.assertNotIn("private-secret", json.dumps(public)); self.assertNotIn("private-client", json.dumps(public))
             self.assertEqual(contract["maxConcurrent"], 2)
-            self.assertEqual(calls[1][2]["definition"]["maxConcurrent"], 20)
+            self.assertEqual(calls[2][2]["definition"]["maxConcurrent"], 20)
             self.assertEqual(public["applicationPid"], "load-app")
-            self.assertEqual(calls[4][0], "/api/open-platform/applications/load-app/installations")
-            self.assertEqual(calls[4][2]["rateLimitPerMinute"], 100000)
+            self.assertEqual(calls[5][0], "/api/open-platform/applications/load-app/installations")
+            self.assertEqual(calls[5][2]["rateLimitPerMinute"], 100000)
             calls.clear()
             with self.assertRaises(ProtocolError): prepare_slo_fixture(request, {}, passed(), consumer, fixture_path=path)
             self.assertEqual(calls, [])

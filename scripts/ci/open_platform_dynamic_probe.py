@@ -216,6 +216,9 @@ def prepare_slo_fixture(request, admin, report, consumer_fixture, *, fixture_pat
     if len(matches) != 1 or matches[0].get("contract", {}).get("maxConcurrent") != 2:
         raise ProtocolError("SLO active source query contract missing")
     query = json.loads(json.dumps(matches[0]["contract"]))
+    source = human("/api/meta/named-queries/by-code/" + query["queryCode"])
+    if source.get("policy", {}).get("rateLimitPerMinute") != 100000:
+        raise ProtocolError("SLO source query rate budget missing")
     query.update(code="release.slo.by-zone", scopes={"execute": "release.slo:query"}, maxConcurrent=20)
     human("/api/open-platform/query-publications/release.slo.by-zone/draft", "PUT", {"expectedRevision": 0, "definition": query})
     human("/api/open-platform/query-publications/release.slo.by-zone/publish", "POST", {"expectedRevision": 1})
@@ -240,7 +243,8 @@ def prepare_slo_fixture(request, admin, report, consumer_fixture, *, fixture_pat
         json.dump(fixture, handle)
     return {"profile": fixture["profile"], "applicationPid": application["pid"], "installationPid": installation["pid"],
             "resourceCode": fixture["resourceCode"], "queryCode": fixture["queryCode"], "maxConcurrent": 20,
-            "sourceQueryMaxConcurrent": 2, "rateLimitPerMinute": 100000}
+            "sourceQueryMaxConcurrent": 2, "sourceQueryRateLimitPerMinute": source["policy"]["rateLimitPerMinute"],
+            "rateLimitPerMinute": 100000}
 
 
 def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None):
@@ -301,6 +305,7 @@ def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None):
         record("publication-snapshot", published.get("activeVersion") == 1)
         named = human("/api/meta/named-queries", "POST", {"code": named_code, "title": "Release zone query",
             "resourceCode": model_code, "actionCode": "read", "fromSql": f"{model['tableName']} a WHERE a.rel_zone = #{{params.zone}}",
+            "policy": {"rateLimitPerMinute": 100000},
             "defaultOrder": [{"field": "pid", "direction": "asc"}], "fields": [
                 {"fieldCode": "pid", "columnExpr": "a.pid", "dataType": "string", "displayName": "PID", "sortable": True, "searchable": False},
                 {"fieldCode": "partName", "columnExpr": "a.rel_name", "dataType": "string", "displayName": "Name", "sortable": False, "searchable": False}]})
