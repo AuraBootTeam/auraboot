@@ -221,7 +221,9 @@ def prepare_slo_fixture(request, admin, report, consumer_fixture, *, fixture_pat
     human("/api/open-platform/query-publications/release.slo.by-zone/publish", "POST", {"expectedRevision": 1})
     scopes = ["release.dynamic:" + operation for operation in ["list", "get", "create", "update", "delete"]]
     scopes += ["release.slo:query", "openapi.profile.read"]
-    installation = human(f"/api/open-platform/applications/{report['applicationPid']}/installations", "POST",
+    application = human("/api/open-platform/applications", "POST",
+                        {"name": "Dynamic SLO consumer", "description": "Exact-image business capacity qualification only"})
+    installation = human(f"/api/open-platform/applications/{application['pid']}/installations", "POST",
                          {"environment": "staging", "scopes": scopes, "rateLimitPerMinute": 100000})
     prefix = f"/api/open-platform/installations/{installation['pid']}"
     human(prefix + "/resources/release.dynamic.parts", "PUT", {"operations": ["list", "get", "create", "update", "delete"],
@@ -236,7 +238,7 @@ def prepare_slo_fixture(request, admin, report, consumer_fixture, *, fixture_pat
     descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
     with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
         json.dump(fixture, handle)
-    return {"profile": fixture["profile"], "applicationPid": report["applicationPid"], "installationPid": installation["pid"],
+    return {"profile": fixture["profile"], "applicationPid": application["pid"], "installationPid": installation["pid"],
             "resourceCode": fixture["resourceCode"], "queryCode": fixture["queryCode"], "maxConcurrent": 20,
             "sourceQueryMaxConcurrent": 2, "rateLimitPerMinute": 100000}
 

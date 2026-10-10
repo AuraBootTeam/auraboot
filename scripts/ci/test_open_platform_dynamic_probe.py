@@ -70,6 +70,7 @@ class DynamicProbeTests(unittest.TestCase):
         def request(path, *, method="GET", body=None, headers=None):
             calls.append((path, method, body))
             result = [{"code": "release.dynamic.by-zone", "contract": contract}] if path.endswith("/queries") else {}
+            if path == "/api/open-platform/applications": result = {"pid": "load-app"}
             if path.endswith("/installations"): result = {"pid": "load-install"}
             if path.endswith("/credentials"): result = {"clientId": "private-client", "clientSecret": "private-secret"}
             return 200, {"code": 0, "data": result}, {}
@@ -83,7 +84,9 @@ class DynamicProbeTests(unittest.TestCase):
             self.assertNotIn("private-secret", json.dumps(public)); self.assertNotIn("private-client", json.dumps(public))
             self.assertEqual(contract["maxConcurrent"], 2)
             self.assertEqual(calls[1][2]["definition"]["maxConcurrent"], 20)
-            self.assertEqual(calls[3][2]["rateLimitPerMinute"], 100000)
+            self.assertEqual(public["applicationPid"], "load-app")
+            self.assertEqual(calls[4][0], "/api/open-platform/applications/load-app/installations")
+            self.assertEqual(calls[4][2]["rateLimitPerMinute"], 100000)
             calls.clear()
             with self.assertRaises(ProtocolError): prepare_slo_fixture(request, {}, passed(), consumer, fixture_path=path)
             self.assertEqual(calls, [])
