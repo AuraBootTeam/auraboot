@@ -38,6 +38,7 @@ import {
   resolveInitialListTabKey,
   collectListSchemaFieldNames,
   collectListBareParamFilters,
+  resolveUserFilterCondition,
 } from '../ListPageContent';
 
 describe('beginLatestListRequest', () => {
@@ -1015,7 +1016,6 @@ describe('reference filter chip labels', () => {
   });
 });
 
-
 describe('list query settlement', () => {
   const empty = { activeSorts: [], chipFilters: [] };
   const filtered = {
@@ -1039,9 +1039,15 @@ describe('list query settlement', () => {
   it('recognizes an explicitly loaded view without duplicating its request', () => {
     expect(areListSortFilterQueriesEqual(structuredClone(filtered), filtered)).toBe(true);
     expect(areListSortFilterQueriesEqual(empty, filtered)).toBe(false);
-    expect(areListSortFilterQueriesEqual({
-      ...empty, activeSorts: [{ fieldCode: 'qty', direction: 'asc', priority: 0 }],
-    }, empty)).toBe(false);
+    expect(
+      areListSortFilterQueriesEqual(
+        {
+          ...empty,
+          activeSorts: [{ fieldCode: 'qty', direction: 'asc', priority: 0 }],
+        },
+        empty,
+      ),
+    ).toBe(false);
   });
 });
 
@@ -1102,7 +1108,9 @@ describe('collectListBareParamFilters', () => {
   it('ignores reserved runtime params even when declared as fields', () => {
     expect(
       collectListBareParamFilters(
-        new URLSearchParams('keyword=abc&view=x&tab=all&pageNum=2&pageSize=50&sort=a%3Adesc&filters=zzz&preset=created_today&locale=en-US'),
+        new URLSearchParams(
+          'keyword=abc&view=x&tab=all&pageNum=2&pageSize=50&sort=a%3Adesc&filters=zzz&preset=created_today&locale=en-US',
+        ),
         fields,
       ),
     ).toEqual({});
@@ -1118,6 +1126,85 @@ describe('collectListBareParamFilters', () => {
   });
 
   it('returns nothing when the schema declares no fields', () => {
-    expect(collectListBareParamFilters(new URLSearchParams('fin_cfw_week_start=2026-01-05'), [])).toEqual({});
+    expect(
+      collectListBareParamFilters(new URLSearchParams('fin_cfw_week_start=2026-01-05'), []),
+    ).toEqual({});
+  });
+});
+
+describe('resolveUserFilterCondition', () => {
+  const smartInputFields = [
+    { field: 'fin_cfw_week_start', component: 'SmartInput', props: {} },
+    { field: 'fin_cfw_forecast_code', component: 'SmartInput', props: {} },
+  ] as any;
+  const modelFieldMap = new Map<string, any>([
+    ['fin_cfw_week_start', { code: 'fin_cfw_week_start', dataType: 'date' }],
+    ['fin_cfw_forecast_code', { code: 'fin_cfw_forecast_code', dataType: 'string' }],
+  ]);
+
+  it('typed date fields use EQ without LIKE wrapping even as SmartInput search fields', () => {
+    expect(
+      resolveUserFilterCondition(
+        'fin_cfw_week_start',
+        '2026-11-16',
+        smartInputFields,
+        modelFieldMap,
+      ),
+    ).toEqual([{ fieldName: 'fin_cfw_week_start', operator: 'EQ', value: '2026-11-16' }]);
+  });
+
+  it('keeps the legacy LIKE heuristic when the model metadata is unavailable', () => {
+    expect(
+      resolveUserFilterCondition('fin_cfw_week_start', '2026-11-16', smartInputFields, new Map()),
+    ).toEqual([{ fieldName: 'fin_cfw_week_start', operator: 'LIKE', value: '%2026-11-16%' }]);
+  });
+
+  it('keeps the legacy LIKE heuristic for text search fields', () => {
+    expect(
+      resolveUserFilterCondition(
+        'fin_cfw_forecast_code',
+        'FC-2026',
+        smartInputFields,
+        modelFieldMap,
+      ),
+    ).toEqual([{ fieldName: 'fin_cfw_forecast_code', operator: 'LIKE', value: '%FC-2026%' }]);
+  });
+
+  it('keeps EQ for keys unknown to both filter block and model metadata', () => {
+    expect(resolveUserFilterCondition('other_field', 'x', smartInputFields, new Map())).toEqual([
+      { fieldName: 'other_field', operator: 'EQ', value: 'x' },
+    ]);
+  });
+
+  it('an explicit field operator wins even for typed fields', () => {
+    const fields = [
+      { field: 'fin_cfw_week_start', component: 'SmartInput', props: { operator: 'gte' } },
+    ] as any;
+    expect(
+      resolveUserFilterCondition('fin_cfw_week_start', '2026-11-16', fields, modelFieldMap),
+    ).toEqual([{ fieldName: 'fin_cfw_week_start', operator: 'GTE', value: '2026-11-16' }]);
+  });
+
+  it('date range objects still expand to the gte/lte pair', () => {
+    expect(
+      resolveUserFilterCondition(
+        'fin_cfw_week_start',
+        { start: '2026-11-16', end: '2026-11-30' },
+        smartInputFields,
+        modelFieldMap,
+      ),
+    ).toEqual([
+      { fieldName: 'fin_cfw_week_start', operator: 'gte', value: '2026-11-16' },
+      { fieldName: 'fin_cfw_week_start', operator: 'lte', value: '2026-11-30' },
+    ]);
+  });
+
+  it('blank values produce no condition', () => {
+    expect(
+      resolveUserFilterCondition('fin_cfw_week_start', '', smartInputFields, modelFieldMap),
+    ).toEqual([]);
+    expect(
+      resolveUserFilterCondition('fin_cfw_week_start', null, smartInputFields, modelFieldMap),
+    ).toEqual([]);
   });
 });

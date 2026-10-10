@@ -360,6 +360,23 @@ const LIST_RESERVED_URL_PARAM_KEYS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * Model data types that tolerate a SQL LIKE '%…%' predicate. Everything else
+ * (date/datetime/time, numeric, boolean, ...) must use EQ: a LIKE against a
+ * DATE or numeric column is rejected by the backend, which is exactly what
+ * happened to drill-down params like /p/fin_cash_forecast_week?fin_cfw_week_start=…
+ * when they were converted with the search field's default LIKE operator.
+ */
+const TEXT_LIKE_FILTER_DATA_TYPES: ReadonlySet<string> = new Set([
+  'string',
+  'text',
+  'char',
+  'varchar',
+  'enum',
+  'json',
+  'jsonb',
+  'uuid',
+]);
+/**
  * Field names declared by the list page schema: table columns (action columns
  * excluded), table search fields and filter-block fields. Drill-down bare URL
  * params are only promoted to row filters when they match one of these, so
@@ -795,6 +812,55 @@ export interface ListQueryFilterCondition {
   operator: string;
   value?: unknown;
   values?: unknown[];
+}
+
+/**
+ * Convert one user filter (key -> raw value, sourced from URL filter_* params,
+ * drill-down bare params or the quick filter bar) into its query conditions.
+ *
+ * SmartInput search fields default to LIKE, but a LIKE '%..%' against a
+ * date/number column is a guaranteed backend error, and drill-down URL params
+ * (e.g. /p/fin_cash_forecast_week?fin_cfw_week_start=...) flow through here with
+ * the field's real model type. When the model metadata types the field as a
+ * non-text scalar the operator therefore falls back to EQ; unknown types keep
+ * the legacy heuristic (explicit operator > SmartInput LIKE > EQ).
+ */
+export function resolveUserFilterCondition(
+  key: string,
+  value: unknown,
+  filterFields: FieldConfig[] | undefined,
+  filterFieldMap?: Map<string, any>,
+): ListQueryFilterCondition[] {
+  if (value == null || value === '') return [];
+  // Date range objects { start, end }
+  if (typeof value === 'object' && ('start' in value || 'end' in value)) {
+    const range = value as { start?: unknown; end?: unknown };
+    const conditions: ListQueryFilterCondition[] = [];
+    if (range.start) conditions.push({ fieldName: key, operator: 'gte', value: String(range.start) });
+    if (range.end) conditions.push({ fieldName: key, operator: 'lte', value: String(range.end) });
+    return conditions;
+  }
+  const fieldConfig = (filterFields || []).find((field) => field.field === key);
+  const explicitOperator = (fieldConfig as any)?.operator || fieldConfig?.props?.operator;
+  const dataType = resolveFieldMetaDataType(key, filterFieldMap);
+  const supportsLike =
+    dataType == null || TEXT_LIKE_FILTER_DATA_TYPES.has(dataType.split('(')[0].trim());
+  const operator =
+    !supportsLike && !explicitOperator
+      ? 'EQ'
+      : typeof explicitOperator === 'string' && explicitOperator.trim()
+        ? explicitOperator.trim().toUpperCase()
+        : fieldConfig?.component === 'SmartInput'
+          ? 'LIKE'
+          : 'EQ';
+  const textValue = String(value);
+  return [
+    {
+      fieldName: key,
+      operator,
+      value: operator === 'LIKE' ? `%${textValue}%` : textValue,
+    },
+  ];
 }
 
 /** Preserve array-valued IN/BETWEEN filters for the dynamic query contract. */
@@ -2220,39 +2286,16 @@ function ListPageContentInner(props: PageContentProps) {
       tabCondition: ListQueryFilterCondition | null,
       userFilters?: Record<string, any>,
       chipFiltersList?: ViewFilterConfig[],
+      filterFieldMap?: Map<string, any>,
     ) => {
       const conditions: ListQueryFilterCondition[] = [];
       if (tabCondition) conditions.push(tabCondition);
       // Convert user filters (key-value from filters) to QueryCondition format
       if (userFilters) {
         for (const [key, value] of Object.entries(userFilters)) {
-          if (value == null || value === '') continue;
-          // Handle date range objects { start, end }
-          if (typeof value === 'object' && ('start' in value || 'end' in value)) {
-            if (value.start) {
-              conditions.push({ fieldName: key, operator: 'gte', value: String(value.start) });
-            }
-            if (value.end) {
-              conditions.push({ fieldName: key, operator: 'lte', value: String(value.end) });
-            }
-          } else {
-            const fieldConfig = ((filterBlock?.fields || []) as FieldConfig[]).find(
-              (field) => field.field === key,
-            );
-            const explicitOperator = (fieldConfig as any)?.operator || fieldConfig?.props?.operator;
-            const operator =
-              typeof explicitOperator === 'string' && explicitOperator.trim()
-                ? explicitOperator.trim().toUpperCase()
-                : fieldConfig?.component === 'SmartInput'
-                  ? 'LIKE'
-                  : 'EQ';
-            const textValue = String(value);
-            conditions.push({
-              fieldName: key,
-              operator,
-              value: operator === 'LIKE' ? `%${textValue}%` : textValue,
-            });
-          }
+          conditions.push(
+            ...resolveUserFilterCondition(key, value, filterBlock?.fields as FieldConfig[] | undefined, filterFieldMap),
+          );
         }
       }
       // Merge chip filters (from FilterChipBar) into conditions
@@ -2265,6 +2308,8 @@ function ListPageContentInner(props: PageContentProps) {
       }
       return conditions.length > 0 ? JSON.stringify(conditions) : undefined;
     },
+    // NOTE: filterBlock is declared later in the component; reads resolve at call time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
 
@@ -2373,6 +2418,7 @@ function ListPageContentInner(props: PageContentProps) {
             tabCondition,
             params?.filters,
             params?.chipFilters ?? chipFiltersRef.current,
+            modelFieldMap,
           );
           if (filtersParam) {
             queryParams.filters = filtersParam;
@@ -2482,6 +2528,7 @@ function ListPageContentInner(props: PageContentProps) {
       auditUserDisplayFields,
       activeSorts,
       skipListData,
+      modelFieldMap,
     ],
   );
 
@@ -2698,7 +2745,7 @@ function ListPageContentInner(props: PageContentProps) {
               queryParams.sortOrder = String(tableBlock.defaultSort.order || 'desc').toLowerCase();
             }
           } else {
-            const filtersParam = buildFiltersParam(tabCondition, filters, chipFilters);
+            const filtersParam = buildFiltersParam(tabCondition, filters, chipFilters, modelFieldMap);
             if (filtersParam) {
               queryParams.filters = filtersParam;
             }
@@ -2768,6 +2815,7 @@ function ListPageContentInner(props: PageContentProps) {
       tableBlock,
       auditUserDisplayFields,
       skipListData,
+      modelFieldMap,
     ],
   );
 
