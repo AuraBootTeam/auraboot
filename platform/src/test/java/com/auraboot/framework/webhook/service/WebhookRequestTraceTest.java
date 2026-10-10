@@ -15,6 +15,7 @@ import org.slf4j.MDC;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -37,7 +38,8 @@ class WebhookRequestTraceTest {
         String oldAllowlist = System.getProperty("AURA_SSRF_ALLOWED_PRIVATE_HOSTS");
         System.setProperty("AURA_SSRF_ALLOWED_PRIVATE_HOSTS", "127.0.0.1");
         receiver.start();
-        try {
+        try (var policies = mockConstruction(WebhookRetryPolicy.class,
+                (policy, context) -> when(policy.delayForRetry(1)).thenReturn(Duration.ofMillis(1250)))) {
             var subscriptions = mock(WebhookSubscriptionMapper.class);
             var deliveries = mock(WebhookDeliveryLogMapper.class);
             var subscription = new WebhookSubscription();
@@ -57,8 +59,10 @@ class WebhookRequestTraceTest {
             var nextAttempt = ArgumentCaptor.forClass(Instant.class);
             verify(deliveries).markFailure(eq(9L), eq("retry-lease"), eq(503),
                     eq("receiver unavailable"), anyString(), nextAttempt.capture());
-            assertThat(nextAttempt.getValue()).isAfterOrEqualTo(before.plusSeconds(1));
-            assertThat(nextAttempt.getValue()).isBefore(after.plusSeconds(2));
+            assertThat(policies.constructed()).hasSize(1);
+            verify(policies.constructed().getFirst()).delayForRetry(1);
+            assertThat(nextAttempt.getValue()).isAfterOrEqualTo(before.plusMillis(1250));
+            assertThat(nextAttempt.getValue()).isBeforeOrEqualTo(after.plusMillis(1250));
             assertThat(bodies).containsExactly(delivery.getRequestBody());
             verify(deliveries, never()).markSuccess(anyLong(), anyString(), anyInt(), any());
             verify(deliveries, never()).markPermanentFailure(any(), any(), any());

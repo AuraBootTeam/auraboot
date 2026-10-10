@@ -45,7 +45,7 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
 
     private static final int DEFAULT_CONNECT_TIMEOUT_MS = 5_000;
     private static final int DEFAULT_READ_TIMEOUT_MS = 10_000;
-    private static final WebhookRetryPolicy RETRY_POLICY = new WebhookRetryPolicy();
+    private final WebhookRetryPolicy retryPolicy = new WebhookRetryPolicy();
 
     /**
      * Shared JDK HTTP client for webhook delivery (P3-E DNS-rebinding
@@ -302,7 +302,7 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
                     truncate(exception.getMessage()));
         } catch (Exception exception) {
             int retryCount = delivery.getRetryCount() == null ? 0 : delivery.getRetryCount();
-            Instant nextRetryAt = Instant.now().plus(RETRY_POLICY.delayForRetry(retryCount));
+            Instant nextRetryAt = Instant.now().plus(retryPolicy.delayForRetry(retryCount));
             Integer status = exception instanceof ResponseFailure failure ? failure.status : null;
             String body = exception instanceof ResponseFailure failure ? failure.body : null;
             deliveryLogMapper.markFailure(delivery.getId(), delivery.getLeaseToken(), status, body,
