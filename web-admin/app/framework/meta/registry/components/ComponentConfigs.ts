@@ -888,6 +888,16 @@ export const DISPLAY_COMPONENT_CONFIGS: ComponentConfig[] = [
     tags: ['decisionops', 'impact', 'integration', 'connector', 'webhook', 'custom-block'],
   },
   {
+    type: 'openapipublicationeditor',
+    name: 'Public Resource Publications',
+    category: 'display',
+    icon: 'globe',
+    description: 'Tenant administrator editor for immutable public resource contracts.',
+    defaultProps: {},
+    propertySchema: [],
+    tags: ['open-platform', 'publication', 'custom-block'],
+  },
+  {
     type: 'decisionrulebinding',
     name: 'Decision Rule Binding',
     category: 'display',

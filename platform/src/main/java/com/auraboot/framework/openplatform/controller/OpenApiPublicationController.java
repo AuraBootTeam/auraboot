@@ -27,6 +27,11 @@ public class OpenApiPublicationController {
         return ApiResponse.success(publications.list());
     }
 
+    @GetMapping("/publication-sources/{code}")
+    public ApiResponse<com.auraboot.framework.openplatform.service.OpenApiPublicationValidator.SourceView> source(@PathVariable String code) {
+        return ApiResponse.success(publications.sourceForAdministration(code));
+    }
+
     @GetMapping("/publications/{code}/openapi")
     public java.util.Map<String, Object> document(@PathVariable String code) {
         return com.auraboot.framework.openplatform.service.OpenApiContractArtifacts.resource(publications.publishedForAdministration(code));

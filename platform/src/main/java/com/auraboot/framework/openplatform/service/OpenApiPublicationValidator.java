@@ -35,6 +35,48 @@ public class OpenApiPublicationValidator {
         return model;
     }
 
+    public record SourceField(String code, String name, Set<OpenApiResourceContract.Type> types,
+                              boolean writable, boolean required, boolean sortable, boolean filterable,
+                              String referenceModel, boolean referencePid, boolean eventReadable) { }
+    public record SourceView(String modelCode, String name, Set<OpenApiResourceContract.Operation> operations,
+                             boolean eventsAllowed, List<SourceField> fields) { }
+
+    /** Advisory editor metadata from the same runtime source as publication validation. */
+    public SourceView describe(String code) {
+        var model = models.getModelDefinition(code).orElseThrow(() -> invalid("Publication model does not exist"));
+        require(StatusConstants.PUBLISHED.equals(model.getStatus()) || StatusConstants.ACTIVE.equals(model.getStatus()),
+                "Publication requires an active model");
+        var caps = model.getCapabilities();
+        require(caps != null, "Model capabilities must be declared");
+        boolean physical = (model.getSourceType() == null || "physical".equals(model.getSourceType()))
+                && !"view".equalsIgnoreCase(model.getModelType());
+        Object commandDelete = model.getExtension() == null ? null : model.getExtension().get("commandOnlyDelete");
+        require(commandDelete == null || commandDelete instanceof Boolean, "Invalid model deletion policy");
+        var operations = java.util.EnumSet.noneOf(OpenApiResourceContract.Operation.class);
+        if (caps.isList()) operations.add(OpenApiResourceContract.Operation.LIST);
+        if (caps.isDetail()) operations.add(OpenApiResourceContract.Operation.GET);
+        if (physical && caps.isCreate() && !model.isCommandOnlyCreate()) operations.add(OpenApiResourceContract.Operation.CREATE);
+        if (physical && caps.isUpdate() && !model.isImmutable()) operations.add(OpenApiResourceContract.Operation.UPDATE);
+        if (physical && caps.isDelete() && !model.isImmutable() && !Boolean.TRUE.equals(commandDelete)) operations.add(OpenApiResourceContract.Operation.DELETE);
+        Set<String> internal = Set.of("id", "pid", "tenant_id", "tenantId", "created_by", "updated_by", "row_version", "deleted_flag", "_expectedVersion");
+        var fields = (model.getFields() == null ? List.<FieldDefinition>of() : model.getFields()).stream()
+                .filter(field -> field.getCode() != null && !internal.contains(field.getCode()) && !field.isTransientField())
+                .map(field -> {
+                    var types = java.util.EnumSet.noneOf(OpenApiResourceContract.Type.class);
+                    for (var type : OpenApiResourceContract.Type.values()) if (typeMatches(type, field.getDataType())) types.add(type);
+                    var ref = field.getRefTarget();
+                    if (ref != null) { types.clear(); types.add(OpenApiResourceContract.Type.PID); }
+                    return new SourceField(field.getCode(), field.getDisplayName(), Set.copyOf(types),
+                            !field.isComputedReadonly() && !Boolean.TRUE.equals(field.getPrimaryKey())
+                                    && !Set.of("created_at", "updated_at").contains(field.getCode()),
+                            Boolean.TRUE.equals(field.getRequired()) && field.getDefaultValue() == null,
+                            caps.canSortBy(field.getCode()), caps.canFilterBy(field.getCode()),
+                            ref == null ? null : ref.getTargetEntity(),
+                            ref == null || ref.getValueField() == null || "pid".equals(ref.getValueField()), !field.isJsonbVirtual());
+                }).filter(field -> !field.types().isEmpty()).toList();
+        return new SourceView(model.getCode(), model.getDisplayName(), Set.copyOf(operations), physical, fields);
+    }
+
     public void validate(OpenApiResourceContract contract, ModelDefinition model) {
         fixedRoutes.requireAvailableResourceRoutes(contract);
         require(model != null && contract.modelCode().equals(model.getCode()), "Publication source mismatch");
@@ -85,6 +127,8 @@ public class OpenApiPublicationValidator {
                     "Published events require physical source fields");
             require(!publicField.writable() || !source.isComputedReadonly(), "Computed field is read-only");
             require(!publicField.writable() || !Boolean.TRUE.equals(source.getPrimaryKey()), "Record identity is read-only");
+            require(!publicField.writable() || !Set.of("created_at", "updated_at").contains(source.getCode()),
+                    "Model audit timestamps are read-only");
             require(!publicField.sortable() || capabilities.canSortBy(source.getCode()), "Sort exceeds model capabilities");
             require(publicField.operators().isEmpty() || capabilities.canFilterBy(source.getCode()), "Filter exceeds model capabilities");
             require(typeMatches(publicField.type(), source.getDataType()), "Public type does not match model field: " + entry.getKey());

@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { createCookieSessionStorage } from 'react-router';
 import path from 'node:path';
+import { mkdir, readFile } from 'node:fs/promises';
 import { BACKEND_URL, BASE_URL as WEB_BASE_URL } from '../../helpers/environments';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 
@@ -14,6 +15,130 @@ const sessionStorage = createCookieSessionStorage({
     secrets: [process.env.SESSION_SECRET || 'dev-only-secret-do-not-use-in-production'],
     secure: false,
   },
+});
+
+test.describe('Dynamic resource publication journey', () => {
+  test.setTimeout(180_000);
+  test.describe.configure({ retries: 0 });
+  test.use({ storageState: { cookies: [], origins: [] }, locale: 'zh-CN', viewport: { width: 1440, height: 1000 } });
+
+  test('publishes a real model contract through UI, retains conflicts, downloads and withdraws', async ({ page }) => {
+    await authenticate(page);
+    const suffix = String(Date.now());
+    const modelCode = `dop_ui_${suffix}`;
+    const modelName = `接入验证零件 ${suffix}`;
+    const resourceCode = `ui.parts.${suffix}`;
+    // Model authoring is fixture setup. Every publication mutation below is driven by the real UI.
+    const createdResponse = await page.request.post(`${WEB_BASE_URL}/api/meta/models`, { data: {
+      code: modelCode, displayName: modelName, tableName: modelCode, modelType: 'entity', sourceType: 'physical',
+      capabilities: { list: true, detail: true, create: true, update: true, delete: true, filter: true, sort: true, paginate: true },
+      fields: [
+        { code: 'dop_ui_name', columnName: 'dop_ui_name', displayName: '零件名称', dataType: 'string', required: true, editable: true, filterable: true, sortable: true },
+        { code: 'dop_ui_details', columnName: 'dop_ui_details', displayName: '联系信息', dataType: 'json', required: false, editable: true },
+      ],
+    } });
+    expect(createdResponse.status()).toBe(200);
+    const created = await createdResponse.json(); expect(String(created.code)).toBe('0');
+    const modelPublish = await page.request.post(`${WEB_BASE_URL}/api/meta/models/${created.data.pid}/publish`, { data: { impactAcknowledged: true } });
+    expect(modelPublish.status()).toBe(200); expect(String((await modelPublish.json()).code)).toBe('0');
+    const screenshotRoot = path.join(process.env.AURA_EVIDENCE_ROOT || '/tmp', 'ui-publication-r1', 'screenshots');
+    await mkdir(screenshotRoot, { recursive: true });
+    const snapshot = async (id: string) => { await page.screenshot({ path: path.join(screenshotRoot, `${id}.png`), fullPage: true }); };
+    await page.goto('/'); await openAccountMenu(page); await page.getByTestId('open-platform-link').click();
+    await expect(page.getByTestId('open-platform-page')).toBeVisible();
+    await expect(page.getByTestId('open-platform-publications-link')).toBeVisible();
+    await snapshot('publication-entry');
+    await page.getByTestId('open-platform-publications-link').click();
+    await expect(page.getByTestId('publication-editor')).toBeVisible();
+    await expect(page.getByRole('heading', { name: '尚未公开业务模型' })).toBeVisible();
+    await snapshot('publication-empty');
+    await page.getByRole('button', { name: '新建公共资源', exact: true }).click();
+    await page.getByLabel('公共资源地址', { exact: true }).fill(resourceCode);
+    await page.getByLabel('查找业务模型', { exact: true }).fill(modelName);
+    await page.getByRole('button', { name: '查找', exact: true }).click();
+    await expect(page.getByLabel('业务模型', { exact: true }).getByRole('option', { name: modelName, exact: true })).toHaveCount(1);
+    const metadataResponse = page.waitForResponse(response => response.url().includes(`/publication-sources/${modelCode}`) && response.status() === 200);
+    await page.getByLabel('业务模型', { exact: true }).selectOption({ label: modelName });
+    const metadata = await (await metadataResponse).json();
+    expect(String(metadata.code)).toBe('0');
+    expect(metadata.data.operations).toEqual(expect.arrayContaining(['list', 'get', 'create', 'update', 'delete']));
+    expect(metadata.data.fields.some((field: { code: string }) => ['id', 'tenant_id', 'row_version'].includes(field.code))).toBe(false);
+    await expect(page.getByLabel('列表查询', { exact: true })).toBeEnabled();
+    await snapshot('publication-source');
+    for (const operation of ['列表查询', '详情读取', '创建记录', '修改记录', '删除记录']) await page.getByLabel(operation, { exact: true }).check();
+    const scopes = page.getByLabel('所需权限', { exact: true });
+    for (const [index, operation] of ['list', 'get', 'create', 'update', 'delete'].entries()) await scopes.nth(index).fill(`dop.ui:${operation}`);
+    await page.getByLabel('机器数据范围', { exact: true }).selectOption('tenant_wide');
+    const nameField = page.getByTestId('publication-field-dop_ui_name');
+    await nameField.getByLabel('零件名称', { exact: true }).check();
+    await nameField.getByLabel('对外字段名称', { exact: true }).fill('name');
+    await nameField.getByLabel('EQ', { exact: true }).check();
+    await nameField.getByLabel('允许排序', { exact: true }).check();
+    const detailsField = page.getByTestId('publication-field-dop_ui_details');
+    await detailsField.getByLabel('联系信息', { exact: true }).check();
+    await detailsField.getByLabel('对外字段名称', { exact: true }).fill('details');
+    await detailsField.getByLabel('对外类型', { exact: true }).selectOption('object');
+    await detailsField.getByLabel('原对象属性', { exact: true }).fill('contact_name');
+    await detailsField.getByLabel('对外属性名称', { exact: true }).fill('contactName');
+    await page.getByLabel('创建通知', { exact: true }).check();
+    await snapshot('publication-fields');
+    const savedResponse = page.waitForResponse(response => response.url().endsWith(`/publications/${resourceCode}/draft`) && response.request().method() === 'PUT');
+    await page.getByRole('button', { name: '保存并校验草稿', exact: true }).click();
+    const savedHttp = await savedResponse; expect(savedHttp.status()).toBe(200);
+    const saved = await savedHttp.json(); expect(String(saved.code)).toBe('0');
+    expect(saved.data.draft.fields.name).toMatchObject({ source: 'dop_ui_name', writable: true, required: true, sortable: true, operators: ['EQ'] });
+    expect(saved.data.draft.fields.details).toMatchObject({ source: 'dop_ui_details', type: 'object', properties: { contactName: { source: 'contact_name', type: 'string' } } });
+    expect(saved.data.draftRevision).toBe(1); expect(saved.data.activeVersion).toBeNull();
+    await expect(page.getByTestId('publication-editor').getByRole('status')).toContainText('草稿已保存并通过来源校验');
+    await snapshot('publication-draft');
+
+    const otherEditor = await page.context().newPage();
+    await otherEditor.goto('/p/c/open_platform_publications');
+    await otherEditor.getByRole('button', { name: '编辑合同', exact: true }).click();
+    await expect(otherEditor.getByLabel('查询超时（毫秒）', { exact: true })).toBeEnabled();
+    await otherEditor.getByLabel('查询超时（毫秒）', { exact: true }).fill('6000');
+    await otherEditor.getByRole('button', { name: '保存并校验草稿', exact: true }).click();
+    await expect(otherEditor.getByTestId('publication-editor').getByRole('status')).toContainText('草稿已保存并通过来源校验');
+    await otherEditor.close();
+    await page.getByLabel('查询超时（毫秒）', { exact: true }).fill('7000');
+    const conflictResponse = page.waitForResponse(response => response.url().endsWith(`/publications/${resourceCode}/draft`) && response.status() === 409);
+    await page.getByRole('button', { name: '保存并校验草稿', exact: true }).click(); await conflictResponse;
+    await expect(page.getByTestId('publication-editor').getByRole('alert')).toContainText('你的修改已保留');
+    await expect(page.getByLabel('查询超时（毫秒）', { exact: true })).toHaveValue('7000');
+    await snapshot('publication-conflict');
+    await page.getByRole('button', { name: '关闭编辑', exact: true }).click();
+    await page.getByRole('group', { name: '操作确认', exact: true }).getByRole('button', { name: '确认', exact: true }).click();
+    await expect(page.getByRole('button', { name: '编辑合同', exact: true })).toBeEnabled();
+    await page.getByRole('button', { name: '编辑合同', exact: true }).click();
+    await expect(page.getByLabel('查询超时（毫秒）', { exact: true })).toHaveValue('6000');
+    await page.getByRole('button', { name: '发布合同', exact: true }).click();
+    await page.getByRole('group', { name: '操作确认', exact: true }).getByRole('button', { name: '确认', exact: true }).click();
+    await expect(page.getByTestId('publication-editor').getByRole('status')).toContainText('已发布');
+    await snapshot('publication-publish');
+    for (const [button, extension] of [['下载 OpenAPI', '.openapi.json'], ['下载类型声明', '.d.ts']] as const) {
+      const downloaded = page.waitForEvent('download'); await page.getByRole('button', { name: button, exact: true }).click();
+      const artifact = await downloaded; expect(artifact.suggestedFilename()).toBe(resourceCode + extension);
+      const location = await artifact.path(); expect(location).toBeTruthy();
+      const content = await readFile(location!, 'utf8'); expect(content.length).toBeGreaterThan(0);
+      expect(content).not.toContain(modelCode); expect(content).not.toContain('dop_ui_name'); expect(content).not.toContain('contact_name'); expect(content).toContain('contactName');
+      if (extension === '.openapi.json') {
+        const document = JSON.parse(content); expect(document.openapi).toBe('3.1.0'); expect(document['x-schema-version']).toBe(1);
+        expect(document.paths[`/api/open/v1/resources/${resourceCode}`].post).toBeDefined();
+      } else expect(content).toContain('export type Resource');
+      await artifact.saveAs(path.join(screenshotRoot, resourceCode + extension));
+    }
+    await page.getByRole('button', { name: '停用资源', exact: true }).click();
+    await snapshot('publication-withdrawdialog');
+    await page.getByRole('group', { name: '操作确认', exact: true }).getByRole('button', { name: '确认', exact: true }).click();
+    await expect(page.getByTestId('publication-editor').getByRole('status')).toContainText('已停用');
+    await expect(page.getByRole('button', { name: '下载 OpenAPI', exact: true })).toBeDisabled();
+    await expect(page.getByRole('button', { name: '下载类型声明', exact: true })).toBeDisabled();
+    const finalState = await page.request.get(`${WEB_BASE_URL}/api/open-platform/publications`);
+    expect(finalState.status()).toBe(200);
+    const final = await finalState.json(); expect(String(final.code)).toBe('0');
+    expect(final.data.find((view: { code: string }) => view.code === resourceCode)).toMatchObject({ status: 'withdrawn', activeVersion: 1, draftRevision: 2 });
+    await snapshot('publication-withdraw');
+  });
 });
 
 async function authenticate(page: import('@playwright/test').Page) {

@@ -39,6 +39,11 @@ public class OpenApiPublicationService {
                 decode(row.draft(), OpenApiResourceContract.class), row.draftRevision(), row.activeVersion(), row.status())).toList();
     }
 
+    public OpenApiPublicationValidator.SourceView sourceForAdministration(String code) {
+        requireAdmin();
+        return validator.describe(code);
+    }
+
     @Transactional
     public PublicationView saveDraft(String code, DraftRequest request) {
         requireAdmin();

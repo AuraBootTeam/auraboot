@@ -68,6 +68,50 @@ class OpenApiPublicationIntegrationTest extends BaseIntegrationTest {
         assertThat(mapper.snapshot(getTestTenant().getId(), definition.code(), 1)).isEqualTo(snapshot);
     }
 
+    @Test void editorSourceUsesDeclaredRuntimeCapabilitiesAndRejectsMachineAdministration() {
+        String code = "open_editor_" + UniqueIdGenerator.generate().toLowerCase();
+        models.saveDefinition(ModelDefinition.builder().code(code).tableName("mt_" + code).displayName("Restricted source")
+                .status("published").sourceType("physical").immutable(true).commandOnlyCreate(true)
+                .capabilities(ModelCapabilities.fullPhysical())
+                .fields(List.of(FieldDefinition.builder().code("name").displayName("Part name").dataType("string").build(),
+                        FieldDefinition.builder().code("tenant_id").displayName("Private tenant").dataType("integer").build()))
+                .build());
+        var source = publications.sourceForAdministration(code);
+        assertThat(source.name()).isEqualTo("Restricted source");
+        assertThat(source.operations()).containsExactlyInAnyOrder(Operation.LIST, Operation.GET);
+        assertThat(source.fields()).extracting(OpenApiPublicationValidator.SourceField::code)
+                .contains("name", "created_at", "updated_at").doesNotContain("id", "pid", "tenant_id", "created_by", "updated_by", "row_version");
+        var name = source.fields().stream().filter(field -> "name".equals(field.code())).findFirst().orElseThrow();
+        assertThat(name.filterable()).isFalse();
+        assertThat(name.sortable()).isFalse();
+        assertThat(name.types()).contains(Type.STRING);
+        assertThat(source.fields().stream().filter(field -> Set.of("created_at", "updated_at").contains(field.code())))
+                .allMatch(field -> !field.writable());
+        var context = MetaContext.snapshot();
+        try {
+            MetaContext.setContext(getTestTenant().getId(), null, "machine-token", "machine");
+            assertThatThrownBy(() -> publications.sourceForAdministration(code)).isInstanceOf(AccessDeniedException.class);
+        } finally { MetaContext.restore(context); }
+    }
+
+    @Test void publicReadTimestampIsAllowedButForgedWriteTimestampIsRejected() {
+        var definition = fixture();
+        var fields = new LinkedHashMap<>(definition.fields());
+        fields.put("createdAt", new Field("created_at", Type.DATETIME, true, true, false, false,
+                Set.of(), false, null, Map.of(), null));
+        var forged = new OpenApiResourceContract(definition.code(), definition.modelCode(), 1,
+                definition.operations(), definition.scopes(), definition.dataPolicy(), fields, 50, 8, 5000, Set.of());
+        assertThatThrownBy(() -> publications.saveDraft(forged.code(), new OpenApiPublicationService.DraftRequest(0, forged)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("timestamps are read-only");
+        assertThat(publications.list()).noneMatch(view -> view.code().equals(forged.code()));
+        fields.put("createdAt", new Field("created_at", Type.DATETIME, true, false, false, false,
+                Set.of(), false, null, Map.of(), null));
+        var readable = new OpenApiResourceContract(definition.code(), definition.modelCode(), 1,
+                definition.operations(), definition.scopes(), definition.dataPolicy(), fields, 50, 8, 5000, Set.of());
+        assertThat(publications.saveDraft(readable.code(), new OpenApiPublicationService.DraftRequest(0, readable)).draft())
+                .isEqualTo(readable);
+    }
+
     @Test void optimisticDraftEditsAndBreakingRevisionsLeavePublishedContractIntact() {
         var definition = fixture();
         publications.saveDraft(definition.code(), new OpenApiPublicationService.DraftRequest(0, definition));

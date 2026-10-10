@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router';
 import {
   ArrowPathIcon,
   ArrowTopRightOnSquareIcon,
@@ -86,7 +87,7 @@ interface CredentialSecret {
 }
 
 export default function OpenPlatformPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { showToast } = useToastContext();
   const [applications, setApplications] = useState<ExternalApplication[]>([]);
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
@@ -417,6 +418,11 @@ export default function OpenPlatformPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          {access.canCreateApplications && <Link
+            to="/p/c/open_platform_publications"
+            data-testid="open-platform-publications-link"
+            className="inline-flex items-center gap-2 rounded-control border border-border-strong bg-panel px-3 py-2 text-sm text-text"
+          >{t('openPlatform.publications.title', undefined, locale.startsWith('zh') ? '公共资源发布' : 'Public resource publications')}</Link>}
           <button
             type="button"
             onClick={() =>
