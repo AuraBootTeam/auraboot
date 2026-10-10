@@ -181,7 +181,8 @@
     "tests/e2e/automation/automation-management.spec.ts",
     "tests/e2e/automation/automation-action-points-golden.spec.ts",
     "tests/e2e/automation/llm-call-node.spec.ts",
-    "tests/e2e/aurabot/report-analytics-permission.spec.ts"
+    "tests/e2e/aurabot/report-analytics-permission.spec.ts",
+    "tests/e2e/page-designer/zz-probe-inspector-fields.spec.ts"
   ],
   "test_excludes_rationale": {
     "_note": "Explanations for each entry in test_excludes. Plain-string exclusion list is what the playwright.oss.config.ts runner consumes; this map is metadata only.",
