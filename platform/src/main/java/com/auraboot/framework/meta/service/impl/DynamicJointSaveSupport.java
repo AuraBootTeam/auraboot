@@ -216,7 +216,10 @@ final class DynamicJointSaveSupport extends BaseMetaService {
         Long tenantId = getCurrentTenantId();
 
         if (relation.getRelationType() == RelationDefinition.RelationType.MANY_TO_MANY) {
-            // For M2M, delete from join table
+            // Junction replacement changes target relations without deleting the target rows.
+            RecordCommandWriterGuard.guardRelationReplacement(dynamicDataMapper,
+                    getModelDefinition(relation.getTargetModel()), relation.getTargetTable(), relation.getJoinTable(),
+                    relation.getSourceField(), relation.getTargetField(), masterId);
             Map<String, Object> conditions = new HashMap<>();
             conditions.put(relation.getSourceField(), masterId);
             conditions.put("tenant_id", tenantId);

@@ -25,7 +25,7 @@ class DynamicJointSaveSupportTest {
     final DynamicJointSaveSupport service = new DynamicJointSaveSupport(metadata, mapper, create, update, lookup, writable);
 
     @BeforeEach void context() { MetaContext.setContext(42L, 43L, "user-43", "tester"); }
-    @AfterEach void clearContext() { MetaContext.clear(); }
+    @AfterEach void clearContext() { MetaContext.clear(); org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(false); }
 
     RelationDefinition relation(String type) {
         return RelationDefinition.builder().name("lines").targetModel("invoice_line").targetTable("invoice_lines")
@@ -95,4 +95,35 @@ class DynamicJointSaveSupportTest {
         assertThatThrownBy(() -> service.saveWithRelations("bad;model", new JointSubTableSaveRequest())).isInstanceOf(MetaServiceException.class);
         verifyNoInteractions(create, update, mapper);
     }
+    @Test void markedTargetBlocksJunctionReplacementBeforeTheDelete() {
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        var relation=relation("MANY_TO_MANY");
+        var protectedModel=ModelDefinition.builder().code("invoice_line")
+            .fields(List.of(FieldDefinition.builder().code("managed").dataType("boolean").build()))
+            .extension(Map.of("recordCommandWriters",Map.of("field","managed","commands",
+                Map.of("create",List.of(),"update",List.of("app:save"),"delete",List.of())))).build();
+        when(lookup.execute("invoice_line")).thenReturn(protectedModel);
+        when(mapper.selectByQuery(anyString(),anyMap())).thenReturn(List.of(Map.of("target_identity","line-1")))
+            .thenReturn(List.of(Map.of("managed",true)));
+        assertThatThrownBy(()->service.deleteExistingChildRecords(relation,"invoice-42"))
+            .hasMessageContaining("RECORD_WRITER_DENIED");
+        verify(mapper,never()).delete(anyString(),anyMap());
+    }
+    @Test void ordinaryTargetKeepsJunctionReplacementScopedToTenant() {
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        var relation=relation("MANY_TO_MANY");
+        var protectedModel=ModelDefinition.builder().code("invoice_line")
+            .fields(List.of(FieldDefinition.builder().code("managed").dataType("boolean").build()))
+            .extension(Map.of("recordCommandWriters",Map.of("field","managed","commands",
+                Map.of("create",List.of(),"update",List.of(),"delete",List.of())))).build();
+        when(lookup.execute("invoice_line")).thenReturn(protectedModel);
+        when(mapper.selectByQuery(anyString(),anyMap())).thenReturn(List.of(Map.of("target_identity","line-1")))
+            .thenReturn(List.of(Map.of("managed",false)));
+        service.deleteExistingChildRecords(relation,"invoice-42");
+        var sql=org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(mapper,times(2)).selectByQuery(sql.capture(),anyMap());
+        assertThat(sql.getAllValues().get(0)).contains("invoice_links", "invoice_id =", "tenant_id =", "FOR UPDATE");
+        verify(mapper).delete("invoice_links",Map.of("invoice_id","invoice-42","tenant_id",42L));
+    }
+
 }

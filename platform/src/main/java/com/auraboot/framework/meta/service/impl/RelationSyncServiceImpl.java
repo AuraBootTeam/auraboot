@@ -358,8 +358,8 @@ public class RelationSyncServiceImpl implements RelationSyncService {
         if (RecordCommandWriterGuard.hasPolicy(writerModel)) {
             Set<String> targetIds = new java.util.TreeSet<>(toAdd);
             targetIds.addAll(toRemove);
-            for (String targetId : targetIds) RecordCommandWriterGuard.guardLegacyConditions(
-                    dynamicDataMapper, writerModel, metaModelService.getTableName(targetModel), Map.of("id", targetId), "update");
+            RecordCommandWriterGuard.guardRelationTargets(dynamicDataMapper, writerModel,
+                    metaModelService.getTableName(targetModel), targetIds, "update");
         }
         // Delete removed relations
         for (String targetId : toRemove) {

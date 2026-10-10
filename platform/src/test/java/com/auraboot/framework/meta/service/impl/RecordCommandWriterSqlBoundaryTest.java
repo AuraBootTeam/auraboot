@@ -85,4 +85,46 @@ class RecordCommandWriterSqlBoundaryTest {
         verifyNoInteractions(mapper);
     }
 
+    @Test void junctionTargetsResolveEitherIdentityAndLockBeforeCheckingOwnership() {
+        MetaContext.setContext(1L,7L,null,"system");
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        var mapper=mock(DynamicDataMapper.class);
+        when(mapper.selectByQuery(anyString(),anyMap())).thenReturn(List.of(Map.of("managed",false)));
+        RecordCommandWriterGuard.guardRelationTargets(mapper,model(),"mt_shared_bid",List.of("pid-b","17","pid-b"),"update");
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(mapper,times(2)).selectByQuery(sql.capture(),anyMap());
+        assertThat(sql.getValue()).contains("id::text =", "OR pid =", "tenant_id =", "deleted_flag = FALSE", "FOR UPDATE");
+        var ordered= inOrder(mapper);
+        ordered.verify(mapper).selectByQuery(anyString(),eq(Map.of("identity","17","tenantId",1L)));
+        ordered.verify(mapper).selectByQuery(anyString(),eq(Map.of("identity","pid-b","tenantId",1L)));
+    }
+    @Test void missingOrAmbiguousJunctionTargetCannotAuthorizeForeignLinkEffects() {
+        MetaContext.setContext(1L,7L,null,"system");
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        var mapper=mock(DynamicDataMapper.class);
+        when(mapper.selectByQuery(anyString(),anyMap())).thenReturn(List.of())
+            .thenReturn(List.of(Map.of("managed",false),Map.of("managed",true)));
+        for(int i=0;i<2;i++) assertThatThrownBy(()->RecordCommandWriterGuard.guardRelationTargets(
+            mapper,model(),"mt_shared_bid",List.of("foreign"),"update"))
+            .hasMessageContaining("missing or ambiguous");
+    }
+    @Test void exactWriterStillMustResolveJunctionTargetInItsTenant() {
+        MetaContext.setContext(1L,7L,null,"system");
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        var mapper=mock(DynamicDataMapper.class);
+        when(mapper.selectByQuery(anyString(),anyMap())).thenReturn(List.of());
+        assertThatThrownBy(()->MetaContext.runWithCommandPermitPlan("ALL",null,"shared_bid","foreign",()->
+            MetaContext.runWithAuthorizedCommandCode("app:save",()->RecordCommandWriterGuard.guardRelationTargets(
+                mapper,model(),"mt_shared_bid",List.of("foreign"),"update"))))
+            .hasMessageContaining("missing or ambiguous");
+    }
+    @Test void markedJunctionTargetRejectsAnOrdinaryWriter() {
+        MetaContext.setContext(1L,7L,null,"system");
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        var mapper=mock(DynamicDataMapper.class);
+        when(mapper.selectByQuery(anyString(),anyMap())).thenReturn(List.of(Map.of("managed",true)));
+        assertThatThrownBy(()->RecordCommandWriterGuard.guardRelationTargets(mapper,model(),"mt_shared_bid",List.of("managed"),"update"))
+            .hasMessageContaining("RECORD_WRITER_DENIED");
+    }
+
 }
