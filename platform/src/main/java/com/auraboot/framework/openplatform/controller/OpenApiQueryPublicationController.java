@@ -1,7 +1,6 @@
 package com.auraboot.framework.openplatform.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
-import com.auraboot.framework.meta.service.NamedQueryService;
 import com.auraboot.framework.openplatform.service.*;
 import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import lombok.RequiredArgsConstructor;
@@ -27,8 +26,13 @@ public class OpenApiQueryPublicationController {
                 .header("Content-Disposition", org.springframework.http.ContentDisposition.attachment().filename(contract.code() + ".d.ts", java.nio.charset.StandardCharsets.UTF_8).build().toString())
                 .body(OpenApiContractArtifacts.queryTypes(contract));
     }
+    @GetMapping("/query-sources")
+    public ApiResponse<com.auraboot.framework.meta.dto.PaginationResult<OpenApiQueryPublicationService.SourceChoice>> sources(
+            @RequestParam(defaultValue = "") String keyword, @RequestParam(defaultValue = "1") int page) {
+        return ApiResponse.success(publications.sources(keyword, page));
+    }
     @GetMapping("/query-sources/{code}")
-    public ApiResponse<NamedQueryService.ExecutionDefinition> source(@PathVariable String code) { return ApiResponse.success(publications.source(code)); }
+    public ApiResponse<OpenApiQueryValidator.SourceView> source(@PathVariable String code) { return ApiResponse.success(publications.source(code)); }
     @PutMapping("/query-publications/{code}/draft")
     public ApiResponse<OpenApiQueryPublicationService.View> save(@PathVariable String code, @RequestBody OpenApiQueryPublicationService.DraftRequest request) {
         return ApiResponse.success(publications.saveDraft(code, request));

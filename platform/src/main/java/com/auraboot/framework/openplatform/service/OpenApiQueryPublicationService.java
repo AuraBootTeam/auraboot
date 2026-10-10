@@ -29,7 +29,19 @@ public class OpenApiQueryPublicationService {
     public record Authority(OpenApiQueryContract contract, OpenApiQueryPolicy policy, Long installationId) { }
 
     public List<View> list() { requireAdmin(); return mapper.listQueries(tenant()).stream().map(this::view).toList(); }
-    public NamedQueryService.ExecutionDefinition source(String code) { requireAdmin(); return queries.describeExecution(code); }
+    public OpenApiQueryValidator.SourceView source(String code) { requireAdmin(); return validator.describe(tenant(), code); }
+    public record SourceChoice(String code, String name, boolean available) { }
+    public com.auraboot.framework.meta.dto.PaginationResult<SourceChoice> sources(String keyword, int page) {
+        requireAdmin();
+        if (page < 1 || keyword != null && keyword.length() > 200) throw new IllegalArgumentException("Invalid source search");
+        var request = new com.auraboot.framework.meta.dto.NamedQueryQueryRequest();
+        request.setPage(page); request.setSize(50); request.setKeyword(keyword); request.setStatus("published");
+        var results = queries.list(request);
+        return com.auraboot.framework.meta.dto.PaginationResult.of(results.getRecords().stream()
+                .map(query -> new SourceChoice(query.getCode(), query.getTitle(), query.getConnectorPid() == null
+                        && query.getFromSql() != null && "read".equals(query.getActionCode()) && query.getResourceCode() != null)).toList(),
+                results.getTotal(), results.getPage(), results.getPageSize());
+    }
     @Transactional public View saveDraft(String code, DraftRequest request) {
         requireAdmin();
         if (request.definition() == null || !code.equals(request.definition().code()) || request.expectedRevision() < 0)

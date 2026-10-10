@@ -120,6 +120,32 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
         try(var machine=MachineDataAccessContext.begin(principal)) {return publicQueries.execute(principal,contract.code(),new OpenApiQueryService.ExecuteRequest(Map.of("zone",zone),10,null));}
         finally {if(previous==null)MetaContext.clear();else MetaContext.restore(previous);}
     }
+    @Test void administrationMetadataPinsTheExecutionSourceAndOffersOnlyCurrentListPublications() throws Exception {
+        var source = publications.source(rowsDefinition.getCode());
+        assertThat(source.fingerprint()).isEqualTo(queries.describeExecution(rowsDefinition.getCode()).fingerprint());
+        assertThat(source.parameters()).containsExactly("zone");
+        assertThat(source.sources()).extracting(OpenApiQueryValidator.SourceModel::modelCode).containsExactlyInAnyOrder(root.modelCode(), child.modelCode());
+        assertThat(source.sources().stream().flatMap(model -> model.resources().stream()).map(OpenApiQueryValidator.SourceResource::code))
+                .containsExactlyInAnyOrder(root.code(), child.code());
+        assertThat(source.fields()).extracting(OpenApiQueryValidator.SourceField::code).containsExactlyInAnyOrder("pid", "name", "childName");
+        assertThat(source.fields().stream().filter(field -> "pid".equals(field.code())).findFirst().orElseThrow().types()).contains(Type.PID, Type.STRING);
+        assertThat(json.writeValueAsString(source)).doesNotContain("fromSql", "columnExpr", "a.pid", "JOIN", "tenantId", "SELECT");
+        var choices = publications.sources(rowsDefinition.getTitle(), 1);
+        assertThat(choices.getRecords()).extracting(OpenApiQueryPublicationService.SourceChoice::code).contains(rowsDefinition.getCode());
+        assertThat(choices.getRecords().stream().filter(choice -> rowsDefinition.getCode().equals(choice.code())).findFirst().orElseThrow().available()).isTrue();
+        resources.withdraw(root.code(), 1);
+        assertThat(publications.source(rowsDefinition.getCode()).sources().stream().filter(model -> root.modelCode().equals(model.modelCode())).findFirst().orElseThrow().resources()).isEmpty();
+    }
+    @Test void administrationMetadataAndDiscoveryRejectMachineIdentityAndInvalidPagination() {
+        assertThatThrownBy(() -> publications.sources("", 0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> publications.sources("x".repeat(201), 1)).isInstanceOf(IllegalArgumentException.class);
+        var previous = MetaContext.snapshot();
+        MetaContext.setContext(principalA.tenantId(), null, principalA.subjectPid(), "machine");
+        try (var machine = MachineDataAccessContext.begin(principalA)) {
+            assertThatThrownBy(() -> publications.source(rowsDefinition.getCode())).isInstanceOf(AccessDeniedException.class);
+            assertThatThrownBy(() -> publications.sources("", 1)).isInstanceOf(AccessDeniedException.class);
+        } finally { MetaContext.restore(previous); }
+    }
     @Test void joinsAndAggregatesScopeEverySourceForEachInstallationWithoutHumanMembership() {
         var a=run(principalA,rows,"A");var b=run(principalB,rows,"B");
         assertThat(a.get("items").toString()).contains("Root A","Child A").doesNotContain("Forbidden sibling","Root B");

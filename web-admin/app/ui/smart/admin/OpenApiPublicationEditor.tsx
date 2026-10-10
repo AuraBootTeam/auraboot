@@ -1,4 +1,5 @@
-import { cloneElement, useEffect, useId, useRef, useState, type ReactElement, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { PublicationField, type LabeledControl } from './PublicationControls';
 import { Link } from 'react-router';
 import { useI18n } from '~/contexts/I18nContext';
 import { publicationRequest, PublicationApiError, identityField, sourceField, publicValueType, type PublicationView,
@@ -10,14 +11,6 @@ const BUTTON = 'rounded-control border border-border-strong bg-panel px-3 py-2 t
 const OPERATIONS: PublicOperation[] = ['list', 'get', 'create', 'update', 'delete'];
 const initial = (): PublicResource => ({ code: '', modelCode: '', schemaVersion: 1, operations: ['list'], scopes: { list: '' },
   dataPolicy: 'installation_filter', fields: { pid: identityField() }, maxPageSize: 50, maxConditions: 8, timeoutMs: 5000, events: [] });
-
-type LabeledControl = ReactElement<{ id?: string; 'aria-describedby'?: string }>;
-function PublicationField({ name, child, help }: { name: string; child: LabeledControl; help?: string }) {
-  const id = useId();
-  return <div className="space-y-1 text-sm text-text"><label htmlFor={id} className="block">{name}</label>
-    {cloneElement(child, { id, 'aria-describedby': help ? `${id}-help` : undefined })}
-    {help && <p id={`${id}-help`} className="text-xs text-text-2">{help}</p>}</div>;
-}
 
 /** Public contract editing is a typed custom block inside the administration DSL page. */
 export function OpenApiPublicationEditor() {
@@ -125,7 +118,8 @@ export function OpenApiPublicationEditor() {
   const status = (row: PublicationView) => row.status === 'published' ? label('live', '已发布', 'Published') : row.status === 'withdrawn' ? label('disabled', '已停用', 'Withdrawn') : label('draft', '草稿', 'Draft');
   return <div data-testid="publication-editor" className="space-y-5">
     <header className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-sm text-text-2">{label('intro', '选择业务模型，明确对外字段和操作，再按安装授予最小权限。', 'Choose a business model, declare public fields and operations, then grant minimum installation permissions.')}</p></div>
-      <Link className={BUTTON} to="/settings/api-docs">{label('installations', '应用、凭据与投递', 'Applications, credentials and deliveries')}</Link></header>
+      <div className="flex flex-wrap gap-2">{dirty ? <><button type="button" className={BUTTON} disabled>{label('queryPublications', '公共查询发布', 'Public query publications')}</button><button type="button" className={BUTTON} disabled>{label('installations', '应用、凭据与投递', 'Applications, credentials and deliveries')}</button></>
+        : <><Link className={BUTTON} to="/p/c/open_platform_queries">{label('queryPublications', '公共查询发布', 'Public query publications')}</Link><Link className={BUTTON} to="/settings/api-docs">{label('installations', '应用、凭据与投递', 'Applications, credentials and deliveries')}</Link></>}</div></header>
     {error && (!editing || denied) && <div role="alert" className="rounded-control border border-danger bg-danger-weak p-3 text-sm text-danger">{error}</div>}
     {notice && (!editing || denied) && <p role="status" className="text-sm text-success">{notice}</p>}
     {loading ? <p role="status" className="animate-pulse rounded-card bg-subtle p-5 text-text-2">{label('loading', '正在加载发布配置…', 'Loading publications…')}</p>

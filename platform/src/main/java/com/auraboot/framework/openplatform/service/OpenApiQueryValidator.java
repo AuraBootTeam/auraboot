@@ -19,6 +19,44 @@ public class OpenApiQueryValidator {
         this.queries = queries;this.resources = resources;this.fixedRoutes = new OpenApiCapabilityRegistry(contributors);
     }
 
+    public record SourceField(String code, String name, Set<OpenApiResourceContract.Type> types) { }
+    public record SourceResource(String code, int schemaVersion) { }
+    public record SourceModel(String modelCode, String name, List<SourceResource> resources) { }
+    public record SourceView(String queryCode, String name, String fingerprint, List<SourceModel> sources,
+                             List<SourceField> fields, Set<String> parameters, String rootPidParameter,
+                             int maxRows, int timeoutMs) { }
+
+    /** Uses the execution catalog and validator type rules without exposing SQL or private identifiers. */
+    public SourceView describe(Long tenant, String code) {
+        var source = queries.describeExecution(code); var query = source.definition();
+        require("published".equals(query.getStatus()) && query.getConnectorPid() == null && query.getFromSql() != null
+                && "read".equals(query.getActionCode()) && source.sourceModels().contains(query.getResourceCode()),
+                "Public queries require a published SQL read NamedQuery");
+        var policy = query.getPolicy() == null ? new com.auraboot.framework.meta.entity.NamedQueryPolicy() : query.getPolicy();
+        require(!Boolean.TRUE.equals(policy.getSelfAnchoredSources()), "Human self-anchored queries cannot be published to machines");
+        validateOrdering(query);
+        var published = resources.publishedContracts(tenant);
+        var models = source.sourceModels().stream().sorted().map(model -> {
+            var metadata = resources.sourceForAdministration(model);
+            var bindings = published.stream().filter(resource -> model.equals(resource.modelCode())
+                    && resource.operations().contains(OpenApiResourceContract.Operation.LIST))
+                    .sorted(Comparator.comparing(OpenApiResourceContract::code))
+                    .map(resource -> new SourceResource(resource.code(), resource.schemaVersion())).toList();
+            return new SourceModel(model, metadata.name(), bindings);
+        }).toList();
+        var fields = query.getFields().stream().map(field -> {
+            Set<OpenApiResourceContract.Type> types = EnumSet.noneOf(OpenApiResourceContract.Type.class);
+            for (var type : OpenApiResourceContract.Type.values()) if (field.getDataType() != null && typeMatches(type, field.getDataType())) types.add(type);
+            require(!types.isEmpty(), "Unsupported query output type");
+            return new SourceField(field.getFieldCode(), field.getDisplayName(), Set.copyOf(types));
+        }).toList();
+        var root = policy.getRootAccess();
+        if (root != null) require(source.sourceModels().contains(root.getModelCode()) && !Boolean.TRUE.equals(root.getAllowCollaborator())
+                && (root.getActionCode() == null || "read".equals(root.getActionCode())), "Machine query root requires its own read source grant");
+        return new SourceView(code, query.getTitle(), source.fingerprint(), models, fields, consumedParameters(query),
+                root == null ? null : root.getPidParam(), policy.getEffectiveMaxRows(com.auraboot.framework.meta.entity.NamedQueryStatus.PUBLISHED), policy.getEffectiveTimeoutMs());
+    }
+
     public NamedQueryService.ExecutionDefinition validate(Long tenant, OpenApiQueryContract contract) {
         fixedRoutes.requireAvailableQueryRoute(contract);
         var source = queries.describeExecution(contract.queryCode()); var query = source.definition();
@@ -49,6 +87,16 @@ public class OpenApiQueryValidator {
         }
         Map<String, String> types = new HashMap<>();
         query.getFields().forEach(field -> types.put(field.getFieldCode(), field.getDataType()));
+        validateOrdering(query);
+        contract.fields().values().forEach(field -> {
+            String type = types.get(field.source());
+            require(type != null && typeMatches(field.type(), type), "Public output type/source does not match the NamedQuery");
+        });
+        var consumed = consumedParameters(query);
+        require(consumed.equals(contract.parameters().keySet()), "Query parameters must exactly match declared source inputs");
+        return source;
+    }
+    private void validateOrdering(com.auraboot.framework.meta.dto.NamedQueryDTO query) {
         var ordering = query.getDefaultOrder();
         require(ordering != null && (ordering.isObject() || (ordering.isArray() && !ordering.isEmpty() && ordering.size() <= 16)),
                 "Public query requires a bounded declared result ordering");
@@ -61,10 +109,8 @@ public class OpenApiQueryValidator {
                     && query.getFields().stream().anyMatch(field -> alias.equals(field.getFieldCode()) && Boolean.TRUE.equals(field.getSortable())),
                     "Query ordering must use declared sortable source outputs");
         });
-        contract.fields().values().forEach(field -> {
-            String type = types.get(field.source());
-            require(type != null && typeMatches(field.type(), type), "Public output type/source does not match the NamedQuery");
-        });
+    }
+    private Set<String> consumedParameters(com.auraboot.framework.meta.dto.NamedQueryDTO query) {
         Set<String> consumed = new HashSet<>();
         List<String> fragments = new ArrayList<>(List.of(query.getFromSql()));
         if (query.getBaseWhere() != null) fragments.add(query.getBaseWhere().toString());
@@ -72,8 +118,7 @@ public class OpenApiQueryValidator {
         fragments.forEach(fragment -> { var match = PARAMETER.matcher(fragment); while (match.find()) consumed.add(match.group(1)); });
         require(!consumed.contains("currentUserId") && !consumed.contains("currentUserPid"), "Machine query cannot depend on a human identity parameter");
         consumed.remove("tenantId");
-        require(consumed.equals(contract.parameters().keySet()), "Query parameters must exactly match declared source inputs");
-        return source;
+        return Collections.unmodifiableSet(new TreeSet<>(consumed));
     }
     private boolean typeMatches(OpenApiResourceContract.Type type, String dataType) {
         String value = dataType.toLowerCase(Locale.ROOT);

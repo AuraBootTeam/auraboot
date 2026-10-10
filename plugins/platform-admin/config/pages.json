@@ -2858,5 +2858,22 @@
       "component": "OpenApiPublicationEditor"
     }
   ]
+},
+{
+  "pageKey": "open_platform_queries",
+  "name:zh-CN": "公共查询发布",
+  "name:en": "Public Query Publications",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "open_api_query_publication_editor",
+      "blockType": "custom",
+      "component": "OpenApiQueryPublicationEditor"
+    }
+  ]
 }
 ]

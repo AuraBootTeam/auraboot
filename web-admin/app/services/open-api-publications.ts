@@ -41,3 +41,27 @@ export function publicValueType(field: PublicField, type: PublicType): PublicFie
     properties: type === 'object' ? Object.keys(field.properties).length ? field.properties : { value: scalar } : {},
     items: type === 'array' ? field.items ?? { ...scalar, source: 'item' } : null };
 }
+
+export interface QueryParameter { type: PublicType; required: boolean; nullable: boolean; items: PublicField | null }
+export interface PublicQuery {
+  code: string; queryCode: string; schemaVersion: number; sourceFingerprint: string; scopes: { execute: string };
+  sourceResources: Record<string, string>; parameters: Record<string, QueryParameter>; fields: Record<string, PublicField>;
+  maxPageSize: number; maxRows: number; timeoutMs: number; maxConcurrent: number;
+}
+export interface QueryPublicationView { code: string; draft: PublicQuery; draftRevision: number; activeVersion: number | null; status: string }
+export interface QuerySource {
+  queryCode: string; name: string; fingerprint: string;
+  sources: { modelCode: string; name: string; resources: { code: string; schemaVersion: number }[] }[];
+  fields: { code: string; name: string | null; types: PublicType[] }[]; parameters: string[];
+  rootPidParameter: string | null; maxRows: number; timeoutMs: number;
+}
+export interface QuerySourceChoice { code: string; name: string; available: boolean }
+export const queryOutput = (source: string, type: PublicType): PublicField => ({ source, type, readable: true, writable: false,
+  required: false, nullable: true, operators: [], sortable: false, referenceResource: null, properties: {}, items: null });
+export function readOnlyQueryOutput(field: PublicField): PublicField {
+  return { ...field, readable: true, writable: false, sortable: false, operators: [], referenceResource: null,
+    properties: Object.fromEntries(Object.entries(field.properties).map(([alias, value]) => [alias, readOnlyQueryOutput(value)])),
+    items: field.items ? readOnlyQueryOutput(field.items) : null };
+}
+
+export const queryParameterItem = (type: PublicType): PublicField => ({ ...queryOutput('item', type), readable: false, writable: true, nullable: false });

@@ -888,6 +888,16 @@ export const DISPLAY_COMPONENT_CONFIGS: ComponentConfig[] = [
     tags: ['decisionops', 'impact', 'integration', 'connector', 'webhook', 'custom-block'],
   },
   {
+    type: 'openapiquerypublicationeditor',
+    name: 'Public Query Publications',
+    category: 'display',
+    icon: 'globe',
+    description: 'Tenant administrator editor for pinned public query contracts.',
+    defaultProps: {},
+    propertySchema: [],
+    tags: ['open-platform', 'query', 'publication', 'custom-block'],
+  },
+  {
     type: 'openapipublicationeditor',
     name: 'Public Resource Publications',
     category: 'display',
