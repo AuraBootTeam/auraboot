@@ -327,11 +327,14 @@ export async function logout(request: Request) {
       typeof process !== 'undefined' ? process.env.SPRING_BOOT_URL || 'http://127.0.0.1:6443' : '';
     if (backendUrl) {
       try {
+        // Bound the revocation call: a dead/hung backend must not stall the
+        // redirect — local session clearing below is what actually logs out.
         await fetch(`${backendUrl}/api/user/sessions/current`, {
           method: 'DELETE',
           headers: {
             Authorization: `Bearer ${token}`,
           },
+          signal: AbortSignal.timeout(3_000),
         });
       } catch (error) {
         console.warn('Failed to revoke backend session during logout', error);
