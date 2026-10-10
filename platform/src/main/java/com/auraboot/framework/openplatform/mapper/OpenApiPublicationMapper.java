@@ -40,6 +40,31 @@ public interface OpenApiPublicationMapper {
                                 @Param("tokenPid") String tokenPid, @Param("code") String code, @Param("operation") String operation);
 
     @Select("""
+        SELECT s.definition::text, g.policy::text, i.id AS installation_id
+        FROM ab_open_api_publication p
+        JOIN ab_open_api_publication_snapshot s ON s.tenant_id = p.tenant_id
+            AND s.code = p.code AND s.schema_version = p.active_version
+        JOIN ab_open_api_resource_grant g ON g.tenant_id = p.tenant_id AND g.resource_code = p.code
+        JOIN ab_application_installation i ON i.tenant_id = g.tenant_id AND i.id = g.installation_id
+        JOIN ab_external_application a ON a.id = i.application_id
+        WHERE p.tenant_id = #{tenantId} AND p.code = #{code} AND p.status = 'published'
+            AND i.pid = #{installationPid} AND i.status = 'active' AND a.status = 'active'
+            AND EXISTS (SELECT 1 FROM ab_application_scope_grant sg
+                WHERE sg.tenant_id = i.tenant_id AND sg.installation_id = i.id
+                AND ((jsonb_exists(g.policy->'operations', 'get') AND sg.scope_code = s.definition->'scopes'->>'get')
+                  OR (jsonb_exists(g.policy->'operations', 'list') AND sg.scope_code = s.definition->'scopes'->>'list')))
+        """)
+    @Options(useCache = false, flushCache = Options.FlushCachePolicy.TRUE)
+    ResourceAuthority eventAuthority(@Param("tenantId") Long tenantId, @Param("installationPid") String installationPid,
+                                     @Param("code") String code);
+
+    @Select("""
+        SELECT definition::text FROM ab_open_api_publication_snapshot
+        WHERE tenant_id = #{tenantId} AND code = #{code} ORDER BY schema_version
+        """)
+    List<String> resourceSnapshots(@Param("tenantId") Long tenantId, @Param("code") String code);
+
+    @Select("""
         SELECT code, draft::text, draft_revision, active_version, status
         FROM ab_open_api_publication WHERE tenant_id = #{tenantId} AND jsonb_exists(draft, 'modelCode') ORDER BY code
         """)

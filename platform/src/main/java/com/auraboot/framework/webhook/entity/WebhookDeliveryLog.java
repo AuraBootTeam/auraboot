@@ -42,6 +42,11 @@ public class WebhookDeliveryLog {
     @TableField("request_body")
     private String requestBody;
 
+    /** Private source context, never part of the transmitted body. */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @TableField("authorization_context")
+    private String authorizationContext;
+
     @TableField("response_status")
     private Integer responseStatus;
 

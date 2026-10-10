@@ -41,6 +41,12 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
     @Autowired private org.springframework.jdbc.core.JdbcTemplate eventJdbc;
     @Autowired private org.springframework.transaction.PlatformTransactionManager eventTransactions;
 
+    @Autowired private OpenApiModelEventConsumer modelEvents;
+    @Autowired private com.auraboot.framework.integration.ReliableEventDeliveryExecutor eventDelivery;
+    @Autowired private com.auraboot.framework.webhook.service.WebhookService webhooks;
+    @Autowired private com.auraboot.framework.webhook.service.WebhookDispatcher webhookDispatcher;
+    @Autowired private com.auraboot.framework.webhook.mapper.WebhookDeliveryLogMapper deliveries;
+
     private OpenApiResourceContract contract;
     private MachinePrincipal principal;
     private String credentialPid;
@@ -99,7 +105,7 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
     }
 
     private List<Map<String, Object>> sourceEvents() {
-        return eventJdbc.queryForList("SELECT event_id, event_type, event_sequence, payload::text AS payload FROM ab_outbox"
+        return eventJdbc.queryForList("SELECT event_id, event_type, event_sequence, occurred_at, correlation_id, subject, payload::text AS payload FROM ab_outbox"
                 + " WHERE tenant_id = ? AND ordering_key LIKE ? ORDER BY id", principal.tenantId(),
                 "open.resource:" + contract.code() + ":%");
     }
@@ -135,6 +141,113 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
             assertThat(deleted.path("source").path("name").asText()).isEqualTo("Changed");
             assertThat(deleted.path("schemaVersion").asInt()).isEqualTo(2);
         } finally { MetaContext.restore(previous); }
+    }
+
+    private com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelope sourceEnvelope() throws Exception {
+        var row = sourceEvents().getFirst();
+        Map<String, Object> payload = json.readerFor(new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() { })
+                .with(com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
+                .readValue(row.get("payload").toString());
+        return new com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelope("1.0",
+                row.get("event_id").toString(), row.get("event_type").toString(), "dynamic-model", row.get("subject").toString(),
+                ((java.sql.Timestamp) row.get("occurred_at")).toInstant(), principal.tenantId(), row.get("correlation_id").toString(),
+                null, "open.resource:" + contract.code() + ":" + row.get("subject"), ((Number) row.get("event_sequence")).longValue(),
+                payload, Map.of());
+    }
+
+    private com.auraboot.framework.webhook.entity.WebhookSubscription eventSubscription(String installation, String url, String secret) {
+        var request = new com.auraboot.framework.webhook.dto.WebhookCreateRequest();
+        request.setName("Published model fixture"); request.setInstallationPid(installation);
+        request.setEventType("open.resource." + contract.code() + ".created"); request.setEventVersion(2);
+        request.setTargetUrl(url); request.setSecret(secret);
+        return webhooks.create(request);
+    }
+
+    @Test
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void durableModelConsumerProjectsEachInstallationAndRechecksQueuedAuthority() throws Exception {
+        publishEvents();
+        var received = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        var signatures = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        var signedAt = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        var receiver = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        receiver.createContext("/receive", exchange -> {
+            received.add(new String(exchange.getRequestBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+            signatures.add(exchange.getRequestHeaders().getFirst("X-Webhook-Signature"));
+            signedAt.add(exchange.getRequestHeaders().getFirst("X-Webhook-Timestamp"));
+            exchange.sendResponseHeaders(200, -1); exchange.close();
+        });
+        String previousHosts = System.getProperty("AURA_SSRF_ALLOWED_PRIVATE_HOSTS");
+        System.setProperty("AURA_SSRF_ALLOWED_PRIVATE_HOSTS", "127.0.0.1"); receiver.start();
+        String secondInstallation = null;
+        var subscriptions = new ArrayList<com.auraboot.framework.webhook.entity.WebhookSubscription>();
+        try {
+            String url = "http://127.0.0.1:" + receiver.getAddress().getPort() + "/receive";
+            var a = eventSubscription(principal.installationPid(), url, "model-fixture-secret"); subscriptions.add(a);
+            var application = management.createApplication(new CreateApplicationRequest("Second model event installation", "Isolation"));
+            var b = management.install(application.pid(), new InstallApplicationRequest("staging", new HashSet<>(contract.scopes().values()), 600));
+            secondInstallation = b.pid();
+            publications.grant(b.pid(), contract.code(), new OpenApiInstallationPolicy(contract.operations(), contract.fields().keySet(),
+                    Set.of("name", "zone"), List.of(new OpenApiInstallationPolicy.RowConstraint("zone", List.of("B")))));
+            subscriptions.add(eventSubscription(b.pid(), url, "other-secret"));
+            subscriptions.add(eventSubscription(null, url, "legacy-secret"));
+            MetaContext.runWithCommandPermitScope("ALL", () -> data.create(contract.modelCode(),
+                    new HashMap<>(Map.of("name", "Source name", "zone", "A", "secret", "Never public"))));
+            var source = sourceEnvelope();
+            eventDelivery.deliver(source, modelEvents, "fixture-consumer-lease");
+            eventDelivery.deliver(source, modelEvents, "duplicate-consumer-lease");
+            assertThat(eventJdbc.queryForObject("SELECT COUNT(*) FROM ab_webhook_delivery_log WHERE tenant_id = ? AND event_id = ?",
+                    Long.class, principal.tenantId(), source.eventId())).isEqualTo(1);
+            assertThat(eventJdbc.queryForObject("SELECT status FROM ab_integration_receipt WHERE tenant_id = ? AND event_id = ? AND consumer_code = ?",
+                    String.class, principal.tenantId(), source.eventId(), modelEvents.consumerCode())).isEqualTo("applied");
+            var queued = deliveries.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.auraboot.framework.webhook.entity.WebhookDeliveryLog>()
+                    .eq(com.auraboot.framework.webhook.entity.WebhookDeliveryLog::getTenantId, principal.tenantId())
+                    .eq(com.auraboot.framework.webhook.entity.WebhookDeliveryLog::getEventId, source.eventId())).getFirst();
+            assertThat(json.readTree(queued.getRequestBody()).path("data").path("name").asText()).isEqualTo("Source name");
+            assertThat(json.writeValueAsString(queued)).doesNotContain("authorizationContext", "Never public");
+            publications.grant(principal.installationPid(), contract.code(), new OpenApiInstallationPolicy(contract.operations(),
+                    Set.of("pid", "zone"), Set.of("name", "zone"),
+                    List.of(new OpenApiInstallationPolicy.RowConstraint("zone", List.of("A")))));
+            // Rehydrate durable state through the production mapper, then claim with the worker's lease protocol.
+            var claimed = deliveries.claimReady(50, "model-fixture-worker", "model-fixture-claim", Instant.now().plusSeconds(30)).stream()
+                    .filter(log -> source.eventId().equals(log.getEventId())).findFirst().orElseThrow();
+            webhookDispatcher.processClaimed(claimed);
+            assertThat(received).hasSize(1); assertThat(new com.auraboot.framework.webhook.service.WebhookSignature().verify("model-fixture-secret",
+                    signedAt.getFirst(), received.getFirst(), signatures.getFirst(), Instant.now(), java.time.Duration.ofMinutes(1))).isTrue();
+            var publicEvent = json.readTree(received.getFirst());
+            assertThat(publicEvent.path("id").asText()).isEqualTo(source.eventId());
+            assertThat(publicEvent.path("recordVersion").asLong()).isEqualTo(source.sequence());
+            assertThat(publicEvent.path("data").has("name")).isFalse();
+            assertThat(publicEvent.path("data").has("secret")).isFalse();
+            assertThat(publicEvent.has("source")).isFalse();
+            assertThat(deliveries.selectById(claimed.getId()).getDeliveryStatus()).isEqualTo("success");
+            // A second source event is queued, then revoked before its first attempt.
+            MetaContext.runWithCommandPermitScope("ALL", () -> data.create(contract.modelCode(), new HashMap<>(Map.of("name", "Revoked", "zone", "A"))));
+            var secondRow = sourceEvents().getLast();
+            var secondSource = new com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelope("1.0", secondRow.get("event_id").toString(),
+                    secondRow.get("event_type").toString(), "dynamic-model", secondRow.get("subject").toString(), Instant.now(), principal.tenantId(),
+                    "second-correlation", null, "open.resource:" + contract.code() + ":" + secondRow.get("subject"), ((Number) secondRow.get("event_sequence")).longValue(),
+                    json.readValue(secondRow.get("payload").toString(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() { }), Map.of());
+            eventDelivery.deliver(secondSource, modelEvents, "second-consumer-lease");
+            publications.revoke(principal.installationPid(), contract.code());
+            var revoked = deliveries.claimReady(50, "model-fixture-worker", "revoked-claim", Instant.now().plusSeconds(30)).stream()
+                    .filter(log -> secondSource.eventId().equals(log.getEventId())).findFirst().orElseThrow();
+            webhookDispatcher.processClaimed(revoked);
+            assertThat(received).hasSize(1);
+            assertThat(deliveries.selectById(revoked.getId()).getDeliveryStatus()).isEqualTo("dead_letter");
+            assertThat(webhooks.replayDelivery(revoked.getPid())).isTrue();
+            var replay = deliveries.claimReady(50, "model-fixture-worker", "replayed-claim", Instant.now().plusSeconds(30)).stream()
+                    .filter(log -> secondSource.eventId().equals(log.getEventId())).findFirst().orElseThrow();
+            webhookDispatcher.processClaimed(replay);
+            assertThat(received).hasSize(1);
+            assertThat(deliveries.selectById(replay.getId()).getDeliveryStatus()).isEqualTo("dead_letter");
+        } finally {
+            receiver.stop(0);
+            if (previousHosts == null) System.clearProperty("AURA_SSRF_ALLOWED_PRIVATE_HOSTS"); else System.setProperty("AURA_SSRF_ALLOWED_PRIVATE_HOSTS", previousHosts);
+            for (var subscription : subscriptions) webhooks.delete(subscription.getPid());
+            if (secondInstallation != null) management.disableInstallation(secondInstallation);
+            cleanupCommittedFixture();
+        }
     }
 
     @Test void humanSingleCrudUsesTheSamePublishedSourceEventHook() {
@@ -426,7 +539,8 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
 
     private void cleanupCommittedFixture() {
         applyTestMetaContext();
-        publications.withdraw(contract.code(), 1);
+        publications.withdraw(contract.code(), publications.list().stream().filter(view -> view.code().equals(contract.code()))
+                .findFirst().orElseThrow().draftRevision());
         management.disableInstallation(principal.installationPid());
         var result = schemas.dropTableByModel(contract.modelCode());
         assertThat(result.isSuccess()).as("fixture table cleanup: %s", result.getErrorMessage()).isTrue();

@@ -122,8 +122,11 @@ public class OutboxWorkerImpl {
 
     private IntegrationEventEnvelope toEnvelope(OutboxEvent event) {
         try {
-            Map<String, Object> payload = objectMapper.readValue(
-                    event.getPayload(), new TypeReference<Map<String, Object>>() {});
+            var reader = objectMapper.readerFor(new TypeReference<Map<String, Object>>() {});
+            if (event.getEventType().startsWith("open.resource.")) {
+                reader = reader.with(com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
+            }
+            Map<String, Object> payload = reader.readValue(event.getPayload());
             Map<String, String> headers = event.getHeaders() == null
                     ? Map.of()
                     : objectMapper.readValue(event.getHeaders(), new TypeReference<Map<String, String>>() {});

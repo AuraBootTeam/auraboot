@@ -124,6 +124,16 @@ public class OpenApiPublicationService {
         return mapper.activeDefinitions(tenantId).stream().map(value -> decode(value, OpenApiResourceContract.class)).toList();
     }
 
+    public Optional<OpenApiResourceContract> snapshot(Long tenantId, String code, int version) {
+        String definition = mapper.snapshot(tenantId, code, version);
+        return definition == null ? Optional.empty() : Optional.of(decode(definition, OpenApiResourceContract.class));
+    }
+
+    public List<OpenApiResourceContract> snapshots(Long tenantId, String code) {
+        return mapper.resourceSnapshots(tenantId, code).stream()
+                .map(value -> decode(value, OpenApiResourceContract.class)).toList();
+    }
+
     public Optional<AuthorizedPublication> currentAuthority(
             com.auraboot.framework.application.security.ExternalMachineAuthenticator.MachinePrincipal principal,
             String code, OpenApiResourceContract.Operation operation) {

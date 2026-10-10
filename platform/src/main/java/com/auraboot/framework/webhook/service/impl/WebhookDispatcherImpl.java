@@ -61,6 +61,32 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
     private final WebhookSignature webhookSignature;
     private final OpenApiEventCatalog eventCatalog;
 
+    private List<com.auraboot.framework.webhook.service.WebhookDeliveryPolicy> deliveryPolicies = List.of();
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setDeliveryPolicies(List<com.auraboot.framework.webhook.service.WebhookDeliveryPolicy> policies) {
+        this.deliveryPolicies = List.copyOf(policies);
+    }
+
+    private Map<String, Object> preparePublished(WebhookSubscription subscription, WebhookDeliveryLog delivery,
+                                                 Map<String, Object> fallback) {
+        var policies = deliveryPolicies.stream().filter(policy -> policy.supports(subscription.getEventType())).toList();
+        if (OpenApiEventCatalog.isModelEvent(subscription.getEventType()) && policies.size() != 1)
+            throw new org.springframework.security.access.AccessDeniedException("Model event authority cannot be evaluated");
+        if (policies.isEmpty()) return fallback;
+        if (policies.size() != 1) throw new IllegalStateException("Ambiguous webhook delivery policy");
+        return policies.getFirst().prepare(subscription, delivery);
+    }
+
+    @Override
+    public WebhookDispatchResult dispatchPublished(WebhookSubscription subscription, Map<String, Object> payload,
+                                                   String authorizationContext) {
+        if (!OpenApiEventCatalog.isModelEvent(subscription.getEventType()) || subscription.getInstallationPid() == null)
+            throw new IllegalArgumentException("Installation-bound published model event required");
+        var receipt = enqueue(subscription, payload, authorizationContext);
+        return new WebhookDispatchResult(receipt == null ? List.of() : List.of(receipt));
+    }
+
     private static final Pattern DANGEROUS_SPEL_PATTERN = Pattern.compile(
             "(?i)(T\\s*\\(|new\\s+|getClass|forName|invoke|exec|Runtime|Process|System|Thread|Class\\." +
             "|#root|#this|\\bvalueOf\\b|java\\.|javax\\.|org\\.springframework)"
@@ -93,11 +119,23 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
     }
 
     private WebhookDispatchResult.Receipt enqueue(WebhookSubscription subscription, Map<String, Object> payload) {
+        return enqueue(subscription, payload, null);
+    }
+
+    private WebhookDispatchResult.Receipt enqueue(WebhookSubscription subscription, Map<String, Object> payload,
+                                                 String authorizationContext) {
+        WebhookDeliveryLog delivery = new WebhookDeliveryLog();
+        delivery.setAuthorizationContext(authorizationContext);
+        delivery.setSubscriptionPid(subscription.getPid());
+        delivery.setTenantId(subscription.getTenantId());
+        delivery.setInstallationPid(subscription.getInstallationPid());
+        delivery.setRequestBody(serializePayload(payload));
+        payload = preparePublished(subscription, delivery, payload);
         if (subscription.getInstallationPid() != null) {
             int version = subscription.getEventVersion() == null ? 1 : subscription.getEventVersion();
             try {
                 OpenApiEventCatalog.EventDescriptor descriptor =
-                        eventCatalog.requireExternal(subscription.getEventType(), version);
+                        eventCatalog.requireExternal(subscription.getTenantId(), subscription.getEventType(), version);
                 requirePublishedEnvelope(descriptor, version, payload);
             } catch (IllegalArgumentException exception) {
                 log.warn("Skipping incompatible Open Platform webhook subscription: subscription={}, reason={}",
@@ -110,7 +148,6 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
                     subscription.getPid(), subscription.getFilterExpression());
             return null;
         }
-        WebhookDeliveryLog delivery = new WebhookDeliveryLog();
         delivery.setPid(UniqueIdGenerator.generate());
         delivery.setTenantId(subscription.getTenantId());
         delivery.setSubscriptionPid(subscription.getPid());
@@ -137,6 +174,13 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
         }
         deliveryLogMapper.insert(delivery);
         return receiptFrom(subscription, delivery);
+    }
+
+    private String serializePayload(Map<String, Object> payload) {
+        try { return objectMapper.writeValueAsString(payload); }
+        catch (com.fasterxml.jackson.core.JsonProcessingException error) {
+            throw new IllegalArgumentException("Webhook payload is not JSON serializable", error);
+        }
     }
 
     private void requirePublishedEnvelope(OpenApiEventCatalog.EventDescriptor descriptor, int version,
@@ -170,6 +214,9 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
         }
         try {
             String body = delivery.getRequestBody();
+            if (OpenApiEventCatalog.isModelEvent(subscription.getEventType())) {
+                body = serializePayload(preparePublished(subscription, delivery, Map.of()));
+            }
 
             // Validate URL + pin the resolved IP so the HTTP send cannot be
             // re-resolved to a different address (P3-E #1 DNS rebinding TOCTOU).
@@ -228,6 +275,9 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
             log.debug("Webhook delivered: subscription={}, url={}, status={}",
                     subscription.getPid(), subscription.getTargetUrl(), status);
 
+        } catch (org.springframework.security.access.AccessDeniedException exception) {
+            deliveryLogMapper.markPermanentFailure(delivery.getId(), delivery.getLeaseToken(),
+                    "Published model event authority revoked or unavailable");
         } catch (IllegalArgumentException exception) {
             log.warn("SSRF blocked or invalid URL for webhook: subscription={}, url={}, reason={}",
                     subscription.getPid(), subscription.getTargetUrl(), exception.getMessage());

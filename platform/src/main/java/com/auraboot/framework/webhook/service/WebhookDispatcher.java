@@ -25,6 +25,10 @@ public interface WebhookDispatcher {
      */
     WebhookDispatchResult dispatchTracked(String eventType, Map<String, Object> payload, Long tenantId);
 
+    /** Queue one independently projected, installation-bound model delivery. */
+    WebhookDispatchResult dispatchPublished(com.auraboot.framework.webhook.entity.WebhookSubscription subscription,
+            Map<String, Object> payload, String authorizationContext);
+
     /** Execute one delivery that has already been durably claimed by a worker. */
     void processClaimed(WebhookDeliveryLog delivery);
 }
