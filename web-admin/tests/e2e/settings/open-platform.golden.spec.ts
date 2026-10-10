@@ -260,6 +260,101 @@ test.describe('Dynamic query publication journey', () => {
   });
 });
 
+test.describe('Dynamic installation authority journey', () => {
+  test.setTimeout(180_000);
+  test.describe.configure({ retries: 0 });
+  test.use({ storageState: { cookies: [], origins: [] }, locale: 'zh-CN', viewport: { width: 1440, height: 1000 } });
+
+  test('persists resource and query grants through installation UI and enforces them on real machine calls', async ({ page }) => {
+    await authenticate(page);
+    const suffix = String(Date.now()); const modelCode = `dop_grant_${suffix}`;
+    const resourceCode = `granted.parts.${suffix}`; const queryCode = `granted.query.${suffix}`; const namedCode = `dop_grant_query_${suffix}`;
+    const operations = ['list', 'get', 'create', 'update', 'delete']; const scopes = operations.map(operation => `dop.grant:${operation}`);
+    const human = async (method: string, url: string, data?: unknown) => { const response = await page.request.fetch(`${WEB_BASE_URL}${url}`, { method, data });
+      expect(response.status(), `${method} ${url}`).toBe(200); const body = await response.json(); expect(String(body.code)).toBe('0'); return body.data; };
+    const model = await human('POST', '/api/meta/models', { code: modelCode, tableName: modelCode, displayName: `授权验证零件 ${suffix}`, modelType: 'entity', sourceType: 'physical',
+      capabilities: { list: true, detail: true, create: true, update: true, delete: true, filter: true, sort: true, paginate: true }, fields: [
+        { code: 'dop_g_name', columnName: 'dop_g_name', displayName: '零件名称', dataType: 'string', required: true, editable: true },
+        { code: 'dop_g_zone', columnName: 'dop_g_zone', displayName: '所属区域', dataType: 'string', required: true, editable: true, filterable: true },
+        { code: 'dop_g_secret', columnName: 'dop_g_secret', displayName: '内部备注', dataType: 'string', editable: true },
+      ] });
+    await human('POST', `/api/meta/models/${model.pid}/publish`, { impactAcknowledged: true });
+    const recordA = await human('POST', `/api/dynamic/${modelCode}/create`, { dop_g_name: 'Allowed A', dop_g_zone: 'A', dop_g_secret: 'Hidden A' });
+    const recordB = await human('POST', `/api/dynamic/${modelCode}/create`, { dop_g_name: 'Forbidden B', dop_g_zone: 'B', dop_g_secret: 'Hidden B' });
+    expect(recordA.pid).toEqual(expect.any(String)); expect(recordB.pid).toEqual(expect.any(String));
+    const field = (source: string, writable = false, required = false) => ({ source, type: 'string', readable: true, writable, required, nullable: !required,
+      operators: [], sortable: false, referenceResource: null, properties: {}, items: null });
+    // Model/publication/app/token setup are fixtures; all tested installation policy writes and revocations below use the UI.
+    const resource = { code: resourceCode, modelCode, schemaVersion: 1, operations, scopes: Object.fromEntries(operations.map((operation, index) => [operation, scopes[index]])), dataPolicy: 'installation_filter',
+      fields: { pid: { ...field('pid'), type: 'pid', nullable: false }, name: field('dop_g_name', true, true), zone: { ...field('dop_g_zone', true, true), operators: ['EQ'] }, secret: field('dop_g_secret') },
+      maxPageSize: 50, maxConditions: 8, timeoutMs: 5000, events: [] };
+    await human('PUT', `/api/open-platform/publications/${resourceCode}/draft`, { expectedRevision: 0, definition: resource });
+    await human('POST', `/api/open-platform/publications/${resourceCode}/publish`, { expectedRevision: 1 });
+    const named = await human('POST', '/api/meta/named-queries', { code: namedCode, title: `授权查询 ${suffix}`, resourceCode: modelCode, actionCode: 'read',
+      fromSql: `${model.tableName} a WHERE a.dop_g_zone = #{params.zone}`, defaultOrder: [{ field: 'pid', direction: 'asc' }], fields: [
+        { fieldCode: 'pid', columnExpr: 'a.pid', dataType: 'string', displayName: '记录标识', sortable: true, searchable: false },
+        { fieldCode: 'partName', columnExpr: 'a.dop_g_name', dataType: 'string', displayName: '零件名称', sortable: false, searchable: false },
+      ] });
+    for (const status of ['testing', 'published']) await human('PUT', `/api/meta/named-queries/${named.pid}/status`, { status });
+    const source = await human('GET', `/api/open-platform/query-sources/${namedCode}`);
+    const query = { code: queryCode, queryCode: namedCode, schemaVersion: 1, sourceFingerprint: source.fingerprint, sourceResources: { [modelCode]: resourceCode }, scopes: { execute: 'dop.grant:query' },
+      parameters: { zone: { type: 'string', required: true, nullable: false, items: null } }, fields: { pid: { ...field('pid'), type: 'pid', nullable: false }, name: field('partName') },
+      maxPageSize: 20, maxRows: 100, timeoutMs: 5000, maxConcurrent: 2 };
+    await human('PUT', `/api/open-platform/query-publications/${queryCode}/draft`, { expectedRevision: 0, definition: query });
+    await human('POST', `/api/open-platform/query-publications/${queryCode}/publish`, { expectedRevision: 1 });
+    const application = await human('POST', '/api/open-platform/applications', { name: `授权接入应用 ${suffix}`, description: 'Real installation policy journey' });
+    const installation = await human('POST', `/api/open-platform/applications/${application.pid}/installations`, { environment: 'staging', scopes: [...scopes, 'dop.grant:query'], rateLimitPerMinute: 600 });
+    const credential = await human('POST', `/api/open-platform/installations/${installation.pid}/credentials`);
+    const issued = await page.request.post(`${BACKEND_URL}/oauth2/token`, { form: { grant_type: 'client_credentials', client_id: credential.clientId, client_secret: credential.clientSecret } });
+    expect(issued.status()).toBe(200); const token = await issued.json(); expect(token.access_token).toEqual(expect.any(String));
+    const machineHeaders = { Authorization: `Bearer ${token.access_token}` }; const resourcePath = `${BACKEND_URL}/api/open/v1/resources/${resourceCode}`;
+    const queryPath = `${BACKEND_URL}/api/open/v1/queries/${queryCode}:execute`;
+    expect((await page.request.get(resourcePath, { headers: machineHeaders })).status()).toBe(403);
+    expect((await page.request.post(queryPath, { headers: machineHeaders, data: { parameters: { zone: 'A' }, limit: 10 } })).status()).toBe(403);
+    const screenshotRoot = path.join(process.env.AURA_EVIDENCE_ROOT || '/tmp', 'ui-publication-r1', 'screenshots'); await mkdir(screenshotRoot, { recursive: true });
+    const snapshot = async (id: string) => { await page.screenshot({ path: path.join(screenshotRoot, `${id}.png`), fullPage: true }); };
+    await page.goto('/settings/api-docs');
+    const installationCard = page.getByTestId(`open-platform-installation-${installation.pid}`);
+    await installationCard.getByRole('button', { name: '数据授权', exact: true }).click();
+    const editor = page.getByTestId('installation-grant-editor'); await expect(editor).toBeVisible(); await snapshot('grant-entry');
+    await editor.getByLabel('授权合同', { exact: true }).selectOption(`resource:${resourceCode}`);
+    await expect(editor).toContainText('此安装尚未获此合同的数据授权');
+    for (const name of ['列表查询', '详情读取', '创建记录', '修改记录', '删除记录']) await editor.getByLabel(name, { exact: true }).check();
+    for (const alias of ['name', 'zone']) { await editor.getByLabel(`读取 ${alias}`, { exact: true }).check(); await editor.getByLabel(new RegExp(`^写入 ${alias}`)).check(); }
+    await expect(editor.getByLabel('读取 secret', { exact: true })).not.toBeChecked();
+    await editor.getByRole('button', { name: '添加行约束', exact: true }).click();
+    const constraint = editor.getByTestId('grant-constraint-0'); await constraint.getByLabel('约束公共字段', { exact: true }).selectOption('zone'); await constraint.getByLabel('允许值（每行一个）', { exact: true }).fill('A');
+    await expect(editor.getByLabel('授权合同', { exact: true })).toBeDisabled(); await snapshot('grant-resource');
+    const granted = page.waitForResponse(response => response.url().endsWith(`/installations/${installation.pid}/resources/${resourceCode}`) && response.request().method() === 'PUT');
+    await editor.getByRole('button', { name: '保存安装授权', exact: true }).click(); expect((await granted).status()).toBe(200);
+    await expect(editor.getByRole('status')).toContainText('授权已保存'); await snapshot('grant-saved');
+    await page.reload(); await installationCard.getByRole('button', { name: '数据授权', exact: true }).click(); await editor.getByLabel('授权合同', { exact: true }).selectOption(`resource:${resourceCode}`);
+    await expect(editor.getByLabel('读取 name', { exact: true })).toBeChecked(); await expect(editor.getByTestId('grant-constraint-0').getByLabel('允许值（每行一个）', { exact: true })).toHaveValue('A');
+    const listed = await page.request.get(resourcePath, { headers: machineHeaders }); expect(listed.status()).toBe(200); expect((await listed.json()).items).toEqual([{ pid: recordA.pid, name: 'Allowed A', zone: 'A' }]);
+    expect((await page.request.get(`${resourcePath}/${recordB.pid}`, { headers: machineHeaders })).status()).toBe(404);
+    const forbidden = await page.request.post(resourcePath, { headers: { ...machineHeaders, 'Idempotency-Key': `grant-forbidden-${suffix}` }, data: { name: 'Denied', zone: 'B' } }); expect(forbidden.status()).toBe(403);
+    await editor.getByLabel('授权合同', { exact: true }).selectOption(`query:${queryCode}`); await expect(editor).toContainText('已有列表授权');
+    await editor.getByLabel('pid', { exact: true }).check(); await editor.getByLabel('name', { exact: true }).check(); await snapshot('grant-query');
+    const queryGranted = page.waitForResponse(response => response.url().endsWith(`/installations/${installation.pid}/queries/${queryCode}`) && response.request().method() === 'PUT');
+    await editor.getByRole('button', { name: '保存安装授权', exact: true }).click(); expect((await queryGranted).status()).toBe(200); await expect(editor.getByRole('status')).toContainText('授权已保存');
+    const result = await page.request.post(queryPath, { headers: machineHeaders, data: { parameters: { zone: 'A' }, limit: 10 } }); expect(result.status()).toBe(200); expect((await result.json()).items).toEqual([{ pid: recordA.pid, name: 'Allowed A' }]);
+    const otherRows = await page.request.post(queryPath, { headers: machineHeaders, data: { parameters: { zone: 'B' }, limit: 10 } }); expect(otherRows.status()).toBe(200); expect((await otherRows.json()).items).toEqual([]);
+    const intent = { name: 'Created A', zone: 'A' }; const createHeaders = { ...machineHeaders, 'Idempotency-Key': `grant-create-${suffix}` };
+    const created = await page.request.post(resourcePath, { headers: createHeaders, data: intent }); expect(created.status()).toBe(201); const row = await created.json(); expect(row).toMatchObject(intent); expect(row.pid).toEqual(expect.any(String)); expect(row).not.toHaveProperty('secret');
+    const replay = await page.request.post(resourcePath, { headers: createHeaders, data: intent }); expect(replay.status()).toBe(201); expect(replay.headers()['idempotent-replay']).toBe('true'); expect(await replay.json()).toEqual(row);
+    const updated = await page.request.patch(`${resourcePath}/${row.pid}`, { headers: { ...machineHeaders, 'Idempotency-Key': `grant-update-${suffix}`, 'If-Match': created.headers().etag }, data: { name: 'Updated A' } }); expect(updated.status()).toBe(200); expect(await updated.json()).toMatchObject({ pid: row.pid, name: 'Updated A' });
+    const removed = await page.request.delete(`${resourcePath}/${row.pid}`, { headers: { ...machineHeaders, 'Idempotency-Key': `grant-delete-${suffix}`, 'If-Match': updated.headers().etag } }); expect(removed.status()).toBe(204);
+    expect((await page.request.get(`${resourcePath}/${row.pid}`, { headers: machineHeaders })).status()).toBe(404);
+    await editor.getByRole('button', { name: '撤销安装授权', exact: true }).click(); await snapshot('grant-revoke-dialog');
+    await editor.getByRole('group', { name: '安装授权操作确认', exact: true }).getByRole('button', { name: '确认', exact: true }).click(); await expect(editor.getByRole('status')).toContainText('授权已撤销');
+    expect((await page.request.post(queryPath, { headers: machineHeaders, data: { parameters: { zone: 'A' }, limit: 10 } })).status()).toBe(403); await snapshot('grant-query-revoked');
+    await editor.getByLabel('授权合同', { exact: true }).selectOption(`resource:${resourceCode}`); await editor.getByRole('button', { name: '撤销安装授权', exact: true }).click();
+    await editor.getByRole('group', { name: '安装授权操作确认', exact: true }).getByRole('button', { name: '确认', exact: true }).click(); await expect(editor.getByRole('status')).toContainText('授权已撤销');
+    expect((await page.request.get(resourcePath, { headers: machineHeaders })).status()).toBe(403); await snapshot('grant-resource-revoked');
+    const persisted = await human('GET', `/api/open-platform/installations/${installation.pid}/resources`); expect(persisted.find((view: { code: string }) => view.code === resourceCode).policy).toBeNull();
+  });
+});
+
 async function authenticate(page: import('@playwright/test').Page) {
   const loginResponse = await page.request.post(`${BACKEND_URL}/api/auth/login`, {
     data: { email: DEFAULT_TEST_ACCOUNT.email, password: DEFAULT_TEST_ACCOUNT.password },

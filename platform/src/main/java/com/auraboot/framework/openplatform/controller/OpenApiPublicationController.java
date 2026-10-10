@@ -63,6 +63,10 @@ public class OpenApiPublicationController {
         return ApiResponse.success(publications.withdraw(code, request.expectedRevision()));
     }
 
+    @GetMapping("/installations/{installationPid}/resources")
+    public ApiResponse<java.util.List<OpenApiPublicationService.InstallationGrantView>> installationGrants(@PathVariable String installationPid) {
+        return ApiResponse.success(publications.installationGrants(installationPid));
+    }
     @PutMapping("/installations/{installationPid}/resources/{code}")
     public ApiResponse<Void> grant(@PathVariable String installationPid, @PathVariable String code,
                                    @RequestBody OpenApiInstallationPolicy policy) {

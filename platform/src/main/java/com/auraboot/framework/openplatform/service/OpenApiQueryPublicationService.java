@@ -69,6 +69,18 @@ public class OpenApiQueryPublicationService {
         requireAdmin();var row=lock(code,revision);mapper.activate(tenant(),key(code),row.activeVersion(),"withdrawn",actor());
         mapper.audit(tenant(),key(code),null,"withdraw",actor(),revision);return view(mapper.lock(tenant(),key(code)));
     }
+    public record InstallationGrantView(String code, String status, OpenApiQueryContract contract, OpenApiQueryPolicy policy) { }
+    public List<InstallationGrantView> installationGrants(String installationPid) {
+        requireAdmin();
+        var installation = installations.findByTenantAndPid(tenant(), installationPid);
+        if (installation == null) throw new IllegalArgumentException("Installation not found");
+        return mapper.listQueries(tenant()).stream().filter(row -> row.activeVersion() != null).map(row -> {
+            var contract = decode(mapper.snapshot(tenant(), row.code(), row.activeVersion()), OpenApiQueryContract.class);
+            String policy = mapper.policy(tenant(), installation.getId(), row.code());
+            return new InstallationGrantView(contract.code(), row.status(), contract,
+                    policy == null ? null : decode(policy, OpenApiQueryPolicy.class));
+        }).toList();
+    }
     @Transactional public void grant(String installationPid, String code, OpenApiQueryPolicy policy) {
         requireAdmin();
         if (mapper.lock(tenant(), key(code)) == null) throw new IllegalArgumentException("Query publication not found");

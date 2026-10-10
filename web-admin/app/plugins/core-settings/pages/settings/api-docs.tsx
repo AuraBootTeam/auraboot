@@ -16,6 +16,7 @@ import {
 import { useI18n } from '~/contexts/I18nContext';
 import { useToastContext } from '~/contexts/ToastContext';
 import OpenPlatformOperationsPanel from './OpenPlatformOperationsPanel';
+import { OpenApiInstallationGrantEditor } from '~/ui/smart/admin/OpenApiInstallationGrantEditor';
 import { openPlatformApiFetch as apiFetch } from './open-platform-api';
 import { MemberPicker } from '~/ui/smart/picker/MemberPicker';
 
@@ -108,6 +109,7 @@ export default function OpenPlatformPage() {
   const [selectedScopes, setSelectedScopes] = useState<Set<string>>(new Set());
   const [secret, setSecret] = useState<CredentialSecret | null>(null);
   const [operationsInstallation, setOperationsInstallation] = useState<string | null>(null);
+  const [grantInstallation, setGrantInstallation] = useState<string | null>(null);
   const [pendingRotate, setPendingRotate] = useState<{
     installationPid: string;
     credential: Credential;
@@ -618,6 +620,15 @@ export default function OpenPlatformPage() {
                             <WrenchScrewdriverIcon className="h-3.5 w-3.5" />
                             {t('openPlatform.operations', undefined, 'Operations')}
                           </button>}
+                          {access.platformAdmin && application.permissions.manageRuntime && <button
+                            type="button"
+                            onClick={() => setGrantInstallation(installation.pid)}
+                            disabled={grantInstallation !== null}
+                            aria-expanded={grantInstallation === installation.pid}
+                            className="min-w-0 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-700 dark:text-gray-200"
+                          >
+                            {t('openPlatform.installationGrants.open', undefined, locale.startsWith('zh') ? '数据授权' : 'Data authority')}
+                          </button>}
                           {application.permissions.manageRuntime && <button
                             type="button"
                             onClick={() => void loadCredentials(installation.pid)}
@@ -698,6 +709,9 @@ export default function OpenPlatformPage() {
                       )}
                       {application.permissions.readOperations && operationsInstallation === installation.pid && (
                         <OpenPlatformOperationsPanel installationPid={installation.pid} />
+                      )}
+                      {access.platformAdmin && application.permissions.manageRuntime && grantInstallation === installation.pid && (
+                        <OpenApiInstallationGrantEditor installationPid={installation.pid} active={installation.status === 'active'} scopes={installation.scopes} onClose={() => setGrantInstallation(null)} />
                       )}
                     </div>
                   ))

@@ -146,6 +146,51 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
             assertThatThrownBy(() -> publications.sources("", 1)).isInstanceOf(AccessDeniedException.class);
         } finally { MetaContext.restore(previous); }
     }
+    @Test void installationAdministrationReadsSnapshotAndDistinctCurrentGrantsIncludingWithdrawal() {
+        var resourceDraft = json.<com.fasterxml.jackson.databind.node.ObjectNode>valueToTree(root);
+        resourceDraft.put("schemaVersion", 2);
+        ((com.fasterxml.jackson.databind.node.ObjectNode) resourceDraft.get("fields")).remove("name");
+        resources.saveDraft(root.code(), new OpenApiPublicationService.DraftRequest(1, json.convertValue(resourceDraft, OpenApiResourceContract.class)));
+        var queryDraft = json.<com.fasterxml.jackson.databind.node.ObjectNode>valueToTree(rows);
+        queryDraft.put("schemaVersion", 2);
+        ((com.fasterxml.jackson.databind.node.ObjectNode) queryDraft.get("fields")).remove("childName");
+        publications.saveDraft(rows.code(), new OpenApiQueryPublicationService.DraftRequest(1, json.convertValue(queryDraft, OpenApiQueryContract.class)));
+        publications.grant(principalA.installationPid(), rows.code(), new OpenApiQueryPolicy(Set.of("pid")));
+        var resourceA = resources.installationGrants(principalA.installationPid()).stream().filter(view -> root.code().equals(view.code())).findFirst().orElseThrow();
+        var resourceB = resources.installationGrants(principalB.installationPid()).stream().filter(view -> root.code().equals(view.code())).findFirst().orElseThrow();
+        assertThat(resourceA.contract()).isEqualTo(root);
+        assertThat(resourceA.policy().rowConstraints()).extracting(constraint -> constraint.values()).containsExactly(List.of("A"));
+        assertThat(resourceB.policy().rowConstraints()).extracting(constraint -> constraint.values()).containsExactly(List.of("B"));
+        var queryA = publications.installationGrants(principalA.installationPid()).stream().filter(view -> rows.code().equals(view.code())).findFirst().orElseThrow();
+        var queryB = publications.installationGrants(principalB.installationPid()).stream().filter(view -> rows.code().equals(view.code())).findFirst().orElseThrow();
+        assertThat(queryA.contract()).isEqualTo(rows);
+        assertThat(queryA.policy().readableFields()).containsExactly("pid");
+        assertThat(queryB.policy().readableFields()).containsExactlyInAnyOrderElementsOf(rows.fields().keySet());
+        resources.withdraw(root.code(), 2); publications.withdraw(rows.code(), 2);
+        assertThat(resources.installationGrants(principalA.installationPid()).stream().filter(view -> root.code().equals(view.code())).findFirst().orElseThrow().status()).isEqualTo("withdrawn");
+        assertThat(publications.installationGrants(principalA.installationPid()).stream().filter(view -> rows.code().equals(view.code())).findFirst().orElseThrow().status()).isEqualTo("withdrawn");
+        resources.revoke(principalA.installationPid(), root.code()); publications.revoke(principalA.installationPid(), rows.code());
+        assertThat(resources.installationGrants(principalA.installationPid()).stream().filter(view -> root.code().equals(view.code())).findFirst().orElseThrow().policy()).isNull();
+        assertThat(publications.installationGrants(principalA.installationPid()).stream().filter(view -> rows.code().equals(view.code())).findFirst().orElseThrow().policy()).isNull();
+    }
+    @Test void installationAdministrationRejectsMissingForeignAndMachineInstallationReads() {
+        assertThatThrownBy(() -> resources.installationGrants("missing-installation")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> publications.installationGrants("missing-installation")).isInstanceOf(IllegalArgumentException.class);
+        var previous = MetaContext.snapshot();
+        Long administratorId = MetaContext.getCurrentUserId();
+        String administratorPid = MetaContext.getCurrentUserPid();
+        try {
+            MetaContext.setContext(principalA.tenantId() + 1, administratorId, administratorPid, "user");
+            assertThatThrownBy(() -> resources.installationGrants(principalA.installationPid())).isInstanceOfAny(AccessDeniedException.class, IllegalArgumentException.class);
+            assertThatThrownBy(() -> publications.installationGrants(principalA.installationPid())).isInstanceOfAny(AccessDeniedException.class, IllegalArgumentException.class);
+            MetaContext.setContext(principalA.tenantId() + 1, null, principalA.subjectPid(), "machine");
+            assertThatThrownBy(() -> resources.installationGrants(principalA.installationPid())).isInstanceOf(AccessDeniedException.class);
+            assertThatThrownBy(() -> publications.installationGrants(principalA.installationPid())).isInstanceOf(AccessDeniedException.class);
+            MetaContext.setContext(principalA.tenantId(), null, principalA.subjectPid(), "machine");
+            assertThatThrownBy(() -> resources.installationGrants(principalA.installationPid())).isInstanceOf(AccessDeniedException.class);
+            assertThatThrownBy(() -> publications.installationGrants(principalA.installationPid())).isInstanceOf(AccessDeniedException.class);
+        } finally { MetaContext.restore(previous); }
+    }
     @Test void joinsAndAggregatesScopeEverySourceForEachInstallationWithoutHumanMembership() {
         var a=run(principalA,rows,"A");var b=run(principalB,rows,"B");
         assertThat(a.get("items").toString()).contains("Root A","Child A").doesNotContain("Forbidden sibling","Root B");

@@ -98,6 +98,22 @@ public class OpenApiPublicationService {
         return view(mapper.lock(tenant(), code));
     }
 
+    public record InstallationGrantView(String code, String status, OpenApiResourceContract contract,
+                                        OpenApiInstallationPolicy policy) { }
+
+    /** Installation editing uses the last published snapshot, including withdrawn grants that can be revoked. */
+    public List<InstallationGrantView> installationGrants(String installationPid) {
+        requireAdmin();
+        var installation = installations.findByTenantAndPid(tenant(), installationPid);
+        if (installation == null) throw new IllegalArgumentException("Installation not found");
+        return mapper.list(tenant()).stream().filter(row -> row.activeVersion() != null).map(row -> {
+            var contract = decode(mapper.snapshot(tenant(), row.code(), row.activeVersion()), OpenApiResourceContract.class);
+            String policy = mapper.policy(tenant(), installation.getId(), row.code());
+            return new InstallationGrantView(row.code(), row.status(), contract,
+                    policy == null ? null : decode(policy, OpenApiInstallationPolicy.class));
+        }).toList();
+    }
+
     @Transactional
     public void grant(String installationPid, String code, OpenApiInstallationPolicy policy) {
         requireAdmin();

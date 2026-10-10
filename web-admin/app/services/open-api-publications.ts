@@ -65,3 +65,8 @@ export function readOnlyQueryOutput(field: PublicField): PublicField {
 }
 
 export const queryParameterItem = (type: PublicType): PublicField => ({ ...queryOutput('item', type), readable: false, writable: true, nullable: false });
+
+export interface InstallationResourcePolicy { operations: PublicOperation[]; readableFields: string[]; writableFields: string[]; rowConstraints: { field: string; values: string[] }[] }
+export interface InstallationQueryPolicy { readableFields: string[] }
+export interface ResourceGrantView { code: string; status: string; contract: PublicResource; policy: InstallationResourcePolicy | null }
+export interface QueryGrantView { code: string; status: string; contract: PublicQuery; policy: InstallationQueryPolicy | null }

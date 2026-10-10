@@ -45,6 +45,10 @@ public class OpenApiQueryPublicationController {
     public ApiResponse<OpenApiQueryPublicationService.View> withdraw(@PathVariable String code, @RequestBody OpenApiPublicationService.RevisionRequest request) {
         return ApiResponse.success(publications.withdraw(code, request.expectedRevision()));
     }
+    @GetMapping("/installations/{installationPid}/queries")
+    public ApiResponse<java.util.List<OpenApiQueryPublicationService.InstallationGrantView>> installationGrants(@PathVariable String installationPid) {
+        return ApiResponse.success(publications.installationGrants(installationPid));
+    }
     @PutMapping("/installations/{installationPid}/queries/{code}")
     public ApiResponse<Void> grant(@PathVariable String installationPid, @PathVariable String code, @RequestBody OpenApiQueryPolicy policy) {
         publications.grant(installationPid, code, policy);return ApiResponse.success();
