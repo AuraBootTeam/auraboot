@@ -323,7 +323,10 @@ export function resolveSavedViewFilterExpressions(
   });
 }
 
-function clearTransientViewSearchParams(params: URLSearchParams): void {
+function clearTransientViewSearchParams(
+  params: URLSearchParams,
+  knownFieldNames?: ReadonlySet<string>,
+): void {
   for (const key of Array.from(params.keys())) {
     if (
       key === 'sort' ||
@@ -331,11 +334,105 @@ function clearTransientViewSearchParams(params: URLSearchParams): void {
       key === 'filters' ||
       key === 'preset' ||
       key === 'pageNum' ||
-      key.startsWith('filter_')
+      key.startsWith('filter_') ||
+      (knownFieldNames?.has(key) ?? false)
     ) {
       params.delete(key);
     }
   }
+}
+
+/**
+ * URL params owned by the list runtime itself. A bare param with one of these
+ * names is never promoted to a row filter, even when the schema declares a
+ * field of the same name.
+ */
+const LIST_RESERVED_URL_PARAM_KEYS: ReadonlySet<string> = new Set([
+  'sort',
+  'keyword',
+  'filters',
+  'preset',
+  'view',
+  'tab',
+  'pageNum',
+  'pageSize',
+  'locale',
+]);
+
+/**
+ * Field names declared by the list page schema: table columns (action columns
+ * excluded), table search fields and filter-block fields. Drill-down bare URL
+ * params are only promoted to row filters when they match one of these, so
+ * foreign params can never leak into the query.
+ */
+export function collectListSchemaFieldNames(schema: unknown): string[] {
+  const names = new Set<string>();
+  const blocks = (schema as { blocks?: unknown })?.blocks;
+  if (!Array.isArray(blocks)) return [];
+  for (const block of blocks) {
+    const record = block as {
+      blockType?: unknown;
+      columns?: unknown;
+      searchFields?: unknown;
+      fields?: unknown;
+      table?: { columns?: unknown; searchFields?: unknown };
+    };
+    if (record.blockType === 'table') {
+      const columns = Array.isArray(record.table?.columns) ? record.table?.columns : record.columns;
+      if (Array.isArray(columns)) {
+        for (const column of columns) {
+          const col = column as { field?: unknown; isActionColumn?: unknown };
+          if (typeof col?.field === 'string' && col.field && !col.isActionColumn) {
+            names.add(col.field);
+          }
+        }
+      }
+      const searchFields = Array.isArray(record.table?.searchFields)
+        ? record.table?.searchFields
+        : record.searchFields;
+      if (Array.isArray(searchFields)) {
+        for (const field of searchFields) {
+          if (typeof field === 'string' && field) names.add(field);
+        }
+      }
+    }
+    if (record.blockType === 'filters' || record.blockType === 'filter') {
+      if (Array.isArray(record.fields)) {
+        for (const field of record.fields) {
+          const f = field as { field?: unknown };
+          if (typeof f?.field === 'string' && f.field) names.add(f.field);
+        }
+      }
+    }
+  }
+  return [...names];
+}
+
+/**
+ * Collect drill-down bare URL params as row filters.
+ *
+ * Dashboard drill-down navigation writes mapped param names bare — e.g.
+ * /p/fin_cash_forecast_week?fin_cfw_week_start=… via the widget drillDown
+ * paramMapping — while the list runtime only consumed filter_* and filters=,
+ * so the bare form was silently dropped and the target list rendered unfiltered.
+ * A bare param becomes a row filter only when its name matches a field declared
+ * by the page schema and is not a reserved runtime param; filter_* params keep
+ * precedence over a bare param for the same field.
+ */
+export function collectListBareParamFilters(
+  searchParams: URLSearchParams,
+  fieldNames: Iterable<string>,
+): Record<string, any> {
+  const known = new Set(fieldNames);
+  if (known.size === 0) return {};
+  const filters: Record<string, any> = {};
+  searchParams.forEach((value, key) => {
+    if (!key || key.startsWith('filter_') || LIST_RESERVED_URL_PARAM_KEYS.has(key)) return;
+    if (known.has(key) && value != null && value !== '') {
+      filters[key] = value;
+    }
+  });
+  return filters;
 }
 
 function stableConfigString(value: unknown): string {
@@ -1106,6 +1203,11 @@ function ListPageContentInner(props: PageContentProps) {
     routerSetSearchParams,
     listUrlWritesEnabledRef,
   );
+  const listSchemaFieldNames = useMemo(() => collectListSchemaFieldNames(schema), [schema]);
+  const listSchemaFieldNameSet = useMemo(
+    () => new Set(listSchemaFieldNames),
+    [listSchemaFieldNames],
+  );
   const urlFilters = useMemo(() => {
     const filters: Record<string, any> = {};
     searchParams.forEach((value, key) => {
@@ -1114,8 +1216,13 @@ function ListPageContentInner(props: PageContentProps) {
         filters[fieldName] = value;
       }
     });
-    return filters;
-  }, [searchParams]);
+    // Drill-down bare params (e.g. fin_cfw_week_start written by a dashboard
+    // drillDown paramMapping) seed row filters too; filter_* keeps precedence.
+    return {
+      ...collectListBareParamFilters(searchParams, listSchemaFieldNames),
+      ...filters,
+    };
+  }, [searchParams, listSchemaFieldNames]);
   const urlPageNum = useMemo(() => {
     const raw = searchParams.get('pageNum');
     if (!raw) return null;
@@ -2399,7 +2506,7 @@ function ListPageContentInner(props: PageContentProps) {
       (prev) => {
         const p = new URLSearchParams(prev);
         p.delete('view');
-        clearTransientViewSearchParams(p);
+        clearTransientViewSearchParams(p, listSchemaFieldNameSet);
         return p;
       },
       { replace: true },
@@ -4114,7 +4221,7 @@ function ListPageContentInner(props: PageContentProps) {
       (prev) => {
         const p = new URLSearchParams(prev);
         p.set('view', currentView.pid);
-        clearTransientViewSearchParams(p);
+        clearTransientViewSearchParams(p, listSchemaFieldNameSet);
         return p;
       },
       { replace: true },
@@ -4518,7 +4625,7 @@ function ListPageContentInner(props: PageContentProps) {
           const p = new URLSearchParams(prev);
           if (key) {
             p.delete('view');
-            clearTransientViewSearchParams(p);
+            clearTransientViewSearchParams(p, listSchemaFieldNameSet);
             p.set('preset', key);
           } else {
             p.delete('preset');
@@ -4601,7 +4708,7 @@ function ListPageContentInner(props: PageContentProps) {
         (prev) => {
           const p = new URLSearchParams(prev);
           p.set('view', pid);
-          clearTransientViewSearchParams(p);
+          clearTransientViewSearchParams(p, listSchemaFieldNameSet);
           return p;
         },
         { replace: true },
@@ -5777,7 +5884,7 @@ function ListPageContentInner(props: PageContentProps) {
                   (prev) => {
                     const p = new URLSearchParams(prev);
                     p.set('view', view.pid);
-                    clearTransientViewSearchParams(p);
+                    clearTransientViewSearchParams(p, listSchemaFieldNameSet);
                     return p;
                   },
                   { replace: true },
@@ -5804,7 +5911,7 @@ function ListPageContentInner(props: PageContentProps) {
                 (prev) => {
                   const p = new URLSearchParams(prev);
                   p.set('view', pid);
-                  clearTransientViewSearchParams(p);
+                  clearTransientViewSearchParams(p, listSchemaFieldNameSet);
                   return p;
                 },
                 { replace: true },

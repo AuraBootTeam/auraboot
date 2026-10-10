@@ -36,6 +36,8 @@ import {
   tabFilterToQueryCondition,
   resolveSavedViewFilterExpressions,
   resolveInitialListTabKey,
+  collectListSchemaFieldNames,
+  collectListBareParamFilters,
 } from '../ListPageContent';
 
 describe('beginLatestListRequest', () => {
@@ -1040,5 +1042,82 @@ describe('list query settlement', () => {
     expect(areListSortFilterQueriesEqual({
       ...empty, activeSorts: [{ fieldCode: 'qty', direction: 'asc', priority: 0 }],
     }, empty)).toBe(false);
+  });
+});
+
+describe('collectListSchemaFieldNames', () => {
+  const schema = {
+    blocks: [
+      { blockType: 'form-buttons' },
+      {
+        blockType: 'table',
+        table: {
+          columns: [
+            { field: 'fin_cfw_forecast_code' },
+            { field: 'fin_cfw_week_start' },
+            { field: 'actions', isActionColumn: true },
+          ],
+          searchFields: ['fin_cfw_forecast_code', 'fin_cfw_week_start'],
+        },
+      },
+      {
+        blockType: 'filters',
+        fields: [{ field: 'fin_cfw_currency' }],
+      },
+    ],
+  };
+
+  it('collects table columns (excluding action columns), search fields and filter fields', () => {
+    expect(collectListSchemaFieldNames(schema)).toEqual([
+      'fin_cfw_forecast_code',
+      'fin_cfw_week_start',
+      'fin_cfw_currency',
+    ]);
+  });
+
+  it('returns empty for schemas without blocks', () => {
+    expect(collectListSchemaFieldNames({})).toEqual([]);
+    expect(collectListSchemaFieldNames(undefined)).toEqual([]);
+  });
+});
+
+describe('collectListBareParamFilters', () => {
+  const fields = ['fin_cfw_week_start', 'fin_cfw_currency', 'keyword'];
+
+  it('promotes drill-down bare params that match a declared field', () => {
+    expect(
+      collectListBareParamFilters(
+        new URLSearchParams('fin_cfw_week_start=2026-01-05&fin_cfw_currency=CNY'),
+        fields,
+      ),
+    ).toEqual({ fin_cfw_week_start: '2026-01-05', fin_cfw_currency: 'CNY' });
+  });
+
+  it('ignores bare params that are not declared page fields', () => {
+    expect(
+      collectListBareParamFilters(new URLSearchParams('utm_source=mail&other=1'), fields),
+    ).toEqual({});
+  });
+
+  it('ignores reserved runtime params even when declared as fields', () => {
+    expect(
+      collectListBareParamFilters(
+        new URLSearchParams('keyword=abc&view=x&tab=all&pageNum=2&pageSize=50&sort=a%3Adesc&filters=zzz&preset=created_today&locale=en-US'),
+        fields,
+      ),
+    ).toEqual({});
+  });
+
+  it('leaves filter_* params to the existing path and skips empty values', () => {
+    expect(
+      collectListBareParamFilters(
+        new URLSearchParams('filter_fin_cfw_week_start=2026-01-05&fin_cfw_week_start='),
+        fields,
+      ),
+    ).toEqual({});
+  });
+
+  it('returns nothing when the schema declares no fields', () => {
+    expect(collectListBareParamFilters(new URLSearchParams('fin_cfw_week_start=2026-01-05'), [])).toEqual({});
   });
 });
