@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ get: vi.fn(), handleAction: vi.fn(), navigate: vi.fn(), permissions: new Set<string>(), toast: { showSuccessToast: vi.fn(), showErrorToast: vi.fn(), showInfoToast: vi.fn(), showWarningToast: vi.fn() } }));
 vi.mock('react-router', () => ({ useParams: () => ({ memberPid: 'MEMBER-1' }), useNavigate: () => mocks.navigate, useFetcher: () => ({ state: 'idle', Form: (props: React.ComponentProps<'form'>) => <form {...props} /> }) }));
@@ -14,7 +14,11 @@ async function loadMember(status = 'active', linkedUser = false) {
     pid: 'MEMBER-1', status, user: linkedUser ? { pid: 'USER-1', username: 'customer', email: 'customer@example.test', phone: null, realName: 'Customer', avatar: null } : null, joinDate: null, leaveDate: null,
     createdAt: '2026-10-03T00:00:00Z', updatedAt: '2026-10-03T00:00:00Z',
   } }));
-  const view = render(<MemberDetailPage />);
+  let view!: ReturnType<typeof render>;
+  // Complete the async loader commit, including the dialog's event listener,
+  // before dispatching events from tests. A visible action bar alone does not
+  // guarantee that passive effects have been installed.
+  await act(async () => { view = render(<MemberDetailPage />); });
   await screen.findByTestId('action-bar');
   return view;
 }
