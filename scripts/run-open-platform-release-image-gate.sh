@@ -214,6 +214,8 @@ docker run --rm --user "$RUNNER_UID:$RUNNER_GID" --network "$NET" \
   -e BASE_URL="http://$APP:6443" "$PYTHON_IMAGE" python /probe/open-platform-release-probe.py \
   > "$ARTIFACTS/protocol-probe.json" 2> "$ARTIFACTS/logs/protocol-probe.log" \
   || fail "two-domain HTTP protocol probe failed"
+python3 "$STAGE/scripts/ci/open_platform_dynamic_probe.py" --verify-release-report "$ARTIFACTS/protocol-probe.json" \
+  || fail "dynamic business case reconciliation failed"
 CLIENT_ID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["clientId"])' "$CREDENTIAL_ARTIFACT")"
 CLIENT_SECRET="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["clientSecret"])' "$CREDENTIAL_ARTIFACT")"
 
@@ -292,7 +294,7 @@ python3 - "$ARTIFACTS/release-image-receipt.json" <<PY
 import json, sys
 json.dump({
   "ref": "$REF_SHA", "image": "$IMAGE", "digest": "$DIGEST", "health": "UP",
-  "protocolProbe": "assets+inventory+cursor+etag+catalog", "slo": "production-thresholds-ok",
+  "protocolProbe": "assets+inventory+cursor+etag+catalog+dynamic-crud+named-query", "dynamicCases": 16, "slo": "production-thresholds-ok",
   "webhookDrainBacklog": 0, "registryPush": "disabled", "builder": "$AURA_CI_BUILDER_ID",
   "job": "$AURA_CI_JOB_ID"
 }, open(sys.argv[1], "w"), indent=2, sort_keys=True)

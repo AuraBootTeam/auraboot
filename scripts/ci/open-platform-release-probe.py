@@ -5,12 +5,11 @@ import importlib.util
 from pathlib import Path
 
 import json
-import importlib.util
-from pathlib import Path
 import os
 import urllib.parse
 
 from open_platform_http import Client, data
+from open_platform_dynamic_probe import run_dynamic_probe
 
 bootstrap_spec = importlib.util.spec_from_file_location(
     "release_bootstrap", Path(__file__).with_name("release-bootstrap.py"))
@@ -125,12 +124,14 @@ def main():
     if types != {"assets.assignment.changed", "inventory.stock-in.confirmed"}:
         raise RuntimeError(f"unexpected external event catalog: {types}")
 
+    dynamic = run_dynamic_probe(request, admin, evidence_path=Path(ARTIFACT).with_name("dynamic-probe.json"))
+
     with open(ARTIFACT, "w", encoding="utf-8") as handle:
         json.dump({"clientId": credential["clientId"], "clientSecret": credential["clientSecret"]}, handle)
     os.chmod(ARTIFACT, 0o600)
     print(json.dumps({
         "assetPid": asset1["pid"], "stockInPid": stock_in["pid"],
-        "cursorOpaque": True, "staleWriteStatus": 412, "catalogCount": len(catalog),
+        "cursorOpaque": True, "staleWriteStatus": 412, "catalogCount": len(catalog), "dynamic": dynamic,
     }, sort_keys=True))
 
 
