@@ -9,7 +9,7 @@ import os
 import urllib.parse
 
 from open_platform_http import Client, data
-from open_platform_dynamic_probe import run_dynamic_probe, run_sdk_consumer, audited_command, verify_command_audits
+from open_platform_dynamic_probe import run_dynamic_probe, run_sdk_consumer, audited_command, verify_command_audits, prepare_slo_fixture
 from open_platform_model_event_probe import run_model_event_probe
 from open_platform_model_event_runtime import DockerInfrastructure
 
@@ -144,9 +144,11 @@ def main():
                    "--network", os.environ["SDK_NETWORK"], "-v", os.environ["SDK_CONSUMER_ROOT"] + ":/consumer:ro",
                    os.environ["SDK_NODE_IMAGE"], "node", "/consumer/real-backend.mjs"]
     sdk = None
+    load_input = None
 
     def consume(fixture):
-        nonlocal sdk
+        nonlocal sdk, load_input
+        load_input = fixture
         sdk = run_sdk_consumer(fixture, sdk_command, base_url=os.environ["SDK_BASE_URL"],
                                evidence_path=Path(ARTIFACT).with_name("sdk-probe.json"))
 
@@ -160,10 +162,13 @@ def main():
         evidence_path=Path(ARTIFACT).parent / "model-events" / "result.json",
         receiver_host=os.environ["MODEL_RECEIVER_HOST"], secret_file=os.environ["MODEL_EVENT_SECRET_FILE"])
 
+    slo_fixture = prepare_slo_fixture(request, admin, dynamic, load_input,
+        fixture_path=os.environ.get("SLO_FIXTURE_ARTIFACT", str(Path(ARTIFACT).with_name("slo-fixture.json"))))
+
     with open(ARTIFACT, "w", encoding="utf-8") as handle:
         json.dump({"clientId": credential["clientId"], "clientSecret": credential["clientSecret"]}, handle)
     os.chmod(ARTIFACT, 0o600)
-    print(json.dumps(dict(static["public"], dynamic=dynamic, sdk=sdk, modelEvents=model_events), sort_keys=True))
+    print(json.dumps(dict(static["public"], dynamic=dynamic, sdk=sdk, modelEvents=model_events, sloFixture=slo_fixture), sort_keys=True))
 
 
 if __name__ == "__main__":

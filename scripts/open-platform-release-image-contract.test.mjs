@@ -54,6 +54,8 @@ assert.match(gate, /verify-open-platform-sdk\.py/);
 assert.match(gate, /-p 127\.0\.0\.1::6443/);
 assert.match(gate, /protocol binding is not loopback-only/);
 assert.match(gate, /"sdkCases": 13/);
+assert.match(gate, /BUSINESS_FIXTURE_PATH=\/artifacts\/slo-fixture\.json/);
+assert.match(gate, /verify-open-platform-slo\.py/);
 assert.match(gate, /"modelEventCases": 18/);
 assert.match(gate, /--model-event-secret-file "\$MODEL_EVENT_SECRET_FILE"/);
 assert.match(gate, /MODEL_APP="\$APP" MODEL_POSTGRES="\$PG"/);
@@ -127,6 +129,7 @@ for (const [status, ownLock] of [[0, true], [1, true], [42, true], [42, false], 
     fs.writeFileSync(credentials, 'private-sentinel');
     const modelKey = path.join(artifacts, 'private-model-key');
     fs.writeFileSync(modelKey, 'private-sentinel');
+    fs.writeFileSync(path.join(artifacts, 'slo-fixture.json'), 'private-sentinel');
     const calls = path.join(work, 'docker-calls');
     const result = spawnSync('bash', ['-c', `set -Eeuo pipefail
 ${exitHandler}
@@ -135,7 +138,7 @@ trap cleanup EXIT
 exit ${status}
 `], {
       encoding:'utf8', env:{...process.env, WORK_ROOT:work, ARTIFACTS:artifacts, LOCK_DIR:lock,
-        LOCK_TOKEN:'mine', CREDENTIAL_ARTIFACT:credentials, MODEL_EVENT_SECRET_FILE:modelKey, CALLS:calls, NET:'owned-network',
+        LOCK_TOKEN:'mine', CREDENTIAL_ARTIFACT:credentials, MODEL_EVENT_SECRET_FILE:modelKey, SLO_FIXTURE_ARTIFACT:path.join(artifacts, 'slo-fixture.json'), CALLS:calls, NET:'owned-network',
         DB_SAMPLE_PID:'', DB_SAMPLE_STOP:path.join(artifacts, 'db-sampling.stop'),
         APP:'owned-app', PG:'owned-pg', REDIS:'owned-redis', IMAGE:'owned-image'}
     });
@@ -143,6 +146,7 @@ exit ${status}
     assert.equal(fs.readFileSync(database, 'utf8'), 'retained database bytes');
     assert.equal(fs.existsSync(credentials), false);
     assert.equal(fs.existsSync(modelKey), false);
+    assert.equal(fs.existsSync(path.join(artifacts, 'slo-fixture.json')), false);
     assert.equal(fs.existsSync(lock), !ownLock);
     if (!ownLock) assert.equal(fs.readFileSync(path.join(lock, 'owner'), 'utf8'), 'other');
     const commands = fs.readFileSync(calls, 'utf8');

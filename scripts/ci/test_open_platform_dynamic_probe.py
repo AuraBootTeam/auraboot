@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from open_platform_dynamic_probe import CASES, run_dynamic_probe, run_sdk_consumer, verify_report, verify_release_report, verify_command_audits
+from open_platform_dynamic_probe import CASES, run_dynamic_probe, run_sdk_consumer, verify_report, verify_release_report, verify_command_audits, prepare_slo_fixture
 from open_platform_http import ProtocolError
 
 
@@ -63,6 +63,30 @@ class DynamicProbeTests(unittest.TestCase):
             report = command_passed(); report["auditProofs"][1][key] = value
             with self.subTest(key=key):
                 with self.assertRaises(ProtocolError): verify_command_audits(report)
+
+    def test_slo_fixture_uses_active_query_and_private_independent_load_installation(self):
+        calls = []
+        contract = {"code": "release.dynamic.by-zone", "maxConcurrent": 2, "sourceFingerprint": "source-fingerprint", "scopes": {"execute": "release.dynamic:query"}}
+        def request(path, *, method="GET", body=None, headers=None):
+            calls.append((path, method, body))
+            result = [{"code": "release.dynamic.by-zone", "contract": contract}] if path.endswith("/queries") else {}
+            if path.endswith("/installations"): result = {"pid": "load-install"}
+            if path.endswith("/credentials"): result = {"clientId": "private-client", "clientSecret": "private-secret"}
+            return 200, {"code": 0, "data": result}, {}
+        consumer = {"resourceCode": "release.dynamic.parts", "queryCode": "release.dynamic.by-zone", "allowedPid": "allowed-pid", "hiddenPid": "hidden-pid"}
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "fixture.json"
+            public = prepare_slo_fixture(request, {}, passed(), consumer, fixture_path=path)
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+            private = json.loads(path.read_text()); self.assertEqual(private["clientSecret"], "private-secret")
+            self.assertEqual(private["queryCode"], "release.slo.by-zone")
+            self.assertNotIn("private-secret", json.dumps(public)); self.assertNotIn("private-client", json.dumps(public))
+            self.assertEqual(contract["maxConcurrent"], 2)
+            self.assertEqual(calls[1][2]["definition"]["maxConcurrent"], 20)
+            self.assertEqual(calls[3][2]["rateLimitPerMinute"], 100000)
+            calls.clear()
+            with self.assertRaises(ProtocolError): prepare_slo_fixture(request, {}, passed(), consumer, fixture_path=path)
+            self.assertEqual(calls, [])
 
     def test_fixed_complete_report(self):
         self.assertEqual(verify_report(passed()), passed())

@@ -4,6 +4,8 @@ Uses production administration and machine HTTP routes only. Importing never
 contacts or provisions a target. A passed report requires every fixed case.
 """
 import json
+import os
+import uuid
 import subprocess
 import re
 import time
@@ -186,6 +188,57 @@ def verify_release_report(report, *, model_event_secret=None):
     verify_model_event_report(report.get("modelEvents"), secret=model_event_secret)
     verify_command_audits(report.get("commandAudits"))
     return report
+
+
+
+def prepare_slo_fixture(request, admin, report, consumer_fixture, *, fixture_path):
+    """Grant an independent load installation on the existing verified physical model."""
+    verify_report(report)
+    if (consumer_fixture.get("resourceCode") != "release.dynamic.parts"
+            or consumer_fixture.get("queryCode") != "release.dynamic.by-zone"):
+        raise ProtocolError("SLO source fixture identity invalid")
+    for key in ["allowedPid", "hiddenPid"]:
+        value = consumer_fixture.get(key)
+        if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", value) or value.isdigit():
+            raise ProtocolError("SLO reference PID invalid")
+    path = Path(fixture_path)
+    if path.exists() or path.is_symlink(): raise ProtocolError("SLO private fixture already exists")
+
+    def human(route, method="GET", body=None):
+        from open_platform_http import data
+        _, response, _ = request(route, method=method, body=body, headers=admin)
+        if not isinstance(response, dict) or str(response.get("code")) != "0":
+            raise ProtocolError("SLO administration failed")
+        return data(response)
+
+    views = human(f"/api/open-platform/installations/{report['installationPid']}/queries")
+    matches = [view for view in views if view.get("code") == consumer_fixture["queryCode"]]
+    if len(matches) != 1 or matches[0].get("contract", {}).get("maxConcurrent") != 2:
+        raise ProtocolError("SLO active source query contract missing")
+    query = json.loads(json.dumps(matches[0]["contract"]))
+    query.update(code="release.slo.by-zone", scopes={"execute": "release.slo:query"}, maxConcurrent=20)
+    human("/api/open-platform/query-publications/release.slo.by-zone/draft", "PUT", {"expectedRevision": 0, "definition": query})
+    human("/api/open-platform/query-publications/release.slo.by-zone/publish", "POST", {"expectedRevision": 1})
+    scopes = ["release.dynamic:" + operation for operation in ["list", "get", "create", "update", "delete"]]
+    scopes += ["release.slo:query", "openapi.profile.read"]
+    installation = human(f"/api/open-platform/applications/{report['applicationPid']}/installations", "POST",
+                         {"environment": "staging", "scopes": scopes, "rateLimitPerMinute": 100000})
+    prefix = f"/api/open-platform/installations/{installation['pid']}"
+    human(prefix + "/resources/release.dynamic.parts", "PUT", {"operations": ["list", "get", "create", "update", "delete"],
+          "readableFields": ["pid", "name", "zone"], "writableFields": ["name", "zone"],
+          "rowConstraints": [{"field": "zone", "values": ["A"]}]})
+    human(prefix + "/queries/release.slo.by-zone", "PUT", {"readableFields": ["pid", "name"]})
+    credential = human(prefix + "/credentials", "POST", {})
+    fixture = {"schemaVersion": 1, "profile": "open-platform-dynamic-slo-v1", "runId": "slo-" + uuid.uuid4().hex[:20],
+        "resourceCode": consumer_fixture["resourceCode"], "queryCode": query["code"],
+        "allowedPid": consumer_fixture["allowedPid"], "hiddenPid": consumer_fixture["hiddenPid"],
+        "clientId": credential["clientId"], "clientSecret": credential["clientSecret"]}
+    descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+        json.dump(fixture, handle)
+    return {"profile": fixture["profile"], "applicationPid": report["applicationPid"], "installationPid": installation["pid"],
+            "resourceCode": fixture["resourceCode"], "queryCode": fixture["queryCode"], "maxConcurrent": 20,
+            "sourceQueryMaxConcurrent": 2, "rateLimitPerMinute": 100000}
 
 
 def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None):

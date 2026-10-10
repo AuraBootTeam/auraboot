@@ -35,6 +35,9 @@ ARTIFACTS="$(cd "$AURA_REGRESSION_ARTIFACTS" && pwd)"
 mkdir -p "$ARTIFACTS/logs"
 CREDENTIAL_ARTIFACT="$ARTIFACTS/open-platform-credentials.json"
 MODEL_EVENT_SECRET_FILE="$ARTIFACTS/model-event-secret.key"
+SLO_FIXTURE_ARTIFACT="$ARTIFACTS/slo-fixture.json"
+[[ ! -e "$SLO_FIXTURE_ARTIFACT" && ! -L "$SLO_FIXTURE_ARTIFACT" ]] \
+  || fatal "SLO private fixture path already exists"
 [[ ! -e "$MODEL_EVENT_SECRET_FILE" && ! -L "$MODEL_EVENT_SECRET_FILE" ]] \
   || fatal "model event private key path already exists"
 WORK_PARENT="${AURA_CI_RELEASE_WORK_ROOT:-/opt/aura-ci/state/release-image-work}"
@@ -76,6 +79,7 @@ cleanup() {
     wait "$DB_SAMPLE_PID" || true
   fi
   rm -f "$CREDENTIAL_ARTIFACT"
+  if [[ -n "${SLO_FIXTURE_ARTIFACT:-}" ]]; then rm -f "$SLO_FIXTURE_ARTIFACT"; fi
   if [[ -n "${MODEL_EVENT_SECRET_FILE:-}" ]]; then rm -f "$MODEL_EVENT_SECRET_FILE"; fi
   if docker inspect "$APP" >/dev/null 2>&1; then
     docker logs "$APP" > "$ARTIFACTS/logs/app.log" 2>&1 || true
@@ -238,7 +242,7 @@ SDK_NODE_IMAGE="$SDK_NODE_IMAGE" SDK_BASE_URL="http://$APP:6443" \
 MODEL_APP="$APP" MODEL_POSTGRES="$PG" MODEL_SOURCE_REF="$REF_SHA" MODEL_IMAGE_DIGEST="$DIGEST" \
 AURA_CI_JOB_ID="$AURA_CI_JOB_ID" \
 MODEL_RECEIVER_HOST="$NETWORK_GATEWAY" \
-MODEL_EVENT_SECRET_FILE="$MODEL_EVENT_SECRET_FILE" \
+MODEL_EVENT_SECRET_FILE="$MODEL_EVENT_SECRET_FILE" SLO_FIXTURE_ARTIFACT="$SLO_FIXTURE_ARTIFACT" \
 python3 "$STAGE/scripts/ci/open-platform-release-probe.py" \
   > "$ARTIFACTS/protocol-probe.json" 2> "$ARTIFACTS/logs/protocol-probe.log" \
   || fail "two-domain HTTP protocol probe failed"
@@ -268,6 +272,7 @@ docker run --rm --user "$RUNNER_UID:$RUNNER_GID" --network "$NET" \
   -v "$STAGE/tests/load/k6":/scripts:ro \
   -v "$ARTIFACTS":/artifacts -e PROFILE=production -e BASE_URL="http://$APP:6443" \
   -e CLIENT_ID="$CLIENT_ID" -e CLIENT_SECRET="$CLIENT_SECRET" \
+  -e BUSINESS_FIXTURE_PATH=/artifacts/slo-fixture.json \
   -e SUMMARY_PATH=/artifacts/slo-summary.json "$K6_IMAGE" run /scripts/open-platform-slo.js \
   > "$ARTIFACTS/logs/k6.log" 2>&1 || SLO_RC=$?
 # Preserve normalized statements (no bound credential values) on both red and
@@ -286,8 +291,10 @@ cat /proc/loadavg > "$ARTIFACTS/host-load-after.txt"
 docker stats --no-stream --format '{{json .}}' "$APP" "$PG" "$REDIS" \
   > "$ARTIFACTS/container-resources.jsonl" 2> "$ARTIFACTS/logs/container-resources.log" || true
 [[ "$SLO_RC" == 0 ]] || fail "Open Platform production SLO thresholds failed (k6 exit=$SLO_RC, SQL profile exit=$PROFILE_RC)"
+python3 "$STAGE/scripts/ci/verify-open-platform-slo.py" "$ARTIFACTS/slo-summary.json" production \
+  || fail "Open Platform business SLO sample reconciliation failed"
 [[ "$PROFILE_RC" == 0 ]] || fatal "SQL profile could not be collected"
-rm -f "$CREDENTIAL_ARTIFACT"
+rm -f "$CREDENTIAL_ARTIFACT" "$SLO_FIXTURE_ARTIFACT"
 
 info "waiting for Webhook queue drain"
 if [[ "$RELEASE_MUTATION" == "webhook-backlog" ]]; then
