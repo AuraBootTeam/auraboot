@@ -36,6 +36,28 @@ import static org.mockito.Mockito.when;
  */
 @ExtendWith(MockitoExtension.class)
 class ValidationServiceReferenceValidationTest {
+    @Test void explicitPidIdentityDoesNotQueryANumericDisplayColumn() {
+        FieldDefinition field=referenceField("submitted_offer","submission");
+        field.getRefTarget().setTargetTable("mt_submission");
+        field.getRefTarget().setValueField("pid");
+        field.getRefTarget().setTargetField("sequence");
+        when(dynamicDataMapper.selectByQuery(anyString(),any())).thenAnswer(invocation -> {
+            String sql=invocation.getArgument(0);
+            assertFalse(sql.contains("sequence"));assertFalse(sql.contains(" OR "));
+            Map<?,?> params=invocation.getArgument(1);assertEquals("01OFFER",params.get("refValue"));
+            return List.of(Map.of("cnt",1L));
+        });
+        assertTrue(service.validateField(field,"01OFFER",ValidationContext.CREATE).isValid());
+    }
+
+    @Test void databaseFailureCannotApproveAReference() {
+        FieldDefinition field=referenceField("submitted_offer","submission");
+        field.getRefTarget().setTargetTable("mt_submission");
+        field.getRefTarget().setValueField("pid");
+        when(dynamicDataMapper.selectByQuery(anyString(),any())).thenThrow(new IllegalStateException("Database unavailable"));
+        var result=service.validateField(field,"01OFFER",ValidationContext.CREATE);
+        assertFalse(result.isValid());assertTrue(result.getErrors().getFirst().contains("could not be verified"));
+    }
 
     @Mock
     private DynamicDataMapper dynamicDataMapper;
