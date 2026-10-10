@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from open_platform_dynamic_probe import CASES, run_dynamic_probe, verify_report
+from open_platform_dynamic_probe import CASES, run_dynamic_probe, run_sdk_consumer, verify_report, verify_release_report
 from open_platform_http import ProtocolError
 
 
@@ -106,6 +106,60 @@ class SdkReportTests(unittest.TestCase):
     def test_wrong_sdk_profile(self):
         report = self.report(); report["profile"] = "loopback-fixture"
         with self.assertRaises(ProtocolError): self.verify(report)
+
+    def test_release_requires_sdk_in_addition_to_dynamic_http(self):
+        sdk = self.report()
+        with self.assertRaises(ProtocolError): verify_release_report({"dynamic": passed()})
+        self.assertEqual(verify_release_report({"dynamic": passed(), "sdk": sdk})["sdk"], sdk)
+
+    def test_consumer_private_stdin_and_fixed_safe_ledger(self):
+        import subprocess
+        report = self.report()
+        report["secret"] = "private-sentinel"
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory) / "sdk.json"
+            with patch("subprocess.run", return_value=subprocess.CompletedProcess([], 0, json.dumps(report), "private-sentinel")) as child:
+                actual = run_sdk_consumer({"clientSecret": "private-sentinel"}, ["node", "consumer"],
+                                          base_url="http://real-backend", evidence_path=evidence)
+            self.assertEqual(actual["passed"], 13)
+            self.assertIn("private-sentinel", child.call_args.kwargs["input"])
+            self.assertNotIn("private-sentinel", json.dumps(child.call_args.args))
+            self.assertEqual(child.call_args.kwargs["timeout"], 90)
+            self.assertNotIn("sentinel", evidence.read_text())
+
+    def test_consumer_nonzero_cannot_pass_from_complete_stdout(self):
+        import subprocess
+        report = self.report()
+        with tempfile.TemporaryDirectory() as directory:
+            with patch("subprocess.run", return_value=subprocess.CompletedProcess([], 1, json.dumps(report), "private-sentinel")):
+                with self.assertRaises(ProtocolError) as failure:
+                    run_sdk_consumer({}, ["node"], base_url="http://backend", evidence_path=Path(directory)/"sdk.json")
+                self.assertNotIn("sentinel", str(failure.exception))
+
+    def test_consumer_timeout_bad_stdout_and_missing_command_are_redacted(self):
+        import subprocess
+        for problem in [subprocess.TimeoutExpired(["private-sentinel"], 90), OSError("private-sentinel")]:
+            with patch("subprocess.run", side_effect=problem):
+                with self.assertRaises(ProtocolError) as failure:
+                    run_sdk_consumer({}, [], base_url="http://backend", evidence_path=Path("unused"))
+                self.assertNotIn("sentinel", str(failure.exception))
+        with patch("subprocess.run", return_value=subprocess.CompletedProcess([], 0, "private-sentinel", "")):
+            with self.assertRaises(ProtocolError) as failure:
+                run_sdk_consumer({}, [], base_url="http://backend", evidence_path=Path("unused"))
+            self.assertNotIn("sentinel", str(failure.exception))
+
+    def test_failed_consumer_keeps_safe_execution_denominator(self):
+        import subprocess
+        report = self.report()
+        report["cases"][2]["status"] = "failed"
+        for row in report["cases"][3:]: row["status"] = "did_not_run"
+        report.update(executed=3, passed=2, requests=4)
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)/"sdk.json"
+            with patch("subprocess.run", return_value=subprocess.CompletedProcess([], 1, json.dumps(report), "")):
+                with self.assertRaises(ProtocolError):
+                    run_sdk_consumer({}, [], base_url="http://backend", evidence_path=evidence)
+            self.assertEqual(json.loads(evidence.read_text())["cases"], report["cases"])
 
 
 if __name__ == "__main__":

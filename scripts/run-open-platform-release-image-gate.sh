@@ -51,7 +51,7 @@ APP="open-platform-$SAFE_JOB-app"
 IMAGE="auraboot-platform-open-api:ci-${REF_SHA:0:12}"
 FLYWAY_IMAGE="${AURA_CI_RELEASE_FLYWAY_IMAGE:-flyway/flyway:12.8.1}"
 K6_IMAGE="${AURA_CI_K6_IMAGE:-grafana/k6:1.3.0}"
-PYTHON_IMAGE="${AURA_CI_PYTHON_IMAGE:-python:3.13-alpine}"
+SDK_NODE_IMAGE="${AURA_CI_NODE_IMAGE:-node:22-alpine}"
 BUILD_JDK_IMAGE="eclipse-temurin:21-jdk"
 RUNTIME_JRE_IMAGE="eclipse-temurin:21-jre-alpine"
 PULL_TIMEOUT="${AURA_CI_RELEASE_PULL_TIMEOUT:-300}"
@@ -99,7 +99,7 @@ BASE_IMAGE_MANIFEST="$ARTIFACTS/base-images.json"
 # The admitted host prewarms these images. Freeze only digests belonging to each
 # configured source repository; public mirror aliases are never source authority.
 python3 "$SCRIPT_DIR/ci/freeze-release-base-images.py" "$BASE_IMAGE_MANIFEST" \
-  pgvector/pgvector:pg16 redis:7.4-alpine "$FLYWAY_IMAGE" "$K6_IMAGE" "$PYTHON_IMAGE" \
+  pgvector/pgvector:pg16 redis:7.4-alpine "$FLYWAY_IMAGE" "$K6_IMAGE" "$SDK_NODE_IMAGE" \
   "$BUILD_JDK_IMAGE" "$RUNTIME_JRE_IMAGE" \
   || fatal "unable to freeze prewarmed base image identities"
 base_ref() {
@@ -118,7 +118,7 @@ PGVECTOR_IMAGE="$(base_ref pgvector/pgvector:pg16)"
 REDIS_IMAGE="$(base_ref redis:7.4-alpine)"
 FLYWAY_IMAGE="$(base_ref "$FLYWAY_IMAGE")"
 K6_IMAGE="$(base_ref "$K6_IMAGE")"
-PYTHON_IMAGE="$(base_ref "$PYTHON_IMAGE")"
+SDK_NODE_IMAGE="$(base_ref "$SDK_NODE_IMAGE")"
 BUILD_JDK_IMAGE="$(base_ref "$BUILD_JDK_IMAGE")"
 RUNTIME_JRE_IMAGE="$(base_ref "$RUNTIME_JRE_IMAGE")"
 
@@ -153,6 +153,14 @@ git -C "$REPO_ROOT" archive --format=tar HEAD | tar -x -C "$STAGE"
 # the immutable public plugin staging copy so the test-profile app can consume the read-only bind
 # mount without running as root or changing permissions in the source checkout.
 chmod -R a+rX "$STAGE/plugins"
+SDK_ROOT="$WORK_ROOT/sdk"
+info "building and installing the exact-ref SDK tarball"
+timeout 600 docker run --rm --user "$RUNNER_UID:$RUNNER_GID" \
+  -v "$STAGE":/source:ro -v "$WORK_ROOT":/work \
+  "$SDK_NODE_IMAGE" sh /source/scripts/ci/prepare-open-platform-sdk.sh /source /work/sdk \
+  > "$ARTIFACTS/logs/sdk-prepare.log" 2>&1 || fail "fresh SDK preparation failed"
+python3 "$STAGE/scripts/ci/verify-open-platform-sdk.py" "$STAGE" "$SDK_ROOT" "$ARTIFACTS/sdk-archive.json" \
+  || fail "fresh SDK archive reconciliation failed"
 info "building exact-ref image $IMAGE"
 docker build -f "$STAGE/platform/Dockerfile" -t "$IMAGE" \
   --build-arg "BUILD_JDK_IMAGE=$BUILD_JDK_IMAGE" --build-arg "RUNTIME_JRE_IMAGE=$RUNTIME_JRE_IMAGE" "$STAGE" \
@@ -187,6 +195,7 @@ JWT_KEY="$(openssl rand -base64 64 | tr -d '\n')"
 # since #2037 AuraPluginManager fails fast on undescribed paths instead of
 # skipping them. The image pre-creates the empty jar root /app/pf4j-plugins.
 docker run -d --name "$APP" --network "$NET" \
+  -p 127.0.0.1::6443 \
   -v "$STAGE/plugins":/plugins:ro \
   -e SERVER_PORT=6443 -e SPRING_PROFILES_ACTIVE=community \
   -e JWT_SECRET="$JWT_KEY" \
@@ -209,9 +218,12 @@ info "running two-domain HTTP protocol probe"
 # success or failure path so a failed probe cannot leave client credentials in CI artifacts.
 : > "$CREDENTIAL_ARTIFACT"
 chmod 0600 "$CREDENTIAL_ARTIFACT"
-docker run --rm --user "$RUNNER_UID:$RUNNER_GID" --network "$NET" \
-  -v "$STAGE/scripts/ci":/probe:ro -v "$ARTIFACTS":/artifacts \
-  -e BASE_URL="http://$APP:6443" "$PYTHON_IMAGE" python /probe/open-platform-release-probe.py \
+APP_BIND="$(docker port "$APP" 6443/tcp)"
+[[ "$APP_BIND" =~ ^127\.0\.0\.1:[0-9]+$ ]] || fatal "release app protocol binding is not loopback-only"
+BASE_URL="http://$APP_BIND" CREDENTIAL_ARTIFACT="$CREDENTIAL_ARTIFACT" \
+SDK_RUNNER_USER="$RUNNER_UID:$RUNNER_GID" SDK_NETWORK="$NET" SDK_CONSUMER_ROOT="$SDK_ROOT/consumer" \
+SDK_NODE_IMAGE="$SDK_NODE_IMAGE" SDK_BASE_URL="http://$APP:6443" \
+python3 "$STAGE/scripts/ci/open-platform-release-probe.py" \
   > "$ARTIFACTS/protocol-probe.json" 2> "$ARTIFACTS/logs/protocol-probe.log" \
   || fail "two-domain HTTP protocol probe failed"
 python3 "$STAGE/scripts/ci/open_platform_dynamic_probe.py" --verify-release-report "$ARTIFACTS/protocol-probe.json" \
@@ -294,7 +306,8 @@ python3 - "$ARTIFACTS/release-image-receipt.json" <<PY
 import json, sys
 json.dump({
   "ref": "$REF_SHA", "image": "$IMAGE", "digest": "$DIGEST", "health": "UP",
-  "protocolProbe": "assets+inventory+cursor+etag+catalog+dynamic-crud+named-query", "dynamicCases": 16, "slo": "production-thresholds-ok",
+  "protocolProbe": "assets+inventory+cursor+etag+catalog+dynamic-crud+named-query+fresh-sdk", "dynamicCases": 16, "sdkCases": 13, "slo": "production-thresholds-ok",
+  "sdkArchive": json.load(open("$ARTIFACTS/sdk-archive.json")), "sdkNodeImage": "$SDK_NODE_IMAGE",
   "webhookDrainBacklog": 0, "registryPush": "disabled", "builder": "$AURA_CI_BUILDER_ID",
   "job": "$AURA_CI_JOB_ID"
 }, open(sys.argv[1], "w"), indent=2, sort_keys=True)

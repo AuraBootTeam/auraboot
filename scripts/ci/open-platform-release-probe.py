@@ -9,7 +9,7 @@ import os
 import urllib.parse
 
 from open_platform_http import Client, data
-from open_platform_dynamic_probe import run_dynamic_probe
+from open_platform_dynamic_probe import run_dynamic_probe, run_sdk_consumer
 
 bootstrap_spec = importlib.util.spec_from_file_location(
     "release_bootstrap", Path(__file__).with_name("release-bootstrap.py"))
@@ -124,14 +124,25 @@ def main():
     if types != {"assets.assignment.changed", "inventory.stock-in.confirmed"}:
         raise RuntimeError(f"unexpected external event catalog: {types}")
 
-    dynamic = run_dynamic_probe(request, admin, evidence_path=Path(ARTIFACT).with_name("dynamic-probe.json"))
+    sdk_command = ["docker", "run", "--rm", "-i", "--user", os.environ["SDK_RUNNER_USER"],
+                   "--network", os.environ["SDK_NETWORK"], "-v", os.environ["SDK_CONSUMER_ROOT"] + ":/consumer:ro",
+                   os.environ["SDK_NODE_IMAGE"], "node", "/consumer/real-backend.mjs"]
+    sdk = None
+
+    def consume(fixture):
+        nonlocal sdk
+        sdk = run_sdk_consumer(fixture, sdk_command, base_url=os.environ["SDK_BASE_URL"],
+                               evidence_path=Path(ARTIFACT).with_name("sdk-probe.json"))
+
+    dynamic = run_dynamic_probe(request, admin, evidence_path=Path(ARTIFACT).with_name("dynamic-probe.json"),
+                                consumer=consume)
 
     with open(ARTIFACT, "w", encoding="utf-8") as handle:
         json.dump({"clientId": credential["clientId"], "clientSecret": credential["clientSecret"]}, handle)
     os.chmod(ARTIFACT, 0o600)
     print(json.dumps({
         "assetPid": asset1["pid"], "stockInPid": stock_in["pid"],
-        "cursorOpaque": True, "staleWriteStatus": 412, "catalogCount": len(catalog), "dynamic": dynamic,
+        "cursorOpaque": True, "staleWriteStatus": 412, "catalogCount": len(catalog), "dynamic": dynamic, "sdk": sdk,
     }, sort_keys=True))
 
 

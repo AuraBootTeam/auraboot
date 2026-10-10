@@ -4,6 +4,7 @@ Uses production administration and machine HTTP routes only. Importing never
 contacts or provisions a target. A passed report requires every fixed case.
 """
 import json
+import subprocess
 from pathlib import Path
 
 from open_platform_http import ProtocolError
@@ -48,6 +49,43 @@ def verify_sdk_report(report):
         raise ProtocolError("SDK real backend totals invalid")
     if report.get("requests") != 17 or report.get("tokenExchanges") != 1:
         raise ProtocolError("SDK real transport/cache budget invalid")
+    return report
+
+
+def run_sdk_consumer(fixture, command, *, base_url, evidence_path):
+    """Run the installed SDK with private stdin; never echo child diagnostics."""
+    try:
+        result = subprocess.run(command, input=json.dumps(dict(fixture, baseUrl=base_url)),
+                                text=True, capture_output=True, timeout=90, check=False)
+        report = json.loads(result.stdout)
+    except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError) as error:
+        raise ProtocolError("SDK consumer transport failed") from None
+    # Preserve only fixed, safe ledger fields, including a failed execution.
+    profile = json.loads((Path(__file__).resolve().parents[1] /
+                          "fixtures/open-platform-consumer/real-backend.profile.json").read_text())
+    rows = report.get("cases") if isinstance(report, dict) else None
+    statuses = {"passed", "failed", "did_not_run"}
+    if (not isinstance(rows, list) or len(rows) != len(profile["cases"])
+            or [row.get("id") for row in rows if isinstance(row, dict)] != profile["cases"]
+            or any(row.get("status") not in statuses for row in rows)):
+        raise ProtocolError("SDK consumer ledger malformed")
+    safe = {key: report.get(key) for key in
+            ["schemaVersion", "profile", "executed", "passed", "requests", "tokenExchanges"]}
+    if (safe["schemaVersion"] != 1 or safe["profile"] != profile["id"]
+            or any(type(safe[key]) is not int for key in ["executed", "passed", "requests", "tokenExchanges"])):
+        raise ProtocolError("SDK consumer ledger metadata malformed")
+    safe["cases"] = [{"id": row["id"], "status": row["status"]} for row in rows]
+    Path(evidence_path).write_text(json.dumps(safe, indent=2) + "\n", encoding="utf-8")
+    if result.returncode != 0:
+        raise ProtocolError("SDK consumer failed")
+    return verify_sdk_report(safe)
+
+
+def verify_release_report(report):
+    if not isinstance(report, dict):
+        raise ProtocolError("release protocol report invalid")
+    verify_report(report.get("dynamic"))
+    verify_sdk_report(report.get("sdk"))
     return report
 
 
@@ -189,4 +227,4 @@ if __name__ == "__main__":
     import sys
     if len(sys.argv) != 3 or sys.argv[1] != "--verify-release-report":
         raise SystemExit("usage: open_platform_dynamic_probe.py --verify-release-report REPORT")
-    verify_report(json.loads(Path(sys.argv[2]).read_text(encoding="utf-8")).get("dynamic"))
+    verify_release_report(json.loads(Path(sys.argv[2]).read_text(encoding="utf-8")))
