@@ -342,6 +342,11 @@ export default function MemberDetailPage() {
 
       {/* Action buttons */}
       <div className="mb-6 flex flex-wrap gap-2" data-testid="action-bar">
+        {member.status === 'active' && member.user && hasPermission('admin.customer.impersonate') && (
+          <ActionButton onClick={() => { setReasonRequired(false); setShowImpersonationDialog(true); }} variant="primary">
+            {l('代客户登录', 'Access as customer')}
+          </ActionButton>
+        )}
         {member.status === 'pending' && (
           <>
             {canPerform('approve') && (<ActionButton onClick={doApprove} disabled={actionLoading} variant="primary">
