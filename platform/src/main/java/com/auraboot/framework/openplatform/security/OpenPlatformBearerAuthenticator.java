@@ -43,7 +43,7 @@ public class OpenPlatformBearerAuthenticator implements ExternalMachineAuthentic
     @Transactional
     public MachinePrincipal authenticate(HttpServletRequest request) {
         OpenApiCapabilityRegistry.Capability capability = capabilityRegistry.resolve(request.getMethod(), request.getRequestURI()).orElse(null);
-        if (capability == null && !request.getRequestURI().matches("/api/open/v1/resources/[a-z][a-z0-9.-]{1,99}(?:/[^/]+)?")) {
+        if (capability == null && !request.getRequestURI().matches("/api/open/v1/(?:resources/[a-z][a-z0-9.-]{1,99}(?:/[^/]+)?|queries/[a-z][a-z0-9.-]{1,93}:execute)")) {
             throw new ExternalMachineAuthException(404, "open_api_capability_not_found");
         }
         String authorization = request.getHeader("Authorization");

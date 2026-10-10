@@ -91,6 +91,9 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
     @org.springframework.beans.factory.annotation.Autowired
     private NamedQueryFieldProtection fieldProtection;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private org.springframework.jdbc.core.JdbcTemplate deadlineJdbc;
+
     private final NamedQueryMapper namedQueryMapper;
     private final NamedQueryFieldMapper namedQueryFieldMapper;
     private final NamedQueryVersionMapper namedQueryVersionMapper;
@@ -306,6 +309,23 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         var fields = readFields(definition);
         dto.setFields(fields.stream().map(this::toFieldDTO).toList());
         dto.setFieldCount(fields.size());
+        return dto;
+    }
+
+    @Override
+    public ExecutionDefinition describeExecution(String code) {
+        var definition = readDefinition(code);
+        if (definition == null) throw new MetaServiceException("Named query not found: " + code);
+        var fields = readFields(definition);
+        var dto = executionDTO(definition.query(), fields);
+        var sources = definition.query().isConnectorType() ? Set.<String>of()
+                : fieldProtection.resolveSourceModels(definition.query(), fields);
+        return new ExecutionDefinition(dto, com.auraboot.framework.meta.util.NamedQueryDefinitionFingerprint.of(dto), sources);
+    }
+
+    private NamedQueryDTO executionDTO(NamedQuery query, List<NamedQueryField> fields) {
+        var dto = toDTO(query, false);
+        dto.setFields(fields.stream().map(this::toFieldDTO).toList()); dto.setFieldCount(fields.size());
         return dto;
     }
 
@@ -689,6 +709,12 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             throw new MetaServiceException("Named query is not executable (status: " + query.getStatus() + "): " + code);
         }
 
+        List<NamedQueryField> fields = readFields(definition);
+        if (request.getExpectedDefinitionFingerprint() != null && !request.getExpectedDefinitionFingerprint().equals(
+                com.auraboot.framework.meta.util.NamedQueryDefinitionFingerprint.of(executionDTO(query, fields)))) {
+            throw new AccessDeniedException("Published named query source changed");
+        }
+
         Long tenantId = getCurrentTenantId();
         NamedQueryPolicy policy = query.getPolicy() != null ? query.getPolicy() : new NamedQueryPolicy();
         Map<String, Object> authorizationParams = new HashMap<>();
@@ -716,13 +742,19 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         }
 
         // 3. Get field whitelist
-        List<NamedQueryField> fields = readFields(definition);
         validatePublicOutputAliases(fields);
         Map<String, NamedQueryField> fieldMap = fields.stream()
                 .collect(Collectors.toMap(NamedQueryField::getFieldCode, f -> f));
 
+        List<NamedQueryField> selectedFields = fields;
+        if (request.getPublishedOutputFields() != null) {
+            var selected = request.getPublishedOutputFields();
+            if (selected.isEmpty() || !fieldMap.keySet().containsAll(selected)) throw new AccessDeniedException("Invalid published query output selection");
+            selectedFields = fields.stream().filter(field -> selected.contains(field.getFieldCode())).toList();
+        }
+
         // 4. Build SELECT columns (validate expressions to prevent SQL injection via admin config)
-        List<String> selectColumns = fields.stream()
+        List<String> selectColumns = selectedFields.stream()
                 .map(f -> {
                     SqlSafetyUtils.validateSqlFragment(f.getColumnExpr());
                     SqlSafetyUtils.validateIdentifier(f.getFieldCode(), "NQ field code");
@@ -772,7 +804,8 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         boolean rootRecordGrant = authorizeRootRecord(query, policy, params);
         boolean aggregateRootGrant = collaboratorGrant || rootRecordGrant;
 
-        NamedQueryFieldProtection.Plan protection = fieldProtection.prepare(query, fields, "list", aggregateRootGrant);
+        applyExecutionDeadline(request);
+        NamedQueryFieldProtection.Plan protection = fieldProtection.prepare(query, selectedFields, "list", aggregateRootGrant);
         if (MachineDataAccessContext.isActive()) {
             protection.parameters().forEach((key, value) -> {
                 if (params.containsKey(key)) throw new AccessDeniedException("Reserved machine named query parameter");
@@ -815,23 +848,35 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
                 request.getSize() != null ? request.getSize() : 20, effectiveMaxRows);
         int offset = PaginationSafetyUtils.offset(pageNum, pageSize, effectiveMaxRows);
 
+        fieldProtection.validateMachineSql(protection, sql.toString());
         sql = new StringBuilder(fieldProtection.rewrite(protection, sql.toString()));
 
         // Count total
         // The shared source rewrite already applies tenant and row scopes before counting.
         // TenantLineInterceptor fails on deeply nested subqueries wrapped by the NQ engine.
         String countSql = "SELECT COUNT(*) FROM (" + sql + ") AS _count_query";
+        applyExecutionDeadline(request);
         Long total = dynamicDataMapper.countByQueryWithoutTenant(countSql, params);
 
         // Add LIMIT/OFFSET
         sql.append(" LIMIT ").append(pageSize).append(" OFFSET ").append(offset);
 
         // 11. Execute (bypass tenant interceptor — tenant isolation is in the NQ SQL itself)
+        applyExecutionDeadline(request);
         List<Map<String, Object>> records = dropEmptyRowNullEntries(
                 dynamicDataMapper.selectByQueryWithoutTenant(sql.toString(), params));
 
         records = fieldProtection.apply(protection, records);
         return PaginationResult.of(records, total, pageNum, pageSize);
+    }
+
+    private void applyExecutionDeadline(NamedQueryTestRequest request) {
+        if (request.getExecutionDeadlineNanos() == null) return;
+        long remaining = request.getExecutionDeadlineNanos() - System.nanoTime();
+        if (remaining <= 0) throw new org.springframework.dao.QueryTimeoutException("Named query execution deadline expired");
+        long millis = Math.max(1, java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(remaining));
+        // The remaining budget applies to each SQL stage, so count + projection share one deadline.
+        deadlineJdbc.queryForObject("SELECT set_config('statement_timeout', ?, true)", String.class, millis + "ms");
     }
 
     /**
@@ -892,6 +937,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             NamedQueryPolicy policy,
             Map<String, Object> params,
             Long memberId) {
+        if (MachineDataAccessContext.isActive()) return false;
         NamedQueryPolicy.RootAccess root = policy == null ? null : policy.getRootAccess();
         if (root == null || !Boolean.TRUE.equals(root.getAllowCollaborator())) return false;
         String modelCode = trimToNull(root.getModelCode());
@@ -931,6 +977,13 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         if (recordPid == null || recordPid.isBlank()) {
             throw new MetaServiceException(
                     "Named query root record pid parameter is required: " + pidParam);
+        }
+
+        if (MachineDataAccessContext.isActive()) {
+            MachineDataAccessContext.requireDecision(modelCode).requireAction("read");
+            dynamicDataServiceProvider.getObject().getById(modelCode, recordPid);
+            // Every joined source still requires its own scoped machine grant.
+            return false;
         }
 
         Long memberId = MetaContext.getCurrentMemberId();

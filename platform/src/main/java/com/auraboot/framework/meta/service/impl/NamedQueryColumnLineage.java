@@ -37,6 +37,16 @@ final class NamedQueryColumnLineage {
         return Set.copyOf(consumed);
     }
 
+    Set<PhysicalColumn> resolveConsumedSql(String sql) {
+        inspectConsumption = true; consumed.clear();
+        try {
+            projection((Select) CCJSqlParserUtil.parse(sql.replaceAll("#\\{params\\.[a-zA-Z0-9_]+}", "?")), Map.of());
+            return Set.copyOf(consumed);
+        } catch (net.sf.jsqlparser.JSQLParserException failure) {
+            throw new MetaServiceException("Cannot resolve complete named query dependencies", failure);
+        }
+    }
+
     Map<String, Origin> resolve(String fromSql, List<NamedQueryField> fields) {
         try {
             String source = fromSql.trim();
@@ -190,6 +200,9 @@ final class NamedQueryColumnLineage {
             }
             @Override public <S> Void visit(Function value, S context) {
                 opaque[0] = true;
+                // COUNT(*) reveals scoped row cardinality, not any protected column.
+                if ("count".equalsIgnoreCase(value.getName()) && value.getParameters() != null
+                        && value.getParameters().size() == 1 && value.getParameters().get(0) instanceof AllColumns) return null;
                 return super.visit(value, context);
             }
             @Override public <S> Void visit(Select value, S context) {

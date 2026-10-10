@@ -10,7 +10,7 @@ import java.util.Map;
 
 /** Public resource-specific status contracts; common authentication errors retain the host handler. */
 @Order(0)
-@RestControllerAdvice(assignableTypes = {OpenApiResourceWriteController.class, OpenPlatformFacadeController.class})
+@RestControllerAdvice(assignableTypes = {OpenApiResourceWriteController.class, OpenPlatformFacadeController.class, OpenApiQueryController.class})
 public class OpenApiResourceErrorHandler {
     @ExceptionHandler(OpenApiPreconditionException.class)
     public ResponseEntity<Map<String, Object>> precondition(OpenApiPreconditionException error) {

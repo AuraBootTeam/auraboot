@@ -108,6 +108,23 @@ public record OpenApiResourceContract(
         return projectObject(fields, record, 0);
     }
 
+    public static Map<String, Object> projectFields(Map<String, Field> fields, Map<String, Object> record) {
+        return projectObject(fields, record, 0);
+    }
+
+    public static Object validateFieldValue(Field field, Object value) {
+        return validateValue(field, value, true, 1);
+    }
+
+    public static void validatePublicFields(Map<String, Field> fields) {
+        require(fields != null && !fields.isEmpty() && fields.size() <= 100, "Bounded public field schema required");
+        fields.forEach((alias, field) -> {
+            identifier(alias, "field alias", "[a-zA-Z][a-zA-Z0-9]{0,99}");
+            require(field != null && !INTERNAL.contains(alias) && !INTERNAL.contains(field.source()), "Internal field is not publishable");
+        });
+        require(fields.values().stream().map(Field::source).distinct().count() == fields.size(), "Duplicate public source field");
+    }
+
     public Object validateFilterValue(String alias, Object value) {
         Field field = fields.get(alias);
         require(field != null && field.readable() && field.type() != Type.OBJECT && field.type() != Type.ARRAY,

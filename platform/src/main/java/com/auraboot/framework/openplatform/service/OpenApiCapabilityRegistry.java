@@ -18,11 +18,18 @@ public class OpenApiCapabilityRegistry {
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
     private final List<Capability> capabilities;
     private OpenApiPublicationService dynamicPublications;
+    private OpenApiQueryPublicationService dynamicQueries;
 
     @org.springframework.beans.factory.annotation.Autowired
-    public OpenApiCapabilityRegistry(List<OpenApiCapabilityContributor> contributors, OpenApiPublicationService publications) {
+    public OpenApiCapabilityRegistry(List<OpenApiCapabilityContributor> contributors, OpenApiPublicationService publications,
+                                     OpenApiQueryPublicationService queries) {
         this(contributors);
         this.dynamicPublications = publications;
+        this.dynamicQueries = queries;
+    }
+
+    public OpenApiCapabilityRegistry(List<OpenApiCapabilityContributor> contributors, OpenApiPublicationService publications) {
+        this(contributors, publications, null);
     }
 
     public OpenApiCapabilityRegistry(List<OpenApiCapabilityContributor> contributors) {
@@ -68,6 +75,7 @@ public class OpenApiCapabilityRegistry {
         if (dynamicPublications == null || tenantId == null) return capabilities;
         List<Capability> published = new ArrayList<>(capabilities);
         dynamicPublications.publishedContracts(tenantId).forEach(contract -> published.addAll(resourceCapabilities(contract)));
+        if (dynamicQueries != null) dynamicQueries.published(tenantId).forEach(contract -> published.add(queryCapability(contract)));
         assertUnique(published);
         return List.copyOf(published);
     }
@@ -85,9 +93,23 @@ public class OpenApiCapabilityRegistry {
         Optional<Capability> fixed = resolve(method, path);
         if (fixed.isPresent() || dynamicPublications == null) return fixed;
         String[] segments = path.split("/", -1);
+        if (dynamicQueries != null && segments.length == 6 && "queries".equals(segments[4]) && segments[5].endsWith(":execute")) {
+            String code = segments[5].substring(0, segments[5].length() - ":execute".length());
+            return dynamicQueries.active(tenantId, code).map(this::queryCapability).filter(capability -> capability.method().matches(method));
+        }
         if (segments.length < 6 || segments.length > 7 || !"resources".equals(segments[4])) return Optional.empty();
         return dynamicPublications.active(tenantId, segments[5]).stream().flatMap(contract -> resourceCapabilities(contract).stream())
                 .filter(capability -> capability.method().matches(method) && pathMatcher.match(capability.pathPattern(), path)).findFirst();
+    }
+
+    public void requireAvailableQueryRoute(OpenApiQueryContract contract) {
+        var candidate = queryCapability(contract);
+        if (resolve(candidate.method().name(), candidate.pathPattern()).isPresent()) throw new IllegalArgumentException("Query route is already reserved");
+    }
+
+    private Capability queryCapability(OpenApiQueryContract contract) {
+        return new Capability("query." + contract.code() + ".execute", HttpMethod.POST,
+                "/api/open/v1/queries/" + contract.code() + ":execute", contract.scopes().get("execute"), "source-grants", contract.schemaVersion());
     }
 
     private List<Capability> resourceCapabilities(OpenApiResourceContract contract) {

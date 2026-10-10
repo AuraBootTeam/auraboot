@@ -9,7 +9,12 @@ import java.util.List;
 @InterceptorIgnore(tenantLine = "true")
 public interface OpenApiPublicationMapper {
     @Select("SELECT set_config('statement_timeout', #{timeout}, true)")
+    @Options(useCache = false, flushCache = Options.FlushCachePolicy.TRUE)
     String setStatementTimeout(@Param("timeout") String timeout);
+
+    @Select("SELECT pg_try_advisory_xact_lock(hashtextextended(concat('open-query:', #{tenantId}, ':', #{code}, ':', #{slot}), 0))")
+    @Options(useCache = false, flushCache = Options.FlushCachePolicy.TRUE)
+    boolean tryQuerySlot(@Param("tenantId") Long tenantId, @Param("code") String code, @Param("slot") int slot);
     record PublicationRow(String code, String draft, long draftRevision, Integer activeVersion, String status) { }
     record ResourceAuthority(String definition, String policy, Long installationId) { }
 
@@ -36,7 +41,7 @@ public interface OpenApiPublicationMapper {
 
     @Select("""
         SELECT code, draft::text, draft_revision, active_version, status
-        FROM ab_open_api_publication WHERE tenant_id = #{tenantId} ORDER BY code
+        FROM ab_open_api_publication WHERE tenant_id = #{tenantId} AND jsonb_exists(draft, 'modelCode') ORDER BY code
         """)
     List<PublicationRow> list(@Param("tenantId") Long tenantId);
 
@@ -81,9 +86,23 @@ public interface OpenApiPublicationMapper {
         SELECT s.definition::text FROM ab_open_api_publication p
         JOIN ab_open_api_publication_snapshot s ON s.tenant_id = p.tenant_id
             AND s.code = p.code AND s.schema_version = p.active_version
-        WHERE p.tenant_id = #{tenantId} AND p.status = 'published' ORDER BY p.code
+        WHERE p.tenant_id = #{tenantId} AND p.status = 'published' AND jsonb_exists(s.definition, 'modelCode') ORDER BY p.code
         """)
     List<String> activeDefinitions(@Param("tenantId") Long tenantId);
+
+    @Select("""
+        SELECT code, draft::text, draft_revision, active_version, status
+        FROM ab_open_api_publication WHERE tenant_id = #{tenantId} AND jsonb_exists(draft, 'queryCode') ORDER BY code
+        """)
+    List<PublicationRow> listQueries(@Param("tenantId") Long tenantId);
+
+    @Select("""
+        SELECT s.definition::text FROM ab_open_api_publication p
+        JOIN ab_open_api_publication_snapshot s ON s.tenant_id = p.tenant_id
+            AND s.code = p.code AND s.schema_version = p.active_version
+        WHERE p.tenant_id = #{tenantId} AND p.status = 'published' AND jsonb_exists(s.definition, 'queryCode') ORDER BY p.code
+        """)
+    List<String> activeQueryDefinitions(@Param("tenantId") Long tenantId);
 
     @Insert("""
         INSERT INTO ab_open_api_publication_snapshot(tenant_id, code, schema_version, definition, published_by_pid)

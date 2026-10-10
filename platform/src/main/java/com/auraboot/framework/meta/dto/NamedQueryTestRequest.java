@@ -16,6 +16,18 @@ import java.util.Map;
 @Data
 public class NamedQueryTestRequest {
 
+    /** Server-only source pin; clients cannot supply it to internal query endpoints. */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private String expectedDefinitionFingerprint;
+
+    /** Server-only public output selection; never expands the canonical field whitelist. */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private java.util.Set<String> publishedOutputFields;
+
+    /** Monotonic execution deadline supplied by a trusted public query service. */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private Long executionDeadlineNanos;
+
     /**
      * 测试参数
      */

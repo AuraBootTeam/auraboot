@@ -49,6 +49,26 @@ public class NamedQueryFieldProtection {
         return prepare(query, fields, "export", false);
     }
 
+    public Set<String> resolveSourceModels(NamedQuery query, List<NamedQueryField> fields) {
+        return Set.copyOf(sources.resolvePlan(MetaContext.getCurrentTenantId(), query.getFromSql(), fields).models().values());
+    }
+
+    /** Includes engine-added base predicates and ordering, before trusted policy SQL is injected. */
+    public void validateMachineSql(Plan plan, String sql) {
+        if (!MachineDataAccessContext.isActive()) return;
+        Map<String, Set<String>> readable = new HashMap<>();
+        plan.evidence().path("sourceModels").fields().forEachRemaining(source -> {
+            var decision = MachineDataAccessContext.requireDecision(source.getValue().asText());
+            Set<String> columns = decision.readableFields().stream().map(field -> models.getColumnName(decision.modelCode(), field))
+                    .collect(java.util.stream.Collectors.toSet());
+            readable.put(NamedQuerySourceModels.identity(source.getKey()), columns);
+        });
+        new NamedQueryColumnLineage(plan.views()).resolveConsumedSql(sql).forEach(column -> {
+            var allowed = readable.get(NamedQuerySourceModels.identity(column.table()));
+            if (allowed == null || !allowed.contains(column.column())) throw new AccessDeniedException("Named query depends on a non-public machine field");
+        });
+    }
+
     public Plan prepare(NamedQuery query, List<NamedQueryField> fields, String context) {
         return prepare(query, fields, context, false);
     }
