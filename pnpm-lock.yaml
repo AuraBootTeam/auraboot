@@ -124,6 +124,8 @@ importers:
         specifier: '>=1.50.0 <2'
         version: 1.60.0
 
+  packages/wechat-mini-runtime: {}
+
   plugins/cli:
     dependencies:
       '@modelcontextprotocol/sdk':
