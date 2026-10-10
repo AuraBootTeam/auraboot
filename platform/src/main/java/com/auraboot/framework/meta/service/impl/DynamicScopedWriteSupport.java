@@ -11,7 +11,6 @@ import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.meta.util.JsonbFieldHelper;
 import com.auraboot.framework.meta.security.SqlSafetyUtils;
-import com.auraboot.framework.meta.constant.SystemFieldConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import java.io.*;
@@ -100,18 +99,14 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
             params.put(paramName, parameterValue);
             index++;
         }
-        boolean machinePhysicalWrite = com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
-                && (model.getSourceType() == null || "physical".equals(model.getSourceType()))
-                && !"view".equalsIgnoreCase(model.getModelType());
-        if (tableName.startsWith(SystemFieldConstants.DYNAMIC_TABLE_PREFIX) || machinePhysicalWrite) {
+        if (PhysicalRowVersionSupport.isVersioned(model, dynamicDataMapper)) {
             if (index > 0) {
                 sql.append(", ");
             }
             // Every successful dynamic-model mutation advances the public optimistic token,
             // including legacy callers that do not yet submit an expectedVersion. When a trusted
             // expectedVersion is present the WHERE predicate below additionally turns this into
-            // compare-and-swap. Machine publications include physical tables with custom names.
-            // Human writes to externally managed ab_* tables retain their own version contracts.
+            // compare-and-swap. The physical column contract applies to human and machine writes.
             sql.append("row_version = row_version + 1");
         }
 

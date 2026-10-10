@@ -83,7 +83,7 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
         String modelCode = "open_machine_" + suffix;
         var reference = FieldDefinition.RefTarget.builder().targetEntity(modelCode).valueField("pid").build();
         String tablePrefix = testInfo.getTestMethod().orElseThrow().getName()
-                .equals("customPhysicalTablePreservesPublicHttpCrudVersions") ? "custom_" : "mt_";
+                .matches("customPhysicalTablePreservesPublicHttpCrudVersions|humanCustomTableMutationInvalidatesMachineEtagAndEmitsEvent") ? "custom_" : "mt_";
         models.saveDefinition(ModelDefinition.builder().code(modelCode).tableName(tablePrefix + modelCode)
                 .displayName("Machine permission fixture").status("published").sourceType("physical").primaryKey("id")
                 .extension(Map.of("softDelete", testInfo.getTestMethod().orElseThrow().getName()
@@ -882,6 +882,35 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
     void customPhysicalTablePreservesPublicHttpCrudVersions() throws Exception {
         // Reuse the bearer/row-policy/CAS/replay assertions against a non-mt_ physical table.
         publicHttpCrudTraversesBearerFilterPublicationPolicyAndStableErrors();
+    }
+
+    @Test void humanCustomTableMutationInvalidatesMachineEtagAndEmitsEvent() throws Exception {
+        publishEvents();
+        String etag;
+        MetaContext.setContext(principal.tenantId(), null, principal.subjectPid(), "machine");
+        try (var machine = MachineDataAccessContext.begin(principal)) {
+            etag = resources.get(principal, contract.code(), allowedPid).headers().get("ETag");
+        } finally { applyTestMetaContext(); }
+        var changed = MetaContext.runWithCommandPermitScope("ALL", () ->
+                data.update(contract.modelCode(), allowedPid, new HashMap<>(Map.of("name", "Human changed"))));
+        assertThat(((Number) eventJdbc.queryForMap("SELECT row_version FROM "
+                + models.getModelDefinition(contract.modelCode()).orElseThrow().getTableName() + " WHERE pid = ?", allowedPid)
+                .get("row_version")).longValue()).isEqualTo(2);
+        assertThat(changed).containsEntry("row_version", 2);
+        var events = sourceEvents();
+        assertThat(events).hasSize(1);
+        assertThat(json.readTree(events.getFirst().get("payload").toString()).path("source").path("name").asText())
+                .isEqualTo("Human changed");
+        MetaContext.setContext(principal.tenantId(), null, principal.subjectPid(), "machine");
+        try (var machine = MachineDataAccessContext.begin(principal)) {
+            assertThat(resources.get(principal, contract.code(), allowedPid).headers().get("ETag")).isNotEqualTo(etag);
+            assertThatThrownBy(() -> resources.write(principal, contract.code(), Operation.UPDATE, allowedPid,
+                    "human-stale-key1", etag, Map.of("name", "Stale overwrite")))
+                    .isInstanceOf(OpenApiPreconditionException.class);
+        } finally { applyTestMetaContext(); }
+        assertThat(sourceEvents()).hasSize(1);
+        assertThat(eventJdbc.queryForObject("SELECT name FROM " + models.getModelDefinition(contract.modelCode()).orElseThrow().getTableName()
+                + " WHERE pid = ?", String.class, allowedPid)).isEqualTo("Human changed");
     }
 
     private void cleanupCommittedFixture() {

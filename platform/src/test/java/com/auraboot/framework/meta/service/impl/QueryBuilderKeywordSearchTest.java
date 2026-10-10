@@ -21,7 +21,7 @@ class QueryBuilderKeywordSearchTest {
 
     @BeforeEach
     void setUp() {
-        queryBuilderService = new QueryBuilderServiceImpl(null);
+        queryBuilderService = new QueryBuilderServiceImpl(org.mockito.Mockito.mock(com.auraboot.framework.meta.mapper.DynamicDataMapper.class));
     }
 
     @Test
@@ -146,7 +146,7 @@ class QueryBuilderKeywordSearchTest {
             ))
             .build();
 
-        QueryBuilderServiceImpl impl = new QueryBuilderServiceImpl(null);
+        QueryBuilderServiceImpl impl = new QueryBuilderServiceImpl(org.mockito.Mockito.mock(com.auraboot.framework.meta.mapper.DynamicDataMapper.class));
         impl.setTableMetadataService(new com.auraboot.framework.meta.ddl.TableMetadataService(null, null) {
             @Override
             public String getColumnTypeDefinition(String tableName, String columnName) {
@@ -244,7 +244,7 @@ class QueryBuilderKeywordSearchTest {
             ))
             .build();
 
-        QueryBuilderServiceImpl impl = new QueryBuilderServiceImpl(null);
+        QueryBuilderServiceImpl impl = new QueryBuilderServiceImpl(org.mockito.Mockito.mock(com.auraboot.framework.meta.mapper.DynamicDataMapper.class));
         impl.setTableMetadataService(new com.auraboot.framework.meta.ddl.TableMetadataService(null, null) {
             @Override
             public String getColumnTypeDefinition(String tableName, String columnName) {
