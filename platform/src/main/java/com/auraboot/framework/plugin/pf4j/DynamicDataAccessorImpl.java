@@ -3,10 +3,13 @@ package com.auraboot.framework.plugin.pf4j;
 import com.auraboot.framework.meta.dto.DynamicQueryRequest;
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.dto.QueryCondition;
+import com.auraboot.framework.meta.dto.SortField;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.plugin.extension.DataAccessErrorCode;
 import com.auraboot.framework.plugin.extension.DataAccessor;
 import com.auraboot.framework.plugin.extension.DataAccessorException;
+import com.auraboot.framework.plugin.extension.DataPage;
+import com.auraboot.framework.plugin.extension.DataPageQuery;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
@@ -64,6 +67,33 @@ public class DynamicDataAccessorImpl implements DataAccessor {
         }
 
         return queryAll(modelCode, conditions);
+    }
+
+    @Override
+    public DataPage queryPage(String modelCode, DataPageQuery query) {
+        java.util.Objects.requireNonNull(query, "query");
+        List<QueryCondition> conditions = new ArrayList<>();
+        query.exactFilters().forEach((field, value) -> conditions.add(QueryCondition.builder()
+                .fieldName(field).operator(QueryCondition.Operator.EQ).value(value).build()));
+        query.anyOfFilters().forEach((field, values) -> conditions.add(QueryCondition.builder()
+                .fieldName(field).operator(QueryCondition.Operator.IN).values(values).build()));
+        List<SortField> sorts = new ArrayList<>();
+        for (DataPageQuery.Sort sort : query.sorts()) {
+            sorts.add(SortField.builder().fieldName(sort.field())
+                    .direction(sort.descending() ? SortField.SortDirection.DESC : SortField.SortDirection.ASC)
+                    .priority(sorts.size()).build());
+        }
+        if (query.sorts().stream().noneMatch(sort -> sort.field().equals("pid"))) {
+            sorts.add(SortField.builder().fieldName("pid").priority(sorts.size()).build());
+        }
+        DynamicQueryRequest request = DynamicQueryRequest.builder()
+                .pageNum(query.page()).pageSize(query.size()).conditions(conditions).sortFields(sorts).build();
+        PaginationResult<Map<String, Object>> result = withCommandAuthority(
+                () -> dynamicDataService.list(modelCode, request));
+        if (result == null || result.getRecords() == null || result.getTotal() == null) {
+            throw new IllegalStateException("Host query returned an incomplete database page");
+        }
+        return new DataPage(result.getRecords(), result.getTotal(), query.page(), query.size());
     }
 
     @Override

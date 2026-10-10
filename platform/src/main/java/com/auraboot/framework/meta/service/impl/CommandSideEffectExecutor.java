@@ -358,7 +358,10 @@ public class CommandSideEffectExecutor {
             Long tenantId,
             Set<String> jsonbColumns,
             Map<String, Object> legacyConditions) {
-        if (!shouldUseScopedWrite()) {
+        ModelDefinition writerModel = metaModelService.getModelDefinition(modelCode).orElse(null);
+        RecordCommandWriterGuard.assertInputAllowed(writerModel, data, "update");
+        RecordCommandWriterGuard.guardParentInput(dynamicDataMapper, writerModel, code -> metaModelService.getModelDefinition(code).orElse(null), data);
+        if (!shouldUseScopedWrite() && !RecordCommandWriterGuard.hasPolicy(writerModel)) {
             return jsonbColumns == null || jsonbColumns.isEmpty()
                     ? dynamicDataMapper.update(tableName, data, legacyConditions)
                     : dynamicDataMapper.updateWithJsonb(tableName, data, legacyConditions, jsonbColumns);
@@ -401,9 +404,15 @@ public class CommandSideEffectExecutor {
                 .append(idEntry.getKey())
                 .append(" = #{params.recordId}")
                 .append(" AND tenant_id = #{params.tenantId}");
+        RecordCommandWriterGuard.appendStoredPredicate(sql, writerModel,
+                Boolean.TRUE.equals(data.get("deleted_flag")) ? "delete" : "update", code -> metaModelService.getModelDefinition(code).orElse(null));
+        RecordCommandWriterGuard.appendMarkerInvariant(sql, writerModel, data);
         appendScopedWriteGuards(sql, tenantId, modelCode, "update");
 
-        return dynamicDataMapper.updateByQuery(sql.toString(), params);
+        int updated = dynamicDataMapper.updateByQuery(sql.toString(), params);
+        if (updated == 0 && RecordCommandWriterGuard.hasPolicy(writerModel))
+            throw new com.auraboot.framework.exception.ConflictException("SIDE_EFFECT update refused: ownership or target scope changed");
+        return updated;
     }
 
     private boolean shouldUseScopedWrite() {

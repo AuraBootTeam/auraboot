@@ -22,6 +22,36 @@ public class DynamicSqlProvider {
     }
 
 
+    public static String selectRecordWriterTargetsForUpdate(Map<String,Object> params) {
+        String table=SqlSafetyUtils.requireIdentifier((String)params.get("tableName"),"record writer lock table");
+        String marker=SqlSafetyUtils.requireIdentifier((String)params.get("markerColumn"),"record writer marker column");
+        String alias=SqlSafetyUtils.requireIdentifier((String)params.get("markerAlias"),"record writer marker alias");
+        if (!(params.get("conditions") instanceof Map<?,?> conditions) || !(conditions.get("tenant_id") instanceof Long))
+            throw new IllegalArgumentException("Record writer lock requires a typed tenant_id condition");
+        StringBuilder sql=new StringBuilder("SELECT id, pid, ").append(marker).append(" AS ").append(alias)
+            .append(" FROM ").append(table).append(" WHERE ");
+        int index=0;
+        for(var entry:conditions.entrySet()) {
+            String column=SqlSafetyUtils.requireIdentifier((String)entry.getKey(),"record writer condition column");
+            if(index++>0) sql.append(" AND ");
+            if (entry.getValue()==null) sql.append(column).append(" IS NULL");
+            else if("id".equals(column)) sql.append("(id::text = #{conditions.id}::text OR pid = #{conditions.id}::text)");
+            else sql.append(column).append(" = #{conditions.").append(column).append("}");
+        }
+        return sql.append(" ORDER BY pid FOR UPDATE").toString();
+    }
+
+    public static String selectRelationTargetsForUpdate(Map<String,Object> params) {
+        String table=SqlSafetyUtils.requireIdentifier((String)params.get("tableName"),"record writer junction table");
+        String source=SqlSafetyUtils.requireIdentifier((String)params.get("sourceColumn"),"record writer junction source");
+        String target=SqlSafetyUtils.requireIdentifier((String)params.get("targetColumn"),"record writer junction target");
+        if (!(params.get("tenantId") instanceof Long) || !(params.get("sourceIdentity") instanceof String identity) || identity.isBlank())
+            throw new IllegalArgumentException("Relation lock requires a typed tenantId and sourceIdentity");
+        return "SELECT "+target+" AS target_identity FROM "+table+" WHERE "+source
+            +" = #{sourceIdentity} AND tenant_id = #{tenantId} ORDER BY "+target+" FOR UPDATE";
+    }
+
+
     /**
      * Validate export SQL: must be a SELECT statement and pass safety checks.
      */

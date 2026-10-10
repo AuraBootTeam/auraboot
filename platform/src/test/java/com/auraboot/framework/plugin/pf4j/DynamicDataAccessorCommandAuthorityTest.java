@@ -35,6 +35,24 @@ class DynamicDataAccessorCommandAuthorityTest {
     }
 
     @Test
+    void boundedQueryKeepsTheExistingPermitPlanAndDoesNotLeakIt() {
+        java.util.concurrent.atomic.AtomicReference<String> scope = new java.util.concurrent.atomic.AtomicReference<>();
+        when(dynamicDataService.list(anyString(), any())).thenAnswer(i -> {
+            scope.set(MetaContext.getCommandPermitScope());
+            return com.auraboot.framework.meta.dto.PaginationResult.empty(1, 20);
+        });
+        DynamicDataAccessorImpl accessor = new DynamicDataAccessorImpl(dynamicDataService);
+        MetaContext.runWithCommandPermitPlan("SELF", 4L, "m", null,
+                () -> accessor.queryPage("m", new com.auraboot.framework.plugin.extension.DataPageQuery(
+                        Map.of(), Map.of(), java.util.List.of(), 1, 20)));
+        assertThat(scope).hasValue("SELF");
+        assertThat(MetaContext.getCommandPermitScope()).isNull();
+        accessor.queryPage("m", new com.auraboot.framework.plugin.extension.DataPageQuery(
+                Map.of(), Map.of(), java.util.List.of(), 1, 20));
+        assertThat(scope.get()).isNull();
+    }
+
+    @Test
     @DisplayName("inside the scope, a handler's write is not re-projected through the caller")
     void insideTheScopeTheProjectionIsLifted() {
         java.util.concurrent.atomic.AtomicReference<String> scopeDuringCall =

@@ -44,6 +44,7 @@ public class RollUpSummaryService {
      * @param childFilter     optional SQL WHERE fragment
      * @param tenantId        tenant ID
      */
+    @org.springframework.transaction.annotation.Transactional
     public void recalculate(String parentModelCode, String parentFieldCode, String parentRecordId,
                             String childModelCode, String childFieldCode, String childFkCode,
                             String function, String childFilter, Long tenantId) {
@@ -112,8 +113,9 @@ public class RollUpSummaryService {
 
         // Update parent record
         var idEntry = CommandExecutorUtils.resolveRecordIdColumn(parentRecordId);
-        dynamicDataMapper.update(parentTable, Map.of(parentColumn, result),
-                Map.of("tenant_id", tenantId, idEntry.getKey(), idEntry.getValue()));
+        Map<String,Object> writeConditions = RecordCommandWriterGuard.guardLegacyConditions(dynamicDataMapper,
+                parentModel, parentTable, Map.of("tenant_id", tenantId, idEntry.getKey(), idEntry.getValue()), "update", Map.of(parentColumn, result), code -> metaModelService.getModelDefinition(code).orElse(null));
+        dynamicDataMapper.update(parentTable, Map.of(parentColumn, result), writeConditions);
 
         log.info("RollUp {}({}.{}) where {}={} = {} -> {}.{}",
                 function, childModelCode, childFieldCode, childFkCode, parentRecordId,
@@ -134,6 +136,7 @@ public class RollUpSummaryService {
      * @param tenantId        tenant ID
      * @return number of parent records updated
      */
+    @org.springframework.transaction.annotation.Transactional
     public int batchRecalculate(String parentModelCode, String parentFieldCode,
                                 String childModelCode, String childFieldCode, String childFkCode,
                                 String function, String childFilter, Long tenantId) {

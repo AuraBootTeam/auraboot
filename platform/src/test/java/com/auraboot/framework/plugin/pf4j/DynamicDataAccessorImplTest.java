@@ -9,6 +9,9 @@ import com.auraboot.framework.meta.dto.QueryCondition;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.plugin.extension.DataAccessErrorCode;
 import com.auraboot.framework.plugin.extension.DataAccessorException;
+import com.auraboot.framework.plugin.extension.DataPage;
+import com.auraboot.framework.plugin.extension.DataPageQuery;
+import com.auraboot.framework.meta.dto.SortField;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.dao.DuplicateKeyException;
@@ -37,6 +40,74 @@ class DynamicDataAccessorImplTest {
 
     @Mock private DynamicDataService dynamicDataService;
     @InjectMocks private DynamicDataAccessorImpl accessor;
+
+    @Test
+    void queryPage_sendsOneBoundedOrderedAndFilteredDatabaseQueryForALargeMatchSet() {
+        when(dynamicDataService.list(eq("m"), any(DynamicQueryRequest.class)))
+                .thenReturn(PaginationResult.of(List.of(Map.of("pid", "B")), 100_001L, 3, 20));
+        DataPage result = accessor.queryPage("m", new DataPageQuery(
+                Map.of("supplier", "SUP-A", "managed", true),
+                Map.of("status", List.of("submitted", "closed")),
+                List.of(new DataPageQuery.Sort("submitted_at", true)), 3, 20));
+        assertThat(result.total()).isEqualTo(100_001L);
+        assertThat(result.records()).containsExactly(Map.of("pid", "B"));
+        assertThat(result.page()).isEqualTo(3);
+        assertThat(result.size()).isEqualTo(20);
+        ArgumentCaptor<DynamicQueryRequest> cap = ArgumentCaptor.forClass(DynamicQueryRequest.class);
+        verify(dynamicDataService, times(1)).list(eq("m"), cap.capture());
+        DynamicQueryRequest request = cap.getValue();
+        assertThat(request.getPageNum()).isEqualTo(3);
+        assertThat(request.getPageSize()).isEqualTo(20);
+        assertThat(request.getConditions()).anySatisfy(c -> {
+            assertThat(c.getFieldName()).isEqualTo("supplier");
+            assertThat(c.getOperator()).isEqualTo(QueryCondition.Operator.EQ);
+            assertThat(c.getValue()).isEqualTo("SUP-A");
+        }).anySatisfy(c -> {
+            assertThat(c.getFieldName()).isEqualTo("managed");
+            assertThat(c.getValue()).isEqualTo(true);
+        }).anySatisfy(c -> {
+            assertThat(c.getFieldName()).isEqualTo("status");
+            assertThat(c.getOperator()).isEqualTo(QueryCondition.Operator.IN);
+            assertThat(c.getValues()).containsExactly("submitted", "closed");
+        });
+        assertThat(request.getSortFields()).extracting(SortField::getFieldName)
+                .containsExactly("submitted_at", "pid");
+        assertThat(request.getSortFields()).extracting(SortField::getDirection)
+                .containsExactly(SortField.SortDirection.DESC, SortField.SortDirection.ASC);
+    }
+
+    @Test
+    void queryPage_preservesExplicitPublicPidOrdering() {
+        when(dynamicDataService.list(eq("m"), any(DynamicQueryRequest.class)))
+                .thenReturn(PaginationResult.empty(1, 20));
+        accessor.queryPage("m", new DataPageQuery(Map.of(), Map.of(),
+                List.of(new DataPageQuery.Sort("pid", true)), 1, 20));
+        ArgumentCaptor<DynamicQueryRequest> cap = ArgumentCaptor.forClass(DynamicQueryRequest.class);
+        verify(dynamicDataService).list(eq("m"), cap.capture());
+        assertThat(cap.getValue().getSortFields()).hasSize(1);
+        assertThat(cap.getValue().getSortFields().getFirst().getDirection())
+                .isEqualTo(SortField.SortDirection.DESC);
+    }
+
+    @Test
+    void queryPage_rejectsIncompleteHostResultsInsteadOfPretendingTheListIsEmpty() {
+        when(dynamicDataService.list(eq("m"), any(DynamicQueryRequest.class)))
+                .thenReturn(new PaginationResult<>());
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> accessor.queryPage("m",
+                new DataPageQuery(Map.of(), Map.of(), List.of(), 1, 20)))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("incomplete");
+    }
+
+    @Test
+    void queryPage_preservesHostPermissionDenial() {
+        when(dynamicDataService.list(eq("m"), any(DynamicQueryRequest.class)))
+                .thenThrow(new AccessDeniedException("private host detail"));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> accessor.queryPage("m",
+                new DataPageQuery(Map.of(), Map.of(), List.of(), 1, 20)))
+                .isInstanceOf(DataAccessorException.class)
+                .satisfies(error -> assertThat(((DataAccessorException) error).code())
+                        .isEqualTo(DataAccessErrorCode.PERMISSION_DENIED));
+    }
 
     @Test
     void getById_delegates() {

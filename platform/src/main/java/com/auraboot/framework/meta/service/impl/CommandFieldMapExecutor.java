@@ -114,6 +114,8 @@ public class CommandFieldMapExecutor {
                 injectExistingJsonbData(tableName, request.getTargetRecordId(), tenantId, jsonbCols, data);
             }
 
+            RecordCommandWriterGuard.assertInputAllowed(modelDef, data, "create".equalsIgnoreCase(request.getOperationType()) ? "create" : "update");
+            RecordCommandWriterGuard.guardParentInput(dynamicDataMapper, modelDef, code -> metaModelService.getModelDefinition(code).orElse(null), data);
             Map<String, Object> columnData = prepareColumnData(modelDef, data, jsonbCols);
 
             // Determine operation type - use actual table name for database operations
@@ -289,6 +291,8 @@ public class CommandFieldMapExecutor {
             injectExistingJsonbData(tableName, request.getTargetRecordId(), tenantId, jsonbColumns, data);
         }
 
+        RecordCommandWriterGuard.assertInputAllowed(modelDef, data, "create".equalsIgnoreCase(operationType) ? "create" : "update");
+        RecordCommandWriterGuard.guardParentInput(dynamicDataMapper, modelDef, code -> metaModelService.getModelDefinition(code).orElse(null), data);
         Map<String, Object> columnData = prepareColumnData(modelDef, data, jsonbColumns);
 
         // Execute the database operation
@@ -422,10 +426,14 @@ public class CommandFieldMapExecutor {
             params.put("expectedVersion", expectedVersion);
             sql.append(" AND row_version = #{params.expectedVersion}");
         }
+        ModelDefinition writerModel = metaModelService.getModelDefinition(modelCode).orElse(null);
+        RecordCommandWriterGuard.appendStoredPredicate(sql, writerModel,
+                Boolean.TRUE.equals(data.get("deleted_flag")) ? "delete" : "update", code -> metaModelService.getModelDefinition(code).orElse(null));
+        RecordCommandWriterGuard.appendMarkerInvariant(sql, writerModel, data);
         appendScopedWriteGuards(sql, tenantId, modelCode, "update");
 
         int updated = dynamicDataMapper.updateByQuery(sql.toString(), params);
-        if (updated == 0 && expectedVersion != null) {
+        if (updated == 0 && (expectedVersion != null || RecordCommandWriterGuard.hasPolicy(writerModel))) {
             throw new com.auraboot.framework.exception.ConflictException(
                     "FIELD_MAP update refused: target changed after command authorization");
         }
@@ -458,10 +466,12 @@ public class CommandFieldMapExecutor {
             params.put("expectedVersion", expectedVersion);
             sql.append(" AND row_version = #{params.expectedVersion}");
         }
+        RecordCommandWriterGuard.appendStoredPredicate(sql, metaModelService.getModelDefinition(modelCode).orElse(null), "delete", code -> metaModelService.getModelDefinition(code).orElse(null));
         appendScopedWriteGuards(sql, tenantId, modelCode, "delete");
 
         int deleted = dynamicDataMapper.deleteByQuery(sql.toString(), params);
-        if (deleted == 0 && expectedVersion != null) {
+        if (deleted == 0 && (expectedVersion != null || RecordCommandWriterGuard.hasPolicy(
+                metaModelService.getModelDefinition(modelCode).orElse(null)))) {
             throw new com.auraboot.framework.exception.ConflictException(
                     "FIELD_MAP delete refused: target changed after command authorization");
         }

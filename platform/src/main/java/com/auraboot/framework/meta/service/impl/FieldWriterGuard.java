@@ -18,6 +18,7 @@ public final class FieldWriterGuard {
 
     /** New records have no stored value, so every supplied protected field is a write. */
     public static void assertCreateAllowed(ModelDefinition model, Map<String, Object> data) {
+        RecordCommandWriterGuard.assertInputAllowed(model, data, "create");
         if (data == null || data.isEmpty()) {
             return;
         }
@@ -32,6 +33,9 @@ public final class FieldWriterGuard {
             ModelDefinition model,
             Map<String, Object> submitted,
             Map<String, Object> existingRecord) {
+        RecordCommandWriterGuard.assertStoredAllowed(model, existingRecord, "update");
+        RecordCommandWriterGuard.assertInputAllowed(model, submitted, "update");
+        RecordCommandWriterGuard.assertMarkerUnchanged(model, submitted, existingRecord);
         if (model == null || model.getFields() == null || submitted == null || submitted.isEmpty()) {
             return;
         }
