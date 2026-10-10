@@ -62,6 +62,9 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
     @Autowired private com.auraboot.framework.webhook.service.WebhookDispatcher webhookDispatcher;
     @Autowired private com.auraboot.framework.webhook.mapper.WebhookDeliveryLogMapper deliveries;
 
+    @Autowired private com.auraboot.framework.meta.service.impl.CommandFieldMapExecutor fieldMap;
+    @Autowired private com.auraboot.framework.meta.service.impl.CommandStateCheckExecutor stateCheck;
+
     private OpenApiResourceContract contract;
     private MachinePrincipal principal;
     private String credentialPid;
@@ -302,6 +305,88 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
                     .map(row -> ((Number) row.get("event_sequence")).longValue()).toList()).containsExactly(1L, 2L, 3L, 4L, 5L);
             return null;
         });
+    }
+
+    @Test void commandFieldMapOriginsShareSourceVersionsAndNumericIdentity() {
+        publishEvents();
+        MetaContext.runWithCommandPermitScope("ALL", () -> {
+            var rule = new com.auraboot.framework.meta.entity.BindingRule();
+            rule.setRuleType("FIELD_MAP"); rule.setTargetModel(contract.modelCode());
+            rule.setSourceField("name"); rule.setTargetField("name");
+            var request = new com.auraboot.framework.meta.dto.CommandExecuteRequest();
+            request.setOperationType("create");
+            var created = fieldMap.executeFieldMapPhase(List.of(rule), Map.of("name", "Command explicit"), principal.tenantId(), request);
+            String pid = created.get("recordPid").toString();
+            long id = eventJdbc.queryForObject("SELECT id FROM mt_" + contract.modelCode() + " WHERE pid = ? AND tenant_id = ?",
+                    Long.class, pid, principal.tenantId());
+            request.setOperationType("update"); request.setTargetRecordId(Long.toString(id));
+            fieldMap.executeFieldMapPhase(List.of(rule), Map.of("name", "Command numeric update"), principal.tenantId(), request);
+            assertThat(data.getById(contract.modelCode(), pid)).containsEntry("name", "Command numeric update");
+            request.setOperationType("delete");
+            fieldMap.executeFieldMapPhase(List.of(rule), Map.of(), principal.tenantId(), request);
+            assertThat(sourceEvents()).hasSize(3);
+            assertThat(sourceEvents().stream().map(row -> row.get("subject")).toList()).containsOnly(pid);
+            assertThat(sourceEvents().stream().map(row -> ((Number) row.get("event_sequence")).longValue()).toList())
+                    .containsExactly(1L, 2L, 3L);
+            var command = new com.auraboot.framework.meta.entity.CommandDefinition();
+            command.setCode("fixture.create"); command.setModelCode(contract.modelCode());
+            var implicit = new com.auraboot.framework.meta.dto.CommandExecuteRequest(); implicit.setOperationType("create");
+            fieldMap.executeImplicitFieldMapPhase(Map.of("type", "create", "inputFields", List.of("name", "zone")),
+                    Map.of("name", "Command implicit", "zone", "A"), principal.tenantId(), implicit, command);
+            assertThat(sourceEvents()).hasSize(4);
+            return null;
+        });
+    }
+
+    @Test void commandStateOriginAdvancesVersionAndRollsBackObserverFailure() {
+        publishEvents();
+        MetaContext.runWithCommandPermitScope("ALL", () -> {
+            var command = new com.auraboot.framework.meta.entity.CommandDefinition();
+            command.setCode("fixture.transition"); command.setModelCode(contract.modelCode());
+            var request = new com.auraboot.framework.meta.dto.CommandExecuteRequest(); request.setTargetRecordId(allowedPid);
+            var config = Map.<String, Object>of("stateField", "name", "fromStates", List.of("Visible"), "toState", "Approved");
+            assertThat(stateCheck.executeStateCheckPhase(command, Map.of(), principal.tenantId(), request, config)).isEqualTo("Approved");
+            assertThat(data.getById(contract.modelCode(), allowedPid)).containsEntry("name", "Approved");
+            assertThat(sourceEvents()).hasSize(1);
+            assertThat(((Number) sourceEvents().getFirst().get("event_sequence")).longValue()).isEqualTo(2L);
+            var nested = new org.springframework.transaction.support.TransactionTemplate(eventTransactions);
+            nested.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_NESTED);
+            var next = Map.<String, Object>of("stateField", "name", "fromStates", List.of("Approved"), "toState", "Final");
+            assertThatThrownBy(() -> nested.execute(status -> MetaContext.runWithCommandPermitPlan("ALL", 1L,
+                    contract.modelCode(), allowedPid, () -> stateCheck.executeStateCheckPhase(command, Map.of(), principal.tenantId(), request, next))))
+                    .isInstanceOf(com.auraboot.framework.exception.ConflictException.class);
+            assertThat(sourceEvents()).hasSize(1);
+            long id = eventJdbc.queryForObject("SELECT id FROM mt_" + contract.modelCode() + " WHERE pid = ? AND tenant_id = ?",
+                    Long.class, allowedPid, principal.tenantId()); request.setTargetRecordId(Long.toString(id));
+            try {
+                eventFaultObserver.fail = true;
+                assertThatThrownBy(() -> nested.execute(status -> stateCheck.executeStateCheckPhase(command, Map.of(), principal.tenantId(), request, next)))
+                        .isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+            } finally { eventFaultObserver.fail = false; }
+            assertThat(data.getById(contract.modelCode(), allowedPid)).containsEntry("name", "Approved");
+            assertThat(sourceEvents()).hasSize(1);
+            stateCheck.executeStateCheckPhase(command, Map.of(), principal.tenantId(), request, next);
+            assertThat(sourceEvents()).hasSize(2);
+            assertThat(((Number) sourceEvents().getLast().get("event_sequence")).longValue()).isEqualTo(3L);
+            return null;
+        });
+    }
+
+    @Test void commandRejectedDeleteRollsBackItsCapturedSourceEvent() {
+        publishEvents();
+        var rule = new com.auraboot.framework.meta.entity.BindingRule();
+        rule.setRuleType("FIELD_MAP"); rule.setTargetModel(contract.modelCode());
+        rule.setSourceField("name"); rule.setTargetField("name");
+        var request = new com.auraboot.framework.meta.dto.CommandExecuteRequest();
+        request.setOperationType("delete"); request.setTargetRecordId(allowedPid);
+        var nested = new org.springframework.transaction.support.TransactionTemplate(eventTransactions);
+        nested.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_NESTED);
+        assertThatThrownBy(() -> nested.execute(status -> MetaContext.runWithCommandPermitScope("NONE", () ->
+                fieldMap.executeFieldMapPhase(List.of(rule), Map.of(), principal.tenantId(), request))))
+                .isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+        assertThat(sourceEvents()).isEmpty();
+        assertThat(MetaContext.runWithCommandPermitScope("ALL", () -> data.getById(contract.modelCode(), allowedPid)))
+                .containsEntry("name", "Visible");
     }
 
     @Test void softBatchDeleteKeepsTombstonesAndRollsBackPartialFailure() {

@@ -32,7 +32,7 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
             ModelDefinition model,
             String modelCode,
             String primaryKeyColumn,
-            String recordId,
+            Object recordId,
             Map<String, Object> columnData,
             Set<String> jsonbColumns,
             Object expectedVersion){
@@ -52,7 +52,7 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
             ModelDefinition model,
             String modelCode,
             String primaryKeyColumn,
-            String recordId,
+            Object recordId,
             Map<String, Object> columnData,
             Set<String> jsonbColumns,
             Object expectedVersion,
@@ -61,7 +61,7 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
         return executeScopedUpdate(model, modelCode, primaryKeyColumn, recordId, columnData, jsonbColumns, expectedVersion, compareColumn, compareValue, "update");
     }
 
-    int executeScopedUpdate(ModelDefinition model, String modelCode, String primaryKeyColumn, String recordId, Map<String,Object> columnData, Set<String> jsonbColumns, Object expectedVersion, String compareColumn, Object compareValue, String permissionOperation){
+    int executeScopedUpdate(ModelDefinition model, String modelCode, String primaryKeyColumn, Object recordId, Map<String,Object> columnData, Set<String> jsonbColumns, Object expectedVersion, String compareColumn, Object compareValue, String permissionOperation){
         if (columnData == null || columnData.isEmpty()) {
             throw new MetaServiceException("Update data cannot be empty");
         }
@@ -139,7 +139,7 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
             ModelDefinition model,
             String modelCode,
             String primaryKeyColumn,
-            String recordId,
+            Object recordId,
             Long expectedVersion){
         String tableName = SqlSafetyUtils.requireIdentifier(model.getTableName(), "table name");
         String pkColumn = SqlSafetyUtils.requireIdentifier(primaryKeyColumn, "primary key column");

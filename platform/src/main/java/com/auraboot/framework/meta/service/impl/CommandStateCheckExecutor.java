@@ -41,6 +41,9 @@ public class CommandStateCheckExecutor {
     private final StateTransitionEngine stateTransitionEngine;
     private final StateGraphService stateGraphService;
     private final CommandSpelEvaluator spelEvaluator;
+    private final com.auraboot.framework.meta.service.DataPermissionEngine dataPermissionEngine;
+    private final com.auraboot.framework.meta.service.DataDomainService dataDomainService;
+    private final CommandModelMutationSupport modelMutations;
     private final org.springframework.beans.factory.ObjectProvider<com.auraboot.framework.meta.service.DynamicDataService> dataService;
 
     @SuppressWarnings("unchecked")
@@ -230,8 +233,10 @@ public class CommandStateCheckExecutor {
                     .flatMap(model -> findFieldDefinition(model, stateField))
                     .orElse(null);
             var idEntry = CommandExecutorUtils.resolveRecordIdColumn(recordId);
-            Map<String, Object> conditions = Map.of("tenant_id", tenantId, idEntry.getKey(), idEntry.getValue());
-            int updated;
+            var model = modelOpt.orElseThrow(() -> new BusinessException(ResponseCode.BadParam, "State transition model is unavailable"));
+            Long expectedVersion = com.auraboot.framework.application.tenant.MetaContext.getCommandExpectedVersion(modelCode, recordId);
+            Map<String, Object> stateData;
+            Set<String> jsonbColumns;
             if (modelOpt.isPresent() && stateDefinition != null && stateDefinition.isJsonbVirtual()) {
                 CommandExecutorUtils.validateSqlIdentifier(stateDefinition.getJsonbColumn(), "state jsonb column");
                 CommandExecutorUtils.validateSqlIdentifier(stateDefinition.getJsonbPath(), "state jsonb path");
@@ -247,16 +252,27 @@ public class CommandStateCheckExecutor {
                             : value);
                 }
                 data.put("updated_at", Instant.now());
-                updated = dynamicDataMapper.updateWithJsonb(
-                        tableName, data, conditions, Set.of(stateDefinition.getJsonbColumn()));
+                stateData = data;
+                jsonbColumns = Set.of(stateDefinition.getJsonbColumn());
             } else {
-                Map<String, Object> data = Map.of(stateField, newState);
-                updated = dynamicDataMapper.update(tableName, data, conditions);
+                stateData = new LinkedHashMap<>(Map.of(stateField, newState, "updated_at", Instant.now()));
+                jsonbColumns = Set.of();
             }
-            if (updated == 0) {
+            int updated = new DynamicScopedWriteSupport(dynamicDataMapper, dataPermissionEngine, dataDomainService)
+                    .executeScopedUpdate(model, modelCode, idEntry.getKey(), idEntry.getValue(), stateData,
+                            jsonbColumns, expectedVersion);
+            if (updated == 0 && expectedVersion != null) {
+                throw new com.auraboot.framework.exception.ConflictException("State transition target changed after authorization");
+            }
+            if (updated != 1) {
                 throw new BusinessException(ResponseCode.BadParam,
-                        "state transition affected 0 rows for " + modelCode + " id=" + recordId);
+                        "state transition affected an unexpected row count for " + modelCode + " id=" + recordId);
             }
+            modelMutations.observe(modelCode, idEntry, tenantId,
+                    com.auraboot.framework.meta.service.ModelMutationObserver.Operation.UPDATED);
+            com.auraboot.framework.application.tenant.MetaContext.advanceCommandExpectedVersion(modelCode, recordId);
+        } catch (com.auraboot.framework.exception.ConflictException | org.springframework.security.access.AccessDeniedException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Failed to write state transition for model={}, record={}, state={}: {}",
                     modelCode, recordId, newState, e.getMessage());
