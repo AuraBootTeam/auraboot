@@ -690,8 +690,13 @@ public class QueryBuilderServiceImpl extends BaseMetaService implements QueryBui
         // row_version is a platform-owned physical column, not a business MetaField binding.
         // Always project it so every list/detail record can supply the exact optimistic token
         // required by high-risk commands. PublicRecordSanitizer intentionally preserves it.
+        // Machine publications also support API-created physical tables with custom names.
+        boolean machinePhysicalRead = com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
+                && (modelDefinition.getSourceType() == null || "physical".equals(modelDefinition.getSourceType()))
+                && !"view".equalsIgnoreCase(modelDefinition.getModelType());
         if (modelDefinition.getTableName() != null
-                && modelDefinition.getTableName().startsWith(SystemFieldConstants.DYNAMIC_TABLE_PREFIX)
+                && (modelDefinition.getTableName().startsWith(SystemFieldConstants.DYNAMIC_TABLE_PREFIX)
+                    || machinePhysicalRead)
                 && !selectFields.contains("row_version")) {
             selectFields.add("row_version");
         }

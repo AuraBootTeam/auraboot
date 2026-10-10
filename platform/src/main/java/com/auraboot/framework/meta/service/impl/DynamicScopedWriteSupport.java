@@ -100,14 +100,18 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
             params.put(paramName, parameterValue);
             index++;
         }
-        if (tableName.startsWith(SystemFieldConstants.DYNAMIC_TABLE_PREFIX)) {
+        boolean machinePhysicalWrite = com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
+                && (model.getSourceType() == null || "physical".equals(model.getSourceType()))
+                && !"view".equalsIgnoreCase(model.getModelType());
+        if (tableName.startsWith(SystemFieldConstants.DYNAMIC_TABLE_PREFIX) || machinePhysicalWrite) {
             if (index > 0) {
                 sql.append(", ");
             }
             // Every successful dynamic-model mutation advances the public optimistic token,
             // including legacy callers that do not yet submit an expectedVersion. When a trusted
             // expectedVersion is present the WHERE predicate below additionally turns this into
-            // compare-and-swap. Externally managed ab_* tables retain their own version contracts.
+            // compare-and-swap. Machine publications include physical tables with custom names.
+            // Human writes to externally managed ab_* tables retain their own version contracts.
             sql.append("row_version = row_version + 1");
         }
 

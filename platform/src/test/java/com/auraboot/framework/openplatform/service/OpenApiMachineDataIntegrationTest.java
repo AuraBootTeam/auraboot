@@ -82,7 +82,9 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
         String suffix = UniqueIdGenerator.generate().toLowerCase();
         String modelCode = "open_machine_" + suffix;
         var reference = FieldDefinition.RefTarget.builder().targetEntity(modelCode).valueField("pid").build();
-        models.saveDefinition(ModelDefinition.builder().code(modelCode).tableName("mt_" + modelCode)
+        String tablePrefix = testInfo.getTestMethod().orElseThrow().getName()
+                .equals("customPhysicalTablePreservesPublicHttpCrudVersions") ? "custom_" : "mt_";
+        models.saveDefinition(ModelDefinition.builder().code(modelCode).tableName(tablePrefix + modelCode)
                 .displayName("Machine permission fixture").status("published").sourceType("physical").primaryKey("id")
                 .extension(Map.of("softDelete", testInfo.getTestMethod().orElseThrow().getName()
                         .matches("softBatchDeleteKeepsTombstonesAndRollsBackPartialFailure|softCascadeDeletesKeepTombstonesAndOwnerEvents")))
@@ -873,6 +875,13 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
                     .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Idempotent-Replay", "true"));
             assertThat(MachineDataAccessContext.isActive()).isFalse();
         } finally { cleanupCommittedFixture(); }
+    }
+
+    @Test
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void customPhysicalTablePreservesPublicHttpCrudVersions() throws Exception {
+        // Reuse the bearer/row-policy/CAS/replay assertions against a non-mt_ physical table.
+        publicHttpCrudTraversesBearerFilterPublicationPolicyAndStableErrors();
     }
 
     private void cleanupCommittedFixture() {
