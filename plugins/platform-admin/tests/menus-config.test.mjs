@@ -199,3 +199,14 @@ test('platform-admin exposes account page provisioning from existing employees',
   assert.equal(handlerRule.handlerClass, 'tenantMemberCommandHandler');
   assert.equal(handlerRule.enabled, true);
 });
+
+// Translation administration must never become public through directory grouping.
+test('translation administration leaves require an explicitly granted system-management permission', () => {
+  const leaves = menus.filter(menu => ['i18n_resources', 'i18n_coverage', 'i18n_workflow'].includes(menu.code));
+  assert.equal(leaves.length, 3);
+  const grants = new Set(permissions.map(permission => permission.code));
+  for (const menu of leaves) {
+    assert.equal(menu.permissionCode, 'system_management', `${menu.code} must be hidden from business-only roles`);
+    assert.ok(grants.has(menu.permissionCode), 'the required permission must exist');
+  }
+});
