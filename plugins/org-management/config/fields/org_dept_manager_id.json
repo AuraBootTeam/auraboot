@@ -3,6 +3,12 @@
   "displayName:zh-CN": "部门负责人",
   "displayName:en": "Department Manager",
   "dataType": "reference",
-  "refTarget": { "targetModel": "org_employee", "targetField": "org_emp_name" },
-  "extension": { "placeholder:zh-CN": "请选择部门负责人" }
+  "refTarget": {
+    "targetModel": "org_employee",
+    "targetField": "org_emp_name",
+    "valueField": "pid"
+  },
+  "extension": {
+    "placeholder:zh-CN": "请选择部门负责人"
+  }
 }

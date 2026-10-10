@@ -219,7 +219,8 @@
     "dataType": "reference",
     "refTarget": {
       "targetModel": "sys_user",
-      "displayField": "nick_name"
+      "displayField": "nick_name",
+      "valueField": "pid"
     }
   },
   {

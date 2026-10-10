@@ -3,6 +3,12 @@
   "displayName:zh-CN": "上级部门",
   "displayName:en": "Parent Department",
   "dataType": "reference",
-  "refTarget": { "targetModel": "org_department", "targetField": "org_dept_name" },
-  "extension": { "placeholder:zh-CN": "请选择上级部门" }
+  "refTarget": {
+    "targetModel": "org_department",
+    "targetField": "org_dept_name",
+    "valueField": "pid"
+  },
+  "extension": {
+    "placeholder:zh-CN": "请选择上级部门"
+  }
 }

@@ -3,7 +3,16 @@
   "displayName:zh-CN": "岗位",
   "displayName:en": "Position",
   "dataType": "reference",
-  "constraints": { "required": true },
-  "refTarget": { "targetModel": "org_position", "targetField": "org_pos_name", "displayField": "org_pos_name" },
-  "extension": { "placeholder:zh-CN": "请选择岗位" }
+  "constraints": {
+    "required": true
+  },
+  "refTarget": {
+    "targetModel": "org_position",
+    "targetField": "org_pos_name",
+    "displayField": "org_pos_name",
+    "valueField": "pid"
+  },
+  "extension": {
+    "placeholder:zh-CN": "请选择岗位"
+  }
 }

@@ -5,7 +5,8 @@
   "dataType": "reference",
   "refTarget": {
     "targetModel": "ab_tenant_member",
-    "targetField": "pid"
+    "targetField": "pid",
+    "valueField": "pid"
   },
   "constraints": {
     "required": false
