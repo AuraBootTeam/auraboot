@@ -152,6 +152,7 @@ public class OpenApiResourceService {
                     try { data.getById(contract.modelCode(), previous.responseRecordPid()); }
                     catch (MetaRecordNotFoundException absent) { throw new AccessDeniedException("Replay target is no longer accessible", absent); }
                 }
+                com.auraboot.framework.openplatform.security.OpenApiBusinessAudit.result(code, operation.code(), previous.responseRecordPid(), true);
                 return new Result(previous.responseStatus(), decode(previous.responseBody(), OBJECT),
                         decode(previous.responseHeaders(), HEADERS), true);
             }
@@ -175,6 +176,7 @@ public class OpenApiResourceService {
             if (idempotency.completeResponse(principal.tenantId(), authorization.installationId(), route, key, requestHash,
                     result.status(), encode(result.body()), encode(result.headers()), authorityHash, resultPid) != 1)
                 throw new IllegalStateException("Original resource write response could not be persisted");
+            com.auraboot.framework.openplatform.security.OpenApiBusinessAudit.result(code, operation.code(), resultPid, false);
             return result;
         }
     }

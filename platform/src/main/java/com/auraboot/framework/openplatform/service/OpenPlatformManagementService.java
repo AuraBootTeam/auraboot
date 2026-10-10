@@ -251,8 +251,18 @@ public class OpenPlatformManagementService {
         return auditMapper.findForOperations(tenantId, installationPid, normalizedRequestId, status,
                         Math.max(1, Math.min(limit, 200))).stream()
                 .map(item -> new CallAuditView(item.getRequestId(), item.getHttpMethod(), item.getRequestPath(),
-                        item.getResponseStatus(), item.getDurationMs(), item.getOccurredAt()))
+                        item.getResponseStatus(), item.getDurationMs(), item.getOccurredAt(),
+                        auditText(item, "actorKind"), item.getApplicationPid(), item.getInstallationPid(),
+                        auditText(item, "capability"), auditText(item, "resource"), auditText(item, "operation"),
+                        auditText(item, "recordPid"), item.getBusinessDetails() != null
+                            && item.getBusinessDetails().path("idempotentReplay").isBoolean()
+                            ? item.getBusinessDetails().path("idempotentReplay").booleanValue() : null))
                 .toList();
+    }
+
+    private String auditText(com.auraboot.framework.openplatform.entity.OpenApiCallAudit item, String key) {
+        var value = item.getBusinessDetails() == null ? null : item.getBusinessDetails().get(key);
+        return value != null && value.isTextual() ? value.textValue() : null;
     }
 
     public List<WebhookDeliveryView> listWebhookDeliveries(String installationPid, String status, int limit) {

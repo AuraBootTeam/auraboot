@@ -993,6 +993,65 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void machineHttpAuditPersistsPublicActorAndOriginalReplayIntent() throws Exception {
+        String collection = "/api/open/v1/resources/" + contract.code();
+        String origin = "audit-" + UniqueIdGenerator.generate();
+        String bearer = "Bearer " + rawToken;
+        String requestBody = "{\"name\":\"Secret-free audit\",\"zone\":\"A\"}";
+        try {
+            var created = http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(collection)
+                    .header("Authorization", bearer).header("X-Request-Id", origin)
+                    .header("X-Actor-Kind", "human").header("Idempotency-Key", origin)
+                    .contentType("application/json").content(requestBody))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isCreated())
+                    .andReturn().getResponse();
+            String pid = json.readTree(created.getContentAsString()).path("pid").asText();
+            http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(collection)
+                    .header("Authorization", bearer).header("X-Request-Id", origin + "-replay")
+                    .header("Idempotency-Key", origin).contentType("application/json").content(requestBody))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isCreated())
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Idempotent-Replay", "true"));
+            http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(collection + "/" + pid)
+                    .header("Authorization", bearer).header("X-Request-Id", origin + "-stale")
+                    .header("Idempotency-Key", origin + "-patch").contentType("application/json").content("{\"name\":\"Denied\"}"))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isPreconditionFailed());
+            http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(collection + "/" + pid)
+                    .header("Authorization", bearer).header("X-Request-Id", origin + "-delete")
+                    .header("Idempotency-Key", origin + "-delete").header("If-Match", created.getHeader("ETag")))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNoContent());
+            http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(collection + "/" + pid)
+                    .header("Authorization", bearer).header("X-Request-Id", origin + "-delete-replay")
+                    .header("Idempotency-Key", origin + "-delete").header("If-Match", created.getHeader("ETag")))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNoContent());
+            applyTestMetaContext();
+            for (var suffix : List.of("", "-replay", "-stale", "-delete", "-delete-replay")) {
+                var audits = management.listCallAudits(principal.installationPid(), origin + suffix, null, 20);
+                assertThat(audits).hasSize(1);
+                var audit = audits.getFirst();
+                assertThat(audit.actorKind()).isEqualTo("machine");
+                assertThat(audit.applicationPid()).isEqualTo(principal.applicationPid());
+                assertThat(audit.installationPid()).isEqualTo(principal.installationPid());
+                assertThat(audit.resource()).isEqualTo(contract.code());
+                assertThat(audit.recordPid()).isEqualTo(pid);
+                String operation = suffix.equals("-stale") ? "update" : suffix.startsWith("-delete") ? "delete" : "create";
+                assertThat(audit.operation()).isEqualTo(operation);
+                assertThat(audit.capability()).isEqualTo("resource." + contract.code() + "." + operation);
+                assertThat(audit.status()).isEqualTo(suffix.equals("-stale") ? 412 : suffix.startsWith("-delete") ? 204 : 201);
+                assertThat(audit.idempotentReplay()).isEqualTo(suffix.equals("-stale") ? null : suffix.endsWith("replay"));
+                assertThat(audit.durationMs()).isNotNegative();
+                assertThat(json.writeValueAsString(audit)).doesNotContain(rawToken, "tokenPid", "tenantId", "Secret-free audit");
+                String persisted = eventJdbc.queryForObject("SELECT business_details::text FROM ab_open_api_call_audit WHERE tenant_id=? AND installation_pid=? AND request_id=?",
+                        String.class, principal.tenantId(), principal.installationPid(), origin + suffix);
+                assertThat(json.readTree(persisted).path("actorKind").asText()).isEqualTo("machine");
+                assertThat(persisted).doesNotContain(rawToken, "tokenPid", "tenantId", "Secret-free audit");
+            }
+            assertThat(eventJdbc.queryForObject("SELECT COUNT(*) FROM ab_audit_trail WHERE tenant_id=? AND actor_name=?",
+                    Long.class, principal.tenantId(), principal.tokenPid())).isZero();
+        } finally { cleanupCommittedFixture(); }
+    }
+
+    @Test
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     void customPhysicalTablePreservesPublicHttpCrudVersions() throws Exception {
         // Reuse the bearer/row-policy/CAS/replay assertions against a non-mt_ physical table.
         publicHttpCrudTraversesBearerFilterPublicationPolicyAndStableErrors();

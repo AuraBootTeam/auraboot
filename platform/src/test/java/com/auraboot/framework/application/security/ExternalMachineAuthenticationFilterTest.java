@@ -43,6 +43,10 @@ class ExternalMachineAuthenticationFilterTest {
         var response = new MockHttpServletResponse();
         FilterChain chain = (req, res) -> {
             assertEquals(42L, MetaContext.getCurrentTenantId());
+            assertNull(MetaContext.getCurrentUserId());
+            assertNull(MetaContext.getCurrentUserPid());
+            assertNull(MetaContext.getCurrentUsername());
+            assertEquals("token-pid", MachineDataAccessContext.principal().subjectPid());
             assertTrue(SecurityContextHolder.getContext().getAuthentication().isAuthenticated());
             assertTrue(Boolean.TRUE.equals(request.getAttribute(
                     ExternalMachineAuthenticationFilter.AUTHENTICATED_ATTRIBUTE)));
@@ -74,5 +78,26 @@ class ExternalMachineAuthenticationFilterTest {
         assertEquals(429, response.getStatus());
         assertTrue(response.getContentAsString().contains("rate_limit_exceeded"));
         assertFalse(chained.get());
+    }
+
+    @Test
+    void unhandledFailureIsAuditedAsServerErrorAndClearsMachineIdentity() {
+        var auditedStatus = new java.util.concurrent.atomic.AtomicInteger();
+        ExternalMachineAuthenticator authenticator = new ExternalMachineAuthenticator() {
+            public boolean supports(jakarta.servlet.http.HttpServletRequest request) { return true; }
+            public MachinePrincipal authenticate(jakarta.servlet.http.HttpServletRequest request) {
+                return new MachinePrincipal(42L, "token-pid", "Application", Set.of());
+            }
+            public void recordCall(MachinePrincipal principal, jakarta.servlet.http.HttpServletRequest request,
+                                   int status, long durationMillis) { auditedStatus.set(status); }
+        };
+        var filter = new ExternalMachineAuthenticationFilter(List.of(authenticator), new ObjectMapper());
+        assertThrows(IllegalStateException.class, () -> filter.doFilter(
+                new MockHttpServletRequest("GET", "/api/open/v1/whoami"), new MockHttpServletResponse(),
+                (request, response) -> { throw new IllegalStateException("Controlled business failure"); }));
+        assertEquals(500, auditedStatus.get());
+        assertNull(MachineDataAccessContext.principal());
+        assertFalse(MetaContext.exists());
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
     }
 }

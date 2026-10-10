@@ -5,6 +5,8 @@ contacts or provisions a target. A passed report requires every fixed case.
 """
 import json
 import subprocess
+import re
+import time
 from pathlib import Path
 
 from open_platform_http import ProtocolError
@@ -17,6 +19,46 @@ CASES = (
     "idempotent-conflict", "update-version", "stale-write",
     "prospective-row-denial", "delete", "grant-revocation", "public-openapi",
 )
+AUDIT_CASES = (
+    ("resource-row-field-projection", "list", 200, None),
+    ("query-source-row-projection", "execute", 200, None),
+    ("create", "create", 201, False), ("idempotent-replay", "create", 201, True),
+    ("idempotent-conflict", "create", 409, None), ("update-version", "update", 200, False),
+    ("stale-write", "update", 412, None), ("prospective-row-denial", "update", 403, None),
+    ("delete", "delete", 204, False),
+)
+
+
+def verify_audits(report):
+    proofs = report.get("auditProofs")
+    if (not isinstance(proofs, list) or len(proofs) != len(AUDIT_CASES)
+            or [row.get("id") for row in proofs if isinstance(row, dict)] != [row[0] for row in AUDIT_CASES]):
+        raise ProtocolError("dynamic business audit denominator invalid")
+    for key in ["applicationPid", "installationPid"]:
+        value = report.get(key)
+        if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", value) or value.isdigit():
+            raise ProtocolError("dynamic business audit actor identity missing")
+    created_pid = proofs[2].get("recordPid")
+    if not isinstance(created_pid, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", created_pid) or created_pid.isdigit():
+        raise ProtocolError("dynamic business audit created PID missing")
+    fields = {"id", "requestId", "method", "path", "status", "durationMs", "occurredAt", "actorKind",
+              "applicationPid", "installationPid", "capability", "resource", "operation", "recordPid", "idempotentReplay"}
+    for proof, (case, operation, status, replay) in zip(proofs, AUDIT_CASES):
+        resource = "release.dynamic.by-zone" if operation == "execute" else "release.dynamic.parts"
+        pid = created_pid if case in ["create", "idempotent-replay", "update-version", "stale-write", "prospective-row-denial", "delete"] else None
+        method = {"list": "GET", "execute": "POST", "create": "POST", "update": "PATCH", "delete": "DELETE"}[operation]
+        path = "/api/open/v1/queries/" + resource + ":execute" if operation == "execute" else "/api/open/v1/resources/" + resource
+        if operation in ["update", "delete"]: path += "/" + created_pid
+        if (set(proof) - fields or proof.get("actorKind") != "machine"
+                or any(proof.get(key) != report[key] for key in ["applicationPid", "installationPid"])
+                or proof.get("requestId") != "release-dynamic-" + case or proof.get("resource") != resource
+                or proof.get("operation") != operation or proof.get("recordPid") != pid
+                or proof.get("capability") != ("query." if operation == "execute" else "resource.") + resource + "." + operation
+                or proof.get("idempotentReplay") is not replay or type(proof.get("status")) is not int or proof["status"] != status
+                or proof.get("method") != method or proof.get("path") != path
+                or type(proof.get("durationMs")) is not int or proof["durationMs"] < 0
+                or not isinstance(proof.get("occurredAt"), str) or not proof["occurredAt"]):
+            raise ProtocolError("dynamic business audit identity/result invalid")
 
 
 def verify_report(report):
@@ -31,6 +73,7 @@ def verify_report(report):
         raise ProtocolError("dynamic probe has failed or unexecuted cases")
     if report.get("executed") != len(CASES) or report.get("passed") != len(CASES):
         raise ProtocolError("dynamic probe totals do not match fixed cases")
+    verify_audits(report)
     return report
 
 
@@ -123,7 +166,7 @@ def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None):
     operations = ["list", "get", "create", "update", "delete"]
     scopes = {operation: "release.dynamic:" + operation for operation in operations}
     query_scope = "release.dynamic:query"
-    report = {"schemaVersion": 1, "cases": rows, "executed": 0, "passed": 0}
+    report = {"schemaVersion": 1, "cases": rows, "executed": 0, "passed": 0, "auditProofs": []}
     try:
         model = human("/api/meta/models", "POST", {
             "code": model_code, "tableName": model_code, "displayName": "Release dynamic parts",
@@ -165,6 +208,21 @@ def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None):
         application = human("/api/open-platform/applications", "POST", {"name": "Dynamic release consumer", "description": "Exact-image CI only"})
         installation = human(f"/api/open-platform/applications/{application['pid']}/installations", "POST",
             {"environment": "staging", "scopes": list(scopes.values()) + [query_scope], "rateLimitPerMinute": 600})
+        report.update(applicationPid=application["pid"], installationPid=installation["pid"])
+
+        def audited(case, *args, **kwargs):
+            headers = dict(kwargs.pop("headers", {}), **{"X-Request-Id": "release-dynamic-" + case})
+            result = request(*args, headers=headers, **kwargs)
+            deadline = time.monotonic() + 5
+            while True:
+                audits = human(f"/api/open-platform/installations/{installation['pid']}/audits?requestId=release-dynamic-{case}")
+                if audits or time.monotonic() >= deadline: break
+                time.sleep(.1)
+            if not isinstance(audits, list) or len(audits) != 1:
+                raise ProtocolError("dynamic business audit missing or duplicated")
+            report["auditProofs"].append(dict(audits[0], id=case))
+            return result
+
         credentials = human(f"/api/open-platform/installations/{installation['pid']}/credentials", "POST", {})
         _, token, _ = request("/oauth2/token", "POST", form={"grant_type": "client_credentials",
             "client_id": credentials["clientId"], "client_secret": credentials["clientSecret"]})
@@ -176,13 +234,13 @@ def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None):
         grant_path = f"/api/open-platform/installations/{installation['pid']}/resources/{resource}"
         human(grant_path, "PUT", {"operations": operations, "readableFields": ["pid", "name", "zone"],
             "writableFields": ["name", "zone"], "rowConstraints": [{"field": "zone", "values": ["A"]}]})
-        _, page, _ = request(path, headers=machine)
+        _, page, _ = audited("resource-row-field-projection", path, headers=machine)
         record("resource-row-field-projection", page.get("items") == [{"pid": a["pid"], "name": "Allowed A", "zone": "A"}])
         request(path + "/" + b["pid"], headers=machine, expected=(404,)); record("hidden-record")
         request(path, "POST", body={"name": "Outside", "zone": "B"}, headers=dict(machine, **{"Idempotency-Key": "dynamic-outside-create"}), expected=(403,)); record("outside-create")
         query_grant_path = f"/api/open-platform/installations/{installation['pid']}/queries/{query}"
         human(query_grant_path, "PUT", {"readableFields": ["pid", "name"]})
-        _, query_a, _ = request(query_path, "POST", body={"parameters": {"zone": "A"}, "limit": 10}, headers=machine)
+        _, query_a, _ = audited("query-source-row-projection", query_path, "POST", body={"parameters": {"zone": "A"}, "limit": 10}, headers=machine)
         _, query_b, _ = request(query_path, "POST", body={"parameters": {"zone": "B"}, "limit": 10}, headers=machine)
         record("query-source-row-projection", query_a.get("items") == [{"pid": a["pid"], "name": "Allowed A"}] and query_b.get("items") == [])
         if consumer is not None:
@@ -191,24 +249,24 @@ def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None):
                       "queryCode": query, "allowedPid": a["pid"], "hiddenPid": b["pid"]})
         intent = {"name": "Machine created", "zone": "A"}
         create_headers = dict(machine, **{"Idempotency-Key": "dynamic-release-create"})
-        _, created, created_headers = request(path, "POST", body=intent, headers=create_headers, expected=(201,))
+        _, created, created_headers = audited("create", path, "POST", body=intent, headers=create_headers, expected=(201,))
         etag = header(created_headers, "ETag")
         record("create", isinstance(created.get("pid"), str) and created == dict(intent, pid=created["pid"]) and isinstance(etag, str) and etag.startswith('"'))
-        _, replay, replay_headers = request(path, "POST", body=intent, headers=create_headers, expected=(201,))
+        _, replay, replay_headers = audited("idempotent-replay", path, "POST", body=intent, headers=create_headers, expected=(201,))
         record("idempotent-replay", replay == created and header(replay_headers, "Idempotent-Replay") == "true")
-        request(path, "POST", body=dict(intent, name="Conflicting intent"), headers=create_headers, expected=(409,)); record("idempotent-conflict")
+        audited("idempotent-conflict", path, "POST", body=dict(intent, name="Conflicting intent"), headers=create_headers, expected=(409,)); record("idempotent-conflict")
         row_path = path + "/" + created["pid"]
-        _, updated, updated_headers = request(row_path, "PATCH", body={"name": "Machine updated"},
+        _, updated, updated_headers = audited("update-version", row_path, "PATCH", body={"name": "Machine updated"},
             headers=dict(machine, **{"Idempotency-Key": "dynamic-release-update", "If-Match": etag}))
         next_etag = header(updated_headers, "ETag")
         record("update-version", updated == dict(intent, pid=created["pid"], name="Machine updated") and isinstance(next_etag, str) and next_etag != etag)
-        request(row_path, "PATCH", body={"name": "Stale"}, headers=dict(machine, **{"Idempotency-Key": "dynamic-release-stale", "If-Match": etag}), expected=(412,))
+        audited("stale-write", row_path, "PATCH", body={"name": "Stale"}, headers=dict(machine, **{"Idempotency-Key": "dynamic-release-stale", "If-Match": etag}), expected=(412,))
         _, persisted, persisted_headers = request(row_path, headers=machine)
         record("stale-write", persisted == updated and header(persisted_headers, "ETag") == next_etag)
-        request(row_path, "PATCH", body={"zone": "B"}, headers=dict(machine, **{"Idempotency-Key": "dynamic-release-zone", "If-Match": next_etag}), expected=(403,))
+        audited("prospective-row-denial", row_path, "PATCH", body={"zone": "B"}, headers=dict(machine, **{"Idempotency-Key": "dynamic-release-zone", "If-Match": next_etag}), expected=(403,))
         _, persisted, persisted_headers = request(row_path, headers=machine)
         record("prospective-row-denial", persisted == updated and header(persisted_headers, "ETag") == next_etag)
-        request(row_path, "DELETE", headers=dict(machine, **{"Idempotency-Key": "dynamic-release-delete", "If-Match": next_etag}), expected=(204,))
+        audited("delete", row_path, "DELETE", headers=dict(machine, **{"Idempotency-Key": "dynamic-release-delete", "If-Match": next_etag}), expected=(204,))
         request(row_path, headers=machine, expected=(404,)); record("delete")
         human(query_grant_path, "DELETE")
         request(query_path, "POST", body={"parameters": {"zone": "A"}, "limit": 10}, headers=machine, expected=(403,))

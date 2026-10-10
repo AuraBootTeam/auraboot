@@ -218,6 +218,8 @@ public class OpenPlatformFacadeController {
             eventPublisher.publish(publication.eventType(), publication.eventVersion(), String.valueOf(target),
                     publicResource, principal.tenantId());
         }
+        com.auraboot.framework.openplatform.security.OpenApiBusinessAudit.result(
+                resultResource.code(), "execute", String.valueOf(target), result.isIdempotentReplay());
         return response;
     }
 

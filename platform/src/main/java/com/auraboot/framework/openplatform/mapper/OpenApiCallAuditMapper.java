@@ -11,6 +11,8 @@ import java.util.List;
 
 @Mapper
 public interface OpenApiCallAuditMapper extends BaseMapper<OpenApiCallAudit> {
+    @org.apache.ibatis.annotations.Results({@org.apache.ibatis.annotations.Result(column = "business_details", property = "businessDetails",
+            typeHandler = com.auraboot.framework.application.typehandler.JsonNodeTypeHandler.class)})
     @Select("""
             SELECT * FROM ab_open_api_call_audit
             WHERE tenant_id = #{tenantId} AND installation_pid = #{installationPid}

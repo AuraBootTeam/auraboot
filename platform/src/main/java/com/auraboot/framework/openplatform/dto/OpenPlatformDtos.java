@@ -70,7 +70,9 @@ public final class OpenPlatformDtos {
                                      double p95DurationMs, long deadLetterCount) { }
 
     public record CallAuditView(String requestId, String method, String path, Integer status,
-                                Long durationMs, Instant occurredAt) { }
+                                Long durationMs, Instant occurredAt, String actorKind, String applicationPid,
+                                String installationPid, String capability, String resource, String operation,
+                                String recordPid, Boolean idempotentReplay) { }
 
     public record WebhookDeliveryView(String pid, String subscriptionName, String eventId, String requestId,
                                       String status, Integer retryCount, Integer maxRetries,

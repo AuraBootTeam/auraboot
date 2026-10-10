@@ -11,8 +11,29 @@ from open_platform_http import ProtocolError
 
 
 def passed():
+    audits = []
+    fixtures = [("resource-row-field-projection", "list", 200, None, None),
+                ("query-source-row-projection", "execute", 200, None, None),
+                ("create", "create", 201, "record-pid", False),
+                ("idempotent-replay", "create", 201, "record-pid", True),
+                ("idempotent-conflict", "create", 409, None, None),
+                ("update-version", "update", 200, "record-pid", False),
+                ("stale-write", "update", 412, "record-pid", None),
+                ("prospective-row-denial", "update", 403, "record-pid", None),
+                ("delete", "delete", 204, "record-pid", False)]
+    for case, operation, status, pid, replay in fixtures:
+        resource = "release.dynamic.by-zone" if operation == "execute" else "release.dynamic.parts"
+        path = "/api/open/v1/queries/" + resource + ":execute" if operation == "execute" else "/api/open/v1/resources/" + resource
+        if operation in ["update", "delete"]: path += "/record-pid"
+        audits.append({"id": case, "requestId": "release-dynamic-" + case, "actorKind": "machine",
+            "applicationPid": "app-pid", "installationPid": "install-pid", "resource": resource,
+            "operation": operation, "recordPid": pid, "idempotentReplay": replay, "status": status,
+            "capability": ("query." if operation == "execute" else "resource.") + resource + "." + operation,
+            "method": {"list": "GET", "execute": "POST", "create": "POST", "update": "PATCH", "delete": "DELETE"}[operation],
+            "path": path, "durationMs": 1, "occurredAt": "2026-10-11T00:00:00Z"})
     return {"schemaVersion": 1, "cases": [{"id": case, "status": "passed"} for case in CASES],
-            "executed": len(CASES), "passed": len(CASES)}
+            "executed": len(CASES), "passed": len(CASES), "auditProofs": audits,
+            "applicationPid": "app-pid", "installationPid": "install-pid"}
 
 
 class DynamicProbeTests(unittest.TestCase):
@@ -22,6 +43,23 @@ class DynamicProbeTests(unittest.TestCase):
     def test_missing_case(self):
         report = passed(); report["cases"].pop()
         with self.assertRaises(ProtocolError): verify_report(report)
+
+    def test_audit_proofs_are_mandatory_and_reject_wrong_identity_result_or_private_fields(self):
+        report = passed(); del report["auditProofs"]
+        with self.assertRaises(ProtocolError): verify_report(report)
+        for change in [lambda r: r["auditProofs"].pop(),
+                       lambda r: r["auditProofs"].reverse(),
+                       lambda r: r["auditProofs"].__setitem__(1, r["auditProofs"][0]),
+                       lambda r: r.__setitem__("installationPid", "other-install")]:
+            report = passed(); change(report)
+            with self.assertRaises(ProtocolError): verify_report(report)
+        for key, value in [("actorKind", "human"), ("installationPid", "other-install"),
+                           ("resource", "internal_model"), ("recordPid", "123"), ("operation", "update"),
+                           ("requestId", "unrelated"), ("status", 500), ("durationMs", True),
+                           ("idempotentReplay", 1), ("token", "private-sentinel"), ("tenantId", 42)]:
+            report = passed(); report["auditProofs"][3][key] = value
+            with self.subTest(key=key):
+                with self.assertRaises(ProtocolError): verify_report(report)
 
     def test_duplicate_case(self):
         report = passed(); report["cases"][1] = copy.deepcopy(report["cases"][0])

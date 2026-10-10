@@ -69,17 +69,20 @@ public class ExternalMachineAuthenticationFilter extends OncePerRequestFilter {
         var authentication = new UsernamePasswordAuthenticationToken(
                 principal, null, authorities);
         SecurityContextHolder.getContext().setAuthentication(authentication);
-        MetaContext.setContext(principal.tenantId(), null, principal.subjectPid(), principal.subjectName());
+        MetaContext.setContext(principal.tenantId(), null, null, null);
         MetaContext.setMemberId(null);
         request.setAttribute(AUTHENTICATED_ATTRIBUTE, Boolean.TRUE);
         MDC.put("tenantId", String.valueOf(principal.tenantId()));
 
+        boolean completed = false;
         try (var machineScope = MachineDataAccessContext.begin(principal)) {
             filterChain.doFilter(request, response);
+            completed = true;
         } finally {
             long durationMillis = (System.nanoTime() - startedAt) / 1_000_000L;
             try {
-                authenticator.recordCall(principal, request, response.getStatus(), durationMillis);
+                authenticator.recordCall(principal, request,
+                        completed ? response.getStatus() : HttpServletResponse.SC_INTERNAL_SERVER_ERROR, durationMillis);
             } finally {
                 MetaContext.clear();
                 MDC.remove("tenantId");

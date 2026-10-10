@@ -77,6 +77,7 @@ public class OpenPlatformBearerAuthenticator implements ExternalMachineAuthentic
         if (token.consumedCount() == null) {
             throw new ExternalMachineAuthException(429, "rate_limit_exceeded");
         }
+        OpenApiBusinessAudit.capture(request, capability);
         return new MachinePrincipal(token.tenantId(), token.tokenPid(), token.applicationPid(), scopes,
                 token.applicationPid(), token.installationPid(), token.environment(), token.tokenPid());
     }
@@ -97,6 +98,7 @@ public class OpenPlatformBearerAuthenticator implements ExternalMachineAuthentic
         audit.setDurationMs(durationMillis);
         audit.setRemoteAddress(request.getRemoteAddr());
         audit.setOccurredAt(Instant.now());
+        audit.setBusinessDetails(OpenApiBusinessAudit.details(request));
         auditMapper.insert(audit);
     }
 

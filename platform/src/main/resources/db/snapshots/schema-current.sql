@@ -12525,7 +12525,8 @@ CREATE TABLE public.ab_open_api_call_audit (
     response_status integer NOT NULL,
     duration_ms bigint NOT NULL,
     remote_address character varying(96),
-    occurred_at timestamp with time zone DEFAULT now() NOT NULL
+    occurred_at timestamp with time zone DEFAULT now() NOT NULL,
+    business_details jsonb
 );
 
 
@@ -12534,6 +12535,13 @@ CREATE TABLE public.ab_open_api_call_audit (
 --
 
 COMMENT ON TABLE public.ab_open_api_call_audit IS 'Secret-free request audit for public Open API calls';
+
+
+--
+-- Name: COLUMN ab_open_api_call_audit.business_details; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_open_api_call_audit.business_details IS 'Server-owned public machine actor/capability/resource/operation/PID/replay descriptors; no payload or credentials';
 
 
 --
