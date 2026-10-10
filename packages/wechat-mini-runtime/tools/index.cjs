@@ -2,6 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const { execFileSync } = require("node:child_process");
+const { createServer } = require("node:net");
 const { target } = require("../runtime/environment");
 const { redact } = require("../runtime/logger");
 const MARKER = ".aura-mini-project.json";
@@ -37,16 +38,6 @@ function prepareProject({
     purpose !== "release-build"
   )
     throw new Error("Test project cannot target production");
-  if (fs.existsSync(out)) {
-    const markerPath = path.join(out, MARKER);
-    if (!fs.existsSync(markerPath))
-      throw new Error("Refuse to overwrite unowned project output");
-    const old = JSON.parse(fs.readFileSync(markerPath));
-    if (old.source !== source || old.kind !== "aura-mini-test")
-      throw new Error("Output belongs to another source");
-    fs.rmSync(out, { recursive: true });
-  }
-  fs.mkdirSync(out, { recursive: true });
   const excluded = new Set([
     "node_modules",
     "tests",
@@ -54,14 +45,6 @@ function prepareProject({
     ".git",
     ".DS_Store",
   ]);
-  fs.cpSync(source, out, {
-    recursive: true,
-    filter: (entry) =>
-      !path
-        .relative(source, entry)
-        .split(path.sep)
-        .some((part) => excluded.has(part)),
-  });
   const sourceHash = crypto.createHash("sha256");
   function fingerprint(dir) {
     for (const name of fs.readdirSync(dir).sort()) {
@@ -78,6 +61,24 @@ function prepareProject({
   }
   fingerprint(source);
   const sourceIdentity = { ...identity, sha256: sourceHash.digest("hex") };
+  if (fs.existsSync(out)) {
+    const markerPath = path.join(out, MARKER);
+    if (!fs.existsSync(markerPath))
+      throw new Error("Refuse to overwrite unowned project output");
+    const old = JSON.parse(fs.readFileSync(markerPath));
+    if (old.source !== source || old.kind !== "aura-mini-test")
+      throw new Error("Output belongs to another source");
+    fs.rmSync(out, { recursive: true });
+  }
+  fs.mkdirSync(out, { recursive: true });
+  fs.cpSync(source, out, {
+    recursive: true,
+    filter: (entry) =>
+      !path
+        .relative(source, entry)
+        .split(path.sep)
+        .some((part) => excluded.has(part)),
+  });
   const generated = { ...config, dataMode: mode, sourceIdentity };
   fs.writeFileSync(
     path.join(out, "config.js"),
@@ -196,7 +197,11 @@ async function captureEvidence(
   return manifest;
 }
 // A native tap resolves before route transition finishes. Reacquire the top page.
-async function waitForPage(mp, route, { timeoutMs = 15000, intervalMs = 100, monitor } = {}) {
+async function waitForPage(
+  mp,
+  route,
+  { timeoutMs = 15000, intervalMs = 100, monitor } = {},
+) {
   const deadline = Date.now() + timeoutMs;
   do {
     if (monitor) monitor.assertClean();
@@ -230,6 +235,180 @@ async function verifyBridge(mp, expected) {
     throw new Error("Bridge source identity mismatch");
   return actual;
 }
+function readProject(project, { expected = {}, mode } = {}) {
+  project = fs.realpathSync(project);
+  const marker = path.join(project, MARKER);
+  if (!fs.existsSync(marker))
+    throw new Error("Independent generated project required");
+  const manifest = JSON.parse(fs.readFileSync(marker, "utf8"));
+  if (
+    manifest.kind !== "aura-mini-test" ||
+    fs.realpathSync(manifest.out) !== project
+  )
+    throw new Error("Generated project ownership mismatch");
+  if (
+    manifest.purpose !== "test" ||
+    /^(online|production)$/.test(manifest.config.appEnv)
+  )
+    throw new Error("DevTools test cannot target a release project");
+  if (mode && manifest.mode !== mode)
+    throw new Error("Project data mode mismatch");
+  for (const [key, value] of Object.entries(expected)) {
+    if (value !== undefined && manifest.config[key] !== value)
+      throw new Error(`Project configuration mismatch: ${key}`);
+  }
+  target(manifest.config);
+  return manifest;
+}
+function portBusy(port) {
+  return new Promise((resolve, reject) => {
+    const server = createServer();
+    server.once("error", (error) =>
+      error.code === "EADDRINUSE" ? resolve(true) : reject(error),
+    );
+    server.once("listening", () => server.close(() => resolve(false)));
+    server.listen(port, "127.0.0.1");
+  });
+}
+async function openDevTools({
+  automator,
+  cli,
+  project,
+  port,
+  expected,
+  mode,
+  execute = execFileSync,
+  isPortBusy = portBusy,
+  timeoutMs = 30000,
+  intervalMs = 100,
+}) {
+  // Validate the independent project's identity before any product fixture writes.
+  const manifest = readProject(project, { expected, mode });
+  preflight({ cli, project, port, execute });
+  if (!(await isPortBusy(port)))
+    execute(
+      cli,
+      ["auto", "--project", manifest.out, "--auto-port", String(port)],
+      {
+        encoding: "utf8",
+        timeout: 20000,
+      },
+    );
+  const deadline = Date.now() + timeoutMs;
+  let mp;
+  do {
+    let timer;
+    const connection = automator.connect({
+      wsEndpoint: `ws://127.0.0.1:${port}`,
+    });
+    try {
+      mp = await Promise.race([
+        connection,
+        new Promise((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error("DevTools connection timed out")),
+            Math.max(1, deadline - Date.now()),
+          );
+        }),
+      ]);
+      break;
+    } catch (error) {
+      // Dispose any connection which completes after the bounded observation.
+      connection
+        .then(
+          (late) => late.disconnect(),
+          () => {},
+        )
+        .catch(() => {});
+      const wrappedTransportFailure =
+        error.message ===
+        `Failed connecting to ws://127.0.0.1:${port}, check if target project window is opened with automation enabled`;
+      if (
+        Date.now() >= deadline ||
+        (!wrappedTransportFailure &&
+          !/ECONNREFUSED|Connection closed|socket hang up/i.test(
+            error.message || "",
+          ))
+      )
+        throw error;
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    } finally {
+      clearTimeout(timer);
+    }
+  } while (Date.now() < deadline);
+  if (!mp) throw new Error("DevTools bridge unavailable");
+  const monitor = monitorConsole(mp);
+  let identityTimer;
+  try {
+    await Promise.race([
+      (async () => {
+        do {
+          monitor.assertClean();
+          let initialized = true;
+          try {
+            await verifyBridge(mp, manifest.config);
+          } catch (error) {
+            if (error.message !== "Bridge runtime identity missing")
+              throw error;
+            initialized = false;
+          }
+          if (initialized) {
+            try {
+              if (await mp.currentPage()) return;
+            } catch (error) {
+              // DevTools 2.02 / automator 0.12: initial webview metadata is not registered yet.
+              if (
+                error.message !==
+                "Cannot destructure property 'rawPath' of 't.getPageMetaByWebviewId(...)' as it is null."
+              )
+                throw error;
+              monitor.assertClean();
+            }
+          }
+          await new Promise((resolve) => setTimeout(resolve, intervalMs));
+        } while (Date.now() < deadline);
+        throw new Error("DevTools appservice did not initialize");
+      })(),
+      new Promise((_, reject) => {
+        identityTimer = setTimeout(
+          () => reject(new Error("DevTools identity check timed out")),
+          Math.max(1, deadline - Date.now()),
+        );
+      }),
+    ]);
+    monitor.assertClean();
+  } catch (error) {
+    monitor.detach();
+    await mp.disconnect();
+    throw error;
+  } finally {
+    clearTimeout(identityTimer);
+  }
+  return {
+    mp,
+    monitor,
+    manifest,
+    capture(filename, directory) {
+      if (!/^[a-z0-9_-]+\.png$/i.test(filename))
+        throw new Error("Safe screenshot filename required");
+      return captureEvidence(mp, {
+        directory,
+        scenario: filename.slice(0, -4),
+        identity: manifest.identity,
+        mode: manifest.mode,
+        monitor,
+      });
+    },
+    async close() {
+      try {
+        monitor.assertClean();
+      } finally {
+        monitor.detach();
+        await mp.disconnect();
+      }
+    },
+  };
+}
 module.exports = {
   prepareProject,
   preflight,
@@ -237,4 +416,6 @@ module.exports = {
   waitForPage,
   monitorConsole,
   captureEvidence,
+  readProject,
+  openDevTools,
 };

@@ -41,6 +41,8 @@ Logger defaults to metadata and summaries. Both sinks use the same redacted reco
 Load `scripts/vendor/wechat-mini-runtime/tools/index.cjs` outside the mini-program runtime:
 
 - `prepareProject({source,out,config,mode,identity,purpose})`: separate owned output, excludes node_modules/tests/golden, fingerprints source, records fixture/real-stack identity. Test purpose rejects production; explicit release-build permits offline release preparation.
+- `readProject(project,{expected,mode})`: validates generated ownership, test purpose, data mode and expected product config before CLI or fixture writes. Release projects cannot be opened by this test driver.
+- `openDevTools({automator,cli,project,port,expected,mode})`: validates the independent project, checks login, starts only an unused bridge, observes bounded transport/app startup and verifies identity before returning `{mp,monitor,manifest,capture,close}`. Existing bridges must match the expected project. Only exact known SDK startup gaps are observed; compiler/runtime failures stop immediately. Attach the monitor before product fixtures and close in a finally block.
 - `preflight({cli,project,port})`: checks project file, bridge port shape and CLI login. It does not terminate occupied ports or establish process ownership.
 - `verifyBridge(mp,expectedConfig)`: checks the connected app's miniRuntimeIdentity against origin/runtime/target/version/data mode/source digest. The app must expose that config on launch. A reachable bridge alone is insufficient.
 - `waitForPage(mp,route,{monitor})`: waits for the expected top page after a native tap, with a bounded timeout; it does not replace the tap.
