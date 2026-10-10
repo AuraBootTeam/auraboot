@@ -1145,10 +1145,13 @@
         "id": "table",
         "blockType": "table",
         "empty": {
-          "title": { "zh-CN": "暂无匹配成员", "en-US": "No matching members" },
+          "title": {
+            "zh-CN": "暂无符合条件的成员",
+            "en-US": "No matching members"
+          },
           "description": {
-            "zh-CN": "尝试清除筛选条件，或请管理员添加成员。",
-            "en-US": "Clear the filters or ask an administrator to add members."
+            "zh-CN": "请调整状态筛选；如尚未开通账号，可从人员开通账号。",
+            "en-US": "Adjust the status filter, or provision an account from an employee."
           }
         },
         "columns": [
@@ -1186,11 +1189,6 @@
           {
             "field": "leave_date",
             "width": 128
-          },
-          {
-            "field": "created_at",
-            "width": 208,
-            "valueType": "datetime"
           }
         ],
         "selection": {
@@ -1439,16 +1437,6 @@
         "defaultSort": {
           "field": "created_at",
           "order": "desc"
-        },
-        "empty": {
-          "title": {
-            "zh-CN": "暂无符合条件的成员",
-            "en-US": "No matching members"
-          },
-          "description": {
-            "zh-CN": "请调整状态筛选；如尚未开通账号，可从人员开通账号。",
-            "en-US": "Adjust the status filter, or provision an account from an employee."
-          }
         }
       }
     ],
