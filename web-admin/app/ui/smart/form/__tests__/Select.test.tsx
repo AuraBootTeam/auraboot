@@ -31,6 +31,21 @@ describe('Smart Select', () => {
     mockRefetch = vi.fn();
   });
 
+  it('exposes an external field label on the interactive select trigger', () => {
+    render(<div><label htmlFor="rfq_state">RFQ state</label>
+      <Select name="rfq_state" aria-label="RFQ state"
+        options={[{ label: 'Draft', value: 'draft' }]} /></div>);
+    const trigger = screen.getByRole('combobox', { name: 'RFQ state' });
+    expect(screen.getByLabelText('RFQ state')).toBe(trigger);
+    expect(trigger).toHaveAttribute('id', 'rfq_state');
+  });
+
+  it('names the interactive trigger from its own localized label', () => {
+    render(<Select name="source_type" label="Source type"
+      options={[{ label: 'FQC', value: 'fqc' }]} />);
+    expect(screen.getByRole('combobox', { name: 'Source type' })).toBeInTheDocument();
+  });
+
   it('provides a keyboard-accessible named clear action without changing the clear value contract', () => {
     const onChange = vi.fn();
     const onClear = vi.fn();
