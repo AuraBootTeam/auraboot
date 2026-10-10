@@ -58,6 +58,8 @@ class DynamicDataServiceAtomicIncrementGuardTest {
 
     @Mock MetaModelService metadataService;
     @Mock DynamicDataMapper mapper;
+    @Mock com.auraboot.framework.meta.service.VirtualFieldEngine virtualFields;
+    @Mock org.springframework.context.ApplicationContext applicationContext;
 
     DynamicDataServiceImpl service;
 
@@ -76,6 +78,8 @@ class DynamicDataServiceAtomicIncrementGuardTest {
                 null, null, null, null, null, null, null, null, null, null, null);
         ReflectionTestUtils.setField(service, "metadataService", metadataService);
         ReflectionTestUtils.setField(service, "dynamicDataMapper", mapper);
+        ReflectionTestUtils.setField(service, "virtualFieldEngine", virtualFields);
+        ReflectionTestUtils.setField(service, "applicationContext", applicationContext);
 
         testModel = ModelDefinition.builder()
                 .code("cr_cj_profile")

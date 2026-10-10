@@ -19,6 +19,7 @@ import static com.auraboot.framework.openplatform.service.OpenApiResourceContrac
 import static org.assertj.core.api.Assertions.*;
 
 /** Real production authentication, publication and dynamic data services against PostgreSQL. */
+@org.springframework.context.annotation.Import(OpenApiMachineDataIntegrationTest.EventFaultConfiguration.class)
 @org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
     @Autowired private MetaModelService models;
@@ -41,6 +42,20 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
     @Autowired private org.springframework.jdbc.core.JdbcTemplate eventJdbc;
     @Autowired private org.springframework.transaction.PlatformTransactionManager eventTransactions;
 
+    @org.springframework.boot.test.context.TestConfiguration
+    static class EventFaultConfiguration {
+        @org.springframework.context.annotation.Bean
+        EventFaultObserver eventFaultObserver() { return new EventFaultObserver(); }
+    }
+
+    static class EventFaultObserver implements ModelMutationObserver {
+        boolean fail;
+        @Override public void observe(ModelDefinition model, String pid, Operation operation) {
+            if (fail) throw new IllegalStateException("Fixture event persistence failure");
+        }
+    }
+
+    @Autowired private EventFaultObserver eventFaultObserver;
     @Autowired private OpenApiModelEventConsumer modelEvents;
     @Autowired private com.auraboot.framework.integration.ReliableEventDeliveryExecutor eventDelivery;
     @Autowired private com.auraboot.framework.webhook.service.WebhookService webhooks;
@@ -66,6 +81,8 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
                 .fields(List.of(FieldDefinition.builder().code("name").columnName("name").dataType("STRING").displayName("Name").sortable(true).filterable(true).build(),
                         FieldDefinition.builder().code("zone").columnName("zone").dataType("STRING").displayName("Zone").sortable(true).filterable(true).build(),
                         FieldDefinition.builder().code("secret").columnName("secret").dataType("STRING").displayName("Secret").sortable(true).filterable(true).build(),
+                        FieldDefinition.builder().code("counter").columnName("counter").dataType("INTEGER").displayName("Counter").build(),
+                        FieldDefinition.builder().code("cap").columnName("cap").dataType("INTEGER").displayName("Cap").build(),
                         FieldDefinition.builder().code("related").columnName("related").dataType("REFERENCE").displayName("Related").refTarget(reference).build())).build());
         var schema = schemas.createTableByModel(modelCode);
         assertThat(schema.isSuccess()).as("production schema creation: %s", schema.getErrorMessage()).isTrue();
@@ -248,6 +265,87 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
             if (secondInstallation != null) management.disableInstallation(secondInstallation);
             cleanupCommittedFixture();
         }
+    }
+
+    @Test void bulkCasAndAtomicOriginsEmitOnlyForAffectedRows() {
+        publishEvents();
+        MetaContext.runWithCommandPermitScope("ALL", () -> {
+            var rows = data.bulkCreate(contract.modelCode(), List.of(Map.of("name", "Bulk one", "zone", "A", "counter", 0, "cap", 5),
+                    Map.of("name", "Bulk two", "zone", "A", "counter", 0, "cap", 5)));
+            String first = rows.getFirst().get("pid").toString(), second = rows.getLast().get("pid").toString();
+            assertThat(sourceEvents()).hasSize(2);
+            assertThat(data.compareAndSet(contract.modelCode(), first, "name", "Bulk one", Map.of("name", "CAS one"))).isTrue();
+            assertThat(data.compareAndSet(contract.modelCode(), first, "name", "Bulk one", Map.of("name", "Must not write"))).isFalse();
+            assertThat(sourceEvents()).hasSize(3);
+            data.compareAndSetBatch(contract.modelCode(), "name", List.of(
+                    new com.auraboot.framework.plugin.extension.CompareAndSetUpdate(first, "CAS one", Map.of("name", "Batch one")),
+                    new com.auraboot.framework.plugin.extension.CompareAndSetUpdate(second, "Bulk two", Map.of("name", "Batch two"))));
+            assertThat(sourceEvents()).hasSize(5);
+            var nested = new org.springframework.transaction.support.TransactionTemplate(eventTransactions);
+            nested.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_NESTED);
+            assertThatThrownBy(() -> nested.execute(status -> {
+                data.compareAndSetBatch(contract.modelCode(), "name", List.of(
+                        new com.auraboot.framework.plugin.extension.CompareAndSetUpdate(first, "Batch one", Map.of("name", "Partial forbidden")),
+                        new com.auraboot.framework.plugin.extension.CompareAndSetUpdate(second, "Wrong expectation", Map.of("name", "Partial forbidden"))));
+                return null;
+            })).isInstanceOf(com.auraboot.framework.meta.exception.MetaServiceException.class);
+            assertThat(sourceEvents()).hasSize(5);
+            assertThat(data.getById(contract.modelCode(), first)).containsEntry("name", "Batch one");
+            assertThat(data.incrementWithinCap(contract.modelCode(), first, "counter", 2, "cap")).contains(2L);
+            assertThat(data.incrementWithinCap(contract.modelCode(), first, "counter", 10, "cap")).isEmpty();
+            assertThat(sourceEvents()).hasSize(6);
+            data.batchDelete(contract.modelCode(), List.of(first, second));
+            assertThat(sourceEvents()).hasSize(8);
+            assertThat(sourceEvents().stream().filter(row -> first.equals(row.get("subject")))
+                    .map(row -> ((Number) row.get("event_sequence")).longValue()).toList()).containsExactly(1L, 2L, 3L, 4L, 5L);
+            return null;
+        });
+    }
+
+    @Test void batchAndImportRowsHaveSavepointsAndUseOwnerCreate() throws Exception {
+        publishEvents();
+        var importFile = java.nio.file.Files.createTempFile("aura-model-event-import-", ".json");
+        try {
+            java.nio.file.Files.writeString(importFile, "[{\"name\":\"Imported\",\"zone\":\"A\",\"counter\":0},{\"name\":\"Invalid import\",\"zone\":\"A\",\"counter\":\"invalid-integer\"}]");
+            MetaContext.runWithCommandPermitScope("ALL", () -> {
+                var batch = data.batchCreate(contract.modelCode(), List.of(new HashMap<>(Map.of("name", "Batch created", "zone", "A", "counter", 0)),
+                        new HashMap<>(Map.of("name", "Invalid batch", "zone", "A", "counter", "invalid-integer"))));
+                assertThat(batch.getSuccess()).isEqualTo(1); assertThat(batch.getFailed()).isEqualTo(1);
+                var imported = data.importData(contract.modelCode(), DataImportRequest.builder().filePath(importFile.toString())
+                        .format(DataImportRequest.ImportFormat.JSON).batchSize(2).build());
+                assertThat(imported.getSuccessCount()).isEqualTo(1); assertThat(imported.getFailedCount()).isEqualTo(1);
+                assertThat(sourceEvents()).hasSize(2);
+                var updated = data.batchUpdate(contract.modelCode(), List.of(new HashMap<>(Map.of("pid", allowedPid, "name", "Batch updated")),
+                        new HashMap<>(Map.of("pid", deniedPid, "counter", "invalid-integer"))));
+                assertThat(updated.getSuccess()).isEqualTo(1); assertThat(updated.getFailed()).isEqualTo(1);
+                assertThat(sourceEvents()).hasSize(3);
+                assertThat(data.list(contract.modelCode(), DynamicQueryRequest.builder().pageNum(1).pageSize(100).build()).getTotal()).isEqualTo(4);
+                return null;
+            });
+        } finally { java.nio.file.Files.deleteIfExists(importFile); }
+    }
+
+    @Test void observerFailureRollsBackEveryBatchRowBeforeReportingFailure() {
+        publishEvents();
+        MetaContext.runWithCommandPermitScope("ALL", () -> {
+            try {
+                eventFaultObserver.fail = true;
+                var failed = data.batchCreate(contract.modelCode(), List.of(new HashMap<>(Map.of("name", "Failed one", "zone", "A")),
+                        new HashMap<>(Map.of("name", "Failed two", "zone", "A"))));
+                assertThat(failed.getSuccess()).isZero(); assertThat(failed.getFailed()).isEqualTo(2);
+                assertThat(sourceEvents()).isEmpty();
+                assertThat(data.list(contract.modelCode(), DynamicQueryRequest.builder().pageNum(1).pageSize(100).build()).getTotal()).isEqualTo(2);
+                var before = data.getById(contract.modelCode(), allowedPid);
+                var failedUpdate = data.batchUpdate(contract.modelCode(), List.of(new HashMap<>(Map.of("pid", allowedPid, "name", "Failed update"))));
+                assertThat(failedUpdate.getFailed()).isEqualTo(1);
+                assertThat(data.getById(contract.modelCode(), allowedPid)).containsEntry("name", before.get("name"))
+                        .containsEntry("row_version", before.get("row_version"));
+                assertThat(sourceEvents()).isEmpty();
+            } finally { eventFaultObserver.fail = false; }
+            var recovered = data.batchCreate(contract.modelCode(), List.of(new HashMap<>(Map.of("name", "Recovered", "zone", "A"))));
+            assertThat(recovered.getSuccess()).isEqualTo(1); assertThat(sourceEvents()).hasSize(1);
+            return null;
+        });
     }
 
     @Test void humanSingleCrudUsesTheSamePublishedSourceEventHook() {

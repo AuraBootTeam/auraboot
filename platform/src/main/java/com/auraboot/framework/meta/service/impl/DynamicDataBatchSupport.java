@@ -58,6 +58,8 @@ final class DynamicDataBatchSupport extends BaseMetaService {
 
     private final ToColumnDataOperation toColumnDataOperation;
 
+    private final ModelMutationObserver mutationObserver;
+
     @FunctionalInterface
     interface GetByIdOperation { Map<String, Object> execute(String modelCode, String recordId); }
 
@@ -239,6 +241,9 @@ final class DynamicDataBatchSupport extends BaseMetaService {
                     "Bulk create expected " + dataList.size() + " rows inserted but got " + inserted);
         }
 
+        for (var row : createdRecords) {
+            mutationObserver.observe(model, row.get(primaryKey.getCode()).toString(), ModelMutationObserver.Operation.CREATED);
+        }
         return createdRecords;
     }
 
@@ -355,6 +360,9 @@ final class DynamicDataBatchSupport extends BaseMetaService {
             }
         }
 
+        for (String recordId : recordIds) {
+            mutationObserver.observe(model, recordId, ModelMutationObserver.Operation.DELETED);
+        }
         int affected = dynamicDataMapper.deleteByQuery(sql.toString(), params);
         if (affected != recordIds.size()) {
             throw new MetaServiceException(

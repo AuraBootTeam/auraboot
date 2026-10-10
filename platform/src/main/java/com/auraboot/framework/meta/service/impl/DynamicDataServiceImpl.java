@@ -380,7 +380,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         if (updated > 1) {
             throw new MetaServiceException("compareAndSet updated more than one record");
         }
-        if (updated == 1 && MetaContext.getCommandExpectedVersion(modelCode, recordId) != null) {
+        if (updated == 1) {
+            notifyModelMutation(model, recordId, ModelMutationObserver.Operation.UPDATED);
             MetaContext.advanceCommandExpectedVersion(modelCode, recordId);
         }
         return updated == 1;
@@ -498,6 +499,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         if (affected != updates.size()) {
             throw new MetaServiceException("CAS batch conflict: no partial batch may commit");
         }
+        for (var update : updates) {
+            notifyModelMutation(model, update.recordId(), ModelMutationObserver.Operation.UPDATED);
+        }
         for (int i = 0; i < updates.size(); i++) {
             if (versions.get(i) != null) MetaContext.advanceCommandExpectedVersion(modelCode, updates.get(i).recordId());
         }
@@ -561,6 +565,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         if (rows == null || rows.isEmpty()) {
             return Optional.empty();
         }
+        if (rows.size() != 1) throw new MetaServiceException("Atomic increment affected more than one record");
+        notifyModelMutation(model, recordId, ModelMutationObserver.Operation.UPDATED);
         Object val = rows.get(0).get("new_value");
         if (val instanceof Number n) {
             return Optional.of(n.longValue());
@@ -1173,10 +1179,6 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 }
                 throw new MetaServiceException("Failed to update record");
             }
-            if (MetaContext.getCommandExpectedVersion(modelCode, recordId) != null) {
-                MetaContext.advanceCommandExpectedVersion(modelCode, recordId);
-            }
-
             // Materialize computed fields after update
             virtualFieldEngine.materialize(modelCode, recordId, changedFields);
             notifyModelMutation(model, recordId, ModelMutationObserver.Operation.UPDATED);
@@ -1214,6 +1216,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                     () -> getAutomationTriggerService().onRecordUpdate(
                             modelCode, recordId, automationBefore, automationAfter));
 
+            MetaContext.advanceCommandExpectedVersion(modelCode, recordId);
             return updatedRecord;
 
         } catch (AccessDeniedException e) {
@@ -1293,6 +1296,15 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             log.error("Failed to record change log for delete: model={}, id={}: {}",
                     logSafe(modelCode), logSafe(recordId), logSafe(e.getMessage()), e);
         }
+    }
+
+    private <T> T inRowTransaction(java.util.function.Supplier<T> operation) {
+        var transaction = new org.springframework.transaction.support.TransactionTemplate(
+                applicationContext.getBean(org.springframework.transaction.PlatformTransactionManager.class));
+        // Outside a transaction this starts one; inside bulk/import it provides a per-row savepoint.
+        // A caught row failure therefore cannot leave the source mutation without its event.
+        transaction.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_NESTED);
+        return transaction.execute(status -> operation.get());
     }
 
     private void notifyModelMutation(ModelDefinition model, String pid, ModelMutationObserver.Operation operation) {
@@ -1681,7 +1693,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     private DynamicDataTransferSupport dynamicDataTransferSupport() {
-        return new DynamicDataTransferSupport(queryBuilderService, dynamicDataMapper, objectMapper, dataPermissionEngine, fieldMaskService, dataDomainService, fieldPermissionService, DynamicDataServiceImpl::buildFieldLabelMap, DynamicDataServiceImpl::materializeReferenceDisplayValues, this::applyFieldPermissionFilter, this::currentMemberIdForFieldPermissions, this::resolveEnrichmentTarget, this::enrichReferenceDisplayFields, this::appendScopedBulkFilter, this::getModelDefinition, this::assertWritable, this::toColumnData, this::mapSortFields);
+        return new DynamicDataTransferSupport(queryBuilderService, dynamicDataMapper, objectMapper, dataPermissionEngine, fieldMaskService, dataDomainService, fieldPermissionService, DynamicDataServiceImpl::buildFieldLabelMap, DynamicDataServiceImpl::materializeReferenceDisplayValues, this::applyFieldPermissionFilter, this::currentMemberIdForFieldPermissions, this::resolveEnrichmentTarget, this::enrichReferenceDisplayFields, this::appendScopedBulkFilter, this::getModelDefinition, this::assertWritable, this::toColumnData, this::mapSortFields, (code, input) -> inRowTransaction(() -> create(code, input)));
     }
 
     private DynamicJointSaveSupport dynamicJointSaveSupport() {
@@ -1689,7 +1701,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     private DynamicDataBatchSupport dynamicDataBatchSupport() {
-        return new DynamicDataBatchSupport(metadataService, validationService, typeSystemManager, dynamicDataMapper, dataPermissionEngine, dataDomainService, payloadTemporalNormalizer, this::getById, this::create, this::convertDataTypes, this::filterVirtualFields, this::stripNonWritableFields, this::ensureTableExists, this::update, this::appendScopedBulkFilter, this::getModelDefinition, this::assertWritable, this::toColumnData);
+        return new DynamicDataBatchSupport(metadataService, validationService, typeSystemManager, dynamicDataMapper, dataPermissionEngine, dataDomainService, payloadTemporalNormalizer, this::getById, (code, input) -> inRowTransaction(() -> create(code, input)), this::convertDataTypes, this::filterVirtualFields, this::stripNonWritableFields, this::ensureTableExists, (code, inputId, input) -> inRowTransaction(() -> update(code, inputId, input)), this::appendScopedBulkFilter, this::getModelDefinition, this::assertWritable, this::toColumnData, this::notifyModelMutation);
     }
 
     private DynamicDataListingSupport dynamicDataListingSupport() {
