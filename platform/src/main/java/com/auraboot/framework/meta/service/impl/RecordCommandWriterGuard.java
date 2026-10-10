@@ -18,16 +18,17 @@ public final class RecordCommandWriterGuard {
     private static Policy policy(ModelDefinition model) {
         Object raw = model == null || model.getExtension() == null ? null : model.getExtension().get(POLICY);
         if (raw == null) return null;
-        if (!(raw instanceof Map<?, ?> declaration) || !declaration.keySet().equals(java.util.Set.of("field", "commands"))
-            || !(declaration.get("field") instanceof String code) || code.isBlank()
-            || !(declaration.get("commands") instanceof Map<?, ?> commands)
-            || !commands.keySet().equals(java.util.Set.of("create", "update", "delete"))) throw invalid(model);
-        for (Object writers : commands.values()) {
-            if (!(writers instanceof List<?> list) || list.stream().anyMatch(v -> !(v instanceof String s) || s.isBlank())) throw invalid(model);
+        try {
+            com.auraboot.framework.meta.security.RecordCommandWriterDeclaration.validate(raw);
+        } catch (IllegalArgumentException e) {
+            throw invalid(model);
         }
+        Map<?, ?> declaration = (Map<?, ?>) raw;
+        String code = (String) declaration.get("field");
+        Map<?, ?> commands = (Map<?, ?>) declaration.get("commands");
         FieldDefinition marker = model.getFields() == null ? null : model.getFields().stream()
             .filter(f -> f != null && code.equals(f.getCode())).findFirst().orElse(null);
-        if (marker == null || !"boolean".equalsIgnoreCase(marker.getDataType()) || marker.isVirtual() || marker.isJsonbVirtual()) throw invalid(model);
+        if (marker == null || !"boolean".equalsIgnoreCase(marker.getDataType()) || marker.isVirtual() || marker.isJsonbVirtual() || !marker.isImmutable()) throw invalid(model);
         SqlSafetyUtils.requireIdentifier(column(marker), "record writer marker column");
         return new Policy(marker, commands);
     }
@@ -48,6 +49,7 @@ public final class RecordCommandWriterGuard {
     public static void assertInputAllowed(ModelDefinition model, Map<String, Object> input, String operation) {
         Policy policy = policy(model);
         if (policy == null || input == null) return;
+        assertMatchingAliases(policy, input);
         for(String name: new java.util.LinkedHashSet<>(java.util.List.of(policy.marker().getCode(), column(policy.marker())))) {
             Object proposed=input.get(name);
             if (proposed != null && !(proposed instanceof Boolean)) throw new MetaServiceException("Record writer marker must be a boolean");
@@ -70,10 +72,64 @@ public final class RecordCommandWriterGuard {
         if (policy != null && !authorized(policy, operation)) sql.append(" AND ").append(column(policy.marker())).append(" IS DISTINCT FROM TRUE");
     }
 
+    /** Same-value round trips are allowed; ownership never transfers after creation. */
+    public static void assertMarkerUnchanged(ModelDefinition model, Map<String,Object> input, Map<String,Object> stored) {
+        Policy policy = policy(model);
+        if (policy == null || input == null) return;
+        assertMatchingAliases(policy, input);
+        for (String name : new java.util.LinkedHashSet<>(List.of(policy.marker().getCode(), column(policy.marker())))) {
+            if (!input.containsKey(name)) continue;
+            Object current = stored == null ? null : stored.containsKey(policy.marker().getCode())
+                ? stored.get(policy.marker().getCode()) : stored.get(column(policy.marker()));
+            if (!java.util.Objects.equals(current, input.get(name)))
+                throw new MetaServiceException("RECORD_OWNERSHIP_IMMUTABLE: record writer marker cannot change after creation");
+        }
+    }
+
+    /** SQL writers must also preserve the selector when no pre-read is available. */
+    public static void appendMarkerInvariant(StringBuilder sql, ModelDefinition model, Map<String,Object> input) {
+        Policy policy = policy(model);
+        if (policy == null || input == null) return;
+        assertMatchingAliases(policy, input);
+        for (String name : new java.util.LinkedHashSet<>(List.of(policy.marker().getCode(), column(policy.marker())))) {
+            if (!input.containsKey(name)) continue;
+            Object proposed = input.get(name);
+            if (proposed != null && !(proposed instanceof Boolean))
+                throw new MetaServiceException("Record writer marker must be a boolean");
+            sql.append(" AND ").append(column(policy.marker())).append(proposed == null ? " IS NULL"
+                : Boolean.TRUE.equals(proposed) ? " IS TRUE" : " IS FALSE");
+            return;
+        }
+    }
+
+    /** Legacy raw mapper paths cannot materialize the immutable selector. */
+    public static void assertLegacyMarkerUntouched(ModelDefinition model, Map<String,Object> data) {
+        Policy policy = policy(model);
+        if (policy != null && data != null
+                && (data.containsKey(policy.marker().getCode()) || data.containsKey(column(policy.marker()))))
+            throw new MetaServiceException("RECORD_OWNERSHIP_IMMUTABLE: legacy writes cannot materialize the record writer marker");
+    }
+
+    private static void assertMatchingAliases(Policy policy, Map<String,Object> input) {
+        String code = policy.marker().getCode();
+        String physical = column(policy.marker());
+        if (input.containsKey(code) && input.containsKey(physical) && !java.util.Objects.equals(input.get(code), input.get(physical)))
+            throw new MetaServiceException("Conflicting record writer marker aliases");
+    }
+
+    public static void validatePolicy(ModelDefinition model) { policy(model); }
+
     /** Legacy mapper mutations keep their existing mapping but lock and validate their exact targets. */
     public static Map<String,Object> guardLegacyConditions(
             com.auraboot.framework.meta.mapper.DynamicDataMapper mapper, ModelDefinition model,
             String table, Map<String,Object> conditions, String operation) {
+        return guardLegacyConditions(mapper, model, table, conditions, operation, null);
+    }
+
+    public static Map<String,Object> guardLegacyConditions(
+            com.auraboot.framework.meta.mapper.DynamicDataMapper mapper, ModelDefinition model,
+            String table, Map<String,Object> conditions, String operation, Map<String,Object> values) {
+        assertLegacyMarkerUntouched(model, values);
         Policy policy = policy(model);
         if (policy == null) return conditions;
         if (!org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive())
@@ -83,21 +139,18 @@ public final class RecordCommandWriterGuard {
         Map<String,Object> scoped = new java.util.LinkedHashMap<>(conditions);
         Object declaredTenant = scoped.putIfAbsent("tenant_id", tenant);
         if (declaredTenant != null && !tenant.toString().equals(declaredTenant.toString())) throw denied(model);
-        if (authorized(policy, operation)) return scoped;
-        StringBuilder sql = new StringBuilder("SELECT ").append(column(policy.marker())).append(" AS ")
-            .append(SqlSafetyUtils.requireIdentifier(policy.marker().getCode(), "record writer marker field"))
-            .append(" FROM ").append(SqlSafetyUtils.requireIdentifier(table,"record writer target table")).append(" WHERE ");
-        Map<String,Object> params = new java.util.LinkedHashMap<>();
-        int i=0;
-        for(var condition:scoped.entrySet()) {
-            if(i>0) sql.append(" AND ");
-            sql.append(SqlSafetyUtils.requireIdentifier(condition.getKey(),"record writer condition column"));
-            if(condition.getValue()==null) sql.append(" IS NULL");
-            else {String key="condition"+i;sql.append(" = #{params.").append(key).append("}");params.put(key,condition.getValue());}
-            i++;
+        scoped.put("tenant_id", tenant);
+        List<Map<String,Object>> rows = mapper.selectRecordWriterTargetsForUpdate(
+                table, column(policy.marker()), policy.marker().getCode(), scoped);
+        if (scoped.containsKey("id") || scoped.containsKey("pid")) {
+            if (rows == null || rows.size() != 1)
+                throw new MetaServiceException("Record writer target is missing or ambiguous in the current tenant");
+            if (scoped.containsKey("id")) {
+                Object resolvedId = rows.get(0).get("id");
+                if (resolvedId == null) throw new MetaServiceException("Record writer target has no stored identity");
+                scoped.put("id", resolvedId);
+            }
         }
-        sql.append(" ORDER BY pid FOR UPDATE");
-        List<Map<String,Object>> rows = mapper.selectByQuery(sql.toString(),params);
         if(rows!=null) for(Map<String,Object> row:rows) assertStoredAllowed(model,row,operation);
         return scoped;
     }
@@ -109,15 +162,11 @@ public final class RecordCommandWriterGuard {
         Policy policy = policy(model);
         if (policy == null) return;
         Long tenant = relationTenant();
-        String sql = "SELECT " + column(policy.marker()) + " AS "
-            + SqlSafetyUtils.requireIdentifier(policy.marker().getCode(), "record writer marker field")
-            + " FROM " + SqlSafetyUtils.requireIdentifier(table, "record writer target table")
-            + " WHERE tenant_id = #{params.tenantId} AND deleted_flag = FALSE"
-            + " AND (id::text = #{params.identity} OR pid = #{params.identity}) ORDER BY pid FOR UPDATE";
         if (identities == null || identities.stream().anyMatch(identity -> identity == null || identity.isBlank()))
             throw new MetaServiceException("Record writer relation target is missing");
         for (String identity : new java.util.TreeSet<>(identities)) {
-            List<Map<String,Object>> rows = mapper.selectByQuery(sql, Map.of("tenantId", tenant, "identity", identity));
+            List<Map<String,Object>> rows = mapper.selectRecordWriterTargetsForUpdate(table, column(policy.marker()),
+                    policy.marker().getCode(), Map.of("tenant_id", tenant, "id", identity, "deleted_flag", false));
             if (rows == null || rows.size() != 1)
                 throw new MetaServiceException("Record writer relation target is missing or ambiguous in the current tenant");
             assertStoredAllowed(model, rows.get(0), operation);
@@ -130,11 +179,8 @@ public final class RecordCommandWriterGuard {
             String targetTable, String junctionTable, String sourceColumn, String targetColumn, String sourceIdentity) {
         if (policy(model) == null) return;
         Long tenant = relationTenant();
-        String sql = "SELECT " + SqlSafetyUtils.requireIdentifier(targetColumn, "record writer junction target")
-            + " AS target_identity FROM " + SqlSafetyUtils.requireIdentifier(junctionTable, "record writer junction table")
-            + " WHERE " + SqlSafetyUtils.requireIdentifier(sourceColumn, "record writer junction source")
-            + " = #{params.sourceIdentity} AND tenant_id = #{params.tenantId} ORDER BY " + targetColumn + " FOR UPDATE";
-        List<Map<String,Object>> links = mapper.selectByQuery(sql, Map.of("sourceIdentity", sourceIdentity, "tenantId", tenant));
+        List<Map<String,Object>> links = mapper.selectRelationTargetsForUpdate(
+                junctionTable, sourceColumn, targetColumn, tenant, sourceIdentity);
         java.util.List<String> identities = new java.util.ArrayList<>();
         if (links != null) for (Map<String,Object> link : links) {
             Object identity = link.get("target_identity");

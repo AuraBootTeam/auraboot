@@ -131,6 +131,7 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
         }
         appendAggregateBindingGuard(sql, params, model);
         RecordCommandWriterGuard.appendStoredPredicate(sql, model, permissionOperation);
+        RecordCommandWriterGuard.appendMarkerInvariant(sql, model, columnData);
         appendScopedWriteGuards(sql, tenantId, modelCode, userId, permissionOperation);
 
         return dynamicDataMapper.updateByQuery(sql.toString(), params);

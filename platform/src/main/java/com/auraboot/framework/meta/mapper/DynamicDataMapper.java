@@ -24,6 +24,22 @@ public interface DynamicDataMapper {
             @Param("tenantId") Long tenantId, @Param("targetRecordPid") String targetRecordPid);
 
 
+    /** Structured ownership lock; the provider always binds an explicit tenant predicate. */
+    @SelectProvider(type = DynamicSqlProvider.class, method = "selectRecordWriterTargetsForUpdate")
+    @InterceptorIgnore(tenantLine = "true")
+    List<Map<String,Object>> selectRecordWriterTargetsForUpdate(
+            @Param("tableName") String tableName, @Param("markerColumn") String markerColumn,
+            @Param("markerAlias") String markerAlias, @Param("conditions") Map<String,Object> conditions);
+
+    /** Structured junction lock; values remain bound and tenant scope cannot be omitted. */
+    @SelectProvider(type = DynamicSqlProvider.class, method = "selectRelationTargetsForUpdate")
+    @InterceptorIgnore(tenantLine = "true")
+    List<Map<String,Object>> selectRelationTargetsForUpdate(
+            @Param("tableName") String tableName, @Param("sourceColumn") String sourceColumn,
+            @Param("targetColumn") String targetColumn, @Param("tenantId") Long tenantId,
+            @Param("sourceIdentity") String sourceIdentity);
+
+
     /**
      * 根据SQL查询数据
      * @param sql SQL语句

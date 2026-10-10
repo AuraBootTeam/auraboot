@@ -114,7 +114,7 @@ public class RollUpSummaryService {
         // Update parent record
         var idEntry = CommandExecutorUtils.resolveRecordIdColumn(parentRecordId);
         Map<String,Object> writeConditions = RecordCommandWriterGuard.guardLegacyConditions(dynamicDataMapper,
-                parentModel, parentTable, Map.of("tenant_id", tenantId, idEntry.getKey(), idEntry.getValue()), "update");
+                parentModel, parentTable, Map.of("tenant_id", tenantId, idEntry.getKey(), idEntry.getValue()), "update", Map.of(parentColumn, result));
         dynamicDataMapper.update(parentTable, Map.of(parentColumn, result), writeConditions);
 
         log.info("RollUp {}({}.{}) where {}={} = {} -> {}.{}",

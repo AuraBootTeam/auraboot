@@ -35,6 +35,7 @@ public final class FieldWriterGuard {
             Map<String, Object> existingRecord) {
         RecordCommandWriterGuard.assertStoredAllowed(model, existingRecord, "update");
         RecordCommandWriterGuard.assertInputAllowed(model, submitted, "update");
+        RecordCommandWriterGuard.assertMarkerUnchanged(model, submitted, existingRecord);
         if (model == null || model.getFields() == null || submitted == null || submitted.isEmpty()) {
             return;
         }

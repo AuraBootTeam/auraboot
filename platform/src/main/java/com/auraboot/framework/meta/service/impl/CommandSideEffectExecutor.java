@@ -405,9 +405,13 @@ public class CommandSideEffectExecutor {
                 .append(" AND tenant_id = #{params.tenantId}");
         RecordCommandWriterGuard.appendStoredPredicate(sql, writerModel,
                 Boolean.TRUE.equals(data.get("deleted_flag")) ? "delete" : "update");
+        RecordCommandWriterGuard.appendMarkerInvariant(sql, writerModel, data);
         appendScopedWriteGuards(sql, tenantId, modelCode, "update");
 
-        return dynamicDataMapper.updateByQuery(sql.toString(), params);
+        int updated = dynamicDataMapper.updateByQuery(sql.toString(), params);
+        if (updated == 0 && RecordCommandWriterGuard.hasPolicy(writerModel))
+            throw new com.auraboot.framework.exception.ConflictException("SIDE_EFFECT update refused: ownership or target scope changed");
+        return updated;
     }
 
     private boolean shouldUseScopedWrite() {

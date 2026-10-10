@@ -99,12 +99,12 @@ class DynamicJointSaveSupportTest {
         org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
         var relation=relation("MANY_TO_MANY");
         var protectedModel=ModelDefinition.builder().code("invoice_line")
-            .fields(List.of(FieldDefinition.builder().code("managed").dataType("boolean").build()))
+            .fields(List.of(FieldDefinition.builder().code("managed").dataType("boolean").immutable(true).build()))
             .extension(Map.of("recordCommandWriters",Map.of("field","managed","commands",
                 Map.of("create",List.of(),"update",List.of("app:save"),"delete",List.of())))).build();
         when(lookup.execute("invoice_line")).thenReturn(protectedModel);
-        when(mapper.selectByQuery(anyString(),anyMap())).thenReturn(List.of(Map.of("target_identity","line-1")))
-            .thenReturn(List.of(Map.of("managed",true)));
+        when(mapper.selectRelationTargetsForUpdate(anyString(),anyString(),anyString(),anyLong(),anyString())).thenReturn(List.of(Map.of("target_identity","line-1")));
+        when(mapper.selectRecordWriterTargetsForUpdate(anyString(),anyString(),anyString(),anyMap())).thenReturn(List.of(Map.of("managed",true)));
         assertThatThrownBy(()->service.deleteExistingChildRecords(relation,"invoice-42"))
             .hasMessageContaining("RECORD_WRITER_DENIED");
         verify(mapper,never()).delete(anyString(),anyMap());
@@ -113,16 +113,15 @@ class DynamicJointSaveSupportTest {
         org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
         var relation=relation("MANY_TO_MANY");
         var protectedModel=ModelDefinition.builder().code("invoice_line")
-            .fields(List.of(FieldDefinition.builder().code("managed").dataType("boolean").build()))
+            .fields(List.of(FieldDefinition.builder().code("managed").dataType("boolean").immutable(true).build()))
             .extension(Map.of("recordCommandWriters",Map.of("field","managed","commands",
                 Map.of("create",List.of(),"update",List.of(),"delete",List.of())))).build();
         when(lookup.execute("invoice_line")).thenReturn(protectedModel);
-        when(mapper.selectByQuery(anyString(),anyMap())).thenReturn(List.of(Map.of("target_identity","line-1")))
-            .thenReturn(List.of(Map.of("managed",false)));
+        when(mapper.selectRelationTargetsForUpdate(anyString(),anyString(),anyString(),anyLong(),anyString())).thenReturn(List.of(Map.of("target_identity","line-1")));
+        when(mapper.selectRecordWriterTargetsForUpdate(anyString(),anyString(),anyString(),anyMap())).thenReturn(List.of(Map.of("managed",false)));
         service.deleteExistingChildRecords(relation,"invoice-42");
-        var sql=org.mockito.ArgumentCaptor.forClass(String.class);
-        verify(mapper,times(2)).selectByQuery(sql.capture(),anyMap());
-        assertThat(sql.getAllValues().get(0)).contains("invoice_links", "invoice_id =", "tenant_id =", "FOR UPDATE");
+        verify(mapper).selectRelationTargetsForUpdate("invoice_links","invoice_id","parent_id",42L,"invoice-42");
+        verify(mapper).selectRecordWriterTargetsForUpdate("invoice_lines","managed","managed",Map.of("id","line-1","tenant_id",42L,"deleted_flag",false));
         verify(mapper).delete("invoice_links",Map.of("invoice_id","invoice-42","tenant_id",42L));
     }
 

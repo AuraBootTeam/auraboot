@@ -317,4 +317,24 @@ class CommandFieldMapExecutorFieldPermissionTest {
         field.setDataType("STRING");
         return field;
     }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
+    void protectedDeleteWithZeroRowsCannotReportSuccessWithoutAVersion(boolean soft) {
+        var model=ModelDefinition.builder().code(MODEL).tableName("mt_shared_bid").softDelete(soft)
+            .fields(List.of(FieldDefinition.builder().code("managed").dataType("boolean").immutable(true).build()))
+            .extension(Map.of("recordCommandWriters",Map.of("field","managed","commands",
+                Map.of("create",List.of("app:create"),"update",List.of("app:save"),"delete",List.of())))).build();
+        when(metaModelService.getModelDefinition(MODEL)).thenReturn(Optional.of(model));
+        var request=new CommandExecuteRequest();request.setOperationType("delete");request.setTargetRecordId("bid-a");
+        var command=new CommandDefinition();command.setCode("native:delete");command.setModelCode(MODEL);
+        assertThatThrownBy(()->MetaContext.runWithCommandPermitPlan("ALL",null,MODEL,"bid-a",()->
+            MetaContext.runWithAuthorizedCommandCode("native:delete",()->executor.executeImplicitFieldMapPhase(
+                Map.of("type","delete"),Map.of(),TENANT_ID,request,command))))
+            .isInstanceOf(com.auraboot.framework.exception.ConflictException.class).hasMessageContaining("FIELD_MAP");
+        var sql=org.mockito.ArgumentCaptor.forClass(String.class);
+        if(soft) verify(dynamicDataMapper).updateByQuery(sql.capture(),org.mockito.ArgumentMatchers.anyMap());
+        else verify(dynamicDataMapper).deleteByQuery(sql.capture(),org.mockito.ArgumentMatchers.anyMap());
+        assertThat(sql.getValue()).contains("managed IS DISTINCT FROM TRUE","tenant_id =").doesNotContain("row_version = #{params.expectedVersion}");
+    }
+
 }
