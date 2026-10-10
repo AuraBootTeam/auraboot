@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { cloneElement, useEffect, useId, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { useI18n } from '~/contexts/I18nContext';
 import { publicationRequest, PublicationApiError, identityField, sourceField, publicValueType, type PublicationView,
@@ -10,6 +10,14 @@ const BUTTON = 'rounded-control border border-border-strong bg-panel px-3 py-2 t
 const OPERATIONS: PublicOperation[] = ['list', 'get', 'create', 'update', 'delete'];
 const initial = (): PublicResource => ({ code: '', modelCode: '', schemaVersion: 1, operations: ['list'], scopes: { list: '' },
   dataPolicy: 'installation_filter', fields: { pid: identityField() }, maxPageSize: 50, maxConditions: 8, timeoutMs: 5000, events: [] });
+
+type LabeledControl = ReactElement<{ id?: string; 'aria-describedby'?: string }>;
+function PublicationField({ name, child, help }: { name: string; child: LabeledControl; help?: string }) {
+  const id = useId();
+  return <div className="space-y-1 text-sm text-text"><label htmlFor={id} className="block">{name}</label>
+    {cloneElement(child, { id, 'aria-describedby': help ? `${id}-help` : undefined })}
+    {help && <p id={`${id}-help`} className="text-xs text-text-2">{help}</p>}</div>;
+}
 
 /** Public contract editing is a typed custom block inside the administration DSL page. */
 export function OpenApiPublicationEditor() {
@@ -111,7 +119,7 @@ export function OpenApiPublicationEditor() {
   };
   const updateField = (alias: string, field: PublicField) => change({ ...draft, fields: { ...draft.fields, [alias]: field } });
   const section = (title: string, content: ReactNode) => <section className="space-y-4 rounded-card border border-border bg-panel p-5"><h2 className="text-base font-semibold text-text">{title}</h2>{content}</section>;
-  const input = (name: string, child: ReactNode, help?: string) => <label className="block space-y-1 text-sm text-text"><span>{name}</span>{child}{help && <span className="block text-xs text-text-2">{help}</span>}</label>;
+  const input = (name: string, child: LabeledControl, help?: string) => <PublicationField name={name} child={child} help={help} />;
   const status = (row: PublicationView) => row.status === 'published' ? label('live', '已发布', 'Published') : row.status === 'withdrawn' ? label('disabled', '已停用', 'Withdrawn') : label('draft', '草稿', 'Draft');
   return <div data-testid="publication-editor" className="space-y-5">
     <header className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="text-xl font-semibold text-text">{label('title', '公共资源发布', 'Public resource publications')}</h1>

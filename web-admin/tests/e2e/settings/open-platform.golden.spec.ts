@@ -126,6 +126,7 @@ test.describe('Dynamic resource publication journey', () => {
         expect(document.paths[`/api/open/v1/resources/${resourceCode}`].post).toBeDefined();
       } else expect(content).toContain('export type Resource');
       await artifact.saveAs(path.join(screenshotRoot, resourceCode + extension));
+      await snapshot(extension === '.openapi.json' ? 'publication-openapi' : 'publication-types');
     }
     await page.getByRole('button', { name: '停用资源', exact: true }).click();
     await snapshot('publication-withdrawdialog');
