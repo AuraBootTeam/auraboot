@@ -125,14 +125,18 @@ class ProcurementPluginHostRealDbIT {
             ()->MetaContext.runWithAuthorizedCommandCode(writer,work));}
     private Object sync(String id,String entry){return syncWith(context,id,entry);}
     private Object syncWith(CommandHandlerExtension.CommandContext selectedContext,String id,String entry){
+        return syncSelectedWith(selectedContext,List.<String[]>of(new String[]{id,entry}));
+    }
+    private Object syncSelectedWith(CommandHandlerExtension.CommandContext selectedContext,List<String[]> identities){
         try{
             Class<?> selection=plugin.loadClass("com.auraboot.quote.engine.procurement.ProcurementRequisitionReader$Selection");
-            Object selected=selection.getConstructor(String.class,String.class).newInstance(id,entry);
+            var selected=new ArrayList<Object>();
+            for(var identity:identities) selected.add(selection.getConstructor(String.class,String.class).newInstance(identity[0],identity[1]));
             Class<?> importer=plugin.loadClass("com.auraboot.quote.engine.procurement.ProcurementRequisitionImporter");
             Class<?> policy=plugin.loadClass(importer.getName()+"$EligibilityPolicy");
             Object trusted=java.lang.reflect.Proxy.newProxyInstance(plugin,new Class<?>[]{policy},(proxy,method,args)->true);
             return importer.getMethod("sync",CommandHandlerExtension.CommandContext.class,List.class,int.class,policy)
-                    .invoke(null,selectedContext,List.of(selected),20,trusted);
+                    .invoke(null,selectedContext,selected,20,trusted);
         }catch(ReflectiveOperationException error){throw unwrap(error);}
     }
     private List<Map<String,Object>> rows(){return scope(SYNC,()->db.queryPage("pr_purchase_request",
@@ -653,6 +657,42 @@ class ProcurementPluginHostRealDbIT {
             assertTrue(nativeRows("qo_procurement_execution_common","qo_pr_execution_task_pid",task).isEmpty());
             original.forEach((pid,row)->assertEquals(row,db.getById("qo_procurement_submission_common",pid)));return null;
         });
+    }
+
+    @Test void nativeBatchSourceSyncLocksAllQuotesBeforeAnySourceInCanonicalOrder() {
+        var fixture=savedNativeQuote();var tx=new TransactionTemplate(transactions);
+        response=row("100","12");tx.execute(status->scope(SYNC,()->sync("100","12")));
+        String secondSource=rows().stream().filter(r->!fixture.source().equals(r.get("pid"))).map(r->(String)r.get("pid")).findFirst().orElseThrow();
+        String supplier=scope(SYNC,()->(String)db.getById("s2p_bid",fixture.quote()).get("s2p_bid_supplier_id"));
+        String secondQuote=scope("qo_procurement_task_common:dispatch",()->(String)createProductEntity("quote",Map.of(
+                "key","batch-"+provider,"task_pid",task,"supplier_pid",supplier,"state","draft","revision",0,
+                "cutoff_at",fixture.cutoff().toString(),"source_pids",List.of(secondSource))).get("pid"));
+        var quoteIds=new TreeSet<String>(List.of(fixture.quote(),secondQuote));
+        assertEquals(2,quoteIds.size());
+        var identities=new ArrayList<String[]>();
+        identities.add(new String[]{"100",quoteIds.last().equals(fixture.quote())?"11":"12"});
+        identities.add(new String[]{"100",quoteIds.first().equals(fixture.quote())?"11":"12"});
+        String changed=row("100","11").replace(",1500,1400,400,300,1000,",",1500,1399,400,300,1000,");
+        response="["+changed.substring(1,changed.length()-1)+","+row("100","12").substring(1,row("100","12").length()-1)+"]";
+        var locks=new ArrayList<String>();
+        DataAccessor observed=(DataAccessor)java.lang.reflect.Proxy.newProxyInstance(DataAccessor.class.getClassLoader(),new Class<?>[]{DataAccessor.class},
+                (proxy,method,args)->{
+                    Object result;try {result=method.invoke(db,args);}catch(InvocationTargetException error){throw error.getCause();}
+                    if(method.getName().equals("compareAndSetBatch") && ("s2p_bid".equals(args[0]) || "pr_purchase_request".equals(args[0])))
+                        for(Object update:(List<?>)args[2]) locks.add(args[0]+":"+((CompareAndSetUpdate)update).recordId());
+                    return result;
+                });
+        var settings=new HashMap<String,Object>(context.settings());settings.put(CommandHandlerExtension.DATA_ACCESSOR_KEY,observed);
+        var selectedContext=new CommandHandlerExtension.CommandContext(tenantId,context.pluginId(),context.namespace(),SYNC,context.modelCode(),task,context.payload(),settings,false);
+        assertEquals(identities.stream().map(id->id[1].equals("11")?"changed":"unchanged").toList(),
+                tx.execute(status->scope(SYNC,()->syncSelectedWith(selectedContext,identities))),"results must retain selected identity order");
+        assertEquals(quoteIds.stream().map(q->"s2p_bid:"+q).toList(),locks.subList(0,2),"batch must lock all quotations before touching sources");
+        var sourceIds=new TreeSet<String>(List.of(fixture.source(),secondSource));
+        assertEquals(sourceIds.stream().map(s->"pr_purchase_request:"+s).toList(),locks.subList(2,4));
+        scope(SYNC,()->{for(String source:sourceIds) {assertNativeQuantity("pr_purchase_request",source,"qo_pr_source_approved_qty",source.equals(fixture.source())?"1399":"1400");
+            assertNativeQuantity("pr_purchase_request",source,"qo_pr_source_reserved_qty","0");}
+            assertEquals("invalidated",db.getById("s2p_bid",fixture.quote()).get("s2p_bid_status"));
+            assertEquals("draft",db.getById("s2p_bid",secondQuote).get("s2p_bid_status"));return null;});
     }
 
     @Test void nativeShipmentReplaySnapshotAndFulfillmentNeverChangeActualReceipts() {
