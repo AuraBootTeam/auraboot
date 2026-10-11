@@ -629,6 +629,18 @@ public class HandlerPhase implements CommandPhase {
                         new TenantProjectionAccessorImpl(tenantId,
                                 new BackgroundDataAccessorImpl(dynamicDataService)));
             }
+            if (Boolean.TRUE.equals(pluginSettings.get(
+                    com.auraboot.framework.plugin.pf4j.RelatedCommandDataAccessor.OPT_IN))) {
+                if (handler == null || !"handler".equals(pluginSettings.get("targetRecordAuthorization"))
+                        || !(pluginSettings.get(CommandHandlerExtension.TENANT_PROJECTION_ACCESSOR_KEY)
+                            instanceof TenantProjectionAccessor projection)) {
+                    throw new AccessDeniedException("Related delete authorization requires a target handler and projection");
+                }
+                pluginSettings.put(CommandHandlerExtension.DATA_ACCESSOR_KEY,
+                        new com.auraboot.framework.plugin.pf4j.RelatedCommandDataAccessor(dynamicDataService,
+                                tenantId,commandCode,modelCode,effectiveRecordId,
+                                MetaContext.getCurrentUserPid(),handler,projection));
+            }
             pluginSettings.put(TenantRoleAssignmentAccessor.SETTINGS_KEY,
                     new TenantRoleAssignmentAccessorImpl(tenantId, userId, identityDirectoryAccessor,
                             roleMapper, userRoleService, tenantMemberService, userService));

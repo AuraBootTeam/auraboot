@@ -44,6 +44,15 @@ public interface CommandHandlerExtension extends ExtensionPoint {
             String action, Long tenantId, String currentUserPid, Map<String,Object> record,
             RecordReadAccessor records) {}
 
+    /** Explicit per-related-record delete decision; older handlers cannot grant it. */
+    default boolean authorizeRelatedDelete(RelatedDeleteAuthorizationContext context) {
+        return false;
+    }
+
+    /** Server-loaded root and related record; no caller-supplied authorization data. */
+    record RelatedDeleteAuthorizationContext(TargetAuthorizationContext root,
+            String modelCode, String recordId, Map<String,Object> record) {}
+
     /**
      * Get the command type this handler processes.
      * Format: "namespace:command-name" (e.g., "billing:generate-invoice")

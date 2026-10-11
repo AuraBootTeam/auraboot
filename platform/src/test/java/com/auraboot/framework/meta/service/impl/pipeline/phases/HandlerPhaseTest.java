@@ -191,6 +191,25 @@ class HandlerPhaseTest {
     }
 
     @Test
+    void execute_installsRelatedDeleteOnlyWithTargetAuthorizationAndProjection() throws Exception {
+        MetaContext.setContext(1L,2L,"supplier-pid","Supplier");
+        RecordingPluginHandler handler = new RecordingPluginHandler(PLUGIN_HANDLER_CODE);
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(handler));
+        when(metaModelService.getModelDefinition("pr_purchase_order")).thenReturn(Optional.empty());
+        var allowed=buildContext(BUSINESS_COMMAND_CODE,"pr_purchase_order",Map.of("type","custom",
+                "handler",PLUGIN_HANDLER_CODE,"handlerParams",Map.of("targetRecordAuthorization","handler",
+                        TenantProjectionAccessor.OPT_IN_HANDLER_PARAM,true,"relatedDeleteAuthorization",true)));
+        phase.execute(allowed);
+        assertThat(handler.capturedContext.get().dataAccessor())
+                .isInstanceOf(com.auraboot.framework.plugin.pf4j.RelatedCommandDataAccessor.class);
+        handler.capturedContext.set(null);
+        var missing=buildContext(BUSINESS_COMMAND_CODE,"pr_purchase_order",Map.of("type","custom",
+                "handler",PLUGIN_HANDLER_CODE,"handlerParams",Map.of("relatedDeleteAuthorization",true)));
+        assertThatThrownBy(()->phase.execute(missing)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(handler.capturedContext.get()).isNull();
+    }
+
+    @Test
     void execute_runsChainedSecondaryAfterPrimary_sharingTheSameContext() throws Exception {
         RecordingPluginHandler primary = new RecordingPluginHandler(PLUGIN_HANDLER_CODE);
         RecordingSecondaryHandler secondary = new RecordingSecondaryHandler();
