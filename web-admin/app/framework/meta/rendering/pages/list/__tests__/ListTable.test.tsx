@@ -40,6 +40,13 @@ function renderListTable(overrides: Partial<ListTableProps> = {}) {
 }
 
 describe('ListTable selection column layout', () => {
+  it('declares column scope on data and action headers for browser table semantics', () => {
+    renderListTable({ columns: [...columns, { field: 'actions', label: 'Actions', isActionColumn: true }] });
+    for (const field of ['name', 'kind', 'actions']) {
+      expect(screen.getByTestId(`table-header-${field}`)).toHaveAttribute('scope', 'col');
+    }
+  });
+
   it('does not render body selection cells when selection is disabled', () => {
     renderListTable();
 
