@@ -92,6 +92,7 @@ def passed():
                      "idempotentReplay": None, "status": status, "method": "GET", "path": path,
                      "capability": "resource." + resource + "." + operation, "durationMs": 30, "occurredAt": "2026-10-11T00:00:00Z"}
             deadline_rows.append({"operation": operation, "status": status, "requestId": marker, "audit": audit,
+                "query": "limit=1" if kind == "identityFailure" and operation == "list" else "", "etag": None,
                 "error": {"success": False, "code": code, "message": message}})
         report["virtualResource"][kind] = {"resource": "release.dynamic.virtual-" + suffix, "requests": deadline_rows,
             "healthyItems": [{"pid": "allowed-pid", "name": "Allowed A", "zone": "A"}, {"pid": "extra-pid", "name": "Virtual extra A", "zone": "A"}]}
@@ -327,7 +328,7 @@ class DynamicProbeTests(unittest.TestCase):
                 report = passed(); del report["virtualResource"][kind][key]
                 with self.subTest(deadline_missing=key), self.assertRaises(ProtocolError): verify_report(report)
             for index in [0, 1]:
-                for key, value in [("status", wrong_status), ("status", True), ("requestId", "foreign"),
+                for key, value in [("status", wrong_status), ("status", True), ("requestId", "foreign"), ("query", "limit=999"), ("etag", '"unsafe"'),
                                    ("error", {"code": "40000", "context": "open_api_query_timeout"}), ("audit", None)]:
                     report = passed(); report["virtualResource"][kind]["requests"][index][key] = value
                     with self.subTest(deadline=index, key=key), self.assertRaises(ProtocolError): verify_report(report)

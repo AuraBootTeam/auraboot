@@ -449,7 +449,9 @@ def verify_virtual_deadline(deadline, virtual, failure_kind="deadline"):
     for row, operation in zip(rows, ["list", "get"]):
         path = "/api/open/v1/resources/" + resource + ("/" + virtual["allowedPid"] if operation == "get" else "")
         marker = "release-virtual-" + suffix + "-" + operation
-        if (not isinstance(row, dict) or set(row) != {"operation", "status", "requestId", "error", "audit"}
+        query = "limit=1" if failure_kind == "identityFailure" and operation == "list" else ""
+        if (not isinstance(row, dict) or set(row) != {"operation", "status", "requestId", "error", "audit", "query", "etag"}
+                or row["query"] != query or row["etag"] is not None
                 or row["operation"] != operation or type(row["status"]) is not int or row["status"] != expected_status
                 or row["requestId"] != marker
                 or row["error"] != {"success": False, "code": error_code, "message": message}):
@@ -507,12 +509,15 @@ def run_virtual_deadline_probe(request, human, installation_pid, machine, defini
     for operation in ["list", "get"]:
         path = "/api/open/v1/resources/" + resource + ("/" + allowed["pid"] if operation == "get" else "")
         marker = "release-virtual-" + suffix + "-" + operation
-        status, error, headers = request(path, headers=dict(machine, **{"X-Request-Id": marker}), expected=(expected_status,))
+        query = "limit=1" if failure_kind == "identityFailure" and operation == "list" else ""
+        status, error, headers = request(path + ("?" + query if query else ""),
+                                         headers=dict(machine, **{"X-Request-Id": marker}), expected=(expected_status,))
         response_marker = next((value for key, value in headers.items() if key.lower() == "x-request-id"), None)
         audits = human(f"/api/open-platform/installations/{installation_pid}/audits?requestId={marker}")
         if not isinstance(audits, list) or len(audits) != 1:
             raise ProtocolError("virtual deadline audit missing or duplicated")
-        rows.append({"operation": operation, "status": status, "requestId": response_marker, "error": error, "audit": audits[0]})
+        rows.append({"operation": operation, "status": status, "requestId": response_marker, "error": error, "audit": audits[0],
+                     "query": query, "etag": next((v for k, v in headers.items() if k.lower() == "etag"), None)})
     _, healthy, _ = request(healthy_path, headers=machine)
     return {"resource": resource, "requests": rows, "healthyItems": healthy.get("items")}
 
