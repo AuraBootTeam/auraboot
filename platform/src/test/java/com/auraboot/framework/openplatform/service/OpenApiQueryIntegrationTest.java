@@ -960,7 +960,7 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
                             FieldDefinition.builder().code("name").dataType("STRING").displayName("Name").build(),
                             FieldDefinition.builder().code("zone").dataType("STRING").displayName("Zone").filterable(true).build())).build());
             var contract = new OpenApiResourceContract("ambiguous." + suffix, modelCode, 1, root.operations(), root.scopes(),
-                    DataPolicy.INSTALLATION_FILTER, root.fields(), 50, 8, 5000, Set.of(), Map.of(root.modelCode(), root.code()));
+                    DataPolicy.INSTALLATION_FILTER, root.fields(), Math.min(50, maxRows), 8, 5000, Set.of(), Map.of(root.modelCode(), root.code()));
             resources.saveDraft(contract.code(), new OpenApiPublicationService.DraftRequest(0, contract)); resources.publish(contract.code(), 1);
             resources.grant(principalA.installationPid(), contract.code(), new OpenApiInstallationPolicy(contract.operations(),
                     contract.fields().keySet(), Set.of(), List.of(new OpenApiInstallationPolicy.RowConstraint("zone", List.of("A")))));
