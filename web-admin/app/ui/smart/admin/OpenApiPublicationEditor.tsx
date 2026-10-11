@@ -29,7 +29,8 @@ export function OpenApiPublicationEditor() {
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sourceLoading, setSourceLoading] = useState(false);
-  const [sourceValidationAttempted, setSourceValidationAttempted] = useState(false);
+  const [sourceValidationAttempts, setSourceValidationAttempts] = useState(0);
+  const sourceForm = useRef<HTMLFormElement>(null);
   const [busy, setBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState('');
@@ -38,6 +39,9 @@ export function OpenApiPublicationEditor() {
   const [confirm, setConfirm] = useState<'publish' | 'withdraw' | 'discard' | null>(null);
   const confirmationRef = useRef<HTMLDivElement>(null);
   useEffect(() => { if (confirm) { confirmationRef.current?.scrollIntoView({ block: 'nearest' }); confirmationRef.current?.querySelector<HTMLButtonElement>('button')?.focus(); } }, [confirm]);
+  useEffect(() => {
+    if (sourceValidationAttempts > 0) sourceForm.current?.querySelector<HTMLElement>('input:invalid, select:invalid, textarea:invalid')?.focus();
+  }, [sourceValidationAttempts]);
   const requestId = useRef(0);
   const modelRequestId = useRef(0);
   const errorText = (cause: unknown) => cause instanceof PublicationApiError && cause.status === 409
@@ -67,7 +71,7 @@ export function OpenApiPublicationEditor() {
   }, [dirty]);
   const change = (next: PublicResource) => { setDraft(next); setDirty(true); setNotice(''); setError(''); };
   const chooseSource = async (code: string, reset = true) => {
-    const id = ++requestId.current; setSourceLoading(true); setSource(undefined); setError(''); setSourceValidationAttempted(false);
+    const id = ++requestId.current; setSourceLoading(true); setSource(undefined); setError(''); setSourceValidationAttempts(0);
     try {
       const next = await publicationRequest<PublicationSource>(`/api/open-platform/publication-sources/${encodeURIComponent(code)}`);
       if (id !== requestId.current) return;
@@ -79,7 +83,7 @@ export function OpenApiPublicationEditor() {
   };
   const select = (next?: PublicationView) => {
     setView(next); setDraft(next?.draft ?? initial()); setDirty(false); setEditing(true); setError(''); setNotice('');
-    setSource(undefined); setSourceValidationAttempted(false); requestId.current++;
+    setSource(undefined); setSourceValidationAttempts(0); requestId.current++;
     if (next) void chooseSource(next.draft.modelCode, false);
   };
   const mutate = async (operation: 'save' | 'publish' | 'withdraw') => {
@@ -136,7 +140,7 @@ export function OpenApiPublicationEditor() {
               <p className="text-sm text-text-2">{status(row)} · {label('activeVersion', '当前发布版本', 'Active version')} {row.activeVersion ?? '—'} · {label('draftRevision', '草稿修订', 'Draft revision')} {row.draftRevision}</p></div>
               <button className={BUTTON} type="button" disabled={busy || dirty} onClick={() => select(row)}>{label('edit', '编辑合同', 'Edit contract')}</button></li>)}</ul>}
         </div>}
-    {editing && !denied && <form className="space-y-4" onSubmit={event => { event.preventDefault(); void mutate('save'); }}>
+    {editing && !denied && <form ref={sourceForm} className="space-y-4" onSubmit={event => { event.preventDefault(); void mutate('save'); }}>
       <fieldset disabled={busy || sourceLoading} className="space-y-4">
         {section(label('identity', '来源与公共地址', 'Source and public address'), <div className="grid gap-4 md:grid-cols-2">
           {input(label('code', '公共资源地址', 'Public resource address'), <input required pattern="[a-z][a-z0-9.\-]{1,99}" className={CONTROL} value={draft.code} disabled={!!view} placeholder="sales.orders" onChange={event => change({ ...draft, code: event.target.value })} />,
@@ -157,13 +161,13 @@ export function OpenApiPublicationEditor() {
           <p className="text-sm text-text-2">{label('virtualSourceHelp', '为每个来源选择已发布的列表资源；安装还需获得这些来源的列表和字段授权。虚拟模型自身的行约束会同时生效。', 'Select a published list resource for each source. Installations also need its list and field grants. The virtual model row constraints apply as well.')}</p>
           {source.sources.map(model => { const selected = draft.sourceResources?.[model.modelCode] ?? ''; return <div key={model.modelCode} data-testid={`publication-source-${model.modelCode}`}>
             {input(model.name || label('unnamed', '未命名业务模型', 'Unnamed business model'), <select required className={CONTROL} disabled={!!view?.activeVersion} value={selected}
-              aria-invalid={sourceValidationAttempted && !selected} aria-describedby={sourceValidationAttempted && !selected ? `publication-source-error-${model.modelCode}` : undefined}
-              onInvalid={event => { event.preventDefault(); setSourceValidationAttempted(true); event.currentTarget.form?.querySelector<HTMLElement>(':invalid')?.focus(); }}
+              aria-invalid={sourceValidationAttempts > 0 && !selected} aria-describedby={sourceValidationAttempts > 0 && !selected ? `publication-source-error-${model.modelCode}` : undefined}
+              onInvalid={event => { event.preventDefault(); setSourceValidationAttempts(previous => previous + 1); }}
               onChange={event => change({ ...draft, sourceResources: { ...draft.sourceResources, [model.modelCode]: event.target.value } })}>
               <option value="">{label('chooseSourceResource', '选择已发布的列表资源', 'Choose a published list resource')}</option>
               {selected && !model.resources.some(resource => resource.code === selected) && <option value={selected} disabled>{selected} ({label('sourceUnavailable', '来源已不可用', 'Source unavailable')})</option>}
               {model.resources.map(resource => <option key={resource.code} value={resource.code}>{resource.code} (v{resource.schemaVersion})</option>)}</select>)}
-            {sourceValidationAttempted && !selected && <p id={`publication-source-error-${model.modelCode}`} role="alert" className="mt-2 text-sm text-danger">
+            {sourceValidationAttempts > 0 && !selected && <p id={`publication-source-error-${model.modelCode}`} role="alert" className="mt-2 text-sm text-danger">
               {label('sourceRequired', '请选择该来源的已发布列表资源。', 'Choose a published list resource for this source.')}</p>}
           </div>; })}
         </div>)}

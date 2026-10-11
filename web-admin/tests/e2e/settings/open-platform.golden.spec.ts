@@ -257,8 +257,11 @@ test.describe('Dynamic resource publication journey', () => {
     const requiredSourceError = page.getByTestId(`publication-source-${modelCode}`).getByRole('alert');
     await expect(requiredSourceError).toHaveText('请选择该来源的已发布列表资源。');
     await expect(requiredSourceError).toBeVisible();
+    await expect(requiredSourceError).toBeInViewport();
     await expect(sourceSelector).toHaveAttribute('aria-invalid', 'true');
     await expect(sourceSelector).toHaveAttribute('aria-describedby', `publication-source-error-${modelCode}`);
+    await page.getByRole('button', { name: '保存并校验草稿', exact: true }).click();
+    await expect(sourceSelector).toBeFocused();
     expect(prematureDraftWrites).toEqual([]);
     page.off('request', observeDraftWrite);
     const blockedCatalog = await page.request.get(`${WEB_BASE_URL}/api/open-platform/publications`);
