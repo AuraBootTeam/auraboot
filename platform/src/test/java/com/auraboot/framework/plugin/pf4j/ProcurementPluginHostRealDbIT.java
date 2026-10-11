@@ -155,4 +155,32 @@ class ProcurementPluginHostRealDbIT {
         assertTrue(denied.getMessage().contains("WRITER_DENIED"),denied.toString());
         assertTrue(rows().isEmpty());assertEquals(1,references());
     }
+    private String matchPhone(String phone) {
+        try {
+            Class<?> service=plugin.loadClass("com.auraboot.quote.engine.procurement.ProcurementSourceService");
+            return (String)service.getMethod("matchVerifiedPhone",String.class)
+                    .invoke(service.getConstructor(DataAccessor.class).newInstance(db),phone);
+        } catch(ReflectiveOperationException error) {throw unwrap(error);}
+    }
+    @Test void nativePhoneLookupCountsActiveContactsAndRejectsAmbiguousOwnership() {
+        String writer="pr_supplier_pcba_contact:sync_directory";
+        String phone="+8613"+String.format(Locale.ROOT,"%09d",Math.floorMod(actorId,1_000_000_000L));
+        String supplier=scope(writer,()->(String)db.create("pr_supplier_common",Map.of(
+                "pr_supplier_code",provider,"pr_supplier_name","Host phone fixture","pr_supplier_status","enabled")).get("pid"));
+        String contact=scope(writer,()->(String)db.create("pr_supplier_pcba_contact",Map.of(
+                "pr_spc_supplier_id",supplier,"pr_spc_name","Current contact","qo_pr_contact_state","active",
+                "qo_pr_contact_normalized_phone",phone)).get("pid"));
+        scope(writer,()->db.create("pr_supplier_pcba_contact",Map.of("pr_spc_supplier_id",supplier,
+                "pr_spc_name","Disabled history","qo_pr_contact_state","inactive","qo_pr_contact_normalized_phone",phone)));
+        assertEquals(contact,scope(writer,()->matchPhone(phone)));
+        scope(writer,()->db.create("pr_supplier_pcba_contact",Map.of("pr_spc_supplier_id",supplier,
+                "pr_spc_name","Ambiguous active contact","qo_pr_contact_state","active","qo_pr_contact_normalized_phone",phone)));
+        SecurityException conflict=assertThrows(SecurityException.class,()->scope(writer,()->matchPhone(phone)));
+        assertEquals("PHONE_OWNERSHIP_CONFLICT",conflict.getMessage());
+        scope(writer,()->db.update("pr_supplier_pcba_contact",contact,Map.of("qo_pr_contact_state","inactive")));
+        assertNotEquals(contact,scope(writer,()->matchPhone(phone)));
+        scope(writer,()->db.update("pr_supplier_common",supplier,Map.of("pr_supplier_status","disabled")));
+        assertEquals("SUPPLIER_UNAVAILABLE",assertThrows(SecurityException.class,()->scope(writer,()->matchPhone(phone))).getMessage());
+    }
+
 }
