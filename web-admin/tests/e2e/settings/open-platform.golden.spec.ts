@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { createCookieSessionStorage } from 'react-router';
 import path from 'node:path';
-import { mkdir, readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { BACKEND_URL, BASE_URL as WEB_BASE_URL } from '../../helpers/environments';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 
@@ -15,6 +15,23 @@ const sessionStorage = createCookieSessionStorage({
     secrets: [process.env.SESSION_SECRET || 'dev-only-secret-do-not-use-in-production'],
     secure: false,
   },
+});
+
+// A supplied acceptance plan is materialized before any browser capture, including all unresolved rows.
+test.beforeAll(async () => {
+  if (!process.env.AURA_UI_ACCEPTANCE_MATRIX) return;
+  if (!process.env.AURA_EVIDENCE_ROOT) throw new Error('UI acceptance requires a registered evidence round');
+  const plan = JSON.parse(await readFile(process.env.AURA_UI_ACCEPTANCE_MATRIX, 'utf8'));
+  expect(Array.isArray(plan.rows) && plan.rows.length >= 25).toBe(true);
+  expect(new Set(plan.rows.map((row: { ID: string }) => row.ID)).size).toBe(plan.rows.length);
+  for (const row of plan.rows) for (const field of ['ID', 'feature', 'actionPoint', 'state', 'expectation', 'driver', 'screenshotId', 'status']) {
+    expect(typeof row[field] === 'string' && row[field].length > 0).toBe(true);
+  }
+  const columns = ['ID', 'feature', 'actionPoint', 'state', 'expectation', 'driver', 'screenshotId', 'status'];
+  const markdown = ['| ' + columns.join(' | ') + ' |', '| ' + columns.map(() => '---').join(' | ') + ' |',
+    ...plan.rows.map((row: Record<string, string>) => '| ' + columns.map(column => row[column].replaceAll('|', '/')).join(' | ') + ' |')].join('\n');
+  await writeFile(path.join(process.env.AURA_EVIDENCE_ROOT, 'acceptance-matrix.json'), JSON.stringify(plan, null, 2) + '\n');
+  await writeFile(path.join(process.env.AURA_EVIDENCE_ROOT, 'acceptance-matrix.md'), markdown + '\n');
 });
 
 test.describe('Dynamic resource publication journey', () => {
@@ -159,6 +176,69 @@ test.describe('Dynamic resource publication journey', () => {
       await artifact.saveAs(path.join(screenshotRoot, resourceCode + extension));
       await snapshot(extension === '.openapi.json' ? 'publication-openapi' : 'publication-types');
     }
+    // Model/query authoring remains fixture setup; every virtual publication mutation uses the real UI.
+    const virtualCode = `ui.virtual-parts.${suffix}`; const virtualModel = `dop_uv_${suffix}`;
+    const virtualName = `虚拟接入零件 ${suffix}`; const virtualQuery = `dop_uv_query_${suffix}`;
+    const queryResponse = await page.request.post(`${WEB_BASE_URL}/api/meta/named-queries`, { data: {
+      code: virtualQuery, title: virtualName, resourceCode: modelCode, actionCode: 'read', fromSql: `${created.data.tableName} a`,
+      defaultOrder: [{ field: 'pid', direction: 'asc' }], fields: [
+        { fieldCode: 'pid', columnExpr: 'a.pid', dataType: 'string', displayName: '记录标识', sortable: true, searchable: false },
+        { fieldCode: 'name', columnExpr: 'a.dop_ui_name', dataType: 'string', displayName: '零件名称', sortable: true, searchable: false },
+      ],
+    } });
+    expect(queryResponse.status()).toBe(200); const virtualSource = await queryResponse.json(); expect(String(virtualSource.code)).toBe('0');
+    for (const status of ['testing', 'published']) {
+      const response = await page.request.put(`${WEB_BASE_URL}/api/meta/named-queries/${virtualSource.data.pid}/status`, { data: { status } });
+      expect(response.status()).toBe(200); expect(String((await response.json()).code)).toBe('0');
+    }
+    const virtualResponse = await page.request.post(`${WEB_BASE_URL}/api/meta/models`, { data: {
+      code: virtualModel, displayName: virtualName, modelType: 'view', sourceType: 'namedQuery', sourceRef: virtualQuery, primaryKey: 'pid',
+      capabilities: { list: true, detail: true, filter: true, sort: true, paginate: true },
+      fields: [{ code: 'name', displayName: '零件名称', dataType: 'string', filterable: true, sortable: true }],
+    } });
+    expect(virtualResponse.status()).toBe(200); const virtual = await virtualResponse.json(); expect(String(virtual.code)).toBe('0');
+    const virtualPublished = await page.request.post(`${WEB_BASE_URL}/api/meta/models/${virtual.data.pid}/publish`, { data: { impactAcknowledged: true } });
+    expect(virtualPublished.status()).toBe(200); expect(String((await virtualPublished.json()).code)).toBe('0');
+    await page.getByRole('button', { name: '关闭编辑', exact: true }).click();
+    await page.getByRole('button', { name: '新建公共资源', exact: true }).click();
+    await page.getByLabel('公共资源地址', { exact: true }).fill(virtualCode);
+    await page.getByLabel('查找业务模型', { exact: true }).fill(virtualName);
+    await page.getByRole('button', { name: '查找', exact: true }).click();
+    await expect(page.getByLabel('业务模型', { exact: true }).getByRole('option', { name: virtualName, exact: true })).toHaveCount(1);
+    await page.getByLabel('业务模型', { exact: true }).selectOption({ label: virtualName });
+    const sourceSelector = page.getByTestId(`publication-source-${modelCode}`).getByRole('combobox');
+    await expect(sourceSelector).toHaveValue('');
+    await expect(sourceSelector.getByRole('option', { name: `${resourceCode} (v1)`, exact: true })).toHaveCount(1);
+    await sourceSelector.selectOption(resourceCode);
+    await expect(page.getByText('为每个来源选择已发布的列表资源；安装还需获得这些来源的列表和字段授权。虚拟模型自身的行约束会同时生效。', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('创建记录', { exact: true })).toBeDisabled();
+    await expect(page.getByLabel('修改记录', { exact: true })).toBeDisabled();
+    for (const operation of ['列表查询', '详情读取']) await page.getByLabel(operation, { exact: true }).check();
+    await page.getByLabel('所需权限', { exact: true }).nth(0).fill('dop.ui:list');
+    await page.getByLabel('所需权限', { exact: true }).nth(1).fill('dop.ui:get');
+    await page.getByLabel('机器数据范围', { exact: true }).selectOption('tenant_wide');
+    await page.getByTestId('publication-field-name').getByLabel('零件名称', { exact: true }).check();
+    await snapshot('publication-virtual-source');
+    const virtualSaved = page.waitForResponse(response => response.url().endsWith(`/publications/${virtualCode}/draft`) && response.request().method() === 'PUT');
+    await page.getByRole('button', { name: '保存并校验草稿', exact: true }).click();
+    const virtualSavedHttp = await virtualSaved; expect(virtualSavedHttp.status()).toBe(200);
+    const virtualDraft = await virtualSavedHttp.json(); expect(String(virtualDraft.code)).toBe('0');
+    expect(virtualDraft.data.draft.sourceResources).toEqual({ [modelCode]: resourceCode });
+    expect(virtualDraft.data.draft.fields.name.writable).toBe(false);
+    await page.getByRole('button', { name: '发布合同', exact: true }).click();
+    await page.getByRole('group', { name: '操作确认', exact: true }).getByRole('button', { name: '确认', exact: true }).click();
+    await expect(page.getByTestId('publication-editor').getByRole('status')).toContainText('已发布');
+    await expect(sourceSelector).toBeDisabled();
+    await page.getByRole('button', { name: '关闭编辑', exact: true }).click();
+    await page.getByTestId('publication-editor').getByRole('listitem').filter({ has: page.getByText(virtualCode, { exact: true }) })
+      .getByRole('button', { name: '编辑合同', exact: true }).click();
+    await expect(sourceSelector).toHaveValue(resourceCode); await expect(sourceSelector).toBeDisabled();
+    await snapshot('publication-virtual-published');
+    const virtualState = await page.request.get(`${WEB_BASE_URL}/api/open-platform/publications`);
+    expect(virtualState.status()).toBe(200); const virtualCatalog = await virtualState.json(); expect(String(virtualCatalog.code)).toBe('0');
+    expect(virtualCatalog.data.find((view: { code: string }) => view.code === virtualCode)).toMatchObject({ status: 'published', activeVersion: 1,
+      draft: { sourceResources: { [modelCode]: resourceCode } } });
+    await page.getByRole('button', { name: '关闭编辑', exact: true }).click(); await ownContractEdit.click();
     await page.getByRole('button', { name: '停用资源', exact: true }).click();
     await expect(page.getByRole('group', { name: '操作确认', exact: true })).toBeInViewport();
     await snapshot('publication-withdrawdialog');
