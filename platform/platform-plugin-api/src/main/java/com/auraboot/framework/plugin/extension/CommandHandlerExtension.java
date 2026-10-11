@@ -31,6 +31,20 @@ import java.util.Set;
 public interface CommandHandlerExtension extends ExtensionPoint {
 
     /**
+     * Explicit server-metadata opt-in for a handler-owned target authorization boundary.
+     * Invoked after command permission and before idempotency; never grants raw model reads.
+     * An older handler fails closed when its command opts in without implementing this contract.
+     */
+    default boolean authorizeTarget(TargetAuthorizationContext context) {
+        throw new UnsupportedOperationException("Handler target authorization is unavailable");
+    }
+
+    /** Authenticated host identity and read-only tenant data; no caller payload is exposed. */
+    record TargetAuthorizationContext(String commandType, String modelCode, String recordId,
+            String action, Long tenantId, String currentUserPid, Map<String,Object> record,
+            RecordReadAccessor records) {}
+
+    /**
      * Get the command type this handler processes.
      * Format: "namespace:command-name" (e.g., "billing:generate-invoice")
      *

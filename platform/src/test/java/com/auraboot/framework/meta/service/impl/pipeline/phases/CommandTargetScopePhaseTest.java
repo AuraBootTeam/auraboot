@@ -371,6 +371,67 @@ class CommandTargetScopePhaseTest {
                 dynamicDataService, applicationContext, transactionManager, extensionRegistry);
     }
 
+    private CommandPipelineContext handlerTarget() {
+        givenMember();
+        when(dynamicDataService.getById(anyString(), anyString())).thenReturn(RECORD);
+        var ctx=context("supplier_quote", "REC-1");
+        ctx.setExecConfig(Map.of("handlerParams", Map.of("targetRecordAction","update",
+                "targetRecordAuthorization","handler")));
+        ctx.setAuthorizationVerdict(com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict.authorized("supplier.use"));
+        when(extensionRegistry.getCommandHandler(ctx.getCommandCode())).thenReturn(Optional.of(commandHandler));
+        when(commandHandler.requiresDslPersistence(ctx.getCommandCode(),ctx.getExecConfig(),ctx.getRequest())).thenReturn(false);
+        MetaContext.setContext(1L,42L,"supplier-user","supplier");
+        return ctx;
+    }
+
+    @Test void handlerTargetAuthorizationKeepsVersionWithoutGrantingRawModelRead() {
+        var ctx=handlerTarget();
+        when(commandHandler.authorizeTarget(any())).thenAnswer(invocation -> {
+            var target=(CommandHandlerExtension.TargetAuthorizationContext)invocation.getArgument(0);
+            assertThat(target.currentUserPid()).isEqualTo("supplier-user");
+            assertThat(target.tenantId()).isEqualTo(1L);
+            assertThat(target.action()).isEqualTo("update");
+            assertThat(target.recordId()).isEqualTo("REC-1");
+            assertThat(target.records()).isNotInstanceOf(com.auraboot.framework.plugin.extension.DataAccessor.class);
+            assertThat(target.records().getById("supplier","company-1")).isEqualTo(RECORD);
+            return true;
+        });
+        phase().execute(ctx);
+        assertThat(ctx.getTargetRecordVersion()).isEqualTo(13L);
+        assertThat(ctx.getTargetRecordReadable()).isTrue();
+        verifyNoInteractions(permissionFacade);
+    }
+
+    @Test void revokedHandlerTargetCannotReplayKnownRequest() {
+        var ctx=handlerTarget();ctx.getRequest().setClientRequestId("known-supplier-key");
+        when(commandHandler.authorizeTarget(any())).thenThrow(new SecurityException("membership revoked"));
+        var pipeline=new CommandPipeline(List.of(phase()),List.of(new IdempotencyPhase(idempotencyService)));
+        assertThatThrownBy(() -> {
+            if(pipeline.executePreGuardPhases(ctx)==null) pipeline.executeGuardedPhases(ctx);
+        }).isInstanceOf(BusinessException.class);
+        verifyNoInteractions(idempotencyService);
+        assertThat(ctx.getTargetRecordReadable()).isFalse();
+    }
+
+    @Test void handlerTargetRequiresDeclaredPermissionAndActiveHostIdentity() {
+        var ctx=handlerTarget();ctx.setAuthorizationVerdict(null);
+        assertThatThrownBy(() -> phase().execute(ctx)).isInstanceOf(BusinessException.class);
+        verify(commandHandler,org.mockito.Mockito.never()).authorizeTarget(any());
+    }
+
+    @Test void missingHandlerTargetFailsBeforeReplay() {
+        var ctx=handlerTarget();when(dynamicDataService.getById(anyString(),anyString())).thenReturn(null);
+        assertThatThrownBy(() -> phase().execute(ctx)).isInstanceOf(BusinessException.class);
+        verify(commandHandler,org.mockito.Mockito.never()).authorizeTarget(any());
+        verifyNoInteractions(idempotencyService);
+    }
+
+    @Test void handlerTargetStorageFailureCannotFallBackToOrdinaryRead() {
+        var ctx=handlerTarget();when(commandHandler.authorizeTarget(any())).thenThrow(new IllegalStateException("storage offline"));
+        assertThatThrownBy(() -> phase().execute(ctx)).isInstanceOf(IllegalStateException.class).hasMessage("storage offline");
+        verifyNoInteractions(permissionFacade);
+    }
+
     private void givenRecordIsReadable(boolean readable) {
         when(dynamicDataService.getById(anyString(), anyString())).thenReturn(RECORD);
         givenPermission(readable);

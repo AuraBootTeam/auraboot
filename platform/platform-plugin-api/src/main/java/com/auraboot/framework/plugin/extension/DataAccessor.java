@@ -19,7 +19,7 @@ import java.util.Optional;
  * @author AuraBoot Team
  * @since 2.4.0
  */
-public interface DataAccessor {
+public interface DataAccessor extends RecordReadAccessor {
 
     /**
      * Get a single record by ID.

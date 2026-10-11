@@ -8,6 +8,19 @@ import static org.assertj.core.api.Assertions.*;
 
 class HostCapabilityDefaultsTest {
     @Test
+    void olderHandlersFailClosedWhenTargetAuthorizationIsExplicitlyRequested() {
+        var handler=new CommandHandlerExtension() {
+            public String getCommandType() { return "supplier:save"; }
+            public Object execute(CommandContext ctx) { throw new AssertionError("Must not execute"); }
+        };
+        assertThatThrownBy(() -> handler.authorizeTarget(null))
+                .isInstanceOf(UnsupportedOperationException.class).hasMessageContaining("authorization is unavailable");
+        assertThat(java.util.Arrays.stream(RecordReadAccessor.class.getMethods()).map(java.lang.reflect.Method::getName))
+                .containsExactlyInAnyOrder("getById","queryPage");
+        assertThat(RecordReadAccessor.class.isAssignableFrom(DataAccessor.class)).isTrue();
+    }
+
+    @Test
     void olderFileHostsCannotImplyMetadataRelationsRetentionOrPublishUnlinkedArtifacts() {
         FileAccessor accessor = new FileAccessor() {
             public InputStream open(String id) { throw new AssertionError("Default must not open bytes"); }
