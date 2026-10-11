@@ -12515,9 +12515,9 @@ ALTER SEQUENCE public.ab_object_alias_id_seq OWNED BY public.ab_object_alias.id;
 CREATE TABLE public.ab_open_api_call_audit (
     id bigint NOT NULL,
     pid character varying(26) NOT NULL,
-    tenant_id bigint NOT NULL,
-    application_pid character varying(26) NOT NULL,
-    installation_pid character varying(26) NOT NULL,
+    tenant_id bigint,
+    application_pid character varying(26),
+    installation_pid character varying(26),
     token_pid character varying(26),
     request_id character varying(128),
     http_method character varying(16) NOT NULL,
@@ -12526,7 +12526,8 @@ CREATE TABLE public.ab_open_api_call_audit (
     duration_ms bigint NOT NULL,
     remote_address character varying(96),
     occurred_at timestamp with time zone DEFAULT now() NOT NULL,
-    business_details jsonb
+    business_details jsonb,
+    CONSTRAINT chk_open_api_audit_identity CHECK ((((tenant_id IS NOT NULL) AND (application_pid IS NOT NULL) AND (installation_pid IS NOT NULL)) OR ((tenant_id IS NULL) AND (application_pid IS NULL) AND (installation_pid IS NULL) AND (token_pid IS NULL) AND COALESCE(((business_details ->> 'actorKind'::text) = 'unauthenticated'::text), false) AND COALESCE(((business_details ->> 'phase'::text) = 'authentication'::text), false))))
 );
 
 
