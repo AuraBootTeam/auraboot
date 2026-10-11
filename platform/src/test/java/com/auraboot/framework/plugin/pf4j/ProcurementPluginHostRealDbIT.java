@@ -1,6 +1,14 @@
 package com.auraboot.framework.plugin.pf4j;
 
 import com.auraboot.framework.application.TestApplication;
+import com.auraboot.framework.auth.dao.entity.AuthIdentity;
+import com.auraboot.framework.auth.mapper.AuthIdentityMapper;
+import com.auraboot.framework.auth.wechat.WechatMiniClient;
+import com.auraboot.framework.auth.wechat.WechatMiniProperties;
+import com.auraboot.framework.auth.wechat.WechatMiniIdentityService;
+import com.auraboot.framework.exception.RootUnCheckedException;
+import com.auraboot.framework.user.mapper.UserMapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.cloudconfig.dto.CloudConfigSaveRequest;
 import com.auraboot.framework.cloudconfig.service.CloudConfigService;
@@ -42,6 +50,8 @@ class ProcurementPluginHostRealDbIT {
     @Autowired DataSource source;
     @Autowired UserService users;
     @Autowired TenantMemberService members;
+    @Autowired AuthIdentityMapper identities;
+    @Autowired UserMapper userMapper;
     private Long actorId,tenantId;
     private URLClassLoader plugin;
     private DynamicDataAccessorImpl db;
@@ -129,6 +139,69 @@ class ProcurementPluginHostRealDbIT {
     private long references(){return scope(SYNC,()->db.queryPage("customer_pcba_int_external_ref",
             new DataPageQuery(Map.of("customer_pcba_ref_account_id",provider),Map.of(),List.of(),1,20)).total());}
     private static String row(String id,String entry){return "[["+id+",\"REQ-FIXTURE\","+entry+",900,\"TEST-MATERIAL\",\"Host material\",\"fixture\",1500,1400,400,300,1000,\"PCS\",\"2026-12-01T00:00:00\",\"ORG-FIXTURE\",\"C\",\"A\",\"A\"]]";}
+
+    @Test void nativeBoundIdentitySelectsCurrentActorBeforeConsumingPhoneGrant() throws Exception {
+        String appId = "wx-" + provider;
+        String ownOpenid = "own-" + provider;
+        String foreignOpenid = "foreign-" + provider;
+        var foreignUser = users.signUp("other-" + provider + "@example.invalid", "host-fixture-password-123",
+                "Other host fixture", "other-" + provider);
+        var now = java.time.Instant.now();
+        for (var entry : Map.of(ownOpenid, actorId, foreignOpenid, foreignUser.getId()).entrySet()) {
+            var identity = new AuthIdentity();
+            identity.setPid(com.baomidou.mybatisplus.core.toolkit.IdWorker.getIdStr());
+            identity.setUserId(entry.getValue());identity.setAppId(appId);identity.setProvider("wechat_mini");
+            identity.setOpenid(entry.getKey());identity.setCreatedAt(now);identity.setUpdatedAt(now);
+            assertEquals(1, identities.insert(identity));
+        }
+        var selected = new java.util.concurrent.atomic.AtomicReference<>(ownOpenid);
+        var requests = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        server.createContext("/sns/jscode2session", e -> {
+            requests.add("login");
+            byte[] body = json.writeValueAsBytes(Map.of("openid", selected.get(), "session_key", "synthetic-session"));
+            e.getResponseHeaders().set("Content-Type", "text/plain");
+            e.sendResponseHeaders(200, body.length);e.getResponseBody().write(body);e.close();
+        });
+        server.createContext("/cgi-bin/stable_token", e -> {
+            requests.add("token");
+            byte[] body = json.writeValueAsBytes(Map.of("access_token", "synthetic-phone-token", "expires_in", 7200));
+            e.sendResponseHeaders(200, body.length);e.getResponseBody().write(body);e.close();
+        });
+        server.createContext("/wxa/business/getuserphonenumber", e -> {
+            requests.add(new String(e.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            byte[] body = json.writeValueAsBytes(Map.of("errcode", 0, "phone_info", Map.of(
+                    "purePhoneNumber", "13800138000", "countryCode", "86",
+                    "watermark", Map.of("appid", appId, "timestamp", 1791730000))));
+            e.sendResponseHeaders(200, body.length);e.getResponseBody().write(body);e.close();
+        });
+        var properties = new WechatMiniProperties();
+        properties.setAppId(appId);properties.setAppSecret("synthetic-phone-secret");
+        properties.setApiBaseUrl("http://127.0.0.1:" + server.getAddress().getPort());
+        var service = new WechatMiniIdentityService(identities, userMapper, new WechatMiniClient(properties), properties, users);
+        var phone = service.verifyCurrentUserPhoneGrant("synthetic-login", "synthetic-phone-code");
+        assertEquals(ownOpenid, phone.openid());assertEquals(appId, phone.appId());
+        assertEquals("86", phone.countryCode());assertEquals("13800138000", phone.nationalNumber());
+        assertEquals(List.of("login", "token"), requests.subList(0, 2));
+        assertEquals(Map.of("code", "synthetic-phone-code", "openid", ownOpenid), json.readValue(requests.get(2), Map.class));
+        selected.set(foreignOpenid);
+        assertThrows(RootUnCheckedException.class, () -> service.verifyCurrentUserPhoneGrant("foreign-login", "unused-phone"));
+        selected.set("unbound-" + provider);
+        assertThrows(RootUnCheckedException.class, () -> service.verifyCurrentUserPhoneGrant("unbound-login", "unused-phone"));
+        properties.setAppId("another-app");selected.set(ownOpenid);
+        assertThrows(RootUnCheckedException.class, () -> service.verifyCurrentUserPhoneGrant("wrong-app-login", "unused-phone"));
+        assertEquals(6, requests.size());assertEquals(List.of("login", "login", "login"), requests.subList(3, 6));
+        MetaContext.setSessionContext(1L, 1L, "tenant", null, null, "active", 1, true, foreignUser.getId(), "web");
+        assertThrows(RootUnCheckedException.class, () -> service.verifyCurrentUserPhoneGrant("impersonated", "unused-phone"));
+        assertEquals(6, requests.size());
+        MetaContext.clear();
+        assertThrows(RootUnCheckedException.class, () -> service.verifyCurrentUserPhoneGrant("anonymous", "unused-phone"));
+        assertEquals(6, requests.size());
+        MetaContext.setContext(tenantId, actorId, actor, "Host fixture");
+        var stored = identities.selectList(new QueryWrapper<AuthIdentity>().eq("app_id", appId));
+        assertEquals(2, stored.size());
+        assertTrue(stored.stream().allMatch(identity -> identity.getLastLoginAt() == null));
+        assertEquals(Set.of(actorId, foreignUser.getId()), new HashSet<>(stored.stream().map(AuthIdentity::getUserId).toList()));
+    }
 
     @Test void actualHostSecretAndNativePersistenceSurviveReplay() throws Exception {
         var tx=new TransactionTemplate(transactions);

@@ -35,17 +35,13 @@ public class WechatMiniClient {
 
     private final WechatMiniProperties properties;
 
-    private RestClient restClient() {
-        return RestClient.create();
-    }
-
     public WxSession code2Session(String jsCode) {
         if (isBlank(properties.getAppId()) || isBlank(properties.getAppSecret())) {
             throw new RootUnCheckedException(ResponseCode.BadParam,
                     "WeChat mini-program login is not configured (aura.wechat.mini.*)");
         }
         // Full-URI build honors the apiBase scheme (http for local stubs/tests).
-        String base = properties.getApiBaseUrl().replaceAll("/+$", "");
+        String base = validatedApiBase();
         String uri = base + "/sns/jscode2session"
                 + "?appid=" + urlEncode(properties.getAppId())
                 + "&secret=" + urlEncode(properties.getAppSecret())
@@ -56,16 +52,19 @@ public class WechatMiniClient {
         // parse explicitly (same pattern as WechatPcClient).
         SessionResponse body;
         try {
-            String raw = restClient().get().uri(URI.create(uri)).retrieve().body(String.class);
+            String raw = PHONE_CLIENT.get().uri(URI.create(uri)).retrieve().body(String.class);
+            if (isBlank(raw)) {
+                throw new RootUnCheckedException(ResponseCode.BadParam, "WeChat login exchange returned an empty response");
+            }
             body = json().readValue(raw, SessionResponse.class);
-        } catch (Exception e) {
-            log.warn("WeChat jscode2session call failed: {}", e.getMessage());
+        } catch (RestClientException | JsonProcessingException e) {
+            // The transport URI contains the app secret and login code.
+            log.warn("WeChat jscode2session call failed: {}", e.getClass().getSimpleName());
             throw new RootUnCheckedException(ResponseCode.BadParam, "WeChat login exchange failed");
         }
         if (body == null || isBlank(body.getOpenid())) {
             int code = body == null ? 0 : body.getErrcode() == null ? -1 : body.getErrcode();
-            String msg = body == null || body.getErrmsg() == null ? "unknown" : body.getErrmsg();
-            log.warn("WeChat jscode2session rejected: errcode={} errmsg={}", code, msg);
+            log.warn("WeChat jscode2session rejected: errcode={}", code);
             throw new RootUnCheckedException(ResponseCode.BadParam, "WeChat login code rejected (" + code + ")");
         }
         return new WxSession(body.getOpenid(), body.getUnionid());
@@ -94,7 +93,7 @@ public class WechatMiniClient {
         if (isBlank(appId) || isBlank(secret)) {
             throw phoneFailure("WeChat mini-program phone verification is not configured");
         }
-        String base = phoneApiBase();
+        String base = validatedApiBase();
         JsonNode token = phonePost(base + "/cgi-bin/stable_token", Map.of(
                 "grant_type", "client_credential", "appid", appId,
                 "secret", secret, "force_refresh", false));
@@ -125,7 +124,7 @@ public class WechatMiniClient {
                 watermark.path("timestamp").asLong());
     }
 
-    private String phoneApiBase() {
+    private String validatedApiBase() {
         String configured = properties.getApiBaseUrl();
         if (isBlank(configured)) {
             throw phoneFailure("WeChat phone API base is not configured");

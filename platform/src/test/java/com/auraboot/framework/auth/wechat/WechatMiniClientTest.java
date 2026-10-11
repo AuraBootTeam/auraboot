@@ -188,4 +188,20 @@ class WechatMiniClientTest {
                 .isInstanceOf(RootUnCheckedException.class);
         assertThat(requests).isEmpty();
     }
+    @Test
+    void loginTransportFailureDoesNotExposeSecretCodeOrProviderResponse() {
+        server.createContext("/sns/jscode2session", exchange -> respond(exchange, 503, "private-login-provider-detail"));
+        assertThatThrownBy(() -> client.code2Session("private-login-code"))
+                .isInstanceOf(RootUnCheckedException.class)
+                .hasMessage("WeChat login exchange failed").hasNoCause();
+    }
+
+    @Test
+    void loginMalformedBodyDoesNotExposePrivateProviderPayload() {
+        stubExchange("text/plain", "private-login-provider-detail");
+        assertThatThrownBy(() -> client.code2Session("private-login-code"))
+                .isInstanceOf(RootUnCheckedException.class)
+                .hasMessage("WeChat login exchange failed").hasNoCause();
+    }
+
 }
