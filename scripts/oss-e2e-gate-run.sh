@@ -283,9 +283,10 @@ if [[ "$SCOPE_MODE" == slice ]]; then
   AUDIT="$REPO_ROOT/scripts/gates/hifi-golden-results.mjs"
   [[ -f "$PROFILE" && -f "$AUDIT" ]] || die_env "fixed slice contract is missing"
   SLICE_GREP="$(node "$AUDIT" "$PROFILE" - selection)" || die_env "fixed slice selection is invalid"
-  PW_PROFILE=oss pnpm exec playwright test "${RUN_PATHS[@]}" --project=oss --no-deps \
+  PLAYWRIGHT_JSON_OUTPUT_FILE="$AURA_EVIDENCE_ROOT/collection.json" PW_PROFILE=oss \
+    pnpm exec playwright test "${RUN_PATHS[@]}" --project=oss --no-deps \
     --grep "$SLICE_GREP" \
-    --repeat-each="$REPEAT" --list --reporter=json >"$AURA_EVIDENCE_ROOT/collection.json" \
+    --repeat-each="$REPEAT" --list --reporter=json >"$AURA_EVIDENCE_ROOT/collection.stdout.log" \
     2>"$AURA_EVIDENCE_ROOT/collection.stderr.log" || exit 1
   node "$AUDIT" "$PROFILE" "$AURA_EVIDENCE_ROOT/collection.json" collection "$REPEAT" \
     >"$AURA_EVIDENCE_ROOT/collection-ledger.json" || exit 1

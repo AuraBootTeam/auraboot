@@ -1707,6 +1707,7 @@ openPlatform:
   rotateTitle: Rotate credential
   rotateWarning: A new secret is created now. The previous credential can issue tokens until its grace period ends; issued tokens expire at their normal short TTL.
   graceMinutes: Grace period (minutes)
+  graceRange: Enter a whole number from 5 to 10080 minutes.
   rotate: Rotate
   noCredentials: No credentials
   secretTitle: Save this credential now
@@ -1760,9 +1761,7 @@ openPlatform:
   compatible: Compatible
   actionRequired: Action required
   eventSchema: Schema
-  catalogVersion: Catalog
   signing: Signing
-  rotateBy: Rotate by
   chooseSupportedEventVersion: Choose a supported event version.
   rotateSigningSecretNow: Rotate the signing secret now.
   addSigningSecretBeforeDelivery: Add a signing secret before enabling delivery.

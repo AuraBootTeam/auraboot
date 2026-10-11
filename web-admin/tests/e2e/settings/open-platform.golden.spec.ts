@@ -983,6 +983,11 @@ test.describe('Open Platform golden journey', () => {
     await expect(operations).not.toContainText(
       /super-secret|https:\/\/.*hook|Bearer [A-Za-z0-9._-]+/,
     );
+    await expect(webhookHealth.locator('[data-rotation-status="healthy"]').first()).toContainText('目录版本 v1');
+    await expect(webhookHealth.locator('[data-rotation-status="healthy"]').first()).toContainText('12/01');
+    await expect(webhookHealth.locator('[data-rotation-status="due"]')).toContainText('09/20');
+    await expect(webhookHealth.locator('[data-rotation-status="overdue"]')).toContainText('08/01');
+    await expect(webhookHealth.locator('[data-compatible="false"]')).toContainText('目录版本 v1');
     await captureLocator(eventCatalog, 'OP-PROTO-01');
     await captureLocator(
       webhookHealth.locator('[data-rotation-status="healthy"]').first(),
@@ -1229,8 +1234,15 @@ test.describe('Open Platform golden journey', () => {
     const rotateDialog = page.getByRole('dialog', { name: '轮换凭据' });
     await expect(rotateDialog).toContainText('宽限期');
     await expect(rotateDialog).toContainText('已签发的 Token');
+    await rotateDialog.getByRole('spinbutton').fill('5.5');
+    await expect(rotateDialog.getByRole('button', { name: '轮换' })).toBeDisabled();
+    await expect(rotateDialog.getByRole('spinbutton')).toHaveAttribute('aria-invalid', 'true');
+    await rotateDialog.getByRole('spinbutton').fill('5');
+    await expect(rotateDialog.getByRole('button', { name: '轮换' })).toBeEnabled();
     await rotateDialog.getByRole('spinbutton').fill('1');
     await expect(rotateDialog.getByRole('button', { name: '轮换' })).toBeDisabled();
+    await expect(rotateDialog.getByRole('alert')).toHaveText('请输入 5 至 10080 的整数分钟。');
+    await expect(rotateDialog.getByRole('spinbutton')).toHaveAccessibleDescription('请输入 5 至 10080 的整数分钟。');
     await capture(page, 'OP-OPS-12');
     await rotateDialog.getByRole('button', { name: '取消' }).click();
     await credentialList.getByRole('button', { name: '轮换' }).click();
@@ -1387,6 +1399,12 @@ test.describe('Open Platform golden journey', () => {
     for (const label of ['已停用', '所有者']) {
       const badge = appCard.getByText(label, { exact: true }).first();
       await expect(badge).toHaveCSS('white-space', 'nowrap');
+    }
+    const headerActions = page.getByTestId('open-platform-page').locator('header').first();
+    for (const action of ['公共资源发布', 'API 参考', '新建应用']) {
+      const control = headerActions.getByRole(action === '公共资源发布' ? 'link' : 'button', { name: action });
+      await expect(control).toHaveCSS('white-space', 'nowrap');
+      await expect(control).toBeInViewport();
     }
     await capture(page, 'OP-OPS-16-top', false);
     await expect(operations).toContainText('open-platform-golden-whoami');

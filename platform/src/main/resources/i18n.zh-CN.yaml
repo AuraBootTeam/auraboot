@@ -2004,6 +2004,7 @@ openPlatform:
   rotateTitle: 轮换凭据
   rotateWarning: 现在创建新密钥。旧凭据可在宽限期结束前签发 Token；已签发的 Token 按自身短期 TTL 失效。
   graceMinutes: 宽限期（分钟）
+  graceRange: 请输入 5 至 10080 的整数分钟。
   rotate: 轮换
   noCredentials: 暂无凭据
   secretTitle: 立即保存此凭据
@@ -2057,9 +2058,7 @@ openPlatform:
   compatible: 兼容
   actionRequired: 需要处理
   eventSchema: 事件版本
-  catalogVersion: 目录版本
   signing: 签名状态
-  rotateBy: 轮换截止时间
   chooseSupportedEventVersion: 请选择受支持的事件版本。
   rotateSigningSecretNow: 请立即轮换签名密钥。
   addSigningSecretBeforeDelivery: 启用投递前请添加签名密钥。

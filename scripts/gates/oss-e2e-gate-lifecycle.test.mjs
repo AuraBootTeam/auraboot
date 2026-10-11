@@ -60,7 +60,7 @@ if(process.env.MODE==='zero-tests')report.suites[0].specs=[];
 if(!collection && process.env.MODE==='missing-result')report.suites[0].specs.pop();
 if(!collection && process.env.MODE==='skipped-result')report.suites[0].specs[0].tests[0].results[0].status='skipped';
 if(!collection && process.env.MODE==='retried-result')report.suites[0].specs[0].tests[0].results.push({status:'passed',retry:1});
-if(collection)console.log(JSON.stringify(report));else{if(process.env.PLAYWRIGHT_JSON_OUTPUT_FILE)fs.writeFileSync(process.env.PLAYWRIGHT_JSON_OUTPUT_FILE,JSON.stringify(report));console.log('12 passed');}
+if(process.env.PLAYWRIGHT_JSON_OUTPUT_FILE){fs.mkdirSync(require('node:path').dirname(process.env.PLAYWRIGHT_JSON_OUTPUT_FILE),{recursive:true});fs.writeFileSync(process.env.PLAYWRIGHT_JSON_OUTPUT_FILE,JSON.stringify(report));console.log(collection?'Listing tests:':'12 passed');}else console.log(JSON.stringify(report));
 `, { mode: 0o755 });
   registerFixtureWorkspace(root, repo);
   const env = { ...process.env, AURA_WORKSPACE_ROOT: root, AURA_WORKSPACE_STATE_DIR: path.join(root, 'state'),

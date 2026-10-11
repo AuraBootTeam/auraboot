@@ -67,7 +67,10 @@ n=len(profile['tests']) if collection else int(os.environ.get('REPORT_COUNT',str
 rows=profile['tests'][:n]
 tests=[{'file':row['file'],'title':row['title'],'tests':[{'projectName':row['project'],'expectedStatus':'passed','status':'expected','results':[] if collection else [{'status':'passed','retry':int(os.environ.get('REPORT_RETRY','0'))}]}]} for row in rows]
 report={'stats':{'expected':n,'unexpected':0,'skipped':int(os.environ.get('REPORT_SKIPPED','0')),'flaky':0},'errors':[],'config':{'projects':[{'name':'oss','retries':0}]},'suites':[{'specs':tests}]}
-if collection: print(json.dumps(report))
+if collection:
+ if os.environ.get('PLAYWRIGHT_JSON_OUTPUT_FILE'):
+  p=Path(os.environ['PLAYWRIGHT_JSON_OUTPUT_FILE']);p.parent.mkdir(parents=True,exist_ok=True);p.write_text(json.dumps(report));print('Listing tests:')
+ else: print(json.dumps(report))
 elif os.environ.get('REPORT_MISSING')!='1':
  p=Path(os.environ['PLAYWRIGHT_JSON_OUTPUT_FILE']);p.parent.mkdir(parents=True,exist_ok=True);p.write_text(json.dumps(report))
 REPORT_FIXTURE

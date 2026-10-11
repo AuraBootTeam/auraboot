@@ -115,6 +115,7 @@ export default function OpenPlatformPage() {
     credential: Credential;
   } | null>(null);
   const [rotationGraceMinutes, setRotationGraceMinutes] = useState(1440);
+  const rotationGraceInvalid = !Number.isInteger(rotationGraceMinutes) || rotationGraceMinutes < 5 || rotationGraceMinutes > 10080;
   const [pendingRevoke, setPendingRevoke] = useState<{
     installationPid: string;
     credential: Credential;
@@ -419,7 +420,7 @@ export default function OpenPlatformPage() {
             )}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 [&>a]:shrink-0 [&>a]:whitespace-nowrap [&>button]:shrink-0 [&>button]:whitespace-nowrap">
           {access.canCreateApplications && <Link
             to="/p/c/open_platform_publications"
             data-testid="open-platform-publications-link"
@@ -975,14 +976,19 @@ export default function OpenPlatformPage() {
               min={5}
               max={10080}
               value={rotationGraceMinutes}
+              aria-invalid={rotationGraceInvalid}
+              aria-describedby="open-platform-rotation-grace-range"
               onChange={(event) => setRotationGraceMinutes(Number(event.target.value))}
               className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
             />
           </label>
+          <p id="open-platform-rotation-grace-range" className="mt-2 text-sm text-text-muted" role={rotationGraceInvalid ? 'alert' : undefined}>
+            {t('openPlatform.graceRange', undefined, 'Enter a whole number from 5 to 10080 minutes.')}
+          </p>
           <DialogActions
             onCancel={() => setPendingRotate(null)}
             onConfirm={() => void rotateCredential()}
-            confirmDisabled={rotationGraceMinutes < 5 || rotationGraceMinutes > 10080}
+            confirmDisabled={rotationGraceInvalid}
             confirmText={t('openPlatform.rotate', undefined, 'Rotate')}
             cancelText={t('common.cancel', undefined, 'Cancel')}
           />
