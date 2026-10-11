@@ -409,8 +409,8 @@ class ProcurementPluginHostRealDbIT {
                 "qo_pr_submission_line_submission_pid",(String)second.get("submissionPid")).getFirst().get("qo_pr_submission_line_content").toString());
         var originalContent=json.readTree(snapshotLines.getFirst().get("qo_pr_submission_line_content").toString());
         var newContent=json.readTree(latestContent);
-        assertEquals(new BigDecimal("1400"),originalContent.path("source_snapshot").path("approved_qty").decimalValue());
-        assertEquals(new BigDecimal("1399"),newContent.path("source_snapshot").path("approved_qty").decimalValue());
+        assertEquals(0,new BigDecimal("1400").compareTo(originalContent.path("source_snapshot").path("approved_qty").decimalValue()));
+        assertEquals(0,new BigDecimal("1399").compareTo(newContent.path("source_snapshot").path("approved_qty").decimalValue()));
         assertEquals(0,new BigDecimal("2.000001").compareTo(newContent.path("unit_price").decimalValue()));
     }
 
