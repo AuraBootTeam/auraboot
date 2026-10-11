@@ -3029,6 +3029,17 @@
               "deleted"
             ]
           }
+        },
+        "sourceResources": {
+          "type": "object",
+          "maxProperties": 16,
+          "propertyNames": {
+            "pattern": "^[A-Za-z][A-Za-z0-9_]{0,127}$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9.-]{1,99}$"
+          }
         }
       },
       "additionalProperties": false

@@ -30,6 +30,7 @@ import static com.auraboot.framework.openplatform.service.OpenApiResourceContrac
 public class OpenApiResourceService {
     private final OpenApiResourceAuthorizer authorizer;
     private final DynamicDataService data;
+    private final OpenApiVirtualResourceReader virtualReader;
     private final OpenApiProtocolTokenCodec codec;
     private final OpenApiIdempotencyMapper idempotency;
     private final OpenApiPublicationMapper publications;
@@ -53,7 +54,8 @@ public class OpenApiResourceService {
         var authorization = authorizer.authorize(principal, code, Operation.GET);
         try (var scope = authorization.openScope()) {
             timeout(authorization.contract());
-            var row = data.getById(authorization.contract().modelCode(), pid);
+            var row = authorization.sourceBinding().queryFingerprint() == null
+                    ? data.getById(authorization.contract().modelCode(), pid) : virtualReader.get(authorization, pid);
             return result(200, authorization, row, pid);
         }
     }
@@ -95,7 +97,8 @@ public class OpenApiResourceService {
         }
         try (var scope = authorization.openScope()) {
             timeout(contract);
-            var page = data.list(contract.modelCode(), request);
+            var page = authorization.sourceBinding().queryFingerprint() == null
+                    ? data.list(contract.modelCode(), request) : virtualReader.list(authorization, request);
             var selected = page.getRecords().stream().limit(limit).toList();
             boolean hasMore = page.getRecords().size() > limit;
             String next = null;
@@ -199,7 +202,9 @@ public class OpenApiResourceService {
     }
 
     private Result result(int status, OpenApiResourceAuthorizer.Authorization authorization, Map<String, Object> row, String pid) {
-        String etag = codec.encodeEtag(etagBinding(MachineDataAccessContext.principal(), authorization.contract()), pid, rowVersion(row));
+        String etag = authorization.sourceBinding().queryFingerprint() == null
+                ? codec.encodeEtag(etagBinding(MachineDataAccessContext.principal(), authorization.contract()), pid, rowVersion(row))
+                : "\"" + hash(Map.of("authority", authorityHash(authorization), "record", project(authorization, row)), false) + "\"";
         Map<String, String> headers = status == 201
                 ? Map.of("ETag", etag, "Location", "/api/open/v1/resources/" + authorization.contract().code() + "/" + pid)
                 : Map.of("ETag", etag);
@@ -265,7 +270,7 @@ public class OpenApiResourceService {
         };
     }
     private String authorityHash(OpenApiResourceAuthorizer.Authorization authorization) {
-        return hash(Map.of("contract", authorization.contract(), "policy", authorization.policy(), "installation", authorization.installationId()), true);
+        return hash(Map.of("contract", authorization.contract(), "policy", authorization.policy(), "installation", authorization.installationId(), "sources", authorization.sourceAuthorities()), true);
     }
     private String etagBinding(MachinePrincipal principal, OpenApiResourceContract contract) {
         return contract.code() + "@" + principal.tenantId() + ":" + contract.schemaVersion();

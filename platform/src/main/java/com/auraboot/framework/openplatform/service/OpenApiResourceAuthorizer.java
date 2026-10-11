@@ -24,9 +24,11 @@ public class OpenApiResourceAuthorizer {
     private final OpenApiPublicationValidator validator;
 
     public record Authorization(OpenApiResourceContract contract, OpenApiInstallationPolicy policy,
-                                MachineDataAccessContext.Decision decision, Long installationId) {
+                                MachineDataAccessContext.Decision decision, Long installationId,
+                                Map<String, MachineDataAccessContext.Decision> decisions,
+                                Map<String, Object> sourceAuthorities, OpenApiResourceSourceBinding sourceBinding) {
         public MachineDataAccessContext.Scope openScope() {
-            return MachineDataAccessContext.authorize(Map.of(contract.modelCode(), decision));
+            return MachineDataAccessContext.authorize(decisions);
         }
     }
 
@@ -43,8 +45,15 @@ public class OpenApiResourceAuthorizer {
         var contract = authority.contract();
         if (!contract.operations().contains(operation)) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "open_api_operation_not_published");
         if (!principal.scopes().contains(contract.scopes().get(operation))) throw new AccessDeniedException("Published operation scope required");
-        ModelDefinition model = validator.validate(contract);
-        publications.requireSourceBinding(principal.tenantId(), contract, model);
+        ModelDefinition model = validator.resolveModel(contract);
+        var sourceBinding = publications.requireSourceBinding(principal.tenantId(), contract, model);
+        try {
+            validator.validate(contract, model);
+        } catch (IllegalArgumentException unavailable) {
+            // CATCH: published virtual source/grant withdrawal is an authorization denial, not caller input.
+            if (!"namedQuery".equals(model.getSourceType())) throw unavailable;
+            throw new AccessDeniedException("Published virtual resource source is unavailable", unavailable);
+        }
         var policy = authority.policy();
         policy.validate(contract);
         if (!policy.operations().contains(operation)) throw new AccessDeniedException("Installation operation grant required");
@@ -66,7 +75,20 @@ public class OpenApiResourceAuthorizer {
         };
         var decision = new MachineDataAccessContext.Decision(principal.tenantId(), principal.installationPid(),
                 contract.modelCode(), Set.of(action), readable, writable, constraints);
-        return new Authorization(contract, policy, decision, authority.installationId());
+        Map<String, MachineDataAccessContext.Decision> decisions = new java.util.LinkedHashMap<>();
+        Map<String, Object> sourceAuthorities = new java.util.LinkedHashMap<>();
+        decisions.put(contract.modelCode(), decision);
+        for (var entry : contract.sourceResources().entrySet()) {
+            var source = authorize(principal, entry.getValue(), OpenApiResourceContract.Operation.LIST);
+            if (!entry.getKey().equals(source.contract().modelCode()) || !"physical".equals(source.sourceBinding().sourceType())) {
+                throw new AccessDeniedException("Virtual query requires its declared physical source grant");
+            }
+            decisions.put(entry.getKey(), source.decision());
+            sourceAuthorities.put(entry.getKey(), Map.of("contract", source.contract(), "policy", source.policy(),
+                    "installation", source.installationId()));
+        }
+        return new Authorization(contract, policy, decision, authority.installationId(), Map.copyOf(decisions),
+                Map.copyOf(sourceAuthorities), sourceBinding);
     }
 
     private Object scalar(OpenApiResourceContract.Type type, String value) {

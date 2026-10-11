@@ -10,7 +10,7 @@ const CONTROL = 'w-full rounded-control border border-border-strong bg-panel px-
 const BUTTON = 'rounded-control border border-border-strong bg-panel px-3 py-2 text-sm text-text hover:bg-hover focus:outline-none focus:ring-2 focus:ring-accent-weak disabled:opacity-50';
 const OPERATIONS: PublicOperation[] = ['list', 'get', 'create', 'update', 'delete'];
 const initial = (): PublicResource => ({ code: '', modelCode: '', schemaVersion: 1, operations: ['list'], scopes: { list: '' },
-  dataPolicy: 'installation_filter', fields: { pid: identityField() }, maxPageSize: 50, maxConditions: 8, timeoutMs: 5000, events: [] });
+  dataPolicy: 'installation_filter', fields: { pid: identityField() }, maxPageSize: 50, maxConditions: 8, timeoutMs: 5000, events: [], sourceResources: {} });
 
 /** Public contract editing is a typed custom block inside the administration DSL page. */
 export function OpenApiPublicationEditor() {
@@ -71,7 +71,8 @@ export function OpenApiPublicationEditor() {
       const next = await publicationRequest<PublicationSource>(`/api/open-platform/publication-sources/${encodeURIComponent(code)}`);
       if (id !== requestId.current) return;
       setSource(next);
-      if (reset) change({ ...draft, modelCode: code, fields: { pid: identityField() }, operations: [], scopes: {}, events: [] });
+      if (reset) change({ ...draft, modelCode: code, fields: { pid: identityField() }, operations: [], scopes: {}, events: [],
+        sourceResources: Object.fromEntries((next.sources ?? []).map(model => [model.modelCode, ''])) });
     } catch (cause) { if (id === requestId.current) fail(cause); }
     finally { if (id === requestId.current) setSourceLoading(false); }
   };
@@ -150,6 +151,15 @@ export function OpenApiPublicationEditor() {
               label('sourceHelp', '操作和字段取自正式模型定义；保存与发布时服务端重新校验。', 'Operations and fields come from the runtime model. The server validates them again on save and publish.'))}
             <div className="flex gap-2"><button type="button" className={BUTTON} disabled={modelPage <= 1} onClick={() => void loadModels(modelPage - 1)}>{label('previous', '上一页', 'Previous')}</button>
               <button type="button" className={BUTTON} disabled={modelPage * 50 >= modelTotal} onClick={() => void loadModels(modelPage + 1)}>{label('next', '下一页', 'Next')}</button></div></div>
+        </div>)}
+        {source && !!source.sources?.length && section(label('virtualSources', '虚拟模型来源授权', 'Virtual model source grants'), <div className="space-y-3">
+          <p className="text-sm text-text-2">{label('virtualSourceHelp', '为每个来源选择已发布的列表资源；安装还需获得这些来源的列表和字段授权。虚拟模型自身的行约束会同时生效。', 'Select a published list resource for each source. Installations also need its list and field grants. The virtual model row constraints apply as well.')}</p>
+          {source.sources.map(model => { const selected = draft.sourceResources?.[model.modelCode] ?? ''; return <div key={model.modelCode} data-testid={`publication-source-${model.modelCode}`}>
+            {input(model.name || label('unnamed', '未命名业务模型', 'Unnamed business model'), <select required className={CONTROL} disabled={!!view?.activeVersion} value={selected}
+              onChange={event => change({ ...draft, sourceResources: { ...draft.sourceResources, [model.modelCode]: event.target.value } })}>
+              <option value="">{label('chooseSourceResource', '选择已发布的列表资源', 'Choose a published list resource')}</option>
+              {selected && !model.resources.some(resource => resource.code === selected) && <option value={selected} disabled>{selected} ({label('sourceUnavailable', '来源已不可用', 'Source unavailable')})</option>}
+              {model.resources.map(resource => <option key={resource.code} value={resource.code}>{resource.code} (v{resource.schemaVersion})</option>)}</select>)}</div>; })}
         </div>)}
         {sourceLoading && <p role="status">{label('sourceLoading', '正在读取来源能力…', 'Loading source capabilities…')}</p>}
         {source && section(label('operations', '操作与权限', 'Operations and scopes'), <div className="space-y-3">

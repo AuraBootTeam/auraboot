@@ -28,6 +28,23 @@ public class NamedQueryTestRequest {
     @com.fasterxml.jackson.annotation.JsonIgnore
     private Long executionDeadlineNanos;
 
+    /** Trusted virtual-resource row boundaries; independent of caller filter operator choices. */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private java.util.List<ResourceCondition> resourceConditions;
+
+    /** Typed, server-validated public filters; JDBC temporal and decimal values stay intact. */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private java.util.List<ResourceCondition> resourceFilters;
+
+    public record ResourceCondition(String field, String operator, Object value) {}
+
+    /** Trusted resource keyset continuation, bound to the current source grants by the public facade. */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private String resourceCursor;
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private DynamicQueryRequest.KeysetContinuation resourceContinuation;
+
     /**
      * 测试参数
      */

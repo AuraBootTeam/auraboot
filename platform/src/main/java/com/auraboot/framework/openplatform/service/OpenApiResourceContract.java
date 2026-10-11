@@ -15,7 +15,14 @@ public record OpenApiResourceContract(
         Set<Operation> operations, Map<Operation, String> scopes,
         DataPolicy dataPolicy, Map<String, Field> fields,
         int maxPageSize, int maxConditions, int timeoutMs,
-        Set<String> events) {
+        Set<String> events, Map<String, String> sourceResources) {
+
+    public OpenApiResourceContract(String code, String modelCode, int schemaVersion,
+            Set<Operation> operations, Map<Operation, String> scopes, DataPolicy dataPolicy, Map<String, Field> fields,
+            int maxPageSize, int maxConditions, int timeoutMs, Set<String> events) {
+        this(code, modelCode, schemaVersion, operations, scopes, dataPolicy, fields,
+                maxPageSize, maxConditions, timeoutMs, events, Map.of());
+    }
 
     private static final Set<String> INTERNAL = Set.of(
             "id", "tenant_id", "tenantId", "created_by", "updated_by", "row_version",
@@ -52,6 +59,12 @@ public record OpenApiResourceContract(
         scopes = Map.copyOf(scopes == null ? Map.of() : scopes);
         fields = Map.copyOf(fields == null ? Map.of() : fields);
         events = Set.copyOf(events == null ? Set.of() : events);
+        sourceResources = Map.copyOf(sourceResources == null ? Map.of() : sourceResources);
+        require(sourceResources.size() <= 16, "Bounded virtual source bindings required");
+        sourceResources.forEach((model, resource) -> {
+            identifier(model, "source model", "[A-Za-z][A-Za-z0-9_]{0,127}");
+            identifier(resource, "source resource", "[a-z][a-z0-9.-]{1,99}");
+        });
         require(!operations.isEmpty() && dataPolicy != null, "Operations and data policy required");
         require(scopes.keySet().equals(operations), "Every operation requires exactly one scope declaration");
         scopes.values().forEach(scope -> identifier(scope, "scope", "[a-z][a-z0-9.:-]{1,159}"));
@@ -207,6 +220,7 @@ public record OpenApiResourceContract(
     /** A same-major revision must keep every existing operation and published field contract. */
     public void requireCompatibleWith(OpenApiResourceContract previous) {
         require(code.equals(previous.code()) && modelCode.equals(previous.modelCode()), "Public source binding cannot change");
+        require(sourceResources.equals(previous.sourceResources()), "Public source grants cannot change");
         require(operations.containsAll(previous.operations()) && dataPolicy == previous.dataPolicy(), "Public operation/policy cannot be removed or changed");
         previous.scopes().forEach((operation, scope) -> require(scope.equals(scopes.get(operation)), "Public scope cannot change"));
         previous.fields().forEach((alias, field) -> require(field.equals(fields.get(alias)), "Existing public field contract cannot change: " + alias));

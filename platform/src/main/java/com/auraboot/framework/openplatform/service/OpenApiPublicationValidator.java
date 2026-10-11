@@ -18,21 +18,24 @@ public class OpenApiPublicationValidator {
     private final MetaModelService models;
     private final OpenApiCapabilityRegistry fixedRoutes;
     private final org.springframework.beans.factory.ObjectProvider<com.auraboot.framework.meta.service.NamedQueryService> queries;
+    private final org.springframework.beans.factory.ObjectProvider<OpenApiQueryValidator> queryValidator;
 
     public OpenApiPublicationValidator(MetaModelService models) {
         this(models, List.of());
     }
 
     public OpenApiPublicationValidator(MetaModelService models, List<OpenApiCapabilityContributor> contributors) {
-        this(models, contributors, null);
+        this(models, contributors, null, null);
     }
 
     @org.springframework.beans.factory.annotation.Autowired
     public OpenApiPublicationValidator(MetaModelService models, List<OpenApiCapabilityContributor> contributors,
-            org.springframework.beans.factory.ObjectProvider<com.auraboot.framework.meta.service.NamedQueryService> queries) {
+            org.springframework.beans.factory.ObjectProvider<com.auraboot.framework.meta.service.NamedQueryService> queries,
+            org.springframework.beans.factory.ObjectProvider<OpenApiQueryValidator> queryValidator) {
         this.models = models;
         this.fixedRoutes = new OpenApiCapabilityRegistry(contributors);
         this.queries = queries;
+        this.queryValidator = queryValidator;
     }
 
     /** Pins delegated execution semantics together with model storage provenance. */
@@ -46,17 +49,20 @@ public class OpenApiPublicationValidator {
     }
 
     public ModelDefinition validate(OpenApiResourceContract contract) {
-        ModelDefinition model = models.getModelDefinition(contract.modelCode())
-                .orElseThrow(() -> invalid("Publication model does not exist"));
+        ModelDefinition model = resolveModel(contract);
         validate(contract, model);
         return model;
+    }
+
+    public ModelDefinition resolveModel(OpenApiResourceContract contract) {
+        return models.getModelDefinition(contract.modelCode()).orElseThrow(() -> invalid("Publication model does not exist"));
     }
 
     public record SourceField(String code, String name, Set<OpenApiResourceContract.Type> types,
                               boolean writable, boolean required, boolean sortable, boolean filterable,
                               String referenceModel, boolean referencePid, boolean eventReadable) { }
     public record SourceView(String modelCode, String name, Set<OpenApiResourceContract.Operation> operations,
-                             boolean eventsAllowed, List<SourceField> fields) { }
+                             boolean eventsAllowed, List<SourceField> fields, List<OpenApiQueryValidator.SourceModel> sources) { }
 
     /** Advisory editor metadata from the same runtime source as publication validation. */
     public SourceView describe(String code) {
@@ -75,23 +81,30 @@ public class OpenApiPublicationValidator {
         if (physical && caps.isCreate() && !model.isCommandOnlyCreate()) operations.add(OpenApiResourceContract.Operation.CREATE);
         if (physical && caps.isUpdate() && !model.isImmutable()) operations.add(OpenApiResourceContract.Operation.UPDATE);
         if (physical && caps.isDelete() && !model.isImmutable() && !Boolean.TRUE.equals(commandDelete)) operations.add(OpenApiResourceContract.Operation.DELETE);
+        var querySource = "namedQuery".equals(model.getSourceType())
+                ? queryValidator.getObject().describe(com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId(), model.getSourceRef()) : null;
+        require(querySource == null || querySource.parameters().isEmpty(), "Parameterized sources require a public query contract");
+        Set<String> queryOutputs = querySource == null ? Set.of() : querySource.fields().stream()
+                .map(OpenApiQueryValidator.SourceField::code).collect(java.util.stream.Collectors.toSet());
         Set<String> internal = Set.of("id", "pid", "tenant_id", "tenantId", "created_by", "updated_by", "row_version", "deleted_flag", "_expectedVersion");
         var fields = (model.getFields() == null ? List.<FieldDefinition>of() : model.getFields()).stream()
-                .filter(field -> field.getCode() != null && !internal.contains(field.getCode()) && !field.isTransientField())
+                .filter(field -> field.getCode() != null && !internal.contains(field.getCode()) && !field.isTransientField()
+                        && (querySource == null || queryOutputs.contains(field.getCode())))
                 .map(field -> {
                     var types = java.util.EnumSet.noneOf(OpenApiResourceContract.Type.class);
                     for (var type : OpenApiResourceContract.Type.values()) if (typeMatches(type, field.getDataType())) types.add(type);
                     var ref = field.getRefTarget();
                     if (ref != null) { types.clear(); types.add(OpenApiResourceContract.Type.PID); }
                     return new SourceField(field.getCode(), field.getDisplayName(), Set.copyOf(types),
-                            !field.isComputedReadonly() && !Boolean.TRUE.equals(field.getPrimaryKey())
+                            physical && !field.isComputedReadonly() && !Boolean.TRUE.equals(field.getPrimaryKey())
                                     && !Set.of("created_at", "updated_at").contains(field.getCode()),
                             Boolean.TRUE.equals(field.getRequired()) && field.getDefaultValue() == null,
                             caps.canSortBy(field.getCode()), caps.canFilterBy(field.getCode()),
                             ref == null ? null : ref.getTargetEntity(),
                             ref == null || ref.getValueField() == null || "pid".equals(ref.getValueField()), !field.isJsonbVirtual());
                 }).filter(field -> !field.types().isEmpty()).toList();
-        return new SourceView(model.getCode(), model.getDisplayName(), Set.copyOf(operations), physical, fields);
+        return new SourceView(model.getCode(), model.getDisplayName(), Set.copyOf(operations), physical, fields,
+                querySource == null ? List.of() : querySource.sources());
     }
 
     public void validate(OpenApiResourceContract contract, ModelDefinition model) {
@@ -161,6 +174,19 @@ public class OpenApiPublicationValidator {
             } else {
                 require(publicField.referenceResource() == null, "Public reference requires a model reference binding");
             }
+        }
+        if ("namedQuery".equals(model.getSourceType())) {
+            require(queryValidator != null, "Virtual source validator is unavailable");
+            require(!contract.operations().contains(OpenApiResourceContract.Operation.GET)
+                    || "pid".equals(capabilities.resolveDetailKeyField(model.getPrimaryKey())), "Virtual resource detail must use PID");
+            var source = queryValidator.getObject().validateResource(com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId(), contract, model);
+            source.sourceModels().forEach(code -> {
+                var dependency = models.getModelDefinition(code).orElseThrow(() -> invalid("Virtual source model is unavailable"));
+                require((dependency.getSourceType() == null || "physical".equals(dependency.getSourceType()))
+                        && !"view".equalsIgnoreCase(dependency.getModelType()), "Virtual query dependencies require physical source publications");
+            });
+        } else {
+            require(contract.sourceResources().isEmpty(), "Source grants are only supported for NamedQuery virtual resources");
         }
         if (contract.operations().contains(OpenApiResourceContract.Operation.CREATE)) {
             for (var source : fields.values()) {

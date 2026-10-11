@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from open_platform_dynamic_probe import CASES, run_dynamic_probe, run_sdk_consumer, verify_report, verify_release_report, verify_command_audits, prepare_slo_fixture, run_source_binding_probe, import_public_plugin, run_public_plugin_metadata_rollback
 from open_platform_http import ProtocolError
-from open_platform_dynamic_probe import PLUGIN_QUERY_SOURCE_FINGERPRINT, verify_named_query_absent, run_claimed_query_rollback
+from open_platform_dynamic_probe import PLUGIN_QUERY_SOURCE_FINGERPRINT, verify_named_query_absent, run_claimed_query_rollback, verify_virtual_resource
 
 
 def passed():
@@ -62,6 +62,14 @@ def passed():
                 "error": {"success": False, "code": "open_api_source_changed", "message": "Published resource source binding is unavailable or changed"},
                 "baseline": {"pid": "source-pid", "name": "Storage binding original"}, "baselineEtag": '"opaque-etag-value"',
                 "restoredStatus": 200, "restored": {"pid": "source-pid", "name": "Storage binding original"}, "restoredEtag": '"opaque-etag-value"'},
+            "virtualResource": {"resource": "release.dynamic.virtual-parts", "sourceResources": {"release_dynamic_parts": "release.dynamic.parts"},
+                "allowedPid": "allowed-pid", "hiddenPid": "hidden-pid", "extraPid": "extra-pid",
+                "items": [{"pid": "allowed-pid", "name": "Allowed A", "zone": "A"}],
+                "detail": {"pid": "allowed-pid", "name": "Allowed A", "zone": "A"},
+                "etag": '"' + "a" * 64 + '"', "stableEtag": '"' + "a" * 64 + '"',
+                "ownHiddenStatus": 404, "sourceHiddenStatus": 404, "fieldDeniedStatus": 403, "revokedStatus": 403,
+                "pages": [{"items": [{"pid": "allowed-pid", "name": "Allowed A", "zone": "A"}], "nextCursor": "opaque-cursor"},
+                          {"items": [{"pid": "extra-pid", "name": "Virtual extra A", "zone": "A"}], "nextCursor": None}]},
             "queryRateLimit": {"status": 429, "code": "open_api_query_rate_limited", "retryAfter": "60",
                                "requestId": "release-dynamic-query-quota", "audit": quota_audit}}
 
@@ -259,6 +267,21 @@ class DynamicProbeTests(unittest.TestCase):
                            ("restored", {"pid": "source-pid", "name": "Private source binding sentinel"})]:
             report = passed(); report["resourceSourceBinding"][key] = value
             with self.subTest(key=key), self.assertRaises(ProtocolError): verify_report(report)
+
+    def test_virtual_resource_proof_is_mandatory_and_rejects_missing_boundaries(self):
+        report = passed(); del report["virtualResource"]
+        with self.assertRaises(ProtocolError): verify_report(report)
+        for key, value in [("sourceResources", {}), ("items", []), ("detail", {"pid": "hidden-pid"}),
+                           ("etag", None), ("stableEtag", '"' + "b" * 64 + '"'), ("ownHiddenStatus", 200),
+                           ("sourceHiddenStatus", 200), ("fieldDeniedStatus", 200), ("revokedStatus", 200),
+                           ("hiddenPid", "allowed-pid"), ("pages", []), ("pages", [{"items": None, "nextCursor": None}])]:
+            proof = copy.deepcopy(passed()["virtualResource"]); proof[key] = value
+            with self.subTest(key=key), self.assertRaises(ProtocolError): verify_virtual_resource(proof)
+        proof = copy.deepcopy(passed()["virtualResource"])
+        proof["pages"][1]["items"] = copy.deepcopy(proof["pages"][0]["items"])
+        with self.assertRaises(ProtocolError): verify_virtual_resource(proof)
+        proof = copy.deepcopy(passed()["virtualResource"]); proof["items"][0]["privateValue"] = "Private sentinel"
+        with self.assertRaises(ProtocolError): verify_virtual_resource(proof)
 
     def test_query_quota_requires_response_and_persisted_public_audit(self):
         self.assertEqual(verify_report(passed()), passed())

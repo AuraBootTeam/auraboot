@@ -8,6 +8,7 @@ export interface PublicField {
 export interface PublicResource {
   code: string; modelCode: string; schemaVersion: number; operations: PublicOperation[];
   scopes: Partial<Record<PublicOperation, string>>; dataPolicy: 'tenant_wide' | 'installation_filter';
+  sourceResources?: Record<string, string>;
   fields: Record<string, PublicField>; maxPageSize: number; maxConditions: number; timeoutMs: number; events: string[];
 }
 export interface PublicationView { code: string; draft: PublicResource; draftRevision: number; activeVersion: number | null; status: string }
@@ -15,7 +16,7 @@ export interface PublicationSourceField {
   code: string; name: string; types: PublicType[]; writable: boolean; required: boolean;
   sortable: boolean; filterable: boolean; referenceModel: string | null; referencePid: boolean; eventReadable: boolean;
 }
-export interface PublicationSource { modelCode: string; name: string; operations: PublicOperation[]; eventsAllowed: boolean; fields: PublicationSourceField[] }
+export interface PublicationSource { modelCode: string; name: string; operations: PublicOperation[]; eventsAllowed: boolean; fields: PublicationSourceField[]; sources?: QuerySource['sources'] }
 export interface ModelChoice { code: string; displayName: string; status: string }
 export class PublicationApiError extends Error {
   constructor(public readonly status: number, message: string) { super(message); }

@@ -40,7 +40,13 @@ describe('validateStructural plugin manifest schema', () => {
       models: [{ code: 'public_record', capabilities: { list: true, detail: true, create: false } }],
       publicResources: [publicFixture('resource')], publicQueries: [publicFixture('query')],
     };
+    manifest.publicResources[0].sourceResources = { public_record: 'records.public' };
     expect(validateStructural(pluginWithManifest(manifest)).errorCount).toBe(0);
+    manifest.publicResources[0].sourceResources = { public_record: 'private/table' };
+    expect(validateStructural(pluginWithManifest(manifest)).messages).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'L1-MANIFEST', path: 'plugin.json/publicResources/0/sourceResources/public_record' }),
+    ]));
+    manifest.publicResources[0].sourceResources = {};
     manifest.publicQueries[0].sourceFingerprint = 'invalid';
     expect(validateStructural(pluginWithManifest(manifest)).messages).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'L1-MANIFEST', path: 'plugin.json/publicQueries/0/sourceFingerprint' }),

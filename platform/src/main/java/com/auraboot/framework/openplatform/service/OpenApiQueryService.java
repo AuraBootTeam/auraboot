@@ -29,7 +29,7 @@ public class OpenApiQueryService {
 
     public record ExecuteRequest(Map<String, Object> parameters, Integer limit, String cursor) { }
     public static final class QueryRateLimitException extends RuntimeException {
-        private QueryRateLimitException(Throwable cause) {
+        QueryRateLimitException(Throwable cause) {
             super("Published query execution rate budget exhausted", cause);
         }
     }

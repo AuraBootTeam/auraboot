@@ -329,6 +329,7 @@ def verify_report(report):
     verify_claimed_query_rollback(report.get("queryRollbackProtection"), proofs[1], report["pluginQuerySource"])
     verify_audits(report)
     verify_source_binding(report.get("resourceSourceBinding"))
+    verify_virtual_resource(report.get("virtualResource"))
     quota = report.get("queryRateLimit")
     resource = "release.dynamic.by-zone.quota"
     request_id = "release-dynamic-query-quota"
@@ -367,6 +368,101 @@ def verify_source_binding(proof):
             or len(proof["baselineEtag"]) < 12 or proof.get("restoredEtag") != proof["baselineEtag"]):
         raise ProtocolError("dynamic resource source binding proof invalid")
     return proof
+
+
+def verify_virtual_resource(proof):
+    keys = {"resource", "sourceResources", "allowedPid", "hiddenPid", "extraPid", "items", "detail", "etag",
+            "stableEtag", "ownHiddenStatus", "sourceHiddenStatus", "pages", "fieldDeniedStatus", "revokedStatus"}
+    if not isinstance(proof, dict) or set(proof) != keys:
+        raise ProtocolError("virtual resource proof missing or malformed")
+    identities = [proof.get(key) for key in ["allowedPid", "hiddenPid", "extraPid"]]
+    if any(not isinstance(pid, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", pid) for pid in identities) or len(set(identities)) != 3:
+        raise ProtocolError("virtual resource fixture identities invalid")
+    expected = {"pid": identities[0], "name": "Allowed A", "zone": "A"}
+    if (proof["resource"] != "release.dynamic.virtual-parts"
+            or proof["sourceResources"] != {"release_dynamic_parts": "release.dynamic.parts"}
+            or proof["items"] != [expected] or proof["detail"] != expected
+            or not isinstance(proof["etag"], str) or not re.fullmatch(r'"[a-f0-9]{64}"', proof["etag"])
+            or proof["stableEtag"] != proof["etag"]):
+        raise ProtocolError("virtual resource projection or ETag invalid")
+    for key, expected_status in [("ownHiddenStatus", 404), ("sourceHiddenStatus", 404), ("fieldDeniedStatus", 403), ("revokedStatus", 403)]:
+        if type(proof[key]) is not int or proof[key] != expected_status:
+            raise ProtocolError("virtual resource denial invalid: " + key)
+    pages = proof["pages"]
+    if (not isinstance(pages, list) or len(pages) != 2
+            or any(not isinstance(page, dict) or set(page) != {"items", "nextCursor"} for page in pages)
+            or any(not isinstance(page["items"], list) or len(page["items"]) != 1 or not isinstance(page["items"][0], dict) for page in pages)
+            or {page["items"][0].get("pid") for page in pages} != {identities[0], identities[2]}
+            or not isinstance(pages[0]["nextCursor"], str) or not pages[0]["nextCursor"] or pages[1]["nextCursor"] is not None):
+        raise ProtocolError("virtual resource keyset proof invalid")
+    expected_rows = {identities[0]: expected, identities[2]: {"pid": identities[2], "name": "Virtual extra A", "zone": "A"}}
+    if any(page["items"][0] != expected_rows[page["items"][0]["pid"]] for page in pages):
+        raise ProtocolError("virtual resource keyset projection invalid")
+    return proof
+
+
+def run_virtual_resource_probe(request, human, installation_pid, machine, scopes, physical_definition, allowed, hidden):
+    """Exercise the declared source grant and the virtual policy through production HTTP routes."""
+    source_model = "release_dynamic_parts"
+    code = "release.dynamic.virtual-parts"
+    query_code = "release_dynamic_virtual_source"
+    model_code = "release_dynamic_virtual_parts"
+    named = human("/api/meta/named-queries", "POST", {"code": query_code, "title": "Release virtual parts source",
+        "resourceCode": source_model, "actionCode": "read", "fromSql": source_model + " a",
+        "policy": {"rateLimitPerMinute": 100000}, "baseWhere": [], "defaultOrder": [{"field": "pid", "direction": "asc"}],
+        "fields": [{"fieldCode": alias, "columnExpr": "a." + column, "dataType": "string", "displayName": alias,
+                    "sortable": alias == "pid", "searchable": False}
+                   for alias, column in [("pid", "pid"), ("name", "rel_name"), ("zone", "rel_zone"), ("privateValue", "rel_private")]]})
+    for status in ["testing", "published"]:
+        human(f"/api/meta/named-queries/{named['pid']}/status", "PUT", {"status": status})
+    model = human("/api/meta/models", "POST", {"code": model_code, "displayName": "Release virtual parts",
+        "modelType": "view", "sourceType": "namedQuery", "sourceRef": query_code, "primaryKey": "pid",
+        "capabilities": {key: True for key in ["list", "detail", "filter", "sort", "paginate"]},
+        "fields": [{"code": alias, "displayName": alias, "dataType": "string", "filterable": True}
+                   for alias in ["name", "zone"]]})
+    human(f"/api/meta/models/{model['pid']}/publish", "POST", {"impactAcknowledged": True})
+    fields = {alias: dict(physical_definition["fields"][alias], source=alias, writable=False, required=False, operators=["EQ"] if alias != "pid" else [])
+              for alias in ["pid", "name", "zone"]}
+    definition = dict(physical_definition, code=code, modelCode=model_code, operations=["list", "get"],
+                      scopes={op: scopes[op] for op in ["list", "get"]}, fields=fields,
+                      sourceResources={source_model: "release.dynamic.parts"})
+    human(f"/api/open-platform/publications/{code}/draft", "PUT", {"expectedRevision": 0, "definition": definition})
+    human(f"/api/open-platform/publications/{code}/publish", "POST", {"expectedRevision": 1})
+    virtual_grant = f"/api/open-platform/installations/{installation_pid}/resources/{code}"
+    source_grant = f"/api/open-platform/installations/{installation_pid}/resources/release.dynamic.parts"
+    original = {"operations": physical_definition["operations"], "readableFields": ["pid", "name", "zone"],
+                "writableFields": ["name", "zone"], "rowConstraints": [{"field": "zone", "values": ["A"]}]}
+    policy = {"operations": ["list", "get"], "readableFields": ["pid", "name", "zone"], "writableFields": [],
+              "rowConstraints": [{"field": "name", "values": ["Allowed A", "Hidden B"]}]}
+    extra = human(f"/api/dynamic/{source_model}/create", "POST", {"rel_name": "Virtual extra A", "rel_zone": "A", "rel_private": "Private virtual sentinel"})
+    path = "/api/open/v1/resources/" + code
+    def etag(headers):
+        return next((value for key, value in headers.items() if key.lower() == "etag"), None)
+    try:
+        human(virtual_grant, "PUT", policy)
+        _, listed, _ = request(path, headers=machine)
+        _, detail, headers = request(path + "/" + allowed["pid"], headers=machine)
+        _, _, repeated = request(path + "/" + allowed["pid"], headers=machine)
+        own_status, _, _ = request(path + "/" + extra["pid"], headers=machine, expected=(404,))
+        source_status, _, _ = request(path + "/" + hidden["pid"], headers=machine, expected=(404,))
+        human(virtual_grant, "PUT", dict(policy, rowConstraints=[{"field": "zone", "values": ["A"]}]))
+        _, first, _ = request(path + "?limit=1", headers=machine)
+        cursor = first.get("nextCursor")
+        if not isinstance(cursor, str) or not cursor: raise ProtocolError("virtual first page lacks continuation")
+        from urllib.parse import quote
+        _, second, _ = request(path + "?limit=1&cursor=" + quote(cursor, safe=""), headers=machine)
+        human(source_grant, "PUT", dict(original, readableFields=["pid", "zone"]))
+        field_status, _, _ = request(path, headers=machine, expected=(403,))
+        human(source_grant, "DELETE")
+        revoked_status, _, _ = request(path + "/" + allowed["pid"], headers=machine, expected=(403,))
+        proof = {"resource": code, "sourceResources": definition["sourceResources"], "allowedPid": allowed["pid"],
+                 "hiddenPid": hidden["pid"], "extraPid": extra["pid"], "items": listed.get("items"), "detail": detail,
+                 "etag": etag(headers), "stableEtag": etag(repeated), "ownHiddenStatus": own_status,
+                 "sourceHiddenStatus": source_status, "pages": [{key: page.get(key) for key in ["items", "nextCursor"]} for page in [first, second]], "fieldDeniedStatus": field_status, "revokedStatus": revoked_status}
+        return verify_virtual_resource(proof)
+    finally:
+        human(source_grant, "PUT", original)
+        human(f"/api/dynamic/{source_model}/{extra['pid']}", "DELETE")
 
 
 def run_source_binding_probe(request, human, installation_pid, machine, get_scope):
@@ -682,6 +778,7 @@ def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None):
             "retryAfter": header(quota_headers, "Retry-After"), "requestId": header(quota_headers, "X-Request-Id"), "audit": quota_audits[0]}
         record("query-source-row-projection", query_a.get("items") == [{"pid": a["pid"], "name": "Allowed A"}]
                and query_b.get("items") == [] and quota_first.get("items") == query_a.get("items"))
+        report["virtualResource"] = run_virtual_resource_probe(request, human, installation["pid"], machine, scopes, definition, a, b)
         if consumer is not None:
             consumer({"clientId": credentials["clientId"], "clientSecret": credentials["clientSecret"],
                       "scopes": list(scopes.values()) + [query_scope], "resourceCode": resource,

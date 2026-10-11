@@ -93,9 +93,12 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
         return createQuery(code,sql,fields,null);
     }
     private NamedQueryDTO createQuery(String code,String sql,List<NamedQueryFieldRequest> fields,com.fasterxml.jackson.databind.JsonNode baseWhere) {
+        return createQuery(code, sql, fields, baseWhere, root.modelCode());
+    }
+    private NamedQueryDTO createQuery(String code,String sql,List<NamedQueryFieldRequest> fields,com.fasterxml.jackson.databind.JsonNode baseWhere,String resourceModel) {
         var request=new NamedQueryCreateRequest();request.setCode(code);request.setTitle("Public query fixture");request.setFromSql(sql);
         request.setBaseWhere(baseWhere);
-        request.setResourceCode(root.modelCode());request.setActionCode("read");request.setFields(fields);
+        request.setResourceCode(resourceModel);request.setActionCode("read");request.setFields(fields);
         var order=json.createArrayNode();fields.forEach(field->order.addObject().put("field",field.getFieldCode()).put("direction","asc"));
         request.setDefaultOrder(order);
         var created=queries.create(request);queries.updateStatus(created.getPid(),"testing");queries.updateStatus(created.getPid(),"published");return queries.findByCode(code);
@@ -285,7 +288,7 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
         var contract = new OpenApiResourceContract("virtual." + suffix, virtualModel, 1,
                 Set.of(Operation.LIST, Operation.GET), Map.of(Operation.LIST, root.scopes().get(Operation.LIST),
                         Operation.GET, root.scopes().get(Operation.GET)), DataPolicy.INSTALLATION_FILTER,
-                root.fields(), 50, 8, 5000, Set.of());
+                root.fields(), 50, 8, 5000, Set.of(), Map.of(root.modelCode(), root.code()));
         resources.saveDraft(contract.code(), new OpenApiPublicationService.DraftRequest(0, contract));
         resources.publish(contract.code(), 1);
         resources.grant(principalA.installationPid(), contract.code(), new OpenApiInstallationPolicy(contract.operations(),
@@ -299,6 +302,9 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
         String binding = publicationMapper.sourceBinding(principalA.tenantId(), contract.code(), 1);
         assertThat(json.readTree(binding).path("queryFingerprint").asText())
                 .isEqualTo(queries.describeExecution(source.getCode()).fingerprint());
+        var next = new OpenApiResourceContract(contract.code(), virtualModel, 2, contract.operations(), contract.scopes(),
+                contract.dataPolicy(), contract.fields(), 50, 8, 5000, Set.of(), contract.sourceResources());
+        resources.saveDraft(contract.code(), new OpenApiPublicationService.DraftRequest(1, next));
         var update = new NamedQueryUpdateRequest();
         update.setActionCode("update");
         queries.update(source.getPid(), update);
@@ -311,9 +317,6 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
                 .header("Authorization", "Bearer " + tokenA))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isConflict());
         applyTestMetaContext();
-        var next = new OpenApiResourceContract(contract.code(), virtualModel, 2, contract.operations(), contract.scopes(),
-                contract.dataPolicy(), contract.fields(), 50, 8, 5000, Set.of());
-        resources.saveDraft(contract.code(), new OpenApiPublicationService.DraftRequest(1, next));
         assertThatThrownBy(() -> resources.publish(contract.code(), 2))
                 .isInstanceOf(OpenApiPublicationService.SourceBindingConflictException.class);
         assertThat(publicationMapper.snapshot(principalA.tenantId(), contract.code(), 2)).isNull();
@@ -326,6 +329,177 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
         http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/open/v1/resources/" + contract.code())
                 .header("Authorization", "Bearer " + tokenA))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isConflict());
+    }
+
+    @Test void namedQueryVirtualResourceReadsWithExplicitPhysicalSourceGrants() throws Exception {
+        String suffix = UniqueIdGenerator.generate().toLowerCase();
+        var source = createQuery("virtual_read_" + suffix, "mt_" + root.modelCode() + " a", List.of(
+                nqField("pid", "a.pid", "string"), nqField("name", "a.name", "string"),
+                nqField("zone", "a.zone", "string"), nqField("privateValue", "a.secret", "string")));
+        String extra = humanCreate(root, Map.of("name", "Extra A", "zone", "A", "secret", "Private extra"));
+        String modelCode = "virtual_read_" + suffix;
+        models.saveDefinition(ModelDefinition.builder().code(modelCode).displayName("Granted virtual public source")
+                .sourceType("namedQuery").sourceRef(source.getCode()).primaryKey("pid").status("published")
+                .capabilities(ModelCapabilities.virtualReadOnly()).fields(List.of(
+                        FieldDefinition.builder().code("name").dataType("STRING").displayName("Name").sortable(true).filterable(true).build(),
+                        FieldDefinition.builder().code("zone").dataType("STRING").displayName("Zone").filterable(true).build())).build());
+        var fields = new LinkedHashMap<>(root.fields());
+        fields.put("name", new Field("name", Type.STRING, true, false, false, true, Set.of("EQ"), true, null, Map.of(), null));
+        var contract = new OpenApiResourceContract("virtual-read." + suffix, modelCode, 1,
+                root.operations(), root.scopes(), DataPolicy.INSTALLATION_FILTER, fields, 50, 8, 5000,
+                Set.of(), Map.of(root.modelCode(), root.code()));
+        resources.saveDraft(contract.code(), new OpenApiPublicationService.DraftRequest(0, contract));
+        resources.publish(contract.code(), 1);
+        var metadata = resources.sourceForAdministration(modelCode);
+        assertThat(metadata.sources()).extracting(OpenApiQueryValidator.SourceModel::modelCode).containsExactly(root.modelCode());
+        assertThat(metadata.sources().getFirst().resources()).extracting(OpenApiQueryValidator.SourceResource::code).contains(root.code());
+        assertThat(metadata.fields()).allMatch(field -> !field.writable());
+        assertThat(json.writeValueAsString(metadata)).doesNotContain("fromSql", "a.secret", "privateValue");
+        resources.grant(principalA.installationPid(), contract.code(), new OpenApiInstallationPolicy(contract.operations(),
+                contract.fields().keySet(), Set.of(), List.of(new OpenApiInstallationPolicy.RowConstraint("name", List.of("Root A", "Extra A", "Root B")))));
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/open/v1/resources/" + contract.code())
+                .header("Authorization", "Bearer " + tokenA))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[*].name")
+                        .value(org.hamcrest.Matchers.containsInAnyOrder("Root A", "Extra A")));
+        applyTestMetaContext();
+        resources.grant(principalA.installationPid(), contract.code(), new OpenApiInstallationPolicy(contract.operations(),
+                contract.fields().keySet(), Set.of(), List.of(new OpenApiInstallationPolicy.RowConstraint("name", List.of("Root A", "Root A Renamed")))));
+        var initial = http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/open/v1/resources/" + contract.code())
+                .header("Authorization", "Bearer " + tokenA))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items.length()").value(1))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[0].name").value("Root A"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[0].privateValue").doesNotExist())
+                .andReturn().getResponse();
+        String pid = json.readTree(initial.getContentAsString()).path("items").get(0).path("pid").asText();
+        String path = "/api/open/v1/resources/" + contract.code() + "/" + pid;
+        var first = http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).header("Authorization", "Bearer " + tokenA))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.name").value("Root A")).andReturn().getResponse();
+        assertThat(first.getHeader("ETag")).matches("\"[a-f0-9]{64}\"");
+        assertThat(http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).header("Authorization", "Bearer " + tokenA))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk()).andReturn().getResponse().getHeader("ETag"))
+                .isEqualTo(first.getHeader("ETag"));
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/open/v1/resources/" + contract.code() + "/" + extra)
+                .header("Authorization", "Bearer " + tokenA)).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
+        applyTestMetaContext();
+        MetaContext.runWithCommandPermitScope("ALL", () -> data.update(root.modelCode(), pid, new HashMap<>(Map.of("name", "Root A Renamed"))));
+        var changed = http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).header("Authorization", "Bearer " + tokenA))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.name").value("Root A Renamed")).andReturn().getResponse();
+        assertThat(changed.getHeader("ETag")).isNotEqualTo(first.getHeader("ETag"));
+        applyTestMetaContext();
+        String nullName = humanCreate(root, Map.of("zone", "A", "secret", "Private null"));
+        resources.grant(principalA.installationPid(), contract.code(), new OpenApiInstallationPolicy(contract.operations(),
+                Set.of("pid", "name"), Set.of(), List.of(new OpenApiInstallationPolicy.RowConstraint("zone", List.of("A")))));
+        String originalCursor = null;
+        for (String order : List.of("PID", "ASC", "DESC")) {
+            String cursor = null;
+            var names = new java.util.ArrayList<String>(); var pids = new java.util.ArrayList<String>();
+            do {
+                var request = org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/open/v1/resources/" + contract.code())
+                        .header("Authorization", "Bearer " + tokenA).param("limit", "1");
+                if (!"PID".equals(order)) request.param("sort", "name").param("direction", order);
+                if (cursor != null) request.param("cursor", cursor);
+                var page = json.readTree(http.perform(request).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                        .andReturn().getResponse().getContentAsString());
+                assertThat(page.path("items").size()).isEqualTo(1);
+                var row = page.path("items").get(0); pids.add(row.path("pid").asText());
+                names.add(row.path("name").isNull() || row.path("name").isMissingNode() ? "<null>" : row.path("name").asText());
+                assertThat(row.has("zone") || row.has("privateValue")).isFalse();
+                cursor = page.path("hasMore").asBoolean() ? page.path("nextCursor").asText() : null;
+                if (originalCursor == null && cursor != null) originalCursor = cursor;
+                assertThat(pids.size()).isLessThanOrEqualTo(3);
+            } while (cursor != null);
+            assertThat(pids).containsExactlyInAnyOrder(pid, extra, nullName);
+            if ("ASC".equals(order)) assertThat(names).containsExactly("Extra A", "Root A Renamed", "<null>");
+            if ("DESC".equals(order)) assertThat(names).containsExactly("<null>", "Root A Renamed", "Extra A");
+        }
+        applyTestMetaContext();
+        resources.grant(principalA.installationPid(), root.code(), new OpenApiInstallationPolicy(root.operations(), Set.of("pid", "zone"), Set.of(),
+                List.of(new OpenApiInstallationPolicy.RowConstraint("zone", List.of("A")))));
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/open/v1/resources/" + contract.code())
+                .header("Authorization", "Bearer " + tokenA)).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/open/v1/resources/" + contract.code())
+                .header("Authorization", "Bearer " + tokenA).param("limit", "1").param("cursor", originalCursor))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest());
+        applyTestMetaContext(); resources.revoke(principalA.installationPid(), root.code());
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).header("Authorization", "Bearer " + tokenA))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+    }
+
+    @Test void namedQueryVirtualResourceKeepsTypedDateBoundariesAndFilters() throws Exception {
+        String suffix = UniqueIdGenerator.generate().toLowerCase();
+        String sourceModel = "date_source_" + suffix;
+        var modelFields = List.of(FieldDefinition.builder().code("name").columnName("name").dataType("STRING").build(),
+                FieldDefinition.builder().code("day").columnName("day").dataType("DATE").filterable(true).sortable(true).build(),
+                FieldDefinition.builder().code("zone").columnName("zone").dataType("STRING").filterable(true).build());
+        models.saveDefinition(ModelDefinition.builder().code(sourceModel).tableName("mt_" + sourceModel).displayName("Date source")
+                .sourceType("physical").primaryKey("id").status("published").capabilities(ModelCapabilities.fullPhysical()).fields(modelFields).build());
+        assertThat(schemas.createTableByModel(sourceModel).isSuccess()).isTrue();
+        var fields = new LinkedHashMap<String, Field>(); fields.put("pid", output("pid", Type.PID)); fields.put("name", output("name", Type.STRING));
+        fields.put("day", new Field("day", Type.DATE, true, false, false, false, Set.of("EQ", "IN", "GE", "LE"), true, null, Map.of(), null));
+        fields.put("zone", new Field("zone", Type.STRING, true, false, false, false, Set.of("EQ"), false, null, Map.of(), null));
+        var physical = new OpenApiResourceContract("date-source." + suffix, sourceModel, 1, root.operations(), root.scopes(),
+                DataPolicy.INSTALLATION_FILTER, fields, 50, 8, 5000, Set.of());
+        resources.saveDraft(physical.code(), new OpenApiPublicationService.DraftRequest(0, physical)); resources.publish(physical.code(), 1);
+        resources.grant(principalA.installationPid(), physical.code(), new OpenApiInstallationPolicy(physical.operations(), fields.keySet(), Set.of(),
+                List.of(new OpenApiInstallationPolicy.RowConstraint("zone", List.of("A")))));
+        humanCreate(physical, Map.of("name", "Date A1", "day", java.time.LocalDate.of(2026, 10, 11), "zone", "A"));
+        humanCreate(physical, Map.of("name", "Date A2", "day", java.time.LocalDate.of(2026, 10, 12), "zone", "A"));
+        humanCreate(physical, Map.of("name", "Date B", "day", java.time.LocalDate.of(2026, 10, 11), "zone", "B"));
+        var source = createQuery("date_query_" + suffix, "mt_" + sourceModel + " a", List.of(nqField("pid", "a.pid", "string"),
+                nqField("name", "a.name", "string"), nqField("day", "a.day", "date"), nqField("zone", "a.zone", "string")), null, sourceModel);
+        String virtualModel = "date_virtual_" + suffix;
+        models.saveDefinition(ModelDefinition.builder().code(virtualModel).displayName("Date virtual resource").sourceType("namedQuery")
+                .sourceRef(source.getCode()).primaryKey("pid").status("published").capabilities(ModelCapabilities.virtualReadOnly()).fields(modelFields).build());
+        var contract = new OpenApiResourceContract("date-virtual." + suffix, virtualModel, 1, root.operations(), root.scopes(),
+                DataPolicy.INSTALLATION_FILTER, fields, 50, 8, 5000, Set.of(), Map.of(sourceModel, physical.code()));
+        resources.saveDraft(contract.code(), new OpenApiPublicationService.DraftRequest(0, contract)); resources.publish(contract.code(), 1);
+        resources.grant(principalA.installationPid(), contract.code(), new OpenApiInstallationPolicy(contract.operations(), fields.keySet(), Set.of(),
+                List.of(new OpenApiInstallationPolicy.RowConstraint("day", List.of("2026-10-11")))));
+        String path = "/api/open/v1/resources/" + contract.code();
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).header("Authorization", "Bearer " + tokenA))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items.length()").value(1))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[0].day").value("2026-10-11"));
+        applyTestMetaContext();
+        resources.grant(principalA.installationPid(), contract.code(), new OpenApiInstallationPolicy(contract.operations(), fields.keySet(), Set.of(),
+                List.of(new OpenApiInstallationPolicy.RowConstraint("day", List.of("2026-10-11", "2026-10-12")))));
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).header("Authorization", "Bearer " + tokenA)
+                .param("filters", "[{\"field\":\"day\",\"operator\":\"EQ\",\"value\":\"2026-10-11\"}]"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[*].name").value(org.hamcrest.Matchers.contains("Date A1")));
+        for (String operator : List.of("IN", "GE", "LE")) {
+            String value = "IN".equals(operator) ? "[\"2026-10-11\"]" : "\"2026-10-11\"";
+            var response = http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path)
+                    .header("Authorization", "Bearer " + tokenA)
+                    .param("filters", "[{\"field\":\"day\",\"operator\":\"" + operator + "\",\"value\":" + value + "}]"))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk()).andReturn();
+            var items = json.readTree(response.getResponse().getContentAsString()).path("items");
+            assertThat(items.size()).isEqualTo("GE".equals(operator) ? 2 : 1);
+            assertThat(items.toString()).doesNotContain("Date B");
+        }
+        for (String direction : List.of("ASC", "DESC")) {
+            String cursor = null;
+            var days = new ArrayList<String>();
+            for (int page = 0; page < 2; page++) {
+                var call = org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path)
+                        .header("Authorization", "Bearer " + tokenA).param("limit", "1")
+                        .param("sort", "day").param("direction", direction);
+                if (cursor != null) call.param("cursor", cursor);
+                var response = http.perform(call).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk()).andReturn();
+                var body = json.readTree(response.getResponse().getContentAsString());
+                assertThat(body.path("items").size()).isEqualTo(1);
+                days.add(body.path("items").get(0).path("day").asText());
+                cursor = body.path("nextCursor").isNull() ? null : body.path("nextCursor").asText();
+                if (page == 0) assertThat(cursor).isNotBlank();
+            }
+            assertThat(days).containsExactlyElementsOf("ASC".equals(direction)
+                    ? List.of("2026-10-11", "2026-10-12") : List.of("2026-10-12", "2026-10-11"));
+            assertThat(cursor).isNull();
+        }
     }
 
     @Test void administrationMetadataPinsTheExecutionSourceAndOffersOnlyCurrentListPublications() throws Exception {

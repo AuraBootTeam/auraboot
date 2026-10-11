@@ -66,7 +66,7 @@ public class OpenApiPublicationService {
         requireAdmin();
         var row = requireLocked(code, expectedRevision);
         OpenApiResourceContract contract = decode(row.draft(), OpenApiResourceContract.class);
-        var model = validator.validate(contract);
+        var model = validator.resolveModel(contract);
         for (var field : contract.fields().values()) {
             if (field.referenceResource() == null) continue;
             var target = code.equals(field.referenceResource()) ? contract : active(tenant(), field.referenceResource())
@@ -84,6 +84,7 @@ public class OpenApiPublicationService {
                 throw new PublicationConflictException("New snapshot requires a greater schema version");
             }
         }
+        validator.validate(contract, model);
         mapper.insertResourceSnapshot(tenant(), code, contract.schemaVersion(), encode(contract), actor(),
                 encode(validator.captureSourceBinding(contract, model)));
         mapper.activate(tenant(), code, contract.schemaVersion(), StatusConstants.PUBLISHED, actor());
@@ -158,7 +159,7 @@ public class OpenApiPublicationService {
         return definition == null ? Optional.empty() : Optional.of(decode(definition, OpenApiResourceContract.class));
     }
 
-    public void requireSourceBinding(Long tenantId, OpenApiResourceContract contract,
+    public OpenApiResourceSourceBinding requireSourceBinding(Long tenantId, OpenApiResourceContract contract,
                                      com.auraboot.framework.meta.dto.ModelDefinition model) {
         String binding = mapper.sourceBinding(tenantId, contract.code(), contract.schemaVersion());
         if (binding == null) throw new SourceBindingConflictException();
@@ -169,9 +170,11 @@ public class OpenApiPublicationService {
             // CATCH: map an unavailable delegated source to the public conflict code, preserving its cause.
             throw new SourceBindingConflictException(unavailable);
         }
-        if (!decode(binding, OpenApiResourceSourceBinding.class).equals(current)) {
+        var stored = decode(binding, OpenApiResourceSourceBinding.class);
+        if (!stored.equals(current)) {
             throw new SourceBindingConflictException();
         }
+        return stored;
     }
 
     public List<OpenApiResourceContract> snapshots(Long tenantId, String code) {

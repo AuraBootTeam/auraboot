@@ -725,7 +725,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         List<NamedQueryField> fields = readFields(definition);
         if (request.getExpectedDefinitionFingerprint() != null && !request.getExpectedDefinitionFingerprint().equals(
                 com.auraboot.framework.meta.util.NamedQueryDefinitionFingerprint.of(executionDTO(query, fields)))) {
-            throw new AccessDeniedException("Published named query source changed");
+            throw new com.auraboot.framework.meta.exception.NamedQuerySourceChangedException();
         }
 
         // 2. Rate limit check
@@ -793,6 +793,8 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         if (request.getWhereConditions() != null) {
             parseUserConditions(request.getWhereConditions(), fieldMap, whereClauses, params);
         }
+
+        appendResourceBoundaries(request, fieldMap, whereClauses, params);
 
         // 8. Add tenant isolation and current user context (override any caller-supplied values)
         params.put("tenantId", tenantId);
@@ -867,6 +869,82 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
 
         records = fieldProtection.apply(protection, records);
         return PaginationResult.of(records, total, pageNum, pageSize);
+    }
+
+    private void appendResourceBoundaries(NamedQueryTestRequest request, Map<String, NamedQueryField> fields,
+                                          List<String> clauses, Map<String, Object> params) {
+        appendTypedResourceConditions(request.getResourceConditions(), fields, clauses, params, true);
+        appendTypedResourceConditions(request.getResourceFilters(), fields, clauses, params, false);
+        var continuation = request.getResourceContinuation();
+        String cursor = request.getResourceCursor();
+        if (continuation == null && (cursor == null || cursor.isEmpty())) return;
+        var pid = fields.get("pid");
+        if (pid == null || !pid.checkSortable()) throw new AccessDeniedException("Resource PID is not sortable");
+        String pidExpr = pid.getColumnExpr(); SqlSafetyUtils.validateSqlFragment(pidExpr);
+        params.put("resource_cursor_pid", continuation == null ? cursor : continuation.pid());
+        String afterPid = pidExpr + " > #{params.resource_cursor_pid}";
+        if (continuation == null) { clauses.add(afterPid); return; }
+        var field = fields.get(continuation.field());
+        if (field == null || !field.checkSortable() || !Set.of("ASC", "DESC").contains(continuation.direction())) {
+            throw new AccessDeniedException("Invalid resource sort continuation");
+        }
+        String expr = field.getColumnExpr(); SqlSafetyUtils.validateSqlFragment(expr);
+        if (continuation.value() == null) {
+            clauses.add("(" + expr + " IS NULL AND " + afterPid
+                    + ("DESC".equals(continuation.direction()) ? " OR " + expr + " IS NOT NULL" : "") + ")");
+        } else {
+            params.put("resource_cursor_value", continuation.value());
+            String value = "#{params.resource_cursor_value}";
+            clauses.add("(" + expr + ("ASC".equals(continuation.direction()) ? " > " : " < ") + value
+                    + ("ASC".equals(continuation.direction()) ? " OR " + expr + " IS NULL" : "")
+                    + " OR (" + expr + " = " + value + " AND " + afterPid + "))");
+        }
+    }
+
+    private void appendTypedResourceConditions(List<NamedQueryTestRequest.ResourceCondition> conditions,
+                                               Map<String, NamedQueryField> fields, List<String> clauses,
+                                               Map<String, Object> params, boolean boundary) {
+        if (conditions == null) return;
+        int index = 0;
+        for (var condition : conditions) {
+            var field = fields.get(condition.field());
+            String operator = condition.operator();
+            if (field == null || operator == null
+                    || (boundary && !Set.of("eq", "in").contains(operator))
+                    || (!boundary && field.hasOperators() && !field.supportsOperator(operator))) {
+                throw new AccessDeniedException("Invalid resource condition");
+            }
+            String column = field.getColumnExpr();
+            SqlSafetyUtils.validateSqlFragment(column);
+            String key = (boundary ? "resource_row_" : "resource_filter_") + index++;
+            if ("is_null".equals(operator)) {
+                clauses.add(column + " IS NULL");
+            } else if ("in".equals(operator)) {
+                if (!(condition.value() instanceof List<?> values) || values.isEmpty()) {
+                    throw new AccessDeniedException("Invalid resource IN condition");
+                }
+                List<String> placeholders = new ArrayList<>();
+                for (int i = 0; i < values.size(); i++) {
+                    String itemKey = key + "_" + i;
+                    params.put(itemKey, values.get(i));
+                    placeholders.add("#{params." + itemKey + "}");
+                }
+                clauses.add(column + " IN (" + String.join(", ", placeholders) + ")");
+            } else {
+                String sqlOperator = switch (operator) {
+                    case "eq" -> "=";
+                    case "ne" -> "!=";
+                    case "gt" -> ">";
+                    case "ge", "gte" -> ">=";
+                    case "lt" -> "<";
+                    case "le", "lte" -> "<=";
+                    case "like" -> "LIKE";
+                    default -> throw new AccessDeniedException("Invalid resource filter operator");
+                };
+                params.put(key, "like".equals(operator) ? "%" + condition.value() + "%" : condition.value());
+                clauses.add(column + " " + sqlOperator + " #{params." + key + "}");
+            }
+        }
     }
 
     private void applyExecutionDeadline(NamedQueryTestRequest request) {

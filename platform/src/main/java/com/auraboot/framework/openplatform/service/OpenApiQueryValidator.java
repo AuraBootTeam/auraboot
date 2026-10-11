@@ -57,8 +57,44 @@ public class OpenApiQueryValidator {
                 root == null ? null : root.getPidParam(), policy.getEffectiveMaxRows(com.auraboot.framework.meta.entity.NamedQueryStatus.PUBLISHED), policy.getEffectiveTimeoutMs());
     }
 
+    public NamedQueryService.ExecutionDefinition validateResource(Long tenant, OpenApiResourceContract resource,
+            com.auraboot.framework.meta.dto.ModelDefinition model) {
+        var definition = queries.describeExecution(model.getSourceRef());
+        var contract = new OpenApiQueryContract(resource.code(), model.getSourceRef(), resource.schemaVersion(),
+                definition.fingerprint(), Map.of("execute", resource.scopes().values().iterator().next()),
+                resource.sourceResources(), Map.of(), resource.fields().entrySet().stream().collect(java.util.stream.Collectors.toMap(
+                        Map.Entry::getKey, entry -> resourceProjection(entry.getValue()))), resource.maxPageSize(),
+                resource.maxPageSize() + 1, resource.timeoutMs(), 1);
+        var source = validate(tenant, contract, false);
+        Map<String, com.auraboot.framework.meta.dto.NamedQueryFieldDTO> fields = new HashMap<>();
+        source.definition().getFields().forEach(field -> fields.put(field.getFieldCode(), field));
+        require(fields.containsKey("pid") && Boolean.TRUE.equals(fields.get("pid").getSortable()),
+                "Virtual resources require a sortable PID output");
+        resource.fields().values().forEach(field -> {
+            var output = fields.get(field.source());
+            require(!field.sortable() || Boolean.TRUE.equals(output.getSortable()), "Virtual resource sort exceeds source capability");
+            if (output.getOperators() != null && output.getOperators().length > 0) {
+                var operators = Arrays.stream(output.getOperators()).map(value -> value.toUpperCase(Locale.ROOT)).collect(java.util.stream.Collectors.toSet());
+                require(operators.containsAll(field.operators()), "Virtual resource filter exceeds source capability");
+            }
+        });
+        return source;
+    }
+
+    private OpenApiResourceContract.Field resourceProjection(OpenApiResourceContract.Field field) {
+        require(field.readable() && !field.writable(), "Virtual resource outputs are read-only");
+        return new OpenApiResourceContract.Field(field.source(), field.type(), true, false, field.required(), field.nullable(),
+                Set.of(), false, null, field.properties().entrySet().stream().collect(java.util.stream.Collectors.toMap(
+                        Map.Entry::getKey, entry -> resourceProjection(entry.getValue()))),
+                field.items() == null ? null : resourceProjection(field.items()));
+    }
+
     public NamedQueryService.ExecutionDefinition validate(Long tenant, OpenApiQueryContract contract) {
-        fixedRoutes.requireAvailableQueryRoute(contract);
+        return validate(tenant, contract, true);
+    }
+
+    private NamedQueryService.ExecutionDefinition validate(Long tenant, OpenApiQueryContract contract, boolean queryRoute) {
+        if (queryRoute) fixedRoutes.requireAvailableQueryRoute(contract);
         var source = queries.describeExecution(contract.queryCode()); var query = source.definition();
         require("published".equals(query.getStatus()) && query.getConnectorPid() == null && query.getFromSql() != null,
                 "Public queries require a published SQL NamedQuery");
