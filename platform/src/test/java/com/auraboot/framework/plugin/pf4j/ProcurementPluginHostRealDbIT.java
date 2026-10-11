@@ -414,6 +414,63 @@ class ProcurementPluginHostRealDbIT {
         assertEquals(0,new BigDecimal("2.000001").compareTo(newContent.path("unit_price").decimalValue()));
     }
 
+    private Object allocateNative(Map<String,Object> payload) {
+        try {
+            Class<?> type=plugin.loadClass("com.auraboot.quote.engine.procurement.ProcurementAllocationService");
+            return type.getMethod("allocate",String.class,Map.class)
+                    .invoke(type.getConstructor(DataAccessor.class).newInstance(db),task,payload);
+        } catch(ReflectiveOperationException error) {throw unwrap(error);}
+    }
+    private void openFixtureTask() {
+        try {
+            Class<?> type=plugin.loadClass("com.auraboot.quote.engine.procurement.ProcurementData");
+            type.getMethod("update",DataAccessor.class,String.class,String.class,Map.class)
+                    .invoke(null,db,"task",task,Map.of("state","open"));
+        } catch(ReflectiveOperationException error) {throw unwrap(error);}
+    }
+    @Test void nativeAllocatedDemandChangeAndWholeReturnAreRejectedWithoutLosingReservations() {
+        var fixture=savedNativeQuote();String quote=fixture.quote(),sourcePid=fixture.source();
+        String submit="qo_procurement_quote_common:submit",allocate="qo_procurement_task_common:allocate";
+        String returned="qo_procurement_quote_common:return";var tx=new TransactionTemplate(transactions);
+        var formal=(Map<?,?>)tx.execute(status->scope(submit,()->quoteAt(fixture.clock(),"submit",quote,Map.of("revision",1))));
+        scope("qo_procurement_task_common:dispatch",()->{openFixtureTask();return null;});
+        var request=Map.<String,Object>of("sourceDemands",List.of(Map.of("sourcePid",sourcePid,"sourceRevision",0,"quantity","300.000001")),
+                "allocations",List.of(Map.of("quotePid",quote,"sourcePid",sourcePid,"submissionPid",formal.get("submissionPid"),"quantity","300.000001")));
+        Object confirmed=tx.execute(status->scope(allocate,()->allocateNative(request)));
+        var sourceBefore=scope(allocate,()->db.getById("pr_purchase_request",sourcePid));
+        var quoteBefore=scope(allocate,()->db.getById("s2p_bid",quote));
+        var taskBefore=scope(allocate,()->db.getById("s2p_sourcing_event",task));
+        var allocations=scope(allocate,()->nativeRows("qo_procurement_allocation_common","qo_pr_allocation_task_pid",task));
+        var executions=scope(allocate,()->nativeRows("qo_procurement_execution_common","qo_pr_execution_task_pid",task));
+        var history=scope(allocate,()->nativeRows("qo_procurement_history_common","qo_pr_history_target_pid",quote));
+        var submissions=scope(allocate,()->nativeRows("qo_procurement_submission_common","qo_pr_submission_quote_pid",quote));
+        assertEquals(1,allocations.size());assertEquals(1,executions.size());assertEquals(1,submissions.size());
+        scope(allocate,()->{assertNativeQuantity("pr_purchase_request",sourcePid,"qo_pr_source_reserved_qty","300.000001");return null;});
+        for(String changed:List.of(
+                row("100","11").replace(",1500,1400,400,300,1000,",",1500,1399,400,300,1000,"),
+                row("100","11").replace(",1500,1400,400,300,1000,",",1500,1400,400,300,250,"),
+                row("100","11").replace(",1500,1400,400,300,1000,",",1500,1400,400,300,0,"))) {
+            response=changed;
+            assertEquals("SOURCE_CHANGE_REQUIRES_ALLOCATION_REVIEW",assertThrows(IllegalStateException.class,
+                    ()->tx.execute(status->scope(SYNC,()->sync("100","11")))).getMessage());
+        }
+        assertEquals("QUOTE_ALREADY_ALLOCATED",assertThrows(IllegalStateException.class,
+                ()->tx.execute(status->scope(returned,()->quoteAt(fixture.clock(),"return",quote,Map.of("revision",2,
+                        "reason","Allocated quote cannot be returned","cutoffAt",fixture.cutoff().plusSeconds(3600).toString()))))).getMessage());
+        assertEquals(confirmed,tx.execute(status->scope(allocate,()->allocateNative(request))));
+        scope(allocate,()->{
+            assertEquals(sourceBefore,db.getById("pr_purchase_request",sourcePid));
+            assertEquals(quoteBefore,db.getById("s2p_bid",quote));
+            assertEquals(taskBefore,db.getById("s2p_sourcing_event",task));
+            assertEquals(allocations,nativeRows("qo_procurement_allocation_common","qo_pr_allocation_task_pid",task));
+            assertEquals(executions,nativeRows("qo_procurement_execution_common","qo_pr_execution_task_pid",task));
+            assertEquals(history,nativeRows("qo_procurement_history_common","qo_pr_history_target_pid",quote));
+            assertEquals(submissions,nativeRows("qo_procurement_submission_common","qo_pr_submission_quote_pid",quote));
+            assertNativeQuantity("pr_purchase_request",sourcePid,"qo_pr_source_reserved_qty","300.000001");
+            assertNativeQuantity("pr_purchase_request",sourcePid,"qo_pr_source_approved_qty","1400");return null;
+        });
+    }
+
     @Test void nativeShipmentReplaySnapshotAndFulfillmentNeverChangeActualReceipts() {
         String directory="pr_supplier_common:sync_directory",publish="qo_procurement_order_common:sync_orders";
         String submit="qo_procurement_order_common:submit_shipment",maintain="qo_procurement_address_common:maintain";
