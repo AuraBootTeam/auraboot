@@ -580,25 +580,38 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
     @Test void namedQueryVirtualResourceKeepsTypedDateBoundariesAndFilters() throws Exception {
         String suffix = UniqueIdGenerator.generate().toLowerCase();
         String sourceModel = "date_source_" + suffix;
-        var modelFields = List.of(FieldDefinition.builder().code("name").columnName("name").dataType("STRING").build(),
+        var modelFields = new ArrayList<>(List.of(FieldDefinition.builder().code("name").columnName("name").dataType("STRING").build(),
                 FieldDefinition.builder().code("day").columnName("day").dataType("DATE").filterable(true).sortable(true).build(),
-                FieldDefinition.builder().code("zone").columnName("zone").dataType("STRING").filterable(true).build());
+                FieldDefinition.builder().code("zone").columnName("zone").dataType("STRING").filterable(true).build()));
+        for (var entry : Map.of("units", "INTEGER", "amount", "DECIMAL", "enabled", "BOOLEAN", "moment", "DATETIME").entrySet()) {
+            modelFields.add(FieldDefinition.builder().code(entry.getKey()).columnName(entry.getKey())
+                    .dataType(entry.getValue()).filterable(true).build());
+        }
         models.saveDefinition(ModelDefinition.builder().code(sourceModel).tableName("mt_" + sourceModel).displayName("Date source")
                 .sourceType("physical").primaryKey("id").status("published").capabilities(ModelCapabilities.fullPhysical()).fields(modelFields).build());
         assertThat(schemas.createTableByModel(sourceModel).isSuccess()).isTrue();
         var fields = new LinkedHashMap<String, Field>(); fields.put("pid", output("pid", Type.PID)); fields.put("name", output("name", Type.STRING));
         fields.put("day", new Field("day", Type.DATE, true, false, false, false, Set.of("EQ", "IN", "GE", "LE"), true, null, Map.of(), null));
         fields.put("zone", new Field("zone", Type.STRING, true, false, false, false, Set.of("EQ"), false, null, Map.of(), null));
+        for (var entry : Map.of("units", Type.INTEGER, "amount", Type.DECIMAL, "enabled", Type.BOOLEAN, "moment", Type.DATETIME).entrySet()) {
+            fields.put(entry.getKey(), new Field(entry.getKey(), entry.getValue(), true, false, false, false,
+                    Set.of("EQ"), false, null, Map.of(), null));
+        }
         var physical = new OpenApiResourceContract("date-source." + suffix, sourceModel, 1, root.operations(), root.scopes(),
                 DataPolicy.INSTALLATION_FILTER, fields, 50, 8, 5000, Set.of());
         resources.saveDraft(physical.code(), new OpenApiPublicationService.DraftRequest(0, physical)); resources.publish(physical.code(), 1);
         resources.grant(principalA.installationPid(), physical.code(), new OpenApiInstallationPolicy(physical.operations(), fields.keySet(), Set.of(),
                 List.of(new OpenApiInstallationPolicy.RowConstraint("zone", List.of("A")))));
-        humanCreate(physical, Map.of("name", "Date A1", "day", java.time.LocalDate.of(2026, 10, 11), "zone", "A"));
-        humanCreate(physical, Map.of("name", "Date A2", "day", java.time.LocalDate.of(2026, 10, 12), "zone", "A"));
-        humanCreate(physical, Map.of("name", "Date B", "day", java.time.LocalDate.of(2026, 10, 11), "zone", "B"));
+        humanCreate(physical, Map.of("name", "Date A1", "day", java.time.LocalDate.of(2026, 10, 11), "zone", "A",
+                "units", 7, "amount", new java.math.BigDecimal("12.50"), "enabled", true, "moment", Instant.parse("2026-10-11T12:34:56Z")));
+        humanCreate(physical, Map.of("name", "Date A2", "day", java.time.LocalDate.of(2026, 10, 12), "zone", "A",
+                "units", 8, "amount", new java.math.BigDecimal("13.25"), "enabled", false, "moment", Instant.parse("2026-10-12T12:34:56Z")));
+        humanCreate(physical, Map.of("name", "Date B", "day", java.time.LocalDate.of(2026, 10, 11), "zone", "B",
+                "units", 7, "amount", new java.math.BigDecimal("12.50"), "enabled", true, "moment", Instant.parse("2026-10-11T12:34:56Z")));
         var source = createQuery("date_query_" + suffix, "mt_" + sourceModel + " a", List.of(nqField("pid", "a.pid", "string"),
-                nqField("name", "a.name", "string"), nqField("day", "a.day", "date"), nqField("zone", "a.zone", "string")), null, sourceModel);
+                nqField("name", "a.name", "string"), nqField("day", "a.day", "date"), nqField("zone", "a.zone", "string"),
+                nqField("units", "a.units", "number"), nqField("amount", "a.amount", "number"),
+                nqField("enabled", "a.enabled", "boolean"), nqField("moment", "a.moment", "datetime")), null, sourceModel);
         String virtualModel = "date_virtual_" + suffix;
         models.saveDefinition(ModelDefinition.builder().code(virtualModel).displayName("Date virtual resource").sourceType("namedQuery")
                 .sourceRef(source.getCode()).primaryKey("pid").status("published").capabilities(ModelCapabilities.virtualReadOnly()).fields(modelFields).build());
@@ -648,6 +661,30 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
                     ? List.of("2026-10-11", "2026-10-12") : List.of("2026-10-12", "2026-10-11"));
             assertThat(cursor).isNull();
         }
+        applyTestMetaContext();
+        for (var variation : Map.<String, Object>of("units", 8, "amount", new java.math.BigDecimal("99.00"),
+                "enabled", false, "moment", Instant.parse("2026-10-12T12:34:56Z")).entrySet()) {
+            var values = new HashMap<String, Object>(Map.of("name", "Typed denied " + variation.getKey(),
+                    "day", java.time.LocalDate.of(2026, 10, 11), "zone", "A", "units", 7,
+                    "amount", new java.math.BigDecimal("12.50"), "enabled", true, "moment", Instant.parse("2026-10-11T12:34:56Z")));
+            values.put(variation.getKey(), variation.getValue()); humanCreate(physical, values);
+        }
+        var typedConstraints = new ArrayList<>(List.of(new OpenApiInstallationPolicy.RowConstraint("units", List.of("7")),
+                new OpenApiInstallationPolicy.RowConstraint("amount", List.of("12.50")),
+                new OpenApiInstallationPolicy.RowConstraint("enabled", List.of("true")),
+                new OpenApiInstallationPolicy.RowConstraint("moment", List.of("2026-10-11T12:34:56Z"))));
+        String typedMutation = System.getenv("AURA_IT_NEGATIVE_MUTATION");
+        assertThat(typedMutation).isIn(null, "typed-omit-units", "typed-policy-and-quota");
+        if (Set.of("typed-omit-units", "typed-policy-and-quota").contains(typedMutation == null ? "" : typedMutation)) typedConstraints.removeIf(constraint -> "units".equals(constraint.field()));
+        resources.grant(principalA.installationPid(), contract.code(), new OpenApiInstallationPolicy(contract.operations(),
+                fields.keySet(), Set.of(), typedConstraints));
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).header("Authorization", "Bearer " + tokenA))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[*].name").value(org.hamcrest.Matchers.contains("Date A1")))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[0].units").value(7))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[0].amount").value(12.5))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[0].enabled").value(true))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[0].moment").value("2026-10-11T12:34:56Z"));
     }
 
     @Test void administrationMetadataPinsTheExecutionSourceAndOffersOnlyCurrentListPublications() throws Exception {
@@ -869,6 +906,44 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
         assertThat(audit.installationPid()).isEqualTo(principalA.installationPid());assertThat(audit.resource()).isEqualTo(quotaCode);
         assertThat(audit.operation()).isEqualTo("execute");assertThat(audit.capability()).isEqualTo("query." + quotaCode + ".execute");
         assertThat(audit.idempotentReplay()).isNull();assertThat(MachineDataAccessContext.isActive()).isFalse();
+        String suffix = UniqueIdGenerator.generate().toLowerCase();
+        var virtualQuery = createQuery("virtual_quota_" + suffix, "mt_" + root.modelCode() + " a",
+                List.of(nqField("pid", "a.pid", "string"), nqField("name", "a.name", "string"), nqField("zone", "a.zone", "string")));
+        String quotaMutation = System.getenv("AURA_IT_NEGATIVE_MUTATION");
+        assertThat(quotaMutation).isIn(null, "virtual-quota-relaxed", "typed-policy-and-quota");
+        var virtualPolicy = new com.auraboot.framework.meta.entity.NamedQueryPolicy();
+        virtualPolicy.setRateLimitPerMinute(Set.of("virtual-quota-relaxed", "typed-policy-and-quota")
+                .contains(quotaMutation == null ? "" : quotaMutation) ? 2 : 1);
+        var virtualUpdate = new NamedQueryUpdateRequest(); virtualUpdate.setPolicy(virtualPolicy); queries.update(virtualQuery.getPid(), virtualUpdate);
+        String modelCode = "virtual_quota_" + suffix;
+        models.saveDefinition(ModelDefinition.builder().code(modelCode).displayName("Virtual source quota")
+                .sourceType("namedQuery").sourceRef(virtualQuery.getCode()).primaryKey("pid").status("published")
+                .capabilities(ModelCapabilities.virtualReadOnly()).fields(List.of(
+                        FieldDefinition.builder().code("name").dataType("STRING").build(),
+                        FieldDefinition.builder().code("zone").dataType("STRING").filterable(true).build())).build());
+        var virtualContract = new OpenApiResourceContract("virtual-quota." + suffix, modelCode, 1, root.operations(), root.scopes(),
+                DataPolicy.INSTALLATION_FILTER, root.fields(), 50, 8, 5000, Set.of(), Map.of(root.modelCode(), root.code()));
+        resources.saveDraft(virtualContract.code(), new OpenApiPublicationService.DraftRequest(0, virtualContract));
+        resources.publish(virtualContract.code(), 1);
+        resources.grant(principalA.installationPid(), virtualContract.code(), new OpenApiInstallationPolicy(virtualContract.operations(),
+                virtualContract.fields().keySet(), Set.of(), List.of(new OpenApiInstallationPolicy.RowConstraint("zone", List.of("A")))));
+        String virtualRoute = "/api/open/v1/resources/" + virtualContract.code();
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(virtualRoute).header("Authorization", "Bearer " + tokenA))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[*].name").value(org.hamcrest.Matchers.contains("Root A")));
+        String virtualMarker = "virtual-quota-" + suffix;
+        var virtualDenied = http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(virtualRoute)
+                .header("Authorization", "Bearer " + tokenA).header("X-Request-Id", virtualMarker))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isTooManyRequests())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Retry-After", "60"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code").value("open_api_query_rate_limited"))
+                .andReturn().getResponse();
+        assertThat(virtualDenied.getContentAsString()).doesNotContain(virtualQuery.getCode(), root.modelCode(), tokenA, "fromSql");
+        applyTestMetaContext();
+        var virtualAudits = management.listCallAudits(principalA.installationPid(), virtualMarker, null, 10);
+        assertThat(virtualAudits).hasSize(1); assertThat(virtualAudits.getFirst().status()).isEqualTo(429);
+        assertThat(virtualAudits.getFirst().resource()).isEqualTo(virtualContract.code());
+        assertThat(virtualAudits.getFirst().operation()).isEqualTo("list");
     }
     @Test void realPublicHttpRejectsUnknownEnvelopeParametersAndIgnoresSpoofedTenant() throws Exception {
         String route="/api/open/v1/queries/"+rows.code()+":execute";
