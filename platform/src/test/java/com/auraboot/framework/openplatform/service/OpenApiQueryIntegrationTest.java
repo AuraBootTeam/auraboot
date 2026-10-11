@@ -567,6 +567,7 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
         http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).header("Authorization", "Bearer " + tokenA))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
         verifyAmbiguousVirtualGetAndSourceBudgetBoundary(pid, path);
+        verifyNullVirtualIdentityBeforePagination(pid, extra, path);
         applyTestMetaContext(); resources.withdraw(root.code(), 1);
         assertThat(resources.active(testTenant.getId(), contract.code())).contains(contract);
         for (String unavailable : List.of("/api/open/v1/resources/" + contract.code(), path)) {
@@ -1013,6 +1014,77 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
                     .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.pid").value(pid))
                     .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.name").value("Root A Renamed"));
         }
+    }
+
+    private void verifyNullVirtualIdentityBeforePagination(String validPid, String missingPid, String healthyPath) throws Exception {
+        applyTestMetaContext();
+        String suffix = UniqueIdGenerator.generate().toLowerCase();
+        var source = createQuery("null_identity_source_" + suffix, "mt_" + root.modelCode() + " a", List.of(
+                nqField("pid", "NULLIF(a.pid, '" + missingPid + "')", "string"),
+                nqField("name", "a.name", "string"), nqField("zone", "a.zone", "string")));
+        // Two valid identities sort before the null row, so limit=1 must fail before pagination.
+        var counts = fixtureJdbc.queryForMap("SELECT COUNT(*) AS total, COUNT(NULLIF(pid, ?)) AS identified FROM mt_"
+                + root.modelCode() + " WHERE tenant_id = ? AND zone = 'A'", missingPid, principalA.tenantId());
+        assertThat(((Number) counts.get("total")).longValue()).isEqualTo(3L);
+        assertThat(((Number) counts.get("identified")).longValue()).isEqualTo(2L);
+        String modelCode = "null_identity_model_" + suffix;
+        models.saveDefinition(ModelDefinition.builder().code(modelCode).displayName("Null virtual identity source")
+                .sourceType("namedQuery").sourceRef(source.getCode()).primaryKey("pid").status("published")
+                .capabilities(ModelCapabilities.virtualReadOnly()).fields(List.of(
+                        FieldDefinition.builder().code("name").dataType("STRING").displayName("Name").build(),
+                        FieldDefinition.builder().code("zone").dataType("STRING").displayName("Zone").filterable(true).build())).build());
+        var contract = new OpenApiResourceContract("null-identity." + suffix, modelCode, 1, root.operations(), root.scopes(),
+                DataPolicy.INSTALLATION_FILTER, root.fields(), 50, 8, 5000, Set.of(), Map.of(root.modelCode(), root.code()));
+        resources.saveDraft(contract.code(), new OpenApiPublicationService.DraftRequest(0, contract)); resources.publish(contract.code(), 1);
+        resources.grant(principalA.installationPid(), contract.code(), new OpenApiInstallationPolicy(contract.operations(),
+                contract.fields().keySet(), Set.of(), List.of(new OpenApiInstallationPolicy.RowConstraint("zone", List.of("A")))));
+        MetaContext.setContext(principalA.tenantId(), null, principalA.subjectPid(), "machine");
+        try (var machine = MachineDataAccessContext.begin(principalA)) {
+            assertThatThrownBy(() -> publicResources.list(principalA, contract.code(), 1, null, null, null, null))
+                    .isInstanceOf(OpenApiQueryService.QueryExecutionUnavailableException.class)
+                    .hasCauseInstanceOf(com.auraboot.framework.meta.exception.NamedQueryResourceIdentityException.class);
+        } finally { applyTestMetaContext(); }
+        String route = "/api/open/v1/resources/" + contract.code();
+        for (int limit : List.of(1, 50)) {
+            String marker = "null-identity-list-" + limit + "-" + suffix;
+            var response = http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(route)
+                    .param("limit", Integer.toString(limit)).header("Authorization", "Bearer " + tokenA).header("X-Request-Id", marker))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isServiceUnavailable())
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().doesNotExist("ETag"))
+                    .andReturn().getResponse();
+            assertThat(json.readTree(response.getContentAsString())).isEqualTo(json.valueToTree(Map.of(
+                    "success", false, "code", "open_api_query_unavailable", "message", "Published query execution is unavailable")));
+            assertThat(response.getContentAsString()).doesNotContain(validPid, missingPid, source.getCode(), modelCode, "NULLIF", "Private");
+            applyTestMetaContext();
+            var audits = management.listCallAudits(principalA.installationPid(), marker, null, 10);
+            assertThat(audits).hasSize(1); assertThat(audits.getFirst().status()).isEqualTo(503);
+            assertThat(audits.getFirst().operation()).isEqualTo("list"); assertThat(audits.getFirst().resource()).isEqualTo(contract.code());
+            assertThat(audits.getFirst().recordPid()).isNull();
+        }
+        for (boolean missing : List.of(false, true)) {
+            String requestedPid = missing ? missingPid : validPid;
+            String marker = "null-identity-get-" + missing + "-" + suffix;
+            var response = http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(route + "/" + requestedPid)
+                    .header("Authorization", "Bearer " + tokenA).header("X-Request-Id", marker))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().is(missing ? 404 : 200))
+                    .andReturn().getResponse();
+            if (missing) assertThat(response.getHeader("ETag")).isNull();
+            else {
+                assertThat(response.getHeader("ETag")).startsWith("\"").endsWith("\"");
+                assertThat(json.readTree(response.getContentAsString()).path("pid").asText()).isEqualTo(validPid);
+                assertThat(json.readTree(response.getContentAsString()).path("name").asText()).isEqualTo("Root A Renamed");
+            }
+            assertThat(response.getContentAsString()).doesNotContain(source.getCode(), modelCode, "NULLIF", "Private");
+            applyTestMetaContext();
+            var audits = management.listCallAudits(principalA.installationPid(), marker, null, 10);
+            assertThat(audits).hasSize(1); assertThat(audits.getFirst().status()).isEqualTo(missing ? 404 : 200);
+            assertThat(audits.getFirst().operation()).isEqualTo("get"); assertThat(audits.getFirst().resource()).isEqualTo(contract.code());
+            assertThat(audits.getFirst().recordPid()).isEqualTo(requestedPid);
+        }
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(healthyPath)
+                .header("Authorization", "Bearer " + tokenA))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.name").value("Root A Renamed"));
     }
 
     @Test void exhaustedSourceRateBudgetReturnsPublic429AndRecordsTheMachineDenial() throws Exception {
