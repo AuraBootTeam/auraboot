@@ -599,7 +599,7 @@ def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None):
         quota_named_code = named_code + "_quota"
         quota_query = query + ".quota"
         quota_named = human("/api/meta/named-queries", "POST", dict(named_definition,
-            code=quota_named_code, policy={"rateLimitPerMinute": 1}))
+            code=quota_named_code, status="draft", policy={"rateLimitPerMinute": 1}))
         for status in ["testing", "published"]:
             human(f"/api/meta/named-queries/{quota_named['pid']}/status", "PUT", {"status": status})
         quota_source = human(f"/api/open-platform/query-sources/{quota_named_code}")
