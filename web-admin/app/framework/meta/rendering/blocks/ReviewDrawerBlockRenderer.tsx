@@ -1773,7 +1773,10 @@ function DrawerEditForm({
   canEditRef.current = canEdit;
   const permissionEpoch = useRef({ allowed: canEdit, generation: 0 });
   if (permissionEpoch.current.allowed !== canEdit) {
-    permissionEpoch.current = { allowed: canEdit, generation: permissionEpoch.current.generation + 1 };
+    permissionEpoch.current = {
+      allowed: canEdit,
+      generation: permissionEpoch.current.generation + 1,
+    };
   }
   useEffect(() => {
     if (canEdit) return;
@@ -1858,7 +1861,8 @@ function DrawerEditForm({
           reload: isTwoPhase ? [] : Array.isArray(config.reload) ? config.reload : [],
         },
       });
-      if (!canEditRef.current || permissionGeneration !== permissionEpoch.current.generation) return;
+      if (!canEditRef.current || permissionGeneration !== permissionEpoch.current.generation)
+        return;
       if (isTwoPhase) {
         if (!result || typeof result !== 'object') {
           throw new Error(
@@ -1893,7 +1897,8 @@ function DrawerEditForm({
         onOpenChange?.(false);
       }
     } catch (e: any) {
-      if (!canEditRef.current || permissionGeneration !== permissionEpoch.current.generation) return;
+      if (!canEditRef.current || permissionGeneration !== permissionEpoch.current.generation)
+        return;
       setError(e?.message || String(e));
     } finally {
       setSaving(false);
@@ -1933,7 +1938,8 @@ function DrawerEditForm({
           reload: Array.isArray(config.reload) ? config.reload : [],
         },
       });
-      if (!canEditRef.current || permissionGeneration !== permissionEpoch.current.generation) return;
+      if (!canEditRef.current || permissionGeneration !== permissionEpoch.current.generation)
+        return;
       // A delayed reload must not reopen a closed drawer or replace a newly selected row.
       if (isRecordSelected && !isRecordSelected()) return;
       for (const selection of Array.isArray(config.afterConfirmSelections)
@@ -1951,7 +1957,8 @@ function DrawerEditForm({
       setOpen(false);
       onOpenChange?.(false);
     } catch (e: any) {
-      if (!canEditRef.current || permissionGeneration !== permissionEpoch.current.generation) return;
+      if (!canEditRef.current || permissionGeneration !== permissionEpoch.current.generation)
+        return;
       setError(e?.message || String(e));
     } finally {
       setSaving(false);
@@ -2493,6 +2500,9 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
   const candidateDataSource = candidatesConfig.dataSource;
   const exportDataSource = exportConfig.dataSource;
   const contextStateBinding = stateBindingFromExpression(contextExpression);
+  const candidateContextFields = Array.isArray(candidatesConfig.contextFields)
+    ? candidatesConfig.contextFields
+    : [];
   const selectedCandidateFields = Array.isArray(candidatesConfig.selectedFields)
     ? candidatesConfig.selectedFields
     : [];
@@ -2775,6 +2785,9 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
   const decisionFields = Array.isArray(candidatesConfig.decisionFields)
     ? candidatesConfig.decisionFields
     : [];
+  const visibleCandidateContextFields = candidateContextFields.filter(
+    (field: any) => !field.hideWhenEmpty || !isEmptyValue(readFieldValue(record, field)),
+  );
   const summaryBadges = Array.isArray((block as any).summaryBadges)
     ? (block as any).summaryBadges
     : [];
@@ -3151,6 +3164,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                       locale={locale}
                       t={t}
                       title={sourceConfig.resolutionTitle}
+                      fieldLabels={sourceConfig.resolutionLabels}
                     />
                     {sourceCards.length > 0 && (
                       <div
@@ -3628,7 +3642,8 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                   })
                 )}
               </div>
-              {(shouldShowDecisionStatus ||
+              {(visibleCandidateContextFields.length > 0 ||
+                shouldShowDecisionStatus ||
                 (shouldShowSelectedCandidateDetail &&
                   selectedCandidate &&
                   (selectedCandidateFields.length > 0 || selectedCandidateGroups.length > 0))) && (
@@ -3636,6 +3651,16 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                   data-testid="review-drawer-decision-panel"
                   className="bg-subtle border-border max-h-[48%] shrink-0 overflow-auto border-t p-2.5"
                 >
+                  {visibleCandidateContextFields.length > 0 && (
+                    <section data-testid="review-drawer-context-evidence">
+                      <FieldRows
+                        fields={visibleCandidateContextFields}
+                        record={record}
+                        locale={locale}
+                        t={t}
+                      />
+                    </section>
+                  )}
                   {shouldShowDecisionStatus && (
                     <section data-testid="review-drawer-decision-status">
                       <h3 className="text-text text-sm font-semibold">
