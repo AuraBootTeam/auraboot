@@ -14103,7 +14103,7 @@ CREATE TABLE public.ab_plugin_import_history (
     created_by bigint,
     CONSTRAINT chk_import_status CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'parsing'::character varying, 'validating'::character varying, 'previewing'::character varying, 'importing'::character varying, 'success'::character varying, 'failed'::character varying, 'rolled_back'::character varying, 'cancelled'::character varying])::text[]))),
     CONSTRAINT chk_import_type CHECK (((import_type)::text = ANY ((ARRAY['install'::character varying, 'upgrade'::character varying, 'rollback'::character varying])::text[]))),
-    CONSTRAINT chk_source_type CHECK (((source_type)::text = ANY ((ARRAY['json'::character varying, 'zip'::character varying, 'url'::character varying, 'directory'::character varying])::text[])))
+    CONSTRAINT chk_source_type CHECK (((source_type)::text = ANY ((ARRAY['json'::character varying, 'zip'::character varying, 'url'::character varying, 'directory'::character varying, 'source'::character varying])::text[])))
 );
 
 

@@ -125,7 +125,10 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
         try(var machine=MachineDataAccessContext.begin(principal)) {return publicQueries.execute(principal,contract.code(),new OpenApiQueryService.ExecuteRequest(Map.of("zone",zone),10,null));}
         finally {if(previous==null)MetaContext.clear();else MetaContext.restore(previous);}
     }
-    @Test void pluginQueryPublicationUsesRealSourcePinsGrantsAndWithdrawal() throws Exception {
+    @org.junit.jupiter.params.ParameterizedTest(name = "new NamedQuery publication via {0}")
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"json", "directory", "zip", "source"})
+    void pluginQueryPublicationUsesRealSourcePinsGrantsAndWithdrawal(String entry,
+            @org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
         String suffix = UniqueIdGenerator.generate().toLowerCase();
         var pluginManifest = com.auraboot.framework.plugin.dto.PluginManifest.builder().pluginId("com.example.query-" + suffix)
                 .namespace("query_plugin_" + suffix).version("1.0.0").displayName("Public query plugin").build();
@@ -134,18 +137,50 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
                 .version(pluginManifest.getVersion()).displayName(pluginManifest.getDisplayName()).manifest(pluginManifest)
                 .status("installed").deletedFlag(false).build();
         assertThat(plugins.insert(plugin)).isEqualTo(1);
-        var contract = new OpenApiQueryContract("plugin." + suffix, rows.queryCode(), 1, rows.sourceFingerprint(),
+        String importedQueryCode = "plugin_query_" + suffix;
+        var expectedSource = json.readValue(json.writeValueAsBytes(rowsDefinition), NamedQueryDTO.class);
+        expectedSource.setCode(importedQueryCode);
+        expectedSource.setCurrentVersion(0);
+        var declaredFields = rowsDefinition.getFields().stream().map(field -> {
+            var declared = new NamedQueryFieldRequest();
+            declared.setFieldCode(field.getFieldCode()); declared.setColumnExpr(field.getColumnExpr());
+            declared.setDataType(field.getDataType()); declared.setOperators(field.getOperators() == null ? null : Arrays.asList(field.getOperators()));
+            declared.setSortable(field.getSortable()); declared.setSearchable(field.getSearchable());
+            declared.setSortOrder(field.getSortOrder());
+            return declared;
+        }).toList();
+        var declaredQuery = com.auraboot.framework.plugin.dto.imports.NamedQueryDefinitionDTO.builder()
+                .code(importedQueryCode).title("New plugin query source").resourceCode(rowsDefinition.getResourceCode())
+                .actionCode(rowsDefinition.getActionCode()).fromSql(rowsDefinition.getFromSql())
+                .baseWhere(rowsDefinition.getBaseWhere()).defaultOrder(rowsDefinition.getDefaultOrder())
+                .status("published").fields(declaredFields).policy(rowsDefinition.getPolicy()).build();
+        assertThatThrownBy(() -> queries.describeExecution(importedQueryCode))
+                .as("the plugin query source must not exist before this import")
+                .isInstanceOf(com.auraboot.framework.meta.exception.MetaServiceException.class).hasMessageContaining("not found");
+        var contract = new OpenApiQueryContract("plugin." + suffix, importedQueryCode, 1,
+                com.auraboot.framework.meta.util.NamedQueryDefinitionFingerprint.of(expectedSource),
                 rows.scopes(), rows.sourceResources(), rows.parameters(), rows.fields(), rows.maxPageSize(),
                 rows.maxRows(), rows.timeoutMs(), rows.maxConcurrent());
         var manifest = new com.auraboot.framework.plugin.dto.imports.PluginManifestExtended();
         manifest.setPluginId(plugin.getPluginId()); manifest.setNamespace(plugin.getNamespace()); manifest.setVersion("1.0.0");
+        manifest.setNamedQueries(List.of(declaredQuery));
         manifest.setPublicQueries(List.of(contract));
         var request = new com.auraboot.framework.plugin.dto.imports.ImportRequest();
-        var preview = pluginImports.parseJson(json.writeValueAsString(manifest), "public-query-plugin.json");
+        var preview = parsePublicQueryFixture(manifest, entry, dir);
         assertThat(preview.isValid()).as("query import preview: %s", preview.getErrors()).isTrue();
         var imported = pluginImports.execute(preview.getImportId(), request);
         assertThat(imported.isSuccess()).as("query import failed: %s", imported.getErrorMessage()).isTrue();
+        assertThat(imported.getResourceCounts().get("NAMED_QUERY")).containsEntry("CREATE", 1);
         assertThat(imported.getResourceCounts().get("PUBLIC_QUERY")).containsEntry("CREATE", 1);
+        var actualSource = queries.describeExecution(importedQueryCode);
+        assertThat(actualSource.definition().getStatus()).isEqualTo("published");
+        assertThat(actualSource.definition().getPid()).isNotEqualTo(rowsDefinition.getPid());
+        assertThat(actualSource.fingerprint()).isEqualTo(contract.sourceFingerprint());
+        var sourceOwner = pluginResources.findByTypeAndCode(testTenant.getId(),
+                com.auraboot.framework.plugin.dto.imports.ResourceType.NAMED_QUERY.code(), importedQueryCode);
+        assertThat(sourceOwner.getPluginPid()).isEqualTo(plugin.getPid());
+        assertThat(sourceOwner.getImportId()).isEqualTo(preview.getImportId());
+        assertThat(sourceOwner.getResourcePid()).isEqualTo(actualSource.definition().getPid());
         assertThat(publications.active(testTenant.getId(), contract.code())).contains(contract);
         assertThatThrownBy(() -> run(principalA, contract, "A")).isInstanceOf(AccessDeniedException.class);
         publications.grant(principalA.installationPid(), contract.code(), new OpenApiQueryPolicy(contract.fields().keySet()));
@@ -177,6 +212,33 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
                 plugin.getPid(), UniqueIdGenerator.generate(), testTenant.getId());
         assertThat(publicationMapper.resourceSnapshots(testTenant.getId(), contract.storageCode())).hasSize(1);
         assertThat(run(principalA, contract, "A").get("items").toString()).contains("Child A").doesNotContain("Forbidden sibling", "Root B");
+    }
+
+    private com.auraboot.framework.plugin.dto.imports.ImportPreviewResult parsePublicQueryFixture(
+            com.auraboot.framework.plugin.dto.imports.PluginManifestExtended manifest, String entry,
+            java.nio.file.Path dir) throws Exception {
+        if ("json".equals(entry)) return pluginImports.parseJson(json.writeValueAsString(manifest), "public-query-plugin.json");
+        var fileManifest = (com.fasterxml.jackson.databind.node.ObjectNode) json.valueToTree(manifest);
+        var contracts = fileManifest.remove("publicQueries");
+        fileManifest.putObject("resourceDirs").put("publicQueries", "config/public-queries.json");
+        java.nio.file.Files.createDirectories(dir.resolve("config"));
+        java.nio.file.Files.writeString(dir.resolve("plugin.json"), json.writeValueAsString(fileManifest));
+        java.nio.file.Files.writeString(dir.resolve("config/public-queries.json"), json.writeValueAsString(contracts));
+        return switch (entry) {
+            case "directory" -> pluginImports.parseDirectory(dir.toString());
+            case "source" -> pluginImports.parseSource(new com.auraboot.framework.plugin.source.FileSystemPluginSource(dir));
+            case "zip" -> {
+                var bytes = new java.io.ByteArrayOutputStream();
+                try (var zip = new java.util.zip.ZipOutputStream(bytes)) {
+                    for (String file : List.of("plugin.json", "config/public-queries.json")) {
+                        zip.putNextEntry(new java.util.zip.ZipEntry(file));
+                        zip.write(java.nio.file.Files.readAllBytes(dir.resolve(file))); zip.closeEntry();
+                    }
+                }
+                yield pluginImports.parse(new java.io.ByteArrayInputStream(bytes.toByteArray()), "public-query-plugin.zip");
+            }
+            default -> throw new IllegalArgumentException("Unknown fixture import entry: " + entry);
+        };
     }
 
     @Test void administrationMetadataPinsTheExecutionSourceAndOffersOnlyCurrentListPublications() throws Exception {

@@ -152,8 +152,10 @@ class PluginImportTwoPhaseReferenceIntegrationTest extends BaseIntegrationTest {
                 .as("sweep must flag tpc_dangling_role -> tp_nonexistent_permission, got: %s", dangling)
                 .anyMatch(s -> s.contains("tpc_dangling_role") && s.contains("tp_nonexistent_permission"));
     }
-    @Test
-    void publicResourcePublishesOnlyAfterImportedModelAndBindingsAreReady(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+    @org.junit.jupiter.params.ParameterizedTest(name = "public publication import and rollback via {0}")
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"directory", "zip", "source"})
+    void publicResourcePublishesOnlyAfterImportedModelAndBindingsAreReady(String entry,
+            @org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
         grantCommittedPermissionToTestRole("sys.connector.update", "system", "connector", "update", "Manage public publications");
         String suffix = com.auraboot.framework.common.util.UniqueIdGenerator.generate().toLowerCase();
         String namespace = "pub" + suffix;
@@ -169,9 +171,10 @@ class PluginImportTwoPhaseReferenceIntegrationTest extends BaseIntegrationTest {
             contract.put("code", publicCode).put("modelCode", modelCode);
             manifest.putArray("publicResources").add(contract);
         }
-        java.nio.file.Files.writeString(dir.resolve("plugin.json"), json.writeValueAsString(manifest));
-        var preview = pluginImportService.parseDirectory(dir.toString());
+        writePublicFixture(dir, manifest);
+        var preview = parsePublicFixture(dir, entry);
         assertThat(preview.isValid()).as("public import preview errors: %s", preview.getErrors()).isTrue();
+        assertThat(histories.findByImportId(preview.getImportId()).getSourceType()).isEqualTo(entry);
         try {
             com.auraboot.framework.application.tenant.MetaContext.setContext(testTenant.getId() + 1_000_000L,
                     testUser.getId(), testUser.getPid(), testUser.getUserName());
@@ -210,8 +213,8 @@ class PluginImportTwoPhaseReferenceIntegrationTest extends BaseIntegrationTest {
         manifest.put("version", "2.0.0").put("displayName", "Changed public import metadata").put("description", "Upgrade description");
         ((com.fasterxml.jackson.databind.node.ObjectNode) manifest.get("publicResources").get(0))
                 .put("schemaVersion", 2).put("maxPageSize", 30);
-        java.nio.file.Files.writeString(dir.resolve("plugin.json"), json.writeValueAsString(manifest));
-        var upgradePreview = pluginImportService.parseDirectory(dir.toString());
+        writePublicFixture(dir, manifest);
+        var upgradePreview = parsePublicFixture(dir, entry);
         assertThat(upgradePreview.isValid()).isTrue();
         var upgraded = pluginImportService.execute(upgradePreview.getImportId(), new ImportRequest());
         assertThat(upgraded.isSuccess()).as("public upgrade failed: %s", upgraded.getErrorMessage()).isTrue();
@@ -241,8 +244,8 @@ class PluginImportTwoPhaseReferenceIntegrationTest extends BaseIntegrationTest {
         manifest.put("version", "3.0.0");
         ((com.fasterxml.jackson.databind.node.ObjectNode) manifest.get("publicResources").get(0))
                 .put("schemaVersion", 1).put("maxPageSize", 25);
-        java.nio.file.Files.writeString(dir.resolve("plugin.json"), json.writeValueAsString(manifest));
-        var unchangedPreview = pluginImportService.parseDirectory(dir.toString());
+        writePublicFixture(dir, manifest);
+        var unchangedPreview = parsePublicFixture(dir, entry);
         assertThat(unchangedPreview.isValid()).isTrue();
         var unchanged = pluginImportService.execute(unchangedPreview.getImportId(), new ImportRequest());
         assertThat(unchanged.isSuccess()).isTrue();
@@ -293,6 +296,34 @@ class PluginImportTwoPhaseReferenceIntegrationTest extends BaseIntegrationTest {
         assertThat(restoredOwner.getLastSyncVersion()).isEqualTo("1.0.0");
         assertThat(publications.active(testTenant.getId(), publicCode).orElseThrow().schemaVersion()).isEqualTo(1);
         assertThat(publications.snapshots(testTenant.getId(), publicCode)).hasSize(2);
+    }
+
+    private void writePublicFixture(java.nio.file.Path dir, com.fasterxml.jackson.databind.node.ObjectNode manifest) throws Exception {
+        var fileManifest = manifest.deepCopy();
+        var contracts = fileManifest.remove("publicResources");
+        fileManifest.putObject("resourceDirs").put("publicResources", "config/public-resources.json");
+        java.nio.file.Files.createDirectories(dir.resolve("config"));
+        java.nio.file.Files.writeString(dir.resolve("config/public-resources.json"), json.writeValueAsString(contracts));
+        java.nio.file.Files.writeString(dir.resolve("plugin.json"), json.writeValueAsString(fileManifest));
+    }
+
+    private ImportPreviewResult parsePublicFixture(java.nio.file.Path dir, String entry) throws Exception {
+        return switch (entry) {
+            case "directory" -> pluginImportService.parseDirectory(dir.toString());
+            case "source" -> pluginImportService.parseSource(new com.auraboot.framework.plugin.source.FileSystemPluginSource(dir));
+            case "zip" -> {
+                var bytes = new java.io.ByteArrayOutputStream();
+                try (var zip = new java.util.zip.ZipOutputStream(bytes)) {
+                    for (String file : java.util.List.of("plugin.json", "config/public-resources.json")) {
+                        zip.putNextEntry(new java.util.zip.ZipEntry(file));
+                        zip.write(java.nio.file.Files.readAllBytes(dir.resolve(file)));
+                        zip.closeEntry();
+                    }
+                }
+                yield pluginImportService.parse(new java.io.ByteArrayInputStream(bytes.toByteArray()), "public-import.zip");
+            }
+            default -> throw new IllegalArgumentException("Unknown fixture import entry: " + entry);
+        };
     }
 
 }
