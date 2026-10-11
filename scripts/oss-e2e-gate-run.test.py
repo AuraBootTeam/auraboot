@@ -39,6 +39,12 @@ const path = require('node:path');
 const args = process.argv.slice(2);
 if (args[0] === 'control') process.exit(0);
 if (process.env.RECORD_AURA === '1') fs.appendFileSync(process.env.CALLS, args.join(' ') + '\\n');
+if (args[1] === 'verify') process.exit(Number(process.env.VERIFY_EXIT || '0'));
+if (args[1] === 'show') {
+  console.log(JSON.stringify({allocation: {name: 'owned-new', repo: process.env.RUNTIME_REPO || 'auraboot', slot: 239},
+    sources: [{key: 'core', expected: {root: process.env.RUNTIME_CORE || path.join(process.env.AURA_WORKSPACE_ROOT, 'auraboot')}}]}));
+  process.exit(0);
+}
 if (args[1] === 'list') console.log('name repo slot\\n' + (process.env.EXISTING_RUNTIME || ''));
 else if (args[1] === 'evidence' && args[2] === 'begin') {
   const dir = path.join(process.env.AURA_WORKSPACE_ROOT, '.workspace/evidence/fixture-round');
@@ -84,8 +90,8 @@ esac
         p.write_text(text)
         p.chmod(0o755)
 
-    def run_gate(self, **env):
-        return subprocess.run(['bash', str(self.repo / 'scripts/oss-e2e-gate-run.sh'), '--name', 'owned-new', '--slot', '239'],
+    def run_gate(self, *, reuse=False, **env):
+        return subprocess.run(['bash', str(self.repo / 'scripts/oss-e2e-gate-run.sh'), '--name', 'owned-new', '--slot', '239'] + (['--reuse-runtime'] if reuse else []),
                               env={**self.env, **env}, capture_output=True, text=True, timeout=10)
 
     def calls(self):
@@ -135,6 +141,26 @@ esac
         r = self.run_gate(EXISTING_RUNTIME='owned-new auraboot 239\n')
         self.assertEqual(r.returncode, 2)
         self.assertEqual(self.calls(), '')
+
+    def test_explicit_reuse_verifies_existing_runtime_and_runs_fixed_gate_without_up(self):
+        r = self.run_gate(reuse=True, EXISTING_RUNTIME='owned-new auraboot 239\n', RECORD_AURA='1')
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        calls = self.calls()
+        self.assertIn('runtime verify owned-new', calls)
+        self.assertIn('--list --reporter=json', calls)
+        self.assertIn('--retries=0', calls)
+        self.assertFalse(any(line.startswith(('up ', 'down ', 'destroy ')) for line in calls.splitlines()))
+
+    def test_reuse_rejects_unknown_slot_mismatch_or_failed_identity_before_browser(self):
+        for env in [{}, {'EXISTING_RUNTIME':'owned-new auraboot 240\n'},
+                    {'EXISTING_RUNTIME':'owned-new auraboot 239\n','VERIFY_EXIT':'1'},
+                    {'EXISTING_RUNTIME':'owned-new auraboot 239\n','RUNTIME_REPO':'enterprise'},
+                    {'EXISTING_RUNTIME':'owned-new auraboot 239\n','RUNTIME_CORE':str(self.root)}]:
+            with self.subTest(env=env):
+                r = self.run_gate(reuse=True, **env)
+                self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+                self.assertNotIn('playwright', self.calls())
+                self.assertNotIn('up ', self.calls())
 
     def test_existing_evidence_is_not_overwritten(self):
         p = self.root / '.workspace/golden/owned-new'

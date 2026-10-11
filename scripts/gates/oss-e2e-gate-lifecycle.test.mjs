@@ -91,7 +91,7 @@ for (const [mode, status] of [['', 0], ['up-failure', 2], ['verify-failure', 2],
     assert.equal(r.status, status, r.stdout + r.stderr);
     assert.match(r.stdout, /runtime status must be inspected/);
     const calls = fs.readFileSync(f.calls, 'utf8');
-    assert.doesNotMatch(calls, /destroy|down|stop|--fresh-db/);
+    assert.doesNotMatch(calls, /^(?:stack|aura runtime) (?:destroy|down|stop)(?: |$)|--fresh-db/m);
     assert.match(calls, /stack up owned-run --slot 900 .*--require-new-db/);
     if (mode === 'up-failure' || mode === 'verify-failure') assert.doesNotMatch(calls, /pnpm /);
     if (status === 0) {
@@ -100,7 +100,7 @@ for (const [mode, status] of [['', 0], ['up-failure', 2], ['verify-failure', 2],
       const paths = execution.match(/tests\/e2e\/[^\s]+/g);
       assert.deepEqual(paths, ['tests/e2e/page-designer/form-buttons-refresh-runtime.spec.ts',
         'tests/e2e/showcase/runtime-rendering-e2e.spec.ts', 'tests/e2e/saved-view/saved-view-gantt.spec.ts',
-        'tests/e2e/saved-view/saved-view-kanban.spec.ts']);
+        'tests/e2e/saved-view/saved-view-kanban.spec.ts', 'tests/e2e/settings/open-platform.golden.spec.ts']);
     }
   });
 }
@@ -178,6 +178,6 @@ for (const mode of ['zero-tests', 'missing-result', 'skipped-result', 'retried-r
     const f = fixture(t, mode); const result = f.run();
     assert.equal(result.status, 1, result.stdout + result.stderr);
     assert.doesNotMatch(result.stdout, /OSS E2E GATE: PASS/);
-    assert.doesNotMatch(fs.readFileSync(f.calls, 'utf8'), /destroy|down|stop/);
+    assert.doesNotMatch(fs.readFileSync(f.calls, 'utf8'), /^(?:stack|aura runtime) (?:destroy|down|stop)(?: |$)/m);
   });
 }

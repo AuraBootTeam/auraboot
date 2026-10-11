@@ -51,6 +51,7 @@
 #                           enterprise/deep exclusions). Use for a release sweep.
 #                    <dir>  one or more explicit tests/e2e/<dir>/ paths — repeat
 #                           --scope, or list them after --scope, to override.
+#     --reuse-runtime  verify and use a caller-provisioned existing runtime; no reset or up.
 #     --keep       compatibility flag; every run retains the stack for inspection.
 #     --repeat K   run the slice K times (flakiness check; default: 1)
 #     --workers N  Playwright worker count (default: Playwright's own, PW_WORKERS
@@ -93,6 +94,7 @@ SCOPE_MODE="slice"
 SCOPE_DIRS=()      # explicit override paths
 REPEAT=1
 WORKERS=""         # empty => Playwright base default (PW_WORKERS||4)
+REUSE_RUNTIME=0
 
 # The curated, currently-green regression areas. These are the areas the recent
 # OSS E2E survey work hardened; `slice` runs them minus their *-deep specs (which
@@ -131,6 +133,7 @@ while [[ $# -gt 0 ]]; do
         *)          SCOPE_MODE="dirs"; SCOPE_DIRS+=("$2"); shift 2;;
       esac
       ;;
+    --reuse-runtime) REUSE_RUNTIME=1; shift;;
     --keep)   shift;;
     -h|--help) awk 'NR>=2 && /^#/{sub(/^# ?/,""); print; next} NR>=2{exit}' "${BASH_SOURCE[0]}"; exit 0;;
     --) shift; while [[ $# -gt 0 ]]; do SCOPE_MODE="dirs"; SCOPE_DIRS+=("$1"); shift; done;;
@@ -146,7 +149,9 @@ done
 [[ "$NAME" =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]*$ ]] || die "invalid runtime name"
 [[ -z "$SLOT" || "$SLOT" =~ ^[1-9][0-9]*$ ]] || die "slot must be a positive integer"
 STATE="${AURA_WORKSPACE_STATE_DIR:-$WORKSPACE/.workspace}"
-[[ ! -e "$STATE/env/$NAME.env" && ! -e "$STATE/golden/$NAME" ]] || die_env "runtime state already exists for $NAME"
+if [[ "$REUSE_RUNTIME" == 0 ]]; then
+  [[ ! -e "$STATE/env/$NAME.env" && ! -e "$STATE/golden/$NAME" ]] || die_env "runtime state already exists for $NAME"
+fi
 mkdir -p "$STATE" || die_env "verification state directory is not writable"
 node "$SCRIPT_DIR/dev/oss-disk-preflight.mjs" "$STATE" || die_env "insufficient or unreadable verification storage; no allocation created"
 
@@ -183,6 +188,23 @@ registered_slot_for_name() {
   printf '%s\n' "$RUNTIME_LIST" | awk -v name="$NAME" 'NR > 1 && $1 == name { print $3; exit }'
 }
 registered_slot="$(registered_slot_for_name)"
+if [[ "$REUSE_RUNTIME" == 1 ]]; then
+  [[ -n "$registered_slot" ]] || die_env "explicit reuse requires a registered runtime"
+  [[ -z "$SLOT" || "$SLOT" == "$registered_slot" ]] || die_env "reuse slot does not match registered runtime"
+  SLOT="$registered_slot"
+  "$DEV" runtime show "$NAME" --json | node -e '
+    const fs = require("node:fs");
+    try {
+      const r = JSON.parse(fs.readFileSync(0, "utf8"));
+      const [name, slot, root] = process.argv.slice(1);
+      const sources = (r.sources || []).filter(s => ["core", "auraboot"].includes(s.key));
+      if (r.allocation?.repo !== "auraboot" || r.allocation?.name !== name ||
+          String(r.allocation?.slot) !== slot || sources.length !== 1 ||
+          fs.realpathSync(sources[0].expected.root) !== fs.realpathSync(root)) process.exit(1);
+    } catch { process.exit(1); }
+  ' "$NAME" "$SLOT" "$REPO_ROOT" || die_env "retained runtime is not bound to this Core checkout"
+  "$DEV" runtime verify "$NAME" || die_env "retained runtime source/artifact/ownership verification failed"
+else
 [[ -z "$registered_slot" ]] || die_env "runtime '$NAME' already exists; use a new attempt name and unused slot"
 [[ ! -e "$STATE/golden/$NAME" ]] || die_env "golden state '$NAME' already exists; retained evidence will not be overwritten"
 if [[ -z "$SLOT" ]]; then
@@ -192,6 +214,7 @@ if [[ -z "$SLOT" ]]; then
   [[ -n "$SLOT" ]] || die_env "no free slot; pass --slot N explicitly"
 elif slot_in_use "$SLOT"; then
   die_env "slot $SLOT is occupied; no process will be stopped"
+fi
 fi
 log "retaining verification runtime '$NAME' and its database on every exit"
 
@@ -221,11 +244,16 @@ echo "=============================================================="
 # Backend-side contract set BEFORE the stack starts: exported here so it is plain
 # that the backend booted with it, not asserted after the fact.
 export AGENT_LLM_STUB_MODE=true
+if [[ "$REUSE_RUNTIME" == 1 ]]; then
+  log "1/4 verified caller-provisioned runtime: $NAME slot=$SLOT"
+else
 log "1/4 new isolated stack: $NAME slot=$SLOT"
 # Warm auth is required by the unchanged OSS slice.
 "$GS" up "$NAME" --slot "$SLOT" --ttl 3h --runtime-mode verification --require-new-db --plugin-profile demo \
   || die_env "stack bring-up failed — inspect retained golden-stack logs"
 "$DEV" runtime verify "$NAME" || die_env "runtime ownership verification failed"
+
+fi
 
 # The demo profile does not carry the internal test-fixtures plugin, and ~60 OSS
 # specs (incl. saved-view / automation) reference e2et_* models. Import it
