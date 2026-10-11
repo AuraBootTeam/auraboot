@@ -936,11 +936,94 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
         } finally { applyTestMetaContext(); }
     }
 
-    @Test void revocationIsEnforcedAgainstAnAlreadyAuthenticatedPrincipal() {
-        management.revokeCredential(principal.installationPid(), credentialPid);
-        try (var machine = MachineDataAccessContext.begin(principal)) {
-            assertThatThrownBy(() -> authorizer.authorize(principal, contract.code(), Operation.GET)).isInstanceOf(AccessDeniedException.class);
-        }
+    @Test
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void revocationIsEnforcedAgainstAnAlreadyAuthenticatedPrincipal() throws Exception {
+        record Replay(Operation operation, String pid, String key, String ifMatch,
+                      Map<String, Object> input, OpenApiResourceService.Result original) { }
+        String origin = "credential-" + UniqueIdGenerator.generate();
+        String collection = "/api/open/v1/resources/" + contract.code();
+        var cases = new java.util.ArrayList<Replay>();
+        try {
+            MetaContext.runWithCommandPermitScope("ALL", () -> data.update(contract.modelCode(), deniedPid, Map.of("zone", "A")));
+            publishEvents();
+            MetaContext.setContext(principal.tenantId(), null, principal.subjectPid(), "machine");
+            try (var machine = MachineDataAccessContext.begin(principal)) {
+                var createInput = Map.<String, Object>of("name", "Revocation create", "zone", "A");
+                var created = resources.write(principal, contract.code(), Operation.CREATE, null, origin + "-create", null, createInput);
+                assertThat(created.status()).isEqualTo(201);
+                cases.add(new Replay(Operation.CREATE, null, origin + "-create", null, createInput, created));
+                var beforeUpdate = resources.get(principal, contract.code(), allowedPid);
+                var updateInput = Map.<String, Object>of("name", "Revocation update");
+                var updated = resources.write(principal, contract.code(), Operation.UPDATE, allowedPid, origin + "-update", beforeUpdate.headers().get("ETag"), updateInput);
+                assertThat(updated.status()).isEqualTo(200);
+                cases.add(new Replay(Operation.UPDATE, allowedPid, origin + "-update", beforeUpdate.headers().get("ETag"), updateInput, updated));
+                var beforeDelete = resources.get(principal, contract.code(), deniedPid);
+                var deleted = resources.write(principal, contract.code(), Operation.DELETE, deniedPid, origin + "-delete", beforeDelete.headers().get("ETag"), null);
+                assertThat(deleted.status()).isEqualTo(204);
+                cases.add(new Replay(Operation.DELETE, deniedPid, origin + "-delete", beforeDelete.headers().get("ETag"), null, deleted));
+                for (var replay : cases) {
+                    var result = resources.write(principal, contract.code(), replay.operation(), replay.pid(), replay.key(), replay.ifMatch(), replay.input());
+                    assertThat(result.replay()).isTrue();
+                    assertThat(result.status()).isEqualTo(replay.original().status());
+                    assertThat(result.body()).isEqualTo(replay.original().body());
+                    assertThat(result.headers()).isEqualTo(replay.original().headers());
+                }
+            }
+            applyTestMetaContext();
+            assertThat(sourceEvents()).hasSize(3);
+            management.revokeCredential(principal.installationPid(), credentialPid);
+            var checks = new java.util.ArrayList<org.junit.jupiter.api.function.Executable>();
+            checks.add(() -> {
+                try (var machine = MachineDataAccessContext.begin(principal)) {
+                    assertThatThrownBy(() -> authorizer.authorize(principal, contract.code(), Operation.GET)).isInstanceOf(AccessDeniedException.class);
+                }
+            });
+            for (var replay : cases) {
+                checks.add(() -> {
+                    MetaContext.setContext(principal.tenantId(), null, principal.subjectPid(), "machine");
+                    try (var machine = MachineDataAccessContext.begin(principal)) {
+                        assertThatThrownBy(() -> resources.write(principal, contract.code(), replay.operation(), replay.pid(), replay.key(), replay.ifMatch(), replay.input()))
+                                .isInstanceOf(AccessDeniedException.class);
+                    } finally { applyTestMetaContext(); }
+                });
+                checks.add(() -> {
+                    String method = replay.operation() == Operation.CREATE ? "POST" : replay.operation() == Operation.UPDATE ? "PATCH" : "DELETE";
+                    String path = replay.pid() == null ? collection : collection + "/" + replay.pid();
+                    var request = org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request(org.springframework.http.HttpMethod.valueOf(method), path)
+                            .header("Authorization", "Bearer " + rawToken).header("X-Request-Id", origin + "-denied-" + replay.operation().code())
+                            .header("Idempotency-Key", replay.key());
+                    if (replay.ifMatch() != null) request.header("If-Match", replay.ifMatch());
+                    if (replay.input() != null) request.contentType("application/json").content(json.writeValueAsString(replay.input()));
+                    try {
+                        var response = http.perform(request).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isUnauthorized()).andReturn().getResponse();
+                        assertThat(json.readTree(response.getContentAsString())).isEqualTo(json.valueToTree(Map.of("success", false, "code", "invalid_token", "message", "invalid_token")));
+                        assertThat(response.getHeader("ETag")).isNull();
+                        assertThat(response.getHeader("Location")).isNull();
+                        assertThat(response.getHeader("Idempotent-Replay")).isNull();
+                        assertThat(response.getContentAsString()).doesNotContain(rawToken, "Revocation create", "Revocation update");
+                    } finally { applyTestMetaContext(); }
+                });
+            }
+            org.junit.jupiter.api.Assertions.assertAll("Revoked credential cannot recover any stored write result", checks);
+            applyTestMetaContext();
+            assertThat(eventJdbc.queryForObject("SELECT COUNT(*) FROM ab_application_access_token WHERE tenant_id=? AND pid=? AND revoked_at IS NOT NULL",
+                    Long.class, principal.tenantId(), principal.tokenPid())).isEqualTo(1);
+            assertThat(eventJdbc.queryForObject("SELECT COUNT(*) FROM ab_open_api_idempotency WHERE tenant_id=? AND route_code LIKE ? AND status='completed'",
+                    Long.class, principal.tenantId(), "resource:" + contract.code() + ":%")).isEqualTo(3);
+            var createdRow = MetaContext.runWithCommandPermitScope("ALL", () -> data.getById(contract.modelCode(), cases.getFirst().original().body().get("pid").toString()));
+            assertThat(createdRow).containsEntry("name", "Revocation create").containsEntry("zone", "A");
+            assertThat(((Number) createdRow.get("row_version")).longValue()).isEqualTo(1);
+            var updatedRow = MetaContext.runWithCommandPermitScope("ALL", () -> data.getById(contract.modelCode(), allowedPid));
+            assertThat(updatedRow).containsEntry("name", "Revocation update").containsEntry("zone", "A");
+            assertThat(((Number) updatedRow.get("row_version")).longValue()).isEqualTo(2);
+            assertThatThrownBy(() -> MetaContext.runWithCommandPermitScope("ALL", () -> data.getById(contract.modelCode(), deniedPid)))
+                    .isInstanceOf(com.auraboot.framework.meta.exception.MetaRecordNotFoundException.class);
+            assertThat(sourceEvents()).hasSize(3);
+            for (var replay : cases) {
+                assertThat(management.listCallAudits(principal.installationPid(), origin + "-denied-" + replay.operation().code(), null, 20)).isEmpty();
+            }
+        } finally { cleanupCommittedFixture(); }
     }
 
     @Test void creationChecksBothFieldAndProspectiveRowAuthorityBeforeInsert() {
