@@ -35,6 +35,20 @@ test.beforeAll(async () => {
 });
 
 test.describe('Dynamic resource publication journey', () => {
+  let cleanupCodes: string[] = [];
+  test.afterEach(async ({ page }) => {
+    if (!cleanupCodes.length) return;
+    // Failure cleanup owns only this test's publications; it cannot satisfy any UI assertion.
+    const response = await page.request.get(`${WEB_BASE_URL}/api/open-platform/publications`);
+    expect(response.status()).toBe(200); const catalog = await response.json(); expect(String(catalog.code)).toBe('0');
+    for (const code of [...cleanupCodes].reverse()) {
+      const view = catalog.data.find((entry: { code: string }) => entry.code === code);
+      if (!view || view.status !== 'published') continue;
+      const withdrawn = await page.request.post(`${WEB_BASE_URL}/api/open-platform/publications/${code}/withdraw`,
+        { data: { expectedRevision: view.draftRevision } });
+      expect(withdrawn.status()).toBe(200); expect(String((await withdrawn.json()).code)).toBe('0');
+    }
+  });
   test.setTimeout(180_000);
   test.describe.configure({ retries: 0 });
   test.use({ storageState: { cookies: [], origins: [] }, locale: 'zh-CN', viewport: { width: 1440, height: 1000 } });
@@ -45,6 +59,7 @@ test.describe('Dynamic resource publication journey', () => {
     const modelCode = `dop_ui_${suffix}`;
     const modelName = `接入验证零件 ${suffix}`;
     const resourceCode = `ui.parts.${suffix}`;
+    cleanupCodes = [resourceCode, `ui.virtual-parts.${suffix}`];
     // Model authoring is fixture setup. Every publication mutation below is driven by the real UI.
     const createdResponse = await page.request.post(`${WEB_BASE_URL}/api/meta/models`, { data: {
       code: modelCode, displayName: modelName, tableName: modelCode, modelType: 'entity', sourceType: 'physical',
@@ -217,7 +232,9 @@ test.describe('Dynamic resource publication journey', () => {
     await page.getByLabel('所需权限', { exact: true }).nth(0).fill('dop.ui:list');
     await page.getByLabel('所需权限', { exact: true }).nth(1).fill('dop.ui:get');
     await page.getByLabel('机器数据范围', { exact: true }).selectOption('tenant_wide');
-    await page.getByTestId('publication-field-name').getByLabel('零件名称', { exact: true }).check();
+    const virtualNameField = page.getByTestId('publication-field-name');
+    await virtualNameField.getByLabel('零件名称', { exact: true }).check();
+    await virtualNameField.getByLabel('对外字段名称', { exact: true }).fill('name');
     await snapshot('publication-virtual-source');
     const virtualSaved = page.waitForResponse(response => response.url().endsWith(`/publications/${virtualCode}/draft`) && response.request().method() === 'PUT');
     await page.getByRole('button', { name: '保存并校验草稿', exact: true }).click();
