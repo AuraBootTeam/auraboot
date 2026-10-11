@@ -346,13 +346,9 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
             assertThat(failed.getResponseStatus()).isEqualTo(503);
             assertThat(failed.getNextRetryAt()).isAfterOrEqualTo(before.plusMillis(500)).isBefore(after.plusSeconds(1));
             assertThat(failed.getLeaseToken()).isNull();
-            var recoveredClaim = new java.util.concurrent.atomic.AtomicReference<com.auraboot.framework.webhook.entity.WebhookDeliveryLog>();
-            org.awaitility.Awaitility.await().pollInSameThread().atMost(java.time.Duration.ofSeconds(5)).until(() -> {
-                deliveries.claimReady(50, "jitter-worker", "jitter-second-claim", Instant.now().plusSeconds(30))
-                        .stream().filter(log -> source.eventId().equals(log.getEventId())).findFirst().ifPresent(recoveredClaim::set);
-                return recoveredClaim.get() != null;
-            });
-            webhookDispatcher.processClaimed(recoveredClaim.get());
+            // The scheduled production worker owns recovery; another claimant need not win its lease.
+            org.awaitility.Awaitility.await().pollInSameThread().atMost(java.time.Duration.ofSeconds(5))
+                    .until(() -> "success".equals(deliveries.selectById(claimed.getId()).getDeliveryStatus()));
             var success = deliveries.selectById(claimed.getId());
             assertThat(success.getDeliveryStatus()).isEqualTo("success");
             assertThat(success.getRetryCount()).isEqualTo(1);
