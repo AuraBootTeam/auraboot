@@ -906,6 +906,50 @@ class ProcurementPluginHostRealDbIT {
             assertEquals("draft",db.getById("s2p_bid",batch.secondQuote()).get("s2p_bid_status"));return null;});
     }
 
+    @Test void nativeBatchRejectsIdentityCreatedInAnotherInquiryAfterScopeRead() throws Exception {
+        String connection=scope(SYNC,()->(String)db.getById("s2p_sourcing_event",task).get("qo_pr_task_connection_pid"));
+        String competingTask=scope("qo_procurement_task_common:create",()->{
+            try {Class<?> type=plugin.loadClass("com.auraboot.quote.engine.procurement.ProcurementTaskService");
+                var created=(Map<?,?>)type.getMethod("create",Object.class,String.class,Map.class).invoke(type.getConstructor(DataAccessor.class).newInstance(db),tenantId,actor,
+                        Map.of("title","Concurrent identity "+provider,"connectionPid",connection));return (String)created.get("recordPid");
+            }catch(ReflectiveOperationException error){throw unwrap(error);}
+        });
+        var scoped=new java.util.concurrent.CountDownLatch(1);var inserted=new java.util.concurrent.CountDownLatch(1);
+        var taskObserved=taskLockObserver(()->{scoped.countDown();awaitNativeLatch(inserted,"other inquiry must commit after batch scope read");},()->{});
+        var partialSource=new java.util.concurrent.atomic.AtomicReference<String>();
+        DataAccessor observed=(DataAccessor)java.lang.reflect.Proxy.newProxyInstance(DataAccessor.class.getClassLoader(),new Class<?>[]{DataAccessor.class},
+                (proxy,method,args)->{Object result;try {result=method.invoke(taskObserved,args);}catch(InvocationTargetException error){throw error.getCause();}
+                    if(method.getName().equals("tryCreate") && args[0].equals("pr_purchase_request"))
+                        ((Optional<?>)result).ifPresent(row->partialSource.set(((Map<?,?>)row).get("pid").toString()));
+                    return result;});
+        response=row("100","12").replace("]]", "],")+row("100","11").substring(1);
+        var selected=List.<String[]>of(new String[]{"100","12"},new String[]{"100","11"});
+        var batchContext=importContext(task,observed);var competingContext=importContext(competingTask,db);
+        var pool=java.util.concurrent.Executors.newSingleThreadExecutor();
+        try {
+            var batch=pool.submit(()->nativeActorThread(()->new TransactionTemplate(transactions).execute(status->scope(SYNC,()->syncSelectedWith(batchContext,selected)))));
+            awaitNativeLatch(scoped,"batch must complete missing-identity preflight before its first task lock");
+            response=row("100","11");
+            assertEquals(List.of("added"),new TransactionTemplate(transactions).execute(status->scope(SYNC,()->syncWith(competingContext,"100","11"))));
+            var winner=scope(SYNC,()->nativeRows("pr_purchase_request","qo_pr_source_task_pid",competingTask));assertEquals(1,winner.size());
+            var originalTask=scope(SYNC,()->db.getById("s2p_sourcing_event",task));
+            var winnerTask=scope(SYNC,()->db.getById("s2p_sourcing_event",competingTask));
+            inserted.countDown();
+            var failure=assertThrows(java.util.concurrent.ExecutionException.class,()->batch.get(20,java.util.concurrent.TimeUnit.SECONDS));
+            assertEquals("SOURCE_SYNC_CONFLICT",assertInstanceOf(IllegalStateException.class,failure.getCause()).getMessage());
+            assertNotNull(partialSource.get(),"first batch source must actually be created before the late conflict");
+            scope(SYNC,()->{assertThrows(com.auraboot.framework.meta.exception.MetaRecordNotFoundException.class,
+                    ()->db.getById("pr_purchase_request",partialSource.get()));assertTrue(rows().isEmpty());assertEquals(2,references());
+                assertEquals(winner,nativeRows("pr_purchase_request","qo_pr_source_task_pid",competingTask));
+                assertEquals(originalTask,db.getById("s2p_sourcing_event",task));assertEquals(winnerTask,db.getById("s2p_sourcing_event",competingTask));return null;});
+            response=row("100","12").replace("]]", "],")+row("100","11").substring(1);
+            assertEquals(List.of("added","unchanged"),new TransactionTemplate(transactions).execute(status->scope(SYNC,()->syncSelectedWith(context,selected))));
+            scope(SYNC,()->{assertEquals(1,rows().size());assertEquals(3,references());
+                var retained=nativeRows("pr_purchase_request","qo_pr_source_task_pid",competingTask);assertEquals(1,retained.size());
+                assertEquals(winner.getFirst().get("pid"),retained.getFirst().get("pid"));assertEquals(competingTask,retained.getFirst().get("qo_pr_source_task_pid"));return null;});
+        }finally{inserted.countDown();pool.shutdownNow();assertTrue(pool.awaitTermination(10,java.util.concurrent.TimeUnit.SECONDS));}
+    }
+
     private record DispatchFixture(String supplier,java.time.Clock clock,long version) {}
     private DispatchFixture nativeDispatchFixture() {
         var tx=new TransactionTemplate(transactions);tx.execute(status->scope(SYNC,()->sync("100","11")));
