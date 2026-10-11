@@ -50,6 +50,8 @@ class ProcurementPluginHostRealDbIT {
     @Autowired DataSource source;
     @Autowired UserService users;
     @Autowired TenantMemberService members;
+    @Autowired BackgroundDataAccessor background;
+    @Autowired com.auraboot.framework.tenant.service.TenantService tenants;
     @Autowired AuthIdentityMapper identities;
     @Autowired UserMapper userMapper;
     private Long actorId,tenantId;
@@ -232,6 +234,7 @@ class ProcurementPluginHostRealDbIT {
         var settings=new HashMap<String,Object>();settings.put(CommandHandlerExtension.DATA_ACCESSOR_KEY,selected);
         settings.put(CommandHandlerExtension.CURRENT_USER_PID_KEY,actor);
         settings.put(com.auraboot.framework.plugin.extension.VerifiedPhoneGrantAccessor.SETTINGS_KEY,grant);
+        settings.put(CommandHandlerExtension.TENANT_PROJECTION_ACCESSOR_KEY,new TenantProjectionAccessorImpl(tenantId,background));
         var request=new CommandHandlerExtension.CommandContext(tenantId,"com.auraboot.quote-engine","qoe",
                 "qo_procurement_membership_common:bind_verified_phone","qo_procurement_membership_common",null,
                 Map.of("loginCode","synthetic-login","phoneCode","synthetic-phone-code"),settings,false);
@@ -268,6 +271,55 @@ class ProcurementPluginHostRealDbIT {
         var second=tx.execute(status->scope(bind,()->bindNativeMembership(db,(l,p)->phone)));
         assertEquals(first,second);assertEquals(snapshot,scope(bind,()->db.getById("qo_procurement_membership_common",first.get("recordPid").toString())));
         assertEquals(1,scope(bind,()->nativeRows("qo_procurement_membership_common","qo_pr_membership_user_pid",actor)).size());
+    }
+
+    @Test void nativePhoneBindingIgnoresActualForeignTenantDirectory() throws Exception {
+        String writer="pr_supplier_pcba_contact:sync_directory",bind="qo_procurement_membership_common:bind_verified_phone";
+        String phone="+8613"+String.format(Locale.ROOT,"%09d",Math.floorMod(actorId,1_000_000_000L));
+        String foreignOnly="+8614"+String.format(Locale.ROOT,"%09d",Math.floorMod(actorId,1_000_000_000L));
+        var foreign=new com.auraboot.framework.tenant.dao.entity.Tenant();
+        foreign.setName("foreign-"+provider);foreign.setDisplayName("Foreign directory fixture");
+        foreign.setPid(com.auraboot.framework.common.util.UlidGenerator.generate());foreign.setStatus("ACTIVE");
+        tenants.createTenant(foreign);assertNotEquals(tenantId,foreign.getId());
+        String localSupplier=scope(writer,()->(String)db.create("pr_supplier_common",Map.of(
+                "pr_supplier_code",provider,"pr_supplier_name","Local supplier","pr_supplier_status","enabled")).get("pid"));
+        String localContact=scope(writer,()->(String)db.create("pr_supplier_pcba_contact",Map.of(
+                "pr_spc_supplier_id",localSupplier,"pr_spc_name","Local same phone","qo_pr_contact_state","active",
+                "qo_pr_contact_normalized_phone",phone)).get("pid"));
+        // Independent foreign fixture rows use the physical table; they do not seed foreign metadata or enrollment.
+        String foreignSupplier=cloneForeignDirectoryFixture("mt_pr_supplier_common",localSupplier,foreign.getId(),
+                Map.of("pr_supplier_code","foreign-"+provider,"pr_supplier_name","Foreign supplier"));
+        String foreignContact=cloneForeignDirectoryFixture("mt_pr_supplier_pcba_contact",localContact,foreign.getId(),
+                Map.of("pr_spc_supplier_id",foreignSupplier,"pr_spc_name","Foreign same phone"));
+        cloneForeignDirectoryFixture("mt_pr_supplier_pcba_contact",localContact,foreign.getId(),
+                Map.of("pr_spc_supplier_id",foreignSupplier,"pr_spc_name","Foreign exclusive phone","qo_pr_contact_normalized_phone",foreignOnly));
+        try(var c=source.getConnection();var q=c.prepareStatement("SELECT count(*) FROM mt_pr_supplier_pcba_contact WHERE tenant_id=? AND qo_pr_contact_normalized_phone=? AND qo_pr_contact_state='active'")) {
+            q.setLong(1,foreign.getId());q.setString(2,phone);
+            try(var result=q.executeQuery()){assertTrue(result.next());assertEquals(1,result.getInt(1));}
+        }
+        var projection=new TenantProjectionAccessorImpl(tenantId,background);
+        assertThrows(com.auraboot.framework.meta.exception.MetaRecordNotFoundException.class,
+                ()->projection.getById("pr_supplier_pcba_contact",foreignContact));
+        var tx=new TransactionTemplate(transactions);
+        var result=tx.execute(status->scope(bind,()->bindNativeMembership(db,(l,p)->phone)));
+        assertEquals(localSupplier,result.get("supplierPid"));assertEquals(localContact,result.get("contactPid"));
+        var before=scope(bind,()->db.getById("qo_procurement_membership_common",result.get("recordPid").toString()));
+        var rejection=assertThrows(PluginCommandRejectionException.class,()->tx.execute(status->scope(bind,()->bindNativeMembership(db,(l,p)->foreignOnly))));
+        assertEquals("qo_pr.error.phone_not_registered",rejection.messageKey());
+        assertEquals(before,scope(bind,()->db.getById("qo_procurement_membership_common",result.get("recordPid").toString())));
+        assertEquals(1,scope(bind,()->nativeRows("qo_procurement_membership_common","qo_pr_membership_user_pid",actor)).size());
+    }
+    private String cloneForeignDirectoryFixture(String table,String original,Long foreignTenant,Map<String,Object> values) throws Exception {
+        assertTrue(Set.of("mt_pr_supplier_common","mt_pr_supplier_pcba_contact").contains(table));
+        assertNotEquals(tenantId,foreignTenant);
+        var row=new HashMap<>(values);String pid=com.auraboot.framework.common.util.UlidGenerator.generate();
+        row.put("id",com.baomidou.mybatisplus.core.toolkit.IdWorker.getId());row.put("pid",pid);row.put("tenant_id",foreignTenant);
+        String sql="INSERT INTO "+table+" SELECT (jsonb_populate_record(NULL::"+table+",to_jsonb(src)||?::jsonb)).* FROM "+table+" src WHERE src.pid=? AND src.tenant_id=?";
+        try(var c=source.getConnection();var q=c.prepareStatement(sql)) {
+            q.setString(1,json.writeValueAsString(row));q.setString(2,original);q.setLong(3,tenantId);
+            assertEquals(1,q.executeUpdate());
+        }
+        return pid;
     }
 
     @Test void actualHostSecretAndNativePersistenceSurviveReplay() throws Exception {
