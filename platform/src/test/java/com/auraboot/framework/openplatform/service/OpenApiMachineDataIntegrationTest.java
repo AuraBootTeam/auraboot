@@ -1021,7 +1021,16 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
                     .isInstanceOf(com.auraboot.framework.meta.exception.MetaRecordNotFoundException.class);
             assertThat(sourceEvents()).hasSize(3);
             for (var replay : cases) {
-                assertThat(management.listCallAudits(principal.installationPid(), origin + "-denied-" + replay.operation().code(), null, 20)).isEmpty();
+                String requestId = origin + "-denied-" + replay.operation().code();
+                assertThat(management.listCallAudits(principal.installationPid(), requestId, null, 20))
+                        .singleElement().satisfies(audit -> {
+                            assertThat(audit.actorKind()).isEqualTo("unauthenticated");
+                            assertThat(audit.status()).isEqualTo(401);
+                            assertThat(audit.idempotentReplay()).isNull();
+                        });
+                assertAuthenticationAudit(requestId, 401, "invalid_token", true,
+                        replay.operation() == Operation.CREATE ? "/api/open/v1/resources/{resource}"
+                                : "/api/open/v1/resources/{resource}/{pid}");
             }
         } finally { cleanupCommittedFixture(); }
     }
@@ -1138,9 +1147,70 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
     void publicHttpCrudTraversesBearerFilterPublicationPolicyAndStableErrors() throws Exception {
         String collection = "/api/open/v1/resources/" + contract.code();
         String bearer = "Bearer " + rawToken;
+        String auditOrigin = "authentication-" + UniqueIdGenerator.generate();
         try {
-            http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(collection + "/" + allowedPid))
+            http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(collection + "/" + allowedPid)
+                            .header("X-Request-Id", auditOrigin + "-missing").header("X-Tenant-Id", "999999"))
                     .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isUnauthorized());
+            assertAuthenticationAudit(auditOrigin + "-missing", 401, "invalid_token", false,
+                    "/api/open/v1/resources/{resource}/{pid}");
+            String unknown = "unknown-credential-" + UniqueIdGenerator.generate();
+            http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(collection + "/" + allowedPid)
+                            .header("Authorization", "Bearer " + unknown).header("X-Request-Id", auditOrigin + "-unknown")
+                            .header("X-Tenant-Id", principal.tenantId()).header("X-Installation-Pid", principal.installationPid()))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isUnauthorized());
+            assertAuthenticationAudit(auditOrigin + "-unknown", 401, "invalid_token", false,
+                    "/api/open/v1/resources/{resource}/{pid}");
+            http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/open/v1/whoami")
+                            .header("Authorization", bearer).header("X-Request-Id", auditOrigin + "-scope"))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+            assertAuthenticationAudit(auditOrigin + "-scope", 403, "insufficient_scope", true, "/api/open/v1/whoami");
+            assertThat(eventJdbc.queryForObject("SELECT last_used_at FROM ab_application_access_token WHERE pid = ?",
+                    java.sql.Timestamp.class, principal.tokenPid())).isNull();
+            assertThat(eventJdbc.queryForObject("SELECT COUNT(*) FROM ab_open_api_rate_window WHERE installation_id = "
+                    + "(SELECT installation_id FROM ab_application_access_token WHERE pid = ?)", Long.class, principal.tokenPid())).isZero();
+            var expiry = eventJdbc.queryForObject("SELECT expires_at FROM ab_application_access_token WHERE pid = ?",
+                    java.sql.Timestamp.class, principal.tokenPid());
+            try {
+                eventJdbc.update("UPDATE ab_application_access_token SET expires_at = NOW() - INTERVAL '1 second' WHERE pid = ?", principal.tokenPid());
+                http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(collection + "/" + allowedPid)
+                                .header("Authorization", bearer).header("X-Request-Id", auditOrigin + "-expired"))
+                        .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isUnauthorized());
+                assertAuthenticationAudit(auditOrigin + "-expired", 401, "invalid_token", true,
+                        "/api/open/v1/resources/{resource}/{pid}");
+            } finally {
+                eventJdbc.update("UPDATE ab_application_access_token SET expires_at = ? WHERE pid = ?", expiry, principal.tokenPid());
+            }
+            http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/open/v1/internal/" + rawToken)
+                            .header("Authorization", bearer).header("X-Request-Id", auditOrigin + "-unpublished"))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
+            assertAuthenticationAudit(auditOrigin + "-unpublished", 404, "open_api_capability_not_found", true,
+                    "/api/open/v1/{unpublished}");
+            http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(collection + "/" + allowedPid)
+                            .header("Authorization", bearer))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
+            var lastUse = eventJdbc.queryForObject("SELECT last_used_at FROM ab_application_access_token WHERE pid = ?",
+                    java.sql.Timestamp.class, principal.tokenPid());
+            try {
+                // Populate this installation's current and next minute to avoid a wall-clock boundary race.
+                eventJdbc.update("INSERT INTO ab_open_api_rate_window (installation_id, window_start, request_count) "
+                        + "SELECT t.installation_id, date_trunc('minute', NOW()) + n * INTERVAL '1 minute', 600 "
+                        + "FROM ab_application_access_token t CROSS JOIN generate_series(0, 1) n WHERE t.pid = ? "
+                        + "ON CONFLICT (installation_id, window_start) DO UPDATE SET request_count = 600", principal.tokenPid());
+                http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(collection + "/" + allowedPid)
+                                .header("Authorization", bearer).header("X-Request-Id", auditOrigin + "-rate"))
+                        .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isTooManyRequests());
+                assertAuthenticationAudit(auditOrigin + "-rate", 429, "rate_limit_exceeded", true,
+                        "/api/open/v1/resources/{resource}/{pid}");
+                assertThat(eventJdbc.queryForObject("SELECT last_used_at FROM ab_application_access_token WHERE pid = ?",
+                        java.sql.Timestamp.class, principal.tokenPid())).isEqualTo(lastUse);
+                assertThat(eventJdbc.queryForList("SELECT request_count FROM ab_open_api_rate_window WHERE installation_id = "
+                        + "(SELECT installation_id FROM ab_application_access_token WHERE pid = ?)", Integer.class, principal.tokenPid()))
+                        .containsExactlyInAnyOrder(600, 600);
+            } finally {
+                eventJdbc.update("DELETE FROM ab_open_api_rate_window WHERE installation_id = "
+                        + "(SELECT installation_id FROM ab_application_access_token WHERE pid = ?)", principal.tokenPid());
+            }
             http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(collection + "/" + deniedPid).header("Authorization", bearer))
                     .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
             http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/open/v1/resources/not-published").header("Authorization", bearer))
@@ -1176,6 +1246,26 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
                     .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Idempotent-Replay", "true"));
             assertThat(MachineDataAccessContext.isActive()).isFalse();
         } finally { cleanupCommittedFixture(); }
+    }
+
+    private void assertAuthenticationAudit(String requestId, int status, String code,
+                                           boolean knownIdentity, String path) throws Exception {
+        var rows = eventJdbc.queryForList("SELECT tenant_id, application_pid, installation_pid, token_pid, "
+                + "request_path, response_status, duration_ms, business_details FROM ab_open_api_call_audit WHERE request_id = ?", requestId);
+        assertThat(rows).hasSize(1);
+        var row = rows.get(0);
+        assertThat(row.get("tenant_id")).isEqualTo(knownIdentity ? principal.tenantId() : null);
+        assertThat(row.get("application_pid")).isEqualTo(knownIdentity ? principal.applicationPid() : null);
+        assertThat(row.get("installation_pid")).isEqualTo(knownIdentity ? principal.installationPid() : null);
+        assertThat(row.get("token_pid")).isEqualTo(knownIdentity ? principal.tokenPid() : null);
+        assertThat(row.get("response_status")).isEqualTo(status);
+        assertThat(((Number) row.get("duration_ms")).longValue()).isGreaterThanOrEqualTo(0);
+        assertThat(row.get("request_path")).isEqualTo(path);
+        assertThat(json.readTree(row.get("business_details").toString())).isEqualTo(json.valueToTree(
+                Map.of("actorKind", "unauthenticated", "phase", "authentication", "code", code)));
+        assertThat(row.toString()).doesNotContain(rawToken, "Revocation create", "Revocation update");
+        assertThat(MachineDataAccessContext.isActive()).isFalse();
+        applyTestMetaContext();
     }
 
     @Test

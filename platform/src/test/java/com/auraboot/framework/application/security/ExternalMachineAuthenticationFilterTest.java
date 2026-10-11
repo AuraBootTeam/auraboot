@@ -61,10 +61,19 @@ class ExternalMachineAuthenticationFilterTest {
 
     @Test
     void policyRejectionDoesNotReachController() throws Exception {
+        AtomicBoolean failureAudited = new AtomicBoolean();
         ExternalMachineAuthenticator authenticator = new ExternalMachineAuthenticator() {
             public boolean supports(jakarta.servlet.http.HttpServletRequest request) { return true; }
             public MachinePrincipal authenticate(jakarta.servlet.http.HttpServletRequest request) {
                 throw new ExternalMachineAuthException(429, "rate_limit_exceeded");
+            }
+            public void recordAuthenticationFailure(jakarta.servlet.http.HttpServletRequest request,
+                                                    int status, String code, long durationMillis) {
+                assertEquals(429, status);
+                assertEquals("rate_limit_exceeded", code);
+                assertTrue(durationMillis >= 0);
+                assertNull(MachineDataAccessContext.principal());
+                failureAudited.set(true);
             }
         };
         var filter = new ExternalMachineAuthenticationFilter(List.of(authenticator), new ObjectMapper());
@@ -78,6 +87,7 @@ class ExternalMachineAuthenticationFilterTest {
         assertEquals(429, response.getStatus());
         assertTrue(response.getContentAsString().contains("rate_limit_exceeded"));
         assertFalse(chained.get());
+        assertTrue(failureAudited.get());
     }
 
     @Test

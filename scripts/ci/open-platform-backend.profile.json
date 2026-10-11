@@ -34,6 +34,7 @@
     "com.auraboot.framework.meta.service.impl.NamedQuerySourceScopeRewriterTest",
     "com.auraboot.framework.plugin.validation.NamedQueryFieldValidatorBoundaryTest",
     "com.auraboot.framework.plugin.validation.NamedQueryFieldValidatorTest",
-    "com.auraboot.framework.meta.service.AggregateQueryServiceIntegrationTest"
+    "com.auraboot.framework.meta.service.AggregateQueryServiceIntegrationTest",
+    "com.auraboot.framework.application.security.ExternalMachineAuthenticationFilterTest"
   ]
 }

@@ -51,14 +51,20 @@ public class ExternalMachineAuthenticationFilter extends OncePerRequestFilter {
         try {
             principal = authenticator.authenticate(request);
         } catch (ExternalMachineAuthException exception) {
+            authenticator.recordAuthenticationFailure(request, exception.status(), exception.code(),
+                    (System.nanoTime() - startedAt) / 1_000_000L);
             writeError(response, exception.status(), exception.code());
             return;
         } catch (RuntimeException exception) {
+            authenticator.recordAuthenticationFailure(request, HttpServletResponse.SC_UNAUTHORIZED, "invalid_token",
+                    (System.nanoTime() - startedAt) / 1_000_000L);
             writeError(response, HttpServletResponse.SC_UNAUTHORIZED, "invalid_token");
             return;
         }
 
         if (principal == null || principal.tenantId() == null || principal.subjectPid() == null) {
+            authenticator.recordAuthenticationFailure(request, HttpServletResponse.SC_UNAUTHORIZED, "invalid_token",
+                    (System.nanoTime() - startedAt) / 1_000_000L);
             writeError(response, HttpServletResponse.SC_UNAUTHORIZED, "invalid_token");
             return;
         }
