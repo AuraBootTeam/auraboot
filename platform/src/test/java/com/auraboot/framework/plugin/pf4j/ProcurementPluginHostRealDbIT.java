@@ -123,7 +123,8 @@ class ProcurementPluginHostRealDbIT {
     // Synthetic resolved host permit: this seam does not exercise public command authentication.
     private <T> T scope(String writer,Supplier<T> work){return MetaContext.runWithCommandPermitPlan("ALL",actorId,null,null,
             ()->MetaContext.runWithAuthorizedCommandCode(writer,work));}
-    private Object sync(String id,String entry){
+    private Object sync(String id,String entry){return syncWith(context,id,entry);}
+    private Object syncWith(CommandHandlerExtension.CommandContext selectedContext,String id,String entry){
         try{
             Class<?> selection=plugin.loadClass("com.auraboot.quote.engine.procurement.ProcurementRequisitionReader$Selection");
             Object selected=selection.getConstructor(String.class,String.class).newInstance(id,entry);
@@ -131,7 +132,7 @@ class ProcurementPluginHostRealDbIT {
             Class<?> policy=plugin.loadClass(importer.getName()+"$EligibilityPolicy");
             Object trusted=java.lang.reflect.Proxy.newProxyInstance(plugin,new Class<?>[]{policy},(proxy,method,args)->true);
             return importer.getMethod("sync",CommandHandlerExtension.CommandContext.class,List.class,int.class,policy)
-                    .invoke(null,context,List.of(selected),20,trusted);
+                    .invoke(null,selectedContext,List.of(selected),20,trusted);
         }catch(ReflectiveOperationException error){throw unwrap(error);}
     }
     private List<Map<String,Object>> rows(){return scope(SYNC,()->db.queryPage("pr_purchase_request",
@@ -414,11 +415,12 @@ class ProcurementPluginHostRealDbIT {
         assertEquals(0,new BigDecimal("2.000001").compareTo(newContent.path("unit_price").decimalValue()));
     }
 
-    private Object allocateNative(Map<String,Object> payload) {
+    private Object allocateNative(Map<String,Object> payload) {return allocateNativeWith(db,payload);}
+    private Object allocateNativeWith(DataAccessor accessor,Map<String,Object> payload) {
         try {
             Class<?> type=plugin.loadClass("com.auraboot.quote.engine.procurement.ProcurementAllocationService");
             return type.getMethod("allocate",String.class,Map.class)
-                    .invoke(type.getConstructor(DataAccessor.class).newInstance(db),task,payload);
+                    .invoke(type.getConstructor(DataAccessor.class).newInstance(accessor),task,payload);
         } catch(ReflectiveOperationException error) {throw unwrap(error);}
     }
     private void openFixtureTask() {
@@ -468,6 +470,69 @@ class ProcurementPluginHostRealDbIT {
             assertEquals(submissions,nativeRows("qo_procurement_submission_common","qo_pr_submission_quote_pid",quote));
             assertNativeQuantity("pr_purchase_request",sourcePid,"qo_pr_source_reserved_qty","300.000001");
             assertNativeQuantity("pr_purchase_request",sourcePid,"qo_pr_source_approved_qty","1400");return null;
+        });
+    }
+
+    private static void awaitNativeLatch(java.util.concurrent.CountDownLatch latch,String reason) {
+        try {assertTrue(latch.await(10,java.util.concurrent.TimeUnit.SECONDS),reason);}
+        catch(InterruptedException error){Thread.currentThread().interrupt();throw new AssertionError(reason,error);}
+    }
+    /** Observes only the real native quotation CAS; every operation delegates unchanged to the host. */
+    private DataAccessor quoteLockObserver(Runnable before,Runnable after) {
+        return (DataAccessor)java.lang.reflect.Proxy.newProxyInstance(DataAccessor.class.getClassLoader(),new Class<?>[]{DataAccessor.class},
+                (proxy,method,args)->{
+                    boolean quoteLock=method.getName().equals("compareAndSetBatch") && "s2p_bid".equals(args[0]);
+                    if(quoteLock) before.run();
+                    Object result;
+                    try {result=method.invoke(db,args);}
+                    catch(InvocationTargetException error){throw error.getCause();}
+                    if(quoteLock) after.run();
+                    return result;
+                });
+    }
+    private <T>T nativeActorThread(Supplier<T> work) {
+        MetaContext.setContext(tenantId,actorId,actor,"Host concurrency fixture");
+        try {return work.get();}finally{MetaContext.clear();}
+    }
+    @Test void nativeSourceSyncWinsConcurrentStaleAllocationWithoutLeavingReservations() throws Exception {
+        var fixture=savedNativeQuote();String quote=fixture.quote(),sourcePid=fixture.source();
+        String submit="qo_procurement_quote_common:submit",allocate="qo_procurement_task_common:allocate";
+        var tx=new TransactionTemplate(transactions);
+        var formal=(Map<?,?>)tx.execute(status->scope(submit,()->quoteAt(fixture.clock(),"submit",quote,Map.of("revision",1))));
+        scope("qo_procurement_task_common:dispatch",()->{openFixtureTask();return null;});
+        var taskBefore=scope(allocate,()->db.getById("s2p_sourcing_event",task));
+        var snapshot=scope(submit,()->db.getById("qo_procurement_submission_common",(String)formal.get("submissionPid")));
+        var request=Map.<String,Object>of("sourceDemands",List.of(Map.of("sourcePid",sourcePid,"sourceRevision",0,"quantity","300.000001")),
+                "allocations",List.of(Map.of("quotePid",quote,"sourcePid",sourcePid,"submissionPid",formal.get("submissionPid"),"quantity","300.000001")));
+        var sourceHeld=new java.util.concurrent.CountDownLatch(1);
+        var allocationAttempted=new java.util.concurrent.CountDownLatch(1);
+        var sourceAccessor=quoteLockObserver(()->{},()->{sourceHeld.countDown();awaitNativeLatch(allocationAttempted,"allocation must reach the held native quote lock");});
+        var allocationAccessor=quoteLockObserver(allocationAttempted::countDown,()->{});
+        var settings=new HashMap<String,Object>(context.settings());settings.put(CommandHandlerExtension.DATA_ACCESSOR_KEY,sourceAccessor);
+        var syncContext=new CommandHandlerExtension.CommandContext(tenantId,context.pluginId(),context.namespace(),SYNC,
+                context.modelCode(),task,context.payload(),settings,false);
+        response=row("100","11").replace(",1500,1400,400,300,1000,",",1500,1399,400,300,1000,");
+        var pool=java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var syncFuture=pool.submit(()->nativeActorThread(()->new TransactionTemplate(transactions).execute(status->scope(SYNC,()->syncWith(syncContext,"100","11")))));
+            awaitNativeLatch(sourceHeld,"trusted sync must hold the real quote CAS before allocation starts");
+            var allocationFuture=pool.submit(()->nativeActorThread(()->new TransactionTemplate(transactions).execute(status->scope(allocate,()->allocateNativeWith(allocationAccessor,request)))));
+            assertEquals(List.of("changed"),syncFuture.get(20,java.util.concurrent.TimeUnit.SECONDS));
+            var failure=assertThrows(java.util.concurrent.ExecutionException.class,()->allocationFuture.get(20,java.util.concurrent.TimeUnit.SECONDS));
+            var conflict=assertInstanceOf(com.auraboot.framework.meta.exception.MetaServiceException.class,failure.getCause());
+            assertEquals("CAS batch conflict: no partial batch may commit",conflict.getMessage());
+        } finally {allocationAttempted.countDown();pool.shutdownNow();assertTrue(pool.awaitTermination(10,java.util.concurrent.TimeUnit.SECONDS));}
+        scope(allocate,()->{
+            assertEquals(taskBefore,db.getById("s2p_sourcing_event",task));
+            assertNativeQuantity("pr_purchase_request",sourcePid,"qo_pr_source_reserved_qty","0");
+            assertNativeQuantity("pr_purchase_request",sourcePid,"qo_pr_source_approved_qty","1399");
+            assertNativeQuantity("pr_purchase_request",sourcePid,"qo_pr_source_revision","1");
+            assertEquals("invalidated",db.getById("s2p_bid",quote).get("s2p_bid_status"));
+            assertNativeQuantity("s2p_bid",quote,"qo_pr_quote_revision","3");
+            assertTrue(nativeRows("qo_procurement_allocation_common","qo_pr_allocation_task_pid",task).isEmpty());
+            assertTrue(nativeRows("qo_procurement_execution_common","qo_pr_execution_task_pid",task).isEmpty());
+            assertEquals(snapshot,db.getById("qo_procurement_submission_common",(String)formal.get("submissionPid")));
+            assertEquals(1,nativeRows("qo_procurement_submission_common","qo_pr_submission_quote_pid",quote).size());return null;
         });
     }
 
