@@ -291,6 +291,7 @@ export interface ColumnConfig {
 
   // 字典配置
   dictCode?: string; // 绑定的字典编码，自动显示字典标签而非原始值
+  dictValueSeparator?: string; // Opt-in delimiter for multiple dictionary values
 
   // Currency code for valueType: 'currency' (default: 'cny')
   currencyCode?: string;

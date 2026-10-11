@@ -216,12 +216,12 @@ export const SemanticResolutionEvidence: React.FC<SemanticResolutionEvidenceProp
                     </dd>
                   )}
                 </dl>
+                {vetoes.length > 0 && (
+                  <div className="border-status-red bg-status-red-bg text-status-red rounded-control mt-3 border px-2.5 py-2 text-xs">
+                    {localized(locale, '阻断原因', 'Vetoes')}: {vetoes.join(', ')}
+                  </div>
+                )}
               </details>
-              {vetoes.length > 0 && (
-                <div className="border-status-red bg-status-red-bg text-status-red rounded-control mt-3 border px-2.5 py-2 text-xs">
-                  {localized(locale, '阻断原因', 'Vetoes')}: {vetoes.join(', ')}
-                </div>
-              )}
             </article>
           );
         })}

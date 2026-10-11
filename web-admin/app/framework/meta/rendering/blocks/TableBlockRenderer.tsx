@@ -717,6 +717,21 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
           </span>
         );
       }
+      if (dictItems && column.dictValueSeparator) {
+        const codes = String(value)
+          .split(column.dictValueSeparator)
+          .map((code) => code.trim())
+          .filter(Boolean);
+        const labels = codes.map(
+          (code) => dictItems.find((item) => String(item.value) === code)?.label,
+        );
+        if (
+          labels.length > 0 &&
+          labels.every((label) => typeof label === 'string' && label.trim())
+        ) {
+          return <span>{labels.join(locale.toLowerCase().startsWith('zh') ? '、' : ', ')}</span>;
+        }
+      }
       if (dictItems) {
         const item = dictItems.find((i) => String(i.value) === String(value));
         if (item && typeof item.label === 'string' && item.label.trim()) {

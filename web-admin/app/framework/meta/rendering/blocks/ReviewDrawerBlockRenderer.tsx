@@ -3151,11 +3151,13 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                   className="rounded-card border-border bg-panel overflow-hidden border"
                 >
                   <summary className="bg-panel text-text cursor-pointer px-3 py-2 text-sm font-semibold">
-                    {localized(
+                    {getLocalizedText(
+                      sourceConfig.detailsTitle || {
+                        'zh-CN': '解析证据与 Profile / LLM Policy',
+                        en: 'Parse evidence and Profile / LLM policy',
+                      },
                       locale,
                       t,
-                      '解析证据与 Profile / LLM Policy',
-                      'Parse evidence and Profile / LLM policy',
                     )}
                   </summary>
                   <div className="border-border space-y-3 border-t p-3">

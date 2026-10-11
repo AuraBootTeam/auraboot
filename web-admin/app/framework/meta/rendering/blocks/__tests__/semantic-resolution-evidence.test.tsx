@@ -31,3 +31,16 @@ it('uses configured field labels and keeps technical details collapsed', () => {
   expect(evidence.querySelector('details')).not.toHaveAttribute('open');
   expect(evidence.querySelector('details')).toHaveTextContent('attributes.scoped-category-grammar');
 });
+
+it('keeps internal veto codes inside collapsed technical lineage', () => {
+  render(
+    <SemanticResolutionEvidence
+      traces={[{ standardField: 'voltage', state: 'conflict', vetoes: ['FIELD_SOURCE_CONFLICT'] }]}
+      locale="zh-CN"
+      t={(key) => key}
+    />,
+  );
+  const code = screen.getByText(/FIELD_SOURCE_CONFLICT/);
+  expect(code.closest('details')).not.toBeNull();
+  expect(code.closest('details')).not.toHaveAttribute('open');
+});
