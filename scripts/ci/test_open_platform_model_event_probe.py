@@ -59,9 +59,9 @@ class ModelEventTests(unittest.TestCase):
             with self.assertRaises(ProtocolError): verify_report(report, secret=SECRET)
 
     def test_source_binding_replay_restores_management_metadata_on_success_and_failure(self):
-        model = {"displayName": "Model", "extension": {"sourceRef": "fixture"},
+        model = {"displayName": "Model", "fields": None, "extension": {"sourceRef": "fixture",
                  "fields": [{"code": "rel_name", "columnName": "rel_name"},
-                            {"code": "rel_private", "columnName": "rel_private"}]}
+                            {"code": "rel_private", "columnName": "rel_private"}]}}
         dead = {"pid": "delivery_dead", "eventId": "evt_dead"}
         for fail in [False, True]:
             calls = []
@@ -79,8 +79,18 @@ class ModelEventTests(unittest.TestCase):
                 self.assertEqual(proof["receiverAttemptsAfter"], 0)
             self.assertEqual(calls[1][2]["extension"]["fields"][0]["columnName"], "rel_private")
             self.assertEqual(calls[-1], ("/api/meta/models/model_pid", "PUT", {
-                "displayName": "Model", "extension": dict(model["extension"], fields=model["fields"])}))
-            self.assertEqual(model["fields"][0]["columnName"], "rel_name")
+                "displayName": "Model", "extension": model["extension"]}))
+            self.assertEqual(model["extension"]["fields"][0]["columnName"], "rel_name")
+
+    def test_missing_management_extension_fields_refuses_before_metadata_mutation(self):
+        for fields in [None, "invalid", [None]]:
+            calls = []
+            def human(path, method="GET", body=None):
+                calls.append((path, method))
+                return {"displayName": "Model", "fields": [{"code": "rel_name"}], "extension": {"fields": fields}}
+            with self.assertRaises(ProtocolError):
+                run_source_binding_replay(human, "model", "installation", {"pid": "delivery"}, lambda: {}, lambda: 0)
+            self.assertEqual(calls, [("/api/meta/models/model", "GET")])
 
     def test_complete_fixed_report_recomputes_all_six_signatures(self):
         report = passed()

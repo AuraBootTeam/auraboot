@@ -169,15 +169,7 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
 
     @Test void administrationMetadataRebindingRejectsPublicHttpAndRestorationKeepsOriginalEtag() throws Exception {
         grantCommittedPermissionToTestRole("meta.model.update", "meta", "model", "update", "Manage model metadata");
-        String code = contract.code() + ".binding";
-        var readOnly = new OpenApiResourceContract(code, contract.modelCode(), 1, Set.of(Operation.GET),
-                Map.of(Operation.GET, contract.scopes().get(Operation.GET)), DataPolicy.TENANT_WIDE,
-                Map.of("pid", contract.fields().get("pid"), "name", new Field("name", Type.STRING,
-                        true, false, false, false, Set.of(), false, null, Map.of(), null)), 1, 1, 5000, Set.of());
-        publications.saveDraft(code, new OpenApiPublicationService.DraftRequest(0, readOnly));
-        publications.publish(code, 1);
-        publications.grant(principal.installationPid(), code,
-                new OpenApiInstallationPolicy(Set.of(Operation.GET), Set.of("pid", "name"), Set.of(), List.of()));
+        String code = contract.code();
         String path = "/api/open/v1/resources/" + code + "/" + allowedPid;
         var baseline = http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path)
                         .header("Authorization", "Bearer " + rawToken))
@@ -191,12 +183,16 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
         update.setExtension(Map.of("fields", changedFields));
         String modelPid = modelMapper.findCurrentByCode(contract.modelCode()).getPid();
         modelAdministration.updateModel(modelPid, update);
+        assertThat(models.getModelDefinition(contract.modelCode()).orElseThrow().getCapabilities())
+                .isEqualTo(model.getCapabilities());
         http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).header("Authorization", "Bearer " + rawToken))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isConflict())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code").value("open_api_source_changed"));
         applyTestMetaContext();
         update.setExtension(Map.of("fields", originalFields));
         modelAdministration.updateModel(modelPid, update);
+        assertThat(models.getModelDefinition(contract.modelCode()).orElseThrow().getCapabilities())
+                .isEqualTo(model.getCapabilities());
         var restored = http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path)
                         .header("Authorization", "Bearer " + rawToken))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk()).andReturn();

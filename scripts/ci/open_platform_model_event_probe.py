@@ -132,7 +132,9 @@ def run_source_binding_replay(human, model_pid, installation_pid, dead_log, wait
     model_path = f"/api/meta/models/{model_pid}"
     model = human(model_path)
     original = copy.deepcopy(model.get("extension") or {})
-    original["fields"] = copy.deepcopy(model["fields"])
+    require(isinstance(original.get("fields"), list)
+            and all(isinstance(field, dict) for field in original["fields"]),
+            "model event source binding management fields missing")
     rebound = copy.deepcopy(original)
     fields = [field for field in rebound["fields"] if field.get("code") == "rel_name"]
     require(len(fields) == 1, "model event source binding fixture field missing")
