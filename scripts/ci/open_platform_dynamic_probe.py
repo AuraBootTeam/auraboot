@@ -329,7 +329,11 @@ def verify_report(report):
     verify_claimed_query_rollback(report.get("queryRollbackProtection"), proofs[1], report["pluginQuerySource"])
     verify_audits(report)
     verify_source_binding(report.get("resourceSourceBinding"))
-    verify_virtual_resource(report.get("virtualResource"))
+    virtual = verify_virtual_resource(report.get("virtualResource"))
+    isolation = virtual["installationIsolation"]
+    if (isolation["primaryInstallationPid"] != report.get("installationPid")
+            or isolation["secondaryApplicationPid"] == report.get("applicationPid")):
+        raise ProtocolError("virtual installation proof actor binding invalid")
     quota = report.get("queryRateLimit")
     resource = "release.dynamic.by-zone.quota"
     request_id = "release-dynamic-query-quota"
@@ -372,7 +376,7 @@ def verify_source_binding(proof):
 
 def verify_virtual_resource(proof):
     keys = {"resource", "sourceResources", "allowedPid", "hiddenPid", "extraPid", "items", "detail", "etag",
-            "stableEtag", "ownHiddenStatus", "sourceHiddenStatus", "pages", "fieldDeniedStatus", "revokedStatus"}
+            "stableEtag", "ownHiddenStatus", "sourceHiddenStatus", "pages", "fieldDeniedStatus", "revokedStatus", "installationIsolation"}
     if not isinstance(proof, dict) or set(proof) != keys:
         raise ProtocolError("virtual resource proof missing or malformed")
     identities = [proof.get(key) for key in ["allowedPid", "hiddenPid", "extraPid"]]
@@ -398,6 +402,22 @@ def verify_virtual_resource(proof):
     expected_rows = {identities[0]: expected, identities[2]: {"pid": identities[2], "name": "Virtual extra A", "zone": "A"}}
     if any(page["items"][0] != expected_rows[page["items"][0]["pid"]] for page in pages):
         raise ProtocolError("virtual resource keyset projection invalid")
+    isolation = proof["installationIsolation"]
+    isolation_keys = {"primaryInstallationPid", "secondaryInstallationPid", "secondaryApplicationPid",
+                      "secondaryItems", "secondaryDetail", "firstReadsSecondStatus", "secondReadsFirstStatus", "cursorStatus"}
+    if not isinstance(isolation, dict) or set(isolation) != isolation_keys:
+        raise ProtocolError("virtual installation isolation proof missing or malformed")
+    for key in ["primaryInstallationPid", "secondaryInstallationPid", "secondaryApplicationPid"]:
+        if not isinstance(isolation[key], str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", isolation[key]):
+            raise ProtocolError("virtual installation identity invalid: " + key)
+    if isolation["primaryInstallationPid"] == isolation["secondaryInstallationPid"]:
+        raise ProtocolError("virtual installation identities must differ")
+    secondary_row = {"pid": identities[1], "name": "Hidden B", "zone": "B"}
+    if isolation["secondaryItems"] != [secondary_row] or isolation["secondaryDetail"] != secondary_row:
+        raise ProtocolError("virtual secondary installation projection invalid")
+    for key, status in [("firstReadsSecondStatus", 404), ("secondReadsFirstStatus", 404), ("cursorStatus", 400)]:
+        if type(isolation[key]) is not int or isolation[key] != status:
+            raise ProtocolError("virtual installation isolation denial invalid: " + key)
     return proof
 
 
@@ -438,7 +458,24 @@ def run_virtual_resource_probe(request, human, installation_pid, machine, scopes
     path = "/api/open/v1/resources/" + code
     def etag(headers):
         return next((value for key, value in headers.items() if key.lower() == "etag"), None)
+    secondary = None
+    credentials = None
     try:
+        application = human("/api/open-platform/applications", "POST",
+                            {"name": "Virtual isolation consumer", "description": "Exact-image isolation proof"})
+        secondary = human(f"/api/open-platform/applications/{application['pid']}/installations", "POST",
+                          {"environment": "staging", "scopes": [scopes[op] for op in ["list", "get"]], "rateLimitPerMinute": 600})
+        secondary_base = f"/api/open-platform/installations/{secondary['pid']}"
+        credentials = human(secondary_base + "/credentials", "POST", {})
+        _, token, _ = request("/oauth2/token", "POST", form={"grant_type": "client_credentials",
+                            "client_id": credentials["clientId"], "client_secret": credentials["clientSecret"]})
+        second_machine = {"Authorization": "Bearer " + token["access_token"]}
+        second_policy = dict(policy, rowConstraints=[{"field": "zone", "values": ["B"]}])
+        human(secondary_base + "/resources/release.dynamic.parts", "PUT", second_policy)
+        human(secondary_base + "/resources/" + code, "PUT", second_policy)
+        _, secondary_list, _ = request(path, headers=second_machine)
+        _, secondary_detail, _ = request(path + "/" + hidden["pid"], headers=second_machine)
+        second_denied, _, _ = request(path + "/" + allowed["pid"], headers=second_machine, expected=(404,))
         human(virtual_grant, "PUT", policy)
         _, listed, _ = request(path, headers=machine)
         _, detail, headers = request(path + "/" + allowed["pid"], headers=machine)
@@ -451,6 +488,12 @@ def run_virtual_resource_probe(request, human, installation_pid, machine, scopes
         if not isinstance(cursor, str) or not cursor: raise ProtocolError("virtual first page lacks continuation")
         from urllib.parse import quote
         _, second, _ = request(path + "?limit=1&cursor=" + quote(cursor, safe=""), headers=machine)
+        cursor_denied, _, _ = request(path + "?limit=1&cursor=" + quote(cursor, safe=""),
+                                      headers=second_machine, expected=(400,))
+        isolation = {"primaryInstallationPid": installation_pid, "secondaryInstallationPid": secondary["pid"],
+                     "secondaryApplicationPid": application["pid"], "secondaryItems": secondary_list.get("items"),
+                     "secondaryDetail": secondary_detail, "firstReadsSecondStatus": source_status,
+                     "secondReadsFirstStatus": second_denied, "cursorStatus": cursor_denied}
         human(source_grant, "PUT", dict(original, readableFields=["pid", "zone"]))
         field_status, _, _ = request(path, headers=machine, expected=(403,))
         human(source_grant, "DELETE")
@@ -458,11 +501,18 @@ def run_virtual_resource_probe(request, human, installation_pid, machine, scopes
         proof = {"resource": code, "sourceResources": definition["sourceResources"], "allowedPid": allowed["pid"],
                  "hiddenPid": hidden["pid"], "extraPid": extra["pid"], "items": listed.get("items"), "detail": detail,
                  "etag": etag(headers), "stableEtag": etag(repeated), "ownHiddenStatus": own_status,
-                 "sourceHiddenStatus": source_status, "pages": [{key: page.get(key) for key in ["items", "nextCursor"]} for page in [first, second]], "fieldDeniedStatus": field_status, "revokedStatus": revoked_status}
+                 "sourceHiddenStatus": source_status, "pages": [{key: page.get(key) for key in ["items", "nextCursor"]} for page in [first, second]], "fieldDeniedStatus": field_status, "revokedStatus": revoked_status, "installationIsolation": isolation}
         return verify_virtual_resource(proof)
     finally:
-        human(source_grant, "PUT", original)
-        human(f"/api/dynamic/{source_model}/{extra['pid']}", "DELETE")
+        try:
+            if secondary is not None:
+                # Disabling this owned installation revokes its access even if the probe fails early.
+                human(f"/api/open-platform/installations/{secondary['pid']}", "DELETE")
+        finally:
+            try:
+                human(source_grant, "PUT", original)
+            finally:
+                human(f"/api/dynamic/{source_model}/{extra['pid']}", "DELETE")
 
 
 def run_source_binding_probe(request, human, installation_pid, machine, get_scope):

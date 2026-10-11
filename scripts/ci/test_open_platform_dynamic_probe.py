@@ -68,6 +68,10 @@ def passed():
                 "detail": {"pid": "allowed-pid", "name": "Allowed A", "zone": "A"},
                 "etag": '"' + "a" * 64 + '"', "stableEtag": '"' + "a" * 64 + '"',
                 "ownHiddenStatus": 404, "sourceHiddenStatus": 404, "fieldDeniedStatus": 403, "revokedStatus": 403,
+                "installationIsolation": {"primaryInstallationPid": "install-pid", "secondaryInstallationPid": "second-install-pid",
+                    "secondaryApplicationPid": "second-app-pid", "secondaryItems": [{"pid": "hidden-pid", "name": "Hidden B", "zone": "B"}],
+                    "secondaryDetail": {"pid": "hidden-pid", "name": "Hidden B", "zone": "B"},
+                    "firstReadsSecondStatus": 404, "secondReadsFirstStatus": 404, "cursorStatus": 400},
                 "pages": [{"items": [{"pid": "allowed-pid", "name": "Allowed A", "zone": "A"}], "nextCursor": "opaque-cursor"},
                           {"items": [{"pid": "extra-pid", "name": "Virtual extra A", "zone": "A"}], "nextCursor": None}]},
             "queryRateLimit": {"status": 429, "code": "open_api_query_rate_limited", "retryAfter": "60",
@@ -282,6 +286,21 @@ class DynamicProbeTests(unittest.TestCase):
         with self.assertRaises(ProtocolError): verify_virtual_resource(proof)
         proof = copy.deepcopy(passed()["virtualResource"]); proof["items"][0]["privateValue"] = "Private sentinel"
         with self.assertRaises(ProtocolError): verify_virtual_resource(proof)
+
+        report = passed(); del report["virtualResource"]["installationIsolation"]
+        with self.assertRaises(ProtocolError): verify_report(report)
+        for key, value in [("primaryInstallationPid", "foreign-install"), ("secondaryInstallationPid", "install-pid"),
+                           ("secondaryApplicationPid", "app-pid"), ("secondaryInstallationPid", ""),
+                           ("secondaryItems", []), ("secondaryDetail", {"pid": "allowed-pid"}),
+                           ("firstReadsSecondStatus", 200), ("secondReadsFirstStatus", 200), ("cursorStatus", 200),
+                           ("cursorStatus", True)]:
+            report = passed(); report["virtualResource"]["installationIsolation"][key] = value
+            with self.subTest(isolation=key), self.assertRaises(ProtocolError): verify_report(report)
+        for key in passed()["virtualResource"]["installationIsolation"]:
+            report = passed(); del report["virtualResource"]["installationIsolation"][key]
+            with self.subTest(missing=key), self.assertRaises(ProtocolError): verify_report(report)
+        report = passed(); report["virtualResource"]["installationIsolation"]["secondaryItems"][0]["privateValue"] = "Private sentinel"
+        with self.assertRaises(ProtocolError): verify_report(report)
 
     def test_query_quota_requires_response_and_persisted_public_audit(self):
         self.assertEqual(verify_report(passed()), passed())
