@@ -1297,7 +1297,7 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
                 + "(SELECT id FROM ab_application_installation WHERE pid=?)", Long.class, principal.installationPid())).isEqualTo(tokensBefore);
         assertThat(eventJdbc.queryForObject("SELECT last_used_at FROM ab_application_credential WHERE pid=?",
                 java.sql.Timestamp.class, credentialPid)).isEqualTo(usageBefore);
-        var issued = http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/oauth2/token")
+        var issued = http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/oauth2/token").servletPath("/oauth2/token")
                 .contentType("application/x-www-form-urlencoded").param("grant_type", "client_credentials")
                 .param("client_id", clientId).param("client_secret", clientSecret))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk()).andReturn().getResponse();
@@ -1309,7 +1309,7 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
 
     private String oauthDenial(String authorization, String id, String secret, String scope,
                                int status, String code, boolean known) throws Exception {
-        var request = org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/oauth2/token")
+        var request = org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/oauth2/token").servletPath("/oauth2/token")
                 .contentType("application/x-www-form-urlencoded").param("grant_type", "client_credentials")
                 .header("X-Request-Id", clientSecret).header("X-Tenant-Id", principal.tenantId())
                 .header("X-Installation-Pid", principal.installationPid());
