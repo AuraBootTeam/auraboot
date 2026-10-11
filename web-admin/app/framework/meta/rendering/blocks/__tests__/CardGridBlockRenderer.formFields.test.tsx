@@ -1,6 +1,8 @@
 import React from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ExpressionEvaluator } from '../../../runtime/expression/evaluator';
+import { businessFunctions } from '../../../runtime/expression/business-functions';
 import { ScopedStateManager } from '../../../runtime/state/scoped-state';
 import { CardGridBlockRenderer } from '../CardGridBlockRenderer';
 
@@ -19,7 +21,7 @@ vi.mock('../../components/ComponentLoader', () => ({ ComponentLoader: ({ props }
     readOnly={props.readOnly} onChange={(event) => props.onChange(event.target.value)} /></label>
 ) }));
 
-function setup(bind = true, grouped = false) {
+function setup(bind = true, grouped = false, computed = false) {
   const state = new ScopedStateManager({} as any);
   state.createScope('review');
   let rows = [
@@ -34,8 +36,8 @@ function setup(bind = true, grouped = false) {
     subscribe: (_key: string, listener: () => void) => { listeners.add(listener); return () => listeners.delete(listener); },
   };
   const runtime = {
-    getContext: () => ({ locale: 'en', t: (key: string) => key, ...state.getScope('review') }),
-    getStateManager: () => state, getScopeId: () => 'review', getSchema: () => ({ id: 'review' }),
+    getContext: () => ({ fn: businessFunctions, locale: 'en', t: (key: string) => key, ...state.getScope('review') }),
+    getEvaluator: () => new ExpressionEvaluator(), getStateManager: () => state, getScopeId: () => 'review', getSchema: () => ({ id: 'review' }),
     getDataSourceManager: () => data, triggerFieldLinkage: vi.fn(),
   } as any;
   render(<CardGridBlockRenderer runtime={runtime} block={{ id: 'offers', blockType: 'card-grid',
@@ -45,6 +47,7 @@ function setup(bind = true, grouped = false) {
       { field: 'availableQty', label: 'Available capacity', component: 'SmartInput', readOnly: true },
       { field: 'proposedQty', label: 'Proposed quantity', component: 'SmartInput' },
       { field: 'score', label: 'Score', component: 'SmartInput', readOnly: true },
+      ...(computed ? [{ field: 'groupTotal', label: 'Group total', component: 'SmartInput', valueWhen: '${fn.DECIMAL_SUM_BY(form.choices, "proposedQty", "sourcePid", row.sourcePid)}' }] : []),
     ],
     cardActions: [{ code: 'preview', label: 'Preview', action: { type: 'command', command: 'test:preview' } }],
   } as any} />);
@@ -56,6 +59,17 @@ function setup(bind = true, grouped = false) {
 
 describe('Card-grid draft form fields', () => {
   beforeEach(() => handleAction.mockClear());
+
+  it('updates computed source totals without persisting derived values', () => {
+    const { state } = setup(true, true, true);
+    const card = within(screen.getByRole('group', { name: 'Supplier C' }));
+    expect(card.getByRole('textbox', { name: 'Group total' })).toHaveValue('60');
+    expect(card.getByRole('textbox', { name: 'Group total' })).toHaveAttribute('readonly');
+    fireEvent.change(card.getByRole('textbox', { name: 'Proposed quantity' }), { target: { value: '0.000001' } });
+    expect(card.getByRole('textbox', { name: 'Group total' })).toHaveValue('60.000001');
+    expect(within(screen.getByRole('group', { name: 'Supplier B' })).getByRole('textbox', { name: 'Group total' })).toHaveValue('40');
+    expect(state.getFieldValue('review', 'choices')[2]).not.toHaveProperty('groupTotal');
+  });
 
   it('keeps offered capacity read-only and submits edited draft rows only on an explicit action', () => {
     const { state } = setup();

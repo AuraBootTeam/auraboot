@@ -108,6 +108,7 @@
         "event.emit",
         "export",
         "form.reset",
+        "form.set",
         "form.validate",
         "navigate",
         "new",

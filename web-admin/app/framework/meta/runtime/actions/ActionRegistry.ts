@@ -1012,6 +1012,23 @@ actionRegistry.register('form.reset', ({ stateManager, scopeId }) => {
   stateManager.resetForm(scopeId);
 });
 
+/** Explicitly replace declared form fields using evaluated values; other fields stay intact. */
+actionRegistry.register('form.set', ({ stateManager, scopeId, args, expressionEvaluator, expressionContext }) => {
+  if (!stateManager || !scopeId || !args || typeof args !== 'object' || Array.isArray(args)) {
+    throw new Error('form.set requires a scoped form and field values');
+  }
+  const entries = Object.entries(args);
+  if (entries.some(([key]) => !key.trim() || ['__proto__', 'prototype', 'constructor'].includes(key))) {
+    throw new Error('form.set contains an invalid field key');
+  }
+  const values = expressionEvaluator && expressionContext
+    ? expressionEvaluator.evaluateObject(args, expressionContext) : args;
+  if (Object.values(values).some((value) => value === undefined)) {
+    throw new Error('form.set contains an unresolved field value');
+  }
+  Object.entries(values).forEach(([key, value]) => stateManager.updateForm(scopeId, key, value));
+});
+
 /**
  * state.set - 设置状态
  * 更新指定作用域的状态值

@@ -194,7 +194,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
 
   // ── Empty state ────────────────────────────────────────────────────────────
   if (rows.length === 0) {
-    const emptyMsg =
+    const emptyMsg = cfg.empty?.title ? getLocalizedText(cfg.empty.title, locale, t) :
       t('template.gallery.empty') !== 'template.gallery.empty'
         ? t('template.gallery.empty')
         : t('common.noData') !== 'common.noData'
@@ -205,7 +205,8 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
         data-testid="card-grid-empty"
         className="rounded-control border-border bg-panel text-text-2 border p-3 text-sm"
       >
-        {emptyMsg}
+        <p className="text-text font-medium">{emptyMsg}</p>
+        {cfg.empty?.description && <p className="mt-1">{getLocalizedText(cfg.empty.description, locale, t)}</p>}
       </div>
     );
   }
@@ -297,11 +298,11 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
                     runtime={runtime}
                     field={{ ...field,
                       field: `${formField || block.id}.${idx}.${field.field}`,
-                      readOnly: !formField || field.readOnly,
+                      readOnly: !formField || Boolean(field.valueWhen) || field.readOnly,
                     }}
-                    value={row[field.field]}
+                    value={field.valueWhen ? runtime.getEvaluator().evaluate(field.valueWhen, { ...runtime.getContext(), row } as any) : row[field.field]}
                     onChange={(value) => {
-                      if (!formField || field.readOnly) return;
+                      if (!formField || field.readOnly || field.valueWhen) return;
                       stateManager.updateField(scopeId, formField,
                         rows.map((current, index) => index === idx ? { ...current, [field.field]: value } : current));
                     }}

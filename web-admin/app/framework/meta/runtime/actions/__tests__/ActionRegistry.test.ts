@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { actionRegistry, promptInputForm } from '~/framework/meta/runtime/actions/ActionRegistry';
 import type { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
 import { FlowRunner } from '~/framework/meta/runtime/schema-runtime/FlowRunner';
+import { ExpressionEvaluator } from '~/framework/meta/runtime/expression/evaluator';
+import { ScopedStateManager } from '~/framework/meta/runtime/state/scoped-state';
 import { createExpressionContext } from '~/framework/meta/runtime/expression/context';
 
 describe('ActionRegistry command failure feedback', () => {
@@ -1240,5 +1242,43 @@ describe('ActionRegistry grouped API choices', () => {
     expect(detail.fieldOptions.groups).toEqual([{ value: 'category-a', label: 'Resistors', options: [
       { value: 'supplier-a', label: 'Supplier A' }, { value: 'supplier-b', label: 'Supplier B', disabled: true },
     ] }]);
+  });
+});
+
+
+describe('ActionRegistry explicit form replacement', () => {
+  it('places an API result into the form through the real expression pipeline without changing unrelated edits', async () => {
+    const manager = new ScopedStateManager({ locale: 'zh-CN', theme: 'light' } as any);
+    manager.createScope('plan', { form: { note: 'Keep my edit', rows: [{ quantity: '2' }] } });
+    const rows = [{ quantity: '12345678901234567890.000001' }, { quantity: '0' }];
+    const flow = new FlowRunner({ evaluator: new ExpressionEvaluator(), actionRegistry,
+      stateManager: manager, scopeId: 'plan', dataSourceManager: {} as any,
+      schema: {} as any, getAllFormFields: () => [] });
+    await flow.run([
+      { action: 'api.request', endpoint: '/api/example/read-only-plan', method: 'post',
+        body: { rows: '${form.rows}' }, target: 'proposal' },
+      { action: 'form.set', args: { rows: '${state.proposal.rows}' } },
+    ], { ...manager.getContext('plan'), fetchResult: vi.fn().mockResolvedValue({ code: '0', data: { rows } }) } as any);
+    expect(manager.getContext('plan').form).toEqual({ note: 'Keep my edit', rows });
+  });
+  it('rejects unresolved expressions before replacing any field', async () => {
+    const updateForm = vi.fn();
+    await expect(actionRegistry.execute('form.set', { stateManager: { updateForm } as any,
+      scopeId: 'plan', args: { note: 'Changed', rows: '${state.missing}' },
+      expressionEvaluator: new ExpressionEvaluator(), expressionContext: createExpressionContext() }))
+      .rejects.toThrow('unresolved field value');
+    expect(updateForm).not.toHaveBeenCalled();
+  });
+  it('does not replace form edits when the preceding API request fails', async () => {
+    const manager = new ScopedStateManager({ locale: 'en', theme: 'light' } as any);
+    manager.createScope('failed-plan', { form: { rows: [{ quantity: '3.000001' }] } });
+    const flow = new FlowRunner({ evaluator: new ExpressionEvaluator(), actionRegistry,
+      stateManager: manager, scopeId: 'failed-plan', dataSourceManager: {} as any,
+      schema: {} as any, getAllFormFields: () => [] });
+    await expect(flow.run([
+      { action: 'api.request', endpoint: '/api/example/read-only-plan', target: 'proposal' },
+      { action: 'form.set', args: { rows: '${state.proposal.rows}' } },
+    ], { ...manager.getContext('failed-plan'), fetchResult: vi.fn().mockResolvedValue({ code: '403', message: 'Denied' }) } as any)).rejects.toThrow();
+    expect(manager.getContext('failed-plan').form?.rows).toEqual([{ quantity: '3.000001' }]);
   });
 });
