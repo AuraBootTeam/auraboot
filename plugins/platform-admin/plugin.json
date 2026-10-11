@@ -1,7 +1,7 @@
 {
   "pluginId": "com.auraboot.platform-admin",
   "namespace": "admin",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "dslVersion": 1,
   "pluginType": "config",
   "displayName": "Platform Admin DSL Pages",
