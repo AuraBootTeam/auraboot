@@ -1487,12 +1487,12 @@ function ListPageContentInner(props: PageContentProps) {
     setSearchParams(nextParams, { replace: true });
   }, [pagination.current, pagination.pageSize, searchParams, setSearchParams]);
 
+  // Keep page-owned context stable while runtime draft subscriptions rerender.
+  const listRuntimeContext = useMemo(() => ({ filters }), [filters]);
   // Use usePageRuntime instead of useDynamicPageSetup
   const { runtime, dataSourceManager, t, locale, navigate } = usePageRuntime(schema, {
     token: token || undefined,
-    additionalContext: {
-      filters,
-    },
+    additionalContext: listRuntimeContext,
   });
   useRuntimeStateSubscription(runtime);
   const tableEmptyState = useMemo(() => {
