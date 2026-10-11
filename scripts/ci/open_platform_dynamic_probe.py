@@ -530,9 +530,10 @@ def verify_virtual_null_identity(proof, virtual):
     identities = [proof[key] for key in ["validPid", "secondValidPid", "nullSourcePid"]]
     if any(not isinstance(pid, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", pid) for pid in identities) or len(set(identities)) != 3:
         raise ProtocolError("virtual null identity fixture invalid")
+    # The admin query serializer omits map entries whose SQL value is NULL.
     expected_source = [{"pid": identities[0], "name": "Null identity valid one", "zone": "A"},
                        {"pid": identities[1], "name": "Null identity valid two", "zone": "A"},
-                       {"pid": None, "name": "Null identity candidate", "zone": "A"}]
+                       {"name": "Null identity candidate", "zone": "A"}]
     if not isinstance(proof["sourceRows"], list) or len(proof["sourceRows"]) != 3 or any(not isinstance(row, dict) for row in proof["sourceRows"]) or sorted(proof["sourceRows"], key=lambda row: str(row.get("name", ""))) != sorted(expected_source, key=lambda row: row["name"]):
         raise ProtocolError("virtual null identity source result invalid")
     requests = proof["requests"]

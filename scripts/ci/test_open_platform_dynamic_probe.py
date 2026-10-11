@@ -101,7 +101,7 @@ def passed():
         "validPid": "null-valid-one", "secondValidPid": "null-valid-two", "nullSourcePid": "null-source-pid",
         "sourceRows": [{"pid": "null-valid-one", "name": "Null identity valid one", "zone": "A"},
                        {"pid": "null-valid-two", "name": "Null identity valid two", "zone": "A"},
-                       {"pid": None, "name": "Null identity candidate", "zone": "A"}],
+                       {"name": "Null identity candidate", "zone": "A"}],
         "requests": [], "healthyItems": virtual["identityFailure"]["healthyItems"]}
     for identifier, operation, query, status, pid in [("list-small", "list", "limit=1", 503, None),
             ("list-wide", "list", "limit=50", 503, None), ("get-valid", "get", "", 200, proof["validPid"]),
