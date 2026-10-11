@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from open_platform_dynamic_probe import CASES, run_dynamic_probe, run_sdk_consumer, verify_report, verify_release_report, verify_command_audits, prepare_slo_fixture, run_source_binding_probe, import_public_plugin, run_public_plugin_metadata_rollback
 from open_platform_http import ProtocolError
+from open_platform_dynamic_probe import PLUGIN_QUERY_SOURCE_FINGERPRINT
 
 
 def passed():
@@ -40,7 +41,11 @@ def passed():
             "executed": len(CASES), "passed": len(CASES), "auditProofs": audits,
             "pluginImports": [{"pluginId": plugin, "importId": "import-pid", "pluginPid": "plugin-pid",
                                "resourceType": kind, "created": 1, "success": True}
+                              | ({"namedQueryCreated": 1, "namedQueryPid": "new-query-pid"} if kind == "PUBLIC_QUERY" else {})
                               for plugin, kind in [("release-public-resource", "PUBLIC_RESOURCE"), ("release-public-query", "PUBLIC_QUERY")]],
+            "pluginQuerySource": {"beforeStatus": 400, "queryCode": "release_dynamic_by_zone", "sourcePid": "new-query-pid",
+                "sourceStatus": "published", "sourceVersion": 0, "fingerprint": PLUGIN_QUERY_SOURCE_FINGERPRINT,
+                "importId": "import-pid", "pluginPid": "plugin-pid"},
             "pluginMetadataRollback": {"pluginId": "release-public-resource", "pluginPid": "plugin-pid",
                 "initialImportId": "import-pid", "upgradeImportId": "upgrade-pid", "rollbackImportId": "upgrade-pid",
                 "before": {"pluginId": "release-public-resource", "namespace": "release_public_resource", "version": "1.0.0", "displayName": "Release public contract", "description": None},
@@ -71,6 +76,39 @@ def command_passed():
 
 
 class DynamicProbeTests(unittest.TestCase):
+    def test_new_query_source_proof_is_mandatory_and_strict(self):
+        report = passed(); del report["pluginQuerySource"]
+        with self.assertRaises(ProtocolError): verify_report(report)
+        for key, value in [("beforeStatus", 200), ("queryCode", "preexisting"), ("sourcePid", "foreign"),
+                           ("sourceStatus", "draft"), ("sourceVersion", True), ("fingerprint", "0" * 64),
+                           ("importId", "foreign"), ("pluginPid", "foreign")]:
+            report = passed(); report["pluginQuerySource"][key] = value
+            with self.subTest(key=key), self.assertRaises(ProtocolError): verify_report(report)
+        for key, value in [("namedQueryCreated", True), ("namedQueryCreated", 0), ("namedQueryPid", "123")]:
+            report = passed(); report["pluginImports"][1][key] = value
+            with self.subTest(key=key), self.assertRaises(ProtocolError): verify_report(report)
+
+    def test_joint_query_import_requires_new_source_count_and_pid(self):
+        for mutation in [None, "count", "pid"]:
+            calls = []
+            def request(path, **kwargs):
+                calls.append((path, kwargs))
+                if path.endswith("/parse"): return 200, {"valid": True, "importId": "import-pid"}, {}
+                result = {"success": True, "importId": "import-pid", "pluginId": "release-public-query", "pluginPid": "plugin-pid",
+                          "resourceCounts": {"PUBLIC_QUERY": {"CREATE": 1}, "NAMED_QUERY": {"CREATE": 1}},
+                          "createdResources": {"NAMED_QUERY": ["new-query-pid"]}}
+                if mutation == "count": result["resourceCounts"]["NAMED_QUERY"] = {"SKIP": 1}
+                if mutation == "pid": result["createdResources"]["NAMED_QUERY"] = []
+                return 200, result, {}
+            if mutation:
+                with self.assertRaises(ProtocolError):
+                    import_public_plugin(request, {}, "release-public-query", "PUBLIC_QUERY", {"code": "query"}, named_queries=[{"code": "source"}])
+            else:
+                proof = import_public_plugin(request, {}, "release-public-query", "PUBLIC_QUERY", {"code": "query"}, named_queries=[{"code": "source"}])
+                self.assertEqual(proof["namedQueryPid"], "new-query-pid")
+                self.assertEqual(calls[0][1]["body"]["namedQueries"], [{"code": "source"}])
+                self.assertEqual(calls[0][1]["body"]["publicQueries"], [{"code": "query"}])
+
     def test_public_plugin_parse_execute_rejects_false_success_and_wrong_identity(self):
         for change in [None, "success", "importId", "pluginId", "resourceCounts"]:
             calls = []

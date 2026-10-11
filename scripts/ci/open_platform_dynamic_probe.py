@@ -30,6 +30,10 @@ AUDIT_CASES = (
     ("delete", "delete", 204, False),
 )
 
+# Fixed declaration semantics, authored with NamedQueryDefinitionFingerprint
+# from the qualified JAR before importing. Fresh plugin sources have version 0.
+PLUGIN_QUERY_SOURCE_FINGERPRINT = "9a240519bf431b03641c4b754e65af329bb36bb5a6f2344eb61a5c7f00cc0891"
+
 
 
 COMMAND_AUDIT_CASES = (
@@ -124,14 +128,22 @@ def verify_plugin_import(proof, plugin_id, resource_type):
                    or not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", proof[key])
                    for key in ["importId", "pluginPid"])):
         raise ProtocolError("public plugin import proof invalid")
+    if resource_type == "PUBLIC_QUERY" and (
+            type(proof.get("namedQueryCreated")) is not int or proof["namedQueryCreated"] != 1
+            or not isinstance(proof.get("namedQueryPid"), str)
+            or not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", proof["namedQueryPid"])
+            or proof["namedQueryPid"].isdigit()):
+        raise ProtocolError("public plugin new query creation proof invalid")
 
 
-def import_public_plugin(request, admin, plugin_id, resource_type, definition):
+def import_public_plugin(request, admin, plugin_id, resource_type, definition, *, named_queries=None):
     """Drive production parse/execute; preserve returned import identity and counts."""
     from open_platform_http import data
     key = {"PUBLIC_RESOURCE": "publicResources", "PUBLIC_QUERY": "publicQueries"}[resource_type]
     manifest = {"pluginId": plugin_id, "namespace": plugin_id.replace("-", "_"),
                 "displayName": "Release public contract", "version": "1.0.0", key: [definition]}
+    if named_queries is not None:
+        manifest["namedQueries"] = named_queries
     _, body, _ = request("/api/plugins/import/parse", method="POST", body=manifest, headers=admin)
     preview = data(body)
     if not isinstance(preview, dict) or preview.get("valid") is not True:
@@ -148,7 +160,26 @@ def import_public_plugin(request, admin, plugin_id, resource_type, definition):
         raise ProtocolError("public plugin execution identity or counts invalid")
     proof = {"pluginId": plugin_id, "importId": import_id, "pluginPid": result.get("pluginPid"),
              "resourceType": resource_type, "created": 1, "success": True}
+    if resource_type == "PUBLIC_QUERY":
+        created = result.get("createdResources", {}).get("NAMED_QUERY")
+        if result.get("resourceCounts", {}).get("NAMED_QUERY") != {"CREATE": 1} or not isinstance(created, list) or len(created) != 1:
+            raise ProtocolError("public plugin new query source missing")
+        proof.update(namedQueryCreated=1, namedQueryPid=created[0])
     verify_plugin_import(proof, plugin_id, resource_type)
+    return proof
+
+
+def verify_plugin_query_source(proof, imported):
+    keys = {"beforeStatus", "queryCode", "sourcePid", "sourceStatus", "sourceVersion", "fingerprint", "importId", "pluginPid"}
+    if (not isinstance(proof, dict) or set(proof) != keys
+            or type(proof.get("beforeStatus")) is not int or proof["beforeStatus"] != 400
+            or proof.get("queryCode") != "release_dynamic_by_zone"
+            or proof.get("sourcePid") != imported.get("namedQueryPid")
+            or proof.get("sourceStatus") != "published"
+            or type(proof.get("sourceVersion")) is not int or proof["sourceVersion"] != 0
+            or proof.get("fingerprint") != PLUGIN_QUERY_SOURCE_FINGERPRINT
+            or any(proof.get(key) != imported[key] for key in ["importId", "pluginPid"])):
+        raise ProtocolError("public plugin new query source proof invalid")
     return proof
 
 
@@ -235,6 +266,7 @@ def verify_report(report):
     for proof, plugin, kind in zip(proofs, ["release-public-resource", "release-public-query"], ["PUBLIC_RESOURCE", "PUBLIC_QUERY"]):
         verify_plugin_import(proof, plugin, kind)
     verify_plugin_metadata_rollback(report.get("pluginMetadataRollback"), proofs[0])
+    verify_plugin_query_source(report.get("pluginQuerySource"), proofs[1])
     verify_audits(report)
     verify_source_binding(report.get("resourceSourceBinding"))
     quota = report.get("queryRateLimit")
@@ -499,16 +531,25 @@ def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None):
             "defaultOrder": [{"field": "pid", "direction": "asc"}], "fields": [
                 {"fieldCode": "pid", "columnExpr": "a.pid", "dataType": "string", "displayName": "PID", "sortable": True, "searchable": False},
                 {"fieldCode": "partName", "columnExpr": "a.rel_name", "dataType": "string", "displayName": "Name", "sortable": False, "searchable": False}]}
-        named = human("/api/meta/named-queries", "POST", named_definition)
-        for status in ["testing", "published"]:
-            human(f"/api/meta/named-queries/{named['pid']}/status", "PUT", {"status": status})
-        source = human(f"/api/open-platform/query-sources/{named_code}")
+        if model["tableName"] != model_code:
+            raise ProtocolError("declared query fixture physical source changed")
+        before_status, missing, _ = request("/api/meta/named-queries/by-code/" + named_code, headers=admin, expected=(400,))
+        if not isinstance(missing, dict) or missing.get("message") != "Named query not found: " + named_code:
+            raise ProtocolError("declared query source was not absent before import")
+        named_definition["status"] = "published"
         query_definition = {"code": query, "queryCode": named_code, "schemaVersion": 1,
-            "sourceFingerprint": source["fingerprint"], "sourceResources": {model_code: resource}, "scopes": {"execute": query_scope},
+            "sourceFingerprint": PLUGIN_QUERY_SOURCE_FINGERPRINT, "sourceResources": {model_code: resource}, "scopes": {"execute": query_scope},
             "parameters": {"zone": {"type": "string", "required": True, "nullable": False, "items": None}},
             "fields": {"pid": dict(field("pid"), type="pid", nullable=False), "name": field("partName")},
             "maxPageSize": 20, "maxRows": 100, "timeoutMs": 5000, "maxConcurrent": 2}
-        report["pluginImports"].append(import_public_plugin(request, admin, "release-public-query", "PUBLIC_QUERY", query_definition))
+        report["pluginImports"].append(import_public_plugin(request, admin, "release-public-query", "PUBLIC_QUERY", query_definition,
+                                                           named_queries=[named_definition]))
+        named = human("/api/meta/named-queries/by-code/" + named_code)
+        source = human(f"/api/open-platform/query-sources/{named_code}")
+        report["pluginQuerySource"] = {"beforeStatus": before_status, "queryCode": named["code"], "sourcePid": named["pid"],
+            "sourceStatus": named["status"], "sourceVersion": named["currentVersion"], "fingerprint": source["fingerprint"],
+            "importId": report["pluginImports"][1]["importId"], "pluginPid": report["pluginImports"][1]["pluginPid"]}
+        verify_plugin_query_source(report["pluginQuerySource"], report["pluginImports"][1])
         published_query = [row for row in human("/api/open-platform/query-publications") if row.get("code") == query]
         record("plugin-query-import", len(published_query) == 1 and published_query[0].get("activeVersion") == 1
                and published_query[0].get("status") == "published")
