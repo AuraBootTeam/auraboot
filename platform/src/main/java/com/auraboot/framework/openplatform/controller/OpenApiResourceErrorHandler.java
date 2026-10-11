@@ -12,6 +12,12 @@ import java.util.Map;
 @Order(0)
 @RestControllerAdvice(assignableTypes = {OpenApiResourceWriteController.class, OpenPlatformFacadeController.class, OpenApiQueryController.class})
 public class OpenApiResourceErrorHandler {
+    // Match the root denial before Spring can select its validation cause as a 400.
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<com.auraboot.framework.common.dto.ApiResponse<Object>> denied() {
+        return ResponseEntity.status(403).body(com.auraboot.framework.common.dto.ApiResponse.errorWithContext(
+                com.auraboot.framework.common.constant.ResponseCode.FORBIDDEN, "Current resource or query authorization required"));
+    }
     @ExceptionHandler(com.auraboot.framework.openplatform.service.OpenApiPublicationService.SourceBindingConflictException.class)
     public ResponseEntity<Map<String, Object>> sourceChanged() {
         return ResponseEntity.status(409).body(Map.of("success", false, "code", "open_api_source_changed",

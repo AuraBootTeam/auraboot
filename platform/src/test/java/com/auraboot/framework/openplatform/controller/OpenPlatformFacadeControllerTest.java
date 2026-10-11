@@ -135,7 +135,7 @@ class OpenPlatformFacadeControllerTest {
 
     @Test
     void mapsFacadeValidationFailuresToStablePublicError() {
-        var response = controller.invalidRequest(new IllegalArgumentException("Invalid Idempotency-Key"));
+        var response = new OpenApiResourceErrorHandler().invalid(new IllegalArgumentException("Invalid Idempotency-Key"));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).containsEntry("success", false)

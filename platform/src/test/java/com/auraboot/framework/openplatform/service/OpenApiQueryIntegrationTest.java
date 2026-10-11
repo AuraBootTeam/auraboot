@@ -427,6 +427,21 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
         applyTestMetaContext(); resources.revoke(principalA.installationPid(), root.code());
         http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).header("Authorization", "Bearer " + tokenA))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        applyTestMetaContext();
+        resources.grant(principalA.installationPid(), root.code(), new OpenApiInstallationPolicy(root.operations(), root.fields().keySet(), Set.of(),
+                List.of(new OpenApiInstallationPolicy.RowConstraint("zone", List.of("A")))));
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).header("Authorization", "Bearer " + tokenA))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
+        applyTestMetaContext(); resources.withdraw(root.code(), 1);
+        assertThat(resources.active(testTenant.getId(), contract.code())).contains(contract);
+        for (String unavailable : List.of("/api/open/v1/resources/" + contract.code(), path)) {
+            http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(unavailable).header("Authorization", "Bearer " + tokenA))
+                    .andExpect(result -> assertThat(result.getResolvedException()).isInstanceOf(AccessDeniedException.class))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden())
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code").value("403"))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(
+                            org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("Query source resource is not published"))));
+        }
     }
 
     @Test void namedQueryVirtualResourceKeepsTypedDateBoundariesAndFilters() throws Exception {

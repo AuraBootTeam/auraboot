@@ -259,6 +259,7 @@ test.describe('Dynamic resource publication journey', () => {
     const blockedCatalog = await page.request.get(`${WEB_BASE_URL}/api/open-platform/publications`);
     expect(blockedCatalog.status()).toBe(200); const blockedBody = await blockedCatalog.json(); expect(String(blockedBody.code)).toBe('0');
     expect(blockedBody.data.some((entry: { code: string }) => entry.code === virtualCode)).toBe(false);
+    await snapshot('publication-virtual-source-required');
     await page.getByTestId('publication-editor').locator('section').filter({ has: sourceSelector })
       .screenshot({ path: path.join(screenshotRoot, 'publication-virtual-source-required-region.png') });
     await sourceSelector.selectOption(resourceCode);
@@ -330,13 +331,14 @@ test.describe('Dynamic resource publication journey', () => {
     await expect(sourceSelector).toHaveValue(resourceCode); await expect(sourceSelector).toBeDisabled();
     const unavailableSource = sourceSelector.getByRole('option', { name: `${resourceCode} (来源已不可用)`, exact: true });
     await expect(unavailableSource).toHaveCount(1); await expect(unavailableSource).toBeDisabled();
-    await page.getByTestId('publication-editor').locator('section').filter({ has: sourceSelector })
-      .screenshot({ path: path.join(screenshotRoot, 'publication-virtual-source-unavailable-region.png') });
+
     const deniedSourceRead = await page.request.get(resourcePath, { headers }); expect(deniedSourceRead.status()).toBe(403);
     const afterSourceWithdrawal = await page.request.get(`${WEB_BASE_URL}/api/open-platform/publications`);
     expect(afterSourceWithdrawal.status()).toBe(200); const preservedVirtual = await afterSourceWithdrawal.json(); expect(String(preservedVirtual.code)).toBe('0');
     expect(preservedVirtual.data.find((entry: { code: string }) => entry.code === virtualCode)).toMatchObject({ status: 'published', activeVersion: 1,
       draft: { sourceResources: { [modelCode]: resourceCode } } });
+    await page.getByTestId('publication-editor').locator('section').filter({ has: sourceSelector })
+      .screenshot({ path: path.join(screenshotRoot, 'publication-virtual-source-unavailable-region.png') });
   });
 });
 
