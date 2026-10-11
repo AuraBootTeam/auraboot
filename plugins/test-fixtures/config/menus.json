@@ -139,7 +139,6 @@
   "permissionCode": "e2et.order.read",
   "orderNo": 60,
   "visible": true,
-  "pageKey": "e2et_crm_opp_list",
-  "key": "e2et_crm_opp_list"
+  "pageKey": "e2et_crm_opp_list"
  }
 ]

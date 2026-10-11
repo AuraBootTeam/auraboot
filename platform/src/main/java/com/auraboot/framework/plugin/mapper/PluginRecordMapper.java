@@ -25,6 +25,15 @@ public interface PluginRecordMapper extends BaseMapper<PluginRecord> {
     @Select("SELECT * FROM ab_plugin WHERE pid = #{pid} AND deleted_flag = false")
     PluginRecord findByPid(@Param("pid") String pid);
 
+    /** Retired plugin identity remains available for publication ownership verification. */
+    @Select("SELECT * FROM ab_plugin WHERE tenant_id = #{tenantId} AND pid = #{pid}")
+    PluginRecord findIdentityIncludingDeleted(@Param("tenantId") Long tenantId, @Param("pid") String pid);
+
+    @Select("SELECT * FROM ab_plugin WHERE tenant_id = #{tenantId} AND pid = #{pid} FOR UPDATE")
+    PluginRecord lockIdentityIncludingDeleted(@Param("tenantId") Long tenantId, @Param("pid") String pid);
+
+
+
     /**
      * Find plugin by namespace within a tenant.
      *

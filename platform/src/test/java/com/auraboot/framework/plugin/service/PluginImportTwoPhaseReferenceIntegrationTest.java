@@ -39,6 +39,10 @@ class PluginImportTwoPhaseReferenceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private PluginImportService pluginImportService;
+    @Autowired private com.auraboot.framework.meta.service.MetaModelService models;
+    @Autowired private com.auraboot.framework.openplatform.service.OpenApiPublicationService publications;
+    @Autowired private com.auraboot.framework.plugin.mapper.PluginResourceMapper resources;
+    @Autowired private com.fasterxml.jackson.databind.ObjectMapper json;
 
     private String dirOf(String resourcePath) throws Exception {
         URL resource = getClass().getClassLoader().getResource(resourcePath);
@@ -145,4 +149,61 @@ class PluginImportTwoPhaseReferenceIntegrationTest extends BaseIntegrationTest {
                 .as("sweep must flag tpc_dangling_role -> tp_nonexistent_permission, got: %s", dangling)
                 .anyMatch(s -> s.contains("tpc_dangling_role") && s.contains("tp_nonexistent_permission"));
     }
+    @Test
+    void publicResourcePublishesOnlyAfterImportedModelAndBindingsAreReady(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        grantCommittedPermissionToTestRole("sys.connector.update", "system", "connector", "update", "Manage public publications");
+        String suffix = com.auraboot.framework.common.util.UniqueIdGenerator.generate().toLowerCase();
+        String namespace = "pub" + suffix;
+        String modelCode = namespace + "_record", fieldCode = namespace + "_name", publicCode = "import." + suffix;
+        var manifest = json.createObjectNode().put("pluginId", "com.example.public-import-" + suffix)
+                .put("namespace", namespace).put("version", "1.0.0").put("displayName", "Public import order fixture");
+        manifest.putArray("models").addObject().put("code", modelCode).put("displayName", "Publication source")
+                .put("modelType", "entity").putObject("capabilities").put("list", true).put("detail", true);
+        manifest.putArray("fields").addObject().put("code", fieldCode).put("displayName", "Name").put("dataType", "string");
+        manifest.putArray("modelFieldBindings").addObject().put("modelCode", modelCode).put("fieldCode", fieldCode).put("sequence", 10);
+        try (var fixture = getClass().getResourceAsStream("/plugin/public-resource-contract.json")) {
+            var contract = (com.fasterxml.jackson.databind.node.ObjectNode) json.readTree(java.util.Objects.requireNonNull(fixture));
+            contract.put("code", publicCode).put("modelCode", modelCode);
+            manifest.putArray("publicResources").add(contract);
+        }
+        java.nio.file.Files.writeString(dir.resolve("plugin.json"), json.writeValueAsString(manifest));
+        var preview = pluginImportService.parseDirectory(dir.toString());
+        assertThat(preview.isValid()).as("public import preview errors: %s", preview.getErrors()).isTrue();
+        var result = pluginImportService.execute(preview.getImportId(), new ImportRequest());
+        assertThat(result.isSuccess()).as("public import failed: %s", result.getErrorMessage()).isTrue();
+        var active = publications.active(testTenant.getId(), publicCode).orElseThrow();
+        assertThat(active.modelCode()).isEqualTo(modelCode);
+        assertThat(active.schemaVersion()).isEqualTo(1);
+        assertThat(models.getModelDefinition(modelCode).orElseThrow().getStatus()).isEqualTo("published");
+        assertThat(models.getModelDefinition(modelCode).orElseThrow().getCapabilities().isList()).isTrue();
+        assertThat(models.getModelDefinition(modelCode).orElseThrow().getCapabilities().isCreate()).isFalse();
+        assertThat(models.getModelDefinition(modelCode).orElseThrow().getFields()).extracting("code").contains(fieldCode);
+        var owned = resources.findByTypeAndCode(testTenant.getId(),
+                com.auraboot.framework.plugin.dto.imports.ResourceType.PUBLIC_RESOURCE.code(), publicCode);
+        assertThat(owned.getImportId()).isEqualTo(preview.getImportId());
+        assertThat(owned.getLastSyncVersion()).isEqualTo("1.0.0");
+        assertThat(owned.getImportSnapshot()).containsEntry("status", "published");
+        assertThat(result.getResourceCounts()).containsKey("PUBLIC_RESOURCE");
+        assertThat(result.getResourceCounts().get("PUBLIC_RESOURCE")).containsEntry("CREATE", 1);
+
+        manifest.put("version", "2.0.0");
+        ((com.fasterxml.jackson.databind.node.ObjectNode) manifest.get("publicResources").get(0))
+                .put("schemaVersion", 2).put("maxPageSize", 30);
+        java.nio.file.Files.writeString(dir.resolve("plugin.json"), json.writeValueAsString(manifest));
+        var upgradePreview = pluginImportService.parseDirectory(dir.toString());
+        assertThat(upgradePreview.isValid()).isTrue();
+        var upgraded = pluginImportService.execute(upgradePreview.getImportId(), new ImportRequest());
+        assertThat(upgraded.isSuccess()).as("public upgrade failed: %s", upgraded.getErrorMessage()).isTrue();
+        assertThat(publications.active(testTenant.getId(), publicCode).orElseThrow().schemaVersion()).isEqualTo(2);
+        assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> pluginImportService.rollback(preview.getImportId())))
+                .isInstanceOf(com.auraboot.framework.plugin.exception.PluginException.class).hasMessageContaining("latest successful");
+        assertThat(publications.active(testTenant.getId(), publicCode).orElseThrow().schemaVersion()).isEqualTo(2);
+        assertThat(pluginImportService.rollback(upgradePreview.getImportId()).isSuccess()).isTrue();
+        assertThat(publications.active(testTenant.getId(), publicCode).orElseThrow().schemaVersion()).isEqualTo(1);
+        assertThat(publications.snapshots(testTenant.getId(), publicCode)).hasSize(2);
+        assertThat(resources.findByTypeAndCode(testTenant.getId(),
+                com.auraboot.framework.plugin.dto.imports.ResourceType.PUBLIC_RESOURCE.code(), publicCode).getLastSyncVersion())
+                .isEqualTo("1.0.0");
+    }
+
 }

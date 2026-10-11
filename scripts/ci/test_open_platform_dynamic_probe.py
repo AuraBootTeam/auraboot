@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from open_platform_dynamic_probe import CASES, run_dynamic_probe, run_sdk_consumer, verify_report, verify_release_report, verify_command_audits, prepare_slo_fixture, run_source_binding_probe
+from open_platform_dynamic_probe import CASES, run_dynamic_probe, run_sdk_consumer, verify_report, verify_release_report, verify_command_audits, prepare_slo_fixture, run_source_binding_probe, import_public_plugin
 from open_platform_http import ProtocolError
 
 
@@ -38,6 +38,9 @@ def passed():
     del quota_audit["id"]
     return {"schemaVersion": 1, "cases": [{"id": case, "status": "passed"} for case in CASES],
             "executed": len(CASES), "passed": len(CASES), "auditProofs": audits,
+            "pluginImports": [{"pluginId": plugin, "importId": "import-pid", "pluginPid": "plugin-pid",
+                               "resourceType": kind, "created": 1, "success": True}
+                              for plugin, kind in [("release-public-resource", "PUBLIC_RESOURCE"), ("release-public-query", "PUBLIC_QUERY")]],
             "applicationPid": "app-pid", "installationPid": "install-pid",
             "resourceSourceBinding": {"status": 409, "code": "open_api_source_changed", "requestId": "release-dynamic-source-binding",
                 "error": {"success": False, "code": "open_api_source_changed", "message": "Published resource source binding is unavailable or changed"},
@@ -62,6 +65,32 @@ def command_passed():
 
 
 class DynamicProbeTests(unittest.TestCase):
+    def test_public_plugin_parse_execute_rejects_false_success_and_wrong_identity(self):
+        for change in [None, "success", "importId", "pluginId", "resourceCounts"]:
+            calls = []
+            def request(path, **kwargs):
+                calls.append((path, kwargs))
+                if path.endswith("/parse"): return 200, {"valid": True, "importId": "import-pid"}, {}
+                result = {"success": True, "importId": "import-pid", "pluginId": "release-public-resource",
+                          "pluginPid": "plugin-pid", "resourceCounts": {"PUBLIC_RESOURCE": {"CREATE": 1}}}
+                if change: result[change] = False if change == "success" else {} if change == "resourceCounts" else "foreign"
+                return 200, result, {}
+            with self.subTest(change=change):
+                if change:
+                    with self.assertRaises(ProtocolError): import_public_plugin(request, {}, "release-public-resource", "PUBLIC_RESOURCE", {"code": "resource"})
+                else:
+                    self.assertEqual(import_public_plugin(request, {}, "release-public-resource", "PUBLIC_RESOURCE", {"code": "resource"})["created"], 1)
+                    self.assertEqual(calls[0][1]["body"]["publicResources"], [{"code": "resource"}])
+                    self.assertEqual(calls[1][0], "/api/plugins/import/import-pid/execute")
+                    self.assertEqual(calls[1][1]["body"], {"conflictStrategy": "ERROR"})
+
+    def test_public_plugin_proof_is_mandatory_and_strict(self):
+        report = passed(); del report["pluginImports"]
+        with self.assertRaises(ProtocolError): verify_report(report)
+        for key, value in [("pluginId", "foreign"), ("resourceType", "PUBLIC_QUERY"), ("created", True), ("success", False), ("pluginPid", None)]:
+            report = passed(); report["pluginImports"][0][key] = value
+            with self.subTest(key=key), self.assertRaises(ProtocolError): verify_report(report)
+
     def test_source_binding_fixture_restores_metadata_after_success_and_transport_failure(self):
         for fail in [False, True]:
             state = {"rebound": False, "restored": False}

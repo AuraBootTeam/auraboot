@@ -21,6 +21,11 @@ import static org.assertj.core.api.Assertions.*;
 /** Real two-source SQL, token/installation grants, source pinning and authenticated public HTTP. */
 @org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
+    @Autowired private com.auraboot.framework.plugin.service.impl.PluginPublicPublicationLifecycle pluginPublications;
+    @Autowired private com.auraboot.framework.plugin.service.PluginImportService pluginImports;
+    @Autowired private com.auraboot.framework.plugin.mapper.PluginRecordMapper plugins;
+    @Autowired private com.auraboot.framework.plugin.mapper.PluginResourceMapper pluginResources;
+    @Autowired private com.auraboot.framework.plugin.service.PluginResourceService pluginResourceService;
     @Autowired private MetaModelService models;
     @Autowired private SchemaManagementService schemas;
     @Autowired private DynamicDataService data;
@@ -120,6 +125,60 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
         try(var machine=MachineDataAccessContext.begin(principal)) {return publicQueries.execute(principal,contract.code(),new OpenApiQueryService.ExecuteRequest(Map.of("zone",zone),10,null));}
         finally {if(previous==null)MetaContext.clear();else MetaContext.restore(previous);}
     }
+    @Test void pluginQueryPublicationUsesRealSourcePinsGrantsAndWithdrawal() throws Exception {
+        String suffix = UniqueIdGenerator.generate().toLowerCase();
+        var pluginManifest = com.auraboot.framework.plugin.dto.PluginManifest.builder().pluginId("com.example.query-" + suffix)
+                .namespace("query_plugin_" + suffix).version("1.0.0").displayName("Public query plugin").build();
+        var plugin = com.auraboot.framework.plugin.entity.PluginRecord.builder().pid(UniqueIdGenerator.generate())
+                .tenantId(testTenant.getId()).pluginId(pluginManifest.getPluginId()).namespace(pluginManifest.getNamespace())
+                .version(pluginManifest.getVersion()).displayName(pluginManifest.getDisplayName()).manifest(pluginManifest)
+                .status("installed").deletedFlag(false).build();
+        assertThat(plugins.insert(plugin)).isEqualTo(1);
+        var contract = new OpenApiQueryContract("plugin." + suffix, rows.queryCode(), 1, rows.sourceFingerprint(),
+                rows.scopes(), rows.sourceResources(), rows.parameters(), rows.fields(), rows.maxPageSize(),
+                rows.maxRows(), rows.timeoutMs(), rows.maxConcurrent());
+        var manifest = new com.auraboot.framework.plugin.dto.imports.PluginManifestExtended();
+        manifest.setPluginId(plugin.getPluginId()); manifest.setNamespace(plugin.getNamespace()); manifest.setVersion("1.0.0");
+        manifest.setPublicQueries(List.of(contract));
+        var request = new com.auraboot.framework.plugin.dto.imports.ImportRequest();
+        var preview = pluginImports.parseJson(json.writeValueAsString(manifest), "public-query-plugin.json");
+        assertThat(preview.isValid()).as("query import preview: %s", preview.getErrors()).isTrue();
+        var imported = pluginImports.execute(preview.getImportId(), request);
+        assertThat(imported.isSuccess()).as("query import failed: %s", imported.getErrorMessage()).isTrue();
+        assertThat(imported.getResourceCounts().get("PUBLIC_QUERY")).containsEntry("CREATE", 1);
+        assertThat(publications.active(testTenant.getId(), contract.code())).contains(contract);
+        assertThatThrownBy(() -> run(principalA, contract, "A")).isInstanceOf(AccessDeniedException.class);
+        publications.grant(principalA.installationPid(), contract.code(), new OpenApiQueryPolicy(contract.fields().keySet()));
+        String route = "/api/open/v1/queries/" + contract.code() + ":execute";
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(route)
+                .header("Authorization", "Bearer " + tokenA).contentType("application/json")
+                .content("{\"parameters\":{\"zone\":\"A\"},\"limit\":10}"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items.length()").value(1))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[0].childName").value("Child A"));
+        applyTestMetaContext();
+        var owned = pluginResources.findByTypeAndCode(testTenant.getId(),
+                com.auraboot.framework.plugin.dto.imports.ResourceType.PUBLIC_QUERY.code(), contract.code());
+        assertThat(owned.getResourcePid()).isNull();
+        assertThat(owned.getImportId()).isEqualTo(preview.getImportId());
+        assertThat(pluginResourceService.exportPluginConfig(plugin.getPluginId()).get("publicQueries"))
+                .singleElement().satisfies(declaration -> assertThat(declaration).containsEntry("code", contract.code())
+                        .containsEntry("sourceFingerprint", contract.sourceFingerprint()).doesNotContainKey("draftRevision"));
+        pluginResourceService.deleteResource(owned);
+        assertThat(publications.active(testTenant.getId(), contract.code())).isEmpty();
+        assertThat(publicationMapper.resourceSnapshots(testTenant.getId(), contract.storageCode())).hasSize(1);
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(route)
+                .header("Authorization", "Bearer " + tokenA).contentType("application/json")
+                .content("{\"parameters\":{\"zone\":\"A\"},\"limit\":10}"))
+                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.message").value("open_api_capability_not_found"));
+        applyTestMetaContext();
+        pluginPublications.importDeclarations(manifest, request, new com.auraboot.framework.plugin.dto.imports.ImportExecuteResult(),
+                plugin.getPid(), UniqueIdGenerator.generate(), testTenant.getId());
+        assertThat(publicationMapper.resourceSnapshots(testTenant.getId(), contract.storageCode())).hasSize(1);
+        assertThat(run(principalA, contract, "A").get("items").toString()).contains("Child A").doesNotContain("Forbidden sibling", "Root B");
+    }
+
     @Test void administrationMetadataPinsTheExecutionSourceAndOffersOnlyCurrentListPublications() throws Exception {
         var source = publications.source(rowsDefinition.getCode());
         assertThat(source.fingerprint()).isEqualTo(queries.describeExecution(rowsDefinition.getCode()).fingerprint());

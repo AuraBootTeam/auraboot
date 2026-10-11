@@ -12628,7 +12628,7 @@ CREATE TABLE public.ab_open_api_publication_audit (
     actor_pid character varying(64) NOT NULL,
     revision bigint NOT NULL,
     occurred_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT ab_open_api_publication_audit_action_check CHECK (((action)::text = ANY ((ARRAY['draft'::character varying, 'publish'::character varying, 'withdraw'::character varying, 'grant'::character varying, 'revoke'::character varying])::text[])))
+    CONSTRAINT ab_open_api_publication_audit_action_check CHECK (((action)::text = ANY ((ARRAY['draft'::character varying, 'publish'::character varying, 'withdraw'::character varying, 'grant'::character varying, 'revoke'::character varying, 'plugin_reactivate'::character varying, 'plugin_rollback'::character varying])::text[])))
 );
 
 
@@ -14432,7 +14432,7 @@ CREATE TABLE public.ab_plugin_resource (
     last_sync_version character varying(50),
     CONSTRAINT ab_plugin_resource_ownership_type_check CHECK (((ownership_type)::text = ANY ((ARRAY['plugin_owned'::character varying, 'shared'::character varying, 'user_claimed'::character varying])::text[]))),
     CONSTRAINT chk_resource_action CHECK (((action)::text = ANY ((ARRAY['create'::character varying, 'update'::character varying, 'delete'::character varying, 'skip'::character varying])::text[]))),
-    CONSTRAINT chk_resource_type CHECK (((resource_type)::text = ANY ((ARRAY['model'::character varying, 'field'::character varying, 'model_field_binding'::character varying, 'command'::character varying, 'binding_rule'::character varying, 'permission'::character varying, 'role'::character varying, 'role_permission'::character varying, 'menu'::character varying, 'process'::character varying, 'page'::character varying, 'dict'::character varying, 'dict_item'::character varying, 'named_query'::character varying, 'agent_definition'::character varying, 'i18n'::character varying])::text[])))
+    CONSTRAINT chk_resource_type CHECK (((resource_type)::text = ANY ((ARRAY['model'::character varying, 'field'::character varying, 'model_field_binding'::character varying, 'command'::character varying, 'binding_rule'::character varying, 'permission'::character varying, 'role'::character varying, 'role_permission'::character varying, 'menu'::character varying, 'process'::character varying, 'page'::character varying, 'dict'::character varying, 'dict_item'::character varying, 'named_query'::character varying, 'agent_definition'::character varying, 'i18n'::character varying, 'saved_view'::character varying, 'notification_template'::character varying, 'public_resource'::character varying, 'public_query'::character varying])::text[])))
 );
 
 

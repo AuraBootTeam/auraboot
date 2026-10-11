@@ -15,7 +15,7 @@ from open_platform_http import ProtocolError
 from open_platform_model_event_probe import read_secret, verify_report as verify_model_event_report
 
 CASES = (
-    "publication-snapshot", "resource-no-grant", "query-no-grant",
+    "plugin-resource-import", "publication-snapshot", "plugin-query-import", "resource-no-grant", "query-no-grant",
     "resource-row-field-projection", "hidden-record", "outside-create",
     "query-source-row-projection", "create", "idempotent-replay",
     "idempotent-conflict", "update-version", "stale-write",
@@ -116,6 +116,42 @@ def verify_audits(report):
             raise ProtocolError("dynamic business audit identity/result invalid")
 
 
+def verify_plugin_import(proof, plugin_id, resource_type):
+    if (not isinstance(proof, dict) or proof.get("pluginId") != plugin_id
+            or proof.get("resourceType") != resource_type or proof.get("success") is not True
+            or type(proof.get("created")) is not int or proof["created"] != 1
+            or any(not isinstance(proof.get(key), str)
+                   or not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", proof[key])
+                   for key in ["importId", "pluginPid"])):
+        raise ProtocolError("public plugin import proof invalid")
+
+
+def import_public_plugin(request, admin, plugin_id, resource_type, definition):
+    """Drive production parse/execute; preserve returned import identity and counts."""
+    from open_platform_http import data
+    key = {"PUBLIC_RESOURCE": "publicResources", "PUBLIC_QUERY": "publicQueries"}[resource_type]
+    manifest = {"pluginId": plugin_id, "namespace": plugin_id.replace("-", "_"),
+                "displayName": "Release public contract", "version": "1.0.0", key: [definition]}
+    _, body, _ = request("/api/plugins/import/parse", method="POST", body=manifest, headers=admin)
+    preview = data(body)
+    if not isinstance(preview, dict) or preview.get("valid") is not True:
+        raise ProtocolError("public plugin preview rejected")
+    import_id = preview.get("importId")
+    if not isinstance(import_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", import_id):
+        raise ProtocolError("public plugin import identity missing")
+    _, body, _ = request(f"/api/plugins/import/{import_id}/execute", method="POST",
+                         body={"conflictStrategy": "ERROR"}, headers=admin)
+    result = data(body)
+    if (not isinstance(result, dict) or result.get("success") is not True
+            or result.get("importId") != import_id or result.get("pluginId") != plugin_id
+            or result.get("resourceCounts", {}).get(resource_type) != {"CREATE": 1}):
+        raise ProtocolError("public plugin execution identity or counts invalid")
+    proof = {"pluginId": plugin_id, "importId": import_id, "pluginPid": result.get("pluginPid"),
+             "resourceType": resource_type, "created": 1, "success": True}
+    verify_plugin_import(proof, plugin_id, resource_type)
+    return proof
+
+
 def verify_report(report):
     if not isinstance(report, dict) or report.get("schemaVersion") != 1:
         raise ProtocolError("dynamic probe report schema invalid")
@@ -128,6 +164,11 @@ def verify_report(report):
         raise ProtocolError("dynamic probe has failed or unexecuted cases")
     if report.get("executed") != len(CASES) or report.get("passed") != len(CASES):
         raise ProtocolError("dynamic probe totals do not match fixed cases")
+    proofs = report.get("pluginImports")
+    if not isinstance(proofs, list) or len(proofs) != 2:
+        raise ProtocolError("public plugin import denominator missing")
+    for proof, plugin, kind in zip(proofs, ["release-public-resource", "release-public-query"], ["PUBLIC_RESOURCE", "PUBLIC_QUERY"]):
+        verify_plugin_import(proof, plugin, kind)
     verify_audits(report)
     verify_source_binding(report.get("resourceSourceBinding"))
     quota = report.get("queryRateLimit")
@@ -380,9 +421,11 @@ def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None):
                 "name": field("rel_name", True, True), "zone": dict(field("rel_zone", True, True), operators=["EQ"]),
                 "secret": field("rel_private")},
             "maxPageSize": 50, "maxConditions": 8, "timeoutMs": 5000, "events": []}
-        human(f"/api/open-platform/publications/{resource}/draft", "PUT", {"expectedRevision": 0, "definition": definition})
-        published = human(f"/api/open-platform/publications/{resource}/publish", "POST", {"expectedRevision": 1})
-        record("publication-snapshot", published.get("activeVersion") == 1)
+        report["pluginImports"] = [import_public_plugin(request, admin, "release-public-resource", "PUBLIC_RESOURCE", definition)]
+        record("plugin-resource-import", True)
+        published = [row for row in human("/api/open-platform/publications") if row.get("code") == resource]
+        record("publication-snapshot", len(published) == 1 and published[0].get("activeVersion") == 1
+               and published[0].get("status") == "published")
         named_definition = {"code": named_code, "title": "Release zone query",
             "resourceCode": model_code, "actionCode": "read", "fromSql": f"{model['tableName']} a WHERE a.rel_zone = #{{params.zone}}",
             "policy": {"rateLimitPerMinute": 100000},
@@ -398,8 +441,10 @@ def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None):
             "parameters": {"zone": {"type": "string", "required": True, "nullable": False, "items": None}},
             "fields": {"pid": dict(field("pid"), type="pid", nullable=False), "name": field("partName")},
             "maxPageSize": 20, "maxRows": 100, "timeoutMs": 5000, "maxConcurrent": 2}
-        human(f"/api/open-platform/query-publications/{query}/draft", "PUT", {"expectedRevision": 0, "definition": query_definition})
-        human(f"/api/open-platform/query-publications/{query}/publish", "POST", {"expectedRevision": 1})
+        report["pluginImports"].append(import_public_plugin(request, admin, "release-public-query", "PUBLIC_QUERY", query_definition))
+        published_query = [row for row in human("/api/open-platform/query-publications") if row.get("code") == query]
+        record("plugin-query-import", len(published_query) == 1 and published_query[0].get("activeVersion") == 1
+               and published_query[0].get("status") == "published")
         application = human("/api/open-platform/applications", "POST", {"name": "Dynamic release consumer", "description": "Exact-image CI only"})
         installation = human(f"/api/open-platform/applications/{application['pid']}/installations", "POST",
             {"environment": "staging", "scopes": list(scopes.values()) + [query_scope], "rateLimitPerMinute": 600})

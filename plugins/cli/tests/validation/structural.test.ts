@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync, readFileSync, mkdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, resolve } from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -29,6 +29,45 @@ describe('validateStructural plugin manifest schema', () => {
     for (const dir of tempDirs.splice(0)) {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  const publicFixture = (type: 'resource' | 'query') => JSON.parse(readFileSync(
+    resolve(import.meta.dirname, `../../../../platform/src/test/resources/plugin/public-${type}-contract.json`), 'utf8'));
+
+  it('validates shared public contract fixtures inline and rejects malformed source pins', () => {
+    const manifest = {
+      pluginId: 'public-contracts', namespace: 'public_contracts', version: '1.0.0',
+      models: [{ code: 'public_record', capabilities: { list: true, detail: true, create: false } }],
+      publicResources: [publicFixture('resource')], publicQueries: [publicFixture('query')],
+    };
+    expect(validateStructural(pluginWithManifest(manifest)).errorCount).toBe(0);
+    manifest.publicQueries[0].sourceFingerprint = 'invalid';
+    expect(validateStructural(pluginWithManifest(manifest)).messages).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'L1-MANIFEST', path: 'plugin.json/publicQueries/0/sourceFingerprint' }),
+    ]));
+  });
+
+  it.each([false, true])('validates declared public paths in file and directory mode (%s)', directory => {
+    const plugin = pluginWithManifest({
+      pluginId: 'public-contracts', namespace: 'public_contracts', version: '1.0.0',
+      resourceDirs: { publicResources: directory ? 'public-definitions' : 'publication.json' },
+    });
+    const path = directory ? join(plugin.dir, 'public-definitions', 'records.json') : join(plugin.dir, 'publication.json');
+    if (directory) mkdirSync(join(plugin.dir, 'public-definitions'));
+    writeFileSync(path, JSON.stringify(directory ? publicFixture('resource') : [publicFixture('resource')]));
+    const loaded = loadPlugin(plugin.dir);
+    expect(loaded.resourceFiles.get('publicResources')).toEqual([publicFixture('resource')]);
+    expect(validateStructural(loaded).errorCount).toBe(0);
+    const bad = publicFixture('resource');
+    bad.maxPageSize = 10001;
+    writeFileSync(path, JSON.stringify(directory ? bad : [bad]));
+    expect(validateStructural(loadPlugin(plugin.dir)).messages).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'L1-RESOURCE', path: 'config/publicResources.json/0/maxPageSize' }),
+    ]));
+    writeFileSync(path, '{broken');
+    expect(() => loadPlugin(plugin.dir)).toThrow('Invalid public publication file');
+    rmSync(path);
+    if (!directory) expect(() => loadPlugin(plugin.dir)).toThrow('Required public publication path missing');
   });
 
   it('accepts the canonical backend jarPath and entryClass fields', () => {

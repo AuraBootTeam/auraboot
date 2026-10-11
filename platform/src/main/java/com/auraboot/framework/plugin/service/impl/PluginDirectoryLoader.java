@@ -291,6 +291,18 @@ public class PluginDirectoryLoader {
         }
 
         // Load agent definitions
+        if (resourceDirs.containsKey("publicResources")) {
+            manifest.setPublicResources(mergeList(manifest.getPublicResources(), loadResourceList(
+                    resourcePath(pluginDir, resourceDirs, "publicResources"),
+                    com.auraboot.framework.openplatform.service.OpenApiResourceContract.class)));
+        }
+        if (resourceDirs.containsKey("publicQueries")) {
+            manifest.setPublicQueries(mergeList(manifest.getPublicQueries(), loadResourceList(
+                    resourcePath(pluginDir, resourceDirs, "publicQueries"),
+                    com.auraboot.framework.openplatform.service.OpenApiQueryContract.class)));
+        }
+
+        // Load agent definitions
         if (resourceDirs.containsKey("agentDefinitions")) {
             List<AgentDefinitionDTO> agentDefinitions = loadResourceList(
                     resourcePath(pluginDir, resourceDirs, "agentDefinitions"), AgentDefinitionDTO.class);
@@ -410,6 +422,8 @@ public class PluginDirectoryLoader {
      */
     private <T> List<T> loadResourceList(Path path, Class<T> clazz) throws IOException {
         if (!Files.exists(path)) {
+            if (PluginResourceParsePolicy.requiresFailClosed(clazz)
+                    && clazz != CommandDefinitionDTO.class) throw new IOException("Required public publication path missing: " + path);
             return List.of();
         }
 
@@ -417,7 +431,7 @@ public class PluginDirectoryLoader {
             // Load from single JSON file containing an array
             try {
                 JavaType listType = objectMapper.getTypeFactory().constructCollectionType(List.class, clazz);
-                return objectMapper.readValue(path.toFile(), listType);
+                return PluginResourceParsePolicy.requirePublicDefinitions(objectMapper.readValue(path.toFile(), listType), clazz, path.toString());
             } catch (IOException e) {
                 // Fail loud: the file EXISTS (checked above) but failed to parse. Silently returning
                 // an empty list here makes a single field-type mismatch in one entry drop the WHOLE
@@ -464,12 +478,13 @@ public class PluginDirectoryLoader {
         try {
             var node = objectMapper.readTree(file.toFile());
             if (node == null || node.isNull()) {
+                PluginResourceParsePolicy.requirePublicDefinitions(null, clazz, file.toString());
                 return List.of();
             }
             if (node.isArray()) {
                 JavaType listType = objectMapper.getTypeFactory()
                         .constructCollectionType(List.class, clazz);
-                return objectMapper.convertValue(node, listType);
+                return PluginResourceParsePolicy.requirePublicDefinitions(objectMapper.convertValue(node, listType), clazz, file.toString());
             }
             return List.of(objectMapper.convertValue(node, clazz));
         } catch (Exception e) {
@@ -586,7 +601,7 @@ public class PluginDirectoryLoader {
         if (source.requiresCompleteResources()) {
             Set<String> supported = Set.of("models", "fields", "modelFieldBindings", "bindings", "dicts", "commands",
                     "bindingRules", "menus", "permissions", "roles", "fieldMasks", "capabilities", "pages",
-                    "pageContributions", "i18n", "namedQueries", "agentDefinitions", "savedViews",
+                    "pageContributions", "i18n", "namedQueries", "publicResources", "publicQueries", "agentDefinitions", "savedViews",
                     "notificationTemplates", "dashboards", "decisionDefinitions", "conditionFragments",
                     "eventPolicies", "automations", "semantic", "defaultBootstrap");
             if (resourceDirs.containsKey("bindings") && resourceDirs.containsKey("modelFieldBindings")) {
@@ -641,6 +656,12 @@ public class PluginDirectoryLoader {
                 manifest::getI18nResources, manifest::setI18nResources);
         loadSourceResource(source, resourceDirs, "namedQueries", NamedQueryDefinitionDTO.class,
                 manifest::getNamedQueries, manifest::setNamedQueries);
+        loadSourceResource(source, resourceDirs, "publicResources",
+                com.auraboot.framework.openplatform.service.OpenApiResourceContract.class,
+                manifest::getPublicResources, manifest::setPublicResources);
+        loadSourceResource(source, resourceDirs, "publicQueries",
+                com.auraboot.framework.openplatform.service.OpenApiQueryContract.class,
+                manifest::getPublicQueries, manifest::setPublicQueries);
         loadSourceResource(source, resourceDirs, "agentDefinitions", AgentDefinitionDTO.class,
                 manifest::getAgentDefinitions, manifest::setAgentDefinitions);
         loadSourceResource(source, resourceDirs, "savedViews", SavedViewDefinitionDTO.class,
@@ -706,6 +727,10 @@ public class PluginDirectoryLoader {
                                          String key, Class<T> clazz,
                                          ListGetter<T> getter, ListSetter<T> setter) throws IOException {
         if (!resourceDirs.containsKey(key)) return;
+        if (PluginResourceParsePolicy.requiresFailClosed(clazz) && clazz != CommandDefinitionDTO.class
+                && !source.exists(resourceDirs.get(key))) {
+            throw new IOException("Required public publication path missing: " + resourceDirs.get(key));
+        }
         List<T> items = loadResourceListFromSource(source, resourceDirs.get(key), clazz);
         if (items == null) throw new IOException("Null resource list: " + key);
         if (!items.isEmpty() || source.requiresCompleteResources()) {
@@ -718,15 +743,11 @@ public class PluginDirectoryLoader {
         String jsonPath = relativeDir.endsWith(".json") ? relativeDir : relativeDir + ".json";
         if (source.exists(jsonPath) && !relativeDir.endsWith(".json")) {
             // Try as single JSON array file
-            String json = source.readString(jsonPath);
-            JavaType listType = objectMapper.getTypeFactory().constructCollectionType(List.class, clazz);
-            return objectMapper.readValue(json, listType);
+            return readSourceResourceArray(source, jsonPath, clazz);
         }
 
         if (source.exists(relativeDir) && relativeDir.endsWith(".json")) {
-            String json = source.readString(relativeDir);
-            JavaType listType = objectMapper.getTypeFactory().constructCollectionType(List.class, clazz);
-            return objectMapper.readValue(json, listType);
+            return readSourceResourceArray(source, relativeDir, clazz);
         }
 
         // Load from directory of individual JSON files
@@ -739,16 +760,20 @@ public class PluginDirectoryLoader {
                 String json = source.readString(filePath);
                 var node = objectMapper.readTree(json);
                 if (node == null || node.isNull()) {
+                    PluginResourceParsePolicy.requirePublicDefinitions(null, clazz, filePath);
                     if (source.requiresCompleteResources()) throw new IOException("Null resource is not a complete definition: " + filePath);
                     continue;
                 }
                 if (node.isArray()) {
                     JavaType listType = objectMapper.getTypeFactory().constructCollectionType(List.class, clazz);
-                    result.addAll(objectMapper.convertValue(node, listType));
+                    result.addAll(PluginResourceParsePolicy.requirePublicDefinitions(objectMapper.convertValue(node, listType), clazz, filePath));
                 } else {
                     result.add(objectMapper.convertValue(node, clazz));
                 }
             } catch (Exception e) {
+                if (PluginResourceParsePolicy.requiresFailClosed(clazz)) {
+                    PluginResourceParsePolicy.onResourceParseFailure(filePath, clazz, e);
+                }
                 if (source.requiresCompleteResources()) throw new IOException("Invalid required resource: " + filePath, e);
                 // Per-file resilience (see parseResourceFile): skip a malformed file rather than failing
                 // the whole plugin, but log at ERROR so the drop is visible/diagnosable.
@@ -757,6 +782,19 @@ public class PluginDirectoryLoader {
             }
         }
         return result;
+    }
+
+    private <T> List<T> readSourceResourceArray(PluginSource source, String path, Class<T> clazz) throws IOException {
+        try {
+            String json = source.readString(path);
+            JavaType listType = objectMapper.getTypeFactory().constructCollectionType(List.class, clazz);
+            return PluginResourceParsePolicy.requirePublicDefinitions(objectMapper.readValue(json, listType), clazz, path);
+        } catch (Exception e) {
+            if (PluginResourceParsePolicy.requiresFailClosed(clazz)) {
+                return PluginResourceParsePolicy.onResourceParseFailure(path, clazz, e);
+            }
+            throw new IOException("Invalid resource: " + path, e);
+        }
     }
 
     private List<PluginManifestExtended.SemanticResource> loadSemanticResourcesFromSource(

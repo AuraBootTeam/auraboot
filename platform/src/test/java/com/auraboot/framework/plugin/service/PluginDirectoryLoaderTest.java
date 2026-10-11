@@ -27,6 +27,85 @@ class PluginDirectoryLoaderTest {
 
     private PluginDirectoryLoader loader;
 
+    private String publicFixture(String name) throws IOException {
+        try (var stream = getClass().getResourceAsStream("/plugin/public-" + name + "-contract.json")) {
+            return new String(java.util.Objects.requireNonNull(stream).readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        }
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void publicContractsLoadThroughDirectoryAndPluginSource(boolean source) throws IOException {
+        Files.createDirectories(tempDir.resolve("config"));
+        Files.writeString(tempDir.resolve("plugin.json"), """
+                {"pluginId":"com.test.public","namespace":"public","version":"1.0.0",
+                 "resourceDirs":{"publicResources":"config/resources.json","publicQueries":"config/queries.json"}}
+                """);
+        Files.writeString(tempDir.resolve("config/resources.json"), "[" + publicFixture("resource") + "]");
+        Files.writeString(tempDir.resolve("config/queries.json"), "[" + publicFixture("query") + "]");
+        var manifest = source ? loader.loadFromSource(new FileSystemPluginSource(tempDir)) : loader.loadFromDirectory(tempDir);
+        assertThat(manifest.getPublicResources()).singleElement().satisfies(contract -> {
+            assertThat(contract.code()).isEqualTo("public.records");
+            assertThat(contract.fields().get("pid").writable()).isFalse();
+            assertThat(contract.events()).containsExactlyInAnyOrder("created", "updated", "deleted");
+        });
+        assertThat(manifest.getPublicQueries()).singleElement().satisfies(contract -> {
+            assertThat(contract.sourceResources()).containsEntry("public_record", "public.records");
+            assertThat(contract.sourceFingerprint()).isEqualTo("0".repeat(64));
+        });
+        assertThat(manifest.hasResources()).isTrue();
+        assertThat(manifest.getResourceCounts()).containsEntry("publicResources", 1).containsEntry("publicQueries", 1);
+        assertThat(manifest.validateResources()).isTrue();
+        manifest.setPublicResources(java.util.Arrays.asList(manifest.getPublicResources().getFirst(), null));
+        assertThat(manifest.validateResources()).isFalse();
+        assertThat(manifest.getValidationErrors()).contains("publicResources: unique non-null contracts required");
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void malformedOrMissingPublicContractsCannotBeDropped(boolean source) throws IOException {
+        Files.createDirectories(tempDir.resolve("config"));
+        Files.writeString(tempDir.resolve("plugin.json"), """
+                {"pluginId":"com.test.public","namespace":"public","version":"1.0.0",
+                 "resourceDirs":{"publicResources":"config/resources.json","publicQueries":"config/queries.json"}}
+                """);
+        Files.writeString(tempDir.resolve("config/resources.json"), "[" + publicFixture("resource") + "]");
+        Files.writeString(tempDir.resolve("config/queries.json"), "[{\"code\":\"public.invalid\"}]");
+        assertThatThrownBy(() -> { if (source) loader.loadFromSource(new FileSystemPluginSource(tempDir)); else loader.loadFromDirectory(tempDir); })
+                .isInstanceOf(PluginException.class).hasMessageContaining("queries.json");
+        Files.delete(tempDir.resolve("config/queries.json"));
+        assertThatThrownBy(() -> { if (source) loader.loadFromSource(new FileSystemPluginSource(tempDir)); else loader.loadFromDirectory(tempDir); })
+                .isInstanceOf(PluginException.class).hasMessageContaining("missing");
+        Files.writeString(tempDir.resolve("config/queries.json"), "[" + publicFixture("query") + "]");
+        Files.writeString(tempDir.resolve("config/resources.json"), "[" + publicFixture("resource").replace("\"pid\":", "\"id\":") + "]");
+        assertThatThrownBy(() -> { if (source) loader.loadFromSource(new FileSystemPluginSource(tempDir)); else loader.loadFromDirectory(tempDir); })
+                .isInstanceOf(PluginException.class).hasMessageContaining("resources.json");
+        Files.createDirectories(tempDir.resolve("config/public-queries"));
+        Files.writeString(tempDir.resolve("config/public-queries/invalid.json"), "[{\"code\":\"public.invalid\"}]");
+        Files.writeString(tempDir.resolve("plugin.json"), """
+                {"pluginId":"com.test.public","namespace":"public","version":"1.0.0",
+                 "resourceDirs":{"publicQueries":"config/public-queries"}}
+                """);
+        assertThatThrownBy(() -> { if (source) loader.loadFromSource(new FileSystemPluginSource(tempDir)); else loader.loadFromDirectory(tempDir); })
+                .isInstanceOf(PluginException.class).hasMessageContaining("invalid.json");
+        for (String invalid : List.of("null", "[null]")) {
+            Files.writeString(tempDir.resolve("plugin.json"), """
+                    {"pluginId":"com.test.public","namespace":"public","version":"1.0.0",
+                     "resourceDirs":{"publicQueries":"config/public-queries"}}
+                    """);
+            Files.writeString(tempDir.resolve("config/public-queries/invalid.json"), invalid);
+            assertThatThrownBy(() -> { if (source) loader.loadFromSource(new FileSystemPluginSource(tempDir)); else loader.loadFromDirectory(tempDir); })
+                    .isInstanceOf(PluginException.class).hasMessageContaining("invalid.json");
+            Files.writeString(tempDir.resolve("plugin.json"), """
+                    {"pluginId":"com.test.public","namespace":"public","version":"1.0.0",
+                     "resourceDirs":{"publicQueries":"config/queries.json"}}
+                    """);
+            Files.writeString(tempDir.resolve("config/queries.json"), invalid);
+            assertThatThrownBy(() -> { if (source) loader.loadFromSource(new FileSystemPluginSource(tempDir)); else loader.loadFromDirectory(tempDir); })
+                    .isInstanceOf(PluginException.class).hasMessageContaining("queries.json");
+        }
+    }
+
     @TempDir
     Path tempDir;
 

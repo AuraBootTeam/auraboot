@@ -99,7 +99,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -166,7 +165,7 @@ public class PluginImportServiceImpl implements PluginImportService {
     private final com.auraboot.framework.meta.mapper.CommandDefinitionMapper commandDefinitionMapper;
 
     private final ObjectMapper objectMapper = createObjectMapper();
-    private final AtomicBoolean pluginResourceTypeConstraintChecked = new AtomicBoolean(false);
+    private final PluginPublicPublicationLifecycle publicPublicationLifecycle;
 
     // Cache for in-progress imports (importId -> manifest)
     private final Map<String, ImportContext> importContextCache = new ConcurrentHashMap<>();
@@ -1054,6 +1053,17 @@ public class PluginImportServiceImpl implements PluginImportService {
         importFieldMasks(manifest);
         importCapabilities(manifest);
 
+        // Capabilities are explicit model declarations, normalized against the final bound field set.
+        if (manifest.getModels() != null) {
+            for (var declared : manifest.getModels()) {
+                if (declared.getCapabilities() == null || !importedModelCodes.contains(declared.getCode())) continue;
+                var definition = metaModelService.getModelDefinition(declared.getCode())
+                        .orElseThrow(() -> new PluginException("Imported capability model is missing: " + declared.getCode()));
+                definition.setCapabilities(declared.getCapabilities());
+                metaModelService.saveDefinition(definition);
+            }
+        }
+
         // Post-processing: Auto-publish DRAFT models and sync PUBLISHED models
         autoPublishAndSyncModels(importedModelCodes, request, manifest.getNamespace(), tenantId);
 
@@ -1105,6 +1115,11 @@ public class PluginImportServiceImpl implements PluginImportService {
                 }
             }
             if (cmdCount > 0) log.info("Post-import: auto-published {} draft commands", cmdCount);
+        }
+
+        if (manifest.getPublicResources() != null && !manifest.getPublicResources().isEmpty()
+                || manifest.getPublicQueries() != null && !manifest.getPublicQueries().isEmpty()) {
+            publicPublicationLifecycle.importDeclarations(manifest, request, result, pluginPid, importId, tenantId);
         }
 
         // Post-processing: Auto-link menus to pages by pageKey
@@ -1417,6 +1432,21 @@ public class PluginImportServiceImpl implements PluginImportService {
             throw new PluginException("Can only rollback successful imports");
         }
 
+        boolean hasPublicPublications = pluginResourceMapper.findByPluginPid(history.getPluginPid()).stream()
+                .anyMatch(resource -> resource.getResourceTypeEnum().isPublicPublication());
+        if (hasPublicPublications) {
+            if (!Objects.equals(history.getTenantId(), MetaContext.getCurrentTenantId())) {
+                throw new PluginException("Rollback tenant does not match publication owner");
+            }
+            if (pluginRecordMapper.lockIdentityIncludingDeleted(history.getTenantId(), history.getPluginPid()) == null) {
+                throw new PluginException("Public publication plugin owner is missing");
+            }
+            var latest = importHistoryMapper.findLastSuccessful(history.getTenantId(), history.getPluginId());
+            if (latest == null || !importId.equals(latest.getImportId())) {
+                throw new PluginException("Only the latest successful public publication import can be rolled back");
+            }
+        }
+
         ImportExecuteResult result = ImportExecuteResult.builder()
                 .importId(importId)
                 .pluginId(history.getPluginId())
@@ -1441,7 +1471,9 @@ public class PluginImportServiceImpl implements PluginImportService {
             }
 
             // Clean up resource tracking
-            pluginResourceMapper.deleteByPluginPid(history.getPluginPid());
+            for (PluginResource resource : pluginResourceMapper.findByPluginPid(history.getPluginPid())) {
+                if (!resource.getResourceTypeEnum().isPublicPublication()) pluginResourceMapper.deleteById(resource.getId());
+            }
 
             // Update plugin status or delete if it was a fresh install
             if ("install".equals(history.getImportType())) {
@@ -1670,10 +1702,6 @@ public class PluginImportServiceImpl implements PluginImportService {
      * Otherwise, insert a new record.
      */
     private void saveOrUpdatePluginResource(PluginResource resource, Long tenantId) {
-        if (ResourceType.AGENT_DEFINITION.code().equals(resource.getResourceType())) {
-            ensureAgentDefinitionResourceTypeAllowed();
-        }
-
         PluginResource existing = pluginResourceMapper.findByTenantPluginAndResource(
                 tenantId, resource.getPluginPid(), resource.getResourceType(), resource.getResourceCode());
 
@@ -1703,34 +1731,6 @@ public class PluginImportServiceImpl implements PluginImportService {
             // Insert new record
             pluginResourceMapper.insert(resource);
         }
-    }
-
-    private void ensureAgentDefinitionResourceTypeAllowed() {
-        if (!pluginResourceTypeConstraintChecked.compareAndSet(false, true)) {
-            return;
-        }
-        jdbcTemplate.execute("""
-                DO $$
-                BEGIN
-                    IF EXISTS (
-                        SELECT 1
-                        FROM pg_constraint
-                        WHERE conname = 'chk_resource_type'
-                          AND conrelid = 'ab_plugin_resource'::regclass
-                    ) THEN
-                        ALTER TABLE ab_plugin_resource DROP CONSTRAINT chk_resource_type;
-                    END IF;
-
-                    ALTER TABLE ab_plugin_resource
-                        ADD CONSTRAINT chk_resource_type CHECK (resource_type IN (
-                            'model', 'field', 'model_field_binding', 'command', 'binding_rule',
-                            'permission', 'role', 'role_permission', 'menu', 'process', 'page',
-                            'dict', 'dict_item', 'named_query', 'agent_definition', 'i18n'
-                        ));
-                EXCEPTION
-                    WHEN duplicate_object THEN NULL;
-                END $$;
-                """);
     }
 
     /**

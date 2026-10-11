@@ -175,6 +175,17 @@ final class PluginZipResourceReader {
                 }
             }
 
+            if (resourceDirs.containsKey("publicResources")) {
+                manifest.setPublicResources(mergeResourceList(manifest.getPublicResources(), loadResourceListFromZip(
+                        files, resourceDirs.get("publicResources"),
+                        com.auraboot.framework.openplatform.service.OpenApiResourceContract.class)));
+            }
+            if (resourceDirs.containsKey("publicQueries")) {
+                manifest.setPublicQueries(mergeResourceList(manifest.getPublicQueries(), loadResourceListFromZip(
+                        files, resourceDirs.get("publicQueries"),
+                        com.auraboot.framework.openplatform.service.OpenApiQueryContract.class)));
+            }
+
             // Load Decision Runtime definitions
             if (resourceDirs.containsKey("decisionDefinitions")) {
                 List<DecisionDefinitionSeedDTO> decisions = loadResourceListFromZip(
@@ -268,7 +279,7 @@ final class PluginZipResourceReader {
             try {
                 com.fasterxml.jackson.databind.JavaType listType = objectMapper.getTypeFactory()
                         .constructCollectionType(List.class, clazz);
-                return objectMapper.readValue(new String(content, StandardCharsets.UTF_8), listType);
+                return PluginResourceParsePolicy.requirePublicDefinitions(objectMapper.readValue(new String(content, StandardCharsets.UTF_8), listType), clazz, path);
             } catch (Exception e) {
                 // Commands are fail-closed via PluginResourceParsePolicy: a dropped command file must
                 // fail the import instead of disappearing behind a green result.
@@ -285,6 +296,9 @@ final class PluginZipResourceReader {
                 .sorted()
                 .toList();
         if (children.isEmpty()) {
+            if (PluginResourceParsePolicy.requiresFailClosed(clazz) && clazz != CommandDefinitionDTO.class) {
+                throw new PluginException("Required public publication path missing: " + path);
+            }
             log.debug("Resource path not found in ZIP (file or directory): {}", logSafe(path));
             return List.of();
         }
@@ -295,9 +309,12 @@ final class PluginZipResourceReader {
         for (String child : children) {
             try {
                 var node = objectMapper.readTree(new String(files.get(child), StandardCharsets.UTF_8));
-                if (node == null || node.isNull()) continue;
+                if (node == null || node.isNull()) {
+                    PluginResourceParsePolicy.requirePublicDefinitions(null, clazz, child);
+                    continue;
+                }
                 if (node.isArray()) {
-                    resources.addAll(objectMapper.convertValue(node, listType));
+                    resources.addAll(PluginResourceParsePolicy.requirePublicDefinitions(objectMapper.convertValue(node, listType), clazz, child));
                 } else {
                     resources.add(objectMapper.convertValue(node, clazz));
                 }

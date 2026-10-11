@@ -130,6 +130,12 @@ public class PluginManifestExtended extends PluginManifest {
      */
     private List<NamedQueryDefinitionDTO> namedQueries;
 
+    /** Explicit external contracts; internal model publication does not expose these automatically. */
+    private List<com.auraboot.framework.openplatform.service.OpenApiResourceContract> publicResources;
+
+    /** Read-only external query contracts pin the existing NamedQuery fingerprint. */
+    private List<com.auraboot.framework.openplatform.service.OpenApiQueryContract> publicQueries;
+
     /**
      * Agent definitions to import.
      */
@@ -231,6 +237,12 @@ public class PluginManifestExtended extends PluginManifest {
      */
     @JsonIgnore
     public boolean validateResources() {
+        if (publicResources != null && (publicResources.stream().anyMatch(java.util.Objects::isNull)
+                || publicResources.stream().map(com.auraboot.framework.openplatform.service.OpenApiResourceContract::code)
+                .distinct().count() != publicResources.size())) return false;
+        if (publicQueries != null && (publicQueries.stream().anyMatch(java.util.Objects::isNull)
+                || publicQueries.stream().map(com.auraboot.framework.openplatform.service.OpenApiQueryContract::code)
+                .distinct().count() != publicQueries.size())) return false;
         // Validate models
         if (models != null) {
             for (ModelDefinitionDTO model : models) {
@@ -407,6 +419,14 @@ public class PluginManifestExtended extends PluginManifest {
     @JsonIgnore
     public List<String> getValidationErrors() {
         List<String> errors = new ArrayList<>();
+        if (publicResources != null && (publicResources.stream().anyMatch(java.util.Objects::isNull)
+                || publicResources.stream().filter(java.util.Objects::nonNull)
+                .map(com.auraboot.framework.openplatform.service.OpenApiResourceContract::code)
+                .distinct().count() != publicResources.size())) errors.add("publicResources: unique non-null contracts required");
+        if (publicQueries != null && (publicQueries.stream().anyMatch(java.util.Objects::isNull)
+                || publicQueries.stream().filter(java.util.Objects::nonNull)
+                .map(com.auraboot.framework.openplatform.service.OpenApiQueryContract::code)
+                .distinct().count() != publicQueries.size())) errors.add("publicQueries: unique non-null contracts required");
 
         if (getPluginId() == null || getPluginId().isBlank()) {
             errors.add("pluginId is required");
@@ -662,6 +682,8 @@ public class PluginManifestExtended extends PluginManifest {
                 || (dicts != null && !dicts.isEmpty())
                 || (i18nResources != null && !i18nResources.isEmpty())
                 || (namedQueries != null && !namedQueries.isEmpty())
+                || (publicResources != null && !publicResources.isEmpty())
+                || (publicQueries != null && !publicQueries.isEmpty())
                 || (agentDefinitions != null && !agentDefinitions.isEmpty())
                 || (savedViews != null && !savedViews.isEmpty())
                 || (notificationTemplates != null && !notificationTemplates.isEmpty())
@@ -692,6 +714,8 @@ public class PluginManifestExtended extends PluginManifest {
                 Map.entry("dicts", dicts != null ? dicts.size() : 0),
                 Map.entry("i18nResources", i18nResources != null ? i18nResources.size() : 0),
                 Map.entry("namedQueries", namedQueries != null ? namedQueries.size() : 0),
+                Map.entry("publicResources", publicResources != null ? publicResources.size() : 0),
+                Map.entry("publicQueries", publicQueries != null ? publicQueries.size() : 0),
                 Map.entry("agentDefinitions", agentDefinitions != null ? agentDefinitions.size() : 0),
                 Map.entry("savedViews", savedViews != null ? savedViews.size() : 0),
                 Map.entry("notificationTemplates", notificationTemplates != null ? notificationTemplates.size() : 0),
