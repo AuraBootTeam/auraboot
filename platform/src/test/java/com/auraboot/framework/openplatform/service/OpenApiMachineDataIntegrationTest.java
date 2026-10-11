@@ -237,6 +237,35 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
         } finally { MetaContext.restore(previous); }
     }
 
+    @Test void changedSourceBindingRollsBackHumanMutationAndEventCapture() {
+        publishEvents();
+        var model = models.getModelDefinition(contract.modelCode()).orElseThrow();
+        var field = model.getFields().stream().filter(value -> "name".equals(value.getCode())).findFirst().orElseThrow();
+        String originalColumn = field.getColumnName();
+        field.setColumnName("secret");
+        models.saveDefinition(model);
+        var nested = new org.springframework.transaction.support.TransactionTemplate(eventTransactions);
+        nested.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_NESTED);
+        try {
+            assertThatThrownBy(() -> MetaContext.runWithCommandPermitScope("ALL", () -> nested.execute(status -> {
+                data.update(contract.modelCode(), allowedPid, new HashMap<>(Map.of("name", "Must roll back")));
+                return null;
+            }))).isInstanceOf(com.auraboot.framework.meta.exception.MetaServiceException.class)
+                    .hasRootCauseInstanceOf(OpenApiPublicationService.SourceBindingConflictException.class);
+            assertThat(sourceEvents()).isEmpty();
+            assertThat(eventJdbc.queryForMap("SELECT name, secret FROM " + model.getTableName() + " WHERE tenant_id = ? AND pid = ?",
+                    principal.tenantId(), allowedPid)).containsEntry("name", "Visible").containsEntry("secret", "Private");
+        } finally {
+            field.setColumnName(originalColumn);
+            models.saveDefinition(model);
+        }
+        MetaContext.runWithCommandPermitScope("ALL", () -> data.update(contract.modelCode(), allowedPid,
+                new HashMap<>(Map.of("name", "Restored source"))));
+        assertThat(sourceEvents()).hasSize(1);
+        assertThat(MetaContext.runWithCommandPermitScope("ALL", () -> data.getById(contract.modelCode(), allowedPid)))
+                .containsEntry("name", "Restored source");
+    }
+
     private com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelope sourceEnvelope() throws Exception {
         var row = sourceEvents().getFirst();
         Map<String, Object> payload = json.readerFor(new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() { })
@@ -407,6 +436,20 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
                     .eq(com.auraboot.framework.webhook.entity.WebhookDeliveryLog::getEventId, source.eventId())).getFirst();
             assertThat(json.readTree(queued.getRequestBody()).path("data").path("name").asText()).isEqualTo("Source name");
             assertThat(json.writeValueAsString(queued)).doesNotContain("authorizationContext", "Never public");
+            var model = models.getModelDefinition(contract.modelCode()).orElseThrow();
+            var field = model.getFields().stream().filter(value -> "name".equals(value.getCode())).findFirst().orElseThrow();
+            String originalColumn = field.getColumnName();
+            try {
+                field.setColumnName("secret"); models.saveDefinition(model);
+                var rebound = deliveries.claimReady(50, "model-fixture-worker", "rebound-claim", Instant.now().plusSeconds(30)).stream()
+                        .filter(log -> source.eventId().equals(log.getEventId())).findFirst().orElseThrow();
+                webhookDispatcher.processClaimed(rebound);
+                assertThat(received).isEmpty();
+                assertThat(deliveries.selectById(rebound.getId()).getDeliveryStatus()).isEqualTo("dead_letter");
+            } finally {
+                field.setColumnName(originalColumn); models.saveDefinition(model);
+            }
+            assertThat(webhooks.replayDelivery(queued.getPid())).isTrue();
             publications.grant(principal.installationPid(), contract.code(), new OpenApiInstallationPolicy(contract.operations(),
                     Set.of("pid", "zone"), Set.of("name", "zone"),
                     List.of(new OpenApiInstallationPolicy.RowConstraint("zone", List.of("A")))));

@@ -34,6 +34,7 @@ public class OpenApiModelEventObserver implements ModelMutationObserver {
                 .filter(contract -> contract.modelCode().equals(model.getCode())
                         && contract.events().contains(operation.code())).toList();
         if (contracts.isEmpty()) return;
+        contracts.forEach(contract -> publications.requireSourceBinding(tenant, contract, model));
         // Only schema-owned identifiers enter SQL; identity and tenant remain bound parameters.
         String table = SqlSafetyUtils.requireIdentifier(model.getTableName(), "published event table");
         var columns = new LinkedHashMap<String, String>();

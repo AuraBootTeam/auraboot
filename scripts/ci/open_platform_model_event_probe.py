@@ -5,6 +5,7 @@ database observations. Fixture writes use production HTTP routes exclusively.
 """
 import ipaddress
 import base64
+import copy
 import json
 import os
 import secrets
@@ -78,6 +79,7 @@ def verify_report(report, *, secret=None):
             and proofs[1].get("deliveryPid") == proofs[2].get("deliveryPid")
             and proofs[0].get("eventId") != proofs[1].get("eventId"),
             "model event replay source identity invalid")
+    verify_source_binding(report.get("sourceBindingProof"), proofs[2])
     names = ["Pending source before restart", "Bounded delivery failure", "Bounded delivery failure"]
     origins = ["release-model-pending-source", "release-model-dead-letter", "release-model-dead-letter"]
     for proof, statuses, name, origin in zip(proofs, [[503, 200], [503, 503, 503], [200]], names, origins):
@@ -109,6 +111,48 @@ def verify_report(report, *, secret=None):
                     and json.loads(row["raw_body"])["correlationId"] == origin for row in actual),
                 "model event raw source metadata invalid")
     return report
+
+
+def verify_source_binding(proof, restored):
+    require(isinstance(proof, dict) and set(proof) == {
+        "eventId", "deliveryPid", "subjectPid", "blockedStatus", "blockedReplayCount", "blockedRetryCount",
+        "receiverAttemptsBefore", "receiverAttemptsAfter", "restoredStatus", "restoredReplayCount"},
+        "model event source binding proof missing or malformed")
+    require(all(proof.get(key) == restored.get(key) for key in ["eventId", "deliveryPid", "subjectPid"]),
+        "model event source binding replay identity changed")
+    expected = {"blockedReplayCount": 1, "blockedRetryCount": 0, "receiverAttemptsBefore": 0,
+                "receiverAttemptsAfter": 0, "restoredReplayCount": 2}
+    require(proof["blockedStatus"] == "dead_letter" and proof["restoredStatus"] == "success"
+            and all(type(proof[key]) is int and proof[key] == value for key, value in expected.items()),
+            "model event source binding did not block network or restore owner replay")
+
+
+def run_source_binding_replay(human, model_pid, installation_pid, dead_log, wait_delivery, receiver_attempts):
+    """Rebind through the management API, then restore even if replay or observation fails."""
+    model_path = f"/api/meta/models/{model_pid}"
+    model = human(model_path)
+    original = copy.deepcopy(model.get("extension") or {})
+    original["fields"] = copy.deepcopy(model["fields"])
+    rebound = copy.deepcopy(original)
+    fields = [field for field in rebound["fields"] if field.get("code") == "rel_name"]
+    require(len(fields) == 1, "model event source binding fixture field missing")
+    fields[0]["columnName"] = "rel_private"
+    before = receiver_attempts()
+    require(before == 0, "model event source binding receiver already used")
+    try:
+        human(model_path, "PUT", {"displayName": model["displayName"], "extension": rebound})
+        human(f"/api/open-platform/installations/{installation_pid}/webhook-deliveries/{dead_log['pid']}/replay", "POST", {})
+        blocked = wait_delivery()
+        after = receiver_attempts()
+        require(blocked.get("pid") == dead_log["pid"] and blocked.get("eventId") == dead_log["eventId"]
+                and blocked.get("deliveryStatus") == "dead_letter" and blocked.get("replayCount") == 1
+                and blocked.get("retryCount") == 0 and after == 0,
+                "model event source binding allowed HTTP or changed durable identity")
+    finally:
+        human(model_path, "PUT", {"displayName": model["displayName"], "extension": original})
+    return {"eventId": blocked["eventId"], "deliveryPid": blocked["pid"], "blockedStatus": blocked["deliveryStatus"],
+        "blockedReplayCount": blocked["replayCount"], "blockedRetryCount": blocked["retryCount"],
+        "receiverAttemptsBefore": before, "receiverAttemptsAfter": after}
 
 
 class Receivers:
@@ -310,9 +354,15 @@ def run_model_event_probe(request, admin, infrastructure, *, evidence_path, rece
         record("independent-dead-letter-proof")
         subscription_body["targetUrl"] = replay["url"]
         human("/api/webhooks/" + subscription["pid"], "PUT", subscription_body)
+        report["sourceBindingProof"] = run_source_binding_replay(human, model_row["pid"], installation["pid"], dead_log,
+            lambda: delivery(dead_created["pid"], "dead_letter"),
+            lambda: len(read_delivery(replay["store"], dead_log["pid"], secret=secret,
+                                     run_id=replay["runId"], mode=replay["mode"], failures=1)))
         human(f"/api/open-platform/installations/{installation['pid']}/webhook-deliveries/{dead_log['pid']}/replay", "POST", {})
         done = delivery(dead_created["pid"], "success")
-        record("owner-replay-success", done["replayCount"] == 1 and done["retryCount"] == 0 and done["responseStatus"] == 200)
+        report["sourceBindingProof"].update(subjectPid=dead_created["pid"], restoredStatus=done["deliveryStatus"],
+                                           restoredReplayCount=done["replayCount"])
+        record("owner-replay-success", done["replayCount"] == 2 and done["retryCount"] == 0 and done["responseStatus"] == 200)
         record("same-source-identity-on-replay", done["pid"] == dead_log["pid"] and done["eventId"] == dead_log["eventId"])
         accepted = verify(replay, done, dead_created["pid"], [200], dead_intent, dead_origin)
         record("independent-replay-proof", accepted[0]["raw_body"] == dead_raw[0]["raw_body"])

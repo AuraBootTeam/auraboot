@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from open_platform_http import ProtocolError
-from open_platform_model_event_probe import CASES, Receivers, read_secret, run_model_event_probe, verify_report
+from open_platform_model_event_probe import CASES, Receivers, read_secret, run_model_event_probe, run_source_binding_replay, verify_report
 from open_platform_model_event_runtime import DockerInfrastructure
 
 SECRET = b"model-event-verifier-test-secret-32-bytes"
@@ -38,10 +38,50 @@ def passed():
     return {"schemaVersion": 1, "registered": 18, "cases": [{"id": case, "status": "passed"} for case in CASES],
         "executed": 18, "passed": 18, "sourceProof": {"events": 1, "receipts": 1, "deliveries": 1},
         "deadLetterProof": {"events": 1, "receipts": 1, "deliveries": 1}, "beforeRestart": before,
-        "afterRestart": dict(before, generation="new"), "deliveryProofs": proofs}
+        "afterRestart": dict(before, generation="new"), "deliveryProofs": proofs,
+        "sourceBindingProof": {"eventId": "evt_dead", "deliveryPid": "delivery_dead", "subjectPid": "pid_dead",
+            "blockedStatus": "dead_letter", "blockedReplayCount": 1, "blockedRetryCount": 0,
+            "receiverAttemptsBefore": 0, "receiverAttemptsAfter": 0, "restoredStatus": "success", "restoredReplayCount": 2}}
 
 
 class ModelEventTests(unittest.TestCase):
+    def test_source_binding_proof_is_mandatory_and_linked_to_signed_restoration(self):
+        for key in passed()["sourceBindingProof"]:
+            report = passed(); del report["sourceBindingProof"][key]
+            with self.assertRaises(ProtocolError): verify_report(report, secret=SECRET)
+        for change in [lambda r: r.pop("sourceBindingProof"),
+                       lambda r: r["sourceBindingProof"].update(eventId="other"),
+                       lambda r: r["sourceBindingProof"].update(blockedStatus="success"),
+                       lambda r: r["sourceBindingProof"].update(receiverAttemptsAfter=1),
+                       lambda r: r["sourceBindingProof"].update(receiverAttemptsBefore=False),
+                       lambda r: r["sourceBindingProof"].update(restoredReplayCount=1)]:
+            report = passed(); change(report)
+            with self.assertRaises(ProtocolError): verify_report(report, secret=SECRET)
+
+    def test_source_binding_replay_restores_management_metadata_on_success_and_failure(self):
+        model = {"displayName": "Model", "extension": {"sourceRef": "fixture"},
+                 "fields": [{"code": "rel_name", "columnName": "rel_name"},
+                            {"code": "rel_private", "columnName": "rel_private"}]}
+        dead = {"pid": "delivery_dead", "eventId": "evt_dead"}
+        for fail in [False, True]:
+            calls = []
+            def human(path, method="GET", body=None):
+                calls.append((path, method, copy.deepcopy(body)))
+                return copy.deepcopy(model) if method == "GET" else {}
+            def wait():
+                if fail: raise ProtocolError("observation failed")
+                return dict(dead, deliveryStatus="dead_letter", replayCount=1, retryCount=0)
+            if fail:
+                with self.assertRaises(ProtocolError):
+                    run_source_binding_replay(human, "model_pid", "installation_pid", dead, wait, lambda: 0)
+            else:
+                proof = run_source_binding_replay(human, "model_pid", "installation_pid", dead, wait, lambda: 0)
+                self.assertEqual(proof["receiverAttemptsAfter"], 0)
+            self.assertEqual(calls[1][2]["extension"]["fields"][0]["columnName"], "rel_private")
+            self.assertEqual(calls[-1], ("/api/meta/models/model_pid", "PUT", {
+                "displayName": "Model", "extension": dict(model["extension"], fields=model["fields"])}))
+            self.assertEqual(model["fields"][0]["columnName"], "rel_name")
+
     def test_complete_fixed_report_recomputes_all_six_signatures(self):
         report = passed()
         self.assertEqual(verify_report(report, secret=SECRET), report)

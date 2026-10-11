@@ -20,6 +20,8 @@ import java.util.*;
 public class OpenApiModelEventDeliveryPolicy implements WebhookDeliveryPolicy {
     private final OpenApiPublicationMapper publications;
     private final ObjectMapper json;
+    private final OpenApiPublicationService resourcePublications;
+    private final OpenApiPublicationValidator validator;
 
     @Override public boolean supports(String eventType) { return OpenApiEventCatalog.isModelEvent(eventType); }
 
@@ -39,6 +41,8 @@ public class OpenApiModelEventDeliveryPolicy implements WebhookDeliveryPolicy {
         String definition = publications.snapshot(event.tenantId(), contract.code(), contract.schemaVersion());
         if (definition == null || !contract.equals(read(definition, OpenApiResourceContract.class)))
             throw new IllegalArgumentException("Published model source snapshot mismatch");
+        if (publications.sourceBinding(event.tenantId(), contract.code(), contract.schemaVersion()) == null)
+            throw new IllegalArgumentException("Published model source provenance is unavailable");
     }
 
     @Override
@@ -82,6 +86,16 @@ public class OpenApiModelEventDeliveryPolicy implements WebhookDeliveryPolicy {
         require(target.events().contains(operation), "Subscribed schema does not publish this event");
         current.requireCompatibleWith(target);
         emitted.requireCompatibleWith(target);
+        require(Objects.equals(com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId(), event.tenantId()),
+                "Model event tenant context mismatch");
+        try {
+            var model = validator.validate(current);
+            resourcePublications.requireSourceBinding(event.tenantId(), current, model);
+            resourcePublications.requireSourceBinding(event.tenantId(), emitted, model);
+        } catch (OpenApiPublicationService.SourceBindingConflictException | IllegalArgumentException invalidSource) {
+            // CATCH: source revocation is a terminal authorization decision before network I/O.
+            throw new AccessDeniedException("Published model source is unavailable or changed", invalidSource);
+        }
         var data = new LinkedHashMap<>(target.project(source));
         data.keySet().retainAll(policy.readableFields());
         var envelope = new LinkedHashMap<String, Object>();
