@@ -1204,6 +1204,7 @@ actionRegistry.register(
     let targetRecordPid = args?.targetRecordPid;
     let payload = args?.payload || {};
     let operationType = args?.operationType;
+    let expectedVersion = args?.expectedVersion;
 
     if (expressionEvaluator && expressionContext) {
       if (typeof targetRecordPid === 'string') {
@@ -1212,12 +1213,25 @@ actionRegistry.register(
       if (payload && typeof payload === 'object') {
         payload = expressionEvaluator.evaluateObject(payload, expressionContext);
       }
+      if (typeof expectedVersion === 'string') {
+        expectedVersion = expressionEvaluator.evaluateTemplate(expectedVersion, expressionContext);
+      }
       if (typeof operationType === 'string') {
         operationType = expressionEvaluator.evaluateTemplate(operationType, expressionContext);
       }
     }
     targetRecordPid = targetRecordPid ?? targetRecordPid;
     targetRecordPid = targetRecordPid ?? targetRecordPid;
+
+    let validatedVersion: number | undefined;
+    if (args?.expectedVersion !== undefined) {
+      const version = typeof expectedVersion === 'number' || typeof expectedVersion === 'string'
+        ? (String(expectedVersion).trim() === '' ? NaN : Number(expectedVersion)) : NaN;
+      if (!Number.isSafeInteger(version) || version < 0) {
+        throw new Error(translateOrFallback(t, 'error.data_load_failed', 'Unable to load the current record'));
+      }
+      validatedVersion = version;
+    }
 
     // inputFields sugar: pop a small form (reusing FormDialog) to collect a few
     // fields, then merge the collected values into the command payload. Lets a DSL
@@ -1246,6 +1260,9 @@ actionRegistry.register(
     if (operationType) {
       body.operationType = String(operationType).toUpperCase();
     }
+
+    if (validatedVersion !== undefined) body.expectedVersion = validatedVersion;
+    if (args?.idempotent === true) body.clientRequestId = crypto.randomUUID();
 
     const result = await fetchResult(`/api/meta/commands/execute/${command}`, {
       method: 'post',

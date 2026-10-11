@@ -1184,3 +1184,41 @@ describe('ActionRegistry API request failure boundaries', () => {
     expect(updateState).toHaveBeenCalledWith('api-success-boundary', 'signature', data);
   });
 });
+
+
+describe('ActionRegistry command snapshot version', () => {
+  it('retains the reviewed version across a form and sends only explicit payload fields', async () => {
+    const fetchResult = vi.fn().mockResolvedValue({ code: '0', data: {} });
+    const snapshot = { record: { pid: 'TASK-1', row_version: 7, secret: 'not-a-command-input' } };
+    const evaluator = { evaluateTemplate: (value: string) => value === '${record.row_version}'
+      ? String(snapshot.record.row_version) : snapshot.record.pid,
+      evaluateObject: (value: unknown) => value } as any;
+    window.addEventListener('dialog:form', (event) => {
+      snapshot.record.row_version = 8;
+      (event as CustomEvent).detail.onSubmit({ remark: 'Updated delivery plan' });
+    }, { once: true });
+    await actionRegistry.execute('command.execute', { fetchResult, expressionEvaluator: evaluator,
+      expressionContext: snapshot as any, args: { command: 'task:maintain_plan',
+        targetRecordPid: '${record.pid}', expectedVersion: '${record.row_version}', idempotent: true,
+        inputFields: [{ field: 'remark', type: 'textarea' }], payload: {} } });
+    const body = fetchResult.mock.calls[0][1].params;
+    expect(body).toEqual({ targetRecordPid: 'TASK-1', expectedVersion: 7,
+      clientRequestId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+      payload: { remark: 'Updated delivery plan' } });
+    expect(fetchResult).toHaveBeenCalledOnce();
+  });
+
+  it.each(['', ' ', '${record.row_version}', -1, 1.5, true, null, Number.MAX_SAFE_INTEGER + 1])(
+    'rejects an unavailable version before opening or submitting a form: %s', async (expectedVersion) => {
+      const fetchResult = vi.fn();
+      const opened = vi.fn();
+      window.addEventListener('dialog:form', opened);
+      try {
+        await expect(actionRegistry.execute('command.execute', { fetchResult,
+          args: { command: 'task:maintain_plan', expectedVersion,
+            inputFields: [{ field: 'remark', type: 'textarea' }] } })).rejects.toThrow();
+        expect(opened).not.toHaveBeenCalled();
+        expect(fetchResult).not.toHaveBeenCalled();
+      } finally { window.removeEventListener('dialog:form', opened); }
+    });
+});

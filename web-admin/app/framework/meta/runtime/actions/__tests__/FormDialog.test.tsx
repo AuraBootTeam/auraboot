@@ -496,3 +496,45 @@ describe('FormDialog choice fields', () => {
     expect(screen.getAllByText('必须且只能选择一个“单套用量”列。')).toHaveLength(2);
   });
 });
+
+
+describe('FormDialog calendar and instant fields', () => {
+  it('submits a calendar day unchanged and converts a selected local time into an instant', () => {
+    const onSubmit = vi.fn();
+    renderDialog({ fields: [
+      { field: 'deliveryDate', label: '交付日期', type: 'date', required: true },
+      { field: 'cutoffAt', label: '报价截止时间', type: 'datetime', required: true },
+    ], defaults: {}, onSubmit });
+    const delivery = screen.getByLabelText(/交付日期/);
+    const cutoff = screen.getByLabelText(/报价截止时间/);
+    expect(delivery).toHaveAttribute('type', 'date');
+    expect(cutoff).toHaveAttribute('type', 'datetime-local');
+    fireEvent.change(delivery, { target: { value: '2026-11-01' } });
+    fireEvent.change(cutoff, { target: { value: '2026-10-30T15:45' } });
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(onSubmit).toHaveBeenCalledWith({ deliveryDate: '2026-11-01',
+      cutoffAt: new Date('2026-10-30T15:45').toISOString() });
+  });
+
+  it('preserves the original instant when the user leaves its default unchanged', () => {
+    const onSubmit = vi.fn();
+    renderDialog({ fields: [{ field: 'cutoffAt', label: '截止时间', type: 'datetime' }],
+      defaults: { cutoffAt: '2026-10-30T07:45:32.123Z' }, onSubmit });
+    const value = (screen.getByLabelText('截止时间') as HTMLInputElement).value;
+    const local = new Date('2026-10-30T07:45:32.123Z');
+    const pad = (v: number) => String(v).padStart(2, '0');
+    expect(value).toBe(`${local.getFullYear()}-${pad(local.getMonth()+1)}-${pad(local.getDate())}T${pad(local.getHours())}:${pad(local.getMinutes())}`);
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(onSubmit).toHaveBeenCalledWith({ cutoffAt: '2026-10-30T07:45:32.123Z' });
+  });
+
+  it('blocks submission when a required calendar field is cleared', () => {
+    const onSubmit = vi.fn();
+    renderDialog({ fields: [{ field: 'deliveryDate', label: '交付日期', type: 'date', required: true }],
+      defaults: { deliveryDate: '2026-11-01' }, onSubmit });
+    fireEvent.change(screen.getByLabelText(/交付日期/), { target: { value: '' } });
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByLabelText(/交付日期/)).toHaveAttribute('aria-invalid', 'true');
+  });
+});

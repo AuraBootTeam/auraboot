@@ -43,6 +43,8 @@ interface FormFieldConfig {
     | 'select'
     | 'number'
     | 'textarea'
+    | 'date'
+    | 'datetime'
     | 'multiselect'
     | 'segmented'
     | 'checkbox'
@@ -66,6 +68,22 @@ interface FormFieldConfig {
     endpoint?: string;
     data?: FormOptionConfig[];
   };
+}
+
+function localDateTimeValue(value: unknown): string {
+  if (typeof value !== 'string' || !value) return '';
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return '';
+  const pad = (part: number) => String(part).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function localDateTimeInstant(value: string): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return '';
+  const instant = date.toISOString();
+  return localDateTimeValue(instant) === value ? instant : '';
 }
 
 interface FormDialogState {
@@ -440,7 +458,7 @@ export default function FormDialog() {
 
               return (
                 <div key={`${field.field}-${sourceIndex}`}>
-                  <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <label htmlFor={fieldType === 'date' || fieldType === 'datetime' ? `form-dialog-${field.field}-${sourceIndex}` : undefined} className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
                     {label}
                     {field.required && <span className="ml-1 text-red-500">*</span>}
                   </label>
@@ -683,6 +701,21 @@ export default function FormDialog() {
                       className={`w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 transition-colors dark:bg-gray-700 dark:text-white dark:placeholder-gray-500 ${
                         error
                           ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                          : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600'
+                      } focus:ring-2 focus:outline-none`}
+                    />
+                  ) : fieldType === 'date' || fieldType === 'datetime' ? (
+                    <input
+                      id={`form-dialog-${field.field}-${sourceIndex}`}
+                      ref={isFirst ? (firstInputRef as React.RefObject<HTMLInputElement>) : undefined}
+                      data-testid={`form-dialog-field-${field.field}`}
+                      type={fieldType === 'date' ? 'date' : 'datetime-local'}
+                      value={fieldType === 'date' ? formData[field.field] ?? '' : localDateTimeValue(formData[field.field])}
+                      onChange={(event) => updateField(field.field, fieldType === 'date'
+                        ? event.target.value : localDateTimeInstant(event.target.value))}
+                      aria-invalid={!!error}
+                      className={`w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 dark:bg-gray-700 dark:text-white ${
+                        error ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
                           : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600'
                       } focus:ring-2 focus:outline-none`}
                     />
