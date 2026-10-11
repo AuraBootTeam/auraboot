@@ -272,6 +272,62 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
         };
     }
 
+    @Test void namedQueryVirtualResourcePinsDelegateSemantics() throws Exception {
+        String suffix = UniqueIdGenerator.generate().toLowerCase();
+        var source = createQuery("virtual_source_" + suffix, "mt_" + root.modelCode() + " a",
+                List.of(nqField("pid", "a.pid", "string"), nqField("name", "a.name", "string"), nqField("zone", "a.zone", "string")));
+        String virtualModel = "virtual_public_" + suffix;
+        models.saveDefinition(ModelDefinition.builder().code(virtualModel).displayName("Granted virtual public source")
+                .sourceType("namedQuery").sourceRef(source.getCode()).primaryKey("pid").status("published")
+                .capabilities(ModelCapabilities.virtualReadOnly()).fields(List.of(
+                        FieldDefinition.builder().code("name").dataType("STRING").displayName("Name").build(),
+                        FieldDefinition.builder().code("zone").dataType("STRING").displayName("Zone").filterable(true).build())).build());
+        var contract = new OpenApiResourceContract("virtual." + suffix, virtualModel, 1,
+                Set.of(Operation.LIST, Operation.GET), Map.of(Operation.LIST, root.scopes().get(Operation.LIST),
+                        Operation.GET, root.scopes().get(Operation.GET)), DataPolicy.INSTALLATION_FILTER,
+                root.fields(), 50, 8, 5000, Set.of());
+        resources.saveDraft(contract.code(), new OpenApiPublicationService.DraftRequest(0, contract));
+        resources.publish(contract.code(), 1);
+        resources.grant(principalA.installationPid(), contract.code(), new OpenApiInstallationPolicy(contract.operations(),
+                contract.fields().keySet(), Set.of(), List.of(new OpenApiInstallationPolicy.RowConstraint("zone", List.of("A")))));
+        var model = models.getModelDefinition(virtualModel).orElseThrow();
+        resources.requireSourceBinding(principalA.tenantId(), contract, model);
+        var presentation = new NamedQueryUpdateRequest();
+        presentation.setTitle("Renamed delegated query");
+        queries.update(source.getPid(), presentation);
+        resources.requireSourceBinding(principalA.tenantId(), contract, model);
+        String binding = publicationMapper.sourceBinding(principalA.tenantId(), contract.code(), 1);
+        assertThat(json.readTree(binding).path("queryFingerprint").asText())
+                .isEqualTo(queries.describeExecution(source.getCode()).fingerprint());
+        var update = new NamedQueryUpdateRequest();
+        update.setActionCode("update");
+        queries.update(source.getPid(), update);
+        assertThatThrownBy(() -> resources.requireSourceBinding(principalA.tenantId(), contract, model))
+                .isInstanceOf(OpenApiPublicationService.SourceBindingConflictException.class);
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/open/v1/resources/" + contract.code())
+                .header("Authorization", "Bearer " + tokenA))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isConflict());
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/open/v1/resources/" + contract.code() + "/fixture_pid")
+                .header("Authorization", "Bearer " + tokenA))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isConflict());
+        applyTestMetaContext();
+        var next = new OpenApiResourceContract(contract.code(), virtualModel, 2, contract.operations(), contract.scopes(),
+                contract.dataPolicy(), contract.fields(), 50, 8, 5000, Set.of());
+        resources.saveDraft(contract.code(), new OpenApiPublicationService.DraftRequest(1, next));
+        assertThatThrownBy(() -> resources.publish(contract.code(), 2))
+                .isInstanceOf(OpenApiPublicationService.SourceBindingConflictException.class);
+        assertThat(publicationMapper.snapshot(principalA.tenantId(), contract.code(), 2)).isNull();
+        assertThat(publicationMapper.sourceBinding(principalA.tenantId(), contract.code(), 1)).isEqualTo(binding);
+        assertThat(resources.active(principalA.tenantId(), contract.code())).contains(contract);
+        queries.delete(source.getPid());
+        assertThatThrownBy(() -> resources.requireSourceBinding(principalA.tenantId(), contract, model))
+                .isInstanceOf(OpenApiPublicationService.SourceBindingConflictException.class)
+                .hasCauseInstanceOf(com.auraboot.framework.meta.exception.MetaServiceException.class);
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/open/v1/resources/" + contract.code())
+                .header("Authorization", "Bearer " + tokenA))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isConflict());
+    }
+
     @Test void administrationMetadataPinsTheExecutionSourceAndOffersOnlyCurrentListPublications() throws Exception {
         var source = publications.source(rowsDefinition.getCode());
         assertThat(source.fingerprint()).isEqualTo(queries.describeExecution(rowsDefinition.getCode()).fingerprint());

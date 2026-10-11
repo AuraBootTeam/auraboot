@@ -7,7 +7,7 @@ import java.util.Map;
 /** Internal provenance of the storage read by an immutable public resource snapshot. */
 public record OpenApiResourceSourceBinding(String modelCode, String sourceType, String sourceRef,
                                            String tableName, String primaryKey,
-                                           Map<String, Column> columns) {
+                                           Map<String, Column> columns, String queryFingerprint) {
     public record Column(String columnName, String jsonbColumn, String jsonbPath,
                          String referenceModel, String referenceValueField) { }
 
@@ -16,6 +16,11 @@ public record OpenApiResourceSourceBinding(String modelCode, String sourceType, 
     }
 
     public static OpenApiResourceSourceBinding capture(OpenApiResourceContract contract, ModelDefinition model) {
+        return capture(contract, model, null);
+    }
+
+    public static OpenApiResourceSourceBinding capture(OpenApiResourceContract contract, ModelDefinition model,
+                                                       String queryFingerprint) {
         Map<String, Column> columns = new LinkedHashMap<>();
         contract.fields().values().forEach(field -> {
             if ("pid".equals(field.source())) {
@@ -31,6 +36,6 @@ public record OpenApiResourceSourceBinding(String modelCode, String sourceType, 
                     reference == null ? null : reference.getValueField() == null ? "pid" : reference.getValueField()));
         });
         return new OpenApiResourceSourceBinding(model.getCode(), model.getSourceType() == null ? "physical" : model.getSourceType(),
-                model.getSourceRef(), model.getTableName(), model.getPrimaryKey(), columns);
+                model.getSourceRef(), model.getTableName(), model.getPrimaryKey(), columns, queryFingerprint);
     }
 }

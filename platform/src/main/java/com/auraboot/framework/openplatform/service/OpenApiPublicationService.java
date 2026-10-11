@@ -85,7 +85,7 @@ public class OpenApiPublicationService {
             }
         }
         mapper.insertResourceSnapshot(tenant(), code, contract.schemaVersion(), encode(contract), actor(),
-                encode(OpenApiResourceSourceBinding.capture(contract, model)));
+                encode(validator.captureSourceBinding(contract, model)));
         mapper.activate(tenant(), code, contract.schemaVersion(), StatusConstants.PUBLISHED, actor());
         mapper.audit(tenant(), code, null, "publish", actor(), row.draftRevision());
         return view(mapper.lock(tenant(), code));
@@ -161,8 +161,15 @@ public class OpenApiPublicationService {
     public void requireSourceBinding(Long tenantId, OpenApiResourceContract contract,
                                      com.auraboot.framework.meta.dto.ModelDefinition model) {
         String binding = mapper.sourceBinding(tenantId, contract.code(), contract.schemaVersion());
-        if (binding == null || !decode(binding, OpenApiResourceSourceBinding.class)
-                .equals(OpenApiResourceSourceBinding.capture(contract, model))) {
+        if (binding == null) throw new SourceBindingConflictException();
+        OpenApiResourceSourceBinding current;
+        try {
+            current = validator.captureSourceBinding(contract, model);
+        } catch (com.auraboot.framework.meta.exception.MetaServiceException unavailable) {
+            // CATCH: map an unavailable delegated source to the public conflict code, preserving its cause.
+            throw new SourceBindingConflictException(unavailable);
+        }
+        if (!decode(binding, OpenApiResourceSourceBinding.class).equals(current)) {
             throw new SourceBindingConflictException();
         }
     }
@@ -235,9 +242,12 @@ public class OpenApiPublicationService {
 
     public static class PublicationConflictException extends org.springframework.web.server.ResponseStatusException {
         public PublicationConflictException(String message) { super(org.springframework.http.HttpStatus.CONFLICT, message); }
+        public PublicationConflictException(String message, Throwable cause) { super(org.springframework.http.HttpStatus.CONFLICT, message, cause); }
     }
 
     public static class SourceBindingConflictException extends PublicationConflictException {
-        public SourceBindingConflictException() { super("Published resource source binding is unavailable or changed"); }
+        private static final String MESSAGE = "Published resource source binding is unavailable or changed";
+        public SourceBindingConflictException() { super(MESSAGE); }
+        public SourceBindingConflictException(Throwable cause) { super(MESSAGE, cause); }
     }
 }

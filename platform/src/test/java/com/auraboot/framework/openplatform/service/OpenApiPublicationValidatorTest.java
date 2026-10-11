@@ -81,11 +81,15 @@ class OpenApiPublicationValidatorTest {
         assertThatThrownBy(() -> validator.validate(contract, unfilterableModel)).hasMessageContaining("Sort");
     }
 
-    @Test void sourceBindingIgnoresPresentationAndUnpublishedFieldsButPinsStorageAndVirtualPaths() {
+    @Test void sourceBindingIgnoresPresentationAndUnpublishedFieldsButPinsStorageAndVirtualPaths() throws Exception {
         var contract = contract(Set.of(Operation.GET), false, true);
         var model = model();
         model.setTableName("mt_original");
         var original = OpenApiResourceSourceBinding.capture(contract, model);
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        var historical = (com.fasterxml.jackson.databind.node.ObjectNode) mapper.valueToTree(original);
+        historical.remove("queryFingerprint");
+        assertThat(mapper.treeToValue(historical, OpenApiResourceSourceBinding.class)).isEqualTo(original);
         model.setDisplayName("Renamed presentation");
         model.setFields(List.of(model.getFields().getFirst(), FieldDefinition.builder()
                 .code("private_new_field").dataType("STRING").build()));

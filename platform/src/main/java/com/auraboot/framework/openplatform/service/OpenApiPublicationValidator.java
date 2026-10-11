@@ -17,15 +17,32 @@ import java.util.Set;
 public class OpenApiPublicationValidator {
     private final MetaModelService models;
     private final OpenApiCapabilityRegistry fixedRoutes;
+    private final org.springframework.beans.factory.ObjectProvider<com.auraboot.framework.meta.service.NamedQueryService> queries;
 
     public OpenApiPublicationValidator(MetaModelService models) {
         this(models, List.of());
     }
 
-    @org.springframework.beans.factory.annotation.Autowired
     public OpenApiPublicationValidator(MetaModelService models, List<OpenApiCapabilityContributor> contributors) {
+        this(models, contributors, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public OpenApiPublicationValidator(MetaModelService models, List<OpenApiCapabilityContributor> contributors,
+            org.springframework.beans.factory.ObjectProvider<com.auraboot.framework.meta.service.NamedQueryService> queries) {
         this.models = models;
         this.fixedRoutes = new OpenApiCapabilityRegistry(contributors);
+        this.queries = queries;
+    }
+
+    /** Pins delegated execution semantics together with model storage provenance. */
+    public OpenApiResourceSourceBinding captureSourceBinding(OpenApiResourceContract contract, ModelDefinition model) {
+        String fingerprint = null;
+        if ("namedQuery".equals(model.getSourceType())) {
+            if (queries == null) throw new IllegalStateException("NamedQuery source catalog is unavailable");
+            fingerprint = queries.getObject().describeExecution(model.getSourceRef()).fingerprint();
+        }
+        return OpenApiResourceSourceBinding.capture(contract, model, fingerprint);
     }
 
     public ModelDefinition validate(OpenApiResourceContract contract) {
