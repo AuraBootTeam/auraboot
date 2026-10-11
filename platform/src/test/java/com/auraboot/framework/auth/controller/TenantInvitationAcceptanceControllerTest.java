@@ -117,6 +117,19 @@ class TenantInvitationAcceptanceControllerTest {
     }
 
     @Test
+    void optionalDisplayNameAllowsInvitationWithoutChangingExistingNickname() {
+        org.springframework.test.util.ReflectionTestUtils.setField(controller, "invitationDisplayNameRequired", false);
+        User user = userService.findByPid("user-pid");
+        user.setNickName("微信用户");
+        var response = controller.acceptInvitation("Bearer old-token",
+                new TenantInvitationAcceptanceController.InvitationAcceptanceRequest("SCHOOL-CODE", " "));
+        assertEquals("scoped-token", response.getData().get("jwt"));
+        assertEquals("微信用户", user.getNickName());
+        verify(userService, never()).update(any(User.class));
+        verify(tenantMemberService).addMember(11L, 22L, "active");
+    }
+
+    @Test
     void acceptsLegacyRealNamePayloadAndRoute() throws Exception {
         var request = new ObjectMapper().readValue(
                 "{\"inviteCode\":\"SCHOOL-CODE\",\"realName\":\"高老师\"}",
