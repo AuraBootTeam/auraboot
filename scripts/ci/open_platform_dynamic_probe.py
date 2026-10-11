@@ -715,6 +715,8 @@ def verify_release_report(report, *, model_event_secret=None):
     verify_report(report.get("dynamic"))
     verify_sdk_report(report.get("sdk"))
     verify_model_event_report(report.get("modelEvents"), secret=model_event_secret)
+    if "loadMeasurement" not in report["modelEvents"]:
+        raise ProtocolError("release notification burst measurement missing")
     verify_command_audits(report.get("commandAudits"))
     return report
 
