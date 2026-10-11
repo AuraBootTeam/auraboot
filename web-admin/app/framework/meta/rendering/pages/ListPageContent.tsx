@@ -5584,6 +5584,7 @@ function ListPageContentInner(props: PageContentProps) {
                       chipFilters: [],
                     });
                   }}
+                  hideSearch={Boolean(schemaExtension.hideSearch)}
                   hideQuickFilters={hideQuickFilters}
                   hideSort={listExtensions?.hideSort ?? Boolean(schemaExtension.hideSort)}
                   hideColumnSettings={
