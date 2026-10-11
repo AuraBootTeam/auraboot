@@ -66,3 +66,23 @@ describe('warehouse shortage feedback', () => {
     expect(params).toEqual({ required: '5.00', available: '2.00' });
   });
 });
+
+
+describe('resolveCommandErrorMessage concurrency guidance', () => {
+  it.each(['CAS_VERSION_CONFLICT', 'REQUEST_INTENT_CONFLICT', 'CAS_VERSION_REQUIRED'])(
+    'uses Chinese guidance without leaking technical details for %s', (errorCode) => {
+      const message = resolveCommandErrorMessage({ context: { errorCode, detail: 'SECRET-PID in internal_model' } },
+        'task:update', key => key, 'zh-CN');
+      expect(message).toContain('刷新');
+      expect(message).not.toMatch(/SECRET-PID|internal_model|CAS_|REQUEST_|This/);
+    });
+  it('uses a translated conflict message when provided by the page catalog', () => {
+    expect(resolveCommandErrorMessage({ context: { errorCode: 'CAS_VERSION_CONFLICT' } }, 'task:update',
+      key => key === 'common.error.recordVersionConflict' ? 'Translated version conflict' : key, 'zh-CN'))
+      .toBe('Translated version conflict');
+  });
+  it('preserves actionable English guidance when the catalog is missing', () => {
+    expect(resolveCommandErrorMessage({ context: { errorCode: 'CAS_VERSION_CONFLICT' } }, 'task:update', key => key, 'en-US'))
+      .toBe('This record was updated by someone else. Refresh to review the latest data before saving.');
+  });
+});
