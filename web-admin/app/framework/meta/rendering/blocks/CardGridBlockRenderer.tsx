@@ -10,6 +10,8 @@
  *   "categoryField": "category",
  *   "iconField": "icon",           // value = lucide icon name (renders nothing if unresolvable)
  *   "badgeField": "badge",
+ *   "field": "draftRows",        // optional form array for local card edits
+ *   "fields": [{ "field": "quantity", "component": "SmartInput" }],
  *   "columns": "grid-cols-2",      // optional override; default: responsive 1/2/3
  *   "cardActions": [
  *     { "code": "install", "label": "Install", "action": { "type": "command", "command": "template:install" } }
@@ -17,18 +19,20 @@
  * }
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import type { BlockConfig, CardImageViewport } from '~/framework/meta/schemas/types';
+import type { BlockConfig, CardImageViewport, FieldConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
 import { useAuth } from '~/contexts/AuthContext';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useDictCache } from '~/framework/meta/rendering/pages/hooks/useDictCache';
+import { FieldRenderer } from '~/framework/meta/rendering/FieldRenderer';
 import {
   readDataSourceState,
   useDataSourceSubscription,
+  useRuntimeStateSubscription,
 } from './workbenchBlockUtils';
 
 export interface CardGridBlockRendererProps {
@@ -84,6 +88,12 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
   const cardActions: Array<{ code: string; label?: any; variant?: string; action?: any }> =
     Array.isArray(cfg.cardActions) ? cfg.cardActions : [];
   const columnsClass: string = cfg.columns || 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3';
+  // A declared form field stores draft card rows; data-source refreshes never replace edits.
+  const formField = typeof cfg.field === 'string' && cfg.field.trim() ? cfg.field : undefined;
+  const cardFields: FieldConfig[] = Array.isArray(cfg.fields) ? cfg.fields : [];
+  const stateManager = runtime.getStateManager();
+  const scopeId = runtime.getScopeId();
+  useRuntimeStateSubscription(runtime);
 
   // Subscribe to data-source changes so the component re-renders on updates
   useDataSourceSubscription(runtime, dataSourceId);
@@ -133,6 +143,24 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
     showToast,
   });
 
+  const rawData = dataSourceId
+    ? (() => {
+        try {
+          return dataSourceManager.getData(dataSourceId);
+        } catch {
+          return undefined;
+        }
+      })()
+    : undefined;
+  const formRows = formField ? stateManager?.getFieldValue(scopeId, formField) : undefined;
+  const rows = Array.isArray(formRows) ? formRows : normalizeRows(rawData);
+  useEffect(() => {
+    if (formField && formRows === undefined && dataSourceState?.data !== undefined
+        && !dataSourceState.loading && !dataSourceState.error) {
+      stateManager.updateField(scopeId, formField, normalizeRows(rawData));
+    }
+  }, [formField, formRows, dataSourceState, rawData, scopeId, stateManager]);
+
   // ── Error state ────────────────────────────────────────────────────────────
   if (dataSourceState?.error) {
     const message =
@@ -161,19 +189,6 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
       </div>
     );
   }
-
-  // ── Data ───────────────────────────────────────────────────────────────────
-  const rawData = dataSourceId
-    ? (() => {
-        try {
-          return runtime.getDataSourceManager().getData(dataSourceId);
-        } catch {
-          return undefined;
-        }
-      })()
-    : undefined;
-
-  const rows = normalizeRows(rawData);
 
   // ── Empty state ────────────────────────────────────────────────────────────
   if (rows.length === 0) {
@@ -275,6 +290,28 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
               <span className="rounded-pill border-border mb-3 self-start border px-2 py-0.5 text-xs">
                 {badge}
               </span>
+            )}
+
+            {/* Declared fields; without a form array they are display-only. */}
+            {cardFields.length > 0 && (
+              <fieldset aria-label={title} className="mb-3 space-y-3">
+                {cardFields.map((field) => (
+                  <FieldRenderer
+                    key={field.field}
+                    runtime={runtime}
+                    field={{ ...field,
+                      field: `${formField || block.id}.${idx}.${field.field}`,
+                      readOnly: !formField || field.readOnly,
+                    }}
+                    value={row[field.field]}
+                    onChange={(value) => {
+                      if (!formField || field.readOnly) return;
+                      stateManager.updateField(scopeId, formField,
+                        rows.map((current, index) => index === idx ? { ...current, [field.field]: value } : current));
+                    }}
+                  />
+                ))}
+              </fieldset>
             )}
 
             {/* Actions */}

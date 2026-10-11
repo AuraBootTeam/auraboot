@@ -54,6 +54,17 @@ function roundTrip(kind: string, blocks: LegacyDslBlockV2[], modelCode?: string)
 }
 
 describe('flatPageSerializer round-trip (generator-shaped v4 pages)', () => {
+  it('preserves card-grid draft array binding and ordered read-only/editable fields', () => {
+    roundTrip('form', [{
+      id: 'offers', blockType: 'card-grid', dataSource: 'offers', field: 'choices', titleField: 'supplierName',
+      fields: [
+        { field: 'availableQty', component: 'SmartInput', label: 'Available capacity', readOnly: true },
+        { field: 'proposedQty', component: 'SmartInput', label: 'Proposed quantity' },
+        { field: 'score', component: 'SmartInput', label: 'Score', readOnly: true },
+      ],
+    } as any]);
+  });
+
   it('carries the editor root block id through the flat document for identity stability', () => {
     const tree = migratePageSchemaV2ToV3({
       schemaVersion: 4,
