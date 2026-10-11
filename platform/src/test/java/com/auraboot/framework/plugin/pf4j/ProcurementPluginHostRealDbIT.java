@@ -296,7 +296,8 @@ class ProcurementPluginHostRealDbIT {
             @Override public java.time.Instant instant(){return reads.getAndIncrement()==0?before:after;}
         };
     }
-    @Test void nativeFormalSubmissionRechecksDeadlineAndRollsBackAllWrites() {
+    private record QuoteFixture(String quote,String source,java.time.Instant cutoff,java.time.Clock clock) {}
+    private QuoteFixture savedNativeQuote() {
         String directory="pr_supplier_common:sync_directory",dispatch="qo_procurement_task_common:dispatch";
         String save="qo_procurement_quote_common:save_draft",submit="qo_procurement_quote_common:submit";
         var tx=new TransactionTemplate(transactions);
@@ -319,6 +320,12 @@ class ProcurementPluginHostRealDbIT {
                 "unitPrice","1.250001","currency","CNY","unit","PCS","taxRate","0.13","taxIncluded",true,
                 "availableQty","600","deliveryDate","2026-12-01");
         tx.execute(status->scope(save,()->quoteAt(fixed,"save_draft",quote,Map.of("revision",0,"lines",List.of(line),"paymentTerms","Net 30"))));
+        return new QuoteFixture(quote,sourcePid,cutoff,fixed);
+    }
+    @Test void nativeFormalSubmissionRechecksDeadlineAndRollsBackAllWrites() {
+        var fixture=savedNativeQuote();String quote=fixture.quote(),sourcePid=fixture.source();
+        var cutoff=fixture.cutoff();var before=cutoff.minusSeconds(1);var fixed=fixture.clock();
+        String submit="qo_procurement_quote_common:submit";var tx=new TransactionTemplate(transactions);
         Map<String,Object> draft=scope(submit,()->db.getById("s2p_bid",quote));
         Map<String,Object> originalSource=scope(submit,()->db.getById("pr_purchase_request",sourcePid));
         var history=scope(submit,()->nativeRows("qo_procurement_history_common","qo_pr_history_target_pid",quote));
@@ -348,6 +355,63 @@ class ProcurementPluginHostRealDbIT {
             assertEquals(before,submitted.toInstant());
             return null;
         });
+    }
+
+    @Test void nativeSourceChangeInvalidatesAndRequiresWholeReturnBeforeRequote() throws Exception {
+        var fixture=savedNativeQuote();String quote=fixture.quote(),sourcePid=fixture.source();
+        String submit="qo_procurement_quote_common:submit",save="qo_procurement_quote_common:save_draft";
+        String returned="qo_procurement_quote_common:return";var tx=new TransactionTemplate(transactions);
+        var accepted=(Map<?,?>)tx.execute(status->scope(submit,()->quoteAt(fixture.clock(),"submit",quote,Map.of("revision",1))));
+        String original=(String)accepted.get("submissionPid");
+        var snapshot=scope(submit,()->db.getById("qo_procurement_submission_common",original));
+        var snapshotLines=scope(submit,()->nativeRows("qo_procurement_submission_line_common","qo_pr_submission_line_submission_pid",original));
+        assertEquals(1,snapshotLines.size());
+        assertEquals(List.of("unchanged"),tx.execute(status->scope(SYNC,()->sync("100","11"))));
+        scope(SYNC,()->{
+            assertEquals(1,rows().size());assertEquals(sourcePid,rows().getFirst().get("pid"));
+            assertEquals("submitted",db.getById("s2p_bid",quote).get("s2p_bid_status"));return null;
+        });
+        response=row("100","11").replace(",1500,1400,400,300,1000,",",1500,1399,400,300,1000,");
+        assertEquals(List.of("changed"),tx.execute(status->scope(SYNC,()->sync("100","11"))));
+        scope(SYNC,()->{
+            assertEquals(1,rows().size());assertEquals(sourcePid,rows().getFirst().get("pid"));
+            assertEquals(task,rows().getFirst().get("qo_pr_source_task_pid"));
+            assertNativeQuantity("pr_purchase_request",sourcePid,"qo_pr_source_approved_qty","1399");
+            assertNativeQuantity("pr_purchase_request",sourcePid,"qo_pr_source_revision","1");
+            assertEquals("invalidated",db.getById("s2p_bid",quote).get("s2p_bid_status"));
+            assertNativeQuantity("s2p_bid",quote,"qo_pr_quote_revision","3");
+            assertEquals(snapshot,db.getById("qo_procurement_submission_common",original));
+            assertEquals(snapshotLines,nativeRows("qo_procurement_submission_line_common","qo_pr_submission_line_submission_pid",original));return null;
+        });
+        assertEquals("QUOTE_LOCKED",assertThrows(IllegalStateException.class,()->tx.execute(status->scope(submit,
+                ()->quoteAt(fixture.clock(),"submit",quote,Map.of("revision",3))))).getMessage());
+        assertEquals(List.of("unchanged"),tx.execute(status->scope(SYNC,()->sync("100","11"))));
+        tx.execute(status->scope(returned,()->quoteAt(fixture.clock(),"return",quote,Map.of("revision",3,
+                "reason","Demand changed","cutoffAt",fixture.cutoff().plusSeconds(3600).toString()))));
+        scope(returned,()->{
+            var lines=nativeRows("qo_procurement_quote_line_common","qo_pr_quote_line_quote_pid",quote);
+            assertEquals(1,lines.size());assertNativeQuantity("qo_procurement_quote_line_common",(String)lines.getFirst().get("pid"),"qo_pr_quote_line_source_revision","1");
+            assertEquals("draft",db.getById("s2p_bid",quote).get("s2p_bid_status"));return null;
+        });
+        var newLine=Map.<String,Object>of("sourcePid",sourcePid,"sourceRevision",1,"unitPrice","2.000001",
+                "currency","CNY","unit","PCS","taxRate","0.13","taxIncluded",true,"availableQty","600","deliveryDate","2026-12-01");
+        tx.execute(status->scope(save,()->quoteAt(fixture.clock(),"save_draft",quote,Map.of("revision",4,"lines",List.of(newLine),"paymentTerms","Net 60"))));
+        var second=(Map<?,?>)tx.execute(status->scope(submit,()->quoteAt(fixture.clock(),"submit",quote,Map.of("revision",5))));
+        assertNotEquals(original,second.get("submissionPid"));
+        scope(submit,()->{
+            assertEquals(2,nativeRows("qo_procurement_submission_common","qo_pr_submission_quote_pid",quote).size());
+            assertEquals(snapshot,db.getById("qo_procurement_submission_common",original));
+            assertEquals(snapshotLines,nativeRows("qo_procurement_submission_line_common","qo_pr_submission_line_submission_pid",original));
+            assertNativeQuantity("s2p_bid",quote,"qo_pr_quote_revision","6");
+            assertEquals("submitted",db.getById("s2p_bid",quote).get("s2p_bid_status"));return null;
+        });
+        String latestContent=scope(submit,()->nativeRows("qo_procurement_submission_line_common",
+                "qo_pr_submission_line_submission_pid",(String)second.get("submissionPid")).getFirst().get("qo_pr_submission_line_content").toString());
+        var originalContent=json.readTree(snapshotLines.getFirst().get("qo_pr_submission_line_content").toString());
+        var newContent=json.readTree(latestContent);
+        assertEquals(new BigDecimal("1400"),originalContent.path("source_snapshot").path("approved_qty").decimalValue());
+        assertEquals(new BigDecimal("1399"),newContent.path("source_snapshot").path("approved_qty").decimalValue());
+        assertEquals(0,new BigDecimal("2.000001").compareTo(newContent.path("unit_price").decimalValue()));
     }
 
     @Test void nativeShipmentReplaySnapshotAndFulfillmentNeverChangeActualReceipts() {
