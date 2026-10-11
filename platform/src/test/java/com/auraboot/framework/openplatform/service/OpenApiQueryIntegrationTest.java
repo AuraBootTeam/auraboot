@@ -566,7 +566,7 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
                 List.of(new OpenApiInstallationPolicy.RowConstraint("zone", List.of("A")))));
         http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).header("Authorization", "Bearer " + tokenA))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
-        verifyAmbiguousVirtualGetRejectsTruncatedResults(pid, path);
+        verifyAmbiguousVirtualGetAndSourceBudgetBoundary(pid, path);
         applyTestMetaContext(); resources.withdraw(root.code(), 1);
         assertThat(resources.active(testTenant.getId(), contract.code())).contains(contract);
         for (String unavailable : List.of("/api/open/v1/resources/" + contract.code(), path)) {
@@ -944,7 +944,7 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
         } finally { applyTestMetaContext(); }
         assertThat(run(principalA,rows,"A").get("total")).isEqualTo(1L);
     }
-    private void verifyAmbiguousVirtualGetRejectsTruncatedResults(String pid, String healthyPath) throws Exception {
+    private void verifyAmbiguousVirtualGetAndSourceBudgetBoundary(String pid, String healthyPath) throws Exception {
         for (int maxRows : List.of(5000, 1)) {
             applyTestMetaContext();
             String suffix = UniqueIdGenerator.generate().toLowerCase();
@@ -961,6 +961,13 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
                             FieldDefinition.builder().code("zone").dataType("STRING").displayName("Zone").filterable(true).build())).build());
             var contract = new OpenApiResourceContract("ambiguous." + suffix, modelCode, 1, root.operations(), root.scopes(),
                     DataPolicy.INSTALLATION_FILTER, root.fields(), Math.min(50, maxRows), 8, 5000, Set.of(), Map.of(root.modelCode(), root.code()));
+            if (maxRows == 1) {
+                assertThatThrownBy(() -> resources.saveDraft(contract.code(), new OpenApiPublicationService.DraftRequest(0, contract)))
+                        .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Public query exceeds source execution budget");
+                assertThat(resources.active(principalA.tenantId(), contract.code())).isEmpty();
+                assertThat(publicationMapper.snapshot(principalA.tenantId(), contract.code(), 1)).isNull();
+                continue;
+            }
             resources.saveDraft(contract.code(), new OpenApiPublicationService.DraftRequest(0, contract)); resources.publish(contract.code(), 1);
             resources.grant(principalA.installationPid(), contract.code(), new OpenApiInstallationPolicy(contract.operations(),
                     contract.fields().keySet(), Set.of(), List.of(new OpenApiInstallationPolicy.RowConstraint("zone", List.of("A")))));
