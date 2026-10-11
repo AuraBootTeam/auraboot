@@ -567,6 +567,15 @@ bootRun {
 }
 
 tasks.withType(Test).configureEach {
+    def procurementHostJar = providers.environmentVariable('PROCUREMENT_PLUGIN_JAR').orNull
+    if (procurementHostJar) {
+        inputs.file(procurementHostJar).withPropertyName('procurementHostPluginJar')
+                .withPathSensitivity(PathSensitivity.NONE)
+        inputs.property('procurementHostTenant', providers.environmentVariable('TEST_TENANT_ID').getOrElse(''))
+        // Opt-in host probes depend on live PostgreSQL state as well as the external product JAR.
+        outputs.upToDateWhen { false }
+        outputs.doNotCacheIf('Procurement host verification requires actual database execution') { true }
+    }
     def retainedAllure = providers.environmentVariable('AURA_ALLURE_RESULTS').orNull
     if (retainedAllure) {
         systemProperty 'allure.results.directory', retainedAllure
