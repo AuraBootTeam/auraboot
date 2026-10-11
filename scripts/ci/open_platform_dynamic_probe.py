@@ -31,8 +31,9 @@ AUDIT_CASES = (
 )
 
 # Fixed declaration semantics, authored with NamedQueryDefinitionFingerprint
-# from the qualified JAR before importing. Fresh plugin sources have version 0.
-PLUGIN_QUERY_SOURCE_FINGERPRINT = "9a240519bf431b03641c4b754e65af329bb36bb5a6f2344eb61a5c7f00cc0891"
+# from the qualified JAR before importing. Fresh plugin sources have version 0;
+# persisted fields have the schema's non-null empty operators array.
+PLUGIN_QUERY_SOURCE_FINGERPRINT = "d666f6e320554f17d1167fda1a986a920b400cc0309a51b5806fd5209390d2e2"
 
 
 def verify_named_query_absent(body, code):
@@ -535,8 +536,8 @@ def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None):
             "resourceCode": model_code, "actionCode": "read", "fromSql": f"{model['tableName']} a WHERE a.rel_zone = #{{params.zone}}",
             "policy": {"rateLimitPerMinute": 100000},
             "defaultOrder": [{"field": "pid", "direction": "asc"}], "fields": [
-                {"fieldCode": "pid", "columnExpr": "a.pid", "dataType": "string", "displayName": "PID", "sortable": True, "searchable": False},
-                {"fieldCode": "partName", "columnExpr": "a.rel_name", "dataType": "string", "displayName": "Name", "sortable": False, "searchable": False}]}
+                {"fieldCode": "pid", "columnExpr": "a.pid", "dataType": "string", "displayName": "PID", "sortable": True, "searchable": False, "operators": []},
+                {"fieldCode": "partName", "columnExpr": "a.rel_name", "dataType": "string", "displayName": "Name", "sortable": False, "searchable": False, "operators": []}]}
         if model["tableName"] != model_code:
             raise ProtocolError("declared query fixture physical source changed")
         before_status, missing, _ = request("/api/meta/named-queries/by-code/" + named_code, headers=admin, expected=(400,))
