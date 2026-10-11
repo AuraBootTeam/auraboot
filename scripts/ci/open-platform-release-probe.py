@@ -135,7 +135,7 @@ def run_static_probe(request, admin):
 
 
 def main():
-    request = Client(BASE, allow_expected_rate_limit=True).request
+    request = Client(BASE, max_requests=350, allow_expected_rate_limit=True).request
     admin = bootstrap_module.bootstrap_admin(request)
     static = run_static_probe(request, admin)
     credential = static["credential"]
@@ -152,7 +152,10 @@ def main():
         sdk = run_sdk_consumer(fixture, sdk_command, base_url=os.environ["SDK_BASE_URL"],
                                evidence_path=Path(ARTIFACT).with_name("sdk-probe.json"))
 
-    dynamic = run_dynamic_probe(request, admin, evidence_path=Path(ARTIFACT).with_name("dynamic-probe.json"),
+    from open_platform_authentication_probe import PsqlAuditReader
+    audit_reader = PsqlAuditReader(["docker", "exec", "-i", os.environ["MODEL_POSTGRES"], "psql", "-U", "auraboot",
+                                   "-d", "open_platform_ci", "-X", "-At", "-v", "ON_ERROR_STOP=1"], "open_platform_ci")
+    dynamic = run_dynamic_probe(request, admin, audit_reader=audit_reader, evidence_path=Path(ARTIFACT).with_name("dynamic-probe.json"),
                                 consumer=consume)
     infrastructure = DockerInfrastructure(app=os.environ["MODEL_APP"], postgres=os.environ["MODEL_POSTGRES"],
         network=os.environ["SDK_NETWORK"], job_id=os.environ["AURA_CI_JOB_ID"],

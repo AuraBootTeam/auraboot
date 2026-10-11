@@ -165,6 +165,28 @@ def passed():
         proof["requests"].append({"id": identifier, "operation": operation, "query": query, "status": status,
             "requestId": marker, "body": body, "etag": '"'+"c"*64+'"' if status == 200 else None, "audit": audit})
     virtual["nullIdentity"] = proof
+    from open_platform_authentication_probe import CASES as AUTH_CASES
+    before = {"database": "hermetic-fixture", "installationFound": 1, "tokenCount": 1,
+              "credentialLastUsed": "2026-10-12T00:00:00Z", "tokenLastUsed": None, "quotaCount": 0, "audits": []}
+    denied = copy.deepcopy(before)
+    requests = []
+    for index, (name, status, code, known, token) in enumerate(AUTH_CASES):
+        method = "POST" if name.startswith("oauth") else "GET"
+        path = "/oauth2/token" if method == "POST" else "/api/open/v1/whoami"
+        identifier = "fixture-auth-" + str(index)
+        audit = {"requestId": identifier, "method": method, "path": path, "status": status, "durationMs": 1,
+                 "occurredAt": "2026-10-12T00:00:00Z", "applicationPid": "app-pid" if known else None,
+                 "installationPid": "install-pid" if known else None, "businessDetails": {"actorKind": "unauthenticated", "phase": "authentication", "code": code},
+                 "tokenPresent": token, "tenantMatches": known, "anonymous": not known, "secretFree": True}
+        denied["audits"].append(audit)
+        visible = [{"requestId": identifier, "method": method, "path": path, "status": status,
+                    "actorKind": "unauthenticated", "applicationPid": "app-pid", "installationPid": "install-pid",
+                    "capability": None, "resource": None, "operation": None, "recordPid": None, "idempotentReplay": None}] if known else []
+        requests.append({"id": name, "status": status, "body": {"error": code} if method == "POST" else {"success": False, "code": code, "message": code},
+                         "requestId": identifier, "callerIdReplaced": method == "POST", "visibleAudits": visible})
+    allowed = dict(before, tokenLastUsed="2026-10-12T00:00:01Z", quotaCount=1)
+    report["authenticationFailures"] = {"applicationPid": "app-pid", "installationPid": "install-pid", "before": before,
+                                         "afterDenied": denied, "afterAllowed": allowed, "requests": requests, "normalStatus": 200}
     return report
 
 
@@ -492,6 +514,21 @@ class DynamicProbeTests(unittest.TestCase):
         with self.assertRaises(ProtocolError): verify_report(report)
 
     def test_audit_proofs_are_mandatory_and_reject_wrong_identity_result_or_private_fields(self):
+        baseline = passed()
+        for key in ["authenticationFailures"]:
+            report = copy.deepcopy(baseline); report.pop(key)
+            with self.assertRaises(ProtocolError): verify_report(report)
+        for key in ["before", "afterDenied", "afterAllowed", "requests", "normalStatus"]:
+            report = copy.deepcopy(baseline); report["authenticationFailures"].pop(key)
+            with self.subTest(auth_missing=key), self.assertRaises(ProtocolError): verify_report(report)
+        for index in range(7):
+            for key in baseline["authenticationFailures"]["afterDenied"]["audits"][index]:
+                report = copy.deepcopy(baseline); report["authenticationFailures"]["afterDenied"]["audits"][index].pop(key)
+                with self.subTest(auth_audit=index,missing=key), self.assertRaises(ProtocolError): verify_report(report)
+        for field in ["tokenCount", "credentialLastUsed", "tokenLastUsed", "quotaCount"]:
+            report = copy.deepcopy(baseline); report["authenticationFailures"]["afterDenied"][field] = "changed"
+            with self.subTest(auth_state=field), self.assertRaises(ProtocolError): verify_report(report)
+
         report = passed(); del report["auditProofs"]
         with self.assertRaises(ProtocolError): verify_report(report)
         for change in [lambda r: r["auditProofs"].pop(),

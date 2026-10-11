@@ -460,6 +460,8 @@ def verify_report(report):
     verify_plugin_metadata_rollback(report.get("pluginMetadataRollback"), proofs[0])
     verify_plugin_query_source(report.get("pluginQuerySource"), proofs[1])
     verify_claimed_query_rollback(report.get("queryRollbackProtection"), proofs[1], report["pluginQuerySource"])
+    from open_platform_authentication_probe import verify as verify_authentication
+    verify_authentication(report.get("authenticationFailures"), report.get("applicationPid"), report.get("installationPid"))
     verify_audits(report)
     verify_replay_authority(report.get("replayAuthority"), report)
     verify_write_replay_authority(report.get("writeReplayAuthority"), report)
@@ -995,7 +997,7 @@ def prepare_slo_fixture(request, admin, report, consumer_fixture, *, fixture_pat
             "rateLimitPerMinute": 100000}
 
 
-def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None):
+def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None, audit_reader=None):
     rows = [{"id": case, "status": "did_not_run"} for case in CASES]
 
     def record(case, condition=True):
@@ -1112,6 +1114,9 @@ def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None):
         grant_path = f"/api/open-platform/installations/{installation['pid']}/resources/{resource}"
         human(grant_path, "PUT", {"operations": operations, "readableFields": ["pid", "name", "zone"],
             "writableFields": ["name", "zone"], "rowConstraints": [{"field": "zone", "values": ["A"]}]})
+        from open_platform_authentication_probe import run as run_authentication
+        report["authenticationFailures"] = run_authentication(request, human, report, credentials,
+                token["access_token"], path, audit_reader)
         _, page, _ = audited("resource-row-field-projection", path, headers=machine)
         record("resource-row-field-projection", page.get("items") == [{"pid": a["pid"], "name": "Allowed A", "zone": "A"}])
         request(path + "/" + b["pid"], headers=machine, expected=(404,)); record("hidden-record")
