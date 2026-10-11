@@ -257,10 +257,13 @@ class ProcurementPluginHostRealDbIT {
     }
 
     private Object invokeService(String service,String method,Class<?>[] parameters,Object... arguments) {
+        return invokeServiceAt(java.time.Clock.systemUTC(),service,method,parameters,arguments);
+    }
+    private Object invokeServiceAt(java.time.Clock clock,String service,String method,Class<?>[] parameters,Object... arguments) {
         try {
             Class<?> type=plugin.loadClass("com.auraboot.quote.engine.procurement."+service);
             return type.getMethod(method,parameters).invoke(type.getConstructor(DataAccessor.class,java.time.Clock.class)
-                    .newInstance(db,java.time.Clock.systemUTC()),arguments);
+                    .newInstance(db,clock),arguments);
         } catch(ReflectiveOperationException error) {throw unwrap(error);}
     }
     private List<Map<String,Object>> nativeRows(String model,String field,String value) {
@@ -269,6 +272,84 @@ class ProcurementPluginHostRealDbIT {
     private void assertNativeQuantity(String model,String pid,String field,String quantity) {
         assertEquals(0,new BigDecimal(quantity).compareTo(new BigDecimal(db.getById(model,pid).get(field).toString())),field);
     }
+    @SuppressWarnings("unchecked")
+    private Map<String,Object> createProductEntity(String entity,Map<String,Object> values) {
+        try {
+            Class<?> type=plugin.loadClass("com.auraboot.quote.engine.procurement.ProcurementData");
+            return (Map<String,Object>)type.getMethod("create",DataAccessor.class,String.class,Map.class)
+                    .invoke(null,db,entity,values);
+        } catch(ReflectiveOperationException error) {throw unwrap(error);}
+    }
+    private Object quoteAt(java.time.Clock clock,String action,String quote,Map<String,Object> payload) {
+        return invokeServiceAt(clock,"ProcurementQuoteService","execute",
+                new Class<?>[]{String.class,String.class,String.class,Map.class},action,quote,actor,payload);
+    }
+    /** Deterministic passage of time through the actual service, without replacing native persistence. */
+    private static java.time.Clock crossingClock(java.time.Instant before,java.time.Instant after) {
+        var reads=new java.util.concurrent.atomic.AtomicInteger();
+        return new java.time.Clock() {
+            @Override public java.time.ZoneId getZone(){return java.time.ZoneOffset.UTC;}
+            @Override public java.time.Clock withZone(java.time.ZoneId zone){
+                if(!java.time.ZoneOffset.UTC.equals(zone)) throw new IllegalArgumentException("UTC fixture required");
+                return this;
+            }
+            @Override public java.time.Instant instant(){return reads.getAndIncrement()==0?before:after;}
+        };
+    }
+    @Test void nativeFormalSubmissionRechecksDeadlineAndRollsBackAllWrites() {
+        String directory="pr_supplier_common:sync_directory",dispatch="qo_procurement_task_common:dispatch";
+        String save="qo_procurement_quote_common:save_draft",submit="qo_procurement_quote_common:submit";
+        var tx=new TransactionTemplate(transactions);
+        tx.execute(status->scope(SYNC,()->sync("100","11")));
+        Map<String,Object> sourceRow=rows().getFirst();String sourcePid=(String)sourceRow.get("pid");
+        String supplier=scope(directory,()->(String)db.create("pr_supplier_common",Map.of("pr_supplier_code",provider,
+                "pr_supplier_name","Deadline fixture","pr_supplier_status","enabled","qo_pr_supplier_account_id",provider)).get("pid"));
+        String contact=scope(directory,()->(String)db.create("pr_supplier_pcba_contact",Map.of(
+                "pr_spc_supplier_id",supplier,"pr_spc_name","Deadline contact","qo_pr_contact_state","active")).get("pid"));
+        // Synthetic bound membership and dispatched quote isolate the deadline/transaction seam.
+        scope("qo_procurement_membership_common:bind_verified_phone",()->db.create("qo_procurement_membership_common",Map.of(
+                "qo_pr_membership_key",provider,"qo_pr_membership_user_pid",actor,"qo_pr_membership_supplier_pid",supplier,
+                "qo_pr_membership_contact_pid",contact,"qo_pr_membership_state","active")));
+        var cutoff=java.time.Instant.parse("2026-11-15T08:00:00Z");var before=cutoff.minusSeconds(1);
+        var fixed=java.time.Clock.fixed(before,java.time.ZoneOffset.UTC);
+        String quote=scope(dispatch,()->(String)createProductEntity("quote",Map.of("key",provider,"task_pid",task,
+                "supplier_pid",supplier,"state","draft","revision",0,"cutoff_at",cutoff.toString(),
+                "received_at",before.toString(),"source_pids",List.of(sourcePid))).get("pid"));
+        var line=Map.<String,Object>of("sourcePid",sourcePid,"sourceRevision",sourceRow.get("qo_pr_source_revision"),
+                "unitPrice","1.250001","currency","CNY","unit","PCS","taxRate","0.13","taxIncluded",true,
+                "availableQty","600","deliveryDate","2026-12-01");
+        tx.execute(status->scope(save,()->quoteAt(fixed,"save_draft",quote,Map.of("revision",0,"lines",List.of(line),"paymentTerms","Net 30"))));
+        Map<String,Object> draft=scope(submit,()->db.getById("s2p_bid",quote));
+        Map<String,Object> originalSource=scope(submit,()->db.getById("pr_purchase_request",sourcePid));
+        var history=scope(submit,()->nativeRows("qo_procurement_history_common","qo_pr_history_target_pid",quote));
+        var draftLines=scope(submit,()->nativeRows("qo_procurement_quote_line_common","qo_pr_quote_line_quote_pid",quote));
+        for(var reached:List.of(cutoff,cutoff.plusNanos(1))) {
+            var failure=assertThrows(IllegalStateException.class,()->tx.execute(status->scope(submit,
+                    ()->quoteAt(crossingClock(before,reached),"submit",quote,Map.of("revision",1)))));
+            assertEquals("CUTOFF_EXPIRED",failure.getMessage());
+            scope(submit,()->{
+                assertEquals(draft,db.getById("s2p_bid",quote));
+                assertEquals(originalSource,db.getById("pr_purchase_request",sourcePid));
+                assertEquals(draftLines,nativeRows("qo_procurement_quote_line_common","qo_pr_quote_line_quote_pid",quote));
+                assertEquals(history,nativeRows("qo_procurement_history_common","qo_pr_history_target_pid",quote));
+                assertTrue(nativeRows("qo_procurement_submission_common","qo_pr_submission_quote_pid",quote).isEmpty());
+                return null;
+            });
+        }
+        Object accepted=tx.execute(status->scope(submit,()->quoteAt(fixed,"submit",quote,Map.of("revision",1))));
+        var result=(Map<?,?>)accepted;
+        assertEquals("submitted",result.get("state"));
+        var after=java.time.Clock.fixed(cutoff.plusSeconds(1),java.time.ZoneOffset.UTC);
+        assertEquals(accepted,tx.execute(status->scope(submit,()->quoteAt(after,"submit",quote,Map.of("revision",result.get("revision"))))));
+        scope(submit,()->{
+            assertEquals(1,nativeRows("qo_procurement_submission_common","qo_pr_submission_quote_pid",quote).size());
+            assertEquals(history.size()+1,nativeRows("qo_procurement_history_common","qo_pr_history_target_pid",quote).size());
+            var submitted=assertInstanceOf(java.sql.Timestamp.class,db.getById("s2p_bid",quote).get("s2p_bid_submitted_at"));
+            assertEquals(before,submitted.toInstant());
+            return null;
+        });
+    }
+
     @Test void nativeShipmentReplaySnapshotAndFulfillmentNeverChangeActualReceipts() {
         String directory="pr_supplier_common:sync_directory",publish="qo_procurement_order_common:sync_orders";
         String submit="qo_procurement_order_common:submit_shipment",maintain="qo_procurement_address_common:maintain";
