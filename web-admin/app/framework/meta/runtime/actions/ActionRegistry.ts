@@ -672,7 +672,7 @@ export async function promptInputForm(
   const normalizedFields = fields.map((field) => normalizePromptInputField(field));
   const fieldOptions: Record<
     string,
-    Array<{ label: any; value: string; description?: any; disabled?: boolean; visibleWhen?: any }>
+    Array<{ label: any; value: string; description?: any; disabled?: boolean; visibleWhen?: any; options?: Array<{ value: string; disabled?: boolean }>; defaultValues?: unknown }>
   > = {};
   for (const field of normalizedFields) {
     if (field.dictCode && fetchResult) {
@@ -759,6 +759,8 @@ export async function promptInputForm(
                     .map((choice: any) => ({ value: choice.value, label: choice.label,
                       ...(choice.disabled === true ? { disabled: true } : {}) })) : [] } : {}),
                 ...(option.disabled === true ? { disabled: true } : {}),
+                ...(field.type === 'grouped-multiselect' && field.props?.defaultValuesField
+                  ? { defaultValues: option[field.props.defaultValuesField] } : {}),
               };
             }
             if (option === undefined || option === null) return null;
@@ -808,6 +810,18 @@ export async function promptInputForm(
       } else {
         defaults[field.field] = resolvedDefaultValue;
       }
+    } else if (field.type === 'grouped-multiselect' && field.props?.defaultValuesField) {
+      const groupField = field.props.groupField || 'group';
+      const valuesField = field.props.valuesField || 'values';
+      defaults[field.field] = (fieldOptions[field.field] || []).map((group) => {
+        const values = group.defaultValues;
+        const eligible = new Set((group.options || []).filter((choice) => !choice.disabled).map((choice) => choice.value));
+        if (!Array.isArray(values) || values.some((value) => typeof value !== 'string' || !eligible.has(value))
+          || new Set(values).size !== values.length || (group.disabled && values.length > 0)) {
+          throw new Error(`Invalid grouped defaults for ${field.field}`);
+        }
+        return { [groupField]: group.value, [valuesField]: [...values] };
+      });
     }
   }
 

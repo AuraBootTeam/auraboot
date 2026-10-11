@@ -582,6 +582,16 @@ describe('FormDialog grouped choices', () => {
 
 
 describe('FormDialog grouped default selections', () => {
+  it('submits manual changes to a suggested selection without restoring the original default', () => {
+    const onSubmit = vi.fn();
+    renderDialog({ fields: [{ field: 'selection', type: 'grouped-multiselect', label: 'Selection', required: true }],
+      fieldOptions: { selection: [{ value: 'materials', label: 'Materials', options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }] }] },
+      defaults: { selection: [{ group: 'materials', values: ['a'] }] }, onSubmit });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'A' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'B' }));
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(onSubmit).toHaveBeenCalledWith({ selection: [{ group: 'materials', values: ['b'] }] });
+  });
   it('preserves an explicitly supplied valid selection without adding suppliers', () => {
     const onSubmit = vi.fn();
     const value = [{ group: 'materials', values: ['a'] }];

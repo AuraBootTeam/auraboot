@@ -1252,6 +1252,52 @@ describe('ActionRegistry command snapshot version', () => {
 
 
 describe('ActionRegistry grouped API choices', () => {
+  const defaultField = { field: 'groups', type: 'grouped-multiselect',
+    props: { groupField: 'category', valuesField: 'supplierPids', defaultValuesField: 'preferred' },
+    dataSource: { type: 'api', endpoint: '/api/group-options' } };
+
+  it('initializes independent configured defaults and returns the later manual selection', async () => {
+    const groups = [
+      { value: 'a', label: 'A', preferred: ['s1'], options: [{ value: 's1', label: 'One' }, { value: 's2', label: 'Two' }] },
+      { value: 'b', label: 'B', preferred: [], options: [{ value: 's2', label: 'Two' }] },
+    ];
+    const edited = [{ category: 'a', supplierPids: ['s2'] }, { category: 'b', supplierPids: ['s2'] }];
+    let detail: any;
+    window.addEventListener('dialog:form', (event) => {
+      detail = (event as CustomEvent).detail;
+      detail.onSubmit({ groups: edited });
+    }, { once: true });
+    const result = await promptInputForm([defaultField], 'Select', vi.fn().mockResolvedValue({ data: { items: groups } }));
+    expect(detail.defaults.groups).toEqual([{ category: 'a', supplierPids: ['s1'] }, { category: 'b', supplierPids: [] }]);
+    expect(result.groups).toEqual(edited);
+    expect(groups[0].preferred).toEqual(['s1']);
+  });
+
+  it('preserves explicitly supplied form defaults ahead of provider suggestions', async () => {
+    const saved = [{ category: 'a', supplierPids: ['s2'] }];
+    let detail: any;
+    window.addEventListener('dialog:form', (event) => { detail = (event as CustomEvent).detail; detail.onCancel(); }, { once: true });
+    await expect(promptInputForm([{ ...defaultField, defaultValue: saved }], 'Select',
+      vi.fn().mockResolvedValue({ data: [{ value: 'a', label: 'A', preferred: ['s1'], options: [] }] })))
+      .rejects.toThrow('User cancelled');
+    expect(detail.defaults.groups).toEqual(saved);
+  });
+
+  it.each([
+    { preferred: ['foreign'] }, { preferred: ['s1', 's1'] }, { preferred: 's1' }, {},
+    { preferred: ['s1'], disabled: true },
+    { preferred: ['s1'], options: [{ value: 's1', label: 'One', disabled: true }] },
+  ])('rejects invalid provider defaults before opening a form: %j', async (invalid) => {
+    const listener = vi.fn();
+    window.addEventListener('dialog:form', listener);
+    try {
+      await expect(promptInputForm([defaultField], 'Select', vi.fn().mockResolvedValue({ data: [
+        { value: 'a', label: 'A', options: [{ value: 's1', label: 'One' }], ...invalid },
+      ] }))).rejects.toThrow('Invalid grouped defaults');
+      expect(listener).not.toHaveBeenCalled();
+    } finally { window.removeEventListener('dialog:form', listener); }
+  });
+
   it('retains group-scoped choices and disabled flags without exposing unrelated provider fields', async () => {
     const fetchResult = vi.fn().mockResolvedValue({ code: '0', data: { items: [
       { value: 'category-a', label: 'Resistors', secret: 'not-for-ui', options: [
