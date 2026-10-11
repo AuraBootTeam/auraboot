@@ -146,6 +146,7 @@ class ProcurementPluginHostRealDbIT {
     private static String row(String id,String entry){return "[["+id+",\"REQ-FIXTURE\","+entry+",900,\"TEST-MATERIAL\",\"Host material\",\"fixture\",1500,1400,400,300,1000,\"PCS\",\"2026-12-01T00:00:00\",\"ORG-FIXTURE\",\"C\",\"A\",\"A\"]]";}
 
     @Test void nativeBoundIdentitySelectsCurrentActorBeforeConsumingPhoneGrant() throws Exception {
+        String phoneNational = "13" + String.format(Locale.ROOT,"%09d",Math.floorMod(actorId,1_000_000_000L));
         String appId = "wx-" + provider;
         String ownOpenid = "own-" + provider;
         String foreignOpenid = "foreign-" + provider;
@@ -175,7 +176,7 @@ class ProcurementPluginHostRealDbIT {
         server.createContext("/wxa/business/getuserphonenumber", e -> {
             requests.add(new String(e.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
             byte[] body = json.writeValueAsBytes(Map.of("errcode", 0, "phone_info", Map.of(
-                    "purePhoneNumber", "13800138000", "countryCode", "86",
+                    "purePhoneNumber", phoneNational, "countryCode", "86",
                     "watermark", Map.of("appid", appId, "timestamp", 1791730000))));
             e.sendResponseHeaders(200, body.length);e.getResponseBody().write(body);e.close();
         });
@@ -189,7 +190,18 @@ class ProcurementPluginHostRealDbIT {
         var grant = (com.auraboot.framework.plugin.extension.VerifiedPhoneGrantAccessor) grantSettings.get(
                 com.auraboot.framework.plugin.extension.VerifiedPhoneGrantAccessor.SETTINGS_KEY);
         assertNotNull(grant);
-        assertEquals("+8613800138000", grant.verifyCurrentPhone("synthetic-login", "synthetic-phone-code"));
+        String writer="pr_supplier_pcba_contact:sync_directory";
+        String supplier=scope(writer,()->(String)db.create("pr_supplier_common",Map.of(
+                "pr_supplier_code",provider,"pr_supplier_name","Verified phone binding fixture","pr_supplier_status","enabled")).get("pid"));
+        String contact=scope(writer,()->(String)db.create("pr_supplier_pcba_contact",Map.of(
+                "pr_spc_supplier_id",supplier,"pr_spc_name","Verified contact","qo_pr_contact_state","active",
+                "qo_pr_contact_normalized_phone","+86"+phoneNational)).get("pid"));
+        var bound=new TransactionTemplate(transactions).execute(status->scope("qo_procurement_membership_common:bind_verified_phone",
+                ()->bindNativeMembership(db,grant)));
+        assertEquals(supplier,bound.get("supplierPid"));assertEquals(contact,bound.get("contactPid"));
+        var bindingStored=scope(writer,()->db.getById("qo_procurement_membership_common",bound.get("recordPid").toString()));
+        assertEquals(actor,bindingStored.get("qo_pr_membership_user_pid"));assertEquals(tenantId,bindingStored.get("tenant_id"));
+        assertEquals("active",bindingStored.get("qo_pr_membership_state"));
         assertEquals("PHONE_GRANT_ALREADY_CONSUMED", assertThrows(SecurityException.class,
                 () -> grant.verifyCurrentPhone("replayed-login", "replayed-phone")).getMessage());
         assertEquals(3, requests.size());
@@ -213,6 +225,49 @@ class ProcurementPluginHostRealDbIT {
         assertEquals(2, stored.size());
         assertTrue(stored.stream().allMatch(identity -> identity.getLastLoginAt() == null));
         assertEquals(Set.of(actorId, foreignUser.getId()), new HashSet<>(stored.stream().map(AuthIdentity::getUserId).toList()));
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String,Object> bindNativeMembership(DataAccessor selected,com.auraboot.framework.plugin.extension.VerifiedPhoneGrantAccessor grant) {
+        var settings=new HashMap<String,Object>();settings.put(CommandHandlerExtension.DATA_ACCESSOR_KEY,selected);
+        settings.put(CommandHandlerExtension.CURRENT_USER_PID_KEY,actor);
+        settings.put(com.auraboot.framework.plugin.extension.VerifiedPhoneGrantAccessor.SETTINGS_KEY,grant);
+        var request=new CommandHandlerExtension.CommandContext(tenantId,"com.auraboot.quote-engine","qoe",
+                "qo_procurement_membership_common:bind_verified_phone","qo_procurement_membership_common",null,
+                Map.of("loginCode","synthetic-login","phoneCode","synthetic-phone-code"),settings,false);
+        try {var type=plugin.loadClass("com.auraboot.quote.engine.procurement.ProcurementCommandHandler");
+            return (Map<String,Object>)type.getMethod("execute",CommandHandlerExtension.CommandContext.class)
+                    .invoke(type.getConstructor().newInstance(),request);
+        }catch(ReflectiveOperationException error){throw unwrap(error);}
+    }
+
+    @Test void nativeMembershipCreationRollsBackOnObservedDirectoryChange() {
+        String writer="pr_supplier_pcba_contact:sync_directory",bind="qo_procurement_membership_common:bind_verified_phone";
+        String phone="+8613"+String.format(Locale.ROOT,"%09d",Math.floorMod(actorId,1_000_000_000L));
+        String supplier=scope(writer,()->(String)db.create("pr_supplier_common",Map.of("pr_supplier_code",provider,
+                "pr_supplier_name","Binding rollback fixture","pr_supplier_status","enabled")).get("pid"));
+        String contact=scope(writer,()->(String)db.create("pr_supplier_pcba_contact",Map.of("pr_spc_supplier_id",supplier,
+                "pr_spc_name","Binding rollback contact","qo_pr_contact_state","active","qo_pr_contact_normalized_phone",phone)).get("pid"));
+        var captured=new java.util.concurrent.atomic.AtomicReference<String>();
+        DataAccessor observed=(DataAccessor)java.lang.reflect.Proxy.newProxyInstance(DataAccessor.class.getClassLoader(),new Class<?>[]{DataAccessor.class},
+                (proxy,method,args)->{try {
+                    Object result=method.invoke(db,args);
+                    if(method.getName().equals("create") && args[0].equals("qo_procurement_membership_common")) {
+                        captured.set(((Map<?,?>)result).get("pid").toString());
+                        scope(writer,()->db.update("pr_supplier_pcba_contact",contact,Map.of("qo_pr_contact_state","inactive")));
+                    }
+                    return result;
+                }catch(InvocationTargetException error){throw error.getCause();}});
+        var tx=new TransactionTemplate(transactions);
+        var rejection=assertThrows(com.auraboot.framework.plugin.extension.PluginCommandRejectionException.class,()->tx.execute(status->scope(bind,()->bindNativeMembership(observed,(l,p)->phone))));
+        assertEquals("qo_pr.error.phone_not_registered",rejection.messageKey());assertNotNull(captured.get());
+        assertTrue(scope(bind,()->nativeRows("qo_procurement_membership_common","qo_pr_membership_user_pid",actor)).isEmpty());
+        assertEquals("active",scope(writer,()->db.getById("pr_supplier_pcba_contact",contact)).get("qo_pr_contact_state"));
+        var first=tx.execute(status->scope(bind,()->bindNativeMembership(db,(l,p)->phone)));
+        var snapshot=scope(bind,()->db.getById("qo_procurement_membership_common",first.get("recordPid").toString()));
+        var second=tx.execute(status->scope(bind,()->bindNativeMembership(db,(l,p)->phone)));
+        assertEquals(first,second);assertEquals(snapshot,scope(bind,()->db.getById("qo_procurement_membership_common",first.get("recordPid").toString())));
+        assertEquals(1,scope(bind,()->nativeRows("qo_procurement_membership_common","qo_pr_membership_user_pid",actor)).size());
     }
 
     @Test void actualHostSecretAndNativePersistenceSurviveReplay() throws Exception {
