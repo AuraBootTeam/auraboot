@@ -798,13 +798,13 @@ class AggregateQueryServiceIntegrationTest extends BaseIntegrationTest {
         try {
             var rows = com.auraboot.framework.application.tenant.MetaContext.runWithCommandPermitScope("ALL", () -> List.of(
                     data.create(code, new java.util.HashMap<>(java.util.Map.of("name", "north_50%", "amount", 10, "notes", "never-note"))),
-                    data.create(code, new java.util.HashMap<>(java.util.Map.of("name", "northX49z", "amount", 20, "notes", "north_50%"))),
+                    data.create(code, new java.util.HashMap<>(java.util.Map.of("name", "northX50z", "amount", 20, "notes", "north_50%"))),
                     data.create(code, new java.util.HashMap<>(java.util.Map.of("name", "south", "amount", 50, "notes", "other")))));
             var request = countRequest(code);
             java.util.function.LongSupplier all = () -> com.auraboot.framework.application.tenant.MetaContext.runWithCommandPermitScope("ALL", () -> count(request));
             assertThat(all.getAsLong()).isEqualTo(3);
             request.setKeyword("north_50%"); assertThat(all.getAsLong()).isEqualTo(1);
-            request.setKeyword("50"); assertThat(all.getAsLong()).isEqualTo(2);
+            request.setKeyword("20"); assertThat(all.getAsLong()).isEqualTo(1);
             request.setKeyword("never-note"); assertThat(all.getAsLong()).isZero();
             request.setKeyword("' OR 1=1 --"); assertThat(all.getAsLong()).isZero();
             request.setKeyword(" "); assertThat(all.getAsLong()).isEqualTo(3);
