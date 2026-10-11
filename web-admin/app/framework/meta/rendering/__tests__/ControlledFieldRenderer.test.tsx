@@ -9,6 +9,36 @@ describe('ControlledFieldRenderer', () => {
     capturedPropsSpy.mockClear();
   });
 
+  it('clears the actual select when a parent removes its filter value', async () => {
+    vi.resetModules();
+    vi.doMock('~/framework/meta/rendering/components/ComponentLoader', async () => {
+      const { Select } = await import('~/ui/smart/form/Select');
+      return { ComponentLoader: ({ props }: { props: Record<string, any> }) => <Select {...props} /> };
+    });
+    const { ControlledFieldRenderer } = await import('../ControlledFieldRenderer');
+    function Filter() {
+      const [values, setValues] = React.useState<Record<string, string>>({});
+      return <>
+        <ControlledFieldRenderer field={{ field: 'category', component: 'SmartSelect', label: 'Category', placeholder: 'Choose a category',
+          props: { inline: false, options: [{ value: 'resistors', label: 'Resistors' }] },
+        } as any} value={values.category} onChange={value => setValues({ category: value })}
+          context={{ locale: 'en', t: (key: string) => key } as any} />
+        <button onClick={() => setValues({})}>Reset filters</button>
+        <output data-testid="filter-values">{JSON.stringify(values)}</output>
+      </>;
+    }
+    render(<Filter />);
+    const select = await screen.findByRole('combobox', { name: 'Category' });
+    fireEvent.keyDown(select, { key: 'ArrowDown' });
+    fireEvent.click(await screen.findByRole('option', { name: 'Resistors' }));
+    expect(screen.getByTestId('filter-values')).toHaveTextContent('resistors');
+    expect(screen.getByRole('combobox', { name: 'Category' })).toHaveTextContent('Resistors');
+    fireEvent.click(screen.getByRole('button', { name: 'Reset filters' }));
+    expect(screen.getByTestId('filter-values')).toHaveTextContent('{}');
+    expect(screen.getByRole('combobox', { name: 'Category' })).toHaveTextContent('Choose a category');
+    expect(document.querySelector('input[name="category"]')).toHaveValue('');
+  });
+
   it.each([['zh-CN', '选择来源类型，或留空手工登记'], ['en', 'Choose a source type or leave empty']])(
     'forwards the localized DSL placeholder for %s', async (locale, expected) => {
       vi.resetModules();
