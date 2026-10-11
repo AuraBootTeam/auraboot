@@ -279,6 +279,7 @@ test.describe('Dynamic resource publication journey', () => {
     if (process.env.AURA_UI_NEGATIVE_MUTATION !== 'skip-source-keyboard') {
       for (let index = 0; index < sourceOptionIndex; index++) await sourceSelector.press('ArrowDown');
     }
+    await sourceSelector.press('Enter');
     await expect(sourceSelector).toHaveValue(resourceCode);
     await expect(requiredSourceError).toHaveCount(0);
     await expect(sourceSelector).toHaveAttribute('aria-invalid', 'false');
