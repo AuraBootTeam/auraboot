@@ -235,7 +235,7 @@ test.describe('Dynamic resource publication journey', () => {
     const virtualNameField = page.getByTestId('publication-field-name');
     await virtualNameField.getByLabel('零件名称', { exact: true }).check();
     await virtualNameField.getByLabel('对外字段名称', { exact: true }).fill('name');
-    if (process.env.AURA_UI_NEGATIVE_MUTATION) {
+    if (process.env.AURA_UI_NEGATIVE_MUTATION && process.env.AURA_UI_NEGATIVE_MUTATION !== 'fill-required-source') {
       // Expected-red only: falsify persisted projection assertions using the actual UI.
       expect(process.env.AURA_UI_NEGATIVE_MUTATION).toBe('drop-virtual-output');
       await virtualNameField.getByLabel('零件名称', { exact: true }).uncheck();
@@ -243,6 +243,25 @@ test.describe('Dynamic resource publication journey', () => {
     await snapshot('publication-virtual-source');
     await page.getByTestId('publication-editor').locator('section').filter({ has: sourceSelector })
       .screenshot({ path: path.join(screenshotRoot, 'publication-virtual-source-region.png') });
+    // Native required validation must stop the actual submit, not merely display an empty selector.
+    await sourceSelector.selectOption('');
+    if (process.env.AURA_UI_NEGATIVE_MUTATION === 'fill-required-source') await sourceSelector.selectOption(resourceCode);
+    const prematureDraftWrites: string[] = [];
+    const observeDraftWrite = (request: import('@playwright/test').Request) => {
+      if (request.method() === 'PUT' && request.url().endsWith(`/publications/${virtualCode}/draft`)) prematureDraftWrites.push(request.url());
+    };
+    page.on('request', observeDraftWrite);
+    await page.getByRole('button', { name: '保存并校验草稿', exact: true }).click();
+    expect(await sourceSelector.evaluate((element: HTMLSelectElement) => element.validity.valueMissing)).toBe(true);
+    await expect(sourceSelector).toBeFocused();
+    expect(prematureDraftWrites).toEqual([]);
+    page.off('request', observeDraftWrite);
+    const blockedCatalog = await page.request.get(`${WEB_BASE_URL}/api/open-platform/publications`);
+    expect(blockedCatalog.status()).toBe(200); const blockedBody = await blockedCatalog.json(); expect(String(blockedBody.code)).toBe('0');
+    expect(blockedBody.data.some((entry: { code: string }) => entry.code === virtualCode)).toBe(false);
+    await page.getByTestId('publication-editor').locator('section').filter({ has: sourceSelector })
+      .screenshot({ path: path.join(screenshotRoot, 'publication-virtual-source-required-region.png') });
+    await sourceSelector.selectOption(resourceCode);
     const virtualSaved = page.waitForResponse(response => response.url().endsWith(`/publications/${virtualCode}/draft`) && response.request().method() === 'PUT');
     await page.getByRole('button', { name: '保存并校验草稿', exact: true }).click();
     const virtualSavedHttp = await virtualSaved; expect(virtualSavedHttp.status()).toBe(200);
@@ -305,6 +324,19 @@ test.describe('Dynamic resource publication journey', () => {
     expect(final.data.find((view: { code: string }) => view.code === resourceCode)).toMatchObject({ status: 'withdrawn', activeVersion: 1, draftRevision: 2 });
     await expect(page.getByTestId('publication-editor').getByRole('status')).toBeInViewport();
     await snapshot('publication-withdraw');
+    await page.getByRole('button', { name: '关闭编辑', exact: true }).click();
+    await page.getByTestId('publication-editor').getByRole('listitem').filter({ has: page.getByText(virtualCode, { exact: true }) })
+      .getByRole('button', { name: '编辑合同', exact: true }).click();
+    await expect(sourceSelector).toHaveValue(resourceCode); await expect(sourceSelector).toBeDisabled();
+    const unavailableSource = sourceSelector.getByRole('option', { name: `${resourceCode} (来源已不可用)`, exact: true });
+    await expect(unavailableSource).toHaveCount(1); await expect(unavailableSource).toBeDisabled();
+    await page.getByTestId('publication-editor').locator('section').filter({ has: sourceSelector })
+      .screenshot({ path: path.join(screenshotRoot, 'publication-virtual-source-unavailable-region.png') });
+    const deniedSourceRead = await page.request.get(resourcePath, { headers }); expect(deniedSourceRead.status()).toBe(403);
+    const afterSourceWithdrawal = await page.request.get(`${WEB_BASE_URL}/api/open-platform/publications`);
+    expect(afterSourceWithdrawal.status()).toBe(200); const preservedVirtual = await afterSourceWithdrawal.json(); expect(String(preservedVirtual.code)).toBe('0');
+    expect(preservedVirtual.data.find((entry: { code: string }) => entry.code === virtualCode)).toMatchObject({ status: 'published', activeVersion: 1,
+      draft: { sourceResources: { [modelCode]: resourceCode } } });
   });
 });
 
