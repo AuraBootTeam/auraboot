@@ -95,6 +95,15 @@ class BackendCatalogTest(unittest.TestCase):
                 cases(source)
         self.assertEqual(['actual()'], cases('// @Test void fake() {}\n@Test void actual() {}'))
 
+    def test_fully_qualified_parameterized_annotation_and_tempdir_are_expanded(self):
+        source = '''@org.junit.jupiter.params.ParameterizedTest(name = "entry via {0}")
+                    @org.junit.jupiter.params.provider.ValueSource(strings = {"json", "zip"})
+                    void entries(String entry, @org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) {}
+                    @org.junit.jupiter.api.Test void ordinary() {}'''
+        self.assertEqual(['entry via json', 'entry via zip', 'ordinary()'], cases(source))
+        with self.assertRaises(ValueError):
+            cases('@org.junit.jupiter.api.Disabled @org.junit.jupiter.api.Test void disabled() {}')
+
 
 if __name__ == '__main__':
     unittest.main()

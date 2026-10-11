@@ -21,9 +21,9 @@ def without_comments(source):
 
 def cases(source):
     source = without_comments(source)
-    require(not re.search(r'@(Disabled|TestFactory|TestTemplate|RepeatedTest|Nested)\b', source),
+    require(not re.search(r'@(?:[\w]+\.)*(Disabled|TestFactory|TestTemplate|RepeatedTest|Nested)\b', source),
             "Unsupported or disabled JUnit declaration in blocking scope")
-    annotations = list(re.finditer(r'@(Test|ParameterizedTest)\b', source))
+    annotations = list(re.finditer(r'@(?:[\w]+\.)*(Test|ParameterizedTest)\b', source))
     result = []
     for index, annotation in enumerate(annotations):
         end = annotations[index + 1].start() if index + 1 < len(annotations) else len(source)
@@ -36,18 +36,27 @@ def cases(source):
             require(not parameters.strip(), "Ordinary blocking test must have no parameters")
             result.append(name + "()")
         else:
-            # Only the existing string ValueSource format is admitted. New generators
+            # Only existing string ValueSource formats are admitted. New generators
             # must get an explicit expansion rather than silently passing by count.
-            values = re.fullmatch(r'\s*@ValueSource\(strings\s*=\s*\{(.*?)\}\)\s*', header, re.S)
+            values = re.fullmatch(r'\s*(?:\(name\s*=\s*"((?:\\.|[^"\\])*)"\)\s*)?'
+                                  r'@(?:[\w]+\.)*ValueSource\(strings\s*=\s*\{(.*?)\}\)\s*', header, re.S)
             require(values is not None, "Unsupported parameterized source/display name")
-            strings = re.findall(r'"((?:\\.|[^"\\])*)"', values.group(1))
-            require(strings and re.fullmatch(r'\s*String\s+\w+\s*', parameters),
+            display, arguments = values.groups()
+            strings = re.findall(r'"((?:\\.|[^"\\])*)"', arguments)
+            require(strings and re.fullmatch(r'\s*String\s+\w+\s*'
+                                            r'(?:,\s*@(?:[\w]+\.)*TempDir\s+(?:java\.nio\.file\.)?Path\s+\w+\s*)?', parameters),
                     "Unsupported parameterized arguments")
-            require(re.sub(r'"(?:\\.|[^"\\])*"|[\s,]', '', values.group(1)) == '',
+            require(re.sub(r'"(?:\\.|[^"\\])*"|[\s,]', '', arguments) == '',
                     "Invalid ValueSource")
-            parameter = parameters.strip().split()[-1]
-            result.extend(f"[{i}] {parameter}={json.loads(chr(34) + value + chr(34))}"
-                          for i, value in enumerate(strings, 1))
+            parameter = parameters.split(',')[0].strip().split()[-1]
+            if display is not None:
+                display = json.loads(chr(34) + display + chr(34))
+                require(display.count('{0}') == 1 and not re.search(r'[{}]', display.replace('{0}', '')),
+                        "Unsupported parameterized display placeholders")
+            for i, value in enumerate(strings, 1):
+                value = json.loads(chr(34) + value + chr(34))
+                result.append(display.replace('{0}', value) if display is not None
+                              else f"[{i}] {parameter}={value}")
     require(result and len(result) == len(set(result)), "Empty or duplicate declared cases")
     return result
 
