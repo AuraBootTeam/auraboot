@@ -40,18 +40,22 @@ public class OpenPlatformTokenService {
         }
         Instant now = Instant.now();
         OpenPlatformAuthMapper.CredentialAuthRecord credential = authMapper.findCredential(clientId);
-        if (credential == null || !passwordEncoder.matches(clientSecret, credential.secretHash())
-                || !"active".equals(credential.credentialStatus())
+        if (credential == null || !passwordEncoder.matches(clientSecret, credential.secretHash())) {
+            throw new InvalidClientException();
+        }
+        AuditIdentity identity = new AuditIdentity(credential.tenantId(), credential.applicationPid(),
+                credential.installationPid());
+        if (!"active".equals(credential.credentialStatus())
                 || (credential.credentialExpiresAt() != null && !credential.credentialExpiresAt().isAfter(now))
                 || !"active".equals(credential.installationStatus())
                 || !"active".equals(credential.applicationStatus())) {
-            throw new InvalidClientException();
+            throw new InvalidClientException(identity);
         }
         Set<String> granted = scopeMapper.findScopes(credential.tenantId(), credential.installationId());
         Set<String> requested = parseScopes(requestedScope);
         Set<String> issued = requested.isEmpty() ? new TreeSet<>(granted) : requested;
         if (!granted.containsAll(issued)) {
-            throw new InvalidScopeException();
+            throw new InvalidScopeException(identity);
         }
 
         String rawToken = secretCodec.newAccessToken();
@@ -84,9 +88,19 @@ public class OpenPlatformTokenService {
                 .collect(Collectors.joining(",", "[", "]"));
     }
 
+    public record AuditIdentity(Long tenantId, String applicationPid, String installationPid) { }
+
     public static class InvalidClientException extends RuntimeException {
+        private final AuditIdentity auditIdentity;
+        public InvalidClientException() { this(null); }
+        public InvalidClientException(AuditIdentity auditIdentity) { this.auditIdentity = auditIdentity; }
+        public AuditIdentity auditIdentity() { return auditIdentity; }
     }
 
     public static class InvalidScopeException extends RuntimeException {
+        private final AuditIdentity auditIdentity;
+        public InvalidScopeException() { this(null); }
+        public InvalidScopeException(AuditIdentity auditIdentity) { this.auditIdentity = auditIdentity; }
+        public AuditIdentity auditIdentity() { return auditIdentity; }
     }
 }

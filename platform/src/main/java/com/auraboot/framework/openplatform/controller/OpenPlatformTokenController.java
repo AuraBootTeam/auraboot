@@ -23,6 +23,7 @@ import java.nio.charset.StandardCharsets;
 @RequiredArgsConstructor
 public class OpenPlatformTokenController {
     private final OpenPlatformTokenService tokenService;
+    private final com.auraboot.framework.openplatform.service.OpenPlatformOAuthFailureAudit failureAudit;
 
     @PostMapping(value = "/oauth2/token", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     public TokenResponse token(@RequestParam(value = "grant_type", required = false) String grantType,
@@ -52,16 +53,25 @@ public class OpenPlatformTokenController {
     }
 
     @ExceptionHandler(OpenPlatformTokenService.InvalidClientException.class)
-    public ResponseEntity<Map<String, Object>> invalidClient() {
-        return oauthError(HttpStatus.UNAUTHORIZED, "invalid_client");
+    public ResponseEntity<Map<String, Object>> invalidClient(OpenPlatformTokenService.InvalidClientException error,
+            jakarta.servlet.http.HttpServletRequest request, jakarta.servlet.http.HttpServletResponse response) {
+        return oauthError(HttpStatus.UNAUTHORIZED, "invalid_client", error.auditIdentity(), request, response);
     }
 
     @ExceptionHandler(OpenPlatformTokenService.InvalidScopeException.class)
-    public ResponseEntity<Map<String, Object>> invalidScope() {
-        return oauthError(HttpStatus.BAD_REQUEST, "invalid_scope");
+    public ResponseEntity<Map<String, Object>> invalidScope(OpenPlatformTokenService.InvalidScopeException error,
+            jakarta.servlet.http.HttpServletRequest request, jakarta.servlet.http.HttpServletResponse response) {
+        return oauthError(HttpStatus.BAD_REQUEST, "invalid_scope", error.auditIdentity(), request, response);
     }
 
-    private ResponseEntity<Map<String, Object>> oauthError(HttpStatus status, String error) {
+    private ResponseEntity<Map<String, Object>> oauthError(HttpStatus status, String error,
+            OpenPlatformTokenService.AuditIdentity identity, jakarta.servlet.http.HttpServletRequest request,
+            jakarta.servlet.http.HttpServletResponse response) {
+        // Caller-supplied IDs can contain credentials. Correlate this denial with a server-generated ID.
+        String requestId = java.util.UUID.randomUUID().toString();
+        request.setAttribute(com.auraboot.framework.openplatform.security.OpenApiRequestIdFilter.REQUEST_ID_ATTRIBUTE, requestId);
+        response.setHeader("X-Request-Id", requestId);
+        failureAudit.record(request, requestId, status.value(), error, identity);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("error", error);
         return ResponseEntity.status(status).body(body);

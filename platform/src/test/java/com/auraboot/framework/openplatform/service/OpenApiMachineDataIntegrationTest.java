@@ -74,6 +74,8 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
     private OpenApiResourceContract contract;
     private MachinePrincipal principal;
     private String credentialPid;
+    private String clientId;
+    private String clientSecret;
     private String allowedPid;
     private String deniedPid;
     private String rawToken;
@@ -113,6 +115,8 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
         var installation = management.install(application.pid(), new InstallApplicationRequest("staging", new HashSet<>(scopes.values()), 600));
         var credential = management.createCredential(installation.pid());
         credentialPid = credential.credentialPid();
+        clientId = credential.clientId();
+        clientSecret = credential.clientSecret();
         var token = tokens.issue("client_credentials", credential.clientId(), credential.clientSecret(), null);
         rawToken = token.accessToken();
         var identity = auth.findToken(secrets.sha256(token.accessToken()), OpenPlatformTokenService.AUDIENCE, Instant.now());
@@ -1150,6 +1154,7 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
         String bearer = "Bearer " + rawToken;
         String auditOrigin = "authentication-" + UniqueIdGenerator.generate();
         try {
+            verifyOAuthFailureAudits();
             http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(collection + "/" + allowedPid)
                             .header("X-Request-Id", auditOrigin + "-missing").header("X-Tenant-Id", "999999"))
                     .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isUnauthorized());
@@ -1260,6 +1265,85 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
                     .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Idempotent-Replay", "true"));
             assertThat(MachineDataAccessContext.isActive()).isFalse();
         } finally { cleanupCommittedFixture(); }
+    }
+
+    private void verifyOAuthFailureAudits() throws Exception {
+        long tokensBefore = eventJdbc.queryForObject("SELECT COUNT(*) FROM ab_application_access_token WHERE installation_id = "
+                + "(SELECT id FROM ab_application_installation WHERE pid=?)", Long.class, principal.installationPid());
+        Object usageBefore = eventJdbc.queryForObject("SELECT last_used_at FROM ab_application_credential WHERE pid=?",
+                java.sql.Timestamp.class, credentialPid);
+        oauthDenial("Basic !invalid!", null, null, null, 401, "invalid_client", false);
+        oauthDenial(null, clientId, "wrong-secret", null, 401, "invalid_client", false);
+        oauthDenial(null, "unknown-client-" + UniqueIdGenerator.generate(), clientSecret, null, 401, "invalid_client", false);
+        oauthDenial(null, clientId, clientSecret, "ungranted.scope", 400, "invalid_scope", true);
+        String basic = "Basic " + java.util.Base64.getEncoder().encodeToString((clientId + ":" + clientSecret)
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        oauthDenial(basic, null, null, "ungranted.scope", 400, "invalid_scope", true);
+        oauthDenial(basic, clientId, clientSecret, null, 401, "invalid_client", false);
+        Object expires = eventJdbc.queryForObject("SELECT expires_at FROM ab_application_credential WHERE pid=?",
+                java.sql.Timestamp.class, credentialPid);
+        try {
+            eventJdbc.update("UPDATE ab_application_credential SET expires_at=NOW()-INTERVAL '1 second' WHERE pid=?", credentialPid);
+            oauthDenial(null, clientId, clientSecret, null, 401, "invalid_client", true);
+        } finally { eventJdbc.update("UPDATE ab_application_credential SET expires_at=? WHERE pid=?", expires, credentialPid); }
+        String[] rolledBack = new String[1];
+        new org.springframework.transaction.support.TransactionTemplate(eventTransactions).executeWithoutResult(transaction -> {
+            try { rolledBack[0] = oauthDenial(null, clientId, "wrong-secret", null, 401, "invalid_client", false); }
+            catch (Exception exception) { throw new IllegalStateException("Controlled OAuth denial failed", exception); }
+            finally { transaction.setRollbackOnly(); }
+        });
+        assertOAuthAudit(rolledBack[0], 401, "invalid_client", false);
+        assertThat(eventJdbc.queryForObject("SELECT COUNT(*) FROM ab_application_access_token WHERE installation_id = "
+                + "(SELECT id FROM ab_application_installation WHERE pid=?)", Long.class, principal.installationPid())).isEqualTo(tokensBefore);
+        assertThat(eventJdbc.queryForObject("SELECT last_used_at FROM ab_application_credential WHERE pid=?",
+                java.sql.Timestamp.class, credentialPid)).isEqualTo(usageBefore);
+        var issued = http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/oauth2/token")
+                .contentType("application/x-www-form-urlencoded").param("grant_type", "client_credentials")
+                .param("client_id", clientId).param("client_secret", clientSecret))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk()).andReturn().getResponse();
+        assertThat(json.readTree(issued.getContentAsString()).path("access_token").asText()).startsWith("ab_at_");
+        assertThat(eventJdbc.queryForObject("SELECT COUNT(*) FROM ab_application_access_token WHERE installation_id = "
+                + "(SELECT id FROM ab_application_installation WHERE pid=?)", Long.class, principal.installationPid())).isEqualTo(tokensBefore + 1);
+        applyTestMetaContext();
+    }
+
+    private String oauthDenial(String authorization, String id, String secret, String scope,
+                               int status, String code, boolean known) throws Exception {
+        var request = org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/oauth2/token")
+                .contentType("application/x-www-form-urlencoded").param("grant_type", "client_credentials")
+                .header("X-Request-Id", clientSecret).header("X-Tenant-Id", principal.tenantId())
+                .header("X-Installation-Pid", principal.installationPid());
+        if (authorization != null) request.header("Authorization", authorization);
+        if (id != null) request.param("client_id", id);
+        if (secret != null) request.param("client_secret", secret);
+        if (scope != null) request.param("scope", scope);
+        var response = http.perform(request)
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().is(status))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.error").value(code))
+                .andReturn().getResponse();
+        String requestId = response.getHeader("X-Request-Id");
+        assertThat(requestId).isNotNull().isNotEqualTo(clientSecret);
+        assertOAuthAudit(requestId, status, code, known);
+        return requestId;
+    }
+
+    private void assertOAuthAudit(String requestId, int status, String code, boolean known) throws Exception {
+        var rows = eventJdbc.queryForList("SELECT tenant_id, application_pid, installation_pid, token_pid, "
+                + "http_method, request_path, response_status, duration_ms, business_details FROM ab_open_api_call_audit WHERE request_id=?", requestId);
+        assertThat(rows).hasSize(1);
+        var row = rows.getFirst();
+        assertThat(row.get("tenant_id")).isEqualTo(known ? principal.tenantId() : null);
+        assertThat(row.get("application_pid")).isEqualTo(known ? principal.applicationPid() : null);
+        assertThat(row.get("installation_pid")).isEqualTo(known ? principal.installationPid() : null);
+        assertThat(row.get("token_pid")).isNull();
+        assertThat(row.get("http_method")).isEqualTo("POST");
+        assertThat(row.get("request_path")).isEqualTo("/oauth2/token");
+        assertThat(row.get("response_status")).isEqualTo(status);
+        assertThat(((Number) row.get("duration_ms")).longValue()).isGreaterThanOrEqualTo(0);
+        assertThat(json.readTree(row.get("business_details").toString())).isEqualTo(json.readTree(
+                "{\"actorKind\":\"unauthenticated\",\"phase\":\"authentication\",\"code\":\"" + code + "\"}"));
+        assertThat(row.toString()).doesNotContain(clientSecret, clientId, rawToken);
+        applyTestMetaContext();
     }
 
     private void assertAuthenticationAudit(String requestId, int status, String code,
