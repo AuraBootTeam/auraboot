@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from open_platform_dynamic_probe import CASES, run_dynamic_probe, run_sdk_consumer, verify_report, verify_release_report, verify_command_audits, prepare_slo_fixture, run_source_binding_probe, import_public_plugin
+from open_platform_dynamic_probe import CASES, run_dynamic_probe, run_sdk_consumer, verify_report, verify_release_report, verify_command_audits, prepare_slo_fixture, run_source_binding_probe, import_public_plugin, run_public_plugin_metadata_rollback
 from open_platform_http import ProtocolError
 
 
@@ -41,6 +41,12 @@ def passed():
             "pluginImports": [{"pluginId": plugin, "importId": "import-pid", "pluginPid": "plugin-pid",
                                "resourceType": kind, "created": 1, "success": True}
                               for plugin, kind in [("release-public-resource", "PUBLIC_RESOURCE"), ("release-public-query", "PUBLIC_QUERY")]],
+            "pluginMetadataRollback": {"pluginId": "release-public-resource", "pluginPid": "plugin-pid",
+                "initialImportId": "import-pid", "upgradeImportId": "upgrade-pid", "rollbackImportId": "upgrade-pid",
+                "before": {"pluginId": "release-public-resource", "namespace": "release_public_resource", "version": "1.0.0", "displayName": "Release public contract", "description": None},
+                "upgraded": {"pluginId": "release-public-resource", "namespace": "release_public_resource", "version": "2.0.0", "displayName": "Release upgraded contract", "description": "Release upgrade description"},
+                "restored": {"pluginId": "release-public-resource", "namespace": "release_public_resource", "version": "1.0.0", "displayName": "Release public contract", "description": None},
+                "upgradedActiveVersion": 2, "restoredActiveVersion": 1},
             "applicationPid": "app-pid", "installationPid": "install-pid",
             "resourceSourceBinding": {"status": 409, "code": "open_api_source_changed", "requestId": "release-dynamic-source-binding",
                 "error": {"success": False, "code": "open_api_source_changed", "message": "Published resource source binding is unavailable or changed"},
@@ -83,6 +89,51 @@ class DynamicProbeTests(unittest.TestCase):
                     self.assertEqual(calls[0][1]["body"]["publicResources"], [{"code": "resource"}])
                     self.assertEqual(calls[1][0], "/api/plugins/import/import-pid/execute")
                     self.assertEqual(calls[1][1]["body"], {"conflictStrategy": "ERROR"})
+
+    def test_public_plugin_metadata_rollback_reads_real_route_results_and_rejects_stale_metadata(self):
+        for stale in [False, True]:
+            phase = "before"; calls = []
+            proof = passed()["pluginMetadataRollback"]
+            imported = passed()["pluginImports"][0]
+            def request(path, **kwargs):
+                nonlocal phase
+                calls.append((path, kwargs))
+                if path == "/api/plugins/plugin-pid":
+                    value = proof["upgraded"] if phase == "upgraded" or (stale and phase == "restored") else proof["before"]
+                    return 200, {"code": "0", "data": dict(value, pid="plugin-pid")}, {}
+                if path == "/api/open-platform/publications":
+                    return 200, {"code": "0", "data": [{"code": "release.dynamic.parts", "status": "published", "activeVersion": 2 if phase == "upgraded" else 1}]}, {}
+                if path == "/api/plugins/import/parse":
+                    self.assertEqual(kwargs["body"]["publicResources"][0]["schemaVersion"], 2)
+                    return 200, {"valid": True, "importId": "upgrade-pid"}, {}
+                if path == "/api/plugins/import/upgrade-pid/execute":
+                    self.assertEqual(kwargs["body"], {"conflictStrategy": "OVERWRITE"})
+                    phase = "upgraded"
+                    return 200, {"success": True, "importId": "upgrade-pid", "pluginId": "release-public-resource", "pluginPid": "plugin-pid", "resourceCounts": {"PUBLIC_RESOURCE": {"UPDATE": 1}}}, {}
+                self.assertEqual(path, "/api/plugins/import/upgrade-pid/rollback")
+                self.assertEqual(kwargs["method"], "POST")
+                phase = "restored"
+                return 200, {"success": True, "importId": "upgrade-pid", "pluginId": "release-public-resource"}, {}
+            with self.subTest(stale=stale):
+                if stale:
+                    with self.assertRaisesRegex(ProtocolError, "metadata rollback proof invalid"):
+                        run_public_plugin_metadata_rollback(request, {}, imported, {"code": "release.dynamic.parts", "schemaVersion": 1})
+                else:
+                    self.assertEqual(run_public_plugin_metadata_rollback(request, {}, imported, {"code": "release.dynamic.parts", "schemaVersion": 1}), proof)
+                self.assertEqual(sum(path.endswith("/rollback") for path, _ in calls), 1)
+                self.assertEqual(sum(path == "/api/plugins/plugin-pid" for path, _ in calls), 3)
+
+    def test_public_plugin_metadata_rollback_proof_is_mandatory_and_strict(self):
+        report = passed(); del report["pluginMetadataRollback"]
+        with self.assertRaises(ProtocolError): verify_report(report)
+        for key, value in [("pluginPid", "foreign"), ("initialImportId", "foreign"), ("upgradeImportId", "import-pid"),
+                           ("rollbackImportId", "foreign"), ("restoredActiveVersion", True), ("upgradedActiveVersion", 1),
+                           ("restored", {}), ("before", {}), ("upgraded", {})]:
+            report = passed(); report["pluginMetadataRollback"][key] = value
+            with self.subTest(key=key), self.assertRaises(ProtocolError): verify_report(report)
+        for key in ["version", "description", "namespace", "displayName"]:
+            report = passed(); report["pluginMetadataRollback"]["restored"][key] = "unrestored"
+            with self.subTest(key=key), self.assertRaises(ProtocolError): verify_report(report)
 
     def test_public_plugin_proof_is_mandatory_and_strict(self):
         report = passed(); del report["pluginImports"]

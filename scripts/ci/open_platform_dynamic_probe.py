@@ -152,6 +152,71 @@ def import_public_plugin(request, admin, plugin_id, resource_type, definition):
     return proof
 
 
+
+def verify_plugin_metadata_rollback(proof, imported):
+    keys = {"pluginId", "pluginPid", "initialImportId", "upgradeImportId", "rollbackImportId",
+            "before", "upgraded", "restored", "upgradedActiveVersion", "restoredActiveVersion"}
+    before = {"pluginId": "release-public-resource", "namespace": "release_public_resource",
+              "version": "1.0.0", "displayName": "Release public contract", "description": None}
+    upgraded = dict(before, version="2.0.0", displayName="Release upgraded contract", description="Release upgrade description")
+    if (not isinstance(proof, dict) or set(proof) != keys
+            or proof.get("pluginId") != imported["pluginId"] or proof.get("pluginPid") != imported["pluginPid"]
+            or proof.get("initialImportId") != imported["importId"]
+            or not isinstance(proof.get("upgradeImportId"), str)
+            or not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", proof["upgradeImportId"])
+            or proof["upgradeImportId"] == imported["importId"]
+            or proof.get("rollbackImportId") != proof["upgradeImportId"]
+            or proof.get("before") != before or proof.get("upgraded") != upgraded or proof.get("restored") != before
+            or type(proof.get("upgradedActiveVersion")) is not int or proof["upgradedActiveVersion"] != 2
+            or type(proof.get("restoredActiveVersion")) is not int or proof["restoredActiveVersion"] != 1):
+        raise ProtocolError("public plugin metadata rollback proof invalid")
+    return proof
+
+
+def run_public_plugin_metadata_rollback(request, admin, imported, definition):
+    """Upgrade and roll back through production APIs; read both persisted identities."""
+    from open_platform_http import data
+    def call(path, method="GET", body=None):
+        _, response, _ = request(path, method=method, body=body, headers=admin)
+        return data(response)
+    def metadata():
+        current = call("/api/plugins/" + imported["pluginPid"])
+        if not isinstance(current, dict) or current.get("pid") != imported["pluginPid"]:
+            raise ProtocolError("public plugin metadata read identity invalid")
+        return {key: current.get(key) for key in ["pluginId", "namespace", "version", "displayName", "description"]}
+    def active_version():
+        catalog = call("/api/open-platform/publications")
+        matches = [row for row in catalog if row.get("code") == definition["code"]]
+        if len(matches) != 1 or matches[0].get("status") != "published":
+            raise ProtocolError("public plugin rollback publication identity invalid")
+        return matches[0].get("activeVersion")
+    before = metadata()
+    manifest = dict(before, version="2.0.0", displayName="Release upgraded contract",
+                    description="Release upgrade description", publicResources=[dict(definition, schemaVersion=2)])
+    preview = call("/api/plugins/import/parse", "POST", manifest)
+    if not isinstance(preview, dict) or preview.get("valid") is not True:
+        raise ProtocolError("public plugin upgrade preview rejected")
+    import_id = preview.get("importId")
+    if not isinstance(import_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", import_id):
+        raise ProtocolError("public plugin upgrade identity invalid")
+    executed = call(f"/api/plugins/import/{import_id}/execute", "POST", {"conflictStrategy": "OVERWRITE"})
+    if (not isinstance(executed, dict) or executed.get("success") is not True
+            or executed.get("importId") != import_id or executed.get("pluginId") != imported["pluginId"]
+            or executed.get("pluginPid") != imported["pluginPid"]
+            or executed.get("resourceCounts", {}).get("PUBLIC_RESOURCE") != {"UPDATE": 1}):
+        raise ProtocolError("public plugin upgrade execution invalid")
+    upgraded = metadata(); upgraded_version = active_version()
+    rolled_back = call(f"/api/plugins/import/{import_id}/rollback", "POST")
+    if (not isinstance(rolled_back, dict) or rolled_back.get("success") is not True
+            or rolled_back.get("importId") != import_id or rolled_back.get("pluginId") != imported["pluginId"]):
+        raise ProtocolError("public plugin metadata rollback response invalid")
+    proof = {"pluginId": imported["pluginId"], "pluginPid": imported["pluginPid"],
+             "initialImportId": imported["importId"], "upgradeImportId": import_id,
+             "rollbackImportId": rolled_back["importId"], "before": before, "upgraded": upgraded,
+             "restored": metadata(), "upgradedActiveVersion": upgraded_version, "restoredActiveVersion": active_version()}
+    return verify_plugin_metadata_rollback(proof, imported)
+
+
 def verify_report(report):
     if not isinstance(report, dict) or report.get("schemaVersion") != 1:
         raise ProtocolError("dynamic probe report schema invalid")
@@ -169,6 +234,7 @@ def verify_report(report):
         raise ProtocolError("public plugin import denominator missing")
     for proof, plugin, kind in zip(proofs, ["release-public-resource", "release-public-query"], ["PUBLIC_RESOURCE", "PUBLIC_QUERY"]):
         verify_plugin_import(proof, plugin, kind)
+    verify_plugin_metadata_rollback(report.get("pluginMetadataRollback"), proofs[0])
     verify_audits(report)
     verify_source_binding(report.get("resourceSourceBinding"))
     quota = report.get("queryRateLimit")
@@ -422,6 +488,7 @@ def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None):
                 "secret": field("rel_private")},
             "maxPageSize": 50, "maxConditions": 8, "timeoutMs": 5000, "events": []}
         report["pluginImports"] = [import_public_plugin(request, admin, "release-public-resource", "PUBLIC_RESOURCE", definition)]
+        report["pluginMetadataRollback"] = run_public_plugin_metadata_rollback(request, admin, report["pluginImports"][0], definition)
         record("plugin-resource-import", True)
         published = [row for row in human("/api/open-platform/publications") if row.get("code") == resource]
         record("publication-snapshot", len(published) == 1 and published[0].get("activeVersion") == 1

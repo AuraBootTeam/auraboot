@@ -333,7 +333,7 @@ import json, sys
 json.dump({
   "ref": "$REF_SHA", "image": "$IMAGE", "digest": "$DIGEST", "health": "UP",
   "sourceSetDigest": "$AURA_CI_SOURCE_SET_DIGEST",
-  "protocolProbe": "assets+inventory+cursor+etag+catalog+dynamic-crud+named-query+fresh-sdk+model-event-recovery", "dynamicCases": 16, "sdkCases": 13, "modelEventCases": 18, "slo": "production-thresholds-ok",
+  "protocolProbe": "assets+inventory+cursor+etag+catalog+dynamic-crud+named-query+fresh-sdk+model-event-recovery", "dynamicCases": 18, "sdkCases": 13, "modelEventCases": 18, "slo": "production-thresholds-ok",
   "sdkArchive": json.load(open("$ARTIFACTS/sdk-archive.json")), "sdkNodeImage": "$SDK_NODE_IMAGE",
   "webhookDrainBacklog": 0, "registryPush": "disabled", "builder": "$AURA_CI_BUILDER_ID",
   "job": "$AURA_CI_JOB_ID"
