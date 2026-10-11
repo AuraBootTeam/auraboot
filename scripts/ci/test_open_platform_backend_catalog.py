@@ -42,6 +42,8 @@ class BackendCatalogTest(unittest.TestCase):
         self.assertEqual(source_names, {name for name in names if '.openplatform.' in name})
         self.assertIn('com.auraboot.framework.openplatform.service.OpenPlatformLifecycleIntegrationTest', names)
         self.assertIn('com.auraboot.framework.meta.service.AggregateQueryServiceIntegrationTest', names)
+        self.assertIn('com.auraboot.framework.meta.service.impl.AggregateQueryFilterTreeTest', names)
+        self.assertIn('com.auraboot.framework.meta.service.impl.AggregateQueryServiceImplDataScopeTest', names)
         self.assertIn('com.auraboot.framework.integration.agent.NamedQueryShadowInvokerIntegrationTest', names)
         coverage_names = {row['class'] for row in self.expected['coverage']['sources']}
         all_open_sources = {'com.auraboot.framework.openplatform.' + folder + '.' + file.stem

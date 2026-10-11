@@ -35,7 +35,13 @@
     "com.auraboot.framework.plugin.validation.NamedQueryFieldValidatorBoundaryTest",
     "com.auraboot.framework.plugin.validation.NamedQueryFieldValidatorTest",
     "com.auraboot.framework.meta.service.AggregateQueryServiceIntegrationTest",
-    "com.auraboot.framework.application.security.ExternalMachineAuthenticationFilterTest"
+    "com.auraboot.framework.application.security.ExternalMachineAuthenticationFilterTest",
+    "com.auraboot.framework.meta.service.AggregateQueryServiceTest",
+    "com.auraboot.framework.meta.service.impl.AggregateQueryFilterTreeTest",
+    "com.auraboot.framework.meta.service.impl.AggregateQueryServiceImplDataScopeTest",
+    "com.auraboot.framework.meta.service.impl.CommandPermitDataAccessTest",
+    "com.auraboot.framework.meta.service.impl.SemanticAggregateAdapterTest",
+    "com.auraboot.framework.meta.cache.AggregateQueryCacheInterceptorTest"
   ],
   "coverage": {
     "minimumLinePercent": 80,
