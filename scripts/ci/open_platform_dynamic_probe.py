@@ -307,87 +307,137 @@ def run_public_plugin_metadata_rollback(request, admin, imported, definition):
     return verify_plugin_metadata_rollback(proof, imported)
 
 
-def verify_replay_authority(proof, report):
+def replay_authority_contracts(operation):
+    return {
+        "create": [("fields-denied", 403), ("fields-restored", 201), ("row-denied", 403), ("row-restored", 201), ("current", 200)],
+        "update": [("fields-denied", 403), ("fields-restored", 200), ("row-denied", 403), ("row-restored", 200), ("operation-denied", 403), ("operation-restored", 200), ("current", 200)],
+        "delete": [("fields-denied", 403), ("fields-restored", 204), ("operation-denied", 403), ("operation-restored", 204), ("absent", 404)],
+    }[operation]
+
+
+def verify_replay_authority(proof, report, operation="create"):
     keys = {"resource", "recordPid", "original", "originalEtag", "originalLocation", "outside", "restored", "requests"}
+    if operation != "create": keys.add("originalIfMatch")
     if not isinstance(proof, dict) or set(proof) != keys or proof["resource"] != "release.dynamic.parts":
         raise ProtocolError("replay authority proof missing or malformed")
     pid = proof["recordPid"]
     if not isinstance(pid, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", pid) or pid.isdigit():
         raise ProtocolError("replay authority PID invalid")
+    audit_id = {"create": "create", "update": "update-version", "delete": "delete"}[operation]
+    original_audit = next(row for row in report["auditProofs"] if row["id"] == audit_id)
     created = next(row for row in report["auditProofs"] if row["id"] == "create")
-    expected = {"pid": pid, "name": "Machine created", "zone": "A"}
+    expected = None if operation == "delete" else {"pid": pid, "name": "Machine created" if operation == "create" else "Machine updated", "zone": "A"}
     path = "/api/open/v1/resources/" + proof["resource"]
     location = path + "/" + pid
-    if created["recordPid"] != pid or proof["original"] != expected or proof["originalLocation"] != location or not isinstance(proof["originalEtag"], str) or not re.fullmatch(r'"[^"\s]+"', proof["originalEtag"]):
+    original_location = location if operation == "create" else None
+    etag = proof["originalEtag"]
+    if original_audit["recordPid"] != pid or created["recordPid"] != pid or proof["original"] != expected or proof["originalLocation"] != original_location:
         raise ProtocolError("replay authority original response invalid")
-    if proof["outside"] != dict(expected, zone="B") or proof["restored"] != expected:
+    if (operation == "delete" and etag is not None) or (operation != "delete" and (not isinstance(etag, str) or not re.fullmatch(r'"[^"\s]+"', etag))):
+        raise ProtocolError("replay authority original ETag invalid")
+    if operation != "create":
+        previous = report["replayAuthority"] if operation == "update" else report["writeReplayAuthority"]["update"]
+        if proof["originalIfMatch"] != previous["requests"][-1]["etag"]:
+            raise ProtocolError("replay authority original precondition binding invalid")
+        if operation == "update" and etag == proof["originalIfMatch"]:
+            raise ProtocolError("replay authority update did not advance version")
+    if proof["outside"] != (dict(expected, zone="B") if expected else None) or proof["restored"] != expected:
         raise ProtocolError("replay authority persisted row transition invalid")
-    contracts = [("fields-denied", 403), ("fields-restored", 201), ("row-denied", 403), ("row-restored", 201), ("current", 200)]
+    contracts = replay_authority_contracts(operation)
     rows = proof["requests"]
     if not isinstance(rows, list) or len(rows) != len(contracts):
         raise ProtocolError("replay authority request denominator invalid")
     for row, (identifier, status) in zip(rows, contracts):
-        marker = "release-dynamic-replay-authority-" + identifier
+        prefix = "release-dynamic-replay-authority-" if operation == "create" else "release-dynamic-replay-" + operation + "-"
+        marker = prefix + identifier
+        is_get = identifier in ["current", "absent"]
+        is_replay = not is_get and status != 403
         if not isinstance(row, dict) or set(row) != {"id", "status", "requestId", "body", "etag", "location", "replay", "audit"} or row["id"] != identifier or type(row["status"]) is not int or row["status"] != status or row["requestId"] != marker:
             raise ProtocolError("replay authority response contract invalid")
         if status == 403:
             body = row["body"]
             if not isinstance(body, dict) or set(body) != {"code", "message", "data", "context", "timestamp"} or body["code"] != "403" or body["message"] != "Access forbidden" or body["data"] is not None or body["context"] != "Current resource or query authorization required" or type(body["timestamp"]) is not int or body["timestamp"] <= 0 or any(row[key] is not None for key in ["etag", "location", "replay"]):
                 raise ProtocolError("replay authority denial leaks or loses its public contract")
+        elif status == 404:
+            if not isinstance(row["body"], dict) or row["body"].get("success") is not False or row["body"] != {"success": False, "code": "not_found", "message": "Resource record is unavailable"} or any(row[key] is not None for key in ["etag", "location", "replay"]):
+                raise ProtocolError("replay authority deleted target recovered or leaked headers")
         elif row["body"] != expected:
             raise ProtocolError("replay authority response projection invalid")
-        elif status == 201:
-            if row["etag"] != proof["originalEtag"] or row["location"] != location or row["replay"] != "true":
+        elif is_replay:
+            if row["etag"] != etag or row["location"] != original_location or row["replay"] != "true":
                 raise ProtocolError("replay authority original headers not preserved")
-        elif not isinstance(row["etag"], str) or not re.fullmatch(r'"[^"\s]+"', row["etag"]) or row["etag"] == proof["originalEtag"] or row["location"] is not None or row["replay"] is not None:
+        elif not isinstance(row["etag"], str) or not re.fullmatch(r'"[^"\s]+"', row["etag"]) or row["etag"] == etag or row["location"] is not None or row["replay"] is not None:
             raise ProtocolError("replay authority current version invalid")
-        operation = "get" if status == 200 else "create"
+        audit_operation = "get" if is_get else operation
+        method = "GET" if is_get else {"create": "POST", "update": "PATCH", "delete": "DELETE"}[operation]
         audit = row["audit"]
         expected_audit = {"requestId": marker, "actorKind": "machine", "applicationPid": report["applicationPid"], "installationPid": report["installationPid"],
-            "resource": proof["resource"], "operation": operation, "recordPid": None if status == 403 else pid,
-            "idempotentReplay": True if status == 201 else None, "status": status, "method": "GET" if status == 200 else "POST",
-            "path": location if status == 200 else path, "capability": "resource." + proof["resource"] + "." + operation}
+            "resource": proof["resource"], "operation": audit_operation, "recordPid": None if status == 403 and operation == "create" else pid,
+            "idempotentReplay": True if is_replay else None, "status": status, "method": method,
+            "path": path if operation == "create" and not is_get else location, "capability": "resource." + proof["resource"] + "." + audit_operation}
         if not isinstance(audit, dict) or set(audit) != set(expected_audit) | {"durationMs", "occurredAt"} or any(audit.get(key) != value for key, value in expected_audit.items()) or type(audit.get("status")) is not int or audit.get("idempotentReplay") is not expected_audit["idempotentReplay"] or type(audit.get("durationMs")) is not int or audit["durationMs"] < 0 or not isinstance(audit.get("occurredAt"), str) or not audit["occurredAt"]:
             raise ProtocolError("replay authority machine audit invalid")
     return proof
 
 
-def run_replay_authority_probe(request, human, report, machine, grant_path, operations, model_code, created, headers):
+def verify_write_replay_authority(proof, report):
+    if not isinstance(proof, dict) or set(proof) != {"update", "delete"}:
+        raise ProtocolError("write replay authority proof missing or malformed")
+    for operation in ["update", "delete"]: verify_replay_authority(proof[operation], report, operation)
+    return proof
+
+
+def run_replay_authority_probe(request, human, report, machine, grant_path, operations, model_code, created, headers, operation="create", record_pid=None, if_match=None):
     resource = "release.dynamic.parts"
     path = "/api/open/v1/resources/" + resource
-    pid = created["pid"]
+    pid = record_pid or created["pid"]
     def header(values, key):
         return next((value for name, value in values.items() if name.lower() == key.lower()), None)
     policy = {"operations": operations, "readableFields": ["pid", "name", "zone"], "writableFields": ["name", "zone"], "rowConstraints": [{"field": "zone", "values": ["A"]}]}
     rows = []
     def replay(identifier, status):
-        marker = "release-dynamic-replay-authority-" + identifier
-        method, route = ("GET", path + "/" + pid) if status == 200 else ("POST", path)
+        prefix = "release-dynamic-replay-authority-" if operation == "create" else "release-dynamic-replay-" + operation + "-"
+        marker = prefix + identifier
+        is_get = identifier in ["current", "absent"]
+        method = "GET" if is_get else {"create": "POST", "update": "PATCH", "delete": "DELETE"}[operation]
+        route = path if operation == "create" and not is_get else path + "/" + pid
         request_headers = dict(machine, **{"X-Request-Id": marker})
-        if status != 200: request_headers["Idempotency-Key"] = "dynamic-release-create"
-        actual, body, result_headers = request(route, method, body=None if status == 200 else {"name": "Machine created", "zone": "A"}, headers=request_headers, expected=(status,))
+        if not is_get:
+            request_headers["Idempotency-Key"] = "dynamic-release-" + operation
+            if operation != "create": request_headers["If-Match"] = if_match
+        intent = None if is_get or operation == "delete" else {"name": "Machine created", "zone": "A"} if operation == "create" else {"name": "Machine updated"}
+        actual, body, result_headers = request(route, method, body=intent, headers=request_headers, expected=(status,))
         audits = human(f"/api/open-platform/installations/{report['installationPid']}/audits?requestId={marker}")
         if not isinstance(audits, list) or len(audits) != 1: raise ProtocolError("replay authority audit missing or duplicated")
         rows.append({"id": identifier, "status": actual, "requestId": header(result_headers, "X-Request-Id"), "body": body,
             "etag": header(result_headers, "ETag"), "location": header(result_headers, "Location"), "replay": header(result_headers, "Idempotent-Replay"), "audit": audits[0]})
     def snapshot(row):
         return {"pid": row.get("pid"), "name": row.get("rel_name"), "zone": row.get("rel_zone")}
+    outside = restored = None
+    success = {"create": 201, "update": 200, "delete": 204}[operation]
     try:
         human(grant_path, "PUT", dict(policy, readableFields=["pid", "zone"]))
         replay("fields-denied", 403)
         human(grant_path, "PUT", policy)
-        replay("fields-restored", 201)
-        human(f"/api/dynamic/{model_code}/{pid}", "PUT", {"rel_zone": "B"})
-        outside = snapshot(human(f"/api/dynamic/{model_code}/{pid}"))
-        replay("row-denied", 403)
-        human(f"/api/dynamic/{model_code}/{pid}", "PUT", {"rel_zone": "A"})
-        restored = snapshot(human(f"/api/dynamic/{model_code}/{pid}"))
-        replay("row-restored", 201)
-        replay("current", 200)
+        replay("fields-restored", success)
+        if operation != "delete":
+            human(f"/api/dynamic/{model_code}/{pid}", "PUT", {"rel_zone": "B"})
+            outside = snapshot(human(f"/api/dynamic/{model_code}/{pid}"))
+            replay("row-denied", 403)
+            human(f"/api/dynamic/{model_code}/{pid}", "PUT", {"rel_zone": "A"})
+            restored = snapshot(human(f"/api/dynamic/{model_code}/{pid}"))
+            replay("row-restored", success)
+        if operation != "create":
+            human(grant_path, "PUT", dict(policy, operations=[value for value in operations if value != operation]))
+            replay("operation-denied", 403)
+            human(grant_path, "PUT", policy)
+            replay("operation-restored", success)
+        replay("absent" if operation == "delete" else "current", 404 if operation == "delete" else 200)
     finally:
         human(grant_path, "PUT", policy)
     proof = {"resource": resource, "recordPid": pid, "original": created, "originalEtag": header(headers, "ETag"), "originalLocation": header(headers, "Location"), "outside": outside, "restored": restored, "requests": rows}
-    return verify_replay_authority(proof, report)
+    if operation != "create": proof["originalIfMatch"] = if_match
+    return verify_replay_authority(proof, report, operation)
 
 
 def verify_report(report):
@@ -412,6 +462,7 @@ def verify_report(report):
     verify_claimed_query_rollback(report.get("queryRollbackProtection"), proofs[1], report["pluginQuerySource"])
     verify_audits(report)
     verify_replay_authority(report.get("replayAuthority"), report)
+    verify_write_replay_authority(report.get("writeReplayAuthority"), report)
     verify_source_binding(report.get("resourceSourceBinding"))
     virtual = verify_virtual_resource(report.get("virtualResource"))
     isolation = virtual["installationIsolation"]
@@ -1120,13 +1171,17 @@ def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None):
             headers=dict(machine, **{"Idempotency-Key": "dynamic-release-update", "If-Match": etag}))
         next_etag = header(updated_headers, "ETag")
         record("update-version", updated == dict(intent, pid=created["pid"], name="Machine updated") and isinstance(next_etag, str) and next_etag != etag)
+        report["writeReplayAuthority"] = {}
+        report["writeReplayAuthority"]["update"] = run_replay_authority_probe(request, human, report, machine, grant_path, operations, model_code, updated, updated_headers, "update", created["pid"], etag)
+        next_etag = report["writeReplayAuthority"]["update"]["requests"][-1]["etag"]
         audited("stale-write", row_path, "PATCH", body={"name": "Stale"}, headers=dict(machine, **{"Idempotency-Key": "dynamic-release-stale", "If-Match": etag}), expected=(412,))
         _, persisted, persisted_headers = request(row_path, headers=machine)
         record("stale-write", persisted == updated and header(persisted_headers, "ETag") == next_etag)
         audited("prospective-row-denial", row_path, "PATCH", body={"zone": "B"}, headers=dict(machine, **{"Idempotency-Key": "dynamic-release-zone", "If-Match": next_etag}), expected=(403,))
         _, persisted, persisted_headers = request(row_path, headers=machine)
         record("prospective-row-denial", persisted == updated and header(persisted_headers, "ETag") == next_etag)
-        audited("delete", row_path, "DELETE", headers=dict(machine, **{"Idempotency-Key": "dynamic-release-delete", "If-Match": next_etag}), expected=(204,))
+        _, deleted, deleted_headers = audited("delete", row_path, "DELETE", headers=dict(machine, **{"Idempotency-Key": "dynamic-release-delete", "If-Match": next_etag}), expected=(204,))
+        report["writeReplayAuthority"]["delete"] = run_replay_authority_probe(request, human, report, machine, grant_path, operations, model_code, deleted, deleted_headers, "delete", created["pid"], next_etag)
         request(row_path, headers=machine, expected=(404,)); record("delete")
         human(query_grant_path, "DELETE")
         request(query_path, "POST", body={"parameters": {"zone": "A"}, "limit": 10}, headers=machine, expected=(403,))
