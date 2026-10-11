@@ -35,6 +35,7 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
     @Autowired private OpenApiPublicationService resources;
     @Autowired private OpenApiQueryPublicationService publications;
     @Autowired private OpenApiQueryService publicQueries;
+    @Autowired private OpenApiResourceService publicResources;
     @Autowired private OpenPlatformManagementService management;
     @Autowired private OpenPlatformTokenService tokens;
     @Autowired private OpenPlatformSecretCodec secrets;
@@ -873,6 +874,32 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
         boundary.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_NESTED);
         assertThatThrownBy(()->boundary.executeWithoutResult(status->run(principalA,contract,"A")))
                 .isInstanceOf(org.springframework.web.server.ResponseStatusException.class).hasMessageContaining("504").hasMessageContaining("open_api_query_timeout");
+        assertThat(run(principalA,rows,"A").get("total")).isEqualTo(1L);
+        var virtualSource = createQuery("virtual_timeout_" + suffix, "mt_" + root.modelCode() + " a",
+                List.of(nqField("pid", "a.pid", "string"), nqField("name", "a.name || pg_sleep(0.2)::text", "string"),
+                        nqField("zone", "a.zone", "string")));
+        String modelCode = "virtual_timeout_" + suffix;
+        models.saveDefinition(ModelDefinition.builder().code(modelCode).displayName("Virtual source deadline")
+                .sourceType("namedQuery").sourceRef(virtualSource.getCode()).primaryKey("pid").status("published")
+                .capabilities(ModelCapabilities.virtualReadOnly()).fields(List.of(
+                        FieldDefinition.builder().code("name").dataType("STRING").build(),
+                        FieldDefinition.builder().code("zone").dataType("STRING").filterable(true).build())).build());
+        var virtualContract = new OpenApiResourceContract("virtual-timeout." + suffix, modelCode, 1, root.operations(), root.scopes(),
+                DataPolicy.INSTALLATION_FILTER, root.fields(), 50, 8, 30, Set.of(), Map.of(root.modelCode(), root.code()));
+        resources.saveDraft(virtualContract.code(), new OpenApiPublicationService.DraftRequest(0, virtualContract));
+        resources.publish(virtualContract.code(), 1);
+        resources.grant(principalA.installationPid(), virtualContract.code(), new OpenApiInstallationPolicy(virtualContract.operations(),
+                virtualContract.fields().keySet(), Set.of(), List.of(new OpenApiInstallationPolicy.RowConstraint("zone", List.of("A")))));
+        MetaContext.setContext(principalA.tenantId(), null, principalA.subjectPid(), "machine");
+        // Keep the outer fixture transaction alive after a real PostgreSQL statement cancellation.
+        try (var machine = MachineDataAccessContext.begin(principalA)) {
+            assertThatThrownBy(() -> boundary.executeWithoutResult(status ->
+                    publicResources.list(principalA, virtualContract.code(), 10, null, null, null, null)))
+                    .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                    .hasMessageContaining("504").hasMessageContaining("open_api_query_timeout")
+                    .hasMessageNotContaining(virtualSource.getCode()).hasMessageNotContaining(root.modelCode())
+                    .hasMessageNotContaining(tokenA).hasMessageNotContaining("pg_sleep").hasMessageNotContaining("fromSql");
+        } finally { applyTestMetaContext(); }
         assertThat(run(principalA,rows,"A").get("total")).isEqualTo(1L);
     }
     @Test void exhaustedSourceRateBudgetReturnsPublic429AndRecordsTheMachineDenial() throws Exception {
