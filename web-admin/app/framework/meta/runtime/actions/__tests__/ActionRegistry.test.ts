@@ -548,14 +548,14 @@ describe('ActionRegistry command.execute inputFields (command-form sugar)', () =
       once: true,
     });
 
-    await actionRegistry.execute('command.execute', {
+    await expect(actionRegistry.execute('command.execute', {
       fetchResult,
       args: {
         command: 'cr_account:set_credential',
         targetRecordPid: 'A1',
         inputFields: [{ field: 'cookies_json', type: 'textarea', required: true }],
       },
-    });
+    })).rejects.toBeInstanceOf(ActionCancelledError);
 
     expect(fetchResult).not.toHaveBeenCalled();
   });
@@ -904,6 +904,49 @@ describe('ActionRegistry toast handlers', () => {
 });
 
 describe('ActionRegistry dialog.form handler', () => {
+  it.each(['dialog.form', 'command.execute'])('stops downstream writes and success feedback after cancelling %s', async (action) => {
+    const manager = new ScopedStateManager({ locale: 'en', theme: 'light' } as any);
+    manager.createScope('cancel-input', { form: { category: 'previous selection' } });
+    const fetchResult = vi.fn().mockResolvedValue({ code: '0', data: {} });
+    const showToast = vi.fn();
+    const flow = new FlowRunner({ evaluator: new ExpressionEvaluator(), actionRegistry,
+      stateManager: manager, scopeId: 'cancel-input', dataSourceManager: {} as any,
+      schema: {} as any, getAllFormFields: () => [] });
+    window.addEventListener('dialog:form', (event) => (event as CustomEvent).detail.onCancel(), { once: true });
+    const fields = [{ field: 'category', type: 'text' }];
+    await expect(flow.run([
+      { action, args: action === 'dialog.form' ? { fields } : { command: 'policy:create', inputFields: fields } },
+      { action: 'command.execute', args: { command: 'policy:save', payload: { category: '${form.category}' } } },
+      { action: 'toast.show', args: { message: 'Saved', level: 'success' } },
+    ], { ...manager.getContext('cancel-input'), fetchResult, showToast } as any)).rejects.toBeInstanceOf(ActionCancelledError);
+    expect(fetchResult).not.toHaveBeenCalled();
+    expect(showToast).not.toHaveBeenCalled();
+    expect(manager.getContext('cancel-input').form?.category).toBe('previous selection');
+  });
+
+  it('resolves choice endpoints and defaults from the current flow context', async () => {
+    const fetchResult = vi.fn().mockResolvedValue({ data: [{ value: 'supplier-a', label: 'Supplier A' }] });
+    const stateManager = { updateForm: vi.fn() };
+    let detail: any;
+    window.addEventListener('dialog:form', (event) => { detail = (event as CustomEvent).detail;
+      detail.onSubmit({ suppliers: ['supplier-a'] }); }, { once: true });
+    await actionRegistry.execute('dialog.form', { fetchResult, stateManager, scopeId: 'current',
+      expressionContext: { form: { connection: 'connection-a', suppliers: ['supplier-a'] } } as any,
+      args: { fields: [{ field: 'suppliers', type: 'multiselect', defaultValue: '${form.suppliers}',
+        dataSource: { type: 'api', endpoint: '/api/connections/${form.connection}/suppliers' } }] } });
+    expect(fetchResult).toHaveBeenCalledWith('/api/connections/connection-a/suppliers', { method: 'get' });
+    expect(detail.defaults.suppliers).toEqual(['supplier-a']);
+    expect(stateManager.updateForm).toHaveBeenCalledWith('current', 'suppliers', ['supplier-a']);
+  });
+
+  it('propagates invalid provider defaults instead of treating them as user cancellation', async () => {
+    const fetchResult = vi.fn().mockResolvedValue({ data: [{ value: 'group', label: 'Group', options: [], preferred: ['foreign'] }] });
+    await expect(actionRegistry.execute('command.execute', { fetchResult, args: { command: 'policy:save',
+      inputFields: [{ field: 'groups', type: 'grouped-multiselect', props: { defaultValuesField: 'preferred' },
+        dataSource: { type: 'api', endpoint: '/api/choices' } }] } })).rejects.toThrow('Invalid grouped defaults');
+    expect(fetchResult).toHaveBeenCalledTimes(1);
+    expect(fetchResult.mock.calls[0][0]).toBe('/api/choices');
+  });
   it('stores submitted values into the scoped form state', async () => {
     const stateManager = { updateForm: vi.fn() };
     window.addEventListener('dialog:form', (e) => {
@@ -920,17 +963,17 @@ describe('ActionRegistry dialog.form handler', () => {
     expect(stateManager.updateForm).toHaveBeenCalledWith('scope-1', 'qty', 2);
   });
 
-  it('returns silently when the user cancels', async () => {
+  it('signals deliberate cancellation without changing form values', async () => {
     const stateManager = { updateForm: vi.fn() };
     window.addEventListener('dialog:form', (e) => {
       (e as CustomEvent).detail.onCancel();
     }, { once: true });
 
-    await actionRegistry.execute('dialog.form', {
+    await expect(actionRegistry.execute('dialog.form', {
       stateManager,
       scopeId: 'scope-1',
       args: { fields: [{ field: 'name' }] },
-    });
+    })).rejects.toBeInstanceOf(ActionCancelledError);
 
     expect(stateManager.updateForm).not.toHaveBeenCalled();
   });

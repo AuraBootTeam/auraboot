@@ -834,7 +834,7 @@ export async function promptInputForm(
         defaults,
         submitLabel,
         onSubmit: (formData: Record<string, any>) => resolve(formData),
-        onCancel: () => reject(new Error('User cancelled')),
+        onCancel: () => reject(new ActionCancelledError()),
       },
     });
     window.dispatchEvent(event);
@@ -914,17 +914,13 @@ function readInputPath(source: unknown, path: string): unknown {
  *   }
  * }
  */
-actionRegistry.register('dialog.form', async ({ args, stateManager, scopeId, fetchResult }) => {
+actionRegistry.register('dialog.form', async ({ args, stateManager, scopeId, fetchResult, expressionContext }) => {
   if (!args?.fields) {
     console.error('[ActionRegistry] dialog.form: missing fields in args');
     return;
   }
-  let formData: Record<string, any>;
-  try {
-    formData = await promptInputForm(args.fields, args.title, fetchResult);
-  } catch {
-    return; // user cancelled
-  }
+  const formData = await promptInputForm(args.fields, args.title, fetchResult, args.submitLabel,
+    (expressionContext as Record<string, unknown> | undefined) ?? {});
   // Store form values in stateManager under form.{fieldName}
   if (stateManager && scopeId) {
     Object.entries(formData).forEach(([key, value]) => {
@@ -1277,18 +1273,13 @@ actionRegistry.register(
     // page express "click button → small form → submit command" in one action,
     // without a page-specific React component. User cancel aborts (no submit).
     if (Array.isArray(args?.inputFields) && args.inputFields.length > 0) {
-      let collected: Record<string, any>;
-      try {
-        collected = await promptInputForm(
+      const collected = await promptInputForm(
           args.inputFields,
           args?.inputFieldsTitle,
           fetchResult,
           args?.inputFieldsSubmitLabel,
           (expressionContext as Record<string, unknown> | undefined) ?? {},
         );
-      } catch {
-        return; // user cancelled the form — abort the command silently
-      }
       payload = { ...payload, ...collected };
     }
 
