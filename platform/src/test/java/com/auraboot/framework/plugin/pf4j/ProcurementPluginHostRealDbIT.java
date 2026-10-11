@@ -659,7 +659,8 @@ class ProcurementPluginHostRealDbIT {
         });
     }
 
-    @Test void nativeBatchSourceSyncLocksAllQuotesBeforeAnySourceInCanonicalOrder() {
+    private record BatchFixture(QuoteFixture first,String secondSource,String secondQuote,List<String[]> identities) {}
+    private BatchFixture savedNativeBatch() {
         var fixture=savedNativeQuote();var tx=new TransactionTemplate(transactions);
         response=row("100","12");tx.execute(status->scope(SYNC,()->sync("100","12")));
         String secondSource=rows().stream().filter(r->!fixture.source().equals(r.get("pid"))).map(r->(String)r.get("pid")).findFirst().orElseThrow();
@@ -674,6 +675,12 @@ class ProcurementPluginHostRealDbIT {
         identities.add(new String[]{"100",quoteIds.first().equals(fixture.quote())?"11":"12"});
         String changed=row("100","11").replace(",1500,1400,400,300,1000,",",1500,1399,400,300,1000,");
         response="["+changed.substring(1,changed.length()-1)+","+row("100","12").substring(1,row("100","12").length()-1)+"]";
+        return new BatchFixture(fixture,secondSource,secondQuote,identities);
+    }
+    @Test void nativeBatchSourceSyncLocksAllQuotesBeforeAnySourceInCanonicalOrder() {
+        var batch=savedNativeBatch();var fixture=batch.first();var secondSource=batch.secondSource();var secondQuote=batch.secondQuote();
+        var identities=batch.identities();var quoteIds=new TreeSet<String>(List.of(fixture.quote(),secondQuote));
+        var tx=new TransactionTemplate(transactions);
         var locks=new ArrayList<String>();
         DataAccessor observed=(DataAccessor)java.lang.reflect.Proxy.newProxyInstance(DataAccessor.class.getClassLoader(),new Class<?>[]{DataAccessor.class},
                 (proxy,method,args)->{
@@ -693,6 +700,96 @@ class ProcurementPluginHostRealDbIT {
             assertNativeQuantity("pr_purchase_request",source,"qo_pr_source_reserved_qty","0");}
             assertEquals("invalidated",db.getById("s2p_bid",fixture.quote()).get("s2p_bid_status"));
             assertEquals("draft",db.getById("s2p_bid",secondQuote).get("s2p_bid_status"));return null;});
+    }
+
+    private CommandHandlerExtension.CommandContext importContext(String selectedTask,DataAccessor accessor) {
+        var settings=new HashMap<String,Object>(context.settings());settings.put(CommandHandlerExtension.DATA_ACCESSOR_KEY,accessor);
+        return new CommandHandlerExtension.CommandContext(tenantId,context.pluginId(),context.namespace(),SYNC,context.modelCode(),selectedTask,context.payload(),settings,false);
+    }
+    private DataAccessor taskLockObserver(Runnable before,Runnable after) {
+        return (DataAccessor)java.lang.reflect.Proxy.newProxyInstance(DataAccessor.class.getClassLoader(),new Class<?>[]{DataAccessor.class},
+                (proxy,method,args)->{
+                    boolean locking=method.getName().equals("compareAndSetBatch") && "s2p_sourcing_event".equals(args[0]);
+                    if(locking) before.run();
+                    Object result;try {result=method.invoke(db,args);}catch(InvocationTargetException error){throw error.getCause();}
+                    if(locking) after.run();return result;
+                });
+    }
+    @Test void nativeConcurrentSourceBatchesRejectStaleFactsWithoutPartialWrites() throws Exception {
+        var batch=savedNativeBatch();var held=new java.util.concurrent.CountDownLatch(1);var attempted=new java.util.concurrent.CountDownLatch(1);
+        var first=importContext(task,taskLockObserver(()->{},()->{held.countDown();awaitNativeLatch(attempted,"second batch must attempt native task CAS");}));
+        var second=importContext(task,taskLockObserver(attempted::countDown,()->{}));
+        var opposite=new ArrayList<>(batch.identities());Collections.reverse(opposite);
+        var committed=new HashMap<String,Map<String,Object>>();
+        var pool=java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var accepted=pool.submit(()->nativeActorThread(()->new TransactionTemplate(transactions).execute(status->scope(SYNC,()->{
+                Object result=syncSelectedWith(first,batch.identities());
+                committed.put("task",db.getById("s2p_sourcing_event",task));
+                committed.put("source1",db.getById("pr_purchase_request",batch.first().source()));
+                committed.put("source2",db.getById("pr_purchase_request",batch.secondSource()));
+                committed.put("quote1",db.getById("s2p_bid",batch.first().quote()));
+                committed.put("quote2",db.getById("s2p_bid",batch.secondQuote()));return result;
+            }))));
+            awaitNativeLatch(held,"first batch must hold its actual task lock");
+            var rejected=pool.submit(()->nativeActorThread(()->new TransactionTemplate(transactions).execute(status->scope(SYNC,()->syncSelectedWith(second,opposite)))));
+            assertEquals(batch.identities().stream().map(id->id[1].equals("11")?"changed":"unchanged").toList(),accepted.get(20,java.util.concurrent.TimeUnit.SECONDS));
+            var error=assertThrows(java.util.concurrent.ExecutionException.class,()->rejected.get(20,java.util.concurrent.TimeUnit.SECONDS));
+            var conflict=assertInstanceOf(com.auraboot.framework.meta.exception.MetaServiceException.class,error.getCause());
+            assertEquals("CAS batch conflict: no partial batch may commit",conflict.getMessage());
+        } finally {attempted.countDown();pool.shutdownNow();assertTrue(pool.awaitTermination(10,java.util.concurrent.TimeUnit.SECONDS));}
+        scope(SYNC,()->{
+            assertEquals(committed.get("task"),db.getById("s2p_sourcing_event",task));
+            assertEquals(committed.get("source1"),db.getById("pr_purchase_request",batch.first().source()));
+            assertEquals(committed.get("source2"),db.getById("pr_purchase_request",batch.secondSource()));
+            assertEquals(committed.get("quote1"),db.getById("s2p_bid",batch.first().quote()));
+            assertEquals(committed.get("quote2"),db.getById("s2p_bid",batch.secondQuote()));
+            assertEquals(2,rows().size());assertEquals(3,references());
+            assertNativeQuantity("pr_purchase_request",batch.first().source(),"qo_pr_source_revision","1");
+            assertNativeQuantity("pr_purchase_request",batch.secondSource(),"qo_pr_source_revision","0");
+            assertNativeQuantity("pr_purchase_request",batch.first().source(),"qo_pr_source_approved_qty","1399");
+            assertNativeQuantity("pr_purchase_request",batch.secondSource(),"qo_pr_source_approved_qty","1400");
+            assertNativeQuantity("pr_purchase_request",batch.first().source(),"qo_pr_source_reserved_qty","0");
+            assertNativeQuantity("pr_purchase_request",batch.secondSource(),"qo_pr_source_reserved_qty","0");
+            var history=nativeRows("qo_procurement_history_common","qo_pr_history_target_pid",batch.first().quote());
+            assertEquals(2,history.size());
+            assertEquals(1,history.stream().filter(h->"source_changed".equals(h.get("qo_pr_history_action"))).count());
+            assertTrue(nativeRows("qo_procurement_history_common","qo_pr_history_target_pid",batch.secondQuote()).isEmpty());
+            assertTrue(nativeRows("qo_procurement_allocation_common","qo_pr_allocation_task_pid",task).isEmpty());
+            assertTrue(nativeRows("qo_procurement_execution_common","qo_pr_execution_task_pid",task).isEmpty());return null;
+        });
+        assertEquals(List.of("unchanged","unchanged"),new TransactionTemplate(transactions).execute(status->scope(SYNC,()->syncSelectedWith(context,opposite))));
+        scope(SYNC,()->{assertEquals(2,rows().size());assertEquals(3,references());
+            var history=nativeRows("qo_procurement_history_common","qo_pr_history_target_pid",batch.first().quote());
+            assertEquals(2,history.size());
+            assertEquals(1,history.stream().filter(h->"source_changed".equals(h.get("qo_pr_history_action"))).count());return null;});
+    }
+
+    @Test void nativeCrossInquiryBatchKeepsOriginalSourceAssignmentAndLocksBothTasks() {
+        var batch=savedNativeBatch();String connection=scope(SYNC,()->(String)db.getById("s2p_sourcing_event",task).get("qo_pr_task_connection_pid"));
+        String newTask=scope("qo_procurement_task_common:create",()->{
+            try {Class<?> type=plugin.loadClass("com.auraboot.quote.engine.procurement.ProcurementTaskService");
+                var created=(Map<?,?>)type.getMethod("create",Object.class,String.class,Map.class).invoke(type.getConstructor(DataAccessor.class).newInstance(db),tenantId,actor,
+                        Map.of("title","Duplicate import "+provider,"connectionPid",connection));return (String)created.get("recordPid");
+            }catch(ReflectiveOperationException error){throw unwrap(error);}
+        });
+        var locked=new ArrayList<String>();
+        DataAccessor observed=(DataAccessor)java.lang.reflect.Proxy.newProxyInstance(DataAccessor.class.getClassLoader(),new Class<?>[]{DataAccessor.class},
+                (proxy,method,args)->{Object result;try {result=method.invoke(db,args);}catch(InvocationTargetException error){throw error.getCause();}
+                    if(method.getName().equals("compareAndSetBatch")) for(Object update:(List<?>)args[2]) locked.add(args[0]+":"+((CompareAndSetUpdate)update).recordId());return result;});
+        var selected=importContext(newTask,observed);
+        assertEquals(batch.identities().stream().map(id->id[1].equals("11")?"changed":"unchanged").toList(),
+                new TransactionTemplate(transactions).execute(status->scope(SYNC,()->syncSelectedWith(selected,batch.identities()))));
+        var taskIds=new TreeSet<String>(List.of(task,newTask));
+        assertEquals(taskIds.stream().map(t->"s2p_sourcing_event:"+t).toList(),locked.subList(0,2));
+        var quoteIds=new TreeSet<String>(List.of(batch.first().quote(),batch.secondQuote()));
+        assertEquals(quoteIds.stream().map(q->"s2p_bid:"+q).toList(),locked.subList(2,4));
+        scope(SYNC,()->{assertEquals(2,rows().size());assertEquals(3,references());
+            assertTrue(nativeRows("pr_purchase_request","qo_pr_source_task_pid",newTask).isEmpty());
+            assertTrue(nativeRows("s2p_bid","s2p_bid_sourcing_event_id",newTask).isEmpty());
+            for(var source:rows()) assertEquals(task,source.get("qo_pr_source_task_pid"));
+            assertEquals("invalidated",db.getById("s2p_bid",batch.first().quote()).get("s2p_bid_status"));
+            assertEquals("draft",db.getById("s2p_bid",batch.secondQuote()).get("s2p_bid_status"));return null;});
     }
 
     @Test void nativeShipmentReplaySnapshotAndFulfillmentNeverChangeActualReceipts() {
