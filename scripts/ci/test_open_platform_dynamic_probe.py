@@ -80,7 +80,8 @@ def passed():
 
     for kind, suffix, status, code, message in [
         ("deadline", "timeout", 504, "open_api_query_timeout", "Published query execution deadline exceeded"),
-        ("executionFailure", "unavailable", 503, "open_api_query_unavailable", "Published query execution is unavailable")]:
+        ("executionFailure", "unavailable", 503, "open_api_query_unavailable", "Published query execution is unavailable"),
+        ("identityFailure", "ambiguous", 503, "open_api_query_unavailable", "Published query execution is unavailable")]:
         deadline_rows = []
         for operation in ["list", "get"]:
             resource = "release.dynamic.virtual-" + suffix
@@ -321,7 +322,7 @@ class DynamicProbeTests(unittest.TestCase):
         report = passed(); report["virtualResource"]["installationIsolation"]["secondaryItems"][0]["privateValue"] = "Private sentinel"
         with self.assertRaises(ProtocolError): verify_report(report)
 
-        for kind, wrong_status in [("deadline", 503), ("executionFailure", 504)]:
+        for kind, wrong_status in [("deadline", 503), ("executionFailure", 504), ("identityFailure", 504)]:
             for key in passed()["virtualResource"][kind]:
                 report = passed(); del report["virtualResource"][kind][key]
                 with self.subTest(deadline_missing=key), self.assertRaises(ProtocolError): verify_report(report)

@@ -334,7 +334,7 @@ def verify_report(report):
     if (isolation["primaryInstallationPid"] != report.get("installationPid")
             or isolation["secondaryApplicationPid"] == report.get("applicationPid")):
         raise ProtocolError("virtual installation proof actor binding invalid")
-    if any(row["audit"]["applicationPid"] != report.get("applicationPid") for kind in ["deadline", "executionFailure"] for row in virtual[kind]["requests"]):
+    if any(row["audit"]["applicationPid"] != report.get("applicationPid") for kind in ["deadline", "executionFailure", "identityFailure"] for row in virtual[kind]["requests"]):
         raise ProtocolError("virtual deadline application binding invalid")
     quota = report.get("queryRateLimit")
     resource = "release.dynamic.by-zone.quota"
@@ -378,7 +378,7 @@ def verify_source_binding(proof):
 
 def verify_virtual_resource(proof):
     keys = {"resource", "sourceResources", "allowedPid", "hiddenPid", "extraPid", "items", "detail", "etag",
-            "stableEtag", "ownHiddenStatus", "sourceHiddenStatus", "pages", "fieldDeniedStatus", "revokedStatus", "installationIsolation", "deadline", "executionFailure"}
+            "stableEtag", "ownHiddenStatus", "sourceHiddenStatus", "pages", "fieldDeniedStatus", "revokedStatus", "installationIsolation", "deadline", "executionFailure", "identityFailure"}
     if not isinstance(proof, dict) or set(proof) != keys:
         raise ProtocolError("virtual resource proof missing or malformed")
     identities = [proof.get(key) for key in ["allowedPid", "hiddenPid", "extraPid"]]
@@ -421,17 +421,24 @@ def verify_virtual_resource(proof):
         if type(isolation[key]) is not int or isolation[key] != status:
             raise ProtocolError("virtual installation isolation denial invalid: " + key)
     verify_virtual_deadline(proof["deadline"], proof)
-    verify_virtual_deadline(proof["executionFailure"], proof, execution_failure=True)
+    verify_virtual_deadline(proof["executionFailure"], proof, failure_kind="executionFailure")
+    verify_virtual_deadline(proof["identityFailure"], proof, failure_kind="identityFailure")
     return proof
 
 
-def virtual_failure_contract(execution_failure):
-    return ("unavailable", 503, "open_api_query_unavailable", "Published query execution is unavailable") if execution_failure else (
-        "timeout", 504, "open_api_query_timeout", "Published query execution deadline exceeded")
+def virtual_failure_contract(failure_kind):
+    contracts = {
+        "deadline": ("timeout", 504, "open_api_query_timeout", "Published query execution deadline exceeded"),
+        "executionFailure": ("unavailable", 503, "open_api_query_unavailable", "Published query execution is unavailable"),
+        "identityFailure": ("ambiguous", 503, "open_api_query_unavailable", "Published query execution is unavailable"),
+    }
+    if failure_kind not in contracts:
+        raise ProtocolError("Unknown virtual failure contract")
+    return contracts[failure_kind]
 
 
-def verify_virtual_deadline(deadline, virtual, execution_failure=False):
-    suffix, expected_status, error_code, message = virtual_failure_contract(execution_failure)
+def verify_virtual_deadline(deadline, virtual, failure_kind="deadline"):
+    suffix, expected_status, error_code, message = virtual_failure_contract(failure_kind)
     resource = "release.dynamic.virtual-" + suffix
     if not isinstance(deadline, dict) or set(deadline) != {"resource", "requests", "healthyItems"} or deadline["resource"] != resource:
         raise ProtocolError("virtual deadline proof missing or malformed")
@@ -466,15 +473,19 @@ def verify_virtual_deadline(deadline, virtual, execution_failure=False):
     return deadline
 
 
-def run_virtual_deadline_probe(request, human, installation_pid, machine, definition, allowed, healthy_path, execution_failure=False):
+def run_virtual_deadline_probe(request, human, installation_pid, machine, definition, allowed, healthy_path, failure_kind="deadline"):
     """Require real SQL failure, persisted public audits and healthy reads on the same live target."""
-    suffix, expected_status, _, _ = virtual_failure_contract(execution_failure)
+    suffix, expected_status, _, _ = virtual_failure_contract(failure_kind)
     source = "release_dynamic_" + suffix + "_source"
     model_code = "release_dynamic_" + suffix + "_model"
     resource = "release.dynamic.virtual-" + suffix
-    expression = "a.rel_name || (1 / 0)::text" if execution_failure else "a.rel_name || pg_sleep(0.2)::text"
+    expression = {"deadline": "a.rel_name || pg_sleep(0.2)::text", "executionFailure": "a.rel_name || (1 / 0)::text",
+                  "identityFailure": "a.rel_name"}[failure_kind]
+    from_sql = "release_dynamic_parts a"
+    if failure_kind == "identityFailure":
+        from_sql += " JOIN release_dynamic_parts b ON a.rel_zone = b.rel_zone"
     named = human("/api/meta/named-queries", "POST", {"code": source, "title": "Release virtual SQL " + suffix,
-        "resourceCode": "release_dynamic_parts", "actionCode": "read", "fromSql": "release_dynamic_parts a",
+        "resourceCode": "release_dynamic_parts", "actionCode": "read", "fromSql": from_sql,
         "policy": {"rateLimitPerMinute": 100000}, "baseWhere": [], "defaultOrder": [{"field": "pid", "direction": "asc"}],
         "fields": [{"fieldCode": alias, "columnExpr": expression, "dataType": "string", "displayName": alias,
                     "sortable": alias == "pid", "searchable": False}
@@ -486,7 +497,7 @@ def run_virtual_deadline_probe(request, human, installation_pid, machine, defini
         "capabilities": {key: True for key in ["list", "detail", "filter", "sort", "paginate"]},
         "fields": [{"code": alias, "displayName": alias, "dataType": "string", "filterable": True} for alias in ["name", "zone"]]})
     human(f"/api/meta/models/{model['pid']}/publish", "POST", {"impactAcknowledged": True})
-    slow = dict(definition, code=resource, modelCode=model_code, timeoutMs=5000 if execution_failure else 30)
+    slow = dict(definition, code=resource, modelCode=model_code, timeoutMs=30 if failure_kind == "deadline" else 5000)
     human(f"/api/open-platform/publications/{resource}/draft", "PUT", {"expectedRevision": 0, "definition": slow})
     human(f"/api/open-platform/publications/{resource}/publish", "POST", {"expectedRevision": 1})
     human(f"/api/open-platform/installations/{installation_pid}/resources/{resource}", "PUT",
@@ -580,7 +591,8 @@ def run_virtual_resource_probe(request, human, installation_pid, machine, scopes
                      "secondaryDetail": secondary_detail, "firstReadsSecondStatus": source_status,
                      "secondReadsFirstStatus": second_denied, "cursorStatus": cursor_denied}
         deadline_proof = run_virtual_deadline_probe(request, human, installation_pid, machine, definition, allowed, path)
-        failure_proof = run_virtual_deadline_probe(request, human, installation_pid, machine, definition, allowed, path, execution_failure=True)
+        failure_proof = run_virtual_deadline_probe(request, human, installation_pid, machine, definition, allowed, path, failure_kind="executionFailure")
+        identity_proof = run_virtual_deadline_probe(request, human, installation_pid, machine, definition, allowed, path, failure_kind="identityFailure")
         human(source_grant, "PUT", dict(original, readableFields=["pid", "zone"]))
         field_status, _, _ = request(path, headers=machine, expected=(403,))
         human(source_grant, "DELETE")
@@ -588,7 +600,7 @@ def run_virtual_resource_probe(request, human, installation_pid, machine, scopes
         proof = {"resource": code, "sourceResources": definition["sourceResources"], "allowedPid": allowed["pid"],
                  "hiddenPid": hidden["pid"], "extraPid": extra["pid"], "items": listed.get("items"), "detail": detail,
                  "etag": etag(headers), "stableEtag": etag(repeated), "ownHiddenStatus": own_status,
-                 "sourceHiddenStatus": source_status, "pages": [{key: page.get(key) for key in ["items", "nextCursor"]} for page in [first, second]], "fieldDeniedStatus": field_status, "revokedStatus": revoked_status, "installationIsolation": isolation, "deadline": deadline_proof, "executionFailure": failure_proof}
+                 "sourceHiddenStatus": source_status, "pages": [{key: page.get(key) for key in ["items", "nextCursor"]} for page in [first, second]], "fieldDeniedStatus": field_status, "revokedStatus": revoked_status, "installationIsolation": isolation, "deadline": deadline_proof, "executionFailure": failure_proof, "identityFailure": identity_proof}
         return verify_virtual_resource(proof)
     finally:
         try:
