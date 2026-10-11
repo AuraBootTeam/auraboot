@@ -48,15 +48,16 @@ test.describe('Dynamic resource publication journey', () => {
     await expect(page.getByTestId('open-platform-page')).toBeVisible();
     await expect(page.getByTestId('open-platform-publications-link')).toBeVisible();
     await snapshot('publication-entry');
-    // Only the first catalog GET is a declared empty-state visual fixture. All mutations stay real.
+    // Catalog GETs are a declared empty-state visual fixture until capture; all mutations stay real.
     await page.route('**/api/open-platform/publications', async route => {
       expect(route.request().method()).toBe('GET');
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ code: '0', data: [] }) });
-    }, { times: 1 });
+    });
     await page.getByTestId('open-platform-publications-link').click();
     await expect(page.getByTestId('publication-editor')).toBeVisible();
     await expect(page.getByRole('heading', { name: '尚未公开业务模型' })).toBeVisible();
     await snapshot('publication-empty');
+    await page.unroute('**/api/open-platform/publications');
     const realCatalogResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/open-platform/publications' && response.request().method() === 'GET');
     await page.reload();
     const realCatalogHttp = await realCatalogResponse; expect(realCatalogHttp.status()).toBe(200);
@@ -117,7 +118,9 @@ test.describe('Dynamic resource publication journey', () => {
 
     const otherEditor = await page.context().newPage();
     await otherEditor.goto('/p/c/open_platform_publications');
-    await otherEditor.getByRole('button', { name: '编辑合同', exact: true }).click();
+    await otherEditor.getByTestId('publication-editor').getByRole('listitem')
+      .filter({ has: otherEditor.getByText(resourceCode, { exact: true }) })
+      .getByRole('button', { name: '编辑合同', exact: true }).click();
     await expect(otherEditor.getByLabel('查询超时（毫秒）', { exact: true })).toBeEnabled();
     await otherEditor.getByLabel('查询超时（毫秒）', { exact: true }).fill('6000');
     await otherEditor.getByRole('button', { name: '保存并校验草稿', exact: true }).click();
@@ -219,15 +222,16 @@ test.describe('Dynamic query publication journey', () => {
     await mkdir(screenshotRoot, { recursive: true });
     const snapshot = async (id: string) => { await page.screenshot({ path: path.join(screenshotRoot, `${id}.png`), fullPage: true }); };
     await page.goto('/p/c/open_platform_publications'); await expect(page.getByTestId('publication-editor')).toBeVisible();
-    // Retained catalogs may contain prior runs; render empty state once, then reload the real catalog.
+    // Cover empty state during capture, including repeated mount GETs, then reload the real catalog.
     await page.route('**/api/open-platform/query-publications', async route => {
       expect(route.request().method()).toBe('GET');
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ code: '0', data: [] }) });
-    }, { times: 1 });
+    });
     await page.getByTestId('publication-editor').getByRole('link', { name: '公共查询发布', exact: true }).click();
     const editor = page.getByTestId('query-publication-editor'); await expect(editor).toBeVisible();
     await expect(editor).toContainText('尚未公开命名查询'); await expect(editor).not.toContainText(/Page Unavailable|Page not found/);
     await snapshot('query-entry');
+    await page.unroute('**/api/open-platform/query-publications');
     const realQueryCatalogResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/open-platform/query-publications' && response.request().method() === 'GET');
     await page.reload();
     const realQueryCatalogHttp = await realQueryCatalogResponse; expect(realQueryCatalogHttp.status()).toBe(200);
