@@ -17,9 +17,14 @@ public class OpenApiVirtualResourceReader {
     private final ObjectMapper json;
 
     public Map<String, Object> get(OpenApiResourceAuthorizer.Authorization authority, String pid) {
-        var records = execute(authority, DynamicQueryRequest.builder().pageNum(1).pageSize(2).build(), pid).getRecords();
+        var page = execute(authority, DynamicQueryRequest.builder().pageNum(1).pageSize(2).build(), pid);
+        var records = page.getRecords();
         if (records.isEmpty()) throw new MetaRecordNotFoundException(authority.contract().modelCode(), pid);
-        if (records.size() != 1) throw new IllegalStateException("Virtual resource PID is ambiguous");
+        // A source row budget may truncate records; only an exact total proves a unique PID.
+        if (records.size() != 1 || !Long.valueOf(1).equals(page.getTotal())) {
+            throw new OpenApiQueryService.QueryExecutionUnavailableException(
+                    new IllegalStateException("Virtual resource PID is ambiguous"));
+        }
         return records.getFirst();
     }
 

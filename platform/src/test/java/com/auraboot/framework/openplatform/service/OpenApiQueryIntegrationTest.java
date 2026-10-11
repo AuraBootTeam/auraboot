@@ -566,6 +566,7 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
                 List.of(new OpenApiInstallationPolicy.RowConstraint("zone", List.of("A")))));
         http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).header("Authorization", "Bearer " + tokenA))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
+        verifyAmbiguousVirtualGetRejectsTruncatedResults(pid, path);
         applyTestMetaContext(); resources.withdraw(root.code(), 1);
         assertThat(resources.active(testTenant.getId(), contract.code())).contains(contract);
         for (String unavailable : List.of("/api/open/v1/resources/" + contract.code(), path)) {
@@ -943,6 +944,54 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
         } finally { applyTestMetaContext(); }
         assertThat(run(principalA,rows,"A").get("total")).isEqualTo(1L);
     }
+    private void verifyAmbiguousVirtualGetRejectsTruncatedResults(String pid, String healthyPath) throws Exception {
+        for (int maxRows : List.of(5000, 1)) {
+            applyTestMetaContext();
+            String suffix = UniqueIdGenerator.generate().toLowerCase();
+            var source = createQuery("ambiguous_source_" + suffix,
+                    "mt_" + root.modelCode() + " a JOIN mt_" + root.modelCode() + " b ON a.zone = b.zone",
+                    List.of(nqField("pid", "a.pid", "string"), nqField("name", "a.name", "string"), nqField("zone", "a.zone", "string")));
+            var policy = new com.auraboot.framework.meta.entity.NamedQueryPolicy(); policy.setMaxRows(maxRows);
+            var update = new NamedQueryUpdateRequest(); update.setPolicy(policy); queries.update(source.getPid(), update);
+            String modelCode = "ambiguous_model_" + suffix;
+            models.saveDefinition(ModelDefinition.builder().code(modelCode).displayName("Ambiguous virtual source")
+                    .sourceType("namedQuery").sourceRef(source.getCode()).primaryKey("pid").status("published")
+                    .capabilities(ModelCapabilities.virtualReadOnly()).fields(List.of(
+                            FieldDefinition.builder().code("name").dataType("STRING").displayName("Name").build(),
+                            FieldDefinition.builder().code("zone").dataType("STRING").displayName("Zone").filterable(true).build())).build());
+            var contract = new OpenApiResourceContract("ambiguous." + suffix, modelCode, 1, root.operations(), root.scopes(),
+                    DataPolicy.INSTALLATION_FILTER, root.fields(), 50, 8, 5000, Set.of(), Map.of(root.modelCode(), root.code()));
+            resources.saveDraft(contract.code(), new OpenApiPublicationService.DraftRequest(0, contract)); resources.publish(contract.code(), 1);
+            resources.grant(principalA.installationPid(), contract.code(), new OpenApiInstallationPolicy(contract.operations(),
+                    contract.fields().keySet(), Set.of(), List.of(new OpenApiInstallationPolicy.RowConstraint("zone", List.of("A")))));
+            MetaContext.setContext(principalA.tenantId(), null, principalA.subjectPid(), "machine");
+            try (var machine = MachineDataAccessContext.begin(principalA)) {
+                assertThatThrownBy(() -> publicResources.get(principalA, contract.code(), pid))
+                        .isInstanceOf(OpenApiQueryService.QueryExecutionUnavailableException.class)
+                        .hasMessageContaining("503").hasMessageContaining("open_api_query_unavailable")
+                        .hasCauseInstanceOf(IllegalStateException.class).hasMessageNotContaining(modelCode);
+            } finally { applyTestMetaContext(); }
+            String marker = "ambiguous-get-" + suffix;
+            var response = http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                    .get("/api/open/v1/resources/" + contract.code() + "/" + pid)
+                    .header("Authorization", "Bearer " + tokenA).header("X-Request-Id", marker))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isServiceUnavailable())
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().doesNotExist("ETag"))
+                    .andReturn().getResponse();
+            assertThat(json.readTree(response.getContentAsString())).isEqualTo(json.valueToTree(Map.of(
+                    "success", false, "code", "open_api_query_unavailable", "message", "Published query execution is unavailable")));
+            assertThat(response.getContentAsString()).doesNotContain(pid, modelCode, source.getCode(), "ambiguous", "fromSql");
+            applyTestMetaContext();
+            var audits = management.listCallAudits(principalA.installationPid(), marker, null, 10);
+            assertThat(audits).hasSize(1); assertThat(audits.getFirst().status()).isEqualTo(503);
+            assertThat(audits.getFirst().resource()).isEqualTo(contract.code()); assertThat(audits.getFirst().operation()).isEqualTo("get");
+            http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(healthyPath).header("Authorization", "Bearer " + tokenA))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.pid").value(pid))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.name").value("Root A Renamed"));
+        }
+    }
+
     @Test void exhaustedSourceRateBudgetReturnsPublic429AndRecordsTheMachineDenial() throws Exception {
         var policy = new com.auraboot.framework.meta.entity.NamedQueryPolicy();policy.setRateLimitPerMinute(1);
         var update = new NamedQueryUpdateRequest();update.setPolicy(policy);queries.update(rowsDefinition.getPid(), update);
