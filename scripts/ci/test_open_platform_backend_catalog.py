@@ -104,6 +104,11 @@ class BackendCatalogTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             cases('@org.junit.jupiter.api.Disabled @org.junit.jupiter.api.Test void disabled() {}')
 
+    def test_display_names_before_and_after_test_keep_exact_junit_identity(self):
+        source = '''@DisplayName("before (named)") @Order(1) @Test void one() {}
+                    @Test @DisplayName("after") void two() {} @Test void three() {}'''
+        self.assertEqual(['before (named)', 'after', 'three()'], cases(source))
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -34,7 +34,12 @@ def cases(source):
         header = text[:method.start()]
         if annotation.group(1) == "Test":
             require(not parameters.strip(), "Ordinary blocking test must have no parameters")
-            result.append(name + "()")
+            preceding = re.search(r'(?:\s*@[\w.]+(?:\((?:[^()"\'{}]|"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\')*\))?)+\s*$',
+                                  source[:annotation.start()])
+            decorations = (preceding.group() if preceding else '') + header
+            labels = re.findall(r'@(?:[\w]+\.)*DisplayName\(\s*("(?:\\.|[^"\\])*")\s*\)', decorations)
+            require(len(labels) <= 1, "Duplicate display names")
+            result.append(json.loads(labels[0]) if labels else name + "()")
         else:
             # Only existing string ValueSource formats are admitted. New generators
             # must get an explicit expansion rather than silently passing by count.
