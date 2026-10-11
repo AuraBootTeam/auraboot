@@ -917,8 +917,19 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
         resources.publish(failingContract.code(), 1);
         resources.grant(principalA.installationPid(), failingContract.code(), new OpenApiInstallationPolicy(failingContract.operations(),
                 failingContract.fields().keySet(), Set.of(), List.of(new OpenApiInstallationPolicy.RowConstraint("zone", List.of("A")))));
+        var failingQuery = new OpenApiQueryContract("fault-query." + suffix, failingSource.getCode(), 1,
+                queries.describeExecution(failingSource.getCode()).fingerprint(), rows.scopes(), Map.of(root.modelCode(), root.code()),
+                Map.of(), root.fields(), 20, 100, 5000, 2);
+        publications.saveDraft(failingQuery.code(), new OpenApiQueryPublicationService.DraftRequest(0, failingQuery));
+        publications.publish(failingQuery.code(), 1);
+        publications.grant(principalA.installationPid(), failingQuery.code(), new OpenApiQueryPolicy(failingQuery.fields().keySet()));
         MetaContext.setContext(principalA.tenantId(), null, principalA.subjectPid(), "machine");
         try (var machine = MachineDataAccessContext.begin(principalA)) {
+            assertThatThrownBy(() -> boundary.executeWithoutResult(status -> publicQueries.execute(principalA, failingQuery.code(),
+                    new OpenApiQueryService.ExecuteRequest(Map.of(), 10, null))))
+                    .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                    .hasMessageContaining("503").hasMessageContaining("open_api_query_unavailable")
+                    .hasMessageNotContaining("SELECT").hasMessageNotContaining("division by zero");
             for (boolean detail : List.of(false, true)) {
                 assertThatThrownBy(() -> boundary.executeWithoutResult(status -> {
                     if (detail) publicResources.get(principalA, failingContract.code(), allowedPid);
