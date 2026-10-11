@@ -1,4 +1,4 @@
-import React, { forwardRef, useState } from 'react';
+import React, { forwardRef, useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { useActionData } from 'react-router';
 import clsx from 'clsx';
 import type { TextareaProps } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
@@ -70,6 +70,36 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
       onBlur,
     });
 
+    const elementRef = useRef<HTMLTextAreaElement | null>(null);
+    const attachRef = useCallback((element: HTMLTextAreaElement | null) => {
+      elementRef.current = element;
+      if (typeof ref === 'function') ref(element);
+      else if (ref) ref.current = element;
+    }, [ref]);
+
+    useLayoutEffect(() => {
+      const element = elementRef.current;
+      if (!autoResize || !element || !isVisible) return;
+      const previousHeight = element.style.height;
+      let measuredWidth = element.clientWidth;
+      const resize = () => {
+        element.style.height = 'auto';
+        const borderHeight = element.offsetHeight - element.clientHeight;
+        element.style.height = `${element.scrollHeight + borderHeight}px`;
+      };
+      resize();
+      const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(() => {
+        if (element.clientWidth === measuredWidth) return;
+        measuredWidth = element.clientWidth;
+        resize();
+      });
+      observer?.observe(element);
+      return () => {
+        observer?.disconnect();
+        element.style.height = previousHeight;
+      };
+    }, [autoResize, field.value, isVisible]);
+
     // 条件渲染和状态
     const isDisabled = disabledValue;
     const shouldRender = isVisible;
@@ -110,7 +140,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
       >
         <div className="relative">
           <BaseTextarea
-            ref={ref}
+            ref={attachRef}
             id={name}
             name={name}
             placeholder={placeholderText}
