@@ -254,6 +254,11 @@ test.describe('Dynamic resource publication journey', () => {
     await page.getByRole('button', { name: '保存并校验草稿', exact: true }).click();
     expect(await sourceSelector.evaluate((element: HTMLSelectElement) => element.validity.valueMissing)).toBe(true);
     await expect(sourceSelector).toBeFocused();
+    const requiredSourceError = page.getByTestId(`publication-source-${modelCode}`).getByRole('alert');
+    await expect(requiredSourceError).toHaveText('请选择该来源的已发布列表资源。');
+    await expect(requiredSourceError).toBeVisible();
+    await expect(sourceSelector).toHaveAttribute('aria-invalid', 'true');
+    await expect(sourceSelector).toHaveAttribute('aria-describedby', `publication-source-error-${modelCode}`);
     expect(prematureDraftWrites).toEqual([]);
     page.off('request', observeDraftWrite);
     const blockedCatalog = await page.request.get(`${WEB_BASE_URL}/api/open-platform/publications`);
@@ -263,6 +268,8 @@ test.describe('Dynamic resource publication journey', () => {
     await page.getByTestId('publication-editor').locator('section').filter({ has: sourceSelector })
       .screenshot({ path: path.join(screenshotRoot, 'publication-virtual-source-required-region.png') });
     await sourceSelector.selectOption(resourceCode);
+    await expect(requiredSourceError).toHaveCount(0);
+    await expect(sourceSelector).toHaveAttribute('aria-invalid', 'false');
     const virtualSaved = page.waitForResponse(response => response.url().endsWith(`/publications/${virtualCode}/draft`) && response.request().method() === 'PUT');
     await page.getByRole('button', { name: '保存并校验草稿', exact: true }).click();
     const virtualSavedHttp = await virtualSaved; expect(virtualSavedHttp.status()).toBe(200);
