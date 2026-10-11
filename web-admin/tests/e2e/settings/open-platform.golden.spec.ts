@@ -539,13 +539,25 @@ test.describe('Open Platform golden journey', () => {
     await capture(page, 'OP-UI-06');
     await dismissToasts(page);
 
+    // Published dynamic contracts extend the real capability catalog in a shared tenant.
+    const capabilitiesResponse = await page.request.get(`${WEB_BASE_URL}/api/open-platform/capabilities`);
+    expect(capabilitiesResponse.status()).toBe(200);
+    const capabilitiesBody = await capabilitiesResponse.json();
+    expect(String(capabilitiesBody.code)).toBe('0');
+    const catalogScopes = [...new Set((capabilitiesBody.data as Array<{ requiredScope: string }>)
+      .map((capability) => capability.requiredScope))].sort();
+    expect(catalogScopes).toEqual(expect.arrayContaining([
+      'assets.manage', 'assets.read', 'inventory.stock-ins.read', 'inventory.stock-ins.manage',
+      'openapi.events.read', 'automation.events.write', 'openapi.profile.read',
+    ]));
     await appCard.getByRole('button', { name: '添加安装' }).click();
     const installDialog = page.getByRole('dialog', { name: '安装应用' });
     await installDialog.getByLabel('环境').selectOption('production');
     await installDialog.getByTestId('open-platform-rate-limit').fill('1200');
     const scopeChecks = installDialog.getByRole('checkbox');
     await expect(scopeChecks.first()).toBeChecked();
-    await expect(scopeChecks).toHaveCount(7);
+    await expect(scopeChecks).toHaveCount(catalogScopes.length);
+    for (const scope of catalogScopes) await expect(installDialog.getByLabel(scope, { exact: true })).toHaveCount(1);
     await installDialog.getByLabel('assets.read').check();
     await installDialog.getByLabel('inventory.stock-ins.read').check();
     await installDialog.getByLabel('inventory.stock-ins.manage').check();
