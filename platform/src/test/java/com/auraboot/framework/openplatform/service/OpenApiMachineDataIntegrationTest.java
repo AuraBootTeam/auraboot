@@ -1196,7 +1196,8 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
             assertThat(response.getHeader("Idempotent-Replay")).isEqualTo("true");
         } else {
             assertThat(json.readTree(response.getContentAsString()).path("code").asText()).isEqualTo("403");
-            assertThat(json.readTree(response.getContentAsString()).path("message").asText())
+            assertThat(json.readTree(response.getContentAsString()).path("message").asText()).isEqualTo("Access forbidden");
+            assertThat(json.readTree(response.getContentAsString()).path("context").asText())
                     .isEqualTo("Current resource or query authorization required");
             assertThat(response.getContentAsString()).doesNotContain("Secret-free audit", rawToken, "Replay authorization changed", "Replay target");
             assertThat(response.getHeader("ETag")).isNull();
