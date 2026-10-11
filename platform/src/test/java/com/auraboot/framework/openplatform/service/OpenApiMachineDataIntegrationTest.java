@@ -1136,7 +1136,7 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
             var current = http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(collection + "/" + pid)
                     .header("Authorization", bearer).header("X-Request-Id", origin + "-current"))
                     .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk()).andReturn().getResponse();
-            assertThat(current.getContentAsString()).isEqualTo(created.getContentAsString());
+            assertThat(json.readTree(current.getContentAsString())).isEqualTo(json.readTree(created.getContentAsString()));
             assertThat(current.getHeader("ETag")).isNotEqualTo(created.getHeader("ETag"));
             applyTestMetaContext();
             var restoredRow = MetaContext.runWithCommandPermitScope("ALL", () -> data.getById(contract.modelCode(), pid));
@@ -1190,7 +1190,7 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
                 .contentType("application/json").content(body))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().is(status)).andReturn().getResponse();
         if (status == 201) {
-            assertThat(response.getContentAsString()).isEqualTo(original.getContentAsString());
+            assertThat(json.readTree(response.getContentAsString())).isEqualTo(json.readTree(original.getContentAsString()));
             assertThat(response.getHeader("ETag")).isEqualTo(original.getHeader("ETag"));
             assertThat(response.getHeader("Location")).isEqualTo(original.getHeader("Location"));
             assertThat(response.getHeader("Idempotent-Replay")).isEqualTo("true");
