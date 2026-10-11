@@ -26,6 +26,8 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
     @Autowired private com.auraboot.framework.plugin.mapper.PluginRecordMapper plugins;
     @Autowired private com.auraboot.framework.plugin.mapper.PluginResourceMapper pluginResources;
     @Autowired private com.auraboot.framework.plugin.service.PluginResourceService pluginResourceService;
+    @Autowired private com.auraboot.framework.tenant.service.TenantService tenantService;
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate fixtureJdbc;
     @Autowired private MetaModelService models;
     @Autowired private SchemaManagementService schemas;
     @Autowired private DynamicDataService data;
@@ -46,7 +48,7 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
     private OpenApiQueryContract rows,summary;
     private NamedQueryDTO rowsDefinition;
     private MachinePrincipal principalA,principalB;
-    private String tokenA;
+    private String tokenA, tokenB;
     private Set<String> scopes;
 
     @BeforeEach void fixture() {
@@ -118,7 +120,7 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
         publications.grant(installation.pid(),rows.code(),new OpenApiQueryPolicy(rows.fields().keySet()));
         publications.grant(installation.pid(),summary.code(),new OpenApiQueryPolicy(summary.fields().keySet()));
         var credential=management.createCredential(installation.pid());var token=tokens.issue("client_credentials",credential.clientId(),credential.clientSecret(),null);
-        if("A".equals(zone))tokenA=token.accessToken();
+        if("A".equals(zone))tokenA=token.accessToken(); else tokenB=token.accessToken();
         var identity=auth.findToken(secrets.sha256(token.accessToken()),OpenPlatformTokenService.AUDIENCE,Instant.now());
         return new MachinePrincipal(identity.tenantId(),identity.tokenPid(),"machine",scopes,identity.applicationPid(),identity.installationPid(),identity.environment(),identity.tokenPid());
     }
@@ -337,6 +339,20 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
                 nqField("pid", "a.pid", "string"), nqField("name", "a.name", "string"),
                 nqField("zone", "a.zone", "string"), nqField("privateValue", "a.secret", "string")));
         String extra = humanCreate(root, Map.of("name", "Extra A", "zone", "A", "secret", "Private extra"));
+        var foreignTenant = new com.auraboot.framework.tenant.dao.entity.Tenant();
+        foreignTenant.setPid(UniqueIdGenerator.generate()); foreignTenant.setName("virtual-tenant-" + suffix);
+        foreignTenant.setDisplayName("Virtual isolation tenant"); foreignTenant.setStatus("active");
+        foreignTenant.setContactEmail("virtual@example.test"); foreignTenant.setDeletedFlag(false);
+        foreignTenant.setCreatedAt(Instant.now()); foreignTenant.setUpdatedAt(Instant.now());
+        foreignTenant = tenantService.createTenant(foreignTenant);
+        String foreignPid = UniqueIdGenerator.generate();
+        String mutation = System.getenv("AURA_IT_NEGATIVE_MUTATION");
+        assertThat(mutation).isIn(null, "foreign-row-as-own");
+        Long seededTenant = "foreign-row-as-own".equals(mutation) ? testTenant.getId() : foreignTenant.getId();
+        // Same physical source and allowed business values: only tenant isolation may exclude this row.
+        fixtureJdbc.update("INSERT INTO mt_" + root.modelCode() + " (pid, tenant_id, name, zone, secret) VALUES (?, ?, ?, ?, ?)",
+                foreignPid, seededTenant, "Root A", "A", "Foreign private value");
+
         String modelCode = "virtual_read_" + suffix;
         models.saveDefinition(ModelDefinition.builder().code(modelCode).displayName("Granted virtual public source")
                 .sourceType("namedQuery").sourceRef(source.getCode()).primaryKey("pid").status("published")
@@ -362,6 +378,26 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[*].name")
                         .value(org.hamcrest.Matchers.containsInAnyOrder("Root A", "Extra A")));
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/open/v1/resources/" + contract.code())
+                .header("Authorization", "Bearer " + tokenA).header("X-Tenant-ID", foreignTenant.getId()))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[*].name")
+                        .value(org.hamcrest.Matchers.containsInAnyOrder("Root A", "Extra A")));
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/open/v1/resources/" + contract.code() + "/" + foreignPid)
+                .header("Authorization", "Bearer " + tokenA).header("X-Tenant-ID", foreignTenant.getId()))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
+        applyTestMetaContext();
+        resources.grant(principalB.installationPid(), contract.code(), new OpenApiInstallationPolicy(contract.operations(),
+                contract.fields().keySet(), Set.of(), List.of(new OpenApiInstallationPolicy.RowConstraint("zone", List.of("B")))));
+        var secondInstallation = json.readTree(http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .get("/api/open/v1/resources/" + contract.code()).header("Authorization", "Bearer " + tokenB))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[*].name")
+                        .value(org.hamcrest.Matchers.contains("Root B"))).andReturn().getResponse().getContentAsString());
+        String secondPid = secondInstallation.path("items").get(0).path("pid").asText();
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/open/v1/resources/" + contract.code() + "/" + secondPid)
+                .header("Authorization", "Bearer " + tokenA))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
         applyTestMetaContext();
         resources.grant(principalA.installationPid(), contract.code(), new OpenApiInstallationPolicy(contract.operations(),
                 contract.fields().keySet(), Set.of(), List.of(new OpenApiInstallationPolicy.RowConstraint("name", List.of("Root A", "Root A Renamed")))));
@@ -374,6 +410,13 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
                 .andReturn().getResponse();
         String pid = json.readTree(initial.getContentAsString()).path("items").get(0).path("pid").asText();
         String path = "/api/open/v1/resources/" + contract.code() + "/" + pid;
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).header("Authorization", "Bearer " + tokenB))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/open/v1/resources/" + contract.code() + "/" + secondPid)
+                .header("Authorization", "Bearer " + tokenB))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.name").value("Root B"));
+
         var first = http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).header("Authorization", "Bearer " + tokenA))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.name").value("Root A")).andReturn().getResponse();
@@ -416,6 +459,10 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
             if ("ASC".equals(order)) assertThat(names).containsExactly("Extra A", "Root A Renamed", "<null>");
             if ("DESC".equals(order)) assertThat(names).containsExactly("<null>", "Root A Renamed", "Extra A");
         }
+        assertThat(originalCursor).isNotBlank();
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/open/v1/resources/" + contract.code())
+                .header("Authorization", "Bearer " + tokenB).param("limit", "1").param("cursor", originalCursor))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest());
         applyTestMetaContext();
         resources.grant(principalA.installationPid(), root.code(), new OpenApiInstallationPolicy(root.operations(), Set.of("pid", "zone"), Set.of(),
                 List.of(new OpenApiInstallationPolicy.RowConstraint("zone", List.of("A")))));
