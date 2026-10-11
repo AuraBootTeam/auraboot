@@ -46,7 +46,7 @@ class ProcurementPluginHostRealDbIT {
     private URLClassLoader plugin;
     private DynamicDataAccessorImpl db;
     private HttpServer server;
-    private String response,actor,task,provider;
+    private String response,actor,task,provider,product;
     private List<String> logins,queries,cookies;
     private CommandHandlerExtension.CommandContext context;
 
@@ -79,7 +79,7 @@ class ProcurementPluginHostRealDbIT {
             byte[] body=response.getBytes(StandardCharsets.UTF_8);e.sendResponseHeaders(200,body.length);
             e.getResponseBody().write(body);e.close();
         });server.start();
-        String product=scope(SYNC,()->(String)db.create("prod_product",Map.of("prod_code",provider,"prod_name","Host test material",
+        product=scope(SYNC,()->(String)db.create("prod_product",Map.of("prod_code",provider,"prod_name","Host test material",
                 "prod_type","raw_material","prod_unit","pcs","prod_status","active")).get("pid"));
         String connection=scope(SYNC,()->(String)db.create("customer_pcba_int_kingdee_connection",Map.of(
                 "customer_pcba_kd_profile_name",provider,"customer_pcba_kd_status","active",
@@ -181,6 +181,73 @@ class ProcurementPluginHostRealDbIT {
         assertNotEquals(contact,scope(writer,()->matchPhone(phone)));
         scope(writer,()->db.update("pr_supplier_common",supplier,Map.of("pr_supplier_status","disabled")));
         assertEquals("SUPPLIER_UNAVAILABLE",assertThrows(SecurityException.class,()->scope(writer,()->matchPhone(phone))).getMessage());
+    }
+
+    private Object invokeService(String service,String method,Class<?>[] parameters,Object... arguments) {
+        try {
+            Class<?> type=plugin.loadClass("com.auraboot.quote.engine.procurement."+service);
+            return type.getMethod(method,parameters).invoke(type.getConstructor(DataAccessor.class,java.time.Clock.class)
+                    .newInstance(db,java.time.Clock.systemUTC()),arguments);
+        } catch(ReflectiveOperationException error) {throw unwrap(error);}
+    }
+    private List<Map<String,Object>> nativeRows(String model,String field,String value) {
+        return db.queryPage(model,new DataPageQuery(Map.of(field,value),Map.of(),List.of(),1,20)).records();
+    }
+    private void assertNativeQuantity(String model,String pid,String field,String quantity) {
+        assertEquals(0,new BigDecimal(quantity).compareTo(new BigDecimal(db.getById(model,pid).get(field).toString())),field);
+    }
+    @Test void nativeShipmentReplaySnapshotAndFulfillmentNeverChangeActualReceipts() {
+        String directory="pr_supplier_common:sync_directory",publish="qo_procurement_order_common:sync_orders";
+        String submit="qo_procurement_order_common:submit_shipment",maintain="qo_procurement_address_common:maintain";
+        String supplier=scope(directory,()->(String)db.create("pr_supplier_common",Map.of("pr_supplier_code",provider,
+                "pr_supplier_name","Shipment fixture","pr_supplier_status","enabled","qo_pr_supplier_account_id",provider)).get("pid"));
+        String contact=scope(directory,()->(String)db.create("pr_supplier_pcba_contact",Map.of(
+                "pr_spc_supplier_id",supplier,"pr_spc_name","Shipment contact","qo_pr_contact_state","active")).get("pid"));
+        // Synthetic already-bound supplier fixture; this is not proof of WeChat phone-grant exchange.
+        scope("qo_procurement_membership_common:bind_verified_phone",()->db.create("qo_procurement_membership_common",Map.of(
+                "qo_pr_membership_key",provider,"qo_pr_membership_user_pid",actor,"qo_pr_membership_supplier_pid",supplier,
+                "qo_pr_membership_contact_pid",contact,"qo_pr_membership_state","active")));
+        String address=scope(maintain,()->(String)db.create("qo_procurement_address_common",Map.of(
+                "qo_pr_address_supplier_pid",supplier,"qo_pr_address_state","active","qo_pr_address_address","Fixture warehouse A",
+                "qo_pr_address_manager_name","Fixture manager","qo_pr_address_manager_phone","+8613800000000")).get("pid"));
+        var header=Map.<String,Object>of("account_id",provider,"erp_id",provider,"supplier_pid",supplier,
+                "bill_no","SHIP-"+provider,"order_date","2026-10-12","business_status","approved");
+        var lines=List.of(Map.<String,Object>of("erp_entry_id","1","product_pid",product,"ordered_qty","1000",
+                "submitted_qty","0","received_qty","0"));
+        var tx=new TransactionTemplate(transactions);
+        assertEquals("published",tx.execute(status->scope(publish,()->invokeService("ProcurementOrderService","publish",
+                new Class<?>[]{Map.class,List.class},header,lines))));
+        String order=(String)scope(publish,()->nativeRows("pr_purchase_order","qo_pr_order_erp_id",provider).getFirst().get("pid"));
+        String line=(String)scope(publish,()->nativeRows("pr_purchase_order_line","pr_pol_order_id",order).getFirst().get("pid"));
+        var partial=Map.<String,Object>of("requestKey","shipment-1","addressPid",address,
+                "lines",List.of(Map.of("orderLinePid",line,"quantity","600")));
+        Object first=tx.execute(status->scope(submit,()->invokeService("ProcurementShipmentService","submit",
+                new Class<?>[]{String.class,String.class,Map.class},order,actor,partial)));
+        assertEquals(first,tx.execute(status->scope(submit,()->invokeService("ProcurementShipmentService","submit",
+                new Class<?>[]{String.class,String.class,Map.class},order,actor,partial))));
+        scope(submit,()->{assertNativeQuantity("pr_purchase_order_line",line,"qo_pr_order_line_submitted_qty","600");
+            assertNativeQuantity("pr_purchase_order_line",line,"pr_pol_received_qty","0");
+            assertNativeQuantity("pr_purchase_order",order,"qo_pr_order_revision","1");return null;});
+        scope(maintain,()->db.update("qo_procurement_address_common",address,Map.of("qo_pr_address_address","Fixture warehouse B")));
+        var shipment=scope(submit,()->nativeRows("qo_procurement_shipment_common","qo_pr_shipment_order_pid",order).getFirst());
+        try {assertEquals("Fixture warehouse A",json.readTree(shipment.get("qo_pr_shipment_address_snapshot").toString()).path("address").asText());}
+        catch(java.io.IOException error){throw new IllegalStateException(error);}
+        var tooMuch=Map.<String,Object>of("requestKey","shipment-over","addressPid",address,
+                "lines",List.of(Map.of("orderLinePid",line,"quantity","401")));
+        assertThrows(IllegalArgumentException.class,()->tx.execute(status->scope(submit,()->invokeService("ProcurementShipmentService","submit",
+                new Class<?>[]{String.class,String.class,Map.class},order,actor,tooMuch))));
+        scope(submit,()->{assertNativeQuantity("pr_purchase_order_line",line,"qo_pr_order_line_submitted_qty","600");
+            assertEquals(1,nativeRows("qo_procurement_shipment_common","qo_pr_shipment_order_pid",order).size());
+            assertNativeQuantity("pr_purchase_order",order,"qo_pr_order_revision","1");return null;});
+        var rest=Map.<String,Object>of("requestKey","shipment-2","addressPid",address,
+                "lines",List.of(Map.of("orderLinePid",line,"quantity","400")));
+        tx.execute(status->scope(submit,()->invokeService("ProcurementShipmentService","submit",
+                new Class<?>[]{String.class,String.class,Map.class},order,actor,rest)));
+        scope(submit,()->{assertNativeQuantity("pr_purchase_order_line",line,"qo_pr_order_line_submitted_qty","1000");
+            assertNativeQuantity("pr_purchase_order_line",line,"pr_pol_received_qty","0");
+            assertEquals("fulfilled",db.getById("pr_purchase_order",order).get("qo_pr_order_state"));
+            assertNativeQuantity("pr_purchase_order",order,"qo_pr_order_revision","2");
+            assertEquals(2,nativeRows("qo_procurement_shipment_common","qo_pr_shipment_order_pid",order).size());return null;});
     }
 
 }
