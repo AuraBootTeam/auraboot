@@ -24,10 +24,11 @@ def passed():
             ["release-model-pending-source", "release-model-dead-letter", "release-model-dead-letter"])):
         source = "pending" if group == 0 else "dead"
         payload = {"id": "evt_" + source, "type": "open.resource.release.model-event.parts.created", "schemaVersion": 1,
-            "occurredAt": "2026-10-11T00:00:00Z", "subject": {"type": "release.model-event.parts", "pid": "pid_" + source},
+            "occurredAt": "2023-11-14T22:13:20Z", "subject": {"type": "release.model-event.parts", "pid": "pid_" + source},
             "recordVersion": 1, "correlationId": origin, "data": {"pid": "pid_" + source, "name": name, "zone": "A"}}
         raw = json.dumps(payload).encode()
-        evidence = [{"sequence": index + 1, "receivedAt": 1700000000., "timestamp": "1700000000",
+        evidence = [{"sequence": index + 1, "receivedAt": 1700000000.125, "timestamp": "1700000000",
+            "occurredAt": payload["occurredAt"], "eventAgeAtReceiptMs": 125.0,
             "signature": "sha256=" + hmac.new(SECRET, b"1700000000." + raw, hashlib.sha256).hexdigest(),
             "responseStatus": status, "requestId": origin, "duplicate": False,
             "rawBodyBase64": base64.b64encode(raw).decode(), "bodySha256": hashlib.sha256(raw).hexdigest()}
@@ -138,6 +139,21 @@ class ModelEventTests(unittest.TestCase):
         raw = json.dumps(body).encode()
         row.update(rawBodyBase64=base64.b64encode(raw).decode(), bodySha256=hashlib.sha256(raw).hexdigest(),
                    signature="sha256=" + hmac.new(SECRET, row["timestamp"].encode() + b"." + raw, hashlib.sha256).hexdigest())
+        with self.assertRaises(ProtocolError): verify_report(report, secret=SECRET)
+
+        for occurrence in ["", "not-a-time", "2023-11-14T22:13:20", "2099-01-01T00:00:00Z"]:
+            report = passed()
+            for row in report["deliveryProofs"][0]["rawEvidence"]:
+                body = json.loads(base64.b64decode(row["rawBodyBase64"])); body["occurredAt"] = occurrence
+                raw = json.dumps(body).encode()
+                row.update(rawBodyBase64=base64.b64encode(raw).decode(), bodySha256=hashlib.sha256(raw).hexdigest(),
+                           signature="sha256=" + hmac.new(SECRET, row["timestamp"].encode() + b"." + raw, hashlib.sha256).hexdigest())
+            with self.subTest(occurrence=occurrence), self.assertRaises(ProtocolError): verify_report(report, secret=SECRET)
+
+        for value in [None, True, float("nan"), float("inf"), -1, 1]:
+            report = passed(); report["deliveryProofs"][0]["rawEvidence"][0]["eventAgeAtReceiptMs"] = value
+            with self.subTest(age=value), self.assertRaises(ProtocolError): verify_report(report, secret=SECRET)
+        report = passed(); del report["deliveryProofs"][0]["rawEvidence"][0]["occurredAt"]
         with self.assertRaises(ProtocolError): verify_report(report, secret=SECRET)
 
     def test_missing_or_wrong_private_signature_key_blocks(self):

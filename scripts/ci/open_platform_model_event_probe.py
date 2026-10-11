@@ -7,6 +7,7 @@ import ipaddress
 import base64
 import copy
 import json
+import math
 import os
 import secrets
 import stat
@@ -103,10 +104,16 @@ def verify_report(report, *, secret=None):
                 "event_id": proof.get("eventId"), "response_status": row.get("responseStatus"),
                 "request_id": row.get("requestId"), "body_sha": row.get("bodySha256"),
                 "sequence": row.get("sequence"), "duplicate": row.get("duplicate")})
-        verify_delivery(actual, secret=secret, delivery_pid=proof.get("deliveryPid"), event_id=proof.get("eventId"),
+        verified = verify_delivery(actual, secret=secret, delivery_pid=proof.get("deliveryPid"), event_id=proof.get("eventId"),
             subject_pid=proof.get("subjectPid"), statuses=statuses, originating_request_id=origin,
             event_type="open.resource.release.model-event.parts.created", subject_type="release.model-event.parts",
             schema_version=1, projections=[{"pid": proof.get("subjectPid"), "name": name, "zone": "A"}] * len(statuses))
+        for reported, derived in zip(proof["rawEvidence"], verified["rawEvidence"]):
+            require(reported.get("occurredAt") == derived["occurredAt"]
+                    and type(reported.get("eventAgeAtReceiptMs")) in (int, float)
+                    and math.isfinite(reported["eventAgeAtReceiptMs"])
+                    and reported["eventAgeAtReceiptMs"] == derived["eventAgeAtReceiptMs"],
+                    "model event receipt age does not match signed source and raw receipt")
         require(all(json.loads(row["raw_body"])["recordVersion"] == 1
                     and json.loads(row["raw_body"])["correlationId"] == origin for row in actual),
                 "model event raw source metadata invalid")

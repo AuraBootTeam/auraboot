@@ -1,6 +1,7 @@
 """Read independent receiver evidence without trusting its recorded valid flag."""
 
 import base64
+from datetime import datetime
 import hashlib
 import hmac
 import json
@@ -78,6 +79,7 @@ def verify_delivery(rows, *, secret, delivery_pid, event_id, subject_pid, status
                 'receiver envelope does not match the fresh command')
         if projections is not None:
             require(payload.get('data') == projections[len(bodies)], 'receiver projection mismatch')
+        occurrence = None
         if event_type.startswith('open.resource.'):
             require(set(payload) == {'id', 'type', 'schemaVersion', 'occurredAt', 'subject',
                                      'recordVersion', 'correlationId', 'data'}
@@ -85,6 +87,15 @@ def verify_delivery(rows, *, secret, delivery_pid, event_id, subject_pid, status
                     and isinstance(payload.get('occurredAt'), str) and bool(payload['occurredAt'])
                     and isinstance(payload.get('correlationId'), str) and bool(payload['correlationId']),
                     'model event envelope exposes invalid or internal fields')
+            try:
+                occurred = datetime.fromisoformat(payload['occurredAt'].replace('Z', '+00:00'))
+                require(occurred.tzinfo is not None and occurred.utcoffset() is not None,
+                        'model event occurrence timezone missing')
+                occurrence = occurred.timestamp()
+            except (ValueError, OverflowError):
+                raise ProtocolError('model event occurrence timestamp invalid') from None
+            require(math.isfinite(occurrence) and occurrence <= received_at + 300,
+                    'model event occurrence follows receipt outside the clock window')
         envelopes.append({key: value for key, value in payload.items() if key != 'data'})
         bodies.append(raw)
         proofs.append({'sequence': row['sequence'], 'receivedAt': received_at,
@@ -92,6 +103,9 @@ def verify_delivery(rows, *, secret, delivery_pid, event_id, subject_pid, status
                        'requestId': row.get('request_id'),
                        'duplicate': bool(row['duplicate']), 'rawBodyBase64': base64.b64encode(raw).decode(),
                        'bodySha256': body_sha})
+        if occurrence is not None:
+            proofs[-1].update(occurredAt=payload['occurredAt'],
+                             eventAgeAtReceiptMs=round((received_at - occurrence) * 1000, 3))
     # Without an explicit per-attempt projection contract, retries must preserve
     # identical bytes. Model authorization may narrow a projected retry body.
     if projections is None:
