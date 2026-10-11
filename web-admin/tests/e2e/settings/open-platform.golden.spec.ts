@@ -235,6 +235,11 @@ test.describe('Dynamic resource publication journey', () => {
     const virtualNameField = page.getByTestId('publication-field-name');
     await virtualNameField.getByLabel('零件名称', { exact: true }).check();
     await virtualNameField.getByLabel('对外字段名称', { exact: true }).fill('name');
+    if (process.env.AURA_UI_NEGATIVE_MUTATION) {
+      // Expected-red only: falsify persisted projection assertions using the actual UI.
+      expect(process.env.AURA_UI_NEGATIVE_MUTATION).toBe('drop-virtual-output');
+      await virtualNameField.getByLabel('零件名称', { exact: true }).uncheck();
+    }
     await snapshot('publication-virtual-source');
     const virtualSaved = page.waitForResponse(response => response.url().endsWith(`/publications/${virtualCode}/draft`) && response.request().method() === 'PUT');
     await page.getByRole('button', { name: '保存并校验草稿', exact: true }).click();
