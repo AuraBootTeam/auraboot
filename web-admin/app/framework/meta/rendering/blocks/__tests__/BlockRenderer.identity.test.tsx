@@ -14,7 +14,9 @@
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
+import { ScopedStateManager } from '../../../runtime/state/scoped-state';
+import { ExpressionEvaluator } from '../../../runtime/expression/evaluator';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 // Must be declared BEFORE the SUT import so the module factory runs first.
@@ -135,5 +137,33 @@ describe('BlockRenderer — telemetry identity attributes', () => {
     expect(wrapper).not.toBeNull();
     // attribute should be absent (not empty string) when pageKey is undefined
     expect(wrapper?.hasAttribute('data-aura-page-id')).toBe(false);
+  });
+});
+
+
+describe('BlockRenderer reactive conditions', () => {
+  it('invalidates a visible snapshot on draft edits and restores it only after explicit preview', () => {
+    const state = new ScopedStateManager({} as any);
+    const allocations = [{ quantity: '60.000001' }];
+    state.createScope('preview', { form: { allocations, previewAllocations: allocations } });
+    const runtime = makeRuntime({
+      getContext: () => state.getContext('preview'),
+      getStateManager: () => state,
+      getScopeId: () => 'preview',
+      getEvaluator: () => new ExpressionEvaluator(),
+    });
+    setBlockResolver({ get: () => ({ component: () => <h2>Current preview</h2> }) } as any);
+    const view = render(<BlockRenderer runtime={runtime as any} block={{
+      id: 'preview', blockType: 'rich-text',
+      visibleWhen: '${form.previewAllocations === form.allocations}',
+    }} />);
+    expect(screen.getByRole('heading', { name: 'Current preview' })).toBeVisible();
+    act(() => state.updateField('preview', 'allocations', [{ quantity: '60' }]));
+    expect(screen.queryByRole('heading', { name: 'Current preview' })).toBeNull();
+    act(() => state.updateField('preview', 'previewAllocations', state.getFieldValue('preview', 'allocations')));
+    expect(screen.getByRole('heading', { name: 'Current preview' })).toBeVisible();
+    view.unmount();
+    act(() => state.updateField('preview', 'allocations', [{ quantity: '1' }]));
+    expect(screen.queryByRole('heading', { name: 'Current preview' })).toBeNull();
   });
 });
