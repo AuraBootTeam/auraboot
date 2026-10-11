@@ -1030,7 +1030,8 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
                         });
                 assertAuthenticationAudit(requestId, 401, "invalid_token", true,
                         replay.operation() == Operation.CREATE ? "/api/open/v1/resources/{resource}"
-                                : "/api/open/v1/resources/{resource}/{pid}");
+                                : "/api/open/v1/resources/{resource}/{pid}",
+                        replay.operation() == Operation.CREATE ? "POST" : replay.operation() == Operation.UPDATE ? "PATCH" : "DELETE");
             }
         } finally { cleanupCommittedFixture(); }
     }
@@ -1154,6 +1155,19 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
                     .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isUnauthorized());
             assertAuthenticationAudit(auditOrigin + "-missing", 401, "invalid_token", false,
                     "/api/open/v1/resources/{resource}/{pid}");
+            new org.springframework.transaction.support.TransactionTemplate(
+                    applicationContext.getBean(org.springframework.transaction.PlatformTransactionManager.class))
+                    .executeWithoutResult(transaction -> {
+                        try {
+                            http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(collection + "/" + allowedPid)
+                                            .header("X-Request-Id", auditOrigin + "-rollback"))
+                                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isUnauthorized());
+                        } catch (Exception exception) {
+                            throw new IllegalStateException("Controlled authentication request failed", exception);
+                        } finally { transaction.setRollbackOnly(); }
+                    });
+            assertAuthenticationAudit(auditOrigin + "-rollback", 401, "invalid_token", false,
+                    "/api/open/v1/resources/{resource}/{pid}");
             String unknown = "unknown-credential-" + UniqueIdGenerator.generate();
             http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(collection + "/" + allowedPid)
                             .header("Authorization", "Bearer " + unknown).header("X-Request-Id", auditOrigin + "-unknown")
@@ -1250,8 +1264,14 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
 
     private void assertAuthenticationAudit(String requestId, int status, String code,
                                            boolean knownIdentity, String path) throws Exception {
+        assertAuthenticationAudit(requestId, status, code, knownIdentity, path, "GET");
+    }
+
+    private void assertAuthenticationAudit(String requestId, int status, String code,
+                                           boolean knownIdentity, String path, String method) throws Exception {
         var rows = eventJdbc.queryForList("SELECT tenant_id, application_pid, installation_pid, token_pid, "
-                + "request_path, response_status, duration_ms, business_details FROM ab_open_api_call_audit WHERE request_id = ?", requestId);
+                + "http_method, request_path, response_status, duration_ms, occurred_at, business_details "
+                + "FROM ab_open_api_call_audit WHERE request_id = ?", requestId);
         assertThat(rows).hasSize(1);
         var row = rows.get(0);
         assertThat(row.get("tenant_id")).isEqualTo(knownIdentity ? principal.tenantId() : null);
@@ -1259,6 +1279,8 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
         assertThat(row.get("installation_pid")).isEqualTo(knownIdentity ? principal.installationPid() : null);
         assertThat(row.get("token_pid")).isEqualTo(knownIdentity ? principal.tokenPid() : null);
         assertThat(row.get("response_status")).isEqualTo(status);
+        assertThat(row.get("http_method")).isEqualTo(method);
+        assertThat(row.get("occurred_at")).isNotNull();
         assertThat(((Number) row.get("duration_ms")).longValue()).isGreaterThanOrEqualTo(0);
         assertThat(row.get("request_path")).isEqualTo(path);
         assertThat(json.readTree(row.get("business_details").toString())).isEqualTo(json.valueToTree(
