@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Hermetic process contracts; does not qualify product browser behavior."""
+import json
 import os
 from pathlib import Path
 import shutil
@@ -114,7 +115,10 @@ esac
         self.assertIn('--require-new-db', calls)
         self.assertNotIn('--fresh-db', calls)
         self.assertIn('--project=oss --project=oss-deep --no-deps --repeat-each=1 --retries=0', calls)
-        self.assertEqual(calls.count('.spec.ts'), 10)
+        profile = json.loads((self.repo / 'scripts/gates/oss-e2e-gate-profile.json').read_text())
+        files = list(dict.fromkeys(row['file'] for row in profile['tests']))
+        self.assertEqual(calls.count('.spec.ts'), 2 * len(files))
+        for file in files: self.assertEqual(calls.count(file), 2)
         self.assertIn('--grep', calls)
         self.assertIn('persists resource and query grants', calls)
         self.assertIn('--list --reporter=json', calls)

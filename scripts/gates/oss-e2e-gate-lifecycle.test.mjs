@@ -98,9 +98,8 @@ for (const [mode, status] of [['', 0], ['up-failure', 2], ['verify-failure', 2],
       assert.match(calls, /aura runtime verify owned-run/);
       const execution = calls.split('\n').find(line => line.startsWith('pnpm ') && !line.includes('--list'));
       const paths = execution.match(/tests\/e2e\/[^\s]+/g);
-      assert.deepEqual(paths, ['tests/e2e/page-designer/form-buttons-refresh-runtime.spec.ts',
-        'tests/e2e/showcase/runtime-rendering-e2e.spec.ts', 'tests/e2e/saved-view/saved-view-gantt.spec.ts',
-        'tests/e2e/saved-view/saved-view-kanban.spec.ts', 'tests/e2e/settings/open-platform.golden.spec.ts']);
+      const profile = JSON.parse(fs.readFileSync(new URL('./oss-e2e-gate-profile.json', import.meta.url), 'utf8'));
+      assert.deepEqual(paths, [...new Set(profile.tests.map(row => row.file))]);
     }
   });
 }

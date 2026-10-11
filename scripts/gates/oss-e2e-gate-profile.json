@@ -106,6 +106,94 @@
         "DOP-05",
         "DOP-08"
       ]
+    },
+    {
+      "id": "DOP-BROWSER-04",
+      "file": "tests/e2e/settings/open-platform.golden.spec.ts",
+      "title": "covers application, installation, credential and revocation states",
+      "project": "oss",
+      "requirements": [
+        "DOP-05",
+        "DOP-08",
+        "DOP-11"
+      ]
+    },
+    {
+      "id": "DOP-BROWSER-05",
+      "file": "tests/e2e/settings/open-platform-collaboration.golden.spec.ts",
+      "title": "captures owner, maintainer, viewer and non-member projections",
+      "project": "oss",
+      "requirements": [
+        "DOP-05",
+        "DOP-08",
+        "DOP-11"
+      ]
+    },
+    {
+      "id": "DOP-BROWSER-06",
+      "file": "tests/e2e/settings/open-platform-multi-user.golden.spec.ts",
+      "title": "owner (admin) sees full management surface from the real account menu",
+      "project": "oss",
+      "requirements": [
+        "DOP-05",
+        "DOP-08",
+        "DOP-11"
+      ]
+    },
+    {
+      "id": "DOP-BROWSER-07",
+      "file": "tests/e2e/settings/open-platform-multi-user.golden.spec.ts",
+      "title": "maintainer manages runtime but is denied member and lifecycle writes server-side",
+      "project": "oss",
+      "requirements": [
+        "DOP-05",
+        "DOP-08",
+        "DOP-11"
+      ]
+    },
+    {
+      "id": "DOP-BROWSER-08",
+      "file": "tests/e2e/settings/open-platform-multi-user.golden.spec.ts",
+      "title": "viewer is read-only and denied credentials and writes server-side",
+      "project": "oss",
+      "requirements": [
+        "DOP-05",
+        "DOP-08",
+        "DOP-11"
+      ]
+    },
+    {
+      "id": "DOP-BROWSER-09",
+      "file": "tests/e2e/settings/open-platform-multi-user.golden.spec.ts",
+      "title": "non-member sees an empty console and is denied all app access server-side",
+      "project": "oss",
+      "requirements": [
+        "DOP-05",
+        "DOP-08",
+        "DOP-11"
+      ]
+    },
+    {
+      "id": "DOP-BROWSER-10",
+      "file": "tests/e2e/settings/open-platform-multi-user.golden.spec.ts",
+      "title": "missing and disabled applications return 404 for reads and locked member writes",
+      "project": "oss",
+      "requirements": [
+        "DOP-05",
+        "DOP-08",
+        "DOP-11"
+      ]
+    },
+    {
+      "id": "DOP-BROWSER-11",
+      "file": "tests/e2e/settings/open-platform-multi-user.golden.spec.ts",
+      "title": "sole owner cannot self-remove; concurrent owner deletes keep exactly one owner",
+      "project": "oss",
+      "requirements": [
+        "DOP-05",
+        "DOP-08",
+        "DOP-11"
+      ]
     }
   ]
 }

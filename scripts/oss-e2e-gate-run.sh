@@ -99,18 +99,7 @@ REUSE_RUNTIME=0
 # The curated, currently-green regression areas. These are the areas the recent
 # OSS E2E survey work hardened; `slice` runs them minus their *-deep specs (which
 # the `oss` project routes to `oss-deep`, kept out of the gate to stay bounded).
-SLICE_DIRS=(
-  # Curated, deterministically-green specs the recent OSS E2E survey work verified
-  # (each confirmed green across multiple runs this session). The gate stays SMALL and
-  # reliable on purpose — a born-red gate protects nothing. Broaden with
-  # `--scope <dir>...` (see --help); broad areas carry known-flaky / vertical-excluded
-  # specs and are NOT a clean gate.
-  tests/e2e/page-designer/form-buttons-refresh-runtime.spec.ts
-  tests/e2e/showcase/runtime-rendering-e2e.spec.ts
-  tests/e2e/saved-view/saved-view-gantt.spec.ts
-  tests/e2e/saved-view/saved-view-kanban.spec.ts
-  tests/e2e/settings/open-platform.golden.spec.ts
-)
+SLICE_DIRS=() # Expanded from the same versioned profile as case reconciliation.
 
 C_INFO=$'\033[36m'; C_OK=$'\033[32m'; C_ERR=$'\033[31m'; C_OFF=$'\033[0m'
 log()  { printf '%s[oss-e2e-gate]%s %s\n' "$C_INFO" "$C_OFF" "$*"; }
@@ -157,7 +146,19 @@ node "$SCRIPT_DIR/dev/oss-disk-preflight.mjs" "$STATE" || die_env "insufficient 
 
 RUN_PATHS=()
 case "$SCOPE_MODE" in
-  slice) RUN_PATHS=("${SLICE_DIRS[@]}");;
+  slice)
+    SLICE_FILES="$(python3 - "$REPO_ROOT/scripts/gates/oss-e2e-gate-profile.json" <<'PROFILE_FILES'
+import json,sys
+from pathlib import Path
+profile=json.loads(Path(sys.argv[1]).read_text())
+files=list(dict.fromkeys(row['file'] for row in profile['tests']))
+if not files or any(not isinstance(file,str) or not file.startswith('tests/e2e/') or '..' in file or not file.endswith('.spec.ts') for file in files):
+    raise SystemExit('Invalid profile file inventory')
+print('\n'.join(files))
+PROFILE_FILES
+    )" || die_env "fixed profile file inventory is invalid"
+    while IFS= read -r file; do SLICE_DIRS+=("$file"); done <<< "$SLICE_FILES"
+    RUN_PATHS=("${SLICE_DIRS[@]}");;
   full) RUN_PATHS=();;
   dirs) RUN_PATHS=("${SCOPE_DIRS[@]}");;
 esac
