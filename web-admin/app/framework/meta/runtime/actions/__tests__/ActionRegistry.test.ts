@@ -6,6 +6,8 @@ import { FlowRunner } from '~/framework/meta/runtime/schema-runtime/FlowRunner';
 import { ExpressionEvaluator } from '~/framework/meta/runtime/expression/evaluator';
 import { ScopedStateManager } from '~/framework/meta/runtime/state/scoped-state';
 import { createExpressionContext } from '~/framework/meta/runtime/expression/context';
+import { ActionCancelledError } from '../ActionCancelledError';
+import { registerConfirmDialog, unregisterConfirmDialog } from '~/utils/confirmDialog';
 
 describe('ActionRegistry command failure feedback', () => {
   it('carries the current page language through a flow to its command handler', async () => {
@@ -605,6 +607,29 @@ describe('ActionRegistry command.execute inputFields (command-form sugar)', () =
 });
 
 describe('ActionRegistry dialog.confirm', () => {
+  it('aborts the real flow before its command and navigation when confirmation is cancelled', async () => {
+    const fetchResult = vi.fn();
+    const navigate = vi.fn();
+    const context = createExpressionContext();
+    const flow = new FlowRunner({
+      evaluator: new ExpressionEvaluator(), actionRegistry,
+      stateManager: { getContext: () => context } as any, scopeId: 'cancel-test',
+      dataSourceManager: {} as any, schema: {} as any, getAllFormFields: () => [], navigate,
+    });
+    registerConfirmDialog(async () => false);
+    try {
+      await expect(flow.run([
+        { action: 'dialog.confirm', args: { message: 'Confirm?' } },
+        { action: 'command.execute', args: { command: 'purchase:allocate' } },
+        { action: 'router.back' },
+      ], { ...context, fetchResult } as any)).rejects.toBeInstanceOf(ActionCancelledError);
+      expect(fetchResult).not.toHaveBeenCalled();
+      expect(navigate).not.toHaveBeenCalled();
+    } finally {
+      unregisterConfirmDialog();
+    }
+  });
+
   it('resolves object-form message to zh-CN string before passing to confirm dialog', async () => {
     const confirm = vi.fn().mockResolvedValue(true);
 

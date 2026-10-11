@@ -1,4 +1,5 @@
 import { resolveCommandErrorMessage } from '~/framework/meta/utils/commandResponseErrors';
+import { ActionCancelledError } from '~/framework/meta/runtime/actions/ActionCancelledError';
 /**
  * useActionHandler - 统一的 Action 处理 Hook (重构版本)
  *
@@ -1227,6 +1228,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
           }
         }
       } catch (err) {
+        if (err instanceof ActionCancelledError) return;
         const errorMessage = resolveCommandErrorMessage(
           { context: { detail: err instanceof Error ? err.message : 'Action execution failed' } },
           button.code, t, locale,

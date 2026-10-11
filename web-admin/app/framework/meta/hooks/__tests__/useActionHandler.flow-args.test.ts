@@ -20,6 +20,7 @@ import { renderHook, act } from '@testing-library/react';
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
 import type { ButtonConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
+import { ActionCancelledError } from '~/framework/meta/runtime/actions/ActionCancelledError';
 
 function makeRuntime(executeHandler: ReturnType<typeof vi.fn>): SchemaRuntime {
   const context: Record<string, unknown> = {
@@ -137,6 +138,38 @@ describe('useActionHandler - action.type=flow handler preserves args', () => {
 
 
 describe('useActionHandler flow refresh scope', () => {
+  it('stops a cancelled flow without reporting an error or refreshing data', async () => {
+    const runtime = makeRuntime(vi.fn());
+    runtime.getFlowRunner = () => ({ run: vi.fn().mockRejectedValue(new ActionCancelledError()) }) as any;
+    const loadData = vi.fn();
+    const onError = vi.fn();
+    const { result } = renderHook(() => useActionHandler(baseOptions(runtime, { context: { loadData }, onError })));
+    await act(async () => {
+      await result.current.handleAction({ code: 'confirmPurchase', action: { type: 'flow', steps: [
+        { action: 'dialog.confirm' }, { action: 'command.execute' },
+      ] } } as ButtonConfig);
+    });
+    expect(result.current.error).toBeNull();
+    expect(result.current.loading).toBe(false);
+    expect(onError).not.toHaveBeenCalled();
+    expect(loadData).not.toHaveBeenCalled();
+  });
+
+  it('still reports an ordinary error whose message happens to mention cancellation', async () => {
+    const runtime = makeRuntime(vi.fn());
+    runtime.getFlowRunner = () => ({ run: vi.fn().mockRejectedValue(new Error('User cancelled')) }) as any;
+    const onError = vi.fn();
+    const { result } = renderHook(() => useActionHandler(baseOptions(runtime, { onError })));
+    await act(async () => {
+      await result.current.handleAction({ code: 'confirmPurchase', action: { type: 'flow', steps: [
+        { action: 'dialog.confirm' },
+      ] } } as ButtonConfig);
+    });
+    expect(onError).toHaveBeenCalledOnce();
+    expect(result.current.error).toBeTruthy();
+    expect(result.current.loading).toBe(false);
+  });
+
   it('retains the selected task filter after a successful runtime flow', async () => {
     const executeHandler = vi.fn();
     const runtime = makeRuntime(executeHandler);

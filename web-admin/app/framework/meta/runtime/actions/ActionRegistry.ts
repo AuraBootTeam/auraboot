@@ -1,4 +1,5 @@
 import { resolveCommandErrorMessage } from '~/framework/meta/utils/commandResponseErrors';
+import { ActionCancelledError } from './ActionCancelledError';
 /**
  * ActionRegistry - 动作注册中心
  *
@@ -165,7 +166,9 @@ class ActionRegistry {
     try {
       await handler(context);
     } catch (error) {
-      console.error(`[ActionRegistry] Error executing action ${type}:`, error);
+      if (!(error instanceof ActionCancelledError)) {
+        console.error(`[ActionRegistry] Error executing action ${type}:`, error);
+      }
       throw error;
     }
   }
@@ -647,7 +650,7 @@ actionRegistry.register('dialog.confirm', async ({ args, confirm: ctxConfirm }) 
   const doConfirm = ctxConfirm ?? confirmDialog;
   const confirmed = await doConfirm({ content: message as string });
   if (!confirmed) {
-    throw new Error('User cancelled');
+    throw new ActionCancelledError();
   }
 });
 
