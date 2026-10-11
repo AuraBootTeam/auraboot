@@ -45,6 +45,10 @@ public class NamedQueryTestRequest {
     @com.fasterxml.jackson.annotation.JsonIgnore
     private DynamicQueryRequest.KeysetContinuation resourceContinuation;
 
+    /** Trusted virtual-resource identity invariant; never accepted from public query JSON. */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private boolean requireUniqueResourcePid;
+
     /**
      * 测试参数
      */

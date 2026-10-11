@@ -855,9 +855,20 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         // Count total
         // The shared source rewrite already applies tenant and row scopes before counting.
         // TenantLineInterceptor fails on deeply nested subqueries wrapped by the NQ engine.
-        String countSql = "SELECT COUNT(*) FROM (" + sql + ") AS _count_query";
+        if (request.isRequireUniqueResourcePid()
+                && (!MachineDataAccessContext.isActive() || request.getPublishedOutputFields() == null
+                    || !request.getPublishedOutputFields().contains("pid"))) {
+            throw new AccessDeniedException("Trusted machine resource PID projection required");
+        }
+        // Check the complete scoped result before LIMIT: a duplicate may lie beyond the first page.
+        String countExpression = request.isRequireUniqueResourcePid()
+                ? "CASE WHEN COUNT(*) = COUNT(DISTINCT \"pid\") THEN COUNT(*) ELSE -1 END" : "COUNT(*)";
+        String countSql = "SELECT " + countExpression + " FROM (" + sql + ") AS _count_query";
         applyExecutionDeadline(request);
         Long total = dynamicDataMapper.countByQueryWithoutTenant(countSql, params);
+        if (request.isRequireUniqueResourcePid() && (total == null || total < 0)) {
+            throw new com.auraboot.framework.meta.exception.NamedQueryResourceIdentityException();
+        }
 
         // Add LIMIT/OFFSET
         sql.append(" LIMIT ").append(pageSize).append(" OFFSET ").append(offset);

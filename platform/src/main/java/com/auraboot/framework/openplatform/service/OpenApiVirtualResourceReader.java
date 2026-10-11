@@ -36,6 +36,7 @@ public class OpenApiVirtualResourceReader {
                                                          DynamicQueryRequest request, String pid) {
         NamedQueryTestRequest internal = new NamedQueryTestRequest();
         internal.setPage(1); internal.setSize(request.getPageSize());
+        internal.setRequireUniqueResourcePid(true);
         internal.setExpectedDefinitionFingerprint(authority.sourceBinding().queryFingerprint());
         internal.setExecutionDeadlineNanos(System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(authority.contract().timeoutMs()));
         internal.setPublishedOutputFields(authority.policy().readableFields().stream()
@@ -59,6 +60,9 @@ public class OpenApiVirtualResourceReader {
         internal.setResourceContinuation(request.getKeysetContinuation());
         try {
             return queries.executeQuery(authority.sourceBinding().sourceRef(), internal);
+        } catch (NamedQueryResourceIdentityException ambiguous) {
+            // CATCH: reject non-unique resource identities without exposing private source diagnostics.
+            throw new OpenApiQueryService.QueryExecutionUnavailableException(ambiguous);
         } catch (NamedQuerySourceChangedException changed) {
             // CATCH: execution-time pin failure uses the same public conflict contract as preflight.
             throw new OpenApiPublicationService.SourceBindingConflictException(changed);

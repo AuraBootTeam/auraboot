@@ -978,6 +978,22 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
                         .hasMessageContaining("503").hasMessageContaining("open_api_query_unavailable")
                         .hasCauseInstanceOf(IllegalStateException.class).hasMessageNotContaining(modelCode);
             } finally { applyTestMetaContext(); }
+            for (int limit : List.of(1, 50)) {
+                String listMarker = "ambiguous-list-" + limit + "-" + suffix;
+                var denied = http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/open/v1/resources/" + contract.code()).param("limit", Integer.toString(limit))
+                        .header("Authorization", "Bearer " + tokenA).header("X-Request-Id", listMarker))
+                        .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isServiceUnavailable())
+                        .andReturn().getResponse();
+                assertThat(json.readTree(denied.getContentAsString())).isEqualTo(json.valueToTree(Map.of(
+                        "success", false, "code", "open_api_query_unavailable", "message", "Published query execution is unavailable")));
+                applyTestMetaContext();
+                var listAudits = management.listCallAudits(principalA.installationPid(), listMarker, null, 10);
+                assertThat(listAudits).hasSize(1); assertThat(listAudits.getFirst().status()).isEqualTo(503);
+                assertThat(listAudits.getFirst().operation()).isEqualTo("list");
+                assertThat(listAudits.getFirst().resource()).isEqualTo(contract.code());
+                assertThat(listAudits.getFirst().recordPid()).isNull();
+            }
             String marker = "ambiguous-get-" + suffix;
             var response = http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
                     .get("/api/open/v1/resources/" + contract.code() + "/" + pid)
