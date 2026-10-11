@@ -40,7 +40,7 @@ def passed():
         "deadLetterProof": {"events": 1, "receipts": 1, "deliveries": 1}, "beforeRestart": before,
         "afterRestart": dict(before, generation="new"), "deliveryProofs": proofs,
         "sourceBindingProof": {"eventId": "evt_dead", "deliveryPid": "delivery_dead", "subjectPid": "pid_dead",
-            "blockedStatus": "dead_letter", "blockedReplayCount": 1, "blockedRetryCount": 0,
+            "blockedStatus": "dead_letter", "blockedReplayCount": 1, "blockedRetryCount": 1,
             "receiverAttemptsBefore": 0, "receiverAttemptsAfter": 0, "restoredStatus": "success", "restoredReplayCount": 2}}
 
 
@@ -52,6 +52,7 @@ class ModelEventTests(unittest.TestCase):
         for change in [lambda r: r.pop("sourceBindingProof"),
                        lambda r: r["sourceBindingProof"].update(eventId="other"),
                        lambda r: r["sourceBindingProof"].update(blockedStatus="success"),
+                       lambda r: r["sourceBindingProof"].update(blockedRetryCount=0),
                        lambda r: r["sourceBindingProof"].update(receiverAttemptsAfter=1),
                        lambda r: r["sourceBindingProof"].update(receiverAttemptsBefore=False),
                        lambda r: r["sourceBindingProof"].update(restoredReplayCount=1)]:
@@ -70,7 +71,7 @@ class ModelEventTests(unittest.TestCase):
                 return copy.deepcopy(model) if method == "GET" else {}
             def wait():
                 if fail: raise ProtocolError("observation failed")
-                return dict(dead, deliveryStatus="dead_letter", replayCount=1, retryCount=0)
+                return dict(dead, deliveryStatus="dead_letter", replayCount=1, retryCount=1)
             if fail:
                 with self.assertRaises(ProtocolError):
                     run_source_binding_replay(human, "model_pid", "installation_pid", dead, wait, lambda: 0)

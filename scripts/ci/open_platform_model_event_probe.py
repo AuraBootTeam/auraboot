@@ -120,7 +120,7 @@ def verify_source_binding(proof, restored):
         "model event source binding proof missing or malformed")
     require(all(proof.get(key) == restored.get(key) for key in ["eventId", "deliveryPid", "subjectPid"]),
         "model event source binding replay identity changed")
-    expected = {"blockedReplayCount": 1, "blockedRetryCount": 0, "receiverAttemptsBefore": 0,
+    expected = {"blockedReplayCount": 1, "blockedRetryCount": 1, "receiverAttemptsBefore": 0,
                 "receiverAttemptsAfter": 0, "restoredReplayCount": 2}
     require(proof["blockedStatus"] == "dead_letter" and proof["restoredStatus"] == "success"
             and all(type(proof[key]) is int and proof[key] == value for key, value in expected.items()),
@@ -148,7 +148,7 @@ def run_source_binding_replay(human, model_pid, installation_pid, dead_log, wait
         after = receiver_attempts()
         require(blocked.get("pid") == dead_log["pid"] and blocked.get("eventId") == dead_log["eventId"]
                 and blocked.get("deliveryStatus") == "dead_letter" and blocked.get("replayCount") == 1
-                and blocked.get("retryCount") == 0 and after == 0,
+                and blocked.get("retryCount") == 1 and after == 0,
                 "model event source binding allowed HTTP or changed durable identity")
     finally:
         human(model_path, "PUT", {"displayName": model["displayName"], "extension": original})
