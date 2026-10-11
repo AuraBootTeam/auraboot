@@ -919,7 +919,8 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
                 failingContract.fields().keySet(), Set.of(), List.of(new OpenApiInstallationPolicy.RowConstraint("zone", List.of("A")))));
         var failingQuery = new OpenApiQueryContract("fault-query." + suffix, failingSource.getCode(), 1,
                 queries.describeExecution(failingSource.getCode()).fingerprint(), rows.scopes(), Map.of(root.modelCode(), root.code()),
-                Map.of(), root.fields(), 20, 100, 5000, 2);
+                Map.of(), Map.of("pid", output("pid", Type.PID), "name", output("name", Type.STRING), "zone", output("zone", Type.STRING)),
+                20, 100, 5000, 2);
         publications.saveDraft(failingQuery.code(), new OpenApiQueryPublicationService.DraftRequest(0, failingQuery));
         publications.publish(failingQuery.code(), 1);
         publications.grant(principalA.installationPid(), failingQuery.code(), new OpenApiQueryPolicy(failingQuery.fields().keySet()));
