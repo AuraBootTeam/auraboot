@@ -96,6 +96,28 @@ def passed():
                 "error": {"success": False, "code": code, "message": message}})
         report["virtualResource"][kind] = {"resource": "release.dynamic.virtual-" + suffix, "requests": deadline_rows,
             "healthyItems": [{"pid": "allowed-pid", "name": "Allowed A", "zone": "A"}, {"pid": "extra-pid", "name": "Virtual extra A", "zone": "A"}]}
+    virtual = report["virtualResource"]
+    proof = {"resource": "release.dynamic.virtual-null-identity", "sourceResource": "release.dynamic.null-parts",
+        "validPid": "null-valid-one", "secondValidPid": "null-valid-two", "nullSourcePid": "null-source-pid",
+        "sourceRows": [{"pid": "null-valid-one", "name": "Null identity valid one", "zone": "A"},
+                       {"pid": "null-valid-two", "name": "Null identity valid two", "zone": "A"},
+                       {"pid": None, "name": "Null identity candidate", "zone": "A"}],
+        "requests": [], "healthyItems": virtual["identityFailure"]["healthyItems"]}
+    for identifier, operation, query, status, pid in [("list-small", "list", "limit=1", 503, None),
+            ("list-wide", "list", "limit=50", 503, None), ("get-valid", "get", "", 200, proof["validPid"]),
+            ("get-null", "get", "", 404, proof["nullSourcePid"])]:
+        marker = "release-virtual-null-identity-" + identifier
+        path = "/api/open/v1/resources/" + proof["resource"] + ("/"+pid if operation == "get" else "")
+        audit = {"requestId": marker, "actorKind": "machine", "applicationPid": "app-pid", "installationPid": "install-pid",
+                 "resource": proof["resource"], "operation": operation, "recordPid": pid, "idempotentReplay": None,
+                 "status": status, "method": "GET", "path": path, "capability": "resource."+proof["resource"]+"."+operation,
+                 "durationMs": 5, "occurredAt": "2026-10-12T00:00:00Z"}
+        body = proof["sourceRows"][0] if status == 200 else {"success": False,
+            "code": "open_api_query_unavailable" if status == 503 else "not_found",
+            "message": "Published query execution is unavailable" if status == 503 else "Resource record is unavailable"}
+        proof["requests"].append({"id": identifier, "operation": operation, "query": query, "status": status,
+            "requestId": marker, "body": body, "etag": '"'+"c"*64+'"' if status == 200 else None, "audit": audit})
+    virtual["nullIdentity"] = proof
     return report
 
 
@@ -339,6 +361,24 @@ class DynamicProbeTests(unittest.TestCase):
             for key, value in [("requests", []), ("healthyItems", []), ("healthyItems", [{"pid": "allowed-pid", "name": "Private"}])]:
                 report = passed(); report["virtualResource"][kind][key] = value
                 with self.subTest(deadline_boundary=key), self.assertRaises(ProtocolError): verify_report(report)
+
+        for key in passed()["virtualResource"]["nullIdentity"]:
+            report = passed(); del report["virtualResource"]["nullIdentity"][key]
+            with self.subTest(null_missing=key), self.assertRaises(ProtocolError): verify_report(report)
+        for key, value in [("resource", "foreign"), ("sourceResource", "foreign"), ("requests", []),
+                           ("sourceRows", []), ("healthyItems", []), ("validPid", "private-id"),
+                           ("secondValidPid", "null-valid-one"), ("nullSourcePid", "null-valid-one")]:
+            report = passed(); report["virtualResource"]["nullIdentity"][key] = value
+            with self.subTest(null_field=key), self.assertRaises(ProtocolError): verify_report(report)
+        for index in range(4):
+            for key, value in [("status", True), ("status", 504), ("requestId", "foreign"),
+                               ("body", {"success": False, "private": "SQL source"}), ("query", "limit=999"), ("etag", '"unsafe"')]:
+                report = passed(); report["virtualResource"]["nullIdentity"]["requests"][index][key] = value
+                with self.subTest(null_response=index, key=key), self.assertRaises(ProtocolError): verify_report(report)
+            for key, value in [("installationPid", "foreign"), ("applicationPid", "foreign"), ("status", True),
+                               ("operation", "execute"), ("recordPid", "foreign"), ("durationMs", True), ("path", "/foreign")]:
+                report = passed(); report["virtualResource"]["nullIdentity"]["requests"][index]["audit"][key] = value
+                with self.subTest(null_audit=index, key=key), self.assertRaises(ProtocolError): verify_report(report)
 
     def test_query_quota_requires_response_and_persisted_public_audit(self):
         self.assertEqual(verify_report(passed()), passed())

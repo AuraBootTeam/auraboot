@@ -334,7 +334,7 @@ def verify_report(report):
     if (isolation["primaryInstallationPid"] != report.get("installationPid")
             or isolation["secondaryApplicationPid"] == report.get("applicationPid")):
         raise ProtocolError("virtual installation proof actor binding invalid")
-    if any(row["audit"]["applicationPid"] != report.get("applicationPid") for kind in ["deadline", "executionFailure", "identityFailure"] for row in virtual[kind]["requests"]):
+    if any(row["audit"]["applicationPid"] != report.get("applicationPid") for kind in ["deadline", "executionFailure", "identityFailure", "nullIdentity"] for row in virtual[kind]["requests"]):
         raise ProtocolError("virtual deadline application binding invalid")
     quota = report.get("queryRateLimit")
     resource = "release.dynamic.by-zone.quota"
@@ -378,7 +378,7 @@ def verify_source_binding(proof):
 
 def verify_virtual_resource(proof):
     keys = {"resource", "sourceResources", "allowedPid", "hiddenPid", "extraPid", "items", "detail", "etag",
-            "stableEtag", "ownHiddenStatus", "sourceHiddenStatus", "pages", "fieldDeniedStatus", "revokedStatus", "installationIsolation", "deadline", "executionFailure", "identityFailure"}
+            "stableEtag", "ownHiddenStatus", "sourceHiddenStatus", "pages", "fieldDeniedStatus", "revokedStatus", "installationIsolation", "deadline", "executionFailure", "identityFailure", "nullIdentity"}
     if not isinstance(proof, dict) or set(proof) != keys:
         raise ProtocolError("virtual resource proof missing or malformed")
     identities = [proof.get(key) for key in ["allowedPid", "hiddenPid", "extraPid"]]
@@ -423,6 +423,7 @@ def verify_virtual_resource(proof):
     verify_virtual_deadline(proof["deadline"], proof)
     verify_virtual_deadline(proof["executionFailure"], proof, failure_kind="executionFailure")
     verify_virtual_deadline(proof["identityFailure"], proof, failure_kind="identityFailure")
+    verify_virtual_null_identity(proof["nullIdentity"], proof)
     return proof
 
 
@@ -522,6 +523,85 @@ def run_virtual_deadline_probe(request, human, installation_pid, machine, defini
     return {"resource": resource, "requests": rows, "healthyItems": healthy.get("items")}
 
 
+def verify_virtual_null_identity(proof, virtual):
+    keys = {"resource", "sourceResource", "validPid", "secondValidPid", "nullSourcePid", "sourceRows", "requests", "healthyItems"}
+    if not isinstance(proof, dict) or set(proof) != keys or proof["resource"] != "release.dynamic.virtual-null-identity" or proof["sourceResource"] != "release.dynamic.null-parts":
+        raise ProtocolError("virtual null identity proof missing or malformed")
+    identities = [proof[key] for key in ["validPid", "secondValidPid", "nullSourcePid"]]
+    if any(not isinstance(pid, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", pid) for pid in identities) or len(set(identities)) != 3:
+        raise ProtocolError("virtual null identity fixture invalid")
+    expected_source = [{"pid": identities[0], "name": "Null identity valid one", "zone": "A"},
+                       {"pid": identities[1], "name": "Null identity valid two", "zone": "A"},
+                       {"pid": None, "name": "Null identity candidate", "zone": "A"}]
+    if not isinstance(proof["sourceRows"], list) or len(proof["sourceRows"]) != 3 or any(not isinstance(row, dict) for row in proof["sourceRows"]) or sorted(proof["sourceRows"], key=lambda row: str(row.get("name", ""))) != sorted(expected_source, key=lambda row: row["name"]):
+        raise ProtocolError("virtual null identity source result invalid")
+    requests = proof["requests"]
+    contracts = [("list-small", "list", "limit=1", 503, None), ("list-wide", "list", "limit=50", 503, None),
+                 ("get-valid", "get", "", 200, identities[0]), ("get-null", "get", "", 404, identities[2])]
+    if not isinstance(requests, list) or len(requests) != len(contracts):
+        raise ProtocolError("virtual null identity request denominator invalid")
+    for row, (identifier, operation, query, status, record_pid) in zip(requests, contracts):
+        marker = "release-virtual-null-identity-" + identifier
+        path = "/api/open/v1/resources/" + proof["resource"] + ("/" + record_pid if operation == "get" else "")
+        body = expected_source[0] if status == 200 else {"success": False, "code": "open_api_query_unavailable" if status == 503 else "not_found",
+                "message": "Published query execution is unavailable" if status == 503 else "Resource record is unavailable"}
+        if not isinstance(row, dict) or set(row) != {"id", "operation", "query", "status", "requestId", "body", "etag", "audit"} or row["id"] != identifier or row["operation"] != operation or row["query"] != query or type(row["status"]) is not int or row["status"] != status or row["requestId"] != marker or row["body"] != body:
+            raise ProtocolError("virtual null identity response invalid")
+        if (status != 200 and row["etag"] is not None) or (status == 200 and (not isinstance(row["etag"], str) or not re.fullmatch(r'"[a-f0-9]{64}"', row["etag"]))):
+            raise ProtocolError("virtual null identity ETag invalid")
+        expected_audit = {"requestId": marker, "actorKind": "machine", "installationPid": virtual["installationIsolation"]["primaryInstallationPid"],
+            "resource": proof["resource"], "operation": operation, "recordPid": record_pid, "idempotentReplay": None,
+            "status": status, "method": "GET", "path": path, "capability": "resource." + proof["resource"] + "." + operation}
+        audit = row["audit"]
+        if not isinstance(audit, dict) or set(audit) != set(expected_audit) | {"applicationPid", "durationMs", "occurredAt"} or any(audit.get(key) != value for key, value in expected_audit.items()) or type(audit.get("status")) is not int or type(audit.get("durationMs")) is not int or audit["durationMs"] < 0 or not isinstance(audit.get("applicationPid"), str) or not audit["applicationPid"] or not isinstance(audit.get("occurredAt"), str) or not audit["occurredAt"]:
+            raise ProtocolError("virtual null identity audit invalid")
+    healthy = [{"pid": virtual["allowedPid"], "name": "Allowed A", "zone": "A"}, {"pid": virtual["extraPid"], "name": "Virtual extra A", "zone": "A"}]
+    if not isinstance(proof["healthyItems"], list) or any(not isinstance(row, dict) for row in proof["healthyItems"]) or sorted(proof["healthyItems"], key=lambda row: str(row.get("pid", ""))) != sorted(healthy, key=lambda row: row["pid"]):
+        raise ProtocolError("virtual null identity healthy recovery invalid")
+    return proof
+
+
+def run_virtual_null_identity_probe(request, human, installation_pid, machine, physical, virtual, healthy_path):
+    model_code, source_code = "release_dynamic_null_parts", "release.dynamic.null-parts"
+    resource, query_code = "release.dynamic.virtual-null-identity", "release_dynamic_null_identity_source"
+    model = human("/api/meta/models", "POST", {"code": model_code, "tableName": model_code, "displayName": "Release null identity source",
+        "modelType": "entity", "sourceType": "physical",
+        "capabilities": {key: True for key in ["list", "detail", "create", "update", "delete", "filter", "sort", "paginate"]},
+        "fields": [{"code": code, "columnName": code, "displayName": code, "dataType": "string", "required": code != "rel_private", "editable": True, "filterable": code == "rel_zone"} for code in ["rel_name", "rel_zone", "rel_private"]]})
+    human(f"/api/meta/models/{model['pid']}/publish", "POST", {"impactAcknowledged": True})
+    if model.get("tableName") != model_code: raise ProtocolError("null identity physical source changed")
+    created = [human(f"/api/dynamic/{model_code}/create", "POST", {"rel_name": name, "rel_zone": "A", "rel_private": "Private null identity fixture"})
+               for name in ["Null identity valid one", "Null identity valid two", "Null identity candidate"]]
+    pids = [row.get("pid") for row in created]
+    if any(not isinstance(pid, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", pid) for pid in pids) or len(set(pids)) != 3: raise ProtocolError("null identity created PID invalid")
+    source_contract = dict(physical, code=source_code, modelCode=model_code)
+    for code, contract in [(source_code, source_contract)]:
+        human(f"/api/open-platform/publications/{code}/draft", "PUT", {"expectedRevision": 0, "definition": contract})
+        human(f"/api/open-platform/publications/{code}/publish", "POST", {"expectedRevision": 1})
+        human(f"/api/open-platform/installations/{installation_pid}/resources/{code}", "PUT", {"operations": ["list", "get"], "readableFields": ["pid", "name", "zone"], "writableFields": [], "rowConstraints": [{"field": "zone", "values": ["A"]}]})
+    named = human("/api/meta/named-queries", "POST", {"code": query_code, "title": "Release null identity query", "resourceCode": model_code, "actionCode": "read", "fromSql": model_code + " a", "policy": {"rateLimitPerMinute": 100000}, "baseWhere": [], "defaultOrder": [{"field": "pid", "direction": "asc"}],
+        "fields": [{"fieldCode": alias, "columnExpr": expr, "dataType": "string", "displayName": alias, "sortable": alias == "pid", "searchable": False}
+                   for alias, expr in [("pid", "NULLIF(a.pid, '" + pids[2] + "')"), ("name", "a.rel_name"), ("zone", "a.rel_zone")]]})
+    for status in ["testing", "published"]: human(f"/api/meta/named-queries/{named['pid']}/status", "PUT", {"status": status})
+    source_result = human(f"/api/meta/named-queries/{query_code}/execute", "POST", {"page": 1, "size": 50})
+    model = human("/api/meta/models", "POST", {"code": "release_dynamic_null_identity_virtual", "displayName": "Release null identity virtual resource", "modelType": "view", "sourceType": "namedQuery", "sourceRef": query_code, "primaryKey": "pid", "capabilities": {key: True for key in ["list", "detail", "filter", "sort", "paginate"]}, "fields": [{"code": alias, "displayName": alias, "dataType": "string", "filterable": True} for alias in ["name", "zone"]]})
+    human(f"/api/meta/models/{model['pid']}/publish", "POST", {"impactAcknowledged": True})
+    contract = dict(virtual, code=resource, modelCode=model['code'], sourceResources={model_code: source_code})
+    human(f"/api/open-platform/publications/{resource}/draft", "PUT", {"expectedRevision": 0, "definition": contract})
+    human(f"/api/open-platform/publications/{resource}/publish", "POST", {"expectedRevision": 1})
+    human(f"/api/open-platform/installations/{installation_pid}/resources/{resource}", "PUT", {"operations": ["list", "get"], "readableFields": ["pid", "name", "zone"], "writableFields": [], "rowConstraints": [{"field": "zone", "values": ["A"]}]})
+    rows = []
+    for identifier, operation, query, status, pid in [("list-small", "list", "limit=1", 503, None), ("list-wide", "list", "limit=50", 503, None), ("get-valid", "get", "", 200, pids[0]), ("get-null", "get", "", 404, pids[2])]:
+        route = "/api/open/v1/resources/" + resource + ("/" + pid if operation == "get" else "")
+        marker = "release-virtual-null-identity-" + identifier
+        actual, body, headers = request(route + ("?" + query if query else ""), headers=dict(machine, **{"X-Request-Id": marker}), expected=(status,))
+        audits = human(f"/api/open-platform/installations/{installation_pid}/audits?requestId={marker}")
+        if not isinstance(audits, list) or len(audits) != 1: raise ProtocolError("null identity audit missing or duplicated")
+        rows.append({"id": identifier, "operation": operation, "query": query, "status": actual, "requestId": next((v for k,v in headers.items() if k.lower() == "x-request-id"), None), "body": body, "etag": next((v for k,v in headers.items() if k.lower() == "etag"), None), "audit": audits[0]})
+    _, healthy, _ = request(healthy_path, headers=machine)
+    return {"resource": resource, "sourceResource": source_code, "validPid": pids[0], "secondValidPid": pids[1], "nullSourcePid": pids[2], "sourceRows": source_result.get("records"), "requests": rows, "healthyItems": healthy.get("items")}
+
+
 def run_virtual_resource_probe(request, human, installation_pid, machine, scopes, physical_definition, allowed, hidden):
     """Exercise the declared source grant and the virtual policy through production HTTP routes."""
     source_model = "release_dynamic_parts"
@@ -598,6 +678,7 @@ def run_virtual_resource_probe(request, human, installation_pid, machine, scopes
         deadline_proof = run_virtual_deadline_probe(request, human, installation_pid, machine, definition, allowed, path)
         failure_proof = run_virtual_deadline_probe(request, human, installation_pid, machine, definition, allowed, path, failure_kind="executionFailure")
         identity_proof = run_virtual_deadline_probe(request, human, installation_pid, machine, definition, allowed, path, failure_kind="identityFailure")
+        null_proof = run_virtual_null_identity_probe(request, human, installation_pid, machine, physical_definition, definition, path)
         human(source_grant, "PUT", dict(original, readableFields=["pid", "zone"]))
         field_status, _, _ = request(path, headers=machine, expected=(403,))
         human(source_grant, "DELETE")
@@ -605,7 +686,7 @@ def run_virtual_resource_probe(request, human, installation_pid, machine, scopes
         proof = {"resource": code, "sourceResources": definition["sourceResources"], "allowedPid": allowed["pid"],
                  "hiddenPid": hidden["pid"], "extraPid": extra["pid"], "items": listed.get("items"), "detail": detail,
                  "etag": etag(headers), "stableEtag": etag(repeated), "ownHiddenStatus": own_status,
-                 "sourceHiddenStatus": source_status, "pages": [{key: page.get(key) for key in ["items", "nextCursor"]} for page in [first, second]], "fieldDeniedStatus": field_status, "revokedStatus": revoked_status, "installationIsolation": isolation, "deadline": deadline_proof, "executionFailure": failure_proof, "identityFailure": identity_proof}
+                 "sourceHiddenStatus": source_status, "pages": [{key: page.get(key) for key in ["items", "nextCursor"]} for page in [first, second]], "fieldDeniedStatus": field_status, "revokedStatus": revoked_status, "installationIsolation": isolation, "deadline": deadline_proof, "executionFailure": failure_proof, "identityFailure": identity_proof, "nullIdentity": null_proof}
         return verify_virtual_resource(proof)
     finally:
         try:
