@@ -235,7 +235,7 @@ test.describe('Dynamic resource publication journey', () => {
     const virtualNameField = page.getByTestId('publication-field-name');
     await virtualNameField.getByLabel('零件名称', { exact: true }).check();
     await virtualNameField.getByLabel('对外字段名称', { exact: true }).fill('name');
-    if (process.env.AURA_UI_NEGATIVE_MUTATION && process.env.AURA_UI_NEGATIVE_MUTATION !== 'fill-required-source') {
+    if (process.env.AURA_UI_NEGATIVE_MUTATION && !['fill-required-source', 'skip-source-keyboard'].includes(process.env.AURA_UI_NEGATIVE_MUTATION)) {
       // Expected-red only: falsify persisted projection assertions using the actual UI.
       expect(process.env.AURA_UI_NEGATIVE_MUTATION).toBe('drop-virtual-output');
       await virtualNameField.getByLabel('零件名称', { exact: true }).uncheck();
@@ -270,11 +270,26 @@ test.describe('Dynamic resource publication journey', () => {
     await snapshot('publication-virtual-source-required');
     await page.getByTestId('publication-editor').locator('section').filter({ has: sourceSelector })
       .screenshot({ path: path.join(screenshotRoot, 'publication-virtual-source-required-region.png') });
-    await sourceSelector.selectOption(resourceCode);
+    // Observe option order, then recover through native keyboard events rather than programmatic selection.
+    const sourceOptionIndex = await sourceSelector.evaluate((element: HTMLSelectElement, value: string) =>
+      Array.from(element.options).findIndex(option => option.value === value), resourceCode);
+    expect(sourceOptionIndex).toBeGreaterThan(0);
+    await expect(sourceSelector).toBeFocused();
+    await sourceSelector.press('Home');
+    if (process.env.AURA_UI_NEGATIVE_MUTATION !== 'skip-source-keyboard') {
+      for (let index = 0; index < sourceOptionIndex; index++) await sourceSelector.press('ArrowDown');
+    }
+    await expect(sourceSelector).toHaveValue(resourceCode);
     await expect(requiredSourceError).toHaveCount(0);
     await expect(sourceSelector).toHaveAttribute('aria-invalid', 'false');
+    await sourceSelector.press('Tab');
+    await expect(page.getByLabel('列表查询', { exact: true })).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(sourceSelector).toBeFocused();
+    await page.getByTestId('publication-editor').locator('section').filter({ has: sourceSelector })
+      .screenshot({ path: path.join(screenshotRoot, 'publication-virtual-source-keyboard-region.png') });
     const virtualSaved = page.waitForResponse(response => response.url().endsWith(`/publications/${virtualCode}/draft`) && response.request().method() === 'PUT');
-    await page.getByRole('button', { name: '保存并校验草稿', exact: true }).click();
+    await page.getByRole('button', { name: '保存并校验草稿', exact: true }).press('Enter');
     const virtualSavedHttp = await virtualSaved; expect(virtualSavedHttp.status()).toBe(200);
     const virtualDraft = await virtualSavedHttp.json(); expect(String(virtualDraft.code)).toBe('0');
     expect(virtualDraft.data.draft.sourceResources).toEqual({ [modelCode]: resourceCode });
