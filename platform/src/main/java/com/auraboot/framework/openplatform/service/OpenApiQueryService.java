@@ -93,7 +93,7 @@ public class OpenApiQueryService {
         } catch (org.springframework.dao.QueryTimeoutException timeout) {
             throw new QueryDeadlineExceededException(timeout);
         } catch (org.springframework.dao.DataAccessException unavailable) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "open_api_query_unavailable", unavailable);
+            throw new QueryExecutionUnavailableException(unavailable);
         } catch (com.auraboot.framework.meta.exception.NamedQueryRateLimitException exhausted) {
             throw new QueryRateLimitException(exhausted);
         } catch (com.auraboot.framework.meta.exception.MetaServiceException unsafe) {
@@ -104,6 +104,12 @@ public class OpenApiQueryService {
     public static final class QueryDeadlineExceededException extends ResponseStatusException {
         public QueryDeadlineExceededException(Throwable cause) {
             super(HttpStatus.GATEWAY_TIMEOUT, "open_api_query_timeout", cause);
+        }
+    }
+    /** Database execution diagnostics stay in the cause, never in a public error body. */
+    public static final class QueryExecutionUnavailableException extends ResponseStatusException {
+        public QueryExecutionUnavailableException(Throwable cause) {
+            super(HttpStatus.SERVICE_UNAVAILABLE, "open_api_query_unavailable", cause);
         }
     }
     private Map<String, Object> jdbcParameters(OpenApiQueryContract contract, Map<String, Object> input) {

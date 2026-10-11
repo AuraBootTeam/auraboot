@@ -149,5 +149,13 @@ class OpenPlatformFacadeControllerTest {
         var typed = new com.auraboot.framework.openplatform.service.OpenApiQueryService.QueryDeadlineExceededException(privateCause);
         assertThat(typed).hasCause(privateCause).hasMessageContaining("504").hasMessageContaining("open_api_query_timeout")
                 .hasMessageNotContaining("Private");
+        var unavailable = new OpenApiResourceErrorHandler().queryUnavailable();
+        assertThat(unavailable.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(unavailable.getBody()).isEqualTo(Map.of("success", false, "code", "open_api_query_unavailable",
+                "message", "Published query execution is unavailable"));
+        var sourceFailure = new org.springframework.dao.DataIntegrityViolationException("Private source SQL and credentials");
+        var publicFailure = new com.auraboot.framework.openplatform.service.OpenApiQueryService.QueryExecutionUnavailableException(sourceFailure);
+        assertThat(publicFailure).hasCause(sourceFailure).hasMessageContaining("503").hasMessageContaining("open_api_query_unavailable")
+                .hasMessageNotContaining("Private");
     }
 }

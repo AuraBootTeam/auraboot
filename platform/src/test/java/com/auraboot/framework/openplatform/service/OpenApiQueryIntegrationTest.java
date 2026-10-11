@@ -901,6 +901,35 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
                     .hasMessageNotContaining(tokenA).hasMessageNotContaining("pg_sleep").hasMessageNotContaining("fromSql");
         } finally { applyTestMetaContext(); }
         assertThat(run(principalA,rows,"A").get("total")).isEqualTo(1L);
+        String allowedPid = json.valueToTree(run(principalA, rows, "A")).get("items").get(0).get("pid").asText();
+        var failingSource = createQuery("virtual_fault_" + suffix, "mt_" + root.modelCode() + " a",
+                List.of(nqField("pid", "a.pid", "string"), nqField("name", "a.name || (1 / 0)::text", "string"),
+                        nqField("zone", "a.zone", "string")));
+        String failingModel = "virtual_fault_" + suffix;
+        models.saveDefinition(ModelDefinition.builder().code(failingModel).displayName("Virtual source failure")
+                .sourceType("namedQuery").sourceRef(failingSource.getCode()).primaryKey("pid").status("published")
+                .capabilities(ModelCapabilities.virtualReadOnly()).fields(List.of(
+                        FieldDefinition.builder().code("name").dataType("STRING").build(),
+                        FieldDefinition.builder().code("zone").dataType("STRING").filterable(true).build())).build());
+        var failingContract = new OpenApiResourceContract("virtual-fault." + suffix, failingModel, 1, root.operations(), root.scopes(),
+                DataPolicy.INSTALLATION_FILTER, root.fields(), 50, 8, 5000, Set.of(), Map.of(root.modelCode(), root.code()));
+        resources.saveDraft(failingContract.code(), new OpenApiPublicationService.DraftRequest(0, failingContract));
+        resources.publish(failingContract.code(), 1);
+        resources.grant(principalA.installationPid(), failingContract.code(), new OpenApiInstallationPolicy(failingContract.operations(),
+                failingContract.fields().keySet(), Set.of(), List.of(new OpenApiInstallationPolicy.RowConstraint("zone", List.of("A")))));
+        MetaContext.setContext(principalA.tenantId(), null, principalA.subjectPid(), "machine");
+        try (var machine = MachineDataAccessContext.begin(principalA)) {
+            for (boolean detail : List.of(false, true)) {
+                assertThatThrownBy(() -> boundary.executeWithoutResult(status -> {
+                    if (detail) publicResources.get(principalA, failingContract.code(), allowedPid);
+                    else publicResources.list(principalA, failingContract.code(), 10, null, null, null, null);
+                })).isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                        .hasMessageContaining("503").hasMessageContaining("open_api_query_unavailable")
+                        .hasMessageNotContaining(failingSource.getCode()).hasMessageNotContaining(root.modelCode())
+                        .hasMessageNotContaining("SELECT").hasMessageNotContaining("division by zero");
+            }
+        } finally { applyTestMetaContext(); }
+        assertThat(run(principalA,rows,"A").get("total")).isEqualTo(1L);
     }
     @Test void exhaustedSourceRateBudgetReturnsPublic429AndRecordsTheMachineDenial() throws Exception {
         var policy = new com.auraboot.framework.meta.entity.NamedQueryPolicy();policy.setRateLimitPerMinute(1);

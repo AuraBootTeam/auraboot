@@ -33,6 +33,11 @@ public class OpenApiResourceErrorHandler {
         return ResponseEntity.status(504).body(Map.of("success", false, "code", "open_api_query_timeout",
                 "message", "Published query execution deadline exceeded"));
     }
+    @ExceptionHandler(com.auraboot.framework.openplatform.service.OpenApiQueryService.QueryExecutionUnavailableException.class)
+    public ResponseEntity<Map<String, Object>> queryUnavailable() {
+        return ResponseEntity.status(503).body(Map.of("success", false, "code", "open_api_query_unavailable",
+                "message", "Published query execution is unavailable"));
+    }
     @ExceptionHandler(OpenApiPreconditionException.class)
     public ResponseEntity<Map<String, Object>> precondition(OpenApiPreconditionException error) {
         return ResponseEntity.status(412).body(Map.of("success", false, "code", "precondition_failed", "message", error.getMessage()));
