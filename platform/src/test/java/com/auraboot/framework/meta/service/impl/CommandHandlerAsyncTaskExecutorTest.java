@@ -231,6 +231,29 @@ class CommandHandlerAsyncTaskExecutorTest {
     }
 
     @Test
+    void installsScopedSecretBridgeDuringAuthenticatedAsyncExecution() throws Exception {
+        var configs=mock(com.auraboot.framework.cloudconfig.service.CloudConfigService.class);
+        ReflectionTestUtils.setField(executor,"cloudConfigService",configs);
+        for(Object optIn:java.util.List.of(true,false,"true")) {
+            AtomicReference<CommandHandlerExtension.CommandContext> captured=new AtomicReference<>();
+            CommandHandlerExtension handler=mock(CommandHandlerExtension.class);
+            when(handler.execute(org.mockito.ArgumentMatchers.any())).thenAnswer(inv->{
+                CommandHandlerExtension.CommandContext context=inv.getArgument(0); captured.set(context);
+                assertThat(MetaContext.getCurrentTenantId()).isEqualTo(123L);
+                assertThat(context.tenantSecretAccessor()!=null).isEqualTo(Boolean.TRUE.equals(optIn));
+                return Map.of("success",true);
+            });
+            when(extensionRegistry.getCommandHandler("bom:import_material_library")).thenReturn(Optional.of(handler));
+            var input=params("bom:import_material_library");
+            input.set("handlerParams",objectMapper.valueToTree(Map.of("tenantSecretRead",optIn,
+                    "tenantSecretServiceTypes",java.util.List.of("integration"),"tenantSecretFields",java.util.List.of("appSecret"))));
+            assertThat(executor.execute(input,noop).isSuccess()).isTrue();
+            assertThat(captured.get()).isNotNull();
+        }
+        org.mockito.Mockito.verifyNoInteractions(configs);
+    }
+
+    @Test
     void restoresExactCommandWriterIdentityOnlyFromPersistedPermitPlan() throws Exception {
         AtomicReference<String> commandSeen = new AtomicReference<>();
         CommandHandlerExtension handler = mock(CommandHandlerExtension.class);

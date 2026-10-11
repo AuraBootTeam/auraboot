@@ -87,6 +87,9 @@ public class HandlerPhase implements CommandPhase {
     private final DataDomainService dataDomainService;
 
     @Autowired(required = false)
+    private com.auraboot.framework.cloudconfig.service.CloudConfigService cloudConfigService;
+
+    @Autowired(required = false)
     private BiTemporalService biTemporalService;
 
     @Autowired
@@ -615,6 +618,8 @@ public class HandlerPhase implements CommandPhase {
             if (request.getExpectedVersion() != null && expectedVersion != null) {
                 pluginSettings.put(CommandHandlerExtension.EXPECTED_VERSION_KEY, expectedVersion);
             }
+            com.auraboot.framework.plugin.pf4j.TenantSecretAccessorImpl.install(
+                    pluginSettings, tenantId, cloudConfigService, objectMapper);
             pluginSettings.put("__dataAccessor",
                     new com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImpl(dynamicDataService));
             if (commandExecutor != null) {

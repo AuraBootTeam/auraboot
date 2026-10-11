@@ -86,6 +86,9 @@ class HandlerPhaseTest {
     private DataDomainService dataDomainService;
 
     @Mock
+    private com.auraboot.framework.cloudconfig.service.CloudConfigService cloudConfigService;
+
+    @Mock
     private FileService fileService;
 
     @Mock
@@ -102,6 +105,7 @@ class HandlerPhaseTest {
 
     @BeforeEach
     void setUp() {
+        ReflectionTestUtils.setField(phase, "cloudConfigService", cloudConfigService);
         ReflectionTestUtils.setField(phase, "fileService", fileService);
         ReflectionTestUtils.setField(phase, "storageProvider", storageProvider);
         ReflectionTestUtils.setField(phase, "asyncTaskService", asyncTaskService);
@@ -188,6 +192,22 @@ class HandlerPhaseTest {
         phase.execute(rejected);
 
         assertThat(stringValue.capturedContext.get().tenantProjectionAccessor()).isNull();
+    }
+
+    @Test
+    void execute_installsTenantSecretOnlyForExplicitServerScope() {
+        for (Object optIn : List.of(true, false, "true")) {
+            RecordingPluginHandler handler = new RecordingPluginHandler(PLUGIN_HANDLER_CODE);
+            when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(handler));
+            var context = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of(
+                    "type", "custom", "handler", PLUGIN_HANDLER_CODE,
+                    "handlerParams", Map.of("tenantSecretRead", optIn,
+                            "tenantSecretServiceTypes", List.of("integration"), "tenantSecretFields", List.of("appSecret"))));
+            context.getPayload().put("tenantSecretRead", true);
+            phase.execute(context);
+            assertThat(handler.capturedContext.get().tenantSecretAccessor() != null).isEqualTo(Boolean.TRUE.equals(optIn));
+        }
+        org.mockito.Mockito.verifyNoInteractions(cloudConfigService);
     }
 
     @Test

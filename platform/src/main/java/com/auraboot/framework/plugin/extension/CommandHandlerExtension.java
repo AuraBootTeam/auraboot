@@ -284,6 +284,12 @@ public interface CommandHandlerExtension extends ExtensionPoint {
             return accessor instanceof TenantRoleAssignmentAccessor value ? value : null;
         }
 
+        /** Available only through explicit server-owned secret scope metadata. */
+        public TenantSecretAccessor tenantSecretAccessor() {
+            Object accessor = settings != null ? settings.get(TenantSecretAccessor.SETTINGS_KEY) : null;
+            return accessor instanceof TenantSecretAccessor value ? value : null;
+        }
+
         public IdentityDirectoryAccessor identityDirectoryAccessor() {
             Object accessor = settings != null ? settings.get(IDENTITY_DIRECTORY_ACCESSOR_KEY) : null;
             return accessor instanceof IdentityDirectoryAccessor value ? value : null;
