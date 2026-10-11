@@ -322,6 +322,44 @@ class ProcurementPluginHostRealDbIT {
         return pid;
     }
 
+    @Test void nativeImportRejectsProductDiscontinuedAfterMaterialResolution() throws Exception {
+        var resolved=new java.util.concurrent.CountDownLatch(1);var discontinued=new java.util.concurrent.CountDownLatch(1);
+        var first=new java.util.concurrent.atomic.AtomicBoolean(true);
+        var statuses=new java.util.concurrent.CopyOnWriteArrayList<String>();
+        var initialStatus=new java.util.concurrent.atomic.AtomicReference<String>();
+        var finalStatus=new java.util.concurrent.atomic.AtomicReference<String>();
+        DataAccessor observed=(DataAccessor)java.lang.reflect.Proxy.newProxyInstance(DataAccessor.class.getClassLoader(),new Class<?>[]{DataAccessor.class},
+                (proxy,method,args)->{Object result;try {result=method.invoke(db,args);}catch(InvocationTargetException error){throw error.getCause();}
+                    if(method.getName().equals("getById") && args[0].equals("prod_product") && args[1].equals(product)) {
+                        var snapshot=new LinkedHashMap<>((Map<String,Object>)result);
+                        statuses.add(snapshot.get("prod_status").toString());
+                        if(first.compareAndSet(true,false)) {
+                            initialStatus.set(snapshot.get("prod_status").toString());resolved.countDown();
+                            awaitNativeLatch(discontinued,"product lifecycle change must commit after material resolution read");
+                        } else finalStatus.set(snapshot.get("prod_status").toString());
+                        return snapshot;
+                    }
+                    return result;});
+        var selected=importContext(task,observed);var taskBefore=scope(SYNC,()->db.getById("s2p_sourcing_event",task));
+        var pool=java.util.concurrent.Executors.newSingleThreadExecutor();
+        try {
+            var importing=pool.submit(()->nativeActorThread(()->new TransactionTemplate(transactions).execute(status->scope(SYNC,()->syncWith(selected,"100","11")))));
+            awaitNativeLatch(resolved,"material resolver must receive the original active product snapshot");
+            new TransactionTemplate(transactions).execute(status->scope("prod:discontinue_product",()->db.update("prod_product",product,Map.of("prod_status","discontinued"))));
+            discontinued.countDown();
+            try {
+                importing.get(20,java.util.concurrent.TimeUnit.SECONDS);
+                fail("Import accepted discontinued product: snapshots="+statuses);
+            } catch(java.util.concurrent.ExecutionException failure) {
+                assertEquals("SOURCE_PRODUCT_UNAVAILABLE",assertInstanceOf(SecurityException.class,failure.getCause()).getMessage());
+            }
+            assertEquals("active",initialStatus.get());assertEquals("discontinued",finalStatus.get());
+            scope(SYNC,()->{assertTrue(rows().isEmpty());assertEquals(1,references());
+                assertEquals(taskBefore,db.getById("s2p_sourcing_event",task));
+                assertEquals("discontinued",db.getById("prod_product",product).get("prod_status"));return null;});
+        }finally{discontinued.countDown();pool.shutdownNow();assertTrue(pool.awaitTermination(10,java.util.concurrent.TimeUnit.SECONDS));}
+    }
+
     @Test void actualHostSecretAndNativePersistenceSurviveReplay() throws Exception {
         var tx=new TransactionTemplate(transactions);
         assertEquals(List.of("added"),tx.execute(status->scope(SYNC,()->sync("100","11"))));

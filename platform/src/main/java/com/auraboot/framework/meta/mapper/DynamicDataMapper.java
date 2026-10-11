@@ -46,7 +46,10 @@ public interface DynamicDataMapper {
      * @param params 参数映射
      * @return 查询结果
      */
+    // Mutable business rows must be re-read under the database transaction isolation level.
+    // A command's second read must not reuse a pre-change MyBatis session snapshot.
     @SelectProvider(type = DynamicSqlProvider.class, method = "selectByQuery")
+    @Options(useCache = false, flushCache = Options.FlushCachePolicy.TRUE)
     List<Map<String, Object>> selectByQuery(@Param("sql") String sql, @Param("params") Map<String, Object> params);
 
     /**
