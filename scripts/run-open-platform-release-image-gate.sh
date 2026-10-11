@@ -236,6 +236,7 @@ chmod 0600 "$ARTIFACTS/backend-junit/"*.xml
 cp "$STAGE/platform/build/reports/jacoco/test/jacocoTestReport.xml" "$ARTIFACTS/backend-jacoco.xml"
 python3 "$STAGE/scripts/ci/open_platform_backend_catalog.py" verify --root "$STAGE" \
   --plan "$ARTIFACTS/backend-plan.json" --results "$ARTIFACTS/backend-junit" \
+  --coverage "$ARTIFACTS/backend-jacoco.xml" \
   --receipt "$ARTIFACTS/backend-receipt.json" || fail "backend case reconciliation failed"
 
 PROTOCOL_KEY="$(openssl rand -base64 48 | tr -d '\n')"

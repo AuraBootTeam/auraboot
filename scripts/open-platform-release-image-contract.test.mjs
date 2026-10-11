@@ -68,6 +68,7 @@ assert.match(gate, /createdb -U auraboot "\$BACKEND_DB"/);
 assert.match(gate, /open_platform_backend_catalog\.py" plan/);
 assert.match(gate, /open_platform_backend_catalog\.py" verify/);
 assert.match(gate, /backend case reconciliation failed/);
+assert.match(gate, /--coverage "\$ARTIFACTS\/backend-jacoco\.xml"/);
 assert.match(gate, /"backend": json\.load\(open\("\$ARTIFACTS\/backend-receipt\.json"\)\)/);
 assert.ok(gate.indexOf('backend case reconciliation failed') < gate.indexOf('PROTOCOL_KEY='));
 assert.match(gate, /mapfile -t classes < \/artifacts\/backend-selectors\.txt/);

@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
-from open_platform_backend_catalog import cases, plan, reconcile
+from open_platform_backend_catalog import cases, plan, reconcile, coverage_result
 
 
 class BackendCatalogTest(unittest.TestCase):
@@ -21,6 +21,18 @@ class BackendCatalogTest(unittest.TestCase):
                 ET.SubElement(suite, 'testcase', classname=row['class'], name=name)
             ET.ElementTree(suite).write(self.results / f'TEST-{index}.xml')
 
+        self.coverage = self.results / 'jacoco.xml'
+        report = ET.Element('report', name='hermetic-coverage-fixture')
+        for row in self.expected['coverage']['sources']:
+            package_name, filename = row['class'].rsplit('.', 1)
+            package = ET.SubElement(report, 'package', name=package_name.replace('.', '/'))
+            source = ET.SubElement(package, 'sourcefile', name=filename + '.java')
+            for line in range(1, 101):
+                ET.SubElement(source, 'line', nr=str(line), ci='1' if line <= 80 else '0',
+                              mi='0' if line <= 80 else '1')
+            ET.SubElement(source, 'counter', type='LINE', covered='80', missed='20')
+        ET.ElementTree(report).write(self.coverage)
+
     def test_profile_reuses_every_open_platform_class_and_existing_query_regressions(self):
         names = {row['class'] for row in self.expected['classes']}
         directory = self.root / 'platform/src/test/java/com/auraboot/framework/openplatform'
@@ -31,16 +43,49 @@ class BackendCatalogTest(unittest.TestCase):
         self.assertIn('com.auraboot.framework.openplatform.service.OpenPlatformLifecycleIntegrationTest', names)
         self.assertIn('com.auraboot.framework.meta.service.AggregateQueryServiceIntegrationTest', names)
         self.assertIn('com.auraboot.framework.integration.agent.NamedQueryShadowInvokerIntegrationTest', names)
+        coverage_names = {row['class'] for row in self.expected['coverage']['sources']}
+        all_open_sources = {'com.auraboot.framework.openplatform.' + folder + '.' + file.stem
+                            for folder in ['service', 'security']
+                            for file in (self.root / 'platform/src/main/java/com/auraboot/framework/openplatform' / folder).rglob('*.java')}
+        exemptions = {row['class'] for row in self.expected['coverage']['nonExecutable']}
+        self.assertEqual({'com.auraboot.framework.openplatform.service.OpenApiCapabilityContributor'}, exemptions)
+        self.assertEqual(all_open_sources - exemptions, {name for name in coverage_names if '.openplatform.' in name})
+        self.assertIn('com.auraboot.framework.meta.service.impl.NamedQueryServiceImpl', coverage_names)
+        self.assertIn('com.auraboot.framework.meta.service.impl.AggregateQueryServiceImpl', coverage_names)
 
     def test_exact_case_results_are_accepted(self):
-        receipt = reconcile(self.expected, self.results)
+        receipt = reconcile(self.expected, self.results, self.coverage)
         self.assertEqual(self.expected['expectedCases'], receipt['passed'])
         self.assertEqual('PASS', receipt['verdict'])
+        self.assertEqual(80, receipt['coverage']['minimumLinePercent'])
+        self.assertEqual(len(self.expected['coverage']['sources']), len(receipt['coverage']['sources']))
+        original = self.coverage.read_bytes()
+        for mutation in ['below', 'missing', 'duplicate', 'empty', 'fake-counter', 'negative', 'missing-report']:
+            self.coverage.write_bytes(original)
+            tree = ET.parse(self.coverage)
+            source = tree.getroot().find('package/sourcefile')
+            counter = source.find('counter')
+            if mutation == 'below':
+                source.findall('line')[79].set('ci', '0')
+                source.findall('line')[79].set('mi', '1')
+                counter.set('covered', '79'); counter.set('missed', '21')
+            elif mutation == 'missing': tree.getroot().find('package').remove(source)
+            elif mutation == 'duplicate': tree.getroot().find('package').append(copy.deepcopy(source))
+            elif mutation == 'empty': counter.set('covered', '0'); counter.set('missed', '0')
+            elif mutation == 'fake-counter': counter.set('covered', '81'); counter.set('missed', '19')
+            elif mutation == 'negative': counter.set('missed', '-1')
+            tree.write(self.coverage)
+            if mutation == 'missing-report': self.coverage.unlink()
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                reconcile(self.expected, self.results, self.coverage)
+        self.coverage.write_bytes(original)
+        with self.assertRaises(ValueError):
+            reconcile(self.expected, self.results)
 
     def test_omitted_class_is_rejected(self):
         next(self.results.glob('*.xml')).unlink()
         with self.assertRaises(ValueError):
-            reconcile(self.expected, self.results)
+            reconcile(self.expected, self.results, self.coverage)
 
     def test_duplicate_or_renamed_case_is_rejected_even_at_same_count(self):
         file = next(self.results.glob('*.xml'))
@@ -50,14 +95,14 @@ class BackendCatalogTest(unittest.TestCase):
             tree.getroot().find('testcase').set('name', name)
             tree.write(file)
             with self.assertRaises(ValueError):
-                reconcile(self.expected, self.results)
+                reconcile(self.expected, self.results, self.coverage)
         tree.getroot().find('testcase').set('name', original)
         duplicate = copy.deepcopy(tree.getroot().find('testcase'))
         tree.getroot().append(duplicate)
         tree.getroot().set('tests', str(len(tree.getroot().findall('testcase'))))
         tree.write(file)
         with self.assertRaises(ValueError):
-            reconcile(self.expected, self.results)
+            reconcile(self.expected, self.results, self.coverage)
 
     def test_failures_errors_and_skips_cannot_be_hidden_by_summary(self):
         file = next(self.results.glob('*.xml'))
@@ -67,7 +112,7 @@ class BackendCatalogTest(unittest.TestCase):
             ET.SubElement(case, tag)
             tree.write(file)
             with self.assertRaises(ValueError):
-                reconcile(self.expected, self.results)
+                reconcile(self.expected, self.results, self.coverage)
             case.remove(case.find(tag))
             tree.write(file)
 
@@ -77,11 +122,11 @@ class BackendCatalogTest(unittest.TestCase):
         tree.getroot().set('tests', '0')
         tree.write(file)
         with self.assertRaises(ValueError):
-            reconcile(self.expected, self.results)
+            reconcile(self.expected, self.results, self.coverage)
         for file in self.results.glob('*.xml'):
             file.unlink()
         with self.assertRaises(ValueError):
-            reconcile(self.expected, self.results)
+            reconcile(self.expected, self.results, self.coverage)
 
     def test_string_value_source_expands_exact_instances(self):
         source = '''@ParameterizedTest @ValueSource(strings = {"en-US", "tr-TR"})

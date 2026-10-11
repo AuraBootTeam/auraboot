@@ -66,6 +66,83 @@ def cases(source):
     return result
 
 
+def coverage_plan(root, policy):
+    minimum = policy['minimumLinePercent']
+    require(type(minimum) is int and 80 <= minimum <= 100, "Coverage threshold must be at least 80%")
+    source_root = root / "platform/src/main/java"
+    names = list(policy['classes'])
+    for package in policy['sourcePackages']:
+        require(re.fullmatch(r'[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+', package), "Invalid coverage package")
+        directory = source_root / package.replace('.', '/')
+        require(directory.is_dir(), "Missing coverage source package")
+        names.extend('.'.join(p.relative_to(source_root).with_suffix('').parts)
+                     for p in sorted(directory.rglob('*.java')))
+    require(names and len(names) == len(set(names)), "Empty or duplicate coverage sources")
+    exemptions = policy['nonExecutableClasses']
+    require(type(exemptions) is list and len(exemptions) == len(set(exemptions))
+            and set(exemptions) <= set(names), "Invalid non-executable coverage declarations")
+    rows, excluded = [], []
+    for name in sorted(names):
+        require(re.fullmatch(r'[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+', name), "Invalid coverage source")
+        path = source_root / (name.replace('.', '/') + '.java')
+        data = path.read_bytes()
+        row = {'class': name, 'source': str(path.relative_to(root)),
+               'sha256': hashlib.sha256(data).hexdigest()}
+        if name in exemptions:
+            source = without_comments(data.decode())
+            require(re.search(r'public\s+interface\s+' + re.escape(path.stem) + r'\b', source)
+                    and not re.search(r'\b(?:default|static|class|enum|record)\b|=', source),
+                    "Executable code cannot be excluded from coverage")
+            excluded.append(row)
+        else:
+            rows.append(row)
+    require(rows, "Empty executable coverage scope")
+    return {'minimumLinePercent': minimum, 'sources': rows, 'nonExecutable': excluded}
+
+
+def coverage_result(expected, report):
+    require(report is not None and Path(report).is_file(), "Missing JaCoCo report")
+    tree = ET.parse(report).getroot()
+    require(tree.tag == 'report', "Invalid JaCoCo report root")
+    sources = {}
+    for package in tree.findall('package'):
+        for source in package.findall('sourcefile'):
+            key = package.get('name', '') + '/' + source.get('name', '')
+            require(key not in sources, "Duplicate JaCoCo source")
+            sources[key] = source
+    rows, failures = [], []
+    minimum = expected['coverage']['minimumLinePercent']
+    for wanted in expected['coverage']['sources']:
+        key = wanted['class'].replace('.', '/') + '.java'
+        require(key in sources, "Missing coverage source: " + wanted['class'])
+        source = sources[key]
+        counters = [c for c in source.findall('counter') if c.get('type') == 'LINE']
+        require(len(counters) == 1, "Missing or duplicate LINE counter: " + wanted['class'])
+        counter = counters[0]
+        require(all(re.fullmatch(r'0|[1-9][0-9]*', counter.get(k, '')) for k in ['covered', 'missed']),
+                "Invalid line counts: " + wanted['class'])
+        covered, missed = int(counter.get('covered')), int(counter.get('missed'))
+        require(covered + missed > 0, "Empty executable coverage: " + wanted['class'])
+        lines, actual_covered, actual_missed = set(), 0, 0
+        for line in source.findall('line'):
+            require(all(re.fullmatch(r'0|[1-9][0-9]*', line.get(k, '')) for k in ['nr', 'ci', 'mi']),
+                    "Invalid coverage line: " + wanted['class'])
+            number = int(line.get('nr'))
+            require(number > 0 and number not in lines, "Duplicate or invalid coverage line")
+            lines.add(number)
+            if int(line.get('ci')) > 0: actual_covered += 1
+            elif int(line.get('mi')) > 0: actual_missed += 1
+            else: require(False, "Empty executable line")
+        require((covered, missed) == (actual_covered, actual_missed),
+                "LINE counter differs from instruction-bearing lines: " + wanted['class'])
+        row = {'class': wanted['class'], 'covered': covered, 'total': covered + missed,
+               'minimumLinePercent': minimum, 'passed': covered * 100 >= minimum * (covered + missed)}
+        rows.append(row)
+        if not row['passed']: failures.append(wanted['class'] + f" {covered}/{covered + missed}")
+    require(not failures, "Coverage below blocking threshold: " + '; '.join(failures))
+    return {'sources': rows, 'minimumLinePercent': minimum, 'verdict': 'PASS'}
+
+
 def plan(root):
     root = Path(root)
     profile_path = root / "scripts/ci/open-platform-backend.profile.json"
@@ -89,10 +166,11 @@ def plan(root):
                      'sha256': hashlib.sha256(data).hexdigest(), 'cases': cases(data.decode())})
     return {'schemaVersion': 1, 'profile': profile['id'], 'requirements': profile['requirements'],
             'profileSha256': hashlib.sha256(profile_path.read_bytes()).hexdigest(), 'classes': rows,
+            'coverage': coverage_plan(root, profile['coverage']),
             'expectedClasses': len(rows), 'expectedCases': sum(len(row['cases']) for row in rows)}
 
 
-def reconcile(expected, results):
+def reconcile(expected, results, coverage=None):
     wanted = collections.Counter((row['class'], name)
                                  for row in expected['classes'] for name in row['cases'])
     actual = collections.Counter()
@@ -111,7 +189,8 @@ def reconcile(expected, results):
             actual[(test.get('classname'), test.get('name'))] += 1
     require(actual == wanted, "JUnit case identities differ from blocking profile")
     return {'profile': expected['profile'], 'executed': sum(actual.values()),
-            'passed': sum(actual.values()), 'classes': len(expected['classes']), 'verdict': 'PASS'}
+            'passed': sum(actual.values()), 'classes': len(expected['classes']),
+            'coverage': coverage_result(expected, coverage), 'verdict': 'PASS'}
 
 
 def main():
@@ -122,6 +201,7 @@ def main():
     parser.add_argument('--selectors')
     parser.add_argument('--results')
     parser.add_argument('--receipt')
+    parser.add_argument('--coverage')
     args = parser.parse_args()
     current = plan(args.root)
     if args.mode == 'plan':
@@ -133,7 +213,7 @@ def main():
         require(args.receipt and not Path(args.receipt).exists(), "Receipt already exists or is missing")
         require(current == json.loads(Path(args.plan).read_text()), "Backend source/profile drift")
         require(args.results and args.receipt, "Results and receipt required")
-        output = reconcile(current, args.results)
+        output = reconcile(current, args.results, args.coverage)
         Path(args.receipt).write_text(json.dumps(output, indent=2) + '\n')
         print(json.dumps(output))
 

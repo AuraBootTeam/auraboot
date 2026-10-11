@@ -36,5 +36,19 @@
     "com.auraboot.framework.plugin.validation.NamedQueryFieldValidatorTest",
     "com.auraboot.framework.meta.service.AggregateQueryServiceIntegrationTest",
     "com.auraboot.framework.application.security.ExternalMachineAuthenticationFilterTest"
-  ]
+  ],
+  "coverage": {
+    "minimumLinePercent": 80,
+    "sourcePackages": [
+      "com.auraboot.framework.openplatform.service",
+      "com.auraboot.framework.openplatform.security"
+    ],
+    "classes": [
+      "com.auraboot.framework.meta.service.impl.NamedQueryServiceImpl",
+      "com.auraboot.framework.meta.service.impl.AggregateQueryServiceImpl"
+    ],
+    "nonExecutableClasses": [
+      "com.auraboot.framework.openplatform.service.OpenApiCapabilityContributor"
+    ]
+  }
 }

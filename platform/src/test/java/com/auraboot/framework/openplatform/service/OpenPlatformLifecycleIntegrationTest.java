@@ -51,6 +51,8 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
     @Autowired private OpenApiRateLimitMapper rateLimitMapper;
     @Autowired private OpenPlatformBearerAuthenticator authenticator;
     @Autowired private OpenPlatformSecretCodec secretCodec;
+    @Autowired private OpenApiEventPublisher eventPublisher;
+    @Autowired private OpenPlatformRetentionWorker retentionWorker;
     @Autowired private JdbcTemplate jdbcTemplate;
     @Autowired private WebhookService webhookService;
     @Autowired private WebhookDispatcher webhookDispatcher;
@@ -467,6 +469,38 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
         assertEquals(0, overview.deadLetterCount());
         assertTrue(managementService.listCallAudits(installation.pid(), null, null, 50).isEmpty());
         assertTrue(managementService.listWebhookDeliveries(installation.pid(), null, 50).isEmpty());
+        verifyRetentionKeepsValidInstallationData(application.pid(), installation.pid(), rotation.credential());
+    }
+
+    private void verifyRetentionKeepsValidInstallationData(String applicationPid, String installationPid,
+            com.auraboot.framework.openplatform.dto.OpenPlatformDtos.CredentialSecret credential) {
+        Long installationId = jdbcTemplate.queryForObject("SELECT id FROM ab_application_installation WHERE pid=?", Long.class, installationPid);
+        Long tenantId = getTestTenant().getId();
+        String oldToken = tokenService.issue("client_credentials", credential.clientId(), credential.clientSecret(), "assets.read").accessToken();
+        String oldHash = secretCodec.sha256(oldToken);
+        jdbcTemplate.update("UPDATE ab_application_access_token SET expires_at=NOW()-INTERVAL '8 days' WHERE token_hash=?", oldHash);
+        jdbcTemplate.update("INSERT INTO ab_open_api_rate_window(installation_id,window_start,request_count) VALUES (?,NOW()-INTERVAL '3 days',1),(?,NOW()-INTERVAL '1 day',1)", installationId, installationId);
+        String oldAudit = UniqueIdGenerator.generate(), keptAudit = UniqueIdGenerator.generate();
+        jdbcTemplate.update("INSERT INTO ab_open_api_call_audit(pid,tenant_id,application_pid,installation_pid,http_method,request_path,response_status,duration_ms,occurred_at) "
+                + "VALUES (?,?,?,?,'GET','/api/open/v1/whoami',200,1,NOW()-INTERVAL '91 days'),(?,?,?,?,'GET','/api/open/v1/whoami',200,1,NOW()-INTERVAL '89 days')",
+                oldAudit, tenantId, applicationPid, installationPid, keptAudit, tenantId, applicationPid, installationPid);
+        jdbcTemplate.update("INSERT INTO ab_open_api_idempotency(tenant_id,installation_id,route_code,idempotency_key,request_hash,expires_at) "
+                + "VALUES (?,?,'retention','older-retention-key',?,NOW()-INTERVAL '8 days'),(?,?,'retention','grace-retention-key',?,NOW()-INTERVAL '6 days')",
+                tenantId, installationId, secretCodec.sha256("old"), tenantId, installationId, secretCodec.sha256("grace"));
+        int auditDays = (Integer) org.springframework.test.util.ReflectionTestUtils.getField(retentionWorker, "auditDays");
+        try {
+            org.springframework.test.util.ReflectionTestUtils.setField(retentionWorker, "auditDays", 0);
+            assertThrows(IllegalStateException.class, retentionWorker::purge);
+            assertEquals(1, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ab_open_api_call_audit WHERE pid=?", Integer.class, oldAudit));
+        } finally { org.springframework.test.util.ReflectionTestUtils.setField(retentionWorker, "auditDays", auditDays); }
+        retentionWorker.purge();
+        assertEquals(0, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ab_application_access_token WHERE token_hash=?", Integer.class, oldHash));
+        assertEquals(2, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ab_application_access_token WHERE installation_id=?", Integer.class, installationId));
+        assertEquals(1, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ab_open_api_rate_window WHERE installation_id=?", Integer.class, installationId));
+        assertEquals(0, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ab_open_api_call_audit WHERE pid=?", Integer.class, oldAudit));
+        assertEquals(1, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ab_open_api_call_audit WHERE pid=?", Integer.class, keptAudit));
+        assertEquals(0, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ab_open_api_idempotency WHERE installation_id=? AND idempotency_key='older-retention-key'", Integer.class, installationId));
+        assertEquals(1, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ab_open_api_idempotency WHERE installation_id=? AND idempotency_key='grace-retention-key'", Integer.class, installationId));
     }
 
     @Test
@@ -602,6 +636,15 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
         assertTrue(rejected.receipts().isEmpty());
         assertEquals(0, jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM ab_webhook_delivery_log WHERE event_id = 'evt_invalid'", Integer.class));
+        eventPublisher.publish("assets.assignment.changed", 1, "asset-public-pid",
+                Map.of("pid", "asset-public-pid", "assetCode", "A-001", "secret", "never-publish"), tenantId);
+        var publishedBodies = jdbcTemplate.queryForList("SELECT request_body FROM ab_webhook_delivery_log WHERE installation_pid=?", String.class, installation.pid());
+        assertFalse(publishedBodies.isEmpty());
+        assertTrue(publishedBodies.stream().allMatch(body -> body.contains("asset-public-pid") && body.contains("A-001")));
+        assertFalse(publishedBodies.stream().anyMatch(body -> body.contains("never-publish") || body.contains("secret")));
+        assertThrows(IllegalArgumentException.class, () -> eventPublisher.publish("platform.command.executed", 1,
+                "asset-public-pid", Map.of(), tenantId));
+        assertEquals(publishedBodies.size(), jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ab_webhook_delivery_log WHERE installation_pid=?", Integer.class, installation.pid()));
     }
 
     private void insertWebhookHealthRow(Long tenantId, String installationPid, String pid, String name,
