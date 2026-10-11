@@ -31,6 +31,7 @@ interface FormOptionConfig {
   description?: string | Record<string, string>;
   disabled?: boolean;
   visibleWhen?: VisibilityRule;
+  options?: FormOptionConfig[];
 }
 
 interface FormFieldConfig {
@@ -46,6 +47,7 @@ interface FormFieldConfig {
     | 'date'
     | 'datetime'
     | 'multiselect'
+    | 'grouped-multiselect'
     | 'segmented'
     | 'checkbox'
     | 'file'
@@ -237,6 +239,23 @@ export default function FormDialog() {
             locale,
             t,
           });
+        }
+      }
+      if (field.type === 'grouped-multiselect') {
+        const groups = visibleOptions(field, state.fieldOptions, formData);
+        const groupKey = field.props?.groupField || 'group';
+        const valuesKey = field.props?.valuesField || 'values';
+        const selections = Array.isArray(value) ? value : [];
+        const valid = groups.length > 0 && selections.length === groups.length && groups.every((group) => {
+          const matching = selections.filter((item: any) => item?.[groupKey] === group.value);
+          if (matching.length !== 1 || !Array.isArray(matching[0][valuesKey])) return false;
+          const values = matching[0][valuesKey];
+          return !group.disabled && values.length > 0 && new Set(values).size === values.length && values.every((selected: unknown) =>
+            (group.options || []).some((option) => option.value === selected && !option.disabled));
+        });
+        if (!valid) {
+          const label = field.label ? getLocalizedText(field.label, locale, t) : field.field;
+          newErrors[field.field] = buildRequiredFieldMessage(label, { dataType: 'select', locale, t });
         }
       }
       if (field.type === 'bom-upload-review') {
@@ -458,7 +477,7 @@ export default function FormDialog() {
 
               return (
                 <div key={`${field.field}-${sourceIndex}`}>
-                  <label htmlFor={fieldType === 'date' || fieldType === 'datetime' ? `form-dialog-${field.field}-${sourceIndex}` : undefined} className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <label htmlFor={component !== 'memberpicker' && ['date', 'datetime', 'select', 'number', 'textarea', 'text'].includes(fieldType) ? `form-dialog-${field.field}-${sourceIndex}` : undefined} className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
                     {label}
                     {field.required && <span className="ml-1 text-red-500">*</span>}
                   </label>
@@ -474,6 +493,7 @@ export default function FormDialog() {
                     />
                   ) : fieldType === 'select' ? (
                     <select
+                      id={`form-dialog-${field.field}-${sourceIndex}`}
                       ref={
                         isFirst ? (firstInputRef as React.RefObject<HTMLSelectElement>) : undefined
                       }
@@ -524,6 +544,37 @@ export default function FormDialog() {
                           >
                             {getLocalizedText(option.label, locale, t)}
                           </button>
+                        );
+                      })}
+                    </div>
+                  ) : fieldType === 'grouped-multiselect' ? (
+                    <div className={`max-h-80 space-y-3 overflow-y-auto rounded-lg border p-3 ${error ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}>
+                      {options.map((group) => {
+                        const groupKey = field.props?.groupField || 'group';
+                        const valuesKey = field.props?.valuesField || 'values';
+                        const selections = Array.isArray(formData[field.field]) ? formData[field.field] : [];
+                        const chosen = selections.find((item: any) => item?.[groupKey] === group.value)?.[valuesKey] || [];
+                        return (
+                          <fieldset key={group.value} className="rounded-md border border-gray-200 p-3 dark:border-gray-600" disabled={group.disabled}>
+                            <legend className="px-1 text-sm font-medium text-gray-900 dark:text-white">{getLocalizedText(group.label, locale, t)}</legend>
+                            {group.description && <p className="mb-2 text-xs text-gray-500 dark:text-gray-300">{getLocalizedText(group.description, locale, t)}</p>}
+                            {(group.options || []).map((option, optionIndex) => (
+                              <label key={option.value} className="flex min-h-11 cursor-pointer items-center gap-3 text-sm text-gray-900 dark:text-white">
+                                <input type="checkbox" disabled={option.disabled}
+                                  ref={isFirst && group === options[0] && optionIndex === 0 ? firstInputRef as React.RefObject<HTMLInputElement> : undefined}
+                                  checked={Array.isArray(chosen) && chosen.includes(option.value)}
+                                  onChange={() => {
+                                    const current = Array.isArray(chosen) ? chosen : [];
+                                    const next = current.includes(option.value) ? current.filter((item: string) => item !== option.value) : [...current, option.value];
+                                    updateField(field.field, options.map((entry) => ({
+                                      [groupKey]: entry.value,
+                                      [valuesKey]: entry.value === group.value ? next : selections.find((item: any) => item?.[groupKey] === entry.value)?.[valuesKey] || [],
+                                    })));
+                                  }} />
+                                <span>{getLocalizedText(option.label, locale, t)}</span>
+                              </label>
+                            ))}
+                          </fieldset>
                         );
                       })}
                     </div>
@@ -685,6 +736,7 @@ export default function FormDialog() {
                     </div>
                   ) : fieldType === 'number' ? (
                     <input
+                      id={`form-dialog-${field.field}-${sourceIndex}`}
                       ref={
                         isFirst ? (firstInputRef as React.RefObject<HTMLInputElement>) : undefined
                       }
@@ -721,6 +773,7 @@ export default function FormDialog() {
                     />
                   ) : fieldType === 'textarea' ? (
                     <textarea
+                      id={`form-dialog-${field.field}-${sourceIndex}`}
                       ref={
                         isFirst
                           ? (firstInputRef as React.RefObject<HTMLTextAreaElement>)
@@ -739,6 +792,7 @@ export default function FormDialog() {
                     />
                   ) : (
                     <input
+                      id={`form-dialog-${field.field}-${sourceIndex}`}
                       ref={
                         isFirst ? (firstInputRef as React.RefObject<HTMLInputElement>) : undefined
                       }

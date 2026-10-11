@@ -750,6 +750,11 @@ export async function promptInputForm(
                           ? description
                           : String(description),
                     }),
+                ...(field.type === 'grouped-multiselect' ? { options: Array.isArray(option.options)
+                  ? option.options.filter((choice: any) => choice && typeof choice.value === 'string' && choice.value.trim()
+                      && (typeof choice.label === 'string' || (choice.label && typeof choice.label === 'object')))
+                    .map((choice: any) => ({ value: choice.value, label: choice.label,
+                      ...(choice.disabled === true ? { disabled: true } : {}) })) : [] } : {}),
                 ...(option.disabled === true ? { disabled: true } : {}),
               };
             }

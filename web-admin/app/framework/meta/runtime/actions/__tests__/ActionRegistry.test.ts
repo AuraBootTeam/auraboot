@@ -1222,3 +1222,23 @@ describe('ActionRegistry command snapshot version', () => {
       } finally { window.removeEventListener('dialog:form', opened); }
     });
 });
+
+
+describe('ActionRegistry grouped API choices', () => {
+  it('retains group-scoped choices and disabled flags without exposing unrelated provider fields', async () => {
+    const fetchResult = vi.fn().mockResolvedValue({ code: '0', data: { items: [
+      { value: 'category-a', label: 'Resistors', secret: 'not-for-ui', options: [
+        { value: 'supplier-a', label: 'Supplier A', secret: 'not-for-ui' },
+        { value: 'supplier-b', label: 'Supplier B', disabled: true },
+        { label: 'No identity' },
+      ] },
+    ] } });
+    let detail: any;
+    window.addEventListener('dialog:form', (event) => { detail = (event as CustomEvent).detail; detail.onCancel(); }, { once: true });
+    await expect(promptInputForm([{ field: 'groups', type: 'grouped-multiselect', dataSource: {
+      type: 'api', endpoint: '/api/group-options' } }], 'Select', fetchResult)).rejects.toThrow('User cancelled');
+    expect(detail.fieldOptions.groups).toEqual([{ value: 'category-a', label: 'Resistors', options: [
+      { value: 'supplier-a', label: 'Supplier A' }, { value: 'supplier-b', label: 'Supplier B', disabled: true },
+    ] }]);
+  });
+});
