@@ -610,3 +610,15 @@ describe('FormDialog named native inputs', () => {
     expect(screen.getByRole('combobox', { name: '采购品类' })).toBeInTheDocument();
   });
 });
+
+
+describe('FormDialog unavailable grouped options', () => {
+  it('explains an empty group and prevents its submission', () => {
+    const onSubmit = vi.fn();
+    renderDialog({ fields: [{ field: 'selection', type: 'grouped-multiselect', label: '各品类供应商', required: true }],
+      fieldOptions: { selection: [{ value: 'empty', label: '电阻', options: [] }] }, defaults: {}, onSubmit });
+    expect(screen.getByRole('group', { name: '电阻' })).toHaveTextContent('暂无可选项');
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+});

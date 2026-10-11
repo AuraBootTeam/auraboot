@@ -558,6 +558,7 @@ export default function FormDialog() {
                           <fieldset key={group.value} className="rounded-md border border-gray-200 p-3 dark:border-gray-600" disabled={group.disabled}>
                             <legend className="px-1 text-sm font-medium text-gray-900 dark:text-white">{getLocalizedText(group.label, locale, t)}</legend>
                             {group.description && <p className="mb-2 text-xs text-gray-500 dark:text-gray-300">{getLocalizedText(group.description, locale, t)}</p>}
+                            {(group.options || []).length === 0 && <p className="py-2 text-sm text-gray-500 dark:text-gray-300">{translatedOrFallback(t, 'common.noData', locale.startsWith('zh') ? '暂无可选项' : 'No available options')}</p>}
                             {(group.options || []).map((option, optionIndex) => (
                               <label key={option.value} className="flex min-h-11 cursor-pointer items-center gap-3 text-sm text-gray-900 dark:text-white">
                                 <input type="checkbox" disabled={option.disabled}

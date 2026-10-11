@@ -134,3 +134,31 @@ describe('useActionHandler - action.type=flow handler preserves args', () => {
     expect(contextArgs.record).toBeUndefined();
   });
 });
+
+
+describe('useActionHandler flow refresh scope', () => {
+  it('retains the selected task filter after a successful runtime flow', async () => {
+    const executeHandler = vi.fn();
+    const runtime = makeRuntime(executeHandler);
+    const run = vi.fn().mockResolvedValue(undefined);
+    runtime.getFlowRunner = () => ({ run }) as any;
+    const loadData = vi.fn().mockResolvedValue(undefined);
+    const filters = { qo_pr_source_task_pid: 'TASK-1', state: 'active' };
+    const { result } = renderHook(() => useActionHandler(baseOptions(runtime, { context: { loadData, filters } })));
+    await act(async () => {
+      await result.current.handleAction({ code: 'save', action: { type: 'flow', steps: [
+        { action: 'command.execute', args: { command: 'test:update' } },
+      ] } } as ButtonConfig, { pid: 'SOURCE-1' });
+    });
+    expect(run).toHaveBeenCalledOnce();
+    expect(loadData).toHaveBeenCalledWith({ filters });
+  });
+
+  it('retains filters after a fallback flow without a runtime runner', async () => {
+    const loadData = vi.fn().mockResolvedValue(undefined);
+    const filters = { parent_pid: 'PARENT-1' };
+    const { result } = renderHook(() => useActionHandler(baseOptions(makeRuntime(vi.fn()), { context: { loadData, filters } })));
+    await act(async () => { await result.current.handleAction({ code: 'flow', action: { type: 'flow', steps: [] } } as any, { pid: 'ROW-1' }); });
+    expect(loadData).toHaveBeenCalledWith({ filters });
+  });
+});

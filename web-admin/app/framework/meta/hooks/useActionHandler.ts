@@ -1194,7 +1194,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                   (freshContext as any).fetchResult = fr;
                   const contextWithRecord = { ...freshContext, record, row: record };
                   await flowRunner.run(actionDef.steps, contextWithRecord as any);
-                  if (context.loadData) await context.loadData();
+                  if (context.loadData) await context.loadData({ filters: context.filters });
                   return;
                 }
               }
@@ -1221,7 +1221,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                   });
                 }
               }
-              if (context.loadData) await context.loadData();
+              if (context.loadData) await context.loadData({ filters: context.filters });
             }
             return;
           }
