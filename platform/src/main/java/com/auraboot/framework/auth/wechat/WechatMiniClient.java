@@ -9,6 +9,15 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.time.Duration;
+import java.util.Map;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import org.springframework.http.MediaType;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.web.client.RestClientException;
 
 /**
  * WeChat mini-program client: exchanges a wx.login code for the caller's
@@ -21,6 +30,8 @@ import java.net.URI;
 public class WechatMiniClient {
 
     public record WxSession(String openid, String unionid) {}
+
+    private static final RestClient PHONE_CLIENT = phoneClient();
 
     private final WechatMiniProperties properties;
 
@@ -58,6 +69,120 @@ public class WechatMiniClient {
             throw new RootUnCheckedException(ResponseCode.BadParam, "WeChat login code rejected (" + code + ")");
         }
         return new WxSession(body.getOpenid(), body.getUnionid());
+    }
+
+    /** Server-verified grant. This value does not grant membership or roles. */
+    public record VerifiedPhone(String appId, String openid, String countryCode,
+                                String nationalNumber, long grantedAtEpochSeconds) {
+        @Override
+        public String toString() {
+            return "VerifiedPhone[redacted]";
+        }
+    }
+
+    /**
+     * Exchanges the one-use phone code, bound by WeChat to an already-resolved
+     * mini-program openid. Callers must obtain that openid from host identity,
+     * never from an unauthenticated request body.
+     */
+    public VerifiedPhone verifyPhoneGrant(String phoneCode, String authenticatedOpenid) {
+        if (isBlank(phoneCode) || isBlank(authenticatedOpenid)) {
+            throw phoneFailure("WeChat phone grant requires a code and authenticated identity");
+        }
+        String appId = properties.getAppId();
+        String secret = properties.getAppSecret();
+        if (isBlank(appId) || isBlank(secret)) {
+            throw phoneFailure("WeChat mini-program phone verification is not configured");
+        }
+        String base = phoneApiBase();
+        JsonNode token = phonePost(base + "/cgi-bin/stable_token", Map.of(
+                "grant_type", "client_credential", "appid", appId,
+                "secret", secret, "force_refresh", false));
+        String accessToken = requiredText(token, "access_token");
+        if (!token.path("expires_in").isIntegralNumber() || token.path("expires_in").asLong() <= 0) {
+            throw phoneFailure("WeChat token response is invalid");
+        }
+        // No retry: a phone grant is one-use. A failed exchange requires a new grant.
+        JsonNode response = phonePost(base + "/wxa/business/getuserphonenumber?access_token="
+                + urlEncode(accessToken), Map.of("code", phoneCode, "openid", authenticatedOpenid));
+        if (!response.path("errcode").isIntegralNumber() || response.path("errcode").asLong() != 0) {
+            throw phoneFailure("WeChat phone code rejected");
+        }
+        JsonNode phone = response.path("phone_info");
+        JsonNode watermark = phone.path("watermark");
+        if (!appId.equals(requiredText(watermark, "appid"))
+                || !watermark.path("timestamp").isIntegralNumber()
+                || watermark.path("timestamp").asLong() <= 0) {
+            throw phoneFailure("WeChat phone watermark is invalid");
+        }
+        String country = requiredText(phone, "countryCode");
+        String national = requiredText(phone, "purePhoneNumber");
+        if (!country.matches("[1-9][0-9]{0,3}") || !national.matches("[0-9]{4,14}")
+                || country.length() + national.length() > 15) {
+            throw phoneFailure("WeChat phone number is invalid");
+        }
+        return new VerifiedPhone(appId, authenticatedOpenid, country, national,
+                watermark.path("timestamp").asLong());
+    }
+
+    private String phoneApiBase() {
+        String configured = properties.getApiBaseUrl();
+        if (isBlank(configured)) {
+            throw phoneFailure("WeChat phone API base is not configured");
+        }
+        URI base = URI.create(configured.replaceAll("/+$", ""));
+        boolean loopback = "localhost".equals(base.getHost()) || "127.0.0.1".equals(base.getHost())
+                || "[::1]".equals(base.getHost());
+        if (base.getHost() == null || base.getUserInfo() != null || base.getQuery() != null
+                || base.getFragment() != null || (base.getPath() != null && !base.getPath().isEmpty())
+                || !("https".equals(base.getScheme()) || (loopback && "http".equals(base.getScheme())))) {
+            throw phoneFailure("WeChat phone API base must use HTTPS or local test HTTP");
+        }
+        return base.toString();
+    }
+
+    private static RestClient phoneClient() {
+        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(
+                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build());
+        factory.setReadTimeout(Duration.ofSeconds(10));
+        return RestClient.builder().requestFactory(factory).build();
+    }
+
+    private JsonNode phonePost(String uri, Map<String, Object> payload) {
+        try {
+            String raw = PHONE_CLIENT.post()
+                    .uri(URI.create(uri)).contentType(MediaType.APPLICATION_JSON)
+                    .body(payload).retrieve().body(String.class);
+            if (isBlank(raw)) {
+                throw phoneFailure("WeChat phone verification returned an empty response");
+            }
+            JsonNode body = json().readTree(raw);
+            if (body == null || !body.isObject()) {
+                throw phoneFailure("WeChat phone verification response is invalid");
+            }
+            if (body.has("errcode") && (!body.path("errcode").isIntegralNumber()
+                    || body.path("errcode").asLong() != 0)) {
+                throw phoneFailure("WeChat phone verification rejected");
+            }
+            return body;
+        } catch (RestClientException | JsonProcessingException failure) {
+            // Provider exceptions may contain the token URI or private response body.
+            // Do not retain them as causes accessible to HTTP error logging/renderers.
+            log.warn("WeChat phone verification failed: {}", failure.getClass().getSimpleName());
+            throw phoneFailure("WeChat phone verification exchange failed");
+        }
+    }
+
+    private static String requiredText(JsonNode body, String field) {
+        JsonNode value = body.path(field);
+        if (!value.isTextual() || value.textValue().isBlank()) {
+            throw phoneFailure("WeChat phone verification response is incomplete");
+        }
+        return value.textValue();
+    }
+
+    private static RootUnCheckedException phoneFailure(String message) {
+        return new RootUnCheckedException(ResponseCode.BadParam, message);
     }
 
     private static String urlEncode(String v) {
