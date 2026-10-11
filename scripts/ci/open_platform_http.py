@@ -19,7 +19,7 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 class Client:
-    def __init__(self, base_url, *, timeout=90, max_requests=250, opener=None):
+    def __init__(self, base_url, *, timeout=90, max_requests=250, opener=None, allow_expected_rate_limit=False):
         parsed = urllib.parse.urlsplit(base_url)
         if (parsed.scheme not in {"http", "https"} or not parsed.hostname
                 or parsed.username is not None or parsed.password is not None
@@ -27,6 +27,9 @@ class Client:
             raise ValueError("base URL must be an HTTP(S) origin without credentials")
         if timeout <= 0 or max_requests <= 0:
             raise ValueError("timeout and request budget must be positive")
+        if type(allow_expected_rate_limit) is not bool:
+            raise ValueError("expected rate-limit probe opt-in must be boolean")
+        self.allow_expected_rate_limit = allow_expected_rate_limit
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.max_requests = max_requests
@@ -66,7 +69,7 @@ class Client:
             status = response.code
             raw = response.read(4 * 1024 * 1024 + 1)
             response_headers = dict(response.headers)
-        if status == 429:
+        if status == 429 and not (self.allow_expected_rate_limit and expected == (429,)):
             self.stopped = True
             raise ProtocolError("HTTP 429: transport stopped; no retry")
         if status not in expected:
