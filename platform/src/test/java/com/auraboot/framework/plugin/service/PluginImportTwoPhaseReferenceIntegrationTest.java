@@ -42,6 +42,8 @@ class PluginImportTwoPhaseReferenceIntegrationTest extends BaseIntegrationTest {
     @Autowired private com.auraboot.framework.meta.service.MetaModelService models;
     @Autowired private com.auraboot.framework.openplatform.service.OpenApiPublicationService publications;
     @Autowired private com.auraboot.framework.plugin.mapper.PluginResourceMapper resources;
+    @Autowired private com.auraboot.framework.plugin.mapper.PluginRecordMapper plugins;
+    @Autowired private com.auraboot.framework.plugin.mapper.PluginImportHistoryMapper histories;
     @Autowired private com.fasterxml.jackson.databind.ObjectMapper json;
     @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
 
@@ -170,8 +172,21 @@ class PluginImportTwoPhaseReferenceIntegrationTest extends BaseIntegrationTest {
         java.nio.file.Files.writeString(dir.resolve("plugin.json"), json.writeValueAsString(manifest));
         var preview = pluginImportService.parseDirectory(dir.toString());
         assertThat(preview.isValid()).as("public import preview errors: %s", preview.getErrors()).isTrue();
+        try {
+            com.auraboot.framework.application.tenant.MetaContext.setContext(testTenant.getId() + 1_000_000L,
+                    testUser.getId(), testUser.getPid(), testUser.getUserName());
+            assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> pluginImportService.execute(preview.getImportId(), new ImportRequest())))
+                    .as("cached preview cannot execute under a different tenant")
+                    .isInstanceOf(com.auraboot.framework.plugin.exception.PluginException.class)
+                    .hasMessageContaining("tenant does not match preview owner");
+        } finally {
+            applyTestMetaContext();
+        }
+        assertThat(histories.findByImportId(preview.getImportId()).getStatus()).isEqualTo("previewing");
+        assertThat(plugins.findByTenantAndPluginId(manifest.get("pluginId").asText())).isNull();
         var result = pluginImportService.execute(preview.getImportId(), new ImportRequest());
         assertThat(result.isSuccess()).as("public import failed: %s", result.getErrorMessage()).isTrue();
+        var originalPluginManifest = json.readTree(jdbc.queryForObject("SELECT manifest::text FROM ab_plugin WHERE tenant_id = ? AND pid = ?", String.class, testTenant.getId(), result.getPluginPid()));
         var active = publications.active(testTenant.getId(), publicCode).orElseThrow();
         assertThat(active.modelCode()).isEqualTo(modelCode);
         assertThat(active.schemaVersion()).isEqualTo(1);
@@ -192,7 +207,7 @@ class PluginImportTwoPhaseReferenceIntegrationTest extends BaseIntegrationTest {
         assertThat(originalSources).hasSize(3);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ab_meta_model WHERE code = ? AND (deleted_flag = FALSE OR deleted_flag IS NULL)", Long.class, modelCode)).isEqualTo(1L);
         manifest.remove(java.util.List.of("models", "fields", "modelFieldBindings"));
-        manifest.put("version", "2.0.0");
+        manifest.put("version", "2.0.0").put("displayName", "Changed public import metadata").put("description", "Upgrade description");
         ((com.fasterxml.jackson.databind.node.ObjectNode) manifest.get("publicResources").get(0))
                 .put("schemaVersion", 2).put("maxPageSize", 30);
         java.nio.file.Files.writeString(dir.resolve("plugin.json"), json.writeValueAsString(manifest));
@@ -205,6 +220,10 @@ class PluginImportTwoPhaseReferenceIntegrationTest extends BaseIntegrationTest {
                 .isInstanceOf(com.auraboot.framework.plugin.exception.PluginException.class).hasMessageContaining("latest successful");
         assertThat(publications.active(testTenant.getId(), publicCode).orElseThrow().schemaVersion()).isEqualTo(2);
         assertThat(pluginImportService.rollback(upgradePreview.getImportId()).isSuccess()).isTrue();
+        assertThat(jdbc.queryForObject("SELECT version FROM ab_plugin WHERE tenant_id = ? AND pid = ?", String.class, testTenant.getId(), result.getPluginPid())).as("publication rollback restores plugin metadata version").isEqualTo("1.0.0");
+        assertThat(jdbc.queryForObject("SELECT display_name FROM ab_plugin WHERE tenant_id = ? AND pid = ?", String.class, testTenant.getId(), result.getPluginPid())).isEqualTo("Public import order fixture");
+        assertThat(jdbc.queryForObject("SELECT description FROM ab_plugin WHERE tenant_id = ? AND pid = ?", String.class, testTenant.getId(), result.getPluginPid())).isNull();
+        assertThat(json.readTree(jdbc.queryForObject("SELECT manifest::text FROM ab_plugin WHERE tenant_id = ? AND pid = ?", String.class, testTenant.getId(), result.getPluginPid()))).isEqualTo(originalPluginManifest);
         assertThat(publications.active(testTenant.getId(), publicCode).orElseThrow().schemaVersion()).isEqualTo(1);
         assertThat(publications.snapshots(testTenant.getId(), publicCode)).hasSize(2);
         for (var original : originalSources) {
@@ -229,7 +248,45 @@ class PluginImportTwoPhaseReferenceIntegrationTest extends BaseIntegrationTest {
         assertThat(unchanged.isSuccess()).isTrue();
         assertThat(unchanged.getResourceCounts().get("PUBLIC_RESOURCE")).containsEntry("SKIP", 1);
         assertThat(publications.snapshots(testTenant.getId(), publicCode)).hasSize(2);
+
+        var installed = plugins.selectById(plugins.findByPid(result.getPluginPid()).getId());
+        installed.setDisplayName("User edited metadata");
+        installed.setSettings(java.util.Map.of("retainedSetting", "user-setting"));
+        assertThat(plugins.updateById(installed)).isEqualTo(1);
+        assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> pluginImportService.rollback(unchangedPreview.getImportId())))
+                .as("rollback must not overwrite metadata edited after import")
+                .isInstanceOf(com.auraboot.framework.plugin.exception.PluginException.class)
+                .hasMessageContaining("metadata changed after import");
+        assertThat(plugins.selectById(installed.getId()).getDisplayName()).isEqualTo("User edited metadata");
+        assertThat(publications.active(testTenant.getId(), publicCode).orElseThrow().schemaVersion()).isEqualTo(1);
+        assertThat(publications.snapshots(testTenant.getId(), publicCode)).hasSize(2);
+        assertThat(resources.findByTypeAndCode(testTenant.getId(),
+                com.auraboot.framework.plugin.dto.imports.ResourceType.PUBLIC_RESOURCE.code(), publicCode).getImportId())
+                .isEqualTo(unchangedPreview.getImportId());
+        installed.setDisplayName("Changed public import metadata");
+        assertThat(plugins.updateById(installed)).isEqualTo(1);
+
+        var history = histories.findByImportId(unchangedPreview.getImportId());
+        var persistedSnapshot = history.getManifestSnapshot();
+        assertThat(persistedSnapshot).containsKeys("schemaVersion", "before", "after");
+        assertThat(histories.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<com.auraboot.framework.plugin.entity.PluginImportHistory>()
+                .eq(com.auraboot.framework.plugin.entity.PluginImportHistory::getId, history.getId())
+                .set(com.auraboot.framework.plugin.entity.PluginImportHistory::getManifestSnapshot, null))).isEqualTo(1);
+        assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> pluginImportService.rollback(unchangedPreview.getImportId())))
+                .as("legacy public upgrade without a metadata snapshot must fail closed")
+                .isInstanceOf(com.auraboot.framework.plugin.exception.PluginException.class)
+                .hasMessageContaining("rollback snapshot is missing");
+        assertThat(plugins.selectById(installed.getId()).getVersion()).isEqualTo("3.0.0");
+        assertThat(resources.findByTypeAndCode(testTenant.getId(),
+                com.auraboot.framework.plugin.dto.imports.ResourceType.PUBLIC_RESOURCE.code(), publicCode).getImportId())
+                .isEqualTo(unchangedPreview.getImportId());
+        assertThat(publications.snapshots(testTenant.getId(), publicCode)).hasSize(2);
+        history.setManifestSnapshot(persistedSnapshot);
+        assertThat(histories.updateById(history)).isEqualTo(1);
         assertThat(pluginImportService.rollback(unchangedPreview.getImportId()).isSuccess()).isTrue();
+        assertThat(plugins.selectById(installed.getId()).getSettings()).containsEntry("retainedSetting", "user-setting");
+        assertThat(jdbc.queryForObject("SELECT version FROM ab_plugin WHERE tenant_id = ? AND pid = ?", String.class, testTenant.getId(), result.getPluginPid())).as("unchanged publication rollback restores plugin metadata version").isEqualTo("1.0.0");
+        assertThat(json.readTree(jdbc.queryForObject("SELECT manifest::text FROM ab_plugin WHERE tenant_id = ? AND pid = ?", String.class, testTenant.getId(), result.getPluginPid()))).isEqualTo(originalPluginManifest);
         var restoredOwner = resources.findByTypeAndCode(testTenant.getId(),
                 com.auraboot.framework.plugin.dto.imports.ResourceType.PUBLIC_RESOURCE.code(), publicCode);
         assertThat(restoredOwner.getImportId()).as("unchanged import rollback restores earlier ownership").isEqualTo(preview.getImportId());

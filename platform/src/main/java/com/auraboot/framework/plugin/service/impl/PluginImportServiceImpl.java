@@ -622,6 +622,9 @@ public class PluginImportServiceImpl implements PluginImportService {
         String pluginId = context.getManifest().getPluginId();
         String importId = context.getHistory().getImportId();
         Long tenantId = MetaContext.getCurrentTenantId();
+        if (!Objects.equals(tenantId, context.getHistory().getTenantId())) {
+            throw new PluginException("Import tenant does not match preview owner");
+        }
         String lockKey = "plugin-import:" + tenantId + ":" + pluginId;
 
         // Guard: clean up stale IMPORTING records (>10 min old)
@@ -760,8 +763,34 @@ public class PluginImportServiceImpl implements PluginImportService {
             // to flow to the post-import quality score below.
             pageSchemaImportGate.enforce(manifest);
 
+            boolean publicImport = (manifest.getPublicResources() != null && !manifest.getPublicResources().isEmpty())
+                    || (manifest.getPublicQueries() != null && !manifest.getPublicQueries().isEmpty());
+            PluginMetadataRollbackSnapshot.Metadata previousMetadata = null;
+            if (publicImport) {
+                var previous = pluginRecordMapper.findByTenantAndPluginId(manifest.getPluginId());
+                if (previous != null) {
+                    var locked = pluginRecordMapper.lockIdentityIncludingDeleted(tenantId, previous.getPid());
+                    if (locked == null || !Objects.equals(tenantId, locked.getTenantId())
+                            || !Objects.equals(manifest.getPluginId(), locked.getPluginId())) {
+                        throw new PluginException("Public plugin metadata owner changed before import");
+                    }
+                    previousMetadata = pluginMetadata(locked);
+                }
+            }
+
             // Create or update plugin record
             String pluginPid = createOrUpdatePlugin(manifest, tenantId);
+            if (publicImport) {
+                var installed = pluginRecordMapper.lockIdentityIncludingDeleted(tenantId, pluginPid);
+                if (installed == null || !Objects.equals(tenantId, installed.getTenantId())
+                        || !Objects.equals(manifest.getPluginId(), installed.getPluginId())) {
+                    throw new PluginException("Public plugin metadata owner is missing after import");
+                }
+                var snapshot = new PluginMetadataRollbackSnapshot(1, tenantId, pluginPid,
+                        previousMetadata, pluginMetadata(installed));
+                context.getHistory().setManifestSnapshot(objectMapper.convertValue(snapshot,
+                        new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {}));
+            }
             result.setPluginPid(pluginPid);
 
             // Import resources in dependency order
@@ -1436,15 +1465,30 @@ public class PluginImportServiceImpl implements PluginImportService {
             throw new PluginException("Rollback tenant does not match import owner");
         }
 
+        PluginMetadataRollbackSnapshot metadataRollback = null;
         boolean hasPublicPublications = pluginResourceMapper.findByPluginPid(history.getPluginPid()).stream()
                 .anyMatch(resource -> resource.getResourceTypeEnum().isPublicPublication());
         if (hasPublicPublications) {
-            if (pluginRecordMapper.lockIdentityIncludingDeleted(history.getTenantId(), history.getPluginPid()) == null) {
+            var currentPlugin = pluginRecordMapper.lockIdentityIncludingDeleted(history.getTenantId(), history.getPluginPid());
+            if (currentPlugin == null) {
                 throw new PluginException("Public publication plugin owner is missing");
             }
             var latest = importHistoryMapper.findLastSuccessful(history.getTenantId(), history.getPluginId());
             if (latest == null || !importId.equals(latest.getImportId())) {
                 throw new PluginException("Only the latest successful public publication import can be rolled back");
+            }
+            if ("upgrade".equals(history.getImportType())) {
+                if (history.getManifestSnapshot() == null) {
+                    throw new PluginException("Public plugin metadata rollback snapshot is missing");
+                }
+                metadataRollback = objectMapper.convertValue(history.getManifestSnapshot(), PluginMetadataRollbackSnapshot.class);
+                if (metadataRollback.schemaVersion() != 1 || metadataRollback.before() == null
+                        || !Objects.equals(history.getTenantId(), metadataRollback.tenantId())
+                        || !Objects.equals(history.getPluginPid(), metadataRollback.pluginPid())
+                        || !Objects.equals(history.getPluginId(), metadataRollback.before().pluginId())
+                        || !Objects.equals(pluginMetadata(currentPlugin), metadataRollback.after())) {
+                    throw new PluginException("Public plugin metadata changed after import or rollback snapshot is invalid");
+                }
             }
         }
 
@@ -1480,6 +1524,11 @@ public class PluginImportServiceImpl implements PluginImportService {
                 }
             }
 
+            if (metadataRollback != null && pluginRecordMapper.restoreImportedMetadata(history.getTenantId(),
+                    history.getPluginPid(), metadataRollback.before()) != 1) {
+                throw new PluginException("Public plugin metadata restore owner mismatch");
+            }
+
             // Update plugin status or delete if it was a fresh install
             if ("install".equals(history.getImportType())) {
                 pluginRecordMapper.softDelete(history.getPluginPid());
@@ -1501,6 +1550,11 @@ public class PluginImportServiceImpl implements PluginImportService {
         }
 
         return result;
+    }
+
+    private PluginMetadataRollbackSnapshot.Metadata pluginMetadata(PluginRecord plugin) {
+        return new PluginMetadataRollbackSnapshot.Metadata(plugin.getPluginId(), plugin.getNamespace(),
+                plugin.getVersion(), plugin.getDisplayName(), plugin.getDescription(), plugin.getManifest());
     }
 
     @Override
