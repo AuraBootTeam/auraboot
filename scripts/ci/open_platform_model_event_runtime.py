@@ -140,3 +140,25 @@ class DockerInfrastructure:
         result = self.sql("SELECT json_build_object('lastRun',last_run_at) FROM ab_scheduled_task WHERE pid='sys-outbox-poll'")
         require(isinstance(result, dict) and "lastRun" in result, "model source poll marker missing")
         return result["lastRun"]
+
+    def load_state(self, tenant, event_type, subjects, subscription_pid):
+        tenant, event_type = self.tenant_id(tenant), self.identifier(event_type)
+        subscription_pid = self.identifier(subscription_pid)
+        require(isinstance(subjects, list) and len(subjects) == 32
+                and all(isinstance(subject, str) for subject in subjects) and len(set(subjects)) == 32,
+                'model load observation denominator invalid')
+        subjects = [self.identifier(subject) for subject in subjects]
+        selected = ','.join("'" + subject + "'" for subject in subjects)
+        predicate = 'd.tenant_id=' + tenant + ' AND d.event_id=o.event_id'
+        target = predicate + " AND d.subscription_pid='" + subscription_pid + "'"
+        def scalar(column):
+            return '(SELECT max(d.' + column + ') FROM ab_webhook_delivery_log d WHERE ' + target + ')'
+        return self.sql("SELECT json_build_object('sources',COALESCE((SELECT json_agg(json_build_object("
+            "'subject',o.subject,'eventId',o.event_id,'status',o.status,'sequence',o.event_sequence,"
+            "'receipts',(SELECT count(*) FROM ab_integration_receipt r WHERE r.tenant_id=" + tenant
+            + " AND r.event_id=o.event_id AND r.consumer_code='open-platform-model-webhook-v1' AND r.status='applied'),"
+            "'deliveries',(SELECT count(*) FROM ab_webhook_delivery_log d WHERE " + predicate + "),"
+            "'deliveryPid'," + scalar('pid') + ",'deliveryStatus'," + scalar('delivery_status')
+            + ",'retryCount'," + scalar('retry_count') + ",'responseStatus'," + scalar('response_status')
+            + ')) FROM ab_outbox o WHERE o.tenant_id=' + tenant + " AND o.event_type='" + event_type
+            + "' AND o.subject IN (" + selected + ")), '[]'::json))")

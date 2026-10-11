@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from open_platform_http import ProtocolError
-from open_platform_model_event_probe import CASES, Receivers, read_secret, run_model_event_probe, run_source_binding_replay, verify_report
+from open_platform_model_event_probe import CASES, Receivers, read_secret, run_model_event_probe, run_source_binding_replay, verify_report, load_metrics
 from open_platform_model_event_runtime import DockerInfrastructure
 
 SECRET = b"model-event-verifier-test-secret-32-bytes"
@@ -43,6 +43,36 @@ def passed():
         "sourceBindingProof": {"eventId": "evt_dead", "deliveryPid": "delivery_dead", "subjectPid": "pid_dead",
             "blockedStatus": "dead_letter", "blockedReplayCount": 1, "blockedRetryCount": 1,
             "receiverAttemptsBefore": 0, "receiverAttemptsAfter": 0, "restoredStatus": "success", "restoredReplayCount": 2}}
+
+
+def load_passed():
+    measurement = {"profile": "burst-32x4", "authority": "recorded", "sloVerdict": "unqualified", "status": "complete",
+        "planned": 32, "concurrency": 4, "startedAt": 1700000000.0, "producedAt": 1700000000.1,
+        "finishedAt": 1700000000.5, "rows": [], "queueSamples": []}
+    pending, final = [], []
+    for index in range(32):
+        proof = copy.deepcopy(passed()["deliveryProofs"][2])
+        proof.update(deliveryPid="load_delivery_" + str(index), eventId="load_event_" + str(index), subjectPid="load_pid_" + str(index))
+        row = proof["rawEvidence"][0]
+        payload = json.loads(base64.b64decode(row["rawBodyBase64"]))
+        origin = "release-model-load-" + str(index)
+        payload.update(id=proof["eventId"], subject={"type": "release.model-event.parts", "pid": proof["subjectPid"]},
+                       correlationId=origin, data={"pid": proof["subjectPid"], "name": "Notification load " + str(index), "zone": "A"})
+        raw = json.dumps(payload).encode()
+        row.update(sequence=index+100, requestId=origin, rawBodyBase64=base64.b64encode(raw).decode(),
+                   bodySha256=hashlib.sha256(raw).hexdigest(),
+                   signature="sha256=" + hmac.new(SECRET, row["timestamp"].encode() + b"." + raw, hashlib.sha256).hexdigest())
+        measurement["rows"].append({"index": index, "createStartedAt": 1700000000.001 + (index // 4) * .01,
+                                   "createCompletedAt": 1700000000.009 + (index // 4) * .01, "proof": proof})
+        state = {"subject": proof["subjectPid"], "eventId": proof["eventId"], "status": "delivered", "sequence": 1,
+                 "receipts": 1, "deliveries": 1, "deliveryPid": proof["deliveryPid"], "deliveryStatus": "success",
+                 "retryCount": 0, "responseStatus": 200}
+        final.append(state)
+        pending.append(dict(state, status="pending", receipts=0, deliveries=0, deliveryPid=None,
+                            deliveryStatus=None, retryCount=None, responseStatus=None))
+    measurement["queueSamples"] = [{"observedAt": 1700000000.11, "rows": pending}, {"observedAt": 1700000000.2, "rows": final}]
+    measurement["metrics"] = load_metrics(measurement)
+    return measurement
 
 
 class ModelEventTests(unittest.TestCase):
@@ -97,6 +127,32 @@ class ModelEventTests(unittest.TestCase):
     def test_complete_fixed_report_recomputes_all_six_signatures(self):
         report = passed()
         self.assertEqual(verify_report(report, secret=SECRET), report)
+
+        report = passed(); report["loadMeasurement"] = load_passed()
+        self.assertEqual(verify_report(report, secret=SECRET)["loadMeasurement"]["metrics"]["accepted"], 32)
+        changes = [lambda m: m.update(planned=0), lambda m: m.update(concurrency=True),
+            lambda m: m.update(sloVerdict="passed"), lambda m: m.update(authority="blocking-release"),
+            lambda m: m.update(status="started"), lambda m: m.update(startedAt=float("nan")),
+            lambda m: m.update(producedAt=m["startedAt"]), lambda m: m.update(finishedAt=m["producedAt"]),
+            lambda m: m["rows"].pop(), lambda m: m["rows"][1].update(index=0),
+            lambda m: m["rows"][0].update(createStartedAt=0),
+            lambda m: m["rows"][0]["proof"].update(eventId=m["rows"][1]["proof"]["eventId"]),
+            lambda m: m["rows"][0]["proof"].update(statuses=[503]),
+            lambda m: m["rows"][0]["proof"]["rawEvidence"][0].update(signature="sha256="+"0"*64),
+            lambda m: m["rows"][0]["proof"]["rawEvidence"][0].update(eventAgeAtReceiptMs=0),
+            lambda m: m.update(queueSamples=[]), lambda m: m["queueSamples"][0].update(observedAt=0),
+            lambda m: m["queueSamples"][-1]["rows"][0].update(receipts=2),
+            lambda m: m["queueSamples"][-1]["rows"][0].update(deliveries=True),
+            lambda m: m["queueSamples"][-1]["rows"][0].update(status="pending"),
+            lambda m: m["queueSamples"][-1]["rows"][0].update(deliveryStatus="dead_letter"),
+            lambda m: m["queueSamples"][-1]["rows"][0].update(retryCount=1),
+            lambda m: m["metrics"].update(accepted=0), lambda m: m["metrics"].update(receiptAgeP95Ms=0)]
+        for key in report["loadMeasurement"]["metrics"]:
+            changes.append(lambda m, key=key: m["metrics"].update({key: float("inf")}))
+        for change in changes:
+            with self.subTest(change=changes.index(change)):
+                altered = passed(); altered["loadMeasurement"] = load_passed(); change(altered["loadMeasurement"])
+                with self.assertRaises(ProtocolError): verify_report(altered, secret=SECRET)
 
     def test_denominator_omission_duplication_order_and_expansion(self):
         for mutate in [lambda r: r["cases"].pop(), lambda r: r["cases"].append(r["cases"][0]),
@@ -243,6 +299,8 @@ class RuntimeSafetyTests(unittest.TestCase):
             for value in ["evt' OR 1=1", "evt; DELETE", ""]:
                 with self.assertRaises(ProtocolError): adapter.counts(1, value)
             with self.assertRaises(ProtocolError): adapter.source(True, "event", "subject")
+            for subjects in [[], ["same"] * 32, ["good_"+str(i) for i in range(31)] + ["bad' OR 1=1"]]:
+                with self.assertRaises(ProtocolError): adapter.load_state(1, "event", subjects, "subscription")
             with self.assertRaises(ProtocolError): adapter.sql("DELETE FROM ab_outbox")
 
     def test_nonlinux_constructor_cannot_use_local_containers(self):

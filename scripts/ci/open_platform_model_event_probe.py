@@ -13,6 +13,7 @@ import secrets
 import stat
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from http.server import HTTPServer
 from pathlib import Path
 from queue import Queue
@@ -117,6 +118,8 @@ def verify_report(report, *, secret=None):
         require(all(json.loads(row["raw_body"])["recordVersion"] == 1
                     and json.loads(row["raw_body"])["correlationId"] == origin for row in actual),
                 "model event raw source metadata invalid")
+    if "loadMeasurement" in report:
+        verify_load_measurement(report["loadMeasurement"], secret=secret)
     return report
 
 
@@ -217,7 +220,8 @@ def observe(callback, seconds=75):
     raise ProtocolError("model event bounded observation expired")
 
 
-def run_model_event_probe(request, admin, infrastructure, *, evidence_path, receiver_host, secret_file):
+def run_model_event_probe(request, admin, infrastructure, *, evidence_path, receiver_host, secret_file, measure_load=False):
+    require(type(measure_load) is bool, "model load measurement opt-in must be boolean")
     evidence_path = Path(evidence_path)
     require(not evidence_path.exists() and not evidence_path.is_symlink(), "model event report already exists")
     evidence_path.parent.mkdir(parents=True, exist_ok=True)
@@ -226,9 +230,12 @@ def run_model_event_probe(request, admin, infrastructure, *, evidence_path, rece
     secret = secrets.token_urlsafe(32).encode()
     receivers = None
 
+    request_lock = threading.Lock()
+
     def call(*args, **kwargs):
-        report["requests"] += 1
-        require(report["requests"] <= 200, "model event request budget exhausted")
+        with request_lock:
+            report["requests"] += 1
+            require(report["requests"] <= 200, "model event request budget exhausted")
         return request(*args, **kwargs)
 
     def human(path, method="GET", body=None):
@@ -388,6 +395,10 @@ def run_model_event_probe(request, admin, infrastructure, *, evidence_path, rece
             record("tampered-real-evidence-rejected")
         else:
             record("tampered-real-evidence-rejected", False)
+        if measure_load:
+            report["loadMeasurement"] = {"profile": "burst-32x4", "status": "started"}
+            report["loadMeasurement"] = collect_load_measurement(call, infrastructure, machine, tenant,
+                subscription["pid"], replay, secret)
     finally:
         try:
             if receivers is not None:
@@ -397,3 +408,165 @@ def run_model_event_probe(request, admin, infrastructure, *, evidence_path, rece
             report["passed"] = sum(row["status"] == "passed" for row in rows)
             evidence_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     return verify_report(report, secret=secret)
+
+
+LOAD_COUNT = 32
+LOAD_CONCURRENCY = 4
+
+
+def measurement_raw(proof):
+    rows = []
+    for row in proof['rawEvidence']:
+        require(isinstance(row, dict) and type(row.get('sequence')) is int and row['sequence'] >= 1
+                and type(row.get('duplicate')) is bool and type(row.get('responseStatus')) is int,
+                'model load receipt types invalid')
+        try:
+            raw = base64.b64decode(row.get('rawBodyBase64'), validate=True)
+        except (ValueError, TypeError):
+            raise ProtocolError('model load raw receipt encoding invalid') from None
+        rows.append({'raw_body': raw, 'timestamp_text': row.get('timestamp'), 'received_at': row.get('receivedAt'),
+            'signature': row.get('signature'), 'signature_valid': 1, 'delivery_id': proof['deliveryPid'],
+            'event_id': proof['eventId'], 'response_status': row['responseStatus'], 'request_id': row.get('requestId'),
+            'body_sha': row.get('bodySha256'), 'sequence': row['sequence'], 'duplicate': row['duplicate']})
+    return rows
+
+
+def load_metrics(measurement):
+    """Recompute burst observations, without inventing a notification SLO."""
+    rows = measurement['rows']
+    ages = sorted(row['proof']['rawEvidence'][0]['eventAgeAtReceiptMs'] for row in rows)
+    received = [row['proof']['rawEvidence'][0]['receivedAt'] for row in rows]
+    times = sorted([(row['createStartedAt'], 1) for row in rows]
+                   + [(row['createCompletedAt'], -1) for row in rows])
+    active = peak = 0
+    for _, change in times:
+        active += change
+        peak = max(peak, active)
+    return {'accepted': len(rows), 'failedReceipts': 0, 'receiptErrorRate': 0.0,
+        'producerConcurrencyPeak': peak,
+        'producerRatePerSecond': round(LOAD_COUNT / (measurement['producedAt'] - measurement['startedAt']), 3),
+        'successfulReceiptRatePerSecond': round(LOAD_COUNT / (max(received) - measurement['startedAt']), 3),
+        'observedDrainRatePerSecond': round(LOAD_COUNT / (measurement['finishedAt'] - measurement['startedAt']), 3),
+        'receiptAgeP50Ms': ages[math.ceil(LOAD_COUNT * .50) - 1],
+        'receiptAgeP95Ms': ages[math.ceil(LOAD_COUNT * .95) - 1],
+        'receiptAgeP99Ms': ages[math.ceil(LOAD_COUNT * .99) - 1], 'receiptAgeMaxMs': max(ages),
+        'peakObservedPendingSources': max(sum(row['status'] != 'delivered' for row in sample['rows'])
+                                        for sample in measurement['queueSamples']),
+        'peakObservedPendingDeliveries': max(sum(row['deliveryStatus'] in ('pending', 'processing') for row in sample['rows'])
+                                           for sample in measurement['queueSamples'])}
+
+
+def verify_load_measurement(measurement, *, secret):
+    require(isinstance(measurement, dict) and measurement.get('profile') == 'burst-32x4'
+            and measurement.get('authority') == 'recorded' and measurement.get('sloVerdict') == 'unqualified'
+            and measurement.get('status') == 'complete'
+            and type(measurement.get('planned')) is int and measurement['planned'] == LOAD_COUNT
+            and type(measurement.get('concurrency')) is int and measurement['concurrency'] == LOAD_CONCURRENCY,
+            'model load measurement profile invalid')
+    start, produced, finished = [measurement.get(key) for key in ['startedAt', 'producedAt', 'finishedAt']]
+    require(all(type(value) in (int, float) and math.isfinite(value) for value in [start, produced, finished])
+            and start < produced <= finished, 'model load measurement window invalid')
+    rows = measurement.get('rows')
+    require(isinstance(rows, list) and len(rows) == LOAD_COUNT
+            and all(isinstance(row, dict) and type(row.get('index')) is int for row in rows)
+            and [row['index'] for row in rows] == list(range(LOAD_COUNT)), 'model load measurement denominator invalid')
+    identities = {key: set() for key in ['subjectPid', 'eventId', 'deliveryPid']}
+    for row in rows:
+        proof = row.get('proof')
+        require(isinstance(proof, dict) and all(isinstance(proof.get(key), str) and proof[key] for key in identities)
+                and type(proof.get('attempts')) is int and proof['attempts'] == 1 and proof.get('statuses') == [200]
+                and isinstance(proof.get('rawEvidence'), list) and len(proof['rawEvidence']) == 1,
+                'model load signed receipt missing')
+        for key, values in identities.items():
+            require(proof[key] not in values, 'model load duplicate identity')
+            values.add(proof[key])
+        began, ended = row.get('createStartedAt'), row.get('createCompletedAt')
+        require(all(type(value) in (int, float) and math.isfinite(value) for value in [began, ended])
+                and start <= began < ended <= produced, 'model load producer trace invalid')
+        actual = measurement_raw(proof)
+        verified = verify_delivery(actual, secret=secret, delivery_pid=proof['deliveryPid'], event_id=proof['eventId'],
+            subject_pid=proof['subjectPid'], statuses=[200], originating_request_id='release-model-load-' + str(row['index']),
+            event_type='open.resource.release.model-event.parts.created', subject_type='release.model-event.parts',
+            schema_version=1, projections=[{'pid': proof['subjectPid'], 'name': 'Notification load ' + str(row['index']), 'zone': 'A'}])
+        require(proof['rawEvidence'][0] == verified['rawEvidence'][0], 'model load signed receipt summary mismatch')
+        require(start < verified['rawEvidence'][0]['receivedAt'] <= finished, 'model load receipt outside run')
+        payload = json.loads(actual[0]['raw_body'])
+        require(payload['recordVersion'] == 1 and payload['correlationId'] == 'release-model-load-' + str(row['index']),
+                'model load source metadata mismatch')
+    samples = measurement.get('queueSamples')
+    require(isinstance(samples, list) and bool(samples), 'model load queue observations missing')
+    last_time = produced
+    expected_subjects = identities['subjectPid']
+    for sample in samples:
+        require(isinstance(sample, dict) and type(sample.get('observedAt')) in (int, float)
+                and math.isfinite(sample['observedAt']) and last_time <= sample['observedAt'] <= finished,
+                'model load queue observation window invalid')
+        last_time = sample['observedAt']
+        states = sample.get('rows')
+        require(isinstance(states, list) and len(states) == LOAD_COUNT
+                and all(isinstance(state, dict) for state in states)
+                and {state.get('subject') for state in states} == expected_subjects
+                and {state.get('eventId') for state in states} == identities['eventId'],
+                'model load queue observation identities invalid')
+        for state in states:
+            require(state.get('status') in ('pending', 'processing', 'delivered')
+                    and state.get('deliveryStatus') in (None, 'pending', 'processing', 'success')
+                    and all(type(state.get(key)) is int and 0 <= state[key] <= 1 for key in ['receipts', 'deliveries'])
+                    and type(state.get('sequence')) is int and state['sequence'] == 1,
+                    'model load queue state invalid')
+    final = {state['subject']: state for state in samples[-1]['rows']}
+    for row in rows:
+        state, proof = final[row['proof']['subjectPid']], row['proof']
+        require(state['eventId'] == proof['eventId'] and state.get('deliveryPid') == proof['deliveryPid']
+                and state['status'] == 'delivered' and state['deliveryStatus'] == 'success'
+                and state['receipts'] == state['deliveries'] == 1
+                and type(state.get('responseStatus')) is int and state['responseStatus'] == 200
+                and type(state.get('retryCount')) is int and state['retryCount'] == 0,
+                'model load queue did not drain correctly')
+    expected = load_metrics(measurement)
+    require(isinstance(measurement.get('metrics'), dict) and set(measurement['metrics']) == set(expected)
+            and all(type(measurement['metrics'][key]) in (int, float) and math.isfinite(measurement['metrics'][key])
+                    and measurement['metrics'][key] == value for key, value in expected.items()),
+            'model load reported metrics mismatch')
+    require(expected['producerConcurrencyPeak'] <= LOAD_CONCURRENCY, 'model load concurrency exceeds profile')
+    return measurement
+
+
+def collect_load_measurement(call, infrastructure, machine, tenant, subscription_pid, sink, secret):
+    """Use the original accepting sink and published machine fixture for a burst."""
+    result = {'profile': 'burst-32x4', 'authority': 'recorded', 'sloVerdict': 'unqualified', 'status': 'complete',
+              'planned': LOAD_COUNT, 'concurrency': LOAD_CONCURRENCY, 'startedAt': time.time(), 'queueSamples': []}
+    def create(index):
+        began = time.time()
+        _, body, _ = call('/api/open/v1/resources/release.model-event.parts', 'POST',
+            body={'name': 'Notification load ' + str(index), 'zone': 'A'},
+            headers=dict(machine, **{'Idempotency-Key': 'release-model-load-' + str(index),
+                                      'X-Request-Id': 'release-model-load-' + str(index)}), expected=(201,))
+        require(isinstance(body, dict) and isinstance(body.get('pid'), str) and body['pid'],
+                'model load creation identity missing')
+        return {'index': index, 'subjectPid': body['pid'], 'createStartedAt': began, 'createCompletedAt': time.time()}
+    with ThreadPoolExecutor(max_workers=LOAD_CONCURRENCY) as pool:
+        rows = list(pool.map(create, range(LOAD_COUNT)))
+    subjects = [row['subjectPid'] for row in rows]
+    require(len(set(subjects)) == LOAD_COUNT, 'model load duplicate created identity')
+    result['producedAt'] = time.time()
+    def drained():
+        state = infrastructure.load_state(tenant, 'open.resource.release.model-event.parts.created', subjects, subscription_pid)
+        require(isinstance(state, dict) and isinstance(state.get('sources'), list)
+                and len(state['sources']) == LOAD_COUNT, 'model load source observations missing')
+        result['queueSamples'].append({'observedAt': time.time(), 'rows': state['sources']})
+        return state['sources'] if all(row['status'] == 'delivered' and row['deliveryStatus'] == 'success'
+                                      for row in state['sources']) else None
+    final = {row['subject']: row for row in observe(drained, seconds=60)}
+    result['rows'] = rows
+    for row in rows:
+        state = final[row.pop('subjectPid')]
+        actual = read_delivery(sink['store'], state['deliveryPid'], secret=secret,
+                               run_id=sink['runId'], mode=sink['mode'], failures=1)
+        row['proof'] = verify_delivery(actual, secret=secret, delivery_pid=state['deliveryPid'], event_id=state['eventId'],
+            subject_pid=state['subject'], statuses=[200], originating_request_id='release-model-load-' + str(row['index']),
+            event_type='open.resource.release.model-event.parts.created', subject_type='release.model-event.parts',
+            schema_version=1, projections=[{'pid': state['subject'], 'name': 'Notification load ' + str(row['index']), 'zone': 'A'}])
+    result['finishedAt'] = time.time()
+    result['metrics'] = load_metrics(result)
+    return verify_load_measurement(result, secret=secret)
