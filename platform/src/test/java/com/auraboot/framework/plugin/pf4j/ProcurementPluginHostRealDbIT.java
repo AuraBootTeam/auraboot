@@ -608,6 +608,53 @@ class ProcurementPluginHostRealDbIT {
         });
     }
 
+    @Test void nativeMultipleQuoteSyncAndReverseAllocationCannotInvertLocks() throws Exception {
+        var fixture=savedNativeQuote();var tx=new TransactionTemplate(transactions);
+        var first=(Map<?,?>)tx.execute(status->scope("qo_procurement_quote_common:submit",()->quoteAt(fixture.clock(),"submit",fixture.quote(),Map.of("revision",1))));
+        var second=secondNativeSupplierOffer(fixture);
+        scope("qo_procurement_task_common:dispatch",()->{openFixtureTask();return null;});
+        var beforeTask=scope(SYNC,()->db.getById("s2p_sourcing_event",task));
+        var offers=new TreeMap<String,String>();offers.put(fixture.quote(),(String)first.get("submissionPid"));offers.put(second.quote(),second.submission());
+        var original=new HashMap<String,Map<String,Object>>();
+        scope(SYNC,()->{offers.values().forEach(pid->original.put(pid,db.getById("qo_procurement_submission_common",pid)));return null;});
+        var selected=offers.descendingMap().entrySet().stream().map(e->Map.<String,Object>of("quotePid",e.getKey(),"sourcePid",fixture.source(),"submissionPid",e.getValue(),"quantity","300.000001")).toList();
+        var request=Map.<String,Object>of("sourceDemands",List.of(Map.of("sourcePid",fixture.source(),"sourceRevision",0,"quantity","600.000002")),"allocations",selected);
+        var sourceHeld=new java.util.concurrent.CountDownLatch(1);var allocationReady=new java.util.concurrent.CountDownLatch(1);
+        var syncAccessor=quoteLockObserver(()->{},()->{sourceHeld.countDown();awaitNativeLatch(allocationReady,"allocation must reach the competing quote");});
+        DataAccessor allocationAccessor=(DataAccessor)java.lang.reflect.Proxy.newProxyInstance(DataAccessor.class.getClassLoader(),new Class<?>[]{DataAccessor.class},
+                (proxy,method,args)->{
+                    boolean locking=method.getName().equals("compareAndSetBatch") && "s2p_bid".equals(args[0]);
+                    String quote=locking?((CompareAndSetUpdate)((List<?>)args[2]).getFirst()).recordId():"";
+                    // Canonical first lock may wait on sync; an inverted first lock must actually be held.
+                    if(locking && quote.equals(offers.firstKey())) allocationReady.countDown();
+                    Object result;try {result=method.invoke(db,args);}catch(InvocationTargetException error){throw error.getCause();}
+                    if(locking && quote.equals(offers.lastKey())) allocationReady.countDown();
+                    return result;
+                });
+        var settings=new HashMap<String,Object>(context.settings());settings.put(CommandHandlerExtension.DATA_ACCESSOR_KEY,syncAccessor);
+        var syncContext=new CommandHandlerExtension.CommandContext(tenantId,context.pluginId(),context.namespace(),SYNC,context.modelCode(),task,context.payload(),settings,false);
+        response=row("100","11").replace(",1500,1400,400,300,1000,",",1500,1399,400,300,1000,");
+        var pool=java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var sync=pool.submit(()->nativeActorThread(()->new TransactionTemplate(transactions).execute(status->scope(SYNC,()->syncWith(syncContext,"100","11")))));
+            awaitNativeLatch(sourceHeld,"sync must hold its first real quote lock");
+            var allocate=pool.submit(()->nativeActorThread(()->new TransactionTemplate(transactions).execute(status->scope("qo_procurement_task_common:allocate",()->allocateNativeWith(allocationAccessor,request)))));
+            assertEquals(List.of("changed"),sync.get(20,java.util.concurrent.TimeUnit.SECONDS));
+            var failure=assertThrows(java.util.concurrent.ExecutionException.class,()->allocate.get(20,java.util.concurrent.TimeUnit.SECONDS));
+            var conflict=assertInstanceOf(com.auraboot.framework.meta.exception.MetaServiceException.class,failure.getCause());
+            assertEquals("CAS batch conflict: no partial batch may commit",conflict.getMessage());
+        } finally {allocationReady.countDown();pool.shutdownNow();assertTrue(pool.awaitTermination(10,java.util.concurrent.TimeUnit.SECONDS));}
+        scope(SYNC,()->{
+            assertEquals(beforeTask,db.getById("s2p_sourcing_event",task));
+            for(String quote:offers.keySet()) {assertEquals("invalidated",db.getById("s2p_bid",quote).get("s2p_bid_status"));assertNativeQuantity("s2p_bid",quote,"qo_pr_quote_revision","3");}
+            assertNativeQuantity("pr_purchase_request",fixture.source(),"qo_pr_source_reserved_qty","0");
+            assertNativeQuantity("pr_purchase_request",fixture.source(),"qo_pr_source_approved_qty","1399");
+            assertTrue(nativeRows("qo_procurement_allocation_common","qo_pr_allocation_task_pid",task).isEmpty());
+            assertTrue(nativeRows("qo_procurement_execution_common","qo_pr_execution_task_pid",task).isEmpty());
+            original.forEach((pid,row)->assertEquals(row,db.getById("qo_procurement_submission_common",pid)));return null;
+        });
+    }
+
     @Test void nativeShipmentReplaySnapshotAndFulfillmentNeverChangeActualReceipts() {
         String directory="pr_supplier_common:sync_directory",publish="qo_procurement_order_common:sync_orders";
         String submit="qo_procurement_order_common:submit_shipment",maintain="qo_procurement_address_common:maintain";
