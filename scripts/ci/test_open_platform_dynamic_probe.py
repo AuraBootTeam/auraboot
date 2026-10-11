@@ -32,13 +32,34 @@ def passed():
             "capability": ("query." if operation == "execute" else "resource.") + resource + "." + operation,
             "method": {"list": "GET", "execute": "POST", "create": "POST", "update": "PATCH", "delete": "DELETE"}[operation],
             "path": path, "durationMs": 1, "occurredAt": "2026-10-11T00:00:00Z"})
+    original = {"pid": "record-pid", "name": "Machine created", "zone": "A"}
+    location = "/api/open/v1/resources/release.dynamic.parts/record-pid"
+    authority_rows = []
+    for identifier, status in [("fields-denied", 403), ("fields-restored", 201), ("row-denied", 403), ("row-restored", 201), ("current", 200)]:
+        marker = "release-dynamic-replay-authority-" + identifier
+        operation = "get" if status == 200 else "create"
+        audit = {key: value for key, value in audits[2].items() if key != "id"}
+        audit.update(requestId=marker, operation=operation, status=status,
+                     recordPid=None if status == 403 else "record-pid",
+                     idempotentReplay=True if status == 201 else None,
+                     method="GET" if status == 200 else "POST",
+                     path=location if status == 200 else location.rsplit("/", 1)[0],
+                     capability="resource.release.dynamic.parts." + operation)
+        body = {"code": "403", "message": "Access forbidden", "data": None,
+                "context": "Current resource or query authorization required", "timestamp": 1791744000000} if status == 403 else dict(original)
+        authority_rows.append({"id": identifier, "status": status, "requestId": marker,
+            "body": body, "etag": None if status == 403 else ('"first-version"' if status == 201 else '"current-version"'),
+            "location": location if status == 201 else None, "replay": "true" if status == 201 else None, "audit": audit})
+    authority = {"resource": "release.dynamic.parts", "recordPid": "record-pid", "original": original,
+        "originalEtag": '"first-version"', "originalLocation": location,
+        "outside": dict(original, zone="B"), "restored": dict(original), "requests": authority_rows}
     quota_audit = dict(audits[1], requestId="release-dynamic-query-quota", status=429,
                        resource="release.dynamic.by-zone.quota",
                        path="/api/open/v1/queries/release.dynamic.by-zone.quota:execute",
                        capability="query.release.dynamic.by-zone.quota.execute")
     del quota_audit["id"]
     report = {"schemaVersion": 1, "cases": [{"id": case, "status": "passed"} for case in CASES],
-            "executed": len(CASES), "passed": len(CASES), "auditProofs": audits,
+            "executed": len(CASES), "passed": len(CASES), "auditProofs": audits, "replayAuthority": authority,
             "pluginImports": [{"pluginId": plugin, "importId": "import-pid", "pluginPid": "plugin-pid",
                                "resourceType": kind, "created": 1, "success": True}
                               | ({"namedQueryCreated": 1, "namedQueryPid": "new-query-pid"} if kind == "PUBLIC_QUERY" else {})
@@ -460,6 +481,43 @@ class DynamicProbeTests(unittest.TestCase):
             report = passed(); report["auditProofs"][3][key] = value
             with self.subTest(key=key):
                 with self.assertRaises(ProtocolError): verify_report(report)
+
+        report = passed(); del report["replayAuthority"]
+        with self.assertRaises(ProtocolError): verify_report(report)
+        for key in passed()["replayAuthority"]:
+            report = passed(); del report["replayAuthority"][key]
+            with self.subTest(missing=key):
+                with self.assertRaises(ProtocolError): verify_report(report)
+        for key, value in [("resource", "internal-model"), ("recordPid", "different-pid"),
+                           ("original", {}), ("originalEtag", "weak"), ("originalLocation", "/private"),
+                           ("outside", {}), ("restored", {}), ("requests", [])]:
+            report = passed(); report["replayAuthority"][key] = value
+            with self.subTest(proof=key):
+                with self.assertRaises(ProtocolError): verify_report(report)
+        for index, row in enumerate(passed()["replayAuthority"]["requests"]):
+            for key in row:
+                report = passed(); del report["replayAuthority"]["requests"][index][key]
+                with self.subTest(request=index, missing=key):
+                    with self.assertRaises(ProtocolError): verify_report(report)
+            for key, value in [("id", "wrong"), ("status", True), ("requestId", "wrong"),
+                               ("body", {"private": "sentinel"}), ("etag", "weak"),
+                               ("location", "/private"), ("replay", "false")]:
+                report = passed(); report["replayAuthority"]["requests"][index][key] = value
+                with self.subTest(request=index, changed=key):
+                    with self.assertRaises(ProtocolError): verify_report(report)
+            for key in row["audit"]:
+                report = passed(); del report["replayAuthority"]["requests"][index]["audit"][key]
+                with self.subTest(audit=index, missing=key):
+                    with self.assertRaises(ProtocolError): verify_report(report)
+            for key, value in [("actorKind", "human"), ("applicationPid", "other-app"),
+                               ("installationPid", "other-install"), ("resource", "other-resource"),
+                               ("operation", "delete"), ("recordPid", "other-pid"),
+                               ("idempotentReplay", 1), ("status", True), ("method", "DELETE"),
+                               ("path", "/private"), ("capability", "other"), ("requestId", "wrong"),
+                               ("durationMs", True), ("occurredAt", ""), ("token", "private-sentinel")]:
+                report = passed(); report["replayAuthority"]["requests"][index]["audit"][key] = value
+                with self.subTest(audit=index, changed=key):
+                    with self.assertRaises(ProtocolError): verify_report(report)
 
     def test_duplicate_case(self):
         report = passed(); report["cases"][1] = copy.deepcopy(report["cases"][0])
