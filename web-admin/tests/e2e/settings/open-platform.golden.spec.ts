@@ -135,8 +135,11 @@ test.describe('Dynamic resource publication journey', () => {
     await snapshot('publication-conflict');
     await page.getByRole('button', { name: '关闭编辑', exact: true }).click();
     await page.getByRole('group', { name: '操作确认', exact: true }).getByRole('button', { name: '确认', exact: true }).click();
-    await expect(page.getByRole('button', { name: '编辑合同', exact: true })).toBeEnabled();
-    await page.getByRole('button', { name: '编辑合同', exact: true }).click();
+    const ownContractEdit = page.getByTestId('publication-editor').getByRole('listitem')
+      .filter({ has: page.getByText(resourceCode, { exact: true }) })
+      .getByRole('button', { name: '编辑合同', exact: true });
+    await expect(ownContractEdit).toBeEnabled();
+    await ownContractEdit.click();
     await expect(page.getByLabel('查询超时（毫秒）', { exact: true })).toHaveValue('6000');
     await page.getByRole('button', { name: '发布合同', exact: true }).click();
     await page.getByRole('group', { name: '操作确认', exact: true }).getByRole('button', { name: '确认', exact: true }).click();
@@ -259,7 +262,7 @@ test.describe('Dynamic query publication journey', () => {
       if (type === 'object') { await output.getByLabel('原对象属性', { exact: true }).fill('contact_name'); await output.getByLabel('对外属性名称', { exact: true }).fill('contactName'); }
     }
     await expect(editor.getByLabel('可写', { exact: true })).toHaveCount(0);
-    await editor.locator('section').filter({ has: editor.getByTestId('query-output-partDetails') }).screenshot({ path: path.join(screenshotRoot, 'query-output-region.png') });
+    await editor.locator('section').filter({ has: page.getByTestId('query-output-partDetails') }).screenshot({ path: path.join(screenshotRoot, 'query-output-region.png') });
     await editor.getByRole('button', { name: '保存并校验查询草稿', exact: true }).locator('..').locator('..').screenshot({ path: path.join(screenshotRoot, 'query-footer-region.png') });
     const savedResponse = page.waitForResponse(response => response.url().endsWith(`/query-publications/${publicCode}/draft`) && response.request().method() === 'PUT');
     await page.getByRole('button', { name: '保存并校验查询草稿', exact: true }).click();
