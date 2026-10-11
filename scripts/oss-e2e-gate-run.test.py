@@ -47,7 +47,10 @@ if (args[1] === 'show') {
 }
 if (args[1] === 'list') console.log('name repo slot\\n' + (process.env.EXISTING_RUNTIME || ''));
 else if (args[1] === 'evidence' && args[2] === 'begin') {
-  const dir = path.join(process.env.AURA_WORKSPACE_ROOT, '.workspace/evidence/fixture-round');
+  const counter = path.join(process.env.AURA_WORKSPACE_ROOT, 'round-counter');
+  const n = fs.existsSync(counter) ? Number(fs.readFileSync(counter, 'utf8')) + 1 : 1;
+  fs.writeFileSync(counter, String(n));
+  const dir = path.join(process.env.AURA_WORKSPACE_ROOT, '.workspace/evidence/fixture-round-' + n);
   fs.mkdirSync(dir, { recursive: true });
   console.log(dir);
 } else console.log('runtime ensure');
@@ -81,7 +84,7 @@ exit "${PW_EXIT:-0}"
 printf '%s\n' "$*" >> "$CALLS"
 case "$1" in
  up) exit "${UP_EXIT:-0}";;
- env) printf 'export PLAYWRIGHT_BASE_URL=http://private-fixture BACKEND_URL=http://private-fixture BFF_PORT=1 PW_RESULTS_JSON=$AURA_EVIDENCE_ROOT/report/results.json\n';;
+ env) printf 'export AURA_EVIDENCE_ROOT=$AURA_WORKSPACE_ROOT/retained-stack-evidence\nexport PLAYWRIGHT_BASE_URL=http://private-fixture BACKEND_URL=http://private-fixture BFF_PORT=1 PW_RESULTS_JSON=$AURA_EVIDENCE_ROOT/report/results.json\n';;
  destroy|down) exit 99;;
 esac
 ''')
@@ -153,6 +156,17 @@ esac
         self.assertIn('--list --reporter=json', calls)
         self.assertIn('--retries=0', calls)
         self.assertFalse(any(line.startswith(('up ', 'down ', 'destroy ')) for line in calls.splitlines()))
+        first = self.root / '.workspace/evidence/fixture-round-1/results.json'
+        self.assertTrue(first.is_file(), r.stdout + r.stderr)
+        original = first.read_bytes()
+        failed = self.run_gate(reuse=True, EXISTING_RUNTIME='owned-new auraboot 239\n', RECORD_AURA='1', REPORT_COUNT='14')
+        self.assertEqual(failed.returncode, 1, failed.stdout + failed.stderr)
+        second = self.root / '.workspace/evidence/fixture-round-2/results.json'
+        self.assertTrue(second.is_file())
+        self.assertNotEqual(first, second)
+        self.assertEqual(first.read_bytes(), original)
+        self.assertNotEqual(second.read_bytes(), original)
+        self.assertFalse((self.root / 'retained-stack-evidence/results.json').exists())
 
     def test_reuse_rejects_unknown_slot_mismatch_or_failed_identity_before_browser(self):
         for env in [{}, {'EXISTING_RUNTIME':'owned-new auraboot 240\n'},

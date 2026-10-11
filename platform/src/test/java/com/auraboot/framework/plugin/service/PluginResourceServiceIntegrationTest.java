@@ -112,7 +112,10 @@ class PluginResourceServiceIntegrationTest extends BaseIntegrationTest {
         assertThat(pluginResourceMapper.findByTenantAndType(testTenant.getId(), ResourceType.MODEL.code()))
                 .filteredOn(row -> resourceCode.equals(row.getResourceCode())).singleElement()
                 .extracting(PluginResource::getImportSnapshot).isEqualTo(snapshot);
-        assertThat(pluginResourceMapper.findCreatedResourcesForRollback(pluginPid).getFirst().getImportSnapshot()).isEqualTo(snapshot);
+        assertThat(pluginResourceMapper.findCreatedResourcesForRollback(testTenant.getId(), pluginPid, resource.getImportId()).getFirst().getImportSnapshot()).isEqualTo(snapshot);
+        assertThat(pluginResourceMapper.findCreatedResourcesForRollback(testTenant.getId(), pluginPid, "another-import")).isEmpty();
+        assertThat(pluginResourceMapper.findCreatedResourcesForRollback(-1L, pluginPid, resource.getImportId())).isEmpty();
+        assertThat(pluginResourceMapper.findCreatedResourcesForRollback(testTenant.getId(), "another-plugin", resource.getImportId())).isEmpty();
         assertThat(pluginResourceMapper.findByTenantPluginAndResource(testTenant.getId(), pluginPid, ResourceType.MODEL.code(), resourceCode)
                 .getImportSnapshot()).isEqualTo(snapshot);
 
@@ -122,7 +125,10 @@ class PluginResourceServiceIntegrationTest extends BaseIntegrationTest {
         resource.setUserModified(true);
         resource.setOwnershipType(OwnershipType.USER_CLAIMED.code());
         assertThat(pluginResourceMapper.updateById(resource)).isEqualTo(1);
-        assertThat(pluginResourceMapper.findUpdatedResourcesForRollback(pluginPid).getFirst().getPreviousState()).isEqualTo(previous);
+        assertThat(pluginResourceMapper.findUpdatedResourcesForRollback(testTenant.getId(), pluginPid, resource.getImportId()).getFirst().getPreviousState()).isEqualTo(previous);
+        assertThat(pluginResourceMapper.findUpdatedResourcesForRollback(testTenant.getId(), pluginPid, "another-import")).isEmpty();
+        assertThat(pluginResourceMapper.findUpdatedResourcesForRollback(-1L, pluginPid, resource.getImportId())).isEmpty();
+        assertThat(pluginResourceMapper.findUpdatedResourcesForRollback(testTenant.getId(), "another-plugin", resource.getImportId())).isEmpty();
         assertThat(pluginResourceMapper.findModifiedByPluginPid(pluginPid).getFirst().getImportSnapshot()).isEqualTo(snapshot);
         assertThat(pluginResourceMapper.findUserClaimedByPluginPid(pluginPid).getFirst().getPreviousState()).isEqualTo(previous);
     }

@@ -267,6 +267,19 @@ log "1b/4 import internal test-fixtures plugin (e2et_* models)"
 # --- 2. resolve the stack env (base URL + backend + PG*) ---------------------
 log "2/4 resolve stack env"
 eval "$("$GS" env "$NAME")" || die_env "could not resolve stack env for '$NAME'"
+# Stack evidence records its build/import identity. Each gate invocation owns a
+# separate registered round so a later report cannot replace an earlier failure.
+GATE_EVIDENCE_ROOT="$("$DEV" runtime evidence begin "$NAME" --purpose "OSS E2E gate $SCOPE_MODE")" \
+  || die_env "could not register this gate's evidence round"
+[[ "$GATE_EVIDENCE_ROOT" == /* && -d "$GATE_EVIDENCE_ROOT" && ! -L "$GATE_EVIDENCE_ROOT" ]] \
+  || die_env "gate evidence round must be an existing absolute directory"
+[[ ! -e "$GATE_EVIDENCE_ROOT/results.json" && ! -e "$GATE_EVIDENCE_ROOT/collection.json" ]] \
+  || die_env "gate evidence round already contains a report"
+export AURA_EVIDENCE_ROOT="$GATE_EVIDENCE_ROOT"
+export AURA_EVIDENCE_DIR="$AURA_EVIDENCE_ROOT/playwright/evidence"
+export SEED_LOG_DIR="$AURA_EVIDENCE_ROOT/logs/seed"
+export PW_ARTIFACT_DIR="$AURA_EVIDENCE_ROOT/playwright/artifacts"
+export PW_REPORT_DIR="$AURA_EVIDENCE_ROOT/playwright/report"
 export PW_RESULTS_JSON="$AURA_EVIDENCE_ROOT/results.json"
 export PLAYWRIGHT_JSON_OUTPUT_FILE="$AURA_EVIDENCE_ROOT/results.json"
 mkdir -p "$AURA_EVIDENCE_ROOT/logs"

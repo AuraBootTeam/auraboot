@@ -95,16 +95,16 @@ public interface PluginResourceMapper extends BaseMapper<PluginResource> {
     /**
      * Find resources in reverse order for rollback.
      */
-    @Select("SELECT * FROM ab_plugin_resource WHERE plugin_pid = #{pluginPid} AND action = 'create' ORDER BY sequence DESC")
+    @Select("SELECT * FROM ab_plugin_resource WHERE tenant_id = #{tenantId} AND plugin_pid = #{pluginPid} AND import_id = #{importId} AND action = 'create' ORDER BY sequence DESC")
     @ResultMap("mybatis-plus_PluginResource")
-    List<PluginResource> findCreatedResourcesForRollback(@Param("pluginPid") String pluginPid);
+    List<PluginResource> findCreatedResourcesForRollback(@Param("tenantId") Long tenantId, @Param("pluginPid") String pluginPid, @Param("importId") String importId);
 
     /**
-     * Find resources with previous state for rollback.
+     * Find changed ownership records with previous state for rollback.
      */
-    @Select("SELECT * FROM ab_plugin_resource WHERE plugin_pid = #{pluginPid} AND action = 'update' AND previous_state IS NOT NULL ORDER BY sequence DESC")
+    @Select("SELECT * FROM ab_plugin_resource WHERE tenant_id = #{tenantId} AND plugin_pid = #{pluginPid} AND import_id = #{importId} AND (action = 'update' OR (action = 'skip' AND resource_type IN ('public_resource', 'public_query'))) AND previous_state IS NOT NULL ORDER BY sequence DESC")
     @ResultMap("mybatis-plus_PluginResource")
-    List<PluginResource> findUpdatedResourcesForRollback(@Param("pluginPid") String pluginPid);
+    List<PluginResource> findUpdatedResourcesForRollback(@Param("tenantId") Long tenantId, @Param("pluginPid") String pluginPid, @Param("importId") String importId);
 
     /**
      * Find existing resource by tenant, plugin, type and code.

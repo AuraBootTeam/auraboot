@@ -43,6 +43,7 @@ class PluginImportTwoPhaseReferenceIntegrationTest extends BaseIntegrationTest {
     @Autowired private com.auraboot.framework.openplatform.service.OpenApiPublicationService publications;
     @Autowired private com.auraboot.framework.plugin.mapper.PluginResourceMapper resources;
     @Autowired private com.fasterxml.jackson.databind.ObjectMapper json;
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     private String dirOf(String resourcePath) throws Exception {
         URL resource = getClass().getClassLoader().getResource(resourcePath);
@@ -186,6 +187,11 @@ class PluginImportTwoPhaseReferenceIntegrationTest extends BaseIntegrationTest {
         assertThat(result.getResourceCounts()).containsKey("PUBLIC_RESOURCE");
         assertThat(result.getResourceCounts().get("PUBLIC_RESOURCE")).containsEntry("CREATE", 1);
 
+        var originalSources = resources.findByPluginPid(result.getPluginPid()).stream()
+                .filter(resource -> !resource.getResourceTypeEnum().isPublicPublication()).toList();
+        assertThat(originalSources).hasSize(3);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ab_meta_model WHERE code = ? AND (deleted_flag = FALSE OR deleted_flag IS NULL)", Long.class, modelCode)).isEqualTo(1L);
+        manifest.remove(java.util.List.of("models", "fields", "modelFieldBindings"));
         manifest.put("version", "2.0.0");
         ((com.fasterxml.jackson.databind.node.ObjectNode) manifest.get("publicResources").get(0))
                 .put("schemaVersion", 2).put("maxPageSize", 30);
@@ -201,9 +207,35 @@ class PluginImportTwoPhaseReferenceIntegrationTest extends BaseIntegrationTest {
         assertThat(pluginImportService.rollback(upgradePreview.getImportId()).isSuccess()).isTrue();
         assertThat(publications.active(testTenant.getId(), publicCode).orElseThrow().schemaVersion()).isEqualTo(1);
         assertThat(publications.snapshots(testTenant.getId(), publicCode)).hasSize(2);
+        for (var original : originalSources) {
+            var retained = resources.findByTypeAndCode(testTenant.getId(), original.getResourceType(), original.getResourceCode());
+            assertThat(retained).as("prior source ownership must survive a publication-only rollback: %s", original.getResourceCode()).isNotNull();
+            assertThat(retained.getPid()).isEqualTo(original.getPid());
+            assertThat(retained.getImportId()).isEqualTo(preview.getImportId());
+        }
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ab_meta_model WHERE code = ? AND (deleted_flag = FALSE OR deleted_flag IS NULL)", Long.class, modelCode)).isEqualTo(1L);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ab_meta_field WHERE code = ? AND (deleted_flag = FALSE OR deleted_flag IS NULL)", Long.class, fieldCode)).isEqualTo(1L);
         assertThat(resources.findByTypeAndCode(testTenant.getId(),
                 com.auraboot.framework.plugin.dto.imports.ResourceType.PUBLIC_RESOURCE.code(), publicCode).getLastSyncVersion())
                 .isEqualTo("1.0.0");
+
+        manifest.put("version", "3.0.0");
+        ((com.fasterxml.jackson.databind.node.ObjectNode) manifest.get("publicResources").get(0))
+                .put("schemaVersion", 1).put("maxPageSize", 25);
+        java.nio.file.Files.writeString(dir.resolve("plugin.json"), json.writeValueAsString(manifest));
+        var unchangedPreview = pluginImportService.parseDirectory(dir.toString());
+        assertThat(unchangedPreview.isValid()).isTrue();
+        var unchanged = pluginImportService.execute(unchangedPreview.getImportId(), new ImportRequest());
+        assertThat(unchanged.isSuccess()).isTrue();
+        assertThat(unchanged.getResourceCounts().get("PUBLIC_RESOURCE")).containsEntry("SKIP", 1);
+        assertThat(publications.snapshots(testTenant.getId(), publicCode)).hasSize(2);
+        assertThat(pluginImportService.rollback(unchangedPreview.getImportId()).isSuccess()).isTrue();
+        var restoredOwner = resources.findByTypeAndCode(testTenant.getId(),
+                com.auraboot.framework.plugin.dto.imports.ResourceType.PUBLIC_RESOURCE.code(), publicCode);
+        assertThat(restoredOwner.getImportId()).as("unchanged import rollback restores earlier ownership").isEqualTo(preview.getImportId());
+        assertThat(restoredOwner.getLastSyncVersion()).isEqualTo("1.0.0");
+        assertThat(publications.active(testTenant.getId(), publicCode).orElseThrow().schemaVersion()).isEqualTo(1);
+        assertThat(publications.snapshots(testTenant.getId(), publicCode)).hasSize(2);
     }
 
 }

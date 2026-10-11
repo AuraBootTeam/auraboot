@@ -122,7 +122,7 @@ public class PluginPublicPublicationLifecycle {
         record.setPluginPid(pluginPid);
         record.setImportId(importId);
         record.setAction(action.code());
-        record.setPreviousState(action == ResourceAction.SKIP ? null : previous);
+        record.setPreviousState(previous);
         record.setCurrentState(after);
         record.setImportSnapshot(after);
         record.setLastSyncVersion(manifest.getVersion());

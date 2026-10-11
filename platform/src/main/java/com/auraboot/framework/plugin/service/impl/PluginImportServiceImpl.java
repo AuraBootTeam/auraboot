@@ -1432,12 +1432,13 @@ public class PluginImportServiceImpl implements PluginImportService {
             throw new PluginException("Can only rollback successful imports");
         }
 
+        if (!Objects.equals(history.getTenantId(), MetaContext.getCurrentTenantId())) {
+            throw new PluginException("Rollback tenant does not match import owner");
+        }
+
         boolean hasPublicPublications = pluginResourceMapper.findByPluginPid(history.getPluginPid()).stream()
                 .anyMatch(resource -> resource.getResourceTypeEnum().isPublicPublication());
         if (hasPublicPublications) {
-            if (!Objects.equals(history.getTenantId(), MetaContext.getCurrentTenantId())) {
-                throw new PluginException("Rollback tenant does not match publication owner");
-            }
             if (pluginRecordMapper.lockIdentityIncludingDeleted(history.getTenantId(), history.getPluginPid()) == null) {
                 throw new PluginException("Public publication plugin owner is missing");
             }
@@ -1457,7 +1458,7 @@ public class PluginImportServiceImpl implements PluginImportService {
 
         try {
             // Get resources in reverse order
-            List<PluginResource> createdResources = pluginResourceMapper.findCreatedResourcesForRollback(history.getPluginPid());
+            List<PluginResource> createdResources = pluginResourceMapper.findCreatedResourcesForRollback(history.getTenantId(), history.getPluginPid(), importId);
 
             // Delete created resources in reverse order
             for (PluginResource resource : createdResources) {
@@ -1465,14 +1466,18 @@ public class PluginImportServiceImpl implements PluginImportService {
             }
 
             // Restore updated resources
-            List<PluginResource> updatedResources = pluginResourceMapper.findUpdatedResourcesForRollback(history.getPluginPid());
+            List<PluginResource> updatedResources = pluginResourceMapper.findUpdatedResourcesForRollback(history.getTenantId(), history.getPluginPid(), importId);
             for (PluginResource resource : updatedResources) {
                 resourceImporter.restoreResource(resource);
             }
 
             // Clean up resource tracking
-            for (PluginResource resource : pluginResourceMapper.findByPluginPid(history.getPluginPid())) {
-                if (!resource.getResourceTypeEnum().isPublicPublication()) pluginResourceMapper.deleteById(resource.getId());
+            for (PluginResource resource : pluginResourceMapper.findByImportId(importId)) {
+                if (Objects.equals(history.getTenantId(), resource.getTenantId())
+                        && Objects.equals(history.getPluginPid(), resource.getPluginPid())
+                        && !resource.getResourceTypeEnum().isPublicPublication()) {
+                    pluginResourceMapper.deleteById(resource.getId());
+                }
             }
 
             // Update plugin status or delete if it was a fresh install
