@@ -241,12 +241,14 @@ test.describe('Dynamic resource publication journey', () => {
       await virtualNameField.getByLabel('零件名称', { exact: true }).uncheck();
     }
     await snapshot('publication-virtual-source');
+    await page.getByTestId('publication-editor').locator('section').filter({ has: sourceSelector })
+      .screenshot({ path: path.join(screenshotRoot, 'publication-virtual-source-region.png') });
     const virtualSaved = page.waitForResponse(response => response.url().endsWith(`/publications/${virtualCode}/draft`) && response.request().method() === 'PUT');
     await page.getByRole('button', { name: '保存并校验草稿', exact: true }).click();
     const virtualSavedHttp = await virtualSaved; expect(virtualSavedHttp.status()).toBe(200);
     const virtualDraft = await virtualSavedHttp.json(); expect(String(virtualDraft.code)).toBe('0');
     expect(virtualDraft.data.draft.sourceResources).toEqual({ [modelCode]: resourceCode });
-    expect(virtualDraft.data.draft.fields.name.writable).toBe(false);
+    expect(virtualDraft.data.draft.fields.name).toMatchObject({ source: 'name', readable: true, writable: false });
     await page.getByRole('button', { name: '发布合同', exact: true }).click();
     await page.getByRole('group', { name: '操作确认', exact: true }).getByRole('button', { name: '确认', exact: true }).click();
     await expect(page.getByTestId('publication-editor').getByRole('status')).toContainText('已发布');
@@ -256,10 +258,38 @@ test.describe('Dynamic resource publication journey', () => {
       .getByRole('button', { name: '编辑合同', exact: true }).click();
     await expect(sourceSelector).toHaveValue(resourceCode); await expect(sourceSelector).toBeDisabled();
     await snapshot('publication-virtual-published');
+    await page.getByTestId('publication-editor').locator('section').filter({ has: sourceSelector })
+      .screenshot({ path: path.join(screenshotRoot, 'publication-virtual-published-region.png') });
     const virtualState = await page.request.get(`${WEB_BASE_URL}/api/open-platform/publications`);
     expect(virtualState.status()).toBe(200); const virtualCatalog = await virtualState.json(); expect(String(virtualCatalog.code)).toBe('0');
     expect(virtualCatalog.data.find((view: { code: string }) => view.code === virtualCode)).toMatchObject({ status: 'published', activeVersion: 1,
       draft: { sourceResources: { [modelCode]: resourceCode } } });
+    // Consumption uses the contract configured above; app/row/grant authoring is fixture setup.
+    const human = async (method: string, url: string, data?: unknown) => {
+      const response = await page.request.fetch(`${WEB_BASE_URL}${url}`, { method, data });
+      expect(response.status(), `${method} ${url}`).toBe(200); const body = await response.json(); expect(String(body.code)).toBe('0'); return body.data;
+    };
+    const record = await human('POST', `/api/dynamic/${modelCode}/create`, {
+      dop_ui_name: 'UI virtual projection', dop_ui_details: { contact_name: 'Hidden virtual source property' },
+    });
+    const application = await human('POST', '/api/open-platform/applications', { name: `虚拟消费验证 ${suffix}`, description: 'UI-authored virtual contract consumption' });
+    const installation = await human('POST', `/api/open-platform/applications/${application.pid}/installations`, {
+      environment: 'staging', scopes: ['dop.ui:list', 'dop.ui:get'], rateLimitPerMinute: 600,
+    });
+    for (const code of [resourceCode, virtualCode]) await human('PUT', `/api/open-platform/installations/${installation.pid}/resources/${code}`, {
+      operations: ['list', 'get'], readableFields: ['pid', 'name'], writableFields: [], rowConstraints: [],
+    });
+    const credential = await human('POST', `/api/open-platform/installations/${installation.pid}/credentials`);
+    const issued = await page.request.post(`${BACKEND_URL}/oauth2/token`, { form: {
+      grant_type: 'client_credentials', client_id: credential.clientId, client_secret: credential.clientSecret,
+    } });
+    expect(issued.status()).toBe(200); const token = await issued.json(); expect(token.access_token).toEqual(expect.any(String));
+    const headers = { Authorization: `Bearer ${token.access_token}` }; const resourcePath = `${BACKEND_URL}/api/open/v1/resources/${virtualCode}`;
+    const listed = await page.request.get(resourcePath, { headers }); expect(listed.status()).toBe(200);
+    expect((await listed.json()).items).toEqual([{ pid: record.pid, name: 'UI virtual projection' }]);
+    const detail = await page.request.get(`${resourcePath}/${record.pid}`, { headers }); expect(detail.status()).toBe(200);
+    expect(await detail.json()).toEqual({ pid: record.pid, name: 'UI virtual projection' });
+    expect(detail.headers().etag).toMatch(/^"[a-f0-9]{64}"$/);
     await page.getByRole('button', { name: '关闭编辑', exact: true }).click(); await ownContractEdit.click();
     await page.getByRole('button', { name: '停用资源', exact: true }).click();
     await expect(page.getByRole('group', { name: '操作确认', exact: true })).toBeInViewport();
