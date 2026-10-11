@@ -40,7 +40,7 @@ export interface ExecuteRegistryActionOptions {
     loadData?: (...args: any[]) => void | Promise<void>;
     [key: string]: any;
   };
-  dataSourceManager: DataSourceManager;
+  dataSourceManager?: DataSourceManager | null;
   locale: string;
   t: (key: string) => string;
   token?: string;
