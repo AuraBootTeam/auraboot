@@ -141,5 +141,13 @@ class OpenPlatformFacadeControllerTest {
         assertThat(response.getBody()).containsEntry("success", false)
                 .containsEntry("code", "invalid_request")
                 .containsEntry("message", "Invalid Idempotency-Key");
+        var timeout = new OpenApiResourceErrorHandler().queryDeadline();
+        assertThat(timeout.getStatusCode()).isEqualTo(HttpStatus.GATEWAY_TIMEOUT);
+        assertThat(timeout.getBody()).isEqualTo(Map.of("success", false, "code", "open_api_query_timeout",
+                "message", "Published query execution deadline exceeded"));
+        var privateCause = new org.springframework.dao.QueryTimeoutException("Private source SQL and credentials");
+        var typed = new com.auraboot.framework.openplatform.service.OpenApiQueryService.QueryDeadlineExceededException(privateCause);
+        assertThat(typed).hasCause(privateCause).hasMessageContaining("504").hasMessageContaining("open_api_query_timeout")
+                .hasMessageNotContaining("Private");
     }
 }

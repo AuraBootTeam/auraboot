@@ -91,13 +91,19 @@ public class OpenApiQueryService {
             response.put("hasMore", hasMore);response.put("nextCursor", cursor);response.put("schemaVersion", contract.schemaVersion());
             return response;
         } catch (org.springframework.dao.QueryTimeoutException timeout) {
-            throw new ResponseStatusException(HttpStatus.GATEWAY_TIMEOUT, "open_api_query_timeout", timeout);
+            throw new QueryDeadlineExceededException(timeout);
         } catch (org.springframework.dao.DataAccessException unavailable) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "open_api_query_unavailable", unavailable);
         } catch (com.auraboot.framework.meta.exception.NamedQueryRateLimitException exhausted) {
             throw new QueryRateLimitException(exhausted);
         } catch (com.auraboot.framework.meta.exception.MetaServiceException unsafe) {
             throw new AccessDeniedException("Published query cannot be safely evaluated", unsafe);
+        }
+    }
+    /** Typed public signal prevents host advice from replacing the query deadline code. */
+    public static final class QueryDeadlineExceededException extends ResponseStatusException {
+        public QueryDeadlineExceededException(Throwable cause) {
+            super(HttpStatus.GATEWAY_TIMEOUT, "open_api_query_timeout", cause);
         }
     }
     private Map<String, Object> jdbcParameters(OpenApiQueryContract contract, Map<String, Object> input) {

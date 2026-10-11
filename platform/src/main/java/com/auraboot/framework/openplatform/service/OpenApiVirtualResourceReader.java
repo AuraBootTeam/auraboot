@@ -62,8 +62,7 @@ public class OpenApiVirtualResourceReader {
             throw new OpenApiQueryService.QueryRateLimitException(exhausted);
         } catch (org.springframework.dao.QueryTimeoutException timeout) {
             // CATCH: translate the canonical SQL timeout without exposing source details.
-            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.GATEWAY_TIMEOUT,
-                    "open_api_query_timeout", timeout);
+            throw new OpenApiQueryService.QueryDeadlineExceededException(timeout);
         } catch (MetaServiceException unsafe) {
             // CATCH: invalid or inaccessible source execution cannot fall back to a broader data path.
             throw new AccessDeniedException("Published virtual resource cannot be safely evaluated", unsafe);

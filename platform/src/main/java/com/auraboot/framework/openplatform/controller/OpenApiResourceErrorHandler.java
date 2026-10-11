@@ -28,6 +28,11 @@ public class OpenApiResourceErrorHandler {
         return ResponseEntity.status(429).header("Retry-After", "60").body(Map.of("success", false,
                 "code", "open_api_query_rate_limited", "message", "Published query execution rate budget exhausted"));
     }
+    @ExceptionHandler(com.auraboot.framework.openplatform.service.OpenApiQueryService.QueryDeadlineExceededException.class)
+    public ResponseEntity<Map<String, Object>> queryDeadline() {
+        return ResponseEntity.status(504).body(Map.of("success", false, "code", "open_api_query_timeout",
+                "message", "Published query execution deadline exceeded"));
+    }
     @ExceptionHandler(OpenApiPreconditionException.class)
     public ResponseEntity<Map<String, Object>> precondition(OpenApiPreconditionException error) {
         return ResponseEntity.status(412).body(Map.of("success", false, "code", "precondition_failed", "message", error.getMessage()));
