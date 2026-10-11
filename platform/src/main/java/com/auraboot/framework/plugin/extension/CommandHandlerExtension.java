@@ -290,6 +290,12 @@ public interface CommandHandlerExtension extends ExtensionPoint {
             return accessor instanceof TenantSecretAccessor value ? value : null;
         }
 
+        /** Available only to an explicitly opted-in synchronous authenticated host command. */
+        public VerifiedPhoneGrantAccessor verifiedPhoneGrantAccessor() {
+            Object accessor = settings != null ? settings.get(VerifiedPhoneGrantAccessor.SETTINGS_KEY) : null;
+            return accessor instanceof VerifiedPhoneGrantAccessor value ? value : null;
+        }
+
         public IdentityDirectoryAccessor identityDirectoryAccessor() {
             Object accessor = settings != null ? settings.get(IDENTITY_DIRECTORY_ACCESSOR_KEY) : null;
             return accessor instanceof IdentityDirectoryAccessor value ? value : null;

@@ -90,6 +90,9 @@ public class HandlerPhase implements CommandPhase {
     private com.auraboot.framework.cloudconfig.service.CloudConfigService cloudConfigService;
 
     @Autowired(required = false)
+    private com.auraboot.framework.auth.wechat.WechatMiniIdentityService wechatMiniIdentityService;
+
+    @Autowired(required = false)
     private BiTemporalService biTemporalService;
 
     @Autowired
@@ -620,6 +623,8 @@ public class HandlerPhase implements CommandPhase {
             }
             com.auraboot.framework.plugin.pf4j.TenantSecretAccessorImpl.install(
                     pluginSettings, tenantId, cloudConfigService, objectMapper);
+            com.auraboot.framework.plugin.pf4j.VerifiedPhoneGrantAccessorImpl.install(
+                    pluginSettings, tenantId, userId, request.isDryRun(), wechatMiniIdentityService);
             pluginSettings.put("__dataAccessor",
                     new com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImpl(dynamicDataService));
             if (commandExecutor != null) {

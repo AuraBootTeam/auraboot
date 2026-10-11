@@ -183,9 +183,16 @@ class ProcurementPluginHostRealDbIT {
         properties.setAppId(appId);properties.setAppSecret("synthetic-phone-secret");
         properties.setApiBaseUrl("http://127.0.0.1:" + server.getAddress().getPort());
         var service = new WechatMiniIdentityService(identities, userMapper, new WechatMiniClient(properties), properties, users);
-        var phone = service.verifyCurrentUserPhoneGrant("synthetic-login", "synthetic-phone-code");
-        assertEquals(ownOpenid, phone.openid());assertEquals(appId, phone.appId());
-        assertEquals("86", phone.countryCode());assertEquals("13800138000", phone.nationalNumber());
+        var grantSettings = new HashMap<String,Object>();
+        grantSettings.put(com.auraboot.framework.plugin.extension.VerifiedPhoneGrantAccessor.OPT_IN_HANDLER_PARAM, true);
+        VerifiedPhoneGrantAccessorImpl.install(grantSettings, tenantId, actorId, false, service);
+        var grant = (com.auraboot.framework.plugin.extension.VerifiedPhoneGrantAccessor) grantSettings.get(
+                com.auraboot.framework.plugin.extension.VerifiedPhoneGrantAccessor.SETTINGS_KEY);
+        assertNotNull(grant);
+        assertEquals("+8613800138000", grant.verifyCurrentPhone("synthetic-login", "synthetic-phone-code"));
+        assertEquals("PHONE_GRANT_ALREADY_CONSUMED", assertThrows(SecurityException.class,
+                () -> grant.verifyCurrentPhone("replayed-login", "replayed-phone")).getMessage());
+        assertEquals(3, requests.size());
         assertEquals(List.of("login", "token"), requests.subList(0, 2));
         assertEquals(Map.of("code", "synthetic-phone-code", "openid", ownOpenid), json.readValue(requests.get(2), Map.class));
         selected.set(foreignOpenid);
