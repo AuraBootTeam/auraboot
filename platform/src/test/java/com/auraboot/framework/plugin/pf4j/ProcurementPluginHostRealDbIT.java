@@ -536,6 +536,78 @@ class ProcurementPluginHostRealDbIT {
         });
     }
 
+    private <T>T otherNativeMember(Long userId,String userPid,String writer,Supplier<T> work) {
+        MetaContext.setContext(tenantId,userId,userPid,"Second supplier fixture");
+        try {return MetaContext.runWithCommandPermitPlan("ALL",userId,null,null,
+                ()->MetaContext.runWithAuthorizedCommandCode(writer,work));}
+        finally {MetaContext.setContext(tenantId,actorId,actor,"Host fixture");}
+    }
+    private record FormalOffer(String quote,String submission) {}
+    private FormalOffer secondNativeSupplierOffer(QuoteFixture fixture) {
+        String directory="pr_supplier_common:sync_directory";
+        var user=users.signUp("second-"+provider+"@example.invalid","host-fixture-password-123","Second supplier","second-"+provider);
+        members.addMember(user.getId(),tenantId,"active");
+        String supplier=scope(directory,()->(String)db.create("pr_supplier_common",Map.of("pr_supplier_code","second-"+provider,
+                "pr_supplier_name","Second lock-order supplier","pr_supplier_status","enabled","qo_pr_supplier_account_id",provider)).get("pid"));
+        String contact=scope(directory,()->(String)db.create("pr_supplier_pcba_contact",Map.of(
+                "pr_spc_supplier_id",supplier,"pr_spc_name","Second contact","qo_pr_contact_state","active")).get("pid"));
+        // Synthetic already-bound membership, separate actual account; no enrollment-policy claim.
+        scope("qo_procurement_membership_common:bind_verified_phone",()->db.create("qo_procurement_membership_common",Map.of(
+                "qo_pr_membership_key","second-"+provider,"qo_pr_membership_user_pid",user.getPid(),"qo_pr_membership_supplier_pid",supplier,
+                "qo_pr_membership_contact_pid",contact,"qo_pr_membership_state","active")));
+        String quote=scope("qo_procurement_task_common:dispatch",()->(String)createProductEntity("quote",Map.of("key","second-"+provider,
+                "task_pid",task,"supplier_pid",supplier,"state","draft","revision",0,"cutoff_at",fixture.cutoff().toString(),
+                "received_at",fixture.cutoff().minusSeconds(1).toString(),"source_pids",List.of(fixture.source()))).get("pid"));
+        var line=Map.<String,Object>of("sourcePid",fixture.source(),"sourceRevision",0,"unitPrice","2.000001","currency","CNY",
+                "unit","PCS","taxRate","0.13","taxIncluded",true,"availableQty","600","deliveryDate","2026-12-01");
+        var tx=new TransactionTemplate(transactions);
+        tx.execute(status->otherNativeMember(user.getId(),user.getPid(),"qo_procurement_quote_common:save_draft",()->invokeServiceAt(
+                fixture.clock(),"ProcurementQuoteService","execute",new Class<?>[]{String.class,String.class,String.class,Map.class},
+                "save_draft",quote,user.getPid(),Map.of("revision",0,"lines",List.of(line),"paymentTerms","Net 30"))));
+        var formal=(Map<?,?>)tx.execute(status->otherNativeMember(user.getId(),user.getPid(),"qo_procurement_quote_common:submit",()->invokeServiceAt(
+                fixture.clock(),"ProcurementQuoteService","execute",new Class<?>[]{String.class,String.class,String.class,Map.class},
+                "submit",quote,user.getPid(),Map.of("revision",1))));
+        return new FormalOffer(quote,(String)formal.get("submissionPid"));
+    }
+    @Test void nativeMultipleSupplierAllocationLocksQuotesInCanonicalOrderDespiteReverseSelection() {
+        var fixture=savedNativeQuote();var tx=new TransactionTemplate(transactions);
+        var first=(Map<?,?>)tx.execute(status->scope("qo_procurement_quote_common:submit",
+                ()->quoteAt(fixture.clock(),"submit",fixture.quote(),Map.of("revision",1))));
+        var second=secondNativeSupplierOffer(fixture);
+        scope("qo_procurement_task_common:dispatch",()->{openFixtureTask();return null;});
+        var offers=new TreeMap<String,String>();offers.put(fixture.quote(),(String)first.get("submissionPid"));offers.put(second.quote(),second.submission());
+        assertEquals(2,offers.size());
+        var reverse=offers.descendingMap().entrySet().stream().map(e->Map.<String,Object>of("quotePid",e.getKey(),
+                "sourcePid",fixture.source(),"submissionPid",e.getValue(),"quantity","300.000001")).toList();
+        var request=Map.<String,Object>of("sourceDemands",List.of(Map.of("sourcePid",fixture.source(),"sourceRevision",0,"quantity","600.000002")),"allocations",reverse);
+        var locked=new ArrayList<String>();
+        DataAccessor observed=(DataAccessor)java.lang.reflect.Proxy.newProxyInstance(DataAccessor.class.getClassLoader(),new Class<?>[]{DataAccessor.class},
+                (proxy,method,args)->{
+                    Object result;
+                    try {result=method.invoke(db,args);}catch(InvocationTargetException error){throw error.getCause();}
+                    if(method.getName().equals("compareAndSetBatch") && "s2p_bid".equals(args[0]))
+                        for(Object update:(List<?>)args[2]) locked.add(((CompareAndSetUpdate)update).recordId());
+                    return result;
+                });
+        String allocate="qo_procurement_task_common:allocate";
+        tx.execute(status->scope(allocate,()->allocateNativeWith(observed,request)));
+        assertEquals(new ArrayList<>(offers.keySet()),locked,"actual native quote locks must follow source synchronization order");
+        var allocated=scope(allocate,()->nativeRows("qo_procurement_allocation_common","qo_pr_allocation_task_pid",task));
+        var executed=scope(allocate,()->nativeRows("qo_procurement_execution_common","qo_pr_execution_task_pid",task));
+        assertEquals(2,allocated.size());assertEquals(2,executed.size());
+        assertEquals(2,allocated.stream().map(a->a.get("qo_pr_allocation_supplier_pid")).distinct().count());
+        var identities=allocated.stream().map(a->a.get("qo_pr_allocation_submission_pid")).collect(java.util.stream.Collectors.toSet());
+        assertEquals(new HashSet<>(offers.values()),identities);
+        scope(allocate,()->{assertNativeQuantity("pr_purchase_request",fixture.source(),"qo_pr_source_reserved_qty","600.000002");
+            for(var allocation:allocated) assertNativeQuantity("qo_procurement_allocation_common",(String)allocation.get("pid"),"qo_pr_allocation_quantity","300.000001");return null;});
+        tx.execute(status->scope(allocate,()->allocateNative(request)));
+        scope(allocate,()->{
+            assertEquals(allocated,nativeRows("qo_procurement_allocation_common","qo_pr_allocation_task_pid",task));
+            assertEquals(executed,nativeRows("qo_procurement_execution_common","qo_pr_execution_task_pid",task));
+            assertNativeQuantity("pr_purchase_request",fixture.source(),"qo_pr_source_reserved_qty","600.000002");return null;
+        });
+    }
+
     @Test void nativeShipmentReplaySnapshotAndFulfillmentNeverChangeActualReceipts() {
         String directory="pr_supplier_common:sync_directory",publish="qo_procurement_order_common:sync_orders";
         String submit="qo_procurement_order_common:submit_shipment",maintain="qo_procurement_address_common:maintain";
