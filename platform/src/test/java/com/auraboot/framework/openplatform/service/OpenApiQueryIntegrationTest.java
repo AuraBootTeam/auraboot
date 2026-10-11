@@ -124,6 +124,39 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
         var identity=auth.findToken(secrets.sha256(token.accessToken()),OpenPlatformTokenService.AUDIENCE,Instant.now());
         return new MachinePrincipal(identity.tenantId(),identity.tokenPid(),"machine",scopes,identity.applicationPid(),identity.installationPid(),identity.environment(),identity.tokenPid());
     }
+    private void activateTenantAdministrator(Long tenantId) {
+        var members = applicationContext.getBean(com.auraboot.framework.tenant.service.TenantMemberService.class);
+        var roles = applicationContext.getBean(com.auraboot.framework.rbac.service.RoleService.class);
+        var userRoles = applicationContext.getBean(com.auraboot.framework.rbac.service.UserRoleService.class);
+        var permissions = applicationContext.getBean(com.auraboot.framework.permission.mapper.PermissionMapper.class);
+        var rolePermissions = applicationContext.getBean(com.auraboot.framework.rbac.mapper.RolePermissionMapper.class);
+        var permissionService = applicationContext.getBean(com.auraboot.framework.permission.service.UserPermissionService.class);
+        var member = members.addMember(testUser.getId(), tenantId, "active");
+        MetaContext.setContext(tenantId, testUser.getId(), testUser.getPid(), testUser.getUserName());
+        MetaContext.setMemberId(member.getId());
+        var role = new com.auraboot.framework.rbac.entity.Role();
+        org.springframework.beans.BeanUtils.copyProperties(testRole, role);
+        role.setId(null); role.setPid(UniqueIdGenerator.generate()); role.setTenantId(tenantId);
+        role.setCode("virtual_admin_" + role.getPid().toLowerCase()); role.setName("Virtual tenant administrator");
+        role = roles.createRole(role);
+        assertThat(userRoles.assignRolesToMember(member.getId(), List.of(role.getId()), tenantId, null)).isTrue();
+        var permission = new com.auraboot.framework.permission.entity.Permission();
+        permission.setPid(UniqueIdGenerator.generate()); permission.setTenantId(tenantId);
+        permission.setCode("sys.connector.update"); permission.setName("Manage Open Platform");
+        permission.setResourceType("system"); permission.setResourceCode("connector"); permission.setAction("update");
+        permission.setSource("test"); permission.setStatus("active"); permission.setDeletedFlag(false);
+        permission.setCreatedAt(Instant.now()); permission.setUpdatedAt(Instant.now());
+        permissions.insert(permission);
+        var binding = new com.auraboot.framework.rbac.entity.RolePermission();
+        binding.setPid(UniqueIdGenerator.generate()); binding.setTenantId(tenantId);
+        binding.setRoleId(role.getId()); binding.setPermissionId(permission.getId());
+        binding.setGrantType("grant"); binding.setStatus("active"); binding.setDeletedFlag(false);
+        binding.setCreatedAt(Instant.now()); binding.setUpdatedAt(Instant.now()); rolePermissions.insert(binding);
+        permissionService.evictPermissionDefinitions(tenantId);
+        permissionService.evictUserPermissions(tenantId, testUser.getId());
+        assertThat(permissionService.hasPermission(testUser.getId(), "sys.connector.update")).isTrue();
+    }
+
     private Map<String,Object> run(MachinePrincipal principal,OpenApiQueryContract contract,String zone) {
         var previous=MetaContext.snapshot();
         MetaContext.setContext(principal.tenantId(),null,principal.subjectPid(),"machine");
@@ -347,7 +380,7 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
         foreignTenant = tenantService.createTenant(foreignTenant);
         String foreignPid = UniqueIdGenerator.generate();
         String mutation = System.getenv("AURA_IT_NEGATIVE_MUTATION");
-        assertThat(mutation).isIn(null, "foreign-row-as-own");
+        assertThat(mutation).isIn(null, "foreign-row-as-own", "foreign-token-as-own");
         Long seededTenant = "foreign-row-as-own".equals(mutation) ? testTenant.getId() : foreignTenant.getId();
         // Same physical source and allowed business values: only tenant isolation may exclude this row.
         fixtureJdbc.update("INSERT INTO mt_" + root.modelCode() + " (pid, tenant_id, name, zone, secret) VALUES (?, ?, ?, ?, ?)",
@@ -417,6 +450,56 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.name").value("Root B"));
 
+        applyTestMetaContext();
+        var physicalDefinition = models.getModelDefinition(root.modelCode()).orElseThrow();
+        var virtualDefinition = models.getModelDefinition(modelCode).orElseThrow();
+        String foreignToken;
+        try {
+            activateTenantAdministrator(foreignTenant.getId());
+            // Both tenants publish the same public/model/query codes against the same physical table.
+            models.saveDefinition(physicalDefinition);
+            resources.saveDraft(root.code(), new OpenApiPublicationService.DraftRequest(0, root));
+            resources.publish(root.code(), 1);
+            createQuery(source.getCode(), "mt_" + root.modelCode() + " a", List.of(
+                    nqField("pid", "a.pid", "string"), nqField("name", "a.name", "string"),
+                    nqField("zone", "a.zone", "string"), nqField("privateValue", "a.secret", "string")));
+            models.saveDefinition(virtualDefinition);
+            resources.saveDraft(contract.code(), new OpenApiPublicationService.DraftRequest(0, contract));
+            resources.publish(contract.code(), 1);
+            var foreignApplication = management.createApplication(new CreateApplicationRequest("Foreign virtual consumer", "Tenant token boundary"));
+            var foreignInstallation = management.install(foreignApplication.pid(), new InstallApplicationRequest("staging",
+                    Set.of(root.scopes().get(Operation.LIST)), 600));
+            var foreignPolicy = new OpenApiInstallationPolicy(root.operations(), root.fields().keySet(), Set.of(),
+                    List.of(new OpenApiInstallationPolicy.RowConstraint("zone", List.of("A"))));
+            resources.grant(foreignInstallation.pid(), root.code(), foreignPolicy);
+            resources.grant(foreignInstallation.pid(), contract.code(), foreignPolicy);
+            var credential = management.createCredential(foreignInstallation.pid());
+            foreignToken = tokens.issue("client_credentials", credential.clientId(), credential.clientSecret(), null).accessToken();
+            var identity = auth.findToken(secrets.sha256(foreignToken), OpenPlatformTokenService.AUDIENCE, Instant.now());
+            assertThat(identity.tenantId()).isEqualTo(foreignTenant.getId()).isNotEqualTo(principalA.tenantId());
+            assertThat(identity.installationPid()).isNotIn(principalA.installationPid(), principalB.installationPid());
+        } finally {
+            applyTestMetaContext();
+        }
+        String foreignReadToken = "foreign-token-as-own".equals(mutation) ? tokenA : foreignToken;
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/open/v1/resources/" + contract.code())
+                .header("Authorization", "Bearer " + foreignReadToken).header("X-Tenant-ID", testTenant.getId()))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items.length()").value(1))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[0].pid").value(foreignPid))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[0].name").value("Root A"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[0].privateValue").doesNotExist());
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/open/v1/resources/" + contract.code() + "/" + foreignPid)
+                .header("Authorization", "Bearer " + foreignToken).header("X-Tenant-ID", testTenant.getId()))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.pid").value(foreignPid))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.privateValue").doesNotExist());
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).header("Authorization", "Bearer " + foreignToken))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/open/v1/resources/" + contract.code() + "/" + foreignPid)
+                .header("Authorization", "Bearer " + tokenA))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
+
         var first = http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).header("Authorization", "Bearer " + tokenA))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.name").value("Root A")).andReturn().getResponse();
@@ -460,6 +543,9 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
             if ("DESC".equals(order)) assertThat(names).containsExactly("<null>", "Root A Renamed", "Extra A");
         }
         assertThat(originalCursor).isNotBlank();
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/open/v1/resources/" + contract.code())
+                .header("Authorization", "Bearer " + foreignToken).param("limit", "1").param("cursor", originalCursor))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest());
         http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/open/v1/resources/" + contract.code())
                 .header("Authorization", "Bearer " + tokenB).param("limit", "1").param("cursor", originalCursor))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest());
