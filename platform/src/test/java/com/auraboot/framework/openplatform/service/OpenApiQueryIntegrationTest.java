@@ -308,6 +308,38 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
                 .isInstanceOf(org.springframework.web.server.ResponseStatusException.class).hasMessageContaining("504").hasMessageContaining("open_api_query_timeout");
         assertThat(run(principalA,rows,"A").get("total")).isEqualTo(1L);
     }
+    @Test void exhaustedSourceRateBudgetReturnsPublic429AndRecordsTheMachineDenial() throws Exception {
+        var policy = new com.auraboot.framework.meta.entity.NamedQueryPolicy();policy.setRateLimitPerMinute(1);
+        var update = new NamedQueryUpdateRequest();update.setPolicy(policy);queries.update(rowsDefinition.getPid(), update);
+        var source = queries.describeExecution(rowsDefinition.getCode());
+        String quotaCode = rows.code() + ".quota";
+        var next = new OpenApiQueryContract(quotaCode, rows.queryCode(), 1, source.fingerprint(),
+                rows.scopes(), rows.sourceResources(), rows.parameters(), rows.fields(), rows.maxPageSize(), rows.maxRows(), rows.timeoutMs(), rows.maxConcurrent());
+        publications.saveDraft(quotaCode, new OpenApiQueryPublicationService.DraftRequest(0, next));publications.publish(quotaCode, 1);
+        publications.grant(principalA.installationPid(), quotaCode, new OpenApiQueryPolicy(rows.fields().keySet()));
+        String route = "/api/open/v1/queries/" + quotaCode + ":execute";
+        String marker = "quota-" + UniqueIdGenerator.generate();
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(route)
+                .header("Authorization", "Bearer " + tokenA).contentType("application/json")
+                .content("{\"parameters\":{\"zone\":\"A\"},\"limit\":10}"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
+        var rejected = http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(route)
+                .header("Authorization", "Bearer " + tokenA).header("X-Request-Id", marker).contentType("application/json")
+                .content("{\"parameters\":{\"zone\":\"A\"},\"limit\":10}"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isTooManyRequests())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Retry-After", "60"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("X-Request-Id", marker))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code").value("open_api_query_rate_limited"))
+                .andReturn().getResponse();
+        assertThat(rejected.getContentAsString()).doesNotContain(rowsDefinition.getCode(), root.modelCode(), child.modelCode(), tokenA, "fromSql");
+        applyTestMetaContext();
+        var audits = management.listCallAudits(principalA.installationPid(), marker, null, 10);assertThat(audits).hasSize(1);
+        var audit = audits.getFirst();assertThat(audit.status()).isEqualTo(429);
+        assertThat(audit.actorKind()).isEqualTo("machine");assertThat(audit.applicationPid()).isEqualTo(principalA.applicationPid());
+        assertThat(audit.installationPid()).isEqualTo(principalA.installationPid());assertThat(audit.resource()).isEqualTo(quotaCode);
+        assertThat(audit.operation()).isEqualTo("execute");assertThat(audit.capability()).isEqualTo("query." + quotaCode + ".execute");
+        assertThat(audit.idempotentReplay()).isNull();assertThat(MachineDataAccessContext.isActive()).isFalse();
+    }
     @Test void realPublicHttpRejectsUnknownEnvelopeParametersAndIgnoresSpoofedTenant() throws Exception {
         String route="/api/open/v1/queries/"+rows.code()+":execute";
         http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(route)

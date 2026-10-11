@@ -31,9 +31,16 @@ def passed():
             "capability": ("query." if operation == "execute" else "resource.") + resource + "." + operation,
             "method": {"list": "GET", "execute": "POST", "create": "POST", "update": "PATCH", "delete": "DELETE"}[operation],
             "path": path, "durationMs": 1, "occurredAt": "2026-10-11T00:00:00Z"})
+    quota_audit = dict(audits[1], requestId="release-dynamic-query-quota", status=429,
+                       resource="release.dynamic.by-zone.quota",
+                       path="/api/open/v1/queries/release.dynamic.by-zone.quota:execute",
+                       capability="query.release.dynamic.by-zone.quota.execute")
+    del quota_audit["id"]
     return {"schemaVersion": 1, "cases": [{"id": case, "status": "passed"} for case in CASES],
             "executed": len(CASES), "passed": len(CASES), "auditProofs": audits,
-            "applicationPid": "app-pid", "installationPid": "install-pid"}
+            "applicationPid": "app-pid", "installationPid": "install-pid",
+            "queryRateLimit": {"status": 429, "code": "open_api_query_rate_limited", "retryAfter": "60",
+                               "requestId": "release-dynamic-query-quota", "audit": quota_audit}}
 
 
 def command_passed():
@@ -51,6 +58,22 @@ def command_passed():
 
 
 class DynamicProbeTests(unittest.TestCase):
+    def test_query_quota_requires_response_and_persisted_public_audit(self):
+        self.assertEqual(verify_report(passed()), passed())
+        report = passed(); del report["queryRateLimit"]
+        with self.assertRaises(ProtocolError): verify_report(report)
+        for key, value in [("status", 403), ("code", "access_denied"), ("retryAfter", None),
+                           ("requestId", "wrong"), ("token", "private")]:
+            report = passed(); report["queryRateLimit"][key] = value
+            with self.subTest(response=key):
+                with self.assertRaises(ProtocolError): verify_report(report)
+        for key, value in [("status", 200), ("installationPid", "foreign-install"),
+                           ("idempotentReplay", False), ("recordPid", "private-id"),
+                           ("capability", "internal-query"), ("durationMs", True), ("tenantId", 42)]:
+            report = passed(); report["queryRateLimit"]["audit"][key] = value
+            with self.subTest(audit=key):
+                with self.assertRaises(ProtocolError): verify_report(report)
+
     def test_command_audit_requires_exact_public_actor_target_and_denied_status(self):
         self.assertEqual(verify_command_audits(command_passed()), command_passed())
         for change in [lambda r: r["auditProofs"].pop(), lambda r: r["auditProofs"].reverse(),

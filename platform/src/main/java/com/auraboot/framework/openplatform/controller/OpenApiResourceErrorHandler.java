@@ -12,6 +12,11 @@ import java.util.Map;
 @Order(0)
 @RestControllerAdvice(assignableTypes = {OpenApiResourceWriteController.class, OpenPlatformFacadeController.class, OpenApiQueryController.class})
 public class OpenApiResourceErrorHandler {
+    @ExceptionHandler(com.auraboot.framework.openplatform.service.OpenApiQueryService.QueryRateLimitException.class)
+    public ResponseEntity<Map<String, Object>> queryRateLimit() {
+        return ResponseEntity.status(429).header("Retry-After", "60").body(Map.of("success", false,
+                "code", "open_api_query_rate_limited", "message", "Published query execution rate budget exhausted"));
+    }
     @ExceptionHandler(OpenApiPreconditionException.class)
     public ResponseEntity<Map<String, Object>> precondition(OpenApiPreconditionException error) {
         return ResponseEntity.status(412).body(Map.of("success", false, "code", "precondition_failed", "message", error.getMessage()));

@@ -78,6 +78,8 @@ class OpenApiContractArtifactsTest {
         var endpoint = doc.path("paths").path("/api/open/v1/queries/fixture.summary:execute").path("post");
         assertThat(endpoint.path("x-max-concurrent").asInt()).isEqualTo(2);
         assertThat(endpoint.path("x-max-rows").asInt()).isEqualTo(30);
+        assertThat(endpoint.path("responses").path("429").path("headers").path("Retry-After").path("schema").path("minimum").asInt()).isEqualTo(1);
+        assertThat(endpoint.path("responses").path("429").path("description").asText()).contains("open_api_query_rate_limited");
         assertThat(OpenApiContractArtifacts.queryTypes(query())).contains("\"zones\": Array<string>", "\"count\"?: number").doesNotContain("private_");
     }
     @Test void readOnlyPublicationsDoNotAdvertiseWritesOrWriteTypes() {

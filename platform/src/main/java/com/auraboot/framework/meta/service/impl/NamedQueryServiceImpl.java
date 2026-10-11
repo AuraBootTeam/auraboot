@@ -709,12 +709,6 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             throw new MetaServiceException("Named query is not executable (status: " + query.getStatus() + "): " + code);
         }
 
-        List<NamedQueryField> fields = readFields(definition);
-        if (request.getExpectedDefinitionFingerprint() != null && !request.getExpectedDefinitionFingerprint().equals(
-                com.auraboot.framework.meta.util.NamedQueryDefinitionFingerprint.of(executionDTO(query, fields)))) {
-            throw new AccessDeniedException("Published named query source changed");
-        }
-
         Long tenantId = getCurrentTenantId();
         NamedQueryPolicy policy = query.getPolicy() != null ? query.getPolicy() : new NamedQueryPolicy();
         Map<String, Object> authorizationParams = new HashMap<>();
@@ -728,11 +722,16 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
                 policy, authorizationParams, MetaContext.getCurrentMemberId());
         authorizeDeclaredResource(query, policy, authorizationParams);
 
+        List<NamedQueryField> fields = readFields(definition);
+        if (request.getExpectedDefinitionFingerprint() != null && !request.getExpectedDefinitionFingerprint().equals(
+                com.auraboot.framework.meta.util.NamedQueryDefinitionFingerprint.of(executionDTO(query, fields)))) {
+            throw new AccessDeniedException("Published named query source changed");
+        }
+
         // 2. Rate limit check
         if (policy.isRateLimitEnabled()) {
             if (!rateLimiter.tryAcquire(tenantId, code, policy.getRateLimitPerMinute())) {
-                throw new MetaServiceException("Rate limit exceeded for query: " + code
-                        + " (max " + policy.getRateLimitPerMinute() + " per minute)");
+                throw new com.auraboot.framework.meta.exception.NamedQueryRateLimitException(code, policy.getRateLimitPerMinute());
             }
         }
 

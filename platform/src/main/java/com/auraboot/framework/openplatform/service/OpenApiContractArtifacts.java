@@ -95,6 +95,10 @@ public final class OpenApiContractArtifacts {
         var endpoint = endpoint(contract.code() + ".execute", contract.scopes().get("execute"));
         endpoint.put("requestBody", Map.of("required", true, "content", content(ref("QueryRequest"))));
         var responses = errors(); responses.put("200", Map.of("description", "Installation-projected published query result", "content", content(ref("QueryPage")))); endpoint.put("responses", responses);
+        var quotaResponse = new LinkedHashMap<String, Object>((Map<String, Object>) responses.get("429"));
+        quotaResponse.put("description", "Query rate or concurrency budget exhausted; source rate exhaustion returns code open_api_query_rate_limited");
+        quotaResponse.put("headers", Map.of("Retry-After", Map.of("description", "Optional delta seconds; present for source rate exhaustion", "schema", Map.of("type", "integer", "minimum", 1))));
+        responses.put("429", quotaResponse);
         endpoint.put("x-max-rows", contract.maxRows()); endpoint.put("x-timeout-ms", contract.timeoutMs()); endpoint.put("x-max-concurrent", contract.maxConcurrent());
         return document(contract.code(), contract.schemaVersion(), contract.scopes().values(), Map.of("/api/open/v1/queries/" + contract.code() + ":execute", Map.of("post", endpoint)), schemas);
     }

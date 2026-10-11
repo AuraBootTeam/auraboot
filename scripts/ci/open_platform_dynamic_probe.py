@@ -129,6 +129,24 @@ def verify_report(report):
     if report.get("executed") != len(CASES) or report.get("passed") != len(CASES):
         raise ProtocolError("dynamic probe totals do not match fixed cases")
     verify_audits(report)
+    quota = report.get("queryRateLimit")
+    resource = "release.dynamic.by-zone.quota"
+    request_id = "release-dynamic-query-quota"
+    if (not isinstance(quota, dict) or set(quota) != {"status", "code", "retryAfter", "requestId", "audit"}
+            or type(quota.get("status")) is not int or quota["status"] != 429
+            or quota.get("code") != "open_api_query_rate_limited" or quota.get("retryAfter") != "60"
+            or quota.get("requestId") != request_id):
+        raise ProtocolError("dynamic query quota response proof invalid")
+    audit = quota["audit"]
+    expected = {"requestId": request_id, "actorKind": "machine", "applicationPid": report["applicationPid"],
+                "installationPid": report["installationPid"], "resource": resource, "operation": "execute",
+                "recordPid": None, "idempotentReplay": None, "status": 429, "method": "POST",
+                "path": "/api/open/v1/queries/" + resource + ":execute", "capability": "query." + resource + ".execute"}
+    if (not isinstance(audit, dict) or set(audit) != set(expected) | {"durationMs", "occurredAt"}
+            or any(audit.get(key) != value for key, value in expected.items())
+            or type(audit.get("status")) is not int or type(audit.get("durationMs")) is not int
+            or audit["durationMs"] < 0 or not isinstance(audit.get("occurredAt"), str) or not audit["occurredAt"]):
+        raise ProtocolError("dynamic query quota audit proof invalid")
     return report
 
 
@@ -303,12 +321,13 @@ def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None):
         human(f"/api/open-platform/publications/{resource}/draft", "PUT", {"expectedRevision": 0, "definition": definition})
         published = human(f"/api/open-platform/publications/{resource}/publish", "POST", {"expectedRevision": 1})
         record("publication-snapshot", published.get("activeVersion") == 1)
-        named = human("/api/meta/named-queries", "POST", {"code": named_code, "title": "Release zone query",
+        named_definition = {"code": named_code, "title": "Release zone query",
             "resourceCode": model_code, "actionCode": "read", "fromSql": f"{model['tableName']} a WHERE a.rel_zone = #{{params.zone}}",
             "policy": {"rateLimitPerMinute": 100000},
             "defaultOrder": [{"field": "pid", "direction": "asc"}], "fields": [
                 {"fieldCode": "pid", "columnExpr": "a.pid", "dataType": "string", "displayName": "PID", "sortable": True, "searchable": False},
-                {"fieldCode": "partName", "columnExpr": "a.rel_name", "dataType": "string", "displayName": "Name", "sortable": False, "searchable": False}]})
+                {"fieldCode": "partName", "columnExpr": "a.rel_name", "dataType": "string", "displayName": "Name", "sortable": False, "searchable": False}]}
+        named = human("/api/meta/named-queries", "POST", named_definition)
         for status in ["testing", "published"]:
             human(f"/api/meta/named-queries/{named['pid']}/status", "PUT", {"status": status})
         source = human(f"/api/open-platform/query-sources/{named_code}")
@@ -356,7 +375,37 @@ def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None):
         human(query_grant_path, "PUT", {"readableFields": ["pid", "name"]})
         _, query_a, _ = audited("query-source-row-projection", query_path, "POST", body={"parameters": {"zone": "A"}, "limit": 10}, headers=machine)
         _, query_b, _ = request(query_path, "POST", body={"parameters": {"zone": "B"}, "limit": 10}, headers=machine)
-        record("query-source-row-projection", query_a.get("items") == [{"pid": a["pid"], "name": "Allowed A"}] and query_b.get("items") == [])
+        quota_named_code = named_code + "_quota"
+        quota_query = query + ".quota"
+        quota_named = human("/api/meta/named-queries", "POST", dict(named_definition,
+            code=quota_named_code, policy={"rateLimitPerMinute": 1}))
+        for status in ["testing", "published"]:
+            human(f"/api/meta/named-queries/{quota_named['pid']}/status", "PUT", {"status": status})
+        quota_source = human(f"/api/open-platform/query-sources/{quota_named_code}")
+        quota_definition = dict(query_definition, code=quota_query, queryCode=quota_named_code,
+                                sourceFingerprint=quota_source["fingerprint"])
+        human(f"/api/open-platform/query-publications/{quota_query}/draft", "PUT", {"expectedRevision": 0, "definition": quota_definition})
+        human(f"/api/open-platform/query-publications/{quota_query}/publish", "POST", {"expectedRevision": 1})
+        human(f"/api/open-platform/installations/{installation['pid']}/queries/{quota_query}", "PUT", {"readableFields": ["pid", "name"]})
+        quota_path = "/api/open/v1/queries/" + quota_query + ":execute"
+        _, quota_first, _ = request(quota_path, "POST", body={"parameters": {"zone": "A"}, "limit": 10}, headers=machine)
+        quota_request_id = "release-dynamic-query-quota"
+        quota_status, quota_body, quota_headers = request(quota_path, "POST", body={"parameters": {"zone": "A"}, "limit": 10},
+            headers=dict(machine, **{"X-Request-Id": quota_request_id}), expected=(429,))
+        deadline = time.monotonic() + 5
+        while True:
+            quota_audits = human(f"/api/open-platform/installations/{installation['pid']}/audits?requestId={quota_request_id}")
+            if quota_audits or time.monotonic() >= deadline: break
+            time.sleep(.1)
+        if not isinstance(quota_audits, list) or len(quota_audits) != 1:
+            raise ProtocolError("dynamic query quota audit missing or duplicated")
+        if (set(quota_body) != {"success", "code", "message"} or quota_body.get("success") is not False
+                or quota_body.get("message") != "Published query execution rate budget exhausted"):
+            raise ProtocolError("dynamic query quota public error invalid")
+        report["queryRateLimit"] = {"status": quota_status, "code": quota_body.get("code"),
+            "retryAfter": header(quota_headers, "Retry-After"), "requestId": header(quota_headers, "X-Request-Id"), "audit": quota_audits[0]}
+        record("query-source-row-projection", query_a.get("items") == [{"pid": a["pid"], "name": "Allowed A"}]
+               and query_b.get("items") == [] and quota_first.get("items") == query_a.get("items"))
         if consumer is not None:
             consumer({"clientId": credentials["clientId"], "clientSecret": credentials["clientSecret"],
                       "scopes": list(scopes.values()) + [query_scope], "resourceCode": resource,

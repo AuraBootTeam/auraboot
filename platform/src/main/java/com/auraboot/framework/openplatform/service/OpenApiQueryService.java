@@ -28,6 +28,11 @@ public class OpenApiQueryService {
     private final ObjectMapper json;
 
     public record ExecuteRequest(Map<String, Object> parameters, Integer limit, String cursor) { }
+    public static final class QueryRateLimitException extends RuntimeException {
+        private QueryRateLimitException(Throwable cause) {
+            super("Published query execution rate budget exhausted", cause);
+        }
+    }
     @Transactional(readOnly = true)
     public Map<String, Object> execute(MachinePrincipal principal, String code, ExecuteRequest request) {
         if (principal == null || principal.tenantId() == null || principal.installationPid() == null)
@@ -89,6 +94,8 @@ public class OpenApiQueryService {
             throw new ResponseStatusException(HttpStatus.GATEWAY_TIMEOUT, "open_api_query_timeout", timeout);
         } catch (org.springframework.dao.DataAccessException unavailable) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "open_api_query_unavailable", unavailable);
+        } catch (com.auraboot.framework.meta.exception.NamedQueryRateLimitException exhausted) {
+            throw new QueryRateLimitException(exhausted);
         } catch (com.auraboot.framework.meta.exception.MetaServiceException unsafe) {
             throw new AccessDeniedException("Published query cannot be safely evaluated", unsafe);
         }
