@@ -36,6 +36,26 @@ import static org.mockito.Mockito.when;
 
 class BackgroundDataAccessorImplTest {
 
+    @Test
+    void projectionPageUsesDatabasePagingAndRestoresTenantAndPermitOnFailure() {
+        var query = new com.auraboot.framework.plugin.extension.DataPageQuery(
+                Map.of("owner_pid", "supplier-1"), Map.of(), List.of(), 3, 20);
+        when(dds.list(eq("quote"), any())).thenAnswer(inv -> {
+            assertThat(MetaContext.getCurrentTenantId()).isEqualTo(42L);
+            assertThat(MetaContext.getCommandPermitScopeFor("quote")).isEqualTo("ALL");
+            DynamicQueryRequest request = inv.getArgument(1);
+            assertThat(request.getPageNum()).isEqualTo(3);
+            assertThat(request.getPageSize()).isEqualTo(20);
+            assertThat(request.getConditions()).hasSize(1);
+            assertThat(request.getSortFields()).hasSize(1);
+            throw new IllegalStateException("storage unavailable");
+        });
+        assertThatThrownBy(() -> accessor.queryPage(42L, "quote", query))
+                .isInstanceOf(IllegalStateException.class).hasMessage("storage unavailable");
+        assertThat(MetaContext.exists()).isFalse();
+        assertThat(MetaContext.hasCommandPermitScope()).isFalse();
+    }
+
     private DynamicDataService dds;
     private BackgroundDataAccessorImpl accessor;
 

@@ -89,6 +89,12 @@ public class BackgroundDataAccessorImpl implements BackgroundDataAccessor {
     }
 
     @Override
+    public com.auraboot.framework.plugin.extension.DataPage queryPage(long tenantId, String modelCode,
+            com.auraboot.framework.plugin.extension.DataPageQuery query) {
+        return withTenant(tenantId, () -> new DynamicDataAccessorImpl(dynamicDataService).queryPage(modelCode, query));
+    }
+
+    @Override
     public List<Map<String, Object>> query(long tenantId, String modelCode, Map<String, Object> filters) {
         return withTenant(tenantId, () -> {
             List<QueryCondition> conditions = new ArrayList<>();

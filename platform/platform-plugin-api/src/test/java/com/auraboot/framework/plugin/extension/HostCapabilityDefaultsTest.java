@@ -8,6 +8,20 @@ import static org.assertj.core.api.Assertions.*;
 
 class HostCapabilityDefaultsTest {
     @Test
+    void olderProjectionHostsFailClosedForPagingAndExposeNoMutationMethods() {
+        TenantProjectionAccessor accessor = new TenantProjectionAccessor() {
+            public java.util.Map<String,Object> getById(String model, String id) { throw new AssertionError("Must not read"); }
+            public List<java.util.Map<String,Object>> query(String model, java.util.Map<String,Object> filters) {
+                throw new AssertionError("Must not load an unbounded query");
+            }
+        };
+        assertThatThrownBy(() -> accessor.queryPage("quote",
+                new DataPageQuery(java.util.Map.of(), java.util.Map.of(), List.of(), 1, 20)))
+                .isInstanceOf(UnsupportedOperationException.class).hasMessageContaining("paging is unavailable");
+        assertThat(java.util.Arrays.stream(TenantProjectionAccessor.class.getMethods()).map(java.lang.reflect.Method::getName))
+                .containsExactlyInAnyOrder("getById", "query", "queryIn", "queryPage");
+    }
+    @Test
     void olderHandlersFailClosedWhenTargetAuthorizationIsExplicitlyRequested() {
         var handler=new CommandHandlerExtension() {
             public String getCommandType() { return "supplier:save"; }

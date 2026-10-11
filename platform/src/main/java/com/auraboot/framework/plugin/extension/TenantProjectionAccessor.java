@@ -17,12 +17,18 @@ import java.util.Map;
  * <p>This contract intentionally has no mutation methods and no tenant argument. The host binds
  * every read to the command tenant, preventing a plugin from selecting another tenant.
  */
-public interface TenantProjectionAccessor {
+public interface TenantProjectionAccessor extends RecordReadAccessor {
 
     String SETTINGS_KEY = "__tenantProjectionAccessor";
     String OPT_IN_HANDLER_PARAM = "tenantProjectionRead";
 
     Map<String, Object> getById(String modelCode, String recordId);
+
+    /** Database-backed paging; older hosts fail closed instead of truncating a query. */
+    @Override
+    default DataPage queryPage(String modelCode, DataPageQuery query) {
+        throw new UnsupportedOperationException("Tenant projection paging is unavailable");
+    }
 
     List<Map<String, Object>> query(String modelCode, Map<String, Object> filters);
 
