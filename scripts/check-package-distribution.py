@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import fnmatch
 import json
+import re
 from pathlib import Path
 import subprocess
 import tarfile
@@ -66,13 +67,27 @@ def validate_archive(path, canonical, expected):
 
 
 
+def consumer_case_names():
+    fixture = Path(__file__).with_name("fixtures") / "open-platform-consumer/consumer.test.mjs"
+    declarations = re.findall(r'^check\(("(?:[^"\\]|\\.)*"), async \(\) => \{$', fixture.read_text(), re.MULTILINE)
+    names = [json.loads(name) for name in declarations]
+    if len(names) != 14 or len(set(names)) != 14:
+        raise ValueError("fixed consumer fixture must declare fourteen distinct cases")
+    return names
+
+
 def validate_consumer_output(output):
     lines = [line.removeprefix("CONSUMER_RESULTS ") for line in output.splitlines() if line.startswith("CONSUMER_RESULTS ")]
     if len(lines) != 1:
         raise ValueError("consumer must emit exactly one execution ledger")
     rows = json.loads(lines[0])
-    if not isinstance(rows, list) or len(rows) != 14 or len({row.get("name") for row in rows}) != 14:
+    if (not isinstance(rows, list) or len(rows) != 14
+            or any(not isinstance(row, dict) or set(row) != {"name", "status"}
+                   or not isinstance(row["name"], str) for row in rows)
+            or len({row["name"] for row in rows}) != 14):
         raise ValueError("consumer execution ledger must contain fourteen distinct cases")
+    if {row["name"] for row in rows} != set(consumer_case_names()):
+        raise ValueError("consumer execution ledger differs from the fixed consumer fixture")
     if any(row.get("status") != "passed" for row in rows):
         raise ValueError("consumer execution ledger contains an incomplete or failed case")
     return rows

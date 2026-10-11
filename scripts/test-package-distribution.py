@@ -79,7 +79,7 @@ class ConsumerExecutionContract(unittest.TestCase):
         return "CONSUMER_RESULTS " + json.dumps(rows)
 
     def rows(self):
-        return [{"name": f"case-{index}", "status": "passed"} for index in range(14)]
+        return [{"name": name, "status": "passed"} for name in gate.consumer_case_names()]
 
     def test_actual_execution_ledger(self):
         self.assertEqual(len(gate.validate_consumer_output(self.output(self.rows()))), 14)
@@ -89,10 +89,17 @@ class ConsumerExecutionContract(unittest.TestCase):
             gate.validate_consumer_output("SUMMARY pass=14 fail=0")
 
     def test_empty_missing_and_duplicate_cases(self):
-        for rows in [[], self.rows()[:-1], self.rows()[:-1] + [self.rows()[0]]]:
+        for rows in [[], self.rows()[:-1], self.rows()[:-1] + [self.rows()[0]], [None] * 14]:
             with self.subTest(rows=rows):
                 with self.assertRaisesRegex(ValueError, "fourteen distinct"):
                     gate.validate_consumer_output(self.output(rows))
+
+        renamed = self.rows(); renamed[-1]["name"] = "unrelated synthetic pass"
+        with self.assertRaisesRegex(ValueError, "fixed consumer fixture"):
+            gate.validate_consumer_output(self.output(renamed))
+        unexpected = self.rows(); unexpected[0]["extra"] = True
+        with self.assertRaisesRegex(ValueError, "fourteen distinct"):
+            gate.validate_consumer_output(self.output(unexpected))
 
     def test_failed_and_skipped_cases_are_rejected(self):
         for status in ["failed", "skipped", "did_not_run"]:
