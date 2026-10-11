@@ -52,6 +52,9 @@ class PsqlAuditReader:
             'tokenPresent',a.token_pid IS NOT NULL,'tenantMatches',COALESCE(a.tenant_id=(SELECT tenant_id FROM i),false),
             'anonymous',a.tenant_id IS NULL AND a.application_pid IS NULL AND a.installation_pid IS NULL AND a.token_pid IS NULL,
             'secretFree',({safe}))) FROM ab_open_api_call_audit a WHERE a.request_id IN ({wanted})), '[]'::json));"""
+        return self.query(sql)
+
+    def query(self, sql):
         try:
             result = subprocess.run(self.command, input=sql, capture_output=True, text=True, timeout=20)
             require(result.returncode == 0 and len(result.stdout) < 65536, "authentication SQL read failed")

@@ -187,6 +187,34 @@ def passed():
     allowed = dict(before, tokenLastUsed="2026-10-12T00:00:01Z", quotaCount=1)
     report["authenticationFailures"] = {"applicationPid": "app-pid", "installationPid": "install-pid", "before": before,
                                          "afterDenied": denied, "afterAllowed": allowed, "requests": requests, "normalStatus": 200}
+    resource = "release.dynamic.parts.revocation"
+    state = {"database":"hermetic-fixture","installationFound":1,"credentialStatus":"active","tokenRevoked":False,
+             "records":[{"pid":"create-pid","name":"Revocation create","zone":"A","version":1},
+                        {"pid":"update-pid","name":"Revocation updated","zone":"A","version":2}],
+             "idempotency":[],"events":[],"authentication":copy.deepcopy(allowed)}
+    writes=[];denials=[]
+    for operation,status,method,pid,name,event in [("create",201,"POST","create-pid","Revocation create","created"),
+            ("update",200,"PATCH","update-pid","Revocation updated","updated"),("delete",204,"DELETE","delete-pid",None,"deleted")]:
+        body={"pid":pid,"name":name,"zone":"A"} if name else None
+        etag='"fixture-version"' if name else None;location="/api/open/v1/resources/"+resource+"/"+pid if operation=="create" else None
+        key="revocation-fixture-"+operation
+        writes.append({"operation":operation,"pid":pid,"key":key,"status":status,"body":body,"etag":etag,"location":location,
+                       "replayStatus":status,"replayBody":body,"replayEtag":etag,"replayLocation":location,"replayMarker":"true"})
+        state["idempotency"].append({"route":"resource:"+resource+":"+operation,"key":key,"status":"completed","statusCode":status,
+                                     "body":body,"headers":{},"requestHash":"a"*64,"recordPid":pid,"authorityHash":"b"*64})
+        state["events"].append({"eventId":"fixture-event-"+operation,"type":"open.resource."+resource+"."+event,"sequence":1 if operation=="create" else 2,
+                                "subject":pid,"resource":resource,"operation":event,"recordVersion":1 if operation=="create" else 2,"payloadSha256":"c"*64})
+        denials.append({"operation":operation,"requestId":"fixture-revoked-"+operation,"status":401,
+                       "body":{"success":False,"code":"invalid_token","message":"invalid_token"},"etag":None,"location":None,"replay":None})
+    revoked=copy.deepcopy(state);revoked.update(credentialStatus="revoked",tokenRevoked=True)
+    denied=copy.deepcopy(revoked)
+    for rejection,method in zip(denials,["POST","PATCH","DELETE"]):
+        denied["authentication"]["audits"].append({"requestId":rejection["requestId"],"method":method,
+            "path":"/api/open/v1/resources/{resource}"+("/{pid}" if method!="POST" else ""),"status":401,
+            "applicationPid":"revocation-app","installationPid":"revocation-install","tenantMatches":True,"tokenPresent":True,
+            "anonymous":False,"secretFree":True,"businessDetails":{"actorKind":"unauthenticated","phase":"authentication","code":"invalid_token"}})
+    report["credentialRevocation"]={"resource":resource,"applicationPid":"revocation-app","installationPid":"revocation-install",
+                                  "writes":writes,"before":state,"afterRevoked":revoked,"afterDenied":denied,"denials":denials}
     return report
 
 
@@ -514,6 +542,19 @@ class DynamicProbeTests(unittest.TestCase):
         with self.assertRaises(ProtocolError): verify_report(report)
 
     def test_audit_proofs_are_mandatory_and_reject_wrong_identity_result_or_private_fields(self):
+        original=passed()
+        absent=copy.deepcopy(original);absent.pop("credentialRevocation")
+        with self.assertRaises(ProtocolError):verify_report(absent)
+        for key in ["writes","before","afterRevoked","afterDenied","denials"]:
+            invalid=copy.deepcopy(original);invalid["credentialRevocation"].pop(key)
+            with self.subTest(revoked_missing=key), self.assertRaises(ProtocolError):verify_report(invalid)
+        for index in range(3):
+            invalid=copy.deepcopy(original);invalid["credentialRevocation"]["denials"][index]["status"]=200
+            with self.subTest(revoked_case=index), self.assertRaises(ProtocolError):verify_report(invalid)
+        for key in ["records","idempotency","events"]:
+            invalid=copy.deepcopy(original);invalid["credentialRevocation"]["afterDenied"][key]=[]
+            with self.subTest(revoked_state=key), self.assertRaises(ProtocolError):verify_report(invalid)
+
         baseline = passed()
         for key in ["authenticationFailures"]:
             report = copy.deepcopy(baseline); report.pop(key)

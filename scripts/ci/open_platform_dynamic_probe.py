@@ -462,6 +462,8 @@ def verify_report(report):
     verify_claimed_query_rollback(report.get("queryRollbackProtection"), proofs[1], report["pluginQuerySource"])
     from open_platform_authentication_probe import verify as verify_authentication
     verify_authentication(report.get("authenticationFailures"), report.get("applicationPid"), report.get("installationPid"))
+    from open_platform_revocation_probe import verify as verify_revocation
+    verify_revocation(report.get("credentialRevocation"))
     verify_audits(report)
     verify_replay_authority(report.get("replayAuthority"), report)
     verify_write_replay_authority(report.get("writeReplayAuthority"), report)
@@ -1196,6 +1198,8 @@ def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None, audi
         record("public-openapi", document.get("openapi") == "3.1.0" and path in document.get("paths", {})
                and model_code not in json.dumps(document) and "rel_private" not in json.dumps(document))
         report["resourceSourceBinding"] = run_source_binding_probe(request, human, installation["pid"], machine, scopes["get"])
+        from open_platform_revocation_probe import run as run_revocation
+        report["credentialRevocation"] = run_revocation(request, human, audit_reader, model_code, definition)
     finally:
         report["executed"] = sum(row["status"] != "did_not_run" for row in rows)
         report["passed"] = sum(row["status"] == "passed" for row in rows)
