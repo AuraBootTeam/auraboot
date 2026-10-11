@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ScopedStateManager } from '../../runtime/state/scoped-state';
 import { RepeaterBlockRenderer } from '../blocks/RepeaterBlockRenderer';
@@ -33,6 +33,18 @@ function setup(rows: Record<string, unknown>[]) {
 }
 
 describe('Repeater form array binding', () => {
+  it('accepts an explicit parent-array replacement without resetting edits on unrelated state changes', () => {
+    const { state } = setup([]);
+    act(() => state.updateField('allocation', 'choices', [{ supplier: 'first', quantity: '60' }]));
+    expect(screen.getByRole('textbox')).toHaveValue('60');
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: '40' } });
+    act(() => state.updateState('allocation', 'unrelatedFilter', 'active'));
+    expect(screen.getByRole('textbox')).toHaveValue('40');
+    act(() => state.updateField('allocation', 'choices', [{ supplier: 'second', quantity: '70' }]));
+    expect(screen.getByRole('textbox')).toHaveValue('70');
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: '50' } });
+    expect(state.getFieldValue('allocation', 'choices')).toEqual([{ supplier: 'second', quantity: '50' }]);
+  });
   it('shows initial row values and commits exact decimal strings before linkage', () => {
     const { state, linkagePayloads } = setup([
       { supplier: 'first', quantity: '60' }, { supplier: 'second', quantity: '70' },
