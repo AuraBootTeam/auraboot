@@ -159,7 +159,7 @@ test.describe('Automation Designer — validation gate (P0-4)', () => {
     // Gate blocks save → the errored node is auto-selected and its required
     // field renders a field-level error in the property panel.
     const panel = propertyPanel(page);
-    await expect(panel.getByText('This field is required')).toBeVisible({ timeout: 5000 });
+    await expect(panel.getByText(/This field is required|此字段必填/)).toBeVisible({ timeout: 5000 });
 
     // No raw i18n keys / raw field codes leak in the panel.
     await expect(panel.getByText('$i18n:')).toHaveCount(0);
@@ -204,6 +204,6 @@ test.describe('Automation Designer — validation gate (P0-4)', () => {
       .toContain('edited');
 
     // No field-level error in the panel.
-    await expect(propertyPanel(page).getByText('This field is required')).toHaveCount(0);
+    await expect(propertyPanel(page).getByText(/This field is required|此字段必填/)).toHaveCount(0);
   });
 });
