@@ -412,12 +412,8 @@ public class PluginResourceServiceImpl implements PluginResourceService {
 
         } catch (Exception e) {
             log.error("Failed to uninstall plugin {}: {}", pluginPid, e.getMessage(), e);
-            return UninstallResult.builder()
-                    .success(false)
-                    .pluginPid(pluginPid)
-                    .pluginId(preview.getPluginId())
-                    .errorMessage(e.getMessage())
-                    .build();
+            // CATCH: preserve the transaction rollback signal after any earlier resource mutations.
+            throw new com.auraboot.framework.meta.exception.MetaServiceException("Plugin resource uninstall failed", e);
         }
     }
 
