@@ -1255,7 +1255,7 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
     /**
      * Build query metadata for a named query request.
      * When the request has no explicit dimensions or metrics (identity passthrough),
-     * meta.metrics is derived from the named query's outputFields whitelist.
+     * dimensions and metrics follow the declared output field types in the named query whitelist.
      */
     private AggregateQueryResponse.QueryMeta buildMetaForNamedQuery(
             AggregateQueryRequest request,

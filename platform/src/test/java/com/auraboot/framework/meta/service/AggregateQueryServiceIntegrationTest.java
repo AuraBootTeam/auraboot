@@ -492,12 +492,10 @@ class AggregateQueryServiceIntegrationTest extends BaseIntegrationTest {
         assertThat(((Number) response.getRows().get(0).get("a")).intValue()).isEqualTo(42);
         assertThat(response.getRows().get(0).get("b")).isEqualTo("foo");
 
-        // And: meta.metrics derived from named query outputFields
+        // Passthrough preserves raw rows while chart metadata follows declared field types.
         assertThat(response.getMeta()).isNotNull();
-        assertThat(response.getMeta().getMetrics())
-                .as("meta.metrics should be derived from named query outputFields")
-                .containsExactlyInAnyOrder("a", "b");
-        assertThat(response.getMeta().getDimensions()).isEmpty();
+        assertThat(response.getMeta().getMetrics()).as("numeric outputs are metrics").containsExactly("a");
+        assertThat(response.getMeta().getDimensions()).as("string outputs are dimensions").containsExactly("b");
     }
 
     @Test
