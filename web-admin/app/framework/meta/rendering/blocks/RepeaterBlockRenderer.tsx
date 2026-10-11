@@ -121,6 +121,8 @@ export const RepeaterBlockRenderer: React.FC<RepeaterBlockRendererProps> = ({ bl
                         field: `${repeaterKey}.${rowIndex}.${fieldKey}`,
                       }}
                       runtime={runtime}
+                      value={row[fieldKey]}
+                      onChange={(value) => updateCell(rowIndex, fieldKey, value)}
                     />
                   </div>
                 );
