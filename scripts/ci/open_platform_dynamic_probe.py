@@ -32,8 +32,8 @@ AUDIT_CASES = (
 
 # Fixed declaration semantics, authored with NamedQueryDefinitionFingerprint
 # from the qualified JAR before importing. Fresh plugin sources have version 0;
-# persisted fields have the schema's non-null empty operators array.
-PLUGIN_QUERY_SOURCE_FINGERPRINT = "d666f6e320554f17d1167fda1a986a920b400cc0309a51b5806fd5209390d2e2"
+# baseWhere is explicitly empty and fields have no operator whitelist.
+PLUGIN_QUERY_SOURCE_FINGERPRINT = "b4e13ecf68aee621f9eb099595310b5841310b056748282bf506bcb459906d22"
 
 
 def verify_named_query_absent(body, code):
@@ -534,10 +534,10 @@ def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None):
                and published[0].get("status") == "published")
         named_definition = {"code": named_code, "title": "Release zone query",
             "resourceCode": model_code, "actionCode": "read", "fromSql": f"{model['tableName']} a WHERE a.rel_zone = #{{params.zone}}",
-            "policy": {"rateLimitPerMinute": 100000},
+            "policy": {"rateLimitPerMinute": 100000}, "baseWhere": [],
             "defaultOrder": [{"field": "pid", "direction": "asc"}], "fields": [
-                {"fieldCode": "pid", "columnExpr": "a.pid", "dataType": "string", "displayName": "PID", "sortable": True, "searchable": False, "operators": []},
-                {"fieldCode": "partName", "columnExpr": "a.rel_name", "dataType": "string", "displayName": "Name", "sortable": False, "searchable": False, "operators": []}]}
+                {"fieldCode": "pid", "columnExpr": "a.pid", "dataType": "string", "displayName": "PID", "sortable": True, "searchable": False},
+                {"fieldCode": "partName", "columnExpr": "a.rel_name", "dataType": "string", "displayName": "Name", "sortable": False, "searchable": False}]}
         if model["tableName"] != model_code:
             raise ProtocolError("declared query fixture physical source changed")
         before_status, missing, _ = request("/api/meta/named-queries/by-code/" + named_code, headers=admin, expected=(400,))
