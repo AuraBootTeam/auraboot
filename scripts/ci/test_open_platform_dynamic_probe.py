@@ -78,19 +78,22 @@ def passed():
                                "requestId": "release-dynamic-query-quota", "audit": quota_audit}}
 
 
-    deadline_rows = []
-    for operation in ["list", "get"]:
-        resource = "release.dynamic.virtual-timeout"
-        marker = "release-virtual-timeout-" + operation
-        path = "/api/open/v1/resources/" + resource + ("/allowed-pid" if operation == "get" else "")
-        audit = {"requestId": marker, "actorKind": "machine", "applicationPid": "app-pid", "installationPid": "install-pid",
-                 "resource": resource, "operation": operation, "recordPid": "allowed-pid" if operation == "get" else None,
-                 "idempotentReplay": None, "status": 504, "method": "GET", "path": path,
-                 "capability": "resource." + resource + "." + operation, "durationMs": 30, "occurredAt": "2026-10-11T00:00:00Z"}
-        deadline_rows.append({"operation": operation, "status": 504, "requestId": marker, "audit": audit,
-            "error": {"success": False, "code": "open_api_query_timeout", "message": "Published query execution deadline exceeded"}})
-    report["virtualResource"]["deadline"] = {"resource": "release.dynamic.virtual-timeout", "requests": deadline_rows,
-        "healthyItems": [{"pid": "allowed-pid", "name": "Allowed A", "zone": "A"}, {"pid": "extra-pid", "name": "Virtual extra A", "zone": "A"}]}
+    for kind, suffix, status, code, message in [
+        ("deadline", "timeout", 504, "open_api_query_timeout", "Published query execution deadline exceeded"),
+        ("executionFailure", "unavailable", 503, "open_api_query_unavailable", "Published query execution is unavailable")]:
+        deadline_rows = []
+        for operation in ["list", "get"]:
+            resource = "release.dynamic.virtual-" + suffix
+            marker = "release-virtual-" + suffix + "-" + operation
+            path = "/api/open/v1/resources/" + resource + ("/allowed-pid" if operation == "get" else "")
+            audit = {"requestId": marker, "actorKind": "machine", "applicationPid": "app-pid", "installationPid": "install-pid",
+                     "resource": resource, "operation": operation, "recordPid": "allowed-pid" if operation == "get" else None,
+                     "idempotentReplay": None, "status": status, "method": "GET", "path": path,
+                     "capability": "resource." + resource + "." + operation, "durationMs": 30, "occurredAt": "2026-10-11T00:00:00Z"}
+            deadline_rows.append({"operation": operation, "status": status, "requestId": marker, "audit": audit,
+                "error": {"success": False, "code": code, "message": message}})
+        report["virtualResource"][kind] = {"resource": "release.dynamic.virtual-" + suffix, "requests": deadline_rows,
+            "healthyItems": [{"pid": "allowed-pid", "name": "Allowed A", "zone": "A"}, {"pid": "extra-pid", "name": "Virtual extra A", "zone": "A"}]}
     return report
 
 
@@ -318,21 +321,22 @@ class DynamicProbeTests(unittest.TestCase):
         report = passed(); report["virtualResource"]["installationIsolation"]["secondaryItems"][0]["privateValue"] = "Private sentinel"
         with self.assertRaises(ProtocolError): verify_report(report)
 
-        for key in passed()["virtualResource"]["deadline"]:
-            report = passed(); del report["virtualResource"]["deadline"][key]
-            with self.subTest(deadline_missing=key), self.assertRaises(ProtocolError): verify_report(report)
-        for index in [0, 1]:
-            for key, value in [("status", 503), ("status", True), ("requestId", "foreign"),
-                               ("error", {"code": "40000", "context": "open_api_query_timeout"}), ("audit", None)]:
-                report = passed(); report["virtualResource"]["deadline"]["requests"][index][key] = value
-                with self.subTest(deadline=index, key=key), self.assertRaises(ProtocolError): verify_report(report)
-            for key, value in [("status", 200), ("status", True), ("installationPid", "foreign"),
-                               ("applicationPid", "foreign"), ("operation", "execute"), ("recordPid", "private"), ("durationMs", True)]:
-                report = passed(); report["virtualResource"]["deadline"]["requests"][index]["audit"][key] = value
-                with self.subTest(deadline_audit=index, key=key), self.assertRaises(ProtocolError): verify_report(report)
-        for key, value in [("requests", []), ("healthyItems", []), ("healthyItems", [{"pid": "allowed-pid", "name": "Private"}])]:
-            report = passed(); report["virtualResource"]["deadline"][key] = value
-            with self.subTest(deadline_boundary=key), self.assertRaises(ProtocolError): verify_report(report)
+        for kind, wrong_status in [("deadline", 503), ("executionFailure", 504)]:
+            for key in passed()["virtualResource"][kind]:
+                report = passed(); del report["virtualResource"][kind][key]
+                with self.subTest(deadline_missing=key), self.assertRaises(ProtocolError): verify_report(report)
+            for index in [0, 1]:
+                for key, value in [("status", wrong_status), ("status", True), ("requestId", "foreign"),
+                                   ("error", {"code": "40000", "context": "open_api_query_timeout"}), ("audit", None)]:
+                    report = passed(); report["virtualResource"][kind]["requests"][index][key] = value
+                    with self.subTest(deadline=index, key=key), self.assertRaises(ProtocolError): verify_report(report)
+                for key, value in [("status", 200), ("status", True), ("installationPid", "foreign"),
+                                   ("applicationPid", "foreign"), ("operation", "execute"), ("recordPid", "private"), ("durationMs", True)]:
+                    report = passed(); report["virtualResource"][kind]["requests"][index]["audit"][key] = value
+                    with self.subTest(deadline_audit=index, key=key), self.assertRaises(ProtocolError): verify_report(report)
+            for key, value in [("requests", []), ("healthyItems", []), ("healthyItems", [{"pid": "allowed-pid", "name": "Private"}])]:
+                report = passed(); report["virtualResource"][kind][key] = value
+                with self.subTest(deadline_boundary=key), self.assertRaises(ProtocolError): verify_report(report)
 
     def test_query_quota_requires_response_and_persisted_public_audit(self):
         self.assertEqual(verify_report(passed()), passed())
