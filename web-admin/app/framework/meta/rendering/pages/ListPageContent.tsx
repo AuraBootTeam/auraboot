@@ -323,7 +323,10 @@ export function resolveSavedViewFilterExpressions(
   });
 }
 
-function clearTransientViewSearchParams(params: URLSearchParams): void {
+function clearTransientViewSearchParams(
+  params: URLSearchParams,
+  knownFieldNames?: ReadonlySet<string>,
+): void {
   for (const key of Array.from(params.keys())) {
     if (
       key === 'sort' ||
@@ -331,11 +334,122 @@ function clearTransientViewSearchParams(params: URLSearchParams): void {
       key === 'filters' ||
       key === 'preset' ||
       key === 'pageNum' ||
-      key.startsWith('filter_')
+      key.startsWith('filter_') ||
+      (knownFieldNames?.has(key) ?? false)
     ) {
       params.delete(key);
     }
   }
+}
+
+/**
+ * URL params owned by the list runtime itself. A bare param with one of these
+ * names is never promoted to a row filter, even when the schema declares a
+ * field of the same name.
+ */
+const LIST_RESERVED_URL_PARAM_KEYS: ReadonlySet<string> = new Set([
+  'sort',
+  'keyword',
+  'filters',
+  'preset',
+  'view',
+  'tab',
+  'pageNum',
+  'pageSize',
+  'locale',
+]);
+
+/**
+ * Model data types that tolerate a SQL LIKE '%…%' predicate. Everything else
+ * (date/datetime/time, numeric, boolean, ...) must use EQ: a LIKE against a
+ * DATE or numeric column is rejected by the backend, which is exactly what
+ * happened to drill-down params like /p/fin_cash_forecast_week?fin_cfw_week_start=…
+ * when they were converted with the search field's default LIKE operator.
+ */
+const TEXT_LIKE_FILTER_DATA_TYPES: ReadonlySet<string> = new Set([
+  'string',
+  'text',
+  'char',
+  'varchar',
+  'enum',
+  'json',
+  'jsonb',
+  'uuid',
+]);
+/**
+ * Field names declared by the list page schema: table columns (action columns
+ * excluded), table search fields and filter-block fields. Drill-down bare URL
+ * params are only promoted to row filters when they match one of these, so
+ * foreign params can never leak into the query.
+ */
+export function collectListSchemaFieldNames(schema: unknown): string[] {
+  const names = new Set<string>();
+  const blocks = (schema as { blocks?: unknown })?.blocks;
+  if (!Array.isArray(blocks)) return [];
+  for (const block of blocks) {
+    const record = block as {
+      blockType?: unknown;
+      columns?: unknown;
+      searchFields?: unknown;
+      fields?: unknown;
+      table?: { columns?: unknown; searchFields?: unknown };
+    };
+    if (record.blockType === 'table') {
+      const columns = Array.isArray(record.table?.columns) ? record.table?.columns : record.columns;
+      if (Array.isArray(columns)) {
+        for (const column of columns) {
+          const col = column as { field?: unknown; isActionColumn?: unknown };
+          if (typeof col?.field === 'string' && col.field && !col.isActionColumn) {
+            names.add(col.field);
+          }
+        }
+      }
+      const searchFields = Array.isArray(record.table?.searchFields)
+        ? record.table?.searchFields
+        : record.searchFields;
+      if (Array.isArray(searchFields)) {
+        for (const field of searchFields) {
+          if (typeof field === 'string' && field) names.add(field);
+        }
+      }
+    }
+    if (record.blockType === 'filters' || record.blockType === 'filter') {
+      if (Array.isArray(record.fields)) {
+        for (const field of record.fields) {
+          const f = field as { field?: unknown };
+          if (typeof f?.field === 'string' && f.field) names.add(f.field);
+        }
+      }
+    }
+  }
+  return [...names];
+}
+
+/**
+ * Collect drill-down bare URL params as row filters.
+ *
+ * Dashboard drill-down navigation writes mapped param names bare — e.g.
+ * /p/fin_cash_forecast_week?fin_cfw_week_start=… via the widget drillDown
+ * paramMapping — while the list runtime only consumed filter_* and filters=,
+ * so the bare form was silently dropped and the target list rendered unfiltered.
+ * A bare param becomes a row filter only when its name matches a field declared
+ * by the page schema and is not a reserved runtime param; filter_* params keep
+ * precedence over a bare param for the same field.
+ */
+export function collectListBareParamFilters(
+  searchParams: URLSearchParams,
+  fieldNames: Iterable<string>,
+): Record<string, any> {
+  const known = new Set(fieldNames);
+  if (known.size === 0) return {};
+  const filters: Record<string, any> = {};
+  searchParams.forEach((value, key) => {
+    if (!key || key.startsWith('filter_') || LIST_RESERVED_URL_PARAM_KEYS.has(key)) return;
+    if (known.has(key) && value != null && value !== '') {
+      filters[key] = value;
+    }
+  });
+  return filters;
 }
 
 function stableConfigString(value: unknown): string {
@@ -698,6 +812,55 @@ export interface ListQueryFilterCondition {
   operator: string;
   value?: unknown;
   values?: unknown[];
+}
+
+/**
+ * Convert one user filter (key -> raw value, sourced from URL filter_* params,
+ * drill-down bare params or the quick filter bar) into its query conditions.
+ *
+ * SmartInput search fields default to LIKE, but a LIKE '%..%' against a
+ * date/number column is a guaranteed backend error, and drill-down URL params
+ * (e.g. /p/fin_cash_forecast_week?fin_cfw_week_start=...) flow through here with
+ * the field's real model type. When the model metadata types the field as a
+ * non-text scalar the operator therefore falls back to EQ; unknown types keep
+ * the legacy heuristic (explicit operator > SmartInput LIKE > EQ).
+ */
+export function resolveUserFilterCondition(
+  key: string,
+  value: unknown,
+  filterFields: FieldConfig[] | undefined,
+  filterFieldMap?: Map<string, any>,
+): ListQueryFilterCondition[] {
+  if (value == null || value === '') return [];
+  // Date range objects { start, end }
+  if (typeof value === 'object' && ('start' in value || 'end' in value)) {
+    const range = value as { start?: unknown; end?: unknown };
+    const conditions: ListQueryFilterCondition[] = [];
+    if (range.start) conditions.push({ fieldName: key, operator: 'gte', value: String(range.start) });
+    if (range.end) conditions.push({ fieldName: key, operator: 'lte', value: String(range.end) });
+    return conditions;
+  }
+  const fieldConfig = (filterFields || []).find((field) => field.field === key);
+  const explicitOperator = (fieldConfig as any)?.operator || fieldConfig?.props?.operator;
+  const dataType = resolveFieldMetaDataType(key, filterFieldMap);
+  const supportsLike =
+    dataType == null || TEXT_LIKE_FILTER_DATA_TYPES.has(dataType.split('(')[0].trim());
+  const operator =
+    !supportsLike && !explicitOperator
+      ? 'EQ'
+      : typeof explicitOperator === 'string' && explicitOperator.trim()
+        ? explicitOperator.trim().toUpperCase()
+        : fieldConfig?.component === 'SmartInput'
+          ? 'LIKE'
+          : 'EQ';
+  const textValue = String(value);
+  return [
+    {
+      fieldName: key,
+      operator,
+      value: operator === 'LIKE' ? `%${textValue}%` : textValue,
+    },
+  ];
 }
 
 /** Preserve array-valued IN/BETWEEN filters for the dynamic query contract. */
@@ -1106,6 +1269,11 @@ function ListPageContentInner(props: PageContentProps) {
     routerSetSearchParams,
     listUrlWritesEnabledRef,
   );
+  const listSchemaFieldNames = useMemo(() => collectListSchemaFieldNames(schema), [schema]);
+  const listSchemaFieldNameSet = useMemo(
+    () => new Set(listSchemaFieldNames),
+    [listSchemaFieldNames],
+  );
   const urlFilters = useMemo(() => {
     const filters: Record<string, any> = {};
     searchParams.forEach((value, key) => {
@@ -1114,8 +1282,13 @@ function ListPageContentInner(props: PageContentProps) {
         filters[fieldName] = value;
       }
     });
-    return filters;
-  }, [searchParams]);
+    // Drill-down bare params (e.g. fin_cfw_week_start written by a dashboard
+    // drillDown paramMapping) seed row filters too; filter_* keeps precedence.
+    return {
+      ...collectListBareParamFilters(searchParams, listSchemaFieldNames),
+      ...filters,
+    };
+  }, [searchParams, listSchemaFieldNames]);
   const urlPageNum = useMemo(() => {
     const raw = searchParams.get('pageNum');
     if (!raw) return null;
@@ -1859,6 +2032,14 @@ function ListPageContentInner(props: PageContentProps) {
   }, [modelCode, skipModelFieldMeta]);
 
   const [modelFieldMap, setModelFieldMap] = useState<Map<string, any>>(new Map());
+  // Call-time mirror of modelFieldMap: loadData / handleTabChange read it when a
+  // request fires, so a filter request that waited on fieldMetaReadyRef sees the
+  // settled metadata even though its closure was created before the re-render.
+  const modelFieldMapRef = useRef<Map<string, any>>(new Map());
+  // Resolves once the field metadata for the current model has settled (loaded
+  // or failed). The initial list load awaits it when URL-sourced filters are
+  // present, so their operators are typed before the first request.
+  const fieldMetaReadyRef = useRef<Promise<void>>(Promise.resolve());
   const [referenceDisplayCache, setReferenceDisplayCache] = useState<
     Record<string, Record<string, string>>
   >({});
@@ -1867,11 +2048,13 @@ function ListPageContentInner(props: PageContentProps) {
     let cancelled = false;
     const pageKey = schema?.modelCode || tableName;
     if (!pageKey || skipModelFieldMeta) {
+      modelFieldMapRef.current = new Map();
       setModelFieldMap(new Map());
+      fieldMetaReadyRef.current = Promise.resolve();
       return;
     }
 
-    async function loadModelFields(): Promise<void> {
+    const ready = (async () => {
       try {
         const fieldsRes = await fetchResult<any[]>(`/api/dynamic/${pageKey}/field-meta`, {
           method: 'get',
@@ -1879,6 +2062,7 @@ function ListPageContentInner(props: PageContentProps) {
         });
         if (cancelled) return;
         if (!ResultHelper.isSuccess(fieldsRes) || !fieldsRes.data) {
+          modelFieldMapRef.current = new Map();
           setModelFieldMap(new Map());
           return;
         }
@@ -1886,16 +2070,17 @@ function ListPageContentInner(props: PageContentProps) {
         for (const field of fieldsRes.data) {
           if (field?.code) map.set(field.code, field);
         }
+        modelFieldMapRef.current = map;
         setModelFieldMap(map);
       } catch (error) {
         if (!cancelled) {
+          modelFieldMapRef.current = new Map();
           setModelFieldMap(new Map());
           console.warn('[ListPageContent] Failed to load model field metadata:', error);
         }
       }
-    }
-
-    loadModelFields();
+    })();
+    fieldMetaReadyRef.current = ready;
     return () => {
       cancelled = true;
     };
@@ -2113,39 +2298,16 @@ function ListPageContentInner(props: PageContentProps) {
       tabCondition: ListQueryFilterCondition | null,
       userFilters?: Record<string, any>,
       chipFiltersList?: ViewFilterConfig[],
+      filterFieldMap?: Map<string, any>,
     ) => {
       const conditions: ListQueryFilterCondition[] = [];
       if (tabCondition) conditions.push(tabCondition);
       // Convert user filters (key-value from filters) to QueryCondition format
       if (userFilters) {
         for (const [key, value] of Object.entries(userFilters)) {
-          if (value == null || value === '') continue;
-          // Handle date range objects { start, end }
-          if (typeof value === 'object' && ('start' in value || 'end' in value)) {
-            if (value.start) {
-              conditions.push({ fieldName: key, operator: 'gte', value: String(value.start) });
-            }
-            if (value.end) {
-              conditions.push({ fieldName: key, operator: 'lte', value: String(value.end) });
-            }
-          } else {
-            const fieldConfig = ((filterBlock?.fields || []) as FieldConfig[]).find(
-              (field) => field.field === key,
-            );
-            const explicitOperator = (fieldConfig as any)?.operator || fieldConfig?.props?.operator;
-            const operator =
-              typeof explicitOperator === 'string' && explicitOperator.trim()
-                ? explicitOperator.trim().toUpperCase()
-                : fieldConfig?.component === 'SmartInput'
-                  ? 'LIKE'
-                  : 'EQ';
-            const textValue = String(value);
-            conditions.push({
-              fieldName: key,
-              operator,
-              value: operator === 'LIKE' ? `%${textValue}%` : textValue,
-            });
-          }
+          conditions.push(
+            ...resolveUserFilterCondition(key, value, filterBlock?.fields as FieldConfig[] | undefined, filterFieldMap),
+          );
         }
       }
       // Merge chip filters (from FilterChipBar) into conditions
@@ -2158,6 +2320,8 @@ function ListPageContentInner(props: PageContentProps) {
       }
       return conditions.length > 0 ? JSON.stringify(conditions) : undefined;
     },
+    // NOTE: filterBlock is declared later in the component; reads resolve at call time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
 
@@ -2266,6 +2430,7 @@ function ListPageContentInner(props: PageContentProps) {
             tabCondition,
             params?.filters,
             params?.chipFilters ?? chipFiltersRef.current,
+            modelFieldMapRef.current,
           );
           if (filtersParam) {
             queryParams.filters = filtersParam;
@@ -2399,7 +2564,7 @@ function ListPageContentInner(props: PageContentProps) {
       (prev) => {
         const p = new URLSearchParams(prev);
         p.delete('view');
-        clearTransientViewSearchParams(p);
+        clearTransientViewSearchParams(p, listSchemaFieldNameSet);
         return p;
       },
       { replace: true },
@@ -2477,26 +2642,41 @@ function ListPageContentInner(props: PageContentProps) {
   // Pass current filters (which may include URL filter_* params) for the first load
   useEffect(() => {
     if (schema && !skipListData) {
-      // Restore an active preset view from ?preset= so it survives reload —
-      // a SavedView (?view=) takes precedence and carries its own filters.
-      const initialPreset = urlViewPid ? null : urlPreset;
-      if (initialPreset) {
-        const presetFilters =
-          buildQuickFilterPreset(initialPreset, { userId: user?.id, now: new Date() }) ?? {};
-        setActiveQuickFilter(initialPreset);
-        setFilters(presetFilters);
-        // The debounced sort/filter effect would otherwise re-fetch once on
-        // mount with the still-empty `filters` state and clobber this preset
-        // load — skip exactly that first run so the preset filter wins.
-        skipFirstSortFilterEffectRef.current = true;
-        loadDataRef.current?.({
-          page: pagination.current - 1,
-          size: pagination.pageSize,
-          filters: presetFilters,
+      const runInitialLoad = () => {
+        // Restore an active preset view from ?preset= so it survives reload —
+        // a SavedView (?view=) takes precedence and carries its own filters.
+        const initialPreset = urlViewPid ? null : urlPreset;
+        if (initialPreset) {
+          const presetFilters =
+            buildQuickFilterPreset(initialPreset, { userId: user?.id, now: new Date() }) ?? {};
+          setActiveQuickFilter(initialPreset);
+          setFilters(presetFilters);
+          // The debounced sort/filter effect would otherwise re-fetch once on
+          // mount with the still-empty `filters` state and clobber this preset
+          // load — skip exactly that first run so the preset filter wins.
+          skipFirstSortFilterEffectRef.current = true;
+          loadDataRef.current?.({
+            page: pagination.current - 1,
+            size: pagination.pageSize,
+            filters: presetFilters,
+          });
+        } else {
+          loadDataRef.current?.({ page: pagination.current - 1, size: pagination.pageSize, filters });
+        }
+      };
+      // URL-sourced filters (filter_* / drill-down bare params) are typed by the
+      // model field metadata; awaiting it here prevents the first request from
+      // going out with the un-typed legacy operator (e.g. LIKE on a date).
+      if (Object.keys(urlFilters).length > 0) {
+        let cancelled = false;
+        void fieldMetaReadyRef.current.then(() => {
+          if (!cancelled) runInitialLoad();
         });
-      } else {
-        loadDataRef.current?.({ page: pagination.current - 1, size: pagination.pageSize, filters });
+        return () => {
+          cancelled = true;
+        };
       }
+      runInitialLoad();
     }
     // Intentionally only react to schema changes.
     // Pagination or filter updates are handled by explicit user actions.
@@ -2591,7 +2771,7 @@ function ListPageContentInner(props: PageContentProps) {
               queryParams.sortOrder = String(tableBlock.defaultSort.order || 'desc').toLowerCase();
             }
           } else {
-            const filtersParam = buildFiltersParam(tabCondition, filters, chipFilters);
+            const filtersParam = buildFiltersParam(tabCondition, filters, chipFilters, modelFieldMapRef.current);
             if (filtersParam) {
               queryParams.filters = filtersParam;
             }
@@ -4114,7 +4294,7 @@ function ListPageContentInner(props: PageContentProps) {
       (prev) => {
         const p = new URLSearchParams(prev);
         p.set('view', currentView.pid);
-        clearTransientViewSearchParams(p);
+        clearTransientViewSearchParams(p, listSchemaFieldNameSet);
         return p;
       },
       { replace: true },
@@ -4518,7 +4698,7 @@ function ListPageContentInner(props: PageContentProps) {
           const p = new URLSearchParams(prev);
           if (key) {
             p.delete('view');
-            clearTransientViewSearchParams(p);
+            clearTransientViewSearchParams(p, listSchemaFieldNameSet);
             p.set('preset', key);
           } else {
             p.delete('preset');
@@ -4601,7 +4781,7 @@ function ListPageContentInner(props: PageContentProps) {
         (prev) => {
           const p = new URLSearchParams(prev);
           p.set('view', pid);
-          clearTransientViewSearchParams(p);
+          clearTransientViewSearchParams(p, listSchemaFieldNameSet);
           return p;
         },
         { replace: true },
@@ -5777,7 +5957,7 @@ function ListPageContentInner(props: PageContentProps) {
                   (prev) => {
                     const p = new URLSearchParams(prev);
                     p.set('view', view.pid);
-                    clearTransientViewSearchParams(p);
+                    clearTransientViewSearchParams(p, listSchemaFieldNameSet);
                     return p;
                   },
                   { replace: true },
@@ -5804,7 +5984,7 @@ function ListPageContentInner(props: PageContentProps) {
                 (prev) => {
                   const p = new URLSearchParams(prev);
                   p.set('view', pid);
-                  clearTransientViewSearchParams(p);
+                  clearTransientViewSearchParams(p, listSchemaFieldNameSet);
                   return p;
                 },
                 { replace: true },

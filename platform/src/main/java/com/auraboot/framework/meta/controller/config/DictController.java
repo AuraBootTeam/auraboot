@@ -6,8 +6,10 @@ import com.auraboot.framework.common.dto.PageResult;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.permission.constants.MetaPermission;
+import com.auraboot.framework.i18n.util.I18nLocaleResolver;
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.service.DictService;
+import com.auraboot.framework.meta.service.impl.DictLabelLocalizationHelper;
 import com.auraboot.framework.plugin.dto.imports.ResourceType;
 import com.auraboot.framework.plugin.service.PluginResourceTracker;
 import com.auraboot.framework.meta.service.DictVersionService;
@@ -50,6 +52,7 @@ public class DictController {
     private final DictVersionService dictVersionService;
     private final DictCascadeService dictCascadeService;
     private final PluginResourceTracker pluginResourceTracker;
+    private final I18nLocaleResolver i18nLocaleResolver;
 
     private static String logSafe(Object value) {
         return LogSanitizer.safe(value);
@@ -147,7 +150,8 @@ public class DictController {
     public ApiResponse<DictDataResult> loadDictDataByCode(
             @Parameter(description = "字典编码") @PathVariable @NotBlank String code,
             @Parameter(description = "版本策略") @RequestParam(defaultValue = "latest") String versionStrategy,
-            @Parameter(description = "固定版本号") @RequestParam(required = false) String pinnedVersion) {
+            @Parameter(description = "固定版本号") @RequestParam(required = false) String pinnedVersion,
+            jakarta.servlet.http.HttpServletRequest request) {
         log.info("根据编码加载字典数据: code={}, strategy={}, version={}",
                 logSafe(code), logSafe(versionStrategy), logSafe(pinnedVersion));
 
@@ -159,7 +163,19 @@ public class DictController {
 
         // 加载数据
         DictDataResult result = dictService.loadDictData(code, versionStrategy, pinnedVersion);
+        localizeDictLabels(result, request);
         return ApiResponse.success(result);
+    }
+
+    /**
+     * Resolve served item labels per the request locale. Localized labels ride
+     * along in the item extension "labels" map (written at plugin import /
+     * release bind time); the stored label keeps only one locale. Resolution
+     * happens here, post dictData cache, so the cached payload stays
+     * locale-independent and dictionaries without translations are unchanged.
+     */
+    private void localizeDictLabels(DictDataResult result, jakarta.servlet.http.HttpServletRequest request) {
+        DictLabelLocalizationHelper.localize(result, i18nLocaleResolver.resolveLocale(request));
     }
 
 
@@ -207,18 +223,20 @@ public class DictController {
     public ApiResponse<DictDataResult> loadDictData(
             @Parameter(description = "字典PID") @PathVariable @NotBlank String pid,
             @Parameter(description = "版本策略") @RequestParam(defaultValue = "latest") String versionStrategy,
-            @Parameter(description = "固定版本号") @RequestParam(required = false) String pinnedVersion) {
+            @Parameter(description = "固定版本号") @RequestParam(required = false) String pinnedVersion,
+            jakarta.servlet.http.HttpServletRequest request) {
         log.info("加载字典数据: pid={}, strategy={}, version={}",
                 logSafe(pid), logSafe(versionStrategy), logSafe(pinnedVersion));
-        
+
         // 通过 PID 获取字典
         DictDTO dict = dictService.findByPid(pid);
         if (dict == null) {
             return ApiResponse.failure("字典不存在: " + pid);
         }
-        
+
         // 使用 code 加载数据
         DictDataResult result = dictService.loadDictData(dict.getCode(), versionStrategy, pinnedVersion);
+        localizeDictLabels(result, request);
         return ApiResponse.success(result);
     }
 
@@ -228,10 +246,13 @@ public class DictController {
     @PostMapping("/data/batch")
     @Operation(summary = "批量加载字典数据", description = "批量根据版本策略加载字典数据")
     public ApiResponse<List<DictDataResult>> batchLoadDictData(
-            @Valid @RequestBody List<DictLoadRequest> requests) {
+            @Valid @RequestBody List<DictLoadRequest> requests,
+            jakarta.servlet.http.HttpServletRequest request) {
         log.info("批量加载字典数据: count={}", requests.size());
-        
+
         List<DictDataResult> results = dictService.batchLoadDictData(requests);
+        String locale = i18nLocaleResolver.resolveLocale(request);
+        results.forEach(result -> DictLabelLocalizationHelper.localize(result, locale));
         return ApiResponse.success(results);
     }
 

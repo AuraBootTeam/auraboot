@@ -1907,18 +1907,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             // Update dict items using new replaceItems service method
             if (dto.getItems() != null && !dto.getItems().isEmpty()) {
                 List<DictCreateRequest.DictItemCreateRequest> itemRequests = dto.getItems().stream()
-                    .map(item -> {
-                        DictCreateRequest.DictItemCreateRequest itemReq = new DictCreateRequest.DictItemCreateRequest();
-                        itemReq.setValue(item.getValue());
-                        itemReq.setLabel(item.getEffectiveLabel());
-                        itemReq.setSortOrder(item.getSortNo());
-                        itemReq.setParentValue(item.getParentValue());
-                        itemReq.setDisabled(StatusConstants.DISABLED.equals(item.getStatus()));
-                        if (item.getExtra() != null) {
-                            itemReq.setExtension(objectMapper.convertValue(item.getExtra(), JsonNode.class));
-                        }
-                        return itemReq;
-                    })
+                    .map(this::toDictItemRequest)
                     .toList();
                 dictService.replacePluginItems(updated.getPid(), itemRequests);
             }
@@ -1939,18 +1928,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                 DictDTO resurrected = dictService.findByCode(dto.getCode());
                 if (resurrected != null && dto.getItems() != null && !dto.getItems().isEmpty()) {
                     List<DictCreateRequest.DictItemCreateRequest> itemRequests = dto.getItems().stream()
-                        .map(item -> {
-                            DictCreateRequest.DictItemCreateRequest itemReq = new DictCreateRequest.DictItemCreateRequest();
-                            itemReq.setValue(item.getValue());
-                            itemReq.setLabel(item.getEffectiveLabel());
-                            itemReq.setSortOrder(item.getSortNo());
-                            itemReq.setParentValue(item.getParentValue());
-                            itemReq.setDisabled(StatusConstants.DISABLED.equals(item.getStatus()));
-                            if (item.getExtra() != null) {
-                                itemReq.setExtension(objectMapper.convertValue(item.getExtra(), JsonNode.class));
-                            }
-                            return itemReq;
-                        })
+                        .map(this::toDictItemRequest)
                         .toList();
                     dictService.replaceItems(resurrected.getPid(), itemRequests);
                 }
@@ -1972,18 +1950,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             // Convert items
             if (dto.getItems() != null) {
                 request.setItems(dto.getItems().stream()
-                    .map(item -> {
-                        DictCreateRequest.DictItemCreateRequest itemReq = new DictCreateRequest.DictItemCreateRequest();
-                        itemReq.setValue(item.getValue());
-                        itemReq.setLabel(item.getEffectiveLabel());
-                        itemReq.setSortOrder(item.getSortNo());
-                        itemReq.setParentValue(item.getParentValue());
-                        itemReq.setDisabled(StatusConstants.DISABLED.equals(item.getStatus()));
-                        if (item.getExtra() != null) {
-                            itemReq.setExtension(objectMapper.convertValue(item.getExtra(), JsonNode.class));
-                        }
-                        return itemReq;
-                    })
+                    .map(this::toDictItemRequest)
                     .toList());
             }
 
@@ -1993,6 +1960,34 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                     created.getPid(), created.getId(), dto.getCode(), dto.getEffectiveName(),
                     ResourceAction.CREATE, null, null);
         }
+    }
+
+    /**
+     * Maps one manifest dict item onto its persistence request. The manifest's
+     * localized "label:*" entries ride along as a "labels" map inside the item
+     * extension so the render-time dict reads can serve the label for the
+     * request locale (see DictLabelLocalizationHelper); the stored label keeps
+     * the effective single-locale value for dictionaries without translations.
+     */
+    private DictCreateRequest.DictItemCreateRequest toDictItemRequest(DictDefinitionDTO.DictItemDTO item) {
+        DictCreateRequest.DictItemCreateRequest itemReq = new DictCreateRequest.DictItemCreateRequest();
+        itemReq.setValue(item.getValue());
+        itemReq.setLabel(item.getEffectiveLabel());
+        itemReq.setSortOrder(item.getSortNo());
+        itemReq.setParentValue(item.getParentValue());
+        itemReq.setDisabled(StatusConstants.DISABLED.equals(item.getStatus()));
+        Map<String, String> localizedLabels = item.getAllLocalizedLabels();
+        if (item.getExtra() != null || (localizedLabels != null && !localizedLabels.isEmpty())) {
+            com.fasterxml.jackson.databind.node.ObjectNode extension = item.getExtra() != null
+                    ? (com.fasterxml.jackson.databind.node.ObjectNode) objectMapper.convertValue(
+                            item.getExtra(), JsonNode.class)
+                    : objectMapper.createObjectNode();
+            if (localizedLabels != null && !localizedLabels.isEmpty()) {
+                extension.set("labels", objectMapper.valueToTree(localizedLabels));
+            }
+            itemReq.setExtension(extension);
+        }
+        return itemReq;
     }
 
     @Override

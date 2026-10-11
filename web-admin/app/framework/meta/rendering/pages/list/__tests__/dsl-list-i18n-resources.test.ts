@@ -233,7 +233,16 @@ const REQUIRED_COMMON_KEYS = [
 ];
 
 const REQUIRED_BILINGUAL_SAVED_VIEW_KEYS = REQUIRED_COMMON_KEYS.filter(
-  (key) => key.startsWith('saved_view_overlay_') || key.startsWith('saved_view_mandatory'),
+  (key) =>
+    key.startsWith('saved_view_overlay_') ||
+    key.startsWith('saved_view_mandatory') ||
+    // Saved-view chip surface: the selector trigger and manage panel render
+    // these via t(key, fallback) where the fallback is the zh string — a
+    // missing en entry leaks 「默认视图」/「我的」 into EN sessions.
+    key.startsWith('saved_view_default') ||
+    key.startsWith('saved_view_action_default') ||
+    key.startsWith('saved_view_action_set_default') ||
+    key.startsWith('saved_view_scope_'),
 );
 
 const REQUIRED_JSON_EDITOR_KEYS = [

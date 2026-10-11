@@ -116,8 +116,14 @@ else
   # On the shared CI host every fresh run legitimately stacks next to the other
   # auraboot nightly runtimes of past campaigns, so the task-owner rule needs the
   # explicit parallel reason; local runs keep the strict single-task protection.
+  # The orchestrator marks its executions via AURA_CI_WORKSPACE_ROOT; direct CI
+  # launches (weekly batch without Jenkins) carry that marker but not AURA_CI_JOB_ID.
   parallel_args=()
-  [[ -z "${AURA_CI_JOB_ID:-}" ]] || parallel_args=(--parallel-reason "ci fresh stack for job ${AURA_CI_JOB_ID}")
+  if [[ -n "${AURA_CI_JOB_ID:-}" ]]; then
+    parallel_args=(--parallel-reason "ci fresh stack for job ${AURA_CI_JOB_ID}")
+  elif [[ -n "${AURA_CI_WORKSPACE_ROOT:-}" ]]; then
+    parallel_args=(--parallel-reason "orchestrator weekly batch for ${AURA_CI_WORKSPACE_ROOT}")
+  fi
   "$GS" up "$NAME" --slot "$SLOT" --ttl 12h --runtime-mode verification --require-new-db --plugin-profile demo \
     "${workspace_source_args[@]}" "${renderer_args[@]}" "${parallel_args[@]}" \
     || die_env 'stack bring-up failed; inspect retained golden-stack logs'

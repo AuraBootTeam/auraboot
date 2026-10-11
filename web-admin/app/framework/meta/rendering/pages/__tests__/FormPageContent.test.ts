@@ -624,6 +624,11 @@ describe('resolveEditRecordEndpoint', () => {
     expect(resolveEditRecordEndpoint(undefined, 'crm_lead', 'r1')).toBe('/api/dynamic/crm_lead/r1');
     expect(resolveEditRecordEndpoint({}, 'crm_lead', 'r1')).toBe('/api/dynamic/crm_lead/r1');
   });
+  it('routes page-registry records to the page-manager resource', () => {
+    expect(
+      resolveEditRecordEndpoint({ modelCode: 'page_schema' }, 'page_schema', '01M4PID'),
+    ).toBe('/api/pages/01M4PID');
+  });
   it('prefers schema.modelCode when the route table name is only a page alias', () => {
     expect(
       resolveEditRecordEndpoint(

@@ -326,7 +326,16 @@ async function createOrder(page: Page, title: string): Promise<DynamicRecord> {
       e2et_order_title: title,
       e2et_order_type: 'normal',
       e2et_order_status: 'draft',
-      e2et_order_customer: `Customer ${title}`,
+      // Customer must pre-exist: the reference validator resolves by
+      // e2et_cust_name, so seed it before the order references it.
+      e2et_order_customer: await (async () => {
+        const custName = `Customer ${title}`;
+        const r = await page.request.post('/api/meta/commands/execute/e2et:create_customer', {
+          data: { payload: { e2et_cust_code: `E2EC-${title}`, e2et_cust_name: custName, e2et_cust_region: 'north' } },
+        }).catch(() => null);
+        void r;
+        return custName;
+      })(),
       e2et_order_urgent: false,
       e2et_order_amount: 100,
       e2et_order_qty: 1,
