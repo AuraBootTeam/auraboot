@@ -22,6 +22,15 @@ export default function WorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [todayLabel, setTodayLabel] = useState('');
+
+  // The browser's calendar day may differ from the SSR host's. Both initial
+  // renders omit the date; then show the user's local date after mounting.
+  useEffect(() => {
+    setTodayLabel(new Date().toLocaleDateString(locale || 'en-US', {
+      weekday: 'long', month: 'long', day: 'numeric',
+    }));
+  }, [locale]);
 
   const loadWorkbench = useCallback(async () => {
     setLoading(true);
@@ -129,9 +138,6 @@ export default function WorkbenchPage() {
     }
   }, [dashboard, locale, t, showSuccessToast, showErrorToast]);
 
-  // Follow the active UI locale so the date never mixes English into the zh UI.
-  const todayLabel = new Date().toLocaleDateString(locale || 'en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-
   const headerBand = (
     <header className="flex items-end justify-between mb-6">
       <div>
@@ -139,7 +145,7 @@ export default function WorkbenchPage() {
           {t('workbench.title', undefined, '工作台')}
         </h1>
         <div data-testid="workbench-subline" className="text-[13px] text-gray-500 mt-1">
-          {todayLabel} · {t('workbench.subline', undefined, '概览')}
+          {todayLabel && `${todayLabel} · `}{t('workbench.subline', undefined, '概览')}
         </div>
       </div>
       <div className="flex gap-2">

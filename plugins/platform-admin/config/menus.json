@@ -320,7 +320,7 @@
     "component": null,
     "icon": "global",
     "type": 1,
-    "permissionCode": null,
+    "permissionCode": "system_management",
     "orderNo": 92,
     "visible": true,
     "extension": {
@@ -339,7 +339,7 @@
     "component": null,
     "icon": "translation",
     "type": 1,
-    "permissionCode": null,
+    "permissionCode": "system_management",
     "orderNo": 93,
     "visible": true,
     "extension": {

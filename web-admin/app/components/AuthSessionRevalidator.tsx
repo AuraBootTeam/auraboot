@@ -61,9 +61,12 @@ export function AuthSessionRevalidator({
       return undefined;
     }
 
-    const attemptRevalidate = () => {
+    let disposed = false;
+    let pendingProbe: AbortController | undefined;
+
+    const attemptRevalidate = async () => {
       // Offline root-loader failures would dispose page-level reconnect subscriptions.
-      if (window.navigator.onLine === false) return;
+      if (window.navigator.onLine === false || pendingProbe) return;
       const currentTime = now();
       if (
         !shouldRevalidateAuthSession({
@@ -78,7 +81,29 @@ export function AuthSessionRevalidator({
         return;
       }
       lastRevalidatedAt.current = currentTime;
-      revalidator.revalidate();
+      // Browser connectivity does not imply the backend is reachable. Probe the
+      // same authenticated BFF before background root refreshes: a 5xx would
+      // otherwise replace a healthy live page with the root error boundary.
+      // Authoritative auth rejection still goes through normal loader handling.
+      const probe = new AbortController();
+      pendingProbe = probe;
+      const deadline = window.setTimeout(() => probe.abort(), 10_000);
+      try {
+        const response = await fetch('/api/auth/me', {
+          credentials: 'same-origin',
+          signal: probe.signal,
+        });
+        if (!disposed && !probe.signal.aborted && response.status < 500) {
+          revalidator.revalidate();
+        }
+      } catch (error) {
+        // Only transport failures defer this background refresh. Navigation,
+        // configuration errors and non-network exceptions retain fail-fast behavior.
+        if (!(error instanceof TypeError) && !probe.signal.aborted) throw error;
+      } finally {
+        window.clearTimeout(deadline);
+        if (pendingProbe === probe) pendingProbe = undefined;
+      }
     };
 
     const handleVisibilityChange = () => {
@@ -94,6 +119,8 @@ export function AuthSessionRevalidator({
       intervalMs > 0 ? window.setInterval(attemptRevalidate, intervalMs) : undefined;
 
     return () => {
+      disposed = true;
+      pendingProbe?.abort();
       window.removeEventListener('focus', attemptRevalidate);
       window.removeEventListener('online', attemptRevalidate);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
