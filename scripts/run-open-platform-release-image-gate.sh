@@ -201,6 +201,43 @@ docker run --rm --network "$NET" -v "$STAGE/platform/src/main/resources/db/migra
   -baselineOnMigrate=false -validateMigrationNaming=true -cleanDisabled=true migrate \
   > "$ARTIFACTS/logs/flyway.log" 2>&1 || fail "Flyway migration failed"
 
+info "running the fixed backend profile against a separate freshly migrated database"
+BACKEND_DB="open_platform_backend_ci"
+docker exec "$PG" createdb -U auraboot "$BACKEND_DB" \
+  || fatal "backend test database creation failed"
+docker run --rm --network "$NET" -v "$STAGE/platform/src/main/resources/db/migration/core":/flyway/sql:ro \
+  "$FLYWAY_IMAGE" -url="jdbc:postgresql://$PG:5432/$BACKEND_DB" -user=auraboot \
+  -password=open_platform_ci -locations=filesystem:/flyway/sql -table=ab_flyway_schema_history \
+  -baselineOnMigrate=false -validateMigrationNaming=true -cleanDisabled=true migrate \
+  > "$ARTIFACTS/logs/backend-flyway.log" 2>&1 || fail "backend test migration failed"
+python3 "$STAGE/scripts/ci/open_platform_backend_catalog.py" plan --root "$STAGE" \
+  --plan "$ARTIFACTS/backend-plan.json" --selectors "$ARTIFACTS/backend-selectors.txt" \
+  || fail "backend blocking profile expansion failed"
+BACKEND_GRADLE_HOME="$WORK_ROOT/backend-gradle"
+mkdir -p "$BACKEND_GRADLE_HOME/wrapper/dists/gradle-${GRADLE_VERSION}-bin"
+cp -a "$GRADLE_DISTRIBUTION_DIR" "$BACKEND_GRADLE_HOME/wrapper/dists/gradle-${GRADLE_VERSION}-bin/"
+timeout 1200 docker run --rm --network "$NET" \
+  -v "$STAGE":/source -v "$ARTIFACTS":/artifacts \
+  -v "$BACKEND_GRADLE_HOME":/gradle-home -w /source/platform \
+  -e GRADLE_USER_HOME=/gradle-home \
+  -e TEST_DATABASE_URL="jdbc:postgresql://$PG:5432/$BACKEND_DB" \
+  -e TEST_DATABASE_USERNAME=auraboot -e TEST_DATABASE_PASSWORD=open_platform_ci \
+  -e TEST_EXPECTED_DATABASE="$BACKEND_DB" -e SPRING_DATA_REDIS_HOST="$REDIS" \
+  "$BUILD_JDK_IMAGE" bash -c '
+    set -Eeuo pipefail
+    mapfile -t classes < /artifacts/backend-selectors.txt
+    args=()
+    for class in "${classes[@]}"; do args+=(--tests "$class"); done
+    ./gradlew :test "${args[@]}" :jacocoTestReport --no-daemon
+  ' > "$ARTIFACTS/logs/backend-tests.log" 2>&1 || fail "backend blocking tests failed"
+mkdir -p "$ARTIFACTS/backend-junit"
+cp "$STAGE/platform/build/test-results/test/"TEST-*.xml "$ARTIFACTS/backend-junit/"
+chmod 0600 "$ARTIFACTS/backend-junit/"*.xml
+cp "$STAGE/platform/build/reports/jacoco/test/jacocoTestReport.xml" "$ARTIFACTS/backend-jacoco.xml"
+python3 "$STAGE/scripts/ci/open_platform_backend_catalog.py" verify --root "$STAGE" \
+  --plan "$ARTIFACTS/backend-plan.json" --results "$ARTIFACTS/backend-junit" \
+  --receipt "$ARTIFACTS/backend-receipt.json" || fail "backend case reconciliation failed"
+
 PROTOCOL_KEY="$(openssl rand -base64 48 | tr -d '\n')"
 JWT_KEY="$(openssl rand -base64 64 | tr -d '\n')"
 # AURA_PLUGINS_DIR is the PF4J jar-plugin root and must NOT share
@@ -335,6 +372,7 @@ json.dump({
   "sourceSetDigest": "$AURA_CI_SOURCE_SET_DIGEST",
   "protocolProbe": "assets+inventory+cursor+etag+catalog+dynamic-crud+named-query+fresh-sdk+model-event-recovery", "dynamicCases": 18, "sdkCases": 13, "modelEventCases": 18, "slo": "production-thresholds-ok",
   "sdkArchive": json.load(open("$ARTIFACTS/sdk-archive.json")), "sdkNodeImage": "$SDK_NODE_IMAGE",
+  "backend": json.load(open("$ARTIFACTS/backend-receipt.json")),
   "webhookDrainBacklog": 0, "registryPush": "disabled", "builder": "$AURA_CI_BUILDER_ID",
   "job": "$AURA_CI_JOB_ID"
 }, open(sys.argv[1], "w"), indent=2, sort_keys=True)
