@@ -130,6 +130,7 @@ function buildOtherField(
   config: any,
   candidate: any,
   fields: CandidateField[],
+  locale: string,
 ): CandidateField | null {
   const profileConfig = config?.fieldProfiles || {};
   const otherConfig = profileConfig.otherField;
@@ -153,7 +154,12 @@ function buildOtherField(
   ]);
   const values = Object.entries(parsedAttributes as Record<string, unknown>)
     .filter(([key, value]) => !consumed.has(key) && !excluded.has(key) && !isEmptyValue(value))
-    .map(([key, value]) => `${key}: ${formatOtherValue(value)}`);
+    .map(([key, value]) => {
+      const configured = otherConfig.attributeLabels?.[key];
+      const label = typeof configured === 'string' ? configured
+        : configured?.[locale] || configured?.[locale.split('-')[0]] || configured?.en || key;
+      return `${label}: ${formatOtherValue(value)}`;
+    });
   if (values.length === 0 && !otherConfig.showWhenEmpty) return null;
   return {
     ...otherConfig,
@@ -165,10 +171,12 @@ export function resolveCandidateFieldColumns({
   item,
   candidate,
   referenceRecord,
+  locale = 'zh-CN',
 }: {
   item: any;
   candidate: any;
   referenceRecord?: any;
+  locale?: string;
 }): CandidateField[] {
   return resolveProfiledFieldColumns({
     item: {
@@ -177,6 +185,7 @@ export function resolveCandidateFieldColumns({
     },
     record: candidate,
     referenceRecord,
+    locale,
   });
 }
 
@@ -184,12 +193,14 @@ export function resolveProfiledFieldColumns({
   item,
   record,
   referenceRecord,
+  locale = 'zh-CN',
 }: {
   item: any;
   record: any;
   referenceRecord?: any;
+  locale?: string;
 }): CandidateField[] {
-  return resolveProfiledFieldGroups({ item, record, referenceRecord }).flatMap(
+  return resolveProfiledFieldGroups({ item, record, referenceRecord, locale }).flatMap(
     (group) => group.fields,
   );
 }
@@ -198,10 +209,12 @@ export function resolveProfiledFieldGroups({
   item,
   record,
   referenceRecord,
+  locale = 'zh-CN',
 }: {
   item: any;
   record: any;
   referenceRecord?: any;
+  locale?: string;
 }): ProfiledFieldGroup[] {
   const baseFields = Array.isArray(item?.fieldColumns)
     ? item.fieldColumns
@@ -220,7 +233,7 @@ export function resolveProfiledFieldGroups({
     (field: CandidateField) => !profileManagedFieldKeys.has(fieldKey(field)),
   );
   const fields = [...commonFields, ...profileFields];
-  const otherField = buildOtherField(item, record, fields);
+  const otherField = buildOtherField(item, record, fields, locale);
   const groups: ProfiledFieldGroup[] = [];
   if (commonFields.length > 0) {
     groups.push({

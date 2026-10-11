@@ -445,7 +445,7 @@ function ComparisonList({
   return (
     <div className="space-y-2">
       {value.map((comparison, index) => {
-        const key = formatValue(comparison.label ?? comparison.key, `#${index + 1}`);
+        const key = humanizeComparisonField(comparison.label ?? comparison.key, locale, t) || `#${index + 1}`;
         const sourceValue = formatValue(comparison.sourceValue, '');
         const candidateValue = formatValue(comparison.candidateValue, '');
         const reason = formatValue(comparison.reason, '');
@@ -479,9 +479,10 @@ function ComparisonList({
                 <div className="text-text mt-0.5 break-words">{candidateValue || '-'}</div>
               </div>
               {reason && (
-                <div className="text-text-2 min-w-0 break-words md:col-span-2">
-                  {localized(locale, t, '原因', 'Reason')}: {reason}
-                </div>
+                <details className="text-text-2 min-w-0 break-words md:col-span-2">
+                  <summary>{localized(locale, t, '技术详情', 'Technical details')}</summary>
+                  <div>{localized(locale, t, '原因代码', 'Reason code')}: {reason}</div>
+                </details>
               )}
             </div>
           </section>
@@ -2750,6 +2751,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
     : [];
   const resolvedCanonicalGroups = compareConfig.canonicalFieldProfiles
     ? resolveProfiledFieldGroups({
+        locale,
         item: {
           fieldColumns: canonicalFields,
           fieldProfiles: compareConfig.canonicalFieldProfiles,
@@ -3488,6 +3490,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                       ? readPath(candidate, item.statusColorField)
                       : undefined;
                     const fieldColumns = resolveCandidateFieldColumns({
+                      locale,
                       item,
                       candidate,
                       referenceRecord: {

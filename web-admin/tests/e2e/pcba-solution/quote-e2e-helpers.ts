@@ -1271,6 +1271,31 @@ export async function seedBomWorkbench(
   } as BomWorkbenchSeed;
 
   try {
+    for (const [code, brand, mpn] of [
+      [created.candidateCode, 'Yageo', 'RC0603FR-0710KL'],
+      [created.secondaryCandidateCode, 'UniOhm', '0603WAF1002T5E'],
+    ]) {
+      const existing = await queryDynamicRecords(page, 'bom_material_master', [
+        { fieldName: 'bom_mm_material_code', operator: 'EQ', value: code },
+      ]);
+      if (existing.length > 0) {
+        expect(existing).toHaveLength(1);
+        expect(existing[0].bom_mm_enabled, `material ${code} must be enabled`).toBe(true);
+        continue;
+      }
+      await executeCommand(page, 'bom:create_material', {
+        bom_mm_material_code: code, bom_mm_material_name: '贴片电阻',
+        bom_mm_spec_model: '10K 1% 0603', bom_mm_category: 'resistor',
+        bom_mm_package: '0603', bom_mm_brand: brand, bom_mm_mpn: mpn,
+        bom_mm_unit: 'PCS', bom_mm_enabled: true,
+      });
+      const persisted = await queryDynamicRecords(page, 'bom_material_master', [
+        { fieldName: 'bom_mm_material_code', operator: 'EQ', value: code },
+      ]);
+      expect(persisted, `candidate ${code} must have a persisted master record`).toHaveLength(1);
+      expect(persisted[0].bom_mm_enabled).toBe(true);
+      created.rows.push({ model: 'bom_material_master', pid: String(persisted[0].pid) });
+    }
     const accountResult = await executeCommand(
       page,
       'crm:create_account',

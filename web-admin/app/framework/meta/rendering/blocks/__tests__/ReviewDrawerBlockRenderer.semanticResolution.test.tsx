@@ -148,11 +148,12 @@ describe('ReviewDrawerBlockRenderer semantic resolution trace', () => {
       '100nF',
     );
     expect(screen.getByTestId('review-drawer-semantic-resolution-capacitance')).toHaveTextContent(
-      'row-envelope · mixed [0, 29)',
+      'row-envelope · 混合描述',
     );
     expect(screen.getByTestId('review-drawer-semantic-resolution-capacitance')).toHaveTextContent(
       'attributes.scoped-category-grammar @ 1',
     );
+    expect(screen.getByTestId('review-drawer-semantic-resolution-capacitance')).toHaveTextContent('文本位置: [0, 29)');
     expect(screen.getByTestId('review-drawer-tab-source')).not.toHaveAttribute('open');
   });
 });

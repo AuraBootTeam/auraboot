@@ -15,6 +15,7 @@ import {
   openQuoteRolePage,
   expectCommandDenied,
   dynamicCreate,
+  cleanupRows,
 } from './quote-e2e-helpers';
 
 test.use({ locale: 'zh-CN' });
@@ -150,9 +151,20 @@ for (const c of cases) {
   }, info) => {
     test.setTimeout(120_000);
     const marker = `E2ERULE${Date.now()}${Math.random().toString(16).slice(2, 6)}`;
+    let keyValue = marker;
+    let customerPid = '';
+    if (c.model === 'bom_customer_part_map') {
+      const customer = await executeCommand(page, 'crm:create_account', {
+        crm_acc_name: marker, crm_acc_industry: 'electronics', crm_acc_rating: 'A',
+      }, undefined, 'create');
+      customerPid = String(customer.recordId ?? customer.pid ?? customer.id ?? '');
+      expect(customerPid, 'customer mapping fixture requires a real CRM customer').toBeTruthy();
+      keyValue = customerPid;
+    }
+    const fixtureText = (value: string) => customerPid ? `${marker}-${value}` : value;
     const field = (name: string) => page.getByTestId(`form-field-${name}`);
     const records = () =>
-      queryDynamicRecords(page, c.model, [{ fieldName: c.key, operator: 'EQ', value: marker }]);
+      queryDynamicRecords(page, c.model, [{ fieldName: c.key, operator: 'EQ', value: keyValue }]);
     await page.goto('/home', { waitUntil: 'domcontentloaded' });
     await ensureSidebarExpanded(page);
     const sidebar = page.getByTestId('sidebar');
@@ -183,9 +195,9 @@ for (const c of cases) {
     expect(await records(), 'invalid form must not write a record').toEqual([]);
     await info.attach('rule-required-browser', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
     await info.attach('rule-required-persistence', { body: JSON.stringify({ model: c.model, marker, createRequests, records: [] }), contentType: 'application/json' });
-    await field(c.key).getByRole('textbox').fill(marker);
+    await field(c.key).getByRole('textbox').fill(keyValue);
     for (const value of [c.text, ...(c.extraTexts || [])].filter(Boolean))
-      await field(value!.field).getByRole('textbox').fill(value!.value);
+      await field(value!.field).getByRole('textbox').fill(fixtureText(value!.value));
     for (const choice of [c.select, c.extraSelect, ...(c.choices || [])].filter(Boolean)) {
       await field(choice!.field).getByRole('combobox').first().click();
       await page.getByRole('option', { name: choice!.label, exact: true }).click();
@@ -198,7 +210,7 @@ for (const c of cases) {
     }
     await field(c.remark).getByRole('textbox').fill('rule-gate-created');
     const payload = await submit(page, `bom:create_${c.command}`);
-    expect(payload.payload[c.key]).toBe(marker);
+    expect(payload.payload[c.key]).toBe(keyValue);
     if (c.enabled) expect(payload.payload[c.enabled]).toBe(false);
     await expect.poll(async () => (await records()).length).toBe(1);
     const saved = (await records())[0];
@@ -206,7 +218,7 @@ for (const c of cases) {
     for (const choice of [c.select, c.extraSelect, ...(c.choices || [])].filter(Boolean))
       expect(saved[choice!.field]).toBe(choice!.value);
     for (const value of [c.text, ...(c.extraTexts || [])].filter(Boolean))
-      expect(saved[value!.field]).toBe(value!.value);
+      expect(saved[value!.field]).toBe(fixtureText(value!.value));
     info.annotations.push({
       type: 'created-rule',
       description: JSON.stringify({ model: c.model, pid: saved.pid, marker }),
@@ -215,16 +227,16 @@ for (const c of cases) {
       // Customer identity is a scope, not a one-record-per-customer limit.
       await searchBusinessList(page, `/p/${c.model}`, marker);
       await page.locator('main').getByRole('button', { name: '新建', exact: true }).click();
-      await field(c.key).getByRole('textbox').fill(marker);
+      await field(c.key).getByRole('textbox').fill(keyValue);
       for (const value of c.extraTexts || [])
-        await field(value.field).getByRole('textbox').fill(`${value.value}-SECOND`);
+        await field(value.field).getByRole('textbox').fill(`${fixtureText(value.value)}-SECOND`);
       await field(c.select!.field).getByRole('combobox').first().click();
       await page.getByRole('option', { name: c.select!.label, exact: true }).click();
       await field(c.remark).getByRole('textbox').fill('second-part-for-same-customer');
       await submit(page, `bom:create_${c.command}`);
       await expect.poll(async () => (await records()).length).toBe(2);
       expect((await records()).map((r) => r.bom_cpm_customer_pn_norm).sort())
-        .toEqual(['GATE-PN-NORM', 'GATE-PN-NORM-SECOND']);
+        .toEqual([fixtureText('GATE-PN-NORM'), fixtureText('GATE-PN-NORM-SECOND')]);
       await searchBusinessList(page, `/p/${c.model}`, marker);
       const secondRow = page.getByRole('row').filter({ hasText: 'GATE-PN-RAW-SECOND' });
       await expect(secondRow).toHaveCount(1);
@@ -272,7 +284,7 @@ for (const c of cases) {
       await expect.poll(() => readerKey.evaluate(element => [
         element.textContent,
         ...Array.from(element.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea')).map(input => input.value),
-      ].join(' '))).toContain(marker);
+      ].join(' '))).toMatch(new RegExp(`${marker}|${keyValue}`));
       await expect(denied.page.getByTestId('toolbar-btn-edit')).toHaveCount(0);
       await expect(denied.page.getByTestId('toolbar-btn-delete')).toHaveCount(0);
       await expect(denied.page.locator('main input:not([readonly]):not([disabled]), main textarea:not([readonly]):not([disabled]), main [contenteditable="true"]')).toHaveCount(0);
@@ -309,7 +321,7 @@ for (const c of cases) {
     await expect(row).toHaveCount(1);
     await expect(row).toContainText(marker);
     await clickRowActionByLocator(page, row, 'edit', '编辑');
-    await expect(field(c.key).getByRole('textbox')).toHaveValue(marker);
+    await expect(field(c.key).getByRole('textbox')).toHaveValue(keyValue);
     await field(c.remark).getByRole('textbox').fill('rule-gate-edited');
     await submit(page, `bom:update_${c.command}`);
     await expect.poll(async () => (await records())[0]?.[c.remark]).toBe('rule-gate-edited');
@@ -318,7 +330,7 @@ for (const c of cases) {
     await clickRowActionByLocator(page, row, 'edit', '编辑');
     await expect(field(c.remark).getByRole('textbox')).toHaveValue('rule-gate-edited');
     const edited = (await records())[0];
-    expect(edited[c.key]).toBe(marker);
+    expect(edited[c.key]).toBe(keyValue);
     expect(edited[c.remark]).toBe('rule-gate-edited');
     await info.attach('rule-edited-browser', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
     await info.attach('rule-edited-persistence', { body: JSON.stringify({ model: c.model, marker, saved, beforeDenied, afterDenied, edited }), contentType: 'application/json' });
@@ -359,6 +371,7 @@ for (const c of cases) {
     await expect(page.getByRole('row').filter({ hasText: marker })).toHaveCount(0);
     const afterDelete = await records();
     expect(afterDelete).toEqual([]);
+    if (customerPid) await cleanupRows(page, { quoteId: '', quoteCode: '', rows: [{ model: 'crm_account_common', pid: customerPid }] });
     await info.attach('rule-terminal-browser', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
     await info.attach('rule-terminal-persistence', { body: JSON.stringify({ model: c.model, marker, edited, afterCancel, afterDelete, deletionSupported: true }), contentType: 'application/json' });
   });
