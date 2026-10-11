@@ -19,13 +19,15 @@ vi.mock('../../components/ComponentLoader', () => ({ ComponentLoader: ({ props }
     readOnly={props.readOnly} onChange={(event) => props.onChange(event.target.value)} /></label>
 ) }));
 
-function setup(bind = true) {
+function setup(bind = true, grouped = false) {
   const state = new ScopedStateManager({} as any);
   state.createScope('review');
   let rows = [
-    { pid: 'quote-a', supplierName: 'Supplier A', availableQty: '60', proposedQty: '60', score: '100' },
-    { pid: 'quote-b', supplierName: 'Supplier B', availableQty: '70', proposedQty: '40', score: '90' },
+    { pid: 'quote-a', supplierName: 'Supplier A', availableQty: '60', proposedQty: '60', score: '100', sourcePid: 'source-a', sourceLabel: 'Same material' },
+    { pid: 'quote-b', supplierName: 'Supplier B', availableQty: '70', proposedQty: '40', score: '90', sourcePid: 'source-b', sourceLabel: 'Same material' },
   ];
+  if (grouped) rows.push({ pid: 'quote-c', supplierName: 'Supplier C', availableQty: '50',
+    proposedQty: '0', score: '80', sourcePid: 'source-a', sourceLabel: 'Same material' });
   const listeners = new Set<() => void>();
   const data = {
     getData: () => rows, getState: () => ({ data: rows }),
@@ -38,6 +40,7 @@ function setup(bind = true) {
   } as any;
   render(<CardGridBlockRenderer runtime={runtime} block={{ id: 'offers', blockType: 'card-grid',
     dataSource: 'offers', titleField: 'supplierName', ...(bind ? { field: 'choices' } : {}),
+    ...(grouped ? { groupByField: 'sourcePid', groupTitleField: 'sourceLabel' } : {}),
     fields: [
       { field: 'availableQty', label: 'Available capacity', component: 'SmartInput', readOnly: true },
       { field: 'proposedQty', label: 'Proposed quantity', component: 'SmartInput' },
@@ -86,5 +89,34 @@ describe('Card-grid draft form fields', () => {
     const { state } = setup(false);
     expect(screen.getAllByRole('textbox', { name: 'Proposed quantity' }).every((input: HTMLElement) => input.hasAttribute('readonly'))).toBe(true);
     expect(state.getFieldValue('review', 'choices')).toBeUndefined();
+  });
+
+  it('groups by source identity and edits the original row after display reordering', () => {
+    const { state, refresh } = setup(true, true);
+    const groups: HTMLElement[] = screen.getAllByRole('region', { name: 'Same material' });
+    expect(groups).toHaveLength(2);
+    expect(groups[0].querySelectorAll('[data-testid="card-grid-card"]')).toHaveLength(2);
+    expect(groups[1].querySelectorAll('[data-testid="card-grid-card"]')).toHaveLength(1);
+    const card = within(within(groups[0]).getByRole('group', { name: 'Supplier C' }));
+    fireEvent.change(card.getByRole('textbox', { name: 'Proposed quantity' }),
+      { target: { value: '0.000001' } });
+    expect(state.getFieldValue('review', 'choices').map((row: any) => row.proposedQty))
+      .toEqual(['60', '40', '0.000001']);
+    act(refresh);
+    expect(card.getByRole('textbox', { name: 'Proposed quantity' })).toHaveValue('0.000001');
+    fireEvent.click(groups[0].querySelectorAll('[data-testid="card-grid-action-preview"]')[1]);
+    expect(handleAction.mock.calls[0][1]).toMatchObject({ pid: 'quote-c', sourcePid: 'source-a', proposedQty: '0.000001' });
+  });
+
+  it('keeps missing identities separate and reacts to explicit draft replacement', () => {
+    const { state } = setup(true, true);
+    act(() => state.updateField('review', 'choices', [
+      { pid: 'unknown-a', supplierName: 'Unknown A', sourceLabel: 'Unknown source', proposedQty: '1' },
+      { pid: 'unknown-b', supplierName: 'Unknown B', sourceLabel: 'Unknown source', proposedQty: '2' },
+    ]));
+    const groups: HTMLElement[] = screen.getAllByRole('region', { name: 'Unknown source' });
+    expect(groups).toHaveLength(2);
+    expect(groups.every(group => group.querySelectorAll('[data-testid="card-grid-card"]').length === 1)).toBe(true);
+    expect(screen.queryByRole('group', { name: 'Supplier C' })).toBeNull();
   });
 });

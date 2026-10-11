@@ -34,6 +34,10 @@ vi.mock('react-router', () => ({
   useNavigate: () => vi.fn(),
 }));
 
+vi.mock('~/contexts/TimezoneContext', () => ({ useTimezone: () => ({
+  timezone: 'Asia/Shanghai', formats: { date: 'YYYY-MM-DD', datetime: 'YYYY-MM-DD HH:mm:ss', time: 'HH:mm:ss' },
+}) }));
+
 function makeRuntime(rows: Record<string, unknown>[], locale = 'zh-CN'): SchemaRuntime {
   const context: Record<string, unknown> = {
     locale,
@@ -208,15 +212,15 @@ describe('TableBlockRenderer status-pill renderType', () => {
     expect(pill).toHaveClass('bg-status-amber-bg');
   });
 
-  it('formats date and datetime cells with the runtime locale', () => {
+  it.each([false, true])('formats temporal cells in the effective timezone (explicit renderer: %s)', (explicitRenderer) => {
     const date = '2026-08-09T10:20:30Z';
     const block = {
       id: 'localized-dates',
       blockType: 'table',
       dataSource: 'rows',
       columns: [
-        { field: 'dueDate', label: '日期', valueType: 'date' },
-        { field: 'updatedAt', label: '时间', valueType: 'datetime' },
+        { field: 'dueDate', label: '日期', valueType: 'date', ...(explicitRenderer ? { renderType: 'date' } : {}) },
+        { field: 'updatedAt', label: '时间', valueType: 'datetime', ...(explicitRenderer ? { renderType: 'datetime' } : {}) },
       ],
     } as unknown as BlockConfig;
     render(
@@ -226,8 +230,8 @@ describe('TableBlockRenderer status-pill renderType', () => {
       />,
     );
 
-    expect(screen.getByText(new Date(date).toLocaleDateString('zh-CN'))).toBeInTheDocument();
-    expect(screen.getByText(new Date(date).toLocaleString('zh-CN'))).toBeInTheDocument();
+    expect(screen.getByText('2026-08-09')).toBeInTheDocument();
+    expect(screen.getByText('2026-08-09 18:20:30')).toBeInTheDocument();
   });
 
   it('prefers a backend-enriched reference display label over the raw pid', () => {

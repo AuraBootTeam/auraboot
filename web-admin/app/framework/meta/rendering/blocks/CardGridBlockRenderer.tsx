@@ -13,6 +13,8 @@
  *   "field": "draftRows",        // optional form array for local card edits
  *   "fields": [{ "field": "quantity", "component": "SmartInput" }],
  *   "columns": "grid-cols-2",      // optional override; default: responsive 1/2/3
+ *   "groupByField": "sourcePid",   // optional stable identity; labels never merge groups
+ *   "groupTitleField": "sourceLabel",
  *   "cardActions": [
  *     { "code": "install", "label": "Install", "action": { "type": "command", "command": "template:install" } }
  *   ]
@@ -208,14 +210,8 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
     );
   }
 
-  // ── Card grid ──────────────────────────────────────────────────────────────
-  return (
-    <div
-      data-testid="card-grid-block"
-      className={`grid gap-4 ${columnsClass}`}
-    >
-      {rows.map((row: any, idx: number) => {
-    const rowKey = row.pid || String(idx);
+  const renderCard = (row: any, idx: number) => {
+        const rowKey = row.pid || String(idx);
         const title = getLocalizedText(row[titleField], locale, t);
         const description = descriptionField ? getLocalizedText(row[descriptionField], locale, t) : undefined;
         const imageUrl = imageField && row[imageField] ? String(row[imageField]) : undefined;
@@ -349,9 +345,40 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
             )}
           </div>
         );
-      })}
-    </div>
-  );
+  };
+
+  // Group by stored identity while retaining original indexes for draft edits and actions.
+  const groupByField = typeof cfg.groupByField === 'string' ? cfg.groupByField : undefined;
+  if (groupByField) {
+    const groups = new Map<string, { title: string; entries: Array<{ row: any; index: number }> }>();
+    rows.forEach((row: any, index: number) => {
+      const identity = row[groupByField];
+      const key = (typeof identity === 'string' && identity.trim()) || typeof identity === 'number'
+        ? `${typeof identity}:${identity}` : `missing:${index}`;
+      const group: { title: string; entries: Array<{ row: any; index: number }> } = groups.get(key) || {
+        title: getLocalizedText(row[cfg.groupTitleField || groupByField], locale, t), entries: [],
+      };
+      group.entries.push({ row, index });
+      groups.set(key, group);
+    });
+    return (
+      <div data-testid="card-grid-block" className="space-y-6">
+        {Array.from(groups.entries()).map(([key, group], index) => (
+          <section key={key} data-testid="card-grid-group"
+            aria-labelledby={group.title ? `${block.id}-group-${index}` : undefined}>
+            {group.title && <h2 id={`${block.id}-group-${index}`}
+              className="text-text mb-3 text-base font-semibold">{group.title}</h2>}
+            <div className={`grid gap-4 ${columnsClass}`}>
+              {group.entries.map(({ row, index: originalIndex }) => renderCard(row, originalIndex))}
+            </div>
+          </section>
+        ))}
+      </div>
+    );
+  }
+  return <div data-testid="card-grid-block" className={`grid gap-4 ${columnsClass}`}>
+    {rows.map(renderCard)}
+  </div>;
 };
 
 export default CardGridBlockRenderer;

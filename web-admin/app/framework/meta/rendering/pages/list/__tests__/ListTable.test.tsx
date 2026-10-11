@@ -78,6 +78,16 @@ describe('ListTable selection column layout', () => {
     expect(truncationWrapper).toHaveAttribute('title', longName);
   });
 
+  it('honors explicit non-ellipsis columns without changing the exact displayed value', () => {
+    const quantity = '12345678901234567890.000001';
+    renderListTable({ columns: [{ field: 'quantity', label: 'Quantity', width: 140, ellipsis: false }],
+      data: [{ pid: 'row-1', quantity }] });
+    const cell = screen.getByTestId('table-cell-0-quantity');
+    expect(cell).toHaveTextContent(quantity);
+    expect(cell.querySelector('div.truncate')).toBeNull();
+    expect(cell.querySelector('div.whitespace-normal')).toHaveAttribute('title', quantity);
+  });
+
   it('widens the action column for long labels instead of wrapping them', () => {
     // Regression (page_schema): "统一设计器" + the "⋮" trigger needed ~130px but the
     // column was pinned at 112px, so the label wrapped and every row grew to ~65px.
