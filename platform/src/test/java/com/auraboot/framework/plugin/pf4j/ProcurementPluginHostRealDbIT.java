@@ -792,6 +792,79 @@ class ProcurementPluginHostRealDbIT {
             assertEquals("draft",db.getById("s2p_bid",batch.secondQuote()).get("s2p_bid_status"));return null;});
     }
 
+    private record DispatchFixture(String supplier,java.time.Clock clock,long version) {}
+    private DispatchFixture nativeDispatchFixture() {
+        var tx=new TransactionTemplate(transactions);tx.execute(status->scope(SYNC,()->sync("100","11")));
+        String source=(String)rows().getFirst().get("pid");
+        String category=scope(SYNC,()->(String)db.create("pr_spend_category",Map.of("pr_spc_code",provider,"pr_spc_name","Native dispatch race category")).get("pid"));
+        String supplier=scope("pr_supplier_common:sync_directory",()->(String)db.create("pr_supplier_common",Map.of(
+                "pr_supplier_code",provider,"pr_supplier_name","Native dispatch race supplier","pr_supplier_status","enabled","qo_pr_supplier_account_id",provider)).get("pid"));
+        String connection=scope(SYNC,()->(String)db.getById("s2p_sourcing_event",task).get("qo_pr_task_connection_pid"));
+        tx.execute(status->scope("qo_procurement_category_policy_common:create",()->{
+            try {Class<?> type=plugin.loadClass("com.auraboot.quote.engine.procurement.ProcurementCategoryPolicyService");
+                return type.getMethod("createPolicy",Map.class).invoke(type.getConstructor(DataAccessor.class,Long.class).newInstance(db,tenantId),
+                        Map.of("categoryPid",category,"connectionPid",connection,"supplierPids",List.of(supplier),"defaultSupplierPids",List.of(supplier)));
+            }catch(ReflectiveOperationException error){throw unwrap(error);}
+        }));
+        var clock=java.time.Clock.fixed(java.time.Instant.parse("2026-11-15T07:59:59Z"),java.time.ZoneOffset.UTC);
+        tx.execute(status->scope("qo_procurement_task_common:classify_source",()->{
+            try {Class<?> type=plugin.loadClass("com.auraboot.quote.engine.procurement.ProcurementPlanningService");
+                long version=new BigDecimal(db.getById("s2p_sourcing_event",task).get("row_version").toString()).longValueExact();
+                return type.getMethod("classify",String.class,Long.class,Map.class).invoke(type.getConstructor(DataAccessor.class,java.time.Clock.class,Object.class).newInstance(db,clock,tenantId),
+                        task,version,Map.of("sourcePid",source,"sourceRevision",0,"categoryPid",category));
+            }catch(ReflectiveOperationException error){throw unwrap(error);}
+        }));
+        long version=scope(SYNC,()->new BigDecimal(db.getById("s2p_sourcing_event",task).get("row_version").toString()).longValueExact());
+        return new DispatchFixture(supplier,clock,version);
+    }
+    private Object dispatchWith(DataAccessor accessor,DispatchFixture fixture) {
+        try {Class<?> type=plugin.loadClass("com.auraboot.quote.engine.procurement.ProcurementDispatchService");
+            return type.getMethod("dispatch",String.class,Long.class,Map.class).invoke(type.getConstructor(DataAccessor.class,java.time.Clock.class,Long.class).newInstance(accessor,fixture.clock(),tenantId),
+                    task,fixture.version(),Map.of("supplierPids",List.of(fixture.supplier()),"cutoffAt","2026-11-15T08:00:00Z"));
+        }catch(ReflectiveOperationException error){throw unwrap(error);}
+    }
+    @Test void nativeDispatchRejectsSourceAddedAfterItsSelectionRead() throws Exception {
+        var fixture=nativeDispatchFixture();var selected=new java.util.concurrent.CountDownLatch(1);var added=new java.util.concurrent.CountDownLatch(1);
+        DataAccessor observed=taskLockObserver(()->{selected.countDown();awaitNativeLatch(added,"source import must commit before dispatch task CAS");},()->{});
+        var pool=java.util.concurrent.Executors.newSingleThreadExecutor();
+        try {
+            var dispatch=pool.submit(()->nativeActorThread(()->new TransactionTemplate(transactions).execute(status->scope("qo_procurement_task_common:dispatch",()->dispatchWith(observed,fixture)))));
+            awaitNativeLatch(selected,"dispatch must read its initial classified source selection");
+            response=row("100","12");assertEquals(List.of("added"),new TransactionTemplate(transactions).execute(status->scope(SYNC,()->sync("100","12"))));
+            var taskAfterImport=scope(SYNC,()->db.getById("s2p_sourcing_event",task));var sourcesAfterImport=rows();
+            added.countDown();
+            var failure=assertThrows(java.util.concurrent.ExecutionException.class,()->dispatch.get(20,java.util.concurrent.TimeUnit.SECONDS));
+            assertEquals("SOURCE_CHANGED",assertInstanceOf(IllegalStateException.class,failure.getCause()).getMessage());
+            scope(SYNC,()->{assertEquals(taskAfterImport,db.getById("s2p_sourcing_event",task));assertEquals(sourcesAfterImport,rows());
+                assertEquals("draft",db.getById("s2p_sourcing_event",task).get("s2p_se_status"));
+                assertTrue(nativeRows("s2p_bid","s2p_bid_sourcing_event_id",task).isEmpty());assertEquals(2,rows().size());assertEquals(3,references());return null;});
+        }finally{added.countDown();pool.shutdownNow();assertTrue(pool.awaitTermination(10,java.util.concurrent.TimeUnit.SECONDS));}
+    }
+    @Test void nativeSourceAppendCannotUseDraftReadBeforeDispatchCommits() throws Exception {
+        var fixture=nativeDispatchFixture();var readDraft=new java.util.concurrent.CountDownLatch(1);var dispatched=new java.util.concurrent.CountDownLatch(1);
+        var paused=new java.util.concurrent.atomic.AtomicBoolean();
+        DataAccessor observed=(DataAccessor)java.lang.reflect.Proxy.newProxyInstance(DataAccessor.class.getClassLoader(),new Class<?>[]{DataAccessor.class},
+                (proxy,method,args)->{Object result;try {result=method.invoke(db,args);}catch(InvocationTargetException error){throw error.getCause();}
+                    boolean sourceSync=Arrays.stream(Thread.currentThread().getStackTrace()).anyMatch(frame->frame.getClassName().endsWith(".ProcurementSourceService") && frame.getMethodName().equals("sync"));
+                    if(sourceSync && method.getName().equals("getById") && "s2p_sourcing_event".equals(args[0]) && paused.compareAndSet(false,true)) {
+                        readDraft.countDown();awaitNativeLatch(dispatched,"dispatch must commit before source append resumes");}
+                    return result;});
+        response=row("100","12");var selected=importContext(task,observed);var pool=java.util.concurrent.Executors.newSingleThreadExecutor();
+        try {
+            var append=pool.submit(()->nativeActorThread(()->new TransactionTemplate(transactions).execute(status->scope(SYNC,()->syncWith(selected,"100","12")))));
+            awaitNativeLatch(readDraft,"trusted source sync must actually capture the old draft task");
+            var quotes=(List<?>)new TransactionTemplate(transactions).execute(status->scope("qo_procurement_task_common:dispatch",()->dispatchWith(db,fixture)));
+            assertEquals(1,quotes.size());var taskAfter=scope(SYNC,()->db.getById("s2p_sourcing_event",task));var sourcesAfter=rows();
+            dispatched.countDown();
+            var failure=assertThrows(java.util.concurrent.ExecutionException.class,()->append.get(20,java.util.concurrent.TimeUnit.SECONDS));
+            var conflict=assertInstanceOf(com.auraboot.framework.meta.exception.MetaServiceException.class,failure.getCause());
+            assertEquals("CAS batch conflict: no partial batch may commit",conflict.getMessage());
+            scope(SYNC,()->{assertEquals(taskAfter,db.getById("s2p_sourcing_event",task));assertEquals(sourcesAfter,rows());
+                assertEquals("bidding",db.getById("s2p_sourcing_event",task).get("s2p_se_status"));assertEquals(1,rows().size());assertEquals(2,references());
+                assertEquals(1,nativeRows("s2p_bid","s2p_bid_sourcing_event_id",task).size());return null;});
+        }finally{dispatched.countDown();pool.shutdownNow();assertTrue(pool.awaitTermination(10,java.util.concurrent.TimeUnit.SECONDS));}
+    }
+
     @Test void nativeShipmentReplaySnapshotAndFulfillmentNeverChangeActualReceipts() {
         String directory="pr_supplier_common:sync_directory",publish="qo_procurement_order_common:sync_orders";
         String submit="qo_procurement_order_common:submit_shipment",maintain="qo_procurement_address_common:maintain";
