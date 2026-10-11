@@ -29,6 +29,7 @@ class OpenApiPublicationIntegrationTest extends BaseIntegrationTest {
     @Autowired private MetaModelService models;
     @Autowired private OpenPlatformManagementService management;
     @Autowired private ApplicationInstallationMapper installations;
+    @Autowired private com.fasterxml.jackson.databind.ObjectMapper json;
 
     @Autowired private com.auraboot.framework.openplatform.controller.OpenApiPublicationController documents;
 
@@ -195,6 +196,57 @@ class OpenApiPublicationIntegrationTest extends BaseIntegrationTest {
         assertThat(documents.document(definition.code())).containsEntry("x-schema-version", 2);
         publications.withdraw(definition.code(), 2);
         assertThatThrownBy(() -> documents.document(definition.code())).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test void immutableSourceBindingSurvivesCompatibleRevisionAndRejectsTableRebinding() {
+        var definition = fixture();
+        publications.saveDraft(definition.code(), new OpenApiPublicationService.DraftRequest(0, definition));
+        publications.publish(definition.code(), 1);
+        String binding = mapper.sourceBinding(getTestTenant().getId(), definition.code(), 1);
+        assertThat(binding).contains("mt_" + definition.modelCode(), "columns", "name");
+        var model = models.getModelDefinition(definition.modelCode()).orElseThrow();
+        var expanded = new java.util.ArrayList<>(model.getFields());
+        expanded.add(FieldDefinition.builder().code("extra").dataType("STRING").build());
+        model.setFields(expanded);
+        models.saveDefinition(model);
+        var fields = new LinkedHashMap<>(definition.fields());
+        fields.put("extra", new Field("extra", Type.STRING, true, false, false, true, Set.of(), false, null, Map.of(), null));
+        var next = new OpenApiResourceContract(definition.code(), definition.modelCode(), 2,
+                definition.operations(), definition.scopes(), definition.dataPolicy(), fields, 50, 8, 5000, Set.of());
+        publications.saveDraft(definition.code(), new OpenApiPublicationService.DraftRequest(1, next));
+        assertThat(publications.publish(definition.code(), 2).activeVersion()).isEqualTo(2);
+        assertThat(mapper.sourceBinding(getTestTenant().getId(), definition.code(), 1)).isEqualTo(binding);
+        assertThat(mapper.sourceBinding(getTestTenant().getId(), definition.code(), 2)).contains("extra");
+        model = models.getModelDefinition(definition.modelCode()).orElseThrow();
+        model.setTableName("replacement_" + definition.modelCode());
+        models.saveDefinition(model);
+        var rebound = new OpenApiResourceContract(definition.code(), definition.modelCode(), 3,
+                next.operations(), next.scopes(), next.dataPolicy(), next.fields(), 50, 8, 5000, Set.of());
+        publications.saveDraft(definition.code(), new OpenApiPublicationService.DraftRequest(2, rebound));
+        assertThatThrownBy(() -> publications.publish(definition.code(), 3))
+                .isInstanceOf(OpenApiPublicationService.PublicationConflictException.class).hasMessageContaining("source binding");
+        assertThat(mapper.snapshot(getTestTenant().getId(), definition.code(), 3)).isNull();
+        assertThat(publications.active(getTestTenant().getId(), definition.code())).contains(next);
+    }
+
+    @Test void historicalSnapshotWithoutProvenanceCannotBeReboundFromTodaysCatalog() throws Exception {
+        var definition = fixture();
+        publications.saveDraft(definition.code(), new OpenApiPublicationService.DraftRequest(0, definition));
+        // Reproduce the previous production mapper contract without inferring historical storage.
+        mapper.insertSnapshot(getTestTenant().getId(), definition.code(), 1, json.writeValueAsString(definition),
+                MetaContext.getCurrentUserPid());
+        mapper.activate(getTestTenant().getId(), definition.code(), 1, "published", MetaContext.getCurrentUserPid());
+        assertThat(documents.document(definition.code())).containsEntry("x-schema-version", 1);
+        var model = models.getModelDefinition(definition.modelCode()).orElseThrow();
+        assertThatThrownBy(() -> publications.requireSourceBinding(getTestTenant().getId(), definition, model))
+                .isInstanceOf(OpenApiPublicationService.SourceBindingConflictException.class);
+        var next = new OpenApiResourceContract(definition.code(), definition.modelCode(), 2, definition.operations(),
+                definition.scopes(), definition.dataPolicy(), definition.fields(), 50, 8, 5000, Set.of());
+        publications.saveDraft(definition.code(), new OpenApiPublicationService.DraftRequest(1, next));
+        assertThatThrownBy(() -> publications.publish(definition.code(), 2))
+                .isInstanceOf(OpenApiPublicationService.SourceBindingConflictException.class);
+        assertThat(mapper.sourceBinding(getTestTenant().getId(), definition.code(), 1)).isNull();
+        assertThat(mapper.snapshot(getTestTenant().getId(), definition.code(), 2)).isNull();
     }
 
 }

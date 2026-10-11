@@ -136,6 +136,20 @@ public interface OpenApiPublicationMapper {
     int insertSnapshot(@Param("tenantId") Long tenantId, @Param("code") String code,
                        @Param("version") int version, @Param("definition") String definition, @Param("actor") String actor);
 
+    @Insert("""
+        INSERT INTO ab_open_api_publication_snapshot(tenant_id, code, schema_version, definition, published_by_pid, source_binding)
+        VALUES (#{tenantId}, #{code}, #{version}, CAST(#{definition} AS jsonb), #{actor}, CAST(#{binding} AS jsonb))
+        """)
+    int insertResourceSnapshot(@Param("tenantId") Long tenantId, @Param("code") String code,
+                               @Param("version") int version, @Param("definition") String definition,
+                               @Param("actor") String actor, @Param("binding") String binding);
+
+    @Select("""
+        SELECT source_binding::text FROM ab_open_api_publication_snapshot
+        WHERE tenant_id = #{tenantId} AND code = #{code} AND schema_version = #{version}
+        """)
+    String sourceBinding(@Param("tenantId") Long tenantId, @Param("code") String code, @Param("version") int version);
+
     @Update("""
         UPDATE ab_open_api_publication SET active_version = #{version}, status = #{status},
             updated_by_pid = #{actor}, updated_at = NOW()

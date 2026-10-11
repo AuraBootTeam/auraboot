@@ -129,6 +129,7 @@ def verify_report(report):
     if report.get("executed") != len(CASES) or report.get("passed") != len(CASES):
         raise ProtocolError("dynamic probe totals do not match fixed cases")
     verify_audits(report)
+    verify_source_binding(report.get("resourceSourceBinding"))
     quota = report.get("queryRateLimit")
     resource = "release.dynamic.by-zone.quota"
     request_id = "release-dynamic-query-quota"
@@ -148,6 +149,67 @@ def verify_report(report):
             or audit["durationMs"] < 0 or not isinstance(audit.get("occurredAt"), str) or not audit["occurredAt"]):
         raise ProtocolError("dynamic query quota audit proof invalid")
     return report
+
+
+def verify_source_binding(proof):
+    fields = {"status", "code", "error", "requestId", "baseline", "baselineEtag", "restoredStatus", "restored", "restoredEtag"}
+    baseline = proof.get("baseline") if isinstance(proof, dict) else None
+    if (not isinstance(proof, dict) or set(proof) != fields or type(proof.get("status")) is not int
+            or proof["status"] != 409 or proof.get("code") != "open_api_source_changed"
+            or proof.get("error") != {"success": False, "code": "open_api_source_changed",
+                                     "message": "Published resource source binding is unavailable or changed"}
+            or proof.get("requestId") != "release-dynamic-source-binding"
+            or not isinstance(baseline, dict) or set(baseline) != {"pid", "name"}
+            or not isinstance(baseline.get("pid"), str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", baseline["pid"])
+            or baseline["pid"].isdigit() or baseline.get("name") != "Storage binding original"
+            or type(proof.get("restoredStatus")) is not int or proof["restoredStatus"] != 200
+            or proof.get("restored") != baseline or not isinstance(proof.get("baselineEtag"), str)
+            or not proof["baselineEtag"].startswith('"') or not proof["baselineEtag"].endswith('"')
+            or len(proof["baselineEtag"]) < 12 or proof.get("restoredEtag") != proof["baselineEtag"]):
+        raise ProtocolError("dynamic resource source binding proof invalid")
+    return proof
+
+
+def run_source_binding_probe(request, human, installation_pid, machine, get_scope):
+    """Keep the deliberate metadata mutation separate from CRUD and capacity fixtures."""
+    model_code = "release_dynamic_binding"
+    resource = "release.dynamic.source-binding"
+    fields = [{"code": name, "columnName": name, "displayName": "Storage binding field", "dataType": "string"}
+              for name in ["rel_binding_name", "rel_binding_private"]]
+    model = human("/api/meta/models", "POST", {"code": model_code, "tableName": model_code,
+        "displayName": "Release source binding", "modelType": "entity", "sourceType": "physical", "fields": fields})
+    human(f"/api/meta/models/{model['pid']}/publish", "POST", {"impactAcknowledged": True})
+    row = human(f"/api/dynamic/{model_code}/create", "POST",
+                {"rel_binding_name": "Storage binding original", "rel_binding_private": "Private source binding sentinel"})
+    def public_field(source, kind="string"):
+        return {"source": source, "type": kind, "readable": True, "writable": False, "required": False,
+                "nullable": False, "operators": [], "sortable": False, "referenceResource": None, "properties": {}, "items": None}
+    definition = {"code": resource, "modelCode": model_code, "schemaVersion": 1, "operations": ["get"],
+        "scopes": {"get": get_scope}, "dataPolicy": "tenant_wide",
+        "fields": {"pid": public_field("pid", "pid"), "name": public_field("rel_binding_name")},
+        "maxPageSize": 1, "maxConditions": 1, "timeoutMs": 5000, "events": []}
+    human(f"/api/open-platform/publications/{resource}/draft", "PUT", {"expectedRevision": 0, "definition": definition})
+    human(f"/api/open-platform/publications/{resource}/publish", "POST", {"expectedRevision": 1})
+    human(f"/api/open-platform/installations/{installation_pid}/resources/{resource}", "PUT",
+          {"operations": ["get"], "readableFields": ["pid", "name"], "writableFields": [], "rowConstraints": []})
+    path = f"/api/open/v1/resources/{resource}/{row['pid']}"
+    _, baseline, baseline_headers = request(path, headers=machine)
+    rebound = [dict(field) for field in fields]
+    rebound[0]["columnName"] = "rel_binding_private"
+    model_path = f"/api/meta/models/{model['pid']}"
+    try:
+        human(model_path, "PUT", {"displayName": "Release source binding", "extension": {"fields": rebound}})
+        status, error, headers = request(path, headers=dict(machine, **{"X-Request-Id": "release-dynamic-source-binding"}), expected=(409,))
+    finally:
+        human(model_path, "PUT", {"displayName": "Release source binding", "extension": {"fields": fields}})
+    restored_status, restored, restored_headers = request(path, headers=machine)
+    def header(values, name):
+        return next((value for key, value in values.items() if key.lower() == name.lower()), None)
+    proof = {"status": status, "code": error.get("code") if isinstance(error, dict) else None,
+        "error": error,
+        "requestId": header(headers, "X-Request-Id"), "baseline": baseline, "baselineEtag": header(baseline_headers, "ETag"),
+        "restoredStatus": restored_status, "restored": restored, "restoredEtag": header(restored_headers, "ETag")}
+    return verify_source_binding(proof)
 
 
 def verify_sdk_report(report):
@@ -438,6 +500,7 @@ def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None):
         _, document, _ = request(f"/api/open-platform/publications/{resource}/openapi", headers=admin)
         record("public-openapi", document.get("openapi") == "3.1.0" and path in document.get("paths", {})
                and model_code not in json.dumps(document) and "rel_private" not in json.dumps(document))
+        report["resourceSourceBinding"] = run_source_binding_probe(request, human, installation["pid"], machine, scopes["get"])
     finally:
         report["executed"] = sum(row["status"] != "did_not_run" for row in rows)
         report["passed"] = sum(row["status"] == "passed" for row in rows)

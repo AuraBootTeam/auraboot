@@ -38,6 +38,7 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
     @Autowired private CommandService commands;
     @Autowired private CommandExecutor executor;
     @Autowired private OpenApiLegacyAuthority legacy;
+    @Autowired private com.auraboot.framework.meta.controller.config.ModelController modelAdministration;
 
     @Autowired private org.springframework.jdbc.core.JdbcTemplate eventJdbc;
     @Autowired private org.springframework.transaction.PlatformTransactionManager eventTransactions;
@@ -137,6 +138,70 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
         return eventJdbc.queryForList("SELECT event_id, event_type, event_sequence, occurred_at, correlation_id, subject, payload::text AS payload FROM ab_outbox"
                 + " WHERE tenant_id = ? AND ordering_key LIKE ? ORDER BY id", principal.tenantId(),
                 "open.resource:" + contract.code() + ":%");
+    }
+
+    @Test void machineGrantCannotFollowAChangedPhysicalStorageBinding() throws Exception {
+        assertThat(authorizer.authorize(principal, contract.code(), Operation.GET).contract()).isEqualTo(contract);
+        var model = models.getModelDefinition(contract.modelCode()).orElseThrow();
+        model.setTableName("unowned_" + contract.modelCode());
+        models.saveDefinition(model);
+        assertThatThrownBy(() -> authorizer.authorize(principal, contract.code(), Operation.GET))
+                .isInstanceOf(OpenApiPublicationService.PublicationConflictException.class).hasMessageContaining("source binding");
+        assertThat(publications.active(principal.tenantId(), contract.code())).contains(contract);
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                        "/api/open/v1/resources/" + contract.code() + "/" + allowedPid)
+                .header("Authorization", "Bearer " + rawToken))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isConflict())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code")
+                        .value("open_api_source_changed"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                        .string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("unowned_"))));
+    }
+
+    @Test void machineGrantCannotFollowAChangedColumnBinding() {
+        var model = models.getModelDefinition(contract.modelCode()).orElseThrow();
+        model.getFields().stream().filter(field -> "name".equals(field.getCode())).findFirst().orElseThrow()
+                .setColumnName("secret");
+        models.saveDefinition(model);
+        assertThatThrownBy(() -> authorizer.authorize(principal, contract.code(), Operation.GET))
+                .isInstanceOf(OpenApiPublicationService.PublicationConflictException.class).hasMessageContaining("source binding");
+    }
+
+    @Test void administrationMetadataRebindingRejectsPublicHttpAndRestorationKeepsOriginalEtag() throws Exception {
+        grantCommittedPermissionToTestRole("meta.model.update", "meta", "model", "update", "Manage model metadata");
+        String code = contract.code() + ".binding";
+        var readOnly = new OpenApiResourceContract(code, contract.modelCode(), 1, Set.of(Operation.GET),
+                Map.of(Operation.GET, contract.scopes().get(Operation.GET)), DataPolicy.TENANT_WIDE,
+                Map.of("pid", contract.fields().get("pid"), "name", new Field("name", Type.STRING,
+                        true, false, false, false, Set.of(), false, null, Map.of(), null)), 1, 1, 5000, Set.of());
+        publications.saveDraft(code, new OpenApiPublicationService.DraftRequest(0, readOnly));
+        publications.publish(code, 1);
+        publications.grant(principal.installationPid(), code,
+                new OpenApiInstallationPolicy(Set.of(Operation.GET), Set.of("pid", "name"), Set.of(), List.of()));
+        String path = "/api/open/v1/resources/" + code + "/" + allowedPid;
+        var baseline = http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path)
+                        .header("Authorization", "Bearer " + rawToken))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk()).andReturn();
+        applyTestMetaContext();
+        var model = models.getModelDefinition(contract.modelCode()).orElseThrow();
+        var originalFields = json.convertValue(model.getFields(), new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, Object>>>() { });
+        var changedFields = json.convertValue(model.getFields(), new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, Object>>>() { });
+        changedFields.stream().filter(field -> "name".equals(field.get("code"))).findFirst().orElseThrow().put("columnName", "secret");
+        var update = new MetaModelUpdateRequest(); update.setDisplayName("Machine permission fixture");
+        update.setExtension(Map.of("fields", changedFields));
+        String modelPid = modelMapper.findCurrentByCode(contract.modelCode()).getPid();
+        modelAdministration.updateModel(modelPid, update);
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).header("Authorization", "Bearer " + rawToken))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isConflict())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code").value("open_api_source_changed"));
+        applyTestMetaContext();
+        update.setExtension(Map.of("fields", originalFields));
+        modelAdministration.updateModel(modelPid, update);
+        var restored = http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path)
+                        .header("Authorization", "Bearer " + rawToken))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk()).andReturn();
+        assertThat(restored.getResponse().getContentAsString()).isEqualTo(baseline.getResponse().getContentAsString());
+        assertThat(restored.getResponse().getHeader("ETag")).isEqualTo(baseline.getResponse().getHeader("ETag"));
     }
 
     @Test void modelEventsShareCrudTransactionAndIdempotentReplay() throws Exception {

@@ -44,6 +44,7 @@ public class OpenApiResourceAuthorizer {
         if (!contract.operations().contains(operation)) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "open_api_operation_not_published");
         if (!principal.scopes().contains(contract.scopes().get(operation))) throw new AccessDeniedException("Published operation scope required");
         ModelDefinition model = validator.validate(contract);
+        publications.requireSourceBinding(principal.tenantId(), contract, model);
         var policy = authority.policy();
         policy.validate(contract);
         if (!policy.operations().contains(operation)) throw new AccessDeniedException("Installation operation grant required");

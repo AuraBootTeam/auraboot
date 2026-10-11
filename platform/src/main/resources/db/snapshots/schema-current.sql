@@ -12657,8 +12657,17 @@ CREATE TABLE public.ab_open_api_publication_snapshot (
     definition jsonb NOT NULL,
     published_by_pid character varying(64) NOT NULL,
     published_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT ab_open_api_publication_snapshot_schema_version_check CHECK ((schema_version > 0))
+    source_binding jsonb,
+    CONSTRAINT ab_open_api_publication_snapshot_schema_version_check CHECK ((schema_version > 0)),
+    CONSTRAINT chk_open_api_source_binding CHECK (((source_binding IS NULL) OR (jsonb_typeof(source_binding) = 'object'::text)))
 );
+
+
+--
+-- Name: COLUMN ab_open_api_publication_snapshot.source_binding; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_open_api_publication_snapshot.source_binding IS 'Immutable internal model storage provenance; never exported in the public contract';
 
 
 --

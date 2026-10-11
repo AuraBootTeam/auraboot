@@ -12,6 +12,11 @@ import java.util.Map;
 @Order(0)
 @RestControllerAdvice(assignableTypes = {OpenApiResourceWriteController.class, OpenPlatformFacadeController.class, OpenApiQueryController.class})
 public class OpenApiResourceErrorHandler {
+    @ExceptionHandler(com.auraboot.framework.openplatform.service.OpenApiPublicationService.SourceBindingConflictException.class)
+    public ResponseEntity<Map<String, Object>> sourceChanged() {
+        return ResponseEntity.status(409).body(Map.of("success", false, "code", "open_api_source_changed",
+                "message", "Published resource source binding is unavailable or changed"));
+    }
     @ExceptionHandler(com.auraboot.framework.openplatform.service.OpenApiQueryService.QueryRateLimitException.class)
     public ResponseEntity<Map<String, Object>> queryRateLimit() {
         return ResponseEntity.status(429).header("Retry-After", "60").body(Map.of("success", false,

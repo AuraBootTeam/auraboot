@@ -66,7 +66,7 @@ public class OpenApiPublicationService {
         requireAdmin();
         var row = requireLocked(code, expectedRevision);
         OpenApiResourceContract contract = decode(row.draft(), OpenApiResourceContract.class);
-        validator.validate(contract);
+        var model = validator.validate(contract);
         for (var field : contract.fields().values()) {
             if (field.referenceResource() == null) continue;
             var target = code.equals(field.referenceResource()) ? contract : active(tenant(), field.referenceResource())
@@ -79,11 +79,13 @@ public class OpenApiPublicationService {
         if (row.activeVersion() != null) {
             OpenApiResourceContract previous = decode(mapper.snapshot(tenant(), code, row.activeVersion()), OpenApiResourceContract.class);
             contract.requireCompatibleWith(previous);
+            requireSourceBinding(tenant(), previous, model);
             if (contract.schemaVersion() <= previous.schemaVersion()) {
                 throw new PublicationConflictException("New snapshot requires a greater schema version");
             }
         }
-        mapper.insertSnapshot(tenant(), code, contract.schemaVersion(), encode(contract), actor());
+        mapper.insertResourceSnapshot(tenant(), code, contract.schemaVersion(), encode(contract), actor(),
+                encode(OpenApiResourceSourceBinding.capture(contract, model)));
         mapper.activate(tenant(), code, contract.schemaVersion(), StatusConstants.PUBLISHED, actor());
         mapper.audit(tenant(), code, null, "publish", actor(), row.draftRevision());
         return view(mapper.lock(tenant(), code));
@@ -156,6 +158,15 @@ public class OpenApiPublicationService {
         return definition == null ? Optional.empty() : Optional.of(decode(definition, OpenApiResourceContract.class));
     }
 
+    public void requireSourceBinding(Long tenantId, OpenApiResourceContract contract,
+                                     com.auraboot.framework.meta.dto.ModelDefinition model) {
+        String binding = mapper.sourceBinding(tenantId, contract.code(), contract.schemaVersion());
+        if (binding == null || !decode(binding, OpenApiResourceSourceBinding.class)
+                .equals(OpenApiResourceSourceBinding.capture(contract, model))) {
+            throw new SourceBindingConflictException();
+        }
+    }
+
     public List<OpenApiResourceContract> snapshots(Long tenantId, String code) {
         return mapper.resourceSnapshots(tenantId, code).stream()
                 .map(value -> decode(value, OpenApiResourceContract.class)).toList();
@@ -224,5 +235,9 @@ public class OpenApiPublicationService {
 
     public static class PublicationConflictException extends org.springframework.web.server.ResponseStatusException {
         public PublicationConflictException(String message) { super(org.springframework.http.HttpStatus.CONFLICT, message); }
+    }
+
+    public static class SourceBindingConflictException extends PublicationConflictException {
+        public SourceBindingConflictException() { super("Published resource source binding is unavailable or changed"); }
     }
 }

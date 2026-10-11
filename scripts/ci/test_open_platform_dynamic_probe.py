@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from open_platform_dynamic_probe import CASES, run_dynamic_probe, run_sdk_consumer, verify_report, verify_release_report, verify_command_audits, prepare_slo_fixture
+from open_platform_dynamic_probe import CASES, run_dynamic_probe, run_sdk_consumer, verify_report, verify_release_report, verify_command_audits, prepare_slo_fixture, run_source_binding_probe
 from open_platform_http import ProtocolError
 
 
@@ -39,6 +39,10 @@ def passed():
     return {"schemaVersion": 1, "cases": [{"id": case, "status": "passed"} for case in CASES],
             "executed": len(CASES), "passed": len(CASES), "auditProofs": audits,
             "applicationPid": "app-pid", "installationPid": "install-pid",
+            "resourceSourceBinding": {"status": 409, "code": "open_api_source_changed", "requestId": "release-dynamic-source-binding",
+                "error": {"success": False, "code": "open_api_source_changed", "message": "Published resource source binding is unavailable or changed"},
+                "baseline": {"pid": "source-pid", "name": "Storage binding original"}, "baselineEtag": '"opaque-etag-value"',
+                "restoredStatus": 200, "restored": {"pid": "source-pid", "name": "Storage binding original"}, "restoredEtag": '"opaque-etag-value"'},
             "queryRateLimit": {"status": 429, "code": "open_api_query_rate_limited", "retryAfter": "60",
                                "requestId": "release-dynamic-query-quota", "audit": quota_audit}}
 
@@ -58,6 +62,39 @@ def command_passed():
 
 
 class DynamicProbeTests(unittest.TestCase):
+    def test_source_binding_fixture_restores_metadata_after_success_and_transport_failure(self):
+        for fail in [False, True]:
+            state = {"rebound": False, "restored": False}
+            def human(path, method="GET", body=None):
+                if path == "/api/meta/models": return {"pid": "model-pid"}
+                if path.endswith("/create"): return {"pid": "source-pid"}
+                if path == "/api/meta/models/model-pid" and method == "PUT":
+                    state["rebound"] = body["extension"]["fields"][0]["columnName"] == "rel_binding_private"
+                    state["restored"] = not state["rebound"]
+                return {}
+            def request(path, **kwargs):
+                if state["rebound"]:
+                    if fail: raise ProtocolError("transport failure")
+                    return 409, {"success": False, "code": "open_api_source_changed", "message": "Published resource source binding is unavailable or changed"}, {"X-Request-Id": "release-dynamic-source-binding"}
+                return 200, {"pid": "source-pid", "name": "Storage binding original"}, {"ETag": '"opaque-etag-value"'}
+            with self.subTest(fail=fail):
+                if fail:
+                    with self.assertRaises(ProtocolError): run_source_binding_probe(request, human, "install-pid", {}, "resource.get")
+                else:
+                    self.assertEqual(run_source_binding_probe(request, human, "install-pid", {}, "resource.get")["status"], 409)
+                self.assertTrue(state["restored"])
+                self.assertFalse(state["rebound"])
+
+    def test_source_binding_proof_is_mandatory_and_preserves_the_original_record_and_etag(self):
+        report = passed(); del report["resourceSourceBinding"]
+        with self.assertRaises(ProtocolError): verify_report(report)
+        for key, value in [("status", 200), ("code", "access_denied"), ("requestId", "foreign-request"),
+                           ("error", {"success": False, "code": "open_api_source_changed", "message": "Private source binding sentinel"}),
+                           ("baselineEtag", None), ("restoredStatus", 403), ("restoredEtag", '"another-value"'),
+                           ("restored", {"pid": "source-pid", "name": "Private source binding sentinel"})]:
+            report = passed(); report["resourceSourceBinding"][key] = value
+            with self.subTest(key=key), self.assertRaises(ProtocolError): verify_report(report)
+
     def test_query_quota_requires_response_and_persisted_public_audit(self):
         self.assertEqual(verify_report(passed()), passed())
         report = passed(); del report["queryRateLimit"]

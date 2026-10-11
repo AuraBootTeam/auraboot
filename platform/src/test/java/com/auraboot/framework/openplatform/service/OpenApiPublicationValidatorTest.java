@@ -80,4 +80,24 @@ class OpenApiPublicationValidatorTest {
         final var unfilterableModel = model;
         assertThatThrownBy(() -> validator.validate(contract, unfilterableModel)).hasMessageContaining("Sort");
     }
+
+    @Test void sourceBindingIgnoresPresentationAndUnpublishedFieldsButPinsStorageAndVirtualPaths() {
+        var contract = contract(Set.of(Operation.GET), false, true);
+        var model = model();
+        model.setTableName("mt_original");
+        var original = OpenApiResourceSourceBinding.capture(contract, model);
+        model.setDisplayName("Renamed presentation");
+        model.setFields(List.of(model.getFields().getFirst(), FieldDefinition.builder()
+                .code("private_new_field").dataType("STRING").build()));
+        assertThat(OpenApiResourceSourceBinding.capture(contract, model)).isEqualTo(original);
+        model.setTableName("mt_replacement");
+        assertThat(OpenApiResourceSourceBinding.capture(contract, model)).isNotEqualTo(original);
+        model.setTableName("mt_original");
+        model.getFields().getFirst().setColumnName("replacement_name");
+        assertThat(OpenApiResourceSourceBinding.capture(contract, model)).isNotEqualTo(original);
+        model.getFields().getFirst().setColumnName(null);
+        model.getFields().getFirst().setJsonbColumn("details");
+        model.getFields().getFirst().setJsonbPath("otherName");
+        assertThat(OpenApiResourceSourceBinding.capture(contract, model)).isNotEqualTo(original);
+    }
 }
