@@ -18,6 +18,7 @@ import {
   type To,
 } from 'react-router';
 import { BlockRenderer, type PageContentProps } from '@auraboot/runtime-kernel';
+import { useRuntimeStateSubscription } from '../blocks/workbenchBlockUtils';
 import { usePageRuntime } from '~/framework/meta/rendering/pages/hooks/usePageRuntime';
 import { buildApiEndpoint, getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { fetchResult } from '~/shared/services/http-client';
@@ -981,8 +982,13 @@ function translateOrFallback(t: (key: string) => string, key: string, fallback: 
 export function buildToolbarConditionContext(
   list: { total: number; records: unknown[] },
   base: Record<string, any>,
+  runtimeContext: Record<string, any> = {},
 ): Record<string, any> {
-  return { ...base, recordCount: list.records?.length ?? 0, total: list.total ?? 0 };
+  return {
+    ...base, ...runtimeContext,
+    state: { ...runtimeContext.state, ...base.state },
+    recordCount: list.records?.length ?? 0, total: list.total ?? 0,
+  };
 }
 
 export function shouldSkipListData(
@@ -1488,6 +1494,7 @@ function ListPageContentInner(props: PageContentProps) {
       filters,
     },
   });
+  useRuntimeStateSubscription(runtime);
   const tableEmptyState = useMemo(() => {
     const configured = (tableBlock as any)?.empty ?? (tableBlock as any)?.table?.empty;
     if (!configured || typeof configured !== 'object') return {};
@@ -4326,6 +4333,7 @@ function ListPageContentInner(props: PageContentProps) {
   // Evaluate toolbar button visibility (visibleWhen expression).
   // Exposes the loaded list's recordCount/total so conditions like
   // `recordCount == 0` (singleton "新建" button) work.
+  const toolbarRuntimeContext = runtime?.getContext() ?? {};
   const evaluateButtonVisible = useCallback(
     (button: ButtonConfig): boolean => {
       if (!canUseButton(button)) return false;
@@ -4334,10 +4342,11 @@ function ListPageContentInner(props: PageContentProps) {
       const conditionContext = buildToolbarConditionContext(
         { total: pagination.total, records: data },
         createExpressionContext({ state: { filters } }),
+        toolbarRuntimeContext,
       );
       return evaluateCondition(button.visibleWhen, conditionContext as any);
     },
-    [canUseButton, pagination.total, data, filters],
+    [canUseButton, pagination.total, data, filters, toolbarRuntimeContext],
   );
 
   const visibleBulkActions = useMemo(() => {
