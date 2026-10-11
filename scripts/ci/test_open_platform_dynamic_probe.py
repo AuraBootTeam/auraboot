@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from open_platform_dynamic_probe import CASES, run_dynamic_probe, run_sdk_consumer, verify_report, verify_release_report, verify_command_audits, prepare_slo_fixture, run_source_binding_probe, import_public_plugin, run_public_plugin_metadata_rollback
 from open_platform_http import ProtocolError
-from open_platform_dynamic_probe import PLUGIN_QUERY_SOURCE_FINGERPRINT, verify_named_query_absent
+from open_platform_dynamic_probe import PLUGIN_QUERY_SOURCE_FINGERPRINT, verify_named_query_absent, run_claimed_query_rollback
 
 
 def passed():
@@ -46,6 +46,11 @@ def passed():
             "pluginQuerySource": {"beforeStatus": 400, "queryCode": "release_dynamic_by_zone", "sourcePid": "new-query-pid",
                 "sourceStatus": "published", "sourceVersion": 0, "fingerprint": PLUGIN_QUERY_SOURCE_FINGERPRINT,
                 "importId": "import-pid", "pluginPid": "plugin-pid"},
+            "queryRollbackProtection": {"queryCode": "release.dynamic.by-zone", "importId": "import-pid", "pluginPid": "plugin-pid",
+                "beforeOwnership": "SHARED", "ownershipType": "USER_CLAIMED", "userModified": True,
+                "rollbackStatus": 422, "errorCode": "40000",
+                "errorDetail": "Rollback failed: Public publication is claimed or modified: release.dynamic.by-zone",
+                "activeVersion": 1, "sourcePid": "new-query-pid", "fingerprint": PLUGIN_QUERY_SOURCE_FINGERPRINT},
             "pluginMetadataRollback": {"pluginId": "release-public-resource", "pluginPid": "plugin-pid",
                 "initialImportId": "import-pid", "upgradeImportId": "upgrade-pid", "rollbackImportId": "upgrade-pid",
                 "before": {"pluginId": "release-public-resource", "namespace": "release_public_resource", "version": "1.0.0", "displayName": "Release public contract", "description": None},
@@ -76,6 +81,39 @@ def command_passed():
 
 
 class DynamicProbeTests(unittest.TestCase):
+    def test_claimed_query_rollback_proof_is_mandatory_and_strict(self):
+        report = passed(); del report["queryRollbackProtection"]
+        with self.assertRaises(ProtocolError): verify_report(report)
+        for key, value in [("importId", "foreign"), ("pluginPid", "foreign"), ("beforeOwnership", "USER_CLAIMED"),
+                           ("ownershipType", "SHARED"), ("userModified", False), ("rollbackStatus", 200),
+                           ("errorCode", "0"), ("errorDetail", "unrelated rejection"), ("activeVersion", True),
+                           ("sourcePid", "foreign"), ("fingerprint", "0" * 64)]:
+            with self.subTest(key=key):
+                report = passed(); report["queryRollbackProtection"][key] = value
+                with self.assertRaises(ProtocolError): verify_report(report)
+
+    def test_claimed_query_rollback_reads_persisted_owner_and_source_after_denial(self):
+        report = passed(); calls = []
+        def request(path, **kwargs):
+            calls.append(path)
+            if path.endswith("/rollback"):
+                return 422, {"code": "40000", "context": {"detail": report["queryRollbackProtection"]["errorDetail"]}}, {}
+            if "/claim?" in path: return 200, None, {}
+            if "/ownership?" in path:
+                claimed = sum("/ownership?" in p for p in calls) == 2
+                return 200, {"pluginPid": "plugin-pid", "ownershipType": "USER_CLAIMED" if claimed else "SHARED", "userModified": claimed}, {}
+            if path.endswith("query-publications"):
+                return 200, [{"code": "release.dynamic.by-zone", "status": "published", "activeVersion": 1}], {}
+            if "/by-code/" in path:
+                return 200, {"pid": "new-query-pid", "status": "published", "currentVersion": 0}, {}
+            if "/query-sources/" in path: return 200, {"fingerprint": PLUGIN_QUERY_SOURCE_FINGERPRINT}, {}
+            raise AssertionError("Unexpected production route")
+        proof = run_claimed_query_rollback(request, {}, report["pluginImports"][1], report["pluginQuerySource"])
+        self.assertEqual(proof, report["queryRollbackProtection"])
+        self.assertEqual(len(calls), 7)
+        self.assertLess(next(i for i, p in enumerate(calls) if p.endswith("/rollback")),
+                        next(i for i, p in enumerate(calls) if p.endswith("query-publications")))
+
     def test_named_query_absence_requires_business_error_context(self):
         valid = {"code": "40000", "message": "Business error", "context": "Named query not found: new-query"}
         verify_named_query_absent(valid, "new-query")

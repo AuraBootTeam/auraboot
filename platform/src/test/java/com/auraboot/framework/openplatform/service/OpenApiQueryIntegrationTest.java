@@ -199,7 +199,38 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
         assertThat(pluginResourceService.exportPluginConfig(plugin.getPluginId()).get("publicQueries"))
                 .singleElement().satisfies(declaration -> assertThat(declaration).containsEntry("code", contract.code())
                         .containsEntry("sourceFingerprint", contract.sourceFingerprint()).doesNotContainKey("draftRevision"));
-        pluginResourceService.deleteResource(owned);
+        var originalOwnership = owned.getOwnershipType();
+        var originalModified = owned.getUserModified();
+        var staleOwner = json.readValue(json.writeValueAsBytes(owned),
+                com.auraboot.framework.plugin.entity.PluginResource.class);
+        staleOwner.setImportId(UniqueIdGenerator.generate());
+        assertThatThrownBy(() -> pluginPublications.restore(staleOwner))
+                .isInstanceOf(com.auraboot.framework.plugin.exception.PluginException.class)
+                .hasMessageContaining("owner changed");
+        var foreignTenant = json.readValue(json.writeValueAsBytes(owned),
+                com.auraboot.framework.plugin.entity.PluginResource.class);
+        foreignTenant.setTenantId(testTenant.getId() + 1000000);
+        assertThatThrownBy(() -> pluginPublications.restore(foreignTenant))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThat(publications.active(testTenant.getId(), contract.code())).contains(contract);
+        pluginResourceService.claimByUser(testTenant.getId(),
+                com.auraboot.framework.plugin.dto.imports.ResourceType.PUBLIC_QUERY, contract.code());
+        assertThatThrownBy(() -> pluginImports.rollback(preview.getImportId()))
+                .as("plugin rollback must not withdraw a user-claimed public query")
+                .isInstanceOf(com.auraboot.framework.plugin.exception.PluginException.class)
+                .hasMessageContaining("claimed");
+        assertThat(publications.active(testTenant.getId(), contract.code())).contains(contract);
+        assertThat(queries.describeExecution(importedQueryCode).definition().getPid())
+                .isEqualTo(actualSource.definition().getPid());
+        var claimed = pluginResources.findByTypeAndCode(testTenant.getId(),
+                com.auraboot.framework.plugin.dto.imports.ResourceType.PUBLIC_QUERY.code(), contract.code());
+        assertThat(claimed.getOwnershipTypeEnum())
+                .isEqualTo(com.auraboot.framework.plugin.dto.imports.OwnershipType.USER_CLAIMED);
+        // Restore this fixture's ownership before exercising the existing explicit withdrawal journey.
+        claimed.setOwnershipType(originalOwnership);
+        claimed.setUserModified(originalModified);
+        assertThat(pluginResources.updateById(claimed)).isEqualTo(1);
+        pluginResourceService.deleteResource(claimed);
         assertThat(publications.active(testTenant.getId(), contract.code())).isEmpty();
         assertThat(publicationMapper.resourceSnapshots(testTenant.getId(), contract.storageCode())).hasSize(1);
         http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(route)

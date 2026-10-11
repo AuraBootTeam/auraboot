@@ -66,7 +66,7 @@ public class PluginPublicPublicationLifecycle {
                            String importId, Long tenantId) {
         String key = storageCode(type, code);
         var current = publications.lock(tenantId, key);
-        var owned = tracking.findByTypeAndCode(tenantId, type.code(), code);
+        var owned = tracking.lockByTypeAndCode(tenantId, type.code(), code);
         Map<String, Object> before = current == null ? null : state(current);
         if (current != null) {
             var identity = owned == null ? null : plugins.findIdentityIncludingDeleted(tenantId, owned.getPluginPid());
@@ -164,6 +164,16 @@ public class PluginPublicPublicationLifecycle {
         requireAdmin(resource.getTenantId());
         var type = resource.getResourceTypeEnum();
         var row = publications.lock(resource.getTenantId(), storageCode(type, resource.getResourceCode()));
+        var currentOwner = tracking.lockByTypeAndCode(resource.getTenantId(), type.code(), resource.getResourceCode());
+        if (currentOwner == null || !Objects.equals(resource.getId(), currentOwner.getId())
+                || !Objects.equals(resource.getPluginPid(), currentOwner.getPluginPid())
+                || !Objects.equals(resource.getImportId(), currentOwner.getImportId())) {
+            throw new PluginException("Public publication rollback owner changed: " + resource.getResourceCode());
+        }
+        if (currentOwner.getOwnershipTypeEnum() == OwnershipType.USER_CLAIMED
+                || Boolean.TRUE.equals(currentOwner.getUserModified())) {
+            throw new PluginException("Public publication is claimed or modified: " + resource.getResourceCode());
+        }
         if (row == null || !sameState(resource.getImportSnapshot(), state(row))) {
             throw new PluginException("Public publication changed since import: " + resource.getResourceCode());
         }

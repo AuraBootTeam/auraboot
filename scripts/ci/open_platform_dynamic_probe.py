@@ -191,6 +191,58 @@ def verify_plugin_query_source(proof, imported):
 
 
 
+def verify_claimed_query_rollback(proof, imported, source):
+    keys = {"queryCode", "importId", "pluginPid", "beforeOwnership", "ownershipType", "userModified",
+            "rollbackStatus", "errorCode", "errorDetail", "activeVersion", "sourcePid", "fingerprint"}
+    if (not isinstance(proof, dict) or set(proof) != keys
+            or proof.get("queryCode") != "release.dynamic.by-zone"
+            or any(proof.get(key) != imported[key] for key in ["importId", "pluginPid"])
+            or proof.get("beforeOwnership") != "SHARED" or proof.get("ownershipType") != "USER_CLAIMED"
+            or proof.get("userModified") is not True
+            or type(proof.get("rollbackStatus")) is not int or proof["rollbackStatus"] != 422
+            or proof.get("errorCode") != "40000"
+            or proof.get("errorDetail") != "Rollback failed: Public publication is claimed or modified: release.dynamic.by-zone"
+            or type(proof.get("activeVersion")) is not int or proof["activeVersion"] != 1
+            or proof.get("sourcePid") != source["sourcePid"]
+            or proof.get("fingerprint") != PLUGIN_QUERY_SOURCE_FINGERPRINT):
+        raise ProtocolError("claimed public query rollback protection invalid")
+    return proof
+
+
+def run_claimed_query_rollback(request, admin, imported, source):
+    from open_platform_http import data
+    query = "release.dynamic.by-zone"
+    suffix = "?resourceType=PUBLIC_QUERY&resourceCode=" + query
+    def get(path):
+        _, body, _ = request(path, headers=admin)
+        return data(body)
+    before = get("/api/plugins/resources/ownership" + suffix)
+    if before.get("pluginPid") != imported["pluginPid"] or before.get("userModified") is not False:
+        raise ProtocolError("query ownership baseline invalid")
+    request("/api/plugins/resources/claim" + suffix, method="POST", headers=admin)
+    status, error, _ = request("/api/plugins/import/" + imported["importId"] + "/rollback",
+                               method="POST", headers=admin, expected=(422,))
+    context = error.get("context") if isinstance(error, dict) else None
+    detail = context.get("detail") if isinstance(context, dict) else context
+    expected = "Rollback failed: Public publication is claimed or modified: " + query
+    if detail != expected and (not isinstance(error, dict) or error.get("message") != expected):
+        raise ProtocolError("claimed query rollback denial reason invalid")
+    after = get("/api/plugins/resources/ownership" + suffix)
+    views = [row for row in get("/api/open-platform/query-publications") if row.get("code") == query]
+    named = get("/api/meta/named-queries/by-code/release_dynamic_by_zone")
+    current_source = get("/api/open-platform/query-sources/release_dynamic_by_zone")
+    if (after.get("pluginPid") != imported["pluginPid"] or len(views) != 1
+            or views[0].get("status") != "published" or named.get("status") != "published"
+            or named.get("currentVersion") != 0):
+        raise ProtocolError("claimed query rollback changed source or publication")
+    proof = {"queryCode": query, "importId": imported["importId"], "pluginPid": imported["pluginPid"],
+             "beforeOwnership": before.get("ownershipType"), "ownershipType": after.get("ownershipType"),
+             "userModified": after.get("userModified"), "rollbackStatus": status, "errorCode": error.get("code"),
+             "errorDetail": expected, "activeVersion": views[0].get("activeVersion"), "sourcePid": named.get("pid"),
+             "fingerprint": current_source.get("fingerprint")}
+    return verify_claimed_query_rollback(proof, imported, source)
+
+
 def verify_plugin_metadata_rollback(proof, imported):
     keys = {"pluginId", "pluginPid", "initialImportId", "upgradeImportId", "rollbackImportId",
             "before", "upgraded", "restored", "upgradedActiveVersion", "restoredActiveVersion"}
@@ -274,6 +326,7 @@ def verify_report(report):
         verify_plugin_import(proof, plugin, kind)
     verify_plugin_metadata_rollback(report.get("pluginMetadataRollback"), proofs[0])
     verify_plugin_query_source(report.get("pluginQuerySource"), proofs[1])
+    verify_claimed_query_rollback(report.get("queryRollbackProtection"), proofs[1], report["pluginQuerySource"])
     verify_audits(report)
     verify_source_binding(report.get("resourceSourceBinding"))
     quota = report.get("queryRateLimit")
@@ -556,6 +609,8 @@ def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None):
             "sourceStatus": named["status"], "sourceVersion": named["currentVersion"], "fingerprint": source["fingerprint"],
             "importId": report["pluginImports"][1]["importId"], "pluginPid": report["pluginImports"][1]["pluginPid"]}
         verify_plugin_query_source(report["pluginQuerySource"], report["pluginImports"][1])
+        report["queryRollbackProtection"] = run_claimed_query_rollback(request, admin,
+                report["pluginImports"][1], report["pluginQuerySource"])
         published_query = [row for row in human("/api/open-platform/query-publications") if row.get("code") == query]
         record("plugin-query-import", len(published_query) == 1 and published_query[0].get("activeVersion") == 1
                and published_query[0].get("status") == "published")
