@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from open_platform_dynamic_probe import CASES, run_dynamic_probe, run_sdk_consumer, verify_report, verify_release_report, verify_command_audits, prepare_slo_fixture, run_source_binding_probe, import_public_plugin, run_public_plugin_metadata_rollback
 from open_platform_http import ProtocolError
-from open_platform_dynamic_probe import PLUGIN_QUERY_SOURCE_FINGERPRINT
+from open_platform_dynamic_probe import PLUGIN_QUERY_SOURCE_FINGERPRINT, verify_named_query_absent
 
 
 def passed():
@@ -76,6 +76,15 @@ def command_passed():
 
 
 class DynamicProbeTests(unittest.TestCase):
+    def test_named_query_absence_requires_business_error_context(self):
+        valid = {"code": "40000", "message": "Business error", "context": "Named query not found: new-query"}
+        verify_named_query_absent(valid, "new-query")
+        for key, value in [("code", "0"), ("message", "Named query not found: new-query"),
+                           ("context", None), ("context", "Named query not found: foreign-query")]:
+            with self.subTest(key=key, value=value):
+                bad = dict(valid); bad[key] = value
+                with self.assertRaises(ProtocolError): verify_named_query_absent(bad, "new-query")
+
     def test_new_query_source_proof_is_mandatory_and_strict(self):
         report = passed(); del report["pluginQuerySource"]
         with self.assertRaises(ProtocolError): verify_report(report)

@@ -35,6 +35,12 @@ AUDIT_CASES = (
 PLUGIN_QUERY_SOURCE_FINGERPRINT = "9a240519bf431b03641c4b754e65af329bb36bb5a6f2344eb61a5c7f00cc0891"
 
 
+def verify_named_query_absent(body, code):
+    if (not isinstance(body, dict) or body.get("code") != "40000"
+            or body.get("message") != "Business error"
+            or body.get("context") != "Named query not found: " + code):
+        raise ProtocolError("declared query source was not absent before import")
+
 
 COMMAND_AUDIT_CASES = (
     ("asset-assign", "assets.assign", "assets", 200, False),
@@ -534,8 +540,7 @@ def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None):
         if model["tableName"] != model_code:
             raise ProtocolError("declared query fixture physical source changed")
         before_status, missing, _ = request("/api/meta/named-queries/by-code/" + named_code, headers=admin, expected=(400,))
-        if not isinstance(missing, dict) or missing.get("message") != "Named query not found: " + named_code:
-            raise ProtocolError("declared query source was not absent before import")
+        verify_named_query_absent(missing, named_code)
         named_definition["status"] = "published"
         query_definition = {"code": query, "queryCode": named_code, "schemaVersion": 1,
             "sourceFingerprint": PLUGIN_QUERY_SOURCE_FINGERPRINT, "sourceResources": {model_code: resource}, "scopes": {"execute": query_scope},
