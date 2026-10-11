@@ -1098,6 +1098,7 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
     @Test
     @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     void machineHttpAuditPersistsPublicActorAndOriginalReplayIntent() throws Exception {
+        publishEvents();
         String collection = "/api/open/v1/resources/" + contract.code();
         String origin = "audit-" + UniqueIdGenerator.generate();
         String bearer = "Bearer " + rawToken;
@@ -1147,16 +1148,87 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
                     .header("Authorization", bearer).header("X-Request-Id", origin + "-stale")
                     .header("Idempotency-Key", origin + "-patch").contentType("application/json").content("{\"name\":\"Denied\"}"))
                     .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isPreconditionFailed());
-            http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(collection + "/" + pid)
-                    .header("Authorization", bearer).header("X-Request-Id", origin + "-delete")
-                    .header("Idempotency-Key", origin + "-delete").header("If-Match", current.getHeader("ETag")))
-                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNoContent());
-            http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(collection + "/" + pid)
-                    .header("Authorization", bearer).header("X-Request-Id", origin + "-delete-replay")
-                    .header("Idempotency-Key", origin + "-delete").header("If-Match", current.getHeader("ETag")))
-                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNoContent());
+            String updateBody = "{\"name\":\"Secret-free update\"}";
+            String updateMatch = current.getHeader("ETag");
+            String updateKey = origin + "-update";
+            var updated = http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(collection + "/" + pid)
+                    .header("Authorization", bearer).header("X-Request-Id", updateKey)
+                    .header("Idempotency-Key", updateKey).header("If-Match", updateMatch)
+                    .contentType("application/json").content(updateBody))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk()).andReturn().getResponse();
+            assertThat(json.readTree(updated.getContentAsString())).isEqualTo(json.valueToTree(Map.of("pid", pid, "name", "Secret-free update", "zone", "A")));
+            assertThat(updated.getHeader("ETag")).isNotEqualTo(updateMatch);
+            assertThat(updated.getHeader("Idempotent-Replay")).isNull();
+            assertWriteReplayAuthority("PATCH", collection + "/" + pid, bearer, origin + "-update-replay", updateKey, updateMatch, updateBody, 200, updated);
             applyTestMetaContext();
-            for (var suffix : List.of("", "-replay", "-policy-denied", "-policy-restored", "-row-denied", "-row-restored", "-current", "-stale", "-delete", "-delete-replay")) {
+            publications.grant(principal.installationPid(), contract.code(), new OpenApiInstallationPolicy(contract.operations(),
+                    Set.of("pid", "zone"), Set.of("name", "zone"), originalPolicy.rowConstraints()));
+            assertWriteReplayAuthority("PATCH", collection + "/" + pid, bearer, origin + "-update-policy-denied", updateKey, updateMatch, updateBody, 403, updated);
+            applyTestMetaContext();
+            publications.grant(principal.installationPid(), contract.code(), originalPolicy);
+            assertWriteReplayAuthority("PATCH", collection + "/" + pid, bearer, origin + "-update-policy-restored", updateKey, updateMatch, updateBody, 200, updated);
+            applyTestMetaContext();
+            MetaContext.runWithCommandPermitScope("ALL", () -> data.update(contract.modelCode(), pid, Map.of("zone", "B")));
+            assertWriteReplayAuthority("PATCH", collection + "/" + pid, bearer, origin + "-update-row-denied", updateKey, updateMatch, updateBody, 403, updated);
+            applyTestMetaContext();
+            var updateOutside = MetaContext.runWithCommandPermitScope("ALL", () -> data.getById(contract.modelCode(), pid));
+            assertThat(updateOutside).containsEntry("name", "Secret-free update").containsEntry("zone", "B");
+            assertThat(((Number) updateOutside.get("row_version")).longValue()).isEqualTo(5);
+            MetaContext.runWithCommandPermitScope("ALL", () -> data.update(contract.modelCode(), pid, Map.of("zone", "A")));
+            assertWriteReplayAuthority("PATCH", collection + "/" + pid, bearer, origin + "-update-row-restored", updateKey, updateMatch, updateBody, 200, updated);
+            applyTestMetaContext();
+            var noUpdate = new HashSet<>(contract.operations()); noUpdate.remove(Operation.UPDATE);
+            publications.grant(principal.installationPid(), contract.code(), new OpenApiInstallationPolicy(noUpdate,
+                    originalPolicy.readableFields(), originalPolicy.writableFields(), originalPolicy.rowConstraints()));
+            assertWriteReplayAuthority("PATCH", collection + "/" + pid, bearer, origin + "-update-operation-denied", updateKey, updateMatch, updateBody, 403, updated);
+            applyTestMetaContext();
+            publications.grant(principal.installationPid(), contract.code(), originalPolicy);
+            assertWriteReplayAuthority("PATCH", collection + "/" + pid, bearer, origin + "-update-operation-restored", updateKey, updateMatch, updateBody, 200, updated);
+            current = http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(collection + "/" + pid)
+                    .header("Authorization", bearer).header("X-Request-Id", origin + "-update-current"))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk()).andReturn().getResponse();
+            assertThat(json.readTree(current.getContentAsString())).isEqualTo(json.readTree(updated.getContentAsString()));
+            assertThat(current.getHeader("ETag")).isNotEqualTo(updated.getHeader("ETag"));
+            applyTestMetaContext();
+            var updateRestored = MetaContext.runWithCommandPermitScope("ALL", () -> data.getById(contract.modelCode(), pid));
+            assertThat(updateRestored).containsEntry("name", "Secret-free update").containsEntry("zone", "A");
+            assertThat(((Number) updateRestored.get("row_version")).longValue()).isEqualTo(6);
+            assertThat(eventJdbc.queryForObject("SELECT COUNT(*) FROM ab_open_api_idempotency WHERE tenant_id=? AND route_code=? AND idempotency_key=? AND status='completed'",
+                    Long.class, principal.tenantId(), "resource:" + contract.code() + ":update", updateKey)).isEqualTo(1);
+            String deleteMatch = current.getHeader("ETag");
+            String deleteKey = origin + "-delete";
+            var deleted = http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(collection + "/" + pid)
+                    .header("Authorization", bearer).header("X-Request-Id", deleteKey)
+                    .header("Idempotency-Key", deleteKey).header("If-Match", deleteMatch))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNoContent()).andReturn().getResponse();
+            assertWriteReplayAuthority("DELETE", collection + "/" + pid, bearer, origin + "-delete-replay", deleteKey, deleteMatch, null, 204, deleted);
+            applyTestMetaContext();
+            publications.grant(principal.installationPid(), contract.code(), new OpenApiInstallationPolicy(contract.operations(),
+                    Set.of("pid", "zone"), Set.of("name", "zone"), originalPolicy.rowConstraints()));
+            assertWriteReplayAuthority("DELETE", collection + "/" + pid, bearer, origin + "-delete-policy-denied", deleteKey, deleteMatch, null, 403, deleted);
+            applyTestMetaContext();
+            publications.grant(principal.installationPid(), contract.code(), originalPolicy);
+            assertWriteReplayAuthority("DELETE", collection + "/" + pid, bearer, origin + "-delete-policy-restored", deleteKey, deleteMatch, null, 204, deleted);
+            applyTestMetaContext();
+            var noDelete = new HashSet<>(contract.operations()); noDelete.remove(Operation.DELETE);
+            publications.grant(principal.installationPid(), contract.code(), new OpenApiInstallationPolicy(noDelete,
+                    originalPolicy.readableFields(), originalPolicy.writableFields(), originalPolicy.rowConstraints()));
+            assertWriteReplayAuthority("DELETE", collection + "/" + pid, bearer, origin + "-delete-operation-denied", deleteKey, deleteMatch, null, 403, deleted);
+            applyTestMetaContext();
+            publications.grant(principal.installationPid(), contract.code(), originalPolicy);
+            assertWriteReplayAuthority("DELETE", collection + "/" + pid, bearer, origin + "-delete-operation-restored", deleteKey, deleteMatch, null, 204, deleted);
+            applyTestMetaContext();
+            assertThatThrownBy(() -> MetaContext.runWithCommandPermitScope("ALL", () -> data.getById(contract.modelCode(), pid)))
+                    .isInstanceOf(com.auraboot.framework.meta.exception.MetaRecordNotFoundException.class);
+            assertThat(eventJdbc.queryForObject("SELECT COUNT(*) FROM ab_open_api_idempotency WHERE tenant_id=? AND route_code=? AND idempotency_key=? AND status='completed'",
+                    Long.class, principal.tenantId(), "resource:" + contract.code() + ":delete", deleteKey)).isEqualTo(1);
+            var events = sourceEvents();
+            assertThat(events).hasSize(7);
+            assertThat(events.stream().map(row -> row.get("event_id")).distinct()).hasSize(7);
+            assertThat(json.readTree(events.getFirst().get("payload").toString()).path("source").path("name").asText()).isEqualTo("Secret-free audit");
+            assertThat(json.readTree(events.getLast().get("payload").toString()).path("source").path("name").asText()).isEqualTo("Secret-free update");
+            applyTestMetaContext();
+            for (var suffix : List.of("", "-replay", "-policy-denied", "-policy-restored", "-row-denied", "-row-restored", "-current", "-stale", "-update", "-update-replay", "-update-policy-denied", "-update-policy-restored", "-update-row-denied", "-update-row-restored", "-update-operation-denied", "-update-operation-restored", "-update-current", "-delete", "-delete-replay", "-delete-policy-denied", "-delete-policy-restored", "-delete-operation-denied", "-delete-operation-restored")) {
                 var audits = management.listCallAudits(principal.installationPid(), origin + suffix, null, 20);
                 assertThat(audits).hasSize(1);
                 var audit = audits.getFirst();
@@ -1165,18 +1237,18 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
                 assertThat(audit.installationPid()).isEqualTo(principal.installationPid());
                 assertThat(audit.resource()).isEqualTo(contract.code());
                 boolean deniedReplay = suffix.endsWith("-denied");
-                assertThat(audit.recordPid()).isEqualTo(deniedReplay ? null : pid);
-                String operation = suffix.equals("-stale") ? "update" : suffix.startsWith("-delete") ? "delete" : suffix.equals("-current") ? "get" : "create";
+                assertThat(audit.recordPid()).isEqualTo(deniedReplay && !suffix.startsWith("-update") && !suffix.startsWith("-delete") ? null : pid);
+                String operation = suffix.endsWith("-current") ? "get" : suffix.startsWith("-update") || suffix.equals("-stale") ? "update" : suffix.startsWith("-delete") ? "delete" : "create";
                 assertThat(audit.operation()).isEqualTo(operation);
                 assertThat(audit.capability()).isEqualTo("resource." + contract.code() + "." + operation);
-                assertThat(audit.status()).isEqualTo(suffix.equals("-stale") ? 412 : suffix.startsWith("-delete") ? 204 : deniedReplay ? 403 : suffix.equals("-current") ? 200 : 201);
-                assertThat(audit.idempotentReplay()).isEqualTo(suffix.equals("-stale") || deniedReplay || suffix.equals("-current") ? null : suffix.endsWith("replay") || suffix.endsWith("-restored"));
+                assertThat(audit.status()).isEqualTo(suffix.equals("-stale") ? 412 : deniedReplay ? 403 : suffix.startsWith("-delete") ? 204 : suffix.startsWith("-update") || suffix.equals("-current") ? 200 : 201);
+                assertThat(audit.idempotentReplay()).isEqualTo(suffix.equals("-stale") || deniedReplay || suffix.endsWith("-current") ? null : suffix.endsWith("replay") || suffix.endsWith("-restored"));
                 assertThat(audit.durationMs()).isNotNegative();
-                assertThat(json.writeValueAsString(audit)).doesNotContain(rawToken, "tokenPid", "tenantId", "Secret-free audit");
+                assertThat(json.writeValueAsString(audit)).doesNotContain(rawToken, "tokenPid", "tenantId", "Secret-free audit", "Secret-free update");
                 String persisted = eventJdbc.queryForObject("SELECT business_details::text FROM ab_open_api_call_audit WHERE tenant_id=? AND installation_pid=? AND request_id=?",
                         String.class, principal.tenantId(), principal.installationPid(), origin + suffix);
                 assertThat(json.readTree(persisted).path("actorKind").asText()).isEqualTo("machine");
-                assertThat(persisted).doesNotContain(rawToken, "tokenPid", "tenantId", "Secret-free audit");
+                assertThat(persisted).doesNotContain(rawToken, "tokenPid", "tenantId", "Secret-free audit", "Secret-free update");
             }
             assertThat(eventJdbc.queryForObject("SELECT COUNT(*) FROM ab_audit_trail WHERE tenant_id=? AND actor_name=?",
                     Long.class, principal.tenantId(), principal.tokenPid())).isZero();
@@ -1185,12 +1257,21 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
 
     private void assertCreateReplayAuthority(String collection, String bearer, String origin, String suffix,
                                             String body, int status, org.springframework.mock.web.MockHttpServletResponse original) throws Exception {
-        var response = http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(collection)
-                .header("Authorization", bearer).header("X-Request-Id", origin + suffix).header("Idempotency-Key", origin)
-                .contentType("application/json").content(body))
+        assertWriteReplayAuthority("POST", collection, bearer, origin + suffix, origin, null, body, status, original);
+    }
+
+    private void assertWriteReplayAuthority(String method, String path, String bearer, String requestId, String key,
+                                           String ifMatch, String body, int status,
+                                           org.springframework.mock.web.MockHttpServletResponse original) throws Exception {
+        var request = org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request(org.springframework.http.HttpMethod.valueOf(method), path)
+                .header("Authorization", bearer).header("X-Request-Id", requestId).header("Idempotency-Key", key);
+        if (ifMatch != null) request.header("If-Match", ifMatch);
+        if (body != null) request.contentType("application/json").content(body);
+        var response = http.perform(request)
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().is(status)).andReturn().getResponse();
-        if (status == 201) {
-            assertThat(json.readTree(response.getContentAsString())).isEqualTo(json.readTree(original.getContentAsString()));
+        if (status != 403) {
+            if (status == 204) assertThat(response.getContentAsString()).isEmpty();
+            else assertThat(json.readTree(response.getContentAsString())).isEqualTo(json.readTree(original.getContentAsString()));
             assertThat(response.getHeader("ETag")).isEqualTo(original.getHeader("ETag"));
             assertThat(response.getHeader("Location")).isEqualTo(original.getHeader("Location"));
             assertThat(response.getHeader("Idempotent-Replay")).isEqualTo("true");
@@ -1199,7 +1280,7 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
             assertThat(json.readTree(response.getContentAsString()).path("message").asText()).isEqualTo("Access forbidden");
             assertThat(json.readTree(response.getContentAsString()).path("context").asText())
                     .isEqualTo("Current resource or query authorization required");
-            assertThat(response.getContentAsString()).doesNotContain("Secret-free audit", rawToken, "Replay authorization changed", "Replay target");
+            assertThat(response.getContentAsString()).doesNotContain("Secret-free audit", "Secret-free update", rawToken, "Replay authorization changed", "Replay target");
             assertThat(response.getHeader("ETag")).isNull();
             assertThat(response.getHeader("Location")).isNull();
             assertThat(response.getHeader("Idempotent-Replay")).isNull();
