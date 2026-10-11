@@ -270,16 +270,9 @@ test.describe('Dynamic resource publication journey', () => {
     await snapshot('publication-virtual-source-required');
     await page.getByTestId('publication-editor').locator('section').filter({ has: sourceSelector })
       .screenshot({ path: path.join(screenshotRoot, 'publication-virtual-source-required-region.png') });
-    // Observe option order, then recover through native keyboard events rather than programmatic selection.
-    const sourceOptionIndex = await sourceSelector.evaluate((element: HTMLSelectElement, value: string) =>
-      Array.from(element.options).findIndex(option => option.value === value), resourceCode);
-    expect(sourceOptionIndex).toBeGreaterThan(0);
+    // Native typeahead recovers the source through keyboard events on the current browser.
     await expect(sourceSelector).toBeFocused();
-    await sourceSelector.press('Home');
-    if (process.env.AURA_UI_NEGATIVE_MUTATION !== 'skip-source-keyboard') {
-      for (let index = 0; index < sourceOptionIndex; index++) await sourceSelector.press('ArrowDown');
-    }
-    await sourceSelector.press('Enter');
+    if (process.env.AURA_UI_NEGATIVE_MUTATION !== 'skip-source-keyboard') await page.keyboard.type(resourceCode);
     await expect(sourceSelector).toHaveValue(resourceCode);
     await expect(requiredSourceError).toHaveCount(0);
     await expect(sourceSelector).toHaveAttribute('aria-invalid', 'false');
