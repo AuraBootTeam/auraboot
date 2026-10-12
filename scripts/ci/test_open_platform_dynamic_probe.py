@@ -173,17 +173,18 @@ def passed():
     for index, (name, status, code, known, token) in enumerate(AUTH_CASES):
         method = "POST" if name.startswith("oauth") else "GET"
         path = "/oauth2/token" if method == "POST" else "/api/open/v1/resources/release.dynamic.parts" if name == "bearer-expired" else "/api/open/v1/whoami"
+        audit_path = "/api/open/v1/resources/{resource}" if name == "bearer-expired" else path
         identifier = "fixture-auth-" + str(index)
-        audit = {"requestId": identifier, "method": method, "path": path, "status": status, "durationMs": 1,
+        audit = {"requestId": identifier, "method": method, "path": audit_path, "status": status, "durationMs": 1,
                  "occurredAt": "2026-10-12T00:00:00Z", "applicationPid": "app-pid" if known else None,
                  "installationPid": "install-pid" if known else None, "businessDetails": {"actorKind": "unauthenticated", "phase": "authentication", "code": code},
                  "tokenPresent": token, "tenantMatches": known, "anonymous": not known, "secretFree": True}
         denied["audits"].append(audit)
-        visible = [{"requestId": identifier, "method": method, "path": path, "status": status,
+        visible = [{"requestId": identifier, "method": method, "path": audit_path, "status": status,
                     "actorKind": "unauthenticated", "applicationPid": "app-pid", "installationPid": "install-pid",
                     "capability": None, "resource": None, "operation": None, "recordPid": None, "idempotentReplay": None}] if known else []
         requests.append({"id": name, "status": status, "body": {"error": code} if method == "POST" else {"success": False, "code": code, "message": code},
-                         "requestId": identifier, "callerIdReplaced": method == "POST", "visibleAudits": visible})
+                         "requestId": identifier, "callerIdReplaced": method == "POST", "visibleAudits": visible, "method":method,"path":path})
     allowed = dict(before, tokenLastUsed="2026-10-12T00:00:01Z", quotaCount=1)
     report["authenticationFailures"] = {"applicationPid": "app-pid", "installationPid": "install-pid", "before": before,
                                          "afterDenied": denied, "afterAllowed": allowed, "requests": requests, "normalStatus": 200, "resourcePath":"/api/open/v1/resources/release.dynamic.parts"}
@@ -578,6 +579,12 @@ class DynamicProbeTests(unittest.TestCase):
             for key in baseline["authenticationFailures"]["afterDenied"]["audits"][index]:
                 report = copy.deepcopy(baseline); report["authenticationFailures"]["afterDenied"]["audits"][index].pop(key)
                 with self.subTest(auth_audit=index,missing=key), self.assertRaises(ProtocolError): verify_report(report)
+        expired_index = next(i for i, row in enumerate(baseline['authenticationFailures']['requests']) if row['id'] == 'bearer-expired')
+        for changed in ['request-path','audit-path']:
+            report = copy.deepcopy(baseline)
+            if changed == 'request-path': report['authenticationFailures']['requests'][expired_index]['path']='/api/open/v1/whoami'
+            else: report['authenticationFailures']['afterDenied']['audits'][expired_index]['path']='/api/open/v1/resources/release.dynamic.parts'
+            with self.subTest(expired_path=changed), self.assertRaises(ProtocolError): verify_report(report)
         for stage in ['expired','restored']:
             for key in baseline['authenticationFailures']['tokenExpiry'][stage]:
                 report = copy.deepcopy(baseline); report['authenticationFailures']['tokenExpiry'][stage].pop(key)

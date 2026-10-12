@@ -162,11 +162,12 @@ def verify(proof, application, installation, resource_path):
     for row, (name, status, code, known, token) in zip(rows, CASES):
         path = '/oauth2/token' if name.startswith('oauth') else resource_path if name == 'bearer-expired' else '/api/open/v1/whoami'
         method = 'POST' if name.startswith('oauth') else 'GET'
+        audit_path = '/api/open/v1/resources/{resource}' if name == 'bearer-expired' else path
         expected_body = {'error': code} if method == 'POST' else {'success': False, 'code': code, 'message': code}
-        require(set(row) == {'id','status','body','requestId','callerIdReplaced','visibleAudits'} and row.get('id') == name and row.get('status') == status and row.get('body') == expected_body
+        require(set(row) == {'id','status','body','requestId','callerIdReplaced','visibleAudits','method','path'} and row.get('method') == method and row.get('path') == path and row.get('id') == name and row.get('status') == status and row.get('body') == expected_body
                 and row.get('callerIdReplaced') is (method == 'POST'), "authentication response contract invalid")
         audit = indexed[row['requestId']]
-        require(set(audit) == {'requestId','method','path','status','durationMs','occurredAt','applicationPid','installationPid','businessDetails','tokenPresent','tenantMatches','anonymous','secretFree'} and audit.get('method') == method and audit.get('path') == path and audit.get('status') == status
+        require(set(audit) == {'requestId','method','path','status','durationMs','occurredAt','applicationPid','installationPid','businessDetails','tokenPresent','tenantMatches','anonymous','secretFree'} and audit.get('method') == method and audit.get('path') == audit_path and audit.get('status') == status
                 and type(audit.get('durationMs')) is int and audit['durationMs'] >= 0
                 and isinstance(audit.get('occurredAt'), str) and audit['occurredAt']
                 and audit.get('secretFree') is True and audit.get('tokenPresent') is token
@@ -181,7 +182,7 @@ def verify(proof, application, installation, resource_path):
             view = visible[0]
             require(isinstance(view, dict) and view.get('requestId') == row['requestId'] and view.get('actorKind') == 'unauthenticated'
                     and view.get('applicationPid') == application and view.get('installationPid') == installation
-                    and view.get('status') == status and view.get('method') == method and view.get('path') == path
+                    and view.get('status') == status and view.get('method') == method and view.get('path') == audit_path
                     and all(view.get(k) is None for k in ['capability', 'resource', 'operation', 'recordPid', 'idempotentReplay']),
                     "authentication management view forged business authority")
     expired_request = next(row for row in rows if row['id'] == 'bearer-expired')
@@ -209,9 +210,10 @@ def run(request, human, report, credential, token, path, reader):
             if name == 'oauth-scope': form['scope'] = 'ungranted.' + uuid.uuid4().hex
         elif name == 'bearer-unknown': headers['Authorization'] = 'Bearer unknown-' + uuid.uuid4().hex
         elif name in ['bearer-scope', 'bearer-expired']: headers['Authorization'] = 'Bearer ' + token
+        request_path = '/oauth2/token' if oauth else path if name == 'bearer-expired' else '/api/open/v1/whoami'
         clock = reader.token_clock(installation, token) if name == 'bearer-expired' else None
         try:
-            response_status, body, response_headers = request('/oauth2/token' if oauth else path if name == 'bearer-expired' else '/api/open/v1/whoami',
+            response_status, body, response_headers = request(request_path,
                     method='POST' if oauth else 'GET', form=form, headers=headers, expected=(status,))
         finally:
             if clock is not None:
@@ -223,7 +225,8 @@ def run(request, human, report, credential, token, path, reader):
             proof['tokenExpiry'] = {'expired': clock, 'restored': restored_clock, 'requestId': identifier}
         visible = human(f'/api/open-platform/installations/{installation}/audits?requestId={identifier}')
         proof['requests'].append({'id': name, 'status': response_status, 'body': body, 'requestId': identifier,
-                                 'callerIdReplaced': identifier != supplied, 'visibleAudits': visible})
+                                 'callerIdReplaced': identifier != supplied, 'visibleAudits': visible,
+                                 'method': 'POST' if oauth else 'GET', 'path': request_path})
     ids = [r['requestId'] for r in proof['requests']]
     proof['afterDenied'] = reader.read(installation, credential, token, ids)
     proof['normalStatus'], _, _ = request(path, headers={'Authorization': 'Bearer ' + token})
