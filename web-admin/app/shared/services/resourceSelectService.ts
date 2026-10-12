@@ -99,8 +99,25 @@ export async function fetchWorkflowOptions(): Promise<ResourceOption[]> {
   )?.provider as
     | { fetchOptions?: () => Promise<ResourceOption[]> }
     | undefined;
-  if (!provider?.fetchOptions) return [];
-  return provider.fetchOptions();
+  if (provider?.fetchOptions) return provider.fetchOptions();
+  // Built-in fallback for runtimes without the BPM web package: the platform
+  // BPM module serves deployed process definitions directly. The deployed
+  // list returns `data: []` (not an envelope) when the module is absent.
+  try {
+    const result = await fetchResult<{ processKey: string; processName: string; status?: string }>(
+      '/api/bpm/process-definitions/deployed',
+    );
+    const rows = (Array.isArray(result?.data) ? result.data : []).filter(
+      (d) => d.processKey,
+    );
+    return rows.map((d) => ({
+      label: d.processName || d.processKey,
+      value: d.processKey,
+      description: d.status,
+    }));
+  } catch {
+    return [];
+  }
 }
 
 export async function fetchAutomationOptions(): Promise<ResourceOption[]> {

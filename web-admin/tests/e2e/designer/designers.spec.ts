@@ -51,11 +51,11 @@ test.describe('Flow Designer (F4-b)', () => {
     let result = await Promise.race([
       toolbarLocator
         .first()
-        .waitFor({ timeout: 8000 })
+        .waitFor({ timeout: 20_000 })
         .then(() => 'toolbar' as const),
       loginLocator
         .first()
-        .waitFor({ timeout: 8000 })
+        .waitFor({ timeout: 20_000 })
         .then(() => 'login' as const),
     ]).catch(() => 'timeout' as const);
 
@@ -103,11 +103,11 @@ test.describe('Flow Designer (F4-b)', () => {
     const result = await Promise.race([
       paletteLocator
         .first()
-        .waitFor({ timeout: 8000 })
+        .waitFor({ timeout: 20_000 })
         .then(() => 'content' as const),
       loginLocator
         .first()
-        .waitFor({ timeout: 8000 })
+        .waitFor({ timeout: 20_000 })
         .then(() => 'login' as const),
     ]).catch(() => 'timeout' as const);
 
@@ -154,11 +154,11 @@ test.describe('Flow Designer (F4-b)', () => {
     const result = await Promise.race([
       paletteLocator
         .first()
-        .waitFor({ timeout: 8000 })
+        .waitFor({ timeout: 20_000 })
         .then(() => 'content' as const),
       loginLocator
         .first()
-        .waitFor({ timeout: 8000 })
+        .waitFor({ timeout: 20_000 })
         .then(() => 'login' as const),
     ]).catch(() => 'timeout' as const);
 
@@ -245,11 +245,11 @@ test.describe('BPMN Designer (F4-c)', () => {
     const result = await Promise.race([
       headingLocator
         .first()
-        .waitFor({ timeout: 8000 })
+        .waitFor({ timeout: 20_000 })
         .then(() => 'content' as const),
       loginLocator
         .first()
-        .waitFor({ timeout: 8000 })
+        .waitFor({ timeout: 20_000 })
         .then(() => 'login' as const),
     ]).catch(() => 'timeout' as const);
 

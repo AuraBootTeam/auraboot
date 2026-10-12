@@ -651,7 +651,7 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     // The errored node is auto-selected and its required field renders a
     // field-level error in the property panel — NOT just a generic toast.
     const panel = page.locator(`[data-testid="prop-field-modelCode"]`);
-    await expect(panel.getByText('This field is required')).toBeVisible({ timeout: 5_000 });
+    await expect(panel.getByText(/This field is required|此字段必填/)).toBeVisible({ timeout: 5_000 });
     // The toolbar surfaces a structured error count (not a transient toast).
     await expect(page.getByText(/存在错误|Errors/).first()).toBeVisible();
 
