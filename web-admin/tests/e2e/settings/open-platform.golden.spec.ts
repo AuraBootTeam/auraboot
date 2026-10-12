@@ -56,6 +56,40 @@ const publicationText = (cn: string) => {
   if (!(cn in publicationEnglish)) throw new Error(`Missing English publication expectation: ${cn}`);
   return publicationEnglish[cn];
 };
+const queryLocale = process.env.AURA_OPEN_PLATFORM_QUERY_LOCALE || 'zh-CN';
+if (!['zh-CN', 'en-US'].includes(queryLocale)) throw new Error('Unsupported query publication locale');
+const queryEnglish: Record<string, string> = {
+  "查询已停用": "Query withdrawn",
+  "公共查询发布": "Public query publications",
+  "查找": "Search",
+  "可写": "Writable",
+  "确认": "Confirm",
+  "查询草稿已保存并通过来源校验": "Query draft saved and source validation passed",
+  "已发布查询": "Query published",
+  "新建公共查询": "New public query",
+  "尚未公开命名查询": "No NamedQueries are public yet",
+  "公共查询地址": "Public query address",
+  "查找命名查询": "Find NamedQuery",
+  "命名查询来源": "NamedQuery source",
+  "查询执行权限": "Query execution scope",
+  "参数类型": "Parameter type",
+  "必填参数": "Required parameter",
+  "对外输出名称": "Public output name",
+  "输出类型": "Output type",
+  "保存并校验查询草稿": "Save and validate query draft",
+  "发布查询": "Publish query",
+  "下载查询 OpenAPI": "Download query OpenAPI",
+  "下载查询类型声明": "Download query types",
+  "停用查询": "Withdraw query",
+  "查询操作确认": "Confirm query operation",
+  "原对象属性": "Source property",
+  "对外属性名称": "Public property name"
+};
+const queryText = (cn: string) => {
+  if (queryLocale === 'zh-CN') return cn;
+  if (!(cn in queryEnglish)) throw new Error(`Missing English query expectation: ${cn}`);
+  return queryEnglish[cn];
+};
 const UI_MUTATION = process.env.AURA_OPEN_PLATFORM_UI_MUTATION;
 const sessionStorage = createCookieSessionStorage({
   cookie: {
@@ -444,9 +478,9 @@ test.describe('Dynamic resource publication journey', () => {
 
 test.describe('Dynamic query publication journey', () => {
   test.setTimeout(180_000);
-  test.use({ storageState: { cookies: [], origins: [] }, locale: 'zh-CN', viewport: { width: 1440, height: 1000 } });
+  test.use({ storageState: { cookies: [], origins: [] }, locale: queryLocale, viewport: { width: 1440, height: 1000 } });
   test('pins a real NamedQuery, saves read-only projections, downloads and withdraws through UI', async ({ page }) => {
-    await authenticate(page);
+    await authenticate(page, queryLocale);
     const suffix = String(Date.now()); const modelCode = `dop_q_${suffix}`; const modelName = `查询验证零件 ${suffix}`;
     const queryCode = `dop_named_${suffix}`; const queryName = `区域零件查询 ${suffix}`;
     const sourceCode = `query.parts.${suffix}`; const publicCode = `parts.by-zone.${suffix}`;
@@ -496,9 +530,9 @@ test.describe('Dynamic query publication journey', () => {
       expect(route.request().method()).toBe('GET');
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ code: '0', data: [] }) });
     });
-    await page.getByTestId('publication-editor').getByRole('link', { name: '公共查询发布', exact: true }).click();
+    await page.getByTestId('publication-editor').getByRole('link', { name: queryText("公共查询发布"), exact: true }).click();
     const editor = page.getByTestId('query-publication-editor'); await expect(editor).toBeVisible();
-    await expect(editor).toContainText('尚未公开命名查询'); await expect(editor).not.toContainText(/Page Unavailable|Page not found/);
+    await expect(editor).toContainText(queryText("尚未公开命名查询")); await expect(editor).not.toContainText(/Page Unavailable|Page not found/);
     await snapshot('query-entry');
     await page.unroute('**/api/open-platform/query-publications');
     const realQueryCatalogResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/open-platform/query-publications' && response.request().method() === 'GET');
@@ -507,44 +541,44 @@ test.describe('Dynamic query publication journey', () => {
     const realQueryCatalog = await realQueryCatalogHttp.json(); expect(String(realQueryCatalog.code)).toBe('0');
     expect(Array.isArray(realQueryCatalog.data)).toBe(true);
     expect(realQueryCatalog.data.some((entry: { code: string }) => entry.code === publicCode)).toBe(false);
-    await page.getByRole('button', { name: '新建公共查询', exact: true }).click();
-    await page.getByLabel('公共查询地址', { exact: true }).fill(publicCode);
-    await page.getByLabel('查找命名查询', { exact: true }).fill(queryName); await page.getByRole('button', { name: '查找', exact: true }).click();
-    await expect(page.getByLabel('命名查询来源', { exact: true }).getByRole('option', { name: queryName, exact: true })).toHaveCount(1);
+    await page.getByRole('button', { name: queryText("新建公共查询"), exact: true }).click();
+    await page.getByLabel(queryText("公共查询地址"), { exact: true }).fill(publicCode);
+    await page.getByLabel(queryText("查找命名查询"), { exact: true }).fill(queryName); await page.getByRole('button', { name: queryText("查找"), exact: true }).click();
+    await expect(page.getByLabel(queryText("命名查询来源"), { exact: true }).getByRole('option', { name: queryName, exact: true })).toHaveCount(1);
     const sourceResponse = page.waitForResponse(response => response.url().endsWith(`/query-sources/${queryCode}`) && response.status() === 200);
-    await page.getByLabel('命名查询来源', { exact: true }).selectOption({ label: queryName });
+    await page.getByLabel(queryText("命名查询来源"), { exact: true }).selectOption({ label: queryName });
     const source = await (await sourceResponse).json(); expect(String(source.code)).toBe('0'); expect(source.data.parameters).toEqual(['zone']);
     expect(source.data.fingerprint).toMatch(/^[a-f0-9]{64}$/); expect(source.data.sources[0].resources).toContainEqual({ code: sourceCode, schemaVersion: 1 });
     expect(JSON.stringify(source)).not.toContain('fromSql'); expect(JSON.stringify(source)).not.toContain('columnExpr');
     await snapshot('query-source');
     await page.getByTestId(`query-source-${modelCode}`).getByLabel(modelName, { exact: true }).selectOption(sourceCode);
-    await page.getByLabel('查询执行权限', { exact: true }).fill('dop.q:execute'); await snapshot('query-bindings');
+    await page.getByLabel(queryText("查询执行权限"), { exact: true }).fill('dop.q:execute'); await snapshot('query-bindings');
     const parameter = page.getByTestId('query-parameter-zone');
-    await expect(parameter.getByLabel('参数类型', { exact: true })).toHaveValue('string'); await expect(parameter.getByLabel('必填参数', { exact: true })).toBeChecked();
+    await expect(parameter.getByLabel(queryText("参数类型"), { exact: true })).toHaveValue('string'); await expect(parameter.getByLabel(queryText("必填参数"), { exact: true })).toBeChecked();
     await parameter.scrollIntoViewIfNeeded(); await snapshot('query-parameters');
     for (const [sourceField, label, alias, type] of [['pid', '记录标识', 'pid', 'pid'], ['partName', '零件名称', 'name', 'string'], ['partDetails', '联系信息', 'details', 'object']]) {
       const output = page.getByTestId(`query-output-${sourceField}`); await output.getByLabel(label, { exact: true }).check();
-      await output.getByLabel('对外输出名称', { exact: true }).fill(alias); await output.getByLabel('输出类型', { exact: true }).selectOption(type);
-      if (type === 'object') { await output.getByLabel('原对象属性', { exact: true }).fill('contact_name'); await output.getByLabel('对外属性名称', { exact: true }).fill('contactName'); }
+      await output.getByLabel(queryText("对外输出名称"), { exact: true }).fill(alias); await output.getByLabel(queryText("输出类型"), { exact: true }).selectOption(type);
+      if (type === 'object') { await output.getByLabel(queryText("原对象属性"), { exact: true }).fill('contact_name'); await output.getByLabel(queryText("对外属性名称"), { exact: true }).fill('contactName'); }
     }
-    await expect(editor.getByLabel('可写', { exact: true })).toHaveCount(0);
+    await expect(editor.getByLabel(queryText("可写"), { exact: true })).toHaveCount(0);
     for (const [field, image] of [['partDetails', 'query-output-region'], ['partName', 'query-output-name'], ['pid', 'query-output-pid']]) {
       const output = editor.getByTestId(`query-output-${field}`);
       await output.scrollIntoViewIfNeeded();
       await expect(output).toBeInViewport({ ratio: 1 });
       await output.screenshot({ path: path.join(screenshotRoot, `${image}.png`) });
     }
-    await editor.getByRole('button', { name: '保存并校验查询草稿', exact: true }).locator('..').locator('..').screenshot({ path: path.join(screenshotRoot, 'query-footer-region.png') });
+    await editor.getByRole('button', { name: queryText("保存并校验查询草稿"), exact: true }).locator('..').locator('..').screenshot({ path: path.join(screenshotRoot, 'query-footer-region.png') });
     const savedResponse = page.waitForResponse(response => response.url().endsWith(`/query-publications/${publicCode}/draft`) && response.request().method() === 'PUT');
-    await page.getByRole('button', { name: '保存并校验查询草稿', exact: true }).click();
+    await page.getByRole('button', { name: queryText("保存并校验查询草稿"), exact: true }).click();
     const savedHttp = await savedResponse; expect(savedHttp.status()).toBe(200); const saved = await savedHttp.json(); expect(String(saved.code)).toBe('0');
     expect(saved.data.draft).toMatchObject({ sourceFingerprint: source.data.fingerprint, sourceResources: { [modelCode]: sourceCode }, parameters: { zone: { type: 'string', required: true, nullable: false } } });
     expect(saved.data.draft.fields.details).toMatchObject({ readable: true, writable: false, properties: { contactName: { source: 'contact_name', readable: true, writable: false } } });
-    await expect(editor.getByRole('status')).toContainText('查询草稿已保存并通过来源校验'); await snapshot('query-draft');
-    await page.getByRole('button', { name: '发布查询', exact: true }).click();
-    await page.getByRole('group', { name: '查询操作确认', exact: true }).getByRole('button', { name: '确认', exact: true }).click();
-    await expect(editor.getByRole('status')).toContainText('已发布查询'); await snapshot('query-publish');
-    for (const [button, extension] of [['下载查询 OpenAPI', '.openapi.json'], ['下载查询类型声明', '.d.ts']] as const) {
+    await expect(editor.getByRole('status')).toContainText(queryText("查询草稿已保存并通过来源校验")); await snapshot('query-draft');
+    await page.getByRole('button', { name: queryText("发布查询"), exact: true }).click();
+    await page.getByRole('group', { name: queryText("查询操作确认"), exact: true }).getByRole('button', { name: queryText("确认"), exact: true }).click();
+    await expect(editor.getByRole('status')).toContainText(queryText("已发布查询")); await snapshot('query-publish');
+    for (const [button, extension] of [[queryText("下载查询 OpenAPI"), '.openapi.json'], [queryText("下载查询类型声明"), '.d.ts']] as const) {
       const downloaded = page.waitForEvent('download'); await page.getByRole('button', { name: button, exact: true }).click();
       const artifact = await downloaded; expect(artifact.suggestedFilename()).toBe(publicCode + extension); const location = await artifact.path(); expect(location).toBeTruthy();
       const content = await readFile(location!, 'utf8'); expect(content).toContain('contactName'); expect(content).not.toContain(modelCode); expect(content).not.toContain(queryCode); expect(content).not.toContain('contact_name'); expect(content).not.toContain('dop_q_name');
@@ -552,9 +586,9 @@ test.describe('Dynamic query publication journey', () => {
       else { expect(content).toContain('export type QueryParameters'); expect(content).toContain('export type QueryItem'); }
       await artifact.saveAs(path.join(screenshotRoot, publicCode + extension)); await snapshot(extension === '.openapi.json' ? 'query-openapi' : 'query-types');
     }
-    await page.getByRole('button', { name: '停用查询', exact: true }).click(); const confirmation = page.getByRole('group', { name: '查询操作确认', exact: true });
-    await expect(confirmation).toBeInViewport(); await snapshot('query-withdrawdialog'); await confirmation.getByRole('button', { name: '确认', exact: true }).click();
-    await expect(editor.getByRole('status')).toContainText('查询已停用'); await expect(page.getByRole('button', { name: '下载查询 OpenAPI', exact: true })).toBeDisabled();
+    await page.getByRole('button', { name: queryText("停用查询"), exact: true }).click(); const confirmation = page.getByRole('group', { name: queryText("查询操作确认"), exact: true });
+    await expect(confirmation).toBeInViewport(); await snapshot('query-withdrawdialog'); await confirmation.getByRole('button', { name: queryText("确认"), exact: true }).click();
+    await expect(editor.getByRole('status')).toContainText(queryText("查询已停用")); await expect(page.getByRole('button', { name: queryText("下载查询 OpenAPI"), exact: true })).toBeDisabled();
     const persisted = await page.request.get(`${WEB_BASE_URL}/api/open-platform/query-publications`); expect(persisted.status()).toBe(200);
     const publications = await persisted.json(); expect(String(publications.code)).toBe('0');
     expect(publications.data.find((entry: { code: string }) => entry.code === publicCode)).toMatchObject({ status: 'withdrawn', activeVersion: 1, draftRevision: 1 });
