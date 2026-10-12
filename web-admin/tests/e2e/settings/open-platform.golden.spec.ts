@@ -108,7 +108,7 @@ const sessionStorage = createCookieSessionStorage({
 
 // A supplied acceptance plan is materialized before any browser capture, including all unresolved rows.
 test.beforeAll(async () => {
-  if (UI_MUTATION && !['scope-label-clipping', 'publication-overflow', 'intro-word-break', 'publication-title-locale', 'query-compatibility-feedback', 'query-confirmation-stale'].includes(UI_MUTATION)) throw new Error('Unsupported Open Platform UI mutation');
+  if (UI_MUTATION && !['scope-label-clipping', 'publication-overflow', 'intro-word-break', 'publication-title-locale', 'query-compatibility-feedback', 'query-confirmation-stale', 'major-grant-alias'].includes(UI_MUTATION)) throw new Error('Unsupported Open Platform UI mutation');
   if (['intro-word-break', 'publication-title-locale'].includes(UI_MUTATION || '') && publicationLocale !== 'en-US') throw new Error('English locale mutation requires en-US');
   if (!process.env.AURA_UI_ACCEPTANCE_MATRIX) return;
   if (!process.env.AURA_EVIDENCE_ROOT) throw new Error('UI acceptance requires a registered evidence round');
@@ -720,6 +720,15 @@ test.describe('Dynamic installation authority journey', () => {
       maxPageSize: 20, maxRows: 100, timeoutMs: 5000, maxConcurrent: 2 };
     await human('PUT', `/api/open-platform/query-publications/${queryCode}/draft`, { expectedRevision: 0, definition: query });
     await human('POST', `/api/open-platform/query-publications/${queryCode}/publish`, { expectedRevision: 1 });
+    const majorResourceCode = resourceCode + '.v2'; const majorQueryCode = queryCode + '.v2';
+    const { name: originalName, ...otherResourceFields } = resource.fields;
+    const majorResource = { ...resource, code: majorResourceCode, fields: { ...otherResourceFields, displayName: originalName } };
+    await human('PUT', `/api/open-platform/publications/${majorResourceCode}/draft`, { expectedRevision: 0, definition: majorResource });
+    await human('POST', `/api/open-platform/publications/${majorResourceCode}/publish`, { expectedRevision: 1 });
+    const { name: originalQueryName, ...otherQueryFields } = query.fields;
+    const majorQuery = { ...query, code: majorQueryCode, sourceResources: { [modelCode]: majorResourceCode }, fields: { ...otherQueryFields, displayName: originalQueryName } };
+    await human('PUT', `/api/open-platform/query-publications/${majorQueryCode}/draft`, { expectedRevision: 0, definition: majorQuery });
+    await human('POST', `/api/open-platform/query-publications/${majorQueryCode}/publish`, { expectedRevision: 1 });
     const application = await human('POST', '/api/open-platform/applications', { name: `授权接入应用 ${suffix}`, description: 'Real installation policy journey' });
     const installation = await human('POST', `/api/open-platform/applications/${application.pid}/installations`, { environment: 'staging', scopes: [...scopes, 'dop.grant:query'], rateLimitPerMinute: 600 });
     const credential = await human('POST', `/api/open-platform/installations/${installation.pid}/credentials`);
@@ -731,10 +740,12 @@ test.describe('Dynamic installation authority journey', () => {
     expect((await page.request.post(queryPath, { headers: machineHeaders, data: { parameters: { zone: 'A' }, limit: 10 } })).status()).toBe(403);
     const screenshotRoot = path.join(process.env.AURA_EVIDENCE_ROOT || '/tmp', 'ui-publication-r1', 'screenshots'); await mkdir(screenshotRoot, { recursive: true });
     const snapshot = async (id: string) => { await page.screenshot({ path: path.join(screenshotRoot, `${id}.png`), fullPage: true }); };
-    await page.goto('/settings/api-docs');
+    await page.goto('/'); await openAccountMenu(page); await page.getByTestId('open-platform-link').click();
+    await expect(page.getByTestId('open-platform-page')).toBeVisible();
     const installationCard = page.getByTestId(`open-platform-installation-${installation.pid}`);
     await installationCard.getByRole('button', { name: '数据授权', exact: true }).click();
-    const editor = page.getByTestId('installation-grant-editor'); await expect(editor).toBeVisible(); await snapshot('grant-entry');
+    const editor = page.getByTestId('installation-grant-editor'); await expect(editor).toBeVisible();
+    await expect(editor.getByLabel('授权合同', { exact: true })).toBeEnabled(); await snapshot('grant-entry');
     await editor.getByLabel('授权合同', { exact: true }).selectOption(`resource:${resourceCode}`);
     await expect(editor).toContainText('此安装尚未获此合同的数据授权');
     for (const name of ['列表查询', '详情读取', '创建记录', '修改记录', '删除记录']) await editor.getByLabel(name, { exact: true }).check();
@@ -762,6 +773,87 @@ test.describe('Dynamic installation authority journey', () => {
     await editor.getByRole('button', { name: '保存安装授权', exact: true }).click(); expect((await queryGranted).status()).toBe(200); await expect(editor.getByRole('status').filter({ hasText: '授权已保存' })).toBeVisible();
     const result = await page.request.post(queryPath, { headers: machineHeaders, data: { parameters: { zone: 'A' }, limit: 10 } }); expect(result.status()).toBe(200); expect((await result.json()).items).toEqual([{ pid: recordA.pid, name: 'Allowed A' }]);
     const otherRows = await page.request.post(queryPath, { headers: machineHeaders, data: { parameters: { zone: 'B' }, limit: 10 } }); expect(otherRows.status()).toBe(200); expect((await otherRows.json()).items).toEqual([]);
+    const resourceCatalogPath = `/api/open-platform/installations/${installation.pid}/resources`;
+    const queryCatalogPath = `/api/open-platform/installations/${installation.pid}/queries`;
+    const oldAuthority = async () => ({
+      resource: (await human('GET', resourceCatalogPath)).find((view: { code: string }) => view.code === resourceCode).policy,
+      query: (await human('GET', queryCatalogPath)).find((view: { code: string }) => view.code === queryCode).policy,
+    });
+    const baselineAuthority = await oldAuthority();
+    const baselineRecord = await page.request.get(`${resourcePath}/${recordA.pid}`, { headers: machineHeaders });
+    expect(baselineRecord.status()).toBe(200); const baselineBody = await baselineRecord.json(); const baselineEtag = baselineRecord.headers().etag;
+    expect(baselineBody).toEqual({ pid: recordA.pid, name: 'Allowed A', zone: 'A' }); expect(baselineEtag).toMatch(/^"[^"\r\n]+"$/);
+    const assertOldUnchanged = async () => {
+      expect(await oldAuthority()).toEqual(baselineAuthority);
+      const response = await page.request.get(`${resourcePath}/${recordA.pid}`, { headers: machineHeaders });
+      expect(response.status()).toBe(200); expect(await response.json()).toEqual(baselineBody); expect(response.headers().etag).toBe(baselineEtag);
+      const responseQuery = await page.request.post(queryPath, { headers: machineHeaders, data: { parameters: { zone: 'A' }, limit: 10 } });
+      expect(responseQuery.status()).toBe(200); expect((await responseQuery.json()).items).toEqual([{ pid: recordA.pid, name: 'Allowed A' }]);
+    };
+    const majorResourcePath = `${BACKEND_URL}/api/open/v1/resources/${majorResourceCode}`;
+    const majorQueryPath = `${BACKEND_URL}/api/open/v1/queries/${majorQueryCode}:execute`;
+    const executeMajor = () => page.request.post(majorQueryPath, { headers: machineHeaders, data: { parameters: { zone: 'A' }, limit: 10 } });
+    expect((await page.request.get(`${majorResourcePath}/${recordA.pid}`, { headers: machineHeaders })).status()).toBe(403);
+    expect((await executeMajor()).status()).toBe(403);
+    await editor.getByLabel('授权合同', { exact: true }).selectOption(`resource:${majorResourceCode}`);
+    await expect(editor).toContainText('此安装尚未获此合同的数据授权'); await snapshot('grant-major-ungranted');
+    const grantMajorResource = async () => {
+      await editor.getByLabel('授权合同', { exact: true }).selectOption(`resource:${majorResourceCode}`);
+      for (const operation of ['列表查询', '详情读取']) await editor.getByLabel(operation, { exact: true }).check();
+      for (const alias of ['displayName', 'zone']) await editor.getByLabel(`读取 ${alias}`, { exact: true }).check();
+      if (UI_MUTATION === 'major-grant-alias') await editor.getByLabel('读取 displayName', { exact: true }).uncheck();
+      await expect(editor.getByLabel('读取 displayName', { exact: true })).toBeChecked();
+      await expect(editor.getByLabel('读取 secret', { exact: true })).not.toBeChecked();
+      await editor.getByRole('button', { name: '添加行约束', exact: true }).click();
+      await editor.getByTestId('grant-constraint-0').getByLabel('约束公共字段', { exact: true }).selectOption('zone');
+      await editor.getByTestId('grant-constraint-0').getByLabel('允许值（每行一个）', { exact: true }).fill('A');
+      const response = page.waitForResponse(reply => reply.url().endsWith(`/installations/${installation.pid}/resources/${majorResourceCode}`) && reply.request().method() === 'PUT');
+      await editor.getByRole('button', { name: '保存安装授权', exact: true }).click(); const saved = await response;
+      expect(saved.status()).toBe(200); const savedPolicy = saved.request().postDataJSON();
+      expect({ ...savedPolicy, operations: [...savedPolicy.operations].sort(), readableFields: [...savedPolicy.readableFields].sort() }).toEqual({ operations: ['get', 'list'], readableFields: ['displayName', 'pid', 'zone'], writableFields: [], rowConstraints: [{ field: 'zone', values: ['A'] }] });
+      await expect(editor.getByRole('status').filter({ hasText: '授权已保存' })).toBeVisible();
+    };
+    const revokeMajor = async (kind: 'resource' | 'query', code: string, image?: string) => {
+      await editor.getByLabel('授权合同', { exact: true }).selectOption(`${kind}:${code}`);
+      await editor.getByRole('button', { name: '撤销安装授权', exact: true }).click();
+      const confirmation = editor.getByRole('group', { name: '安装授权操作确认', exact: true });
+      await expect(confirmation).toBeVisible(); if (image) await snapshot(image);
+      const response = page.waitForResponse(reply => reply.url().endsWith(`/installations/${installation.pid}/${kind === 'resource' ? 'resources' : 'queries'}/${code}`) && reply.request().method() === 'DELETE');
+      await confirmation.getByRole('button', { name: '确认', exact: true }).click(); expect((await response).status()).toBe(200);
+      await expect(editor.getByRole('status').filter({ hasText: '授权已撤销' })).toBeVisible();
+    };
+    await grantMajorResource(); await snapshot('grant-major-resource-saved');
+    const majorRecord = await page.request.get(`${majorResourcePath}/${recordA.pid}`, { headers: machineHeaders });
+    expect(majorRecord.status()).toBe(200); expect(await majorRecord.json()).toEqual({ pid: recordA.pid, displayName: 'Allowed A', zone: 'A' });
+    expect((await page.request.get(`${majorResourcePath}/${recordB.pid}`, { headers: machineHeaders })).status()).toBe(404);
+    const deniedMajorWrite = await page.request.post(majorResourcePath, { headers: { ...machineHeaders, 'Idempotency-Key': `major-readonly-denial-${suffix}` }, data: { displayName: 'Denied major write', zone: 'A' } });
+    expect(deniedMajorWrite.status()).toBe(403);
+    expect((await executeMajor()).status()).toBe(403); await assertOldUnchanged();
+    await editor.getByLabel('授权合同', { exact: true }).selectOption(`query:${majorQueryCode}`);
+    await expect(editor).toContainText('已有列表授权');
+    for (const alias of ['pid', 'displayName']) await editor.getByLabel(alias, { exact: true }).check();
+    const majorQueryGranted = page.waitForResponse(reply => reply.url().endsWith(`/installations/${installation.pid}/queries/${majorQueryCode}`) && reply.request().method() === 'PUT');
+    await editor.getByRole('button', { name: '保存安装授权', exact: true }).click(); const grantedQuery = await majorQueryGranted;
+    expect(grantedQuery.status()).toBe(200); const savedQueryPolicy = grantedQuery.request().postDataJSON();
+    expect({ ...savedQueryPolicy, readableFields: [...savedQueryPolicy.readableFields].sort() }).toEqual({ readableFields: ['displayName', 'pid'] });
+    await expect(editor.getByRole('status').filter({ hasText: '授权已保存' })).toBeVisible(); await snapshot('grant-major-query-saved');
+    const majorItems = await executeMajor(); expect(majorItems.status()).toBe(200); expect((await majorItems.json()).items).toEqual([{ pid: recordA.pid, displayName: 'Allowed A' }]);
+    const hiddenMajor = await page.request.post(majorQueryPath, { headers: machineHeaders, data: { parameters: { zone: 'B' }, limit: 10 } });
+    expect(hiddenMajor.status()).toBe(200); expect((await hiddenMajor.json()).items).toEqual([]); await assertOldUnchanged();
+    await revokeMajor('resource', majorResourceCode, 'grant-major-source-revoke-dialog');
+    expect((await executeMajor()).status()).toBe(403); await assertOldUnchanged();
+    await grantMajorResource();
+    const restoredMajorItems = await executeMajor(); expect(restoredMajorItems.status()).toBe(200); expect((await restoredMajorItems.json()).items).toEqual([{ pid: recordA.pid, displayName: 'Allowed A' }]);
+    await snapshot('grant-major-source-restored'); await assertOldUnchanged();
+    await revokeMajor('query', majorQueryCode);
+    expect((await executeMajor()).status()).toBe(403);
+    expect((await human('GET', queryCatalogPath)).find((view: { code: string }) => view.code === majorQueryCode).policy).toBeNull();
+    await snapshot('grant-major-query-revoked'); await assertOldUnchanged();
+    await revokeMajor('resource', majorResourceCode);
+    expect((await page.request.get(`${majorResourcePath}/${recordA.pid}`, { headers: machineHeaders })).status()).toBe(403);
+    expect((await human('GET', resourceCatalogPath)).find((view: { code: string }) => view.code === majorResourceCode).policy).toBeNull();
+    await snapshot('grant-major-resource-revoked'); await assertOldUnchanged();
+    await editor.getByLabel('授权合同', { exact: true }).selectOption(`query:${queryCode}`);
     const intent = { name: 'Created A', zone: 'A' }; const createHeaders = { ...machineHeaders, 'Idempotency-Key': `grant-create-${suffix}` };
     const created = await page.request.post(resourcePath, { headers: createHeaders, data: intent }); expect(created.status()).toBe(201); const row = await created.json(); expect(row).toMatchObject(intent); expect(row.pid).toEqual(expect.any(String)); expect(row).not.toHaveProperty('secret');
     const replay = await page.request.post(resourcePath, { headers: createHeaders, data: intent }); expect(replay.status()).toBe(201); expect(replay.headers()['idempotent-replay']).toBe('true'); expect(await replay.json()).toEqual(row);
