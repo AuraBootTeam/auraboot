@@ -48,6 +48,9 @@ export function OpenApiPublicationEditor() {
     ? label('conflict', '草稿已被其他管理员更新。你的修改已保留，请放弃本地修改后重新选择。', 'Another administrator updated this draft. Your edits are retained; discard them and reopen the resource.')
     : cause instanceof PublicationApiError && cause.status === 403
       ? label('denied', '当前账号没有开放平台管理权限。', 'Your account does not have Open Platform administrator permission.')
+      : cause instanceof PublicationApiError && cause.status === 400 && cause.message.startsWith('Existing public field contract cannot change: ')
+        ? label('incompatibleField', '已发布的资源字段不能修改。请使用新的公共资源地址发布新合同，原合同将保持有效。',
+          'Published resource fields cannot change. Publish a new contract at a new public resource address; the original contract stays active.')
       : cause instanceof Error ? cause.message : label('failed', '请求失败，请重试。', 'Request failed. Please retry.');
   const fail = (cause: unknown) => { setError(errorText(cause)); if (cause instanceof PublicationApiError && cause.status === 403) setDenied(true); };
   const load = async () => {
@@ -98,7 +101,7 @@ export function OpenApiPublicationEditor() {
       setNotice(operation === 'save' ? label('saved', '草稿已保存并通过来源校验。', 'Draft saved and source validation passed.')
         : operation === 'publish' ? label('published', '已发布。第三方仍需安装授权与对应权限。', 'Published. External clients still need installation grants and scopes.')
           : label('withdrawn', '已停用，外部调用与合同下载已关闭。', 'Withdrawn. External calls and contract downloads are closed.'));
-    } catch (cause) { fail(cause); }
+    } catch (cause) { setConfirm(null); fail(cause); }
     finally { setBusy(false); }
   };
   const download = async (kind: 'openapi' | 'types') => {
