@@ -1402,6 +1402,8 @@ def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None, audi
             "retryAfter": header(quota_headers, "Retry-After"), "requestId": header(quota_headers, "X-Request-Id"), "audit": quota_audits[0]}
         record("query-source-row-projection", query_a.get("items") == [{"pid": a["pid"], "name": "Allowed A"}]
                and query_b.get("items") == [] and quota_first.get("items") == query_a.get("items"))
+        report["queryMajorCompatibility"] = run_query_major_probe(
+            request, human, admin, installation["pid"], machine, query_definition, grant_path)
         report["virtualResource"] = run_virtual_resource_probe(request, human, installation["pid"], machine, scopes, definition, a, b)
         if consumer is not None:
             consumer({"clientId": credentials["clientId"], "clientSecret": credentials["clientSecret"],
@@ -1436,8 +1438,6 @@ def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None, audi
         request(row_path, headers=machine, expected=(404,)); record("delete")
         report["resourceMajorCompatibility"] = run_resource_major_probe(
             request, human, admin, installation["pid"], machine, definition, a["pid"])
-        report["queryMajorCompatibility"] = run_query_major_probe(
-            request, human, admin, installation["pid"], machine, query_definition, grant_path)
         human(query_grant_path, "DELETE")
         request(query_path, "POST", body={"parameters": {"zone": "A"}, "limit": 10}, headers=machine, expected=(403,))
         human(grant_path, "DELETE")
