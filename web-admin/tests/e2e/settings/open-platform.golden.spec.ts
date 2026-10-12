@@ -60,6 +60,10 @@ const queryLocale = process.env.AURA_OPEN_PLATFORM_QUERY_LOCALE || 'zh-CN';
 if (!['zh-CN', 'en-US'].includes(queryLocale)) throw new Error('Unsupported query publication locale');
 const queryEnglish: Record<string, string> = {
   "查询已停用": "Query withdrawn",
+  "合同版本": "Schema version",
+  "已发布的查询输出不能修改。请使用新的公共查询地址发布新合同，原合同将保持有效。": "Published query outputs cannot change. Publish a new contract at a new public query address; the original contract stays active.",
+  "关闭编辑": "Close editor",
+  "编辑查询合同": "Edit query contract",
   "公共查询发布": "Public query publications",
   "查找": "Search",
   "可写": "Writable",
@@ -104,7 +108,7 @@ const sessionStorage = createCookieSessionStorage({
 
 // A supplied acceptance plan is materialized before any browser capture, including all unresolved rows.
 test.beforeAll(async () => {
-  if (UI_MUTATION && !['scope-label-clipping', 'publication-overflow', 'intro-word-break', 'publication-title-locale'].includes(UI_MUTATION)) throw new Error('Unsupported Open Platform UI mutation');
+  if (UI_MUTATION && !['scope-label-clipping', 'publication-overflow', 'intro-word-break', 'publication-title-locale', 'query-compatibility-feedback', 'query-confirmation-stale'].includes(UI_MUTATION)) throw new Error('Unsupported Open Platform UI mutation');
   if (['intro-word-break', 'publication-title-locale'].includes(UI_MUTATION || '') && publicationLocale !== 'en-US') throw new Error('English locale mutation requires en-US');
   if (!process.env.AURA_UI_ACCEPTANCE_MATRIX) return;
   if (!process.env.AURA_EVIDENCE_ROOT) throw new Error('UI acceptance requires a registered evidence round');
@@ -524,7 +528,10 @@ test.describe('Dynamic query publication journey', () => {
     const screenshotRoot = path.join(process.env.AURA_EVIDENCE_ROOT || '/tmp', 'ui-publication-r1', 'screenshots');
     await mkdir(screenshotRoot, { recursive: true });
     const snapshot = async (id: string) => { await page.screenshot({ path: path.join(screenshotRoot, `${id}.png`), fullPage: true }); };
-    await page.goto('/p/c/open_platform_publications'); await expect(page.getByTestId('publication-editor')).toBeVisible();
+    await page.goto('/'); await openAccountMenu(page); await page.getByTestId('open-platform-link').click();
+    await expect(page.getByTestId('open-platform-page')).toBeVisible();
+    await page.getByTestId('open-platform-publications-link').click();
+    await expect(page.getByTestId('publication-editor')).toBeVisible();
     // Cover empty state during capture, including repeated mount GETs, then reload the real catalog.
     await page.route('**/api/open-platform/query-publications', async route => {
       expect(route.request().method()).toBe('GET');
@@ -578,6 +585,81 @@ test.describe('Dynamic query publication journey', () => {
     await page.getByRole('button', { name: queryText("发布查询"), exact: true }).click();
     await page.getByRole('group', { name: queryText("查询操作确认"), exact: true }).getByRole('button', { name: queryText("确认"), exact: true }).click();
     await expect(editor.getByRole('status')).toContainText(queryText("已发布查询")); await snapshot('query-publish');
+    const originalDocumentResponse = await page.request.get(`${WEB_BASE_URL}/api/open-platform/query-publications/${publicCode}/openapi`);
+    expect(originalDocumentResponse.status()).toBe(200); const originalDocument = await originalDocumentResponse.json();
+    const nameOutput = editor.getByTestId('query-output-partName');
+    await nameOutput.getByLabel(queryText("对外输出名称"), { exact: true }).fill('displayName');
+    await page.getByLabel(queryText("合同版本"), { exact: true }).fill('2');
+    const breakingSave = page.waitForResponse(response => response.url().endsWith(`/query-publications/${publicCode}/draft`) && response.request().method() === 'PUT');
+    await page.getByRole('button', { name: queryText("保存并校验查询草稿"), exact: true }).click();
+    const breakingSaved = await breakingSave; expect(breakingSaved.status()).toBe(200);
+    const breakingDraft = await breakingSaved.json(); expect(breakingDraft.data).toMatchObject({ activeVersion: 1, draftRevision: 2 });
+    expect(breakingDraft.data.draft.fields.displayName.source).toBe('partName'); expect(breakingDraft.data.draft.fields.name).toBeUndefined();
+    await expect(editor.getByRole('status')).toContainText(queryText("查询草稿已保存并通过来源校验")); await snapshot('query-newdraft');
+    await page.getByRole('button', { name: queryText("发布查询"), exact: true }).click();
+    const incompatibleConfirm = page.getByRole('group', { name: queryText("查询操作确认"), exact: true });
+    await expect(incompatibleConfirm).toBeInViewport(); await snapshot('query-compat-confirm');
+    const incompatibleMarkup = await incompatibleConfirm.evaluate(element => element.outerHTML);
+    const rejectionResponse = page.waitForResponse(response => response.url().endsWith(`/query-publications/${publicCode}/publish`) && response.request().method() === 'POST');
+    await incompatibleConfirm.getByRole('button', { name: queryText("确认"), exact: true }).click();
+    const rejection = await rejectionResponse; expect(rejection.status()).toBe(400);
+    expect(await rejection.json()).toMatchObject({ code: '400', message: 'Existing query output cannot change' });
+    if (UI_MUTATION === 'query-confirmation-stale') {
+      await editor.evaluate((element, markup) => element.insertAdjacentHTML('beforeend', markup), incompatibleMarkup);
+    }
+    await expect(page.getByRole('group', { name: queryText("查询操作确认"), exact: true })).toHaveCount(0);
+    if (UI_MUTATION === 'query-compatibility-feedback') {
+      await editor.getByRole('alert').evaluate(element => { element.textContent = 'Publication succeeded'; });
+    }
+    await expect(editor.getByRole('alert')).toHaveText(queryText("已发布的查询输出不能修改。请使用新的公共查询地址发布新合同，原合同将保持有效。"));
+    await expect(editor.getByRole('alert')).toBeInViewport();
+    await expect(nameOutput.getByLabel(queryText("对外输出名称"), { exact: true })).toHaveValue('displayName');
+    await snapshot('query-compatibility');
+    const afterRejected = await page.request.get(`${WEB_BASE_URL}/api/open-platform/query-publications/${publicCode}/openapi`);
+    expect(afterRejected.status()).toBe(200); expect(await afterRejected.json()).toEqual(originalDocument);
+    // Repair only the draft; the old published snapshot must stay unchanged.
+    await page.getByLabel(queryText("合同版本"), { exact: true }).fill('1');
+    await nameOutput.getByLabel(queryText("对外输出名称"), { exact: true }).fill('name');
+    const repairResponse = page.waitForResponse(response => response.url().endsWith(`/query-publications/${publicCode}/draft`) && response.request().method() === 'PUT');
+    await page.getByRole('button', { name: queryText("保存并校验查询草稿"), exact: true }).click();
+    const repaired = await repairResponse; expect(repaired.status()).toBe(200);
+    expect((await repaired.json()).data).toMatchObject({ activeVersion: 1, draftRevision: 3 });
+    await page.getByRole('button', { name: queryText("关闭编辑"), exact: true }).click();
+    const majorCode = publicCode + '.v2';
+    await page.getByRole('button', { name: queryText("新建公共查询"), exact: true }).click();
+    await page.getByLabel(queryText("公共查询地址"), { exact: true }).fill(majorCode);
+    await page.getByLabel(queryText("查找命名查询"), { exact: true }).fill(queryName);
+    await page.getByRole('button', { name: queryText("查找"), exact: true }).click();
+    await page.getByLabel(queryText("命名查询来源"), { exact: true }).selectOption({ label: queryName });
+    await page.getByTestId(`query-source-${modelCode}`).getByLabel(modelName, { exact: true }).selectOption(sourceCode);
+    await page.getByLabel(queryText("查询执行权限"), { exact: true }).fill('dop.q:execute');
+    for (const [sourceField, label, alias, type] of [['pid', '记录标识', 'pid', 'pid'], ['partName', '零件名称', 'displayName', 'string'], ['partDetails', '联系信息', 'details', 'object']]) {
+      const output = editor.getByTestId(`query-output-${sourceField}`); await output.getByLabel(label, { exact: true }).check();
+      await output.getByLabel(queryText("对外输出名称"), { exact: true }).fill(alias);
+      await output.getByLabel(queryText("输出类型"), { exact: true }).selectOption(type);
+      if (type === 'object') { await output.getByLabel(queryText("原对象属性"), { exact: true }).fill('contact_name'); await output.getByLabel(queryText("对外属性名称"), { exact: true }).fill('contactName'); }
+    }
+    const majorSaveResponse = page.waitForResponse(response => response.url().endsWith(`/query-publications/${majorCode}/draft`) && response.request().method() === 'PUT');
+    await page.getByRole('button', { name: queryText("保存并校验查询草稿"), exact: true }).click();
+    const majorSaved = await majorSaveResponse; expect(majorSaved.status()).toBe(200);
+    expect((await majorSaved.json()).data).toMatchObject({ draftRevision: 1, activeVersion: null });
+    const majorPublishResponse = page.waitForResponse(response => response.url().endsWith(`/query-publications/${majorCode}/publish`) && response.request().method() === 'POST');
+    await page.getByRole('button', { name: queryText("发布查询"), exact: true }).click();
+    await page.getByRole('group', { name: queryText("查询操作确认"), exact: true }).getByRole('button', { name: queryText("确认"), exact: true }).click();
+    const majorPublished = await majorPublishResponse; expect(majorPublished.status()).toBe(200);
+    expect((await majorPublished.json()).data).toMatchObject({ activeVersion: 1, draftRevision: 1, status: 'published' });
+    await expect(editor.getByRole('status')).toContainText(queryText("已发布查询")); await snapshot('query-major-publish');
+    const majorDocumentResponse = await page.request.get(`${WEB_BASE_URL}/api/open-platform/query-publications/${majorCode}/openapi`);
+    expect(majorDocumentResponse.status()).toBe(200); const majorDocument = await majorDocumentResponse.json();
+    expect(majorDocument.paths[`/api/open/v1/queries/${majorCode}:execute`].post).toBeDefined();
+    expect(majorDocument.components.schemas.QueryItem.properties.displayName).toBeDefined();
+    expect(majorDocument.components.schemas.QueryItem.properties.name).toBeUndefined();
+    const oldStillPublished = await page.request.get(`${WEB_BASE_URL}/api/open-platform/query-publications/${publicCode}/openapi`);
+    expect(oldStillPublished.status()).toBe(200); expect(await oldStillPublished.json()).toEqual(originalDocument);
+    await page.getByRole('button', { name: queryText("关闭编辑"), exact: true }).click();
+    await editor.getByRole('listitem').filter({ has: page.getByText(publicCode, { exact: true }) })
+      .getByRole('button', { name: queryText("编辑查询合同"), exact: true }).click();
+    await expect(nameOutput.getByLabel(queryText("对外输出名称"), { exact: true })).toHaveValue('name');
     for (const [button, extension] of [[queryText("下载查询 OpenAPI"), '.openapi.json'], [queryText("下载查询类型声明"), '.d.ts']] as const) {
       const downloaded = page.waitForEvent('download'); await page.getByRole('button', { name: button, exact: true }).click();
       const artifact = await downloaded; expect(artifact.suggestedFilename()).toBe(publicCode + extension); const location = await artifact.path(); expect(location).toBeTruthy();
@@ -591,7 +673,7 @@ test.describe('Dynamic query publication journey', () => {
     await expect(editor.getByRole('status')).toContainText(queryText("查询已停用")); await expect(page.getByRole('button', { name: queryText("下载查询 OpenAPI"), exact: true })).toBeDisabled();
     const persisted = await page.request.get(`${WEB_BASE_URL}/api/open-platform/query-publications`); expect(persisted.status()).toBe(200);
     const publications = await persisted.json(); expect(String(publications.code)).toBe('0');
-    expect(publications.data.find((entry: { code: string }) => entry.code === publicCode)).toMatchObject({ status: 'withdrawn', activeVersion: 1, draftRevision: 1 });
+    expect(publications.data.find((entry: { code: string }) => entry.code === publicCode)).toMatchObject({ status: 'withdrawn', activeVersion: 1, draftRevision: 3 });
     await snapshot('query-withdraw');
   });
 });

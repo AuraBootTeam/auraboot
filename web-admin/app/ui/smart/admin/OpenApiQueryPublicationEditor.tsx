@@ -33,6 +33,9 @@ export function OpenApiQueryPublicationEditor() {
     setError(cause instanceof PublicationApiError && cause.status === 409
       ? label('conflict', '草稿已被其他管理员更新。你的修改已保留，请放弃本地修改后重新打开。', 'Another administrator updated the draft. Your edits are retained; discard them and reopen.')
       : forbidden ? label('denied', '当前账号没有开放平台管理权限。', 'Your account does not have Open Platform administrator permission.')
+        : cause instanceof PublicationApiError && cause.status === 400 && cause.message === 'Existing query output cannot change'
+          ? label('incompatibleOutput', '已发布的查询输出不能修改。请使用新的公共查询地址发布新合同，原合同将保持有效。',
+            'Published query outputs cannot change. Publish a new contract at a new public query address; the original contract stays active.')
         : cause instanceof Error ? cause.message : label('failed', '请求失败，请重试。', 'Request failed. Please retry.'));
   };
   const load = async () => { setLoading(true); setError(''); setDenied(false);
@@ -76,7 +79,7 @@ export function OpenApiQueryPublicationEditor() {
       setNotice(action === 'save' ? label('saved', '查询草稿已保存并通过来源校验。', 'Query draft saved and source validation passed.')
         : action === 'publish' ? label('published', '已发布查询。安装仍需获得查询及所有来源资源的授权。', 'Query published. Installations still need query and every source resource grant.')
           : label('withdrawn', '查询已停用，外部执行与合同下载已关闭。', 'Query withdrawn. External execution and contract downloads are closed.'));
-    } catch (cause) { fail(cause); } finally { setBusy(false); }
+    } catch (cause) { setConfirm(null); fail(cause); } finally { setBusy(false); }
   };
   const download = async (kind: 'openapi' | 'types') => { if (!view) return; setBusy(true); setError('');
     try { const response = await fetch(`/api/open-platform/query-publications/${encodeURIComponent(view.code)}/${kind}`);
