@@ -405,6 +405,7 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
         assertThrows(OpenPlatformTokenService.InvalidClientException.class, () -> tokenService.issue(
                 "client_credentials", credential.clientId(), credential.clientSecret(),
                 "automation.events.write"));
+        verifyDisabledCredentialWritesAreNotFoundAndLeaveStateUnchanged(installation.pid(), credential.credentialPid());
     }
 
     @Test
@@ -426,6 +427,7 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
         var secondToken = tokenService.issue("client_credentials", secondCredential.clientId(),
                 secondCredential.clientSecret(), "openapi.profile.read");
         managementService.disableApplication(application.pid());
+        verifyDisabledCredentialWritesAreNotFoundAndLeaveStateUnchanged(secondInstallation.pid(), secondCredential.credentialPid());
 
         assertNull(authMapper.findToken(secretCodec.sha256(secondToken.accessToken()),
                 OpenPlatformTokenService.AUDIENCE, Instant.now()));
@@ -470,6 +472,35 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
         assertTrue(managementService.listCallAudits(installation.pid(), null, null, 50).isEmpty());
         assertTrue(managementService.listWebhookDeliveries(installation.pid(), null, 50).isEmpty());
         verifyRetentionKeepsValidInstallationData(application.pid(), installation.pid(), rotation.credential());
+    }
+
+    private void verifyDisabledCredentialWritesAreNotFoundAndLeaveStateUnchanged(
+            String installationPid, String credentialPid) {
+        var before = credentialLifecycleState(installationPid);
+        assertTrue(((Number) before.get("credentials")).intValue() > 0);
+        org.junit.jupiter.api.Assertions.assertAll(
+                () -> assertEquals(ResponseCode.NOT_FOUND, assertThrows(BusinessException.class,
+                        () -> managementService.createCredential(installationPid)).getResponseCode()),
+                () -> assertEquals(ResponseCode.NOT_FOUND, assertThrows(BusinessException.class,
+                        () -> managementService.rotateCredential(installationPid, credentialPid,
+                                new RotateCredentialRequest(15))).getResponseCode()),
+                () -> assertEquals(before, credentialLifecycleState(installationPid)));
+    }
+
+    private Map<String, Object> credentialLifecycleState(String installationPid) {
+        Long installationId = jdbcTemplate.queryForObject(
+                "SELECT id FROM ab_application_installation WHERE tenant_id=? AND pid=?",
+                Long.class, getTestTenant().getId(), installationPid);
+        var state = new java.util.LinkedHashMap<String, Object>();
+        state.put("credentials", jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ab_application_credential WHERE installation_id=?", Integer.class, installationId));
+        state.put("credentialHash", jdbcTemplate.queryForObject(
+                "SELECT md5(COALESCE(jsonb_agg(to_jsonb(c) ORDER BY c.id)::text, '[]')) "
+                        + "FROM ab_application_credential c WHERE installation_id=?", String.class, installationId));
+        state.put("tokenHash", jdbcTemplate.queryForObject(
+                "SELECT md5(COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t.id)::text, '[]')) "
+                        + "FROM ab_application_access_token t WHERE installation_id=?", String.class, installationId));
+        return state;
     }
 
     private void verifyRetentionKeepsValidInstallationData(String applicationPid, String installationPid,
