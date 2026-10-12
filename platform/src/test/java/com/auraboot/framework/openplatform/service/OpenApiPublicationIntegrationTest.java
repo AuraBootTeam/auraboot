@@ -134,13 +134,15 @@ class OpenApiPublicationIntegrationTest extends BaseIntegrationTest {
         var installation = management.install(application.pid(), new InstallApplicationRequest("staging", definition.scopes().values().stream()
                 .collect(java.util.stream.Collectors.toSet()), 100));
         Long installationId = installations.findByTenantAndPid(getTestTenant().getId(), installation.pid()).getId();
-        var originalPolicy = new OpenApiInstallationPolicy(Set.of(Operation.GET), Set.of("pid", "name"), Set.of(), List.of());
+        var originalPolicy = new OpenApiInstallationPolicy(Set.of(Operation.GET), Set.of("pid"), Set.of(), List.of());
         publications.grant(installation.pid(), definition.code(), originalPolicy);
         String originalStoredPolicy = mapper.policy(getTestTenant().getId(), installationId, definition.code());
         assertThat(originalStoredPolicy).isNotBlank();
 
+        var majorFields = new LinkedHashMap<>(fields);
+        majorFields.put("displayName", definition.fields().get("name"));
         var major = new OpenApiResourceContract(definition.code() + ".v2", definition.modelCode(), 1,
-                definition.operations(), definition.scopes(), definition.dataPolicy(), fields, 50, 8, 5000, Set.of());
+                definition.operations(), definition.scopes(), definition.dataPolicy(), majorFields, 50, 8, 5000, Set.of());
         publications.saveDraft(major.code(), new OpenApiPublicationService.DraftRequest(0, major));
         assertThat(publications.publish(major.code(), 1).activeVersion()).isEqualTo(1);
         assertThat(publications.active(getTestTenant().getId(), major.code())).contains(major);
@@ -149,7 +151,7 @@ class OpenApiPublicationIntegrationTest extends BaseIntegrationTest {
         assertThatThrownBy(() -> publications.requirePolicy(getTestTenant().getId(), installationId, major))
                 .isInstanceOf(AccessDeniedException.class);
 
-        var majorPolicy = new OpenApiInstallationPolicy(Set.of(Operation.GET), Set.of("pid"), Set.of(), List.of());
+        var majorPolicy = new OpenApiInstallationPolicy(Set.of(Operation.GET), Set.of("pid", "displayName"), Set.of(), List.of());
         publications.grant(installation.pid(), major.code(), majorPolicy);
         assertThat(publications.requirePolicy(getTestTenant().getId(), installationId, major)).isEqualTo(majorPolicy);
         assertThat(publications.requirePolicy(getTestTenant().getId(), installationId, definition)).isEqualTo(originalPolicy);
