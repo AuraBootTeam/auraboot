@@ -315,3 +315,29 @@ describe('executeFetch', () => {
     );
   });
 });
+
+
+describe('executeFetch legacy raw option response boundary', () => {
+  const originalFetch = globalThis.fetch;
+  afterEach(() => { globalThis.fetch = originalFetch; });
+  it.each([[{ value: 'a', label: 'A' }], { items: [] }, { records: [{ value: 'a', label: 'A' }], total: 1 }])(
+    'normalizes only transport-proven HTTP200 raw collections as success: %j', async body => {
+      globalThis.fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { status: 200 }));
+      const result = await executeFetch('http://localhost/api/options', { method: 'get' });
+      expect(result.code).toBe('0');expect(result.success).toBe(true);expect(result.data).toEqual(body);
+    });
+  it.each([{ success: false, items: [] }, { code: '35000', items: [] }, { error: 'Denied', items: [] },
+    { exception: 'InternalException', records: [] }, { items: [], context: { detail: 'Denied' } }, { arbitrary: true }])(
+    'does not promote declared failures or arbitrary objects into raw success: %j', async body => {
+      globalThis.fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { status: 200 }));
+      const result = await executeFetch('http://localhost/api/options', { method: 'get' });
+      expect(result.success).toBe(false);expect(result.code).not.toBe('0');
+    });
+  it('does not infer raw success from an HTTP failure or another status', async () => {
+    for (const status of [201, 400, 403, 500]) {
+      globalThis.fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ items: [] }), { status }));
+      const result = await executeFetch('http://localhost/api/options', { method: 'get' });
+      expect(result.success).toBe(false);expect(result.code).not.toBe('0');
+    }
+  });
+});

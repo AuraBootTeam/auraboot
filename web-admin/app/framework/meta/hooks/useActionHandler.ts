@@ -823,9 +823,11 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                   fetchResult,
                   inputFieldsSubmitLabel,
                   actionRuntimeContext,
+                  { t, locale },
                 );
-              } catch {
-                return;
+              } catch (error) {
+                if (error instanceof ActionCancelledError) return;
+                throw error;
               }
               payload = {
                 ...payload,
@@ -1055,9 +1057,11 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                     ...(runtime?.getContext?.() ?? {}),
                     record: record || context.data,
                   },
+                  { t, locale },
                 );
-              } catch {
-                return;
+              } catch (error) {
+                if (error instanceof ActionCancelledError) return;
+                throw error;
               }
             }
             await executeCommand(actionDef.command, targetRecordPid, payload, 'update');

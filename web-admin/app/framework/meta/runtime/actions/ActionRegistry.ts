@@ -662,12 +662,51 @@ actionRegistry.register('dialog.confirm', async ({ args, confirm: ctxConfirm }) 
  * and `command.execute`'s `inputFields` sugar (which merges them into the command
  * payload). Pre-fetches options for choice fields with dictCode or api/static dataSources.
  */
+type PromptFeedbackContext = Pick<ActionContext, 't' | 'locale'>;
+
+function isLegacyPromptChoices(result: any): boolean {
+  // Existing plugin option endpoints also return raw items/records on HTTP 200.
+  // Direct callers may also provide that raw shape; explicit failures are excluded.
+  const status = result?.httpStatus;
+  return result != null && result.success !== false && String(result.code ?? '').trim() === ''
+    && (status == null || (Number(status) >= 200 && Number(status) < 300))
+    && result.context == null && result.error == null && result.exception == null
+    && !String(result.message ?? '').trim() && !String(result.desc ?? '').trim()
+    && (Array.isArray(result) || Array.isArray(result.items) || Array.isArray(result.records));
+}
+
+async function fetchPromptChoices(
+  fetchResult: NonNullable<ActionContext['fetchResult']>,
+  endpoint: string,
+  options: Record<string, unknown>,
+  feedback: PromptFeedbackContext,
+): Promise<any> {
+  const fallback = translateOrFallback(feedback.t, 'error.data_load_failed',
+    feedback.locale?.toLowerCase().startsWith('zh') ? '数据加载失败，请重试。' : 'Unable to load data. Try again.');
+  let result: any;
+  try {
+    result = await fetchResult(endpoint, options);
+  } catch {
+    // A thrown transport error is diagnostic text, never public business copy.
+    throw new Error(fallback);
+  }
+  if (!result || Number(result.httpStatus) >= 400 || result.success === false
+    || (!ResultHelper.isSuccess(result) && !isLegacyPromptChoices(result))) {
+    const detail = result ? ResultHelper.getErrorDetail(result) : undefined;
+    throw new Error(detail
+      ? resolveCommandErrorMessage({ context: { detail } }, '', feedback.t, feedback.locale, fallback)
+      : fallback);
+  }
+  return result;
+}
+
 export async function promptInputForm(
   fields: Array<Record<string, any> | string>,
   title: any,
   fetchResult?: (url: string, opts: any) => Promise<any>,
   submitLabel?: any,
   runtimeContext: Record<string, unknown> = {},
+  feedback: PromptFeedbackContext = {},
 ): Promise<Record<string, any>> {
   const normalizedFields = fields.map((field) => normalizePromptInputField(field));
   const fieldOptions: Record<
@@ -676,106 +715,96 @@ export async function promptInputForm(
   > = {};
   for (const field of normalizedFields) {
     if (field.dictCode && fetchResult) {
-      try {
-        const result = await fetchResult(
-          `/api/meta/dict/by-code/${encodeURIComponent(String(field.dictCode))}/data`,
-          { method: 'get' },
-        );
-        const resultPayload = (result as any)?.data ?? result;
-        const data = resultPayload as
-          | { items?: Array<Record<string, any>> }
-          | Array<Record<string, any>>;
-        const rawOptions = Array.isArray(data)
-          ? data
-          : Array.isArray(data?.items)
-            ? data.items
+      const result = await fetchPromptChoices(fetchResult,
+        `/api/meta/dict/by-code/${encodeURIComponent(String(field.dictCode))}/data`,
+        { method: 'get' }, feedback,
+      );
+      const resultPayload = (result as any)?.data ?? result;
+      const data = resultPayload as
+        | { items?: Array<Record<string, any>> }
+        | Array<Record<string, any>>;
+      const rawOptions = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.items)
+          ? data.items
+          : [];
+      fieldOptions[field.field] = rawOptions
+        .map((option: any) => {
+          const value = option?.value;
+          const label = option?.label ?? option?.['label:zh-CN'] ?? option?.['label:en'] ?? value;
+          if (value === undefined || value === null) return null;
+          return {
+            value: String(value),
+            label: label && typeof label === 'object' ? label : String(label ?? value),
+            ...(option?.description === undefined || option?.description === null
+              ? {}
+              : { description: option.description }),
+            ...(option?.disabled === true ? { disabled: true } : {}),
+          };
+        })
+        .filter(Boolean) as Array<{
+        label: any;
+        value: string;
+        description?: any;
+        disabled?: boolean;
+      }>;
+    } else if (field.dataSource?.type === 'api' && field.dataSource.endpoint && fetchResult) {
+      const endpoint = String(field.dataSource.endpoint).replace(
+        /\$\{([^}]+)\}/g,
+        (_match, path) => String(readInputPath(runtimeContext, path) ?? ''),
+      );
+      const result = await fetchPromptChoices(fetchResult, endpoint, {
+        method: 'get',
+        ...(field.dataSource.params ? { params: field.dataSource.params } : {}),
+      }, feedback);
+      const valueField = field.dataSource.valueField || 'value';
+      const labelField = field.dataSource.labelField || 'label';
+      const descriptionField = field.dataSource.descriptionField;
+      const resultPayload = (result as any)?.data ?? result;
+      const rawOptions = Array.isArray(resultPayload)
+        ? resultPayload
+        : Array.isArray(resultPayload?.records)
+          ? resultPayload.records
+          : Array.isArray(resultPayload?.items)
+            ? resultPayload.items
             : [];
-        fieldOptions[field.field] = rawOptions
-          .map((option: any) => {
-            const value = option?.value;
-            const label = option?.label ?? option?.['label:zh-CN'] ?? option?.['label:en'] ?? value;
+      fieldOptions[field.field] = rawOptions
+        .map((option: any) => {
+          if (option && typeof option === 'object') {
+            const value = option[valueField] ?? option.value;
+            const label = option[labelField] ?? option.label ?? option.name ?? value;
             if (value === undefined || value === null) return null;
+            const description = descriptionField ? option[descriptionField] : option.description;
             return {
               value: String(value),
               label: label && typeof label === 'object' ? label : String(label ?? value),
-              ...(option?.description === undefined || option?.description === null
+              ...(description === undefined || description === null || description === ''
                 ? {}
-                : { description: option.description }),
-              ...(option?.disabled === true ? { disabled: true } : {}),
+                : {
+                    description:
+                      description && typeof description === 'object'
+                        ? description
+                        : String(description),
+                  }),
+              ...(field.type === 'grouped-multiselect' ? { options: Array.isArray(option.options)
+                ? option.options.filter((choice: any) => choice && typeof choice.value === 'string' && choice.value.trim()
+                    && (typeof choice.label === 'string' || (choice.label && typeof choice.label === 'object')))
+                  .map((choice: any) => ({ value: choice.value, label: choice.label,
+                    ...(choice.disabled === true ? { disabled: true } : {}) })) : [] } : {}),
+              ...(option.disabled === true ? { disabled: true } : {}),
+              ...(field.type === 'grouped-multiselect' && field.props?.defaultValuesField
+                ? { defaultValues: option[field.props.defaultValuesField] } : {}),
             };
-          })
-          .filter(Boolean) as Array<{
-          label: any;
-          value: string;
-          description?: any;
-          disabled?: boolean;
-        }>;
-      } catch (e) {
-        console.error(`[promptInputForm] Failed to fetch dictionary for ${field.field}:`, e);
-        fieldOptions[field.field] = [];
-      }
-    } else if (field.dataSource?.type === 'api' && field.dataSource.endpoint && fetchResult) {
-      try {
-        const endpoint = String(field.dataSource.endpoint).replace(
-          /\$\{([^}]+)\}/g,
-          (_match, path) => String(readInputPath(runtimeContext, path) ?? ''),
-        );
-        const result = await fetchResult(endpoint, {
-          method: 'get',
-          ...(field.dataSource.params ? { params: field.dataSource.params } : {}),
-        });
-        const valueField = field.dataSource.valueField || 'value';
-        const labelField = field.dataSource.labelField || 'label';
-        const descriptionField = field.dataSource.descriptionField;
-        const resultPayload = (result as any)?.data ?? result;
-        const rawOptions = Array.isArray(resultPayload)
-          ? resultPayload
-          : Array.isArray(resultPayload?.records)
-            ? resultPayload.records
-            : Array.isArray(resultPayload?.items)
-              ? resultPayload.items
-              : [];
-        fieldOptions[field.field] = rawOptions
-          .map((option: any) => {
-            if (option && typeof option === 'object') {
-              const value = option[valueField] ?? option.value;
-              const label = option[labelField] ?? option.label ?? option.name ?? value;
-              if (value === undefined || value === null) return null;
-              const description = descriptionField ? option[descriptionField] : option.description;
-              return {
-                value: String(value),
-                label: label && typeof label === 'object' ? label : String(label ?? value),
-                ...(description === undefined || description === null || description === ''
-                  ? {}
-                  : {
-                      description:
-                        description && typeof description === 'object'
-                          ? description
-                          : String(description),
-                    }),
-                ...(field.type === 'grouped-multiselect' ? { options: Array.isArray(option.options)
-                  ? option.options.filter((choice: any) => choice && typeof choice.value === 'string' && choice.value.trim()
-                      && (typeof choice.label === 'string' || (choice.label && typeof choice.label === 'object')))
-                    .map((choice: any) => ({ value: choice.value, label: choice.label,
-                      ...(choice.disabled === true ? { disabled: true } : {}) })) : [] } : {}),
-                ...(option.disabled === true ? { disabled: true } : {}),
-                ...(field.type === 'grouped-multiselect' && field.props?.defaultValuesField
-                  ? { defaultValues: option[field.props.defaultValuesField] } : {}),
-              };
-            }
-            if (option === undefined || option === null) return null;
-            return { value: String(option), label: String(option) };
-          })
-          .filter(Boolean) as Array<{
-          label: any;
-          value: string;
-          description?: any;
-          disabled?: boolean;
-        }>;
-      } catch (e) {
-        console.error(`[promptInputForm] Failed to fetch options for ${field.field}:`, e);
-        fieldOptions[field.field] = [];
-      }
+          }
+          if (option === undefined || option === null) return null;
+          return { value: String(option), label: String(option) };
+        })
+        .filter(Boolean) as Array<{
+        label: any;
+        value: string;
+        description?: any;
+        disabled?: boolean;
+      }>;
     } else if (field.dataSource?.type === 'static') {
       fieldOptions[field.field] = field.dataSource.data || [];
     }
@@ -914,13 +943,13 @@ function readInputPath(source: unknown, path: string): unknown {
  *   }
  * }
  */
-actionRegistry.register('dialog.form', async ({ args, stateManager, scopeId, fetchResult, expressionContext }) => {
+actionRegistry.register('dialog.form', async ({ args, stateManager, scopeId, fetchResult, expressionContext, t, locale }) => {
   if (!args?.fields) {
     console.error('[ActionRegistry] dialog.form: missing fields in args');
     return;
   }
   const formData = await promptInputForm(args.fields, args.title, fetchResult, args.submitLabel,
-    (expressionContext as Record<string, unknown> | undefined) ?? {});
+    (expressionContext as Record<string, unknown> | undefined) ?? {}, { t, locale });
   // Store form values in stateManager under form.{fieldName}
   if (stateManager && scopeId) {
     Object.entries(formData).forEach(([key, value]) => {
@@ -1278,7 +1307,7 @@ actionRegistry.register(
           args?.inputFieldsTitle,
           fetchResult,
           args?.inputFieldsSubmitLabel,
-          (expressionContext as Record<string, unknown> | undefined) ?? {},
+          (expressionContext as Record<string, unknown> | undefined) ?? {}, { t, locale },
         );
       payload = { ...payload, ...collected };
     }

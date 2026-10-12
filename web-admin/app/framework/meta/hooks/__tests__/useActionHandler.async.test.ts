@@ -72,7 +72,7 @@ describe('useActionHandler - offboarding action propagation', () => {
             endpoint: `/api/tenant/members/\${record.pid}/offboarding-candidates?action=${action}`,
           }),
         })]),
-        expect.anything(), expect.anything(), undefined, expect.anything(),
+        expect.anything(), expect.anything(), undefined, expect.anything(), expect.objectContaining({ locale: 'en-US' }),
       );
       expect(fetchResultMock).toHaveBeenCalledTimes(1);
     } finally {
@@ -1797,5 +1797,49 @@ describe('useActionHandler - explicit confirmation style', () => {
     } finally {
       confirm.mockRestore();
     }
+  });
+});
+
+
+describe('useActionHandler dynamic choices fail before submission', () => {
+  const field = { field: 'selection', type: 'select', required: true,
+    dataSource: { type: 'api', endpoint: '/api/example/choices' } };
+  it.each(['command', 'state_transition'])('reports a rejected choice read for %s without executing the command', async type => {
+    fetchResultMock.mockReset();
+    if (type === 'command') fetchResultMock.mockResolvedValueOnce({ code: '0', data: { pid: 'example-1', row_version: 1 } });
+    fetchResultMock.mockResolvedValue({ code: '35000', httpStatus: 400,
+      context: { exception: 'BusinessException', detail: 'Review the classification before continuing.' }, data: null });
+    const showToast = vi.fn();
+    const { result } = renderHook(() => useActionHandler({ runtime: makeRuntime(), navigate: vi.fn() as any,
+      tableName: 'example', locale: 'en-US', t: key => key, showToast }));
+    const dialog = vi.fn((event: Event) => (event as CustomEvent).detail.onCancel());
+    window.addEventListener('dialog:form', dialog);
+    try {
+      await act(async () => { await result.current.handleAction({ code: 'example-update',
+        action: { type, command: 'example:update', inputFields: [field] },
+      } as unknown as ButtonConfig, { pid: 'example-1', row_version: 1 }); });
+      expect(result.current.error).toBe('Review the classification before continuing.');
+      expect(showToast).toHaveBeenCalledWith('Review the classification before continuing.', 'error');
+      expect(dialog).not.toHaveBeenCalled();expect(fetchResultMock).toHaveBeenCalledTimes(type === 'command' ? 2 : 1);
+      expect(fetchResultMock.mock.calls.at(-1)?.[0]).toBe('/api/example/choices');
+      expect(result.current.loading).toBe(false);
+    } finally { window.removeEventListener('dialog:form', dialog); }
+  });
+  it.each(['command', 'state_transition'])('keeps actual dialog cancellation silent for %s', async type => {
+    fetchResultMock.mockReset();
+    if (type === 'command') fetchResultMock.mockResolvedValueOnce({ code: '0', data: { pid: 'example-1', row_version: 1 } });
+    fetchResultMock.mockResolvedValue({ code: '0', data: [] });
+    const showToast = vi.fn();
+    const { result } = renderHook(() => useActionHandler({ runtime: makeRuntime(), navigate: vi.fn() as any,
+      tableName: 'example', locale: 'en-US', t: key => key, showToast }));
+    const cancel = (event: Event) => (event as CustomEvent).detail.onCancel();
+    window.addEventListener('dialog:form', cancel);
+    try {
+      await act(async () => { await result.current.handleAction({ code: 'example-update',
+        action: { type, command: 'example:update', inputFields: [field] },
+      } as unknown as ButtonConfig, { pid: 'example-1', row_version: 1 }); });
+      expect(result.current.error).toBeNull();expect(showToast).not.toHaveBeenCalled();
+      expect(fetchResultMock).toHaveBeenCalledTimes(type === 'command' ? 2 : 1);expect(result.current.loading).toBe(false);
+    } finally { window.removeEventListener('dialog:form', cancel); }
   });
 });

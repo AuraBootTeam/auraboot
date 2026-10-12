@@ -8,7 +8,19 @@
 import { ErrorCodes, type Result } from './types';
 import { ResultHelper } from '~/utils/type';
 
-function normalizeResult<T>(result: Result<T>): Result<T> {
+function normalizeResult<T>(result: Result<T>, httpStatus?: number): Result<T> {
+  // Legacy plugin option endpoints return raw collections on HTTP 200. Admit
+  // that exact transport shape before normalization, never a declared failure.
+  if (httpStatus === 200 && result !== null && typeof result === 'object') {
+    const raw = result as unknown as Record<string, unknown>;
+    const collection = Array.isArray(result) || Array.isArray(raw.items) || Array.isArray(raw.records);
+    const declaredResult = ['code', 'success', 'error', 'errors', 'exception'].some(key => Object.hasOwn(raw, key));
+    if (collection && !declaredResult && raw.context == null
+      && !String(raw.message ?? '').trim() && !String(raw.desc ?? '').trim()) {
+      return { ...result, code: ErrorCodes.SUCCESS, success: true, message: '', desc: '',
+        data: result as unknown as T, context: null };
+    }
+  }
   // Ensure code is always a string — backend may return numeric 0 instead of "0"
   const code = String(result.code ?? '');
   const message = result.message ?? result.desc ?? '';
@@ -91,7 +103,7 @@ export async function executeFetch<T>(url: string, init: RequestInit): Promise<R
     // Parse JSON response
     try {
       const result: Result<T> = await response.json();
-      return normalizeResult(result);
+      return normalizeResult(result, response.status);
     } catch (jsonError) {
       return handleJsonError(jsonError as Error);
     }
