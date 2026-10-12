@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "d9fb6a3ed",
+    "commit": "776e4ad8f",
     "evidenceKind": "static-registration",
     "executed": 0,
     "generator": "scripts/gen-coverage-manifest.mjs"
@@ -3529,6 +3529,32 @@
           "note": "kind=form"
         },
         {
+          "id": "page:open_platform_publications",
+          "action": "open_platform_publications",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/settings/open-platform.golden.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
+          "note": "kind=list"
+        },
+        {
+          "id": "page:open_platform_queries",
+          "action": "open_platform_queries",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/settings/open-platform.golden.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
+          "note": "kind=list"
+        },
+        {
           "id": "page:scheduled_task_detail",
           "action": "scheduled_task_detail",
           "surface": "ui",
@@ -4669,6 +4695,7 @@
           "driver": "browser",
           "evidence": [
             "web-admin/tests/e2e/designer/report-designer-deep.spec.ts",
+            "web-admin/tests/e2e/list-ux/ux-operation-feedback.spec.ts",
             "web-admin/tests/e2e/report-designer-dualwrite-golden.spec.ts"
           ],
           "assertion": "browser test reference registered; execution and assertions not verified",
@@ -6744,7 +6771,7 @@
   "stats": {
     "commands": 257,
     "untested": 173,
-    "pages": 172,
+    "pages": 174,
     "pagesUntested": 107,
     "platformPages": 95,
     "platformPagesUntested": 37

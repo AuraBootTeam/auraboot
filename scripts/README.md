@@ -270,6 +270,8 @@ receiver, requires an invalid-signature mutation to fail, and verifies restorati
 | script | refs | updated | purpose |
 |---|---|---|---|
 | `fixtures/open-platform-consumer/consumer.test.mjs` | 1 | 2026-10-02 | Fourteen consumer contract cases driven by the distribution gate from a fresh out-of-repo installation. |
+| `fixtures/open-platform-consumer/real-backend.mjs` | 1 | 2026-10-13 | Run the fixed thirteen real-backend SDK cases against the verified fresh installation; accept credentials only on private stdin. |
+| `ci/prepare-open-platform-sdk.sh` | 1 | 2026-10-13 | Fresh-build, pack and install the SDK outside the checkout; execute the original fourteen loopback consumers and type positive/expected-error fixture. Never publishes. |
 
 T3 acceptance: `node scripts/oss-remediation-t3-run.mjs --executor /absolute/path/to/aura --runtime OWNED_RUNTIME --database-url jdbc:postgresql://127.0.0.1:5432/OWNED_TEST_DB --database-user TEST_USER --out /absolute/fresh/evidence-directory`. The executor supplies owned dependency homes. The database must already be migrated; this runner never resets or migrates it. `TEST_DATABASE_PASSWORD` is inherited without being recorded. Test skips are reported explicitly; a coverage pass proves the fixed family line target, not execution of skipped scenarios. Gate self-tests: `node --test scripts/check-oss-remediation-t3.test.mjs`.
 

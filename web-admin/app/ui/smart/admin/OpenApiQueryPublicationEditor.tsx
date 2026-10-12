@@ -23,6 +23,7 @@ export function OpenApiQueryPublicationEditor() {
   const [view, setView] = useState<QueryPublicationView>(); const [draft, setDraft] = useState<PublicQuery>(initial);
   const [source, setSource] = useState<QuerySource>(); const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(true); const [sourceLoading, setSourceLoading] = useState(false);
+  const [catalogReady, setCatalogReady] = useState(false);
   const [dirty, setDirty] = useState(false); const [busy, setBusy] = useState(false); const [denied, setDenied] = useState(false);
   const [error, setError] = useState(''); const [notice, setNotice] = useState('');
   const [confirm, setConfirm] = useState<'publish' | 'withdraw' | 'discard' | null>(null);
@@ -38,8 +39,8 @@ export function OpenApiQueryPublicationEditor() {
             'Published query outputs cannot change. Publish a new contract at a new public query address; the original contract stays active.')
         : cause instanceof Error ? cause.message : label('failed', '请求失败，请重试。', 'Request failed. Please retry.'));
   };
-  const load = async () => { setLoading(true); setError(''); setDenied(false);
-    try { setViews(await publicationRequest<QueryPublicationView[]>('/api/open-platform/query-publications')); }
+  const load = async () => { setLoading(true); setCatalogReady(false); setError(''); setDenied(false);
+    try { setViews(await publicationRequest<QueryPublicationView[]>('/api/open-platform/query-publications')); setCatalogReady(true); }
     catch (cause) { fail(cause); } finally { setLoading(false); }
   };
   const loadChoices = async (page = 1) => { const id = ++catalogRequest.current;
@@ -106,7 +107,7 @@ export function OpenApiQueryPublicationEditor() {
         : <div className="space-y-4"><div className="flex flex-wrap justify-between gap-3"><h2 className="text-base font-semibold text-text">{label('catalog', '查询发布目录', 'Query publication catalog')}</h2>
           <div className="flex gap-2"><button type="button" className={BUTTON} disabled={busy || dirty} onClick={() => { setEditing(false); void load(); }}>{label('refresh', '刷新目录', 'Reload catalog')}</button>
             <button type="button" className={BUTTON} disabled={busy || dirty} onClick={() => select()}>{label('new', '新建公共查询', 'New public query')}</button></div></div>
-          {views.length === 0 ? <p className="rounded-card border border-border bg-subtle p-5 text-sm text-text-2">{label('empty', '尚未公开命名查询。保存草稿不会开放外部执行。', 'No NamedQueries are public yet. Saving a draft does not enable external execution.')}</p>
+          {!catalogReady ? null : views.length === 0 ? <p className="rounded-card border border-border bg-subtle p-5 text-sm text-text-2">{label('empty', '尚未公开命名查询。保存草稿不会开放外部执行。', 'No NamedQueries are public yet. Saving a draft does not enable external execution.')}</p>
             : <ul className="divide-y divide-border rounded-card border border-border bg-panel">{views.map(row => <li key={row.code} className="flex items-center justify-between gap-3 p-4"><div><p className="font-medium text-text">{row.code}</p>
               <p className="text-sm text-text-2">{row.status === 'published' ? label('live', '已发布', 'Published') : row.status === 'withdrawn' ? label('disabled', '已停用', 'Withdrawn') : label('draft', '草稿', 'Draft')} · {label('version', '当前发布版本', 'Active version')} {row.activeVersion ?? '—'} · {label('revision', '草稿修订', 'Draft revision')} {row.draftRevision}</p></div>
               <button type="button" className={BUTTON} disabled={busy || dirty} onClick={() => select(row)}>{label('edit', '编辑查询合同', 'Edit query contract')}</button></li>)}</ul>}</div>}

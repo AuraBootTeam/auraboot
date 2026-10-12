@@ -68,6 +68,8 @@ const QUERY_VIEWPORT = process.env.AURA_OPEN_PLATFORM_QUERY_VIEWPORT || 'desktop
 if (!['desktop', 'narrow'].includes(QUERY_VIEWPORT)) throw new Error('Unsupported query publication viewport');
 const queryViewport = QUERY_VIEWPORT === 'narrow' ? { width: 1024, height: 900 } : { width: 1440, height: 1000 };
 const queryEnglish: Record<string, string> = {
+  "正在加载查询发布…": "Loading query publications…",
+  "刷新目录": "Reload catalog",
   "查询已停用": "Query withdrawn",
   "合同版本": "Schema version",
   "已发布的查询输出不能修改。请使用新的公共查询地址发布新合同，原合同将保持有效。": "Published query outputs cannot change. Publish a new contract at a new public query address; the original contract stays active.",
@@ -677,19 +679,38 @@ test.describe('Dynamic query publication journey', () => {
     await expect(page.getByTestId('open-platform-page')).toBeVisible();
     await page.getByTestId('open-platform-publications-link').click();
     await expect(page.getByTestId('publication-editor')).toBeVisible();
-    // Cover empty state during capture, including repeated mount GETs, then reload the real catalog.
+    // Catalog GETs are declared presentation fixtures; all query mutations remain real.
+    let releaseCatalog!: () => void;
+    const catalogGate = new Promise<void>(resolve => { releaseCatalog = resolve; });
     await page.route('**/api/open-platform/query-publications', async route => {
-      expect(route.request().method()).toBe('GET');
+      expect(route.request().method()).toBe('GET'); await catalogGate;
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ code: '0', data: [] }) });
     });
     await page.getByTestId('publication-editor').getByRole('link', { name: queryText("公共查询发布"), exact: true }).click();
+    await expect(page).toHaveURL(new URL('/p/c/open_platform_queries', WEB_BASE_URL).toString());
     const editor = page.getByTestId('query-publication-editor'); await expect(editor).toBeVisible();
+    try {
+      await expect(editor.getByRole('status')).toHaveText(queryText("正在加载查询发布…"));
+      await expect(editor).not.toContainText(queryText("尚未公开命名查询"));
+      await snapshot('query-loading');
+    } finally { releaseCatalog(); }
     await expect(editor).toContainText(queryText("尚未公开命名查询")); await expect(editor).not.toContainText(/Page Unavailable|Page not found/);
     await snapshot('query-entry');
+    await page.unroute('**/api/open-platform/query-publications');
+    const catalogProblem = queryLocale === 'zh-CN' ? '查询目录暂时不可用，请重试。' : 'Query catalog unavailable. Retry.';
+    await page.route('**/api/open-platform/query-publications', async route => {
+      expect(route.request().method()).toBe('GET');
+      await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ code: '503', message: catalogProblem }) });
+    });
+    await editor.getByRole('button', { name: queryText("刷新目录"), exact: true }).click();
+    await expect(editor.getByRole('alert')).toHaveText(catalogProblem);
+    await expect(editor).not.toContainText(queryText("尚未公开命名查询"));
+    await snapshot('query-failure');
     await page.unroute('**/api/open-platform/query-publications');
     const realQueryCatalogResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/open-platform/query-publications' && response.request().method() === 'GET');
     await page.reload();
     const realQueryCatalogHttp = await realQueryCatalogResponse; expect(realQueryCatalogHttp.status()).toBe(200);
+    await expect(editor.getByRole('alert')).toHaveCount(0);
     const realQueryCatalog = await realQueryCatalogHttp.json(); expect(String(realQueryCatalog.code)).toBe('0');
     expect(Array.isArray(realQueryCatalog.data)).toBe(true);
     expect(realQueryCatalog.data.some((entry: { code: string }) => entry.code === publicCode)).toBe(false);
