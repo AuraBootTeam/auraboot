@@ -112,7 +112,7 @@ const sessionStorage = createCookieSessionStorage({
 
 // A supplied acceptance plan is materialized before any browser capture, including all unresolved rows.
 test.beforeAll(async () => {
-  if (UI_MUTATION && !['scope-label-clipping', 'publication-overflow', 'intro-word-break', 'publication-title-locale', 'query-compatibility-feedback', 'query-confirmation-stale', 'major-grant-alias', 'resource-compatibility-feedback', 'resource-confirmation-stale', 'resource-catalog-feedback', 'resource-validation-feedback', 'resource-catalog-empty'].includes(UI_MUTATION)) throw new Error('Unsupported Open Platform UI mutation');
+  if (UI_MUTATION && !['scope-label-clipping', 'publication-overflow', 'intro-word-break', 'publication-title-locale', 'query-compatibility-feedback', 'query-confirmation-stale', 'major-grant-alias', 'resource-compatibility-feedback', 'resource-confirmation-stale', 'resource-catalog-feedback', 'resource-validation-feedback', 'resource-catalog-empty', 'resource-publish-conflict'].includes(UI_MUTATION)) throw new Error('Unsupported Open Platform UI mutation');
   if (['intro-word-break', 'publication-title-locale'].includes(UI_MUTATION || '') && publicationLocale !== 'en-US') throw new Error('English locale mutation requires en-US');
   if (!process.env.AURA_UI_ACCEPTANCE_MATRIX) return;
   if (!process.env.AURA_EVIDENCE_ROOT) throw new Error('UI acceptance requires a registered evidence round');
@@ -314,6 +314,27 @@ test.describe('Dynamic resource publication journey', () => {
     await otherEditor.getByRole('button', { name: publicationText("保存并校验草稿"), exact: true }).click();
     await expect(otherEditor.getByTestId('publication-editor').getByRole('status')).toContainText(publicationText("草稿已保存并通过来源校验"));
     await otherEditor.close();
+    // The still-clean original window must not publish the revision replaced by another editor.
+    await page.getByRole('button', { name: publicationText("发布合同"), exact: true }).click();
+    const stalePublishConfirmation = page.getByRole('group', { name: publicationText("操作确认"), exact: true });
+    await expect(stalePublishConfirmation).toBeVisible();
+    const stalePublishResponse = page.waitForResponse(response => response.url().endsWith(`/publications/${resourceCode}/publish`) && response.request().method() === 'POST');
+    await stalePublishConfirmation.getByRole('button', { name: publicationText("确认"), exact: true }).click();
+    const stalePublish = await stalePublishResponse;
+    expect(stalePublish.status()).toBe(409);
+    expect(stalePublish.request().postDataJSON()).toEqual({ expectedRevision: 1 });
+    expect(String((await stalePublish.json()).code)).toBe('409');
+    await expect(stalePublishConfirmation).toHaveCount(0);
+    const stalePublishAlert = page.getByTestId('publication-editor').getByRole('alert');
+    if (UI_MUTATION === 'resource-publish-conflict') await stalePublishAlert.evaluate(element => { element.textContent = 'Published.'; });
+    await expect(stalePublishAlert).toContainText(publicationText("你的修改已保留"));
+    await expect(page.getByLabel(publicationText("查询超时（毫秒）"), { exact: true })).toHaveValue(String(saved.data.draft.timeoutMs));
+    const afterStalePublish = await page.request.get(`${WEB_BASE_URL}/api/open-platform/publications`);
+    expect(afterStalePublish.status()).toBe(200); const afterStaleCatalog = await afterStalePublish.json();
+    expect(String(afterStaleCatalog.code)).toBe('0');
+    expect(afterStaleCatalog.data.find((entry: { code: string }) => entry.code === resourceCode)).toMatchObject({ activeVersion: null, draftRevision: 2, draft: { timeoutMs: 6000 } });
+    await stalePublishAlert.evaluate(element => element.scrollIntoView({ block: 'center' }));
+    await expect(stalePublishAlert).toBeInViewport({ ratio: 1 }); await snapshot('publication-publish-conflict');
     await page.getByLabel(publicationText("查询超时（毫秒）"), { exact: true }).fill('7000');
     const conflictResponse = page.waitForResponse(response => response.url().endsWith(`/publications/${resourceCode}/draft`) && response.status() === 409);
     await page.getByRole('button', { name: publicationText("保存并校验草稿"), exact: true }).click(); await conflictResponse;
