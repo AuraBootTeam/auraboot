@@ -88,7 +88,7 @@ test.describe('AI Natural Language Modeling', () => {
     await expect(generateBtn).toBeDisabled();
   });
 
-  test.fixme('should fill textarea when clicking example chip', async ({ page }) => {
+  test('should fill textarea when clicking example chip', async ({ page }) => {
     await page.goto('/meta/ai-modeling');
     await page.waitForLoadState('domcontentloaded');
 
