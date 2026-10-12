@@ -97,6 +97,36 @@ assert.doesNotMatch(sampler, /SELECT \*|usename|query,|query AS|client_addr/);
 console.log('open-platform release-image contract: PASS');
 
 // Execute the production expected-red receipt block without a Docker lifecycle.
+const basePull = gate.slice(gate.indexOf("while IFS=$'\\t' read -r base_image expected_image_id; do"),
+  gate.indexOf('PGVECTOR_IMAGE="$(base_ref'));
+assert.ok(basePull.includes('done <<< "$PINNED_BASES"'));
+const baseReference = `docker.io/pgvector/pgvector@sha256:${'b'.repeat(64)}`;
+const expectedImageId = `sha256:${'a'.repeat(64)}`;
+for (const [actualImageId, pullExit] of [[expectedImageId, 0], [`sha256:${'c'.repeat(64)}`, 0], [expectedImageId, 124]]) {
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'open-platform-base-pull-'));
+  try {
+    fs.mkdirSync(path.join(temporary, 'logs'));
+    const result = spawnSync('bash', ['-c', `set -Eeuo pipefail
+fatal() { printf '%s\\n' "$*" >&2; exit 2; }
+timeout() { shift; "$@"; }
+docker() {
+  case "$1" in
+    pull)
+      [[ "$*" == "pull --platform linux/amd64 $EXPECTED_REFERENCE" ]] || return 17
+      return "$PULL_EXIT";;
+    image) printf '%s\\n' "$ACTUAL_IMAGE_ID";;
+    *) return 18;;
+  esac
+}
+${basePull}
+`], {encoding: 'utf8', env: {...process.env, ARTIFACTS: temporary, PULL_TIMEOUT: '120',
+      PINNED_BASES: `${baseReference}\t${expectedImageId}`, EXPECTED_REFERENCE: baseReference,
+      ACTUAL_IMAGE_ID: actualImageId, PULL_EXIT: String(pullExit)}});
+    assert.equal(result.status, actualImageId === expectedImageId && pullExit === 0 ? 0 : 2, result.stderr);
+  } finally { fs.rmSync(temporary, {recursive: true}); }
+}
+console.log('open-platform immutable amd64 base pull: 3 executable cases PASS');
+
 const sourceIdentityCheck = gate.slice(gate.indexOf('[[ "${AURA_CI_SOURCE_SET_DIGEST:-}"'),
   gate.indexOf('[[ "$(uname -s)"'));
 const mutationReceipt = gate.slice(gate.indexOf('if [[ "$DRAINED" != 1 &&'),

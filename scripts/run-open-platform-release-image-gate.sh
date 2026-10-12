@@ -119,7 +119,7 @@ base_ref() {
 PINNED_BASES="$(python3 -c 'import json,sys; rows=json.load(open(sys.argv[1]))["images"]; print("\n".join(row["reference"]+"\t"+row["imageId"] for row in rows))' "$BASE_IMAGE_MANIFEST")" \
   || fatal "invalid frozen base image manifest"
 while IFS=$'\t' read -r base_image expected_image_id; do
-  timeout "$PULL_TIMEOUT" docker pull "$base_image" > "$ARTIFACTS/logs/base-pull-${expected_image_id#sha256:}.log" 2>&1 \
+  timeout "$PULL_TIMEOUT" docker pull --platform linux/amd64 "$base_image" > "$ARTIFACTS/logs/base-pull-${expected_image_id#sha256:}.log" 2>&1 \
     || fatal "bounded pull failed for $base_image; mirror it by immutable digest in the controlled registry"
   [[ "$(docker image inspect "$base_image" --format '{{.Id}}')" == "$expected_image_id" ]] \
     || fatal "pulled image identity differs from frozen manifest: $base_image"
