@@ -28,17 +28,22 @@ import type { Page } from '../../fixtures';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
-// Flow/BPMN designer uses a compact layout below 1600px (palette/inspector collapse
-// behind toggles + a drawer backdrop intercepts canvas clicks). These specs assert the
-// palette/canvas/nodes directly, so run them at the wide layout the designer targets.
-// See FlowDesigner.tsx COMPACT_FLOW_DESIGNER_QUERY '(max-width: 1599px)'.
-test.use({ viewport: { width: 1680, height: 1050 } });
+// Flow/BPMN designer uses a compact layout below 1600px window width AND below a
+// 1440px WORKSPACE width (FlowDesigner ResizeObserver: the palette collapses behind
+// toggles when the editor area minus the sidebar is narrow). With the sidebar open a
+// 1680px window leaves ~1380px of workspace — compact again. 1920px keeps the
+// workspace above the threshold so these palette/canvas assertions see the wide
+// layout the designer targets.
+test.use({ viewport: { width: 1920, height: 1080 } });
 
 // ============================================================
 //  Flow Designer (F4-b)
 // ============================================================
 
 test.describe('Flow Designer (F4-b)', () => {
+  // The palette races can legitimately exceed 15s on a cold worker: the
+  // automation-designer chunk pulls hundreds of vite modules on first load.
+  test.setTimeout(60_000);
   /**
    * F4-E09: Open flow designer - canvas renders
    */
@@ -237,6 +242,10 @@ test.describe('Flow Designer (F4-b)', () => {
 
 test.describe('BPMN Designer (F4-c)', () => {
   async function openBPMNDesigner(page: Page): Promise<boolean> {
+    // The route is absent from the OSS core runtime: the dynamic-route guard
+    // renders "Menu configuration not found" within a second or two. Keep the
+    // probe well under the 15s default test timeout — a 20s race here dies as
+    // a timeout failure instead of resolving to a skip.
     await page.goto('/bpmn-designer', { waitUntil: 'domcontentloaded' });
 
     const headingLocator = page.locator('[data-testid="bpmn-page-title"]');
@@ -245,11 +254,11 @@ test.describe('BPMN Designer (F4-c)', () => {
     const result = await Promise.race([
       headingLocator
         .first()
-        .waitFor({ timeout: 20_000 })
+        .waitFor({ timeout: 6_000 })
         .then(() => 'content' as const),
       loginLocator
         .first()
-        .waitFor({ timeout: 20_000 })
+        .waitFor({ timeout: 6_000 })
         .then(() => 'login' as const),
     ]).catch(() => 'timeout' as const);
 
