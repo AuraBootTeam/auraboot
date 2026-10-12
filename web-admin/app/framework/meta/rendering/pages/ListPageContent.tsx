@@ -179,6 +179,41 @@ interface ListLoadDataParams {
   filters?: Record<string, any>;
   sorts?: SortConfig[];
   chipFilters?: ViewFilterConfig[];
+  retryRequest?: ListApiReadRequest;
+}
+
+interface ListApiReadRequest {
+  endpoint: string;
+  method: 'get' | 'post' | 'put' | 'delete' | 'patch' | 'options';
+  queryParams: Record<string, any>;
+}
+
+/** Keep only the newest API read failure; authentication stays with the caller. */
+export function useListApiReadRetry() {
+  const failedRequestRef = useRef<ListApiReadRequest | null>(null);
+  const clearFailure = useCallback(() => { failedRequestRef.current = null; }, []);
+  const getFailedRequest = useCallback(() => (
+    failedRequestRef.current ? structuredClone(failedRequestRef.current) : null
+  ), []);
+  const read = useCallback(async <T extends { code: string | number; data?: unknown },>(
+    request: ListApiReadRequest,
+    isLatest: () => boolean,
+    fetch: (request: ListApiReadRequest) => Promise<T>,
+  ): Promise<T> => {
+    const sealedRequest = structuredClone(request);
+    try {
+      const result = await fetch(structuredClone(sealedRequest));
+      if (isLatest()) {
+        failedRequestRef.current = ResultHelper.isSuccess(result) && result.data
+          ? null : sealedRequest;
+      }
+      return result;
+    } catch (error) {
+      if (isLatest()) failedRequestRef.current = sealedRequest;
+      throw error;
+    }
+  }, []);
+  return { read, getFailedRequest, clearFailure };
 }
 
 /** Keyword searches reuse submitted filters, never pending filter-form edits. */
@@ -1238,6 +1273,12 @@ function ListPageContentInner(props: PageContentProps) {
     urlFilters,
   );
 
+  const {
+    read: readApiRequest,
+    getFailedRequest: getFailedApiRequest,
+    clearFailure: clearApiReadFailure,
+  } = useListApiReadRetry();
+
   // Synchronous ref update ensures loadData always reads the latest keyword
   // even when called in the same event cycle as a state update (e.g., Playwright fill + Enter)
   const setKeyword = useCallback(
@@ -2232,6 +2273,7 @@ function ListPageContentInner(props: PageContentProps) {
         return;
       }
 
+      clearApiReadFailure();
       try {
         setLoading(true);
         setError(null);
@@ -2240,9 +2282,10 @@ function ListPageContentInner(props: PageContentProps) {
         let endpoint: string;
         let method: 'get' | 'post' | 'put' | 'delete' | 'patch' | 'options' = 'get';
         const isApiDatasource = schema.dataSource?.type === 'api' && schema.dataSource.endpoint;
+        const retryRequest = isApiDatasource ? params?.retryRequest : undefined;
         if (isApiDatasource) {
-          endpoint = schema.dataSource!.endpoint!;
-          method = (schema.dataSource!.method as typeof method) || 'get';
+          endpoint = retryRequest?.endpoint ?? schema.dataSource!.endpoint!;
+          method = retryRequest?.method ?? ((schema.dataSource!.method as typeof method) || 'get');
         } else {
           // Use schema.modelCode for API endpoint when available (supports NQ-backed pages
           // where URL tableName differs from actual model, e.g., /p/crm-my-tasks → crm_activity_common)
@@ -2254,92 +2297,108 @@ function ListPageContentInner(props: PageContentProps) {
         // Pending filter-form edits do not participate in keyword-only searches.
         if (params?.filters !== undefined) rememberSubmittedFilters(params.filters);
 
-        const requestedPageNum = (params?.page ?? pagination.current - 1) + 1;
-        const requestedPageSize = params?.size ?? pagination.pageSize;
+        const requestedPageNum = retryRequest
+          ? Number(retryRequest.queryParams.page) + 1
+          : (params?.page ?? pagination.current - 1) + 1;
+        const requestedPageSize = retryRequest
+          ? Number(retryRequest.queryParams.size)
+          : params?.size ?? pagination.pageSize;
         const requestedPageZeroBased = Math.max(requestedPageNum - 1, 0);
         const requestedSorts = params?.sorts ?? activeSorts;
-        lastScheduledSortFilterValuesRef.current = {
-          activeSorts: requestedSorts,
-          chipFilters: params?.chipFilters ?? chipFiltersRef.current,
-        };
-        const queryParams: Record<string, any> = {};
-
-        if (isApiDatasource) {
-          queryParams.page = requestedPageZeroBased;
-          queryParams.size = requestedPageSize;
-        } else {
-          queryParams.pageNum = requestedPageNum;
-          queryParams.pageSize = requestedPageSize;
-          if (auditUserDisplayFields) {
-            queryParams.auditUserDisplayFields = auditUserDisplayFields;
-          }
+        if (!retryRequest) {
+          lastScheduledSortFilterValuesRef.current = {
+            activeSorts: requestedSorts,
+            chipFilters: params?.chipFilters ?? chipFiltersRef.current,
+          };
         }
+        const queryParams: Record<string, any> = retryRequest
+          ? structuredClone(retryRequest.queryParams) : {};
 
-        if (isApiDatasource) {
-          // For API datasources, pass filter values as individual query params
-          if (params?.filters) {
-            for (const [key, value] of Object.entries(params.filters)) {
-              if (value == null || value === '') continue;
-              // Handle date range objects { start, end }
-              if (typeof value === 'object' && ('start' in value || 'end' in value)) {
-                if (value.start) queryParams[`${key}_start`] = String(value.start);
-                if (value.end) queryParams[`${key}_end`] = String(value.end);
-              } else {
-                queryParams[key] = String(value);
-              }
+        if (!retryRequest) {
+          if (isApiDatasource) {
+            queryParams.page = requestedPageZeroBased;
+            queryParams.size = requestedPageSize;
+          } else {
+            queryParams.pageNum = requestedPageNum;
+            queryParams.pageSize = requestedPageSize;
+            if (auditUserDisplayFields) {
+              queryParams.auditUserDisplayFields = auditUserDisplayFields;
             }
           }
-          if (requestedSorts.length === 1) {
-            queryParams.sortField = requestedSorts[0].fieldCode;
-            queryParams.sortOrder = requestedSorts[0].direction;
-          } else if (tableBlock?.defaultSort?.field) {
-            queryParams.sortField = tableBlock.defaultSort.field;
-            queryParams.sortOrder = String(tableBlock.defaultSort.order || 'desc').toLowerCase();
+
+          if (isApiDatasource) {
+            // For API datasources, pass filter values as individual query params
+            if (params?.filters) {
+              for (const [key, value] of Object.entries(params.filters)) {
+                if (value == null || value === '') continue;
+                // Handle date range objects { start, end }
+                if (typeof value === 'object' && ('start' in value || 'end' in value)) {
+                  if (value.start) queryParams[`${key}_start`] = String(value.start);
+                  if (value.end) queryParams[`${key}_end`] = String(value.end);
+                } else {
+                  queryParams[key] = String(value);
+                }
+              }
+            }
+            if (requestedSorts.length === 1) {
+              queryParams.sortField = requestedSorts[0].fieldCode;
+              queryParams.sortOrder = requestedSorts[0].direction;
+            } else if (tableBlock?.defaultSort?.field) {
+              queryParams.sortField = tableBlock.defaultSort.field;
+              queryParams.sortOrder = String(tableBlock.defaultSort.order || 'desc').toLowerCase();
+            }
+          } else {
+            // For standard dynamic tables, use JSON filters array
+            const tabCondition = getTabFilter();
+            const filtersParam = buildFiltersParam(
+              tabCondition,
+              params?.filters,
+              params?.chipFilters ?? chipFiltersRef.current,
+            );
+            if (filtersParam) {
+              queryParams.filters = filtersParam;
+            }
+            // Use active sorts (user-driven) > SavedView sorts > DSL defaultSort
+            // Multi-field sort: use sortFields param (field:direction pairs) when >1 sort
+            if (requestedSorts.length > 1) {
+              queryParams.sortFields = requestedSorts
+                .map((s) => `${s.fieldCode}:${s.direction}`)
+                .join(',');
+            } else if (requestedSorts.length === 1) {
+              queryParams.sortField = requestedSorts[0].fieldCode;
+              queryParams.sortOrder = requestedSorts[0].direction;
+            } else if (tableBlock?.defaultSort?.field) {
+              queryParams.sortField = tableBlock.defaultSort.field;
+              queryParams.sortOrder = String(tableBlock.defaultSort.order || 'desc').toLowerCase();
+            }
           }
-        } else {
-          // For standard dynamic tables, use JSON filters array
-          const tabCondition = getTabFilter();
-          const filtersParam = buildFiltersParam(
-            tabCondition,
-            params?.filters,
-            params?.chipFilters ?? chipFiltersRef.current,
-          );
-          if (filtersParam) {
-            queryParams.filters = filtersParam;
+
+          // Pass keyword search to backend (supported by DynamicController)
+          // Use ref to get latest value — avoids stale closure when Enter triggers
+          // in the same React cycle as the keyword state update
+          const currentKeyword = keywordRef.current;
+          if (currentKeyword.trim()) {
+            queryParams.keyword = currentKeyword.trim();
           }
-          // Use active sorts (user-driven) > SavedView sorts > DSL defaultSort
-          // Multi-field sort: use sortFields param (field:direction pairs) when >1 sort
-          if (requestedSorts.length > 1) {
-            queryParams.sortFields = requestedSorts
-              .map((s) => `${s.fieldCode}:${s.direction}`)
-              .join(',');
-          } else if (requestedSorts.length === 1) {
-            queryParams.sortField = requestedSorts[0].fieldCode;
-            queryParams.sortOrder = requestedSorts[0].direction;
-          } else if (tableBlock?.defaultSort?.field) {
-            queryParams.sortField = tableBlock.defaultSort.field;
-            queryParams.sortOrder = String(tableBlock.defaultSort.order || 'desc').toLowerCase();
+
+          // When page uses namedQuery data source, pass queryCode to backend
+          if (namedQueryCode) {
+            queryParams.queryCode = namedQueryCode;
           }
+
         }
 
-        // Pass keyword search to backend (supported by DynamicController)
-        // Use ref to get latest value — avoids stale closure when Enter triggers
-        // in the same React cycle as the keyword state update
-        const currentKeyword = keywordRef.current;
-        if (currentKeyword.trim()) {
-          queryParams.keyword = currentKeyword.trim();
-        }
-
-        // When page uses namedQuery data source, pass queryCode to backend
-        if (namedQueryCode) {
-          queryParams.queryCode = namedQueryCode;
-        }
-
-        const result = await fetchResult<PaginationResult<DynamicEntity>>(endpoint, {
-          method,
-          params: queryParams,
-          token: token || undefined,
-        });
+        const fetchCurrentActorRequest = (request: ListApiReadRequest) => (
+          fetchResult<PaginationResult<DynamicEntity>>(request.endpoint, {
+            method: request.method,
+            params: request.queryParams,
+            token: token || undefined,
+          })
+        );
+        const request = { endpoint, method, queryParams };
+        const result = isApiDatasource
+          ? await readApiRequest(request, isLatestRequest, fetchCurrentActorRequest)
+          : await fetchCurrentActorRequest(request);
 
         // A newer loadData was issued while this request was in flight — this
         // response (and its pagination) is stale; drop it instead of letting
@@ -2402,6 +2461,8 @@ function ListPageContentInner(props: PageContentProps) {
       tableName,
       token,
       rememberSubmittedFilters,
+      readApiRequest,
+      clearApiReadFailure,
       pagination.current,
       pagination.pageSize,
       getTabFilter,
@@ -4928,7 +4989,10 @@ function ListPageContentInner(props: PageContentProps) {
         retryLabel={getLocalizedText({ 'zh-CN': '重试', en: 'Retry' }, locale, t)}
         onRetry={() => {
           setError(null);
-          void loadData({ page: pagination.current - 1, size: pagination.pageSize, filters });
+          const retryRequest = getFailedApiRequest();
+          void loadData(retryRequest
+            ? { retryRequest }
+            : { page: pagination.current - 1, size: pagination.pageSize, filters });
         }}
       />
     );
