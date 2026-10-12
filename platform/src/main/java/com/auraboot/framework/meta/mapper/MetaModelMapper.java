@@ -149,6 +149,16 @@ public interface MetaModelMapper extends BaseMapper<Model> {
     Model findCurrentByCode(@Param("code") String code);
 
     /**
+     * Explicit-tenant variant: the tenant condition is a bound parameter rather
+     * than the tenant-line interceptor, so resolution stays deterministic on
+     * background threads whose pooled connection may carry a stale session
+     * tenant (observed: plugin scheduler threads resolving models for the
+     * wrong tenant). Callers pass MetaContext.getCurrentTenantId().
+     */
+    @Select("SELECT * FROM ab_meta_model WHERE tenant_id = #{tenantId} AND code = #{code} AND is_current = TRUE AND deleted_flag = false")
+    Model findCurrentByCodeForTenant(@Param("tenantId") Long tenantId, @Param("code") String code);
+
+    /**
      * 根据租户ID和模型编码查询指定版本模型
      * @param tenantId 租户ID
        
