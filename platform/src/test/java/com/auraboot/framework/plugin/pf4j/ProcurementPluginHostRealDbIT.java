@@ -817,6 +817,117 @@ class ProcurementPluginHostRealDbIT {
         assertEquals(1,creates.get());assertExecutionReservationUnchanged(fixture,"succeeded");
     }
 
+    private record DualExecutionFixture(String source,String firstQuote,String secondQuote,String firstExecution,String secondExecution,Map<String,Object> protectedFacts) {}
+    private DualExecutionFixture allocatedDualExecutionFixture() {
+        var first=savedNativeQuote();var tx=new TransactionTemplate(transactions);
+        var formal=(Map<?,?>)tx.execute(status->scope("qo_procurement_quote_common:submit",
+                ()->quoteAt(first.clock(),"submit",first.quote(),Map.of("revision",1))));
+        var second=secondNativeSupplierOffer(first);
+        scope("qo_procurement_task_common:dispatch",()->{openFixtureTask();return null;});
+        var selected=List.of(Map.<String,Object>of("quotePid",first.quote(),"sourcePid",first.source(),"submissionPid",formal.get("submissionPid"),"quantity","200.000001"),
+                Map.<String,Object>of("quotePid",second.quote(),"sourcePid",first.source(),"submissionPid",second.submission(),"quantity","100"));
+        tx.execute(status->scope("qo_procurement_task_common:allocate",()->allocateNative(Map.of(
+                "sourceDemands",List.of(Map.of("sourcePid",first.source(),"sourceRevision",0,"quantity","300.000001")),"allocations",selected))));
+        return scope(EXECUTE_ORDER,()->{
+            var allocations=nativeRows("qo_procurement_allocation_common","qo_pr_allocation_task_pid",task);
+            var executions=nativeRows("qo_procurement_execution_common","qo_pr_execution_task_pid",task);
+            assertEquals(2,allocations.size());assertEquals(2,executions.size());
+            assertEquals(2,executions.stream().map(e->e.get("qo_pr_execution_supplier_pid")).distinct().count());
+            assertEquals(2,executions.stream().map(e->e.get("qo_pr_execution_execution_marker")).distinct().count());
+            for(var execution:executions) assertEquals("pending",execution.get("qo_pr_execution_state"));
+            String firstPid=(String)allocations.stream().filter(a->first.quote().equals(a.get("qo_pr_allocation_quote_pid"))).findFirst().orElseThrow().get("qo_pr_allocation_execution_pid");
+            String secondPid=(String)allocations.stream().filter(a->second.quote().equals(a.get("qo_pr_allocation_quote_pid"))).findFirst().orElseThrow().get("qo_pr_allocation_execution_pid");
+            assertNotEquals(firstPid,secondPid);
+            assertNativeQuantity("pr_purchase_request",first.source(),"qo_pr_source_reserved_qty","300.000001");
+            return new DualExecutionFixture(first.source(),first.quote(),second.quote(),firstPid,secondPid,
+                    dualExecutionProtectedFacts(first.source(),first.quote(),second.quote()));
+        });
+    }
+    private Map<String,Object> dualExecutionProtectedFacts(String sourcePid,String firstQuote,String secondQuote) {
+        return Map.of("first",executionProtectedFacts(sourcePid,firstQuote),"second",executionProtectedFacts(sourcePid,secondQuote));
+    }
+    private void assertDualExecutionIsolation(DualExecutionFixture fixture,Map<String,Object> successfulLedger,String secondState) {
+        scope(EXECUTE_ORDER,()->{
+            assertEquals(successfulLedger,db.getById("qo_procurement_execution_common",fixture.firstExecution()));
+            assertEquals("succeeded",successfulLedger.get("qo_pr_execution_state"));
+            var secondLedger=db.getById("qo_procurement_execution_common",fixture.secondExecution());
+            assertEquals(secondState,secondLedger.get("qo_pr_execution_state"));
+            if(secondState.equals("succeeded")) {
+                assertFalse(((String)secondLedger.get("qo_pr_execution_erp_order_id")).isBlank());
+                assertNotEquals(successfulLedger.get("qo_pr_execution_erp_order_id"),secondLedger.get("qo_pr_execution_erp_order_id"));
+                assertNotEquals(successfulLedger.get("qo_pr_execution_erp_bill_no"),secondLedger.get("qo_pr_execution_erp_bill_no"));
+            }
+            assertEquals(fixture.protectedFacts(),dualExecutionProtectedFacts(fixture.source(),fixture.firstQuote(),fixture.secondQuote()));
+            assertNativeQuantity("pr_purchase_request",fixture.source(),"qo_pr_source_reserved_qty","300.000001");
+            assertEquals(2,nativeRows("qo_procurement_execution_common","qo_pr_execution_task_pid",task).size());return null;
+        });
+    }
+    private void assertGatewayOwnAllocation(Object[] args,String executionPid) {
+        var rows=(List<Map<String,Object>>)args[1];assertEquals(1,rows.size());
+        assertEquals(executionPid,rows.getFirst().get("qo_pr_allocation_execution_pid"));
+        assertFalse(((String)args[0]).isBlank());
+        assertEquals(db.getById("qo_procurement_execution_common",executionPid).get("qo_pr_execution_execution_marker"),args[0]);
+    }
+    /** Two independent service calls, not a new bulk-order API or customer ERP acceptance. */
+    @Test void nativeSuccessfulExecutionSurvivesOtherSupplierFailureAndIndependentRetry() {
+        var fixture=allocatedDualExecutionFixture();var firstCreates=new java.util.concurrent.atomic.AtomicInteger();
+        var secondCreates=new java.util.concurrent.atomic.AtomicInteger();var bridge=new IndependentTransactionAccessorImpl(transactions,data);
+        var firstService=nativeExecutionService(bridge,(method,args)->{
+            assertEquals("create",method);assertGatewayOwnAllocation(args,fixture.firstExecution());firstCreates.incrementAndGet();
+            return executionResult("succeeded","first-order-"+provider,"FIRST-"+provider,"");
+        });
+        var secondService=nativeExecutionService(bridge,(method,args)->{
+            assertEquals("create",method);assertGatewayOwnAllocation(args,fixture.secondExecution());
+            return secondCreates.incrementAndGet()==1?executionResult("failed","","","SYNTHETIC_SUPPLIER_FAILURE")
+                    :executionResult("succeeded","second-order-"+provider,"SECOND-"+provider,"");
+        });
+        scope(EXECUTE_ORDER,()->executeNativeOrder(firstService,fixture.firstExecution()));
+        var successful=scope(EXECUTE_ORDER,()->db.getById("qo_procurement_execution_common",fixture.firstExecution()));
+        assertEquals("first-order-"+provider,successful.get("qo_pr_execution_erp_order_id"));
+        assertDualExecutionIsolation(fixture,successful,"pending");
+        scope(EXECUTE_ORDER,()->executeNativeOrder(secondService,fixture.secondExecution()));
+        assertDualExecutionIsolation(fixture,successful,"failed");assertEquals(1,secondCreates.get());
+        scope(EXECUTE_ORDER,()->executeNativeOrder(firstService,fixture.firstExecution()));
+        assertEquals(1,firstCreates.get());assertDualExecutionIsolation(fixture,successful,"failed");
+        scope(EXECUTE_ORDER,()->executeNativeOrder(secondService,fixture.secondExecution()));
+        assertEquals(2,secondCreates.get());assertDualExecutionIsolation(fixture,successful,"succeeded");
+        scope(EXECUTE_ORDER,()->executeNativeOrder(firstService,fixture.firstExecution()));
+        scope(EXECUTE_ORDER,()->executeNativeOrder(secondService,fixture.secondExecution()));
+        assertEquals(1,firstCreates.get());assertEquals(2,secondCreates.get());assertDualExecutionIsolation(fixture,successful,"succeeded");
+    }
+    @Test void nativeSuccessfulExecutionSurvivesOtherSupplierUnknownAndLookupRecovery() {
+        var fixture=allocatedDualExecutionFixture();var firstCreates=new java.util.concurrent.atomic.AtomicInteger();
+        var secondCreates=new java.util.concurrent.atomic.AtomicInteger();var lookups=new java.util.concurrent.atomic.AtomicInteger();
+        var resolved=new java.util.concurrent.atomic.AtomicBoolean();var bridge=new IndependentTransactionAccessorImpl(transactions,data);
+        var firstService=nativeExecutionService(bridge,(method,args)->{
+            assertEquals("create",method);assertGatewayOwnAllocation(args,fixture.firstExecution());firstCreates.incrementAndGet();
+            return executionResult("succeeded","first-order-"+provider,"FIRST-"+provider,"");
+        });
+        var secondService=nativeExecutionService(bridge,(method,args)->{
+            if(method.equals("create")){assertGatewayOwnAllocation(args,fixture.secondExecution());secondCreates.incrementAndGet();throw new IllegalStateException("synthetic second-supplier timeout");}
+            assertEquals("lookup",method);lookups.incrementAndGet();
+            assertEquals(db.getById("qo_procurement_execution_common",fixture.secondExecution()).get("qo_pr_execution_execution_marker"),args[0]);
+            return resolved.get()?executionResult("succeeded","found-second-order-"+provider,"FOUND-SECOND-"+provider,"")
+                    :executionResult("failed","","","SYNTHETIC_LOOKUP_FAILURE");
+        });
+        scope(EXECUTE_ORDER,()->executeNativeOrder(firstService,fixture.firstExecution()));
+        var successful=scope(EXECUTE_ORDER,()->db.getById("qo_procurement_execution_common",fixture.firstExecution()));
+        assertEquals("first-order-"+provider,successful.get("qo_pr_execution_erp_order_id"));
+        assertEquals("synthetic second-supplier timeout",assertThrows(IllegalStateException.class,()->new TransactionTemplate(transactions).execute(
+                status->scope(EXECUTE_ORDER,()->executeNativeOrder(secondService,fixture.secondExecution())))).getMessage());
+        assertDualExecutionIsolation(fixture,successful,"unknown");
+        scope(EXECUTE_ORDER,()->executeNativeOrder(firstService,fixture.firstExecution()));
+        assertEquals(1,firstCreates.get());assertDualExecutionIsolation(fixture,successful,"unknown");
+        scope(EXECUTE_ORDER,()->executeNativeOrder(secondService,fixture.secondExecution()));
+        assertEquals(1,secondCreates.get());assertEquals(1,lookups.get());assertDualExecutionIsolation(fixture,successful,"unknown");
+        resolved.set(true);scope(EXECUTE_ORDER,()->executeNativeOrder(secondService,fixture.secondExecution()));
+        assertEquals(1,secondCreates.get());assertEquals(2,lookups.get());assertDualExecutionIsolation(fixture,successful,"succeeded");
+        scope(EXECUTE_ORDER,()->executeNativeOrder(firstService,fixture.firstExecution()));
+        scope(EXECUTE_ORDER,()->executeNativeOrder(secondService,fixture.secondExecution()));
+        assertEquals(1,firstCreates.get());assertEquals(1,secondCreates.get());assertEquals(2,lookups.get());
+        assertDualExecutionIsolation(fixture,successful,"succeeded");
+    }
+
     private static void awaitNativeLatch(java.util.concurrent.CountDownLatch latch,String reason) {
         try {assertTrue(latch.await(10,java.util.concurrent.TimeUnit.SECONDS),reason);}
         catch(InterruptedException error){Thread.currentThread().interrupt();throw new AssertionError(reason,error);}
