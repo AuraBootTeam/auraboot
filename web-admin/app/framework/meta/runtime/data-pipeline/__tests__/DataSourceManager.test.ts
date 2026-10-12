@@ -502,6 +502,38 @@ describe('DataSourceManager', () => {
     });
   });
 
+  it('retains human error detail and actual HTTP status separately from business code', async () => {
+    for (const httpStatus of [400, 403]) {
+      for (const context of ['分页参数无效', { detail: '分页参数无效', messageKey: 'private-key', cause: 'private-cause' }]) {
+        mockedFetchResult.mockResolvedValueOnce({
+          code: '35000', httpStatus, status: 500, statusCode: 502,
+          desc: 'Bad parameter', message: 'Bad parameter', context, success: false, data: null,
+        } as any);
+        const manager = new DataSourceManager(createExpressionContext({} as any));
+        manager.register('offers', { type: 'api', endpoint: '/api/ext/qoe/procurement/quote-lines',
+          method: 'get', autoFetch: false });
+        await manager.fetch('offers');
+        expect(manager.getState('offers')?.error).toMatchObject({
+          message: '分页参数无效', status: httpStatus, statusCode: httpStatus, code: '35000',
+        });
+        expect(manager.getState('offers')?.data).toBeNull();
+        expect(manager.getState('offers')?.loading).toBe(false);
+      }
+    }
+  });
+
+  it('does not turn diagnostic objects into user-visible data-source text', async () => {
+    for (const context of [{ detail: { private: 'secret' } }, { detail: '  ', messageKey: 'private-key' }]) {
+      mockedFetchResult.mockResolvedValueOnce({ code: '35000', httpStatus: 400,
+        desc: 'Original failure', context, success: false, data: null } as any);
+      const manager = new DataSourceManager(createExpressionContext({} as any));
+      manager.register('offers', { type: 'api', endpoint: '/api/ext/qoe/procurement/quote-lines',
+        method: 'get', autoFetch: false });
+      await manager.fetch('offers');
+      expect(manager.getState('offers')?.error?.message).toBe('Original failure');
+    }
+  });
+
   it('omits format for namedQuery sources by default (option/dropdown format)', async () => {
     mockedFetchResult.mockResolvedValueOnce({ code: '0', data: [] } as any);
 

@@ -109,6 +109,49 @@ describe('executeFetch', () => {
     expect(result.httpStatus).toBe(422);
   });
 
+  it('uses only human backend context on HTTP rejection and preserves diagnostics', async () => {
+    for (const context of ['分页参数无效，请刷新后重试。',
+      { detail: '分页参数无效，请刷新后重试。', messageKey: '$i18n:private-key', cause: 'private-cause' }]) {
+      globalThis.fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+        code: '35000', message: 'Bad parameter', context,
+      }), { status: 400 }));
+      const result = await executeFetch('http://localhost/api/list?size=0', { method: 'get' });
+      expect(result.desc).toBe('分页参数无效，请刷新后重试。');
+      expect(result.message).toBe('Bad parameter');
+      expect(result.context).toEqual(context);
+      expect(result.httpStatus).toBe(400);
+      expect(result.code).toBe('35000');
+    }
+  });
+
+  it('keeps generic errors for empty or structured diagnostic context', async () => {
+    for (const context of [null, '', '  ', { detail: '' }, { detail: { secret: 'private' } },
+      { detail: 123, messageKey: '$i18n:private', cause: 'private' }, { messageKey: 'private' }]) {
+      globalThis.fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+        code: '35000', desc: 'Original failure', message: 'Bad parameter', context,
+      }), { status: 400 }));
+      const result = await executeFetch('http://localhost/api/list', { method: 'get' });
+      expect(result.desc).toBe('Original failure');
+      expect(result.message).toBe('Bad parameter');
+      expect(result.context).toEqual(context);
+    }
+  });
+
+  it('uses human detail for normal business rejection but leaves successful descriptions intact', async () => {
+    const cases: Array<[Record<string, unknown>, string]> = [
+      [{ code: '35000', message: 'Bad parameter', context: { detail: '可读的业务拒绝' } }, '可读的业务拒绝'],
+      [{ code: '0', success: false, desc: 'Rejected', context: '明确拒绝' }, '明确拒绝'],
+      [{ code: '0', desc: 'Loaded', context: { detail: '非错误详情' } }, 'Loaded'],
+      [{ code: '35000', success: true, desc: 'Explicit success', context: '非错误详情' }, 'Explicit success'],
+    ];
+    for (const [body, expected] of cases) {
+      globalThis.fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { status: 200 }));
+      const result = await executeFetch('http://localhost/api/list', { method: 'get' });
+      expect(result.desc).toBe(expected);
+      expect(result.message).toBe(body.message ?? body.desc);
+    }
+  });
+
   it('should handle HTTP error with empty statusText', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: false,

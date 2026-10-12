@@ -6,6 +6,7 @@
  */
 
 import { ErrorCodes, type Result } from './types';
+import { ResultHelper } from '~/utils/type';
 
 function normalizeResult<T>(result: Result<T>): Result<T> {
   // Ensure code is always a string — backend may return numeric 0 instead of "0"
@@ -18,7 +19,7 @@ function normalizeResult<T>(result: Result<T>): Result<T> {
   return {
     ...result,
     code,
-    desc,
+    desc: success ? desc : ResultHelper.getErrorDetail(result) ?? desc,
     message,
     success,
     data: result.data ?? null,
@@ -132,7 +133,8 @@ async function handleHttpError(response: Response): Promise<Result<any>> {
     const body = await response.json();
     return {
       code: body.code || statusCode,
-      desc: body.desc || body.message || `HTTP Error: ${statusCode} ${statusText}`,
+      desc: ResultHelper.getErrorDetail(body)
+        ?? (body.desc || body.message || `HTTP Error: ${statusCode} ${statusText}`),
       message: body.message || `HTTP Error: ${statusCode} ${statusText}`,
       success: false,
       data: body.data || null,
