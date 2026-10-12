@@ -8,6 +8,12 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class DataPageQueryTest {
+    @Test void keywordIsOptionalAndFrozenWithTheBoundedRequest() {
+        assertThat(new DataPageQuery(Map.of(),Map.of(),List.of(),1,20).keyword()).isEmpty();
+        assertThat(new DataPageQuery(Map.of(),Map.of(),List.of(),1,20,null).keyword()).isEmpty();
+        assertThat(new DataPageQuery(Map.of(),Map.of(),List.of(),2,20,"  十一月 %_采购  ").keyword())
+                .isEqualTo("十一月 %_采购");
+    }
     @Test
     void rejectsUnboundedOverflowingAndAmbiguousRequests() {
         for (int[] boundary : List.of(new int[]{0, 20}, new int[]{1, 0},

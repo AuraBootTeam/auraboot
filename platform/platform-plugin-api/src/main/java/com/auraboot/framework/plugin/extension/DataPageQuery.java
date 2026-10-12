@@ -10,10 +10,18 @@ public record DataPageQuery(Map<String, Object> exactFilters,
                             Map<String, List<Object>> anyOfFilters,
                             List<Sort> sorts,
                             int page,
-                            int size) {
+                            int size,
+                            String keyword) {
     public static final int MAX_SIZE = 1_000;
 
+    /** Preserve existing plugin callers; keyword search is opt-in and uses host searchable metadata. */
+    public DataPageQuery(Map<String,Object> exactFilters,Map<String,List<Object>> anyOfFilters,
+                         List<Sort> sorts,int page,int size) {
+        this(exactFilters,anyOfFilters,sorts,page,size,"");
+    }
+
     public DataPageQuery {
+        keyword = keyword == null ? "" : keyword.trim();
         if (page < 1 || size < 1 || size > MAX_SIZE
                 || (long) (page - 1) * size > Integer.MAX_VALUE) {
             throw new IllegalArgumentException("Invalid bounded page");

@@ -48,7 +48,7 @@ class DynamicDataAccessorImplTest {
         DataPage result = accessor.queryPage("m", new DataPageQuery(
                 Map.of("supplier", "SUP-A", "managed", true),
                 Map.of("status", List.of("submitted", "closed")),
-                List.of(new DataPageQuery.Sort("submitted_at", true)), 3, 20));
+                List.of(new DataPageQuery.Sort("submitted_at", true)), 3, 20, " RFQ-100 "));
         assertThat(result.total()).isEqualTo(100_001L);
         assertThat(result.records()).containsExactly(Map.of("pid", "B"));
         assertThat(result.page()).isEqualTo(3);
@@ -56,6 +56,7 @@ class DynamicDataAccessorImplTest {
         ArgumentCaptor<DynamicQueryRequest> cap = ArgumentCaptor.forClass(DynamicQueryRequest.class);
         verify(dynamicDataService, times(1)).list(eq("m"), cap.capture());
         DynamicQueryRequest request = cap.getValue();
+        assertThat(request.getKeyword()).isEqualTo("RFQ-100");
         assertThat(request.getPageNum()).isEqualTo(3);
         assertThat(request.getPageSize()).isEqualTo(20);
         assertThat(request.getConditions()).anySatisfy(c -> {

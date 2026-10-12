@@ -87,7 +87,8 @@ public class DynamicDataAccessorImpl implements DataAccessor {
             sorts.add(SortField.builder().fieldName("pid").priority(sorts.size()).build());
         }
         DynamicQueryRequest request = DynamicQueryRequest.builder()
-                .pageNum(query.page()).pageSize(query.size()).conditions(conditions).sortFields(sorts).build();
+                .pageNum(query.page()).pageSize(query.size()).conditions(conditions).sortFields(sorts)
+                .keyword(query.keyword()).build();
         PaginationResult<Map<String, Object>> result = withCommandAuthority(
                 () -> dynamicDataService.list(modelCode, request));
         if (result == null || result.getRecords() == null || result.getTotal() == null) {
