@@ -91,7 +91,7 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
         models.saveDefinition(ModelDefinition.builder().code(modelCode).tableName(tablePrefix + modelCode)
                 .displayName("Machine permission fixture").status("published").sourceType("physical").primaryKey("id")
                 .extension(Map.of("softDelete", testInfo.getTestMethod().orElseThrow().getName()
-                        .matches("softBatchDeleteKeepsTombstonesAndRollsBackPartialFailure|softCascadeDeletesKeepTombstonesAndOwnerEvents")))
+                        .matches("softBatchDeleteKeepsTombstonesAndRollsBackPartialFailure|softCascadeDeletesKeepTombstonesAndOwnerEvents|humanSingleCrudUsesTheSamePublishedSourceEventHook")))
                 .capabilities(ModelCapabilities.fullPhysical().toBuilder()
                         .filterableFields(List.of("name", "zone", "secret")).sortableFields(List.of("name", "zone", "secret")).build())
                 .fields(List.of(FieldDefinition.builder().code("name").columnName("name").dataType("STRING").displayName("Name").sortable(true).filterable(true).build(),
@@ -819,8 +819,12 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
         });
     }
 
-    @Test void humanSingleCrudUsesTheSamePublishedSourceEventHook() {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"hard", "soft"})
+    void humanSingleCrudUsesTheSamePublishedSourceEventHook(String mode) {
+        boolean softDelete = "soft".equals(mode);
         var definition = models.getModelDefinition(contract.modelCode()).orElseThrow();
+        definition.getExtension().put("softDelete", softDelete);
         var navigationFields = new ArrayList<>(definition.getFields());
         navigationFields.add(FieldDefinition.builder().code("children").dataType("STRING").virtualType("transient").build());
         definition.setFields(navigationFields);
@@ -863,12 +867,49 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
             assertThat(saved.getSuccess()).as("joint errors: %s", saved.getErrors()).isTrue();
             assertThat(saved.getSubTableCounts()).containsEntry("children", 1);
             assertThat(saved.getSavedRecords().get("children").get(0)).containsEntry("related", allowedPid);
+            var oldChildren = eventJdbc.queryForList("SELECT pid, deleted_flag, row_version FROM " + definition.getTableName()
+                    + " WHERE tenant_id = ? AND pid IN (?, ?) ORDER BY pid", principal.tenantId(), first.get("pid"), second.get("pid"));
+            if (softDelete) {
+                assertThat(oldChildren).hasSize(2).allSatisfy(row -> {
+                    assertThat(row.get("deleted_flag")).isEqualTo(true);
+                    assertThat(((Number) row.get("row_version")).longValue()).isEqualTo(2L);
+                });
+            } else { assertThat(oldChildren).isEmpty(); }
+            // Empty replacement deletes only current children, never old tombstones again.
+            var empty = data.saveWithRelations(contract.modelCode(), JointSubTableSaveRequest.builder()
+                    .masterData(new HashMap<>(Map.of("pid", allowedPid, "name", "Empty replacement")))
+                    .tables(Map.of("children", List.of())).replaceExisting(true).build());
+            assertThat(empty.getSuccess()).as("empty replacement errors: %s", empty.getErrors()).isTrue();
+            assertThat(empty.getSubTableCounts()).containsEntry("children", 0);
+            assertThat(sourceEvents()).hasSize(12);
+            if (softDelete) {
+                assertThat(eventJdbc.queryForList("SELECT pid, deleted_flag, row_version FROM " + definition.getTableName()
+                        + " WHERE tenant_id = ? AND pid IN (?, ?) ORDER BY pid", principal.tenantId(), first.get("pid"), second.get("pid")))
+                        .isEqualTo(oldChildren);
+            }
+            try {
+                eventFaultObserver.failAfter = 3;
+                var partial = data.saveWithRelations(contract.modelCode(), JointSubTableSaveRequest.builder()
+                        .masterData(new HashMap<>(Map.of("pid", allowedPid, "name", "Partial children")))
+                        .tables(Map.of("children", List.of(Map.of("name", "Retained child", "zone", "A"),
+                                Map.of("name", "Rolled back child", "zone", "A")))).build());
+                assertThat(partial.getSuccess()).isFalse();
+                assertThat(partial.getSubTableCounts()).containsEntry("children", 1);
+                assertThat(partial.getSavedRecords().get("children")).hasSize(1);
+                assertThat(partial.getSubTableErrors().get("children")).singleElement().satisfies(error -> {
+                    assertThat(error.getRowIndex()).isEqualTo(1);
+                    assertThat(error.getMessage()).isEqualTo("Fixture event persistence failure");
+                });
+            } finally { eventFaultObserver.failAfter = -1; }
             assertThat(eventJdbc.queryForObject("SELECT count(*) FROM " + definition.getTableName()
-                    + " WHERE tenant_id = ? AND pid IN (?, ?)", Long.class, principal.tenantId(), first.get("pid"), second.get("pid"))).isZero();
+                    + " WHERE tenant_id = ? AND name = ?", Long.class, principal.tenantId(), "Rolled back child")).isZero();
+            assertThat(eventJdbc.queryForObject("SELECT count(*) FROM " + definition.getTableName()
+                    + " WHERE tenant_id = ? AND name = ? AND related = ?", Long.class, principal.tenantId(), "Retained child", allowedPid))
+                    .isEqualTo(1L);
             assertThat(data.getById(contract.modelCode(), deniedPid)).containsEntry("zone", "B");
             return null;
         });
-        assertThat(sourceEvents()).hasSize(10);
+        assertThat(sourceEvents()).hasSize(14);
     }
 
     @Test void guardedDeleteFailureRollsBackItsBeforeDeleteEvent() {
