@@ -142,6 +142,15 @@ test.describe('i18n admin real workflow', () => {
     const admin = await openAsRole(browser, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
     const clients: APIRequestContext[] = [];
     const prefix = `e2e.ios-handover.${Date.now()}.${info.workerIndex}.tenant.`;
+    // The isolation journey creates tenants: it requires the multi-tenant
+    // posture (system.mode multi + tenant self-provisioning). Single-mode
+    // deployments answer the create with 403 — skip rather than run red.
+    const postureProbe = await admin.page.request.post('/api/tenant-selection/process', {
+      data: { action: 'create', tenantName: `${prefix}posture-probe`.replaceAll('.', '-'), displayName: 'Posture probe' },
+      failOnStatusCode: false,
+    });
+    test.skip(postureProbe.status() === 403, 'requires the multi-tenant posture (tenant self-provisioning enabled)');
+    expect(postureProbe.status(), `unexpected tenant create failure: ${postureProbe.status()}`).toBeLessThan(400);
     const identities: Array<{ tenantId: string; userId: string; roleCodes: string[] }> = [];
     const fixtures: Resource[] = [];
     const outcomes: Array<{ tenantId: string; foreignPid: string; method: string; code: string }> = [];
