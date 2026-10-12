@@ -257,6 +257,8 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             disabled={disabledValue || (loading && !radixOpen)}
           >
             <SelectTrigger
+              id={name}
+              aria-label={accessibleLabel || undefined}
               data-testid={`select-trigger-${name}`}
               className={clsx(
                 fieldSizeStyles[size],

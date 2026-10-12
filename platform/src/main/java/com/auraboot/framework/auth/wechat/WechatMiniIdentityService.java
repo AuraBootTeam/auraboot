@@ -1,6 +1,7 @@
 package com.auraboot.framework.auth.wechat;
 
 import com.auraboot.framework.auth.dao.entity.AuthIdentity;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.auth.mapper.AuthIdentityMapper;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.RootUnCheckedException;
@@ -135,6 +136,42 @@ public class WechatMiniIdentityService {
             return;
         }
         createIdentity(userId, session, session.unionid());
+    }
+
+    /**
+     * Verifies a phone grant for the authenticated account without changing its
+     * identity, tenant membership or roles. A fresh login code selects the exact
+     * bound mini identity; caller-supplied openids and unionid attachment are not used.
+     */
+    public WechatMiniClient.VerifiedPhone verifyCurrentUserPhoneGrant(String loginCode, String phoneCode) {
+        Long userId = MetaContext.exists() ? MetaContext.getCurrentUserId() : null;
+        String appId = wechatMiniProperties.getAppId();
+        if (userId == null || userId <= 0 || MetaContext.isImpersonating()) {
+            throw new RootUnCheckedException(ResponseCode.BadParam,
+                    "WeChat phone verification requires the authenticated account");
+        }
+        if (isBlank(loginCode) || isBlank(phoneCode) || isBlank(appId)) {
+            throw new RootUnCheckedException(ResponseCode.BadParam,
+                    "WeChat phone verification requires configured login and phone grants");
+        }
+        WechatMiniClient.WxSession session = wechatMiniClient.code2Session(loginCode);
+        if (session == null || isBlank(session.openid())) {
+            throw new RootUnCheckedException(ResponseCode.BadParam, "WeChat identity is missing");
+        }
+        var identities = authIdentityMapper.selectList(new QueryWrapper<AuthIdentity>()
+                .eq("provider", PROVIDER_WECHAT_MINI).eq("app_id", appId)
+                .eq("openid", session.openid()).last("LIMIT 2"));
+        if (identities.size() != 1) {
+            throw new RootUnCheckedException(ResponseCode.BadParam,
+                    "WeChat identity is not uniquely bound to this account");
+        }
+        AuthIdentity identity = identities.getFirst();
+        if (!userId.equals(identity.getUserId()) || !PROVIDER_WECHAT_MINI.equals(identity.getProvider())
+                || !appId.equals(identity.getAppId()) || !session.openid().equals(identity.getOpenid())) {
+            throw new RootUnCheckedException(ResponseCode.BadParam,
+                    "WeChat identity is not bound to this account");
+        }
+        return wechatMiniClient.verifyPhoneGrant(phoneCode, session.openid());
     }
 
     private WechatIdentityLookup.Resolution lookup(WechatMiniClient.WxSession session) {

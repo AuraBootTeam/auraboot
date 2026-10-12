@@ -220,7 +220,9 @@ public class CommandStateCheckExecutor {
                     .flatMap(model -> findFieldDefinition(model, stateField))
                     .orElse(null);
             var idEntry = CommandExecutorUtils.resolveRecordIdColumn(recordId);
-            Map<String, Object> conditions = Map.of("tenant_id", tenantId, idEntry.getKey(), idEntry.getValue());
+            Map<String, Object> conditions = RecordCommandWriterGuard.guardLegacyConditions(dynamicDataMapper,
+                    modelOpt.orElse(null), tableName, Map.of("tenant_id", tenantId, idEntry.getKey(), idEntry.getValue()),
+                    "update", Map.of(stateField, newState), code -> metaModelService.getModelDefinition(code).orElse(null));
             int updated;
             if (modelOpt.isPresent() && stateDefinition != null && stateDefinition.isJsonbVirtual()) {
                 CommandExecutorUtils.validateSqlIdentifier(stateDefinition.getJsonbColumn(), "state jsonb column");

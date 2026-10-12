@@ -15,6 +15,11 @@ import java.util.List;
 @Mapper
 public interface CommandDefinitionMapper extends BaseMapper<CommandDefinition> {
 
+    /**
+     * Allocate the next tenant/code version, including soft-deleted history, in the insert snapshot.
+     * A live current definition or a concurrent unique-key winner produces zero inserted rows.
+     * Generated keys return both the stored ID and the allocated version to the caller.
+     */
     @Insert("""
         INSERT INTO ab_command_definition
         (pid, tenant_id, code, display_name, description, model_code,
@@ -22,18 +27,23 @@ public interface CommandDefinitionMapper extends BaseMapper<CommandDefinition> {
          cmd_risk_level, plugin_pid,
          version, semver, is_current, row_version, status, deleted_flag,
          created_at, updated_at)
-        VALUES
-        (#{pid}, #{tenantId}, #{code}, #{displayName}, #{description}, #{modelCode},
+        SELECT
+         #{pid}, #{tenantId}, #{code}, #{displayName}, #{description}, #{modelCode},
          #{inputSchema, typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler},
          #{targetModels, typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler},
          #{executionConfig, typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler},
          #{extension, typeHandler=com.auraboot.framework.application.database.mybatis.ExtensionTypeHandler},
          #{cmdRiskLevel}, #{pluginPid},
-         #{version}, #{semver}, #{isCurrent}, #{rowVersion}, #{status}, #{deletedFlag},
-         #{createdAt}, #{updatedAt})
+         (SELECT COALESCE(MAX(version), 0) + 1 FROM ab_command_definition
+          WHERE tenant_id = #{tenantId} AND code = #{code}),
+         #{semver}, #{isCurrent}, #{rowVersion}, #{status}, #{deletedFlag},
+         #{createdAt}, #{updatedAt}
+        WHERE NOT EXISTS (SELECT 1 FROM ab_command_definition
+                          WHERE tenant_id = #{tenantId} AND code = #{code}
+                            AND is_current = TRUE AND deleted_flag = FALSE)
         ON CONFLICT (tenant_id, code, version) DO NOTHING
         """)
-    @Options(useGeneratedKeys = true, keyProperty = "id")
+    @Options(useGeneratedKeys = true, keyProperty = "id,version", keyColumn = "id,version")
     int insertIdempotent(CommandDefinition commandDefinition);
 
     @Select("SELECT * FROM ab_command_definition WHERE pid = #{pid} AND deleted_flag = false")

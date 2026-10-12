@@ -31,6 +31,28 @@ export const ERROR_CODES = {
  * Provides type-safe response code checking without magic strings.
  */
 export class ResultHelper {
+  /** Read public business detail, without promoting system/auth diagnostic context. */
+  static getErrorDetail(result: {
+    code?: string | number;
+    httpStatus?: unknown;
+    context?: unknown;
+  }): string | undefined {
+    const status = Number(result.httpStatus);
+    if (status === 401 || status === 403 || status >= 500) return undefined;
+    // Exact backend ResponseCode.BadParam / BUSINESS_ERROR contracts; other codes
+    // do not establish that context is human business copy.
+    if (!['35000', '40000'].includes(String(result.code))) return undefined;
+    const context = result.context;
+    if (context && typeof context === 'object' && 'exception' in context
+      && context.exception !== 'BusinessException') return undefined;
+    const detail = typeof context === 'string'
+      ? context
+      : context && typeof context === 'object' && 'detail' in context
+        ? context.detail
+        : undefined;
+    return typeof detail === 'string' && detail.trim() ? detail.trim() : undefined;
+  }
+
   static isSuccess(result: { code: string | number }): boolean {
     return String(result.code) === ErrorCodes.SUCCESS;
   }

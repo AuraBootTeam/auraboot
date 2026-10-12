@@ -29,6 +29,7 @@ import com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutor;
 import com.auraboot.framework.meta.service.impl.CommandExecutorUtils;
 import com.auraboot.framework.meta.service.impl.ModelMutationGuard;
 import com.auraboot.framework.meta.service.impl.FieldWriterGuard;
+import com.auraboot.framework.meta.service.impl.RecordCommandWriterGuard;
 import com.auraboot.framework.plugin.extension.WorkflowCapability;
 import com.auraboot.framework.plugin.pf4j.WorkflowCapabilityRegistry;
 import com.auraboot.framework.meta.service.impl.DynamicDataQueryScope;
@@ -84,6 +85,12 @@ public class HandlerPhase implements CommandPhase {
     private final RecordSnapshotReader snapshotReader;
     private final DataPermissionEngine dataPermissionEngine;
     private final DataDomainService dataDomainService;
+
+    @Autowired(required = false)
+    private com.auraboot.framework.cloudconfig.service.CloudConfigService cloudConfigService;
+
+    @Autowired(required = false)
+    private com.auraboot.framework.auth.wechat.WechatMiniIdentityService wechatMiniIdentityService;
 
     @Autowired(required = false)
     private BiTemporalService biTemporalService;
@@ -279,6 +286,9 @@ public class HandlerPhase implements CommandPhase {
         ModelMutationGuard.assertMutableOrInsertedInThisCommand(
                 modelDef, "updated by handler result persistence", fieldMapResults, recordIdStr);
         FieldWriterGuard.assertFieldsAllowed(modelDef, persistable.keySet());
+        RecordCommandWriterGuard.assertInputAllowed(modelDef, persistable, "update");
+        RecordCommandWriterGuard.guardParentInput(dynamicDataMapper, modelDef,
+                code -> metaModelService.getModelDefinition(code).orElse(null), persistable);
 
         String tableName = metaModelService.getTableName(modelCode);
         CommandExecutorUtils.validateSqlIdentifier(tableName, "handler field tableName");
@@ -308,7 +318,7 @@ public class HandlerPhase implements CommandPhase {
         // in the data map. (Distinct from OSS #398, which only covered the
         // CommandSideEffectExecutor UPDATE_RECORD + partial-CRUD paths.)
         Set<String> jsonbColumns = resolveJsonbColumns(modelDef, tableName);
-        if (shouldUseScopedWrite()) {
+        if (shouldUseScopedWrite() || RecordCommandWriterGuard.hasPolicy(modelDef)) {
             executeScopedUpdate(
                     tableName, modelCode, recordIdStr, idEntry, persistable, tenantId, jsonbColumns);
         } else if (jsonbColumns.isEmpty()) {
@@ -397,10 +407,14 @@ public class HandlerPhase implements CommandPhase {
             params.put("expectedVersion", expectedVersion);
             sql.append(" AND row_version = #{params.expectedVersion}");
         }
+        ModelDefinition writerModel = metaModelService.getModelDefinition(modelCode).orElse(null);
+        RecordCommandWriterGuard.appendStoredPredicate(sql, writerModel, "update",
+                code -> metaModelService.getModelDefinition(code).orElse(null));
+        RecordCommandWriterGuard.appendMarkerInvariant(sql, writerModel, data);
         appendScopedWriteGuards(sql, tenantId, modelCode);
 
         int updated = dynamicDataMapper.updateByQuery(sql.toString(), params);
-        if (updated <= 0 && expectedVersion != null) {
+        if (updated <= 0 && (expectedVersion != null || RecordCommandWriterGuard.hasPolicy(writerModel))) {
             throw new com.auraboot.framework.exception.ConflictException(
                     "Handler result write failed: target changed after command authorization");
         }
@@ -607,6 +621,10 @@ public class HandlerPhase implements CommandPhase {
             if (request.getExpectedVersion() != null && expectedVersion != null) {
                 pluginSettings.put(CommandHandlerExtension.EXPECTED_VERSION_KEY, expectedVersion);
             }
+            com.auraboot.framework.plugin.pf4j.TenantSecretAccessorImpl.install(
+                    pluginSettings, tenantId, cloudConfigService, objectMapper);
+            com.auraboot.framework.plugin.pf4j.VerifiedPhoneGrantAccessorImpl.install(
+                    pluginSettings, tenantId, userId, request.isDryRun(), wechatMiniIdentityService);
             pluginSettings.put("__dataAccessor",
                     new com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImpl(dynamicDataService));
             if (commandExecutor != null) {
@@ -620,6 +638,18 @@ public class HandlerPhase implements CommandPhase {
                 pluginSettings.put(CommandHandlerExtension.TENANT_PROJECTION_ACCESSOR_KEY,
                         new TenantProjectionAccessorImpl(tenantId,
                                 new BackgroundDataAccessorImpl(dynamicDataService)));
+            }
+            if (Boolean.TRUE.equals(pluginSettings.get(
+                    com.auraboot.framework.plugin.pf4j.RelatedCommandDataAccessor.OPT_IN))) {
+                if (handler == null || !"handler".equals(pluginSettings.get("targetRecordAuthorization"))
+                        || !(pluginSettings.get(CommandHandlerExtension.TENANT_PROJECTION_ACCESSOR_KEY)
+                            instanceof TenantProjectionAccessor projection)) {
+                    throw new AccessDeniedException("Related delete authorization requires a target handler and projection");
+                }
+                pluginSettings.put(CommandHandlerExtension.DATA_ACCESSOR_KEY,
+                        new com.auraboot.framework.plugin.pf4j.RelatedCommandDataAccessor(dynamicDataService,
+                                tenantId,commandCode,modelCode,effectiveRecordId,
+                                MetaContext.getCurrentUserPid(),handler,projection));
             }
             pluginSettings.put(TenantRoleAssignmentAccessor.SETTINGS_KEY,
                     new TenantRoleAssignmentAccessorImpl(tenantId, userId, identityDirectoryAccessor,
@@ -707,6 +737,11 @@ public class HandlerPhase implements CommandPhase {
                     handlerCode, commandCode, e.getMessage(), e);
             if (e instanceof AccessDeniedException accessDeniedException) {
                 throw accessDeniedException;
+            }
+            if (e instanceof SecurityException) {
+                // The transport-neutral plugin SPI may reject ownership without Spring dependencies.
+                // Keep the authorization status and cause, never expose its internal record diagnostics.
+                throw new AccessDeniedException("Access denied", e);
             }
             if (e instanceof DataAccessorException dataAccess
                     && dataAccess.code() == DataAccessErrorCode.PERMISSION_DENIED) {

@@ -46,6 +46,10 @@ export interface BlockConfig {
 
   // 表单相关
   fields?: FieldConfig[];
+  /** Optional card-grid inner field layout; existing cards retain stacked fields. */
+  fieldsLayout?: LayoutConfig;
+  /** Fit card-grid tracks to the available width, collapsing unused tracks. */
+  autoFitColumns?: boolean;
   buttons?: ButtonConfig[];
 
   // 表格相关

@@ -45,6 +45,44 @@ class PageSchemaValidatorBoundaryTest {
     }
 
     @ParameterizedTest
+    @CsvSource({"api,false", "namedQuery,false", "entity,true"})
+    void primaryListTableInheritsThePublishedPageDataSource(String sourceType, boolean bindingFinding) {
+        var page = page(table(Map.of("field", "projection_only", "label", "Projected Value")));
+        page.setExtension(Map.of("dataSource", Map.of("type", sourceType, "endpoint", "/api/ext/test/items")));
+        var manifest = manifest(page); manifest.setModelFieldBindings(List.of(binding("name", false)));
+        assertEquals(bindingFinding, codes(validate(manifest)).contains("S-PAGE-FIELD-REF"));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"detail,table,false", "list,sub-table,false", "list,embedded-list,false", "list,table,true"})
+    void pageApiDoesNotExemptIndependentModelTables(String kind, String type, boolean override) {
+        var block = table(Map.of("field", "unbound", "label", "Name")); block.put("blockType", type);
+        if (override) block.put("dataSource", Map.of("type", "entity"));
+        var page = page(block); page.setKind(kind);
+        page.setExtension(Map.of("dataSource", Map.of("type", "api", "endpoint", "/api/ext/test/items")));
+        var manifest = manifest(page); manifest.setModelFieldBindings(List.of(binding("name", false)));
+        assertTrue(codes(validate(manifest)).contains("S-PAGE-FIELD-REF"));
+    }
+
+    @Test
+    void pageApiDoesNotExemptATableForAnotherBoundModel() {
+        var block = table(Map.of("field", "unbound", "label", "Name"));
+        block.put("modelCode", "other_entity");
+        var page = page(block);
+        page.setExtension(Map.of("dataSource", Map.of("type", "api", "endpoint", "/api/ext/test/items")));
+        var otherBinding = binding("name", false); otherBinding.setModelCode("other_entity");
+        var manifest = manifest(page); manifest.setModelFieldBindings(List.of(otherBinding));
+        assertTrue(codes(validate(manifest)).contains("S-PAGE-FIELD-REF"));
+    }
+
+    @Test
+    void primaryApiTableStillRequiresBusinessColumnLabels() {
+        var page = page(table(Map.of("field", "projection_only")));
+        page.setExtension(Map.of("dataSource", Map.of("type", "api", "endpoint", "/api/ext/test/items")));
+        assertTrue(codes(validate(page)).contains("S-PAGE-LABEL"));
+    }
+
+    @ParameterizedTest
     @CsvSource({"false,false,false,true", "true,false,false,false", "false,true,false,false", "false,false,true,false"})
     void editableRequiredFieldsNeedARequiredProjection(boolean readOnly, boolean hidden, boolean required, boolean finding) {
         var field = new HashMap<String, Object>(); field.put("field", "name"); field.put("readOnly", readOnly); field.put("hidden", hidden); field.put("required", required);

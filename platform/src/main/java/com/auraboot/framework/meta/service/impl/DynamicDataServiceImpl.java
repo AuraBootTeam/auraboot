@@ -408,6 +408,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             if (update == null || !ids.add(update.recordId())) {
                 throw new MetaServiceException("CAS batch contains a null or duplicate record");
             }
+            RecordCommandWriterGuard.assertInputAllowed(model, update.nextValues(), "update");
+            RecordCommandWriterGuard.guardParentInput(dynamicDataMapper, model, code -> metadataService.getModelDefinition(code).orElse(null), update.nextValues());
             Map<String, Object> data = new LinkedHashMap<>(update.nextValues());
             stripNonWritableFields(modelCode, data);
             if (data.size() != update.nextValues().size()) {
@@ -492,6 +494,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         }
         sql.append(")");
         appendAggregateBindingGuard(sql, params, model);
+        RecordCommandWriterGuard.appendStoredPredicate(sql, model, "update", code -> metadataService.getModelDefinition(code).orElse(null));
         appendScopedWriteGuards(sql, tenantId, modelCode, getCurrentUserId(), "update");
         int affected = dynamicDataMapper.updateByQuery(sql.toString(), params);
         if (affected != updates.size()) {
@@ -548,7 +551,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         if (capCode != null) {
             capCol = resolveNumericColumn(model, capCode);
         }
-        String softDeleteClause = buildSoftDeleteClause(model);
+        StringBuilder guardedClause = new StringBuilder(buildSoftDeleteClause(model));
+        RecordCommandWriterGuard.appendStoredPredicate(guardedClause, model, "update", code -> metadataService.getModelDefinition(code).orElse(null));
+        String softDeleteClause = guardedClause.toString();
         FieldDefinition pkField = metadataService.getPrimaryKeyField(modelCode);
         String pkColumn = SqlSafetyUtils.requireIdentifier(
                 pkField.getColumnName(), "primary key column");
@@ -798,6 +803,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         // Same reason as the fields above: a derived row created under a command authorized for one
         // aggregate belongs to that aggregate, not to whichever one the payload names.
         injectAggregateBinding(model, enrichedData);
+        RecordCommandWriterGuard.guardParentInput(dynamicDataMapper, model, code -> metadataService.getModelDefinition(code).orElse(null), enrichedData);
 
         // 生成主键（如果需要）
         FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
@@ -1223,6 +1229,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         // Get record before deletion for change tracking
         Map<String, Object> existingRecord = getById(modelCode, recordId);
+        RecordCommandWriterGuard.assertStoredAllowed(model, existingRecord, "delete");
         Long planExpectedVersion = MetaContext.getCommandExpectedVersion(modelCode, recordId);
 
         // 构建删除条件
@@ -1475,6 +1482,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         validateModelCode(modelCode);
         logOperation("createRelations", modelCode, relationName);
         RelationDefinition relation = DynamicDataValueMapper.findRelation(getModelDefinition(modelCode), relationName);
+        ModelDefinition sourceModel = getModelDefinition(modelCode);
+        RecordCommandWriterGuard.guardLegacyConditions(dynamicDataMapper, sourceModel,
+                sourceModel.getTableName(), Map.of("id", recordId), "update", null,
+                code -> metadataService.getModelDefinition(code).orElse(null));
         return relationSupport().createRelations(relation, recordId, targetRecordIds, getCurrentTenantId());
     }
 
@@ -1485,6 +1496,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         validateModelCode(modelCode);
         logOperation("removeRelations", modelCode, relationName);
         RelationDefinition relation = DynamicDataValueMapper.findRelation(getModelDefinition(modelCode), relationName);
+        ModelDefinition sourceModel = getModelDefinition(modelCode);
+        RecordCommandWriterGuard.guardLegacyConditions(dynamicDataMapper, sourceModel,
+                sourceModel.getTableName(), Map.of("id", recordId), "update", null,
+                code -> metadataService.getModelDefinition(code).orElse(null));
         return relationSupport().removeRelations(relation, recordId, targetRecordIds, getCurrentTenantId());
     }
 
@@ -1640,7 +1655,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     private DynamicScopedWriteSupport dynamicScopedWriteSupport() {
-        return new DynamicScopedWriteSupport(dynamicDataMapper, dataPermissionEngine, dataDomainService);
+        return new DynamicScopedWriteSupport(dynamicDataMapper, dataPermissionEngine, dataDomainService, metadataService);
     }
 
     private DynamicDataTransferSupport dynamicDataTransferSupport() {

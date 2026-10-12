@@ -1054,6 +1054,15 @@ public class PluginImportServiceImpl implements PluginImportService {
         importFieldMasks(manifest);
         importCapabilities(manifest);
 
+        // Validate the freshly imported database metadata, not an older active release snapshot.
+        Set<String> composedModelCodes = new java.util.LinkedHashSet<>(importedModelCodes);
+        if (manifest.getModelFieldBindings() != null) {
+            for (var binding : manifest.getModelFieldBindings()) {
+                if (binding.isValid()) composedModelCodes.add(binding.getModelCode());
+            }
+        }
+        com.auraboot.framework.plugin.validation.PluginModelOwnershipImportGate.validate(metaModelService, composedModelCodes);
+
         // Post-processing: Auto-publish DRAFT models and sync PUBLISHED models
         autoPublishAndSyncModels(importedModelCodes, request, manifest.getNamespace(), tenantId);
 

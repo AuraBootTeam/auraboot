@@ -100,6 +100,7 @@ class BackgroundDataBatchService {
                                          BackgroundDataAccessor.BatchClaimRequest request) {
         ModelDefinition model = requirePhysicalDynamicModel(request.modelCode());
         ModelMutationGuard.assertMutable(model, "claimed");
+        com.auraboot.framework.meta.service.impl.RecordCommandWriterGuard.assertBulkClaimAllowed(model);
 
         Map<String, Object> exact = resolveScalarMap(model, request.exactFilters(), false);
         Map<String, List<Object>> in = resolveInMap(model, request.inFilters());

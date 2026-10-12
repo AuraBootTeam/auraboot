@@ -33,6 +33,7 @@ import { InlineEditCell } from '~/framework/meta/rendering/components/InlineEdit
 import { useMediaQuery } from '~/framework/meta/rendering/components/ResponsiveBlockLayout';
 import { getLegacyCompatibleRecordPid } from '~/framework/meta/utils/publicRecordId';
 import { RowActionButtons } from '~/framework/meta/rendering/pages/list/RowActionButtons';
+import { useTimezone } from '~/contexts/TimezoneContext';
 
 export interface TableBlockRendererProps {
   block: BlockConfig;
@@ -166,6 +167,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
   const context = runtime.getContext();
   const locale = context.locale || 'zh-CN';
   const t = context.t || ((key: string) => key);
+  const { timezone, formats: dateTimeFormats } = useTimezone();
 
   const evaluator = runtime.getEvaluator();
   const dataSourceManager = runtime.getDataSourceManager();
@@ -775,17 +777,19 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       return cellRendererRegistry.render(column.renderType, {
         value,
         record: row,
-        column: column as any,
+        column: { ...column, timezone, dateTimeFormats } as any,
+        locale,
+        t,
       } as any);
     }
 
     // valueType 渲染
     switch (column.valueType) {
       case 'date':
-        return new Date(value).toLocaleDateString(locale);
-
       case 'datetime':
-        return new Date(value).toLocaleString(locale);
+        return cellRendererRegistry.render(column.valueType, {
+          value, record: row, column: { ...column, timezone, dateTimeFormats } as any, locale, t,
+        } as any);
 
       case 'currency':
         return new Intl.NumberFormat(locale, {

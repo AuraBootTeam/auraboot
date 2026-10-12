@@ -522,3 +522,23 @@ describe('Business Functions Library', () => {
     });
   });
 });
+
+
+describe('Exact decimal expressions', () => {
+  it('preserves large values and mixed scales with source identity filtering', () => {
+    const rows = [{ source: 'a', quantity: '9007199254740993.000001' }, { source: 'a', quantity: '0.000009' }, { source: 'b', quantity: '999' }];
+    expect(fn.DECIMAL_SUM_BY(rows, 'quantity', 'source', 'a')).toBe('9007199254740993.00001');
+    expect(fn.DECIMAL_SUBTRACT('9007199254740993.000011', fn.DECIMAL_SUM_BY(rows, 'quantity', 'source', 'a'))).toBe('0.000001');
+    expect(fn.DECIMAL_SUBTRACT('40', '60.00')).toBe('-20');
+    expect(fn.DECIMAL_SUBTRACT('0.000', '0')).toBe('0');
+  });
+  it('rejects invalid input instead of showing a false zero gap', () => {
+    for (const quantity of ['', '1e2', 'NaN', '1.2.3', 0, null, '1'.repeat(257)]) expect(() => fn.DECIMAL_SUM_BY([{ quantity }], 'quantity')).toThrow();
+    expect(() => fn.DECIMAL_SUM_BY(undefined, 'quantity')).toThrow();
+    expect(fn.DECIMAL_SUM_BY([], 'quantity')).toBe('0');
+  });
+  it('runs through the expression parser without lambdas', () => {
+    const parser = new ExpressionParser(createExpressionContext({ form: { rows: [{ quantity: '0.1' }, { quantity: '0.2' }] } } as any));
+    expect(parser.evaluate('${fn.DECIMAL_SUBTRACT("0.3", fn.DECIMAL_SUM_BY(form.rows, "quantity"))}')).toBe('0');
+  });
+});

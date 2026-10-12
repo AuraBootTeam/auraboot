@@ -226,4 +226,13 @@ class PluginResourceImporterLifecycleTest {
         verify(jdbcTemplate).update(contains("UPDATE ab_agent_definition"),eq("agent-42"));
         verify(jdbcTemplate).update(contains("WHERE tenant_id = ? AND agent_code = ?"),eq(42L),eq("invoice_agent"));
     }
+    @Test void malformedRecordWriterDeclarationFailsBeforeModelOrResourcePersistence() {
+        var dto=ModelDefinitionDTO.builder().code("shared_bid").extension(Map.of("recordCommandWriters",true)).build();
+        assertThatThrownBy(()->importer.importModel(dto,"p","i",42L,ImportRequest.ConflictStrategy.OVERWRITE,false))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("recordCommandWriters");
+        verify(metaModelService,never()).create(any());
+        verifyNoInteractions(metaModelMapper);
+        verifyNoInteractions(pluginResourceMapper);
+    }
+
 }

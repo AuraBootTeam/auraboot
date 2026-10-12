@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.entity.CommandDefinition;
+import com.auraboot.framework.meta.exception.MetaRecordNotFoundException;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
@@ -71,7 +72,7 @@ public class CommandTargetScopePhase implements CommandPhase {
         return command == null
                 || !StringUtils.hasText(command.getModelCode())
                 || !StringUtils.hasText(ctx.getRequest().getTargetRecordId())
-                || (isHandlerManagedTarget(ctx) && targetRecordAction(ctx) == null);
+                || (isHandlerManagedTarget(ctx) && targetRecordAction(ctx) == null && !handlerTargetAuthorization(ctx));
     }
 
     /** Server-owned command metadata; callers cannot turn a write into a read. */
@@ -85,6 +86,15 @@ public class CommandTargetScopePhase implements CommandPhase {
             throw new BusinessException(ResponseCode.FORBIDDEN, "Invalid target record action policy");
         }
         return value;
+    }
+
+    private boolean handlerTargetAuthorization(CommandPipelineContext ctx) {
+        Object params = ctx.getExecConfig() == null ? null : ctx.getExecConfig().get("handlerParams");
+        if (!(params instanceof Map<?, ?> values) || !values.containsKey("targetRecordAuthorization")) return false;
+        if (!"handler".equals(values.get("targetRecordAuthorization"))) {
+            throw new BusinessException(ResponseCode.FORBIDDEN, "Invalid target authorization policy");
+        }
+        return true;
     }
 
     private boolean isHandlerManagedTarget(CommandPipelineContext ctx) {
@@ -169,9 +179,18 @@ public class CommandTargetScopePhase implements CommandPhase {
 
         // Read the record itself out of the caller's projection: the boundary has to SEE the row to
         // judge it, and reading it through the very gate we are evaluating would be circular.
-        Map<String, Object> record = MetaContext.runWithCommandPermitScope("ALL",
-                () -> dynamicDataService.getById(modelCode, recordId));
+        Map<String, Object> record;
+        try {
+            record = MetaContext.runWithCommandPermitScope("ALL",
+                    () -> dynamicDataService.getById(modelCode, recordId));
+        } catch (MetaRecordNotFoundException missing) {
+            // Protected targets absent from this tenant's scope are denied like a null lookup.
+            // Other lookup failures still propagate; ordinary commands retain not-found behavior.
+            if (handlerTargetAuthorization(ctx)) return false;
+            throw missing;
+        }
         if (record == null) {
+            if (handlerTargetAuthorization(ctx)) return false;
             // A missing record is not an authorization answer — later phases surface "not found".
             return null;
         }
@@ -180,7 +199,7 @@ public class CommandTargetScopePhase implements CommandPhase {
         // The authorization phase has already resolved this exact target (or its explicitly
         // declared aggregate reference) and verified an active record-share grant. Re-running
         // ordinary model RBAC here would erase that record-scoped grant for collaborator roles.
-        if (ctx.getAuthorizationVerdict() != null
+        if (!handlerTargetAuthorization(ctx) && ctx.getAuthorizationVerdict() != null
                 && ctx.getAuthorizationVerdict().isAuthorized()
                 && ctx.getAuthorizationVerdict().permissionCode() != null
                 && ctx.getAuthorizationVerdict().permissionCode().startsWith("record-share:")) {
@@ -189,9 +208,38 @@ public class CommandTargetScopePhase implements CommandPhase {
 
         Long memberId = resolveMemberId(ctx);
         if (memberId == null) {
+            if (handlerTargetAuthorization(ctx)) return false;
             // No subject to evaluate (system/scheduled invocation), but D5 still retains the
             // server-loaded target version for the write that follows.
             return null;
+        }
+
+        if (handlerTargetAuthorization(ctx)) {
+            if (ctx.getAuthorizationVerdict() == null || !ctx.getAuthorizationVerdict().isAuthorized()
+                    || !isHandlerManagedTarget(ctx) || !StringUtils.hasText(MetaContext.getCurrentUserPid())
+                    || !java.util.Objects.equals(ctx.getTenantId(), MetaContext.getCurrentTenantId())
+                    || !java.util.Objects.equals(ctx.getUserId(), MetaContext.getCurrentUserId())) {
+                throw new BusinessException(ResponseCode.FORBIDDEN, "Handler target authorization context is missing");
+            }
+            var handler = extensionRegistry.getCommandHandler(resolveHandlerCode(ctx)).orElseThrow(
+                    () -> new BusinessException(ResponseCode.FORBIDDEN, "Target authorization handler is missing"));
+            var delegate = new com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImpl(dynamicDataService);
+            var reads = new com.auraboot.framework.plugin.extension.RecordReadAccessor() {
+                public Map<String,Object> getById(String model, String id) {
+                    return MetaContext.runWithCommandPermitScope("ALL", () -> delegate.getById(model, id));
+                }
+                public com.auraboot.framework.plugin.extension.DataPage queryPage(String model,
+                        com.auraboot.framework.plugin.extension.DataPageQuery query) {
+                    return MetaContext.runWithCommandPermitScope("ALL", () -> delegate.queryPage(model, query));
+                }
+            };
+            try {
+                return handler.authorizeTarget(new com.auraboot.framework.plugin.extension.CommandHandlerExtension.TargetAuthorizationContext(
+                    ctx.getCommandCode(), modelCode, recordId, targetRecordAction(ctx), ctx.getTenantId(),
+                    MetaContext.getCurrentUserPid(), java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(record)), reads));
+            } catch (SecurityException denied) {
+                return false;
+            }
         }
 
         PermissionResult result = applicationContext.getBean(PermissionFacade.class)

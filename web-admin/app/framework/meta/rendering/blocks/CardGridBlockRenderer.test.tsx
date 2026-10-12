@@ -139,6 +139,23 @@ describe('CardGridBlockRenderer', () => {
     expect(screen.getByText('IoT')).toBeTruthy();
   });
 
+  it('opts into adaptive tracks independently for each identity group', () => {
+    const runtime = makeRuntime({ data: [
+      { ...sampleRows[0], source: 'one' },
+      { ...sampleRows[1], source: 'two' },
+    ] });
+    const { rerender } = render(<CardGridBlockRenderer
+      block={{ ...baseBlock, autoFitColumns: true, groupByField: 'source' }}
+      runtime={runtime as any} />);
+    for (const group of screen.getAllByTestId('card-grid-group')) {
+      expect((group.lastElementChild as HTMLElement).style.gridTemplateColumns)
+        .toBe('repeat(auto-fit, minmax(min(100%, 20rem), 1fr))');
+    }
+    rerender(<CardGridBlockRenderer block={baseBlock} runtime={runtime as any} />);
+    expect(screen.getByTestId('card-grid-block').style.gridTemplateColumns).toBe('');
+    expect(screen.getByTestId('card-grid-block').className).toContain('sm:grid-cols-2');
+  });
+
   it('renders a card badge through its declared dictionary', () => {
     const runtime = makeRuntime({ data: [{ pid: 'r1', name: '蜜蜂', status: 'published' }] });
     render(
@@ -201,6 +218,28 @@ describe('CardGridBlockRenderer', () => {
     const errorEl = screen.getByTestId('card-grid-error');
     expect(errorEl).toBeTruthy();
     expect(errorEl.getAttribute('role')).toBe('alert');
+  });
+
+  it.each([
+    ['zh-CN', { code: '403' }, '你没有权限访问该页面，请联系管理员开通权限。'],
+    ['en-US', { status: 403 }, 'You do not have permission to view this page. Please contact an administrator.'],
+    ['ja-JP', { statusCode: 403 }, 'このページを表示する権限がありません。管理者にお問い合わせください。'],
+    ['ko-KR', { code: 403 }, '이 페이지에 접근할 권한이 없습니다. 관리자에게 문의하세요.'],
+  ])('localizes forbidden data without exposing server text in %s', (locale, status, message) => {
+    const runtime = makeRuntime({data:sampleRows, state:{
+      error:Object.assign(new Error('Access forbidden; internal model/record details'), status),
+    }});
+    runtime.getContext = () => ({locale:locale as string,t:(key:string)=>key});
+    render(<CardGridBlockRenderer block={baseBlock} runtime={runtime as any} />);
+    expect(screen.getByRole('alert')).toHaveTextContent(message as string);
+    expect(screen.queryByText(/internal model|Access forbidden/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Template A')).not.toBeInTheDocument();
+  });
+
+  it('preserves actionable domain errors that do not carry a forbidden status', () => {
+    const runtime = makeRuntime({state:{error:new Error('请先选择已分类的采购申请明细')}});
+    render(<CardGridBlockRenderer block={baseBlock} runtime={runtime as any} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('请先选择已分类的采购申请明细');
   });
 
   it('clicking a card action calls handleAction with the row', () => {

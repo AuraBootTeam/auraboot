@@ -134,9 +134,11 @@ class GlobalExceptionHandlerI18nTest {
                 "$i18n:meta_record.duplicate", new DuplicateKeyException("INSERT INTO private_table"));
         when(registry.getAllPhases()).thenThrow(businessFailure)
                 .thenThrow(new DataAccessResourceFailureException("Database private_connection unavailable"));
+        var metaAdvice = new MetaApiExceptionHandler();
+        ReflectionTestUtils.setField(metaAdvice, "globalExceptionHandler", handler);
         var mvc = MockMvcBuilders.standaloneSetup(new CommandPipelineController(registry))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter())
-                .setControllerAdvice(new MetaApiExceptionHandler(), handler).build();
+                .setControllerAdvice(metaAdvice, handler).build();
 
         var rejected = mvc.perform(get("/api/meta/command-phases"))
                 .andExpect(status().isBadRequest())

@@ -243,6 +243,11 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
   };
 
   const adaptedValue = useMemo(() => {
+    if (componentLower === 'smartselect' || componentLower === 'select') {
+      // An absent parent value clears a controlled picker; it must not restore
+      // the smart control's previously selected internal value after reset.
+      return value ?? (field.props?.multiple ? [] : '');
+    }
     if (componentLower === 'cascadeselect') {
       // Re-inflate stored leaf string into a single-element path so the picker
       // can display the selected leaf value. Parent-level labels won't repopulate
@@ -292,7 +297,7 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
       return parseJsonObject(value);
     }
     return value;
-  }, [componentLower, expectsJsonObjectValue, isMemberPickerMultiple, isUploadComponent, value]);
+  }, [componentLower, expectsJsonObjectValue, isMemberPickerMultiple, isUploadComponent, field.props?.multiple, value]);
 
   const adaptedOnChange = useMemo(() => {
     if (componentLower === 'cascadeselect') {

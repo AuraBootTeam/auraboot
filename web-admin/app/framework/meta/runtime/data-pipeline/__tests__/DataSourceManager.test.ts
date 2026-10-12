@@ -502,6 +502,57 @@ describe('DataSourceManager', () => {
     });
   });
 
+  it('retains human error detail and actual HTTP status separately from business code', async () => {
+    for (const httpStatus of [400, 403]) {
+      for (const context of ['分页参数无效', { detail: '分页参数无效', messageKey: 'private-key', cause: 'private-cause' }]) {
+        mockedFetchResult.mockResolvedValueOnce({
+          code: '35000', httpStatus, status: 500, statusCode: 502,
+          desc: 'Bad parameter', message: 'Bad parameter', context, success: false, data: null,
+        } as any);
+        const manager = new DataSourceManager(createExpressionContext({} as any));
+        manager.register('offers', { type: 'api', endpoint: '/api/ext/qoe/procurement/quote-lines',
+          method: 'get', autoFetch: false });
+        await manager.fetch('offers');
+        expect(manager.getState('offers')?.error).toMatchObject({
+          message: httpStatus === 403 ? 'Bad parameter' : '分页参数无效', status: httpStatus, statusCode: httpStatus, code: '35000',
+        });
+        expect(manager.getState('offers')?.data).toBeNull();
+        expect(manager.getState('offers')?.loading).toBe(false);
+      }
+    }
+  });
+
+  it('does not turn diagnostic objects into user-visible data-source text', async () => {
+    for (const context of [{ detail: { private: 'secret' } }, { detail: '  ', messageKey: 'private-key' }]) {
+      mockedFetchResult.mockResolvedValueOnce({ code: '35000', httpStatus: 400,
+        desc: 'Original failure', context, success: false, data: null } as any);
+      const manager = new DataSourceManager(createExpressionContext({} as any));
+      manager.register('offers', { type: 'api', endpoint: '/api/ext/qoe/procurement/quote-lines',
+        method: 'get', autoFetch: false });
+      await manager.fetch('offers');
+      expect(manager.getState('offers')?.error?.message).toBe('Original failure');
+    }
+  });
+
+  it('does not promote generic Core diagnostics but retains actual status and business identity', async () => {
+    for (const result of [
+      { code: '1', httpStatus: 500, desc: 'Internal system error', context: {
+        exception: 'IllegalStateException', detail: 'SELECT secret FROM private_model; PID secret', cause: 'private-cause' } },
+      { code: '403', httpStatus: 403, desc: 'Access forbidden', context: 'private permission' },
+      { code: '35000', httpStatus: 400, desc: 'Bad parameter', context: {
+        exception: 'IllegalStateException', detail: 'private stored snapshot' } },
+    ]) {
+      mockedFetchResult.mockResolvedValueOnce({ ...result, success: false, data: null } as any);
+      const manager = new DataSourceManager(createExpressionContext({} as any));
+      manager.register('read', { type: 'api', endpoint: '/api/meta/command-phases', method: 'get', autoFetch: false });
+      await manager.fetch('read');
+      expect(manager.getState('read')?.error).toMatchObject({
+        message: result.desc, status: result.httpStatus, statusCode: result.httpStatus, code: result.code,
+      });
+      expect(manager.getState('read')?.data).toBeNull();
+    }
+  });
+
   it('omits format for namedQuery sources by default (option/dropdown format)', async () => {
     mockedFetchResult.mockResolvedValueOnce({ code: '0', data: [] } as any);
 

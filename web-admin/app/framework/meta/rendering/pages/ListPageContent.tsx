@@ -1,3 +1,4 @@
+import { resolveListReadErrorMessage } from '~/framework/meta/utils/listReadErrors';
 import { resolveTemporalType } from '~/shared/services/dateTimeFormatService';
 /**
  * ListPageContent — Extracted rendering logic from dynamic.$tableName.tsx
@@ -18,6 +19,7 @@ import {
   type To,
 } from 'react-router';
 import { BlockRenderer, type PageContentProps } from '@auraboot/runtime-kernel';
+import { useRuntimeStateSubscription } from '../blocks/workbenchBlockUtils';
 import { usePageRuntime } from '~/framework/meta/rendering/pages/hooks/usePageRuntime';
 import { buildApiEndpoint, getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { fetchResult } from '~/shared/services/http-client';
@@ -48,7 +50,7 @@ import {
 import { useToastContext } from '~/contexts/ToastContext';
 import { DataSourceProvider } from '~/framework/meta/contexts/DataSourceContext';
 import { createFieldRenderer } from '~/framework/meta/utils/createFieldRenderer';
-import { ErrorAlert } from '~/ui/ErrorAlert';
+import { ListErrorState } from './list/ListErrorState';
 import { useAuth } from '~/contexts/AuthContext';
 import { ListPageHeader } from './list/ListPageHeader';
 import { useSavedViews } from '~/framework/smart/hooks/useSavedViews';
@@ -1144,8 +1146,13 @@ function translateOrFallback(t: (key: string) => string, key: string, fallback: 
 export function buildToolbarConditionContext(
   list: { total: number; records: unknown[] },
   base: Record<string, any>,
+  runtimeContext: Record<string, any> = {},
 ): Record<string, any> {
-  return { ...base, recordCount: list.records?.length ?? 0, total: list.total ?? 0 };
+  return {
+    ...base, ...runtimeContext,
+    state: { ...runtimeContext.state, ...base.state },
+    recordCount: list.records?.length ?? 0, total: list.total ?? 0,
+  };
 }
 
 export function shouldSkipListData(
@@ -1654,13 +1661,14 @@ function ListPageContentInner(props: PageContentProps) {
     setSearchParams(nextParams, { replace: true });
   }, [pagination.current, pagination.pageSize, searchParams, setSearchParams]);
 
+  // Keep page-owned context stable while runtime draft subscriptions rerender.
+  const listRuntimeContext = useMemo(() => ({ filters }), [filters]);
   // Use usePageRuntime instead of useDynamicPageSetup
   const { runtime, dataSourceManager, t, locale, navigate } = usePageRuntime(schema, {
     token: token || undefined,
-    additionalContext: {
-      filters,
-    },
+    additionalContext: listRuntimeContext,
   });
+  useRuntimeStateSubscription(runtime);
   const tableEmptyState = useMemo(() => {
     const configured = (tableBlock as any)?.empty ?? (tableBlock as any)?.table?.empty;
     if (!configured || typeof configured !== 'object') return {};
@@ -2509,16 +2517,14 @@ function ListPageContentInner(props: PageContentProps) {
             }));
           }
         } else {
-          setError(result.desc || t('common.loadDataError') || 'Failed to load data');
+          setError(resolveListReadErrorMessage(result, locale, t));
         }
       } catch (err) {
         // A stale request's error must not clobber the newer request's state.
         if (requestId !== loadDataSeqRef.current) {
           return;
         }
-        setError(
-          err instanceof Error ? err.message : t('common.loadDataError') || 'Failed to load data',
-        );
+        setError(resolveListReadErrorMessage(err, locale, t));
       } finally {
         // Only the newest invocation owns the loading flag; an older one that
         // resolves late must not clear the newer request's spinner.
@@ -2814,13 +2820,11 @@ function ListPageContentInner(props: PageContentProps) {
               }));
             }
           } else {
-            setError(result.desc || t('common.loadDataError') || 'Failed to load data');
+            setError(resolveListReadErrorMessage(result, locale, t));
           }
         } catch (err) {
           if (!isLatestRequest()) return;
-          setError(
-            err instanceof Error ? err.message : t('common.loadDataError') || 'Failed to load data',
-          );
+          setError(resolveListReadErrorMessage(err, locale, t));
         } finally {
           if (isLatestRequest()) {
             setLoading(false);
@@ -4513,6 +4517,7 @@ function ListPageContentInner(props: PageContentProps) {
   // Evaluate toolbar button visibility (visibleWhen expression).
   // Exposes the loaded list's recordCount/total so conditions like
   // `recordCount == 0` (singleton "新建" button) work.
+  const toolbarRuntimeContext = runtime?.getContext() ?? {};
   const evaluateButtonVisible = useCallback(
     (button: ButtonConfig): boolean => {
       if (!canUseButton(button)) return false;
@@ -4521,10 +4526,11 @@ function ListPageContentInner(props: PageContentProps) {
       const conditionContext = buildToolbarConditionContext(
         { total: pagination.total, records: data },
         createExpressionContext({ state: { filters } }),
+        toolbarRuntimeContext,
       );
       return evaluateCondition(button.visibleWhen, conditionContext as any);
     },
-    [canUseButton, pagination.total, data, filters],
+    [canUseButton, pagination.total, data, filters, toolbarRuntimeContext],
   );
 
   const visibleBulkActions = useMemo(() => {
@@ -5048,14 +5054,38 @@ function ListPageContentInner(props: PageContentProps) {
     return found;
   }, [allBlocks]);
 
+  const listPageTitle = (() => {
+    // Import writes page titles into the tenant i18n bundle as
+    // page.<pageKey>.title (en + zh-CN). Prefer that key so the title
+    // follows the UI locale; schema.title/schema.name are stored as
+    // plain zh strings and would otherwise pin the title to zh.
+    const listPageKey = schema.pageKey || tableName;
+    const keyedTitle = t(`page.${listPageKey}.title`);
+    if (keyedTitle && keyedTitle !== `page.${listPageKey}.title`) {
+      return keyedTitle;
+    }
+    if (schema.title) return getLocalizedText(schema.title, locale, t);
+    if (schema.name && schema.name.trim()) {
+      return getLocalizedText(schema.name, locale, t);
+    }
+    return tableName;
+  })();
+
   // Error handling — local errors only (schema loading errors handled by DynamicPageRenderer)
   if (error) {
     return (
-      <ErrorAlert
+      <ListErrorState
+        title={listPageTitle}
+        buttons={actionBlock?.buttons || []}
+        evaluateVisible={evaluateButtonVisible}
+        resolveLabel={resolveButtonLabel}
+        onNavigate={to => navigateAwayFromList(to)}
         error={error}
+        errorTitle={getLocalizedText({ 'zh-CN': '加载失败', en: 'Unable to load' }, locale, t)}
+        retryLabel={getLocalizedText({ 'zh-CN': '重试', en: 'Retry' }, locale, t)}
         onRetry={() => {
           setError(null);
-          window.location.reload();
+          void loadData({ page: pagination.current - 1, size: pagination.pageSize, filters });
         }}
       />
     );
@@ -5198,24 +5228,7 @@ function ListPageContentInner(props: PageContentProps) {
           />
           {/* Page title, view selector, and action buttons */}
           <ListPageHeader
-            title={
-              (() => {
-                // Import writes page titles into the tenant i18n bundle as
-                // page.<pageKey>.title (en + zh-CN). Prefer that key so the title
-                // follows the UI locale; schema.title/schema.name are stored as
-                // plain zh strings and would otherwise pin the title to zh.
-                const listPageKey = schema.pageKey || tableName;
-                const keyedTitle = t(`page.${listPageKey}.title`);
-                if (keyedTitle && keyedTitle !== `page.${listPageKey}.title`) {
-                  return keyedTitle;
-                }
-                if (schema.title) return getLocalizedText(schema.title, locale, t);
-                if (schema.name && schema.name.trim()) {
-                  return getLocalizedText(schema.name, locale, t);
-                }
-                return tableName;
-              })()
-            }
+            title={listPageTitle}
             modelCode={modelCode}
             savedViews={savedViews}
             currentView={currentView}
@@ -5762,6 +5775,7 @@ function ListPageContentInner(props: PageContentProps) {
                       chipFilters: [],
                     });
                   }}
+                  hideSearch={Boolean(schemaExtension.hideSearch)}
                   hideQuickFilters={hideQuickFilters}
                   hideSort={listExtensions?.hideSort ?? Boolean(schemaExtension.hideSort)}
                   hideColumnSettings={
@@ -5865,6 +5879,7 @@ function ListPageContentInner(props: PageContentProps) {
               )}
 
               {/* Pagination + Bulk Action Toolbar */}
+              {!loading && (
               <ListPagination
                 current={pagination.current}
                 pageSize={pagination.pageSize}
@@ -5894,6 +5909,7 @@ function ListPageContentInner(props: PageContentProps) {
                 resolveBulkActionLabel={resolveButtonLabel}
                 onClearSelection={clearAllSelection}
               />
+              )}
             </div>
           ) : (
             <div data-aura-block-id={tableBlock?.id} data-aura-element-id={tableBlock?.id}>

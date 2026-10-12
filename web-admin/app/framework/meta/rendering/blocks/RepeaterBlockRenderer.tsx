@@ -6,7 +6,7 @@
  * parent form field (`block.field`).
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { FieldRenderer } from '~/framework/meta/rendering/FieldRenderer';
@@ -18,6 +18,7 @@ export interface RepeaterBlockRendererProps {
 }
 
 type RepeaterRow = Record<string, unknown>;
+const EMPTY_ROWS: RepeaterRow[] = [];
 
 export const RepeaterBlockRenderer: React.FC<RepeaterBlockRendererProps> = ({ block, runtime }) => {
   const context = runtime.getContext();
@@ -34,10 +35,17 @@ export const RepeaterBlockRenderer: React.FC<RepeaterBlockRendererProps> = ({ bl
     const existing = stateManager.getFieldValue(scopeId, repeaterKey);
     if (Array.isArray(existing)) return existing as RepeaterRow[];
     const rows = (block as any).props?.rows;
-    return Array.isArray(rows) ? (rows as RepeaterRow[]) : [];
+    return Array.isArray(rows) ? (rows as RepeaterRow[]) : EMPTY_ROWS;
   })();
 
   const [rows, setRows] = useState<RepeaterRow[]>(initialRows);
+
+  useEffect(() => {
+    const current = stateManager.getFieldValue(scopeId, repeaterKey);
+    setRows(Array.isArray(current) ? current : initialRows);
+    return stateManager.subscribe(scopeId, (state) => state.form?.[repeaterKey],
+      (next) => setRows(Array.isArray(next) ? next : []));
+  }, [initialRows, repeaterKey, scopeId, stateManager]);
 
   const commitRows = useCallback(
     (next: RepeaterRow[]) => {
@@ -121,6 +129,8 @@ export const RepeaterBlockRenderer: React.FC<RepeaterBlockRendererProps> = ({ bl
                         field: `${repeaterKey}.${rowIndex}.${fieldKey}`,
                       }}
                       runtime={runtime}
+                      value={row[fieldKey]}
+                      onChange={(value) => updateCell(rowIndex, fieldKey, value)}
                     />
                   </div>
                 );

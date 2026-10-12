@@ -36,6 +36,26 @@ import static org.mockito.Mockito.when;
 
 class BackgroundDataAccessorImplTest {
 
+    @Test
+    void projectionPageUsesDatabasePagingAndRestoresTenantAndPermitOnFailure() {
+        var query = new com.auraboot.framework.plugin.extension.DataPageQuery(
+                Map.of("owner_pid", "supplier-1"), Map.of(), List.of(), 3, 20);
+        when(dds.list(eq("quote"), any())).thenAnswer(inv -> {
+            assertThat(MetaContext.getCurrentTenantId()).isEqualTo(42L);
+            assertThat(MetaContext.getCommandPermitScopeFor("quote")).isEqualTo("ALL");
+            DynamicQueryRequest request = inv.getArgument(1);
+            assertThat(request.getPageNum()).isEqualTo(3);
+            assertThat(request.getPageSize()).isEqualTo(20);
+            assertThat(request.getConditions()).hasSize(1);
+            assertThat(request.getSortFields()).hasSize(1);
+            throw new IllegalStateException("storage unavailable");
+        });
+        assertThatThrownBy(() -> accessor.queryPage(42L, "quote", query))
+                .isInstanceOf(IllegalStateException.class).hasMessage("storage unavailable");
+        assertThat(MetaContext.exists()).isFalse();
+        assertThat(MetaContext.hasCommandPermitScope()).isFalse();
+    }
+
     private DynamicDataService dds;
     private BackgroundDataAccessorImpl accessor;
 
@@ -72,6 +92,19 @@ class BackgroundDataAccessorImplTest {
 
         assertThat(result).isPresent().get().asInstanceOf(
                 org.assertj.core.api.InstanceOfAssertFactories.MAP).containsEntry("id", "x1");
+    }
+
+    @Test
+    void tryCreate_allowsHostNormalizationWithoutMutatingImmutableCallerData() {
+        when(dds.create(anyString(), any())).thenAnswer(invocation -> {
+            Map<String, Object> payload = invocation.getArgument(1);
+            payload.put("normalized", true);
+            return payload;
+        });
+        Map<String, Object> original = Map.of("slot_at", "2026-10-12T06:00:00Z");
+        assertThat(accessor.tryCreate(42L, "qo_procurement_reminder_common", original).orElseThrow())
+                .containsEntry("normalized", true);
+        assertThat(original).containsOnlyKeys("slot_at");
     }
 
     @Test

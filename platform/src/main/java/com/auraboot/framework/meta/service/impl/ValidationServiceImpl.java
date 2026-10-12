@@ -354,7 +354,8 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
             }
             targetTable = targetModel.getTableName();
         }
-        String valueField = (refTarget.getValueField() != null && !refTarget.getValueField().isBlank())
+        boolean explicitIdentity = refTarget.getValueField() != null && !refTarget.getValueField().isBlank();
+        String valueField = explicitIdentity
                 ? refTarget.getValueField()
                 : (refTarget.getTargetField() != null && !refTarget.getTargetField().isBlank())
                         ? refTarget.getTargetField()
@@ -362,16 +363,16 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
         SqlSafetyUtils.validateIdentifier(targetTable, "reference targetTable");
         SqlSafetyUtils.validateIdentifier(valueField, "reference valueField");
         Long tenantId = MetaContext.getCurrentTenantId();
-        // A reference candidate is accepted when it resolves through the declared
-        // valueField, the target's pid column, or the display key — callers
-        // legitimately pass any of the three, and all identify the same row.
+        // A declared valueField is the identity contract; a display column is never
+        // an alternate identity. Preserve pid/key compatibility only for legacy
+        // declarations that have no explicit valueField.
         String displayField = (refTarget.getTargetField() != null && !refTarget.getTargetField().isBlank())
                 ? refTarget.getTargetField()
                 : null;
         for (String candidate : parseReferenceValues(rawValue)) {
             String lookup = "(" + valueField + " = #{params.refValue}";
-            if (!valueField.equalsIgnoreCase("pid")) lookup += " OR pid = #{params.refValue}";
-            if (displayField != null && !displayField.equalsIgnoreCase(valueField)) {
+            if (!explicitIdentity && !valueField.equalsIgnoreCase("pid")) lookup += " OR pid = #{params.refValue}";
+            if (!explicitIdentity && displayField != null && !displayField.equalsIgnoreCase(valueField)) {
                 lookup += " OR " + displayField + " = #{params.refValue}";
             }
             lookup += ")";
@@ -390,8 +391,9 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
                                 + "': " + targetTable + "." + valueField + " = " + candidate);
                     }
                 }
-            } catch (Exception e) {
+            } catch (RuntimeException e) {
                 log.warn("Reference existence check failed for {}: {}", fieldDefinition.getCode(), e.getMessage());
+                errors.add("Reference existence could not be verified for field '" + fieldDefinition.getName() + "'");
             }
         }
     }

@@ -65,7 +65,16 @@ export default function ConfirmDialog({
   useEffect(() => {
     if (!open) return;
 
+    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     confirmBtnRef.current?.focus();
+    return () => {
+      if (trigger?.isConnected) trigger.focus();
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [open, handleKeyDown]);

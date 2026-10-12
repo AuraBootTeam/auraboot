@@ -179,7 +179,8 @@ export const ListTable = React.memo(function ListTable({
       const title =
         typeof rawValue === 'string' || typeof rawValue === 'number' ? String(rawValue) : undefined;
       return (
-        <div className="max-w-full min-w-0 truncate" title={title}>
+        <div className={`max-w-full min-w-0 ${column.ellipsis === false
+          ? 'whitespace-normal break-words' : 'truncate'}`} title={title}>
           {renderCellContent(record, column, rowIndex)}
         </div>
       );
