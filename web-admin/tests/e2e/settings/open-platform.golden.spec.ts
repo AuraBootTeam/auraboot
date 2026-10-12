@@ -164,6 +164,10 @@ test.describe('Dynamic resource publication journey', () => {
     await expect(page.getByTestId('publication-editor').getByRole('alert')).toContainText('你的修改已保留');
     await expect(page.getByLabel('查询超时（毫秒）', { exact: true })).toHaveValue('7000');
     await expect(page.getByTestId('publication-editor').getByRole('alert')).toBeInViewport();
+    const conflictActions = page.getByTestId('publication-editor').getByRole('button', { name: '关闭编辑', exact: true }).locator('..');
+    await conflictActions.scrollIntoViewIfNeeded();
+    await expect(conflictActions).toBeInViewport({ ratio: 1 });
+    await expect(page.getByTestId('publication-editor').getByRole('alert')).toBeInViewport({ ratio: 1 });
     await snapshot('publication-conflict');
     await page.getByRole('button', { name: '关闭编辑', exact: true }).click();
     await page.getByRole('group', { name: '操作确认', exact: true }).getByRole('button', { name: '确认', exact: true }).click();
@@ -447,7 +451,12 @@ test.describe('Dynamic query publication journey', () => {
       if (type === 'object') { await output.getByLabel('原对象属性', { exact: true }).fill('contact_name'); await output.getByLabel('对外属性名称', { exact: true }).fill('contactName'); }
     }
     await expect(editor.getByLabel('可写', { exact: true })).toHaveCount(0);
-    await editor.locator('section').filter({ has: page.getByTestId('query-output-partDetails') }).screenshot({ path: path.join(screenshotRoot, 'query-output-region.png') });
+    for (const [field, image] of [['partDetails', 'query-output-region'], ['partName', 'query-output-name'], ['pid', 'query-output-pid']]) {
+      const output = editor.getByTestId(`query-output-${field}`);
+      await output.scrollIntoViewIfNeeded();
+      await expect(output).toBeInViewport({ ratio: 1 });
+      await output.screenshot({ path: path.join(screenshotRoot, `${image}.png`) });
+    }
     await editor.getByRole('button', { name: '保存并校验查询草稿', exact: true }).locator('..').locator('..').screenshot({ path: path.join(screenshotRoot, 'query-footer-region.png') });
     const savedResponse = page.waitForResponse(response => response.url().endsWith(`/query-publications/${publicCode}/draft`) && response.request().method() === 'PUT');
     await page.getByRole('button', { name: '保存并校验查询草稿', exact: true }).click();
@@ -550,7 +559,12 @@ test.describe('Dynamic installation authority journey', () => {
     expect((await page.request.get(`${resourcePath}/${recordB.pid}`, { headers: machineHeaders })).status()).toBe(404);
     const forbidden = await page.request.post(resourcePath, { headers: { ...machineHeaders, 'Idempotency-Key': `grant-forbidden-${suffix}` }, data: { name: 'Denied', zone: 'B' } }); expect(forbidden.status()).toBe(403);
     await editor.getByLabel('授权合同', { exact: true }).selectOption(`query:${queryCode}`); await expect(editor).toContainText('已有列表授权');
-    await editor.getByLabel('pid', { exact: true }).check(); await editor.getByLabel('name', { exact: true }).check(); await snapshot('grant-query');
+    await editor.getByLabel('pid', { exact: true }).check(); await editor.getByLabel('name', { exact: true }).check();
+    const queryGrantActions = editor.getByRole('button', { name: '保存安装授权', exact: true }).locator('..').locator('..');
+    await queryGrantActions.scrollIntoViewIfNeeded();
+    await expect(queryGrantActions).toBeInViewport({ ratio: 1 });
+    for (const alias of ['pid', 'name']) await expect(editor.getByLabel(alias, { exact: true }).locator('..')).toBeInViewport({ ratio: 1 });
+    await snapshot('grant-query');
     const queryGranted = page.waitForResponse(response => response.url().endsWith(`/installations/${installation.pid}/queries/${queryCode}`) && response.request().method() === 'PUT');
     await editor.getByRole('button', { name: '保存安装授权', exact: true }).click(); expect((await queryGranted).status()).toBe(200); await expect(editor.getByRole('status').filter({ hasText: '授权已保存' })).toBeVisible();
     const result = await page.request.post(queryPath, { headers: machineHeaders, data: { parameters: { zone: 'A' }, limit: 10 } }); expect(result.status()).toBe(200); expect((await result.json()).items).toEqual([{ pid: recordA.pid, name: 'Allowed A' }]);
@@ -787,7 +801,9 @@ test.describe('Open Platform golden journey', () => {
       ratio: 1,
     });
     await capture(page, 'OP-UI-07-top', false);
-    await installDialog.getByRole('checkbox').last().scrollIntoViewIfNeeded();
+    const lastInstallationScope = installDialog.getByRole('checkbox').last().locator('..');
+    await lastInstallationScope.scrollIntoViewIfNeeded();
+    await expect(lastInstallationScope).toBeInViewport({ ratio: 1 });
     await expect(installDialog.getByRole('checkbox').last()).toBeInViewport({ ratio: 1 });
     await installDialog.getByRole('button', { name: '安装', exact: true }).scrollIntoViewIfNeeded();
     await expect(installDialog.getByRole('button', { name: '安装', exact: true })).toBeInViewport({
@@ -1589,6 +1605,7 @@ test.describe('Open Platform golden journey', () => {
     await capture(page, 'OP-UI-09');
     await revokeDialog.getByRole('button', { name: '取消' }).click();
 
+    await dismissToasts(page);
     await appCard.getByRole('button', { name: '编辑 Scope' }).click();
     const scopeDialog = page.getByRole('dialog', { name: '编辑 Scope' });
     await expect(scopeDialog).toContainText('立即吊销此安装的现有 Access Token');
@@ -1605,7 +1622,9 @@ test.describe('Open Platform golden journey', () => {
       ratio: 1,
     });
     await capture(page, 'OP-UI-10-top', false);
-    await scopeDialog.getByRole('checkbox').last().scrollIntoViewIfNeeded();
+    const lastEditableScope = scopeDialog.getByRole('checkbox').last().locator('..');
+    await lastEditableScope.scrollIntoViewIfNeeded();
+    await expect(lastEditableScope).toBeInViewport({ ratio: 1 });
     await expect(scopeDialog.getByRole('checkbox').last()).toBeInViewport({ ratio: 1 });
     await scopeDialog.getByRole('button', { name: '保存', exact: true }).scrollIntoViewIfNeeded();
     await expect(scopeDialog.getByRole('button', { name: '保存', exact: true })).toBeInViewport({
