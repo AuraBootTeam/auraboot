@@ -113,16 +113,16 @@ export interface FlatPageDocument {
 export function serializePageTreeToFlat(document: PageSchemaV3): FlatPageDocument {
   const issues: string[] = [];
   const kind = document.kind;
-  if (kind !== 'list' && kind !== 'form' && kind !== 'detail') {
+  if (kind !== 'list' && kind !== 'form' && kind !== 'detail' && kind !== 'dashboard') {
     throw new FlatSerializationError([
-      `kind "${kind}" has no flat v4 runtime representation (expected list | form | detail)`,
+      `kind "${kind}" has no flat v4 runtime representation (expected list | form | detail | dashboard)`,
     ]);
   }
 
   const { topLevel, rootBlockId } = resolveTopLevelBlocks(document);
   const blocks: LegacyDslBlockV2[] = [];
   for (const block of topLevel) {
-    const flat = serializeBlock(block, issues);
+    const flat = serializeBlock(block, issues, kind);
     if (flat) blocks.push(flat);
   }
   if (issues.length > 0) {
@@ -149,7 +149,11 @@ function resolveTopLevelBlocks(document: PageSchemaV3): {
   return { topLevel: blocks, rootBlockId: undefined };
 }
 
-function serializeBlock(block: DslBlockV3, issues: string[]): LegacyDslBlockV2 | null {
+function serializeBlock(
+  block: DslBlockV3,
+  issues: string[],
+  kind: PageSchemaV3Kind = 'detail',
+): LegacyDslBlockV2 | null {
   if (DESIGNER_ONLY_BLOCK_TYPES.has(block.blockType)) {
     issues.push(describeUnsupported(block));
     return null;
@@ -168,11 +172,18 @@ function serializeBlock(block: DslBlockV3, issues: string[]): LegacyDslBlockV2 |
     case 'tabs':
       return serializeTabs(block, issues);
     case 'widget': {
-      // migrateWidgetLikeBlock maps flat `chart` / `stat-card` rows to editor
-      // widgets. `number-card` converges to the flat stat-card vocabulary (the
-      // list renderer dispatches stat-card via the BlockRenderer fallback);
-      // other widget types belong to the dashboard designer and have no
-      // page-side flat counterpart.
+      // Dashboard pages store widget blocks verbatim (blockType 'widget' +
+      // widgetType) — the dashboard runtime dispatches on widgetType and the
+      // stored-page contract asserts the original type survives the round
+      // trip. List/form/detail keep the converging mapping: migrateWidgetLike
+      // Block maps flat `chart` / `stat-card` rows to editor widgets, and
+      // `number-card` converges to the flat stat-card vocabulary (the list
+      // renderer dispatches stat-card via the BlockRenderer fallback).
+      if (kind === 'dashboard') {
+        const flat = serializePassthrough({ ...block, blockType: 'widget' }, issues);
+        if (block.widgetType) flat.widgetType = block.widgetType;
+        return flat;
+      }
       const widgetType = block.widgetType ?? '';
       if (widgetType === 'chart' || widgetType === 'stat-card' || widgetType === 'number-card') {
         const flatType = widgetType === 'number-card' ? 'stat-card' : widgetType;
