@@ -43,6 +43,22 @@ class BaseImageIdentityTest(unittest.TestCase):
         self.assertEqual(bound["transportReference"], transport)
         self.assertEqual(bound["imageId"], image["imageId"])
         self.assertEqual(module.bind_transports([image], "{}")[0]["transportReference"], tag)
+        selected = []
+        canonical = "docker.io/docker/dockerfile@sha256:" + "b" * 64
+        frontend = "mirror.example/docker/dockerfile@sha256:" + "b" * 64
+        record = self.record([frontend])
+        image = module.freeze_prewarmed(canonical, {canonical: frontend}, lambda ref: (selected.append(ref), record)[1])
+        self.assertEqual(selected, [frontend])
+        self.assertEqual(image["reference"], canonical)
+        self.assertEqual(image["tag"], canonical)
+        self.assertEqual(image["imageId"], record["Id"])
+        with self.assertRaises(ValueError):
+            module.freeze_prewarmed(canonical, {canonical: frontend.replace("b" * 64, "c" * 64)},
+                                   lambda ref: self.fail("changed digest must reject before inspection"))
+        with self.assertRaises(ValueError):
+            module.freeze_prewarmed(canonical, {canonical: frontend}, lambda ref: self.record([frontend.replace("b" * 64, "c" * 64)]))
+        with self.assertRaises(ValueError):
+            module.freeze_prewarmed("redis:7.4-alpine", {}, lambda ref: self.record([frontend]))
         bad_maps = [{tag: transport.replace("b" * 64, "c" * 64)},
                     {tag: "mirror.example/cache/redis:latest"}, {"unknown": transport},
                     {tag: "https://" + transport}, {tag: None}, [],

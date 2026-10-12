@@ -60,6 +60,8 @@ IMAGE="auraboot-platform-open-api:ci-${REF_SHA:0:12}"
 FLYWAY_IMAGE="${AURA_CI_RELEASE_FLYWAY_IMAGE:-flyway/flyway:12.8.1}"
 K6_IMAGE="${AURA_CI_K6_IMAGE:-grafana/k6:1.3.0}"
 SDK_NODE_IMAGE="${AURA_CI_NODE_IMAGE:-node:22-alpine}"
+# Dockerfile frontend 1.20.0; digest verified against Docker Hub official tag metadata.
+DOCKERFILE_FRONTEND_SOURCE="docker.io/docker/dockerfile@sha256:26147acbda4f14c5add9946e2fd2ed543fc402884fd75146bd342a7f6271dc1d"
 BUILD_JDK_IMAGE="eclipse-temurin:21-jdk"
 RUNTIME_JRE_IMAGE="eclipse-temurin:21-jre-alpine"
 PULL_TIMEOUT="${AURA_CI_RELEASE_PULL_TIMEOUT:-300}"
@@ -111,7 +113,7 @@ BASE_IMAGE_MANIFEST="$ARTIFACTS/base-images.json"
 # Explicit transport mappings retain that source digest and are recorded in the manifest.
 python3 "$SCRIPT_DIR/ci/freeze-release-base-images.py" "$BASE_IMAGE_MANIFEST" \
   pgvector/pgvector:pg16 redis:7.4-alpine "$FLYWAY_IMAGE" "$K6_IMAGE" "$SDK_NODE_IMAGE" \
-  "$BUILD_JDK_IMAGE" "$RUNTIME_JRE_IMAGE" \
+  "$BUILD_JDK_IMAGE" "$RUNTIME_JRE_IMAGE" "$DOCKERFILE_FRONTEND_SOURCE" \
   || fatal "unable to freeze prewarmed base image identities"
 base_ref() {
   python3 -c 'import json,sys; rows=json.load(open(sys.argv[1]))["images"]; print(next(row["transportReference"] for row in rows if row["tag"]==sys.argv[2]))' \
@@ -132,6 +134,7 @@ K6_IMAGE="$(base_ref "$K6_IMAGE")"
 SDK_NODE_IMAGE="$(base_ref "$SDK_NODE_IMAGE")"
 BUILD_JDK_IMAGE="$(base_ref "$BUILD_JDK_IMAGE")"
 RUNTIME_JRE_IMAGE="$(base_ref "$RUNTIME_JRE_IMAGE")"
+DOCKERFILE_FRONTEND_IMAGE="$(base_ref "$DOCKERFILE_FRONTEND_SOURCE")"
 
 # The admitted host installer prewarms this distribution from the configured transport mirror and
 # verifies it against Gradle's fixed official SHA-256. Seed the BuildKit cache from that verified
@@ -147,13 +150,13 @@ printf '%s  %s\n' "$GRADLE_DISTRIBUTION_SHA256" "$GRADLE_ZIP" | sha256sum --chec
   || fatal "host Gradle wrapper distribution checksum mismatch"
 info "seeding BuildKit Gradle wrapper cache from verified host distribution"
 {
-  printf '# syntax=docker/dockerfile:1\n'
+  printf '# syntax=%s\n' "$DOCKERFILE_FRONTEND_IMAGE"
   printf 'FROM %s\n' "$BUILD_JDK_IMAGE"
   printf 'COPY dists/gradle-%s-bin/%s /tmp/gradle-dist\n' \
     "$GRADLE_VERSION" "$GRADLE_DISTRIBUTION_HASH"
   printf 'RUN --mount=type=cache,target=/root/.gradle/wrapper mkdir -p /root/.gradle/wrapper/dists/gradle-%s-bin/%s && cp -a /tmp/gradle-dist/. /root/.gradle/wrapper/dists/gradle-%s-bin/%s/\n' \
     "$GRADLE_VERSION" "$GRADLE_DISTRIBUTION_HASH" "$GRADLE_VERSION" "$GRADLE_DISTRIBUTION_HASH"
-} | docker build -f - "$GRADLE_WRAPPER_HOME" \
+} | docker build -f - "$GRADLE_WRAPPER_HOME" --build-arg "BUILDKIT_SYNTAX=$DOCKERFILE_FRONTEND_IMAGE" \
   > "$ARTIFACTS/logs/gradle-wrapper-cache-seed.log" 2>&1 \
   || fatal "failed to seed BuildKit Gradle wrapper cache"
 
@@ -174,6 +177,7 @@ python3 "$STAGE/scripts/ci/verify-open-platform-sdk.py" "$STAGE" "$SDK_ROOT" "$A
   || fail "fresh SDK archive reconciliation failed"
 info "building exact-ref image $IMAGE"
 docker build -f "$STAGE/platform/Dockerfile" -t "$IMAGE" \
+  --build-arg "BUILDKIT_SYNTAX=$DOCKERFILE_FRONTEND_IMAGE" \
   --build-arg "BUILD_JDK_IMAGE=$BUILD_JDK_IMAGE" --build-arg "RUNTIME_JRE_IMAGE=$RUNTIME_JRE_IMAGE" "$STAGE" \
   > "$ARTIFACTS/logs/docker-build.log" 2>&1 || fail "image build failed"
 DIGEST="$(docker image inspect "$IMAGE" --format '{{.Id}}')"

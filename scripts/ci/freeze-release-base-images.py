@@ -39,7 +39,7 @@ def freeze_image(tag, record):
 
 
 
-def bind_transports(images, raw):
+def load_transports(raw):
     """A transport can select another registry, but never different image bytes."""
     def unique_object(pairs):
         result = {}
@@ -53,6 +53,34 @@ def bind_transports(images, raw):
     mapping = json.loads(raw, object_pairs_hook=unique_object)
     if not isinstance(mapping, dict) or len(mapping) > 32:
         raise ValueError("bounded base image transport map required")
+    return mapping
+
+
+def checked_transport(source, transport):
+    if not isinstance(transport, str) or not re.fullmatch(
+        r"[a-z0-9][a-z0-9.-]*(?::[0-9]{1,5})?/[a-z0-9][a-z0-9._/-]*@sha256:[0-9a-f]{64}", transport):
+        raise ValueError("immutable registry transport reference required")
+    name, _, digest = transport.partition("@")
+    if repository(name) != name or ".." in name or "//" in name or name.endswith("/"):
+        raise ValueError("explicit normalized registry transport required")
+    if digest != source.partition("@")[2]:
+        raise ValueError("base image transport digest differs from frozen source")
+    return transport
+
+
+def freeze_prewarmed(tag, mapping, inspect):
+    if "@" not in tag:
+        return freeze_image(tag, inspect(tag))
+    source = repository(tag) + "@" + tag.partition("@")[2]
+    transport = checked_transport(source, mapping.get(source, source))
+    image = freeze_image(transport, inspect(transport))
+    # An explicit canonical digest authorizes transport selection before inspection.
+    # The selected registry must report that exact digest; named tags keep canonical authority.
+    return dict(image, tag=tag, reference=source)
+
+
+def bind_transports(images, raw):
+    mapping = load_transports(raw)
     sources = {image["reference"] for image in images}
     if not set(mapping).issubset(sources):
         raise ValueError("base image transport source is not in the frozen manifest")
@@ -60,14 +88,7 @@ def bind_transports(images, raw):
     for image in images:
         source = image["reference"]
         transport = mapping.get(source, source)
-        if not isinstance(transport, str) or not re.fullmatch(
-                r"[a-z0-9][a-z0-9.-]*(?::[0-9]{1,5})?/[a-z0-9][a-z0-9._/-]*@sha256:[0-9a-f]{64}", transport):
-            raise ValueError("immutable registry transport reference required")
-        name, _, digest = transport.partition("@")
-        if repository(name) != name or ".." in name or "//" in name or name.endswith("/"):
-            raise ValueError("explicit normalized registry transport required")
-        if digest != source.partition("@")[2]:
-            raise ValueError("base image transport digest differs from frozen source")
+        transport = checked_transport(source, transport)
         bound.append(dict(image, transportReference=transport))
     return bound
 
@@ -76,14 +97,15 @@ def main():
     output, *tags = sys.argv[1:]
     if not tags:
         raise ValueError("no configured base images")
-    images = []
-    for tag in tags:
-        raw = subprocess.check_output(["docker", "image", "inspect", tag], text=True)
-        records = json.loads(raw)
+    raw_transports = os.environ.get("AURA_CI_RELEASE_BASE_IMAGE_TRANSPORTS", "{}")
+    mapping = load_transports(raw_transports)
+    def inspect(reference):
+        records = json.loads(subprocess.check_output(["docker", "image", "inspect", reference], text=True))
         if len(records) != 1:
-            raise ValueError(f"expected one prewarmed image: {tag}")
-        images.append(freeze_image(tag, records[0]))
-    images = bind_transports(images, os.environ.get("AURA_CI_RELEASE_BASE_IMAGE_TRANSPORTS", "{}"))
+            raise ValueError(f"expected one prewarmed image: {reference}")
+        return records[0]
+    images = [freeze_prewarmed(tag, mapping, inspect) for tag in tags]
+    images = bind_transports(images, raw_transports)
     Path(output).write_text(json.dumps({"images": images}, indent=2) + "\n")
 
 

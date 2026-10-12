@@ -17,6 +17,11 @@ assert.match(gate, /registry publication requires a separate owner-authorized jo
 assert.match(gate, /GRADLE_DISTRIBUTION_SHA256="6f74b601422d6d6fc4e1f9a1ab6522f642c2fdcbc15ae33ebd30ba3d7198e854"/);
 assert.match(gate, /sha256sum --check --status/);
 assert.match(gate, /seeding BuildKit Gradle wrapper cache from verified host distribution/);
+assert.match(gate, /DOCKERFILE_FRONTEND_SOURCE="docker\.io\/docker\/dockerfile@sha256:26147acbda4f14c5add9946e2fd2ed543fc402884fd75146bd342a7f6271dc1d"/);
+assert.match(gate, /"\$BUILD_JDK_IMAGE" "\$RUNTIME_JRE_IMAGE" "\$DOCKERFILE_FRONTEND_SOURCE"/);
+assert.match(gate, /DOCKERFILE_FRONTEND_IMAGE="\$\(base_ref "\$DOCKERFILE_FRONTEND_SOURCE"\)"/);
+assert.equal((gate.match(/--build-arg "BUILDKIT_SYNTAX=\$DOCKERFILE_FRONTEND_IMAGE"/g) ?? []).length, 2);
+assert.doesNotMatch(gate, /# syntax=docker\/dockerfile:1/);
 assert.match(gate, /--mount=type=cache,target=\/root\/\.gradle\/wrapper/);
 assert.match(dockerfile, /COPY VERSION \/VERSION/);
 assert.match(gate, /docker logs "\$APP" > "\$ARTIFACTS\/logs\/app\.log"/);
