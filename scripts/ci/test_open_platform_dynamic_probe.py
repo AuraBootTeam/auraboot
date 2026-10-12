@@ -222,6 +222,27 @@ def passed():
             "anonymous":False,"secretFree":True,"businessDetails":{"actorKind":"unauthenticated","phase":"authentication","code":"invalid_token"}})
     report["credentialRevocation"]={"resource":resource,"applicationPid":"revocation-app","installationPid":"revocation-install",
                                   "writes":writes,"before":state,"afterRevoked":revoked,"afterDenied":denied,"denials":denials}
+    def major_document(code, alias):
+        return {"openapi": "3.1.0", "paths": {"/api/open/v1/resources/" + code: {}},
+                "components": {"schemas": {"Resource": {"properties": {key: {} for key in ["pid", alias, "zone", "secret"]}}}}}
+    def major_policy(alias):
+        return {"operations": ["get"], "readableFields": sorted(["pid", alias, "zone"]),
+                "writableFields": [], "rowConstraints": [{"field": "zone", "values": ["A"]}]}
+    major_old = "release.dynamic.parts.major"
+    old_snapshot = {"status": 200, "body": {"pid": "allowed-pid", "name": "Allowed A", "zone": "A"},
+                    "etag": '"stable-old-etag"', "activeVersion": 1, "policy": major_policy("name"),
+                    "openapi": major_document(major_old, "name")}
+    denial = {"status": 403, "body": {"code": "403", "message": "Access forbidden", "data": None,
+                "context": "Current resource or query authorization required", "timestamp": 1791744000000}, "etag": None}
+    report["resourceMajorCompatibility"] = {"installationPid": "install-pid", "oldCode": major_old,
+        "newCode": major_old + ".v2", "rejection": {"status": 400,
+            "body": {"code": "400", "message": "Existing public field contract cannot change: name"}},
+        "oldSnapshots": [copy.deepcopy(old_snapshot) for _ in range(4)],
+        "newOpenapi": major_document(major_old + ".v2", "displayName"),
+        "newPolicy": major_policy("displayName"), "beforeGrantPolicy": None, "afterRevokePolicy": None,
+        "beforeGrant": copy.deepcopy(denial), "afterRevoke": copy.deepcopy(denial),
+        "afterGrant": {"status": 200, "body": {"pid": "allowed-pid", "displayName": "Allowed A", "zone": "A"},
+                       "etag": '"new-major-etag"'}}
     return report
 
 
@@ -408,6 +429,34 @@ class DynamicProbeTests(unittest.TestCase):
                     self.assertEqual(run_source_binding_probe(request, human, "install-pid", {}, "resource.get")["status"], 409)
                 self.assertTrue(state["restored"])
                 self.assertFalse(state["rebound"])
+
+    def test_resource_major_proof_is_mandatory_and_rejects_contract_or_grant_reuse(self):
+        report = passed(); del report["resourceMajorCompatibility"]
+        with self.assertRaises(ProtocolError): verify_report(report)
+        mutations = [
+            lambda p: p.update(installationPid="foreign-install"),
+            lambda p: p.update(newCode=p["oldCode"]),
+            lambda p: p["rejection"].update(status=200),
+            lambda p: p["rejection"]["body"].update(message="unrelated rejection"),
+            lambda p: p["oldSnapshots"].pop(),
+            lambda p: p["oldSnapshots"][1].update(activeVersion=2),
+            lambda p: p["oldSnapshots"][2].update(etag='"changed"'),
+            lambda p: p["oldSnapshots"][3]["body"].update(name="Changed"),
+            lambda p: p["oldSnapshots"][2]["policy"].update(readableFields=["pid"]),
+            lambda p: p["oldSnapshots"][1]["openapi"].update(openapi="3.0.0"),
+            lambda p: p.update(newOpenapi=p["oldSnapshots"][0]["openapi"]),
+            lambda p: p.update(newPolicy=p["oldSnapshots"][0]["policy"]),
+            lambda p: p.update(beforeGrantPolicy=p["newPolicy"]),
+            lambda p: p.update(afterRevokePolicy=p["newPolicy"]),
+            lambda p: p["beforeGrant"].update(status=200),
+            lambda p: p["afterRevoke"].update(status=200),
+            lambda p: p["afterGrant"]["body"].update(secret="Private A"),
+            lambda p: p["afterGrant"]["body"].update(pid="hidden-pid"),
+            lambda p: p["afterGrant"].update(etag=None),
+        ]
+        for index, mutate in enumerate(mutations):
+            report = passed(); mutate(report["resourceMajorCompatibility"])
+            with self.subTest(index=index), self.assertRaises(ProtocolError): verify_report(report)
 
     def test_source_binding_proof_is_mandatory_and_preserves_the_original_record_and_etag(self):
         report = passed(); del report["resourceSourceBinding"]

@@ -468,6 +468,7 @@ def verify_report(report):
     verify_replay_authority(report.get("replayAuthority"), report)
     verify_write_replay_authority(report.get("writeReplayAuthority"), report)
     verify_source_binding(report.get("resourceSourceBinding"))
+    verify_resource_major(report.get("resourceMajorCompatibility"), report.get("installationPid"))
     virtual = verify_virtual_resource(report.get("virtualResource"))
     isolation = virtual["installationIsolation"]
     if (isolation["primaryInstallationPid"] != report.get("installationPid")
@@ -494,6 +495,131 @@ def verify_report(report):
             or audit["durationMs"] < 0 or not isinstance(audit.get("occurredAt"), str) or not audit["occurredAt"]):
         raise ProtocolError("dynamic query quota audit proof invalid")
     return report
+
+
+def verify_resource_major(proof, installation_pid):
+    if not isinstance(proof, dict) or proof.get("installationPid") != installation_pid:
+        raise ProtocolError("resource major installation proof missing")
+    old = "release.dynamic.parts.major"
+    if proof.get("oldCode") != old or proof.get("newCode") != old + ".v2":
+        raise ProtocolError("resource major address identity invalid")
+    rejection = proof.get("rejection", {})
+    if (rejection.get("status") != 400 or str(rejection.get("body", {}).get("code")) != "400"
+            or rejection.get("body", {}).get("message") != "Existing public field contract cannot change: name"):
+        raise ProtocolError("resource major incompatible publication was not rejected")
+    snapshots = proof.get("oldSnapshots")
+    if not isinstance(snapshots, list) or len(snapshots) != 4:
+        raise ProtocolError("resource major old contract checkpoints missing")
+    baseline = snapshots[0]
+    if any(row != baseline for row in snapshots):
+        raise ProtocolError("resource major changed old contract, policy, projection or ETag")
+    body = baseline.get("body", {})
+    etag = baseline.get("etag")
+    if (baseline.get("status") != 200 or baseline.get("activeVersion") != 1
+            or set(body) != {"pid", "name", "zone"} or not body.get("pid")
+            or body.get("name") != "Allowed A" or body.get("zone") != "A"
+            or not isinstance(etag, str) or not re.fullmatch(r'"[^"\r\n]+"', etag)):
+        raise ProtocolError("resource major old record baseline invalid")
+    def policy(alias):
+        return {"operations": ["get"], "readableFields": sorted(["pid", alias, "zone"]),
+                "writableFields": [], "rowConstraints": [{"field": "zone", "values": ["A"]}]}
+    if baseline.get("policy") != policy("name") or proof.get("newPolicy") != policy("displayName"):
+        raise ProtocolError("resource major independent policies invalid")
+    def document(value, code, alias):
+        if (not isinstance(value, dict) or value.get("openapi") != "3.1.0"
+                or "/api/open/v1/resources/" + code not in value.get("paths", {})
+                or set(value.get("components", {}).get("schemas", {}).get("Resource", {}).get("properties", {}))
+                    != {"pid", alias, "zone", "secret"}):
+            raise ProtocolError("resource major published OpenAPI invalid")
+    document(baseline.get("openapi"), old, "name")
+    document(proof.get("newOpenapi"), old + ".v2", "displayName")
+    if proof.get("beforeGrantPolicy", "missing") is not None or proof.get("afterRevokePolicy", "missing") is not None:
+        raise ProtocolError("resource major independent grant catalog invalid")
+    for key in ["beforeGrant", "afterRevoke"]:
+        row = proof.get(key, {})
+        denied = row.get("body", {})
+        if (row.get("status") != 403 or denied.get("code") != "403"
+                or denied.get("message") != "Access forbidden" or denied.get("data") is not None
+                or denied.get("context") != "Current resource or query authorization required"
+                or type(denied.get("timestamp")) is not int or denied["timestamp"] <= 0
+                or row.get("etag") is not None):
+            raise ProtocolError("resource major inherited or retained old authorization")
+    allowed = proof.get("afterGrant", {})
+    if (allowed.get("status") != 200 or allowed.get("body") != {
+            "pid": body["pid"], "displayName": "Allowed A", "zone": "A"}
+            or not isinstance(allowed.get("etag"), str)
+            or not re.fullmatch(r'"[^"\r\n]+"', allowed["etag"])):
+        raise ProtocolError("resource major explicitly granted projection invalid")
+    return proof
+
+
+def run_resource_major_probe(request, human, admin, installation_pid, machine, definition, record_pid):
+    import copy
+    old = "release.dynamic.parts.major"
+    new = old + ".v2"
+    old_definition = copy.deepcopy(definition)
+    old_definition["code"] = old
+    def publish(code, contract):
+        human(f"/api/open-platform/publications/{code}/draft", "PUT",
+              {"expectedRevision": 0, "definition": contract})
+        return human(f"/api/open-platform/publications/{code}/publish", "POST", {"expectedRevision": 1})
+    def grant_path(code):
+        return f"/api/open-platform/installations/{installation_pid}/resources/{code}"
+    def policy(alias):
+        return {"operations": ["get"], "readableFields": sorted(["pid", alias, "zone"]),
+                "writableFields": [], "rowConstraints": [{"field": "zone", "values": ["A"]}]}
+    def read(code, expected=200):
+        status, body, headers = request(f"/api/open/v1/resources/{code}/{record_pid}",
+                                        headers=machine, expected=(expected,))
+        return {"status": status, "body": body, "etag": next(
+            (v for k, v in headers.items() if k.lower() == "etag"), None)}
+    def openapi(code):
+        return request(f"/api/open-platform/publications/{code}/openapi", headers=admin)[1]
+    def stored_policy(code):
+        rows = human(f"/api/open-platform/installations/{installation_pid}/resources")
+        found = [row for row in rows if row.get("code") == code]
+        if len(found) != 1:
+            raise ProtocolError("resource major installation catalog identity missing")
+        value = found[0].get("policy")
+        if value is not None:
+            value = dict(value)
+            for key in ["operations", "readableFields", "writableFields"]:
+                value[key] = sorted(value[key])
+        return value
+    def snapshot():
+        rows = [row for row in human("/api/open-platform/publications") if row.get("code") == old]
+        if len(rows) != 1:
+            raise ProtocolError("resource major old publication identity missing")
+        return dict(read(old), activeVersion=rows[0].get("activeVersion"),
+                    policy=stored_policy(old), openapi=openapi(old))
+    publish(old, old_definition)
+    human(grant_path(old), "PUT", policy("name"))
+    proof = {"installationPid": installation_pid, "oldCode": old, "newCode": new,
+             "oldSnapshots": [snapshot()]}
+    breaking = copy.deepcopy(old_definition)
+    breaking["schemaVersion"] = 2
+    breaking["fields"]["displayName"] = breaking["fields"].pop("name")
+    human(f"/api/open-platform/publications/{old}/draft", "PUT",
+          {"expectedRevision": 1, "definition": breaking})
+    status, body, _ = request(f"/api/open-platform/publications/{old}/publish", "POST",
+                             body={"expectedRevision": 2}, headers=admin, expected=(400,))
+    proof["rejection"] = {"status": status, "body": body}
+    proof["oldSnapshots"].append(snapshot())
+    major = copy.deepcopy(breaking)
+    major.update(code=new, schemaVersion=1)
+    publish(new, major)
+    proof["newOpenapi"] = openapi(new)
+    proof["beforeGrantPolicy"] = stored_policy(new)
+    proof["beforeGrant"] = read(new, 403)
+    human(grant_path(new), "PUT", policy("displayName"))
+    proof["newPolicy"] = stored_policy(new)
+    proof["afterGrant"] = read(new)
+    proof["oldSnapshots"].append(snapshot())
+    human(grant_path(new), "DELETE")
+    proof["afterRevokePolicy"] = stored_policy(new)
+    proof["afterRevoke"] = read(new, 403)
+    proof["oldSnapshots"].append(snapshot())
+    return verify_resource_major(proof, installation_pid)
 
 
 def verify_source_binding(proof):
@@ -1190,6 +1316,8 @@ def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None, audi
         _, deleted, deleted_headers = audited("delete", row_path, "DELETE", headers=dict(machine, **{"Idempotency-Key": "dynamic-release-delete", "If-Match": next_etag}), expected=(204,))
         report["writeReplayAuthority"]["delete"] = run_replay_authority_probe(request, human, report, machine, grant_path, operations, model_code, deleted, deleted_headers, "delete", created["pid"], next_etag)
         request(row_path, headers=machine, expected=(404,)); record("delete")
+        report["resourceMajorCompatibility"] = run_resource_major_probe(
+            request, human, admin, installation["pid"], machine, definition, a["pid"])
         human(query_grant_path, "DELETE")
         request(query_path, "POST", body={"parameters": {"zone": "A"}, "limit": 10}, headers=machine, expected=(403,))
         human(grant_path, "DELETE")
