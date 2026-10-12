@@ -182,9 +182,7 @@ public class OpenPlatformManagementService {
         Long tenantId = requireTenant();
         ApplicationInstallation installation = requireInstallation(tenantId, installationPid);
         requireInstallationCapability(tenantId, installation, OpenPlatformApplicationRole::canManageRuntime);
-        if (!"active".equals(installation.getStatus())) {
-            throw new IllegalStateException("Installation is not active");
-        }
+        requireActiveCredentialInstallation(tenantId, installation);
         String clientSecret = secretCodec.newClientSecret();
         Instant now = Instant.now();
         ApplicationCredential credential = new ApplicationCredential();
@@ -215,6 +213,7 @@ public class OpenPlatformManagementService {
         Long tenantId = requireTenant();
         ApplicationInstallation installation = requireInstallation(tenantId, installationPid);
         requireInstallationCapability(tenantId, installation, OpenPlatformApplicationRole::canManageRuntime);
+        requireActiveCredentialInstallation(tenantId, installation);
         ApplicationCredential previous = credentialMapper.findByInstallation(tenantId, installation.getId()).stream()
                 .filter(item -> credentialPid.equals(item.getPid()) && "active".equals(item.getStatus()))
                 .findFirst().orElseThrow(() -> new IllegalArgumentException("Active credential not found"));
@@ -485,6 +484,14 @@ public class OpenPlatformManagementService {
             throw new IllegalStateException("User context is required");
         }
         return userPid;
+    }
+
+    private void requireActiveCredentialInstallation(Long tenantId, ApplicationInstallation installation) {
+        ExternalApplication application = applicationMapper.selectById(installation.getApplicationId());
+        if (!"active".equals(installation.getStatus()) || application == null
+                || !tenantId.equals(application.getOwnerTenantId()) || !"active".equals(application.getStatus())) {
+            throw new BusinessException(ResponseCode.NOT_FOUND, "Installation not found");
+        }
     }
 
     private ApplicationInstallation requireInstallation(Long tenantId, String pid) {
