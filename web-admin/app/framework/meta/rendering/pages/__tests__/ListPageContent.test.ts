@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  useListKeywordSearch,
   areListSortFilterQueriesEqual,
   isListQuerySettled,
   applyLocalSortUpdate,
@@ -1040,5 +1041,74 @@ describe('list query settlement', () => {
     expect(areListSortFilterQueriesEqual({
       ...empty, activeSorts: [{ fieldCode: 'qty', direction: 'asc', priority: 0 }],
     }, empty)).toBe(false);
+  });
+});
+
+
+describe('useListKeywordSearch submitted filter contract', () => {
+  it('keeps applied filters through debounce and Enter without applying pending form edits', () => {
+    vi.useFakeTimers();
+    try {
+      const load = vi.fn();
+      const form = { s2p_se_status: 'draft' };
+      const { result, unmount } = renderHook(() =>
+        useListKeywordSearch(load, true, 20, {}),
+      );
+      act(() => result.current.rememberSubmittedFilters(form));
+      form.s2p_se_status = 'bidding'; // Edited form has not been submitted.
+      act(() => result.current.debouncedSearch());
+      act(() => vi.advanceTimersByTime(299));
+      expect(load).not.toHaveBeenCalled();
+      act(() => vi.advanceTimersByTime(1));
+      expect(load).toHaveBeenLastCalledWith({ page: 0, size: 20, filters: { s2p_se_status: 'draft' } });
+      act(() => result.current.debouncedSearch());
+      act(() => result.current.commitSearch());
+      expect(load).toHaveBeenCalledTimes(2);
+      expect(load).toHaveBeenLastCalledWith({ page: 0, size: 20, filters: { s2p_se_status: 'draft' } });
+      act(() => vi.advanceTimersByTime(300));
+      expect(load).toHaveBeenCalledTimes(2);
+      // Explicit filter-search commits the edited form.
+      act(() => result.current.rememberSubmittedFilters(form));
+      act(() => result.current.commitSearch());
+      expect(load).toHaveBeenLastCalledWith({ page: 0, size: 20, filters: { s2p_se_status: 'bidding' } });
+      // Explicit reset uses {}, rather than falling back to the previous query.
+      act(() => result.current.rememberSubmittedFilters({}));
+      act(() => result.current.commitSearch());
+      expect(load).toHaveBeenLastCalledWith({ page: 0, size: 20, filters: {} });
+      unmount();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('Enter retains the submitted query even before a pending debounce fires', () => {
+    vi.useFakeTimers();
+    try {
+      const load = vi.fn();
+      const { result, unmount } = renderHook(() => useListKeywordSearch(load, true, 20, {}));
+      act(() => result.current.rememberSubmittedFilters({ s2p_se_status: 'draft' }));
+      act(() => result.current.debouncedSearch());
+      act(() => result.current.commitSearch());
+      expect(load).toHaveBeenCalledExactlyOnceWith({ page: 0, size: 20, filters: { s2p_se_status: 'draft' } });
+      act(() => vi.advanceTimersByTime(300));
+      expect(load).toHaveBeenCalledTimes(1);
+      unmount();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('preserves initial URL filters, latest page size and enabled state in the real scheduling hook', () => {
+    vi.useFakeTimers();
+    try {
+      const load = vi.fn();
+      const { result, rerender, unmount } = renderHook(
+        ({ enabled, size }: { enabled: boolean; size: number }) => useListKeywordSearch(load, enabled, size, { source: 'selected' }),
+        { initialProps: { enabled: false, size: 20 } },
+      );
+      act(() => result.current.commitSearch());
+      expect(load).not.toHaveBeenCalled();
+      rerender({ enabled: true, size: 50 });
+      act(() => result.current.debouncedSearch());
+      act(() => vi.advanceTimersByTime(300));
+      expect(load).toHaveBeenLastCalledWith({ page: 0, size: 50, filters: { source: 'selected' } });
+      unmount();
+    } finally { vi.useRealTimers(); }
   });
 });

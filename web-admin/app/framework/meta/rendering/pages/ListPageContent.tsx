@@ -181,6 +181,29 @@ interface ListLoadDataParams {
   chipFilters?: ViewFilterConfig[];
 }
 
+/** Keyword searches reuse submitted filters, never pending filter-form edits. */
+export function useListKeywordSearch(
+  load: (params: ListLoadDataParams) => void,
+  enabled: boolean,
+  pageSize: number,
+  initialFilters: Record<string, any>,
+) {
+  const appliedFiltersRef = useRef(structuredClone(initialFilters));
+  const rememberSubmittedFilters = useCallback((filters: Record<string, any>) => {
+    appliedFiltersRef.current = structuredClone(filters);
+  }, []);
+  const search = () => {
+    if (!enabled) return;
+    load({ page: 0, size: pageSize, filters: structuredClone(appliedFiltersRef.current) });
+  };
+  const debouncedSearch = useDebouncedCallback(search, 300);
+  const commitSearch = () => {
+    debouncedSearch.cancel();
+    search();
+  };
+  return { debouncedSearch, commitSearch, rememberSubmittedFilters };
+}
+
 interface BulkFieldCommandState {
   button: ButtonConfig;
   selectedIds: string[];
@@ -1208,10 +1231,12 @@ function ListPageContentInner(props: PageContentProps) {
   // Debounced auto-search: triggers loadData 300ms after the user stops typing,
   // so results update without requiring Enter. Reduces API calls by ~60-80%
   // compared to firing on every keystroke.
-  const debouncedSearch = useDebouncedCallback(() => {
-    if (!schema) return;
-    loadData({ page: 0, size: pagination.pageSize });
-  }, 300);
+  const { debouncedSearch, commitSearch, rememberSubmittedFilters } = useListKeywordSearch(
+    (params) => { void loadData(params); },
+    Boolean(schema),
+    pagination.pageSize,
+    urlFilters,
+  );
 
   // Synchronous ref update ensures loadData always reads the latest keyword
   // even when called in the same event cycle as a state update (e.g., Playwright fill + Enter)
@@ -2225,6 +2250,10 @@ function ListPageContentInner(props: PageContentProps) {
           endpoint = `${buildApiEndpoint(apiTableName)}/list`;
         }
 
+        // Capture only explicitly submitted filters before issuing the request.
+        // Pending filter-form edits do not participate in keyword-only searches.
+        if (params?.filters !== undefined) rememberSubmittedFilters(params.filters);
+
         const requestedPageNum = (params?.page ?? pagination.current - 1) + 1;
         const requestedPageSize = params?.size ?? pagination.pageSize;
         const requestedPageZeroBased = Math.max(requestedPageNum - 1, 0);
@@ -2372,6 +2401,7 @@ function ListPageContentInner(props: PageContentProps) {
       schema,
       tableName,
       token,
+      rememberSubmittedFilters,
       pagination.current,
       pagination.pageSize,
       getTabFilter,
@@ -5475,8 +5505,7 @@ function ListPageContentInner(props: PageContentProps) {
                       },
                       { replace: true },
                     );
-                    debouncedSearch.cancel();
-                    loadData({ page: 0, size: pagination.pageSize });
+                    commitSearch();
                   }}
                   filterFormVisible={filterFormVisible}
                   onFilterFormToggle={() => setFilterFormVisible((prev) => !prev)}
