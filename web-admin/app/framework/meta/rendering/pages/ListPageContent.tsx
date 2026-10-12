@@ -49,7 +49,7 @@ import {
 import { useToastContext } from '~/contexts/ToastContext';
 import { DataSourceProvider } from '~/framework/meta/contexts/DataSourceContext';
 import { createFieldRenderer } from '~/framework/meta/utils/createFieldRenderer';
-import { ErrorAlert } from '~/ui/ErrorAlert';
+import { ListErrorState } from './list/ListErrorState';
 import { useAuth } from '~/contexts/AuthContext';
 import { ListPageHeader } from './list/ListPageHeader';
 import { useSavedViews } from '~/framework/smart/hooks/useSavedViews';
@@ -4884,12 +4884,34 @@ function ListPageContentInner(props: PageContentProps) {
     return found;
   }, [allBlocks]);
 
+  const listPageTitle = (() => {
+    // Import writes page titles into the tenant i18n bundle as
+    // page.<pageKey>.title (en + zh-CN). Prefer that key so the title
+    // follows the UI locale; schema.title/schema.name are stored as
+    // plain zh strings and would otherwise pin the title to zh.
+    const listPageKey = schema.pageKey || tableName;
+    const keyedTitle = t(`page.${listPageKey}.title`);
+    if (keyedTitle && keyedTitle !== `page.${listPageKey}.title`) {
+      return keyedTitle;
+    }
+    if (schema.title) return getLocalizedText(schema.title, locale, t);
+    if (schema.name && schema.name.trim()) {
+      return getLocalizedText(schema.name, locale, t);
+    }
+    return tableName;
+  })();
+
   // Error handling — local errors only (schema loading errors handled by DynamicPageRenderer)
   if (error) {
     return (
-      <ErrorAlert
+      <ListErrorState
+        title={listPageTitle}
+        buttons={actionBlock?.buttons || []}
+        evaluateVisible={evaluateButtonVisible}
+        resolveLabel={resolveButtonLabel}
+        onNavigate={to => navigateAwayFromList(to)}
         error={error}
-        title={getLocalizedText({ 'zh-CN': '加载失败', en: 'Unable to load' }, locale, t)}
+        errorTitle={getLocalizedText({ 'zh-CN': '加载失败', en: 'Unable to load' }, locale, t)}
         retryLabel={getLocalizedText({ 'zh-CN': '重试', en: 'Retry' }, locale, t)}
         onRetry={() => {
           setError(null);
@@ -5036,24 +5058,7 @@ function ListPageContentInner(props: PageContentProps) {
           />
           {/* Page title, view selector, and action buttons */}
           <ListPageHeader
-            title={
-              (() => {
-                // Import writes page titles into the tenant i18n bundle as
-                // page.<pageKey>.title (en + zh-CN). Prefer that key so the title
-                // follows the UI locale; schema.title/schema.name are stored as
-                // plain zh strings and would otherwise pin the title to zh.
-                const listPageKey = schema.pageKey || tableName;
-                const keyedTitle = t(`page.${listPageKey}.title`);
-                if (keyedTitle && keyedTitle !== `page.${listPageKey}.title`) {
-                  return keyedTitle;
-                }
-                if (schema.title) return getLocalizedText(schema.title, locale, t);
-                if (schema.name && schema.name.trim()) {
-                  return getLocalizedText(schema.name, locale, t);
-                }
-                return tableName;
-              })()
-            }
+            title={listPageTitle}
             modelCode={modelCode}
             savedViews={savedViews}
             currentView={currentView}
