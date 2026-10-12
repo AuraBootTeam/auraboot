@@ -6,6 +6,7 @@ import { BACKEND_URL, BASE_URL as WEB_BASE_URL } from '../../helpers/environment
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 
 const EVIDENCE_DIR = path.join(process.env.AURA_EVIDENCE_ROOT || '/tmp', 'ui-golden-20260914');
+const UI_MUTATION = process.env.AURA_OPEN_PLATFORM_UI_MUTATION;
 const sessionStorage = createCookieSessionStorage({
   cookie: {
     name: '__session',
@@ -19,6 +20,7 @@ const sessionStorage = createCookieSessionStorage({
 
 // A supplied acceptance plan is materialized before any browser capture, including all unresolved rows.
 test.beforeAll(async () => {
+  if (UI_MUTATION && UI_MUTATION !== 'scope-label-clipping') throw new Error('Unsupported Open Platform UI mutation');
   if (!process.env.AURA_UI_ACCEPTANCE_MATRIX) return;
   if (!process.env.AURA_EVIDENCE_ROOT) throw new Error('UI acceptance requires a registered evidence round');
   const plan = JSON.parse(await readFile(process.env.AURA_UI_ACCEPTANCE_MATRIX, 'utf8'));
@@ -1624,6 +1626,16 @@ test.describe('Open Platform golden journey', () => {
     await capture(page, 'OP-UI-10-top', false);
     const lastEditableScope = scopeDialog.getByRole('checkbox').last().locator('..');
     await lastEditableScope.scrollIntoViewIfNeeded();
+    if (UI_MUTATION === 'scope-label-clipping') {
+      // A declared test-only layout fault must be rejected by the original full-label assertion.
+      const geometry = await lastEditableScope.evaluate(element => {
+        const before = element.getBoundingClientRect();
+        (element as HTMLElement).style.transform = 'translateY(48px)';
+        const after = element.getBoundingClientRect();
+        return { beforeTop: before.top, beforeBottom: before.bottom, afterTop: after.top, afterBottom: after.bottom };
+      });
+      console.log('Open Platform UI mutation scope-label-clipping:', JSON.stringify(geometry));
+    }
     await expect(lastEditableScope).toBeInViewport({ ratio: 1 });
     await expect(scopeDialog.getByRole('checkbox').last()).toBeInViewport({ ratio: 1 });
     await scopeDialog.getByRole('button', { name: '保存', exact: true }).scrollIntoViewIfNeeded();
