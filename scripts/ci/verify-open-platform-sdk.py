@@ -77,7 +77,20 @@ def verify(source, output):
     return receipt
 
 
+def consume(source, output, receipt_path, evidence_path, node):
+    """Verify the fresh archive before accepting a private UI fixture on stdin."""
+    receipt = verify(source, output)
+    Path(receipt_path).write_text(json.dumps(receipt, indent=2) + "\n")
+    fixture = json.load(sys.stdin)
+    from open_platform_dynamic_probe import run_sdk_consumer
+    return run_sdk_consumer(fixture, [node, str(Path(output) / "consumer/real-backend.mjs")],
+                            base_url=fixture["baseUrl"], evidence_path=evidence_path)
+
+
 if __name__ == "__main__":
-    if len(sys.argv) != 4:
-        raise SystemExit("usage: verify-open-platform-sdk.py SOURCE OUTPUT RECEIPT")
-    Path(sys.argv[3]).write_text(json.dumps(verify(*sys.argv[1:3]), indent=2) + "\n")
+    if len(sys.argv) == 7 and sys.argv[1] == "consume":
+        consume(*sys.argv[2:])
+    elif len(sys.argv) == 4:
+        Path(sys.argv[3]).write_text(json.dumps(verify(*sys.argv[1:3]), indent=2) + "\n")
+    else:
+        raise SystemExit("usage: verify-open-platform-sdk.py SOURCE OUTPUT RECEIPT | consume SOURCE OUTPUT RECEIPT REPORT NODE")

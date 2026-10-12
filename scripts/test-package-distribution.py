@@ -6,6 +6,7 @@ from pathlib import Path
 import tarfile
 import tempfile
 import unittest
+from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location("distribution", Path(__file__).with_name("check-package-distribution.py"))
 gate = importlib.util.module_from_spec(spec)
@@ -105,6 +106,15 @@ class ConsumerExecutionContract(unittest.TestCase):
             (consumer / "consumer-ts-check.ts").write_text("export {};\n")
             with self.assertRaisesRegex(ValueError, "frozen source"):
                 sdk.verify_consumer_checks(source, output, gate)
+
+            # A rejected archive must not read credentials or start a network consumer.
+            with patch.object(sdk, "verify", side_effect=ValueError("archive rejected")), \
+                    patch("sys.stdin") as private_input:
+                private_input.read.side_effect = AssertionError("private fixture read before verification")
+                with self.assertRaisesRegex(ValueError, "archive rejected"):
+                    sdk.consume(source, output, output / "receipt.json", output / "sdk.json", "node")
+            self.assertFalse((output / "receipt.json").exists())
+            self.assertFalse((output / "sdk.json").exists())
 
     def test_actual_execution_ledger(self):
         self.assertEqual(len(gate.validate_consumer_output(self.output(self.rows()))), 14)

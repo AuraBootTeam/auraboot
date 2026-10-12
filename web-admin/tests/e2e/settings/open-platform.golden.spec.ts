@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test';
 import { createCookieSessionStorage } from 'react-router';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { BACKEND_URL, BASE_URL as WEB_BASE_URL } from '../../helpers/environments';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
@@ -112,7 +114,7 @@ const sessionStorage = createCookieSessionStorage({
 
 // A supplied acceptance plan is materialized before any browser capture, including all unresolved rows.
 test.beforeAll(async () => {
-  if (UI_MUTATION && !['scope-label-clipping', 'publication-overflow', 'intro-word-break', 'publication-title-locale', 'query-compatibility-feedback', 'query-confirmation-stale', 'major-grant-alias', 'resource-compatibility-feedback', 'resource-confirmation-stale', 'resource-catalog-feedback', 'resource-validation-feedback', 'resource-catalog-empty', 'resource-publish-conflict'].includes(UI_MUTATION)) throw new Error('Unsupported Open Platform UI mutation');
+  if (UI_MUTATION && !['scope-label-clipping', 'publication-overflow', 'intro-word-break', 'publication-title-locale', 'query-compatibility-feedback', 'query-confirmation-stale', 'major-grant-alias', 'resource-compatibility-feedback', 'resource-confirmation-stale', 'resource-catalog-feedback', 'resource-validation-feedback', 'resource-catalog-empty', 'resource-publish-conflict', 'sdk-ui-projection'].includes(UI_MUTATION)) throw new Error('Unsupported Open Platform UI mutation');
   if (['intro-word-break', 'publication-title-locale'].includes(UI_MUTATION || '') && publicationLocale !== 'en-US') throw new Error('English locale mutation requires en-US');
   if (!process.env.AURA_UI_ACCEPTANCE_MATRIX) return;
   if (!process.env.AURA_EVIDENCE_ROOT) throw new Error('UI acceptance requires a registered evidence round');
@@ -837,7 +839,7 @@ test.describe('Dynamic installation authority journey', () => {
   test.describe.configure({ retries: 0 });
   test.use({ storageState: { cookies: [], origins: [] }, locale: installationLocale, viewport: installationViewport });
 
-  test('persists resource and query grants through installation UI and enforces them on real machine calls', async ({ page }) => {
+  test('persists resource and query grants through installation UI and enforces them on real machine calls', async ({ page }, testInfo) => {
     await authenticate(page, installationLocale);
     const suffix = String(Date.now()); const modelCode = `dop_grant_${suffix}`;
     const resourceCode = `granted.parts.${suffix}`; const queryCode = `granted.query.${suffix}`; const namedCode = `dop_grant_query_${suffix}`;
@@ -932,6 +934,34 @@ test.describe('Dynamic installation authority journey', () => {
     await editor.getByRole('button', { name: installationText('保存安装授权'), exact: true }).click(); expect((await queryGranted).status()).toBe(200); await expect(editor.getByRole('status').filter({ hasText: installationText('授权已保存') })).toBeVisible();
     const result = await page.request.post(queryPath, { headers: machineHeaders, data: { parameters: { zone: 'A' }, limit: 10 } }); expect(result.status()).toBe(200); expect((await result.json()).items).toEqual([{ pid: recordA.pid, name: 'Allowed A' }]);
     const otherRows = await page.request.post(queryPath, { headers: machineHeaders, data: { parameters: { zone: 'B' }, limit: 10 } }); expect(otherRows.status()).toBe(200); expect((await otherRows.json()).items).toEqual([]);
+    // Reuse the release SDK consumer against these exact UI-authored installation policies.
+    const coreRoot = fileURLToPath(new URL('../../../../', import.meta.url));
+    const sdkOutput = path.join(process.env.AURA_EVIDENCE_ROOT || testInfo.outputDir, 'ui-sdk-consumer');
+    const preparedSdk = spawnSync('sh', [path.join(coreRoot, 'scripts/ci/prepare-open-platform-sdk.sh'), coreRoot, sdkOutput],
+      { encoding: 'utf8', timeout: 60_000 });
+    await writeFile(path.join(screenshotRoot, 'sdk-prepare.log'), (preparedSdk.stdout || '') + (preparedSdk.stderr || '') || 'SDK prepare produced no output');
+    expect(preparedSdk.status, 'The original fresh SDK preparation must succeed').toBe(0);
+    if (UI_MUTATION === 'sdk-ui-projection') {
+      await editor.getByLabel(installationText('授权合同'), { exact: true }).selectOption(`resource:${resourceCode}`);
+      await editor.getByLabel(`${installationText('读取')} name`, { exact: true }).uncheck();
+      const narrowedGrant = page.waitForResponse(response => response.url().endsWith(`/installations/${installation.pid}/resources/${resourceCode}`) && response.request().method() === 'PUT');
+      await editor.getByRole('button', { name: installationText('保存安装授权'), exact: true }).click();
+      expect((await narrowedGrant).status()).toBe(200);
+      await expect(editor.getByRole('status').filter({ hasText: installationText('授权已保存') })).toBeVisible();
+    }
+    const sdkReportPath = path.join(sdkOutput, 'real-backend-results.json');
+    const sdkArchiveReceipt = path.join(sdkOutput, 'archive-receipt.json');
+    const consumedSdk = spawnSync('python3', ['-B', path.join(coreRoot, 'scripts/ci/verify-open-platform-sdk.py'), 'consume', coreRoot,
+      sdkOutput, sdkArchiveReceipt, sdkReportPath, process.execPath], { encoding: 'utf8', timeout: 95_000,
+      input: JSON.stringify({ baseUrl: BACKEND_URL, clientId: credential.clientId, clientSecret: credential.clientSecret,
+        scopes: [...scopes, 'dop.grant:query'], resourceCode, queryCode, allowedPid: recordA.pid, hiddenPid: recordB.pid }) });
+    await writeFile(path.join(screenshotRoot, 'sdk-consumer.exit'), String(consumedSdk.status) + '\n');
+    expect(consumedSdk.status, 'The original SDK13 must consume the UI-authored grant without exposing credentials').toBe(0);
+    const sdkReport = JSON.parse(await readFile(sdkReportPath, 'utf8'));
+    const sdkProfile = JSON.parse(await readFile(path.join(coreRoot, 'scripts/fixtures/open-platform-consumer/real-backend.profile.json'), 'utf8'));
+    expect(sdkReport.cases).toEqual(sdkProfile.cases.map((id: string) => ({ id, status: 'passed' })));
+    expect(sdkReport).toMatchObject({ profile: sdkProfile.id, executed: 13, passed: 13, requests: 17, tokenExchanges: 1 });
+    await snapshot('grant-sdk-consumed');
     const resourceCatalogPath = `/api/open-platform/installations/${installation.pid}/resources`;
     const queryCatalogPath = `/api/open-platform/installations/${installation.pid}/queries`;
     const oldAuthority = async () => ({
