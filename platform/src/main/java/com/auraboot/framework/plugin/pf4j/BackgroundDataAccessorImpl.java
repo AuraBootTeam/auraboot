@@ -39,6 +39,7 @@ public class BackgroundDataAccessorImpl implements BackgroundDataAccessor {
     private final BackgroundDataBatchService batchService;
     private final String transactionResourceId;
     private final TransactionTemplate transactionTemplate;
+    private final TransactionTemplate idempotentCreateTemplate;
 
     /** Lightweight constructor retained for hermetic callers that only use the legacy methods. */
     public BackgroundDataAccessorImpl(DynamicDataService dynamicDataService) {
@@ -62,6 +63,12 @@ public class BackgroundDataAccessorImpl implements BackgroundDataAccessor {
                 ? null : TransactionResourceIdentityRegistry.identityOf(dataSource);
         this.transactionTemplate = transactionManager == null
                 ? null : new TransactionTemplate(transactionManager);
+        this.idempotentCreateTemplate = transactionManager == null
+                ? null : new TransactionTemplate(transactionManager);
+        if (this.idempotentCreateTemplate != null) {
+            this.idempotentCreateTemplate.setPropagationBehavior(
+                    org.springframework.transaction.TransactionDefinition.PROPAGATION_NESTED);
+        }
     }
 
     @Override
@@ -73,7 +80,12 @@ public class BackgroundDataAccessorImpl implements BackgroundDataAccessor {
     public Optional<Map<String, Object>> tryCreate(long tenantId, String modelCode, Map<String, Object> data) {
         return withTenant(tenantId, () -> {
             try {
-                return Optional.of(dynamicDataService.create(modelCode, data));
+                // A duplicate must roll back its savepoint, not poison the enclosing outbox batch.
+                Map<String, Object> created = idempotentCreateTemplate == null
+                        ? dynamicDataService.create(modelCode, data == null ? null : new java.util.LinkedHashMap<>(data))
+                        : idempotentCreateTemplate.execute(status -> dynamicDataService.create(modelCode,
+                                data == null ? null : new java.util.LinkedHashMap<>(data)));
+                return Optional.of(java.util.Objects.requireNonNull(created, "Idempotent create returned no record"));
             } catch (RuntimeException error) {
                 if (!IdempotentCreateSupport.isUniqueViolation(error)) throw error;
                 log.debug("tryCreate hit unique violation (idempotent skip): tenant={} model={} cause={}",

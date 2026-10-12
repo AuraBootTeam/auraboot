@@ -1158,6 +1158,46 @@ class ProcurementPluginHostRealDbIT {
     }
 
     private record ShipmentFixture(String order,String line,String address) {}
+    @Test void nativeReminderSchedulerUsesHostPaginationAndDeduplicatesWithoutRequestContext() throws Exception {
+        var fixture=shipmentFixture();String selected=(String)scope("qo_procurement_address_common:maintain",()->db.getById("qo_procurement_address_common",fixture.address())).get("qo_pr_address_supplier_pid");
+        var failures=new ArrayList<String>();
+        // Limit only the outer supplier scan to this fixture; inner projections, transactions and inserts are native.
+        BackgroundDataAccessor observed=(BackgroundDataAccessor)java.lang.reflect.Proxy.newProxyInstance(BackgroundDataAccessor.class.getClassLoader(),new Class<?>[]{BackgroundDataAccessor.class},(proxy,method,args)->{
+            if(method.getName().equals("query")) throw new AssertionError("Unbounded background read");
+            if(method.getName().equals("queryPage") && args.length==5) {
+                var filters=new LinkedHashMap<String,Object>((Map<String,Object>)args[2]);filters.put("pid",selected);
+                return background.queryPage((Long)args[0],(String)args[1],filters,(String)args[3],(Integer)args[4]);
+            }
+            try{return method.invoke(background,args);}catch(InvocationTargetException error){
+                if(method.getName().equals("executeInTransaction")) failures.add(error.getCause().toString());
+                throw error.getCause();
+            }
+        });
+        var type=plugin.loadClass("com.auraboot.quote.engine.procurement.ProcurementReminderScheduler");
+        var constructor=type.getDeclaredConstructor(java.time.Clock.class);constructor.setAccessible(true);
+        var scheduler=constructor.newInstance(java.time.Clock.fixed(java.time.Instant.parse("2026-10-10T06:00:15Z"),java.time.ZoneOffset.UTC));
+        for(var entry:Map.<String,Object>of("enabled",true,"background",observed,"tenants",(BackgroundTenantAccessor)()->List.of(tenantId)).entrySet()) {
+            var field=type.getDeclaredField(entry.getKey());field.setAccessible(true);field.set(scheduler,entry.getValue());
+        }
+        MetaContext.clear();
+        try{
+            type.getMethod("tick").invoke(scheduler);type.getMethod("tick").invoke(scheduler);assertTrue(failures.isEmpty(),failures.toString());
+            var rejected=assertThrows(IllegalStateException.class,()->background.executeInTransaction(()->{
+                assertTrue(background.tryCreate(tenantId,"qo_procurement_reminder_common",Map.of(
+                        "qo_pr_reminder_key",provider+"-rollback","qo_pr_reminder_supplier_pid",selected,
+                        "qo_pr_reminder_kind","shipment","qo_pr_reminder_slot_at","2026-10-10T06:00:00Z",
+                        "qo_pr_reminder_state","pending","qo_pr_reminder_revision",0,"qo_pr_reminder_targets",List.of(fixture.order()))).isPresent());
+                throw new IllegalStateException("ROLLBACK_SENTINEL");
+            }));
+            assertEquals("ROLLBACK_SENTINEL",rejected.getMessage());
+        }
+        finally{MetaContext.setContext(tenantId,actorId,actor,"Host fixture");}
+        var reminders=scope("qo_procurement_reminder_common:queue",()->nativeRows("qo_procurement_reminder_common","qo_pr_reminder_supplier_pid",selected));
+        assertEquals(1,reminders.size());var row=reminders.getFirst();assertEquals("pending",row.get("qo_pr_reminder_state"));assertEquals("shipment",row.get("qo_pr_reminder_kind"));
+        var raw=row.get("qo_pr_reminder_targets");var targets=raw instanceof String text?json.readValue(text,List.class):(List<?>)raw;
+        assertEquals(List.of(fixture.order()),targets);
+        scope("qo_procurement_order_common:submit_shipment",()->{assertNativeQuantity("pr_purchase_order_line",fixture.line(),"qo_pr_order_line_submitted_qty","0");return null;});
+    }
     @Test void nativeSupplierAddressCommandFiltersBeforePaginationAndProjectsSafeFields() throws Exception {
         var fixture=shipmentFixture();String maintain="qo_procurement_address_common:maintain";
         String supplier=(String)scope(maintain,()->db.getById("qo_procurement_address_common",fixture.address())).get("qo_pr_address_supplier_pid");

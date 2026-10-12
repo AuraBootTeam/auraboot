@@ -95,6 +95,19 @@ class BackgroundDataAccessorImplTest {
     }
 
     @Test
+    void tryCreate_allowsHostNormalizationWithoutMutatingImmutableCallerData() {
+        when(dds.create(anyString(), any())).thenAnswer(invocation -> {
+            Map<String, Object> payload = invocation.getArgument(1);
+            payload.put("normalized", true);
+            return payload;
+        });
+        Map<String, Object> original = Map.of("slot_at", "2026-10-12T06:00:00Z");
+        assertThat(accessor.tryCreate(42L, "qo_procurement_reminder_common", original).orElseThrow())
+                .containsEntry("normalized", true);
+        assertThat(original).containsOnlyKeys("slot_at");
+    }
+
+    @Test
     void tryCreate_returnsEmpty_onDuplicateKey() {
         when(dds.create(anyString(), any()))
                 .thenThrow(new DuplicateKeyException("unique constraint failed"));
