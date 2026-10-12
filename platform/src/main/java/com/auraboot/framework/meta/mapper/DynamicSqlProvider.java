@@ -9,6 +9,19 @@ import java.util.Set;
 
 public class DynamicSqlProvider {
 
+    public static String selectRelationChildrenForUpdate(Map<String, Object> params) {
+        String table = (String) params.get("tableName");
+        String column = (String) params.get("parentColumn");
+        SqlSafetyUtils.validateIdentifier(table, "relation lock table");
+        SqlSafetyUtils.validateIdentifier(column, "relation lock parent column");
+        if (params.get("tenantId") == null || params.get("parentPid") == null
+                || !(params.get("softDelete") instanceof Boolean softDelete)) {
+            throw new IllegalArgumentException("Relation lock requires tenantId, parentPid and softDelete");
+        }
+        return "SELECT pid FROM " + table + " WHERE tenant_id = #{tenantId} AND " + column + " = #{parentPid}"
+                + (softDelete ? " AND deleted_flag = false" : "") + " ORDER BY pid FOR UPDATE";
+    }
+
     public static String selectTargetVersionForUpdate(Map<String, Object> params) {
         String table = (String) params.get("tableName");
         String key = (String) params.get("primaryKeyColumn");

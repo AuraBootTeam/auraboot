@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.*;
 @org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
     @Autowired private MetaModelService models;
+    @Autowired private MetaFieldService metadataFields;
     @Autowired private SchemaManagementService schemas;
     @Autowired private DynamicDataService data;
     @Autowired private OpenApiPublicationService publications;
@@ -801,6 +802,16 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
                 assertThat(data.getById(contract.modelCode(), allowedPid)).containsEntry("name", before.get("name"))
                         .containsEntry("row_version", before.get("row_version"));
                 assertThat(sourceEvents()).isEmpty();
+                var failedJointCreate = data.saveWithRelations(contract.modelCode(), JointSubTableSaveRequest.builder()
+                        .masterData(new HashMap<>(Map.of("name", "Failed joint create", "zone", "A"))).build());
+                assertThat(failedJointCreate.getSuccess()).isFalse();
+                var failedJointUpdate = data.saveWithRelations(contract.modelCode(), JointSubTableSaveRequest.builder()
+                        .masterData(new HashMap<>(Map.of("pid", allowedPid, "name", "Failed joint update"))).build());
+                assertThat(failedJointUpdate.getSuccess()).isFalse();
+                assertThat(data.getById(contract.modelCode(), allowedPid)).containsEntry("name", before.get("name"))
+                        .containsEntry("row_version", before.get("row_version"));
+                assertThat(data.list(contract.modelCode(), DynamicQueryRequest.builder().pageNum(1).pageSize(100).build()).getTotal()).isEqualTo(2);
+                assertThat(sourceEvents()).isEmpty();
             } finally { eventFaultObserver.fail = false; }
             var recovered = data.batchCreate(contract.modelCode(), List.of(new HashMap<>(Map.of("name", "Recovered", "zone", "A"))));
             assertThat(recovered.getSuccess()).isEqualTo(1); assertThat(sourceEvents()).hasSize(1);
@@ -809,15 +820,55 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test void humanSingleCrudUsesTheSamePublishedSourceEventHook() {
+        var definition = models.getModelDefinition(contract.modelCode()).orElseThrow();
+        var navigationFields = new ArrayList<>(definition.getFields());
+        navigationFields.add(FieldDefinition.builder().code("children").dataType("STRING").virtualType("transient").build());
+        definition.setFields(navigationFields);
+        models.saveDefinition(definition);
+        var modelRow = modelMapper.findCurrentByCode(contract.modelCode());
+        var relationCreate = new MetaFieldCreateRequest();
+        relationCreate.setCode("children");
+        relationCreate.setDataType("string");
+        relationCreate.setStatus("published");
+        relationCreate.setRefTarget(Map.of("targetEntity", contract.modelCode(), "targetTable", definition.getTableName(),
+                "valueField", "pid", "targetField", "related", "bidirectional", Map.of("relationType", "ONE_TO_MANY")));
+        var relationField = metadataFields.create(relationCreate);
+        models.bindFieldToModel(modelRow.getId(), relationField.getId(), 1, false, true, true, null, null, null, null);
+        models.refreshModelCache(contract.modelCode());
+        assertThat(models.getModelDefinition(contract.modelCode()).orElseThrow().getRelations()).hasSize(1);
         publishEvents();
         MetaContext.runWithCommandPermitScope("ALL", () -> {
             String pid = data.create(contract.modelCode(), new HashMap<>(Map.of("name", "Human", "zone", "A")))
                     .get("pid").toString();
             data.update(contract.modelCode(), pid, new HashMap<>(Map.of("name", "Human update")));
             data.delete(contract.modelCode(), pid);
+            assertThat(sourceEvents()).hasSize(3);
+            var first = data.create(contract.modelCode(), new HashMap<>(Map.of("name", "Child one", "zone", "A", "related", allowedPid)));
+            var second = data.create(contract.modelCode(), new HashMap<>(Map.of("name", "Child two", "zone", "A", "related", allowedPid)));
+            var replacement = JointSubTableSaveRequest.builder()
+                    .masterData(new HashMap<>(Map.of("pid", allowedPid, "name", "Joint master")))
+                    .tables(Map.of("children", List.of(Map.of("name", "Replacement", "zone", "A"))))
+                    .replaceExisting(true).build();
+            try {
+                eventFaultObserver.failAfter = 3;
+                var failed = data.saveWithRelations(contract.modelCode(), replacement);
+                assertThat(failed.getSuccess()).isFalse();
+                assertThat(failed.getErrors()).containsExactly("Sub-table 'children': Fixture event persistence failure");
+            } finally { eventFaultObserver.failAfter = -1; }
+            // Master success is retained, while the whole failed replacement is restored.
+            assertThat(sourceEvents()).hasSize(6);
+            assertThat(data.getById(contract.modelCode(), first.get("pid").toString())).containsEntry("name", "Child one");
+            assertThat(data.getById(contract.modelCode(), second.get("pid").toString())).containsEntry("name", "Child two");
+            var saved = data.saveWithRelations(contract.modelCode(), replacement);
+            assertThat(saved.getSuccess()).as("joint errors: %s", saved.getErrors()).isTrue();
+            assertThat(saved.getSubTableCounts()).containsEntry("children", 1);
+            assertThat(saved.getSavedRecords().get("children").get(0)).containsEntry("related", allowedPid);
+            assertThat(eventJdbc.queryForObject("SELECT count(*) FROM " + definition.getTableName()
+                    + " WHERE tenant_id = ? AND pid IN (?, ?)", Long.class, principal.tenantId(), first.get("pid"), second.get("pid"))).isZero();
+            assertThat(data.getById(contract.modelCode(), deniedPid)).containsEntry("zone", "B");
             return null;
         });
-        assertThat(sourceEvents()).hasSize(3);
+        assertThat(sourceEvents()).hasSize(10);
     }
 
     @Test void guardedDeleteFailureRollsBackItsBeforeDeleteEvent() {

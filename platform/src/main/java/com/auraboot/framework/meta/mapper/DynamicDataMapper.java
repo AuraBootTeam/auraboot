@@ -16,6 +16,14 @@ import java.util.Set;
 @Mapper
 public interface DynamicDataMapper {
 
+    /** Locks only registered relation children within the explicitly bound tenant. */
+    @SelectProvider(type = DynamicSqlProvider.class, method = "selectRelationChildrenForUpdate")
+    @InterceptorIgnore(tenantLine = "true")
+    List<Map<String, Object>> selectRelationChildrenForUpdate(
+            @Param("tableName") String tableName, @Param("parentColumn") String parentColumn,
+            @Param("tenantId") Long tenantId, @Param("parentPid") String parentPid,
+            @Param("softDelete") boolean softDelete);
+
     /** Fixed tenant-scoped lock query for current-state command intents; never accepts raw SQL. */
     @SelectProvider(type = DynamicSqlProvider.class, method = "selectTargetVersionForUpdate")
     @InterceptorIgnore(tenantLine = "true")

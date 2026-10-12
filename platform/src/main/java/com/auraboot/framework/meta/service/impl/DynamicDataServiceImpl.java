@@ -1735,7 +1735,35 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     private DynamicJointSaveSupport dynamicJointSaveSupport() {
-        return new DynamicJointSaveSupport(metadataService, dynamicDataMapper, this::create, this::update, this::getModelDefinition, this::assertWritable);
+        return new DynamicJointSaveSupport(metadataService, dynamicDataMapper,
+                (code, input) -> inRowTransaction(() -> create(code, input)),
+                (code, pid, input) -> inRowTransaction(() -> update(code, pid, input)),
+                this::getModelDefinition, this::assertWritable, this::deleteJointChildren);
+    }
+
+    private void deleteJointChildren(RelationDefinition relation, String masterId) {
+        inRowTransaction(() -> {
+            String code = relation.getTargetModel();
+            ModelDefinition model = getModelDefinition(code);
+            ModelMutationGuard.assertDeleteAllowed(model);
+            FieldDefinition field = model.getFields().stream()
+                    .filter(candidate -> relation.getTargetField().equals(candidate.getCode()))
+                    .findFirst().orElseThrow(() -> new MetaServiceException("Unknown joint replacement field"));
+            if (field.isVirtual() || field.isJsonbVirtual()) {
+                throw new MetaServiceException("Joint replacement requires a stored relation field");
+            }
+            String column = field.getColumnName() != null ? field.getColumnName() : field.getCode();
+            String table = metadataService.getTableName(code);
+            SqlSafetyUtils.validateIdentifier(table, "joint replacement table");
+            SqlSafetyUtils.validateIdentifier(column, "joint replacement column");
+            var rows = dynamicDataMapper.selectRelationChildrenForUpdate(
+                    table, column, getCurrentTenantId(), masterId, model.isSoftDelete());
+            for (var row : rows) {
+                if (row.get("pid") == null) throw new MetaServiceException("Joint replacement row has no PID");
+                delete(code, row.get("pid").toString());
+            }
+            return null;
+        });
     }
 
     private DynamicDataBatchSupport dynamicDataBatchSupport() {
