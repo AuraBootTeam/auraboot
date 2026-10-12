@@ -750,7 +750,7 @@ test.describe('Open Platform golden journey', () => {
     await installDialog.getByLabel('automation.events.write').check();
     await installDialog.getByLabel('openapi.profile.read').check();
     await installDialog.getByRole('heading', { name: '安装应用', exact: true }).scrollIntoViewIfNeeded();
-    await expect(installDialog.getByLabel('环境', { exact: true })).toBeInViewport();
+    await expect(installDialog.getByLabel('环境')).toBeInViewport();
     await capture(page, 'OP-UI-07-top', false);
     await installDialog.getByRole('button', { name: '安装', exact: true }).scrollIntoViewIfNeeded();
     await expect(installDialog.getByRole('button', { name: '安装', exact: true })).toBeInViewport();
