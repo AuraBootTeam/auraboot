@@ -738,6 +738,11 @@ public class HandlerPhase implements CommandPhase {
             if (e instanceof AccessDeniedException accessDeniedException) {
                 throw accessDeniedException;
             }
+            if (e instanceof SecurityException) {
+                // The transport-neutral plugin SPI may reject ownership without Spring dependencies.
+                // Keep the authorization status and cause, never expose its internal record diagnostics.
+                throw new AccessDeniedException("Access denied", e);
+            }
             if (e instanceof DataAccessorException dataAccess
                     && dataAccess.code() == DataAccessErrorCode.PERMISSION_DENIED) {
                 throw new AccessDeniedException("Plugin source data access denied", dataAccess);

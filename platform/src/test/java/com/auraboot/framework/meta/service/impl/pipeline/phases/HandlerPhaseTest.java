@@ -366,6 +366,24 @@ class HandlerPhaseTest {
     }
 
     @Test
+    void execute_mapsTransportNeutralSecurityDenialWithoutDiagnosticLeakage() {
+        SecurityException denial = new SecurityException("FOREIGN_ORDER_LINE:private-record-id");
+        CommandHandlerExtension rejected = new CommandHandlerExtension() {
+            @Override public String getCommandType() { return PLUGIN_HANDLER_CODE; }
+            @Override public Object execute(CommandContext context) { throw denial; }
+        };
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(rejected));
+        CommandPipelineContext ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of(
+                "type", "state_transition", "handler", PLUGIN_HANDLER_CODE));
+
+        assertThatThrownBy(() -> phase.execute(ctx))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessage("Access denied")
+                .hasCause(denial);
+        assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+    }
+
+    @Test
     void execute_preservesPluginAccessDeniedSemantic() {
         CommandHandlerExtension denied = new CommandHandlerExtension() {
             @Override public String getCommandType() { return PLUGIN_HANDLER_CODE; }
