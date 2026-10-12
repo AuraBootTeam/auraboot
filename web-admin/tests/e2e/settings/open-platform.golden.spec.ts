@@ -746,13 +746,34 @@ test.describe('Dynamic query publication journey', () => {
   });
 });
 
+const installationLocale = process.env.AURA_OPEN_PLATFORM_INSTALLATION_LOCALE || 'zh-CN';
+if (!['zh-CN', 'en-US'].includes(installationLocale)) throw new Error('Unsupported installation locale');
+const installationViewportName = process.env.AURA_OPEN_PLATFORM_INSTALLATION_VIEWPORT || 'desktop';
+if (!['desktop', 'narrow'].includes(installationViewportName)) throw new Error('Unsupported installation viewport');
+const installationViewport = installationViewportName === 'narrow' ? { width: 1024, height: 900 } : { width: 1440, height: 1000 };
+const installationEnglish: Record<string, string> = {
+  '数据授权': 'Data authority', '授权合同': 'Authority contract',
+  '此安装尚未获此合同的数据授权': 'This installation has no authority for this contract',
+  '列表查询': 'list', '详情读取': 'get', '创建记录': 'create', '修改记录': 'update', '删除记录': 'delete',
+  '读取': 'Read', '写入': 'Write', '创建必填': 'Required on create',
+  '添加行约束': 'Add row constraint', '约束公共字段': 'Constraint public field', '允许值（每行一个）': 'Allowed values (one per line)',
+  '保存安装授权': 'Save installation authority', '授权已保存': 'Authority saved', '已有列表授权': 'List granted',
+  '撤销安装授权': 'Revoke installation authority', '安装授权操作确认': 'Installation authority confirmation',
+  '确认': 'Confirm', '授权已撤销': 'Authority revoked',
+};
+const installationText = (cn: string) => {
+  if (installationLocale === 'zh-CN') return cn;
+  if (!(cn in installationEnglish)) throw new Error(`Missing English installation expectation: ${cn}`);
+  return installationEnglish[cn];
+};
+
 test.describe('Dynamic installation authority journey', () => {
   test.setTimeout(180_000);
   test.describe.configure({ retries: 0 });
-  test.use({ storageState: { cookies: [], origins: [] }, locale: 'zh-CN', viewport: { width: 1440, height: 1000 } });
+  test.use({ storageState: { cookies: [], origins: [] }, locale: installationLocale, viewport: installationViewport });
 
   test('persists resource and query grants through installation UI and enforces them on real machine calls', async ({ page }) => {
-    await authenticate(page);
+    await authenticate(page, installationLocale);
     const suffix = String(Date.now()); const modelCode = `dop_grant_${suffix}`;
     const resourceCode = `granted.parts.${suffix}`; const queryCode = `granted.query.${suffix}`; const namedCode = `dop_grant_query_${suffix}`;
     const operations = ['list', 'get', 'create', 'update', 'delete']; const scopes = operations.map(operation => `dop.grant:${operation}`);
@@ -807,38 +828,43 @@ test.describe('Dynamic installation authority journey', () => {
     expect((await page.request.get(resourcePath, { headers: machineHeaders })).status()).toBe(403);
     expect((await page.request.post(queryPath, { headers: machineHeaders, data: { parameters: { zone: 'A' }, limit: 10 } })).status()).toBe(403);
     const screenshotRoot = path.join(process.env.AURA_EVIDENCE_ROOT || '/tmp', 'ui-publication-r1', 'screenshots'); await mkdir(screenshotRoot, { recursive: true });
-    const snapshot = async (id: string) => { await page.screenshot({ path: path.join(screenshotRoot, `${id}.png`), fullPage: true }); };
+    const snapshot = async (id: string) => {
+      if (installationViewportName === 'narrow') {
+        expect(page.viewportSize()).toEqual(installationViewport);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+      }
+      await page.screenshot({ path: path.join(screenshotRoot, `${id}.png`), fullPage: true }); };
     await page.goto('/'); await openAccountMenu(page); await page.getByTestId('open-platform-link').click();
     await expect(page.getByTestId('open-platform-page')).toBeVisible();
     const installationCard = page.getByTestId(`open-platform-installation-${installation.pid}`);
-    await installationCard.getByRole('button', { name: '数据授权', exact: true }).click();
+    await installationCard.getByRole('button', { name: installationText('数据授权'), exact: true }).click();
     const editor = page.getByTestId('installation-grant-editor'); await expect(editor).toBeVisible();
-    await expect(editor.getByLabel('授权合同', { exact: true })).toBeEnabled(); await snapshot('grant-entry');
-    await editor.getByLabel('授权合同', { exact: true }).selectOption(`resource:${resourceCode}`);
-    await expect(editor).toContainText('此安装尚未获此合同的数据授权');
-    for (const name of ['列表查询', '详情读取', '创建记录', '修改记录', '删除记录']) await editor.getByLabel(name, { exact: true }).check();
-    for (const alias of ['name', 'zone']) { await editor.getByLabel(`读取 ${alias}`, { exact: true }).check(); await editor.getByRole('checkbox', { name: `写入 ${alias} (创建必填)`, exact: true }).check(); }
-    await expect(editor.getByLabel('读取 secret', { exact: true })).not.toBeChecked();
-    await editor.getByRole('button', { name: '添加行约束', exact: true }).click();
-    const constraint = editor.getByTestId('grant-constraint-0'); await constraint.getByLabel('约束公共字段', { exact: true }).selectOption('zone'); await constraint.getByLabel('允许值（每行一个）', { exact: true }).fill('A');
-    await expect(editor.getByLabel('授权合同', { exact: true })).toBeDisabled(); await snapshot('grant-resource');
+    await expect(editor.getByLabel(installationText('授权合同'), { exact: true })).toBeEnabled(); await snapshot('grant-entry');
+    await editor.getByLabel(installationText('授权合同'), { exact: true }).selectOption(`resource:${resourceCode}`);
+    await expect(editor).toContainText(installationText('此安装尚未获此合同的数据授权'));
+    for (const name of [installationText('列表查询'), installationText('详情读取'), installationText('创建记录'), installationText('修改记录'), installationText('删除记录')]) await editor.getByLabel(name, { exact: true }).check();
+    for (const alias of ['name', 'zone']) { await editor.getByLabel(`${installationText('读取')} ${alias}`, { exact: true }).check(); await editor.getByRole('checkbox', { name: `${installationText('写入')} ${alias} (${installationText('创建必填')})`, exact: true }).check(); }
+    await expect(editor.getByLabel(`${installationText('读取')} secret`, { exact: true })).not.toBeChecked();
+    await editor.getByRole('button', { name: installationText('添加行约束'), exact: true }).click();
+    const constraint = editor.getByTestId('grant-constraint-0'); await constraint.getByLabel(installationText('约束公共字段'), { exact: true }).selectOption('zone'); await constraint.getByLabel(installationText('允许值（每行一个）'), { exact: true }).fill('A');
+    await expect(editor.getByLabel(installationText('授权合同'), { exact: true })).toBeDisabled(); await snapshot('grant-resource');
     const granted = page.waitForResponse(response => response.url().endsWith(`/installations/${installation.pid}/resources/${resourceCode}`) && response.request().method() === 'PUT');
-    await editor.getByRole('button', { name: '保存安装授权', exact: true }).click(); expect((await granted).status()).toBe(200);
-    await expect(editor.getByRole('status').filter({ hasText: '授权已保存' })).toBeVisible(); await snapshot('grant-saved');
-    await page.reload(); await installationCard.getByRole('button', { name: '数据授权', exact: true }).click(); await editor.getByLabel('授权合同', { exact: true }).selectOption(`resource:${resourceCode}`);
-    await expect(editor.getByLabel('读取 name', { exact: true })).toBeChecked(); await expect(editor.getByTestId('grant-constraint-0').getByLabel('允许值（每行一个）', { exact: true })).toHaveValue('A');
+    await editor.getByRole('button', { name: installationText('保存安装授权'), exact: true }).click(); expect((await granted).status()).toBe(200);
+    await expect(editor.getByRole('status').filter({ hasText: installationText('授权已保存') })).toBeVisible(); await snapshot('grant-saved');
+    await page.reload(); await installationCard.getByRole('button', { name: installationText('数据授权'), exact: true }).click(); await editor.getByLabel(installationText('授权合同'), { exact: true }).selectOption(`resource:${resourceCode}`);
+    await expect(editor.getByLabel(`${installationText('读取')} name`, { exact: true })).toBeChecked(); await expect(editor.getByTestId('grant-constraint-0').getByLabel(installationText('允许值（每行一个）'), { exact: true })).toHaveValue('A');
     const listed = await page.request.get(resourcePath, { headers: machineHeaders }); expect(listed.status()).toBe(200); expect((await listed.json()).items).toEqual([{ pid: recordA.pid, name: 'Allowed A', zone: 'A' }]);
     expect((await page.request.get(`${resourcePath}/${recordB.pid}`, { headers: machineHeaders })).status()).toBe(404);
     const forbidden = await page.request.post(resourcePath, { headers: { ...machineHeaders, 'Idempotency-Key': `grant-forbidden-${suffix}` }, data: { name: 'Denied', zone: 'B' } }); expect(forbidden.status()).toBe(403);
-    await editor.getByLabel('授权合同', { exact: true }).selectOption(`query:${queryCode}`); await expect(editor).toContainText('已有列表授权');
+    await editor.getByLabel(installationText('授权合同'), { exact: true }).selectOption(`query:${queryCode}`); await expect(editor).toContainText(installationText('已有列表授权'));
     await editor.getByLabel('pid', { exact: true }).check(); await editor.getByLabel('name', { exact: true }).check();
-    const queryGrantActions = editor.getByRole('button', { name: '保存安装授权', exact: true }).locator('..').locator('..');
+    const queryGrantActions = editor.getByRole('button', { name: installationText('保存安装授权'), exact: true }).locator('..').locator('..');
     await queryGrantActions.scrollIntoViewIfNeeded();
     await expect(queryGrantActions).toBeInViewport({ ratio: 1 });
     for (const alias of ['pid', 'name']) await expect(editor.getByLabel(alias, { exact: true }).locator('..')).toBeInViewport({ ratio: 1 });
     await snapshot('grant-query');
     const queryGranted = page.waitForResponse(response => response.url().endsWith(`/installations/${installation.pid}/queries/${queryCode}`) && response.request().method() === 'PUT');
-    await editor.getByRole('button', { name: '保存安装授权', exact: true }).click(); expect((await queryGranted).status()).toBe(200); await expect(editor.getByRole('status').filter({ hasText: '授权已保存' })).toBeVisible();
+    await editor.getByRole('button', { name: installationText('保存安装授权'), exact: true }).click(); expect((await queryGranted).status()).toBe(200); await expect(editor.getByRole('status').filter({ hasText: installationText('授权已保存') })).toBeVisible();
     const result = await page.request.post(queryPath, { headers: machineHeaders, data: { parameters: { zone: 'A' }, limit: 10 } }); expect(result.status()).toBe(200); expect((await result.json()).items).toEqual([{ pid: recordA.pid, name: 'Allowed A' }]);
     const otherRows = await page.request.post(queryPath, { headers: machineHeaders, data: { parameters: { zone: 'B' }, limit: 10 } }); expect(otherRows.status()).toBe(200); expect((await otherRows.json()).items).toEqual([]);
     const resourceCatalogPath = `/api/open-platform/installations/${installation.pid}/resources`;
@@ -863,32 +889,32 @@ test.describe('Dynamic installation authority journey', () => {
     const executeMajor = () => page.request.post(majorQueryPath, { headers: machineHeaders, data: { parameters: { zone: 'A' }, limit: 10 } });
     expect((await page.request.get(`${majorResourcePath}/${recordA.pid}`, { headers: machineHeaders })).status()).toBe(403);
     expect((await executeMajor()).status()).toBe(403);
-    await editor.getByLabel('授权合同', { exact: true }).selectOption(`resource:${majorResourceCode}`);
-    await expect(editor).toContainText('此安装尚未获此合同的数据授权'); await snapshot('grant-major-ungranted');
+    await editor.getByLabel(installationText('授权合同'), { exact: true }).selectOption(`resource:${majorResourceCode}`);
+    await expect(editor).toContainText(installationText('此安装尚未获此合同的数据授权')); await snapshot('grant-major-ungranted');
     const grantMajorResource = async () => {
-      await editor.getByLabel('授权合同', { exact: true }).selectOption(`resource:${majorResourceCode}`);
-      for (const operation of ['列表查询', '详情读取']) await editor.getByLabel(operation, { exact: true }).check();
-      for (const alias of ['displayName', 'zone']) await editor.getByLabel(`读取 ${alias}`, { exact: true }).check();
-      if (UI_MUTATION === 'major-grant-alias') await editor.getByLabel('读取 displayName', { exact: true }).uncheck();
-      await expect(editor.getByLabel('读取 displayName', { exact: true })).toBeChecked();
-      await expect(editor.getByLabel('读取 secret', { exact: true })).not.toBeChecked();
-      await editor.getByRole('button', { name: '添加行约束', exact: true }).click();
-      await editor.getByTestId('grant-constraint-0').getByLabel('约束公共字段', { exact: true }).selectOption('zone');
-      await editor.getByTestId('grant-constraint-0').getByLabel('允许值（每行一个）', { exact: true }).fill('A');
+      await editor.getByLabel(installationText('授权合同'), { exact: true }).selectOption(`resource:${majorResourceCode}`);
+      for (const operation of [installationText('列表查询'), installationText('详情读取')]) await editor.getByLabel(operation, { exact: true }).check();
+      for (const alias of ['displayName', 'zone']) await editor.getByLabel(`${installationText('读取')} ${alias}`, { exact: true }).check();
+      if (UI_MUTATION === 'major-grant-alias') await editor.getByLabel(`${installationText('读取')} displayName`, { exact: true }).uncheck();
+      await expect(editor.getByLabel(`${installationText('读取')} displayName`, { exact: true })).toBeChecked();
+      await expect(editor.getByLabel(`${installationText('读取')} secret`, { exact: true })).not.toBeChecked();
+      await editor.getByRole('button', { name: installationText('添加行约束'), exact: true }).click();
+      await editor.getByTestId('grant-constraint-0').getByLabel(installationText('约束公共字段'), { exact: true }).selectOption('zone');
+      await editor.getByTestId('grant-constraint-0').getByLabel(installationText('允许值（每行一个）'), { exact: true }).fill('A');
       const response = page.waitForResponse(reply => reply.url().endsWith(`/installations/${installation.pid}/resources/${majorResourceCode}`) && reply.request().method() === 'PUT');
-      await editor.getByRole('button', { name: '保存安装授权', exact: true }).click(); const saved = await response;
+      await editor.getByRole('button', { name: installationText('保存安装授权'), exact: true }).click(); const saved = await response;
       expect(saved.status()).toBe(200); const savedPolicy = saved.request().postDataJSON();
       expect({ ...savedPolicy, operations: [...savedPolicy.operations].sort(), readableFields: [...savedPolicy.readableFields].sort() }).toEqual({ operations: ['get', 'list'], readableFields: ['displayName', 'pid', 'zone'], writableFields: [], rowConstraints: [{ field: 'zone', values: ['A'] }] });
-      await expect(editor.getByRole('status').filter({ hasText: '授权已保存' })).toBeVisible();
+      await expect(editor.getByRole('status').filter({ hasText: installationText('授权已保存') })).toBeVisible();
     };
     const revokeMajor = async (kind: 'resource' | 'query', code: string, image?: string) => {
-      await editor.getByLabel('授权合同', { exact: true }).selectOption(`${kind}:${code}`);
-      await editor.getByRole('button', { name: '撤销安装授权', exact: true }).click();
-      const confirmation = editor.getByRole('group', { name: '安装授权操作确认', exact: true });
+      await editor.getByLabel(installationText('授权合同'), { exact: true }).selectOption(`${kind}:${code}`);
+      await editor.getByRole('button', { name: installationText('撤销安装授权'), exact: true }).click();
+      const confirmation = editor.getByRole('group', { name: installationText('安装授权操作确认'), exact: true });
       await expect(confirmation).toBeVisible(); if (image) await snapshot(image);
       const response = page.waitForResponse(reply => reply.url().endsWith(`/installations/${installation.pid}/${kind === 'resource' ? 'resources' : 'queries'}/${code}`) && reply.request().method() === 'DELETE');
-      await confirmation.getByRole('button', { name: '确认', exact: true }).click(); expect((await response).status()).toBe(200);
-      await expect(editor.getByRole('status').filter({ hasText: '授权已撤销' })).toBeVisible();
+      await confirmation.getByRole('button', { name: installationText('确认'), exact: true }).click(); expect((await response).status()).toBe(200);
+      await expect(editor.getByRole('status').filter({ hasText: installationText('授权已撤销') })).toBeVisible();
     };
     await grantMajorResource(); await snapshot('grant-major-resource-saved');
     const majorRecord = await page.request.get(`${majorResourcePath}/${recordA.pid}`, { headers: machineHeaders });
@@ -897,14 +923,14 @@ test.describe('Dynamic installation authority journey', () => {
     const deniedMajorWrite = await page.request.post(majorResourcePath, { headers: { ...machineHeaders, 'Idempotency-Key': `major-readonly-denial-${suffix}` }, data: { displayName: 'Denied major write', zone: 'A' } });
     expect(deniedMajorWrite.status()).toBe(403);
     expect((await executeMajor()).status()).toBe(403); await assertOldUnchanged();
-    await editor.getByLabel('授权合同', { exact: true }).selectOption(`query:${majorQueryCode}`);
-    await expect(editor).toContainText('已有列表授权');
+    await editor.getByLabel(installationText('授权合同'), { exact: true }).selectOption(`query:${majorQueryCode}`);
+    await expect(editor).toContainText(installationText('已有列表授权'));
     for (const alias of ['pid', 'displayName']) await editor.getByLabel(alias, { exact: true }).check();
     const majorQueryGranted = page.waitForResponse(reply => reply.url().endsWith(`/installations/${installation.pid}/queries/${majorQueryCode}`) && reply.request().method() === 'PUT');
-    await editor.getByRole('button', { name: '保存安装授权', exact: true }).click(); const grantedQuery = await majorQueryGranted;
+    await editor.getByRole('button', { name: installationText('保存安装授权'), exact: true }).click(); const grantedQuery = await majorQueryGranted;
     expect(grantedQuery.status()).toBe(200); const savedQueryPolicy = grantedQuery.request().postDataJSON();
     expect({ ...savedQueryPolicy, readableFields: [...savedQueryPolicy.readableFields].sort() }).toEqual({ readableFields: ['displayName', 'pid'] });
-    await expect(editor.getByRole('status').filter({ hasText: '授权已保存' })).toBeVisible(); await snapshot('grant-major-query-saved');
+    await expect(editor.getByRole('status').filter({ hasText: installationText('授权已保存') })).toBeVisible(); await snapshot('grant-major-query-saved');
     const majorItems = await executeMajor(); expect(majorItems.status()).toBe(200); expect((await majorItems.json()).items).toEqual([{ pid: recordA.pid, displayName: 'Allowed A' }]);
     const hiddenMajor = await page.request.post(majorQueryPath, { headers: machineHeaders, data: { parameters: { zone: 'B' }, limit: 10 } });
     expect(hiddenMajor.status()).toBe(200); expect((await hiddenMajor.json()).items).toEqual([]); await assertOldUnchanged();
@@ -921,18 +947,18 @@ test.describe('Dynamic installation authority journey', () => {
     expect((await page.request.get(`${majorResourcePath}/${recordA.pid}`, { headers: machineHeaders })).status()).toBe(403);
     expect((await human('GET', resourceCatalogPath)).find((view: { code: string }) => view.code === majorResourceCode).policy).toBeNull();
     await snapshot('grant-major-resource-revoked'); await assertOldUnchanged();
-    await editor.getByLabel('授权合同', { exact: true }).selectOption(`query:${queryCode}`);
+    await editor.getByLabel(installationText('授权合同'), { exact: true }).selectOption(`query:${queryCode}`);
     const intent = { name: 'Created A', zone: 'A' }; const createHeaders = { ...machineHeaders, 'Idempotency-Key': `grant-create-${suffix}` };
     const created = await page.request.post(resourcePath, { headers: createHeaders, data: intent }); expect(created.status()).toBe(201); const row = await created.json(); expect(row).toMatchObject(intent); expect(row.pid).toEqual(expect.any(String)); expect(row).not.toHaveProperty('secret');
     const replay = await page.request.post(resourcePath, { headers: createHeaders, data: intent }); expect(replay.status()).toBe(201); expect(replay.headers()['idempotent-replay']).toBe('true'); expect(await replay.json()).toEqual(row);
     const updated = await page.request.patch(`${resourcePath}/${row.pid}`, { headers: { ...machineHeaders, 'Idempotency-Key': `grant-update-${suffix}`, 'If-Match': created.headers().etag }, data: { name: 'Updated A' } }); expect(updated.status()).toBe(200); expect(await updated.json()).toMatchObject({ pid: row.pid, name: 'Updated A' });
     const removed = await page.request.delete(`${resourcePath}/${row.pid}`, { headers: { ...machineHeaders, 'Idempotency-Key': `grant-delete-${suffix}`, 'If-Match': updated.headers().etag } }); expect(removed.status()).toBe(204);
     expect((await page.request.get(`${resourcePath}/${row.pid}`, { headers: machineHeaders })).status()).toBe(404);
-    await editor.getByRole('button', { name: '撤销安装授权', exact: true }).click(); await snapshot('grant-revoke-dialog');
-    await editor.getByRole('group', { name: '安装授权操作确认', exact: true }).getByRole('button', { name: '确认', exact: true }).click(); await expect(editor.getByRole('status').filter({ hasText: '授权已撤销' })).toBeVisible();
+    await editor.getByRole('button', { name: installationText('撤销安装授权'), exact: true }).click(); await snapshot('grant-revoke-dialog');
+    await editor.getByRole('group', { name: installationText('安装授权操作确认'), exact: true }).getByRole('button', { name: installationText('确认'), exact: true }).click(); await expect(editor.getByRole('status').filter({ hasText: installationText('授权已撤销') })).toBeVisible();
     expect((await page.request.post(queryPath, { headers: machineHeaders, data: { parameters: { zone: 'A' }, limit: 10 } })).status()).toBe(403); await snapshot('grant-query-revoked');
-    await editor.getByLabel('授权合同', { exact: true }).selectOption(`resource:${resourceCode}`); await editor.getByRole('button', { name: '撤销安装授权', exact: true }).click();
-    await editor.getByRole('group', { name: '安装授权操作确认', exact: true }).getByRole('button', { name: '确认', exact: true }).click(); await expect(editor.getByRole('status').filter({ hasText: '授权已撤销' })).toBeVisible();
+    await editor.getByLabel(installationText('授权合同'), { exact: true }).selectOption(`resource:${resourceCode}`); await editor.getByRole('button', { name: installationText('撤销安装授权'), exact: true }).click();
+    await editor.getByRole('group', { name: installationText('安装授权操作确认'), exact: true }).getByRole('button', { name: installationText('确认'), exact: true }).click(); await expect(editor.getByRole('status').filter({ hasText: installationText('授权已撤销') })).toBeVisible();
     expect((await page.request.get(resourcePath, { headers: machineHeaders })).status()).toBe(403); await snapshot('grant-resource-revoked');
     const persisted = await human('GET', `/api/open-platform/installations/${installation.pid}/resources`); expect(persisted.find((view: { code: string }) => view.code === resourceCode).policy).toBeNull();
   });
