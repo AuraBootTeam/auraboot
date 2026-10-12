@@ -33,6 +33,7 @@ import { useToastContext } from '~/contexts/ToastContext';
 import { useDictCache } from '~/framework/meta/rendering/pages/hooks/useDictCache';
 import { FieldRenderer } from '~/framework/meta/rendering/FieldRenderer';
 import { GridLayoutRenderer } from '~/framework/meta/rendering/layout/GridLayoutRenderer';
+import { resolveErrorLocale, rootT } from '~/error/root-error-view';
 import {
   readDataSourceState,
   useDataSourceSubscription,
@@ -180,8 +181,12 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
 
   // ── Error state ────────────────────────────────────────────────────────────
   if (dataSourceState?.error) {
+    const sourceError = dataSourceState.error as Error & {status?:unknown;statusCode?:unknown;code?:unknown};
+    const status = Number(sourceError.status ?? sourceError.statusCode ?? sourceError.code);
     const message =
-      dataSourceState.error instanceof Error
+      status === 403
+        ? rootT('forbidden', resolveErrorLocale(locale))
+        : dataSourceState.error instanceof Error
         ? dataSourceState.error.message
         : String(dataSourceState.error);
     return (
