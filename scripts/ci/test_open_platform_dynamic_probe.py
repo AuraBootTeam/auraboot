@@ -172,7 +172,7 @@ def passed():
     requests = []
     for index, (name, status, code, known, token) in enumerate(AUTH_CASES):
         method = "POST" if name.startswith("oauth") else "GET"
-        path = "/oauth2/token" if method == "POST" else "/api/open/v1/whoami"
+        path = "/oauth2/token" if method == "POST" else "/api/open/v1/resources/release.dynamic.parts" if name == "bearer-expired" else "/api/open/v1/whoami"
         identifier = "fixture-auth-" + str(index)
         audit = {"requestId": identifier, "method": method, "path": path, "status": status, "durationMs": 1,
                  "occurredAt": "2026-10-12T00:00:00Z", "applicationPid": "app-pid" if known else None,
@@ -186,7 +186,13 @@ def passed():
                          "requestId": identifier, "callerIdReplaced": method == "POST", "visibleAudits": visible})
     allowed = dict(before, tokenLastUsed="2026-10-12T00:00:01Z", quotaCount=1)
     report["authenticationFailures"] = {"applicationPid": "app-pid", "installationPid": "install-pid", "before": before,
-                                         "afterDenied": denied, "afterAllowed": allowed, "requests": requests, "normalStatus": 200}
+                                         "afterDenied": denied, "afterAllowed": allowed, "requests": requests, "normalStatus": 200, "resourcePath":"/api/open/v1/resources/release.dynamic.parts"}
+    auth = report["authenticationFailures"]
+    expired_request = next(row for row in requests if row['id'] == 'bearer-expired')
+    expired = {'database':'hermetic-fixture','installationFound':1,'tokenFound':1,
+               'originalExpiresAt':'2026-10-12T00:10:00Z','effectiveExpiresAt':'2026-10-11T23:59:00Z','observedAt':'2026-10-12T00:00:00Z'}
+    restored = dict(expired, originalExpiresAt=expired['effectiveExpiresAt'], effectiveExpiresAt=expired['originalExpiresAt'], observedAt='2026-10-12T00:00:01Z')
+    auth['tokenExpiry'] = {'expired':expired,'restored':restored,'requestId':expired_request['requestId']}
     resource = "release.dynamic.parts.revocation"
     state = {"database":"hermetic-fixture","installationFound":1,"credentialStatus":"active","tokenRevoked":False,
              "records":[{"pid":"create-pid","name":"Revocation create","zone":"A","version":1},
@@ -542,6 +548,12 @@ class DynamicProbeTests(unittest.TestCase):
         with self.assertRaises(ProtocolError): verify_report(report)
 
     def test_audit_proofs_are_mandatory_and_reject_wrong_identity_result_or_private_fields(self):
+        from open_platform_authentication_probe import PsqlAuditReader
+        for database, allowed in [('auraboot_188', False), ('production', True)]:
+            reader = PsqlAuditReader(['psql'], database, allow_fixture_clock=allowed)
+            with patch('open_platform_authentication_probe.subprocess.run') as sql:
+                with self.assertRaises(ProtocolError): reader.token_clock('install-pid', 'owned-dummy-token')
+                sql.assert_not_called()
         original=passed()
         absent=copy.deepcopy(original);absent.pop("credentialRevocation")
         with self.assertRaises(ProtocolError):verify_report(absent)
@@ -559,13 +571,21 @@ class DynamicProbeTests(unittest.TestCase):
         for key in ["authenticationFailures"]:
             report = copy.deepcopy(baseline); report.pop(key)
             with self.assertRaises(ProtocolError): verify_report(report)
-        for key in ["before", "afterDenied", "afterAllowed", "requests", "normalStatus"]:
+        for key in ["before", "afterDenied", "afterAllowed", "requests", "normalStatus", "tokenExpiry", "resourcePath"]:
             report = copy.deepcopy(baseline); report["authenticationFailures"].pop(key)
             with self.subTest(auth_missing=key), self.assertRaises(ProtocolError): verify_report(report)
-        for index in range(7):
+        for index in range(len(baseline["authenticationFailures"]["requests"])):
             for key in baseline["authenticationFailures"]["afterDenied"]["audits"][index]:
                 report = copy.deepcopy(baseline); report["authenticationFailures"]["afterDenied"]["audits"][index].pop(key)
                 with self.subTest(auth_audit=index,missing=key), self.assertRaises(ProtocolError): verify_report(report)
+        for stage in ['expired','restored']:
+            for key in baseline['authenticationFailures']['tokenExpiry'][stage]:
+                report = copy.deepcopy(baseline); report['authenticationFailures']['tokenExpiry'][stage].pop(key)
+                with self.subTest(expiry_stage=stage,missing=key), self.assertRaises(ProtocolError): verify_report(report)
+        for stage,key,value in [('expired','effectiveExpiresAt','2026-10-12T00:20:00Z'),('expired','tokenFound',0),
+                                ('restored','effectiveExpiresAt','2026-10-12T00:20:00Z'),('restored','observedAt','2026-10-11T00:00:00Z')]:
+            report = copy.deepcopy(baseline); report['authenticationFailures']['tokenExpiry'][stage][key]=value
+            with self.subTest(expiry_stage=stage,changed=key), self.assertRaises(ProtocolError): verify_report(report)
         for field in ["tokenCount", "credentialLastUsed", "tokenLastUsed", "quotaCount"]:
             report = copy.deepcopy(baseline); report["authenticationFailures"]["afterDenied"][field] = "changed"
             with self.subTest(auth_state=field), self.assertRaises(ProtocolError): verify_report(report)

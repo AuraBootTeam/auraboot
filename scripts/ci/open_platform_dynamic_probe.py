@@ -461,7 +461,7 @@ def verify_report(report):
     verify_plugin_query_source(report.get("pluginQuerySource"), proofs[1])
     verify_claimed_query_rollback(report.get("queryRollbackProtection"), proofs[1], report["pluginQuerySource"])
     from open_platform_authentication_probe import verify as verify_authentication
-    verify_authentication(report.get("authenticationFailures"), report.get("applicationPid"), report.get("installationPid"))
+    verify_authentication(report.get("authenticationFailures"), report.get("applicationPid"), report.get("installationPid"), "/api/open/v1/resources/release.dynamic.parts")
     from open_platform_revocation_probe import verify as verify_revocation
     verify_revocation(report.get("credentialRevocation"))
     verify_audits(report)

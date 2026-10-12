@@ -1,5 +1,6 @@
 """Mandatory authentication-denial HTTP and owned-PostgreSQL evidence."""
 import hashlib
+from datetime import datetime
 import json
 import re
 import subprocess
@@ -10,6 +11,7 @@ from open_platform_http import ProtocolError
 CASES = [("bearer-missing", 401, "invalid_token", False, False),
          ("bearer-unknown", 401, "invalid_token", False, False),
          ("bearer-scope", 403, "insufficient_scope", True, True),
+         ("bearer-expired", 401, "invalid_token", True, True),
          ("oauth-unknown", 401, "invalid_client", False, False),
          ("oauth-wrong", 401, "invalid_client", False, False),
          ("oauth-basic", 401, "invalid_client", False, False),
@@ -22,11 +24,13 @@ def require(value, message):
 
 
 class PsqlAuditReader:
-    def __init__(self, command, database):
+    def __init__(self, command, database, *, allow_fixture_clock=False):
         require(isinstance(command, list) and command and all(isinstance(v, str) and v for v in command),
                 "authentication SQL command missing")
         require(isinstance(database, str) and database, "authentication database identity missing")
+        require(type(allow_fixture_clock) is bool, "fixture clock authorization invalid")
         self.command, self.database = command, database
+        self.allow_fixture_clock = allow_fixture_clock
 
     def read(self, installation, credential, token, ids=()):
         require(isinstance(credential, dict) and isinstance(credential.get('clientSecret'), str) and credential['clientSecret']
@@ -54,6 +58,37 @@ class PsqlAuditReader:
             'secretFree',({safe}))) FROM ab_open_api_call_audit a WHERE a.request_id IN ({wanted})), '[]'::json));"""
         return self.query(sql)
 
+    def token_clock(self, installation, token, original=None):
+        """Construct expiry only for an explicitly authorized, isolated token fixture."""
+        require(self.allow_fixture_clock and (self.database == 'open_platform_ci'
+                or re.fullmatch(r'auraboot_[0-9]{1,4}', self.database)), 'owned fixture clock authorization required')
+        require(isinstance(installation, str) and re.fullmatch(r'[A-Za-z0-9_.:-]{1,128}', installation) and isinstance(token, str) and token,
+                'fixture clock identity invalid')
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        literal = lambda value: "'" + value.replace("'", "''") + "'"
+        if original is None:
+            predicate = 't.expires_at > NOW()'
+            target = "NOW() - INTERVAL '1 minute'"
+        else:
+            require(isinstance(original, dict) and original.get('database') == self.database
+                    and original.get('installationFound') == 1 and original.get('tokenFound') == 1,
+                    'fixture clock restoration identity invalid')
+            parse_time(original.get('originalExpiresAt')); parse_time(original.get('effectiveExpiresAt'))
+            predicate = 't.expires_at = ' + literal(original['effectiveExpiresAt']) + '::timestamptz'
+            target = literal(original['originalExpiresAt']) + '::timestamptz'
+        sql = f"""WITH i AS (SELECT id FROM ab_application_installation WHERE pid={literal(installation)}),
+        prior AS MATERIALIZED (SELECT t.id,t.expires_at FROM ab_application_access_token t JOIN i ON i.id=t.installation_id
+          WHERE current_database()={literal(self.database)} AND t.token_hash={literal(token_hash)}
+            AND t.revoked_at IS NULL AND {predicate} FOR UPDATE OF t),
+        changed AS (UPDATE ab_application_access_token t SET expires_at={target} FROM prior WHERE t.id=prior.id AND (SELECT COUNT(*) FROM prior)=1
+          RETURNING t.expires_at)
+        SELECT json_build_object('database',current_database(),'installationFound',(SELECT COUNT(*) FROM i),
+          'tokenFound',(SELECT COUNT(*) FROM changed),'originalExpiresAt',(SELECT expires_at FROM prior),
+          'effectiveExpiresAt',(SELECT expires_at FROM changed),'observedAt',NOW());"""
+        state = self.query(sql)
+        require(state.get('tokenFound') == 1, 'fixture clock must change exactly the owned token')
+        return state
+
     def query(self, sql):
         try:
             result = subprocess.run(self.command, input=sql, capture_output=True, text=True, timeout=20)
@@ -66,9 +101,37 @@ class PsqlAuditReader:
         return state
 
 
-def verify(proof, application, installation):
-    require(isinstance(proof, dict) and set(proof) == {'applicationPid','installationPid','before','afterDenied','afterAllowed','requests','normalStatus'} and proof.get('applicationPid') == application
+
+def parse_time(value):
+    require(isinstance(value, str) and len(value) <= 64, 'fixture timestamp missing')
+    try:
+        result = datetime.fromisoformat(value.replace('Z', '+00:00'))
+    except ValueError:
+        raise ProtocolError('fixture timestamp invalid') from None
+    require(result.tzinfo is not None, 'fixture timestamp timezone missing')
+    return result
+
+
+def verify_expiry(expiry, database, request_id):
+    require(isinstance(expiry, dict) and set(expiry) == {'expired','restored','requestId'}
+            and expiry.get('requestId') == request_id, 'token expiry proof missing')
+    expired, restored = expiry.get('expired'), expiry.get('restored')
+    for state in [expired, restored]:
+        require(isinstance(state, dict) and set(state) == {'database','installationFound','tokenFound','originalExpiresAt','effectiveExpiresAt','observedAt'}
+                and state.get('database') == database and type(state.get('installationFound')) is int and state['installationFound'] == 1
+                and type(state.get('tokenFound')) is int and state['tokenFound'] == 1, 'token expiry fixture identity invalid')
+    original = parse_time(expired['originalExpiresAt']); deadline = parse_time(expired['effectiveExpiresAt'])
+    observed = parse_time(expired['observedAt']); recovery = parse_time(restored['observedAt'])
+    require(deadline < observed < original and recovery >= observed and original > recovery
+            and restored['originalExpiresAt'] == expired['effectiveExpiresAt']
+            and restored['effectiveExpiresAt'] == expired['originalExpiresAt'], 'token expiry or exact restoration unproven')
+
+
+def verify(proof, application, installation, resource_path):
+    require(isinstance(proof, dict) and set(proof) == {'applicationPid','installationPid','before','afterDenied','afterAllowed','requests','normalStatus','tokenExpiry','resourcePath'} and proof.get('applicationPid') == application
             and proof.get('installationPid') == installation, "authentication proof identity missing")
+    require(isinstance(resource_path, str) and re.fullmatch(r'/api/open/v1/resources/[a-z][a-z0-9.-]{1,99}', resource_path)
+            and proof.get('resourcePath') == resource_path, 'authentication resource path missing')
     before, denied, allowed = [proof.get(k) for k in ['before', 'afterDenied', 'afterAllowed']]
     for state in [before, denied, allowed]:
         require(isinstance(state, dict) and set(state) == {'database','installationFound','tokenCount','credentialLastUsed','tokenLastUsed','quotaCount','audits'}
@@ -97,7 +160,7 @@ def verify(proof, application, installation):
     indexed = {a.get('requestId'): a for a in audits}
     require(set(indexed) == set(ids), "authentication audit missing or duplicated")
     for row, (name, status, code, known, token) in zip(rows, CASES):
-        path = '/oauth2/token' if name.startswith('oauth') else '/api/open/v1/whoami'
+        path = '/oauth2/token' if name.startswith('oauth') else resource_path if name == 'bearer-expired' else '/api/open/v1/whoami'
         method = 'POST' if name.startswith('oauth') else 'GET'
         expected_body = {'error': code} if method == 'POST' else {'success': False, 'code': code, 'message': code}
         require(set(row) == {'id','status','body','requestId','callerIdReplaced','visibleAudits'} and row.get('id') == name and row.get('status') == status and row.get('body') == expected_body
@@ -121,6 +184,8 @@ def verify(proof, application, installation):
                     and view.get('status') == status and view.get('method') == method and view.get('path') == path
                     and all(view.get(k) is None for k in ['capability', 'resource', 'operation', 'recordPid', 'idempotentReplay']),
                     "authentication management view forged business authority")
+    expired_request = next(row for row in rows if row['id'] == 'bearer-expired')
+    verify_expiry(proof.get('tokenExpiry'), before['database'], expired_request['requestId'])
     require(proof.get('normalStatus') == 200, "authentication normal recovery missing")
     return proof
 
@@ -129,7 +194,7 @@ def run(request, human, report, credential, token, path, reader):
     require(reader is not None, "owned authentication audit reader is required")
     installation = report['installationPid']
     proof = {'applicationPid': report['applicationPid'], 'installationPid': installation,
-             'before': reader.read(installation, credential, token), 'requests': []}
+             'before': reader.read(installation, credential, token), 'requests': [], 'resourcePath': path}
     for name, status, code, known, token_present in CASES:
         oauth = name.startswith('oauth')
         supplied = credential['clientSecret'] if oauth else 'release-auth-' + uuid.uuid4().hex
@@ -143,12 +208,19 @@ def run(request, human, report, credential, token, path, reader):
                 headers['Authorization'] = 'Basic !invalid!'; form = {'grant_type': 'client_credentials'}
             if name == 'oauth-scope': form['scope'] = 'ungranted.' + uuid.uuid4().hex
         elif name == 'bearer-unknown': headers['Authorization'] = 'Bearer unknown-' + uuid.uuid4().hex
-        elif name == 'bearer-scope': headers['Authorization'] = 'Bearer ' + token
-        response_status, body, response_headers = request('/oauth2/token' if oauth else '/api/open/v1/whoami',
-                method='POST' if oauth else 'GET', form=form, headers=headers, expected=(status,))
+        elif name in ['bearer-scope', 'bearer-expired']: headers['Authorization'] = 'Bearer ' + token
+        clock = reader.token_clock(installation, token) if name == 'bearer-expired' else None
+        try:
+            response_status, body, response_headers = request('/oauth2/token' if oauth else path if name == 'bearer-expired' else '/api/open/v1/whoami',
+                    method='POST' if oauth else 'GET', form=form, headers=headers, expected=(status,))
+        finally:
+            if clock is not None:
+                restored_clock = reader.token_clock(installation, token, clock)
         identifier = next((v for k,v in response_headers.items() if k.lower() == 'x-request-id'), None)
         require(isinstance(identifier, str) and credential['clientSecret'] not in identifier and token not in identifier
                 and (not oauth or identifier != supplied), "authentication response request ID missing or contains credentials")
+        if clock is not None:
+            proof['tokenExpiry'] = {'expired': clock, 'restored': restored_clock, 'requestId': identifier}
         visible = human(f'/api/open-platform/installations/{installation}/audits?requestId={identifier}')
         proof['requests'].append({'id': name, 'status': response_status, 'body': body, 'requestId': identifier,
                                  'callerIdReplaced': identifier != supplied, 'visibleAudits': visible})
@@ -156,4 +228,4 @@ def run(request, human, report, credential, token, path, reader):
     proof['afterDenied'] = reader.read(installation, credential, token, ids)
     proof['normalStatus'], _, _ = request(path, headers={'Authorization': 'Bearer ' + token})
     proof['afterAllowed'] = reader.read(installation, credential, token)
-    return verify(proof, report['applicationPid'], installation)
+    return verify(proof, report['applicationPid'], installation, path)

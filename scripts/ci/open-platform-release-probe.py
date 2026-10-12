@@ -154,7 +154,7 @@ def main():
 
     from open_platform_authentication_probe import PsqlAuditReader
     audit_reader = PsqlAuditReader(["docker", "exec", "-i", os.environ["MODEL_POSTGRES"], "psql", "-U", "auraboot",
-                                   "-d", "open_platform_ci", "-X", "-At", "-v", "ON_ERROR_STOP=1"], "open_platform_ci")
+                                   "-d", "open_platform_ci", "-X", "-At", "-v", "ON_ERROR_STOP=1"], "open_platform_ci", allow_fixture_clock=True)
     dynamic = run_dynamic_probe(request, admin, audit_reader=audit_reader, evidence_path=Path(ARTIFACT).with_name("dynamic-probe.json"),
                                 consumer=consume)
     infrastructure = DockerInfrastructure(app=os.environ["MODEL_APP"], postgres=os.environ["MODEL_POSTGRES"],
