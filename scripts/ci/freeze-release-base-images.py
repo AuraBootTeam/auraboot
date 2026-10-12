@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Freeze prewarmed, named image identities before an admitted release build."""
 import json
+import os
 import re
 import subprocess
 import sys
@@ -37,6 +38,40 @@ def freeze_image(tag, record):
     return {"tag": tag, "reference": ref, "imageId": image_id}
 
 
+
+def bind_transports(images, raw):
+    """A transport can select another registry, but never different image bytes."""
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate base image transport source")
+            result[key] = value
+        return result
+    if not isinstance(raw, str) or len(raw) > 65536:
+        raise ValueError("base image transport input exceeds budget")
+    mapping = json.loads(raw, object_pairs_hook=unique_object)
+    if not isinstance(mapping, dict) or len(mapping) > 32:
+        raise ValueError("bounded base image transport map required")
+    sources = {image["reference"] for image in images}
+    if not set(mapping).issubset(sources):
+        raise ValueError("base image transport source is not in the frozen manifest")
+    bound = []
+    for image in images:
+        source = image["reference"]
+        transport = mapping.get(source, source)
+        if not isinstance(transport, str) or not re.fullmatch(
+                r"[a-z0-9][a-z0-9.-]*(?::[0-9]{1,5})?/[a-z0-9][a-z0-9._/-]*@sha256:[0-9a-f]{64}", transport):
+            raise ValueError("immutable registry transport reference required")
+        name, _, digest = transport.partition("@")
+        if repository(name) != name or ".." in name or "//" in name or name.endswith("/"):
+            raise ValueError("explicit normalized registry transport required")
+        if digest != source.partition("@")[2]:
+            raise ValueError("base image transport digest differs from frozen source")
+        bound.append(dict(image, transportReference=transport))
+    return bound
+
+
 def main():
     output, *tags = sys.argv[1:]
     if not tags:
@@ -48,6 +83,7 @@ def main():
         if len(records) != 1:
             raise ValueError(f"expected one prewarmed image: {tag}")
         images.append(freeze_image(tag, records[0]))
+    images = bind_transports(images, os.environ.get("AURA_CI_RELEASE_BASE_IMAGE_TRANSPORTS", "{}"))
     Path(output).write_text(json.dumps({"images": images}, indent=2) + "\n")
 
 

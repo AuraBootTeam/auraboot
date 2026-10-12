@@ -108,15 +108,16 @@ trap 'exit 143' TERM
 BASE_IMAGE_MANIFEST="$ARTIFACTS/base-images.json"
 # The admitted host prewarms these images. Freeze only digests belonging to each
 # configured source repository; public mirror aliases are never source authority.
+# Explicit transport mappings retain that source digest and are recorded in the manifest.
 python3 "$SCRIPT_DIR/ci/freeze-release-base-images.py" "$BASE_IMAGE_MANIFEST" \
   pgvector/pgvector:pg16 redis:7.4-alpine "$FLYWAY_IMAGE" "$K6_IMAGE" "$SDK_NODE_IMAGE" \
   "$BUILD_JDK_IMAGE" "$RUNTIME_JRE_IMAGE" \
   || fatal "unable to freeze prewarmed base image identities"
 base_ref() {
-  python3 -c 'import json,sys; rows=json.load(open(sys.argv[1]))["images"]; print(next(row["reference"] for row in rows if row["tag"]==sys.argv[2]))' \
+  python3 -c 'import json,sys; rows=json.load(open(sys.argv[1]))["images"]; print(next(row["transportReference"] for row in rows if row["tag"]==sys.argv[2]))' \
     "$BASE_IMAGE_MANIFEST" "$1"
 }
-PINNED_BASES="$(python3 -c 'import json,sys; rows=json.load(open(sys.argv[1]))["images"]; print("\n".join(row["reference"]+"\t"+row["imageId"] for row in rows))' "$BASE_IMAGE_MANIFEST")" \
+PINNED_BASES="$(python3 -c 'import json,sys; rows=json.load(open(sys.argv[1]))["images"]; print("\n".join(row["transportReference"]+"\t"+row["imageId"] for row in rows))' "$BASE_IMAGE_MANIFEST")" \
   || fatal "invalid frozen base image manifest"
 while IFS=$'\t' read -r base_image expected_image_id; do
   timeout "$PULL_TIMEOUT" docker pull --platform linux/amd64 "$base_image" > "$ARTIFACTS/logs/base-pull-${expected_image_id#sha256:}.log" 2>&1 \

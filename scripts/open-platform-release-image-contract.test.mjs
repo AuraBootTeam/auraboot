@@ -101,11 +101,16 @@ const basePull = gate.slice(gate.indexOf("while IFS=$'\\t' read -r base_image ex
   gate.indexOf('PGVECTOR_IMAGE="$(base_ref'));
 assert.ok(basePull.includes('done <<< "$PINNED_BASES"'));
 const baseReference = `docker.io/pgvector/pgvector@sha256:${'b'.repeat(64)}`;
+const baseSelection = gate.slice(gate.indexOf('base_ref() {'), gate.indexOf("while IFS=$'\\t' read -r base_image"));
+assert.ok(baseSelection.includes('transportReference'));
+for (const transportReference of [baseReference, `mirror.example/pgvector/pgvector@sha256:${'b'.repeat(64)}`]) {
 const expectedImageId = `sha256:${'a'.repeat(64)}`;
 for (const [actualImageId, pullExit] of [[expectedImageId, 0], [`sha256:${'c'.repeat(64)}`, 0], [expectedImageId, 124]]) {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'open-platform-base-pull-'));
   try {
     fs.mkdirSync(path.join(temporary, 'logs'));
+    const manifest = path.join(temporary, 'base-images.json');
+    fs.writeFileSync(manifest, JSON.stringify({images: [{tag:'pgvector/pgvector:pg16', reference:baseReference, transportReference, imageId:expectedImageId}]}));
     const result = spawnSync('bash', ['-c', `set -Eeuo pipefail
 fatal() { printf '%s\\n' "$*" >&2; exit 2; }
 timeout() { shift; "$@"; }
@@ -118,14 +123,17 @@ docker() {
     *) return 18;;
   esac
 }
+${baseSelection}
 ${basePull}
+[[ "$(base_ref pgvector/pgvector:pg16)" == "$EXPECTED_REFERENCE" ]]
 `], {encoding: 'utf8', env: {...process.env, ARTIFACTS: temporary, PULL_TIMEOUT: '120',
-      PINNED_BASES: `${baseReference}\t${expectedImageId}`, EXPECTED_REFERENCE: baseReference,
+      BASE_IMAGE_MANIFEST: manifest, EXPECTED_REFERENCE: transportReference,
       ACTUAL_IMAGE_ID: actualImageId, PULL_EXIT: String(pullExit)}});
     assert.equal(result.status, actualImageId === expectedImageId && pullExit === 0 ? 0 : 2, result.stderr);
   } finally { fs.rmSync(temporary, {recursive: true}); }
 }
-console.log('open-platform immutable amd64 base pull: 3 executable cases PASS');
+}
+console.log('open-platform immutable amd64 base pull and transport selection: 6 executable cases PASS');
 
 const sourceIdentityCheck = gate.slice(gate.indexOf('[[ "${AURA_CI_SOURCE_SET_DIGEST:-}"'),
   gate.indexOf('[[ "$(uname -s)"'));
