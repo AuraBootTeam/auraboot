@@ -552,7 +552,7 @@ describe('FormDialog grouped choices', () => {
     renderDialog({ fields: [field], fieldOptions: { categorySuppliers: groups }, defaults: {}, onSubmit });
     const resistors = screen.getByRole('group', { name: '电阻' });
     const capacitors = screen.getByRole('group', { name: '电容' });
-    expect(screen.getAllByRole('checkbox').every((input) => !(input as HTMLInputElement).checked)).toBe(true);
+    expect(screen.getAllByRole('checkbox').every((input: HTMLElement) => !(input as HTMLInputElement).checked)).toBe(true);
     fireEvent.click(screen.getAllByRole('checkbox', { name: '供应商甲' })[0]);
     fireEvent.click(screen.getByTestId('form-dialog-submit'));
     expect(onSubmit).not.toHaveBeenCalled();

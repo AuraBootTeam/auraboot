@@ -19,7 +19,7 @@ function mount(element: React.ReactNode) {
 beforeEach(() => {
   width = 400;
   disconnect.mockClear();
-  vi.spyOn(HTMLTextAreaElement.prototype, 'scrollHeight', 'get').mockImplementation(function () {
+  vi.spyOn(HTMLTextAreaElement.prototype, 'scrollHeight', 'get').mockImplementation(function (this: HTMLTextAreaElement) {
     return this.value.length > 100 ? (width < 300 ? 420 : 240) : 80;
   });
   vi.spyOn(HTMLTextAreaElement.prototype, 'clientWidth', 'get').mockImplementation(() => width);

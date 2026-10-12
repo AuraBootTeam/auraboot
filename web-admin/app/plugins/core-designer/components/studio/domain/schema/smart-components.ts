@@ -99,6 +99,7 @@ export interface InputProps extends FormFieldProps {
 
 // SmartTextarea 属性
 export interface TextareaProps extends FormFieldProps {
+  readOnly?: boolean;
   rows?: number;
   cols?: number;
   maxLength?: number;

@@ -13,7 +13,7 @@ describe('ControlledFieldRenderer', () => {
     vi.resetModules();
     vi.doMock('~/framework/meta/rendering/components/ComponentLoader', async () => {
       const { Select } = await import('~/ui/smart/form/Select');
-      return { ComponentLoader: ({ props }: { props: Record<string, any> }) => <Select {...props} /> };
+      return { ComponentLoader: ({ props }: { props: React.ComponentProps<typeof Select> }) => <Select {...props} /> };
     });
     const { ControlledFieldRenderer } = await import('../ControlledFieldRenderer');
     function Filter() {

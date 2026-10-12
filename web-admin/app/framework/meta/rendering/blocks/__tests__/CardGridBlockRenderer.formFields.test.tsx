@@ -63,15 +63,16 @@ describe('Card-grid draft form fields', () => {
 
   it('uses opt-in field grid without changing read-only capacity or independent draft edits', () => {
     const { state } = setup(true, false, false, true);
-    const cards = screen.getAllByTestId('card-grid-card');
+    const cards = screen.getAllByTestId('card-grid-card') as HTMLElement[];
     const first = within(cards[0]);
-    expect(first.getByTestId('grid-item-availableQty').style.gridColumn).toBe('1 / span 6');
-    expect(first.getByTestId('grid-item-proposedQty').style.gridColumn).toBe('7 / span 6');
-    expect(first.getByTestId('grid-item-score').style.gridColumn).toBe('1 / span 12');
-    expect(first.getByLabelText('Available capacity')).toHaveProperty('readOnly', true);
-    fireEvent.change(first.getByLabelText('Proposed quantity'), { target: { value: '40.000001' } });
-    expect((state.getScope('review').form.choices as any[])[0].proposedQty).toBe('40.000001');
-    expect(within(cards[1]).getByLabelText('Proposed quantity')).toHaveValue('40');
+    const fieldColumn = (name: string) => cards[0].querySelector<HTMLElement>(`[data-testid="grid-item-${name}"]`)?.style.gridColumn;
+    expect(fieldColumn('availableQty')).toBe('1 / span 6');
+    expect(fieldColumn('proposedQty')).toBe('7 / span 6');
+    expect(fieldColumn('score')).toBe('1 / span 12');
+    expect(first.getByRole('textbox', { name: 'Available capacity' })).toHaveProperty('readOnly', true);
+    fireEvent.change(first.getByRole('textbox', { name: 'Proposed quantity' }), { target: { value: '40.000001' } });
+    expect(state.getFieldValue('review', 'choices')[0].proposedQty).toBe('40.000001');
+    expect(within(cards[1]).getByRole('textbox', { name: 'Proposed quantity' })).toHaveValue('40');
   });
 
   it('keeps existing cards stacked when no inner grid is declared', () => {
