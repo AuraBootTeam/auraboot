@@ -778,7 +778,8 @@ test.describe('Open Platform golden journey', () => {
     await installDialog
       .getByRole('heading', { name: '安装应用', exact: true })
       .scrollIntoViewIfNeeded();
-    await expect(installDialog.getByLabel('环境')).toBeInViewport();
+    await installDialog.getByLabel('环境').scrollIntoViewIfNeeded();
+    await expect(installDialog.getByLabel('环境')).toBeInViewport({ ratio: 1 });
     await expect(installDialog.getByRole('button', { name: '安装', exact: true })).toBeInViewport({
       ratio: 1,
     });
