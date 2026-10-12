@@ -9,6 +9,53 @@ const EVIDENCE_DIR = path.join(process.env.AURA_EVIDENCE_ROOT || '/tmp', 'ui-gol
 const PUBLICATION_VIEWPORT = process.env.AURA_OPEN_PLATFORM_PUBLICATION_VIEWPORT || 'desktop';
 if (!['desktop', 'narrow'].includes(PUBLICATION_VIEWPORT)) throw new Error('Unsupported publication viewport');
 const publicationViewport = PUBLICATION_VIEWPORT === 'narrow' ? { width: 1024, height: 900 } : { width: 1440, height: 1000 };
+const publicationLocale = process.env.AURA_OPEN_PLATFORM_PUBLICATION_LOCALE || 'zh-CN';
+if (!['zh-CN', 'en-US'].includes(publicationLocale)) throw new Error('Unsupported publication locale');
+const publicationEnglish: Record<string, string> = {
+  "来源已不可用": "Source unavailable",
+  "公共资源发布": "Public Resource Publications",
+  "公共查询发布": "Public Query Publications",
+  "列表查询": "List",
+  "详情读取": "Get",
+  "创建记录": "Create",
+  "修改记录": "Update",
+  "删除记录": "Delete",
+  "已发布": "Published",
+  "已停用": "Withdrawn",
+  "新建公共资源": "New public resource",
+  "尚未公开业务模型": "No business models are public yet",
+  "编辑合同": "Edit contract",
+  "公共资源地址": "Public resource address",
+  "查找业务模型": "Find business model",
+  "查找": "Search",
+  "业务模型": "Business model",
+  "为每个来源选择已发布的列表资源；安装还需获得这些来源的列表和字段授权。虚拟模型自身的行约束会同时生效。": "Select a published list resource for each source. Installations also need its list and field grants. The virtual model row constraints apply as well.",
+  "请选择该来源的已发布列表资源。": "Choose a published list resource for this source.",
+  "所需权限": "Required scope",
+  "机器数据范围": "Machine data policy",
+  "对外字段名称": "Public field name",
+  "对外类型": "Public type",
+  "允许排序": "Sortable",
+  "查询超时（毫秒）": "Query timeout (ms)",
+  "创建通知": "Created",
+  "保存并校验草稿": "Save and validate draft",
+  "发布合同": "Publish contract",
+  "下载 OpenAPI": "Download OpenAPI",
+  "下载类型声明": "Download types",
+  "停用资源": "Withdraw resource",
+  "关闭编辑": "Close editor",
+  "操作确认": "Confirm operation",
+  "确认": "Confirm",
+  "原对象属性": "Source property",
+  "对外属性名称": "Public property name",
+  "草稿已保存并通过来源校验": "Draft saved and source validation passed",
+  "你的修改已保留": "Your edits are retained"
+};
+const publicationText = (cn: string) => {
+  if (publicationLocale === 'zh-CN') return cn;
+  if (!(cn in publicationEnglish)) throw new Error(`Missing English publication expectation: ${cn}`);
+  return publicationEnglish[cn];
+};
 const UI_MUTATION = process.env.AURA_OPEN_PLATFORM_UI_MUTATION;
 const sessionStorage = createCookieSessionStorage({
   cookie: {
@@ -56,10 +103,10 @@ test.describe('Dynamic resource publication journey', () => {
   });
   test.setTimeout(180_000);
   test.describe.configure({ retries: 0 });
-  test.use({ storageState: { cookies: [], origins: [] }, locale: 'zh-CN', viewport: publicationViewport });
+  test.use({ storageState: { cookies: [], origins: [] }, locale: publicationLocale, viewport: publicationViewport });
 
   test('publishes a real model contract through UI, retains conflicts, downloads and withdraws', async ({ page }) => {
-    await authenticate(page);
+    await authenticate(page, publicationLocale);
     const suffix = String(Date.now());
     const modelCode = `dop_ui_${suffix}`;
     const modelName = `接入验证零件 ${suffix}`;
@@ -99,7 +146,8 @@ test.describe('Dynamic resource publication journey', () => {
     });
     await page.getByTestId('open-platform-publications-link').click();
     await expect(page.getByTestId('publication-editor')).toBeVisible();
-    await expect(page.getByRole('heading', { name: '尚未公开业务模型' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: publicationText("公共资源发布"), exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: publicationText("尚未公开业务模型") })).toBeVisible();
     await snapshot('publication-empty');
     await page.unroute('**/api/open-platform/publications');
     const realCatalogResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/open-platform/publications' && response.request().method() === 'GET');
@@ -108,41 +156,41 @@ test.describe('Dynamic resource publication journey', () => {
     const realCatalog = await realCatalogHttp.json(); expect(String(realCatalog.code)).toBe('0');
     expect(Array.isArray(realCatalog.data)).toBe(true);
     expect(realCatalog.data.some((entry: { code: string }) => entry.code === resourceCode)).toBe(false);
-    await page.getByRole('button', { name: '新建公共资源', exact: true }).click();
-    await page.getByLabel('公共资源地址', { exact: true }).fill(resourceCode);
-    await page.getByLabel('查找业务模型', { exact: true }).fill(modelName);
-    await page.getByRole('button', { name: '查找', exact: true }).click();
-    await expect(page.getByLabel('业务模型', { exact: true }).getByRole('option', { name: modelName, exact: true })).toHaveCount(1);
+    await page.getByRole('button', { name: publicationText("新建公共资源"), exact: true }).click();
+    await page.getByLabel(publicationText("公共资源地址"), { exact: true }).fill(resourceCode);
+    await page.getByLabel(publicationText("查找业务模型"), { exact: true }).fill(modelName);
+    await page.getByRole('button', { name: publicationText("查找"), exact: true }).click();
+    await expect(page.getByLabel(publicationText("业务模型"), { exact: true }).getByRole('option', { name: modelName, exact: true })).toHaveCount(1);
     const metadataResponse = page.waitForResponse(response => response.url().includes(`/publication-sources/${modelCode}`) && response.status() === 200);
-    await page.getByLabel('业务模型', { exact: true }).selectOption({ label: modelName });
+    await page.getByLabel(publicationText("业务模型"), { exact: true }).selectOption({ label: modelName });
     const metadata = await (await metadataResponse).json();
     expect(String(metadata.code)).toBe('0');
     expect(metadata.data.operations).toEqual(expect.arrayContaining(['list', 'get', 'create', 'update', 'delete']));
     expect(metadata.data.fields.some((field: { code: string }) => ['id', 'tenant_id', 'row_version'].includes(field.code))).toBe(false);
-    await expect(page.getByLabel('列表查询', { exact: true })).toBeEnabled();
+    await expect(page.getByLabel(publicationText("列表查询"), { exact: true })).toBeEnabled();
     await snapshot('publication-source');
-    for (const operation of ['列表查询', '详情读取', '创建记录', '修改记录', '删除记录']) await page.getByLabel(operation, { exact: true }).check();
-    const scopes = page.getByLabel('所需权限', { exact: true });
+    for (const operation of [publicationText("列表查询"), publicationText("详情读取"), publicationText("创建记录"), publicationText("修改记录"), publicationText("删除记录")]) await page.getByLabel(operation, { exact: true }).check();
+    const scopes = page.getByLabel(publicationText("所需权限"), { exact: true });
     for (const [index, operation] of ['list', 'get', 'create', 'update', 'delete'].entries()) await scopes.nth(index).fill(`dop.ui:${operation}`);
-    await page.getByLabel('机器数据范围', { exact: true }).selectOption('tenant_wide');
+    await page.getByLabel(publicationText("机器数据范围"), { exact: true }).selectOption('tenant_wide');
     const nameField = page.getByTestId('publication-field-dop_ui_name');
     await nameField.getByLabel('零件名称', { exact: true }).check();
-    await nameField.getByLabel('对外字段名称', { exact: true }).fill('name');
+    await nameField.getByLabel(publicationText("对外字段名称"), { exact: true }).fill('name');
     await nameField.getByLabel('EQ', { exact: true }).check();
-    await nameField.getByLabel('允许排序', { exact: true }).check();
+    await nameField.getByLabel(publicationText("允许排序"), { exact: true }).check();
     const detailsField = page.getByTestId('publication-field-dop_ui_details');
     await detailsField.getByLabel('联系信息', { exact: true }).check();
-    await detailsField.getByLabel('对外字段名称', { exact: true }).fill('details');
-    await detailsField.getByLabel('对外类型', { exact: true }).selectOption('object');
-    await detailsField.getByLabel('原对象属性', { exact: true }).fill('contact_name');
-    await detailsField.getByLabel('对外属性名称', { exact: true }).fill('contactName');
-    await page.getByLabel('创建通知', { exact: true }).check();
+    await detailsField.getByLabel(publicationText("对外字段名称"), { exact: true }).fill('details');
+    await detailsField.getByLabel(publicationText("对外类型"), { exact: true }).selectOption('object');
+    await detailsField.getByLabel(publicationText("原对象属性"), { exact: true }).fill('contact_name');
+    await detailsField.getByLabel(publicationText("对外属性名称"), { exact: true }).fill('contactName');
+    await page.getByLabel(publicationText("创建通知"), { exact: true }).check();
     await snapshot('publication-fields');
     await nameField.scrollIntoViewIfNeeded();
     await nameField.screenshot({ path: path.join(screenshotRoot, 'publication-name-field-region.png') });
     await detailsField.scrollIntoViewIfNeeded();
     await detailsField.screenshot({ path: path.join(screenshotRoot, 'publication-fields-region.png') });
-    const saveButton = page.getByRole('button', { name: '保存并校验草稿', exact: true });
+    const saveButton = page.getByRole('button', { name: publicationText("保存并校验草稿"), exact: true });
     await saveButton.hover();
     const saveContrast = await saveButton.evaluate(element => {
       const luminance = (color: string) => (color.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number)
@@ -153,13 +201,13 @@ test.describe('Dynamic resource publication journey', () => {
     });
     expect(saveContrast).toBeGreaterThanOrEqual(4.5);
     const savedResponse = page.waitForResponse(response => response.url().endsWith(`/publications/${resourceCode}/draft`) && response.request().method() === 'PUT');
-    await page.getByRole('button', { name: '保存并校验草稿', exact: true }).click();
+    await page.getByRole('button', { name: publicationText("保存并校验草稿"), exact: true }).click();
     const savedHttp = await savedResponse; expect(savedHttp.status()).toBe(200);
     const saved = await savedHttp.json(); expect(String(saved.code)).toBe('0');
     expect(saved.data.draft.fields.name).toMatchObject({ source: 'dop_ui_name', writable: true, required: true, sortable: true, operators: ['EQ'] });
     expect(saved.data.draft.fields.details).toMatchObject({ source: 'dop_ui_details', type: 'object', properties: { contactName: { source: 'contact_name', type: 'string' } } });
     expect(saved.data.draftRevision).toBe(1); expect(saved.data.activeVersion).toBeNull();
-    await expect(page.getByTestId('publication-editor').getByRole('status')).toContainText('草稿已保存并通过来源校验');
+    await expect(page.getByTestId('publication-editor').getByRole('status')).toContainText(publicationText("草稿已保存并通过来源校验"));
     await expect(page.getByTestId('publication-editor').getByRole('status')).toBeInViewport();
     await snapshot('publication-draft');
 
@@ -167,39 +215,39 @@ test.describe('Dynamic resource publication journey', () => {
     await otherEditor.goto('/p/c/open_platform_publications');
     await otherEditor.getByTestId('publication-editor').getByRole('listitem')
       .filter({ has: otherEditor.getByText(resourceCode, { exact: true }) })
-      .getByRole('button', { name: '编辑合同', exact: true }).click();
-    await expect(otherEditor.getByLabel('查询超时（毫秒）', { exact: true })).toBeEnabled();
-    await otherEditor.getByLabel('查询超时（毫秒）', { exact: true }).fill('6000');
-    await otherEditor.getByRole('button', { name: '保存并校验草稿', exact: true }).click();
-    await expect(otherEditor.getByTestId('publication-editor').getByRole('status')).toContainText('草稿已保存并通过来源校验');
+      .getByRole('button', { name: publicationText("编辑合同"), exact: true }).click();
+    await expect(otherEditor.getByLabel(publicationText("查询超时（毫秒）"), { exact: true })).toBeEnabled();
+    await otherEditor.getByLabel(publicationText("查询超时（毫秒）"), { exact: true }).fill('6000');
+    await otherEditor.getByRole('button', { name: publicationText("保存并校验草稿"), exact: true }).click();
+    await expect(otherEditor.getByTestId('publication-editor').getByRole('status')).toContainText(publicationText("草稿已保存并通过来源校验"));
     await otherEditor.close();
-    await page.getByLabel('查询超时（毫秒）', { exact: true }).fill('7000');
+    await page.getByLabel(publicationText("查询超时（毫秒）"), { exact: true }).fill('7000');
     const conflictResponse = page.waitForResponse(response => response.url().endsWith(`/publications/${resourceCode}/draft`) && response.status() === 409);
-    await page.getByRole('button', { name: '保存并校验草稿', exact: true }).click(); await conflictResponse;
-    await expect(page.getByTestId('publication-editor').getByRole('alert')).toContainText('你的修改已保留');
-    await expect(page.getByLabel('查询超时（毫秒）', { exact: true })).toHaveValue('7000');
+    await page.getByRole('button', { name: publicationText("保存并校验草稿"), exact: true }).click(); await conflictResponse;
+    await expect(page.getByTestId('publication-editor').getByRole('alert')).toContainText(publicationText("你的修改已保留"));
+    await expect(page.getByLabel(publicationText("查询超时（毫秒）"), { exact: true })).toHaveValue('7000');
     await expect(page.getByTestId('publication-editor').getByRole('alert')).toBeInViewport();
-    const conflictActions = page.getByTestId('publication-editor').getByRole('button', { name: '关闭编辑', exact: true }).locator('..');
+    const conflictActions = page.getByTestId('publication-editor').getByRole('button', { name: publicationText("关闭编辑"), exact: true }).locator('..');
     await conflictActions.scrollIntoViewIfNeeded();
     await expect(conflictActions).toBeInViewport({ ratio: 1 });
     await expect(page.getByTestId('publication-editor').getByRole('alert')).toBeInViewport({ ratio: 1 });
     await saveButton.evaluate(element => element.scrollIntoView({ block: 'center' }));
     await expect(saveButton).toBeInViewport({ ratio: 1 });
     await snapshot('publication-conflict');
-    await page.getByRole('button', { name: '关闭编辑', exact: true }).click();
-    await page.getByRole('group', { name: '操作确认', exact: true }).getByRole('button', { name: '确认', exact: true }).click();
+    await page.getByRole('button', { name: publicationText("关闭编辑"), exact: true }).click();
+    await page.getByRole('group', { name: publicationText("操作确认"), exact: true }).getByRole('button', { name: publicationText("确认"), exact: true }).click();
     const ownContractEdit = page.getByTestId('publication-editor').getByRole('listitem')
       .filter({ has: page.getByText(resourceCode, { exact: true }) })
-      .getByRole('button', { name: '编辑合同', exact: true });
+      .getByRole('button', { name: publicationText("编辑合同"), exact: true });
     await expect(ownContractEdit).toBeEnabled();
     await ownContractEdit.click();
-    await expect(page.getByLabel('查询超时（毫秒）', { exact: true })).toHaveValue('6000');
-    await page.getByRole('button', { name: '发布合同', exact: true }).click();
-    await page.getByRole('group', { name: '操作确认', exact: true }).getByRole('button', { name: '确认', exact: true }).click();
-    await expect(page.getByTestId('publication-editor').getByRole('status')).toContainText('已发布');
+    await expect(page.getByLabel(publicationText("查询超时（毫秒）"), { exact: true })).toHaveValue('6000');
+    await page.getByRole('button', { name: publicationText("发布合同"), exact: true }).click();
+    await page.getByRole('group', { name: publicationText("操作确认"), exact: true }).getByRole('button', { name: publicationText("确认"), exact: true }).click();
+    await expect(page.getByTestId('publication-editor').getByRole('status')).toContainText(publicationText("已发布"));
     await expect(page.getByTestId('publication-editor').getByRole('status')).toBeInViewport();
     await snapshot('publication-publish');
-    for (const [button, extension] of [['下载 OpenAPI', '.openapi.json'], ['下载类型声明', '.d.ts']] as const) {
+    for (const [button, extension] of [[publicationText("下载 OpenAPI"), '.openapi.json'], [publicationText("下载类型声明"), '.d.ts']] as const) {
       const downloaded = page.waitForEvent('download'); await page.getByRole('button', { name: button, exact: true }).click();
       const artifact = await downloaded; expect(artifact.suggestedFilename()).toBe(resourceCode + extension);
       const location = await artifact.path(); expect(location).toBeTruthy();
@@ -235,27 +283,27 @@ test.describe('Dynamic resource publication journey', () => {
     expect(virtualResponse.status()).toBe(200); const virtual = await virtualResponse.json(); expect(String(virtual.code)).toBe('0');
     const virtualPublished = await page.request.post(`${WEB_BASE_URL}/api/meta/models/${virtual.data.pid}/publish`, { data: { impactAcknowledged: true } });
     expect(virtualPublished.status()).toBe(200); expect(String((await virtualPublished.json()).code)).toBe('0');
-    await page.getByRole('button', { name: '关闭编辑', exact: true }).click();
-    await page.getByRole('button', { name: '新建公共资源', exact: true }).click();
-    await page.getByLabel('公共资源地址', { exact: true }).fill(virtualCode);
-    await page.getByLabel('查找业务模型', { exact: true }).fill(virtualName);
-    await page.getByRole('button', { name: '查找', exact: true }).click();
-    await expect(page.getByLabel('业务模型', { exact: true }).getByRole('option', { name: virtualName, exact: true })).toHaveCount(1);
-    await page.getByLabel('业务模型', { exact: true }).selectOption({ label: virtualName });
+    await page.getByRole('button', { name: publicationText("关闭编辑"), exact: true }).click();
+    await page.getByRole('button', { name: publicationText("新建公共资源"), exact: true }).click();
+    await page.getByLabel(publicationText("公共资源地址"), { exact: true }).fill(virtualCode);
+    await page.getByLabel(publicationText("查找业务模型"), { exact: true }).fill(virtualName);
+    await page.getByRole('button', { name: publicationText("查找"), exact: true }).click();
+    await expect(page.getByLabel(publicationText("业务模型"), { exact: true }).getByRole('option', { name: virtualName, exact: true })).toHaveCount(1);
+    await page.getByLabel(publicationText("业务模型"), { exact: true }).selectOption({ label: virtualName });
     const sourceSelector = page.getByTestId(`publication-source-${modelCode}`).getByRole('combobox');
     await expect(sourceSelector).toHaveValue('');
     await expect(sourceSelector.getByRole('option', { name: `${resourceCode} (v1)`, exact: true })).toHaveCount(1);
     await sourceSelector.selectOption(resourceCode);
-    await expect(page.getByText('为每个来源选择已发布的列表资源；安装还需获得这些来源的列表和字段授权。虚拟模型自身的行约束会同时生效。', { exact: true })).toBeVisible();
-    await expect(page.getByLabel('创建记录', { exact: true })).toBeDisabled();
-    await expect(page.getByLabel('修改记录', { exact: true })).toBeDisabled();
-    for (const operation of ['列表查询', '详情读取']) await page.getByLabel(operation, { exact: true }).check();
-    await page.getByLabel('所需权限', { exact: true }).nth(0).fill('dop.ui:list');
-    await page.getByLabel('所需权限', { exact: true }).nth(1).fill('dop.ui:get');
-    await page.getByLabel('机器数据范围', { exact: true }).selectOption('tenant_wide');
+    await expect(page.getByText(publicationText("为每个来源选择已发布的列表资源；安装还需获得这些来源的列表和字段授权。虚拟模型自身的行约束会同时生效。"), { exact: true })).toBeVisible();
+    await expect(page.getByLabel(publicationText("创建记录"), { exact: true })).toBeDisabled();
+    await expect(page.getByLabel(publicationText("修改记录"), { exact: true })).toBeDisabled();
+    for (const operation of [publicationText("列表查询"), publicationText("详情读取")]) await page.getByLabel(operation, { exact: true }).check();
+    await page.getByLabel(publicationText("所需权限"), { exact: true }).nth(0).fill('dop.ui:list');
+    await page.getByLabel(publicationText("所需权限"), { exact: true }).nth(1).fill('dop.ui:get');
+    await page.getByLabel(publicationText("机器数据范围"), { exact: true }).selectOption('tenant_wide');
     const virtualNameField = page.getByTestId('publication-field-name');
     await virtualNameField.getByLabel('零件名称', { exact: true }).check();
-    await virtualNameField.getByLabel('对外字段名称', { exact: true }).fill('name');
+    await virtualNameField.getByLabel(publicationText("对外字段名称"), { exact: true }).fill('name');
     if (process.env.AURA_UI_NEGATIVE_MUTATION && !['fill-required-source', 'skip-source-keyboard'].includes(process.env.AURA_UI_NEGATIVE_MUTATION)) {
       // Expected-red only: falsify persisted projection assertions using the actual UI.
       expect(process.env.AURA_UI_NEGATIVE_MUTATION).toBe('drop-virtual-output');
@@ -272,16 +320,16 @@ test.describe('Dynamic resource publication journey', () => {
       if (request.method() === 'PUT' && request.url().endsWith(`/publications/${virtualCode}/draft`)) prematureDraftWrites.push(request.url());
     };
     page.on('request', observeDraftWrite);
-    await page.getByRole('button', { name: '保存并校验草稿', exact: true }).click();
+    await page.getByRole('button', { name: publicationText("保存并校验草稿"), exact: true }).click();
     expect(await sourceSelector.evaluate((element: HTMLSelectElement) => element.validity.valueMissing)).toBe(true);
     await expect(sourceSelector).toBeFocused();
     const requiredSourceError = page.getByTestId(`publication-source-${modelCode}`).getByRole('alert');
-    await expect(requiredSourceError).toHaveText('请选择该来源的已发布列表资源。');
+    await expect(requiredSourceError).toHaveText(publicationText("请选择该来源的已发布列表资源。"));
     await expect(requiredSourceError).toBeVisible();
     await expect(requiredSourceError).toBeInViewport();
     await expect(sourceSelector).toHaveAttribute('aria-invalid', 'true');
     await expect(sourceSelector).toHaveAttribute('aria-describedby', `publication-source-error-${modelCode}`);
-    await page.getByRole('button', { name: '保存并校验草稿', exact: true }).click();
+    await page.getByRole('button', { name: publicationText("保存并校验草稿"), exact: true }).click();
     await expect(sourceSelector).toBeFocused();
     expect(prematureDraftWrites).toEqual([]);
     page.off('request', observeDraftWrite);
@@ -298,24 +346,24 @@ test.describe('Dynamic resource publication journey', () => {
     await expect(requiredSourceError).toHaveCount(0);
     await expect(sourceSelector).toHaveAttribute('aria-invalid', 'false');
     await sourceSelector.press('Tab');
-    await expect(page.getByLabel('列表查询', { exact: true })).toBeFocused();
+    await expect(page.getByLabel(publicationText("列表查询"), { exact: true })).toBeFocused();
     await page.keyboard.press('Shift+Tab');
     await expect(sourceSelector).toBeFocused();
     await page.getByTestId('publication-editor').locator('section').filter({ has: sourceSelector })
       .screenshot({ path: path.join(screenshotRoot, 'publication-virtual-source-keyboard-region.png') });
     const virtualSaved = page.waitForResponse(response => response.url().endsWith(`/publications/${virtualCode}/draft`) && response.request().method() === 'PUT');
-    await page.getByRole('button', { name: '保存并校验草稿', exact: true }).press('Enter');
+    await page.getByRole('button', { name: publicationText("保存并校验草稿"), exact: true }).press('Enter');
     const virtualSavedHttp = await virtualSaved; expect(virtualSavedHttp.status()).toBe(200);
     const virtualDraft = await virtualSavedHttp.json(); expect(String(virtualDraft.code)).toBe('0');
     expect(virtualDraft.data.draft.sourceResources).toEqual({ [modelCode]: resourceCode });
     expect(virtualDraft.data.draft.fields.name).toMatchObject({ source: 'name', readable: true, writable: false });
-    await page.getByRole('button', { name: '发布合同', exact: true }).click();
-    await page.getByRole('group', { name: '操作确认', exact: true }).getByRole('button', { name: '确认', exact: true }).click();
-    await expect(page.getByTestId('publication-editor').getByRole('status')).toContainText('已发布');
+    await page.getByRole('button', { name: publicationText("发布合同"), exact: true }).click();
+    await page.getByRole('group', { name: publicationText("操作确认"), exact: true }).getByRole('button', { name: publicationText("确认"), exact: true }).click();
+    await expect(page.getByTestId('publication-editor').getByRole('status')).toContainText(publicationText("已发布"));
     await expect(sourceSelector).toBeDisabled();
-    await page.getByRole('button', { name: '关闭编辑', exact: true }).click();
+    await page.getByRole('button', { name: publicationText("关闭编辑"), exact: true }).click();
     await page.getByTestId('publication-editor').getByRole('listitem').filter({ has: page.getByText(virtualCode, { exact: true }) })
-      .getByRole('button', { name: '编辑合同', exact: true }).click();
+      .getByRole('button', { name: publicationText("编辑合同"), exact: true }).click();
     await expect(sourceSelector).toHaveValue(resourceCode); await expect(sourceSelector).toBeDisabled();
     await snapshot('publication-virtual-published');
     await page.getByTestId('publication-editor').locator('section').filter({ has: sourceSelector })
@@ -350,26 +398,26 @@ test.describe('Dynamic resource publication journey', () => {
     const detail = await page.request.get(`${resourcePath}/${record.pid}`, { headers }); expect(detail.status()).toBe(200);
     expect(await detail.json()).toEqual({ pid: record.pid, name: 'UI virtual projection' });
     expect(detail.headers().etag).toMatch(/^"[a-f0-9]{64}"$/);
-    await page.getByRole('button', { name: '关闭编辑', exact: true }).click(); await ownContractEdit.click();
-    await page.getByRole('button', { name: '停用资源', exact: true }).click();
-    await expect(page.getByRole('group', { name: '操作确认', exact: true })).toBeInViewport();
+    await page.getByRole('button', { name: publicationText("关闭编辑"), exact: true }).click(); await ownContractEdit.click();
+    await page.getByRole('button', { name: publicationText("停用资源"), exact: true }).click();
+    await expect(page.getByRole('group', { name: publicationText("操作确认"), exact: true })).toBeInViewport();
     await snapshot('publication-withdrawdialog');
-    await page.getByRole('group', { name: '操作确认', exact: true }).screenshot({ path: path.join(screenshotRoot, 'publication-withdrawdialog-region.png') });
-    await page.getByRole('group', { name: '操作确认', exact: true }).getByRole('button', { name: '确认', exact: true }).click();
-    await expect(page.getByTestId('publication-editor').getByRole('status')).toContainText('已停用');
-    await expect(page.getByRole('button', { name: '下载 OpenAPI', exact: true })).toBeDisabled();
-    await expect(page.getByRole('button', { name: '下载类型声明', exact: true })).toBeDisabled();
+    await page.getByRole('group', { name: publicationText("操作确认"), exact: true }).screenshot({ path: path.join(screenshotRoot, 'publication-withdrawdialog-region.png') });
+    await page.getByRole('group', { name: publicationText("操作确认"), exact: true }).getByRole('button', { name: publicationText("确认"), exact: true }).click();
+    await expect(page.getByTestId('publication-editor').getByRole('status')).toContainText(publicationText("已停用"));
+    await expect(page.getByRole('button', { name: publicationText("下载 OpenAPI"), exact: true })).toBeDisabled();
+    await expect(page.getByRole('button', { name: publicationText("下载类型声明"), exact: true })).toBeDisabled();
     const finalState = await page.request.get(`${WEB_BASE_URL}/api/open-platform/publications`);
     expect(finalState.status()).toBe(200);
     const final = await finalState.json(); expect(String(final.code)).toBe('0');
     expect(final.data.find((view: { code: string }) => view.code === resourceCode)).toMatchObject({ status: 'withdrawn', activeVersion: 1, draftRevision: 2 });
     await expect(page.getByTestId('publication-editor').getByRole('status')).toBeInViewport();
     await snapshot('publication-withdraw');
-    await page.getByRole('button', { name: '关闭编辑', exact: true }).click();
+    await page.getByRole('button', { name: publicationText("关闭编辑"), exact: true }).click();
     await page.getByTestId('publication-editor').getByRole('listitem').filter({ has: page.getByText(virtualCode, { exact: true }) })
-      .getByRole('button', { name: '编辑合同', exact: true }).click();
+      .getByRole('button', { name: publicationText("编辑合同"), exact: true }).click();
     await expect(sourceSelector).toHaveValue(resourceCode); await expect(sourceSelector).toBeDisabled();
-    const unavailableSource = sourceSelector.getByRole('option', { name: `${resourceCode} (来源已不可用)`, exact: true });
+    const unavailableSource = sourceSelector.getByRole('option', { name: `${resourceCode} (${publicationText("来源已不可用")})`, exact: true });
     await expect(unavailableSource).toHaveCount(1); await expect(unavailableSource).toBeDisabled();
 
     const deniedSourceRead = await page.request.get(resourcePath, { headers }); expect(deniedSourceRead.status()).toBe(403);
@@ -379,6 +427,9 @@ test.describe('Dynamic resource publication journey', () => {
       draft: { sourceResources: { [modelCode]: resourceCode } } });
     await page.getByTestId('publication-editor').locator('section').filter({ has: sourceSelector })
       .screenshot({ path: path.join(screenshotRoot, 'publication-virtual-source-unavailable-region.png') });
+    await page.getByTestId('publication-editor').getByRole('link', { name: publicationLocale === 'zh-CN' ? '公共查询发布' : 'Public query publications', exact: true }).click();
+    await expect(page.getByRole('heading', { name: publicationText("公共查询发布"), exact: true })).toBeVisible();
+    await snapshot('publication-query-title');
   });
 });
 
@@ -602,7 +653,7 @@ test.describe('Dynamic installation authority journey', () => {
   });
 });
 
-async function authenticate(page: import('@playwright/test').Page) {
+async function authenticate(page: import('@playwright/test').Page, locale = 'zh-CN') {
   const loginResponse = await page.request.post(`${BACKEND_URL}/api/auth/login`, {
     data: { email: DEFAULT_TEST_ACCOUNT.email, password: DEFAULT_TEST_ACCOUNT.password },
   });
@@ -636,9 +687,9 @@ async function authenticate(page: import('@playwright/test').Page) {
   expect(value).toBeTruthy();
   await page.context().addCookies([
     { name: '__session', value: value!, url: WEB_BASE_URL, httpOnly: true, sameSite: 'Lax' },
-    { name: 'locale', value: 'zh-CN', url: WEB_BASE_URL, sameSite: 'Lax' },
+    { name: 'locale', value: locale, url: WEB_BASE_URL, sameSite: 'Lax' },
   ]);
-  await page.addInitScript(() => localStorage.setItem('locale', 'zh-CN'));
+  await page.addInitScript(value => localStorage.setItem('locale', value), locale);
 
 }
 
