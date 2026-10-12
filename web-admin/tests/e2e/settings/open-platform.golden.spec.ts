@@ -70,7 +70,8 @@ const sessionStorage = createCookieSessionStorage({
 
 // A supplied acceptance plan is materialized before any browser capture, including all unresolved rows.
 test.beforeAll(async () => {
-  if (UI_MUTATION && !['scope-label-clipping', 'publication-overflow'].includes(UI_MUTATION)) throw new Error('Unsupported Open Platform UI mutation');
+  if (UI_MUTATION && !['scope-label-clipping', 'publication-overflow', 'intro-word-break', 'publication-title-locale'].includes(UI_MUTATION)) throw new Error('Unsupported Open Platform UI mutation');
+  if (['intro-word-break', 'publication-title-locale'].includes(UI_MUTATION || '') && publicationLocale !== 'en-US') throw new Error('English locale mutation requires en-US');
   if (!process.env.AURA_UI_ACCEPTANCE_MATRIX) return;
   if (!process.env.AURA_EVIDENCE_ROOT) throw new Error('UI acceptance requires a registered evidence round');
   const plan = JSON.parse(await readFile(process.env.AURA_UI_ACCEPTANCE_MATRIX, 'utf8'));
@@ -128,6 +129,11 @@ test.describe('Dynamic resource publication journey', () => {
     const screenshotRoot = path.join(process.env.AURA_EVIDENCE_ROOT || '/tmp', 'ui-publication-r1', 'screenshots');
     await mkdir(screenshotRoot, { recursive: true });
     const snapshot = async (id: string) => {
+      if (id === 'publication-entry' && publicationLocale === 'en-US') {
+        const intro = page.getByTestId('open-platform-intro');
+        if (UI_MUTATION === 'intro-word-break') await intro.evaluate(element => { element.style.wordBreak = 'break-all'; });
+        await expect(intro).toHaveCSS('word-break', 'normal');
+      }
       if (UI_MUTATION === 'publication-overflow') await page.addStyleTag({ content: 'html { min-width: 1440px !important; }' });
       if (PUBLICATION_VIEWPORT === 'narrow') {
         expect(page.viewportSize()).toEqual(publicationViewport);
@@ -146,6 +152,9 @@ test.describe('Dynamic resource publication journey', () => {
     });
     await page.getByTestId('open-platform-publications-link').click();
     await expect(page.getByTestId('publication-editor')).toBeVisible();
+    if (UI_MUTATION === 'publication-title-locale') {
+      await page.getByRole('heading', { name: publicationText("公共资源发布"), exact: true }).evaluate(element => { element.textContent = '公共资源发布'; });
+    }
     await expect(page.getByRole('heading', { name: publicationText("公共资源发布"), exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: publicationText("尚未公开业务模型") })).toBeVisible();
     await snapshot('publication-empty');

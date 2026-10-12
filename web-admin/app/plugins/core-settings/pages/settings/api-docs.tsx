@@ -418,7 +418,7 @@ export default function OpenPlatformPage() {
           <h1 className="text-2xl font-semibold text-gray-950 dark:text-white">
             {t('openPlatform.title', undefined, 'Open Platform')}
           </h1>
-          <p className="mt-1 max-w-full text-sm break-all whitespace-normal text-gray-500 sm:max-w-2xl sm:break-words dark:text-gray-400">
+          <p data-testid="open-platform-intro" className="mt-1 max-w-full text-sm break-normal break-words whitespace-normal text-gray-500 sm:max-w-2xl dark:text-gray-400">
             {t(
               'openPlatform.subtitle',
               undefined,
