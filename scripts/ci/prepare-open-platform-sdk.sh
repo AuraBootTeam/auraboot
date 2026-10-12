@@ -24,7 +24,25 @@ node "$OUTPUT/toolchain/node_modules/typescript/bin/tsc" \
 ARCHIVE="$(node -e 'const fs=require("fs"); const rows=JSON.parse(fs.readFileSync(process.argv[1])); if(rows.length!==1)process.exit(1); process.stdout.write(rows[0].filename)' "$OUTPUT/pack.json")"
 printf '{"private":true,"type":"module"}\n' > "$OUTPUT/consumer/package.json"
 cp "$SOURCE/scripts/fixtures/open-platform-consumer/real-backend.mjs" \
-  "$SOURCE/scripts/fixtures/open-platform-consumer/real-backend.profile.json" "$OUTPUT/consumer/"
+  "$SOURCE/scripts/fixtures/open-platform-consumer/real-backend.profile.json" \
+  "$SOURCE/scripts/fixtures/open-platform-consumer/consumer.test.mjs" \
+  "$SOURCE/scripts/fixtures/open-platform-consumer/consumer-ts-check.ts" "$OUTPUT/consumer/"
 npm install --prefix "$OUTPUT/consumer" --offline --ignore-scripts --no-audit --no-fund "$OUTPUT/archive/$ARCHIVE"
 node --version > "$OUTPUT/node-version.txt"
 node "$OUTPUT/toolchain/node_modules/typescript/bin/tsc" --version > "$OUTPUT/compiler-version.txt"
+
+# Exercise the same installed archive before the real-backend driver runs.
+(
+  cd "$OUTPUT/consumer"
+  if node consumer.test.mjs > runtime.log 2>&1; then
+    printf '0\n' > runtime.exit
+  else
+    status=$?; printf '%s\n' "$status" > runtime.exit; exit "$status"
+  fi
+  if node "$OUTPUT/toolchain/node_modules/typescript/bin/tsc" \
+    --strict --noEmit --module nodenext --target es2022 consumer-ts-check.ts > types.log 2>&1; then
+    printf '0\n' > types.exit
+  else
+    status=$?; printf '%s\n' "$status" > types.exit; exit "$status"
+  fi
+)

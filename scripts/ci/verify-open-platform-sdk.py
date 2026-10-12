@@ -9,6 +9,19 @@ import sys
 import tarfile
 
 
+def verify_consumer_checks(source, output, distribution):
+    source, output = Path(source), Path(output)
+    for name in ["consumer.test.mjs", "consumer-ts-check.ts"]:
+        if (output / "consumer" / name).read_bytes() != (source / "scripts/fixtures/open-platform-consumer" / name).read_bytes():
+            raise ValueError("SDK contract consumer differs from frozen source")
+    for name in ["runtime", "types"]:
+        if (output / "consumer" / f"{name}.exit").read_text().strip() != "0":
+            raise ValueError(f"SDK contract consumer {name} did not pass")
+        (output / "consumer" / f"{name}.log").read_bytes()
+    rows = distribution.validate_consumer_output((output / "consumer/runtime.log").read_text())
+    return {"provider": "loopback-fixture", "cases": len(rows), "results": rows,
+            "types": "pass", "typeFixtureSha256": hashlib.sha256((output / "consumer/consumer-ts-check.ts").read_bytes()).hexdigest()}
+
 def verify(source, output):
     source, output = Path(source), Path(output)
     spec = importlib.util.spec_from_file_location("distribution", source / "scripts/check-package-distribution.py")
@@ -59,7 +72,8 @@ def verify(source, output):
     receipt.update({"manifestUnchanged": True, "explicitBuild": True, "prepackExecuted": False,
                     "compilerVersion": compiler, "nodeVersion": node,
                     "sourceSha256": hashlib.sha256((package / "src/index.ts").read_bytes()).hexdigest(),
-                    "consumerSourceVerified": True, "installedBytesVerified": True})
+                    "consumerSourceVerified": True, "installedBytesVerified": True,
+                    "contractConsumer": verify_consumer_checks(source, output, distribution)})
     return receipt
 
 

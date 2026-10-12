@@ -10,6 +10,9 @@ import unittest
 spec = importlib.util.spec_from_file_location("distribution", Path(__file__).with_name("check-package-distribution.py"))
 gate = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(gate)
+sdk_spec = importlib.util.spec_from_file_location("sdk_verifier", Path(__file__).with_name("ci") / "verify-open-platform-sdk.py")
+sdk = importlib.util.module_from_spec(sdk_spec)
+sdk_spec.loader.exec_module(sdk)
 LICENSE = Path(__file__).resolve().parents[1].joinpath("packages/open-platform-sdk/LICENSE").read_text()
 
 
@@ -80,6 +83,28 @@ class ConsumerExecutionContract(unittest.TestCase):
 
     def rows(self):
         return [{"name": name, "status": "passed"} for name in gate.consumer_case_names()]
+
+    def test_release_consumer_checks_reconcile_frozen_drivers_and_exits(self):
+        source = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory); consumer = output / "consumer"; consumer.mkdir()
+            for name in ["consumer.test.mjs", "consumer-ts-check.ts"]:
+                (consumer / name).write_bytes((source / "scripts/fixtures/open-platform-consumer" / name).read_bytes())
+            for name in ["runtime", "types"]:
+                (consumer / f"{name}.exit").write_text("0\n")
+                (consumer / f"{name}.log").write_text(self.output(self.rows()) if name == "runtime" else "")
+            self.assertEqual(sdk.verify_consumer_checks(source, output, gate)["cases"], 14)
+            (consumer / "runtime.log").write_text(self.output(self.rows()[:-1]))
+            with self.assertRaisesRegex(ValueError, "fourteen distinct"):
+                sdk.verify_consumer_checks(source, output, gate)
+            (consumer / "runtime.log").write_text(self.output(self.rows()))
+            (consumer / "types.exit").write_text("1\n")
+            with self.assertRaisesRegex(ValueError, "types did not pass"):
+                sdk.verify_consumer_checks(source, output, gate)
+            (consumer / "types.exit").write_text("0\n")
+            (consumer / "consumer-ts-check.ts").write_text("export {};\n")
+            with self.assertRaisesRegex(ValueError, "frozen source"):
+                sdk.verify_consumer_checks(source, output, gate)
 
     def test_actual_execution_ledger(self):
         self.assertEqual(len(gate.validate_consumer_output(self.output(self.rows()))), 14)

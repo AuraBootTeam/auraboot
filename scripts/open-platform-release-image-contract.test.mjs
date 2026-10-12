@@ -71,6 +71,11 @@ assert.ok(gate.includes('REDIS_HOST=redis'));
 assert.match(gate, /SDK_NODE_IMAGE="\$\(base_ref/);
 assert.match(gate, /prepare-open-platform-sdk\.sh \/source \/work\/sdk/);
 assert.match(gate, /verify-open-platform-sdk\.py/);
+const sdkPreparation = fs.readFileSync(new URL('./ci/prepare-open-platform-sdk.sh', import.meta.url), 'utf8');
+assert.match(sdkPreparation, /if node consumer\.test\.mjs > runtime\.log 2>&1/);
+assert.match(sdkPreparation, /--strict --noEmit --module nodenext --target es2022 consumer-ts-check\.ts/);
+assert.match(sdkPreparation, /printf '0\\n' > types\.exit/);
+
 assert.match(gate, /-p 127\.0\.0\.1::6443/);
 assert.match(gate, /protocol binding is not loopback-only/);
 assert.match(gate, /"sdkCases": 13/);
