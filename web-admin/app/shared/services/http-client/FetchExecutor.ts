@@ -133,7 +133,7 @@ async function handleHttpError(response: Response): Promise<Result<any>> {
     const body = await response.json();
     return {
       code: body.code || statusCode,
-      desc: ResultHelper.getErrorDetail(body)
+      desc: ResultHelper.getErrorDetail({ ...body, httpStatus: response.status })
         ?? (body.desc || body.message || `HTTP Error: ${statusCode} ${statusText}`),
       message: body.message || `HTTP Error: ${statusCode} ${statusText}`,
       success: false,

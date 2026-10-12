@@ -514,7 +514,7 @@ describe('DataSourceManager', () => {
           method: 'get', autoFetch: false });
         await manager.fetch('offers');
         expect(manager.getState('offers')?.error).toMatchObject({
-          message: '分页参数无效', status: httpStatus, statusCode: httpStatus, code: '35000',
+          message: httpStatus === 403 ? 'Bad parameter' : '分页参数无效', status: httpStatus, statusCode: httpStatus, code: '35000',
         });
         expect(manager.getState('offers')?.data).toBeNull();
         expect(manager.getState('offers')?.loading).toBe(false);
@@ -531,6 +531,25 @@ describe('DataSourceManager', () => {
         method: 'get', autoFetch: false });
       await manager.fetch('offers');
       expect(manager.getState('offers')?.error?.message).toBe('Original failure');
+    }
+  });
+
+  it('does not promote generic Core diagnostics but retains actual status and business identity', async () => {
+    for (const result of [
+      { code: '1', httpStatus: 500, desc: 'Internal system error', context: {
+        exception: 'IllegalStateException', detail: 'SELECT secret FROM private_model; PID secret', cause: 'private-cause' } },
+      { code: '403', httpStatus: 403, desc: 'Access forbidden', context: 'private permission' },
+      { code: '35000', httpStatus: 400, desc: 'Bad parameter', context: {
+        exception: 'IllegalStateException', detail: 'private stored snapshot' } },
+    ]) {
+      mockedFetchResult.mockResolvedValueOnce({ ...result, success: false, data: null } as any);
+      const manager = new DataSourceManager(createExpressionContext({} as any));
+      manager.register('read', { type: 'api', endpoint: '/api/meta/command-phases', method: 'get', autoFetch: false });
+      await manager.fetch('read');
+      expect(manager.getState('read')?.error).toMatchObject({
+        message: result.desc, status: result.httpStatus, statusCode: result.httpStatus, code: result.code,
+      });
+      expect(manager.getState('read')?.data).toBeNull();
     }
   });
 
