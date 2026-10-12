@@ -12,6 +12,7 @@
  *   "badgeField": "badge",
  *   "field": "draftRows",        // optional form array for local card edits
  *   "fields": [{ "field": "quantity", "component": "SmartInput" }],
+ *   "fieldsLayout": { "type": "grid", "cols": 12 }, // opt-in, fields use layout.colSpan
  *   "columns": "grid-cols-2",      // optional override; default: responsive 1/2/3
  *   "groupByField": "sourcePid",   // optional stable identity; labels never merge groups
  *   "groupTitleField": "sourceLabel",
@@ -23,7 +24,7 @@
 
 import React, { useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import type { BlockConfig, CardImageViewport, FieldConfig } from '~/framework/meta/schemas/types';
+import type { BlockConfig, CardImageViewport, FieldConfig, LayoutConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
@@ -31,6 +32,7 @@ import { useAuth } from '~/contexts/AuthContext';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useDictCache } from '~/framework/meta/rendering/pages/hooks/useDictCache';
 import { FieldRenderer } from '~/framework/meta/rendering/FieldRenderer';
+import { GridLayoutRenderer } from '~/framework/meta/rendering/layout/GridLayoutRenderer';
 import {
   readDataSourceState,
   useDataSourceSubscription,
@@ -93,6 +95,15 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
   // A declared form field stores draft card rows; data-source refreshes never replace edits.
   const formField = typeof cfg.field === 'string' && cfg.field.trim() ? cfg.field : undefined;
   const cardFields: FieldConfig[] = Array.isArray(cfg.fields) ? cfg.fields : [];
+  const fieldsLayout: LayoutConfig | undefined = cfg.fieldsLayout?.type === 'grid' ? cfg.fieldsLayout : undefined;
+  let nextColumn = 0;
+  const fieldBlocks = fieldsLayout ? cardFields.map(field => {
+    const cols = fieldsLayout.cols ?? 12;
+    const colSpan = field.layout?.colSpan ?? field.colSpan ?? Math.max(1, Math.floor(cols / 2));
+    const col = field.layout?.col ?? (nextColumn + colSpan > cols ? 0 : nextColumn);
+    nextColumn = (col + colSpan) % cols;
+    return { ...field, id: field.field, layout: { ...field.layout, col, colSpan } };
+  }) : [];
   const stateManager = runtime.getStateManager();
   const scopeId = runtime.getScopeId();
   useRuntimeStateSubscription(runtime);
@@ -228,6 +239,22 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
                 : undefined
               : getLocalizedText(rawBadge, locale, t);
 
+        const renderField = (field: FieldConfig) => (
+          <FieldRenderer
+            key={field.field}
+            runtime={runtime}
+            field={{ ...field,
+              field: `${formField || block.id}.${idx}.${field.field}`,
+              readOnly: !formField || Boolean(field.valueWhen) || field.readOnly,
+            }}
+            value={field.valueWhen ? runtime.getEvaluator().evaluate(field.valueWhen, { ...runtime.getContext(), row } as any) : row[field.field]}
+            onChange={(value) => {
+              if (!formField || field.readOnly || field.valueWhen) return;
+              stateManager.updateField(scopeId, formField,
+                rows.map((current, index) => index === idx ? { ...current, [field.field]: value } : current));
+            }}
+          />
+        );
         return (
           <div
             key={rowKey}
@@ -291,23 +318,9 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
 
             {/* Declared fields; without a form array they are display-only. */}
             {cardFields.length > 0 && (
-              <fieldset aria-label={title} className="mb-3 space-y-3">
-                {cardFields.map((field) => (
-                  <FieldRenderer
-                    key={field.field}
-                    runtime={runtime}
-                    field={{ ...field,
-                      field: `${formField || block.id}.${idx}.${field.field}`,
-                      readOnly: !formField || Boolean(field.valueWhen) || field.readOnly,
-                    }}
-                    value={field.valueWhen ? runtime.getEvaluator().evaluate(field.valueWhen, { ...runtime.getContext(), row } as any) : row[field.field]}
-                    onChange={(value) => {
-                      if (!formField || field.readOnly || field.valueWhen) return;
-                      stateManager.updateField(scopeId, formField,
-                        rows.map((current, index) => index === idx ? { ...current, [field.field]: value } : current));
-                    }}
-                  />
-                ))}
+              <fieldset aria-label={title} className={fieldsLayout ? 'mb-3' : 'mb-3 space-y-3'}>
+                {fieldsLayout ? <GridLayoutRenderer layout={fieldsLayout}
+                  blocks={fieldBlocks} renderBlock={renderField} /> : cardFields.map(renderField)}
               </fieldset>
             )}
 

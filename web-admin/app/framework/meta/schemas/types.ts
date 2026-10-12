@@ -46,6 +46,8 @@ export interface BlockConfig {
 
   // 表单相关
   fields?: FieldConfig[];
+  /** Optional card-grid inner field layout; existing cards retain stacked fields. */
+  fieldsLayout?: LayoutConfig;
   buttons?: ButtonConfig[];
 
   // 表格相关

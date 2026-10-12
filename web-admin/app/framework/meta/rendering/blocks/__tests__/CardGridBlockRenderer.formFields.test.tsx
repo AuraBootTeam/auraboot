@@ -21,7 +21,7 @@ vi.mock('../../components/ComponentLoader', () => ({ ComponentLoader: ({ props }
     readOnly={props.readOnly} onChange={(event) => props.onChange(event.target.value)} /></label>
 ) }));
 
-function setup(bind = true, grouped = false, computed = false) {
+function setup(bind = true, grouped = false, computed = false, grid = false) {
   const state = new ScopedStateManager({} as any);
   state.createScope('review');
   let rows = [
@@ -42,11 +42,12 @@ function setup(bind = true, grouped = false, computed = false) {
   } as any;
   render(<CardGridBlockRenderer runtime={runtime} block={{ id: 'offers', blockType: 'card-grid',
     dataSource: 'offers', titleField: 'supplierName', ...(bind ? { field: 'choices' } : {}),
+    ...(grid ? { fieldsLayout: { type: 'grid', cols: 12, rowGap: 12, colGap: 12 } } : {}),
     ...(grouped ? { groupByField: 'sourcePid', groupTitleField: 'sourceLabel' } : {}),
     fields: [
       { field: 'availableQty', label: 'Available capacity', component: 'SmartInput', readOnly: true },
       { field: 'proposedQty', label: 'Proposed quantity', component: 'SmartInput' },
-      { field: 'score', label: 'Score', component: 'SmartInput', readOnly: true },
+      { field: 'score', label: 'Score', component: 'SmartInput', readOnly: true, ...(grid ? { layout: { colSpan: 12 } } : {}) },
       ...(computed ? [{ field: 'groupTotal', label: 'Group total', component: 'SmartInput', valueWhen: '${fn.DECIMAL_SUM_BY(form.choices, "proposedQty", "sourcePid", row.sourcePid)}' }] : []),
     ],
     cardActions: [{ code: 'preview', label: 'Preview', action: { type: 'command', command: 'test:preview' } }],
@@ -59,6 +60,25 @@ function setup(bind = true, grouped = false, computed = false) {
 
 describe('Card-grid draft form fields', () => {
   beforeEach(() => handleAction.mockClear());
+
+  it('uses opt-in field grid without changing read-only capacity or independent draft edits', () => {
+    const { state } = setup(true, false, false, true);
+    const cards = screen.getAllByTestId('card-grid-card');
+    const first = within(cards[0]);
+    expect(first.getByTestId('grid-item-availableQty').style.gridColumn).toBe('1 / span 6');
+    expect(first.getByTestId('grid-item-proposedQty').style.gridColumn).toBe('7 / span 6');
+    expect(first.getByTestId('grid-item-score').style.gridColumn).toBe('1 / span 12');
+    expect(first.getByLabelText('Available capacity')).toHaveProperty('readOnly', true);
+    fireEvent.change(first.getByLabelText('Proposed quantity'), { target: { value: '40.000001' } });
+    expect((state.getScope('review').form.choices as any[])[0].proposedQty).toBe('40.000001');
+    expect(within(cards[1]).getByLabelText('Proposed quantity')).toHaveValue('40');
+  });
+
+  it('keeps existing cards stacked when no inner grid is declared', () => {
+    setup();
+    expect(screen.queryByTestId('grid-layout')).not.toBeInTheDocument();
+  });
+
 
   it('updates computed source totals without persisting derived values', () => {
     const { state } = setup(true, true, true);
