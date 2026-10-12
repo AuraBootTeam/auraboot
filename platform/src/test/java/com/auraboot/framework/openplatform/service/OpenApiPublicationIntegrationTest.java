@@ -117,6 +117,7 @@ class OpenApiPublicationIntegrationTest extends BaseIntegrationTest {
         var definition = fixture();
         publications.saveDraft(definition.code(), new OpenApiPublicationService.DraftRequest(0, definition));
         publications.publish(definition.code(), 1);
+        String originalSnapshot = mapper.snapshot(getTestTenant().getId(), definition.code(), 1);
         var fields = new LinkedHashMap<>(definition.fields());
         fields.remove("name");
         var breaking = new OpenApiResourceContract(definition.code(), definition.modelCode(), 2,
@@ -126,6 +127,35 @@ class OpenApiPublicationIntegrationTest extends BaseIntegrationTest {
                 .isInstanceOf(OpenApiPublicationService.PublicationConflictException.class);
         assertThatThrownBy(() -> publications.publish(definition.code(), 2)).hasMessageContaining("cannot change");
         assertThat(publications.active(getTestTenant().getId(), definition.code())).contains(definition);
+        assertThat(mapper.snapshot(getTestTenant().getId(), definition.code(), 2)).isNull();
+        assertThat(mapper.snapshot(getTestTenant().getId(), definition.code(), 1)).isEqualTo(originalSnapshot);
+
+        var application = management.createApplication(new CreateApplicationRequest("Major publication fixture", "Independent grants"));
+        var installation = management.install(application.pid(), new InstallApplicationRequest("staging", definition.scopes().values().stream()
+                .collect(java.util.stream.Collectors.toSet()), 100));
+        Long installationId = installations.findByTenantAndPid(getTestTenant().getId(), installation.pid()).getId();
+        var originalPolicy = new OpenApiInstallationPolicy(Set.of(Operation.GET), Set.of("pid", "name"), Set.of(), List.of());
+        publications.grant(installation.pid(), definition.code(), originalPolicy);
+        String originalStoredPolicy = mapper.policy(getTestTenant().getId(), installationId, definition.code());
+        assertThat(originalStoredPolicy).isNotBlank();
+
+        var major = new OpenApiResourceContract(definition.code() + ".v2", definition.modelCode(), 1,
+                definition.operations(), definition.scopes(), definition.dataPolicy(), fields, 50, 8, 5000, Set.of());
+        publications.saveDraft(major.code(), new OpenApiPublicationService.DraftRequest(0, major));
+        assertThat(publications.publish(major.code(), 1).activeVersion()).isEqualTo(1);
+        assertThat(publications.active(getTestTenant().getId(), major.code())).contains(major);
+        assertThat(mapper.snapshot(getTestTenant().getId(), major.code(), 1)).isNotBlank().isNotEqualTo(originalSnapshot);
+        assertThat(mapper.policy(getTestTenant().getId(), installationId, major.code())).isNull();
+        assertThatThrownBy(() -> publications.requirePolicy(getTestTenant().getId(), installationId, major))
+                .isInstanceOf(AccessDeniedException.class);
+
+        var majorPolicy = new OpenApiInstallationPolicy(Set.of(Operation.GET), Set.of("pid"), Set.of(), List.of());
+        publications.grant(installation.pid(), major.code(), majorPolicy);
+        assertThat(publications.requirePolicy(getTestTenant().getId(), installationId, major)).isEqualTo(majorPolicy);
+        assertThat(publications.requirePolicy(getTestTenant().getId(), installationId, definition)).isEqualTo(originalPolicy);
+        assertThat(mapper.policy(getTestTenant().getId(), installationId, definition.code())).isEqualTo(originalStoredPolicy);
+        assertThat(publications.active(getTestTenant().getId(), definition.code())).contains(definition);
+        assertThat(mapper.snapshot(getTestTenant().getId(), definition.code(), 1)).isEqualTo(originalSnapshot);
         assertThat(mapper.snapshot(getTestTenant().getId(), definition.code(), 2)).isNull();
     }
 
