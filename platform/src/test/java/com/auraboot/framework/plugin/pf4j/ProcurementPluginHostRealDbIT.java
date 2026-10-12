@@ -1158,6 +1158,38 @@ class ProcurementPluginHostRealDbIT {
     }
 
     private record ShipmentFixture(String order,String line,String address) {}
+    @Test void nativeSupplierAddressCommandFiltersBeforePaginationAndProjectsSafeFields() throws Exception {
+        var fixture=shipmentFixture();String maintain="qo_procurement_address_common:maintain";
+        String supplier=(String)scope(maintain,()->db.getById("qo_procurement_address_common",fixture.address())).get("qo_pr_address_supplier_pid");
+        for(int i=0;i<24;i++) {
+            final int index=i;
+            scope(maintain,()->db.create("qo_procurement_address_common",Map.of(
+                    "qo_pr_address_supplier_pid",supplier,"qo_pr_address_state","active","qo_pr_address_address","Warehouse "+index,
+                    "qo_pr_address_manager_name","Manager","qo_pr_address_manager_phone",index==0?" ":"+8613800000000")));
+        }
+        scope(maintain,()->db.create("qo_procurement_address_common",Map.of("qo_pr_address_supplier_pid",supplier,"qo_pr_address_state","inactive")));
+        scope(maintain,()->db.create("qo_procurement_address_common",Map.of("qo_pr_address_supplier_pid","foreign-supplier","qo_pr_address_state","active","qo_pr_address_address","Secret warehouse")));
+        var settings=new HashMap<String,Object>();settings.put(CommandHandlerExtension.DATA_ACCESSOR_KEY,db);
+        settings.put(CommandHandlerExtension.CURRENT_USER_PID_KEY,actor);
+        settings.put(CommandHandlerExtension.TENANT_PROJECTION_ACCESSOR_KEY,new TenantProjectionAccessorImpl(tenantId,background));
+        var type=plugin.loadClass("com.auraboot.quote.engine.procurement.ProcurementCommandHandler");
+        var handler=type.getConstructor().newInstance();var execute=type.getMethod("execute",CommandHandlerExtension.CommandContext.class);
+        var all=new ArrayList<Map<?,?>>();
+        for(int page=1;page<=3;page++) {
+            var request=new CommandHandlerExtension.CommandContext(tenantId,"com.auraboot.quote-engine","qoe",
+                    "qo_procurement_address_common:list_mine","qo_procurement_address_common",null,Map.of("page",page,"size",20),settings,false);
+            var result=(Map<?,?>)execute.invoke(handler,request);
+            assertEquals(25L,((Number)result.get("total")).longValue());
+            var items=(List<?>)result.get("items");assertEquals(page==1?20:page==2?5:0,items.size());
+            for(Object value:items) {
+                var item=(Map<?,?>)value;assertEquals(Set.of("pid","address","managerName","managerPhone","selectable"),item.keySet());
+                assertNotEquals("Secret warehouse",item.get("address"));all.add(item);
+            }
+        }
+        assertEquals(25,all.stream().map(row->row.get("pid")).distinct().count());
+        assertEquals(1,all.stream().filter(row->Boolean.FALSE.equals(row.get("selectable"))).count());
+        assertTrue(all.stream().anyMatch(row->fixture.address().equals(row.get("pid")) && Boolean.TRUE.equals(row.get("selectable"))));
+    }
     private ShipmentFixture shipmentFixture() {
         String directory="pr_supplier_common:sync_directory",publish="qo_procurement_order_common:sync_orders";
         String submit="qo_procurement_order_common:submit_shipment",maintain="qo_procurement_address_common:maintain";
