@@ -85,7 +85,8 @@ describe('useActionHandler - handlerParams.async polling', () => {
   beforeEach(() => { fetchResultMock.mockReset(); confirmMock.mockReset(); });
 
   it.each([
-    [{}, 'default'],
+    [{}, 'danger'],
+    [{ confirmVariant: 'default' }, 'default'],
     [{ danger: true }, 'danger'],
     [{ variant: 'danger' }, 'danger'],
   ] as const)('uses the declared confirmation intent and cancels before dispatch: %j', async (intent, expectedVariant) => {
@@ -1775,10 +1776,13 @@ describe('useActionHandler - handlerParams.async polling', () => {
 
 describe('useActionHandler - explicit confirmation style', () => {
   it.each([
-    [undefined, 'danger'],
-    ['default', 'default'],
-    ['danger', 'danger'],
-  ] as const)('uses %s confirmation style and preserves cancellation', async (variant, expected) => {
+    [undefined, 'danger', {}],
+    ['default', 'default', {}],
+    ['danger', 'danger', {}],
+    ['default', 'default', { danger: true }],
+    ['default', 'default', { variant: 'danger' }],
+    ['danger', 'danger', { variant: 'default' }],
+  ] as const)('uses %s confirmation style and preserves cancellation with legacy flags %j', async (variant, expected, legacy) => {
     fetchResultMock.mockReset();
     const confirm = vi.spyOn(confirmations, 'confirmDialog').mockResolvedValue(false);
     try {
@@ -1788,9 +1792,9 @@ describe('useActionHandler - explicit confirmation style', () => {
       }));
       await act(async () => {
         await result.current.handleAction({
-          code: 'restore', confirm: 'Restore this member?', confirmVariant: variant,
+          code: 'restore', confirm: 'Restore this member?', ...legacy, confirmVariant: variant,
           action: { type: 'command', command: 'admin:restore_member' },
-        } as ButtonConfig, { pid: 'MEMBER-1' });
+        } as unknown as ButtonConfig, { pid: 'MEMBER-1' });
       });
       expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ variant: expected }));
       expect(fetchResultMock).not.toHaveBeenCalled();
@@ -1800,6 +1804,22 @@ describe('useActionHandler - explicit confirmation style', () => {
   });
 });
 
+
+describe('useActionHandler invalid confirmation configuration', () => {
+  it.each(['invalid', 'DEFAULT'])('rejects invalid style %s before confirmation or dispatch', async confirmVariant => {
+    fetchResultMock.mockReset();confirmMock.mockReset();confirmMock.mockResolvedValue(false);
+    const showToast = vi.fn();
+    const { result } = renderHook(() => useActionHandler({ runtime: makeRuntime(), navigate: vi.fn() as any,
+      tableName: 'tenant_member', locale: 'en-US', t: ((key: string, _params?: any, fallback?: string) => fallback ?? key) as any, showToast }));
+    await act(async () => { await result.current.handleAction({ code: 'restore', confirm: 'Restore this member?', confirmVariant,
+      action: { type: 'command', command: 'admin:restore_member' },
+    } as unknown as ButtonConfig, { pid: 'MEMBER-1' }); });
+    expect(result.current.error).toBe('Operation failed');
+    expect(showToast).toHaveBeenCalledWith('Operation failed', 'error');
+    expect(confirmMock).not.toHaveBeenCalled();expect(fetchResultMock).not.toHaveBeenCalled();
+    expect(result.current.loading).toBe(false);
+  });
+});
 
 describe('useActionHandler dynamic choices fail before submission', () => {
   const field = { field: 'selection', type: 'select', required: true,

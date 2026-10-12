@@ -686,12 +686,18 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
     async (button: ButtonConfig, record?: Record<string, any>) => {
       const normalizedButton = normalizeButtonProps(button);
       const actionDef = normalizeAction(normalizedButton);
-      const confirmVariant = normalizedButton.danger || normalizedButton.variant === 'danger' ? 'danger' : 'default';
+      // Confirmation intent is independent of the button's visual variant.
+      const confirmVariant = normalizedButton.confirmVariant ?? 'danger';
       const confirmKey = (normalizedButton as any).confirm || normalizedButton.confirmMessageKey;
 
       try {
         setLoading(true);
         setError(null);
+        if (normalizedButton.confirmVariant !== undefined
+          && normalizedButton.confirmVariant !== 'default' && normalizedButton.confirmVariant !== 'danger') {
+          throw new Error(t('message.operation.failed', undefined,
+            locale.toLowerCase().startsWith('zh') ? '操作失败' : 'Operation failed'));
+        }
 
         switch (actionDef.type) {
           case 'command': {
