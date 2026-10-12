@@ -6,6 +6,9 @@ import { BACKEND_URL, BASE_URL as WEB_BASE_URL } from '../../helpers/environment
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 
 const EVIDENCE_DIR = path.join(process.env.AURA_EVIDENCE_ROOT || '/tmp', 'ui-golden-20260914');
+const PUBLICATION_VIEWPORT = process.env.AURA_OPEN_PLATFORM_PUBLICATION_VIEWPORT || 'desktop';
+if (!['desktop', 'narrow'].includes(PUBLICATION_VIEWPORT)) throw new Error('Unsupported publication viewport');
+const publicationViewport = PUBLICATION_VIEWPORT === 'narrow' ? { width: 1024, height: 900 } : { width: 1440, height: 1000 };
 const UI_MUTATION = process.env.AURA_OPEN_PLATFORM_UI_MUTATION;
 const sessionStorage = createCookieSessionStorage({
   cookie: {
@@ -53,7 +56,7 @@ test.describe('Dynamic resource publication journey', () => {
   });
   test.setTimeout(180_000);
   test.describe.configure({ retries: 0 });
-  test.use({ storageState: { cookies: [], origins: [] }, locale: 'zh-CN', viewport: { width: 1440, height: 1000 } });
+  test.use({ storageState: { cookies: [], origins: [] }, locale: 'zh-CN', viewport: publicationViewport });
 
   test('publishes a real model contract through UI, retains conflicts, downloads and withdraws', async ({ page }) => {
     await authenticate(page);
@@ -77,7 +80,13 @@ test.describe('Dynamic resource publication journey', () => {
     expect(modelPublish.status()).toBe(200); expect(String((await modelPublish.json()).code)).toBe('0');
     const screenshotRoot = path.join(process.env.AURA_EVIDENCE_ROOT || '/tmp', 'ui-publication-r1', 'screenshots');
     await mkdir(screenshotRoot, { recursive: true });
-    const snapshot = async (id: string) => { await page.screenshot({ path: path.join(screenshotRoot, `${id}.png`), fullPage: true }); };
+    const snapshot = async (id: string) => {
+      if (PUBLICATION_VIEWPORT === 'narrow') {
+        expect(page.viewportSize()).toEqual(publicationViewport);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+      }
+      await page.screenshot({ path: path.join(screenshotRoot, `${id}.png`), fullPage: true });
+    };
     await page.goto('/'); await openAccountMenu(page); await page.getByTestId('open-platform-link').click();
     await expect(page.getByTestId('open-platform-page')).toBeVisible();
     await expect(page.getByTestId('open-platform-publications-link')).toBeVisible();
