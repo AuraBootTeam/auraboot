@@ -778,9 +778,63 @@ class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
         assertThatThrownBy(()->run(principalA,rows,"A")).isInstanceOf(AccessDeniedException.class);
         assertThat(run(principalB,rows,"B").get("items").toString()).contains("Child B");
     }
-    @Test void sourceSemanticsCannotFloatBehindAnImmutablePublicSnapshot() {
+    @Test void sourceSemanticsCannotFloatBehindAnImmutablePublicSnapshot() throws Exception {
+        String originalSnapshot = publicationMapper.snapshot(principalA.tenantId(), rows.storageCode(), 1);
+        assertThat(originalSnapshot).isNotBlank();
+        publications.grant(principalA.installationPid(), rows.code(), new OpenApiQueryPolicy(Set.of("pid")));
+        var originalPolicy = publications.authority(principalA, rows.code()).orElseThrow().policy();
+        assertThat(originalPolicy.readableFields()).containsExactly("pid");
+        var renamedFields = new LinkedHashMap<>(rows.fields());
+        renamedFields.put("displayName", renamedFields.remove("name"));
+        var incompatible = new OpenApiQueryContract(rows.code(), rows.queryCode(), 2, rows.sourceFingerprint(),
+                rows.scopes(), rows.sourceResources(), rows.parameters(), renamedFields, rows.maxPageSize(),
+                rows.maxRows(), rows.timeoutMs(), rows.maxConcurrent());
+        publications.saveDraft(rows.code(), new OpenApiQueryPublicationService.DraftRequest(1, incompatible));
+        assertThatThrownBy(() -> publications.publish(rows.code(), 2)).isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Existing query output cannot change");
+        assertThat(publicationMapper.snapshot(principalA.tenantId(), rows.storageCode(), 2)).isNull();
+        var major = new OpenApiQueryContract(rows.code() + ".v2", rows.queryCode(), 1, rows.sourceFingerprint(),
+                rows.scopes(), rows.sourceResources(), rows.parameters(), renamedFields, rows.maxPageSize(),
+                rows.maxRows(), rows.timeoutMs(), rows.maxConcurrent());
+        publications.saveDraft(major.code(), new OpenApiQueryPublicationService.DraftRequest(0, major));
+        publications.publish(major.code(), 1);
+        assertThat(publications.active(principalA.tenantId(), major.code())).contains(major);
+        assertThat(publications.authority(principalA, major.code())).isEmpty();
+        assertThatThrownBy(() -> run(principalA, major, "A")).isInstanceOf(AccessDeniedException.class);
+        String route = "/api/open/v1/queries/" + major.code() + ":execute";
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(route)
+                .header("Authorization", "Bearer " + tokenA).contentType("application/json")
+                .content("{\"parameters\":{\"zone\":\"A\"},\"limit\":10}"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        applyTestMetaContext();
+        publications.grant(principalA.installationPid(), major.code(), new OpenApiQueryPolicy(Set.of("pid", "displayName")));
+        var oldItem = (Map<?, ?>) ((List<?>) run(principalA, rows, "A").get("items")).getFirst();
+        var newItem = (Map<?, ?>) ((List<?>) run(principalA, major, "A").get("items")).getFirst();
+        assertThat(oldItem).hasSize(1);
+        assertThat(oldItem.containsKey("pid")).isTrue();
+        assertThat(newItem.get("pid")).isEqualTo(oldItem.get("pid"));
+        assertThat(newItem.get("displayName")).isEqualTo("Root A");
+        assertThat(newItem.containsKey("name")).isFalse();
+        assertThat(publications.authority(principalB, major.code())).isEmpty();
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(route)
+                .header("Authorization", "Bearer " + tokenA).contentType("application/json")
+                .content("{\"parameters\":{\"zone\":\"A\"},\"limit\":10}"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items.length()").value(1))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[0].displayName").value("Root A"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[0].name").doesNotExist());
+        applyTestMetaContext();
+        publications.revoke(principalA.installationPid(), major.code());
+        assertThatThrownBy(() -> run(principalA, major, "A")).isInstanceOf(AccessDeniedException.class);
+        assertThat(run(principalA, rows, "A").get("items")).isEqualTo(List.of(oldItem));
+        assertThat(publications.authority(principalA, rows.code()).orElseThrow().policy()).isEqualTo(originalPolicy);
+        assertThat(publications.active(principalA.tenantId(), rows.code())).contains(rows);
+        assertThat(publicationMapper.snapshot(principalA.tenantId(), rows.storageCode(), 1)).isEqualTo(originalSnapshot);
+        assertThat(publicationMapper.snapshot(principalA.tenantId(), major.storageCode(), 1)).isNotBlank().isNotEqualTo(originalSnapshot);
+        publications.grant(principalA.installationPid(), major.code(), new OpenApiQueryPolicy(Set.of("pid", "displayName")));
         var update=new NamedQueryUpdateRequest();update.setActionCode("update");queries.update(rowsDefinition.getPid(),update);
         assertThatThrownBy(()->run(principalA,rows,"A")).isInstanceOf(AccessDeniedException.class).hasMessageContaining("source is unavailable");
+        assertThatThrownBy(()->run(principalA,major,"A")).isInstanceOf(AccessDeniedException.class).hasMessageContaining("source is unavailable");
     }
     @Test void cursorBindsParametersInstallationAndCurrentSourceFieldAuthority() {
         String parent=((Map<?,?>)((List<?>)run(principalA,rows,"A").get("items")).getFirst()).get("pid").toString();
