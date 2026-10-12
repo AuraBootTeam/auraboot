@@ -23,7 +23,7 @@ const sessionStorage = createCookieSessionStorage({
 
 // A supplied acceptance plan is materialized before any browser capture, including all unresolved rows.
 test.beforeAll(async () => {
-  if (UI_MUTATION && UI_MUTATION !== 'scope-label-clipping') throw new Error('Unsupported Open Platform UI mutation');
+  if (UI_MUTATION && !['scope-label-clipping', 'publication-overflow'].includes(UI_MUTATION)) throw new Error('Unsupported Open Platform UI mutation');
   if (!process.env.AURA_UI_ACCEPTANCE_MATRIX) return;
   if (!process.env.AURA_EVIDENCE_ROOT) throw new Error('UI acceptance requires a registered evidence round');
   const plan = JSON.parse(await readFile(process.env.AURA_UI_ACCEPTANCE_MATRIX, 'utf8'));
@@ -81,6 +81,7 @@ test.describe('Dynamic resource publication journey', () => {
     const screenshotRoot = path.join(process.env.AURA_EVIDENCE_ROOT || '/tmp', 'ui-publication-r1', 'screenshots');
     await mkdir(screenshotRoot, { recursive: true });
     const snapshot = async (id: string) => {
+      if (UI_MUTATION === 'publication-overflow') await page.addStyleTag({ content: 'html { min-width: 1440px !important; }' });
       if (PUBLICATION_VIEWPORT === 'narrow') {
         expect(page.viewportSize()).toEqual(publicationViewport);
         expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
@@ -137,7 +138,10 @@ test.describe('Dynamic resource publication journey', () => {
     await detailsField.getByLabel('对外属性名称', { exact: true }).fill('contactName');
     await page.getByLabel('创建通知', { exact: true }).check();
     await snapshot('publication-fields');
-    await page.getByTestId('publication-editor').locator('section').filter({ has: detailsField }).screenshot({ path: path.join(screenshotRoot, 'publication-fields-region.png') });
+    await nameField.scrollIntoViewIfNeeded();
+    await nameField.screenshot({ path: path.join(screenshotRoot, 'publication-name-field-region.png') });
+    await detailsField.scrollIntoViewIfNeeded();
+    await detailsField.screenshot({ path: path.join(screenshotRoot, 'publication-fields-region.png') });
     const saveButton = page.getByRole('button', { name: '保存并校验草稿', exact: true });
     await saveButton.hover();
     const saveContrast = await saveButton.evaluate(element => {
@@ -179,6 +183,8 @@ test.describe('Dynamic resource publication journey', () => {
     await conflictActions.scrollIntoViewIfNeeded();
     await expect(conflictActions).toBeInViewport({ ratio: 1 });
     await expect(page.getByTestId('publication-editor').getByRole('alert')).toBeInViewport({ ratio: 1 });
+    await saveButton.evaluate(element => element.scrollIntoView({ block: 'center' }));
+    await expect(saveButton).toBeInViewport({ ratio: 1 });
     await snapshot('publication-conflict');
     await page.getByRole('button', { name: '关闭编辑', exact: true }).click();
     await page.getByRole('group', { name: '操作确认', exact: true }).getByRole('button', { name: '确认', exact: true }).click();
