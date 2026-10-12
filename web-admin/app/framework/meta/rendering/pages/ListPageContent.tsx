@@ -2351,7 +2351,14 @@ function ListPageContentInner(props: PageContentProps) {
             }));
           }
         } else {
-          setError(result.desc || t('common.loadDataError') || 'Failed to load data');
+          setError(
+            result.code === 'network_error'
+              ? getLocalizedText({
+                  'zh-CN': '网络连接失败，请检查连接后重试。',
+                  en: 'Unable to connect. Check your connection and try again.',
+                }, locale, t)
+              : result.desc || t('common.loadDataError') || 'Failed to load data',
+          );
         }
       } catch (err) {
         // A stale request's error must not clobber the newer request's state.
@@ -2641,7 +2648,14 @@ function ListPageContentInner(props: PageContentProps) {
               }));
             }
           } else {
-            setError(result.desc || t('common.loadDataError') || 'Failed to load data');
+            setError(
+            result.code === 'network_error'
+              ? getLocalizedText({
+                  'zh-CN': '网络连接失败，请检查连接后重试。',
+                  en: 'Unable to connect. Check your connection and try again.',
+                }, locale, t)
+              : result.desc || t('common.loadDataError') || 'Failed to load data',
+          );
           }
         } catch (err) {
           if (!isLatestRequest()) return;
@@ -4875,9 +4889,11 @@ function ListPageContentInner(props: PageContentProps) {
     return (
       <ErrorAlert
         error={error}
+        title={getLocalizedText({ 'zh-CN': '加载失败', en: 'Unable to load' }, locale, t)}
+        retryLabel={getLocalizedText({ 'zh-CN': '重试', en: 'Retry' }, locale, t)}
         onRetry={() => {
           setError(null);
-          window.location.reload();
+          void loadData({ page: pagination.current - 1, size: pagination.pageSize, filters });
         }}
       />
     );
@@ -5688,6 +5704,7 @@ function ListPageContentInner(props: PageContentProps) {
               )}
 
               {/* Pagination + Bulk Action Toolbar */}
+              {!loading && (
               <ListPagination
                 current={pagination.current}
                 pageSize={pagination.pageSize}
@@ -5717,6 +5734,7 @@ function ListPageContentInner(props: PageContentProps) {
                 resolveBulkActionLabel={resolveButtonLabel}
                 onClearSelection={clearAllSelection}
               />
+              )}
             </div>
           ) : (
             <div data-aura-block-id={tableBlock?.id} data-aura-element-id={tableBlock?.id}>

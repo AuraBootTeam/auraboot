@@ -26,9 +26,17 @@ export interface ErrorAlertProps {
 
   /** 标题 (可选) */
   title?: string;
+
+  /** Localized retry action label. */
+  retryLabel?: string;
 }
 
-export const ErrorAlert: React.FC<ErrorAlertProps> = ({ error, onRetry, title = '加载失败' }) => {
+export const ErrorAlert: React.FC<ErrorAlertProps> = ({
+  error,
+  onRetry,
+  title = '加载失败',
+  retryLabel = '重试',
+}) => {
   return (
     <div className="rounded-card bg-status-red-bg border border-red-200 p-6">
       <h3 className="mb-2 text-lg font-medium text-red-800">{title}</h3>
@@ -38,7 +46,7 @@ export const ErrorAlert: React.FC<ErrorAlertProps> = ({ error, onRetry, title = 
           onClick={onRetry}
           className="rounded-control bg-red-600 px-4 py-2 text-white hover:bg-red-700"
         >
-          重试
+          {retryLabel}
         </button>
       )}
     </div>
