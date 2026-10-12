@@ -469,6 +469,7 @@ def verify_report(report):
     verify_write_replay_authority(report.get("writeReplayAuthority"), report)
     verify_source_binding(report.get("resourceSourceBinding"))
     verify_resource_major(report.get("resourceMajorCompatibility"), report.get("installationPid"))
+    verify_query_major(report.get("queryMajorCompatibility"), report.get("installationPid"))
     virtual = verify_virtual_resource(report.get("virtualResource"))
     isolation = virtual["installationIsolation"]
     if (isolation["primaryInstallationPid"] != report.get("installationPid")
@@ -495,6 +496,123 @@ def verify_report(report):
             or audit["durationMs"] < 0 or not isinstance(audit.get("occurredAt"), str) or not audit["occurredAt"]):
         raise ProtocolError("dynamic query quota audit proof invalid")
     return report
+
+
+def verify_query_major(proof, installation_pid):
+    old = "release.dynamic.by-zone.major"
+    if (not isinstance(proof, dict) or proof.get("installationPid") != installation_pid
+            or proof.get("oldCode") != old or proof.get("newCode") != old + ".v2"
+            or proof.get("sourceResources") != {"release_dynamic_parts": "release.dynamic.parts"}):
+        raise ProtocolError("query major identity/source proof missing")
+    rejection = proof.get("rejection", {})
+    if (rejection.get("status") != 400 or str(rejection.get("body", {}).get("code")) != "400"
+            or rejection.get("body", {}).get("message") != "Existing query output cannot change"):
+        raise ProtocolError("query major incompatible output was not rejected")
+    snapshots = proof.get("oldSnapshots")
+    if not isinstance(snapshots, list) or len(snapshots) != 5 or any(row != snapshots[0] for row in snapshots):
+        raise ProtocolError("query major changed old contract/policy/result")
+    baseline = snapshots[0]
+    items = baseline.get("body", {}).get("items")
+    if (baseline.get("status") != 200 or baseline.get("activeVersion") != 1
+            or baseline.get("policy") != {"readableFields": ["name", "pid"]}
+            or not isinstance(items, list) or len(items) != 1 or set(items[0]) != {"pid", "name"}
+            or not items[0].get("pid") or items[0].get("name") != "Allowed A"):
+        raise ProtocolError("query major old baseline invalid")
+    pid = items[0]["pid"]
+    def page(value, alias, empty=False):
+        expected = {"items": [] if empty else [{"pid": pid, alias: "Allowed A"}],
+                    "total": 0 if empty else 1, "hasMore": False, "nextCursor": None, "schemaVersion": 1}
+        if value != expected or type(value.get("total")) is not int or type(value.get("schemaVersion")) is not int:
+            raise ProtocolError("query major projected row/total/cursor invalid")
+    page(baseline["body"], "name")
+    def document(value, code, alias):
+        if (not isinstance(value, dict) or value.get("openapi") != "3.1.0"
+                or set(value.get("paths", {})) != {"/api/open/v1/queries/" + code + ":execute"}
+                or set(value.get("components", {}).get("schemas", {}).get("QueryItem", {}).get("properties", {})) != {"pid", alias}):
+            raise ProtocolError("query major published OpenAPI invalid")
+    document(baseline.get("openapi"), old, "name")
+    document(proof.get("newOpenapi"), old + ".v2", "displayName")
+    if (proof.get("newPolicy") != {"readableFields": ["displayName", "pid"]}
+            or proof.get("beforeGrantPolicy", "missing") is not None
+            or proof.get("afterRevokePolicy", "missing") is not None):
+        raise ProtocolError("query major independent installation policy invalid")
+    for key in ["afterGrant", "sourceRestored"]:
+        row = proof.get(key, {})
+        if row.get("status") != 200:
+            raise ProtocolError("query major explicitly granted/restored execution missing")
+        page(row.get("body"), "displayName")
+    if proof.get("hiddenZone", {}).get("status") != 200:
+        raise ProtocolError("query major source row policy proof missing")
+    page(proof["hiddenZone"].get("body"), "displayName", True)
+    for key in ["beforeGrant", "afterRevoke", "sourceRevokedOld", "sourceRevokedNew"]:
+        row = proof.get(key, {}); denied = row.get("body", {})
+        if (row.get("status") != 403 or denied.get("code") != "403"
+                or denied.get("message") != "Access forbidden" or denied.get("data") is not None
+                or denied.get("context") != "Current resource or query authorization required"
+                or type(denied.get("timestamp")) is not int or denied["timestamp"] <= 0):
+            raise ProtocolError("query major current grant/source denial invalid")
+    return proof
+
+
+def run_query_major_probe(request, human, admin, installation_pid, machine, definition, source_grant_path):
+    import copy
+    old = "release.dynamic.by-zone.major"; new = old + ".v2"
+    old_definition = copy.deepcopy(definition); old_definition["code"] = old
+    def publish(code, contract):
+        human(f"/api/open-platform/query-publications/{code}/draft", "PUT",
+              {"expectedRevision": 0, "definition": contract})
+        human(f"/api/open-platform/query-publications/{code}/publish", "POST", {"expectedRevision": 1})
+    def grant_path(code):
+        return f"/api/open-platform/installations/{installation_pid}/queries/{code}"
+    def policy(code):
+        rows = [row for row in human(f"/api/open-platform/installations/{installation_pid}/queries") if row.get("code") == code]
+        if len(rows) != 1:
+            raise ProtocolError("query major installation catalog identity missing")
+        value = rows[0].get("policy")
+        return None if value is None else {"readableFields": sorted(value["readableFields"])}
+    def execute(code, expected=200, zone="A"):
+        status, body, _ = request(f"/api/open/v1/queries/{code}:execute", "POST",
+                                 body={"parameters": {"zone": zone}, "limit": 10}, headers=machine, expected=(expected,))
+        return {"status": status, "body": body}
+    def openapi(code):
+        return request(f"/api/open-platform/query-publications/{code}/openapi", headers=admin)[1]
+    def snapshot():
+        rows = [row for row in human("/api/open-platform/query-publications") if row.get("code") == old]
+        if len(rows) != 1:
+            raise ProtocolError("query major old publication identity missing")
+        return dict(execute(old), activeVersion=rows[0].get("activeVersion"), policy=policy(old), openapi=openapi(old))
+    publish(old, old_definition)
+    human(grant_path(old), "PUT", {"readableFields": ["pid", "name"]})
+    proof = {"installationPid": installation_pid, "oldCode": old, "newCode": new,
+             "sourceResources": old_definition["sourceResources"], "oldSnapshots": [snapshot()]}
+    breaking = copy.deepcopy(old_definition); breaking["schemaVersion"] = 2
+    breaking["fields"]["displayName"] = breaking["fields"].pop("name")
+    human(f"/api/open-platform/query-publications/{old}/draft", "PUT", {"expectedRevision": 1, "definition": breaking})
+    status, body, _ = request(f"/api/open-platform/query-publications/{old}/publish", "POST",
+                             body={"expectedRevision": 2}, headers=admin, expected=(400,))
+    proof["rejection"] = {"status": status, "body": body}; proof["oldSnapshots"].append(snapshot())
+    major = copy.deepcopy(breaking); major.update(code=new, schemaVersion=1)
+    publish(new, major); proof["newOpenapi"] = openapi(new)
+    proof["beforeGrantPolicy"] = policy(new); proof["beforeGrant"] = execute(new, 403)
+    human(grant_path(new), "PUT", {"readableFields": ["pid", "displayName"]})
+    proof["newPolicy"] = policy(new); proof["afterGrant"] = execute(new)
+    proof["hiddenZone"] = execute(new, zone="B"); proof["oldSnapshots"].append(snapshot())
+    source_rows = [row for row in human(f"/api/open-platform/installations/{installation_pid}/resources")
+                   if row.get("code") == "release.dynamic.parts"]
+    if len(source_rows) != 1 or source_rows[0].get("policy") is None:
+        raise ProtocolError("query major source grant fixture missing")
+    source_policy = source_rows[0]["policy"]
+    human(source_grant_path, "DELETE")
+    try:
+        proof["sourceRevokedOld"] = execute(old, 403)
+        proof["sourceRevokedNew"] = execute(new, 403)
+    finally:
+        human(source_grant_path, "PUT", source_policy)
+    proof["sourceRestored"] = execute(new); proof["oldSnapshots"].append(snapshot())
+    human(grant_path(new), "DELETE")
+    proof["afterRevokePolicy"] = policy(new); proof["afterRevoke"] = execute(new, 403)
+    proof["oldSnapshots"].append(snapshot())
+    return verify_query_major(proof, installation_pid)
 
 
 def verify_resource_major(proof, installation_pid):
@@ -1318,6 +1436,8 @@ def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None, audi
         request(row_path, headers=machine, expected=(404,)); record("delete")
         report["resourceMajorCompatibility"] = run_resource_major_probe(
             request, human, admin, installation["pid"], machine, definition, a["pid"])
+        report["queryMajorCompatibility"] = run_query_major_probe(
+            request, human, admin, installation["pid"], machine, query_definition, grant_path)
         human(query_grant_path, "DELETE")
         request(query_path, "POST", body={"parameters": {"zone": "A"}, "limit": 10}, headers=machine, expected=(403,))
         human(grant_path, "DELETE")

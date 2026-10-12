@@ -243,6 +243,26 @@ def passed():
         "beforeGrant": copy.deepcopy(denial), "afterRevoke": copy.deepcopy(denial),
         "afterGrant": {"status": 200, "body": {"pid": "allowed-pid", "displayName": "Allowed A", "zone": "A"},
                        "etag": '"new-major-etag"'}}
+    def query_major_document(code, alias):
+        return {"openapi": "3.1.0", "paths": {"/api/open/v1/queries/" + code + ":execute": {}},
+                "components": {"schemas": {"QueryItem": {"properties": {key: {} for key in ["pid", alias]}}}}}
+    def query_major_page(alias, empty=False):
+        return {"items": [] if empty else [{"pid": "allowed-pid", alias: "Allowed A"}],
+                "total": 0 if empty else 1, "hasMore": False, "nextCursor": None, "schemaVersion": 1}
+    query_old = "release.dynamic.by-zone.major"
+    query_snapshot = {"status": 200, "body": query_major_page("name"), "activeVersion": 1,
+                      "policy": {"readableFields": ["name", "pid"]}, "openapi": query_major_document(query_old, "name")}
+    report["queryMajorCompatibility"] = {"installationPid": "install-pid", "oldCode": query_old, "newCode": query_old + ".v2",
+        "sourceResources": {"release_dynamic_parts": "release.dynamic.parts"},
+        "rejection": {"status": 400, "body": {"code": "400", "message": "Existing query output cannot change"}},
+        "oldSnapshots": [copy.deepcopy(query_snapshot) for _ in range(5)],
+        "newOpenapi": query_major_document(query_old + ".v2", "displayName"),
+        "newPolicy": {"readableFields": ["displayName", "pid"]}, "beforeGrantPolicy": None, "afterRevokePolicy": None,
+        "afterGrant": {"status": 200, "body": query_major_page("displayName")},
+        "sourceRestored": {"status": 200, "body": query_major_page("displayName")},
+        "hiddenZone": {"status": 200, "body": query_major_page("displayName", True)},
+        **{key: {"status": denial["status"], "body": copy.deepcopy(denial["body"])}
+           for key in ["beforeGrant", "afterRevoke", "sourceRevokedOld", "sourceRevokedNew"]}}
     return report
 
 
@@ -429,6 +449,29 @@ class DynamicProbeTests(unittest.TestCase):
                     self.assertEqual(run_source_binding_probe(request, human, "install-pid", {}, "resource.get")["status"], 409)
                 self.assertTrue(state["restored"])
                 self.assertFalse(state["rebound"])
+
+    def test_query_major_proof_is_mandatory_and_rechecks_current_source_authority(self):
+        report = passed(); del report["queryMajorCompatibility"]
+        with self.assertRaises(ProtocolError): verify_report(report)
+        mutations = [
+            lambda p: p.update(installationPid="foreign"), lambda p: p.update(newCode=p["oldCode"]),
+            lambda p: p.update(sourceResources={}), lambda p: p["rejection"].update(status=200),
+            lambda p: p["rejection"]["body"].update(message="unrelated error"), lambda p: p["oldSnapshots"].pop(),
+            lambda p: p["oldSnapshots"][1].update(activeVersion=2),
+            lambda p: p["oldSnapshots"][2]["policy"].update(readableFields=["pid"]),
+            lambda p: p["oldSnapshots"][3]["body"].update(total=2),
+            lambda p: p["oldSnapshots"][4]["openapi"].update(openapi="3.0.0"),
+            lambda p: p.update(newOpenapi=p["oldSnapshots"][0]["openapi"]),
+            lambda p: p.update(newPolicy=p["oldSnapshots"][0]["policy"]),
+            lambda p: p.update(beforeGrantPolicy={}), lambda p: p.update(afterRevokePolicy={}),
+            lambda p: p["beforeGrant"].update(status=200), lambda p: p["afterRevoke"].update(status=200),
+            lambda p: p["sourceRevokedOld"].update(status=200), lambda p: p["sourceRevokedNew"].update(status=200),
+            lambda p: p["afterGrant"]["body"]["items"][0].update(secret="Private A"),
+            lambda p: p["hiddenZone"]["body"].update(total=1), lambda p: p["sourceRestored"].update(status=403),
+        ]
+        for index, mutate in enumerate(mutations):
+            report = passed(); mutate(report["queryMajorCompatibility"])
+            with self.subTest(index=index), self.assertRaises(ProtocolError): verify_report(report)
 
     def test_resource_major_proof_is_mandatory_and_rejects_contract_or_grant_reuse(self):
         report = passed(); del report["resourceMajorCompatibility"]
