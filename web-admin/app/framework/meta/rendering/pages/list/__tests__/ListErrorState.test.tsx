@@ -68,6 +68,17 @@ describe('ListErrorState', () => {
     expect(options.onNavigate).not.toHaveBeenCalled();
   });
 
+  it('rejects consecutive pathname slashes that an internal redirect could turn into an external target', () => {
+    // routes.ts declares /admin/*; admin.$.tsx redirects to `/${params['*']}`.
+    // /admin//attacker can therefore produce //attacker through an internal hop.
+    const options = props({ buttons: ['/admin//attacker', '/p/c//attacker', '/admin/nested//attacker'].map(
+      to => ({ ...back, action: { type: 'navigate', to } }),
+    ) });
+    render(<ListErrorState {...options} />);
+    expect(screen.queryByRole('button', { name: '返回询价列表' })).not.toBeInTheDocument();
+    expect(options.onNavigate).not.toHaveBeenCalled();
+  });
+
   it('does not activate disabled or dynamic enablement navigation on failed data', () => {
     const options = props({ buttons: [{ ...back, disabled: true }, { ...back, enableWhen: 'recordCount > 0' },
       { ...back, disableWhen: 'state.busy' }] });

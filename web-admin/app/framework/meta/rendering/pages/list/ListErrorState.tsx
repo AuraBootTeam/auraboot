@@ -25,7 +25,7 @@ export function staticErrorNavigationTarget(button: ButtonConfig): string | unde
       || Object.keys(action).some(key => key !== 'type' && key !== 'to')) return undefined;
   const to = action.to;
   // Literal internal UI paths only: no templates, encoding, external origins or API endpoints.
-  if (typeof to !== 'string' || to.startsWith('//') || /^\/api(?:\/|\?|$)/i.test(to)
+  if (typeof to !== 'string' || to.split(/[?#]/, 1)[0].includes('//') || /^\/api(?:\/|\?|$)/i.test(to)
       || !/^\/[A-Za-z0-9/_-]+(?:\?[A-Za-z0-9._~=&-]+)?(?:#[A-Za-z0-9._~-]+)?$/.test(to)) return undefined;
   return to;
 }
