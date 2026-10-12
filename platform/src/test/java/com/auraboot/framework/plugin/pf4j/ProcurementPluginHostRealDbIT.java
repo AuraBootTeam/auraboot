@@ -1096,6 +1096,47 @@ class ProcurementPluginHostRealDbIT {
         assertEquals(lineBefore,scope(submit,()->db.getById("pr_purchase_order_line",fixture.line())));
         assertEquals(shipments,scope(submit,()->nativeRows("qo_procurement_shipment_common","qo_pr_shipment_order_pid",fixture.order())));
     }
+    @Test void nativeOrderClosureWinsStaleShipmentWithoutChangingQuantities() throws Exception {
+        var fixture=shipmentFixture();String sync="qo_procurement_order_common:sync_orders",submit="qo_procurement_order_common:submit_shipment";
+        var before=scope(submit,()->db.getById("pr_purchase_order_line",fixture.line()));
+        var held=new java.util.concurrent.CountDownLatch(1);
+        var attempted=new java.util.concurrent.CountDownLatch(1);
+        var closing=orderLockObserver(()->{},()->{held.countDown();awaitNativeLatch(attempted,"shipment must reach the order lock held by closure");});
+        var shipping=orderLockObserver(attempted::countDown,()->{});
+        var pool=java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var closure=pool.submit(()->nativeActorThread(()->new TransactionTemplate(transactions).execute(status->scope(sync,()->{
+                try {
+                    var type=plugin.loadClass("com.auraboot.quote.engine.procurement.ProcurementOrderService");
+                    return type.getMethod("syncClosures",String.class,Map.class,boolean.class).invoke(
+                            type.getConstructor(DataAccessor.class,java.time.Clock.class).newInstance(closing,java.time.Clock.systemUTC()),
+                            provider,Map.of(provider,true),true);
+                }catch(ReflectiveOperationException error){throw unwrap(error);}
+            }))));
+            awaitNativeLatch(held,"closure must hold the actual order CAS before shipment starts");
+            var shipment=pool.submit(()->nativeActorThread(()->new TransactionTemplate(transactions).execute(status->scope(submit,
+                    ()->submitShipmentWith(shipping,fixture,"shipment-after-close","600")))));
+            assertEquals(1,closure.get(20,java.util.concurrent.TimeUnit.SECONDS));
+            var failure=assertThrows(java.util.concurrent.ExecutionException.class,()->shipment.get(20,java.util.concurrent.TimeUnit.SECONDS));
+            var conflict=assertInstanceOf(com.auraboot.framework.meta.exception.MetaServiceException.class,failure.getCause());
+            assertEquals("CAS batch conflict: no partial batch may commit",conflict.getMessage());
+        } finally {attempted.countDown();pool.shutdownNow();assertTrue(pool.awaitTermination(10,java.util.concurrent.TimeUnit.SECONDS));}
+        var closed=scope(submit,()->db.getById("pr_purchase_order",fixture.order()));
+        assertEquals("closed",closed.get("qo_pr_order_state"));
+        scope(submit,()->{assertNativeQuantity("pr_purchase_order",fixture.order(),"qo_pr_order_revision","1");
+            assertNativeQuantity("pr_purchase_order_line",fixture.line(),"pr_pol_qty","1000");
+            assertNativeQuantity("pr_purchase_order_line",fixture.line(),"qo_pr_order_line_submitted_qty","0");
+            assertNativeQuantity("pr_purchase_order_line",fixture.line(),"pr_pol_received_qty","0");
+            assertTrue(nativeRows("qo_procurement_shipment_common","qo_pr_shipment_order_pid",fixture.order()).isEmpty());return null;});
+        assertEquals(before,scope(submit,()->db.getById("pr_purchase_order_line",fixture.line())));
+        var rejected=assertThrows(IllegalStateException.class,()->new TransactionTemplate(transactions).execute(status->scope(submit,
+                ()->submitShipmentWith(db,fixture,"shipment-after-close-fresh","600"))));
+        assertEquals("ORDER_CLOSED_OR_FULFILLED",rejected.getMessage());
+        assertEquals(closed,scope(submit,()->db.getById("pr_purchase_order",fixture.order())));
+        assertEquals(before,scope(submit,()->db.getById("pr_purchase_order_line",fixture.line())));
+        assertTrue(scope(submit,()->nativeRows("qo_procurement_shipment_common","qo_pr_shipment_order_pid",fixture.order())).isEmpty());
+    }
+
     private DataAccessor orderLockObserver(Runnable before,Runnable after) {
         return (DataAccessor)java.lang.reflect.Proxy.newProxyInstance(DataAccessor.class.getClassLoader(),new Class<?>[]{DataAccessor.class},
                 (proxy,method,args)->{
