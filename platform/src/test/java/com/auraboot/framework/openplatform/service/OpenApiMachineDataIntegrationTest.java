@@ -994,6 +994,15 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
             var created = resources.write(principal, contract.code(), Operation.CREATE, null, "reference-ok-001", null,
                     Map.of("name", "Related row", "zone", "A", "related", allowedPid));
             assertThat(created.body()).containsEntry("related", allowedPid);
+            String ownerPid = created.body().get("pid").toString();
+            var originalOwner = resources.get(principal, contract.code(), ownerPid);
+            assertThat(originalOwner.body()).isEqualTo(created.body());
+            assertThatThrownBy(() -> resources.write(principal, contract.code(), Operation.UPDATE, ownerPid,
+                    "reference-patch-hidden", created.headers().get("ETag"), Map.of("related", deniedPid)))
+                    .isInstanceOf(AccessDeniedException.class).hasMessageContaining("Reference target");
+            var afterHidden = resources.get(principal, contract.code(), ownerPid);
+            assertThat(afterHidden.body()).isEqualTo(originalOwner.body());
+            assertThat(afterHidden.headers().get("ETag")).isEqualTo(originalOwner.headers().get("ETag"));
             assertThatThrownBy(() -> resources.write(principal, contract.code(), Operation.CREATE, null, "reference-deny-01", null,
                     Map.of("zone", "A", "related", deniedPid)))
                     .isInstanceOf(AccessDeniedException.class).hasMessageContaining("Reference target");
@@ -1004,6 +1013,26 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
             MetaContext.setContext(principal.tenantId(), null, principal.subjectPid(), "machine");
             assertThatThrownBy(() -> resources.write(principal, contract.code(), Operation.CREATE, null, "reference-no-get1", null,
                     Map.of("zone", "A", "related", allowedPid))).isInstanceOf(AccessDeniedException.class);
+            Map<String, Object> patch = Map.of("name", "Reference restored", "related", allowedPid);
+            assertThatThrownBy(() -> resources.write(principal, contract.code(), Operation.UPDATE, ownerPid,
+                    "reference-patch-restore", created.headers().get("ETag"), patch)).isInstanceOf(AccessDeniedException.class);
+            applyTestMetaContext();
+            publications.grant(principal.installationPid(), contract.code(), grant);
+            MetaContext.setContext(principal.tenantId(), null, principal.subjectPid(), "machine");
+            var afterRestoredAuthority = resources.get(principal, contract.code(), ownerPid);
+            assertThat(afterRestoredAuthority.body()).isEqualTo(originalOwner.body());
+            assertThat(afterRestoredAuthority.headers().get("ETag")).isEqualTo(originalOwner.headers().get("ETag"));
+            var updated = resources.write(principal, contract.code(), Operation.UPDATE, ownerPid,
+                    "reference-patch-restore", created.headers().get("ETag"), patch);
+            assertThat(updated.status()).isEqualTo(200);
+            assertThat(updated.replay()).isFalse();
+            assertThat(updated.body()).containsEntry("pid", ownerPid).containsEntry("name", "Reference restored").containsEntry("related", allowedPid);
+            assertThat(updated.headers().get("ETag")).isNotEqualTo(created.headers().get("ETag"));
+            var replayed = resources.write(principal, contract.code(), Operation.UPDATE, ownerPid,
+                    "reference-patch-restore", created.headers().get("ETag"), patch);
+            assertThat(replayed.replay()).isTrue();
+            assertThat(replayed.body()).isEqualTo(updated.body());
+            assertThat(replayed.headers()).isEqualTo(updated.headers());
         } finally { applyTestMetaContext(); }
     }
 
