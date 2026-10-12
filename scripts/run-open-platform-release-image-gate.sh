@@ -188,20 +188,20 @@ create_isolated_release_network "$NET" "$ARTIFACTS/network-allocation.tsv" \
 NETWORK_GATEWAY="$(docker network inspect "$NET" --format '{{(index .IPAM.Config 0).Gateway}}')"
 python3 -c 'import ipaddress,sys; a=ipaddress.ip_address(sys.argv[1]); assert a.version == 4 and a in ipaddress.ip_network("10.247.0.0/16")' "$NETWORK_GATEWAY" \
   || fatal "model receiver gateway outside owned release pool"
-docker run -d --name "$PG" --network "$NET" \
+docker run -d --name "$PG" --network "$NET" --network-alias pg \
   --label "aura.job-id=$AURA_CI_JOB_ID" --label "aura.source-ref=$REF_SHA" -e POSTGRES_USER=auraboot \
   -e POSTGRES_PASSWORD=open_platform_ci -e POSTGRES_DB=open_platform_ci "$PGVECTOR_IMAGE" \
   -c shared_preload_libraries=pg_stat_statements \
   -c track_io_timing=on -c track_wal_io_timing=on >/dev/null
-docker run -d --name "$REDIS" --network "$NET" "$REDIS_IMAGE" >/dev/null
+docker run -d --name "$REDIS" --network "$NET" --network-alias redis "$REDIS_IMAGE" >/dev/null
 for attempt in $(seq 1 30); do
   # The temporary initialization server accepts sockets before the final TCP listener starts.
-  docker exec "$PG" pg_isready -h "$PG" -U auraboot -d open_platform_ci >/dev/null 2>&1 && break
+  docker exec "$PG" pg_isready -h pg -U auraboot -d open_platform_ci >/dev/null 2>&1 && break
   [[ "$attempt" != 30 ]] || fatal "PostgreSQL did not become ready"
   sleep 1
 done
 docker run --rm --network "$NET" -v "$STAGE/platform/src/main/resources/db/migration/core":/flyway/sql:ro \
-  "$FLYWAY_IMAGE" -url="jdbc:postgresql://$PG:5432/open_platform_ci" -user=auraboot \
+  "$FLYWAY_IMAGE" -url="jdbc:postgresql://pg:5432/open_platform_ci" -user=auraboot \
   -password=open_platform_ci -locations=filesystem:/flyway/sql -table=ab_flyway_schema_history \
   -baselineOnMigrate=false -validateMigrationNaming=true -cleanDisabled=true migrate \
   > "$ARTIFACTS/logs/flyway.log" 2>&1 || fail "Flyway migration failed"
@@ -211,7 +211,7 @@ BACKEND_DB="open_platform_backend_ci"
 docker exec "$PG" createdb -U auraboot "$BACKEND_DB" \
   || fatal "backend test database creation failed"
 docker run --rm --network "$NET" -v "$STAGE/platform/src/main/resources/db/migration/core":/flyway/sql:ro \
-  "$FLYWAY_IMAGE" -url="jdbc:postgresql://$PG:5432/$BACKEND_DB" -user=auraboot \
+  "$FLYWAY_IMAGE" -url="jdbc:postgresql://pg:5432/$BACKEND_DB" -user=auraboot \
   -password=open_platform_ci -locations=filesystem:/flyway/sql -table=ab_flyway_schema_history \
   -baselineOnMigrate=false -validateMigrationNaming=true -cleanDisabled=true migrate \
   > "$ARTIFACTS/logs/backend-flyway.log" 2>&1 || fail "backend test migration failed"
@@ -225,9 +225,9 @@ timeout 1200 docker run --rm --memory=4g --network "$NET" \
   -v "$STAGE":/source -v "$ARTIFACTS":/artifacts \
   -v "$BACKEND_GRADLE_HOME":/gradle-home -w /source/platform \
   -e GRADLE_USER_HOME=/gradle-home \
-  -e TEST_DATABASE_URL="jdbc:postgresql://$PG:5432/$BACKEND_DB" \
+  -e TEST_DATABASE_URL="jdbc:postgresql://pg:5432/$BACKEND_DB" \
   -e TEST_DATABASE_USERNAME=auraboot -e TEST_DATABASE_PASSWORD=open_platform_ci \
-  -e TEST_EXPECTED_DATABASE="$BACKEND_DB" -e SPRING_DATA_REDIS_HOST="$REDIS" \
+  -e TEST_EXPECTED_DATABASE="$BACKEND_DB" -e SPRING_DATA_REDIS_HOST=redis \
   "$BUILD_JDK_IMAGE" bash -c '
     set -Eeuo pipefail
     mapfile -t classes < /artifacts/backend-selectors.txt
@@ -256,15 +256,15 @@ JWT_KEY="$(openssl rand -base64 64 | tr -d '\n')"
 # builtin-import plugins (plugin.json + config/, no PF4J descriptor), and
 # since #2037 AuraPluginManager fails fast on undescribed paths instead of
 # skipping them. The image pre-creates the empty jar root /app/pf4j-plugins.
-docker run -d --name "$APP" --network "$NET" \
+docker run -d --name "$APP" --network "$NET" --network-alias app \
   --label "aura.job-id=$AURA_CI_JOB_ID" --label "aura.source-ref=$REF_SHA" \
   -p 127.0.0.1::6443 \
   -v "$STAGE/plugins":/plugins:ro \
   -e SERVER_PORT=6443 -e SPRING_PROFILES_ACTIVE=community \
   -e JWT_SECRET="$JWT_KEY" \
-  -e DATABASE_URL="jdbc:postgresql://$PG:5432/open_platform_ci" \
+  -e DATABASE_URL="jdbc:postgresql://pg:5432/open_platform_ci" \
   -e SPRING_DATASOURCE_USERNAME=auraboot -e SPRING_DATASOURCE_PASSWORD=open_platform_ci \
-  -e REDIS_HOST="$REDIS" -e REDIS_PORT=6379 \
+  -e REDIS_HOST=redis -e REDIS_PORT=6379 \
   -e AURA_BUILTIN_PLUGINS_DIR=/app/plugins \
   -e AURA_PLUGINS_DIR=/app/pf4j-plugins \
   -e AURA_SSRF_ALLOWED_PRIVATE_HOSTS="$NETWORK_GATEWAY" \
@@ -286,7 +286,7 @@ APP_BIND="$(docker port "$APP" 6443/tcp)"
 [[ "$APP_BIND" =~ ^127\.0\.0\.1:[0-9]+$ ]] || fatal "release app protocol binding is not loopback-only"
 BASE_URL="http://$APP_BIND" CREDENTIAL_ARTIFACT="$CREDENTIAL_ARTIFACT" \
 SDK_RUNNER_USER="$RUNNER_UID:$RUNNER_GID" SDK_NETWORK="$NET" SDK_CONSUMER_ROOT="$SDK_ROOT/consumer" \
-SDK_NODE_IMAGE="$SDK_NODE_IMAGE" SDK_BASE_URL="http://$APP:6443" \
+SDK_NODE_IMAGE="$SDK_NODE_IMAGE" SDK_BASE_URL="http://app:6443" \
 MODEL_APP="$APP" MODEL_POSTGRES="$PG" MODEL_SOURCE_REF="$REF_SHA" MODEL_IMAGE_DIGEST="$DIGEST" \
 AURA_CI_JOB_ID="$AURA_CI_JOB_ID" \
 MODEL_RECEIVER_HOST="$NETWORK_GATEWAY" \
@@ -318,7 +318,7 @@ info "running production-threshold k6 profile inside the CI network"
 SLO_RC=0
 docker run --rm --user "$RUNNER_UID:$RUNNER_GID" --network "$NET" \
   -v "$STAGE/tests/load/k6":/scripts:ro \
-  -v "$ARTIFACTS":/artifacts -e PROFILE=production -e BASE_URL="http://$APP:6443" \
+  -v "$ARTIFACTS":/artifacts -e PROFILE=production -e BASE_URL="http://app:6443" \
   -e CLIENT_ID="$CLIENT_ID" -e CLIENT_SECRET="$CLIENT_SECRET" \
   -e BUSINESS_FIXTURE_PATH=/artifacts/slo-fixture.json \
   -e SUMMARY_PATH=/artifacts/slo-summary.json "$K6_IMAGE" run /scripts/open-platform-slo.js \

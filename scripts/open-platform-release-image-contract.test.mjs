@@ -61,6 +61,13 @@ assert.match(probe, /audit_reader=audit_reader/);
 assert.match(probe, /open_platform_ci/);
 assert.match(probe, /consumer=consume/);
 assert.match(probe, /run_sdk_consumer\(fixture, sdk_command/);
+for (const [name, alias] of [['PG', 'pg'], ['REDIS', 'redis'], ['APP', 'app']]) {
+  assert.ok(gate.includes(`--name "$${name}" --network "$NET" --network-alias ${alias}`));
+}
+assert.ok(!gate.includes('jdbc:postgresql://$PG:5432'));
+assert.ok(!gate.includes('http://$APP:6443'));
+assert.ok(gate.includes('SPRING_DATA_REDIS_HOST=redis'));
+assert.ok(gate.includes('REDIS_HOST=redis'));
 assert.match(gate, /SDK_NODE_IMAGE="\$\(base_ref/);
 assert.match(gate, /prepare-open-platform-sdk\.sh \/source \/work\/sdk/);
 assert.match(gate, /verify-open-platform-sdk\.py/);
@@ -235,7 +242,7 @@ docker() {
   attempts=$((attempts + 1))
   printf '%s\n' "$*" >> "$CALLS"
   # The socket succeeds immediately; TCP is unavailable during initialization.
-  [[ "$*" == *"-h owned-pg"* ]] || return 0
+  [[ "$*" == *"-h pg"* ]] || return 0
   [[ "$TIMEOUT" == false && "$attempts" -ge 2 ]]
 }
 sleep() { :; }
@@ -245,7 +252,7 @@ ${readiness}
     assert.equal(result.status, timeout ? 2 : 0, result.stderr);
     const commands = fs.readFileSync(calls, 'utf8').trim().split('\n');
     assert.equal(commands.length, timeout ? 30 : 2);
-    assert.ok(commands.every(command => command.includes('pg_isready -h owned-pg')));
+    assert.ok(commands.every(command => command.includes('pg_isready -h pg')));
   } finally { fs.rmSync(temporary, {recursive:true}); }
 }
 console.log('open-platform PostgreSQL TCP readiness: 2 executable cases PASS');
