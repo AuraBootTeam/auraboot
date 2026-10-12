@@ -202,20 +202,24 @@ test.describe('Menu System', () => {
       return;
     }
 
-    // Click parent to expand
-    await parentBtn.click();
-
     if (childPath) {
-      // Verify child menu link is visible after expansion
+      // The sidebar may render the group already expanded (default-open groups
+      // or persisted expansion state) — the toggle flips whichever state it
+      // finds, so assert the transition in both directions.
       const childItem = sidebar.locator(`a[href="${childPath}"]`).first();
-      await expect(childItem).toBeVisible({ timeout: 5000 });
+      const initiallyVisible = await childItem.isVisible().catch(() => false);
 
-      // Click parent again to collapse
       await parentBtn.click();
-      await expect(parentBtn).toBeVisible();
+      if (initiallyVisible) {
+        await expect(childItem).not.toBeVisible({ timeout: 5000 });
+        await parentBtn.click();
+        await expect(childItem).toBeVisible({ timeout: 5000 });
+      } else {
+        await expect(childItem).toBeVisible({ timeout: 5000 });
+      }
 
-      // After collapse, child should not be interactable (opacity: 0, max-h: 0)
-      // We just verify the toggle didn't crash the page
+      // The toggle didn't crash the page and the parent stays interactable.
+      await expect(parentBtn).toBeVisible();
       await expect(sidebar).toBeVisible();
     }
   });
