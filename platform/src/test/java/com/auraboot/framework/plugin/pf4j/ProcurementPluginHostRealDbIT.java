@@ -1061,7 +1061,63 @@ class ProcurementPluginHostRealDbIT {
         }finally{dispatched.countDown();pool.shutdownNow();assertTrue(pool.awaitTermination(10,java.util.concurrent.TimeUnit.SECONDS));}
     }
 
-    @Test void nativeShipmentReplaySnapshotAndFulfillmentNeverChangeActualReceipts() {
+    @Test void nativeConcurrentShipmentBatchesCannotShareStaleOrderRemainder() throws Exception {
+        var fixture=shipmentFixture();String submit="qo_procurement_order_common:submit_shipment";
+        var held=new java.util.concurrent.CountDownLatch(1);
+        var attempted=new java.util.concurrent.CountDownLatch(1);
+        var first=orderLockObserver(()->{},()->{held.countDown();awaitNativeLatch(attempted,"second shipment must attempt the held order CAS");});
+        var second=orderLockObserver(attempted::countDown,()->{});
+        var pool=java.util.concurrent.Executors.newFixedThreadPool(2);
+        Object accepted;
+        try {
+            var winner=pool.submit(()->nativeActorThread(()->new TransactionTemplate(transactions).execute(status->scope(submit,
+                    ()->submitShipmentWith(first,fixture,"shipment-concurrent-1","600")))));
+            awaitNativeLatch(held,"first shipment must hold the actual native order CAS");
+            var loser=pool.submit(()->nativeActorThread(()->new TransactionTemplate(transactions).execute(status->scope(submit,
+                    ()->submitShipmentWith(second,fixture,"shipment-concurrent-2","600")))));
+            accepted=winner.get(20,java.util.concurrent.TimeUnit.SECONDS);
+            var failure=assertThrows(java.util.concurrent.ExecutionException.class,()->loser.get(20,java.util.concurrent.TimeUnit.SECONDS));
+            var conflict=assertInstanceOf(com.auraboot.framework.meta.exception.MetaServiceException.class,failure.getCause());
+            assertEquals("CAS batch conflict: no partial batch may commit",conflict.getMessage());
+        } finally {attempted.countDown();pool.shutdownNow();assertTrue(pool.awaitTermination(10,java.util.concurrent.TimeUnit.SECONDS));}
+        var orderBefore=scope(submit,()->db.getById("pr_purchase_order",fixture.order()));
+        var lineBefore=scope(submit,()->db.getById("pr_purchase_order_line",fixture.line()));
+        var shipments=scope(submit,()->nativeRows("qo_procurement_shipment_common","qo_pr_shipment_order_pid",fixture.order()));
+        assertEquals(1,shipments.size());assertEquals("open",orderBefore.get("qo_pr_order_state"));
+        scope(submit,()->{assertNativeQuantity("pr_purchase_order",fixture.order(),"qo_pr_order_revision","1");
+            assertNativeQuantity("pr_purchase_order_line",fixture.line(),"qo_pr_order_line_submitted_qty","600");
+            assertNativeQuantity("pr_purchase_order_line",fixture.line(),"pr_pol_received_qty","0");
+            var rows=nativeRows("qo_procurement_shipment_line_common","qo_pr_shipment_line_shipment_pid",(String)shipments.getFirst().get("pid"));
+            assertEquals(1,rows.size());assertEquals(0,new BigDecimal("600").compareTo(new BigDecimal(rows.getFirst().get("qo_pr_shipment_line_quantity").toString())));
+            return null;});
+        Object replay=new TransactionTemplate(transactions).execute(status->scope(submit,()->submitShipmentWith(db,fixture,"shipment-concurrent-1","600.000")));
+        assertEquals(accepted,replay);
+        assertEquals(orderBefore,scope(submit,()->db.getById("pr_purchase_order",fixture.order())));
+        assertEquals(lineBefore,scope(submit,()->db.getById("pr_purchase_order_line",fixture.line())));
+        assertEquals(shipments,scope(submit,()->nativeRows("qo_procurement_shipment_common","qo_pr_shipment_order_pid",fixture.order())));
+    }
+    private DataAccessor orderLockObserver(Runnable before,Runnable after) {
+        return (DataAccessor)java.lang.reflect.Proxy.newProxyInstance(DataAccessor.class.getClassLoader(),new Class<?>[]{DataAccessor.class},
+                (proxy,method,args)->{
+                    boolean lock=method.getName().equals("compareAndSetBatch") && "pr_purchase_order".equals(args[0]);
+                    if(lock) before.run();
+                    Object result;
+                    try {result=method.invoke(db,args);}catch(InvocationTargetException error){throw error.getCause();}
+                    if(lock) after.run();return result;
+                });
+    }
+    private Object submitShipmentWith(DataAccessor rows,ShipmentFixture fixture,String key,String quantity) {
+        try {
+            var type=plugin.loadClass("com.auraboot.quote.engine.procurement.ProcurementShipmentService");
+            return type.getMethod("submit",String.class,String.class,Map.class).invoke(
+                    type.getConstructor(DataAccessor.class,java.time.Clock.class).newInstance(rows,java.time.Clock.systemUTC()),
+                    fixture.order(),actor,Map.of("requestKey",key,"addressPid",fixture.address(),
+                            "lines",List.of(Map.of("orderLinePid",fixture.line(),"quantity",quantity))));
+        }catch(ReflectiveOperationException error){throw unwrap(error);}
+    }
+
+    private record ShipmentFixture(String order,String line,String address) {}
+    private ShipmentFixture shipmentFixture() {
         String directory="pr_supplier_common:sync_directory",publish="qo_procurement_order_common:sync_orders";
         String submit="qo_procurement_order_common:submit_shipment",maintain="qo_procurement_address_common:maintain";
         String supplier=scope(directory,()->(String)db.create("pr_supplier_common",Map.of("pr_supplier_code",provider,
@@ -1084,6 +1140,13 @@ class ProcurementPluginHostRealDbIT {
                 new Class<?>[]{Map.class,List.class},header,lines))));
         String order=(String)scope(publish,()->nativeRows("pr_purchase_order","qo_pr_order_erp_id",provider).getFirst().get("pid"));
         String line=(String)scope(publish,()->nativeRows("pr_purchase_order_line","pr_pol_order_id",order).getFirst().get("pid"));
+        return new ShipmentFixture(order,line,address);
+    }
+
+    @Test void nativeShipmentReplaySnapshotAndFulfillmentNeverChangeActualReceipts() {
+        var fixture=shipmentFixture();String order=fixture.order(),line=fixture.line(),address=fixture.address();
+        String submit="qo_procurement_order_common:submit_shipment",maintain="qo_procurement_address_common:maintain";
+        var tx=new TransactionTemplate(transactions);
         var partial=Map.<String,Object>of("requestKey","shipment-1","addressPid",address,
                 "lines",List.of(Map.of("orderLinePid",line,"quantity","600")));
         Object first=tx.execute(status->scope(submit,()->invokeService("ProcurementShipmentService","submit",
