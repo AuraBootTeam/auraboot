@@ -683,6 +683,140 @@ class ProcurementPluginHostRealDbIT {
         });
     }
 
+    private static final String EXECUTE_ORDER="qo_procurement_execution_common:generate_orders";
+    private record ExecutionFixture(String source,String quote,String execution,Map<String,Object> protectedFacts) {}
+    private ExecutionFixture allocatedExecutionFixture() {
+        var quote=savedNativeQuote();var tx=new TransactionTemplate(transactions);
+        var formal=(Map<?,?>)tx.execute(status->scope("qo_procurement_quote_common:submit",
+                ()->quoteAt(quote.clock(),"submit",quote.quote(),Map.of("revision",1))));
+        scope("qo_procurement_task_common:dispatch",()->{openFixtureTask();return null;});
+        var request=Map.<String,Object>of("sourceDemands",List.of(Map.of("sourcePid",quote.source(),"sourceRevision",0,"quantity","300.000001")),
+                "allocations",List.of(Map.of("quotePid",quote.quote(),"sourcePid",quote.source(),"submissionPid",formal.get("submissionPid"),"quantity","300.000001")));
+        tx.execute(status->scope("qo_procurement_task_common:allocate",()->allocateNative(request)));
+        return scope(EXECUTE_ORDER,()->{
+            var executions=nativeRows("qo_procurement_execution_common","qo_pr_execution_task_pid",task);
+            assertEquals(1,executions.size());assertEquals("pending",executions.getFirst().get("qo_pr_execution_state"));
+            assertNativeQuantity("pr_purchase_request",quote.source(),"qo_pr_source_reserved_qty","300.000001");
+            return new ExecutionFixture(quote.source(),quote.quote(),(String)executions.getFirst().get("pid"),executionProtectedFacts(quote.source(),quote.quote()));
+        });
+    }
+    private Map<String,Object> executionProtectedFacts(String sourcePid,String quotePid) {
+        var submissions=nativeRows("qo_procurement_submission_common","qo_pr_submission_quote_pid",quotePid);
+        var lines=new ArrayList<Map<String,Object>>();
+        for(var submission:submissions) lines.addAll(nativeRows("qo_procurement_submission_line_common","qo_pr_submission_line_submission_pid",(String)submission.get("pid")));
+        return Map.of("source",db.getById("pr_purchase_request",sourcePid),"quote",db.getById("s2p_bid",quotePid),
+                "task",db.getById("s2p_sourcing_event",task),
+                "allocations",nativeRows("qo_procurement_allocation_common","qo_pr_allocation_task_pid",task),
+                "submissions",submissions,"submissionLines",lines,
+                "history",nativeRows("qo_procurement_history_common","qo_pr_history_target_pid",quotePid));
+    }
+    private void assertExecutionReservationUnchanged(ExecutionFixture fixture,String state) {
+        scope(EXECUTE_ORDER,()->{
+            assertEquals(state,db.getById("qo_procurement_execution_common",fixture.execution()).get("qo_pr_execution_state"));
+            assertEquals(fixture.protectedFacts(),executionProtectedFacts(fixture.source(),fixture.quote()));
+            assertNativeQuantity("pr_purchase_request",fixture.source(),"qo_pr_source_reserved_qty","300.000001");
+            assertEquals(1,nativeRows("qo_procurement_execution_common","qo_pr_execution_task_pid",task).size());return null;
+        });
+    }
+    private Object executionResult(String state,String orderId,String billNo,String failureCode) {
+        try {return plugin.loadClass("com.auraboot.quote.engine.procurement.ProcurementExecutionService$Result")
+                .getConstructor(String.class,String.class,String.class,String.class).newInstance(state,orderId,billNo,failureCode);}
+        catch(ReflectiveOperationException error){throw unwrap(error);}
+    }
+    /** Only external outcomes are synthetic; all checkpoint callbacks use actual host PG transactions. */
+    private Object nativeExecutionService(IndependentTransactionAccessor bridge,java.util.function.BiFunction<String,Object[],Object> outcome) {
+        try {
+            Class<?> service=plugin.loadClass("com.auraboot.quote.engine.procurement.ProcurementExecutionService");
+            Class<?> gateway=plugin.loadClass(service.getName()+"$VerifiedTestGateway");
+            Object fixtureGateway=java.lang.reflect.Proxy.newProxyInstance(plugin,new Class<?>[]{gateway},(proxy,method,args)->{
+                if(method.getName().equals("explicitlyAuthorizedTestAccount")) return true;
+                return outcome.apply(method.getName(),args);
+            });
+            return service.getConstructor(IndependentTransactionAccessor.class,gateway).newInstance(bridge,fixtureGateway);
+        } catch(ReflectiveOperationException error){throw unwrap(error);}
+    }
+    private Object executeNativeOrder(Object service,String executionPid) {
+        try {return service.getClass().getMethod("execute",String.class).invoke(service,executionPid);}
+        catch(ReflectiveOperationException error){throw unwrap(error);}
+    }
+    @Test void nativeExecutionCheckpointSurvivesOuterRollbackWithoutReleasingAllocation() {
+        var fixture=allocatedExecutionFixture();var creates=new java.util.concurrent.atomic.AtomicInteger();
+        var service=nativeExecutionService(new IndependentTransactionAccessorImpl(transactions,data),(method,args)->{
+            assertEquals("create",method);creates.incrementAndGet();assertEquals(1,((List<?>)args[1]).size());
+            return executionResult("succeeded","local-order-"+provider,"LOCAL-"+provider,"");
+        });
+        String failure="outer rollback after completed checkpoint";
+        assertEquals(failure,assertThrows(IllegalStateException.class,()->new TransactionTemplate(transactions).execute(status->scope(EXECUTE_ORDER,()->{
+            executeNativeOrder(service,fixture.execution());throw new IllegalStateException(failure);
+        }))).getMessage());
+        assertEquals(1,creates.get());assertExecutionReservationUnchanged(fixture,"succeeded");
+        scope(EXECUTE_ORDER,()->{
+            var row=db.getById("qo_procurement_execution_common",fixture.execution());
+            assertEquals("local-order-"+provider,row.get("qo_pr_execution_erp_order_id"));
+            assertEquals("LOCAL-"+provider,row.get("qo_pr_execution_erp_bill_no"));return null;
+        });
+        scope(EXECUTE_ORDER,()->executeNativeOrder(service,fixture.execution()));
+        assertEquals(1,creates.get());assertExecutionReservationUnchanged(fixture,"succeeded");
+    }
+    @Test void nativeUnknownExecutionLookupPrecedesRetryAndKeepsIndependentReservation() {
+        var fixture=allocatedExecutionFixture();var creates=new java.util.concurrent.atomic.AtomicInteger();
+        var lookups=new java.util.concurrent.atomic.AtomicInteger();var resolved=new java.util.concurrent.atomic.AtomicBoolean();
+        var service=nativeExecutionService(new IndependentTransactionAccessorImpl(transactions,data),(method,args)->{
+            if(method.equals("create")){creates.incrementAndGet();throw new IllegalStateException("synthetic create timeout");}
+            assertEquals("lookup",method);lookups.incrementAndGet();
+            return resolved.get()?executionResult("succeeded","found-order-"+provider,"FOUND-"+provider,"")
+                    :executionResult("failed","","","SYNTHETIC_LOOKUP_REJECTED");
+        });
+        assertEquals("synthetic create timeout",assertThrows(IllegalStateException.class,()->new TransactionTemplate(transactions).execute(
+                status->scope(EXECUTE_ORDER,()->executeNativeOrder(service,fixture.execution())))).getMessage());
+        assertExecutionReservationUnchanged(fixture,"unknown");
+        scope(EXECUTE_ORDER,()->executeNativeOrder(service,fixture.execution()));
+        assertExecutionReservationUnchanged(fixture,"unknown");assertEquals(1,creates.get());assertEquals(1,lookups.get());
+        resolved.set(true);scope(EXECUTE_ORDER,()->executeNativeOrder(service,fixture.execution()));
+        assertExecutionReservationUnchanged(fixture,"succeeded");assertEquals(1,creates.get());assertEquals(2,lookups.get());
+        scope(EXECUTE_ORDER,()->executeNativeOrder(service,fixture.execution()));
+        assertEquals(1,creates.get());assertEquals(2,lookups.get());assertExecutionReservationUnchanged(fixture,"succeeded");
+    }
+    @Test void nativeConcurrentExecutionClaimsUseActualCasAndCreateExactlyOnce() throws Exception {
+        var fixture=allocatedExecutionFixture();var bothRead=new java.util.concurrent.CountDownLatch(2);
+        var claimReads=new java.util.concurrent.atomic.AtomicInteger();var creates=new java.util.concurrent.atomic.AtomicInteger();
+        var host=new IndependentTransactionAccessorImpl(transactions,data);
+        IndependentTransactionAccessor observed=new IndependentTransactionAccessor(){
+            @Override public <T>T requiresNew(java.util.function.Function<DataAccessor,T> work) {
+                return host.requiresNew(actual->{
+                    DataAccessor observer=(DataAccessor)java.lang.reflect.Proxy.newProxyInstance(DataAccessor.class.getClassLoader(),new Class<?>[]{DataAccessor.class},(proxy,method,args)->{
+                        Object value;try {value=method.invoke(actual,args);}catch(InvocationTargetException error){throw error.getCause();}
+                        if(method.getName().equals("getById") && "qo_procurement_execution_common".equals(args[0])
+                                && fixture.execution().equals(args[1]) && claimReads.incrementAndGet()<=2) {
+                            assertEquals("pending",((Map<?,?>)value).get("qo_pr_execution_state"));
+                            bothRead.countDown();awaitNativeLatch(bothRead,"both execution claims must read the same committed pending revision");
+                        }
+                        return value;
+                    });
+                    return work.apply(observer);
+                });
+            }
+        };
+        var service=nativeExecutionService(observed,(method,args)->{
+            assertEquals("create",method);creates.incrementAndGet();return executionResult("succeeded","race-order-"+provider,"RACE-"+provider,"");
+        });
+        var pool=java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var first=pool.submit(()->nativeActorThread(()->scope(EXECUTE_ORDER,()->executeNativeOrder(service,fixture.execution()))));
+            var second=pool.submit(()->nativeActorThread(()->scope(EXECUTE_ORDER,()->executeNativeOrder(service,fixture.execution()))));
+            int succeeded=0,conflicted=0;
+            for(var future:List.of(first,second)) {
+                try {assertNotNull(future.get(20,java.util.concurrent.TimeUnit.SECONDS));succeeded++;}
+                catch(java.util.concurrent.ExecutionException error) {
+                    var conflict=assertInstanceOf(com.auraboot.framework.meta.exception.MetaServiceException.class,error.getCause());
+                    assertEquals("CAS batch conflict: no partial batch may commit",conflict.getMessage());conflicted++;
+                }
+            }
+            assertEquals(1,succeeded);assertEquals(1,conflicted);
+        } finally {pool.shutdownNow();assertTrue(pool.awaitTermination(10,java.util.concurrent.TimeUnit.SECONDS));}
+        assertEquals(1,creates.get());assertExecutionReservationUnchanged(fixture,"succeeded");
+    }
+
     private static void awaitNativeLatch(java.util.concurrent.CountDownLatch latch,String reason) {
         try {assertTrue(latch.await(10,java.util.concurrent.TimeUnit.SECONDS),reason);}
         catch(InterruptedException error){Thread.currentThread().interrupt();throw new AssertionError(reason,error);}
@@ -1271,6 +1405,135 @@ class ProcurementPluginHostRealDbIT {
         assertEquals(List.of(fixture.order()),targets);
         scope("qo_procurement_order_common:submit_shipment",()->{assertNativeQuantity("pr_purchase_order_line",fixture.line(),"qo_pr_order_line_submitted_qty","0");return null;});
     }
+    /** Same-slot queue races use real transactions; no message transport is invoked. */
+    @Test void nativeReminderSameSlotConcurrentTicksCreateOneFact() throws Exception {
+        var fixture=shipmentFixture();String selected=nativeReminderSupplier(fixture);
+        var probe=new ReminderNativeProbe();
+        var scanReady=new java.util.concurrent.CountDownLatch(2);
+        // Both outer host transactions reach this barrier before either native insert starts.
+        var insertReady=new java.util.concurrent.CyclicBarrier(2);
+        var scheduler=nativeReminderSchedulerFor(nativeReminderObserved(selected,probe,scanReady,insertReady,false));
+        var pool=java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var first=pool.submit(()->nativeReminderTickWithoutRequest(scheduler));
+            var second=pool.submit(()->nativeReminderTickWithoutRequest(scheduler));
+            first.get(30,java.util.concurrent.TimeUnit.SECONDS);
+            second.get(30,java.util.concurrent.TimeUnit.SECONDS);
+        } finally {
+            pool.shutdownNow();
+            assertTrue(pool.awaitTermination(10,java.util.concurrent.TimeUnit.SECONDS),"Reminder workers did not terminate");
+        }
+        assertEquals(2,probe.supplierScans.get());
+        assertEquals(2,probe.transactions.get());
+        assertEquals(2,probe.createAttempts.get());
+        assertEquals(2,probe.forwardedCreates.get());
+        assertTrue(probe.failures.isEmpty(),probe.failures.toString());
+        assertNativeReminderQueueFact(selected,fixture);
+    }
+
+    /** Only same-slot scan recovery is promised here, not missed-slot catch-up or delivery. */
+    @Test void nativeReminderScanFailureRecoversInSameSlotWithoutDuplicateFact() throws Exception {
+        var fixture=shipmentFixture();String selected=nativeReminderSupplier(fixture);
+        var probe=new ReminderNativeProbe();
+        var scheduler=nativeReminderSchedulerFor(nativeReminderObserved(selected,probe,null,null,true));
+        MetaContext.clear();
+        try {
+            scheduler.getClass().getMethod("tick").invoke(scheduler);
+            assertEquals(1,probe.injectedScanFailures.get());
+            assertEquals(0,probe.transactions.get());
+            assertEquals(0,probe.createAttempts.get());
+            assertTrue(background.queryPage(tenantId,"qo_procurement_reminder_common",
+                    Map.of("qo_pr_reminder_supplier_pid",selected),null,100).records().isEmpty());
+            scheduler.getClass().getMethod("tick").invoke(scheduler);
+            scheduler.getClass().getMethod("tick").invoke(scheduler);
+        } finally {MetaContext.setContext(tenantId,actorId,actor,"Host fixture");}
+        assertEquals(3,probe.supplierScans.get());
+        assertEquals(1,probe.injectedScanFailures.get());
+        assertEquals(2,probe.transactions.get());
+        assertEquals(2,probe.createAttempts.get());
+        assertEquals(2,probe.forwardedCreates.get());
+        assertTrue(probe.failures.isEmpty(),probe.failures.toString());
+        assertNativeReminderQueueFact(selected,fixture);
+    }
+
+    private static final class ReminderNativeProbe {
+        final java.util.concurrent.atomic.AtomicInteger supplierScans=new java.util.concurrent.atomic.AtomicInteger();
+        final java.util.concurrent.atomic.AtomicInteger transactions=new java.util.concurrent.atomic.AtomicInteger();
+        final java.util.concurrent.atomic.AtomicInteger createAttempts=new java.util.concurrent.atomic.AtomicInteger();
+        final java.util.concurrent.atomic.AtomicInteger forwardedCreates=new java.util.concurrent.atomic.AtomicInteger();
+        final java.util.concurrent.atomic.AtomicInteger injectedScanFailures=new java.util.concurrent.atomic.AtomicInteger();
+        final java.util.concurrent.ConcurrentLinkedQueue<Throwable> failures=new java.util.concurrent.ConcurrentLinkedQueue<>();
+    }
+    private String nativeReminderSupplier(ShipmentFixture fixture) {
+        return (String)scope("qo_procurement_address_common:maintain",
+                ()->db.getById("qo_procurement_address_common",fixture.address())).get("qo_pr_address_supplier_pid");
+    }
+    private Object nativeReminderSchedulerFor(BackgroundDataAccessor observed) throws Exception {
+        var type=plugin.loadClass("com.auraboot.quote.engine.procurement.ProcurementReminderScheduler");
+        var constructor=type.getDeclaredConstructor(java.time.Clock.class);constructor.setAccessible(true);
+        var scheduler=constructor.newInstance(java.time.Clock.fixed(
+                java.time.Instant.parse("2026-10-10T06:00:15Z"),java.time.ZoneOffset.UTC));
+        for(var entry:Map.<String,Object>of("enabled",true,"background",observed,
+                "tenants",(BackgroundTenantAccessor)()->List.of(tenantId)).entrySet()) {
+            var field=type.getDeclaredField(entry.getKey());field.setAccessible(true);field.set(scheduler,entry.getValue());
+        }
+        return scheduler;
+    }
+    private void nativeReminderTickWithoutRequest(Object scheduler) {
+        MetaContext.clear();
+        try {scheduler.getClass().getMethod("tick").invoke(scheduler);}
+        catch(ReflectiveOperationException failure){throw unwrap(failure);}
+        finally {MetaContext.clear();}
+    }
+    private BackgroundDataAccessor nativeReminderObserved(String selected,ReminderNativeProbe probe,
+            java.util.concurrent.CountDownLatch scanReady,java.util.concurrent.CyclicBarrier insertReady,
+            boolean failFirstScan) {
+        var failNext=new java.util.concurrent.atomic.AtomicBoolean(failFirstScan);
+        return (BackgroundDataAccessor)java.lang.reflect.Proxy.newProxyInstance(
+                BackgroundDataAccessor.class.getClassLoader(),new Class<?>[]{BackgroundDataAccessor.class},(proxy,method,args)->{
+            if(method.getName().equals("query")) throw new AssertionError("Unbounded background read");
+            if(method.getName().equals("queryPage") && args.length==5) {
+                probe.supplierScans.incrementAndGet();
+                if(failNext.compareAndSet(true,false)) {
+                    probe.injectedScanFailures.incrementAndGet();
+                    throw new IllegalStateException("REMINDER_SCAN_SENTINEL");
+                }
+                var filters=new LinkedHashMap<String,Object>((Map<String,Object>)args[2]);filters.put("pid",selected);
+                var page=background.queryPage((Long)args[0],(String)args[1],filters,(String)args[3],(Integer)args[4]);
+                if(scanReady!=null) {
+                    scanReady.countDown();
+                    if(!scanReady.await(15,java.util.concurrent.TimeUnit.SECONDS))
+                        throw new IllegalStateException("Reminder supplier scans did not rendezvous");
+                }
+                return page;
+            }
+            if(method.getName().equals("executeInTransaction")) probe.transactions.incrementAndGet();
+            if(method.getName().equals("tryCreate")) {
+                probe.createAttempts.incrementAndGet();
+                if(insertReady!=null) insertReady.await(15,java.util.concurrent.TimeUnit.SECONDS);
+                probe.forwardedCreates.incrementAndGet();
+            }
+            try {return method.invoke(background,args);}
+            catch(InvocationTargetException failure) {
+                probe.failures.add(failure.getCause());throw failure.getCause();
+            }
+        });
+    }
+    private void assertNativeReminderQueueFact(String selected,ShipmentFixture fixture) throws Exception {
+        var rows=scope("qo_procurement_reminder_common:queue",()->nativeRows(
+                "qo_procurement_reminder_common","qo_pr_reminder_supplier_pid",selected));
+        assertEquals(1,rows.size());var row=rows.getFirst();
+        assertEquals("pending",row.get("qo_pr_reminder_state"));
+        assertEquals("shipment",row.get("qo_pr_reminder_kind"));
+        var raw=row.get("qo_pr_reminder_targets");
+        var targets=raw instanceof String text?json.readValue(text,List.class):(List<?>)raw;
+        assertEquals(List.of(fixture.order()),targets);
+        scope("qo_procurement_order_common:submit_shipment",()->{
+            assertNativeQuantity("pr_purchase_order_line",fixture.line(),"qo_pr_order_line_submitted_qty","0");
+            assertNativeQuantity("pr_purchase_order_line",fixture.line(),"pr_pol_received_qty","0");return null;
+        });
+    }
+
     @Test void nativeSupplierAddressCommandFiltersBeforePaginationAndProjectsSafeFields() throws Exception {
         var fixture=shipmentFixture();String maintain="qo_procurement_address_common:maintain";
         String supplier=(String)scope(maintain,()->db.getById("qo_procurement_address_common",fixture.address())).get("qo_pr_address_supplier_pid");
