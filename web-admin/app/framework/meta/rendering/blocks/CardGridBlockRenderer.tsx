@@ -91,7 +91,11 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
   const imageField: string | undefined = cfg.imageField;
   const cardActions: Array<{ code: string; label?: any; variant?: string; action?: any }> =
     Array.isArray(cfg.cardActions) ? cfg.cardActions : [];
-  const columnsClass: string = cfg.columns || 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3';
+  const autoFitColumns = cfg.autoFitColumns === true;
+  const columnsClass: string = autoFitColumns ? '' : cfg.columns || 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3';
+  const columnsStyle = autoFitColumns
+    ? { gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 20rem), 1fr))' }
+    : undefined;
   // A declared form field stores draft card rows; data-source refreshes never replace edits.
   const formField = typeof cfg.field === 'string' && cfg.field.trim() ? cfg.field : undefined;
   const cardFields: FieldConfig[] = Array.isArray(cfg.fields) ? cfg.fields : [];
@@ -382,7 +386,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
             aria-labelledby={group.title ? `${block.id}-group-${index}` : undefined}>
             {group.title && <h2 id={`${block.id}-group-${index}`}
               className="text-text mb-3 text-base font-semibold">{group.title}</h2>}
-            <div className={`grid gap-4 ${columnsClass}`}>
+            <div className={`grid gap-4 ${columnsClass}`} style={columnsStyle}>
               {group.entries.map(({ row, index: originalIndex }) => renderCard(row, originalIndex))}
             </div>
           </section>
@@ -390,7 +394,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
       </div>
     );
   }
-  return <div data-testid="card-grid-block" className={`grid gap-4 ${columnsClass}`}>
+  return <div data-testid="card-grid-block" className={`grid gap-4 ${columnsClass}`} style={columnsStyle}>
     {rows.map(renderCard)}
   </div>;
 };

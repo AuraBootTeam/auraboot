@@ -139,6 +139,23 @@ describe('CardGridBlockRenderer', () => {
     expect(screen.getByText('IoT')).toBeTruthy();
   });
 
+  it('opts into adaptive tracks independently for each identity group', () => {
+    const runtime = makeRuntime({ data: [
+      { ...sampleRows[0], source: 'one' },
+      { ...sampleRows[1], source: 'two' },
+    ] });
+    const { rerender } = render(<CardGridBlockRenderer
+      block={{ ...baseBlock, autoFitColumns: true, groupByField: 'source' }}
+      runtime={runtime as any} />);
+    for (const group of screen.getAllByTestId('card-grid-group')) {
+      expect((group.lastElementChild as HTMLElement).style.gridTemplateColumns)
+        .toBe('repeat(auto-fit, minmax(min(100%, 20rem), 1fr))');
+    }
+    rerender(<CardGridBlockRenderer block={baseBlock} runtime={runtime as any} />);
+    expect(screen.getByTestId('card-grid-block').style.gridTemplateColumns).toBe('');
+    expect(screen.getByTestId('card-grid-block').className).toContain('sm:grid-cols-2');
+  });
+
   it('renders a card badge through its declared dictionary', () => {
     const runtime = makeRuntime({ data: [{ pid: 'r1', name: '蜜蜂', status: 'published' }] });
     render(
