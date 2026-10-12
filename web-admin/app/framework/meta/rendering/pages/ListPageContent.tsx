@@ -1,3 +1,4 @@
+import { resolveListReadErrorMessage } from '~/framework/meta/utils/listReadErrors';
 import { resolveTemporalType } from '~/shared/services/dateTimeFormatService';
 /**
  * ListPageContent — Extracted rendering logic from dynamic.$tableName.tsx
@@ -2351,23 +2352,14 @@ function ListPageContentInner(props: PageContentProps) {
             }));
           }
         } else {
-          setError(
-            result.code === 'network_error'
-              ? getLocalizedText({
-                  'zh-CN': '网络连接失败，请检查连接后重试。',
-                  en: 'Unable to connect. Check your connection and try again.',
-                }, locale, t)
-              : result.desc || t('common.loadDataError') || 'Failed to load data',
-          );
+          setError(resolveListReadErrorMessage(result, locale, t));
         }
       } catch (err) {
         // A stale request's error must not clobber the newer request's state.
         if (requestId !== loadDataSeqRef.current) {
           return;
         }
-        setError(
-          err instanceof Error ? err.message : t('common.loadDataError') || 'Failed to load data',
-        );
+        setError(resolveListReadErrorMessage(err, locale, t));
       } finally {
         // Only the newest invocation owns the loading flag; an older one that
         // resolves late must not clear the newer request's spinner.
@@ -2648,20 +2640,11 @@ function ListPageContentInner(props: PageContentProps) {
               }));
             }
           } else {
-            setError(
-            result.code === 'network_error'
-              ? getLocalizedText({
-                  'zh-CN': '网络连接失败，请检查连接后重试。',
-                  en: 'Unable to connect. Check your connection and try again.',
-                }, locale, t)
-              : result.desc || t('common.loadDataError') || 'Failed to load data',
-          );
+            setError(resolveListReadErrorMessage(result, locale, t));
           }
         } catch (err) {
           if (!isLatestRequest()) return;
-          setError(
-            err instanceof Error ? err.message : t('common.loadDataError') || 'Failed to load data',
-          );
+          setError(resolveListReadErrorMessage(err, locale, t));
         } finally {
           if (isLatestRequest()) {
             setLoading(false);
