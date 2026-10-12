@@ -115,7 +115,10 @@ export default function OpenPlatformPage() {
     credential: Credential;
   } | null>(null);
   const [rotationGraceMinutes, setRotationGraceMinutes] = useState(1440);
-  const rotationGraceInvalid = !Number.isInteger(rotationGraceMinutes) || rotationGraceMinutes < 5 || rotationGraceMinutes > 10080;
+  const rotationGraceInvalid =
+    !Number.isInteger(rotationGraceMinutes) ||
+    rotationGraceMinutes < 5 ||
+    rotationGraceMinutes > 10080;
   const [pendingRevoke, setPendingRevoke] = useState<{
     installationPid: string;
     credential: Credential;
@@ -385,7 +388,10 @@ export default function OpenPlatformPage() {
         `/api/open-platform/applications/${application.pid}/members/${member.userPid}`,
         { method: 'DELETE' },
       );
-      showToast(t('openPlatform.memberRemoved', undefined, 'Application member removed'), 'success');
+      showToast(
+        t('openPlatform.memberRemoved', undefined, 'Application member removed'),
+        'success',
+      );
       await load();
       setManagingMembers(null);
     } catch (memberError) {
@@ -421,11 +427,19 @@ export default function OpenPlatformPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2 [&>a]:shrink-0 [&>a]:whitespace-nowrap [&>button]:shrink-0 [&>button]:whitespace-nowrap">
-          {access.canCreateApplications && <Link
-            to="/p/c/open_platform_publications"
-            data-testid="open-platform-publications-link"
-            className="inline-flex items-center gap-2 rounded-control border border-border-strong bg-panel px-3 py-2 text-sm text-text"
-          >{t('openPlatform.publications.title', undefined, locale.startsWith('zh') ? '公共资源发布' : 'Public resource publications')}</Link>}
+          {access.canCreateApplications && (
+            <Link
+              to="/p/c/open_platform_publications"
+              data-testid="open-platform-publications-link"
+              className="rounded-control border-border-strong bg-panel text-text inline-flex items-center gap-2 border px-3 py-2 text-sm"
+            >
+              {t(
+                'openPlatform.publications.title',
+                undefined,
+                locale.startsWith('zh') ? '公共资源发布' : 'Public resource publications',
+              )}
+            </Link>
+          )}
           <button
             type="button"
             onClick={() =>
@@ -523,12 +537,16 @@ export default function OpenPlatformPage() {
               <div className="flex flex-col gap-3 border-b border-gray-100 p-5 sm:flex-row sm:items-center sm:justify-between dark:border-gray-800">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="min-w-0 break-words font-semibold text-gray-950 dark:text-white">
+                    <h2 className="min-w-0 font-semibold break-words text-gray-950 dark:text-white">
                       {application.name}
                     </h2>
                     <StatusBadge status={application.status} t={t} />
-                    <span className="shrink-0 whitespace-nowrap rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
-                      {t(`openPlatform.role.${application.accessRole}`, undefined, application.accessRole)}
+                    <span className="shrink-0 rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-medium whitespace-nowrap text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                      {t(
+                        `openPlatform.role.${application.accessRole}`,
+                        undefined,
+                        application.accessRole,
+                      )}
                     </span>
                   </div>
                   {application.description && (
@@ -558,28 +576,36 @@ export default function OpenPlatformPage() {
                       {t('openPlatform.addInstallation', undefined, 'Add installation')}
                     </button>
                   )}
-                  {application.status === 'active' && application.permissions.disableApplication && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setPendingDisable({
-                          kind: 'application',
-                          pid: application.pid,
-                          name: application.name,
-                        })
-                      }
-                      className="rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-300"
-                    >
-                      {t('openPlatform.disable', undefined, 'Disable')}
-                    </button>
-                  )}
+                  {application.status === 'active' &&
+                    application.permissions.disableApplication && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPendingDisable({
+                            kind: 'application',
+                            pid: application.pid,
+                            name: application.name,
+                          })
+                        }
+                        className="rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-300"
+                      >
+                        {t('openPlatform.disable', undefined, 'Disable')}
+                      </button>
+                    )}
                 </div>
               </div>
               <div className="space-y-3 p-5">
-                <div className="flex flex-wrap gap-2" aria-label={t('openPlatform.members', undefined, 'Members')}>
+                <div
+                  className="flex flex-wrap gap-2"
+                  aria-label={t('openPlatform.members', undefined, 'Members')}
+                >
                   {application.members.map((member) => (
-                    <span key={member.userPid} className="rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-200">
-                      {member.displayName} · {t(`openPlatform.role.${member.role}`, undefined, member.role)}
+                    <span
+                      key={member.userPid}
+                      className="rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                    >
+                      {member.displayName} ·{' '}
+                      {t(`openPlatform.role.${member.role}`, undefined, member.role)}
                     </span>
                   ))}
                 </div>
@@ -608,76 +634,91 @@ export default function OpenPlatformPage() {
                           </div>
                         </div>
                         <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2 sm:flex sm:w-auto sm:flex-wrap sm:justify-end">
-                          {application.permissions.readOperations && <button
-                            type="button"
-                            onClick={() =>
-                              setOperationsInstallation((current) =>
-                                current === installation.pid ? null : installation.pid,
-                              )
-                            }
-                            className="inline-flex min-w-0 items-center justify-center gap-1 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200"
-                            aria-expanded={operationsInstallation === installation.pid}
-                          >
-                            <WrenchScrewdriverIcon className="h-3.5 w-3.5" />
-                            {t('openPlatform.operations', undefined, 'Operations')}
-                          </button>}
-                          {access.platformAdmin && application.permissions.manageRuntime && <button
-                            type="button"
-                            onClick={() => setGrantInstallation(installation.pid)}
-                            disabled={grantInstallation !== null}
-                            aria-expanded={grantInstallation === installation.pid}
-                            className="min-w-0 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-700 dark:text-gray-200"
-                          >
-                            {t('openPlatform.installationGrants.open', undefined, locale.startsWith('zh') ? '数据授权' : 'Data authority')}
-                          </button>}
-                          {application.permissions.manageRuntime && <button
-                            type="button"
-                            onClick={() => void loadCredentials(installation.pid)}
-                            className="min-w-0 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200"
-                          >
-                            {t('openPlatform.viewCredentials', undefined, 'View credentials')}
-                          </button>}
-                          {application.permissions.manageRuntime && <button
-                            type="button"
-                            onClick={() => beginEditScopes(installation)}
-                            disabled={installation.status !== 'active'}
-                            className="min-w-0 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-700 dark:text-gray-200"
-                          >
-                            {t('openPlatform.editScopes', undefined, 'Edit scopes')}
-                          </button>}
-                          {application.permissions.manageRuntime && <button
-                            type="button"
-                            onClick={() => void createCredential(installation.pid)}
-                            disabled={installation.status !== 'active'}
-                            className="inline-flex min-w-0 items-center justify-center gap-1 rounded-md bg-gray-900 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-gray-700 disabled:opacity-40 dark:bg-white dark:text-gray-900"
-                          >
-                            <KeyIcon className="h-3.5 w-3.5" />
-                            {t('openPlatform.newCredential', undefined, 'New credential')}
-                          </button>}
-                          {installation.status === 'active' && application.permissions.manageRuntime && (
+                          {application.permissions.readOperations && (
                             <button
                               type="button"
                               onClick={() =>
-                                setPendingDisable({
-                                  kind: 'installation',
-                                  pid: installation.pid,
-                                  name: t(
-                                    `openPlatform.environment.${installation.environment}`,
-                                    undefined,
-                                    installation.environment,
-                                  ),
-                                })
+                                setOperationsInstallation((current) =>
+                                  current === installation.pid ? null : installation.pid,
+                                )
                               }
-                              className="rounded-md p-2 text-red-600 hover:bg-red-50"
-                              aria-label={t(
-                                'openPlatform.disableInstallation',
-                                undefined,
-                                'Disable installation',
-                              )}
+                              className="inline-flex min-w-0 items-center justify-center gap-1 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200"
+                              aria-expanded={operationsInstallation === installation.pid}
                             >
-                              <TrashIcon className="h-4 w-4" />
+                              <WrenchScrewdriverIcon className="h-3.5 w-3.5" />
+                              {t('openPlatform.operations', undefined, 'Operations')}
                             </button>
                           )}
+                          {access.platformAdmin && application.permissions.manageRuntime && (
+                            <button
+                              type="button"
+                              onClick={() => setGrantInstallation(installation.pid)}
+                              disabled={grantInstallation !== null}
+                              aria-expanded={grantInstallation === installation.pid}
+                              className="min-w-0 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-700 dark:text-gray-200"
+                            >
+                              {t(
+                                'openPlatform.installationGrants.open',
+                                undefined,
+                                locale.startsWith('zh') ? '数据授权' : 'Data authority',
+                              )}
+                            </button>
+                          )}
+                          {application.permissions.manageRuntime && (
+                            <button
+                              type="button"
+                              onClick={() => void loadCredentials(installation.pid)}
+                              className="min-w-0 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200"
+                            >
+                              {t('openPlatform.viewCredentials', undefined, 'View credentials')}
+                            </button>
+                          )}
+                          {application.permissions.manageRuntime && (
+                            <button
+                              type="button"
+                              onClick={() => beginEditScopes(installation)}
+                              disabled={installation.status !== 'active'}
+                              className="min-w-0 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-700 dark:text-gray-200"
+                            >
+                              {t('openPlatform.editScopes', undefined, 'Edit scopes')}
+                            </button>
+                          )}
+                          {application.permissions.manageRuntime && (
+                            <button
+                              type="button"
+                              onClick={() => void createCredential(installation.pid)}
+                              disabled={installation.status !== 'active'}
+                              className="inline-flex min-w-0 items-center justify-center gap-1 rounded-md bg-gray-900 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-gray-700 disabled:opacity-40 dark:bg-white dark:text-gray-900"
+                            >
+                              <KeyIcon className="h-3.5 w-3.5" />
+                              {t('openPlatform.newCredential', undefined, 'New credential')}
+                            </button>
+                          )}
+                          {installation.status === 'active' &&
+                            application.permissions.manageRuntime && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setPendingDisable({
+                                    kind: 'installation',
+                                    pid: installation.pid,
+                                    name: t(
+                                      `openPlatform.environment.${installation.environment}`,
+                                      undefined,
+                                      installation.environment,
+                                    ),
+                                  })
+                                }
+                                className="rounded-md p-2 text-red-600 hover:bg-red-50"
+                                aria-label={t(
+                                  'openPlatform.disableInstallation',
+                                  undefined,
+                                  'Disable installation',
+                                )}
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </button>
+                            )}
                         </div>
                       </div>
                       <p className="mt-3 text-xs text-gray-400">
@@ -697,6 +738,9 @@ export default function OpenPlatformPage() {
                       {application.permissions.manageRuntime && credentials[installation.pid] && (
                         <CredentialList
                           installationPid={installation.pid}
+                          active={
+                            application.status === 'active' && installation.status === 'active'
+                          }
                           credentials={credentials[installation.pid]}
                           onRevoke={(credential) =>
                             setPendingRevoke({ installationPid: installation.pid, credential })
@@ -708,12 +752,20 @@ export default function OpenPlatformPage() {
                           t={t}
                         />
                       )}
-                      {application.permissions.readOperations && operationsInstallation === installation.pid && (
-                        <OpenPlatformOperationsPanel installationPid={installation.pid} />
-                      )}
-                      {access.platformAdmin && application.permissions.manageRuntime && grantInstallation === installation.pid && (
-                        <OpenApiInstallationGrantEditor installationPid={installation.pid} active={installation.status === 'active'} scopes={installation.scopes} onClose={() => setGrantInstallation(null)} />
-                      )}
+                      {application.permissions.readOperations &&
+                        operationsInstallation === installation.pid && (
+                          <OpenPlatformOperationsPanel installationPid={installation.pid} />
+                        )}
+                      {access.platformAdmin &&
+                        application.permissions.manageRuntime &&
+                        grantInstallation === installation.pid && (
+                          <OpenApiInstallationGrantEditor
+                            installationPid={installation.pid}
+                            active={installation.status === 'active'}
+                            scopes={installation.scopes}
+                            onClose={() => setGrantInstallation(null)}
+                          />
+                        )}
                     </div>
                   ))
                 )}
@@ -727,6 +779,15 @@ export default function OpenPlatformPage() {
         <Dialog
           title={t('openPlatform.createTitle', undefined, 'Create external application')}
           onClose={() => setShowCreate(false)}
+          footer={
+            <DialogActions
+              onCancel={() => setShowCreate(false)}
+              onConfirm={() => void createApplication()}
+              confirmDisabled={creating || !appName.trim()}
+              confirmText={t('common.create', undefined, 'Create')}
+              cancelText={t('common.cancel', undefined, 'Cancel')}
+            />
+          }
         >
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
             {t('openPlatform.name', undefined, 'Application name')}
@@ -749,13 +810,6 @@ export default function OpenPlatformPage() {
               className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
             />
           </label>
-          <DialogActions
-            onCancel={() => setShowCreate(false)}
-            onConfirm={() => void createApplication()}
-            confirmDisabled={creating || !appName.trim()}
-            confirmText={t('common.create', undefined, 'Create')}
-            cancelText={t('common.cancel', undefined, 'Cancel')}
-          />
         </Dialog>
       )}
 
@@ -763,13 +817,29 @@ export default function OpenPlatformPage() {
         <Dialog
           title={t('openPlatform.manageMembers', undefined, 'Manage members')}
           onClose={() => setManagingMembers(null)}
+          footer={
+            <DialogActions
+              onCancel={() => setManagingMembers(null)}
+              onConfirm={() => void saveMember()}
+              confirmDisabled={!memberPid}
+              confirmText={t('common.save', undefined, 'Save')}
+              cancelText={t('common.cancel', undefined, 'Cancel')}
+            />
+          }
         >
           <div className="space-y-2">
             {managingMembers.members.map((member) => (
-              <div key={member.userPid} className="flex items-center justify-between rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+              <div
+                key={member.userPid}
+                className="flex items-center justify-between rounded-lg border border-gray-200 p-3 dark:border-gray-700"
+              >
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-gray-900 dark:text-white">{member.displayName}</p>
-                  <p className="text-xs text-gray-500">{t(`openPlatform.role.${member.role}`, undefined, member.role)}</p>
+                  <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
+                    {member.displayName}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {t(`openPlatform.role.${member.role}`, undefined, member.role)}
+                  </p>
                 </div>
                 <button
                   type="button"
@@ -801,18 +871,13 @@ export default function OpenPlatformPage() {
                 className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
               >
                 {(['viewer', 'maintainer', 'owner'] as const).map((role) => (
-                  <option key={role} value={role}>{t(`openPlatform.role.${role}`, undefined, role)}</option>
+                  <option key={role} value={role}>
+                    {t(`openPlatform.role.${role}`, undefined, role)}
+                  </option>
                 ))}
               </select>
             </label>
           </div>
-          <DialogActions
-            onCancel={() => setManagingMembers(null)}
-            onConfirm={() => void saveMember()}
-            confirmDisabled={!memberPid}
-            confirmText={t('common.save', undefined, 'Save')}
-            cancelText={t('common.cancel', undefined, 'Cancel')}
-          />
         </Dialog>
       )}
 
@@ -820,6 +885,17 @@ export default function OpenPlatformPage() {
         <Dialog
           title={t('openPlatform.installTitle', undefined, 'Install application')}
           onClose={() => setInstallingApp(null)}
+          footer={
+            <DialogActions
+              onCancel={() => setInstallingApp(null)}
+              onConfirm={() => void install()}
+              confirmDisabled={
+                selectedScopes.size === 0 || rateLimitPerMinute < 1 || rateLimitPerMinute > 100000
+              }
+              confirmText={t('openPlatform.install', undefined, 'Install')}
+              cancelText={t('common.cancel', undefined, 'Cancel')}
+            />
+          }
         >
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
             {t('openPlatform.environmentLabel', undefined, 'Environment')}
@@ -886,15 +962,6 @@ export default function OpenPlatformPage() {
               ))}
             </div>
           </fieldset>
-          <DialogActions
-            onCancel={() => setInstallingApp(null)}
-            onConfirm={() => void install()}
-            confirmDisabled={
-              selectedScopes.size === 0 || rateLimitPerMinute < 1 || rateLimitPerMinute > 100000
-            }
-            confirmText={t('openPlatform.install', undefined, 'Install')}
-            cancelText={t('common.cancel', undefined, 'Cancel')}
-          />
         </Dialog>
       )}
 
@@ -902,6 +969,15 @@ export default function OpenPlatformPage() {
         <Dialog
           title={t('openPlatform.secretTitle', undefined, 'Save this credential now')}
           onClose={() => setSecret(null)}
+          footer={
+            <DialogActions
+              onCancel={() => setSecret(null)}
+              onConfirm={() => setSecret(null)}
+              confirmText={t('openPlatform.saved', undefined, 'I saved it')}
+              cancelText={t('common.cancel', undefined, 'Cancel')}
+              hideCancel
+            />
+          }
         >
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
             {t(
@@ -922,13 +998,6 @@ export default function OpenPlatformPage() {
             onCopy={copy}
             copyLabel={t('common.copy', undefined, 'Copy')}
           />
-          <DialogActions
-            onCancel={() => setSecret(null)}
-            onConfirm={() => setSecret(null)}
-            confirmText={t('openPlatform.saved', undefined, 'I saved it')}
-            cancelText={t('common.cancel', undefined, 'Cancel')}
-            hideCancel
-          />
         </Dialog>
       )}
 
@@ -936,6 +1005,15 @@ export default function OpenPlatformPage() {
         <Dialog
           title={t('openPlatform.revokeTitle', undefined, 'Revoke credential?')}
           onClose={() => setPendingRevoke(null)}
+          footer={
+            <DialogActions
+              onCancel={() => setPendingRevoke(null)}
+              onConfirm={() => void revokeCredential()}
+              confirmText={t('openPlatform.revoke', undefined, 'Revoke')}
+              cancelText={t('common.cancel', undefined, 'Cancel')}
+              destructive
+            />
+          }
         >
           <p className="text-sm text-gray-600 dark:text-gray-300">
             {t(
@@ -947,13 +1025,6 @@ export default function OpenPlatformPage() {
           <code className="mt-3 block rounded bg-gray-100 p-2 text-xs dark:bg-gray-800">
             {pendingRevoke.credential.clientId}
           </code>
-          <DialogActions
-            onCancel={() => setPendingRevoke(null)}
-            onConfirm={() => void revokeCredential()}
-            confirmText={t('openPlatform.revoke', undefined, 'Revoke')}
-            cancelText={t('common.cancel', undefined, 'Cancel')}
-            destructive
-          />
         </Dialog>
       )}
 
@@ -961,6 +1032,15 @@ export default function OpenPlatformPage() {
         <Dialog
           title={t('openPlatform.rotateTitle', undefined, 'Rotate credential')}
           onClose={() => setPendingRotate(null)}
+          footer={
+            <DialogActions
+              onCancel={() => setPendingRotate(null)}
+              onConfirm={() => void rotateCredential()}
+              confirmDisabled={rotationGraceInvalid}
+              confirmText={t('openPlatform.rotate', undefined, 'Rotate')}
+              cancelText={t('common.cancel', undefined, 'Cancel')}
+            />
+          }
         >
           <p className="text-sm text-gray-600 dark:text-gray-300">
             {t(
@@ -982,16 +1062,17 @@ export default function OpenPlatformPage() {
               className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
             />
           </label>
-          <p id="open-platform-rotation-grace-range" className="mt-2 text-sm text-text-muted" role={rotationGraceInvalid ? 'alert' : undefined}>
-            {t('openPlatform.graceRange', undefined, 'Enter a whole number from 5 to 10080 minutes.')}
+          <p
+            id="open-platform-rotation-grace-range"
+            className="text-text-muted mt-2 text-sm"
+            role={rotationGraceInvalid ? 'alert' : undefined}
+          >
+            {t(
+              'openPlatform.graceRange',
+              undefined,
+              'Enter a whole number from 5 to 10080 minutes.',
+            )}
           </p>
-          <DialogActions
-            onCancel={() => setPendingRotate(null)}
-            onConfirm={() => void rotateCredential()}
-            confirmDisabled={rotationGraceInvalid}
-            confirmText={t('openPlatform.rotate', undefined, 'Rotate')}
-            cancelText={t('common.cancel', undefined, 'Cancel')}
-          />
         </Dialog>
       )}
 
@@ -999,6 +1080,15 @@ export default function OpenPlatformPage() {
         <Dialog
           title={t('openPlatform.editScopes', undefined, 'Edit scopes')}
           onClose={() => setEditingScopes(null)}
+          footer={
+            <DialogActions
+              onCancel={() => setEditingScopes(null)}
+              onConfirm={() => void updateScopes()}
+              confirmDisabled={selectedScopes.size === 0}
+              confirmText={t('common.save', undefined, 'Save')}
+              cancelText={t('common.cancel', undefined, 'Cancel')}
+            />
+          }
         >
           <p className="text-sm text-amber-700 dark:text-amber-300">
             {t(
@@ -1028,13 +1118,6 @@ export default function OpenPlatformPage() {
               </label>
             ))}
           </div>
-          <DialogActions
-            onCancel={() => setEditingScopes(null)}
-            onConfirm={() => void updateScopes()}
-            confirmDisabled={selectedScopes.size === 0}
-            confirmText={t('common.save', undefined, 'Save')}
-            cancelText={t('common.cancel', undefined, 'Cancel')}
-          />
         </Dialog>
       )}
 
@@ -1042,6 +1125,15 @@ export default function OpenPlatformPage() {
         <Dialog
           title={t('openPlatform.disableTitle', undefined, 'Disable access?')}
           onClose={() => setPendingDisable(null)}
+          footer={
+            <DialogActions
+              onCancel={() => setPendingDisable(null)}
+              onConfirm={() => void disableTarget()}
+              confirmText={t('openPlatform.disable', undefined, 'Disable')}
+              cancelText={t('common.cancel', undefined, 'Cancel')}
+              destructive
+            />
+          }
         >
           <p className="text-sm text-gray-600 dark:text-gray-300">
             {t(
@@ -1053,13 +1145,6 @@ export default function OpenPlatformPage() {
           <code className="mt-3 block rounded bg-gray-100 p-2 text-xs dark:bg-gray-800">
             {pendingDisable.name}
           </code>
-          <DialogActions
-            onCancel={() => setPendingDisable(null)}
-            onConfirm={() => void disableTarget()}
-            confirmText={t('openPlatform.disable', undefined, 'Disable')}
-            cancelText={t('common.cancel', undefined, 'Cancel')}
-            destructive
-          />
         </Dialog>
       )}
     </main>
@@ -1068,12 +1153,14 @@ export default function OpenPlatformPage() {
 
 function CredentialList({
   installationPid,
+  active,
   credentials,
   onRevoke,
   onRotate,
   t,
 }: {
   installationPid: string;
+  active: boolean;
   credentials: Credential[];
   onRevoke: (credential: Credential) => void;
   onRotate: (credential: Credential) => void;
@@ -1084,6 +1171,11 @@ function CredentialList({
       className="mt-4 border-t border-gray-100 pt-3 dark:border-gray-800"
       data-testid={`open-platform-credentials-${installationPid}`}
     >
+      {!active && (
+        <p className="mb-2 text-xs text-gray-500 dark:text-gray-400" role="status">
+          {t('openPlatform.disabled', undefined, 'Access disabled and active tokens revoked')}
+        </p>
+      )}
       {credentials.length === 0 ? (
         <p className="text-xs text-gray-400">
           {t('openPlatform.noCredentials', undefined, 'No credentials')}
@@ -1114,7 +1206,17 @@ function CredentialList({
                   <button
                     type="button"
                     onClick={() => onRotate(credential)}
-                    className="rounded px-2 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
+                    disabled={!active}
+                    title={
+                      !active
+                        ? t(
+                            'openPlatform.disabled',
+                            undefined,
+                            'Access disabled and active tokens revoked',
+                          )
+                        : undefined
+                    }
+                    className="rounded px-2 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {t('openPlatform.rotate', undefined, 'Rotate')}
                   </button>
@@ -1146,7 +1248,7 @@ function StatusBadge({
   const active = status === 'active' || status === 'success';
   return (
     <span
-      className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium ${active ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
+      className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap ${active ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
     >
       {active && <CheckIcon className="h-3 w-3" />}
       {t(`openPlatform.status.${status}`, undefined, status)}
@@ -1187,10 +1289,12 @@ function Dialog({
   title,
   onClose,
   children,
+  footer,
 }: {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
+  footer: React.ReactNode;
 }) {
   return (
     <div
@@ -1202,10 +1306,13 @@ function Dialog({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-5 shadow-xl dark:bg-gray-900"
+        className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-xl bg-white shadow-xl dark:bg-gray-900"
       >
-        <h2 className="text-lg font-semibold text-gray-950 dark:text-white">{title}</h2>
-        <div className="mt-4">{children}</div>
+        <h2 className="shrink-0 px-5 pt-5 text-lg font-semibold text-gray-950 dark:text-white">
+          {title}
+        </h2>
+        <div className="mt-4 min-h-0 overflow-y-auto px-5 pb-5">{children}</div>
+        {footer}
       </section>
     </div>
   );
@@ -1229,7 +1336,7 @@ function DialogActions({
   hideCancel?: boolean;
 }) {
   return (
-    <div className="mt-6 flex justify-end gap-2">
+    <div className="flex shrink-0 justify-end gap-2 border-t border-gray-100 bg-white px-5 py-4 dark:border-gray-800 dark:bg-gray-900">
       {!hideCancel && (
         <button
           type="button"

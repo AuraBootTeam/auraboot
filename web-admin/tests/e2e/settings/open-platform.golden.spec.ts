@@ -656,14 +656,20 @@ test.describe('Open Platform golden journey', () => {
     context,
   }) => {
     await authenticate(page);
-    const existingResponse = await page.request.get(`${WEB_BASE_URL}/api/open-platform/applications`);
+    const existingResponse = await page.request.get(
+      `${WEB_BASE_URL}/api/open-platform/applications`,
+    );
     expect(existingResponse.status()).toBe(200);
     const existing = await existingResponse.json();
     expect(String(existing.code)).toBe('0');
     const existingPids = (existing.data as Array<{ pid: string }>).map((entry) => entry.pid);
     // Empty-state rendering is a controlled UI projection, not a claim that the DB is empty.
     await page.route('**/api/open-platform/applications', async (route) => {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ code: '0', data: [] }) });
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: '0', data: [] }),
+      });
     });
     await page.goto('/');
     await expect(page).not.toHaveURL(/\/login|\/setup/);
@@ -702,7 +708,9 @@ test.describe('Open Platform golden journey', () => {
     if (existingPids.length === 0) {
       await expect(page.getByTestId('open-platform-empty')).toBeVisible();
     } else {
-      await expect(page.getByTestId('open-platform-application-list').locator('article')).toHaveCount(existingPids.length);
+      await expect(
+        page.getByTestId('open-platform-application-list').locator('article'),
+      ).toHaveCount(existingPids.length);
     }
 
     await page.getByTestId('open-platform-create-app').click();
@@ -714,7 +722,10 @@ test.describe('Open Platform golden journey', () => {
     await page.getByTestId('open-platform-app-name').fill(appName);
     await createDialog.getByRole('textbox', { name: '描述' }).fill('生产订单与库存事件统一接入');
     await createDialog.getByRole('button', { name: '新建' }).click();
-    const appCard = page.getByTestId('open-platform-application-list').locator('article').filter({ hasText: appName });
+    const appCard = page
+      .getByTestId('open-platform-application-list')
+      .locator('article')
+      .filter({ hasText: appName });
     await expect(appCard).toHaveCount(1);
     await expect(appCard.getByText(appName, { exact: true })).toBeVisible();
     await expect(appCard.getByText('生产订单与库存事件统一接入')).toBeVisible();
@@ -725,16 +736,30 @@ test.describe('Open Platform golden journey', () => {
     await dismissToasts(page);
 
     // Published dynamic contracts extend the real capability catalog in a shared tenant.
-    const capabilitiesResponse = await page.request.get(`${WEB_BASE_URL}/api/open-platform/capabilities`);
+    const capabilitiesResponse = await page.request.get(
+      `${WEB_BASE_URL}/api/open-platform/capabilities`,
+    );
     expect(capabilitiesResponse.status()).toBe(200);
     const capabilitiesBody = await capabilitiesResponse.json();
     expect(String(capabilitiesBody.code)).toBe('0');
-    const catalogScopes = [...new Set((capabilitiesBody.data as Array<{ requiredScope: string }>)
-      .map((capability) => capability.requiredScope))].sort();
-    expect(catalogScopes).toEqual(expect.arrayContaining([
-      'assets.manage', 'assets.read', 'inventory.stock-ins.read', 'inventory.stock-ins.manage',
-      'openapi.events.read', 'automation.events.write', 'openapi.profile.read',
-    ]));
+    const catalogScopes = [
+      ...new Set(
+        (capabilitiesBody.data as Array<{ requiredScope: string }>).map(
+          (capability) => capability.requiredScope,
+        ),
+      ),
+    ].sort();
+    expect(catalogScopes).toEqual(
+      expect.arrayContaining([
+        'assets.manage',
+        'assets.read',
+        'inventory.stock-ins.read',
+        'inventory.stock-ins.manage',
+        'openapi.events.read',
+        'automation.events.write',
+        'openapi.profile.read',
+      ]),
+    );
     await appCard.getByRole('button', { name: '添加安装' }).click();
     const installDialog = page.getByRole('dialog', { name: '安装应用' });
     await installDialog.getByLabel('环境').selectOption('production');
@@ -742,19 +767,34 @@ test.describe('Open Platform golden journey', () => {
     const scopeChecks = installDialog.getByRole('checkbox');
     await expect(scopeChecks.first()).toBeChecked();
     await expect(scopeChecks).toHaveCount(catalogScopes.length);
-    for (const scope of catalogScopes) await expect(installDialog.getByLabel(scope, { exact: true })).toHaveCount(1);
+    for (const scope of catalogScopes)
+      await expect(installDialog.getByLabel(scope, { exact: true })).toHaveCount(1);
     await installDialog.getByLabel('assets.read').check();
     await installDialog.getByLabel('inventory.stock-ins.read').check();
     await installDialog.getByLabel('inventory.stock-ins.manage').check();
     await installDialog.getByLabel('openapi.events.read').check();
     await installDialog.getByLabel('automation.events.write').check();
     await installDialog.getByLabel('openapi.profile.read').check();
-    await installDialog.getByRole('heading', { name: '安装应用', exact: true }).scrollIntoViewIfNeeded();
+    await installDialog
+      .getByRole('heading', { name: '安装应用', exact: true })
+      .scrollIntoViewIfNeeded();
     await expect(installDialog.getByLabel('环境')).toBeInViewport();
+    await expect(installDialog.getByRole('button', { name: '安装', exact: true })).toBeInViewport({
+      ratio: 1,
+    });
+    await expect(installDialog.getByRole('button', { name: '取消', exact: true })).toBeInViewport({
+      ratio: 1,
+    });
     await capture(page, 'OP-UI-07-top', false);
+    await installDialog.getByRole('checkbox').last().scrollIntoViewIfNeeded();
+    await expect(installDialog.getByRole('checkbox').last()).toBeInViewport({ ratio: 1 });
     await installDialog.getByRole('button', { name: '安装', exact: true }).scrollIntoViewIfNeeded();
-    await expect(installDialog.getByRole('button', { name: '安装', exact: true })).toBeInViewport();
-    await expect(installDialog.getByRole('button', { name: '取消', exact: true })).toBeInViewport();
+    await expect(installDialog.getByRole('button', { name: '安装', exact: true })).toBeInViewport({
+      ratio: 1,
+    });
+    await expect(installDialog.getByRole('button', { name: '取消', exact: true })).toBeInViewport({
+      ratio: 1,
+    });
     await capture(page, 'OP-UI-07-actions', false);
     await capture(page, 'OP-UI-07');
     await installDialog.getByRole('button', { name: '安装' }).click();
@@ -830,11 +870,18 @@ test.describe('Open Platform golden journey', () => {
       await expect(authorizedReference).toHaveURL(
         `${WEB_BASE_URL}/swagger-ui/index.html?urls.primaryName=open-platform`,
       );
-      await expect(authorizedReference.locator('.opblock').first()).toBeVisible({ timeout: 30_000 });
-      const publicDocument = await authorizedReference.request.get(`${WEB_BASE_URL}/v3/api-docs/open-platform`);
+      await expect(authorizedReference.locator('.opblock').first()).toBeVisible({
+        timeout: 30_000,
+      });
+      const publicDocument = await authorizedReference.request.get(
+        `${WEB_BASE_URL}/v3/api-docs/open-platform`,
+      );
       expect(publicDocument.status()).toBe(200);
       expect((await publicDocument.json()).servers).toEqual([{ url: '/' }]);
-      await authorizedReference.getByRole('button', { name: 'Authorize', exact: true }).first().click();
+      await authorizedReference
+        .getByRole('button', { name: 'Authorize', exact: true })
+        .first()
+        .click();
       const authorizationDialog = authorizedReference.locator('.dialog-ux');
       await expect(authorizationDialog).toBeVisible();
       const oauthAuthorization = authorizationDialog.locator('.auth-container').filter({
@@ -843,19 +890,26 @@ test.describe('Open Platform golden journey', () => {
       await oauthAuthorization.getByLabel('client_id:', { exact: true }).fill(clientId!);
       await oauthAuthorization.getByLabel('client_secret:', { exact: true }).fill(clientSecret!);
       const browserTokenPromise = authorizedReference.waitForResponse(
-        (response) => response.request().method() === 'POST'
-          && response.url() === `${WEB_BASE_URL}/oauth2/token`,
+        (response) =>
+          response.request().method() === 'POST' &&
+          response.url() === `${WEB_BASE_URL}/oauth2/token`,
       );
-      await oauthAuthorization.getByRole('button', {
-        name: 'Apply given OAuth2 credentials', exact: true,
-      }).click();
+      await oauthAuthorization
+        .getByRole('button', {
+          name: 'Apply given OAuth2 credentials',
+          exact: true,
+        })
+        .click();
       const browserTokenResponse = await browserTokenPromise;
       expect(browserTokenResponse.status()).toBe(200);
       const browserToken = await browserTokenResponse.json();
       expect(browserToken.token_type).toBe('Bearer');
-      await expect(oauthAuthorization.getByRole('button', {
-        name: 'Remove authorization', exact: true,
-      })).toBeVisible();
+      await expect(
+        oauthAuthorization.getByRole('button', {
+          name: 'Remove authorization',
+          exact: true,
+        }),
+      ).toBeVisible();
       await oauthAuthorization.getByRole('button', { name: 'Close', exact: true }).click();
       await expect(authorizationDialog).toHaveCount(0);
       const whoamiOperation = authorizedReference.locator('.opblock').filter({
@@ -863,10 +917,13 @@ test.describe('Open Platform golden journey', () => {
       });
       await whoamiOperation.locator('.opblock-summary-control').click();
       // The product enables Try it out by default in its Swagger configuration.
-      await expect(whoamiOperation.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible();
+      await expect(
+        whoamiOperation.getByRole('button', { name: 'Cancel', exact: true }),
+      ).toBeVisible();
       const browserWhoamiPromise = authorizedReference.waitForResponse(
-        (response) => response.request().method() === 'GET'
-          && response.url() === `${WEB_BASE_URL}/api/open/v1/whoami`,
+        (response) =>
+          response.request().method() === 'GET' &&
+          response.url() === `${WEB_BASE_URL}/api/open/v1/whoami`,
       );
       await whoamiOperation.getByRole('button', { name: 'Execute', exact: true }).click();
       const browserWhoamiResponse = await browserWhoamiPromise;
@@ -1218,8 +1275,12 @@ test.describe('Open Platform golden journey', () => {
     await expect(operations).not.toContainText(
       /super-secret|https:\/\/.*hook|Bearer [A-Za-z0-9._-]+/,
     );
-    await expect(webhookHealth.locator('[data-rotation-status="healthy"]').first()).toContainText('目录版本 v1');
-    await expect(webhookHealth.locator('[data-rotation-status="healthy"]').first()).toContainText('12/01');
+    await expect(webhookHealth.locator('[data-rotation-status="healthy"]').first()).toContainText(
+      '目录版本 v1',
+    );
+    await expect(webhookHealth.locator('[data-rotation-status="healthy"]').first()).toContainText(
+      '12/01',
+    );
     await expect(webhookHealth.locator('[data-rotation-status="due"]')).toContainText('09/20');
     await expect(webhookHealth.locator('[data-rotation-status="overdue"]')).toContainText('08/01');
     await expect(webhookHealth.locator('[data-compatible="false"]')).toContainText('目录版本 v1');
@@ -1477,7 +1538,9 @@ test.describe('Open Platform golden journey', () => {
     await rotateDialog.getByRole('spinbutton').fill('1');
     await expect(rotateDialog.getByRole('button', { name: '轮换' })).toBeDisabled();
     await expect(rotateDialog.getByRole('alert')).toHaveText('请输入 5 至 10080 的整数分钟。');
-    await expect(rotateDialog.getByRole('spinbutton')).toHaveAccessibleDescription('请输入 5 至 10080 的整数分钟。');
+    await expect(rotateDialog.getByRole('spinbutton')).toHaveAccessibleDescription(
+      '请输入 5 至 10080 的整数分钟。',
+    );
     await capture(page, 'OP-OPS-12');
     await rotateDialog.getByRole('button', { name: '取消' }).click();
     await credentialList.getByRole('button', { name: '轮换' }).click();
@@ -1528,12 +1591,28 @@ test.describe('Open Platform golden journey', () => {
     await appCard.getByRole('button', { name: '编辑 Scope' }).click();
     const scopeDialog = page.getByRole('dialog', { name: '编辑 Scope' });
     await expect(scopeDialog).toContainText('立即吊销此安装的现有 Access Token');
-    await scopeDialog.getByRole('heading', { name: '编辑 Scope', exact: true }).scrollIntoViewIfNeeded();
-    await expect(scopeDialog.getByRole('heading', { name: '编辑 Scope', exact: true })).toBeInViewport();
+    await scopeDialog
+      .getByRole('heading', { name: '编辑 Scope', exact: true })
+      .scrollIntoViewIfNeeded();
+    await expect(
+      scopeDialog.getByRole('heading', { name: '编辑 Scope', exact: true }),
+    ).toBeInViewport();
+    await expect(scopeDialog.getByRole('button', { name: '保存', exact: true })).toBeInViewport({
+      ratio: 1,
+    });
+    await expect(scopeDialog.getByRole('button', { name: '取消', exact: true })).toBeInViewport({
+      ratio: 1,
+    });
     await capture(page, 'OP-UI-10-top', false);
+    await scopeDialog.getByRole('checkbox').last().scrollIntoViewIfNeeded();
+    await expect(scopeDialog.getByRole('checkbox').last()).toBeInViewport({ ratio: 1 });
     await scopeDialog.getByRole('button', { name: '保存', exact: true }).scrollIntoViewIfNeeded();
-    await expect(scopeDialog.getByRole('button', { name: '保存', exact: true })).toBeInViewport();
-    await expect(scopeDialog.getByRole('button', { name: '取消', exact: true })).toBeInViewport();
+    await expect(scopeDialog.getByRole('button', { name: '保存', exact: true })).toBeInViewport({
+      ratio: 1,
+    });
+    await expect(scopeDialog.getByRole('button', { name: '取消', exact: true })).toBeInViewport({
+      ratio: 1,
+    });
     await capture(page, 'OP-UI-10-actions', false);
     await capture(page, 'OP-UI-10');
     await scopeDialog.getByRole('button', { name: '保存' }).click();
@@ -1552,6 +1631,43 @@ test.describe('Open Platform golden journey', () => {
     await expect(appCard.getByText('已停用', { exact: true })).toBeVisible();
     await dismissToasts(page);
 
+    const verifyInactiveRotationUI = async () => {
+      await expect(credentialList.getByRole('status')).toHaveText('访问已停用，有效 Token 已吊销');
+      const rotateControls = credentialList.getByRole('button', { name: '轮换', exact: true });
+      await expect(rotateControls).toHaveCount(2);
+      const attempts: string[] = [];
+      const observe = (req: import('@playwright/test').Request) => {
+        if (
+          req.method() === 'POST' &&
+          req.url().includes('/credentials/') &&
+          req.url().endsWith('/rotate')
+        )
+          attempts.push(req.url());
+      };
+      page.on('request', observe);
+      try {
+        for (const control of await rotateControls.all()) {
+          await expect(control).toBeDisabled();
+          await expect(control).toHaveAttribute('title', '访问已停用，有效 Token 已吊销');
+          await control.scrollIntoViewIfNeeded();
+          const box = await control.boundingBox();
+          expect(box).not.toBeNull();
+          await page.mouse.click(box!.x + box!.width / 2, box!.y + box!.height / 2);
+          await expect(page.getByRole('dialog', { name: '轮换凭据', exact: true })).toHaveCount(0);
+        }
+        await page.evaluate(
+          () =>
+            new Promise<void>((resolve) =>
+              requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+            ),
+        );
+        expect(attempts).toEqual([]);
+      } finally {
+        page.off('request', observe);
+      }
+    };
+    await verifyInactiveRotationUI();
+
     // Probe the real management API, never the controlled operations rendering fixtures.
     const verifyDisabledCredentialWrites = async () => {
       const credentialPath = `${WEB_BASE_URL}/api/open-platform/installations/${principal.installationPid}/credentials`;
@@ -1559,20 +1675,29 @@ test.describe('Open Platform golden journey', () => {
       expect(beforeResponse.status()).toBe(200);
       const before = await beforeResponse.json();
       expect(String(before.code)).toBe('0');
-      const target = before.data.find((entry: { clientId: string }) => entry.clientId === rotatedClientId);
+      const target = before.data.find(
+        (entry: { clientId: string }) => entry.clientId === rotatedClientId,
+      );
       expect(target).toMatchObject({ status: 'active', expiresAt: null });
       expect(before.data.length).toBeGreaterThanOrEqual(2);
       const createDenied = await page.request.post(credentialPath);
       expect(createDenied.status()).toBe(404);
       expect(String((await createDenied.json()).code)).toBe('404');
-      const rotateDenied = await page.request.post(`${credentialPath}/${target.pid}/rotate`, { data: { graceMinutes: 15 } });
+      const rotateDenied = await page.request.post(`${credentialPath}/${target.pid}/rotate`, {
+        data: { graceMinutes: 15 },
+      });
       expect(rotateDenied.status()).toBe(404);
       expect(String((await rotateDenied.json()).code)).toBe('404');
       const afterResponse = await page.request.get(credentialPath);
       expect(afterResponse.status()).toBe(200);
       expect((await afterResponse.json()).data).toEqual(before.data);
       const deniedIssue = await page.request.post(`${BACKEND_URL}/oauth2/token`, {
-        form: { grant_type: 'client_credentials', client_id: rotatedClientId!, client_secret: rotatedClientSecret!, scope: 'openapi.profile.read' },
+        form: {
+          grant_type: 'client_credentials',
+          client_id: rotatedClientId!,
+          client_secret: rotatedClientSecret!,
+          scope: 'openapi.profile.read',
+        },
       });
       expect(deniedIssue.status()).toBe(401);
     };
@@ -1587,6 +1712,7 @@ test.describe('Open Platform golden journey', () => {
     await capture(page, 'OP-UI-12');
     await disableApplicationDialog.getByRole('button', { name: '停用' }).click();
     await expect(appCard.getByRole('button', { name: '添加安装' })).toBeDisabled();
+    await verifyInactiveRotationUI();
     await verifyDisabledCredentialWrites();
     await dismissToasts(page);
     await capture(page, 'OP-UI-02');
@@ -1671,7 +1797,9 @@ test.describe('Open Platform golden journey', () => {
     }
     const headerActions = page.getByTestId('open-platform-page').locator('header').first();
     for (const action of ['公共资源发布', 'API 参考', '新建应用']) {
-      const control = headerActions.getByRole(action === '公共资源发布' ? 'link' : 'button', { name: action });
+      const control = headerActions.getByRole(action === '公共资源发布' ? 'link' : 'button', {
+        name: action,
+      });
       await expect(control).toHaveCSS('white-space', 'nowrap');
       await expect(control).toBeInViewport();
     }
@@ -1681,9 +1809,12 @@ test.describe('Open Platform golden journey', () => {
     await mobileAudit.scrollIntoViewIfNeeded();
     await expect(mobileAudit.locator('code').first()).toBeInViewport();
     // Settle the resized scroll container before capturing its painted content.
-    await page.evaluate(() => new Promise<void>((resolve) => {
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-    }));
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        }),
+    );
     await capture(page, 'OP-OPS-16', false);
     await eventCatalog.scrollIntoViewIfNeeded();
     await captureLocator(eventCatalog, 'OP-PROTO-10');
@@ -1692,7 +1823,9 @@ test.describe('Open Platform golden journey', () => {
       .toBeLessThanOrEqual(1);
     await webhookHealth.scrollIntoViewIfNeeded();
     await captureLocator(webhookHealth, 'OP-PROTO-11');
-    const preservedResponse = await page.request.get(`${WEB_BASE_URL}/api/open-platform/applications`);
+    const preservedResponse = await page.request.get(
+      `${WEB_BASE_URL}/api/open-platform/applications`,
+    );
     expect(preservedResponse.status()).toBe(200);
     const preserved = await preservedResponse.json();
     expect(String(preserved.code)).toBe('0');
