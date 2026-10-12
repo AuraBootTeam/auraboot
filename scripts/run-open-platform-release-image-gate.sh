@@ -233,7 +233,12 @@ timeout 1200 docker run --rm --network "$NET" \
     mapfile -t classes < /artifacts/backend-selectors.txt
     args=()
     for class in "${classes[@]}"; do args+=(--tests "$class"); done
-    ./gradlew :test "${args[@]}" :jacocoTestReport --no-daemon
+    # The CI Docker proxy enforces 2 GiB per container. Bound both JVMs and context
+    # retention without changing the fixed case denominator or coverage policy.
+    ./gradlew :test "${args[@]}" :jacocoTestReport --no-daemon --no-parallel \
+      -Dorg.gradle.jvmargs="-Xmx768m -XX:MaxMetaspaceSize=256m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8" \
+      -Dorg.gradle.workers.max=1 -PauraTestMaxHeap=640m -PauraTestMinHeap=128m \
+      -PauraTestMaxMetaspace=256m -PspringTestContextCacheMaxSize=1
   ' > "$ARTIFACTS/logs/backend-tests.log" 2>&1 || fail "backend blocking tests failed"
 mkdir -p "$ARTIFACTS/backend-junit"
 cp "$STAGE/platform/build/test-results/test/"TEST-*.xml "$ARTIFACTS/backend-junit/"
