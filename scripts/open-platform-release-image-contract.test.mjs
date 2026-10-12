@@ -22,9 +22,10 @@ assert.match(gate, /"\$BUILD_JDK_IMAGE" "\$RUNTIME_JRE_IMAGE" "\$DOCKERFILE_FRON
 assert.match(gate, /DOCKERFILE_FRONTEND_IMAGE="\$\(base_ref "\$DOCKERFILE_FRONTEND_SOURCE"\)"/);
 assert.equal((gate.match(/--build-arg "BUILDKIT_SYNTAX=\$DOCKERFILE_FRONTEND_IMAGE"/g) ?? []).length, 2);
 assert.doesNotMatch(gate, /# syntax=docker\/dockerfile:1/);
-assert.match(gate, /-Dorg\.gradle\.jvmargs="-Xmx768m -XX:MaxMetaspaceSize=256m/);
-assert.match(gate, /-Dorg\.gradle\.workers\.max=1 -PauraTestMaxHeap=640m -PauraTestMinHeap=128m/);
-assert.match(gate, /-PauraTestMaxMetaspace=256m -PspringTestContextCacheMaxSize=1/);
+assert.match(gate, /timeout 1200 docker run --rm --memory=4g --network "\$NET"/);
+assert.match(gate, /-Dorg\.gradle\.jvmargs="-Xmx1536m -XX:MaxMetaspaceSize=256m/);
+assert.match(gate, /-Dorg\.gradle\.workers\.max=1 -PauraTestMaxHeap=1024m -PauraTestMinHeap=128m/);
+assert.match(gate, /-PauraTestMaxMetaspace=384m -PspringTestContextCacheMaxSize=1/);
 assert.match(gate, /:test "\$\{args\[@\]\}" :jacocoTestReport --no-daemon --no-parallel/);
 assert.match(gate, /--mount=type=cache,target=\/root\/\.gradle\/wrapper/);
 assert.match(dockerfile, /COPY VERSION \/VERSION/);
