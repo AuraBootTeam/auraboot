@@ -14,6 +14,8 @@ if (!['zh-CN', 'en-US'].includes(publicationLocale)) throw new Error('Unsupporte
 const publicationEnglish: Record<string, string> = {
   "来源已不可用": "Source unavailable",
   "合同版本": "Schema version",
+  "刷新目录": "Reload catalog",
+  "正在加载发布配置…": "Loading publications…",
   "已发布的资源字段不能修改。请使用新的公共资源地址发布新合同，原合同将保持有效。": "Published resource fields cannot change. Publish a new contract at a new public resource address; the original contract stays active.",
   "公共资源发布": "Public Resource Publications",
   "公共查询发布": "Public Query Publications",
@@ -110,7 +112,7 @@ const sessionStorage = createCookieSessionStorage({
 
 // A supplied acceptance plan is materialized before any browser capture, including all unresolved rows.
 test.beforeAll(async () => {
-  if (UI_MUTATION && !['scope-label-clipping', 'publication-overflow', 'intro-word-break', 'publication-title-locale', 'query-compatibility-feedback', 'query-confirmation-stale', 'major-grant-alias', 'resource-compatibility-feedback', 'resource-confirmation-stale'].includes(UI_MUTATION)) throw new Error('Unsupported Open Platform UI mutation');
+  if (UI_MUTATION && !['scope-label-clipping', 'publication-overflow', 'intro-word-break', 'publication-title-locale', 'query-compatibility-feedback', 'query-confirmation-stale', 'major-grant-alias', 'resource-compatibility-feedback', 'resource-confirmation-stale', 'resource-catalog-feedback', 'resource-validation-feedback', 'resource-catalog-empty'].includes(UI_MUTATION)) throw new Error('Unsupported Open Platform UI mutation');
   if (['intro-word-break', 'publication-title-locale'].includes(UI_MUTATION || '') && publicationLocale !== 'en-US') throw new Error('English locale mutation requires en-US');
   if (!process.env.AURA_UI_ACCEPTANCE_MATRIX) return;
   if (!process.env.AURA_EVIDENCE_ROOT) throw new Error('UI acceptance requires a registered evidence round');
@@ -185,13 +187,19 @@ test.describe('Dynamic resource publication journey', () => {
     await expect(page.getByTestId('open-platform-page')).toBeVisible();
     await expect(page.getByTestId('open-platform-publications-link')).toBeVisible();
     await snapshot('publication-entry');
-    // Catalog GETs are a declared empty-state visual fixture until capture; all mutations stay real.
+    // Catalog GETs are declared loading/empty/error presentation fixtures; publication writes stay real.
+    let releaseCatalog!: () => void;
+    const catalogGate = new Promise<void>(resolve => { releaseCatalog = resolve; });
     await page.route('**/api/open-platform/publications', async route => {
-      expect(route.request().method()).toBe('GET');
+      expect(route.request().method()).toBe('GET'); await catalogGate;
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ code: '0', data: [] }) });
     });
     await page.getByTestId('open-platform-publications-link').click();
     await expect(page.getByTestId('publication-editor')).toBeVisible();
+    try {
+      await expect(page.getByTestId('publication-editor').getByRole('status')).toHaveText(publicationText("正在加载发布配置…"));
+      await snapshot('publication-loading');
+    } finally { releaseCatalog(); }
     if (UI_MUTATION === 'publication-title-locale') {
       await page.getByRole('heading', { name: publicationText("公共资源发布"), exact: true }).evaluate(element => { element.textContent = '公共资源发布'; });
     }
@@ -199,10 +207,25 @@ test.describe('Dynamic resource publication journey', () => {
     await expect(page.getByRole('heading', { name: publicationText("尚未公开业务模型") })).toBeVisible();
     await snapshot('publication-empty');
     await page.unroute('**/api/open-platform/publications');
+    const catalogProblem = publicationLocale === 'zh-CN' ? '目录暂时不可用，请重试。' : 'Publication catalog unavailable. Retry.';
+    await page.route('**/api/open-platform/publications', async route => {
+      expect(route.request().method()).toBe('GET');
+      await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ code: '503', message: catalogProblem }) });
+    });
+    await page.getByRole('button', { name: publicationText("刷新目录"), exact: true }).click();
+    const catalogAlert = page.getByTestId('publication-editor').getByRole('alert');
+    await expect(catalogAlert).toBeVisible();
+    if (UI_MUTATION === 'resource-catalog-feedback') await catalogAlert.evaluate(element => { element.textContent = 'Catalog loaded'; });
+    await expect(catalogAlert).toHaveText(catalogProblem);
+    if (UI_MUTATION === 'resource-catalog-empty') await catalogAlert.evaluate(element => { const heading = document.createElement('h3'); heading.textContent = '尚未公开业务模型'; element.parentElement?.append(heading); });
+    await expect(page.getByRole('heading', { name: publicationText("尚未公开业务模型"), exact: true })).toHaveCount(0);
+    await snapshot('publication-failure');
+    await page.unroute('**/api/open-platform/publications');
     const realCatalogResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/open-platform/publications' && response.request().method() === 'GET');
-    await page.reload();
+    await page.getByRole('button', { name: publicationText("刷新目录"), exact: true }).click();
     const realCatalogHttp = await realCatalogResponse; expect(realCatalogHttp.status()).toBe(200);
     const realCatalog = await realCatalogHttp.json(); expect(String(realCatalog.code)).toBe('0');
+    await expect(catalogAlert).toHaveCount(0);
     expect(Array.isArray(realCatalog.data)).toBe(true);
     expect(realCatalog.data.some((entry: { code: string }) => entry.code === resourceCode)).toBe(false);
     await page.getByRole('button', { name: publicationText("新建公共资源"), exact: true }).click();
@@ -249,6 +272,27 @@ test.describe('Dynamic resource publication journey', () => {
       return (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
     });
     expect(saveContrast).toBeGreaterThanOrEqual(4.5);
+    const requiredScope = page.getByLabel(publicationText("所需权限"), { exact: true }).first();
+    await requiredScope.fill(''); await saveButton.click();
+    expect(await requiredScope.evaluate(element => (element as HTMLInputElement).validity.valueMissing)).toBe(true);
+    await expect(requiredScope).toBeFocused();
+    expect(await requiredScope.evaluate(element => (element as HTMLInputElement).validationMessage)).not.toBe('');
+    const invalidScopeRegion = requiredScope.locator('..');
+    await expect(requiredScope).toHaveAttribute('aria-invalid', 'true');
+    const requiredMessage = publicationLocale === 'zh-CN' ? '请填写所需权限。' : 'Enter Required scope.';
+    if (UI_MUTATION === 'resource-validation-feedback') await invalidScopeRegion.getByRole('alert').evaluate(element => { element.textContent = 'Please fill out this field.'; });
+    await expect(invalidScopeRegion.getByRole('alert')).toHaveText(requiredMessage);
+    await expect(requiredScope).toHaveAttribute('aria-describedby', await invalidScopeRegion.getByRole('alert').getAttribute('id') || '');
+    await invalidScopeRegion.evaluate(element => element.scrollIntoView({ block: 'center' }));
+    await expect(invalidScopeRegion).toBeInViewport({ ratio: 1 }); await snapshot('publication-invalid');
+    await invalidScopeRegion.screenshot({ path: path.join(screenshotRoot, 'publication-invalid-scope-region.png') });
+    const beforeValidSave = await page.request.get(`${WEB_BASE_URL}/api/open-platform/publications`);
+    expect(beforeValidSave.status()).toBe(200); const beforeValidCatalog = await beforeValidSave.json();
+    expect(String(beforeValidCatalog.code)).toBe('0');
+    expect(beforeValidCatalog.data.some((row: { code: string }) => row.code === resourceCode)).toBe(false);
+    await requiredScope.fill('dop.ui:list');
+    await expect(invalidScopeRegion.getByRole('alert')).toHaveCount(0);
+    await expect(requiredScope).not.toHaveAttribute('aria-invalid', 'true');
     const savedResponse = page.waitForResponse(response => response.url().endsWith(`/publications/${resourceCode}/draft`) && response.request().method() === 'PUT');
     await page.getByRole('button', { name: publicationText("保存并校验草稿"), exact: true }).click();
     const savedHttp = await savedResponse; expect(savedHttp.status()).toBe(200);
