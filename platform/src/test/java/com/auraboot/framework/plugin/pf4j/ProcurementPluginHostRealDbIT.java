@@ -1073,6 +1073,25 @@ class ProcurementPluginHostRealDbIT {
                     task,fixture.version(),Map.of("supplierPids",List.of(fixture.supplier()),"cutoffAt","2026-11-15T08:00:00Z"));
         }catch(ReflectiveOperationException error){throw unwrap(error);}
     }
+    @Test void nativeDispatchCutoffCrossingRollsBackAllPreparedLocksAndInvitations() {
+        var prepared=nativeDispatchFixture();
+        var cutoff=java.time.Instant.parse("2026-11-15T08:00:00Z");
+        var fixture=new DispatchFixture(prepared.supplier(),crossingClock(cutoff.minusSeconds(1),cutoff),prepared.version());
+        String writer="qo_procurement_task_common:dispatch";
+        var beforeTask=scope(writer,()->db.getById("s2p_sourcing_event",task));
+        var beforeSources=scope(writer,()->nativeRows("pr_purchase_request","qo_pr_source_task_pid",task));
+        var beforePolicy=scope(writer,()->nativeRows("qo_procurement_category_policy_common","qo_pr_category_policy_account_id",provider));
+        var rejected=assertThrows(IllegalArgumentException.class,()->new TransactionTemplate(transactions)
+                .execute(status->scope(writer,()->dispatchWith(db,fixture))));
+        assertEquals("CUTOFF_EXPIRED",rejected.getMessage());
+        scope(writer,()->{
+            assertEquals(beforeTask,db.getById("s2p_sourcing_event",task));
+            assertEquals(beforeSources,nativeRows("pr_purchase_request","qo_pr_source_task_pid",task));
+            assertEquals(beforePolicy,nativeRows("qo_procurement_category_policy_common","qo_pr_category_policy_account_id",provider));
+            assertTrue(nativeRows("s2p_bid","s2p_bid_sourcing_event_id",task).isEmpty());
+            return null;
+        });
+    }
     @Test void nativeDispatchRejectsSourceAddedAfterItsSelectionRead() throws Exception {
         var fixture=nativeDispatchFixture();var selected=new java.util.concurrent.CountDownLatch(1);var added=new java.util.concurrent.CountDownLatch(1);
         DataAccessor observed=taskLockObserver(()->{selected.countDown();awaitNativeLatch(added,"source import must commit before dispatch task CAS");},()->{});
@@ -1343,6 +1362,26 @@ class ProcurementPluginHostRealDbIT {
             assertEquals("fulfilled",db.getById("pr_purchase_order",order).get("qo_pr_order_state"));
             assertNativeQuantity("pr_purchase_order",order,"qo_pr_order_revision","2");
             assertEquals(2,nativeRows("qo_procurement_shipment_common","qo_pr_shipment_order_pid",order).size());return null;});
+        scope("qo_procurement_order_common:view_mine",()->{
+            Map<?,?> detail;
+            try {
+                var type=plugin.loadClass("com.auraboot.quote.engine.procurement.ProcurementReadService");
+                var service=type.getConstructor(RecordReadAccessor.class,String.class).newInstance(db,actor);
+                detail=(Map<?,?>)type.getMethod("detail",String.class,String.class).invoke(service,"order",order);
+            } catch(ReflectiveOperationException failure){throw unwrap(failure);}
+            var batches=(List<Map<String,Object>>)detail.get("shipments");
+            assertEquals(2,batches.size());
+            var batchQuantities=new ArrayList<BigDecimal>();
+            for(var batch:batches) {
+                var quantities=(List<Map<String,Object>>)batch.get("lines");assertEquals(1,quantities.size());
+                var quantity=quantities.getFirst();assertEquals(Set.of("pid","orderLinePid","quantity"),quantity.keySet());
+                assertEquals(line,quantity.get("orderLinePid"));batchQuantities.add(new BigDecimal(quantity.get("quantity").toString()));
+            }
+            batchQuantities.sort(BigDecimal::compareTo);
+            assertEquals(0,new BigDecimal("400").compareTo(batchQuantities.getFirst()));
+            assertEquals(0,new BigDecimal("600").compareTo(batchQuantities.getLast()));
+            assertNativeQuantity("pr_purchase_order_line",line,"pr_pol_received_qty","0");return null;
+        });
     }
 
 }
