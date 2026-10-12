@@ -426,6 +426,26 @@ class CommandTargetScopePhaseTest {
         verifyNoInteractions(idempotencyService);
     }
 
+    @Test void tenantScopedMissingHandlerTargetUsesTheSameForbiddenBoundaryAsNull() {
+        var ctx=handlerTarget();
+        when(dynamicDataService.getById(anyString(),anyString())).thenThrow(
+                new com.auraboot.framework.meta.exception.MetaRecordNotFoundException("s2p_bid","foreign-quote"));
+        assertThatThrownBy(() -> phase().execute(ctx)).isInstanceOf(BusinessException.class)
+                .hasMessage("Access denied: you do not have permission to view this record");
+        assertThat(ctx.getTargetRecordReadable()).isFalse();
+        verify(commandHandler,org.mockito.Mockito.never()).authorizeTarget(any());
+        verifyNoInteractions(permissionFacade,idempotencyService);
+    }
+
+    @Test void ordinaryMissingRecordPreservesItsOriginalLookupFailure() {
+        var ctx=context("qo_quote_common","missing");
+        var missing=new com.auraboot.framework.meta.exception.MetaRecordNotFoundException("qo_quote_common","missing");
+        when(dynamicDataService.getById(anyString(),anyString())).thenThrow(missing);
+        assertThatThrownBy(() -> phase().execute(ctx)).isSameAs(missing);
+        assertThat(ctx.getTargetRecordReadable()).isNull();
+        verify(transactionManager).rollback(transactionStatus);
+    }
+
     @Test void handlerTargetStorageFailureCannotFallBackToOrdinaryRead() {
         var ctx=handlerTarget();when(commandHandler.authorizeTarget(any())).thenThrow(new IllegalStateException("storage offline"));
         assertThatThrownBy(() -> phase().execute(ctx)).isInstanceOf(IllegalStateException.class).hasMessage("storage offline");

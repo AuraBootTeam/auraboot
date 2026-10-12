@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.entity.CommandDefinition;
+import com.auraboot.framework.meta.exception.MetaRecordNotFoundException;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
@@ -178,8 +179,16 @@ public class CommandTargetScopePhase implements CommandPhase {
 
         // Read the record itself out of the caller's projection: the boundary has to SEE the row to
         // judge it, and reading it through the very gate we are evaluating would be circular.
-        Map<String, Object> record = MetaContext.runWithCommandPermitScope("ALL",
-                () -> dynamicDataService.getById(modelCode, recordId));
+        Map<String, Object> record;
+        try {
+            record = MetaContext.runWithCommandPermitScope("ALL",
+                    () -> dynamicDataService.getById(modelCode, recordId));
+        } catch (MetaRecordNotFoundException missing) {
+            // Protected targets absent from this tenant's scope are denied like a null lookup.
+            // Other lookup failures still propagate; ordinary commands retain not-found behavior.
+            if (handlerTargetAuthorization(ctx)) return false;
+            throw missing;
+        }
         if (record == null) {
             if (handlerTargetAuthorization(ctx)) return false;
             // A missing record is not an authorization answer — later phases surface "not found".
