@@ -1344,6 +1344,81 @@ class ProcurementPluginHostRealDbIT {
         assertTrue(scope(submit,()->nativeRows("qo_procurement_shipment_common","qo_pr_shipment_order_pid",fixture.order())).isEmpty());
     }
 
+    private Object closeNativeOrder(DataAccessor rows) {
+        try {
+            var type=plugin.loadClass("com.auraboot.quote.engine.procurement.ProcurementOrderService");
+            return type.getMethod("syncClosures",String.class,Map.class,boolean.class).invoke(
+                    type.getConstructor(DataAccessor.class,java.time.Clock.class).newInstance(rows,java.time.Clock.systemUTC()),
+                    provider,Map.of(provider,true),true);
+        }catch(ReflectiveOperationException error){throw unwrap(error);}
+    }
+    private Map<String,Object> publishedOrderFlowFacts(ShipmentFixture fixture) {
+        var shipments=nativeRows("qo_procurement_shipment_common","qo_pr_shipment_order_pid",fixture.order());
+        var shipmentLines=new ArrayList<Map<String,Object>>();
+        for(var shipment:shipments) shipmentLines.addAll(nativeRows("qo_procurement_shipment_line_common","qo_pr_shipment_line_shipment_pid",(String)shipment.get("pid")));
+        return Map.of("orderLines",nativeRows("pr_purchase_order_line","pr_pol_order_id",fixture.order()),
+                "shipments",shipments,"shipmentLines",shipmentLines);
+    }
+    @Test void nativeShipmentWinsStaleClosureThenFreshClosurePreservesCommittedShipment() throws Exception {
+        var fixture=shipmentFixture();String sync="qo_procurement_order_common:sync_orders",submit="qo_procurement_order_common:submit_shipment";
+        var held=new java.util.concurrent.CountDownLatch(1);var attempted=new java.util.concurrent.CountDownLatch(1);
+        var shipping=orderLockObserver(()->{},()->{held.countDown();awaitNativeLatch(attempted,"closure must reach the order CAS held by shipment");});
+        var closing=orderLockObserver(attempted::countDown,()->{});
+        var pool=java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var shipment=pool.submit(()->nativeActorThread(()->new TransactionTemplate(transactions).execute(status->scope(submit,
+                    ()->submitShipmentWith(shipping,fixture,"shipment-before-close","300")))));
+            awaitNativeLatch(held,"shipment must hold the actual parent order CAS before closure starts");
+            var closure=pool.submit(()->nativeActorThread(()->new TransactionTemplate(transactions).execute(status->scope(sync,()->closeNativeOrder(closing)))));
+            assertNotNull(shipment.get(20,java.util.concurrent.TimeUnit.SECONDS));
+            var failure=assertThrows(java.util.concurrent.ExecutionException.class,()->closure.get(20,java.util.concurrent.TimeUnit.SECONDS));
+            var conflict=assertInstanceOf(com.auraboot.framework.meta.exception.MetaServiceException.class,failure.getCause());
+            assertEquals("CAS batch conflict: no partial batch may commit",conflict.getMessage());
+        }finally {attempted.countDown();pool.shutdownNow();assertTrue(pool.awaitTermination(10,java.util.concurrent.TimeUnit.SECONDS));}
+        var committed=scope(sync,()->{
+            assertEquals("open",db.getById("pr_purchase_order",fixture.order()).get("qo_pr_order_state"));
+            assertNativeQuantity("pr_purchase_order",fixture.order(),"qo_pr_order_revision","1");
+            assertNativeQuantity("pr_purchase_order_line",fixture.line(),"pr_pol_qty","1000");
+            assertNativeQuantity("pr_purchase_order_line",fixture.line(),"qo_pr_order_line_submitted_qty","300");
+            assertNativeQuantity("pr_purchase_order_line",fixture.line(),"pr_pol_received_qty","0");
+            assertEquals(1,nativeRows("qo_procurement_shipment_common","qo_pr_shipment_order_pid",fixture.order()).size());
+            return publishedOrderFlowFacts(fixture);
+        });
+        Object closed=new TransactionTemplate(transactions).execute(status->scope(sync,()->closeNativeOrder(db)));
+        assertEquals(1,((Number)closed).intValue());
+        scope(sync,()->{
+            assertEquals("closed",db.getById("pr_purchase_order",fixture.order()).get("qo_pr_order_state"));
+            assertNativeQuantity("pr_purchase_order",fixture.order(),"qo_pr_order_revision","2");
+            assertEquals(committed,publishedOrderFlowFacts(fixture));return null;
+        });
+    }
+    @Test void nativeChangedOrderPublicationRequiresReviewWithoutReplacingShipmentOrReceiptFacts() {
+        var fixture=shipmentFixture("200","125");String sync="qo_procurement_order_common:sync_orders",submit="qo_procurement_order_common:submit_shipment";
+        new TransactionTemplate(transactions).execute(status->scope(submit,()->submitShipmentWith(db,fixture,"shipment-before-republish","300")));
+        var oldOrder=scope(sync,()->db.getById("pr_purchase_order",fixture.order()));
+        var oldFacts=scope(sync,()->publishedOrderFlowFacts(fixture));
+        var header=Map.<String,Object>of("account_id",provider,"erp_id",provider,"supplier_pid",oldOrder.get("pr_po_supplier"),
+                "bill_no","CHANGED-"+provider,"order_date","2026-10-13","business_status","approved");
+        var lines=List.of(Map.<String,Object>of("erp_entry_id","1","product_pid",product,"ordered_qty","1100",
+                "submitted_qty","999","received_qty","400"));
+        for(int replay=0;replay<2;replay++) {
+            assertEquals("manual_review_required",new TransactionTemplate(transactions).execute(status->scope(sync,
+                    ()->invokeService("ProcurementOrderService","publish",new Class<?>[]{Map.class,List.class},header,lines))));
+            scope(sync,()->{
+                var current=db.getById("pr_purchase_order",fixture.order());assertEquals(true,current.get("qo_pr_order_change_pending"));
+                for(String field:List.of("pid","tenant_id","qo_pr_order_key","qo_pr_order_account_id","qo_pr_order_erp_id",
+                        "pr_po_code","pr_po_supplier","pr_po_date","pr_po_status","qo_pr_order_state","qo_pr_order_content_hash","qo_pr_order_published_at"))
+                    assertEquals(oldOrder.get(field),current.get(field),field);
+                assertEquals(oldFacts,publishedOrderFlowFacts(fixture));
+                assertNativeQuantity("pr_purchase_order_line",fixture.line(),"pr_pol_qty","1000");
+                assertNativeQuantity("pr_purchase_order_line",fixture.line(),"qo_pr_order_line_submitted_qty","500");
+                assertNativeQuantity("pr_purchase_order_line",fixture.line(),"pr_pol_received_qty","125");
+                assertEquals(1,nativeRows("pr_purchase_order","qo_pr_order_erp_id",provider).size());
+                assertEquals(1,nativeRows("pr_purchase_order_line","pr_pol_order_id",fixture.order()).size());return null;
+            });
+        }
+    }
+
     private DataAccessor orderLockObserver(Runnable before,Runnable after) {
         return (DataAccessor)java.lang.reflect.Proxy.newProxyInstance(DataAccessor.class.getClassLoader(),new Class<?>[]{DataAccessor.class},
                 (proxy,method,args)->{
@@ -1566,7 +1641,9 @@ class ProcurementPluginHostRealDbIT {
         assertEquals(1,all.stream().filter(row->Boolean.FALSE.equals(row.get("selectable"))).count());
         assertTrue(all.stream().anyMatch(row->fixture.address().equals(row.get("pid")) && Boolean.TRUE.equals(row.get("selectable"))));
     }
-    private ShipmentFixture shipmentFixture() {
+    private ShipmentFixture shipmentFixture() {return shipmentFixture("0","0");}
+    /** Trusted local balances; these are not receipt-adapter or ERP field verification. */
+    private ShipmentFixture shipmentFixture(String submitted,String received) {
         String directory="pr_supplier_common:sync_directory",publish="qo_procurement_order_common:sync_orders";
         String submit="qo_procurement_order_common:submit_shipment",maintain="qo_procurement_address_common:maintain";
         String supplier=scope(directory,()->(String)db.create("pr_supplier_common",Map.of("pr_supplier_code",provider,
@@ -1583,7 +1660,7 @@ class ProcurementPluginHostRealDbIT {
         var header=Map.<String,Object>of("account_id",provider,"erp_id",provider,"supplier_pid",supplier,
                 "bill_no","SHIP-"+provider,"order_date","2026-10-12","business_status","approved");
         var lines=List.of(Map.<String,Object>of("erp_entry_id","1","product_pid",product,"ordered_qty","1000",
-                "submitted_qty","0","received_qty","0"));
+                "submitted_qty",submitted,"received_qty",received));
         var tx=new TransactionTemplate(transactions);
         assertEquals("published",tx.execute(status->scope(publish,()->invokeService("ProcurementOrderService","publish",
                 new Class<?>[]{Map.class,List.class},header,lines))));
