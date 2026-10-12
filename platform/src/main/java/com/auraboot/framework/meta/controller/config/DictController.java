@@ -310,34 +310,43 @@ public class DictController {
 
     // Cascade dict reads (children / tree / query) drive cascading form
     // dropdowns at render time — baseline, same rationale as getDictByCode.
+    // Labels resolve per the request locale post service cache, mirroring the
+    // by-code reads above (query param > X-Locale > Accept-Language; stored
+    // label kept when the extension carries no matching "labels" entry).
     @GetMapping("/{pid}/cascade/children")
     @Operation(summary = "获取级联字典子项", description = "获取级联字典的子项列表")
     public ApiResponse<List<DictItemData>> getCascadeChildren(
             @Parameter(description = "字典PID") @PathVariable @NotBlank String pid,
-            @Parameter(description = "父级值") @RequestParam(required = false) String parentValue) {
+            @Parameter(description = "父级值") @RequestParam(required = false) String parentValue,
+            jakarta.servlet.http.HttpServletRequest request) {
         log.info("获取级联字典子项: pid={}, parentValue={}", logSafe(pid), logSafe(parentValue));
-        
+
         List<DictItemData> result = dictService.getCascadeChildren(pid, parentValue);
+        DictLabelLocalizationHelper.localize(result, i18nLocaleResolver.resolveLocale(request));
         return ApiResponse.success(result);
     }
 
     @GetMapping("/{pid}/cascade/tree")
     @Operation(summary = "构建级联字典树", description = "构建完整的级联字典树结构")
     public ApiResponse<DictTreeNode> buildCascadeTree(
-            @Parameter(description = "字典PID") @PathVariable @NotBlank String pid) {
+            @Parameter(description = "字典PID") @PathVariable @NotBlank String pid,
+            jakarta.servlet.http.HttpServletRequest request) {
         log.info("构建级联字典树: pid={}", logSafe(pid));
-        
+
         DictTreeNode result = dictService.buildCascadeTree(pid);
+        DictLabelLocalizationHelper.localize(result, i18nLocaleResolver.resolveLocale(request));
         return ApiResponse.success(result);
     }
 
     @PostMapping("/cascade/query")
     @Operation(summary = "查询级联字典", description = "根据条件查询级联字典数据")
     public ApiResponse<CascadeDictResult> queryCascadeDict(
-            @Valid @RequestBody CascadeDictRequest request) {
+            @Valid @RequestBody CascadeDictRequest request,
+            jakarta.servlet.http.HttpServletRequest httpRequest) {
         log.info("查询级联字典: dictCode={}", logSafe(request.getDictCode()));
-        
+
         CascadeDictResult result = dictCascadeService.queryCascadeDict(request);
+        DictLabelLocalizationHelper.localize(result, i18nLocaleResolver.resolveLocale(httpRequest));
         return ApiResponse.success(result);
     }
 
