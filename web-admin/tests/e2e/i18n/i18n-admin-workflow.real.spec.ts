@@ -266,7 +266,7 @@ test.describe('i18n admin real workflow', () => {
       // ab_menu.pid is NOT NULL UNIQUE with no generator on the create path, so the
       // fixture supplies its own 26-character identifier; the create envelope echoes it.
       const memberMenuPid = `m${Date.now()}${info.workerIndex}membermenu`.padEnd(26, '0').slice(0, 26);
-      const memberMenu = await accepted<{ pid: string }>(await admin.page.request.post('/api/menu/create', { data: {
+      const memberMenu = await accepted<{ pid: string; id?: number }>(await admin.page.request.post('/api/menu/create', { data: {
         pid: memberMenuPid,
         code: `e2e.ios-handover.${suffix}.member-models`,
         name: 'Member Baseline Models',
@@ -277,6 +277,7 @@ test.describe('i18n admin real workflow', () => {
         orderNo: 900,
       } }));
       expect(memberMenu.pid).toBeTruthy();
+      const memberMenuRowId = memberMenu.id ?? null;
       const resource = await accepted<Resource>(await admin.page.request.post('/api/admin/i18n/resources', { data: {
         key: `e2e.ios-handover.${suffix}.permission`, lang: 'zh-CN', value: 'Permission fixture',
       } }));
@@ -339,7 +340,41 @@ test.describe('i18n admin real workflow', () => {
         params: { key: `${resource.i18nKey}.forbidden`, lang: 'zh-CN' },
       }))).toBeNull();
       await info.attach('authenticated-member-denials', { body: Buffer.from(JSON.stringify(denied, null, 2)), contentType: 'application/json' });
-    } finally { await member?.context.close(); await admin.context.close(); }
+    } finally {
+      // The provisioned member menu is a tenant-owned (plugin_pid NULL) row;
+      // leaving it behind trips rbac-platform-baseline's menu containment and
+      // the OrphanMenuCheckRunner fail-fast at the next backend restart.
+      try {
+        let menuRowId = memberMenuRowId;
+        if (menuRowId == null) {
+          // Fall back to resolving the numeric id from the flat menu listing.
+          const allMenus = await admin.page.request.get('/api/menu/all');
+          if (allMenus.ok()) {
+            const body = await allMenus.json().catch(() => ({}));
+            const roots = Array.isArray(body?.data) ? body.data : [];
+            const walk = (nodes: Array<Record<string, unknown>>): void => {
+              for (const node of nodes ?? []) {
+                if (String(node.code ?? '') === `e2e.ios-handover.${suffix}.member-models`
+                    && node.id != null) {
+                  menuRowId = Number(node.id);
+                }
+                walk((node.children ?? []) as Array<Record<string, unknown>>);
+              }
+            };
+            walk(roots);
+          }
+        }
+        if (menuRowId != null) {
+          const deleted = await admin.page.request.delete(`/api/menu/${menuRowId}`);
+          if (!deleted.ok()) {
+            console.warn(`[i18n-admin] member menu cleanup failed: HTTP ${deleted.status()}`);
+          }
+        }
+      } catch (cleanupError) {
+        console.warn('[i18n-admin] member menu cleanup error:', String(cleanupError));
+      }
+      await member?.context.close(); await admin.context.close();
+    }
   });
 
   test('create, edit, submit, reject with reason, approve and delete through the admin UI', async ({ browser }, info) => {
@@ -409,8 +444,16 @@ test.describe('i18n admin real workflow', () => {
       await openSidebarPage(page, '/settings/i18n-workflow');
       // The workflow table filters by locale (page default ja-JP); the fixture resource
       // was created as zh-CN, so a real reviewer selects the matching locale first.
-      await page.locator('select').filter({ has: page.locator('option[value="zh-CN"]') }).selectOption('zh-CN');
-      await page.locator('select').filter({ has: page.locator('option[value="draft"]') }).selectOption('draft');
+      // The filter selects carry no label association (the visible labels are
+      // siblings without htmlFor) and the page also holds an AI-target select;
+      // address them structurally: Locale is the first select on the page and
+      // the Status filter is the only one offering the draft option. The page
+      // re-mounts its filter row while settling, so retry through each.
+      await expect(() => page.locator('main select').first().selectOption('zh-CN')).toPass({ timeout: 15_000 });
+      await expect(() => page.locator('main select')
+        .filter({ has: page.locator('option[value="draft"]') })
+        .first()
+        .selectOption('draft')).toPass({ timeout: 15_000 });
       await page.getByPlaceholder('Search by key or value…', { exact: true }).fill(key);
       await page.getByRole('button', { name: 'Search', exact: true }).click();
       const rejectedWorkflowRow = page.locator('table').getByRole('row').filter({ has: page.getByRole('cell', { name: key, exact: true }) });
