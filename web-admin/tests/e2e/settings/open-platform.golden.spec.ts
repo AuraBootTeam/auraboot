@@ -64,6 +64,9 @@ const publicationText = (cn: string) => {
 };
 const queryLocale = process.env.AURA_OPEN_PLATFORM_QUERY_LOCALE || 'zh-CN';
 if (!['zh-CN', 'en-US'].includes(queryLocale)) throw new Error('Unsupported query publication locale');
+const QUERY_VIEWPORT = process.env.AURA_OPEN_PLATFORM_QUERY_VIEWPORT || 'desktop';
+if (!['desktop', 'narrow'].includes(QUERY_VIEWPORT)) throw new Error('Unsupported query publication viewport');
+const queryViewport = QUERY_VIEWPORT === 'narrow' ? { width: 1024, height: 900 } : { width: 1440, height: 1000 };
 const queryEnglish: Record<string, string> = {
   "查询已停用": "Query withdrawn",
   "合同版本": "Schema version",
@@ -617,7 +620,7 @@ test.describe('Dynamic resource publication journey', () => {
 
 test.describe('Dynamic query publication journey', () => {
   test.setTimeout(180_000);
-  test.use({ storageState: { cookies: [], origins: [] }, locale: queryLocale, viewport: { width: 1440, height: 1000 } });
+  test.use({ storageState: { cookies: [], origins: [] }, locale: queryLocale, viewport: queryViewport });
   test('pins a real NamedQuery, saves read-only projections, downloads and withdraws through UI', async ({ page }) => {
     await authenticate(page, queryLocale);
     const suffix = String(Date.now()); const modelCode = `dop_q_${suffix}`; const modelName = `查询验证零件 ${suffix}`;
@@ -662,7 +665,14 @@ test.describe('Dynamic query publication journey', () => {
     }
     const screenshotRoot = path.join(process.env.AURA_EVIDENCE_ROOT || '/tmp', 'ui-publication-r1', 'screenshots');
     await mkdir(screenshotRoot, { recursive: true });
-    const snapshot = async (id: string) => { await page.screenshot({ path: path.join(screenshotRoot, `${id}.png`), fullPage: true }); };
+    const snapshot = async (id: string) => {
+      if (UI_MUTATION === 'publication-overflow') await page.addStyleTag({ content: 'html { min-width: 1440px !important; }' });
+      if (QUERY_VIEWPORT === 'narrow') {
+        expect(page.viewportSize()).toEqual(queryViewport);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+      }
+      await page.screenshot({ path: path.join(screenshotRoot, `${id}.png`), fullPage: true });
+    };
     await page.goto('/'); await openAccountMenu(page); await page.getByTestId('open-platform-link').click();
     await expect(page.getByTestId('open-platform-page')).toBeVisible();
     await page.getByTestId('open-platform-publications-link').click();
