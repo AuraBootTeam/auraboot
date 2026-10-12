@@ -749,6 +749,13 @@ test.describe('Open Platform golden journey', () => {
     await installDialog.getByLabel('openapi.events.read').check();
     await installDialog.getByLabel('automation.events.write').check();
     await installDialog.getByLabel('openapi.profile.read').check();
+    await installDialog.getByRole('heading', { name: '安装应用', exact: true }).scrollIntoViewIfNeeded();
+    await expect(installDialog.getByLabel('环境', { exact: true })).toBeInViewport();
+    await capture(page, 'OP-UI-07-top', false);
+    await installDialog.getByRole('button', { name: '安装', exact: true }).scrollIntoViewIfNeeded();
+    await expect(installDialog.getByRole('button', { name: '安装', exact: true })).toBeInViewport();
+    await expect(installDialog.getByRole('button', { name: '取消', exact: true })).toBeInViewport();
+    await capture(page, 'OP-UI-07-actions', false);
     await capture(page, 'OP-UI-07');
     await installDialog.getByRole('button', { name: '安装' }).click();
     await expect(appCard.getByText('生产环境')).toBeVisible();
@@ -1521,6 +1528,13 @@ test.describe('Open Platform golden journey', () => {
     await appCard.getByRole('button', { name: '编辑 Scope' }).click();
     const scopeDialog = page.getByRole('dialog', { name: '编辑 Scope' });
     await expect(scopeDialog).toContainText('立即吊销此安装的现有 Access Token');
+    await scopeDialog.getByRole('heading', { name: '编辑 Scope', exact: true }).scrollIntoViewIfNeeded();
+    await expect(scopeDialog.getByRole('heading', { name: '编辑 Scope', exact: true })).toBeInViewport();
+    await capture(page, 'OP-UI-10-top', false);
+    await scopeDialog.getByRole('button', { name: '保存', exact: true }).scrollIntoViewIfNeeded();
+    await expect(scopeDialog.getByRole('button', { name: '保存', exact: true })).toBeInViewport();
+    await expect(scopeDialog.getByRole('button', { name: '取消', exact: true })).toBeInViewport();
+    await capture(page, 'OP-UI-10-actions', false);
     await capture(page, 'OP-UI-10');
     await scopeDialog.getByRole('button', { name: '保存' }).click();
     await expect(scopeDialog).toBeHidden();
@@ -1538,6 +1552,32 @@ test.describe('Open Platform golden journey', () => {
     await expect(appCard.getByText('已停用', { exact: true })).toBeVisible();
     await dismissToasts(page);
 
+    // Probe the real management API, never the controlled operations rendering fixtures.
+    const verifyDisabledCredentialWrites = async () => {
+      const credentialPath = `${WEB_BASE_URL}/api/open-platform/installations/${principal.installationPid}/credentials`;
+      const beforeResponse = await page.request.get(credentialPath);
+      expect(beforeResponse.status()).toBe(200);
+      const before = await beforeResponse.json();
+      expect(String(before.code)).toBe('0');
+      const target = before.data.find((entry: { clientId: string }) => entry.clientId === rotatedClientId);
+      expect(target).toMatchObject({ status: 'active', expiresAt: null });
+      expect(before.data.length).toBeGreaterThanOrEqual(2);
+      const createDenied = await page.request.post(credentialPath);
+      expect(createDenied.status()).toBe(404);
+      expect(String((await createDenied.json()).code)).toBe('404');
+      const rotateDenied = await page.request.post(`${credentialPath}/${target.pid}/rotate`, { data: { graceMinutes: 15 } });
+      expect(rotateDenied.status()).toBe(404);
+      expect(String((await rotateDenied.json()).code)).toBe('404');
+      const afterResponse = await page.request.get(credentialPath);
+      expect(afterResponse.status()).toBe(200);
+      expect((await afterResponse.json()).data).toEqual(before.data);
+      const deniedIssue = await page.request.post(`${BACKEND_URL}/oauth2/token`, {
+        form: { grant_type: 'client_credentials', client_id: rotatedClientId!, client_secret: rotatedClientSecret!, scope: 'openapi.profile.read' },
+      });
+      expect(deniedIssue.status()).toBe(401);
+    };
+    await verifyDisabledCredentialWrites();
+
     await appCard.getByRole('button', { name: '停用', exact: true }).click();
     const disableApplicationDialog = page.getByRole('dialog', { name: '确认停用访问？' });
     await expect(disableApplicationDialog).toContainText('无法在本页面恢复');
@@ -1547,6 +1587,7 @@ test.describe('Open Platform golden journey', () => {
     await capture(page, 'OP-UI-12');
     await disableApplicationDialog.getByRole('button', { name: '停用' }).click();
     await expect(appCard.getByRole('button', { name: '添加安装' })).toBeDisabled();
+    await verifyDisabledCredentialWrites();
     await dismissToasts(page);
     await capture(page, 'OP-UI-02');
 
