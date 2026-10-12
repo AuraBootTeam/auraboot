@@ -287,11 +287,11 @@ class ProcurementPluginHostRealDbIT {
                 "pr_spc_supplier_id",localSupplier,"pr_spc_name","Local same phone","qo_pr_contact_state","active",
                 "qo_pr_contact_normalized_phone",phone)).get("pid"));
         // Independent foreign fixture rows use the physical table; they do not seed foreign metadata or enrollment.
-        String foreignSupplier=cloneForeignDirectoryFixture("mt_pr_supplier_common",localSupplier,foreign.getId(),
+        String foreignSupplier=cloneForeignNativeFixture("mt_pr_supplier_common",localSupplier,foreign.getId(),
                 Map.of("pr_supplier_code","foreign-"+provider,"pr_supplier_name","Foreign supplier"));
-        String foreignContact=cloneForeignDirectoryFixture("mt_pr_supplier_pcba_contact",localContact,foreign.getId(),
+        String foreignContact=cloneForeignNativeFixture("mt_pr_supplier_pcba_contact",localContact,foreign.getId(),
                 Map.of("pr_spc_supplier_id",foreignSupplier,"pr_spc_name","Foreign same phone"));
-        cloneForeignDirectoryFixture("mt_pr_supplier_pcba_contact",localContact,foreign.getId(),
+        cloneForeignNativeFixture("mt_pr_supplier_pcba_contact",localContact,foreign.getId(),
                 Map.of("pr_spc_supplier_id",foreignSupplier,"pr_spc_name","Foreign exclusive phone","qo_pr_contact_normalized_phone",foreignOnly));
         try(var c=source.getConnection();var q=c.prepareStatement("SELECT count(*) FROM mt_pr_supplier_pcba_contact WHERE tenant_id=? AND qo_pr_contact_normalized_phone=? AND qo_pr_contact_state='active'")) {
             q.setLong(1,foreign.getId());q.setString(2,phone);
@@ -309,8 +309,8 @@ class ProcurementPluginHostRealDbIT {
         assertEquals(before,scope(bind,()->db.getById("qo_procurement_membership_common",result.get("recordPid").toString())));
         assertEquals(1,scope(bind,()->nativeRows("qo_procurement_membership_common","qo_pr_membership_user_pid",actor)).size());
     }
-    private String cloneForeignDirectoryFixture(String table,String original,Long foreignTenant,Map<String,Object> values) throws Exception {
-        assertTrue(Set.of("mt_pr_supplier_common","mt_pr_supplier_pcba_contact").contains(table));
+    private String cloneForeignNativeFixture(String table,String original,Long foreignTenant,Map<String,Object> values) throws Exception {
+        assertTrue(Set.of("mt_pr_supplier_common","mt_pr_supplier_pcba_contact","mt_s2p_bid").contains(table));
         assertNotEquals(tenantId,foreignTenant);
         var row=new HashMap<>(values);String pid=com.auraboot.framework.common.util.UlidGenerator.generate();
         row.put("id",com.baomidou.mybatisplus.core.toolkit.IdWorker.getId());row.put("pid",pid);row.put("tenant_id",foreignTenant);
@@ -320,6 +320,60 @@ class ProcurementPluginHostRealDbIT {
             assertEquals(1,q.executeUpdate());
         }
         return pid;
+    }
+
+    @Test void nativeForeignTenantQuoteCannotBeReadOrMutatedEvenWithMatchingSupplier() throws Exception {
+        var fixture=savedNativeQuote();
+        String read="qo_procurement_quote_common:view_mine";
+        var local=scope(read,()->db.getById("s2p_bid",fixture.quote()));
+        var localLines=scope(read,()->nativeRows("qo_procurement_quote_line_common","qo_pr_quote_line_quote_pid",fixture.quote()));
+        var localHistory=scope(read,()->nativeRows("qo_procurement_history_common","qo_pr_history_target_pid",fixture.quote()));
+        var foreign=new com.auraboot.framework.tenant.dao.entity.Tenant();
+        foreign.setName("foreign-quote-"+provider);foreign.setDisplayName("Foreign quote isolation fixture");
+        foreign.setPid(com.auraboot.framework.common.util.UlidGenerator.generate());foreign.setStatus("ACTIVE");
+        tenants.createTenant(foreign);assertNotEquals(tenantId,foreign.getId());
+        // Deliberately preserve the supplier reference so supplier filtering cannot mask a missing tenant predicate.
+        // This raw adversarial fixture is not a supported foreign-tenant quotation creation or enrollment journey.
+        String target=cloneForeignNativeFixture("mt_s2p_bid",fixture.quote(),foreign.getId(),
+                Map.of("qo_pr_quote_key","foreign-"+provider));
+        String foreignBefore=foreignQuoteSnapshot(target,foreign.getId());
+        assertTrue(foreignBefore.contains(target));
+        assertEquals(fixture.quote(),scope(read,()->{
+            try {
+                var type=plugin.loadClass("com.auraboot.quote.engine.procurement.ProcurementReadService");
+                var service=type.getConstructor(RecordReadAccessor.class,String.class).newInstance(db,actor);
+                var result=(Map<?,?>)type.getMethod("detail",String.class,String.class).invoke(service,"quote",fixture.quote());
+                assertThrows(com.auraboot.framework.meta.exception.MetaRecordNotFoundException.class,()->{
+                    try {type.getMethod("detail",String.class,String.class).invoke(service,"quote",target);}
+                    catch(ReflectiveOperationException failure){throw unwrap(failure);}
+                });
+                return ((Map<?,?>)result.get("quote")).get("pid");
+            } catch(ReflectiveOperationException failure){throw unwrap(failure);}
+        }));
+        var tx=new TransactionTemplate(transactions);
+        for(String action:List.of("save_draft","submit","decline")) {
+            Map<String,Object> payload=new LinkedHashMap<>();payload.put("revision",1);
+            if(action.equals("save_draft")){payload.put("lines",List.of());payload.put("paymentTerms","Denied foreign change");}
+            if(action.equals("decline"))payload.put("reason","Denied foreign decline");
+            assertThrows(com.auraboot.framework.meta.exception.MetaRecordNotFoundException.class,
+                    ()->tx.execute(status->scope("qo_procurement_quote_common:"+action,
+                            ()->quoteAt(fixture.clock(),action,target,payload))));
+            assertEquals(foreignBefore,foreignQuoteSnapshot(target,foreign.getId()));
+            scope(read,()->{
+                assertEquals(local,db.getById("s2p_bid",fixture.quote()));
+                assertEquals(localLines,nativeRows("qo_procurement_quote_line_common","qo_pr_quote_line_quote_pid",fixture.quote()));
+                assertEquals(localHistory,nativeRows("qo_procurement_history_common","qo_pr_history_target_pid",fixture.quote()));
+                assertTrue(nativeRows("qo_procurement_submission_common","qo_pr_submission_quote_pid",target).isEmpty());
+                return null;
+            });
+        }
+    }
+
+    private String foreignQuoteSnapshot(String pid,Long foreignTenant) throws Exception {
+        try(var c=source.getConnection();var q=c.prepareStatement("SELECT to_jsonb(row)::text FROM mt_s2p_bid row WHERE row.pid=? AND row.tenant_id=?")) {
+            q.setString(1,pid);q.setLong(2,foreignTenant);
+            try(var records=q.executeQuery()){assertTrue(records.next());String snapshot=records.getString(1);assertFalse(records.next());return snapshot;}
+        }
     }
 
     @Test void nativeImportRejectsProductDiscontinuedAfterMaterialResolution() throws Exception {
