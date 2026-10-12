@@ -989,6 +989,36 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
         var grant = new OpenApiInstallationPolicy(contract.operations(), fields.keySet(), Set.of("name", "zone", "related"),
                 List.of(new OpenApiInstallationPolicy.RowConstraint("zone", List.of("A"))));
         publications.grant(principal.installationPid(), contract.code(), grant);
+        String otherModel = contract.modelCode() + "_other";
+        models.saveDefinition(ModelDefinition.builder().code(otherModel).tableName("mt_" + otherModel)
+                .displayName("Other reference target").status("published").sourceType("physical").primaryKey("id")
+                .capabilities(ModelCapabilities.fullPhysical().toBuilder().filterableFields(List.of("name", "zone")).sortableFields(List.of("name", "zone")).build())
+                .fields(List.of(FieldDefinition.builder().code("name").columnName("name").dataType("STRING").displayName("Name").filterable(true).sortable(true).build(),
+                        FieldDefinition.builder().code("zone").columnName("zone").dataType("STRING").displayName("Zone").filterable(true).sortable(true).build())).build());
+        assertThat(schemas.createTableByModel(otherModel).isSuccess()).isTrue();
+        String otherPid = MetaContext.runWithCommandPermitScope("ALL", () -> data.create(otherModel,
+                new HashMap<>(Map.of("name", "Other model visible", "zone", "A")))).get("pid").toString();
+        var targetFields = new LinkedHashMap<>(fields); targetFields.remove("related");
+        var otherContract = new OpenApiResourceContract(contract.code() + ".other", otherModel, 1,
+                Set.of(Operation.GET), Map.of(Operation.GET, contract.scopes().get(Operation.GET)),
+                contract.dataPolicy(), targetFields, 50, 8, 5000, Set.of());
+        publications.saveDraft(otherContract.code(), new OpenApiPublicationService.DraftRequest(0, otherContract));
+        publications.publish(otherContract.code(), 1);
+        publications.grant(principal.installationPid(), otherContract.code(), new OpenApiInstallationPolicy(
+                Set.of(Operation.GET), targetFields.keySet(), Set.of(), grant.rowConstraints()));
+        var mismatchedFields = new LinkedHashMap<>(fields);
+        mismatchedFields.put("related", new Field("related", Type.PID, true, true, false, true, Set.of(), false,
+                otherContract.code(), Map.of(), null));
+        var mismatchedContract = new OpenApiResourceContract(contract.code() + ".mismatch", contract.modelCode(), 1,
+                contract.operations(), contract.scopes(), contract.dataPolicy(), mismatchedFields, 50, 8, 5000, Set.of());
+        publications.saveDraft(mismatchedContract.code(), new OpenApiPublicationService.DraftRequest(0, mismatchedContract));
+        var oldSnapshot = publications.publishedForAdministration(contract.code());
+        assertThatThrownBy(() -> publications.publish(mismatchedContract.code(), 1))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("Reference target requires GET on its declared model");
+        assertThat(publications.active(principal.tenantId(), mismatchedContract.code())).isEmpty();
+        assertThat(publications.snapshot(principal.tenantId(), mismatchedContract.code(), 1)).isEmpty();
+        assertThat(publications.installationGrants(principal.installationPid())).noneMatch(view -> view.code().equals(mismatchedContract.code()));
+        assertThat(publications.publishedForAdministration(contract.code())).isEqualTo(oldSnapshot);
         MetaContext.setContext(principal.tenantId(), null, principal.subjectPid(), "machine");
         try (var machine = MachineDataAccessContext.begin(principal)) {
             var created = resources.write(principal, contract.code(), Operation.CREATE, null, "reference-ok-001", null,
@@ -1033,6 +1063,15 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
             assertThat(replayed.replay()).isTrue();
             assertThat(replayed.body()).isEqualTo(updated.body());
             assertThat(replayed.headers()).isEqualTo(updated.headers());
+            var readableOther = resources.get(principal, otherContract.code(), otherPid);
+            assertThat(readableOther.status()).isEqualTo(200);
+            assertThat(readableOther.body()).containsEntry("pid", otherPid).containsEntry("name", "Other model visible");
+            var ownerUnchanged = resources.get(principal, contract.code(), ownerPid);
+            assertThat(ownerUnchanged.body()).isEqualTo(updated.body());
+            assertThat(ownerUnchanged.headers().get("ETag")).isEqualTo(updated.headers().get("ETag"));
+            var otherUnchanged = resources.get(principal, otherContract.code(), otherPid);
+            assertThat(otherUnchanged.body()).isEqualTo(readableOther.body());
+            assertThat(otherUnchanged.headers().get("ETag")).isEqualTo(readableOther.headers().get("ETag"));
         } finally { applyTestMetaContext(); }
     }
 
