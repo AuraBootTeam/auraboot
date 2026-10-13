@@ -35,6 +35,10 @@ Business Applications and private modifications are permitted. There is no
 requirement to publish original business code or modifications under this
 License. Private changes do not exempt use from these conditions.
 
+Source-only forks for contribution review and security research are permitted
+with retained notices; they must not be marketed or operated as a Competing
+Platform. This exception does not grant public platform hosting or resale.
+
 Community use includes evaluation, internal business development and
 attributed customer-owned Business Application delivery. Public operated
 services for third-party customers, including vertical multi-tenant business
