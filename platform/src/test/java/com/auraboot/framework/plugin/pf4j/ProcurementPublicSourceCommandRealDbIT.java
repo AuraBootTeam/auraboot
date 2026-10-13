@@ -403,12 +403,12 @@ class ProcurementPublicSourceCommandRealDbIT {
             assertEquals(formal,formalSnapshot(quote.submission()),"Both formal headers and complete formal lines remain immutable");
             var history=db.query("qo_procurement_history_common",Map.of("qo_pr_history_target_pid",quote.quote()));
             assertTrue(history.stream().anyMatch(event->"SOURCE_CHANGED".equals(event.get("qo_pr_history_reason")) && "system".equals(event.get("qo_pr_history_actor_pid"))));return null;});
-        var changed=snapshot();assertEquals(200,call(token,selected("11")).status());assertEquals(changed,snapshot());
+        var changed=snapshot();assertEquals(200,call(token,selected("11")).status());assertReplaySnapshot(quote.source(),changed,snapshot());
     }
     @Test @Order(4) void publicBatchRollsBackAnActuallyWrittenFirstSourceWhenLaterAllocatedSourceChanges() throws Exception {
         configurePolicy();assertEquals(200,call(token,selected("11")).status());var quote=prepareSubmittedQuote();
         fixture("qo_procurement_task_common:allocate",()->new TransactionTemplate(transactions).execute(status->service("ProcurementAllocationService",new Class<?>[]{DataAccessor.class},new Object[]{db},"allocate",new Class<?>[]{String.class,Map.class},task,
-            Map.of("sourceDemands",List.of(Map.of("sourcePid",quote.source(),"sourceRevision",0,"quantity","300")),
+            Map.of("sourceDemands",List.of(Map.of("sourcePid",quote.source(),"sourceRevision",quote.sourceRevision(),"quantity","300")),
                 "allocations",List.of(Map.of("quotePid",quote.quote(),"sourcePid",quote.source(),"submissionPid",quote.submission(),"quantity","300"))))));
         String allocatedTask=task;
         task=fixture("qo_procurement_task_common:create",()->pid((Map<?,?>)service("ProcurementTaskService",new Class<?>[]{DataAccessor.class},new Object[]{db},"create",new Class<?>[]{Object.class,String.class,Map.class},tenant,actor,Map.of("title",provider+" second draft inquiry","connectionPid",connection))));
@@ -420,7 +420,7 @@ class ProcurementPublicSourceCommandRealDbIT {
         assertEquals(before,snapshot(),"Actual host transaction must roll back source/reference/quote/history/task and reservations");
         assertTrue(sources().isEmpty());fixture(SYNC,()->{assertEquals(0,new BigDecimal("300").compareTo(new BigDecimal(db.getById("pr_purchase_request",quote.source()).get("qo_pr_source_reserved_qty").toString())));return null;});
     }
-    private record Submitted(String source,String quote,String submission){}
+    private record Submitted(String source,String quote,String submission,long sourceRevision){}
     /** Actual domain lifecycle preparation; no state SQL or fake confirmed allocation. */
     private Submitted prepareSubmittedQuote() {
         return fixture("qo_procurement_task_common:dispatch",()->new TransactionTemplate(transactions).execute(status->{
@@ -428,15 +428,18 @@ class ProcurementPublicSourceCommandRealDbIT {
             String category=pid(db.create("pr_spend_category",Map.of("pr_spc_code",provider,"pr_spc_name","Local source category")));
             String supplier=fixture("pr_supplier_common:sync_directory",()->pid(db.create("pr_supplier_common",Map.of("pr_supplier_code",provider,"pr_supplier_name","Local source supplier","pr_supplier_status","enabled","qo_pr_supplier_account_id",provider))));
             fixture("qo_procurement_category_policy_common:create",()->service("ProcurementCategoryPolicyService",new Class<?>[]{DataAccessor.class,Long.class},new Object[]{db,tenant},"createPolicy",new Class<?>[]{Map.class},Map.of("categoryPid",category,"connectionPid",connection,"supplierPids",List.of(supplier),"defaultSupplierPids",List.of(supplier))));
-            service("ProcurementPlanningService",new Class<?>[]{DataAccessor.class,Clock.class,Object.class},new Object[]{db,Clock.systemUTC(),tenant},"classify",new Class<?>[]{String.class,Long.class,Map.class},task,version(),Map.of("sourcePid",source,"sourceRevision",0,"categoryPid",category));
+            long beforeClassification=new BigDecimal(db.getById("pr_purchase_request",source).get("qo_pr_source_revision").toString()).longValueExact();
+            service("ProcurementPlanningService",new Class<?>[]{DataAccessor.class,Clock.class,Object.class},new Object[]{db,Clock.systemUTC(),tenant},"classify",new Class<?>[]{String.class,Long.class,Map.class},task,version(),Map.of("sourcePid",source,"sourceRevision",beforeClassification,"categoryPid",category));
+            long sourceRevision=new BigDecimal(db.getById("pr_purchase_request",source).get("qo_pr_source_revision").toString()).longValueExact();
+            assertEquals(beforeClassification+1,sourceRevision,"Classification must advance the actual source business revision");
             service("ProcurementDispatchService",new Class<?>[]{DataAccessor.class,Clock.class,Long.class},new Object[]{db,Clock.systemUTC(),tenant},"dispatch",new Class<?>[]{String.class,Long.class,Map.class},task,version(),Map.of("supplierPids",List.of(supplier),"cutoffAt","2066-11-15T08:00:00Z"));
             String quote=pid(db.query("s2p_bid",Map.of("s2p_bid_sourcing_event_id",task)).getFirst());
             String contact=fixture("pr_supplier_pcba_contact:sync_directory",()->pid(db.create("pr_supplier_pcba_contact",Map.of("pr_spc_supplier_id",supplier,"pr_spc_name","Local supplier contact","qo_pr_contact_state","active"))));
             fixture("qo_procurement_membership_common:bind_verified_phone",()->db.create("qo_procurement_membership_common",Map.of("qo_pr_membership_key",provider,"qo_pr_membership_user_pid",actor,"qo_pr_membership_supplier_pid",supplier,"qo_pr_membership_contact_pid",contact,"qo_pr_membership_state","active")));
-            var line=Map.<String,Object>of("sourcePid",source,"sourceRevision",0,"unitPrice","1.25","currency","CNY","unit","PCS","taxRate","0.13","taxIncluded",true,"availableQty","600","deliveryDate","2066-12-01");
+            var line=Map.<String,Object>of("sourcePid",source,"sourceRevision",sourceRevision,"unitPrice","1.25","currency","CNY","unit","PCS","taxRate","0.13","taxIncluded",true,"availableQty","600","deliveryDate","2066-12-01");
             fixture("qo_procurement_quote_common:save_draft",()->service("ProcurementQuoteService",new Class<?>[]{DataAccessor.class,Clock.class},new Object[]{db,Clock.systemUTC()},"execute",new Class<?>[]{String.class,String.class,String.class,Map.class},"save_draft",quote,actor,Map.of("revision",0,"lines",List.of(line),"paymentTerms","Net 30")));
             var formal=(Map<?,?>)fixture("qo_procurement_quote_common:submit",()->service("ProcurementQuoteService",new Class<?>[]{DataAccessor.class,Clock.class},new Object[]{db,Clock.systemUTC()},"execute",new Class<?>[]{String.class,String.class,String.class,Map.class},"submit",quote,actor,Map.of("revision",1)));
-            return new Submitted(source,quote,formal.get("submissionPid").toString());
+            return new Submitted(source,quote,formal.get("submissionPid").toString(),sourceRevision);
         }));
     }
     private Long version(){return new BigDecimal(db.getById("s2p_sourcing_event",task).get("row_version").toString()).longValueExact();}
