@@ -50,9 +50,11 @@ public class OpenApiResourceAuthorizer {
         try {
             validator.validate(contract, model);
         } catch (IllegalArgumentException unavailable) {
-            // CATCH: published virtual source/grant withdrawal is an authorization denial, not caller input.
-            if (!"namedQuery".equals(model.getSourceType())) throw unavailable;
-            throw new AccessDeniedException("Published virtual resource source is unavailable", unavailable);
+            // CATCH: invalid published metadata is a source conflict; virtual source grants remain a denial.
+            if ("namedQuery".equals(model.getSourceType())) {
+                throw new AccessDeniedException("Published virtual resource source is unavailable", unavailable);
+            }
+            throw new OpenApiPublicationService.SourceBindingConflictException(unavailable);
         }
         var policy = authority.policy();
         policy.validate(contract);

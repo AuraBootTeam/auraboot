@@ -227,6 +227,35 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk()).andReturn();
         assertThat(fieldRestored.getResponse().getContentAsString()).isEqualTo(baseline.getResponse().getContentAsString());
         assertThat(fieldRestored.getResponse().getHeader("ETag")).isEqualTo(baseline.getResponse().getHeader("ETag"));
+        var semantics = List.of(Map.of("dataType", "INTEGER"), Map.of("virtualType", "transient"),
+                Map.of("virtualType", "computed_readonly"));
+        org.junit.jupiter.api.Assertions.assertAll("published field semantics", semantics.stream()
+                .map(change -> (org.junit.jupiter.api.function.Executable) () -> {
+                    applyTestMetaContext();
+                    var altered = json.convertValue(originalFields,
+                            new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, Object>>>() { });
+                    altered.stream().filter(field -> "name".equals(field.get("code"))).findFirst().orElseThrow().putAll(change);
+                    try {
+                        update.setExtension(Map.of("fields", altered));
+                        modelAdministration.updateModel(modelPid, update);
+                        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path)
+                                        .header("Authorization", "Bearer " + rawToken))
+                                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isConflict())
+                                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code")
+                                        .value("open_api_source_changed"))
+                                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                                        .string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("Private"))));
+                    } finally {
+                        applyTestMetaContext();
+                        update.setExtension(Map.of("fields", originalFields));
+                        modelAdministration.updateModel(modelPid, update);
+                    }
+                    var recovered = http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path)
+                                    .header("Authorization", "Bearer " + rawToken))
+                            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk()).andReturn();
+                    assertThat(recovered.getResponse().getContentAsString()).isEqualTo(baseline.getResponse().getContentAsString());
+                    assertThat(recovered.getResponse().getHeader("ETag")).isEqualTo(baseline.getResponse().getHeader("ETag"));
+                }));
     }
 
     @Test void modelEventsShareCrudTransactionAndIdempotentReplay() throws Exception {
