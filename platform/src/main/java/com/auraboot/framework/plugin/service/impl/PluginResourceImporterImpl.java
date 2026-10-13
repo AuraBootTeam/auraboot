@@ -2718,6 +2718,128 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         }
     }
 
+    // ==================== Stale Menu Reconciliation ====================
+
+    @Override
+    public int pruneStaleMenus(String pluginPid, String importId, Long tenantId,
+                               java.util.Collection<String> configuredMenuCodes) {
+        java.util.Set<String> configured = configuredMenuCodes == null
+                ? java.util.Set.of()
+                : new java.util.HashSet<>(configuredMenuCodes);
+        List<String> staleCodes = trackedMenuCodes(pluginPid, tenantId).stream()
+                .filter(code -> !configured.contains(code))
+                .toList();
+        if (staleCodes.isEmpty()) {
+            return 0;
+        }
+        int pruned = deleteTrackedMenus(pluginPid, importId, tenantId, staleCodes);
+        log.info("Pruned {} stale menu(s) dropped from plugin {} declaration: {}",
+                pruned, logSafe(pluginPid), staleCodes);
+        return pruned;
+    }
+
+    @Override
+    public int deactivateAllPluginMenus(String pluginPid, Long tenantId) {
+        List<String> codes = trackedMenuCodes(pluginPid, tenantId);
+        if (codes.isEmpty()) {
+            return 0;
+        }
+        int deactivated = deleteTrackedMenus(pluginPid, null, tenantId, codes);
+        log.info("Deactivated {} imported menu(s) of uninstalled plugin {}: {}",
+                deactivated, logSafe(pluginPid), codes);
+        return deactivated;
+    }
+
+    /**
+     * Menu codes this plugin family (same plugin_id across installs) previously imported,
+     * per tenant. Scoped to ab_plugin_resource tracking and explicitly excludes
+     * authoring-managed rows, so tenant-owned and dashboard-created menus are never touched.
+     */
+    private List<String> trackedMenuCodes(String pluginPid, Long tenantId) {
+        return jdbcTemplate.queryForList("""
+                SELECT DISTINCT r.resource_code
+                FROM ab_plugin_resource r
+                JOIN ab_plugin p ON p.pid = r.plugin_pid
+                JOIN ab_menu m ON m.tenant_id = r.tenant_id AND m.code = r.resource_code
+                               AND m.deleted_flag = FALSE
+                WHERE p.plugin_id = (SELECT plugin_id FROM ab_plugin WHERE pid = ?)
+                  AND r.tenant_id = ?
+                  AND r.resource_type = ?
+                  AND COALESCE(m.extension ->> 'authoringManaged', 'false') <> 'true'
+                """, String.class, pluginPid, tenantId, ResourceType.MENU.code()).stream()
+                .filter(Objects::nonNull)
+                .filter(code -> !code.isBlank())
+                .toList();
+    }
+
+    /**
+     * Soft-delete tracked menu rows through {@link #rollbackResource}, appending an audit
+     * row per pruned code. rollbackResource falls back to a direct soft delete when the
+     * menu service refuses a parent with active children, so a stale subtree converges in
+     * one pass. A code whose active menu row is already gone is silently accepted
+     * (idempotent re-run).
+     */
+    private int deleteTrackedMenus(String pluginPid, String importId, Long tenantId, List<String> codes) {
+        int pruned = 0;
+        for (String code : codes) {
+            Long menuId = menuMapper.findIdByCode(tenantId, code);
+            if (menuId == null) {
+                continue;
+            }
+            PluginResource record = new PluginResource();
+            record.setResourceType(ResourceType.MENU.code());
+            record.setResourceCode(code);
+            record.setResourceId(menuId);
+            record.setResourcePid(menuMapper.findPidByCode(tenantId, code));
+            try {
+                rollbackResource(record);
+            } catch (Exception e) {
+                log.warn("Failed to prune stale menu {}: {}", logSafe(code),
+                        logSafe(e.getMessage()));
+                continue;
+            }
+            pruned++;
+            if (pluginPid != null) {
+                upsertResourceRecord(createResourceRecord(pluginPid, importId, tenantId,
+                        ResourceType.MENU, record.getResourcePid(), menuId, code, null,
+                        ResourceAction.DELETE, null, null));
+            }
+        }
+        return pruned;
+    }
+
+    /**
+     * ab_plugin_resource enforces one tracking row per (tenant, plugin, type, code), so
+     * prune audits follow the import chain's persistence contract: update the existing
+     * row in place (re-homing it to the current plugin install), insert only when the
+     * code was never tracked.
+     */
+    private void upsertResourceRecord(PluginResource record) {
+        PluginResource existing = pluginResourceMapper.findByTenantPluginAndResource(
+                record.getTenantId(), record.getPluginPid(), record.getResourceType(), record.getResourceCode());
+        if (existing == null) {
+            existing = pluginResourceMapper.findByTypeAndCode(
+                    record.getTenantId(), record.getResourceType(), record.getResourceCode());
+        }
+        if (existing == null) {
+            pluginResourceMapper.insert(record);
+            return;
+        }
+        existing.setPluginPid(record.getPluginPid());
+        existing.setImportId(record.getImportId());
+        existing.setResourcePid(record.getResourcePid());
+        existing.setResourceId(record.getResourceId());
+        existing.setResourceName(record.getResourceName());
+        existing.setAction(record.getAction());
+        existing.setPreviousState(record.getPreviousState());
+        existing.setCurrentState(record.getCurrentState());
+        existing.setImportSnapshot(record.getImportSnapshot());
+        existing.setUserModified(false);
+        existing.setUserModifiedAt(null);
+        existing.setUpdatedAt(record.getUpdatedAt());
+        pluginResourceMapper.updateById(existing);
+    }
+
     // ==================== Helper Methods ====================
 
     private PluginResource createResourceRecord(String pluginPid, String importId, Long tenantId,

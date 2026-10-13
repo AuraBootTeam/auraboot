@@ -246,6 +246,15 @@ final class PluginAccessResourceImporter {
             }
         }
 
+        // menus.json is the plugin's complete menu surface: rows this plugin family
+        // previously imported but no longer declares (renamed/slimmed) are pruned so
+        // they cannot linger as dead sidebar links.
+        int prunedStaleMenus = resourceImporter.pruneStaleMenus(pluginPid, importId, tenantId,
+                sorted.stream().filter(MenuDefinitionDTO::isValid).map(MenuDefinitionDTO::getCode).toList());
+        for (int i = 0; i < prunedStaleMenus; i++) {
+            result.incrementResourceCount(ResourceType.MENU, ResourceAction.DELETE);
+        }
+
         // Auto-generate menu i18n records from name:zh-CN / name:en fields
         generateMenuI18nRecords(sorted, tenantId);
     }
