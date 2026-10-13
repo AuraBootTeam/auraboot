@@ -6,6 +6,7 @@ import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.HostSerializableEventConsumer;
 import com.auraboot.framework.integration.ReliableEventDeliveryExecutor;
 import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.ModelFieldBindingService;
 import com.auraboot.framework.notification.dto.NotificationRuleRequest;
 import com.auraboot.framework.notification.dto.NotificationTemplateCreateRequest;
@@ -151,6 +152,7 @@ class RegisteredSourceBindingPostgresIT {
     @Autowired TenantMemberService members;
     @Autowired PluginImportService imports;
     @Autowired DynamicDataService data;
+    @Autowired MetaModelService metadata;
     @Autowired ModelFieldBindingService bindings;
     @Autowired NotificationRuleService rules;
     @Autowired NotificationTemplateService templates;
@@ -620,7 +622,7 @@ class RegisteredSourceBindingPostgresIT {
         trace.put("productQuoteFacetSelected", productQuoteFacetEnabled);
         if (productQuoteFacetEnabled) {
             ProductQuoteReminderNativeFacet.run(new ProductQuoteReminderNativeFacet.Services(dataSource, jdbc, json,
-                    manager, tenants, users, members, tenantBootstrap, imports, data, templates, rules,
+                    manager, tenants, users, members, tenantBootstrap, imports, data, metadata, templates, rules,
                     reader, validator, reliable, writer, executor, extensions, List.of(tenant.getId(), foreignTenant.getId())), evidence);
             proved("actual full Product DSL import and ReminderService queue facet completed with test-owned station notification authority");
         } else {

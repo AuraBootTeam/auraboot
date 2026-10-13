@@ -4,6 +4,8 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.ReliableEventDeliveryExecutor;
 import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.constant.SystemFieldConstants;
 import com.auraboot.framework.notification.dto.NotificationRuleRequest;
 import com.auraboot.framework.notification.dto.NotificationTemplateCreateRequest;
@@ -53,6 +55,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -70,7 +73,7 @@ final class ProductQuoteReminderNativeFacet {
     record Services(DataSource dataSource, JdbcTemplate jdbc, ObjectMapper json,
                     PlatformTransactionManager manager, TenantService tenants, UserService users,
                     TenantMemberService members, TenantBootstrapService bootstrap, PluginImportService imports,
-                    DynamicDataService data, NotificationTemplateService templates, NotificationRuleService rules,
+                    DynamicDataService data, MetaModelService metadata, NotificationTemplateService templates, NotificationRuleService rules,
                     ImportedNotificationMetadataReader reader, ImportedNotificationMetadataValidator validator,
                     ReliableIntegrationAccessor reliable, StrictInAppDeliveryWriter writer,
                     ReliableEventDeliveryExecutor executor, ExtensionRegistry extensions, List<Long> protectedTenantIds) {}
@@ -342,16 +345,48 @@ final class ProductQuoteReminderNativeFacet {
             assertThat(result.isSuccess()).as("Actual Product import ordinal %s: %s", ordinal, result.getErrorMessage()).isTrue();
         }
         assertThat(s.imports.verifyImportReferenceIntegrity()).isEmpty();
+        trace.put("formalImportedDirectories", 23);
+        trace.put("stage", "product-physical-model-admission");
+        List<Map<String, Object>> physicalModels = new ArrayList<>();
+        trace.put("actualPhysicalModelDiagnostics", physicalModels);
         for (String model : BUSINESS_MODELS) {
-            var registered = s.jdbc.queryForMap("SELECT table_name,status FROM ab_meta_model WHERE tenant_id=? AND code=? AND is_current=TRUE AND deleted_flag=FALSE", tenant.getId(), model);
-            assertThat(registered.get("status")).isEqualTo("published");
-            assertThat(registered.get("table_name")).isEqualTo(SystemFieldConstants.generateTableName(model));
-            String table = (String) registered.get("table_name");
-            assertThat(s.jdbc.queryForObject("SELECT to_regclass(?)::text", String.class, table)).isEqualTo(table);
+            var registered = s.jdbc.queryForMap("SELECT id,code,tenant_id,plugin_pid,table_name,status FROM ab_meta_model WHERE tenant_id=? AND code=? AND is_current=TRUE AND deleted_flag=FALSE", tenant.getId(), model);
+            var owner = s.jdbc.queryForMap("SELECT pid,tenant_id FROM ab_plugin WHERE tenant_id=? AND pid=? AND deleted_flag=FALSE",
+                    tenant.getId(), registered.get("plugin_pid"));
+            var definition = s.metadata.getModelDefinitionFromDb(model);
+            String table = s.metadata.getTableName(model);
+            String actualTable = s.jdbc.queryForObject("SELECT to_regclass(?)::text", String.class, table);
+            Map<String, Object> physical = new LinkedHashMap<>();
+            physical.put("registered", registered);
+            physical.put("owner", owner);
+            physical.put("projectedTable", table);
+            physical.put("actualTable", actualTable);
+            physicalModels.add(physical);
+            verifyImportedPhysicalModel(registered, owner, definition, table, actualTable, tenant.getId(), model);
             tables.put(model, table);
         }
         trace.put("formalImportedDirectories", 23);
         trace.put("actualRegisteredTables", tables);
+    }
+
+    /** Validates the canonical service projection, not a made-up physical name from nullable authoring storage. */
+    static void verifyImportedPhysicalModel(Map<String, Object> registered, Map<String, Object> owner,
+                                           Optional<ModelDefinition> definition, String projectedTable,
+                                           String actualTable, Long tenantId, String model) {
+        assertThat(registered.get("status")).isEqualTo("published");
+        assertThat(registered.get("code")).isEqualTo(model);
+        assertThat(registered.get("tenant_id")).isEqualTo(tenantId);
+        assertThat(registered.get("plugin_pid")).isInstanceOf(String.class);
+        assertThat((String) registered.get("plugin_pid")).isNotBlank();
+        assertThat(owner.get("pid")).isEqualTo(registered.get("plugin_pid"));
+        assertThat(owner.get("tenant_id")).isEqualTo(tenantId);
+        assertThat(definition).isPresent();
+        assertThat(definition.orElseThrow().getId()).isEqualTo(registered.get("id"));
+        assertThat(definition.orElseThrow().getCode()).isEqualTo(model);
+        assertThat(definition.orElseThrow().getStatus()).isEqualTo("published");
+        assertThat(projectedTable).isEqualTo(SystemFieldConstants.generateTableName(model));
+        assertThat(definition.orElseThrow().getTableName()).isEqualTo(projectedTable);
+        assertThat(actualTable).isEqualTo(projectedTable);
     }
 
     private String contact(String supplier, String label) {
