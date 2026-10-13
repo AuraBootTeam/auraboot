@@ -36,6 +36,11 @@ public class WebhookDeliveryLog {
     @TableField("request_id")
     private String requestId;
 
+    /** Internal receiver bulkhead identity, never part of the public DTO. */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @TableField("receiver_key")
+    private String receiverKey;
+
     @TableField("request_url")
     private String requestUrl;
 

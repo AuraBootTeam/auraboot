@@ -1184,6 +1184,8 @@ def verify_release_report(report, *, model_event_secret=None):
         raise ProtocolError("release notification burst measurement missing")
     if "sustainedMeasurement" not in report["modelEvents"]:
         raise ProtocolError("fixed sustained notification measurement missing")
+    if "receiverIsolation" not in report["modelEvents"]:
+        raise ProtocolError("fixed receiver isolation proof missing")
     verify_command_audits(report.get("commandAudits"))
     return report
 

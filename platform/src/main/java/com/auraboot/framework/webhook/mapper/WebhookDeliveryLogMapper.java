@@ -19,20 +19,44 @@ import java.util.List;
 @Mapper
 @InterceptorIgnore(tenantLine = "true")
 public interface WebhookDeliveryLogMapper extends BaseMapper<WebhookDeliveryLog> {
+    @org.apache.ibatis.annotations.Insert("""
+            INSERT INTO ab_webhook_receiver_lane(tenant_id, receiver_key)
+            VALUES(#{tenantId}, #{receiverKey}) ON CONFLICT DO NOTHING
+            """)
+    int registerReceiver(@Param("tenantId") Long tenantId, @Param("receiverKey") String receiverKey);
+
     @Select("""
-            WITH candidates AS (
-                SELECT id FROM ab_webhook_delivery_log
-                WHERE (delivery_status = 'pending' AND next_retry_at <= clock_timestamp())
-                   OR (delivery_status = 'processing' AND lease_until < clock_timestamp())
-                ORDER BY created_at, id
-                FOR UPDATE SKIP LOCKED
-                LIMIT #{limit}
+            WITH candidates AS MATERIALIZED (
+                SELECT l.tenant_id, l.receiver_key FROM ab_webhook_receiver_lane l
+                WHERE (l.lease_until IS NULL OR l.lease_until < clock_timestamp())
+                  AND l.ready_at <= clock_timestamp()
+                  AND EXISTS (SELECT 1 FROM ab_webhook_delivery_log d
+                      WHERE d.tenant_id=l.tenant_id AND d.receiver_key=l.receiver_key
+                        AND ((d.delivery_status='pending' AND d.next_retry_at<=clock_timestamp())
+                          OR (d.delivery_status='processing' AND d.lease_until<clock_timestamp())))
+                ORDER BY l.last_claimed_at, l.tenant_id, l.receiver_key
+                FOR UPDATE OF l SKIP LOCKED LIMIT #{limit}
+            ), lanes AS (
+                UPDATE ab_webhook_receiver_lane l
+                SET lease_token=#{leaseToken}, lease_until=#{leaseUntil}, last_claimed_at=clock_timestamp()
+                FROM candidates c WHERE l.tenant_id=c.tenant_id AND l.receiver_key=c.receiver_key
+                  AND (l.lease_until IS NULL OR l.lease_until<clock_timestamp())
+                RETURNING l.tenant_id,l.receiver_key
+            ), attempts AS (
+                SELECT selected.id FROM lanes l CROSS JOIN LATERAL (
+                    SELECT d.id FROM ab_webhook_delivery_log d
+                    WHERE d.tenant_id=l.tenant_id AND d.receiver_key=l.receiver_key
+                      AND ((d.delivery_status='pending' AND d.next_retry_at<=clock_timestamp())
+                        OR (d.delivery_status='processing' AND d.lease_until<clock_timestamp()))
+                    ORDER BY d.created_at,d.id FOR UPDATE OF d SKIP LOCKED LIMIT 1
+                ) selected
             )
             UPDATE ab_webhook_delivery_log d
-            SET delivery_status = 'processing', lease_owner = #{leaseOwner},
-                lease_token = #{leaseToken}, lease_until = #{leaseUntil}, last_attempt_at = NOW(),
-                updated_at = NOW()
-            FROM candidates c WHERE d.id = c.id
+            SET delivery_status='processing', lease_owner=#{leaseOwner}, lease_token=#{leaseToken},
+                lease_until=#{leaseUntil},last_attempt_at=clock_timestamp(),updated_at=clock_timestamp()
+            FROM attempts a WHERE d.id=a.id
+              AND ((d.delivery_status='pending' AND d.next_retry_at<=clock_timestamp())
+                OR (d.delivery_status='processing' AND d.lease_until<clock_timestamp()))
             RETURNING d.*
             """)
     List<WebhookDeliveryLog> claimReady(@Param("limit") int limit,
@@ -41,18 +65,31 @@ public interface WebhookDeliveryLogMapper extends BaseMapper<WebhookDeliveryLog>
                                         @Param("leaseUntil") Instant leaseUntil);
 
     @Update("""
-            UPDATE ab_webhook_delivery_log
+            UPDATE ab_webhook_receiver_lane l SET lease_token=NULL,lease_until=NULL
+            WHERE l.lease_token=#{leaseToken} AND NOT EXISTS (
+                SELECT 1 FROM ab_webhook_delivery_log d WHERE d.tenant_id=l.tenant_id
+                  AND d.receiver_key=l.receiver_key AND d.delivery_status='processing'
+                  AND d.lease_token=#{leaseToken})
+            """)
+    int releaseUnusedReceivers(@Param("leaseToken") String leaseToken);
+
+    @Update("""
+            WITH completed AS (UPDATE ab_webhook_delivery_log
             SET delivery_status = 'success', response_status = #{responseStatus},
                 response_body = #{responseBody}, delivered_at = NOW(), error_message = NULL,
                 lease_owner = NULL, lease_token = NULL, lease_until = NULL, updated_at = NOW()
             WHERE id = #{id} AND delivery_status = 'processing' AND lease_token = #{leaseToken}
+            RETURNING tenant_id,receiver_key)
+            UPDATE ab_webhook_receiver_lane l SET lease_token=NULL,lease_until=NULL
+            FROM completed c WHERE l.tenant_id=c.tenant_id AND l.receiver_key=c.receiver_key
+                AND l.lease_token=#{leaseToken}
             """)
     int markSuccess(@Param("id") Long id, @Param("leaseToken") String leaseToken,
                     @Param("responseStatus") int responseStatus,
                     @Param("responseBody") String responseBody);
 
     @Update("""
-            UPDATE ab_webhook_delivery_log
+            WITH completed AS (UPDATE ab_webhook_delivery_log
             SET retry_count = retry_count + 1,
                 delivery_status = CASE WHEN retry_count + 1 >= max_retries
                     THEN 'dead_letter' ELSE 'pending' END,
@@ -60,6 +97,11 @@ public interface WebhookDeliveryLogMapper extends BaseMapper<WebhookDeliveryLog>
                 error_message = #{errorMessage}, next_retry_at = #{nextRetryAt},
                 lease_owner = NULL, lease_token = NULL, lease_until = NULL, updated_at = NOW()
             WHERE id = #{id} AND delivery_status = 'processing' AND lease_token = #{leaseToken}
+            RETURNING tenant_id,receiver_key)
+            UPDATE ab_webhook_receiver_lane l SET lease_token=NULL,lease_until=NULL,
+                ready_at=#{nextRetryAt}
+            FROM completed c WHERE l.tenant_id=c.tenant_id AND l.receiver_key=c.receiver_key
+                AND l.lease_token=#{leaseToken}
             """)
     int markFailure(@Param("id") Long id, @Param("leaseToken") String leaseToken,
                     @Param("responseStatus") Integer responseStatus,
@@ -68,14 +110,32 @@ public interface WebhookDeliveryLogMapper extends BaseMapper<WebhookDeliveryLog>
                     @Param("nextRetryAt") Instant nextRetryAt);
 
     @Update("""
-            UPDATE ab_webhook_delivery_log
+            WITH completed AS (UPDATE ab_webhook_delivery_log
             SET retry_count = retry_count + 1, delivery_status = 'dead_letter',
                 error_message = #{errorMessage}, lease_owner = NULL, lease_token = NULL,
                 lease_until = NULL, updated_at = NOW()
             WHERE id = #{id} AND delivery_status = 'processing' AND lease_token = #{leaseToken}
+            RETURNING tenant_id,receiver_key)
+            UPDATE ab_webhook_receiver_lane l SET lease_token=NULL,lease_until=NULL
+            FROM completed c WHERE l.tenant_id=c.tenant_id AND l.receiver_key=c.receiver_key
+                AND l.lease_token=#{leaseToken}
             """)
     int markPermanentFailure(@Param("id") Long id, @Param("leaseToken") String leaseToken,
                              @Param("errorMessage") String errorMessage);
+
+    @Update("""
+            WITH rebound AS (UPDATE ab_webhook_delivery_log
+                SET receiver_key=#{receiverKey},request_url=#{targetUrl},delivery_status='pending',
+                    lease_owner=NULL,lease_token=NULL,lease_until=NULL,next_retry_at=clock_timestamp()
+                WHERE id=#{id} AND delivery_status='processing' AND lease_token=#{leaseToken}
+                RETURNING tenant_id)
+            UPDATE ab_webhook_receiver_lane l SET lease_token=NULL,lease_until=NULL
+            FROM rebound r WHERE l.tenant_id=r.tenant_id AND l.receiver_key=#{oldReceiverKey}
+                AND l.lease_token=#{leaseToken}
+            """)
+    int rebindReceiver(@Param("id") Long id,@Param("leaseToken") String leaseToken,
+                      @Param("oldReceiverKey") String oldReceiverKey,@Param("receiverKey") String receiverKey,
+                      @Param("targetUrl") String targetUrl);
 
     @Update("""
             UPDATE ab_webhook_delivery_log

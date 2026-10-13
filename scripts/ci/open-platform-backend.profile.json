@@ -41,7 +41,9 @@
     "com.auraboot.framework.meta.service.impl.AggregateQueryServiceImplDataScopeTest",
     "com.auraboot.framework.meta.service.impl.CommandPermitDataAccessTest",
     "com.auraboot.framework.meta.service.impl.SemanticAggregateAdapterTest",
-    "com.auraboot.framework.meta.cache.AggregateQueryCacheInterceptorTest"
+    "com.auraboot.framework.meta.cache.AggregateQueryCacheInterceptorTest",
+    "com.auraboot.framework.webhook.service.WebhookSignatureTest",
+    "com.auraboot.framework.webhook.service.WebhookRequestTraceTest"
   ],
   "coverage": {
     "minimumLinePercent": 80,
@@ -51,7 +53,8 @@
     ],
     "classes": [
       "com.auraboot.framework.meta.service.impl.NamedQueryServiceImpl",
-      "com.auraboot.framework.meta.service.impl.AggregateQueryServiceImpl"
+      "com.auraboot.framework.meta.service.impl.AggregateQueryServiceImpl",
+      "com.auraboot.framework.webhook.service.WebhookReceiverKey"
     ],
     "nonExecutableClasses": [
       "com.auraboot.framework.openplatform.service.OpenApiCapabilityContributor"

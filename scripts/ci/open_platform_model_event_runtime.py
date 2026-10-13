@@ -141,6 +141,19 @@ class DockerInfrastructure:
         require(isinstance(result, dict) and "lastRun" in result, "model source poll marker missing")
         return result["lastRun"]
 
+    def receiver_isolation_state(self, tenant, subjects, subscriptions):
+        tenant=self.tenant_id(tenant)
+        require(len(subjects)==2 and len(set(subjects))==2 and len(subscriptions)==4 and len(set(subscriptions))==4,
+                'receiver isolation observation denominator invalid')
+        subjects=','.join("'"+self.identifier(x)+"'" for x in subjects)
+        subscriptions=','.join("'"+self.identifier(x)+"'" for x in subscriptions)
+        return self.sql("SELECT json_build_object('deliveries',COALESCE(json_agg(json_build_object("
+            "'subjectPid',o.subject,'eventId',d.event_id,'subscriptionPid',d.subscription_pid,"
+            "'deliveryPid',d.pid,'deliveryStatus',d.delivery_status,'retryCount',d.retry_count,"
+            "'responseStatus',d.response_status)), '[]'::json)) FROM ab_outbox o "
+            "JOIN ab_webhook_delivery_log d ON d.tenant_id=o.tenant_id AND d.event_id=o.event_id "
+            f"WHERE o.tenant_id={tenant} AND o.subject IN ({subjects}) AND d.subscription_pid IN ({subscriptions})")
+
     def load_state(self, tenant, event_type, subjects, subscription_pid, *, expected_count=32):
         tenant, event_type = self.tenant_id(tenant), self.identifier(event_type)
         subscription_pid = self.identifier(subscription_pid)

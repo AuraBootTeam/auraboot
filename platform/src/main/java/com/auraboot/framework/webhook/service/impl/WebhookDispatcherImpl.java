@@ -174,6 +174,10 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
         } catch (Exception exception) {
             throw new IllegalArgumentException("Webhook payload is not JSON serializable", exception);
         }
+        String receiverKey = com.auraboot.framework.webhook.service.WebhookReceiverKey.of(
+                subscription.getTargetUrl(), subscription.getPid());
+        delivery.setReceiverKey(receiverKey);
+        deliveryLogMapper.registerReceiver(subscription.getTenantId(), receiverKey);
         deliveryLogMapper.insert(delivery);
         return receiptFrom(subscription, delivery);
     }
@@ -215,6 +219,14 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
             return;
         }
         try {
+            String receiverKey = com.auraboot.framework.webhook.service.WebhookReceiverKey.of(
+                    subscription.getTargetUrl(), subscription.getPid());
+            if (!receiverKey.equals(delivery.getReceiverKey())) {
+                deliveryLogMapper.registerReceiver(subscription.getTenantId(), receiverKey);
+                deliveryLogMapper.rebindReceiver(delivery.getId(), delivery.getLeaseToken(),
+                        delivery.getReceiverKey(), receiverKey, subscription.getTargetUrl());
+                return; // Changed targets must acquire their current receiver's bulkhead before sending.
+            }
             boolean modelEvent = OpenApiEventCatalog.isModelEvent(subscription.getEventType());
             if (modelEvent && (subscription.getSecret() == null || subscription.getSecret().isBlank())) {
                 throw new IllegalArgumentException("Published model notifications require a signing secret");
@@ -237,6 +249,9 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
                     ? subscription.getTimeoutMs()
                     : DEFAULT_READ_TIMEOUT_MS;
 
+            if (readTimeoutMs < 1000 || readTimeoutMs > 60000) {
+                throw new IllegalArgumentException("Webhook timeout must be between 1000 and 60000 milliseconds");
+            }
             String timestamp = String.valueOf(Instant.now().getEpochSecond());
             HttpRequest.Builder requestBuilder = PinnedHttpRequests.newPinnedRequestBuilder(target)
                     .timeout(Duration.ofMillis(readTimeoutMs))

@@ -573,11 +573,15 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
                 INSERT INTO ab_webhook_delivery_log
                   (pid, tenant_id, subscription_pid, installation_pid, event_id, request_url,
                    request_body, response_status, response_body, delivery_status, retry_count,
-                   max_retries, error_message, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'dead_letter', 3, 3, ?, NOW(), NOW())
+                   max_retries, error_message, receiver_key, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'dead_letter', 3, 3, ?, 'https://example.invalid:443', NOW(), NOW())
                 """, "delivery-ops-1", tenantId, "subscription-ops-1", installation.pid(), "event-ops-1",
                 "https://secret.example.invalid/hook", "{\"secret\":\"must-not-leak\"}", 503,
                 "private response body", "upstream https://secret.example.invalid failed");
+
+        jdbcTemplate.update("INSERT INTO ab_webhook_receiver_lane(tenant_id,receiver_key) VALUES (?,?) ON CONFLICT DO NOTHING",
+                tenantId, "https://example.invalid:443");
+
 
         var overview = managementService.getOperationsOverview(installation.pid(), 24);
         assertEquals(3, overview.totalCalls());

@@ -135,7 +135,7 @@ def run_static_probe(request, admin):
 
 
 def main():
-    request = Client(BASE, max_requests=650, allow_expected_rate_limit=True).request
+    request = Client(BASE, max_requests=1000, allow_expected_rate_limit=True).request
     admin = bootstrap_module.bootstrap_admin(request)
     static = run_static_probe(request, admin)
     credential = static["credential"]
@@ -163,7 +163,7 @@ def main():
         base_url=BASE, receiver_host=os.environ["MODEL_RECEIVER_HOST"])
     model_events = run_model_event_probe(request, admin, infrastructure,
         evidence_path=Path(ARTIFACT).parent / "model-events" / "result.json",
-        receiver_host=os.environ["MODEL_RECEIVER_HOST"], secret_file=os.environ["MODEL_EVENT_SECRET_FILE"], measure_load=True, measure_sustained=True)
+        receiver_host=os.environ["MODEL_RECEIVER_HOST"], secret_file=os.environ["MODEL_EVENT_SECRET_FILE"], measure_load=True, measure_sustained=True, measure_isolation=True)
 
     slo_fixture = prepare_slo_fixture(request, admin, dynamic, load_input,
         fixture_path=os.environ.get("SLO_FIXTURE_ARTIFACT", str(Path(ARTIFACT).with_name("slo-fixture.json"))))

@@ -54,6 +54,7 @@ class WebhookRequestTraceTest {
             var dispatcher = new WebhookDispatcherImpl(subscriptions, deliveries, new ObjectMapper(),
                     mock(FieldEncryptionService.class), new WebhookSignature(), new OpenApiEventCatalog());
             Instant before = Instant.now();
+            delivery.setReceiverKey(WebhookReceiverKey.of(subscription.getTargetUrl(), subscription.getPid()));
             dispatcher.processClaimed(delivery);
             Instant after = Instant.now();
             var nextAttempt = ArgumentCaptor.forClass(Instant.class);
@@ -99,6 +100,7 @@ class WebhookRequestTraceTest {
             var delivery = new WebhookDeliveryLog(); delivery.setId(7L); delivery.setTenantId(42L);
             delivery.setSubscriptionPid(subscription.getPid()); delivery.setPid("delivery-1"); delivery.setLeaseToken("lease-1");
             when(policy.prepare(subscription, delivery)).thenReturn(Map.of("id", "event-1"));
+            delivery.setReceiverKey(WebhookReceiverKey.of(subscription.getTargetUrl(), subscription.getPid()));
             dispatcher.processClaimed(delivery);
             assertThat(received).isEmpty();
             verify(deliveries).markPermanentFailure(eq(7L), eq("lease-1"), contains("signing secret"));
@@ -150,6 +152,7 @@ class WebhookRequestTraceTest {
             // Rehydrate the persisted representation and execute on a different context.
             WebhookDeliveryLog restored = json.readValue(json.writeValueAsString(queued.getValue()), WebhookDeliveryLog.class);
             restored.setId(1L); restored.setLeaseToken("claimed-lease");
+            restored.setReceiverKey(queued.getValue().getReceiverKey());
             MDC.put("requestId", "unrelated-worker");
             dispatcher.processClaimed(restored);
             dispatcher.processClaimed(restored);

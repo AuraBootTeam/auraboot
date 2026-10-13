@@ -103,6 +103,34 @@ def sustained_passed():
     return m
 
 
+def isolation_passed():
+    t=1700000000.0; subs=['slow-0','slow-1','slow-2'];fast='healthy';rows=[];states=[];intervals=[]
+    created=[{'index':i,'subjectPid':'isolation_subject_'+str(i),'createStartedAt':t+(0 if i==0 else 2),
+              'createCompletedAt':t+(0.1 if i==0 else 2.1)} for i in range(2)]
+    for n,sub in enumerate(subs+[fast]):
+        for i in range(2):
+            proof=copy.deepcopy(load_passed(2)['rows'][i]['proof']);proof.update(subjectPid=created[i]['subjectPid'],
+                eventId='isolation_event_'+str(i),deliveryPid=sub+'_'+str(i))
+            row=proof['rawEvidence'][0];payload=json.loads(base64.b64decode(row['rawBodyBase64']))
+            origin='release-model-isolation-'+str(i);pid=created[i]['subjectPid']
+            payload.update(id=proof['eventId'],subject={'type':'release.model-event.parts','pid':pid},correlationId=origin,
+                data={'pid':pid,'name':'Notification isolation '+str(i),'zone':'A'})
+            raw=json.dumps(payload).encode();received=t+(3 if sub==fast else 1 if n==0 and i==0 else 6+n*2+i)
+            row.update(receivedAt=received,timestamp=str(int(received)),requestId=origin,sequence=n*2+i+1,
+                eventAgeAtReceiptMs=round((received-t)*1000,3),rawBodyBase64=base64.b64encode(raw).decode(),
+                bodySha256=hashlib.sha256(raw).hexdigest(),signature='sha256='+hmac.new(SECRET,str(int(received)).encode()+b'.'+raw,hashlib.sha256).hexdigest())
+            rows.append({'index':i,'subscriptionPid':sub,'proof':proof})
+            states.append({'deliveryPid':proof['deliveryPid'],'eventId':proof['eventId'],'subjectPid':pid,
+                'subscriptionPid':sub,'deliveryStatus':'success','retryCount':0,'responseStatus':200})
+            if sub!=fast: intervals.append({'deliveryPid':proof['deliveryPid'],'startedAt':received,'endedAt':t+6 if n==0 and i==0 else received+.1})
+    held=copy.deepcopy(states)
+    for index,r in enumerate(held):
+        if r['subscriptionPid']!=fast:r.update(deliveryStatus='processing' if index==0 else 'pending',responseStatus=None)
+    return {'status':'complete','profile':'receiver-origin-isolation-v1','slowSubscriptions':subs,'fastSubscription':fast,
+        'blockedAt':t+1.1,'observedWhileHeldAt':t+4,'releasedAt':t+5,'finishedAt':t+15,
+        'created':created,'rows':rows,'slowIntervals':intervals,'heldState':{'deliveries':held},'finalState':{'deliveries':states}}
+
+
 class ModelEventTests(unittest.TestCase):
     def test_source_binding_proof_is_mandatory_and_linked_to_signed_restoration(self):
         for key in passed()["sourceBindingProof"]:
@@ -155,6 +183,17 @@ class ModelEventTests(unittest.TestCase):
     def test_complete_fixed_report_recomputes_all_six_signatures(self):
         report = passed()
         self.assertEqual(verify_report(report, secret=SECRET), report)
+
+        report=passed(); report['receiverIsolation']=isolation_passed()
+        self.assertEqual(verify_report(report,secret=SECRET)['receiverIsolation']['status'],'complete')
+        for change in [lambda m:m['rows'].pop(),lambda m:m['slowSubscriptions'].pop(),
+            lambda m:m.update(releasedAt=m['blockedAt']),lambda m:m['slowIntervals'][1].update(startedAt=m['blockedAt']),
+            lambda m:m['heldState']['deliveries'][1].update(deliveryStatus='processing'),
+            lambda m:m['finalState']['deliveries'][0].update(retryCount=1),
+            lambda m:m['rows'][0]['proof']['rawEvidence'][0].update(signature='sha256='+'0'*64),
+            lambda m:m['rows'][0]['proof']['rawEvidence'][0].update(eventAgeAtReceiptMs=0)]:
+            mutated=passed();mutated['receiverIsolation']=isolation_passed();change(mutated['receiverIsolation'])
+            with self.assertRaises(ProtocolError):verify_report(mutated,secret=SECRET)
 
         report = passed(); report["loadMeasurement"] = load_passed()
         self.assertEqual(verify_report(report, secret=SECRET)["loadMeasurement"]["metrics"]["accepted"], 32)

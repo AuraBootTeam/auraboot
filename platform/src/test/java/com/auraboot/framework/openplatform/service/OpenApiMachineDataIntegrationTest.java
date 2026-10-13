@@ -313,6 +313,9 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
     @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     void failedModelNotificationPersistsJitteredRetryAndRecovers() throws Exception {
         publishEvents();
+        var leaseEntered = new java.util.concurrent.CountDownLatch(1);
+        var leaseRelease = new java.util.concurrent.CountDownLatch(1);
+        String[] leaseSubscription = new String[1];
         var received = new java.util.concurrent.CopyOnWriteArrayList<String>();
         var signatures = new java.util.concurrent.CopyOnWriteArrayList<String>();
         var timestamps = new java.util.concurrent.CopyOnWriteArrayList<String>();
@@ -321,6 +324,16 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
             received.add(new String(exchange.getRequestBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
             signatures.add(exchange.getRequestHeaders().getFirst("X-Webhook-Signature"));
             timestamps.add(exchange.getRequestHeaders().getFirst("X-Webhook-Timestamp"));
+            if (received.size() == 3) {
+                leaseEntered.countDown();
+                try {
+                    if (!leaseRelease.await(15, java.util.concurrent.TimeUnit.SECONDS))
+                        throw new java.io.IOException("Owned lease fixture was not released");
+                } catch (InterruptedException error) {
+                    Thread.currentThread().interrupt();
+                    throw new java.io.IOException("Owned lease fixture interrupted", error);
+                }
+            }
             exchange.sendResponseHeaders(received.size() == 1 ? 503 : 200, -1);
             exchange.close();
         });
@@ -368,7 +381,39 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
             }
             assertThat(eventJdbc.queryForObject("SELECT COUNT(*) FROM ab_webhook_delivery_log WHERE tenant_id = ? AND event_id = ?",
                     Long.class, principal.tenantId(), source.eventId())).isEqualTo(1);
+            var leaseRequest = new com.auraboot.framework.webhook.dto.WebhookCreateRequest();
+            leaseRequest.setName("Receiver lease fence fixture");
+            leaseRequest.setEventType("fixture.receiver-lease." + contract.code());
+            leaseRequest.setTargetUrl(subscription.getTargetUrl());
+            leaseRequest.setSecret("lease-fixture-secret");
+            var leaseSub = webhooks.create(leaseRequest);
+            leaseSubscription[0] = leaseSub.getPid();
+            var queued = webhookDispatcher.dispatchTracked(leaseSub.getEventType(),
+                    Map.of("_eventId", "lease-fixture-" + leaseSub.getPid()), principal.tenantId());
+            assertThat(queued.receipts()).hasSize(1);
+            String deliveryPid = queued.receipts().getFirst().deliveryLogPid();
+            assertThat(leaseEntered.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            var held = deliveries.selectOne(new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<
+                    com.auraboot.framework.webhook.entity.WebhookDeliveryLog>().eq("pid", deliveryPid));
+            assertThat(held.getDeliveryStatus()).isEqualTo("processing");
+            assertThat(held.getLeaseToken()).isNotBlank();
+            assertThat(deliveries.markFailure(held.getId(), "stale-fixture-token", 503, null,
+                    "stale attempt", Instant.now())).isZero();
+            var unchanged = deliveries.selectById(held.getId());
+            assertThat(unchanged.getDeliveryStatus()).isEqualTo("processing");
+            assertThat(unchanged.getRetryCount()).isZero();
+            assertThat(unchanged.getLeaseToken()).isEqualTo(held.getLeaseToken());
+            assertThat(eventJdbc.queryForObject("SELECT lease_token FROM ab_webhook_receiver_lane WHERE tenant_id=? AND receiver_key=?",
+                    String.class, held.getTenantId(), held.getReceiverKey())).isEqualTo(held.getLeaseToken());
+            leaseRelease.countDown();
+            org.awaitility.Awaitility.await().pollInSameThread().atMost(java.time.Duration.ofSeconds(5))
+                    .until(() -> "success".equals(deliveries.selectById(held.getId()).getDeliveryStatus()));
+            assertThat(deliveries.selectById(held.getId()).getEventId()).isEqualTo("lease-fixture-" + leaseSub.getPid());
+            assertThat(eventJdbc.queryForObject("SELECT lease_token FROM ab_webhook_receiver_lane WHERE tenant_id=? AND receiver_key=?",
+                    String.class, held.getTenantId(), held.getReceiverKey())).isNull();
         } finally {
+            leaseRelease.countDown();
+            if (leaseSubscription[0] != null) webhooks.delete(leaseSubscription[0]);
             receiver.stop(0);
             if (previousHosts == null) System.clearProperty("AURA_SSRF_ALLOWED_PRIVATE_HOSTS");
             else System.setProperty("AURA_SSRF_ALLOWED_PRIVATE_HOSTS", previousHosts);

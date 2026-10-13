@@ -60,7 +60,7 @@ public class WebhookServiceImpl implements WebhookService {
         entity.setSecretRotatedAt(hasSecret(request.getSecret()) ? now : null);
         entity.setHeaders(request.getHeaders());
         entity.setMaxRetries(request.getMaxRetries());
-        entity.setTimeoutMs(request.getTimeoutMs());
+        entity.setTimeoutMs(validateTimeout(request.getTimeoutMs()));
         entity.setEnabled(request.isEnabled());
         entity.setCreatedAt(now);
         entity.setUpdatedAt(now);
@@ -117,7 +117,7 @@ public class WebhookServiceImpl implements WebhookService {
         }
         existing.setHeaders(request.getHeaders());
         existing.setMaxRetries(request.getMaxRetries());
-        existing.setTimeoutMs(request.getTimeoutMs());
+        existing.setTimeoutMs(validateTimeout(request.getTimeoutMs()));
         existing.setEnabled(request.isEnabled());
         existing.setUpdatedAt(Instant.now());
 
@@ -179,6 +179,13 @@ public class WebhookServiceImpl implements WebhookService {
         Long tenantId = MetaContext.getCurrentTenantId();
         int replayed = deliveryLogMapper.replay(tenantId, deliveryPid, MetaContext.getCurrentUserPid());
         return replayed == 1;
+    }
+
+    private int validateTimeout(Integer timeout) {
+        int value = timeout == null ? 10000 : timeout;
+        if (value < 1000 || value > 60000)
+            throw new IllegalArgumentException("Webhook timeout must be between 1000 and 60000 milliseconds");
+        return value;
     }
 
     private String validateInstallation(Long tenantId, String installationPid) {

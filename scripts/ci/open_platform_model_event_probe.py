@@ -14,7 +14,7 @@ import stat
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from http.server import HTTPServer
+from http.server import HTTPServer, ThreadingHTTPServer
 from pathlib import Path
 from queue import Queue
 
@@ -118,6 +118,8 @@ def verify_report(report, *, secret=None):
         require(all(json.loads(row["raw_body"])["recordVersion"] == 1
                     and json.loads(row["raw_body"])["correlationId"] == origin for row in actual),
                 "model event raw source metadata invalid")
+    if "receiverIsolation" in report:
+        verify_receiver_isolation(report["receiverIsolation"], secret=secret)
     if "loadMeasurement" in report:
         verify_load_measurement(report["loadMeasurement"], secret=secret)
     if "sustainedMeasurement" in report:
@@ -205,6 +207,31 @@ class Receivers:
         return {"store": store, "runId": run_id, "mode": mode,
                 "url": f"http://{self.host}:{server.server_port}/webhooks/{run_id}"}
 
+    def start_gate(self, label):
+        store = self.directory / (label + '.sqlite')
+        run_id = 'release-model-' + label
+        require(not store.exists(), 'gate receiver store already exists')
+        Receiver(store, self.secret, run_id, mode='accept', failures=1).close()
+        gate, entered, lock, intervals = threading.Event(), threading.Event(), threading.Lock(), []
+        secret = self.secret
+        class ControlledReceiver:
+            def __init__(self): self.run_id = run_id
+            def receive(self, raw, headers):
+                row = {'deliveryPid': next((v for k,v in headers.items() if k.lower()=='x-webhook-delivery'),None), 'startedAt': time.time()}
+                with lock: intervals.append(row)
+                with_receiver = Receiver(store, secret, run_id, mode='accept', failures=1)
+                try: result = with_receiver.receive(raw, headers)
+                finally: with_receiver.close()
+                entered.set()
+                require(gate.wait(45), 'owned slow receiver was not released')
+                with lock: row['endedAt'] = time.time()
+                return result
+        server = ThreadingHTTPServer((self.host, 0), handler(ControlledReceiver()))
+        thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
+        self.servers.append((server, thread))
+        return {'store':store,'runId':run_id,'mode':'accept','gate':gate,'entered':entered,
+            'lock':lock,'intervals':intervals,'url':f'http://{self.host}:{server.server_port}/webhooks/{run_id}'}
+
     def close(self):
         for server, thread in self.servers:
             server.shutdown()
@@ -222,7 +249,8 @@ def observe(callback, seconds=75):
     raise ProtocolError("model event bounded observation expired")
 
 
-def run_model_event_probe(request, admin, infrastructure, *, evidence_path, receiver_host, secret_file, measure_load=False, measure_sustained=False):
+def run_model_event_probe(request, admin, infrastructure, *, evidence_path, receiver_host, secret_file, measure_load=False, measure_sustained=False, measure_isolation=False):
+    require(type(measure_isolation) is bool, "receiver isolation opt-in must be boolean")
     require(type(measure_sustained) is bool, "sustained measurement opt-in must be boolean")
     require(type(measure_load) is bool, "model load measurement opt-in must be boolean")
     evidence_path = Path(evidence_path)
@@ -398,6 +426,10 @@ def run_model_event_probe(request, admin, infrastructure, *, evidence_path, rece
             record("tampered-real-evidence-rejected")
         else:
             record("tampered-real-evidence-rejected", False)
+        if measure_isolation:
+            report['receiverIsolation'] = {'status': 'started'}
+            report['receiverIsolation'] = collect_receiver_isolation(call, human, infrastructure, machine,
+                tenant, installation['pid'], subscription['pid'], receivers, replay, secret)
         if measure_load:
             report["loadMeasurement"] = {"profile": "burst-32x4", "status": "started"}
             report["loadMeasurement"] = collect_load_measurement(call, infrastructure, machine, tenant,
@@ -692,3 +724,125 @@ def collect_sustained_measurement(call, infrastructure, machine, tenant, subscri
     result['finishedAt'] = time.time()
     result['metrics'] = load_metrics(result)
     return verify_sustained_measurement(result, secret=secret)
+
+
+def collect_receiver_isolation(call, human, infrastructure, machine, tenant, installation, fast_subscription, receivers, fast, secret):
+    slow = receivers.start_gate('isolation')
+    subscriptions, created = [], []
+    result = {'status':'complete','profile':'receiver-origin-isolation-v1','rows':[]}
+    try:
+        for index in range(3):
+            sub = human('/api/webhooks','POST',{'name':'Isolated slow endpoint '+str(index),
+                'installationPid':installation,'eventType':'open.resource.release.model-event.parts.created',
+                'eventVersion':1,'targetUrl':slow['url'] if index!=1 else slow['url'].replace('http://','http://gate-user@'),
+                'secret':secret.decode(),'maxRetries':3,'timeoutMs':30000})
+            subscriptions.append(sub['pid'])
+        result.update(slowSubscriptions=subscriptions,fastSubscription=fast_subscription)
+        for index in range(2):
+            began=time.time(); origin='release-model-isolation-'+str(index)
+            _,body,_=call('/api/open/v1/resources/release.model-event.parts','POST',
+                body={'name':'Notification isolation '+str(index),'zone':'A'},
+                headers=dict(machine,**{'Idempotency-Key':origin,'X-Request-Id':origin}),expected=(201,))
+            created.append({'index':index,'subjectPid':body['pid'],'createStartedAt':began,'createCompletedAt':time.time()})
+            if index==0:
+                require(slow['entered'].wait(15),'slow receiver never entered the controlled wait')
+                result['blockedAt']=time.time()
+        result['created']=created
+        subjects=[row['subjectPid'] for row in created]
+        def fast_done():
+            state=infrastructure.load_state(tenant,'open.resource.release.model-event.parts.created',subjects,
+                fast_subscription,expected_count=2)
+            return state['sources'] if len(state['sources'])==2 and all(row['deliveryStatus']=='success' for row in state['sources']) else None
+        fast_states=observe(fast_done,seconds=12)
+        result['observedWhileHeldAt']=time.time()
+        with slow['lock']:
+            require(len(slow['intervals'])==1 and 'endedAt' not in slow['intervals'][0],
+                'slow endpoint monopolized slots or completed before the healthy receiver')
+        result['heldState']=infrastructure.receiver_isolation_state(tenant,subjects,subscriptions+[fast_subscription])
+        require(sum(row['deliveryStatus']=='processing' for row in result['heldState']['deliveries']
+                    if row['subscriptionPid'] in subscriptions)==1,'same receiver claimed multiple concurrent attempts')
+        result['releasedAt']=time.time();slow['gate'].set()
+        def done():
+            state=infrastructure.receiver_isolation_state(tenant,subjects,subscriptions+[fast_subscription])
+            return state if len(state['deliveries'])==8 and all(row['deliveryStatus']=='success' for row in state['deliveries']) else None
+        result['finalState']=observe(done,seconds=30)
+        for state in result['finalState']['deliveries']:
+            index=subjects.index(state['subjectPid']);sink=fast if state['subscriptionPid']==fast_subscription else slow
+            actual=read_delivery(sink['store'],state['deliveryPid'],secret=secret,run_id=sink['runId'],mode=sink['mode'],failures=1)
+            proof=verify_delivery(actual,secret=secret,delivery_pid=state['deliveryPid'],event_id=state['eventId'],
+                subject_pid=subjects[index],statuses=[200],originating_request_id='release-model-isolation-'+str(index),
+                event_type='open.resource.release.model-event.parts.created',subject_type='release.model-event.parts',schema_version=1,
+                projections=[{'pid':subjects[index],'name':'Notification isolation '+str(index),'zone':'A'}])
+            result['rows'].append({'subscriptionPid':state['subscriptionPid'],'index':index,'proof':proof})
+        with slow['lock']:result['slowIntervals']=copy.deepcopy(slow['intervals'])
+        result['finishedAt']=time.time()
+        return verify_receiver_isolation(result,secret=secret)
+    finally:
+        slow['gate'].set()
+        for sub in subscriptions:
+            human('/api/webhooks/'+sub+'/disable','PUT',{})
+
+
+def verify_receiver_isolation(result, *, secret):
+    require(isinstance(result,dict) and result.get('profile')=='receiver-origin-isolation-v1'
+            and result.get('status')=='complete','receiver isolation proof missing or incomplete')
+    subs=result.get('slowSubscriptions');fast=result.get('fastSubscription')
+    require(isinstance(subs,list) and len(subs)==3 and all(isinstance(x,str) and x for x in subs)
+            and isinstance(fast,str) and bool(fast) and len(set(subs+[fast]))==4,'receiver isolation subscription denominator invalid')
+    times=[result.get(k) for k in ['blockedAt','observedWhileHeldAt','releasedAt','finishedAt']]
+    require(all(type(t) in (int,float) and math.isfinite(t) for t in times) and times==sorted(times)
+            and times[0]<times[1]<times[2]<times[3],'receiver isolation ordering invalid')
+    created=result.get('created');rows=result.get('rows')
+    require(isinstance(created,list) and len(created)==2 and [r.get('index') for r in created]==[0,1]
+            and all(type(r.get('index')) is int and isinstance(r.get('subjectPid'),str) for r in created)
+            and len({r.get('subjectPid') for r in created})==2,'receiver isolation source denominator invalid')
+    require(isinstance(rows,list) and len(rows)==8 and {(r.get('subscriptionPid'),r.get('index')) for r in rows}
+            == {(sub,index) for sub in subs+[fast] for index in range(2)}
+            and all(type(r.get('index')) is int for r in rows),'receiver isolation receipt denominator invalid')
+    ids=set();events={};fast_received=[]
+    for row in rows:
+        index=row['index'];proof=row.get('proof');require(isinstance(proof,dict),'receiver isolation raw proof missing')
+        require(type(proof.get('attempts')) is int and proof['attempts']==1,'receiver isolation attempts invalid')
+        actual=measurement_raw(proof)
+        verified=verify_delivery(actual,secret=secret,delivery_pid=proof['deliveryPid'],event_id=proof['eventId'],
+            subject_pid=created[index]['subjectPid'],statuses=[200],originating_request_id='release-model-isolation-'+str(index),
+            event_type='open.resource.release.model-event.parts.created',subject_type='release.model-event.parts',schema_version=1,
+            projections=[{'pid':created[index]['subjectPid'],'name':'Notification isolation '+str(index),'zone':'A'}])
+        require(proof==verified and proof['deliveryPid'] not in ids,'receiver isolation proof mismatch or duplicate')
+        ids.add(proof['deliveryPid']);events.setdefault(index,proof['eventId'])
+        require(events[index]==proof['eventId'],'receiver isolation source identity changed')
+        if row['subscriptionPid']==fast and index==1:fast_received.append(actual[0]['received_at'])
+    require(len(set(events.values()))==2,'receiver isolation duplicate source event')
+    require(times[0]<fast_received[0]<times[1] and created[1]['createStartedAt']>=times[0],
+            'healthy notification did not arrive during the controlled slow wait')
+    intervals=result.get('slowIntervals');require(isinstance(intervals,list) and len(intervals)==6,
+            'receiver isolation slow attempt denominator invalid')
+    slow_ids={r['proof']['deliveryPid'] for r in rows if r['subscriptionPid'] in subs}
+    require({r.get('deliveryPid') for r in intervals}==slow_ids,'receiver isolation interval identities invalid')
+    intervals=sorted(intervals,key=lambda r:r['startedAt'])
+    require(intervals[0]['startedAt']<=times[0] and intervals[0]['endedAt']>=times[2],
+            'receiver isolation first slow attempt was not held')
+    for index,r in enumerate(intervals):
+        require(all(type(r.get(k)) in (int,float) and math.isfinite(r[k]) for k in ['startedAt','endedAt'])
+                and r['startedAt']<r['endedAt']<=times[3]
+                and (index==0 or intervals[index-1]['endedAt']<=r['startedAt']),
+                'same receiver sent overlapping attempts')
+    for key in ['heldState','finalState']:
+        state=result.get(key);require(isinstance(state,dict) and isinstance(state.get('deliveries'),list)
+            and len(state['deliveries'])==8 and {r.get('deliveryPid') for r in state['deliveries']}==ids,
+            'receiver isolation database denominator invalid')
+        for r in state['deliveries']:
+            expected=next(x for x in rows if x['proof']['deliveryPid']==r['deliveryPid'])
+            require(r['subscriptionPid']==expected['subscriptionPid'] and r['subjectPid']==created[expected['index']]['subjectPid']
+                and r['eventId']==expected['proof']['eventId'] and type(r.get('retryCount')) is int and r['retryCount']==0,
+                'receiver isolation database identity mismatch')
+        if key=='finalState':
+            require(all(r['deliveryStatus']=='success' and r['responseStatus']==200 for r in state['deliveries']),
+                    'receiver isolation database did not drain')
+        else:
+            slow_rows=[r for r in state['deliveries'] if r['subscriptionPid'] in subs]
+            require(sum(r['deliveryStatus']=='processing' for r in slow_rows)==1
+                and sum(r['deliveryStatus']=='pending' for r in slow_rows)==5
+                and all(r['deliveryStatus']=='success' for r in state['deliveries'] if r['subscriptionPid']==fast),
+                'receiver isolation live database state invalid')
+    return result
