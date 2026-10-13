@@ -859,6 +859,36 @@ $$;
 
 
 --
+-- Name: protect_notification_durable_intent(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.protect_notification_durable_intent() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF OLD.delivery_key IS NOT NULL THEN
+        IF ROW(NEW.tenant_id,NEW.channel,NEW.delivery_key,NEW.request_hash,NEW.resolution_reference,
+               NEW.configuration_hash,NEW.request_snapshot,NEW.recipient)
+           IS DISTINCT FROM
+           ROW(OLD.tenant_id,OLD.channel,OLD.delivery_key,OLD.request_hash,OLD.resolution_reference,
+               OLD.configuration_hash,OLD.request_snapshot,OLD.recipient) THEN
+            RAISE EXCEPTION 'Immutable notification delivery identity changed';
+        END IF;
+        IF OLD.status IN ('accepted','rejected','unknown','not_attempted') AND NEW.status <> OLD.status THEN
+            RAISE EXCEPTION 'Terminal notification delivery cannot be reopened';
+        END IF;
+        IF OLD.status = 'attempting' AND NEW.status = 'pending' THEN
+            RAISE EXCEPTION 'Attempted notification delivery cannot be reclaimed';
+        END IF;
+        IF OLD.status <> 'pending' AND NEW.attempt_fence IS DISTINCT FROM OLD.attempt_fence THEN
+            RAISE EXCEPTION 'Notification attempt fence is immutable';
+        END IF;
+    END IF;
+    RETURN NEW;
+END $$;
+
+
+--
 -- Name: valid_effect_class(text); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -5266,7 +5296,7 @@ CREATE TABLE public.ab_automation (
     created_by character varying(26),
     updated_by character varying(26),
     flow_config jsonb,
-    CONSTRAINT chk_automation_trigger_type CHECK (((trigger_type)::text = ANY ((ARRAY['on_record_create'::character varying, 'on_record_update'::character varying, 'on_field_change'::character varying, 'on_state_change'::character varying, 'scheduled'::character varying, 'webhook'::character varying, 'on_workflow_event'::character varying, 'on_inactivity'::character varying])::text[])))
+    CONSTRAINT chk_automation_trigger_type CHECK (((trigger_type)::text = ANY ((ARRAY['on_record_create'::character varying, 'on_record_update'::character varying, 'on_field_change'::character varying, 'on_state_change'::character varying, 'scheduled'::character varying, 'webhook'::character varying, 'on_workflow_event'::character varying, 'on_inactivity'::character varying, 'external_event'::character varying])::text[])))
 );
 
 
@@ -12394,14 +12424,25 @@ CREATE TABLE public.ab_notification_send_log (
     id bigint NOT NULL,
     tenant_id bigint NOT NULL,
     template_code character varying(64),
-    channel character varying(16) NOT NULL,
+    channel character varying(32) NOT NULL,
     recipient character varying(256) NOT NULL,
     subject character varying(256),
     content text,
     status character varying(16) NOT NULL,
     error_message text,
     sent_at timestamp with time zone,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    delivery_key text,
+    request_hash character(64),
+    resolution_reference text,
+    configuration_hash character(64),
+    request_snapshot jsonb,
+    attempt_fence uuid,
+    attempt_started_at timestamp with time zone,
+    attempt_lease_until timestamp with time zone,
+    finished_at timestamp with time zone,
+    provider_code bigint,
+    CONSTRAINT ck_notification_durable_shape CHECK (((delivery_key IS NULL) OR ((tenant_id > 0) AND ((channel)::text = 'wechat_subscription'::text) AND (delivery_key <> ''::text) AND (request_hash IS NOT NULL) AND (request_hash ~ '^[a-f0-9]{64}$'::text) AND (configuration_hash IS NOT NULL) AND (configuration_hash ~ '^[a-f0-9]{64}$'::text) AND (resolution_reference IS NOT NULL) AND (resolution_reference <> ''::text) AND (request_snapshot IS NOT NULL) AND (jsonb_typeof(request_snapshot) = 'object'::text) AND ((status)::text = ANY ((ARRAY['pending'::character varying, 'attempting'::character varying, 'accepted'::character varying, 'rejected'::character varying, 'unknown'::character varying, 'not_attempted'::character varying])::text[])) AND ((((status)::text = 'pending'::text) AND (attempt_fence IS NULL) AND (attempt_started_at IS NULL)) OR (((status)::text <> 'pending'::text) AND (attempt_fence IS NOT NULL) AND (attempt_started_at IS NOT NULL))))))
 );
 
 
@@ -12410,6 +12451,20 @@ CREATE TABLE public.ab_notification_send_log (
 --
 
 COMMENT ON TABLE public.ab_notification_send_log IS 'Log of all notification send attempts';
+
+
+--
+-- Name: COLUMN ab_notification_send_log.delivery_key; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_notification_send_log.delivery_key IS 'Nonnull only for durable external notification intents; legacy logs use NULL';
+
+
+--
+-- Name: COLUMN ab_notification_send_log.request_snapshot; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_notification_send_log.request_snapshot IS 'Host-verified immutable request; never credentials, access tokens or raw provider diagnostics';
 
 
 --
@@ -28121,6 +28176,13 @@ CREATE INDEX idx_notification_digest_pending ON public.ab_notification_digest US
 
 
 --
+-- Name: idx_notification_durable_pending; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_notification_durable_pending ON public.ab_notification_send_log USING btree (tenant_id, id) WHERE ((delivery_key IS NOT NULL) AND ((status)::text = 'pending'::text));
+
+
+--
 -- Name: idx_notification_rule_tenant; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -29969,6 +30031,13 @@ CREATE UNIQUE INDEX uq_network_party_enrollment_current ON public.ab_network_par
 
 
 --
+-- Name: uq_notification_durable_identity; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_notification_durable_identity ON public.ab_notification_send_log USING btree (tenant_id, channel, delivery_key) WHERE (delivery_key IS NOT NULL);
+
+
+--
 -- Name: uq_notification_pref_user_channel_cat; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -30407,6 +30476,13 @@ CREATE TRIGGER trg_authoring_validation_run_append_only BEFORE DELETE OR UPDATE 
 --
 
 CREATE TRIGGER trg_check_group_logic_type_consistency BEFORE INSERT OR UPDATE ON public.ab_subject_permission FOR EACH ROW EXECUTE FUNCTION public.check_group_logic_type_consistency();
+
+
+--
+-- Name: ab_notification_send_log trg_notification_durable_intent; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_notification_durable_intent BEFORE UPDATE ON public.ab_notification_send_log FOR EACH ROW EXECUTE FUNCTION public.protect_notification_durable_intent();
 
 
 --
