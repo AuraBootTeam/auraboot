@@ -74,6 +74,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
+import com.auraboot.framework.meta.constant.SystemFieldConstants;
 import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.Approval;
 import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.Binding;
 import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.Entity;
@@ -191,10 +192,12 @@ class RegisteredSourceBindingPostgresIT {
         importFixture(foreignTenant);
         bind(tenant, first);
         for (String kind : kinds) {
-            Map<String, Object> model = jdbc.queryForMap("SELECT pid,table_name FROM ab_meta_model WHERE tenant_id=? AND code=? AND is_current=TRUE AND deleted_flag=FALSE", tenant.getId(), model(kind));
+            Map<String, Object> model = jdbc.queryForMap("SELECT pid,table_name,status FROM ab_meta_model WHERE tenant_id=? AND code=? AND is_current=TRUE AND deleted_flag=FALSE", tenant.getId(), model(kind));
             modelPids.put(kind, (String) model.get("pid"));
             String table = (String) model.get("table_name");
-            assertThat(table).matches("[A-Za-z_][A-Za-z0-9_]{0,127}");
+            assertThat(model.get("status")).isEqualTo("published");
+            assertThat(table).isEqualTo(SystemFieldConstants.generateTableName(model(kind)));
+            assertThat(jdbc.queryForObject("SELECT to_regclass(?)::text", String.class, table)).isEqualTo(table);
             tables.put(kind, table);
         }
         stage = "fixture-native-data-apis";
@@ -292,7 +295,8 @@ class RegisteredSourceBindingPostgresIT {
         List<Map<String, Object>> fields = new ArrayList<>(), models = new ArrayList<>(), bindings = new ArrayList<>();
         types.forEach((name, type) -> fields.add(Map.of("code", field(name), "displayName", name, "dataType", type)));
         for (String kind : kinds) {
-            models.add(Map.of("code", model(kind), "displayName", kind, "modelType", "entity"));
+            models.add(Map.of("code", model(kind), "displayName", kind, "modelType", "entity",
+                    "tableName", SystemFieldConstants.generateTableName(model(kind))));
             for (String name : bound.get(kind)) {
                 bindings.add(Map.of("modelCode", model(kind), "fieldCode", field(name), "sequence", bindings.size() + 1));
             }
