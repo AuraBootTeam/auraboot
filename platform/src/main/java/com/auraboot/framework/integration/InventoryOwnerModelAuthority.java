@@ -29,6 +29,14 @@ public final class InventoryOwnerModelAuthority {
                    String ownerPid, String ownerId, String table) {}
 
     Binding resolve(long tenantId, String modelCode, boolean write) {
+        return resolveOwned(tenantId, modelCode, write ? "com.auraboot.inventory" : null);
+    }
+
+    Binding resolveProcurement(long tenantId, String modelCode, boolean write) {
+        return resolveOwned(tenantId, modelCode, write ? "com.auraboot.procurement" : null);
+    }
+
+    private Binding resolveOwned(long tenantId, String modelCode, String writeOwner) {
         if (!Long.valueOf(tenantId).equals(MetaContext.getCurrentTenantId())) throw denied();
         Model model = models.findCurrentByCode(modelCode);
         ModelDefinition effective = definitions.getModelDefinition(modelCode).orElseThrow(InventoryOwnerModelAuthority::denied);
@@ -42,7 +50,8 @@ public final class InventoryOwnerModelAuthority {
         if (owner == null || !Long.valueOf(tenantId).equals(owner.getTenantId())
                 || !model.getPluginPid().equals(owner.getPid()) || !Boolean.FALSE.equals(owner.getDeletedFlag())
                 || owner.getPluginId() == null || owner.getPluginId().isBlank()
-                || ((write || modelCode.startsWith("inv_")) && !"com.auraboot.inventory".equals(owner.getPluginId()))) throw denied();
+                || ((writeOwner != null && !writeOwner.equals(owner.getPluginId()))
+                    || (modelCode.startsWith("inv_") && !"com.auraboot.inventory".equals(owner.getPluginId())))) throw denied();
         String expectedTable = SystemFieldConstants.generateTableName(modelCode);
         String storedTable = model.getTableName() == null || model.getTableName().isBlank()
                 ? expectedTable : model.getTableName().trim();

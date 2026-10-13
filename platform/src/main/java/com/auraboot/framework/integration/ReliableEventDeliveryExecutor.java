@@ -18,6 +18,7 @@ public class ReliableEventDeliveryExecutor {
     private final OutboxEventMapper outboxEventMapper;
     private final AuraPluginManager pluginManager;
     private final InventoryOwnerModelAuthority modelAuthority;
+    private final InventoryReceiptEnqueueProvenance provenance;
     private final ReliableIntegrationMetrics metrics;
     private final TransactionTemplate transaction;
     private final TransactionTemplate serializableTransaction;
@@ -35,12 +36,19 @@ public class ReliableEventDeliveryExecutor {
         this(outboxEventMapper, metrics, transactionManager, pluginManager, null);
     }
 
-    @Autowired
     public ReliableEventDeliveryExecutor(OutboxEventMapper outboxEventMapper,
                                          ReliableIntegrationMetrics metrics,
                                          PlatformTransactionManager transactionManager,
                                          AuraPluginManager pluginManager,
                                          InventoryOwnerModelAuthority modelAuthority) {
+        this(outboxEventMapper, metrics, transactionManager, pluginManager, modelAuthority, null);
+    }
+
+    @Autowired
+    public ReliableEventDeliveryExecutor(OutboxEventMapper outboxEventMapper, ReliableIntegrationMetrics metrics,
+            PlatformTransactionManager transactionManager, AuraPluginManager pluginManager,
+            InventoryOwnerModelAuthority modelAuthority, InventoryReceiptEnqueueProvenance provenance) {
+        this.provenance = provenance;
         this.modelAuthority = modelAuthority;
         this.pluginManager = pluginManager;
         this.outboxEventMapper = outboxEventMapper;
@@ -69,7 +77,8 @@ public class ReliableEventDeliveryExecutor {
                 MetaContext.setContext(envelope.tenantId(), 0L,
                         "integration-runtime", "integration-runtime");
                 InventoryOwnerCommandScope.consume(envelope, consumer, pluginManager, modelAuthority,
-                        () -> consumer.consume(envelope));
+                        () -> ProcurementReceiptCommandScope.consume(envelope, consumer, pluginManager, modelAuthority,
+                                provenance, leaseToken, () -> consumer.consume(envelope)));
                 int applied = outboxEventMapper.markReceiptApplied(
                         envelope.tenantId(), envelope.eventId(), consumer.consumerCode(), leaseToken);
                 if (applied != 1) {

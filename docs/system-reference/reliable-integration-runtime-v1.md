@@ -98,3 +98,17 @@ undelivered backlog older than five minutes.
 
 Rollback is additive: stop new v1 producers, drain or replay pending rows, then revert consumers.
 Do not drop the receipt/DLQ data during rollback; it is the audit and idempotency record.
+
+The registered `procurement.confirmed-receipt-counter.v1` delivery has a separate host-private
+`pr:consume_confirmed_inventory_receipt` authority. It requires the persisted Inventory producer
+stamp, the complete matching outbox envelope and the current delivery lease before and after
+access. The authority does not grant general update: it permits only `pr_purchase_order_line`
+CAS on an event-qualified target, comparing its server-read `row_version`, with exactly one
+submitted field, `pr_pol_received_qty`. The framework advances the version itself. The current
+row must belong to this tenant, be collaboration-managed, and retain the actual Procurement
+metadata owner/storage binding. Ordinary update/create/delete, other records, extra patch fields,
+non-version CAS, non-increasing quantity and quantity above ordered are rejected. Existing field
+and managed-record writer checks still execute. The consumer must independently verify the
+original immutable Procurement request and full line lineage before computing the quantity;
+this scope does not replace those business checks. Ordinary non-collaboration PR initialization
+and its received-quantity default remain unchanged.

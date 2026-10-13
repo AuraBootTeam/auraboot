@@ -2,6 +2,7 @@ package com.auraboot.framework.plugin.pf4j;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.integration.InventoryOwnerCommandScope;
+import com.auraboot.framework.integration.ProcurementReceiptCommandScope;
 import com.auraboot.framework.meta.dto.DynamicQueryRequest;
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.dto.QueryCondition;
@@ -202,6 +203,9 @@ public class BackgroundDataAccessorImpl implements BackgroundDataAccessor {
                                  String fieldCode,
                                  Object expectedValue,
                                  Object nextValue) {
+        if (ProcurementReceiptCommandScope.active())
+            return ProcurementReceiptCommandScope.compareAndSet(tenantId, modelCode, recordId, fieldCode, expectedValue,
+                    java.util.Collections.singletonMap(fieldCode, nextValue), dynamicDataService);
         return withTenant(tenantId, modelCode, "update", () -> dynamicDataService.compareAndSet(
                 modelCode, recordId, fieldCode, expectedValue, nextValue));
     }
@@ -213,6 +217,8 @@ public class BackgroundDataAccessorImpl implements BackgroundDataAccessor {
                                  String fieldCode,
                                  Object expectedValue,
                                  Map<String, Object> nextValues) {
+        if (ProcurementReceiptCommandScope.active())
+            return ProcurementReceiptCommandScope.compareAndSet(tenantId, modelCode, recordId, fieldCode, expectedValue, nextValues, dynamicDataService);
         return withTenant(tenantId, modelCode, "update", () -> dynamicDataService.compareAndSet(
                 modelCode, recordId, fieldCode, expectedValue, nextValues));
     }
@@ -242,6 +248,8 @@ public class BackgroundDataAccessorImpl implements BackgroundDataAccessor {
      */
 
     private <T> T withTenant(long tenantId, String modelCode, String operation, Supplier<T> work) {
+        if (ProcurementReceiptCommandScope.active())
+            return ProcurementReceiptCommandScope.access(tenantId, modelCode, operation, work);
         if (InventoryOwnerCommandScope.active()) {
             return InventoryOwnerCommandScope.access(tenantId, modelCode, operation, work);
         }
