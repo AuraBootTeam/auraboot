@@ -1082,7 +1082,13 @@ test.describe('Dynamic installation authority journey', () => {
     const removed = await page.request.delete(`${resourcePath}/${row.pid}`, { headers: { ...machineHeaders, 'Idempotency-Key': `grant-delete-${suffix}`, 'If-Match': updated.headers().etag } }); expect(removed.status()).toBe(204);
     expect((await page.request.get(`${resourcePath}/${row.pid}`, { headers: machineHeaders })).status()).toBe(404);
     await verifyModelNotifications({ page, card: installationCard, installationPid: installation.pid, resourceCode, resourcePath, machineHeaders,
-      locale: installationLocale, evidenceRoot: screenshotRoot, testInfo, revoke: async () => {
+      locale: installationLocale, evidenceRoot: screenshotRoot, testInfo, withDeniedSession: async action => {
+        const adminCookies = await page.context().cookies(WEB_BASE_URL);
+        const account = { email: `dop-notify-denied-${suffix}@op-closure.test`, password: 'Closure2026x!' };
+        await human('POST', '/api/meta/commands/execute/admin:create_member', { payload: { name: `Notification denied ${suffix}`, ...account } });
+        try { await authenticate(page, installationLocale, account); await action(); }
+        finally { await page.context().addCookies(adminCookies); }
+      }, revoke: async () => {
     await editor.getByRole('button', { name: installationText('撤销安装授权'), exact: true }).click(); await snapshot('grant-revoke-dialog');
     await editor.getByRole('group', { name: installationText('安装授权操作确认'), exact: true }).getByRole('button', { name: installationText('确认'), exact: true }).click(); await expect(editor.getByRole('status').filter({ hasText: installationText('授权已撤销') })).toBeVisible();
     expect((await page.request.post(queryPath, { headers: machineHeaders, data: { parameters: { zone: 'A' }, limit: 10 } })).status()).toBe(403); await snapshot('grant-query-revoked');
@@ -1094,9 +1100,9 @@ test.describe('Dynamic installation authority journey', () => {
   });
 });
 
-async function authenticate(page: import('@playwright/test').Page, locale = 'zh-CN') {
+async function authenticate(page: import('@playwright/test').Page, locale = 'zh-CN', account: { email: string; password: string } = DEFAULT_TEST_ACCOUNT) {
   const loginResponse = await page.request.post(`${BACKEND_URL}/api/auth/login`, {
-    data: { email: DEFAULT_TEST_ACCOUNT.email, password: DEFAULT_TEST_ACCOUNT.password },
+    data: { email: account.email, password: account.password },
   });
   expect(loginResponse.status()).toBe(200);
   const login = await loginResponse.json();

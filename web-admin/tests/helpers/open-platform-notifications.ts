@@ -21,9 +21,9 @@ const translations: Record<string, string> = {
 
 /** Extends the original installation journey; no route interception or API fallback for UI writes. */
 export async function verifyModelNotifications({ page, card, installationPid, resourceCode, resourcePath, machineHeaders,
-  locale, evidenceRoot, testInfo, revoke }: {
+  locale, evidenceRoot, testInfo, revoke, withDeniedSession }: {
   page: Page; card: Locator; installationPid: string; resourceCode: string; resourcePath: string; machineHeaders: Record<string, string>;
-  locale: string; evidenceRoot: string; testInfo: TestInfo; revoke: () => Promise<void>;
+  locale: string; evidenceRoot: string; testInfo: TestInfo; revoke: () => Promise<void>; withDeniedSession: (action: () => Promise<void>) => Promise<void>;
 }) {
   const text = (cn: string) => locale.startsWith('zh') ? cn : translations[cn];
   const runId = `ui-${Date.now()}-${randomBytes(4).toString('hex')}`;
@@ -57,6 +57,43 @@ export async function verifyModelNotifications({ page, card, installationPid, re
     await card.getByRole('button', { name: text('模型通知'), exact: true }).click();
     await expect(editor.getByLabel(text('模型事件'), { exact: true })).toBeVisible();
     await expect(editor.getByRole('alert')).toHaveCount(0); await image('publication-subscribe-empty');
+    const loadingText = locale.startsWith('zh') ? '正在读取事件合同与订阅…' : 'Loading event contracts and subscriptions…';
+    const failedText = locale.startsWith('zh') ? '通知配置请求失败，请检查合同、授权及接收地址后重试。' : 'Notification request failed. Check the contract, authority and receiver address before retrying.';
+    const deniedText = locale.startsWith('zh') ? '需要当前租户的开放平台管理与 Webhook 管理权限。' : 'Open Platform and Webhook administrator permissions in this tenant are required.';
+    const cdp = await page.context().newCDPSession(page);
+    try {
+      await cdp.send('Network.enable');
+      await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 1000, downloadThroughput: -1, uploadThroughput: -1 });
+      const loadingResponse = page.waitForResponse(response => response.url().endsWith('/api/open-platform/event-catalog') && response.request().method() === 'GET');
+      await editor.getByRole('button', { name: text('刷新通知'), exact: true }).click();
+      await expect(editor.getByRole('status').filter({ hasText: loadingText })).toBeVisible();
+      await expect(editor.getByRole('button', { name: text('刷新通知'), exact: true })).toBeDisabled(); await expect(editor.locator('form')).toHaveCount(0);
+      await image('publication-notification-loading', editor);
+      expect((await loadingResponse).status()).toBe(200); await expect(editor.getByLabel(text('模型事件'), { exact: true })).toBeVisible();
+    } finally {
+      await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 }); await cdp.detach();
+    }
+    const beforeStateFaults = (await human('/api/webhooks')).filter((item: { installationPid: string }) => item.installationPid === installationPid);
+    try {
+      await page.context().setOffline(true); await editor.getByRole('button', { name: text('刷新通知'), exact: true }).click();
+      await expect(editor.getByRole('alert')).toHaveText(failedText); await expect(editor.locator('form')).toHaveCount(0);
+      await expect(editor.getByTestId('notification-subscriptions')).toHaveCount(0); await image('publication-notification-offline-error', editor);
+    } finally { await page.context().setOffline(false); }
+    const recover = async (id: string) => {
+      const response = page.waitForResponse(reply => reply.url().endsWith('/api/open-platform/event-catalog') && reply.request().method() === 'GET');
+      await editor.getByRole('button', { name: text('刷新通知'), exact: true }).click(); expect((await response).status()).toBe(200);
+      await expect(editor.getByRole('alert')).toHaveCount(0); await expect(editor.getByLabel(text('模型事件'), { exact: true })).toBeVisible();
+      expect((await human('/api/webhooks')).filter((item: { installationPid: string }) => item.installationPid === installationPid)).toEqual(beforeStateFaults);
+      await image(id, editor.getByTestId('notification-contract-fields'));
+    };
+    await recover('publication-notification-online-restored');
+    await withDeniedSession(async () => {
+      const deniedResponse = page.waitForResponse(response => response.url().endsWith(`/api/open-platform/installations/${installationPid}/resources`) && response.request().method() === 'GET');
+      await editor.getByRole('button', { name: text('刷新通知'), exact: true }).click(); expect((await deniedResponse).status()).toBe(403);
+      await expect(editor.getByRole('alert')).toHaveText(deniedText); await expect(editor.locator('form')).toHaveCount(0);
+      await expect(editor.getByTestId('notification-subscriptions')).toHaveCount(0); await image('publication-notification-denied', editor);
+    });
+    await recover('publication-notification-permission-restored');
     const name = `ERP model notifications ${runId}`; const eventType = `open.resource.${resourceCode}.created`;
     await editor.getByLabel(text('订阅名称'), { exact: true }).fill(name);
     await editor.getByLabel(text('模型事件'), { exact: true }).selectOption(eventType);
@@ -238,11 +275,29 @@ export async function verifyModelNotifications({ page, card, installationPid, re
     await disableConfirmation.getByRole('button', { name: text('确认'), exact: true }).click();
     await expect(editor.getByRole('status').filter({ hasText: text('订阅已停用') })).toBeVisible(); expect((await human(`/api/webhooks/${subscription.pid}`)).enabled).toBe(false);
     await image('publication-subscribe-disabled');
+    const beforeInactive = (await human('/api/webhooks')).filter((item: { installationPid: string }) => item.installationPid === installationPid);
+    await card.getByRole('button', { name: locale.startsWith('zh') ? '停用安装' : 'Disable installation', exact: true }).click();
+    const installationConfirm = page.getByRole('dialog', { name: locale.startsWith('zh') ? '确认停用访问？' : 'Disable access?', exact: true });
+    await expect(installationConfirm).toBeVisible(); await image('publication-notification-inactive-confirm', installationConfirm);
+    const inactiveResponse = page.waitForResponse(response => response.url().endsWith(`/api/open-platform/installations/${installationPid}`) && response.request().method() === 'DELETE');
+    await installationConfirm.getByRole('button', { name: locale.startsWith('zh') ? '停用' : 'Disable', exact: true }).click(); expect((await inactiveResponse).status()).toBe(200);
+    const inactiveText = locale.startsWith('zh') ? '安装或应用已停用；通知配置只读。' : 'The installation or application is inactive. Notification configuration is read-only.';
+    await expect(editor.getByRole('status').filter({ hasText: inactiveText })).toBeVisible();
+    await expect(editor.getByRole('button', { name: text('保存通知订阅'), exact: true })).toBeDisabled();
+    for (const name of ['订阅名称', '模型事件', '事件版本', '接收地址', '签名密钥', '最大尝试次数']) await expect(editor.getByLabel(text(name), { exact: true })).toBeDisabled();
+    await expect(row.getByRole('button', { name: text('启用订阅'), exact: true })).toBeDisabled();
+    expect((await human('/api/webhooks')).filter((item: { installationPid: string }) => item.installationPid === installationPid)).toEqual(beforeInactive);
+    await image('publication-notification-inactive', editor.getByRole('status').filter({ hasText: inactiveText }));
+    await image('publication-notification-inactive-fields', editor.getByTestId('notification-contract-fields'));
+    await editor.getByRole('button', { name: text('关闭通知编辑'), exact: true }).click();
+    await card.getByRole('button', { name: text('模型通知'), exact: true }).click();
+    await expect(editor.getByRole('status').filter({ hasText: inactiveText })).toBeVisible();
+    await expect(editor.getByLabel(text('订阅名称'), { exact: true })).toBeDisabled(); await image('publication-notification-inactive-reopened', editor.getByTestId('notification-subscriptions'));
     const receipt = { schemaVersion: 1, installationPid, subscriptionPid: subscription.pid, resourceCode, eventType, eventVersion: 1,
       cases: ['ui-subscription-persisted', 'signed-real-delivery', 'real-dead-letter', 'confirmed-same-event-replay', 'revoked-authority-no-send', 'ui-subscription-disabled'],
       deliveryProofs: [successProof, deadProof, replayProof, beforeRevocation], revokedReplay: { ...denied, acceptingReceiverAttempts: 0 },
       fixture: 'original-installation-ui-authored-grant', routeMocks: false };
-    Object.assign(receipt, { eventVariants: ['second-ui-subscription', 'updated-signed-delivery', 'edited-deleted-signed-delivery', 'second-ui-disabled'], variantProofs: [updatedProof, deletedProof], editorActions: ['reload-real-GET', 'dirty-cancel-discard-no-write', 'new-form-reset-no-write', 'disable-enable-signed-send'] });
+    Object.assign(receipt, { editorStates: ['real-latency-loading', 'offline-no-false-empty-restored', 'real-principal-403-restored', 'ui-inactive-read-only-reopened'], eventVariants: ['second-ui-subscription', 'updated-signed-delivery', 'edited-deleted-signed-delivery', 'second-ui-disabled'], variantProofs: [updatedProof, deletedProof], editorActions: ['reload-real-GET', 'dirty-cancel-discard-no-write', 'new-form-reset-no-write', 'disable-enable-signed-send'] });
     const receiptPath = path.join(directory, 'receipt.json'); await writeFile(receiptPath, JSON.stringify(receipt, null, 2));
     await testInfo.attach('dynamic-model-notifications', { path: receiptPath, contentType: 'application/json' });
   } finally {

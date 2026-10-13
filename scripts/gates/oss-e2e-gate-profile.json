@@ -134,6 +134,12 @@
               "updated-signed-delivery",
               "edited-deleted-signed-delivery",
               "second-ui-disabled"
+            ],
+            "editorStates": [
+              "real-latency-loading",
+              "offline-no-false-empty-restored",
+              "real-principal-403-restored",
+              "ui-inactive-read-only-reopened"
             ]
           }
         }
