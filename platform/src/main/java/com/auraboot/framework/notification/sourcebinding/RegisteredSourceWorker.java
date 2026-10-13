@@ -56,6 +56,53 @@ public final class RegisteredSourceWorker {
         }
         return count;
     }
+    record SourceFailure(String sourcePid, String exceptionType) {}
+    record BatchResult(int processedPlans, long matchedSources, int selectedSources, int nextPage,
+                       List<SourceFailure> failures) {
+        BatchResult {
+            failures = List.copyOf(failures);
+        }
+    }
+    private record Selection(List<String> pids, long total, int nextPage) {}
+
+    /** One explicitly bounded page, never presented as a complete source inventory. */
+    BatchResult runPage(long tenant, String code, int page, int size) {
+        SourceBindingTypes.require(page > 0 && size > 0 && size <= 1000);
+        var binding = planner.bindings(tenant).stream().filter(b -> b.code().equals(code)).findFirst();
+        SourceBindingTypes.require(binding.isPresent());
+        Selection selection = scoped(tenant, () -> transaction.execute(status -> selectPage(binding.get(), page, size)));
+        int plans = 0;
+        List<SourceFailure> failures = new ArrayList<>();
+        for (String pid : selection.pids()) {
+            try {
+                plans += process(tenant, code, pid);
+            } catch (RuntimeException failure) {
+                failures.add(new SourceFailure(pid, failure.getClass().getName()));
+            }
+        }
+        return new BatchResult(plans, selection.total(), selection.pids().size(), selection.nextPage(), failures);
+    }
+    private Selection selectPage(SourceBindingTypes.Binding binding, int page, int size) {
+        planner.validate(binding);
+        DataPage result = reader.page(binding, binding.source().entity().modelCode(),
+                RegisteredSourcePlanResolver.filters(binding.source().entity().equals()), page, size);
+        SourceBindingTypes.require(result.page() == page && result.size() == size && result.total() >= 0);
+        long expected = Math.min(size, Math.max(0, result.total() - (long) (page - 1) * size));
+        SourceBindingTypes.require(result.records().size() == expected);
+        Set<String> seen = new HashSet<>();
+        List<String> pids = new ArrayList<>();
+        String previous = null;
+        for (var row : result.records()) {
+            String pid = SourceBindingTypes.pid((String) row.get("pid"));
+            SourceBindingTypes.require(seen.add(pid) && (previous == null || previous.compareTo(pid) < 0));
+            pids.add(pid);
+            previous = pid;
+        }
+        SourceBindingTypes.require(result.total() <= (long) Integer.MAX_VALUE * size);
+        long pages = (result.total() + size - 1) / size;
+        SourceBindingTypes.require(pages <= Integer.MAX_VALUE);
+        return new Selection(List.copyOf(pids), result.total(), page >= pages ? 1 : page + 1);
+    }
     private List<String> scan(SourceBindingTypes.Binding b) {
         planner.validate(b);
         List<String> result = new ArrayList<>();

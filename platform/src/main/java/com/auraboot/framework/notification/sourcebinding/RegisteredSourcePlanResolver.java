@@ -51,6 +51,9 @@ public final class RegisteredSourcePlanResolver implements NotificationDeliveryP
         for (var b : properties.getBindings()) SourceBindingTypes.require(keys.add(b.tenantId() + ":" + b.code()));
         registered = List.copyOf(properties.getBindings());
     }
+    List<SourceBindingTypes.Binding> registeredBindings() {
+        return registered;
+    }
     List<SourceBindingTypes.Binding> bindings(long tenant) {
         return registered.stream().filter(b -> b.tenantId() == tenant).toList();
     }
