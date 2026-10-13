@@ -501,7 +501,7 @@ class ProcurementPublicSourceCommandRealDbIT {
         assertEquals(allocations,fixture(SYNC,()->db.query(domainModel("allocation"),Map.of("qo_pr_allocation_execution_pid",order.execution()))));assertEquals(formal,formalSnapshot(order.quote().submission()));
     }
     private String orderSyncActor() {
-        context();String email=provider+"-order-sync@example.invalid";var user=users.signUp(email,PASSWORD,"Public order sync local fixture",provider);var member=members.addMember(user.getId(),tenant,"active");
+        context();String email=provider+"-order-sync@example.invalid";var user=users.signUp(email,PASSWORD,"Public order sync local fixture",provider+"-order-sync");var member=members.addMember(user.getId(),tenant,"active");
         var codes=new ArrayList<>(ORDER_PERMISSIONS);codes.add("model.pr_purchase_order.read");codes.add("model.pr_purchase_order_line.read");assertEquals(15,codes.size());return actorToken(user.getId(),user.getPid(),member.getId(),email,codes);
     }
     private Map<String,Object> orderReadContract() {
@@ -616,7 +616,7 @@ class ProcurementPublicSourceCommandRealDbIT {
     }
     private String orderActor(boolean integration) {
         context();String email=provider+"-order-"+(integration?"allow":"deny")+"@example.invalid";
-        var user=users.signUp(email,PASSWORD,"Public order local fixture",provider);var member=members.addMember(user.getId(),tenant,"active");
+        var user=users.signUp(email,PASSWORD,"Public order local fixture",provider+"-order-"+(integration?"allow":"deny"));var member=members.addMember(user.getId(),tenant,"active");
         var codes=new ArrayList<>(ORDER_PERMISSIONS);if(!integration)codes.remove("qo.procurement.integrate");assertEquals(integration?13:12,codes.size());
         return actorToken(user.getId(),user.getPid(),member.getId(),email,codes);
     }
