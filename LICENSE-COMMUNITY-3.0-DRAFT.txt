@@ -1,5 +1,5 @@
 AURABOOT COMMUNITY LICENSE — VERSION 3.0 DRAFT
-Prepared: 2026-10-13
+Prepared: 2026-10-14
 Status: Proposed terms for a future expressly identified release.
 This draft does not replace LICENSE.txt or license the current distribution.
 Licensor legal identity and covered release must be specified before adoption.
@@ -39,12 +39,14 @@ Source-only forks for contribution review and security research are permitted
 with retained notices; they must not be marketed or operated as a Competing
 Platform. This exception does not grant public platform hosting or resale.
 
-Community use includes evaluation, internal business development and
-attributed customer-owned Business Application delivery. Public operated
-services for third-party customers, including vertical multi-tenant business
-SaaS, require a separately signed OEM agreement. Remote administration of
-a customer's registered, customer-controlled Business Application does not
-alone constitute public SaaS operation.
+Community use includes evaluation, internal business development,
+attributed customer-owned Business Application delivery and attributed
+domain-specific Business Application SaaS. Multi-tenant foundations do not
+require a commercial license merely because multiple spaces exist.
+White-label public operation of a named domain-specific Business Application
+requires a separately signed OEM agreement. Remote administration of a
+customer-controlled Business Application does not alone constitute OEM
+product operation. These grants do not permit a Competing Platform.
 
 3. Attribution and legal notices
 Retain license, copyright, patent and NOTICE statements applicable to the
@@ -71,17 +73,28 @@ Do not package, publish, sell, distribute, sublicense for operation, or host
 the Software or its derivatives as a Competing Platform, whether paid or
 free. Renaming, UI replacement, separation into modules or adding AI does
 not remove this restriction.
-An Internal, ISV or standard Vertical OEM commercial order does not grant
-a Competing Platform exception. Any exception requires express written
-terms signed by the authorized Licensor.
+An Internal, ISV or ordinary Vertical OEM commercial order does not grant
+a Competing Platform exception.
 
 5. Enterprise code and commercial orders
 This License does not grant rights to separately proprietary enterprise
-modules. Such modules, UI white-label permission, ISV delivery, customer
-General Development Access and OEM operation follow their written orders.
-A runtime customer receiving only a completed application must not receive
-the partner's general developer license or proprietary distribution rights.
-Customer development scope must be expressly licensed in its own name.
+modules. Commercial modules, UI white-label permission and white-label OEM
+operation follow their written orders.
+ISV white-label delivery registers authorization to the final customer;
+the partner may purchase on the customer's behalf. Customer Standard scope
+includes that customer's internal General Development Access without a
+separate runtime-to-designer surcharge. This does not transfer a partner's
+license or unrestricted proprietary distribution rights.
+Standard may be annual or perpetual. Perpetual white-label permission for
+the named entity covers subsequent updates to the same community core and
+does not require maintenance renewal. New proprietary modules and optional
+services are separately listed. Annual expiry must identify renewal,
+perpetual conversion or restoration of Community attribution and an agreed
+transition; no automatic business shutdown or deletion of customer data is
+authorized. Prices, upgrade credits and service terms belong to the order.
+An OEM order names the operator, Business Application, operating rights,
+term, scale and services. Technical tenant, account or replica counts do not
+automatically define its price or require every subscriber to buy Standard.
 
 6. Trademarks
 No right to market a derived product or service as official AuraBoot is
