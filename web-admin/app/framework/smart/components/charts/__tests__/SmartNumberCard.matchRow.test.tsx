@@ -23,7 +23,7 @@ describe('SmartNumberCard matchRow selection', () => {
     mockUseChartData.mockReturnValue({
       data: {
         rows: [
-          { metric_code: 'm14_due_collection_rate', value: 98.6 },
+          { metric_code: 'm14_due_collection_rate', value: 98 },
           { metric_code: 'm15_overdue_receivables', value: 4200 },
         ],
         summary: {},
@@ -39,20 +39,20 @@ describe('SmartNumberCard matchRow selection', () => {
         title="Receivables KPI"
         dataSource={nqSource}
         cards={[
-          { field: 'value', label: 'M14', matchRow: { metric_code: 'm14_due_collection_rate' }, format: 'percent' },
-          { field: 'value', label: 'M15', matchRow: { metric_code: 'm15_overdue_receivables' }, format: 'currency' },
+          { field: 'value', label: 'M14', matchRow: { metric_code: 'm14_due_collection_rate' }, format: 'number' },
+          { field: 'value', label: 'M15', matchRow: { metric_code: 'm15_overdue_receivables' }, format: 'number' },
         ]}
       />,
     );
 
-    expect(screen.getByText('M14').parentElement?.textContent).toContain('98.6');
+    expect(screen.getByText('M14').parentElement?.textContent).toContain('98');
     expect(screen.getByText('M15').parentElement?.textContent).toContain('4,200');
   });
 
   it('a matchRow with no matching row renders the em dash instead of a foreign row value', () => {
     mockUseChartData.mockReturnValue({
       data: {
-        rows: [{ metric_code: 'm14_due_collection_rate', value: 98.6 }],
+        rows: [{ metric_code: 'm14_due_collection_rate', value: 98 }],
         summary: {},
         meta: { dimensions: [], metrics: [] },
       },
@@ -66,13 +66,13 @@ describe('SmartNumberCard matchRow selection', () => {
         title="Receivables KPI"
         dataSource={nqSource}
         cards={[
-          { field: 'value', label: 'M14', matchRow: { metric_code: 'm14_due_collection_rate' } },
-          { field: 'value', label: 'M99', matchRow: { metric_code: 'does_not_exist' } },
+          { field: 'value', label: 'M14', matchRow: { metric_code: 'm14_due_collection_rate' }, format: 'number' },
+          { field: 'value', label: 'M99', matchRow: { metric_code: 'does_not_exist' }, format: 'number' },
         ]}
       />,
     );
 
-    expect(screen.getByText('M14').parentElement?.textContent).toContain('98.6');
+    expect(screen.getByText('M14').parentElement?.textContent).toContain('98');
     expect(screen.getByText('M99').parentElement?.textContent).toContain('—');
   });
 
