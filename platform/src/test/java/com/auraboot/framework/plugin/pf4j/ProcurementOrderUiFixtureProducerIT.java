@@ -2,6 +2,7 @@ package com.auraboot.framework.plugin.pf4j;
 
 import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.common.crypto.FieldEncryptionService;
 import com.auraboot.framework.cloudconfig.dto.CloudConfigSaveRequest;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.CommandExecutor;
@@ -56,6 +57,10 @@ class ProcurementOrderUiFixtureProducerIT extends ProcurementPublicSourceNativeF
                          List<String> executionPids, List<String> quantities) { }
     @Autowired MetaModelService metadata;
     @Autowired CommandExecutor initializerCommands;
+    @Autowired FieldEncryptionService encryptionService;
+    private String encryptionMode;
+    private Path encryptionProofPath;
+    private String encryptionProofSha256;
     private Path initializationDirectory;
     private final List<Map<String, Object>> initializationResults = new ArrayList<>();
     private Map<String, Object> initializationPrincipal;
@@ -80,7 +85,47 @@ class ProcurementOrderUiFixtureProducerIT extends ProcurementPublicSourceNativeF
         assertEquals(binding.path("nativeHostTestSha256").asText(), sha(packageRoot.resolve("plugin/pf4j/ProcurementOrderUiFixtureProducerIT.java")));
         assertEquals(binding.path("nativeSharedFixtureSha256").asText(), sha(packageRoot.resolve("plugin/pf4j/ProcurementPublicSourceNativeFixture.java")));
         assertEquals(binding.path("nativeInitializationFixtureSha256").asText(), sha(packageRoot.resolve("notification/sourcebinding/ProductQuoteNativeInitialization.java")));
+        encryptionProofPath = Path.of(binding.path("encryptionConfigProofPath").asText()).toRealPath();
+        Path workspace = Path.of(binding.path("workspaceRoot").asText()).toRealPath();
+        assertTrue(encryptionProofPath.startsWith(workspace.resolve(".workspace/evidence/procurement-web-stack-20261010").toRealPath()));
+        encryptionProofSha256 = sha(encryptionProofPath);
+        assertEquals(binding.path("encryptionConfigProofSha256").asText(), encryptionProofSha256);
+        JsonNode proof = json.readTree(encryptionProofPath.toFile());
+        assertEquals(binding.path("sourceSet").path("oss").asText(), proof.path("sourceCommit").asText());
+        assertEquals(sha(app.resolve("platform/src/main/java/com/auraboot/framework/common/crypto/FieldEncryptionService.java")), proof.path("fieldEncryptionServiceSha256").asText());
+        assertEquals(sha(app.resolve("platform/src/main/resources/application.yml")), proof.path("applicationYmlSha256").asText());
+        for (String prefix : List.of("runtimeAdmission", "runtimeEnvironmentEvidence", "runtimeProfileEvidence")) {
+            Path artifact = Path.of(proof.path(prefix + "Path").asText()).toRealPath();
+            assertTrue(artifact.startsWith(workspace.resolve(".workspace/evidence/procurement-web-stack-20261010").toRealPath()));
+            assertEquals(proof.path(prefix + "Sha256").asText(), sha(artifact));
+        }
+        JsonNode runtimeProof = json.readTree(Path.of(proof.path("runtimeAdmissionPath").asText()).toFile());
+        assertEquals("ok", runtimeProof.path("verdict").asText());
+        assertEquals("procurement-web-stack-20261010", runtimeProof.path("runtime").asText());
+        assertEquals(proof.path("runtimeMode").asText(), runtimeProof.path("metadata").path("mode").asText());
+        List<JsonNode> runtimeCore = java.util.stream.StreamSupport.stream(runtimeProof.path("sources").spliterator(), false)
+                .filter(row -> row.path("key").asText().equals("oss")).toList();
+        assertEquals(1, runtimeCore.size());
+        assertEquals(proof.path("sourceCommit").asText(), runtimeCore.getFirst().path("actual").path("commit").asText());
+        JsonNode environmentProof = json.readTree(Path.of(proof.path("runtimeEnvironmentEvidencePath").asText()).toFile());
+        assertEquals("procurement-web-stack-20261010", environmentProof.path("runtime").asText());
+        assertEquals(proof.path("environmentKeyState").asText(), environmentProof.path("fieldEncryptionKeyState").asText());
+        JsonNode profileProof = json.readTree(Path.of(proof.path("runtimeProfileEvidencePath").asText()).toFile());
+        assertEquals("procurement-web-stack-20261010", profileProof.path("runtime").asText());
+        assertEquals(proof.path("actualSpringProfiles").asText(), profileProof.path("actualSpringProfiles").asText());
+        assertTrue(System.getenv().containsKey("PROCUREMENT_ORDER_UI_FIELD_ENCRYPTION_KEY"), "Root matching runtime value must be explicitly injected, even blank");
+        encryptionMode = validateEncryptionMode(proof, System.getenv("PROCUREMENT_ORDER_UI_FIELD_ENCRYPTION_KEY"));
+        assertEquals(binding.path("encryptionMode").asText(), encryptionMode);
+        String probe = "SyntheticNativeEncryptionModeProbe";
+        String encrypted = encryptionService.encrypt(probe);
+        assertEquals(probe, encryptionService.decrypt(encrypted));
+        if (encryptionMode.equals("dev-passthrough")) assertEquals(probe, encrypted);
+        else assertTrue(encrypted.startsWith("ENC:"));
         super.prepareEvidence(test);
+        writeArtifact("encryption-mode-admission.json", Map.of("mode", encryptionMode,
+                "proofPath", encryptionProofPath.toString(), "proofSha256", encryptionProofSha256,
+                "actualSpringProfiles", proof.path("actualSpringProfiles").asText(), "nonSecretBeanProbeMatched", true));
+
     }
 
     @Test void producePendingFailedUnknownAndMixedSupplierExecutionPrerequisites() throws Exception {
@@ -235,6 +280,9 @@ class ProcurementOrderUiFixtureProducerIT extends ProcurementPublicSourceNativeF
         assertEquals(sources, canonicalSources(json.readTree(caseEvidence.resolve("readiness.json").toFile()).path("sourceCommits")));
         receipt.put("sourceSet", sources);
         receipt.put("sourceCommits", sources);
+        receipt.put("encryptionMode", encryptionMode);
+        receipt.put("encryptionConfigProofPath", encryptionProofPath.toString());
+        receipt.put("encryptionConfigProofSha256", encryptionProofSha256);
         receipt.put("sourceBindingPath", bindingPath.toString());
         receipt.put("sourceBindingSha256", sha(bindingPath));
         receipt.put("productJarSha256", binding.path("productJarSha256").asText());
@@ -582,6 +630,39 @@ class ProcurementOrderUiFixtureProducerIT extends ProcurementPublicSourceNativeF
         var member = members.addMember(user.getId(), tenant, "active");
         List<String> codes = uiPermissionCodes(integrate);
         return actorToken(user.getId(), user.getPid(), member.getId(), email, codes, password);
+    }
+
+    static String validateEncryptionMode(JsonNode proof, String key) {
+        assertTrue(proof.isObject());
+        assertTrue(proof.path("schemaVersion").isIntegralNumber());
+        assertEquals(1, proof.path("schemaVersion").asInt(-1));
+        assertEquals("procurement-native-runtime-encryption-proof-v1", proof.path("kind").asText());
+        assertEquals("procurement-web-stack-20261010", proof.path("runtime").asText());
+        assertEquals("${FIELD_ENCRYPTION_KEY:}", proof.path("configProperty").asText());
+        assertTrue(proof.has("actualSpringProfiles") && proof.path("actualSpringProfiles").isTextual());
+        String profiles = proof.path("actualSpringProfiles").asText().toLowerCase(java.util.Locale.ROOT);
+        String mode = proof.path("mode").asText();
+        String state = proof.path("environmentKeyState").asText();
+        assertNotNull(key, "Matching managed value must be explicit");
+        if (mode.equals("dev-passthrough")) {
+            assertTrue(List.of("development", "verification").contains(proof.path("runtimeMode").asText()));
+            assertTrue(state.equals("UNSET") || state.equals("EMPTY"));
+            assertTrue(key.isBlank());
+            assertFalse(profiles.contains("prod"), "Production profile cannot be admitted with a blank key");
+            assertTrue(profiles.isBlank() || profiles.contains("dev") || profiles.contains("local") || profiles.contains("test"));
+            return mode;
+        }
+        assertEquals("encrypted", mode);
+        assertEquals("SET", state);
+        assertFalse(key.isBlank());
+        byte[] decoded;
+        try {
+            decoded = java.util.Base64.getDecoder().decode(key);
+        } catch (IllegalArgumentException error) {
+            throw new AssertionError("Managed encryption key is not valid Base64");
+        }
+        assertEquals(32, decoded.length, "Managed AES-256 key must be exactly 32 bytes");
+        return mode;
     }
 
     static boolean validSyntheticCredential(String value, int minimum) {

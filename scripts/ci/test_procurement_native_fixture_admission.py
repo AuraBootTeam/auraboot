@@ -84,6 +84,33 @@ class NativeFixtureAdmissionTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 guard.qualify_selector(*args)
 
+    def test_passthrough_requires_sealed_runtime_source_and_actual_development_environment(self):
+        proof = {'schemaVersion': 1, 'kind': 'procurement-native-runtime-encryption-proof-v1',
+                 'runtime': 'procurement-web-stack-20261010', 'sourceCommit': 'a' * 40,
+                 'fieldEncryptionServiceSha256': 'b' * 64, 'applicationYmlSha256': 'c' * 64,
+                 'configProperty': '${FIELD_ENCRYPTION_KEY:}', 'actualSpringProfiles': 'dev,local,test',
+                 'environmentKeyState': 'UNSET', 'mode': 'dev-passthrough', 'runtimeMode': 'development'}
+        self.assertEqual(guard.encryption_mode(proof, {}, 'a' * 40, 'b' * 64, 'c' * 64), ('dev-passthrough', ''))
+        for changed in ({}, {**proof, 'actualSpringProfiles': 'production'}, {**proof, 'runtimeMode': 'production'},
+                        {**proof, 'sourceCommit': 'd' * 40}, {**proof, 'applicationYmlSha256': 'd' * 64},
+                        {**proof, 'environmentKeyState': 'EMPTY'}):
+            with self.assertRaises(ValueError):
+                guard.encryption_mode(changed, {}, 'a' * 40, 'b' * 64, 'c' * 64)
+
+    def test_encrypted_mode_requires_actual_managed_aes256_not_default_or_blank(self):
+        import base64
+        key = base64.b64encode(bytes(32)).decode()  # Explicit hermetic shape fixture, not runtime default.
+        proof = {'schemaVersion': 1, 'kind': 'procurement-native-runtime-encryption-proof-v1',
+                 'runtime': 'procurement-web-stack-20261010', 'sourceCommit': 'a' * 40,
+                 'fieldEncryptionServiceSha256': 'b' * 64, 'applicationYmlSha256': 'c' * 64,
+                 'configProperty': '${FIELD_ENCRYPTION_KEY:}', 'actualSpringProfiles': 'production',
+                 'environmentKeyState': 'SET', 'mode': 'encrypted'}
+        self.assertEqual(guard.encryption_mode(proof, {'FIELD_ENCRYPTION_KEY': key}, 'a' * 40, 'b' * 64, 'c' * 64)[0], 'encrypted')
+        for values in ({}, {'FIELD_ENCRYPTION_KEY': ''}, {'FIELD_ENCRYPTION_KEY': 'bad'},
+                       {'FIELD_ENCRYPTION_KEY': base64.b64encode(bytes(16)).decode()}):
+            with self.assertRaises(ValueError):
+                guard.encryption_mode(proof, values, 'a' * 40, 'b' * 64, 'c' * 64)
+
 
 if __name__ == '__main__':
     unittest.main()

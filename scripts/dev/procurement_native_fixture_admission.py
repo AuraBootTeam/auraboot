@@ -90,3 +90,36 @@ def qualify_selector(exit_code, counts, cases, sources_unchanged, classes_unchan
     require(cases == [{'className': PRODUCER_CLASS, 'method': PRODUCER_METHOD, 'state': 'passed'}],
             'NATIVE_METHOD_OR_CLASS_DRIFT')
     require(sources_unchanged is True and classes_unchanged is True, 'NATIVE_RUN_BYTES_DRIFT')
+
+
+def encryption_mode(proof, values, runtime_core, service_sha, application_sha):
+    """Validate Root-sealed configuration facts; return matching key only in memory."""
+    require(isinstance(proof, dict) and type(proof.get('schemaVersion')) is int and proof.get('schemaVersion') == 1
+            and proof.get('kind') == 'procurement-native-runtime-encryption-proof-v1'
+            and proof.get('runtime') == 'procurement-web-stack-20261010', 'ENCRYPTION_PROOF_REQUIRED')
+    require(proof.get('sourceCommit') == runtime_core
+            and proof.get('fieldEncryptionServiceSha256') == service_sha
+            and proof.get('applicationYmlSha256') == application_sha
+            and proof.get('configProperty') == '${FIELD_ENCRYPTION_KEY:}', 'ENCRYPTION_CONFIGURATION_SOURCE_DRIFT')
+    profile = proof.get('actualSpringProfiles')
+    require(isinstance(profile, str), 'ACTUAL_RUNTIME_PROFILE_REQUIRED')
+    profile = profile.lower()
+    key = values.get('FIELD_ENCRYPTION_KEY', '')
+    require(isinstance(key, str), 'MANAGED_ENCRYPTION_KEY_INVALID')
+    state = 'UNSET' if 'FIELD_ENCRYPTION_KEY' not in values else 'EMPTY' if not key.strip() else 'SET'
+    require(proof.get('environmentKeyState') == state, 'MANAGED_ENCRYPTION_ENVIRONMENT_DRIFT')
+    mode = proof.get('mode')
+    if mode == 'dev-passthrough':
+        require(proof.get('runtimeMode') in ('development', 'verification'), 'PRODUCTION_RUNTIME_PASSTHROUGH_REFUSED')
+        require(state in ('UNSET', 'EMPTY') and not key.strip(), 'BLANK_KEY_PROOF_REQUIRED')
+        require('prod' not in profile and (not profile.strip() or any(name in profile for name in ('dev', 'local', 'test'))),
+                'NON_DEVELOPMENT_PASSTHROUGH_REFUSED')
+        return mode, key
+    require(mode == 'encrypted' and state == 'SET', 'ENCRYPTED_MANAGED_KEY_REQUIRED')
+    import base64
+    try:
+        decoded = base64.b64decode(key + "=" * (-len(key) % 4), validate=True)
+    except (ValueError, TypeError):
+        raise ValueError('MANAGED_AES256_KEY_INVALID') from None
+    require(len(decoded) == 32, 'MANAGED_AES256_KEY_INVALID')
+    return mode, key

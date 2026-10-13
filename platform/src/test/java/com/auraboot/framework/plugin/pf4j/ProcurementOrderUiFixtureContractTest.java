@@ -78,4 +78,46 @@ class ProcurementOrderUiFixtureContractTest {
         assertThat(ProcurementOrderUiFixtureProducerIT.ERP_COLUMNS.stream().distinct()).hasSize(18);
     }
 
+    private com.fasterxml.jackson.databind.node.ObjectNode encryptionProof(String mode, String profile, String state) {
+        var proof = new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode();
+        proof.put("schemaVersion", 1);
+        proof.put("kind", "procurement-native-runtime-encryption-proof-v1");
+        proof.put("runtime", "procurement-web-stack-20261010");
+        proof.put("configProperty", "${FIELD_ENCRYPTION_KEY:}");
+        proof.put("mode", mode);
+        proof.put("actualSpringProfiles", profile);
+        proof.put("environmentKeyState", state);
+        proof.put("runtimeMode", "development");
+        return proof;
+    }
+
+    @Test void blankKeyRequiresAnExplicitDevRuntimeProofRatherThanImplicitFallback() {
+        var proof = encryptionProof("dev-passthrough", "dev,local,test", "UNSET");
+        assertThat(ProcurementOrderUiFixtureProducerIT.validateEncryptionMode(proof, "")).isEqualTo("dev-passthrough");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> ProcurementOrderUiFixtureProducerIT.validateEncryptionMode(proof, null)).isInstanceOf(AssertionError.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> ProcurementOrderUiFixtureProducerIT.validateEncryptionMode(new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode(), "")).isInstanceOf(AssertionError.class);
+        proof.put("runtimeMode", "production");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> ProcurementOrderUiFixtureProducerIT.validateEncryptionMode(proof, "")).isInstanceOf(AssertionError.class);
+        proof.put("runtimeMode", "development");
+        proof.put("actualSpringProfiles", "production");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> ProcurementOrderUiFixtureProducerIT.validateEncryptionMode(proof, "")).isInstanceOf(AssertionError.class);
+        proof.put("actualSpringProfiles", "staging");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> ProcurementOrderUiFixtureProducerIT.validateEncryptionMode(proof, "")).isInstanceOf(AssertionError.class);
+        proof.put("actualSpringProfiles", "production,dev");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> ProcurementOrderUiFixtureProducerIT.validateEncryptionMode(proof, "")).isInstanceOf(AssertionError.class);
+    }
+
+    @Test void encryptedModeRequiresActualAes256AndCannotMislabelBlankOrUnprovenValues() {
+        var proof = encryptionProof("encrypted", "production", "SET");
+        String key = java.util.Base64.getEncoder().encodeToString(new byte[32]); // Hermetic key shape fixture, never a deployment key.
+        assertThat(ProcurementOrderUiFixtureProducerIT.validateEncryptionMode(proof, key)).isEqualTo("encrypted");
+        for (String invalid : List.of("", "not-base64", java.util.Base64.getEncoder().encodeToString(new byte[16]))) {
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> ProcurementOrderUiFixtureProducerIT.validateEncryptionMode(proof, invalid)).isInstanceOf(AssertionError.class);
+        }
+        proof.put("mode", "dev-passthrough");
+        proof.put("actualSpringProfiles", "dev");
+        proof.put("environmentKeyState", "UNSET");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> ProcurementOrderUiFixtureProducerIT.validateEncryptionMode(proof, key)).isInstanceOf(AssertionError.class);
+    }
+
 }
