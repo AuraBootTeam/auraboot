@@ -50,12 +50,72 @@ class ImportedNotificationMetadataReaderTest {
     @Test
     void physicalIdentifiersComeFromServerMetadataAndTenantPidAreBound() {
         jdbc.rows.add(SourceBindingCanonical.tree(Map.of("table_name", "approved_table")));
-        jdbc.rows.add(SourceBindingCanonical.tree(Map.of("tenant_id", 1)));
+        jdbc.rows.add(SourceBindingCanonical.tree(Map.of("tenant_id", 1, "pid", "src")));
         when(data.getById(1, "source", "src")).thenReturn(Map.of("pid", "src"));
-        assertThat(reader.record(fixture.binding, "source", "src")).containsEntry("tenant_id", 1L).containsEntry("deleted_flag", false);
+        assertThat(reader.record(fixture.binding, "source", "src")).containsEntry("tenant_id", 1L).doesNotContainKey("deleted_flag");
         assertThat(jdbc.sql.get(0)).contains("ab_meta_model").contains("FOR SHARE");
-        assertThat(jdbc.sql.get(1)).isEqualTo("SELECT to_jsonb(r)::text FROM \"approved_table\" r WHERE tenant_id=? AND pid=? AND deleted_flag=FALSE FOR SHARE");
+        assertThat(jdbc.sql.get(1)).isEqualTo("SELECT to_jsonb(r)::text FROM \"approved_table\" r WHERE tenant_id=? AND pid=? FOR SHARE");
         assertThat(jdbc.args.get(1)).containsExactly(1L, "src");
+    }
+    @Test
+    void explicitFalseUsesHardPolicyAndTrueUsesActualPhysicalMarker() {
+        for (Object policy : List.of(false, "false", true, "true")) {
+            jdbc.rows.clear(); jdbc.sql.clear(); jdbc.args.clear();
+            boolean soft = Boolean.TRUE.equals(policy) || "true".equals(policy);
+            jdbc.rows.add(SourceBindingCanonical.tree(Map.of("table_name", "approved_table",
+                    "extension", Map.of("extension", Map.of("softDelete", policy)))));
+            jdbc.rows.add(SourceBindingCanonical.tree(soft
+                    ? Map.of("tenant_id", 1, "pid", "src", "deleted_flag", false)
+                    : Map.of("tenant_id", 1, "pid", "src")));
+            when(data.getById(1, "source", "src")).thenReturn(Map.of("pid", "src"));
+            Map<String, Object> result = reader.record(fixture.binding, "source", "src");
+            assertThat(jdbc.sql.get(1).contains("deleted_flag=FALSE")).isEqualTo(soft);
+            assertThat(result.containsKey("deleted_flag")).isEqualTo(soft);
+            assertThat(jdbc.args.get(1)).containsExactly(1L, "src");
+        }
+    }
+    @Test
+    void malformedPolicyIsRejectedBeforeBusinessQueryOrProjection() {
+        for (Object value : List.of("TRUE", "garbage", 1, Map.of("nested", true))) {
+            jdbc.rows.clear(); jdbc.sql.clear();
+            jdbc.rows.add(SourceBindingCanonical.tree(Map.of("table_name", "approved_table", "extension", Map.of("softDelete", value))));
+            assertThatThrownBy(() -> reader.record(fixture.binding, "source", "src")).isInstanceOf(IllegalArgumentException.class);
+            assertThat(jdbc.sql).hasSize(1);
+        }
+        verifyNoInteractions(data);
+    }
+    @Test
+    void softDeletedAndHardMissingRowsCannotBecomeLiveProjection() {
+        jdbc.rows.add(SourceBindingCanonical.tree(Map.of("table_name", "approved_table", "extension", Map.of("softDelete", true))));
+        jdbc.rows.add(SourceBindingCanonical.tree(Map.of("tenant_id", 1, "pid", "src", "deleted_flag", true)));
+        when(data.getById(1, "source", "src")).thenReturn(Map.of("pid", "src"));
+        assertThatThrownBy(() -> reader.record(fixture.binding, "source", "src")).isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(data);
+        jdbc.rows.add(SourceBindingCanonical.tree(Map.of("table_name", "approved_table")));
+        jdbc.rows.add(null);
+        assertThatThrownBy(() -> reader.record(fixture.binding, "source", "src")).isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(data);
+    }
+    @Test
+    void textualExtensionUsesCanonicalNestedPrecedenceAndInvalidFormsReject() {
+        jdbc.rows.add(SourceBindingCanonical.tree(Map.of("table_name", "approved_table", "extension",
+                "{\"extension\":{\"softDelete\":false},\"softDelete\":true}")));
+        jdbc.rows.add(SourceBindingCanonical.tree(Map.of("tenant_id", 1, "pid", "src")));
+        when(data.getById(1, "source", "src")).thenReturn(Map.of("pid", "src"));
+        assertThat(reader.record(fixture.binding, "source", "src")).doesNotContainKey("deleted_flag");
+        assertThat(jdbc.sql.get(1)).doesNotContain("deleted_flag=FALSE");
+        for (Object invalid : List.of("not-json", List.of("not-object"), Map.of("softDelete", "false "))) {
+            jdbc.rows.clear(); jdbc.sql.clear();
+            jdbc.rows.add(SourceBindingCanonical.tree(Map.of("table_name", "approved_table", "extension", invalid)));
+            assertThatThrownBy(() -> reader.record(fixture.binding, "source", "src")).isInstanceOf(IllegalArgumentException.class);
+            assertThat(jdbc.sql).hasSize(1);
+        }
+    }
+    @Test
+    void lockedPhysicalRowCannotBypassMissingDataScopeProjection() {
+        jdbc.rows.add(SourceBindingCanonical.tree(Map.of("table_name", "approved_table")));
+        jdbc.rows.add(SourceBindingCanonical.tree(Map.of("tenant_id", 1, "pid", "src")));
+        assertThatThrownBy(() -> reader.record(fixture.binding, "source", "src")).isInstanceOf(IllegalArgumentException.class);
     }
     @Test
     void callerCannotSelectUnapprovedModelOrUnsafeTable() {
@@ -103,7 +163,8 @@ class ImportedNotificationMetadataReaderTest {
         public<T> List<T> query(String sql, RowMapper<T> mapper, Object...args) {
             this.sql.add(sql);
             this.args.add(args);
-            return(List<T>) List.of(rows.removeFirst());
+            JsonNode next = rows.removeFirst();
+            return next == null ? List.of() : (List<T>) List.of(next);
         }
     }
 }

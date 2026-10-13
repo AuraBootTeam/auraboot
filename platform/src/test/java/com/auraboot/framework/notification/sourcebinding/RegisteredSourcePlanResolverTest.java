@@ -640,7 +640,8 @@ class RegisteredSourcePlanResolverTest {
         }
         public Map<String, Object> record(Binding b, String model, String pid) {
             reads++;
-            return records.get(model + "/" + pid);
+            Map<String, Object> row = records.get(model + "/" + pid);
+            return row == null ? null : new SourceBindingReader.LiveRecord(row, true);
         }
         public DataPage page(Binding b, String model, Map<String, Object> filters, int page, int size) {
             reads++;

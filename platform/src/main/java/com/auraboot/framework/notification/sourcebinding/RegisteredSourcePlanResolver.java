@@ -135,7 +135,7 @@ public final class RegisteredSourcePlanResolver implements NotificationDeliveryP
     }
     private Map<String, Object> record(SourceBindingTypes.Binding b, SourceBindingTypes.Entity entity, String pid) {
         var row = reader.record(b, entity.modelCode(), pid);
-        SourceBindingTypes.require(row != null && pid.equals(row.get("pid")) && row.get("tenant_id") instanceof Number n && n.longValue() == b.tenantId() && Boolean.FALSE.equals(row.get("deleted_flag")) && matches(row, entity.equals()));
+        SourceBindingTypes.require(row != null && pid.equals(row.get("pid")) && row.get("tenant_id") instanceof Number n && n.longValue() == b.tenantId() && row instanceof SourceBindingReader.LiveRecord && matches(row, entity.equals()));
         return row;
     }
     static boolean matches(Map<String, Object> row, List<SourceBindingTypes.Exact> equals) {

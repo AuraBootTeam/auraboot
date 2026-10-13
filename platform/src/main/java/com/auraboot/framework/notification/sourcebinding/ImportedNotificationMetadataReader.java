@@ -1,17 +1,17 @@
 package com.auraboot.framework.notification.sourcebinding;
 
 import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.meta.entity.payload.ExtensionBean;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.auraboot.framework.plugin.extension.BackgroundDataAccessor;
 import com.auraboot.framework.plugin.extension.DataPage;
 import com.auraboot.framework.plugin.extension.DataPageQuery;
 import com.auraboot.framework.plugin.pf4j.BackgroundDataAccessorImpl;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import javax.sql.DataSource;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -68,12 +68,34 @@ final class ImportedNotificationMetadataReader implements SourceBindingReader {
         JsonNode nativeModel = one(rows("SELECT to_jsonb(m)::text FROM ab_meta_model m WHERE tenant_id=? AND code=? AND is_current=TRUE AND deleted_flag=FALSE FOR SHARE", b.tenantId(), model));
         String table = nativeModel.path("table_name").asText();
         SourceBindingTypes.require(table.matches("[A-Za-z_][A-Za-z0-9_]{0,127}"));
-        JsonNode nativeRow = one(rows("SELECT to_jsonb(r)::text FROM \"" + table + "\" r WHERE tenant_id=? AND pid=? AND deleted_flag=FALSE FOR SHARE", b.tenantId(), pid));
-        Map<String, Object> record = new LinkedHashMap<>(Objects.requireNonNull(data.getById(b.tenantId(), model, pid)));
-        SourceBindingTypes.require(pid.equals(record.get("pid")));
+        boolean softDelete = softDelete(nativeModel);
+        String predicate = softDelete ? " AND deleted_flag=FALSE" : "";
+        JsonNode nativeRow = one(rows("SELECT to_jsonb(r)::text FROM \"" + table + "\" r WHERE tenant_id=? AND pid=?" + predicate + " FOR SHARE", b.tenantId(), pid));
+        SourceBindingTypes.require(pid.equals(nativeRow.path("pid").textValue())
+                && nativeRow.path("tenant_id").isIntegralNumber()
+                && nativeRow.path("tenant_id").longValue() == b.tenantId());
+        if (softDelete) SourceBindingTypes.require(nativeRow.path("deleted_flag").isBoolean()
+                && !nativeRow.path("deleted_flag").booleanValue());
+        Map<String, Object> scoped = data.getById(b.tenantId(), model, pid);
+        SourceBindingTypes.require(scoped != null && pid.equals(scoped.get("pid")));
+        Map<String, Object> record = new LinkedHashMap<>(scoped);
         record.put("tenant_id", nativeRow.path("tenant_id").longValue());
-        record.put("deleted_flag", false);
-        return Collections.unmodifiableMap(record);
+        if (softDelete) record.put("deleted_flag", nativeRow.path("deleted_flag").booleanValue());
+        return new SourceBindingReader.LiveRecord(record, softDelete);
+    }
+    private boolean softDelete(JsonNode model) {
+        JsonNode raw = model.path("extension");
+        if (raw.isMissingNode() || raw.isNull()) return false;
+        if (raw.isTextual()) raw = SourceBindingCanonical.parse(raw.textValue());
+        SourceBindingTypes.require(raw.isObject());
+        ExtensionBean extension = new ObjectMapper().convertValue(raw, ExtensionBean.class);
+        Object value = extension.get("softDelete");
+        boolean declared = (extension.getExtension() != null && extension.getExtension().containsKey("softDelete"))
+                || extension.getDynamicProperties().containsKey("softDelete");
+        if (!declared) return false;
+        SourceBindingTypes.require(value instanceof Boolean || "true".equals(value) || "false".equals(value));
+        // Exactly the canonical ModelDefinitionProjection policy, with invalid declared values rejected.
+        return Boolean.TRUE.equals(value) || "true".equals(String.valueOf(value));
     }
     @Override
     public DataPage page(SourceBindingTypes.Binding b, String model, Map<String, Object> filters, int page, int size) {
