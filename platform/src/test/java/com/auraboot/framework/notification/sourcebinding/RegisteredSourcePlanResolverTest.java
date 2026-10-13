@@ -507,6 +507,123 @@ class RegisteredSourcePlanResolverTest {
         @Override public Clock withZone(ZoneId zone) { return Clock.fixed(now.get(), zone); }
         @Override public Instant instant() { return now.get(); }
     }
+    @Test
+    void remainingChildProgressRechecksEligibilityWithoutChangingEnvelope() throws Exception {
+        remainingFixture(1000);
+        var plans = f.resolver.plan(f.binding, "src");
+        f.records.get("child/d001").put("submitted", new java.math.BigDecimal("60.000001"));
+        assertThat(f.resolver.plan(f.binding, "src")).isEqualTo(plans);
+        f.records.get("child/d001").put("submitted", "100");
+        assertThatThrownBy(() -> f.resolver.plan(f.binding, "src")).isInstanceOf(IllegalArgumentException.class);
+    }
+    @Test
+    void delayedConsumeRejectsFullySuppliedChildrenWithoutInboxOrReceipt() throws Exception {
+        remainingFixture(1000);
+        var pipeline = new ComposedDelivery();
+        var event = pipeline.queue(SourceBindingCanonical.reference("notice", "src", 1));
+        f.records.get("child/d001").put("submitted", "100");
+        assertThatThrownBy(() -> pipeline.deliver(event, pipeline.host)).isInstanceOf(IllegalArgumentException.class);
+        verify(pipeline.transactions).rollback(any());
+        verify(pipeline.notifications, never()).insert(any(Notification.class));
+        verify(pipeline.receipts, never()).markReceiptApplied(anyLong(), anyString(), anyString(), anyString());
+        assertThat(pipeline.queued).containsExactly(event);
+    }
+    @Test
+    void positiveFirstChildCannotHideInvalidLaterRecord() throws Exception {
+        remainingFixture(1000);
+        f.put("child", "d002", Map.of("state", "active", "parent", "t1", "ordered", "10", "submitted", "10"));
+        var clean = new HashMap<>(f.records.get("child/d002"));
+        for (var bad : List.of(Map.of("parent", (Object) "foreign"), Map.of("tenant_id", (Object) 2L),
+                Map.of("ordered", (Object) 1.0d), Map.of("submitted", (Object) "NaN"))) {
+            f.records.put("child/d002", new HashMap<>(clean));
+            f.records.get("child/d002").putAll(bad);
+            // Keep the actual scanned PID present, then change the independent locked record proof.
+            f.childPages.put(1, new DataPage(List.of(f.records.get("child/d001"), clean), 2, 1, 100));
+            assertThatThrownBy(() -> f.resolver.plan(f.binding, "src")).isInstanceOf(IllegalArgumentException.class);
+        }
+        f.records.put("child/d002", new HashMap<>(clean));
+        f.records.get("child/d002").remove("submitted");
+        assertThatThrownBy(() -> f.resolver.plan(f.binding, "src")).isInstanceOf(IllegalArgumentException.class);
+    }
+    @Test
+    void childPagesRejectEmptyTruncationDriftDuplicatesOrderAndConfiguredCapacity() throws Exception {
+        remainingFixture(2);
+        var row = f.records.get("child/d001");
+        for (var page : List.of(new DataPage(List.of(), 0, 1, 100), new DataPage(List.of(row), 2, 1, 100),
+                new DataPage(List.of(row), 3, 1, 100), new DataPage(List.of(row, row), 2, 1, 100),
+                new DataPage(List.of(row), 1, 2, 100))) {
+            f.childPages.put(1, page);
+            assertThatThrownBy(() -> f.resolver.plan(f.binding, "src")).isInstanceOf(IllegalArgumentException.class);
+        }
+    }
+    @Test
+    void allPagesAreValidatedEvenAfterPositiveFirstRow() throws Exception {
+        remainingFixture(1000);
+        for (int n = 2; n <= 101; n++) f.put("child", String.format("d%03d", n),
+                Map.of("state", "active", "parent", "t1", "ordered", "10", "submitted", "10"));
+        assertThat(f.resolver.plan(f.binding, "src")).hasSize(2);
+        f.records.get("child/d101").put("ordered", "bad");
+        assertThatThrownBy(() -> f.resolver.plan(f.binding, "src")).isInstanceOf(IllegalArgumentException.class);
+        f.childPages.put(2, new DataPage(List.of(), 101, 2, 100));
+        assertThatThrownBy(() -> f.resolver.plan(f.binding, "src")).isInstanceOf(IllegalArgumentException.class);
+        f.records.get("child/d101").put("ordered", "10");
+        f.childPages.put(2, new DataPage(List.of(f.records.get("child/d101")), 102, 2, 100));
+        assertThatThrownBy(() -> f.resolver.plan(f.binding, "src")).isInstanceOf(IllegalArgumentException.class);
+    }
+    @Test
+    void childRequiresApprovedPhysicalDecimalAndExactParentField() throws Exception {
+        remainingFixture(1000);
+        for (JsonNode field : f.graphs.get("child").path("fields")) {
+            if ("ordered".equals(field.path("code").asText())) ((ObjectNode) field).put("data_type", "string");
+        }
+        f.reapprove();
+        assertThatThrownBy(() -> f.resolver.plan(f.binding, "src")).isInstanceOf(IllegalArgumentException.class);
+        Binding b = f.binding;
+        assertThatThrownBy(() -> new Binding(b.schemaVersion(), b.code(), b.tenantId(),
+                b.approvals().stream().filter(a -> !a.modelCode().equals("child")).toList(), b.source(),
+                b.owner(), b.principal(), b.verification(), b.ruleId(), b.templateCode(), b.variableToSourceField()))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+    @Test
+    void legacyTargetCanonicalShapeAndInvalidChildDescriptorsRemainStrict() {
+        assertThat(SourceBindingCanonical.tree(f.binding.source().targets()).has("remainingChild")).isFalse();
+        for (String child : List.of("{}", "{\"entity\":null}",
+                "{\"entity\":{\"modelCode\":\"child\",\"equals\":[{\"fieldCode\":\"state\",\"value\":{\"type\":\"STRING\",\"value\":\"active\"}}]},\"parentField\":\"parent\",\"orderedField\":\"ordered\",\"submittedField\":\"submitted\",\"maxRows\":1001}")) {
+            assertThatThrownBy(() -> childTarget(child)).isInstanceOf(Exception.class);
+        }
+    }
+    private Target childTarget(String descriptor) throws Exception {
+        ObjectNode target = (ObjectNode) SourceBindingCanonical.tree(f.binding.source().targets());
+        target.set("remainingChild", SourceBindingCanonical.parse(descriptor));
+        return new ObjectMapper().treeToValue(target, Target.class);
+    }
+    private void remainingFixture(int maxRows) throws Exception {
+        var graph = (ObjectNode) f.graphs.get("target").deepCopy();
+        ((ObjectNode) graph.path("model")).put("id", 90).put("code", "child").put("pid", "m90").put("table_name", "table_child");
+        var fields = graph.putArray("fields");
+        var bindings = graph.putArray("bindings");
+        var tracking = graph.putArray("tracking");
+        int id = 9000;
+        for (var field : Map.of("state", "string", "parent", "string", "ordered", "decimal", "submitted", "decimal").entrySet()) {
+            id++;
+            fields.add(SourceBindingCanonical.tree(Map.of("tenant_id", 1, "id", id, "pid", "f" + id,
+                    "code", field.getKey(), "plugin_pid", "plugin", "is_current", true, "deleted_flag", false,
+                    "data_type", field.getValue(), "feature", Map.of())));
+            bindings.add(SourceBindingCanonical.tree(Map.of("tenant_id", 1, "model_id", 90, "field_id", id,
+                    "pid", "b" + id, "alias_code", field.getKey(), "deleted_flag", false)));
+            tracking.add(SourceBindingCanonical.tree(Map.of("tenant_id", 1, "plugin_pid", "plugin", "resource_pid", "b" + id, "resource_type", "model_field_binding")));
+        }
+        f.graphs.put("child", graph);
+        var approvals = new ArrayList<>(f.binding.approvals());
+        approvals.add(new Approval("METADATA_SHAPE_V1", "child", SourceBindingCanonical.hash(graph), List.of(f.owner), Set.of()));
+        Target target = childTarget("{\"entity\":{\"modelCode\":\"child\",\"equals\":[{\"fieldCode\":\"state\",\"value\":{\"type\":\"STRING\",\"value\":\"active\"}}]},\"parentField\":\"parent\",\"orderedField\":\"ordered\",\"submittedField\":\"submitted\",\"maxRows\":" + maxRows + "}");
+        Binding b = f.binding;
+        f.binding = new Binding(b.schemaVersion(), b.code(), b.tenantId(), approvals,
+                new Source(b.source().entity(), b.source().identityField(), b.source().ownerField(), b.source().occurredAtField(), target),
+                b.owner(), b.principal(), b.verification(), b.ruleId(), b.templateCode(), b.variableToSourceField());
+        f.reapprove();
+        f.put("child", "d001", Map.of("state", "active", "parent", "t1", "ordered", "100", "submitted", "0"));
+    }
     /** Actual accessor/writer/executor composition with hermetic DB/transaction dependencies. */
     private final class ComposedDelivery {
         final NotificationMapper notifications = mock(NotificationMapper.class);
@@ -574,6 +691,7 @@ class RegisteredSourcePlanResolverTest {
         long invalidUser;
         Map<String, Object> lastFilters;
         DataPage scanPage;
+        Map<Integer, DataPage> childPages = new HashMap<>();
         Map<String, JsonNode> graphs = new HashMap<>();
         Map<String, Map<String, Object>> records = new HashMap<>();
         Owner owner = new Owner("plugin", "test-package", "test", "1.0.0");
@@ -647,6 +765,14 @@ class RegisteredSourcePlanResolverTest {
             reads++;
             lastFilters = filters;
             if (model.equals("source")) return scanPage;
+            if (model.equals("child")) {
+                if (childPages.containsKey(page)) return childPages.get(page);
+                var rows = records.entrySet().stream().filter(e -> e.getKey().startsWith("child/"))
+                        .map(Map.Entry::getValue).filter(r -> filters.entrySet().stream().allMatch(e -> e.getValue().equals(r.get(e.getKey()))))
+                        .sorted(java.util.Comparator.comparing(r -> r.get("pid").toString())).toList();
+                int start = Math.min(rows.size(), (page - 1) * size);
+                return new DataPage(rows.subList(start, Math.min(rows.size(), start + size)), rows.size(), page, size);
+            }
             String user =(String) filters.get("user");
             return new DataPage(List.of(records.get("link/l" + user.substring(4))), links, page, size);
         }

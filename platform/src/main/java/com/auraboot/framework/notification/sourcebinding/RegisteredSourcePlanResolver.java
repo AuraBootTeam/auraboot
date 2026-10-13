@@ -4,6 +4,7 @@ import com.auraboot.framework.notification.service.NotificationDeliveryPlanResol
 import com.auraboot.framework.plugin.extension.DataPage;
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.annotation.PostConstruct;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -116,6 +117,10 @@ public final class RegisteredSourcePlanResolver implements NotificationDeliveryP
                 SourceBindingTypes.require(instant(row.get(deadline.fieldCode())).isAfter(now));
             }
         }
+        var child = b.source().targets().remainingChild();
+        if (child != null) {
+            for (String targetPid : targetPids) requireRemainingChild(b, child, targetPid);
+        }
         JsonNode semanticRule = rule.deepCopy();
         ((com.fasterxml.jackson.databind.node.ObjectNode) semanticRule).remove(List.of("send_count", "last_evaluated_at", "created_at", "updated_at"));
         JsonNode semanticTemplate = template.deepCopy();
@@ -127,6 +132,59 @@ public final class RegisteredSourcePlanResolver implements NotificationDeliveryP
         List<Plan> plans = new ArrayList<>();
         for (int i = 0; i<users.size(); i++) plans.add(new Plan(b.tenantId(), SourceBindingCanonical.reference(b.code(), sourcePid, users.get(i)), userPids.get(i), version, b.code(), sourcePid, occurred, title, body));
         return List.copyOf(plans);
+    }
+    /** Traverse the entire approved relation even after finding a positive balance. */
+    private void requireRemainingChild(SourceBindingTypes.Binding binding,
+                                       SourceBindingTypes.RemainingChild child, String parentPid) {
+        Map<String, Object> predicates = filters(child.entity().equals());
+        SourceBindingTypes.require(!predicates.containsKey(child.parentField()));
+        predicates.put(child.parentField(), parentPid);
+        long total = -1;
+        Set<String> seen = new HashSet<>();
+        String previous = null;
+        boolean remaining = false;
+        int size = 100;
+        for (int pageNumber = 1; ; pageNumber++) {
+            DataPage page = reader.page(binding, child.entity().modelCode(), predicates, pageNumber, size);
+            SourceBindingTypes.require(page.page() == pageNumber && page.size() == size
+                    && page.total() > 0 && page.total() <= child.maxRows());
+            if (total == -1) total = page.total();
+            SourceBindingTypes.require(page.total() == total);
+            long expected = Math.min(size, total - (long) (pageNumber - 1) * size);
+            SourceBindingTypes.require(expected > 0 && page.records().size() == expected);
+            for (Map<String, Object> scanned : page.records()) {
+                String pid = string(scanned, "pid");
+                SourceBindingTypes.pid(pid);
+                SourceBindingTypes.require(seen.add(pid) && (previous == null || previous.compareTo(pid) < 0));
+                previous = pid;
+                SourceBindingTypes.require(scanned.get("tenant_id") instanceof Number tenant
+                        && tenant.longValue() == binding.tenantId()
+                        && parentPid.equals(string(scanned, child.parentField())) && matches(scanned, child.entity().equals()));
+                Map<String, Object> row = record(binding, child.entity(), pid);
+                SourceBindingTypes.require(parentPid.equals(string(row, child.parentField())));
+                BigDecimal ordered = exactDecimal(row.get(child.orderedField()));
+                BigDecimal submitted = exactDecimal(row.get(child.submittedField()));
+                remaining |= ordered.compareTo(submitted) > 0;
+            }
+            if (seen.size() == total) break;
+        }
+        SourceBindingTypes.require(remaining);
+    }
+    private BigDecimal exactDecimal(Object value) {
+        SourceBindingTypes.require(value instanceof BigDecimal || value instanceof String
+                || value instanceof java.math.BigInteger || value instanceof Byte || value instanceof Short
+                || value instanceof Integer || value instanceof Long);
+        if (value instanceof BigDecimal decimal) {
+            SourceBindingTypes.require(decimal.signum() >= 0 && decimal.precision() <= 128
+                    && Math.abs((long) decimal.scale()) <= 128);
+            return decimal;
+        }
+        String text = value.toString();
+        SourceBindingTypes.require(text.length() <= 128
+                && text.matches("[+-]?[0-9]+(?:\\.[0-9]+)?"));
+        BigDecimal decimal = new BigDecimal(text);
+        SourceBindingTypes.require(decimal.signum() >= 0 && decimal.precision() <= 128 && decimal.scale() <= 128);
+        return decimal;
     }
     private Map<String, Object> semantic(Map<String, Object> row) {
         var result = new TreeMap<>(row);

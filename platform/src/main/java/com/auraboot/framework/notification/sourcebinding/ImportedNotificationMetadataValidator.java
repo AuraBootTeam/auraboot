@@ -60,6 +60,16 @@ final class ImportedNotificationMetadataValidator {
             type(result, b.source().targets().entity().modelCode(),
                     b.source().targets().deadline().fieldCode(), DataType.DATETIME.getCode());
         }
+        var child = b.source().targets().remainingChild();
+        if (child != null) {
+            type(result, child.entity().modelCode(), child.parentField(), DataType.STRING.getCode());
+            type(result, child.entity().modelCode(), child.orderedField(), DataType.DECIMAL.getCode());
+            type(result, child.entity().modelCode(), child.submittedField(), DataType.DECIMAL.getCode());
+            for (var predicate : child.entity().equals()) {
+                type(result, child.entity().modelCode(), predicate.fieldCode(), predicate.value().raw() instanceof Boolean
+                        ? DataType.BOOLEAN.getCode() : DataType.STRING.getCode());
+            }
+        }
         for (String field : List.of(b.principal().principalField(), b.principal().ownerField(), b.principal().verificationField())) {
             type(result, b.principal().entity().modelCode(), field, DataType.STRING.getCode());
         }

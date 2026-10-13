@@ -87,10 +87,27 @@ public final class SourceBindingTypes {
             require(relation == DeadlineRelation.AFTER_HOST_NOW);
         }
     }
+    /** Finite child eligibility only; counter values are never message variables or configuration versions. */
+    public record RemainingChild(Entity entity, String parentField, String orderedField,
+                                 String submittedField, int maxRows) {
+        public RemainingChild {
+            Objects.requireNonNull(entity);
+            code(parentField);
+            code(orderedField);
+            code(submittedField);
+            require(!orderedField.equals(submittedField) && !parentField.equals(orderedField)
+                    && !parentField.equals(submittedField) && maxRows > 0 && maxRows <= 1000);
+            require(entity.equals().stream().noneMatch(value -> value.fieldCode().equals(parentField)));
+        }
+    }
     public record Target(String listField, Entity entity, String ownerField,
-                         @JsonInclude(JsonInclude.Include.NON_NULL) Deadline deadline) {
+                         @JsonInclude(JsonInclude.Include.NON_NULL) Deadline deadline,
+                         @JsonInclude(JsonInclude.Include.NON_NULL) RemainingChild remainingChild) {
+        public Target(String listField, Entity entity, String ownerField, Deadline deadline) {
+            this(listField, entity, ownerField, deadline, null);
+        }
         public Target(String listField, Entity entity, String ownerField) {
-            this(listField, entity, ownerField, null);
+            this(listField, entity, ownerField, null, null);
         }
         public Target {
             code(listField);
@@ -127,7 +144,7 @@ public final class SourceBindingTypes {
             require(schemaVersion == 1 && tenantId> 0 && ruleId> 0);
             SourceBindingTypes.code(code);
             approvals = List.copyOf(approvals);
-            require(approvals.size() <= 5);
+            require(approvals.size() <= (source != null && source.targets().remainingChild() != null ? 6 : 5));
             Objects.requireNonNull(source);
             Objects.requireNonNull(owner);
             Objects.requireNonNull(principal);
@@ -139,7 +156,12 @@ public final class SourceBindingTypes {
                 SourceBindingTypes.code(k);
                 SourceBindingTypes.code(v);
             });
-            Set<String> models = Set.copyOf(List.of(source.entity.modelCode, source.targets.entity.modelCode, owner.modelCode, principal.entity.modelCode, verification.entity.modelCode));
+            Set<String> models = new HashSet<>(List.of(source.entity.modelCode, source.targets.entity.modelCode,
+                    owner.modelCode, principal.entity.modelCode, verification.entity.modelCode));
+            if (source.targets.remainingChild != null) {
+                require(!models.contains(source.targets.remainingChild.entity.modelCode));
+                models.add(source.targets.remainingChild.entity.modelCode);
+            }
             require(approvals.stream().map(Approval::modelCode).distinct().count() == approvals.size());
             require(models.equals(new HashSet<>(approvals.stream().map(Approval::modelCode).toList())));
         }
