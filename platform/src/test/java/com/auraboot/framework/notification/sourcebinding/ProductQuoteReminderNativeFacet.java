@@ -27,6 +27,7 @@ import com.auraboot.framework.plugin.extension.DataAccessor;
 import com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelope;
 import com.auraboot.framework.plugin.extension.integration.ReliableIntegrationAccessor;
 import com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImpl;
+import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
 import com.auraboot.framework.plugin.service.PluginImportService;
 import com.auraboot.framework.tenant.dao.entity.Tenant;
 import com.auraboot.framework.tenant.service.TenantBootstrapService;
@@ -72,7 +73,7 @@ final class ProductQuoteReminderNativeFacet {
                     DynamicDataService data, NotificationTemplateService templates, NotificationRuleService rules,
                     ImportedNotificationMetadataReader reader, ImportedNotificationMetadataValidator validator,
                     ReliableIntegrationAccessor reliable, StrictInAppDeliveryWriter writer,
-                    ReliableEventDeliveryExecutor executor, List<Long> protectedTenantIds) {}
+                    ReliableEventDeliveryExecutor executor, ExtensionRegistry extensions, List<Long> protectedTenantIds) {}
     private static final List<String> MODELS = List.of("qo_procurement_reminder_common", "s2p_bid",
             "pr_supplier_common", "qo_procurement_membership_common", "pr_supplier_pcba_contact");
     private static final List<String> BUSINESS_MODELS = List.of("pr_supplier_common", "pr_supplier_pcba_contact",
@@ -113,6 +114,15 @@ final class ProductQuoteReminderNativeFacet {
         trace.put("providerCalls", 0);
         try {
             JsonNode input = admission();
+            stage = "product-handler-admission";
+            Map<String, Boolean> handlers = new LinkedHashMap<>();
+            for (String command : List.of("customer_pcba_int:seed_default_kingdee_connection",
+                    "customer_pcba_int:sync_sales_orders", "customer_pcba_int:sync_supplier_purchase_orders",
+                    "customer_pcba_int:sync_latest_purchase_prices")) {
+                handlers.put(command, s.extensions.getCommandHandler(command).isPresent());
+            }
+            trace.put("requiredHandlerRegistration", handlers);
+            assertThat(handlers.values()).containsOnly(true);
             stage = "product-formal-bootstrap-import";
             initializeTenant();
             importProduct(input);
@@ -309,14 +319,27 @@ final class ProductQuoteReminderNativeFacet {
     }
 
     private void importProduct(JsonNode input) {
+        int ordinal = 0;
+        List<Map<String, Object>> diagnostics = new ArrayList<>();
+        trace.put("formalImportDiagnostics", diagnostics);
         for (JsonNode row : input.path("orderedImportDirectories")) {
+            Map<String, Object> current = new LinkedHashMap<>();
+            current.put("ordinal", ++ordinal);
+            current.put("directory", row.path("path").asText());
+            diagnostics.add(current);
             assertThat(row.path("path").asText().length()).isLessThanOrEqualTo(256);
             var preview = s.imports.parseDirectory(row.path("path").asText(), true);
-            assertThat(preview.isValid()).isTrue();
+            current.put("previewValid", preview.isValid());
+            current.put("previewErrors", preview.getErrors());
+            current.put("importId", preview.getImportId());
+            assertThat(preview.isValid()).as("Actual Product preview ordinal %s: %s", ordinal, preview.getErrors()).isTrue();
             var request = ImportRequest.builder().importId(preview.getImportId())
                     .conflictStrategy(ImportRequest.ConflictStrategy.OVERWRITE).autoPublishFields(true)
                     .autoPublishModels(true).autoPublishCommands(true).autoPublishPages(true).createResourcePermissions(true).build();
-            assertThat(s.imports.execute(preview.getImportId(), request).isSuccess()).isTrue();
+            var result = s.imports.execute(preview.getImportId(), request);
+            current.put("executeSuccess", result.isSuccess());
+            current.put("executeError", result.getErrorMessage());
+            assertThat(result.isSuccess()).as("Actual Product import ordinal %s: %s", ordinal, result.getErrorMessage()).isTrue();
         }
         assertThat(s.imports.verifyImportReferenceIntegrity()).isEmpty();
         for (String model : BUSINESS_MODELS) {

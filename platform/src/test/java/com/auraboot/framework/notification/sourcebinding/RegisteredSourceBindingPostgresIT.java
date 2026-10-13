@@ -53,6 +53,9 @@ import org.springframework.scheduling.config.TaskManagementConfigUtils;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -106,6 +109,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Import(RegisteredSourceBindingPostgresIT.PollerIsolation.class)
 @EnabledIfEnvironmentVariable(named = "S06_NATIVE_SOURCE_BINDING", matches = "true")
 class RegisteredSourceBindingPostgresIT {
+    @DynamicPropertySource
+    static void productPluginDirectory(DynamicPropertyRegistry properties) {
+        boolean selected = "true".equals(System.getenv("S06_NATIVE_PRODUCT_QUOTE_FACET"));
+        String file = System.getenv("S06_NATIVE_PRODUCT_INPUT");
+        String directory = System.getenv("S06_NATIVE_PRODUCT_PLUGIN_DIR");
+        ProductQuoteNativePluginDirectory.select(selected, file == null ? null : Path.of(file),
+                System.getenv("S06_NATIVE_PRODUCT_INPUT_SHA256"), directory == null ? null : Path.of(directory),
+                Path.of("/Users/ghj/work/auraboot/.workspace/runtimes/procurement-web-stack-20261010"))
+                .ifPresent(path -> properties.add("aura.plugins.dir", path::toString));
+    }
+
     @TestConfiguration(proxyBeanMethods = false)
     @ConditionalOnProperty(
             name = "s06.native.source-binding.fixture", havingValue = "true")
@@ -131,6 +145,7 @@ class RegisteredSourceBindingPostgresIT {
     @Autowired PlatformTransactionManager manager;
     @Autowired TenantService tenants;
     @Autowired TenantBootstrapService tenantBootstrap;
+    @Autowired ExtensionRegistry extensions;
     @Value("${s06.native.product-quote-facet.enabled:false}") private boolean productQuoteFacetEnabled;
     @Autowired UserService users;
     @Autowired TenantMemberService members;
@@ -606,7 +621,7 @@ class RegisteredSourceBindingPostgresIT {
         if (productQuoteFacetEnabled) {
             ProductQuoteReminderNativeFacet.run(new ProductQuoteReminderNativeFacet.Services(dataSource, jdbc, json,
                     manager, tenants, users, members, tenantBootstrap, imports, data, templates, rules,
-                    reader, validator, reliable, writer, executor, List.of(tenant.getId(), foreignTenant.getId())), evidence);
+                    reader, validator, reliable, writer, executor, extensions, List.of(tenant.getId(), foreignTenant.getId())), evidence);
             proved("actual full Product DSL import and ReminderService queue facet completed with test-owned station notification authority");
         } else {
             trace.put("productQuoteFacet", "not_selected; original seven-method baseline only");
