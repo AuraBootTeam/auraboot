@@ -17,6 +17,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
+import org.springframework.beans.factory.support.BeanDefinitionRegistry;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.scheduling.annotation.ScheduledAnnotationBeanPostProcessor;
+import org.springframework.scheduling.config.TaskManagementConfigUtils;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -35,7 +43,20 @@ import static org.assertj.core.api.Assertions.*;
         "spring.datasource.url=${TEST_DATABASE_URL}", "spring.data.redis.database=${TEST_REDIS_DATABASE}",
         "security.field-encryption.key=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="})
 @ActiveProfiles("integration-test")
+@Import(PluginNotificationDeliveryPostgresIT.PollerIsolation.class)
 class PluginNotificationDeliveryPostgresIT {
+    @TestConfiguration(proxyBeanMethods = false)
+    static class PollerIsolation {
+        @Bean static BeanFactoryPostProcessor preventTestAppAutomaticPollers() {
+            return factory -> {
+                if (!(factory instanceof BeanDefinitionRegistry registry))
+                    throw new IllegalStateException("Native fixture cannot isolate scheduled pollers");
+                String name = TaskManagementConfigUtils.SCHEDULED_ANNOTATION_PROCESSOR_BEAN_NAME;
+                if (registry.containsBeanDefinition(name)) registry.removeBeanDefinition(name);
+            };
+        }
+    }
+    @Autowired ApplicationContext context;
     @Autowired JdbcTemplate jdbc;
     @Autowired DataSource dataSource;
     @Autowired PlatformTransactionManager transactions;
@@ -54,6 +75,7 @@ class PluginNotificationDeliveryPostgresIT {
     private String userPid, otherUserPid, sourceId;
 
     @BeforeEach void fixture() throws Exception {
+        assertThat(context.getBeansOfType(ScheduledAnnotationBeanPostProcessor.class)).isEmpty();
         assertThat(System.getenv("TEST_DATABASE_URL")).isNotBlank();
         assertThat(System.getenv("TEST_REDIS_DATABASE")).isEqualTo("13");
         try (var connection = dataSource.getConnection()) {
@@ -86,8 +108,9 @@ class PluginNotificationDeliveryPostgresIT {
     }
     private long tenant() {
         long id = IdWorker.getId();
+        String pid = UniqueIdGenerator.generate();
         assertThat(jdbc.update("INSERT INTO ab_tenant(id,pid,name,status,deleted_flag) VALUES (?,?,?,'active',FALSE)",
-                id, UniqueIdGenerator.generate(), "S06 native fixture")).isEqualTo(1);
+                id, pid, "S06 native fixture " + pid)).isEqualTo(1);
         tenantIds.add(id); return id;
     }
     private long user(String pid) {
