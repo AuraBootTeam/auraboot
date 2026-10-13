@@ -93,6 +93,18 @@ public class CommandServiceImpl implements CommandService {
         }
 
         commandDefinitionMapper.insertIdempotent(entity);
+        if (commandDefinitionMapper.adoptRetired(entity) > 0) {
+            // insertIdempotent conflicted on (tenant, code, version) with a row a
+            // previous uninstall left soft-deleted and did not insert; adoptRetired
+            // flipped that row back to live with this request's content. Rebind the
+            // pid to the adopted row — and inherit its lifecycle status — so publish
+            // and downstream reads resolve it.
+            CommandDefinition adopted = commandDefinitionMapper.findCurrentByCode(request.getCode());
+            if (adopted != null) {
+                entity.setPid(adopted.getPid());
+                entity.setStatus(adopted.getStatus());
+            }
+        }
         commandMetadataCache.evictCommandDefinitions();
 
         return toDTO(entity);
