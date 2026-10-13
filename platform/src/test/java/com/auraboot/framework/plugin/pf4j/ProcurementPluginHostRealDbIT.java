@@ -46,12 +46,12 @@ class ProcurementPluginHostRealDbIT {
     /** Scheduling isolation only; real business services and mappers remain unchanged. */
     @org.springframework.boot.test.context.TestConfiguration(proxyBeanMethods=false)
     @org.springframework.boot.autoconfigure.condition.ConditionalOnExpression(
-            "T(java.lang.System).getenv('PROCUREMENT_BUYER_ORDER_FIXTURE') == 'true'")
+            "T(java.lang.System).getenv('PROCUREMENT_BUYER_ORDER_FIXTURE') == 'true' || T(java.lang.System).getenv('PROCUREMENT_FOREIGN_DIRECTORY_FIXTURE') == 'true'")
     static class PollerIsolation {
         @org.springframework.context.annotation.Bean
         static org.springframework.beans.factory.config.BeanFactoryPostProcessor preventFixturePollers() {
             return factory -> {
-                if (!"true".equals(System.getenv("PROCUREMENT_BUYER_ORDER_FIXTURE"))) return;
+                if (!"true".equals(System.getenv("PROCUREMENT_BUYER_ORDER_FIXTURE")) && !"true".equals(System.getenv("PROCUREMENT_FOREIGN_DIRECTORY_FIXTURE"))) return;
                 if (!(factory instanceof org.springframework.beans.factory.support.BeanDefinitionRegistry registry))
                     throw new IllegalStateException("Cannot isolate native fixture pollers");
                 String name=org.springframework.scheduling.config.TaskManagementConfigUtils.SCHEDULED_ANNOTATION_PROCESSOR_BEAN_NAME;
@@ -100,6 +100,7 @@ class ProcurementPluginHostRealDbIT {
     private CommandHandlerExtension.CommandContext context;
 
     @BeforeEach void fixture() throws Exception {
+        if ("true".equals(System.getenv("PROCUREMENT_FOREIGN_DIRECTORY_FIXTURE"))) prepareForeignDirectoryBinding();
         if ("true".equals(System.getenv("PROCUREMENT_BUYER_ORDER_FIXTURE"))) prepareBuyerFixtureBinding();
         tenantId=Long.valueOf(System.getenv("TEST_TENANT_ID"));assertTrue(tenantId>0);
         assertEquals("13",System.getenv("TEST_REDIS_DATABASE"));assertNotNull(System.getenv("TEST_DATABASE_URL"));
@@ -332,7 +333,7 @@ class ProcurementPluginHostRealDbIT {
                 Map.of("pr_supplier_code","foreign-"+provider,"pr_supplier_name","Foreign supplier"));
         String foreignContact=cloneForeignNativeFixture("mt_pr_supplier_pcba_contact",localContact,foreign.getId(),
                 Map.of("pr_spc_supplier_id",foreignSupplier,"pr_spc_name","Foreign same phone"));
-        cloneForeignNativeFixture("mt_pr_supplier_pcba_contact",localContact,foreign.getId(),
+        String foreignOnlyContact=cloneForeignNativeFixture("mt_pr_supplier_pcba_contact",localContact,foreign.getId(),
                 Map.of("pr_spc_supplier_id",foreignSupplier,"pr_spc_name","Foreign exclusive phone","qo_pr_contact_normalized_phone",foreignOnly));
         try(var c=source.getConnection();var q=c.prepareStatement("SELECT count(*) FROM mt_pr_supplier_pcba_contact WHERE tenant_id=? AND qo_pr_contact_normalized_phone=? AND qo_pr_contact_state='active'")) {
             q.setLong(1,foreign.getId());q.setString(2,phone);
@@ -349,7 +350,76 @@ class ProcurementPluginHostRealDbIT {
         assertEquals("qo_pr.error.phone_not_registered",rejection.messageKey());
         assertEquals(before,scope(bind,()->db.getById("qo_procurement_membership_common",result.get("recordPid").toString())));
         assertEquals(1,scope(bind,()->nativeRows("qo_procurement_membership_common","qo_pr_membership_user_pid",actor)).size());
+        if ("true".equals(System.getenv("PROCUREMENT_FOREIGN_DIRECTORY_FIXTURE"))) {
+            var receipt=new LinkedHashMap<String,Object>();receipt.put("schemaVersion",1);receipt.putAll(fixtureBinding);
+            receipt.put("kind","foreign-supplier-directory");receipt.put("tenantA",tenantId.toString());receipt.put("tenantB",foreign.getId().toString());
+            receipt.put("foreignSupplierPid",foreignSupplier);receipt.put("foreignContactPid",foreignContact);
+            receipt.put("foreignOnlyContactPid",foreignOnlyContact);receipt.put("foreignOnlyNormalizedPhone",foreignOnly);
+            receipt.put("localSupplierPid",localSupplier);receipt.put("localContactPid",localContact);receipt.put("localNormalizedPhone",phone);
+            receipt.put("localNativeBindingVerified",true);receipt.put("foreignOnlyNativeRejectionKey",rejection.messageKey());
+            receipt.put("retainedAfterTest",true);receipt.put("nativeTrustedPermit",true);receipt.put("publicHTTPVerified",false);
+            receipt.put("snapshots",foreignDirectorySnapshots(tenantId,foreign.getId()));receipt.put("producedAt",java.time.Instant.now().toString());
+            Files.writeString(fixtureReceipt,json.writerWithDefaultPrettyPrinter().writeValueAsString(receipt)+"\n",StandardOpenOption.CREATE_NEW);
+        }
     }
+    /** Opt-in retained proof; ordinary native test behavior and tenant B enrollment remain unchanged. */
+    private void prepareForeignDirectoryBinding() throws Exception {
+        assertTrue(application.getBeansOfType(org.springframework.scheduling.annotation.ScheduledAnnotationBeanPostProcessor.class).isEmpty(),"Fixture scheduling isolation required");
+        assertFalse("true".equals(System.getenv("PROCUREMENT_BUYER_ORDER_FIXTURE")),"Exclusive fixture mode required");
+        fixtureReceipt=Path.of(fixtureEnv("PROCUREMENT_FOREIGN_DIRECTORY_RECEIPT")).toAbsolutePath();
+        assertFalse(Files.exists(fixtureReceipt));assertTrue(Files.isDirectory(fixtureReceipt.getParent()));
+        Path binding=Path.of(fixtureEnv("PROCUREMENT_FIXTURE_SOURCE_BINDING")).toRealPath();
+        assertEquals(fixtureEnv("PROCUREMENT_FIXTURE_SOURCE_BINDING_SHA256"),fixtureSha(binding));
+        var node=json.readTree(Files.readAllBytes(binding));
+        assertEquals("procurement-web-stack-20261010",node.path("runtime").asText());assertEquals("enterprise_22",node.path("database").asText());
+        assertEquals(fixtureEnv("TEST_TENANT_ID"),node.path("tenantId").asText());
+        assertEquals("9dcc0075fa3e3c9ccb314f86d8ad9adbeed2497e",node.path("nativeHostBaseCommit").asText());
+        Path jar=Path.of(fixtureEnv("PROCUREMENT_PLUGIN_JAR")).toRealPath();
+        assertEquals(node.path("productJarSha256").asText(),fixtureSha(jar));
+        assertTrue(node.path("productJarSha256").asText().matches("[a-f0-9]{64}"));
+        Path testSource=Path.of(fixtureEnv("PROCUREMENT_FIXTURE_TEST_SOURCE")).toRealPath();
+        assertEquals(node.path("nativeHostTestSha256").asText(),fixtureSha(testSource));
+        fixtureBinding=new LinkedHashMap<>();
+        for(String key:List.of("runtime","database","tenantId","productJarSha256","nativeHostTestSha256","nativeHostBaseCommit"))
+            fixtureBinding.put(key,node.path(key).asText());
+        var sourceSet=new LinkedHashMap<String,String>();
+        for(String component:List.of("core","product","enterprise","crm","plugins")) {
+            assertTrue(node.path("sourceSet").path(component).asText().matches("[a-f0-9]{40}"));sourceSet.put(component,node.path("sourceSet").path(component).asText());
+        }
+        fixtureBinding.put("sourceSet",sourceSet);fixtureBinding.put("sourceBindingSha256",fixtureSha(binding));
+        try(var c=source.getConnection()) {
+            var url=new java.net.URI(c.getMetaData().getURL().substring("jdbc:".length()));
+            assertTrue(Set.of("localhost","127.0.0.1").contains(url.getHost()));assertEquals(5432,url.getPort());assertEquals("/enterprise_22",url.getPath());
+            fixtureBinding.put("databaseConnection",Map.of("host",url.getHost(),"port",url.getPort(),"database",c.getCatalog()));
+        }
+    }
+    private Map<String,Object> foreignDirectorySnapshots(Long tenantA,Long tenantB) throws Exception {
+        var snapshots=new LinkedHashMap<String,Object>();var modelService=application.getBean(com.auraboot.framework.meta.service.MetaModelService.class);
+        for(String code:List.of("pr_supplier_common","pr_supplier_pcba_contact","s2p_sourcing_event","pr_purchase_request","s2p_bid","pr_purchase_order","pr_purchase_order_line","qo_procurement_membership_common","qo_procurement_quote_line_common","qo_procurement_history_common","qo_procurement_allocation_common","qo_procurement_execution_common","qo_procurement_address_common","qo_procurement_shipment_common","qo_procurement_shipment_line_common","qo_procurement_receipt_common","qo_procurement_reminder_common","qo_procurement_submission_common","qo_procurement_submission_line_common","qo_procurement_category_policy_common","qo_procurement_category_supplier_common")) {
+            String table=modelService.getTableName(code);assertTrue(table.matches("[a-z][a-z0-9_]*"));
+            var tenantsSnapshot=new LinkedHashMap<String,Object>();
+            try(var c=source.getConnection()) {
+                try(var exists=c.prepareStatement("SELECT to_regclass(?) IS NOT NULL")) {
+                    exists.setString(1,table);try(var result=exists.executeQuery()){assertTrue(result.next());assertTrue(result.getBoolean(1));}
+                }
+                for(Long tenant:List.of(tenantA,tenantB)) {
+                    var metadata=new ArrayList<Map<String,Object>>();
+                    try(var q=c.prepareStatement("SELECT pid,table_name FROM ab_meta_model WHERE tenant_id=? AND code=? AND is_current=TRUE AND deleted_flag=FALSE ORDER BY pid")) {
+                        q.setLong(1,tenant);q.setString(2,code);try(var result=q.executeQuery()) {
+                            while(result.next())metadata.add(Map.of("pid",result.getString(1),"tableName",result.getString(2)));
+                        }
+                    }
+                    if(tenant.equals(tenantA)){assertEquals(1,metadata.size());assertEquals(table,metadata.getFirst().get("tableName"));}
+                    try(var q=c.prepareStatement("SELECT COALESCE(jsonb_agg(to_jsonb(r) ORDER BY r.pid),'[]'::jsonb)::text FROM "+table+" r WHERE tenant_id=?")) {
+                        q.setLong(1,tenant);try(var result=q.executeQuery()){assertTrue(result.next());tenantsSnapshot.put(tenant.toString(),Map.of("metadata",metadata,"rows",json.readTree(result.getString(1))));}
+                    }
+                }
+            }
+            snapshots.put(code,Map.of("physicalTable",table,"tableExists",true,"tenants",tenantsSnapshot));
+        }
+        return snapshots;
+    }
+
     private String cloneForeignNativeFixture(String table,String original,Long foreignTenant,Map<String,Object> values) throws Exception {
         assertTrue(Set.of("mt_pr_supplier_common","mt_pr_supplier_pcba_contact","mt_s2p_bid").contains(table));
         assertNotEquals(tenantId,foreignTenant);
@@ -1905,7 +1975,7 @@ class ProcurementPluginHostRealDbIT {
         assertTrue(node.path("productJarSha256").asText().matches("[a-f0-9]{64}"));
         Path testSource=Path.of(fixtureEnv("PROCUREMENT_FIXTURE_TEST_SOURCE")).toRealPath();
         assertEquals(node.path("nativeHostTestSha256").asText(),fixtureSha(testSource));
-        assertEquals("9d9685a62c577d98052681e2aff6c64135ddf93e",node.path("nativeHostBaseCommit").asText());
+        assertEquals("9dcc0075fa3e3c9ccb314f86d8ad9adbeed2497e",node.path("nativeHostBaseCommit").asText());
         // Copy only declared nonsecret identity fields, never arbitrary input diagnostic/configuration data.
         fixtureBinding=new LinkedHashMap<>();
         for(String key:List.of("runtime","database","tenantId","productJarSha256","nativeHostTestSha256","nativeHostBaseCommit"))

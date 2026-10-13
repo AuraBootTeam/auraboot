@@ -132,11 +132,12 @@ class ProcurementPublicSourceCommandRealDbIT {
         final AtomicReference<String> created=new AtomicReference<>();
         volatile Long tenant;
         volatile String missingTargetPid;
+        volatile String missingTargetModel="s2p_sourcing_event";
         volatile boolean publicRequestActive;
         final java.util.concurrent.atomic.AtomicBoolean targetNotFound=new java.util.concurrent.atomic.AtomicBoolean();
         @org.aspectj.lang.annotation.AfterThrowing(pointcut="execution(* com.auraboot.framework.meta.service.DynamicDataService+.getById(..)) && args(model,recordPid)",throwing="failure")
         public void recordMissingTarget(String model,String recordPid,RuntimeException failure) {
-            if(publicRequestActive && Objects.equals(tenant,MetaContext.getCurrentTenantId()) && "s2p_sourcing_event".equals(model)
+            if(publicRequestActive && Objects.equals(tenant,MetaContext.getCurrentTenantId()) && Objects.equals(missingTargetModel,model)
                     && Objects.equals(missingTargetPid,recordPid)
                     && failure instanceof com.auraboot.framework.meta.exception.MetaRecordNotFoundException)
                 targetNotFound.set(true);
@@ -151,7 +152,7 @@ class ProcurementPublicSourceCommandRealDbIT {
     @BeforeEach void prepare(TestInfo test) throws Exception {
         retainedActors.clear();retainedTaskPids.clear();retainedBootstrapPrincipal=null;priorCaseFacts=null;
         caseEvidence=null;tenant=null;userId=null;memberId=null;actor=null;provider=null;token=null;deniedToken=null;
-        loginCount.set(0);queryCount.set(0);publicRequestSequence=0;server=null;task=null;connection=null;observed.tenant=null;observed.missingTargetPid=null;observed.targetNotFound.set(false);
+        loginCount.set(0);queryCount.set(0);orderSaveCount.set(0);orderLookupCount.set(0);savedOrder=null;ambiguousOrderSave=false;publicRequestSequence=0;server=null;task=null;connection=null;observed.tenant=null;observed.missingTargetPid=null;observed.missingTargetModel="s2p_sourcing_event";observed.targetNotFound.set(false);
         prepareEvidence(test);
         assertEquals("13",System.getenv("TEST_REDIS_DATABASE"));
         try(var sql=postgres.getConnection()){assertEquals("enterprise_22",sql.getCatalog());}
@@ -159,7 +160,7 @@ class ProcurementPublicSourceCommandRealDbIT {
         provider="ps_"+UUID.randomUUID().toString().replace("-","").substring(0,24);
         var owner=users.signUp(provider+"@example.invalid",PASSWORD,"Public source local fixture",provider);
         userId=owner.getId();actor=owner.getPid();
-        boolean isolated=test.getTestMethod().orElseThrow().getName().equals("publicRoleAndPayloadCannotGrantIntegrationOrSecretCapabilities");
+        boolean isolated=Set.of("publicRoleAndPayloadCannotGrantIntegrationOrSecretCapabilities","publicOrderTargetCannotCrossIntoAnotherFormallyImportedTenant").contains(test.getTestMethod().orElseThrow().getName());
         tenant=isolated?isolationTenant:baselineTenant;
         boolean initialize=tenant==null;
         if(initialize) {
@@ -218,8 +219,21 @@ class ProcurementPublicSourceCommandRealDbIT {
             byte[] bytes="{\"LoginResultType\":1}".getBytes(StandardCharsets.UTF_8);http.sendResponseHeaders(200,bytes.length);http.getResponseBody().write(bytes);http.close();
         });
         server.createContext("/K3Cloud/Kingdee.BOS.WebApi.ServicesStub.DynamicFormService.ExecuteBillQuery.common.kdsvc",http->{
-            http.getRequestBody().readAllBytes();queryCount.incrementAndGet();
-            byte[] bytes=response.getBytes(StandardCharsets.UTF_8);http.sendResponseHeaders(200,bytes.length);http.getResponseBody().write(bytes);http.close();
+            var request=json.readTree(http.getRequestBody().readAllBytes());String content=response;
+            if("FixturePurchase".equals(request.path("data").path("FormId").asText())) {
+                orderLookupCount.incrementAndGet();assertNotNull(savedOrder);
+                assertEquals(Set.of("data"),json.convertValue(request,Map.class).keySet());assertEquals("OrderId,BillNo,Marker",request.path("data").path("FieldKeys").asText());assertEquals(0,request.path("data").path("StartRow").asInt(-1));
+                assertEquals("Marker = '"+savedOrder.path("Marker").asText()+"'",request.path("data").path("FilterString").asText());
+                assertEquals(2,request.path("data").path("Limit").asInt());
+                content=json.writeValueAsString(List.of(List.of("local-order-1","LOCAL-PO-1",savedOrder.path("Marker").asText())));
+            } else queryCount.incrementAndGet();
+            byte[] bytes=content.getBytes(StandardCharsets.UTF_8);http.sendResponseHeaders(200,bytes.length);http.getResponseBody().write(bytes);http.close();
+        });
+        server.createContext("/K3Cloud/Kingdee.BOS.WebApi.ServicesStub.DynamicFormService.Save.common.kdsvc",http->{
+            var request=json.readTree(http.getRequestBody().readAllBytes());assertEquals("FixturePurchase",request.path("formid").asText());
+            orderSaveCount.incrementAndGet();savedOrder=request.path("data").path("Model");assertTrue(savedOrder.isObject());
+            String content=ambiguousOrderSave?"not-json":"{\"Result\":{\"ResponseStatus\":{\"IsSuccess\":true,\"SuccessEntitys\":[{\"Id\":\"local-order-1\",\"Number\":\"LOCAL-PO-1\"}]}}}";
+            byte[] bytes=content.getBytes(StandardCharsets.UTF_8);http.sendResponseHeaders(200,bytes.length);http.getResponseBody().write(bytes);http.close();
         });server.start();
         var secret=new CloudConfigSaveRequest();secret.setConfigLevel("tenant");secret.setServiceType("integration");secret.setProviderCode(provider);secret.setEnabled(true);secret.setPriority(1);
         secret.setConfig("{\"appSecret\":\"local-test-secret\"}");configs.saveConfig(secret);
@@ -445,6 +459,119 @@ class ProcurementPublicSourceCommandRealDbIT {
     private Long version(){return new BigDecimal(db.getById("s2p_sourcing_event",task).get("row_version").toString()).longValueExact();}
 
     private record Result(int status,com.fasterxml.jackson.databind.JsonNode body){}
+    private static final String GENERATE="qo_procurement_execution_common:generate_orders";
+    private static final List<String> ORDER_PERMISSIONS=List.of("meta.command.execute","qo.procurement.integrate",
+        "model.qo_procurement_execution_common.read","model.s2p_sourcing_event.read","model.pr_supplier_common.read",
+        "model.qo_procurement_allocation_common.read","model.s2p_bid.read","model.qo_procurement_submission_common.read",
+        "model.qo_procurement_submission_line_common.read","model.pr_purchase_request.read","model.prod_product.read",
+        "model.customer_pcba_int_kingdee_connection.read","model.customer_pcba_int_external_ref.read");
+    private final AtomicInteger orderSaveCount=new AtomicInteger(),orderLookupCount=new AtomicInteger();
+    private com.fasterxml.jackson.databind.JsonNode savedOrder;
+    private boolean ambiguousOrderSave;
+    private String baselineOrderExecution;
+    private record PreparedOrder(Submitted quote,String execution,String supplier){}
+    /** The tested execution itself enters the registered controller with a separate exact-role authenticated actor. */
+    @Test @Order(6) void publicConfiguredOrderCreatesImmutableSourceLinkedFactsAndReplaysWithoutAnotherSave() throws Exception {
+        var order=prepareAllocatedOrder();String bearer=orderActor(true);String denied=orderActor(false);
+        var before=snapshot();assertEquals(403,orderCall(denied,order.execution(),Map.of()).status());assertEquals(before,snapshot());
+        assertEquals(400,orderCall(bearer,order.execution(),Map.of("quantity","1","connectionPid","client")).status());assertEquals(before,snapshot());
+        assertEquals(400,orderCall(bearer,order.execution(),Map.of()).status());assertEquals(before,snapshot());
+        assertEquals(0,orderSaveCount.get());assertEquals(0,orderLookupCount.get());
+        configureOrderPolicy();var formal=formalSnapshot(order.quote().submission());
+        var allocations=fixture(SYNC,()->db.query(domainModel("allocation"),Map.of("qo_pr_allocation_execution_pid",order.execution())));
+        var source=fixture(SYNC,()->db.getById(domainModel("source"),order.quote().source()));
+        var created=orderCall(bearer,order.execution(),Map.of());assertEquals(200,created.status());assertEquals(1,orderSaveCount.get());
+        assertEquals("supplier-local",savedOrder.path("Supplier").path("Id").asText());var line=savedOrder.path("Lines").get(0);
+        assertEquals("900",line.path("Material").path("Id").asText());assertEquals(0,new BigDecimal("300.000001").compareTo(new BigDecimal(line.path("Quantity").asText())));
+        assertEquals(0,new BigDecimal("1.25").compareTo(new BigDecimal(line.path("Price").asText())));
+        assertEquals("100",line.path("Source").path("Head").asText());assertEquals("11",line.path("Source").path("Entry").asText());
+        var succeeded=fixture(SYNC,()->db.getById(domainModel("execution"),order.execution()));
+        assertEquals("succeeded",succeeded.get("qo_pr_execution_state"));assertEquals("local-order-1",succeeded.get("qo_pr_execution_erp_order_id"));
+        assertEquals(200,orderCall(bearer,order.execution(),Map.of()).status());assertEquals(1,orderSaveCount.get());assertEquals(0,orderLookupCount.get());
+        assertEquals(succeeded,fixture(SYNC,()->db.getById(domainModel("execution"),order.execution())));
+        assertEquals(formal,formalSnapshot(order.quote().submission()));
+        assertEquals(allocations,fixture(SYNC,()->db.query(domainModel("allocation"),Map.of("qo_pr_allocation_execution_pid",order.execution()))));
+        assertEquals(source,fixture(SYNC,()->db.getById(domainModel("source"),order.quote().source())));
+        writeArtifact("public-order-outcome.json",Map.of("executionPid",order.execution(),"sourcePid",order.quote().source(),"submissionPid",order.quote().submission(),"saveCount",orderSaveCount.get(),"lookupCount",orderLookupCount.get(),"externalErpSynthetic",true,"customer006Verified",false));
+    }
+    @Test @Order(7) void publicUnknownSaveKeepsIndependentCheckpointUntilMarkerLookupWithoutResending() throws Exception {
+        var order=prepareAllocatedOrder();String bearer=orderActor(true);configureOrderPolicy();ambiguousOrderSave=true;
+        var source=fixture(SYNC,()->db.getById(domainModel("source"),order.quote().source()));
+        var formal=formalSnapshot(order.quote().submission());
+        var allocations=fixture(SYNC,()->db.query(domainModel("allocation"),Map.of("qo_pr_allocation_execution_pid",order.execution())));
+        assertEquals(400,orderCall(bearer,order.execution(),Map.of()).status());assertEquals(1,orderSaveCount.get());
+        var unknown=fixture(SYNC,()->db.getById(domainModel("execution"),order.execution()));assertEquals("unknown",unknown.get("qo_pr_execution_state"));
+        assertEquals("CREATE_RESULT_UNKNOWN",unknown.get("qo_pr_execution_failure_code"));
+        assertEquals(source,fixture(SYNC,()->db.getById(domainModel("source"),order.quote().source())));
+        assertEquals(200,orderCall(bearer,order.execution(),Map.of()).status());assertEquals(1,orderSaveCount.get());assertEquals(1,orderLookupCount.get());
+        var succeeded=fixture(SYNC,()->db.getById(domainModel("execution"),order.execution()));assertEquals("succeeded",succeeded.get("qo_pr_execution_state"));
+        assertEquals("local-order-1",succeeded.get("qo_pr_execution_erp_order_id"));assertEquals(formal,formalSnapshot(order.quote().submission()));
+        assertEquals(allocations,fixture(SYNC,()->db.query(domainModel("allocation"),Map.of("qo_pr_allocation_execution_pid",order.execution()))));
+        assertEquals(source,fixture(SYNC,()->db.getById(domainModel("source"),order.quote().source())));
+        writeArtifact("public-order-recovery.json",Map.of("executionPid",order.execution(),"checkpointSurvivedPublicOuterRollback",true,"saveCount",orderSaveCount.get(),"lookupCount",orderLookupCount.get(),"externalErpSynthetic",true,"customer006Verified",false));
+    }
+    @Test @Order(8) void publicOrderTargetCannotCrossIntoAnotherFormallyImportedTenant() throws Exception {
+        assertNotNull(baselineOrderExecution);assertNotEquals(baselineTenant,tenant);String bearer=orderActor(true);
+        var primaryBefore=snapshotTenant(baselineTenant);var secondaryBefore=snapshot();
+        observed.tenant=tenant;observed.missingTargetPid=baselineOrderExecution;observed.missingTargetModel="qo_procurement_execution_common";observed.targetNotFound.set(false);
+        try {
+            assertEquals(400,orderCall(bearer,baselineOrderExecution,Map.of()).status());assertTrue(observed.targetNotFound.get());
+        } finally {observed.missingTargetModel="s2p_sourcing_event";observed.missingTargetPid=null;}
+        assertEquals(primaryBefore,snapshotTenant(baselineTenant));assertEquals(secondaryBefore,snapshot());
+        assertEquals(0,orderSaveCount.get());assertEquals(0,orderLookupCount.get());assertEquals(0,loginCount.get());
+        writeArtifact("public-order-cross-tenant-denial.json",Map.of("foreignTenantId",baselineTenant.toString(),"actorTenantId",tenant.toString(),"executionPid",baselineOrderExecution,"httpStatus",400,"typedTargetNotFoundObserved",true,"bothTenantBusinessFactsUnchanged",true,"erpCalls",0));
+    }
+    private PreparedOrder prepareAllocatedOrder() throws Exception {
+        assertTrue(extensions.getCommandHandler(GENERATE).isPresent());configurePolicy();assertEquals(200,call(token,selected("11")).status());
+        var submitted=prepareSubmittedQuote();
+        var created=fixture("qo_procurement_task_common:allocate",()->new TransactionTemplate(transactions).execute(status->service("ProcurementAllocationService",new Class<?>[]{DataAccessor.class},new Object[]{db},"allocate",new Class<?>[]{String.class,Map.class},task,
+            Map.of("sourceDemands",List.of(Map.of("sourcePid",submitted.source(),"sourceRevision",submitted.sourceRevision(),"quantity","300.000001")),"allocations",List.of(Map.of("quotePid",submitted.quote(),"sourcePid",submitted.source(),"submissionPid",submitted.submission(),"quantity","300.000001"))))));
+        assertTrue(created instanceof List<?>);var group=(Map<?,?>)((List<?>)created).getFirst();String execution=group.get("executionPid").toString();
+        String supplier=fixture(SYNC,()->db.getById("s2p_bid",submitted.quote()).get("s2p_bid_supplier_id").toString());
+        fixture(SYNC,()->db.create("customer_pcba_int_external_ref",Map.of("customer_pcba_ref_external_system","KINGDEE","customer_pcba_ref_instance_key",connection,
+            "customer_pcba_ref_account_id",provider,"customer_pcba_ref_external_form_id","FixtureSupplier","customer_pcba_ref_external_id","supplier-local","customer_pcba_ref_local_model_code","pr_supplier_common","customer_pcba_ref_local_pid",supplier)));
+        baselineOrderExecution=execution;return new PreparedOrder(submitted,execution,supplier);
+    }
+    private String orderActor(boolean integration) {
+        context();String email=provider+"-order-"+(integration?"allow":"deny")+"@example.invalid";
+        var user=users.signUp(email,PASSWORD,"Public order local fixture",provider);var member=members.addMember(user.getId(),tenant,"active");
+        var codes=new ArrayList<>(ORDER_PERMISSIONS);if(!integration)codes.remove("qo.procurement.integrate");assertEquals(integration?13:12,codes.size());
+        return actorToken(user.getId(),user.getPid(),member.getId(),email,codes);
+    }
+    private Map<String,Object> orderContract() {
+        var row=new LinkedHashMap<String,Object>();row.put("connectionPid",connection);row.put("accountId",provider);row.put("formId","FixturePurchase");
+        row.put("markerField","Marker");row.put("orderIdField","OrderId");row.put("billNoField","BillNo");row.put("linesField","Lines");
+        row.put("headerFields",Map.of("supplierExternalId","Supplier.Id","organization","Organization.Id","currency","Currency.Id","paymentTerms","Payment.Id","orderDate","Date"));
+        row.put("lineFields",Map.of("materialExternalId","Material.Id","quantity","Quantity","unitPrice","Price","unit","Unit.Id","taxRate","TaxRate","taxIncluded","TaxIncluded","deliveryDate","DeliveryDate","requisitionId","Source.Head","entryId","Source.Entry"));
+        row.put("supplierReferenceFormId","FixtureSupplier");row.put("organizationValues",Map.of("LOCAL-ORG","org-local"));row.put("currencyValues",Map.of("CNY","currency-local"));
+        row.put("paymentTermValues",Map.of("Net 30","payment-local"));row.put("unitValues",Map.of("PCS","unit-local"));row.put("lookupAbsenceAuthoritative",true);row.put("saveCreatesOrder",true);return row;
+    }
+    private void configureOrderPolicy() throws Exception {
+        context();Path original=Path.of(procurementDirectory);Path copy=Files.createDirectory(caseEvidence.resolve("order-dsl"));
+        try(var files=Files.walk(original)){for(Path path:files.toList()){Path target=copy.resolve(original.relativize(path));if(Files.isDirectory(path))Files.createDirectories(target);else Files.copy(path,target);}}
+        Path commandsFile=copy.resolve("config/commands/procurement.json");Files.copy(commandsFile,caseEvidence.resolve("order-production-default-command.json"));
+        var definitions=json.readTree(commandsFile.toFile());int changed=0;
+        for(var definition:definitions)if(GENERATE.equals(definition.path("code").asText())){
+            var policies=(ArrayNode)definition.path("handlerParams").path("procurementOrderWriteContracts");assertTrue(policies.isEmpty());policies.add(json.valueToTree(orderContract()));changed++;
+        }
+        assertEquals(1,changed);Files.write(commandsFile,json.writerWithDefaultPrettyPrinter().writeValueAsBytes(definitions));importDirectory(copy);
+        var definition=commands.findByCode(GENERATE);assertEquals(tenant,definition.getTenantId());assertEquals("qo_procurement_execution_common",definition.getModelCode());
+        var config=json.readTree(definition.getExecutionConfig());assertEquals(GENERATE,config.path("handler").asText());assertEquals("qo.procurement.integrate",config.path("permissions").get(0).asText());
+        assertTrue(config.path("handlerParams").path("tenantSecretRead").asBoolean());
+        writeArtifact("order-server-policy.json",Map.of("originCommandSha256",sha(original.resolve("config/commands/procurement.json")),"configuredCommandSha256",sha(commandsFile),"tenantId",tenant.toString(),"metadataDiffersFromProductionDefault",true,"customer006Verified",false,"contract",orderContract()));
+    }
+    private Result orderCall(String bearer,String execution,Map<String,Object> payload) throws Exception {
+        MetaContext.clear();org.springframework.test.web.servlet.MvcResult result;observed.publicRequestActive=true;
+        try {result=mvc.perform(post("/api/meta/commands/execute/"+GENERATE).header("Authorization","Bearer "+bearer).header("X-Locale","en-US")
+            .contentType("application/json").content(json.writeValueAsBytes(Map.of("targetRecordPid",execution,"payload",payload)))).andReturn();}
+        finally {observed.publicRequestActive=false;}context();
+        var body=json.readTree(result.getResponse().getContentAsByteArray());
+        var diagnostics=new LinkedHashMap<String,Object>();diagnostics.put("commandCode",GENERATE);diagnostics.put("targetRecordPid",execution);diagnostics.put("httpStatus",result.getResponse().getStatus());
+        diagnostics.put("businessCode",safeNumericCode(body.path("code")));diagnostics.put("contextBusinessCode",safeNumericCode(body.path("context").path("code")));
+        diagnostics.put("saveCount",orderSaveCount.get());diagnostics.put("lookupCount",orderLookupCount.get());diagnostics.put("rawResponseOrCredentialsPersisted",false);
+        writeArtifact("public-order-request-"+(++publicRequestSequence)+".json",diagnostics);return new Result(result.getResponse().getStatus(),body);
+    }
+
     private Result call(String bearer,Map<String,Object> payload) throws Exception {
         MetaContext.clear();org.springframework.test.web.servlet.MvcResult result;observed.publicRequestActive=true;
         try {result=mvc.perform(post("/api/meta/commands/execute/"+SYNC).header("Authorization","Bearer "+bearer)
