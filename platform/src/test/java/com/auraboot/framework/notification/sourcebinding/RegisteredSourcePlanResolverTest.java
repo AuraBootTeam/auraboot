@@ -1,6 +1,17 @@
 package com.auraboot.framework.notification.sourcebinding;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.integration.HostSerializableEventConsumer;
+import com.auraboot.framework.integration.ReliableEventDeliveryExecutor;
+import com.auraboot.framework.integration.ReliableIntegrationMetrics;
+import com.auraboot.framework.meta.mapper.OutboxEventMapper;
+import com.auraboot.framework.notification.entity.Notification;
+import com.auraboot.framework.notification.mapper.NotificationMapper;
+import com.auraboot.framework.notification.service.NotificationDeliveryPlanResolver.Plan;
+import com.auraboot.framework.notification.service.NotificationDeliveryPlanResolver;
+import com.auraboot.framework.notification.service.NotificationSseService;
+import com.auraboot.framework.notification.service.impl.PluginNotificationDeliveryAccessorImpl;
+import com.auraboot.framework.notification.service.impl.StrictInAppDeliveryWriter;
 import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.Approval;
 import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.Binding;
 import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.Entity;
@@ -13,17 +24,25 @@ import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.Veri
 import com.auraboot.framework.plugin.extension.BackgroundDataAccessor;
 import com.auraboot.framework.plugin.extension.DataPage;
 import com.auraboot.framework.plugin.extension.NotificationDeliveryAccessor;
+import com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelope;
+import com.auraboot.framework.plugin.extension.integration.ReliableEventConsumerExtension;
+import com.auraboot.framework.plugin.extension.integration.ReliableIntegrationAccessor;
 import com.fasterxml.jackson.databind.JsonNode;
+import java.lang.reflect.Proxy;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.SimpleTransactionStatus;
@@ -32,7 +51,11 @@ import static com.auraboot.framework.notification.sourcebinding.SourceBindingTyp
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -70,13 +93,13 @@ class RegisteredSourcePlanResolverTest {
     @Test
     void ordinaryNotificationResolverRemainsFunctionalAlongsideRegisteredProtocol() {
         String ref = "trusted-other-reference";
-        com.auraboot.framework.notification.mapper.NotificationMapper mapper = mock(com.auraboot.framework.notification.mapper.NotificationMapper.class);
-        var writer = new com.auraboot.framework.notification.service.impl.StrictInAppDeliveryWriter(mapper, mock(com.auraboot.framework.notification.service.NotificationSseService.class));
-        com.auraboot.framework.plugin.extension.integration.ReliableIntegrationAccessor reliable = mock(com.auraboot.framework.plugin.extension.integration.ReliableIntegrationAccessor.class);
-        var plan = new com.auraboot.framework.notification.service.NotificationDeliveryPlanResolver.Plan(1, ref, "user1", "ordinary-config", "ordinary", "object", java.time.Instant.EPOCH, "Title", "Body");
-        com.auraboot.framework.notification.service.NotificationDeliveryPlanResolver ordinary =(t, r) -> r.equals(ref) ? java.util.Optional.of(plan) : java.util.Optional.empty();
-        var host = new com.auraboot.framework.notification.service.impl.PluginNotificationDeliveryAccessorImpl(List.of(f.resolver, ordinary), reliable, writer);
-        org.springframework.test.util.ReflectionTestUtils.setField(host, "enabled", true);
+        NotificationMapper mapper = mock(NotificationMapper.class);
+        var writer = new StrictInAppDeliveryWriter(mapper, mock(NotificationSseService.class));
+        ReliableIntegrationAccessor reliable = mock(ReliableIntegrationAccessor.class);
+        var plan = new Plan(1, ref, "user1", "ordinary-config", "ordinary", "object", Instant.EPOCH, "Title", "Body");
+        NotificationDeliveryPlanResolver ordinary =(t, r) -> r.equals(ref) ? Optional.of(plan) : Optional.empty();
+        var host = new PluginNotificationDeliveryAccessorImpl(List.of(f.resolver, ordinary), reliable, writer);
+        ReflectionTestUtils.setField(host, "enabled", true);
         MetaContext.setContext(1L, 0L, "host", "host");
         TransactionSynchronizationManager.initSynchronization();
         when(mapper.findActiveRecipient(1, "user1")).thenReturn(1L);
@@ -188,7 +211,7 @@ class RegisteredSourcePlanResolverTest {
     }
     @Test
     void occurrenceUsesExplicitOffsetOrTypedTimestampWithoutTimezoneGuess() {
-        f.records.get("source/src").put("at", java.sql.Timestamp.from(java.time.Instant.parse("2026-10-13T01:00:00.123456Z")));
+        f.records.get("source/src").put("at", java.sql.Timestamp.from(Instant.parse("2026-10-13T01:00:00.123456Z")));
         assertThat(f.resolver.plan(f.binding, "src").getFirst().occurredAt()).hasToString("2026-10-13T01:00:00.123456Z");
         f.records.get("source/src").put("at", "2026-10-13T01:00:00");
         assertThatThrownBy(() -> f.resolver.plan(f.binding, "src")).isInstanceOf(java.time.format.DateTimeParseException.class);
@@ -290,6 +313,142 @@ class RegisteredSourcePlanResolverTest {
         assertThatThrownBy(() -> new RegisteredSourceWorker(f.resolver, f, delivery, tx).runTenant(1)).isInstanceOf(IllegalArgumentException.class);
         assertThat(f.lastFilters).isNull();
         verifyNoInteractions(delivery);
+    }
+    @Test
+    void composedOrdinaryHostNotificationKeepsDefaultConsumerIsolation() {
+        ComposedDelivery pipeline = new ComposedDelivery();
+        var event = pipeline.queue("ordinary-reference");
+        pipeline.deliver(event, pipeline.host);
+        assertThat(pipeline.isolation).isEqualTo(TransactionDefinition.ISOLATION_DEFAULT);
+        assertThat(pipeline.host.requiresSerializableTransaction(event)).isFalse();
+        verify(pipeline.notifications).insert(any(Notification.class));
+        assertThat(f.reads).isZero();
+    }
+    @Test
+    void composedRegisteredHostNotificationUsesSerializableAndPersistsAfterFullResolution() {
+        ComposedDelivery pipeline = new ComposedDelivery();
+        var event = pipeline.queue(SourceBindingCanonical.reference("notice", "src", 1));
+        assertThat(pipeline.host.requiresSerializableTransaction(event)).isTrue();
+        f.reads = 0;
+        pipeline.deliver(event, pipeline.host);
+        assertThat(pipeline.isolation).isEqualTo(TransactionDefinition.ISOLATION_SERIALIZABLE);
+        assertThat(f.reads).isGreaterThan(0);
+        verify(pipeline.notifications).insert(any(Notification.class));
+    }
+    @Test
+    void composedMalformedRegisteredReferenceSelectsIsolationButNeverGrantsAuthority() {
+        ComposedDelivery pipeline = new ComposedDelivery();
+        var ordinary = pipeline.queue("ordinary-reference");
+        var malformed = pipeline.event(ordinary, ordinary.eventType(), "ns1.invalid");
+        assertThat(pipeline.host.requiresSerializableTransaction(malformed)).isTrue();
+        assertThatThrownBy(() -> pipeline.deliver(malformed, pipeline.host)).isInstanceOf(IllegalArgumentException.class);
+        assertThat(pipeline.isolation).isEqualTo(TransactionDefinition.ISOLATION_SERIALIZABLE);
+        verify(pipeline.transactions).rollback(any());
+        verify(pipeline.notifications, never()).insert(any(Notification.class));
+        assertThat(f.reads).isZero();
+    }
+    @Test
+    void composedOtherEventTypeCannotUseRegisteredPrefixToChangeIsolation() {
+        ComposedDelivery pipeline = new ComposedDelivery();
+        var ordinary = pipeline.queue("ordinary-reference");
+        var other = pipeline.event(ordinary, "other.event", SourceBindingCanonical.reference("notice", "src", 1));
+        assertThat(pipeline.host.requiresSerializableTransaction(other)).isFalse();
+        assertThatThrownBy(() -> pipeline.deliver(other, pipeline.host)).hasMessage("NOTIFICATION_DELIVERY_UNAVAILABLE");
+        assertThat(pipeline.isolation).isEqualTo(TransactionDefinition.ISOLATION_DEFAULT);
+        verify(pipeline.notifications, never()).insert(any(Notification.class));
+    }
+    @Test
+    void composedForeignClassloaderCannotOptInOrResolveRegisteredReferenceInDefaultTransaction() {
+        ComposedDelivery pipeline = new ComposedDelivery();
+        var event = pipeline.queue(SourceBindingCanonical.reference("notice", "src", 1));
+        f.reads = 0;
+        AtomicInteger optInCalls = new AtomicInteger();
+        ClassLoader foreign = new ClassLoader(getClass().getClassLoader()) {
+        };
+        Object proxy = Proxy.newProxyInstance(foreign, new Class<?>[] {
+            ReliableEventConsumerExtension.class, HostSerializableEventConsumer.class
+        },(instance, method, args) -> {
+            return switch (method.getName()) {
+                case "consumerCode" -> pipeline.host.consumerCode();
+                case "subscribedEventTypes" -> pipeline.host.subscribedEventTypes();
+                case "requiresSerializableTransaction" -> {
+                    optInCalls.incrementAndGet();
+                    yield true;
+                }
+                case "consume" -> {
+                    pipeline.host.consume((IntegrationEventEnvelope) args[0]);
+                    yield null;
+                }
+                default -> null;
+            };
+        });
+        assertThatThrownBy(() -> pipeline.deliver(event,(ReliableEventConsumerExtension) proxy)).isInstanceOf(IllegalArgumentException.class);
+        assertThat(pipeline.isolation).isEqualTo(TransactionDefinition.ISOLATION_DEFAULT);
+        assertThat(optInCalls).hasValue(0);
+        assertThat(f.reads).isZero();
+        verify(pipeline.notifications, never()).insert(any(Notification.class));
+    }
+    /** Actual accessor/writer/executor composition with hermetic DB/transaction dependencies. */
+    private final class ComposedDelivery {
+        final NotificationMapper notifications = mock(NotificationMapper.class);
+        final OutboxEventMapper receipts = mock(OutboxEventMapper.class);
+        final PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
+        final List<IntegrationEventEnvelope> queued = new ArrayList<>();
+        final PluginNotificationDeliveryAccessorImpl host;
+        final ReliableEventDeliveryExecutor executor;
+        int isolation;
+        ComposedDelivery() {
+            var reliable = mock(ReliableIntegrationAccessor.class);
+            var writer = new StrictInAppDeliveryWriter(notifications, mock(NotificationSseService.class));
+            NotificationDeliveryPlanResolver ordinary =(tenant, reference) -> {
+                if (!"ordinary-reference".equals(reference)) return Optional.empty();
+                return Optional.of(new Plan(1, reference, "ordinary-user", "ordinary-config", "ordinary", "object", Instant.EPOCH, "Title", "Body"));
+            };
+            host = new PluginNotificationDeliveryAccessorImpl(List.of(f.resolver, ordinary), reliable, writer);
+            ReflectionTestUtils.setField(host, "enabled", true);
+            executor = new ReliableEventDeliveryExecutor(receipts, mock(ReliableIntegrationMetrics.class), transactions);
+            when(notifications.findActiveRecipient(anyLong(), anyString())).thenReturn(1L);
+            when(notifications.insert(any(Notification.class))).thenAnswer(call -> {
+                Notification row = call.getArgument(0);
+                row.setId(101L);
+                return 1;
+            });
+            when(reliable.enqueueIdempotent(any())).thenAnswer(call -> {
+                queued.add(call.getArgument(0));
+                return true;
+            });
+            when(receipts.claimReceipt(anyLong(), anyString(), anyString(), anyString())).thenReturn(1);
+            when(receipts.markReceiptApplied(anyLong(), anyString(), anyString(), anyString())).thenReturn(1);
+            when(transactions.getTransaction(any())).thenAnswer(call -> {
+                TransactionDefinition definition = call.getArgument(0);
+                isolation = definition.getIsolationLevel();
+                TransactionSynchronizationManager.setActualTransactionActive(true);
+                TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(isolation == TransactionDefinition.ISOLATION_DEFAULT ? null : isolation);
+                if (!TransactionSynchronizationManager.isSynchronizationActive()) TransactionSynchronizationManager.initSynchronization();
+                return new SimpleTransactionStatus();
+            });
+            doAnswer(call -> {
+                TransactionSynchronizationManager.clear();
+                return null;
+            }).when(transactions).commit(any());
+            doAnswer(call -> {
+                TransactionSynchronizationManager.clear();
+                return null;
+            }).when(transactions).rollback(any());
+        }
+        IntegrationEventEnvelope queue(String reference) {
+            MetaContext.setContext(1L, 0L, "host", "host");
+            assertThat(host.enqueue(new NotificationDeliveryAccessor.Request(1, reference, NotificationDeliveryAccessor.Channel.IN_APP)).status()).isEqualTo(NotificationDeliveryAccessor.Status.QUEUED);
+            return queued.getLast();
+        }
+        void deliver(IntegrationEventEnvelope envelope, ReliableEventConsumerExtension consumer) {
+            executor.deliver(envelope, consumer, "test-lease");
+        }
+        IntegrationEventEnvelope event(IntegrationEventEnvelope input, String type, String reference) {
+            Map<String, Object> payload = new HashMap<>(input.payload());
+            payload.put("resolutionReference", reference);
+            return new IntegrationEventEnvelope(input.schemaVersion(), input.eventId(), type, input.source(), input.subject(), input.occurredAt(), input.tenantId(), input.correlationId(), input.causationId(), input.orderingKey(), input.sequence(), payload, input.headers());
+        }
     }
     static class Fixture implements SourceBindingReader {
         int reads, links = 1;

@@ -58,6 +58,10 @@ class ReliableEventDeliveryIsolationTest {
         }
     }
     static class SerializableConsumer extends Ordinary implements HostSerializableEventConsumer {
+        @Override
+        public boolean requiresSerializableTransaction(IntegrationEventEnvelope envelope) {
+            return true;
+        }
     }
     @Test
     void ordinaryConsumerKeepsExistingDefaultIsolation() {

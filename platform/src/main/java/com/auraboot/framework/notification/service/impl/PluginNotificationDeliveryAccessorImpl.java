@@ -58,6 +58,16 @@ public class PluginNotificationDeliveryAccessorImpl implements NotificationDeliv
         return new Result(inserted ? Status.QUEUED : Status.REPLAYED, null, event.eventId());
     }
 
+    @Override
+    public boolean requiresSerializableTransaction(IntegrationEventEnvelope envelope) {
+        // The prefix selects transaction isolation only. It does not validate or authorize a source fact.
+        if (envelope == null || !EVENT_TYPE.equals(envelope.eventType())) {
+            return false;
+        }
+        Object reference = envelope.payload().get("resolutionReference");
+        return reference instanceof String value && value.startsWith("ns1.");
+    }
+
     @Override public String consumerCode() { return "core.notification.in-app.persistence.v1"; }
     @Override public Set<String> subscribedEventTypes() { return Set.of(EVENT_TYPE); }
     @Override public void consume(IntegrationEventEnvelope event) {

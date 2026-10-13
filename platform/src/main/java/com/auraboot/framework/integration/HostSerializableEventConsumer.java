@@ -1,4 +1,10 @@
 package com.auraboot.framework.integration;
 
-/** Host-only opt-in: receipt, authority reads and effect share one serializable transaction. */
-public interface HostSerializableEventConsumer {}
+import com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelope;
+
+/** Host-only per-envelope opt-in; ordinary events retain the original consumer transaction. */
+public interface HostSerializableEventConsumer {
+    default boolean requiresSerializableTransaction(IntegrationEventEnvelope envelope) {
+        return false;
+    }
+}

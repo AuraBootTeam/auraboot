@@ -33,8 +33,9 @@ public class ReliableEventDeliveryExecutor {
     public void deliver(IntegrationEventEnvelope envelope,
                         ReliableEventConsumerExtension consumer,
                         String leaseToken) {
-        boolean hostSerializable = consumer instanceof HostSerializableEventConsumer
-                && consumer.getClass().getClassLoader() == getClass().getClassLoader();
+        boolean hostSerializable = consumer instanceof HostSerializableEventConsumer hostConsumer
+                && consumer.getClass().getClassLoader() == getClass().getClassLoader()
+                && hostConsumer.requiresSerializableTransaction(envelope);
         (hostSerializable ? serializableTransaction : transaction).executeWithoutResult(status -> {
             int claimed = outboxEventMapper.claimReceipt(
                     envelope.tenantId(), envelope.eventId(), consumer.consumerCode(), leaseToken);
