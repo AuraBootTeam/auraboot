@@ -292,3 +292,6 @@ T3 acceptance: `node scripts/oss-remediation-t3-run.mjs --executor /absolute/pat
 | `lib/oss-stack-lifecycle.mjs` | 0 | 2026-10-10 | Manage registered OSS source mappings and stack lifecycle. |
 | `lib/web-admin-lock-contract.mjs` | 0 | 2026-10-10 | Compare installed Web dependency locks with the frozen source lock. |
 | `oss-e2e-fixture-backend.sh` | 0 | 2026-10-10 | Launch the unchanged backend with separately hashed E2E fixture artifacts. |
+
+| `ci/prepare_openapi_verifier.sh` | 1 | 2026-10-14 | Bootstrap exact hashed dependencies for the isolated OpenAPI verifier. |
+| `ci/verify_openapi_artifacts.py` | 1 | 2026-10-14 | Validate actual generated OpenAPI structure, component schemas, payloads and formats with a fixed case receipt. |

@@ -10,6 +10,11 @@ const slo = fs.readFileSync(new URL('../tests/load/k6/open-platform-slo.js', imp
 const dockerfile = fs.readFileSync(new URL('../platform/Dockerfile', import.meta.url), 'utf8');
 
 assert.match(gate, /AURA_CI_EXPECTED_REF/);
+assert.match(gate, /prepare_openapi_verifier\.sh/);
+assert.match(gate, /verify_openapi_artifacts\.py/);
+assert.match(gate, /OpenAPI contract validation failed/);
+assert.match(gate, /Generated OpenAPI declaration consumer failed/);
+assert.match(gate, /"openapi": json\.load\(open\("\$ARTIFACTS\/openapi-receipt\.json"\)\)/);
 assert.match(gate, /uname -s.*Linux/);
 assert.match(gate, /uname -m.*x86_64/);
 assert.match(gate, /status --porcelain --untracked-files=all/);
@@ -37,7 +42,8 @@ assert.match(gate, /chmod 0600 "\$CREDENTIAL_ARTIFACT"/);
 assert.match(gate, /cleanup\(\)[\s\S]*rm -f "\$CREDENTIAL_ARTIFACT"/);
 assert.match(gate, /RUNNER_UID="\$\(id -u\)"/);
 assert.match(gate, /RUNNER_GID="\$\(id -g\)"/);
-assert.equal((gate.match(/docker run --rm --user "\$RUNNER_UID:\$RUNNER_GID"/g) ?? []).length, 2);
+assert.equal((gate.match(/docker run --rm --user "\$RUNNER_UID:\$RUNNER_GID"/g) ?? []).length, 3);
+assert.match(gate, /node \/sdk\/toolchain\/node_modules\/typescript\/bin\/tsc/);
 assert.match(gate, /PROFILE=production/);
 assert.match(gate, /SPRING_PROFILES_ACTIVE=community/);
 assert.match(gate, /JWT_KEY="\$\(openssl rand -base64 64/);

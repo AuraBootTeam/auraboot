@@ -175,6 +175,9 @@ timeout 600 docker run --rm --user "$RUNNER_UID:$RUNNER_GID" \
   > "$ARTIFACTS/logs/sdk-prepare.log" 2>&1 || fail "fresh SDK preparation failed"
 python3 "$STAGE/scripts/ci/verify-open-platform-sdk.py" "$STAGE" "$SDK_ROOT" "$ARTIFACTS/sdk-archive.json" \
   || fail "fresh SDK archive reconciliation failed"
+OPENAPI_VERIFIER="$WORK_ROOT/openapi-verifier"
+timeout 180 sh "$STAGE/scripts/ci/prepare_openapi_verifier.sh" "$STAGE" "$OPENAPI_VERIFIER" \
+  > "$ARTIFACTS/logs/openapi-bootstrap.log" 2>&1 || fatal "OpenAPI verifier bootstrap unavailable"
 info "building exact-ref image $IMAGE"
 docker build -f "$STAGE/platform/Dockerfile" -t "$IMAGE" \
   --build-arg "BUILDKIT_SYNTAX=$DOCKERFILE_FRONTEND_IMAGE" \
@@ -248,6 +251,21 @@ python3 "$STAGE/scripts/ci/open_platform_backend_catalog.py" verify --root "$STA
   --plan "$ARTIFACTS/backend-plan.json" --results "$ARTIFACTS/backend-junit" \
   --coverage "$ARTIFACTS/backend-jacoco.xml" \
   --receipt "$ARTIFACTS/backend-receipt.json" || fail "backend case reconciliation failed"
+
+info "validating actual generated OpenAPI contracts and declarations"
+OPENAPI_ARTIFACTS="$ARTIFACTS/openapi-contract"
+mkdir -p "$OPENAPI_ARTIFACTS"
+cp "$STAGE/platform/build/test-artifacts/open-api-contract/"*.json "$OPENAPI_ARTIFACTS/"
+cp "$STAGE/platform/build/test-artifacts/open-api-contract/"*.d.ts "$OPENAPI_ARTIFACTS/"
+cp "$STAGE/scripts/fixtures/open-platform-openapi/types-consumer.ts" "$OPENAPI_ARTIFACTS/"
+"$OPENAPI_VERIFIER/bin/python" "$STAGE/scripts/ci/verify_openapi_artifacts.py" \
+  "$OPENAPI_ARTIFACTS" "$ARTIFACTS/openapi-receipt.json" \
+  > "$ARTIFACTS/logs/openapi-validation.log" 2>&1 || fail "OpenAPI contract validation failed"
+timeout 60 docker run --rm --user "$RUNNER_UID:$RUNNER_GID" \
+  -v "$OPENAPI_ARTIFACTS":/consumer:ro -v "$SDK_ROOT":/sdk:ro \
+  "$SDK_NODE_IMAGE" node /sdk/toolchain/node_modules/typescript/bin/tsc \
+  --strict --noEmit --module nodenext --target es2022 /consumer/types-consumer.ts \
+  > "$ARTIFACTS/logs/openapi-types.log" 2>&1 || fail "Generated OpenAPI declaration consumer failed"
 
 PROTOCOL_KEY="$(openssl rand -base64 48 | tr -d '\n')"
 JWT_KEY="$(openssl rand -base64 64 | tr -d '\n')"
@@ -384,6 +402,7 @@ json.dump({
   "protocolProbe": "assets+inventory+cursor+etag+catalog+dynamic-crud+named-query+fresh-sdk+model-event-recovery", "dynamicCases": 18, "sdkCases": 13, "modelEventCases": 18, "slo": "production-thresholds-ok",
   "sdkArchive": json.load(open("$ARTIFACTS/sdk-archive.json")), "sdkNodeImage": "$SDK_NODE_IMAGE",
   "backend": json.load(open("$ARTIFACTS/backend-receipt.json")),
+  "openapi": json.load(open("$ARTIFACTS/openapi-receipt.json")), "openapiTypes": "strict-positive-negative-ok",
   "webhookDrainBacklog": 0, "registryPush": "disabled", "builder": "$AURA_CI_BUILDER_ID",
   "job": "$AURA_CI_JOB_ID"
 }, open(sys.argv[1], "w"), indent=2, sort_keys=True)
