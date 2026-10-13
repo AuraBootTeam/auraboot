@@ -3,7 +3,6 @@ package com.auraboot.framework.auth.wechat;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import lombok.Data;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -26,7 +25,6 @@ import org.springframework.web.client.RestClientException;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class WechatMiniClient {
 
     public record WxSession(String openid, String unionid) {}
@@ -34,6 +32,15 @@ public class WechatMiniClient {
     private static final RestClient PHONE_CLIENT = phoneClient();
 
     private final WechatMiniProperties properties;
+    private final WechatMiniStableTokenClient stableTokens;
+
+    public WechatMiniClient(WechatMiniProperties properties) {
+        this(properties, new WechatMiniStableTokenClient(properties));
+    }
+    @org.springframework.beans.factory.annotation.Autowired
+    public WechatMiniClient(WechatMiniProperties properties, WechatMiniStableTokenClient stableTokens) {
+        this.properties = properties; this.stableTokens = stableTokens;
+    }
 
     public WxSession code2Session(String jsCode) {
         if (isBlank(properties.getAppId()) || isBlank(properties.getAppSecret())) {
@@ -94,12 +101,10 @@ public class WechatMiniClient {
             throw phoneFailure("WeChat mini-program phone verification is not configured");
         }
         String base = validatedApiBase();
-        JsonNode token = phonePost(base + "/cgi-bin/stable_token", Map.of(
-                "grant_type", "client_credential", "appid", appId,
-                "secret", secret, "force_refresh", false));
-        String accessToken = requiredText(token, "access_token");
-        if (!token.path("expires_in").isIntegralNumber() || token.path("expires_in").asLong() <= 0) {
-            throw phoneFailure("WeChat token response is invalid");
+        String accessToken;
+        try { accessToken = stableTokens.acquire().accessToken(); }
+        catch (WechatMiniStableTokenClient.TokenFailure failure) {
+            throw phoneFailure("WeChat token exchange failed");
         }
         // No retry: a phone grant is one-use. A failed exchange requires a new grant.
         JsonNode response = phonePost(base + "/wxa/business/getuserphonenumber?access_token="
