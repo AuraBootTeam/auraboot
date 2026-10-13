@@ -299,6 +299,9 @@ test.describe('Dynamic resource publication journey', () => {
     await expect(invalidScopeRegion.getByRole('alert')).toHaveText(requiredMessage);
     await expect(requiredScope).toHaveAttribute('aria-describedby', await invalidScopeRegion.getByRole('alert').getAttribute('id') || '');
     await expect(requiredScope).toHaveAccessibleDescription(requiredMessage);
+    await test.info().attach('required-scope-accessibility', { contentType: 'application/json',
+      body: JSON.stringify({ schemaVersion: 1, driver: 'browser-native-validation',
+        cases: ['invalid-focus', 'linked-error', 'accessible-description'] }) });
     await invalidScopeRegion.evaluate(element => element.scrollIntoView({ block: 'center' }));
     await expect(invalidScopeRegion).toBeInViewport({ ratio: 1 }); await snapshot('publication-invalid');
     await invalidScopeRegion.screenshot({ path: path.join(screenshotRoot, 'publication-invalid-scope-region.png') });
@@ -1178,11 +1181,15 @@ async function verifyEditorTabOrder(page: import('@playwright/test').Page,
   }
   const root = path.join(process.env.AURA_EVIDENCE_ROOT || '/tmp', 'ui-publication-r1');
   await mkdir(root, { recursive: true });
-  await writeFile(path.join(root, `${id}.json`), JSON.stringify({
+  const proof = {
+    schemaVersion: 1, driver: 'native-keyboard', controlCount: controls.length,
+    cases: ['accessible-names', 'native-forward-tab', 'native-reverse-tab'],
     scope: 'Browser accessible names and anchored bidirectional native tab traversal; native screen reader not exercised',
     controls: controls.map(([, name]) => name), forwardTransitions: controls.length - 1,
     reverseTransitions: controls.length - 1,
-  }, null, 2));
+  };
+  await writeFile(path.join(root, `${id}.json`), JSON.stringify(proof, null, 2));
+  await test.info().attach('source-keyboard-controls', { contentType: 'application/json', body: JSON.stringify(proof) });
 }
 
 async function activateWithEnter(control: import('@playwright/test').Locator) {

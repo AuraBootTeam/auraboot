@@ -68,20 +68,28 @@ for (const row of ossProfile.tests.filter(row => row.id.startsWith('DOP-BROWSER-
   }
 }
 
-test('mandatory dynamic notification evidence cannot be omitted, duplicated or reduced to static fixture green', () => {
-  for (const fault of ['missing', 'duplicate', 'mocked', 'incomplete']) {
-    const report = makeOssReport();
-    const spec = report.suites[0].specs.find(item => item.title === ossProfile.tests.find(row => row.id === 'DOP-BROWSER-03').title);
-    const result = spec.tests[0].results[0];
-    if (fault === 'missing') result.attachments = [];
-    else if (fault === 'duplicate') result.attachments.push(result.attachments[0]);
-    else {
-      const value = JSON.parse(Buffer.from(result.attachments[0].body, 'base64'));
-      if (fault === 'mocked') value.routeMocks = true;
-      else value.cases.pop();
-      result.attachments[0].body = Buffer.from(JSON.stringify(value)).toString('base64');
+test('mandatory browser evidence cannot be omitted, duplicated or weakened', () => {
+  for (const row of ossProfile.tests.filter(row => row.requiredEvidence?.length)) {
+    for (const required of row.requiredEvidence) {
+      for (const fault of ['missing', 'duplicate', 'mocked', 'incomplete']) {
+        const report = makeOssReport();
+        const spec = report.suites[0].specs.find(item => item.title === row.title);
+        const result = spec.tests[0].results[0];
+        const attachment = result.attachments.find(item => item.name === required.name);
+        if (fault === 'missing') result.attachments = result.attachments.filter(item => item !== attachment);
+        else if (fault === 'duplicate') result.attachments.push(attachment);
+        else {
+          const value = JSON.parse(Buffer.from(attachment.body, 'base64'));
+          if (fault === 'mocked') {
+            if ('routeMocks' in value) value.routeMocks = true;
+            else value.driver = 'programmatic-focus';
+          }
+          else value.cases.pop();
+          attachment.body = Buffer.from(JSON.stringify(value)).toString('base64');
+        }
+        assert.throws(() => auditHifiReport(ossProfile, report));
+        assert.equal(auditHifiReport(ossProfile, makeOssReport()).passed, ossProfile.tests.length);
+      }
     }
-    assert.throws(() => auditHifiReport(ossProfile, report));
-    assert.equal(auditHifiReport(ossProfile, makeOssReport()).passed, ossProfile.tests.length);
   }
 });
