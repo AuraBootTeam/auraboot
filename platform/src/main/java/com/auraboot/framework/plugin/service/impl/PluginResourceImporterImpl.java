@@ -1107,8 +1107,10 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
 
             com.auraboot.framework.meta.dto.CommandDefinitionDTO created = commandService.create(request);
 
-            // Auto-publish if requested
-            if (Boolean.TRUE.equals(autoPublish)) {
+            // Auto-publish if requested — an adopted (resurrected) row may already be
+            // PUBLISHED; republishing it would trip the DRAFT-only guard.
+            if (Boolean.TRUE.equals(autoPublish)
+                    && !StatusConstants.PUBLISHED.equals(created.getStatus())) {
                 commandService.publish(created.getPid());
             }
 
