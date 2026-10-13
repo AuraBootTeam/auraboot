@@ -76,6 +76,9 @@ import java.util.*;
 @RequiredArgsConstructor
 public class HandlerPhase implements CommandPhase {
 
+    @Autowired(required = false)
+    private com.auraboot.framework.integration.InventoryReceiptEnqueueProvenance inventoryReceiptProvenance;
+
     private final ApplicationContext applicationContext;
     private final ExtensionRegistry extensionRegistry;
     private final ObjectMapper objectMapper;
@@ -698,7 +701,8 @@ public class HandlerPhase implements CommandPhase {
                     log.info("Dry-run: skipping primary handler {} for command {} (supportsDryRun()=false)",
                             handler.getClass().getName(), handlerCode);
                 } else {
-                    Object result = handler.execute(pluginContext);
+                    Object result = inventoryReceiptProvenance == null ? handler.execute(pluginContext)
+                            : inventoryReceiptProvenance.invoke(handler, pluginContext);
                     if (result instanceof Map) {
                         @SuppressWarnings("unchecked")
                         Map<String, Object> resultMap = (Map<String, Object>) result;
@@ -722,7 +726,8 @@ public class HandlerPhase implements CommandPhase {
                 }
                 log.info("Executing chained secondary handler {} for command {}",
                         secondary.getClass().getName(), handlerCode);
-                Object secResult = secondary.execute(pluginContext);
+                Object secResult = inventoryReceiptProvenance == null ? secondary.execute(pluginContext)
+                        : inventoryReceiptProvenance.invoke(secondary, pluginContext);
                 if (secResult instanceof Map) {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> secMap = (Map<String, Object>) secResult;

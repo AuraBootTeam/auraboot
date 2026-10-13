@@ -116,6 +116,12 @@ public interface OutboxEventMapper {
                             @Param("nextRetryAt") Instant nextRetryAt,
                             @Param("lastError") String lastError);
 
+    /** The trusted posted-fact consumer must still own the current outbox delivery lease. */
+    @Select("SELECT COUNT(*) FROM ab_outbox WHERE tenant_id = #{tenantId} AND event_id = #{eventId} " +
+            "AND status = 'processing' AND lease_token = #{leaseToken} AND lease_until > NOW()")
+    int countActiveDeliveryLease(@Param("tenantId") Long tenantId, @Param("eventId") String eventId,
+                                 @Param("leaseToken") String leaseToken);
+
     @Insert("INSERT INTO ab_integration_receipt (tenant_id, event_id, consumer_code, status, " +
             "lease_token, received_at) VALUES (#{tenantId}, #{eventId}, #{consumerCode}, " +
             "'processing', #{leaseToken}, NOW()) ON CONFLICT (tenant_id, event_id, consumer_code) DO NOTHING")

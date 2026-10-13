@@ -83,6 +83,12 @@ Model names alone are not authorization. Each scoped access resolves the tenant'
 
 Effect and receipt remain in the existing independent transaction. Duplicate receipt claims skip the consumer. The host restores prior identity and command permit state on success/failure; nested unrelated delivery cannot borrow the private owner scope. `InventoryOwnerCommandScopeTest` provides hermetic scope/guard counterexamples, alongside the existing delivery isolation, background accessor, MetaContext and field-writer tests. Assembled PF4J, PostgreSQL delivery and posted receipt lineage require separate native evidence; these tests alone do not prove the Procurement received-quantity consumer or customer ERP contracts.
 
+## Inventory posted-fact enqueue provenance
+
+`inventory.receipt.confirmed.v1` receives host-generated `core.inventory.producer.*` headers and `ab_outbox.command_code=inv:confirm_warehouse_in` only while the host pipeline executes the actual registered Inventory handler instance. The private invocation binds current tenant, permitted `inv_inbound` receipt PID, actual model metadata and started PF4J artifact. Enqueue checks the first observed PF4J caller Class identity, reobserves the artifact and metadata binding, and validates the publisher's deterministic receipt/version UUID and envelope identity. Same-Class unregistered instances, foreign nested callers, missing command scopes and client-supplied reserved headers cannot create this provenance. Other event types receive no new producer authority.
+
+The internal delivery verifier requires the complete persisted envelope, stamp and command to match `ab_outbox`, with the current processing lease still valid. A header alone is not proof; unstamped historical events are not automatically upgraded, and the current JAR cannot attest an older posting artifact. The verifier is prepared for the subsequent fixed Procurement received-quantity consumer; this enqueue slice alone does not implement or validate that consumer. No new business receipt table or public raw-apply endpoint is introduced. Actual PG/PF4J producer invocation, lease/receipt atomicity and physical-table existence remain native admission requirements.
+
 ## Observability and rollback
 
 Micrometer counter `auraboot_integration_events_total{outcome=...}` exposes enqueue, claim, receipt,
