@@ -4,6 +4,10 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.ReliableEventDeliveryExecutor;
 import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.meta.service.CommandExecutor;
+import com.auraboot.framework.meta.dto.CommandExecuteRequest;
+import com.auraboot.framework.auth.service.AuthService;
+import com.auraboot.framework.auth.dto.AuthenticationRequest;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.constant.SystemFieldConstants;
@@ -73,7 +77,7 @@ final class ProductQuoteReminderNativeFacet {
     record Services(DataSource dataSource, JdbcTemplate jdbc, ObjectMapper json,
                     PlatformTransactionManager manager, TenantService tenants, UserService users,
                     TenantMemberService members, TenantBootstrapService bootstrap, PluginImportService imports,
-                    DynamicDataService data, MetaModelService metadata, NotificationTemplateService templates, NotificationRuleService rules,
+                    DynamicDataService data, MetaModelService metadata, CommandExecutor commands, AuthService authentication, NotificationTemplateService templates, NotificationRuleService rules,
                     ImportedNotificationMetadataReader reader, ImportedNotificationMetadataValidator validator,
                     ReliableIntegrationAccessor reliable, StrictInAppDeliveryWriter writer,
                     ReliableEventDeliveryExecutor executor, ExtensionRegistry extensions, List<Long> protectedTenantIds) {}
@@ -89,7 +93,7 @@ final class ProductQuoteReminderNativeFacet {
     private final FacetClock clock = new FacetClock();
     private final Map<String, String> tables = new LinkedHashMap<>();
     private Tenant tenant;
-    private User first, second;
+    private User first, second, initializer;
     private Binding binding;
     private String sourcePid;
     private String stage = "product-admission";
@@ -131,6 +135,9 @@ final class ProductQuoteReminderNativeFacet {
             importProduct(input);
             assertThat(s.protectedTenantIds).hasSize(2).doesNotContain(tenant.getId());
             protectedBaseline = protectedSnapshot();
+            stage = "product-test-initialization-appendix";
+            importInitializationAppendix(input);
+            authenticateInitializer();
             stage = "product-native-initial-facts";
             String supplier = create("pr_supplier_common", "pr_supplier_pcba_contact:sync_directory", Map.of(
                     "pr_supplier_code", namespace, "pr_supplier_name", "Synthetic S06 supplier", "pr_supplier_status", "enabled"));
@@ -144,6 +151,7 @@ final class ProductQuoteReminderNativeFacet {
             String quote = create("s2p_bid", "qo_procurement_task_common:dispatch", Map.of(
                     "s2p_bid_sourcing_event_id", task, "s2p_bid_supplier_id", supplier, "s2p_bid_status", "draft",
                     "s2p_bid_collaboration_managed", true, "qo_pr_quote_cutoff_at", SLOT.plusSeconds(3600)));
+            bind();
             trace.put("initialFacts", Map.of("tenantId", tenant.getId(), "users", List.of(first.getPid(), second.getPid()),
                     "supplierPid", supplier, "contactPids", List.of(c1, c2), "taskPid", task, "quotePid", quote,
                     "seedPurpose", "native API-created synthetic initial facts; not verified phone, task dispatch or subscription acceptance"));
@@ -225,6 +233,11 @@ final class ProductQuoteReminderNativeFacet {
                     "SELECT to_jsonb(r)::text FROM ab_outbox r WHERE tenant_id=? ORDER BY id", String.class, tenant.getId())
                     .stream().map(SourceBindingCanonical::parse).toList();
             trace.put("ownedOutboxRowsBeforeTeardown", rows);
+            if (tables.size() == BUSINESS_MODELS.size()) {
+                trace.put("actualBusinessRowsAtExit", business());
+                trace.put("ownedInboxCountAtExit", count("ab_notification"));
+                trace.put("ownedReceiptCountAtExit", count("ab_integration_receipt"));
+            }
             Path sealed = evidence.resolve(namespace + ".json");
             Files.writeString(sealed, s.json.writerWithDefaultPrettyPrinter().writeValueAsString(trace), StandardOpenOption.CREATE_NEW);
             if (completed) {
@@ -308,7 +321,7 @@ final class ProductQuoteReminderNativeFacet {
         tenant = s.tenants.createTenant(tenant);
         first = user("first");
         second = user("second");
-        User initializer = user("bootstrap");
+        initializer = user("bootstrap");
         bind();
         assertThat(s.bootstrap.bootstrapTenant(tenant.getId(), initializer.getId()).isSuccess()).isTrue();
         bind();
@@ -401,9 +414,74 @@ final class ProductQuoteReminderNativeFacet {
                 "qo_pr_membership_state", "active"));
     }
 
-    private String create(String model, String command, Map<String, Object> facts) {
-        return MetaContext.runWithCommandPermitScope(command,
-                () -> (String) s.data.create(model, new LinkedHashMap<>(facts)).get("pid"));
+    private void importInitializationAppendix(JsonNode input) throws Exception {
+        List<Path> productDirectories = new ArrayList<>();
+        for (JsonNode directory : input.path("orderedImportDirectories")) {
+            Path path = Path.of(directory.path("path").asText()).toRealPath();
+            if (s.json.readTree(path.resolve("plugin.json").toFile()).path("pluginId").asText()
+                    .equals("com.auraboot.quote-procurement")) productDirectories.add(path);
+        }
+        assertThat(productDirectories).hasSize(1);
+        Map<String, Object> appendix = ProductQuoteNativeInitialization.prepare(productDirectories.getFirst(),
+                evidence.resolve("initialization-appendix"), s.json);
+        trace.put("testInitializationAppendix", appendix);
+        var preview = s.imports.parseDirectory((String) appendix.get("testDirectory"), true);
+        trace.put("initializationPreviewErrors", preview.getErrors());
+        assertThat(preview.isValid()).as("Explicit test-only initialization appendix: %s", preview.getErrors()).isTrue();
+        var request = ImportRequest.builder().importId(preview.getImportId())
+                .conflictStrategy(ImportRequest.ConflictStrategy.OVERWRITE).autoPublishFields(true)
+                .autoPublishModels(true).autoPublishCommands(true).autoPublishPages(true)
+                .createResourcePermissions(true).build();
+        var result = s.imports.execute(preview.getImportId(), request);
+        trace.put("initializationImportId", preview.getImportId());
+        trace.put("initializationImportSuccess", result.isSuccess());
+        assertThat(result.isSuccess()).as("Explicit test-only initialization import: %s", result.getErrorMessage()).isTrue();
+        JsonNode expectedWriters = s.json.valueToTree(appendix.get("exactWriterAppendix"));
+        for (String model : ProductQuoteNativeInitialization.FIELDS.keySet()) {
+            var definition = s.metadata.getModelDefinitionFromDb(model).orElseThrow();
+            for (String code : ProductQuoteNativeInitialization.FIELDS.get(model)) {
+                var field = definition.getFields().stream().filter(f -> code.equals(f.getCode())).findFirst().orElseThrow();
+                if (expectedWriters.has(code)) {
+                    assertThat((JsonNode) s.json.valueToTree(field.getAllowedWriterCommands()))
+                            .isEqualTo(expectedWriters.path(code).path("testWriters"));
+                }
+            }
+        }
+        trace.put("actualImportedInitializationWritersVerified", true);
+    }
+
+    private void authenticateInitializer() {
+        MetaContext.setContext(tenant.getId(), initializer.getId(), initializer.getPid(), namespace);
+        var member = s.members.findByTenantIdAndUserId(tenant.getId(), initializer.getId());
+        assertThat(member).isNotNull();
+        MetaContext.setMemberId(member.getId());
+        var request = new AuthenticationRequest();
+        request.setEmail(initializer.getEmail());
+        request.setPassword("S06-local-synthetic-password-123");
+        var authenticated = s.authentication.authenticate(request);
+        assertThat(authenticated.getTenantId()).isEqualTo(tenant.getId());
+        assertThat(authenticated.getUserId()).isEqualTo(initializer.getId());
+        assertThat(authenticated.getJwt()).isNotBlank();
+        trace.put("testInitializer", Map.of("userPid", initializer.getPid(), "memberId", member.getId(),
+                "authenticationVerified", true, "authority", "actual bootstrap initializer in this synthetic tenant only"));
+    }
+
+    private String create(String model, String productionCommand, Map<String, Object> facts) {
+        ProductQuoteNativeInitialization.validatePayload(model, facts);
+        var request = new CommandExecuteRequest();
+        request.setPayload(new LinkedHashMap<>(facts));
+        request.setClientRequestId(namespace + "-" + UUID.randomUUID());
+        var result = s.commands.execute(ProductQuoteNativeInitialization.command(model), request);
+        assertThat(result.getPhaseReached()).isEqualTo("completed");
+        assertThat(result.getData().get("recordPid")).isInstanceOf(String.class);
+        String pid = (String) result.getData().get("recordPid");
+        assertThat(pid).isNotBlank();
+        trace.computeIfAbsent("initializationCommandResults", ignored -> new ArrayList<Map<String, Object>>());
+        @SuppressWarnings("unchecked")
+        var records = (List<Map<String, Object>>) trace.get("initializationCommandResults");
+        records.add(Map.of("model", model, "command", ProductQuoteNativeInitialization.command(model),
+                "productionCommandNotImpersonated", productionCommand, "recordPid", pid, "phase", result.getPhaseReached()));
+        return pid;
     }
 
     private Map<String, Object> nativeRecord(String model, String pid) {
@@ -550,6 +628,9 @@ final class ProductQuoteReminderNativeFacet {
 
     private void bind() {
         MetaContext.setContext(tenant.getId(), first.getId(), first.getPid(), "synthetic-product-notification");
+        var member = s.members.findByTenantIdAndUserId(tenant.getId(), first.getId());
+        assertThat(member).isNotNull();
+        MetaContext.setMemberId(member.getId());
     }
     private static String required(String name) {
         String value = System.getenv(name);
