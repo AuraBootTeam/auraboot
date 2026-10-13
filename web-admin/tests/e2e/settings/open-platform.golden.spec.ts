@@ -302,7 +302,7 @@ test.describe('Dynamic resource publication journey', () => {
     await expect(invalidScopeRegion.getByRole('alert')).toHaveCount(0);
     await expect(requiredScope).not.toHaveAttribute('aria-invalid', 'true');
     const savedResponse = page.waitForResponse(response => response.url().endsWith(`/publications/${resourceCode}/draft`) && response.request().method() === 'PUT');
-    await page.getByRole('button', { name: publicationText("保存并校验草稿"), exact: true }).click();
+    await activateWithEnter(page.getByRole('button', { name: publicationText("保存并校验草稿"), exact: true }));
     const savedHttp = await savedResponse; expect(savedHttp.status()).toBe(200);
     const saved = await savedHttp.json(); expect(String(saved.code)).toBe('0');
     expect(saved.data.draft.fields.name).toMatchObject({ source: 'dop_ui_name', writable: true, required: true, sortable: true, operators: ['EQ'] });
@@ -319,15 +319,15 @@ test.describe('Dynamic resource publication journey', () => {
       .getByRole('button', { name: publicationText("编辑合同"), exact: true }).click();
     await expect(otherEditor.getByLabel(publicationText("查询超时（毫秒）"), { exact: true })).toBeEnabled();
     await otherEditor.getByLabel(publicationText("查询超时（毫秒）"), { exact: true }).fill('6000');
-    await otherEditor.getByRole('button', { name: publicationText("保存并校验草稿"), exact: true }).click();
+    await activateWithEnter(otherEditor.getByRole('button', { name: publicationText("保存并校验草稿"), exact: true }));
     await expect(otherEditor.getByTestId('publication-editor').getByRole('status')).toContainText(publicationText("草稿已保存并通过来源校验"));
     await otherEditor.close();
     // The still-clean original window must not publish the revision replaced by another editor.
-    await page.getByRole('button', { name: publicationText("发布合同"), exact: true }).click();
+    await activateWithEnter(page.getByRole('button', { name: publicationText("发布合同"), exact: true }));
     const stalePublishConfirmation = page.getByRole('group', { name: publicationText("操作确认"), exact: true });
     await expect(stalePublishConfirmation).toBeVisible();
     const stalePublishResponse = page.waitForResponse(response => response.url().endsWith(`/publications/${resourceCode}/publish`) && response.request().method() === 'POST');
-    await stalePublishConfirmation.getByRole('button', { name: publicationText("确认"), exact: true }).click();
+    await activateWithEnter(stalePublishConfirmation.getByRole('button', { name: publicationText("确认"), exact: true }));
     const stalePublish = await stalePublishResponse;
     expect(stalePublish.status()).toBe(409);
     expect(stalePublish.request().postDataJSON()).toEqual({ expectedRevision: 1 });
@@ -345,7 +345,7 @@ test.describe('Dynamic resource publication journey', () => {
     await expect(stalePublishAlert).toBeInViewport({ ratio: 1 }); await snapshot('publication-publish-conflict');
     await page.getByLabel(publicationText("查询超时（毫秒）"), { exact: true }).fill('7000');
     const conflictResponse = page.waitForResponse(response => response.url().endsWith(`/publications/${resourceCode}/draft`) && response.status() === 409);
-    await page.getByRole('button', { name: publicationText("保存并校验草稿"), exact: true }).click(); await conflictResponse;
+    await activateWithEnter(page.getByRole('button', { name: publicationText("保存并校验草稿"), exact: true })); await conflictResponse;
     await expect(page.getByTestId('publication-editor').getByRole('alert')).toContainText(publicationText("你的修改已保留"));
     await expect(page.getByLabel(publicationText("查询超时（毫秒）"), { exact: true })).toHaveValue('7000');
     await expect(page.getByTestId('publication-editor').getByRole('alert')).toBeInViewport();
@@ -357,15 +357,15 @@ test.describe('Dynamic resource publication journey', () => {
     await expect(saveButton).toBeInViewport({ ratio: 1 });
     await snapshot('publication-conflict');
     await page.getByRole('button', { name: publicationText("关闭编辑"), exact: true }).click();
-    await page.getByRole('group', { name: publicationText("操作确认"), exact: true }).getByRole('button', { name: publicationText("确认"), exact: true }).click();
+    await activateWithEnter(page.getByRole('group', { name: publicationText("操作确认"), exact: true }).getByRole('button', { name: publicationText("确认"), exact: true }));
     const ownContractEdit = page.getByTestId('publication-editor').getByRole('listitem')
       .filter({ has: page.getByText(resourceCode, { exact: true }) })
       .getByRole('button', { name: publicationText("编辑合同"), exact: true });
     await expect(ownContractEdit).toBeEnabled();
     await ownContractEdit.click();
     await expect(page.getByLabel(publicationText("查询超时（毫秒）"), { exact: true })).toHaveValue('6000');
-    await page.getByRole('button', { name: publicationText("发布合同"), exact: true }).click();
-    await page.getByRole('group', { name: publicationText("操作确认"), exact: true }).getByRole('button', { name: publicationText("确认"), exact: true }).click();
+    await activateWithEnter(page.getByRole('button', { name: publicationText("发布合同"), exact: true }));
+    await activateWithEnter(page.getByRole('group', { name: publicationText("操作确认"), exact: true }).getByRole('button', { name: publicationText("确认"), exact: true }));
     await expect(page.getByTestId('publication-editor').getByRole('status')).toContainText(publicationText("已发布"));
     await expect(page.getByTestId('publication-editor').getByRole('status')).toBeInViewport();
     await snapshot('publication-publish');
@@ -392,12 +392,12 @@ test.describe('Dynamic resource publication journey', () => {
     expect(breakingDraft.data.draft.fields.displayName.source).toBe('dop_ui_name'); expect(breakingDraft.data.draft.fields.name).toBeUndefined();
     await expect(page.getByTestId('publication-editor').getByRole('status')).toContainText(publicationText("草稿已保存并通过来源校验"));
     await snapshot('publication-major-draft');
-    await page.getByRole('button', { name: publicationText("发布合同"), exact: true }).click();
+    await activateWithEnter(page.getByRole('button', { name: publicationText("发布合同"), exact: true }));
     const incompatibleConfirm = page.getByRole('group', { name: publicationText("操作确认"), exact: true });
     await expect(incompatibleConfirm).toBeInViewport(); await snapshot('publication-major-confirm');
     const incompatibleMarkup = await incompatibleConfirm.evaluate(element => element.outerHTML);
     const incompatibleResponse = page.waitForResponse(reply => reply.url().endsWith(`/publications/${resourceCode}/publish`) && reply.request().method() === 'POST');
-    await incompatibleConfirm.getByRole('button', { name: publicationText("确认"), exact: true }).click();
+    await activateWithEnter(incompatibleConfirm.getByRole('button', { name: publicationText("确认"), exact: true }));
     const incompatible = await incompatibleResponse; expect(incompatible.status()).toBe(400);
     expect(await incompatible.json()).toMatchObject({ code: '400', message: 'Existing public field contract cannot change: name' });
     if (UI_MUTATION === 'resource-confirmation-stale') await page.getByTestId('publication-editor').evaluate((element, markup) => element.insertAdjacentHTML('beforeend', markup), incompatibleMarkup);
@@ -436,8 +436,8 @@ test.describe('Dynamic resource publication journey', () => {
     await saveButton.click(); const savedMajor = await majorSave; expect(savedMajor.status()).toBe(200);
     expect((await savedMajor.json()).data).toMatchObject({ activeVersion: null, draftRevision: 1, draft: { code: majorCode, schemaVersion: 1 } });
     const majorPublish = page.waitForResponse(reply => reply.url().endsWith(`/publications/${majorCode}/publish`) && reply.request().method() === 'POST');
-    await page.getByRole('button', { name: publicationText("发布合同"), exact: true }).click();
-    await page.getByRole('group', { name: publicationText("操作确认"), exact: true }).getByRole('button', { name: publicationText("确认"), exact: true }).click();
+    await activateWithEnter(page.getByRole('button', { name: publicationText("发布合同"), exact: true }));
+    await activateWithEnter(page.getByRole('group', { name: publicationText("操作确认"), exact: true }).getByRole('button', { name: publicationText("确认"), exact: true }));
     const publishedMajor = await majorPublish; expect(publishedMajor.status()).toBe(200);
     expect((await publishedMajor.json()).data).toMatchObject({ activeVersion: 1, draftRevision: 1, status: 'published' });
     await expect(page.getByTestId('publication-editor').getByRole('status')).toContainText(publicationText("已发布"));
@@ -508,7 +508,7 @@ test.describe('Dynamic resource publication journey', () => {
       if (request.method() === 'PUT' && request.url().endsWith(`/publications/${virtualCode}/draft`)) prematureDraftWrites.push(request.url());
     };
     page.on('request', observeDraftWrite);
-    await page.getByRole('button', { name: publicationText("保存并校验草稿"), exact: true }).click();
+    await activateWithEnter(page.getByRole('button', { name: publicationText("保存并校验草稿"), exact: true }));
     expect(await sourceSelector.evaluate((element: HTMLSelectElement) => element.validity.valueMissing)).toBe(true);
     await expect(sourceSelector).toBeFocused();
     const requiredSourceError = page.getByTestId(`publication-source-${modelCode}`).getByRole('alert');
@@ -517,7 +517,7 @@ test.describe('Dynamic resource publication journey', () => {
     await expect(requiredSourceError).toBeInViewport();
     await expect(sourceSelector).toHaveAttribute('aria-invalid', 'true');
     await expect(sourceSelector).toHaveAttribute('aria-describedby', `publication-source-error-${modelCode}`);
-    await page.getByRole('button', { name: publicationText("保存并校验草稿"), exact: true }).click();
+    await activateWithEnter(page.getByRole('button', { name: publicationText("保存并校验草稿"), exact: true }));
     await expect(sourceSelector).toBeFocused();
     expect(prematureDraftWrites).toEqual([]);
     page.off('request', observeDraftWrite);
@@ -540,13 +540,13 @@ test.describe('Dynamic resource publication journey', () => {
     await page.getByTestId('publication-editor').locator('section').filter({ has: sourceSelector })
       .screenshot({ path: path.join(screenshotRoot, 'publication-virtual-source-keyboard-region.png') });
     const virtualSaved = page.waitForResponse(response => response.url().endsWith(`/publications/${virtualCode}/draft`) && response.request().method() === 'PUT');
-    await page.getByRole('button', { name: publicationText("保存并校验草稿"), exact: true }).press('Enter');
+    await activateWithEnter(page.getByRole('button', { name: publicationText("保存并校验草稿"), exact: true }));
     const virtualSavedHttp = await virtualSaved; expect(virtualSavedHttp.status()).toBe(200);
     const virtualDraft = await virtualSavedHttp.json(); expect(String(virtualDraft.code)).toBe('0');
     expect(virtualDraft.data.draft.sourceResources).toEqual({ [modelCode]: resourceCode });
     expect(virtualDraft.data.draft.fields.name).toMatchObject({ source: 'name', readable: true, writable: false });
-    await page.getByRole('button', { name: publicationText("发布合同"), exact: true }).click();
-    await page.getByRole('group', { name: publicationText("操作确认"), exact: true }).getByRole('button', { name: publicationText("确认"), exact: true }).click();
+    await activateWithEnter(page.getByRole('button', { name: publicationText("发布合同"), exact: true }));
+    await activateWithEnter(page.getByRole('group', { name: publicationText("操作确认"), exact: true }).getByRole('button', { name: publicationText("确认"), exact: true }));
     await expect(page.getByTestId('publication-editor').getByRole('status')).toContainText(publicationText("已发布"));
     await expect(sourceSelector).toBeDisabled();
     await page.getByRole('button', { name: publicationText("关闭编辑"), exact: true }).click();
@@ -591,7 +591,7 @@ test.describe('Dynamic resource publication journey', () => {
     await expect(page.getByRole('group', { name: publicationText("操作确认"), exact: true })).toBeInViewport();
     await snapshot('publication-withdrawdialog');
     await page.getByRole('group', { name: publicationText("操作确认"), exact: true }).screenshot({ path: path.join(screenshotRoot, 'publication-withdrawdialog-region.png') });
-    await page.getByRole('group', { name: publicationText("操作确认"), exact: true }).getByRole('button', { name: publicationText("确认"), exact: true }).click();
+    await activateWithEnter(page.getByRole('group', { name: publicationText("操作确认"), exact: true }).getByRole('button', { name: publicationText("确认"), exact: true }));
     await expect(page.getByTestId('publication-editor').getByRole('status')).toContainText(publicationText("已停用"));
     await expect(page.getByRole('button', { name: publicationText("下载 OpenAPI"), exact: true })).toBeDisabled();
     await expect(page.getByRole('button', { name: publicationText("下载类型声明"), exact: true })).toBeDisabled();
@@ -744,13 +744,13 @@ test.describe('Dynamic query publication journey', () => {
     }
     await editor.getByRole('button', { name: queryText("保存并校验查询草稿"), exact: true }).locator('..').locator('..').screenshot({ path: path.join(screenshotRoot, 'query-footer-region.png') });
     const savedResponse = page.waitForResponse(response => response.url().endsWith(`/query-publications/${publicCode}/draft`) && response.request().method() === 'PUT');
-    await page.getByRole('button', { name: queryText("保存并校验查询草稿"), exact: true }).click();
+    await activateWithEnter(page.getByRole('button', { name: queryText("保存并校验查询草稿"), exact: true }));
     const savedHttp = await savedResponse; expect(savedHttp.status()).toBe(200); const saved = await savedHttp.json(); expect(String(saved.code)).toBe('0');
     expect(saved.data.draft).toMatchObject({ sourceFingerprint: source.data.fingerprint, sourceResources: { [modelCode]: sourceCode }, parameters: { zone: { type: 'string', required: true, nullable: false } } });
     expect(saved.data.draft.fields.details).toMatchObject({ readable: true, writable: false, properties: { contactName: { source: 'contact_name', readable: true, writable: false } } });
     await expect(editor.getByRole('status')).toContainText(queryText("查询草稿已保存并通过来源校验")); await snapshot('query-draft');
-    await page.getByRole('button', { name: queryText("发布查询"), exact: true }).click();
-    await page.getByRole('group', { name: queryText("查询操作确认"), exact: true }).getByRole('button', { name: queryText("确认"), exact: true }).click();
+    await activateWithEnter(page.getByRole('button', { name: queryText("发布查询"), exact: true }));
+    await activateWithEnter(page.getByRole('group', { name: queryText("查询操作确认"), exact: true }).getByRole('button', { name: queryText("确认"), exact: true }));
     await expect(editor.getByRole('status')).toContainText(queryText("已发布查询")); await snapshot('query-publish');
     const originalDocumentResponse = await page.request.get(`${WEB_BASE_URL}/api/open-platform/query-publications/${publicCode}/openapi`);
     expect(originalDocumentResponse.status()).toBe(200); const originalDocument = await originalDocumentResponse.json();
@@ -758,17 +758,17 @@ test.describe('Dynamic query publication journey', () => {
     await nameOutput.getByLabel(queryText("对外输出名称"), { exact: true }).fill('displayName');
     await page.getByLabel(queryText("合同版本"), { exact: true }).fill('2');
     const breakingSave = page.waitForResponse(response => response.url().endsWith(`/query-publications/${publicCode}/draft`) && response.request().method() === 'PUT');
-    await page.getByRole('button', { name: queryText("保存并校验查询草稿"), exact: true }).click();
+    await activateWithEnter(page.getByRole('button', { name: queryText("保存并校验查询草稿"), exact: true }));
     const breakingSaved = await breakingSave; expect(breakingSaved.status()).toBe(200);
     const breakingDraft = await breakingSaved.json(); expect(breakingDraft.data).toMatchObject({ activeVersion: 1, draftRevision: 2 });
     expect(breakingDraft.data.draft.fields.displayName.source).toBe('partName'); expect(breakingDraft.data.draft.fields.name).toBeUndefined();
     await expect(editor.getByRole('status')).toContainText(queryText("查询草稿已保存并通过来源校验")); await snapshot('query-newdraft');
-    await page.getByRole('button', { name: queryText("发布查询"), exact: true }).click();
+    await activateWithEnter(page.getByRole('button', { name: queryText("发布查询"), exact: true }));
     const incompatibleConfirm = page.getByRole('group', { name: queryText("查询操作确认"), exact: true });
     await expect(incompatibleConfirm).toBeInViewport(); await snapshot('query-compat-confirm');
     const incompatibleMarkup = await incompatibleConfirm.evaluate(element => element.outerHTML);
     const rejectionResponse = page.waitForResponse(response => response.url().endsWith(`/query-publications/${publicCode}/publish`) && response.request().method() === 'POST');
-    await incompatibleConfirm.getByRole('button', { name: queryText("确认"), exact: true }).click();
+    await activateWithEnter(incompatibleConfirm.getByRole('button', { name: queryText("确认"), exact: true }));
     const rejection = await rejectionResponse; expect(rejection.status()).toBe(400);
     expect(await rejection.json()).toMatchObject({ code: '400', message: 'Existing query output cannot change' });
     if (UI_MUTATION === 'query-confirmation-stale') {
@@ -788,7 +788,7 @@ test.describe('Dynamic query publication journey', () => {
     await page.getByLabel(queryText("合同版本"), { exact: true }).fill('1');
     await nameOutput.getByLabel(queryText("对外输出名称"), { exact: true }).fill('name');
     const repairResponse = page.waitForResponse(response => response.url().endsWith(`/query-publications/${publicCode}/draft`) && response.request().method() === 'PUT');
-    await page.getByRole('button', { name: queryText("保存并校验查询草稿"), exact: true }).click();
+    await activateWithEnter(page.getByRole('button', { name: queryText("保存并校验查询草稿"), exact: true }));
     const repaired = await repairResponse; expect(repaired.status()).toBe(200);
     expect((await repaired.json()).data).toMatchObject({ activeVersion: 1, draftRevision: 3 });
     await page.getByRole('button', { name: queryText("关闭编辑"), exact: true }).click();
@@ -807,12 +807,12 @@ test.describe('Dynamic query publication journey', () => {
       if (type === 'object') { await output.getByLabel(queryText("原对象属性"), { exact: true }).fill('contact_name'); await output.getByLabel(queryText("对外属性名称"), { exact: true }).fill('contactName'); }
     }
     const majorSaveResponse = page.waitForResponse(response => response.url().endsWith(`/query-publications/${majorCode}/draft`) && response.request().method() === 'PUT');
-    await page.getByRole('button', { name: queryText("保存并校验查询草稿"), exact: true }).click();
+    await activateWithEnter(page.getByRole('button', { name: queryText("保存并校验查询草稿"), exact: true }));
     const majorSaved = await majorSaveResponse; expect(majorSaved.status()).toBe(200);
     expect((await majorSaved.json()).data).toMatchObject({ draftRevision: 1, activeVersion: null });
     const majorPublishResponse = page.waitForResponse(response => response.url().endsWith(`/query-publications/${majorCode}/publish`) && response.request().method() === 'POST');
-    await page.getByRole('button', { name: queryText("发布查询"), exact: true }).click();
-    await page.getByRole('group', { name: queryText("查询操作确认"), exact: true }).getByRole('button', { name: queryText("确认"), exact: true }).click();
+    await activateWithEnter(page.getByRole('button', { name: queryText("发布查询"), exact: true }));
+    await activateWithEnter(page.getByRole('group', { name: queryText("查询操作确认"), exact: true }).getByRole('button', { name: queryText("确认"), exact: true }));
     const majorPublished = await majorPublishResponse; expect(majorPublished.status()).toBe(200);
     expect((await majorPublished.json()).data).toMatchObject({ activeVersion: 1, draftRevision: 1, status: 'published' });
     await expect(editor.getByRole('status')).toContainText(queryText("已发布查询")); await snapshot('query-major-publish');
@@ -836,7 +836,7 @@ test.describe('Dynamic query publication journey', () => {
       await artifact.saveAs(path.join(screenshotRoot, publicCode + extension)); await snapshot(extension === '.openapi.json' ? 'query-openapi' : 'query-types');
     }
     await page.getByRole('button', { name: queryText("停用查询"), exact: true }).click(); const confirmation = page.getByRole('group', { name: queryText("查询操作确认"), exact: true });
-    await expect(confirmation).toBeInViewport(); await snapshot('query-withdrawdialog'); await confirmation.getByRole('button', { name: queryText("确认"), exact: true }).click();
+    await expect(confirmation).toBeInViewport(); await snapshot('query-withdrawdialog'); await activateWithEnter(confirmation.getByRole('button', { name: queryText("确认"), exact: true }));
     await expect(editor.getByRole('status')).toContainText(queryText("查询已停用")); await expect(page.getByRole('button', { name: queryText("下载查询 OpenAPI"), exact: true })).toBeDisabled();
     const persisted = await page.request.get(`${WEB_BASE_URL}/api/open-platform/query-publications`); expect(persisted.status()).toBe(200);
     const publications = await persisted.json(); expect(String(publications.code)).toBe('0');
@@ -1139,6 +1139,15 @@ async function authenticate(page: import('@playwright/test').Page, locale = 'zh-
   ]);
   await page.addInitScript(value => localStorage.setItem('locale', value), locale);
 
+}
+
+async function activateWithEnter(control: import('@playwright/test').Locator) {
+  // Unlike click(), press() does not wait for a disabled fieldset to become ready.
+  await expect(control).toBeVisible();
+  await expect(control).toBeEnabled();
+  await control.focus();
+  await expect(control).toBeFocused();
+  await control.press('Enter');
 }
 
 async function capture(page: import('@playwright/test').Page, id: string, fullPage = true) {
