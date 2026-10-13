@@ -122,7 +122,13 @@
               "ui-subscription-disabled"
             ],
             "fixture": "original-installation-ui-authored-grant",
-            "routeMocks": false
+            "routeMocks": false,
+            "editorActions": [
+              "reload-real-GET",
+              "dirty-cancel-discard-no-write",
+              "new-form-reset-no-write",
+              "disable-enable-signed-send"
+            ]
           }
         }
       ]

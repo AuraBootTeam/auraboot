@@ -15,6 +15,8 @@ const translations: Record<string, string> = {
   '订阅已保存': 'Subscription saved', '关闭通知编辑': 'Close notification editor', '编辑订阅': 'Edit subscription',
   '运维': 'Operations', '重放': 'Replay', '确认重放': 'Confirm replay', '停用订阅': 'Disable subscription',
   '通知操作确认': 'Notification confirmation', '确认': 'Confirm', '订阅已停用': 'Subscription disabled',
+  '刷新通知': 'Reload notifications', '取消': 'Cancel', '新建通知订阅': 'New notification subscription',
+  '启用订阅': 'Enable subscription', '订阅已启用': 'Subscription enabled',
 };
 
 /** Extends the original installation journey; no route interception or API fallback for UI writes. */
@@ -83,6 +85,42 @@ export async function verifyModelNotifications({ page, card, installationPid, re
     const row = editor.getByTestId(`notification-${subscription.pid}`); await expect(row).toContainText(name); await expect(row).toContainText(accepting.url);
     await row.getByRole('button', { name: text('编辑订阅'), exact: true }).click();
     await expect(editor.getByLabel(text('接收地址'), { exact: true })).toHaveValue(accepting.url); await image('publication-subscribe-reloaded');
+    const reload = page.waitForResponse(response => response.url().endsWith('/api/webhooks') && response.request().method() === 'GET');
+    await editor.getByRole('button', { name: text('刷新通知'), exact: true }).click(); expect((await reload).status()).toBe(200);
+    await expect(row).toContainText(name); await image('publication-subscribe-explicit-reload');
+    await editor.getByLabel(text('订阅名称'), { exact: true }).fill(name + ' unsaved');
+    await expect(editor.getByRole('button', { name: text('刷新通知'), exact: true })).toBeDisabled();
+    await editor.getByRole('button', { name: text('关闭通知编辑'), exact: true }).click();
+    const discard = editor.getByRole('group', { name: text('通知操作确认'), exact: true });
+    await image('publication-subscribe-discard-confirm', discard);
+    await discard.getByRole('button', { name: text('取消'), exact: true }).click();
+    await expect(editor.getByLabel(text('订阅名称'), { exact: true })).toHaveValue(name + ' unsaved');
+    expect((await human(`/api/webhooks/${subscription.pid}`)).name).toBe(name);
+    await editor.getByRole('button', { name: text('关闭通知编辑'), exact: true }).click();
+    await discard.getByRole('button', { name: text('确认'), exact: true }).click(); await expect(editor).toHaveCount(0);
+    await card.getByRole('button', { name: text('模型通知'), exact: true }).click();
+    await row.getByRole('button', { name: text('编辑订阅'), exact: true }).click();
+    await expect(editor.getByLabel(text('订阅名称'), { exact: true })).toHaveValue(name);
+    await editor.getByRole('button', { name: text('新建通知订阅'), exact: true }).click();
+    await expect(editor.getByLabel(text('订阅名称'), { exact: true })).toHaveValue('');
+    await expect(editor.getByLabel(text('模型事件'), { exact: true })).toHaveValue('');
+    await expect(editor.getByLabel(text('签名密钥'), { exact: true })).toHaveAttribute('required', '');
+    expect((await human('/api/webhooks')).filter((item: { installationPid: string }) => item.installationPid === installationPid)).toHaveLength(1);
+    await image('publication-subscribe-new-form', editor.getByTestId('notification-contract-fields'));
+    await row.getByRole('button', { name: text('停用订阅'), exact: true }).click();
+    const toggleConfirmation = editor.getByRole('group', { name: text('通知操作确认'), exact: true });
+    await toggleConfirmation.getByRole('button', { name: text('取消'), exact: true }).click();
+    expect((await human(`/api/webhooks/${subscription.pid}`)).enabled).toBe(true);
+    await row.getByRole('button', { name: text('停用订阅'), exact: true }).click();
+    const disabledResponse = page.waitForResponse(response => response.url().endsWith(`/api/webhooks/${subscription.pid}/disable`) && response.request().method() === 'PUT');
+    await toggleConfirmation.getByRole('button', { name: text('确认'), exact: true }).click(); expect((await disabledResponse).status()).toBe(200);
+    await expect(editor.getByRole('status').filter({ hasText: text('订阅已停用') })).toBeVisible();
+    expect((await human(`/api/webhooks/${subscription.pid}`)).enabled).toBe(false); await image('publication-subscribe-toggle-disabled');
+    const enabledResponse = page.waitForResponse(response => response.url().endsWith(`/api/webhooks/${subscription.pid}/enable`) && response.request().method() === 'PUT');
+    await row.getByRole('button', { name: text('启用订阅'), exact: true }).click(); expect((await enabledResponse).status()).toBe(200);
+    await expect(editor.getByRole('status').filter({ hasText: text('订阅已启用') })).toBeVisible();
+    expect((await human(`/api/webhooks/${subscription.pid}`)).enabled).toBe(true); await image('publication-subscribe-toggle-enabled');
+    await row.getByRole('button', { name: text('编辑订阅'), exact: true }).click();
     const retarget = async (url: string) => {
       await editor.getByLabel(text('接收地址'), { exact: true }).fill(url);
       const changed = page.waitForResponse(response => response.url().endsWith(`/api/webhooks/${subscription.pid}`) && response.request().method() === 'PUT');
@@ -159,6 +197,7 @@ export async function verifyModelNotifications({ page, card, installationPid, re
       cases: ['ui-subscription-persisted', 'signed-real-delivery', 'real-dead-letter', 'confirmed-same-event-replay', 'revoked-authority-no-send', 'ui-subscription-disabled'],
       deliveryProofs: [successProof, deadProof, replayProof, beforeRevocation], revokedReplay: { ...denied, acceptingReceiverAttempts: 0 },
       fixture: 'original-installation-ui-authored-grant', routeMocks: false };
+    Object.assign(receipt, { editorActions: ['reload-real-GET', 'dirty-cancel-discard-no-write', 'new-form-reset-no-write', 'disable-enable-signed-send'] });
     const receiptPath = path.join(directory, 'receipt.json'); await writeFile(receiptPath, JSON.stringify(receipt, null, 2));
     await testInfo.attach('dynamic-model-notifications', { path: receiptPath, contentType: 'application/json' });
   } finally {
