@@ -4,6 +4,8 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.auth.service.ApiRateLimiter;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.plugin.extension.PluginCommandRejectionException;
+import com.auraboot.framework.plugin.extension.DataAccessorException;
+import com.auraboot.framework.plugin.extension.DataAccessErrorCode;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.exception.ConflictException;
 import com.auraboot.framework.exception.ValidationException;
@@ -146,6 +148,11 @@ public class PluginRestDispatcher {
             // Preserve authorization classification without exposing internal record identities.
             throw new AccessDeniedException("Access denied", e);
         } catch (RuntimeException e) {
+            if (e instanceof DataAccessorException dataAccess
+                    && dataAccess.code() == DataAccessErrorCode.PERMISSION_DENIED) {
+                // Match the command boundary: preserve only the typed authorization verdict.
+                throw new AccessDeniedException("Access denied", dataAccess);
+            }
             log.error("Plugin REST endpoint {} {} failed", httpReq.getMethod(), httpReq.getRequestURI(), e);
             writeError(httpRes, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Internal error");
         }

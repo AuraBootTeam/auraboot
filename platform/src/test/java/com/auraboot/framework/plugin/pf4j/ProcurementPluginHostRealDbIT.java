@@ -2011,26 +2011,37 @@ class ProcurementPluginHostRealDbIT {
         });
         Map<String,Object> supplierActor=authenticateFixtureActor(actorId,actor,fixtureActorMemberId,fixtureActorMemberPid,
                 provider+"@example.invalid",provider+"_supplier",List.of("qo.srm.use","meta.command.execute"),"PROCUREMENT_SUPPLIER_FIXTURE_PASSWORD");
-        Map<String,Object> buyer=closed?Map.of():createAuthenticatedFixtureBuyer();
+        Map<String,Object> buyer=closed?Map.of():createAuthenticatedFixtureBuyer(false);
+        Map<String,Object> buyerMissingSupplierRead=closed?Map.of():createAuthenticatedFixtureBuyer(true);
         var receipt=new LinkedHashMap<String,Object>();
         receipt.put("namespace",provider);receipt.put("taskPid",task);receipt.put("sourcePid",sourcePid);receipt.put("quotePid",quotePid);
         receipt.put("submissionPid",formal.get("submissionPid"));receipt.put("executionPid",execution);receipt.put("accountId",provider);
         receipt.put("supplierPid",dispatch.supplier());receipt.put("orderPid",order);receipt.put("orderLinePid",orderLine);
-        receipt.put("erpOrderId",erpId);receipt.put("erpBillNo",bill);receipt.put("addressPids",addresses);if(!closed)receipt.put("buyer",buyer);
+        receipt.put("erpOrderId",erpId);receipt.put("erpBillNo",bill);receipt.put("addressPids",addresses);
+        if(!closed){receipt.put("buyer",buyer);receipt.put("buyerMissingSupplierRead",buyerMissingSupplierRead);
+            assertNotEquals(buyer.get("userPid"),buyerMissingSupplierRead.get("userPid"));
+            assertNotEquals(buyer.get("memberPid"),buyerMissingSupplierRead.get("memberPid"));}
         receipt.put("supplierActor",supplierActor);receipt.put("orderState",closed?"closed":"open");
         receipt.put("orderedQty","300.000001");receipt.put("submittedQty",initialBalance);receipt.put("receivedQty",initialBalance);
         receipt.put("initialReceivedSynthetic",closed);receipt.put("receiptWriterVerified",false);
         return receipt;
     }
 
-    private Map<String,Object> createAuthenticatedFixtureBuyer() {
-        String email=provider+"-buyer@example.invalid",name=provider+"_buyer";
+    private Map<String,Object> createAuthenticatedFixtureBuyer(boolean missingSupplierRead) {
+        String suffix=missingSupplierRead?"-buyer-no-supplier":"-buyer";
+        String email=provider+suffix+"@example.invalid",name=provider+suffix.replace('-','_');
         var buyer=users.signUp(email,fixtureEnv("PROCUREMENT_BUYER_FIXTURE_PASSWORD"),"Linked buyer fixture",name);
         MetaContext.setContext(tenantId,actorId,actor,"Host fixture");
         var member=members.addMember(buyer.getId(),tenantId,"active");
+        var codes=new ArrayList<>(List.of("qo.procurement.manage","meta.command.execute","page.page.read",
+                "model.s2p_sourcing_event.read","model.qo_procurement_execution_common.read",
+                "model.pr_supplier_common.read","model.pr_purchase_order.read","model.pr_purchase_order_line.read",
+                "model.qo_procurement_shipment_common.read","model.qo_procurement_shipment_line_common.read",
+                "model.pr_purchase_request.read","model.pr_spend_category.read"));
+        if(missingSupplierRead)assertTrue(codes.remove("model.pr_supplier_common.read"));
+        assertEquals(missingSupplierRead?11:12,codes.size());
         return authenticateFixtureActor(buyer.getId(),buyer.getPid(),member.getId(),member.getPid(),email,name,
-                List.of("qo.procurement.manage","meta.command.execute","page.page.read",
-                        "model.s2p_sourcing_event.read","model.qo_procurement_execution_common.read"),"PROCUREMENT_BUYER_FIXTURE_PASSWORD");
+                List.copyOf(codes),"PROCUREMENT_BUYER_FIXTURE_PASSWORD");
     }
     private Map<String,Object> authenticateFixtureActor(Long userId,String userPid,Long memberId,String memberPid,
             String email,String roleCode,List<String> codes,String credentialEnvironment) {

@@ -114,6 +114,36 @@ class PluginRestDispatcherTest {
     }
 
     @Test
+    void codedSdkDataDenialUsesSafe403AndRollsBackBufferedResponse() throws Exception {
+        var failure=new com.auraboot.framework.plugin.extension.DataAccessorException(
+                com.auraboot.framework.plugin.extension.DataAccessErrorCode.PERMISSION_DENIED,
+                new AccessDeniedException("private-supplier-record-and-rule"));
+        var tx=mock(PlatformTransactionManager.class);var mvc=governedMvc(failure,tx);
+        var response=mvc.perform(get("/api/ext/probe/whoami")).andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("403")).andExpect(jsonPath("$.data").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.context").value("Access denied")).andReturn().getResponse();
+        assertThat(response.getHeader("X-Private-Partial")).isNull();
+        assertThat(response.getContentAsString()).doesNotContain("private-supplier-record-and-rule","PERMISSION_DENIED",
+                "DataAccessorException","private-partial-body","private-identity");
+        verify(tx).rollback(any());verify(tx,never()).commit(any());
+    }
+
+    @Test
+    void unknownWrapperDoesNotInferAuthorizationFromMessageOrNestedSdkCode() throws Exception {
+        var nested=new com.auraboot.framework.plugin.extension.DataAccessorException(
+                com.auraboot.framework.plugin.extension.DataAccessErrorCode.PERMISSION_DENIED,
+                new AccessDeniedException("private-nested-record"));
+        var tx=mock(PlatformTransactionManager.class);
+        var mvc=governedMvc(new IllegalStateException("PERMISSION_DENIED private-wrapper",nested),tx);
+        var response=mvc.perform(get("/api/ext/probe/whoami")).andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.error").value("Internal error")).andReturn().getResponse();
+        assertThat(response.getHeader("X-Private-Partial")).isNull();
+        assertThat(response.getContentAsString()).doesNotContain("PERMISSION_DENIED","private-wrapper","private-nested-record",
+                "private-partial-body","private-identity");
+        verify(tx).rollback(any());verify(tx,never()).commit(any());
+    }
+
+    @Test
     void unknownInfrastructureFailureRemainsGeneric500AndDropsPartialBuffer() throws Exception {
         var tx=mock(PlatformTransactionManager.class);var mvc=governedMvc(new IllegalStateException("private-db-address"),tx);
         var response=mvc.perform(get("/api/ext/probe/whoami")).andExpect(status().isInternalServerError())
