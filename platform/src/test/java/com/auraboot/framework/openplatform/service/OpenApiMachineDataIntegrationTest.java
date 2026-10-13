@@ -203,6 +203,30 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk()).andReturn();
         assertThat(restored.getResponse().getContentAsString()).isEqualTo(baseline.getResponse().getContentAsString());
         assertThat(restored.getResponse().getHeader("ETag")).isEqualTo(baseline.getResponse().getHeader("ETag"));
+        applyTestMetaContext();
+        try {
+            update.setExtension(Map.of("fields", originalFields.stream()
+                    .filter(field -> !"name".equals(field.get("code"))).toList()));
+            modelAdministration.updateModel(modelPid, update);
+            assertThat(models.getModelDefinition(contract.modelCode()).orElseThrow().getFields())
+                    .extracting(com.auraboot.framework.meta.dto.FieldDefinition::getCode).doesNotContain("name");
+            http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path)
+                            .header("Authorization", "Bearer " + rawToken))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isConflict())
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code")
+                            .value("open_api_source_changed"))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                            .string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("Published source field"))));
+        } finally {
+            applyTestMetaContext();
+            update.setExtension(Map.of("fields", originalFields));
+            modelAdministration.updateModel(modelPid, update);
+        }
+        var fieldRestored = http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path)
+                        .header("Authorization", "Bearer " + rawToken))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk()).andReturn();
+        assertThat(fieldRestored.getResponse().getContentAsString()).isEqualTo(baseline.getResponse().getContentAsString());
+        assertThat(fieldRestored.getResponse().getHeader("ETag")).isEqualTo(baseline.getResponse().getHeader("ETag"));
     }
 
     @Test void modelEventsShareCrudTransactionAndIdempotentReplay() throws Exception {

@@ -237,6 +237,23 @@ class OpenApiPublicationIntegrationTest extends BaseIntegrationTest {
         String binding = mapper.sourceBinding(getTestTenant().getId(), definition.code(), 1);
         assertThat(binding).contains("mt_" + definition.modelCode(), "columns", "name");
         var model = models.getModelDefinition(definition.modelCode()).orElseThrow();
+        var originalFields = List.copyOf(model.getFields());
+        try {
+            model.setFields(List.of(FieldDefinition.builder().code("private_replacement").dataType("STRING").build()));
+            models.saveDefinition(model);
+            var missing = models.getModelDefinition(definition.modelCode()).orElseThrow();
+            assertThat(missing.getFields()).extracting(FieldDefinition::getCode).doesNotContain("name");
+            assertThatThrownBy(() -> publications.requireSourceBinding(getTestTenant().getId(), definition, missing))
+                    .isInstanceOf(OpenApiPublicationService.SourceBindingConflictException.class)
+                    .hasCauseInstanceOf(IllegalArgumentException.class);
+            assertThat(mapper.sourceBinding(getTestTenant().getId(), definition.code(), 1)).isEqualTo(binding);
+            assertThat(publications.active(getTestTenant().getId(), definition.code())).contains(definition);
+        } finally {
+            model.setFields(originalFields);
+            models.saveDefinition(model);
+        }
+        assertThat(publications.requireSourceBinding(getTestTenant().getId(), definition,
+                models.getModelDefinition(definition.modelCode()).orElseThrow())).isNotNull();
         var expanded = new java.util.ArrayList<>(model.getFields());
         expanded.add(FieldDefinition.builder().code("extra").dataType("STRING").build());
         model.setFields(expanded);

@@ -166,8 +166,8 @@ public class OpenApiPublicationService {
         OpenApiResourceSourceBinding current;
         try {
             current = validator.captureSourceBinding(contract, model);
-        } catch (com.auraboot.framework.meta.exception.MetaServiceException unavailable) {
-            // CATCH: map an unavailable delegated source to the public conflict code, preserving its cause.
+        } catch (com.auraboot.framework.meta.exception.MetaServiceException | IllegalArgumentException unavailable) {
+            // CATCH: unavailable published source metadata is a conflict, not invalid caller input.
             throw new SourceBindingConflictException(unavailable);
         }
         var stored = decode(binding, OpenApiResourceSourceBinding.class);
