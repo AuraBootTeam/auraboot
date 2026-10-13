@@ -3,6 +3,8 @@ package com.auraboot.framework.plugin.pf4j;
 import com.auraboot.module.meta.event.CommandCompletedEvent;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationListener;
+import org.springframework.context.event.ApplicationEventMulticaster;
+import org.springframework.context.support.AbstractApplicationContext;
 import org.springframework.stereotype.Component;
 
 import java.util.Collections;
@@ -21,11 +23,11 @@ import java.util.Set;
  * This forwarder closes that gap for the events plugins are documented to
  * consume.
  *
- * <p>Re-publishing in a child propagates the event back UP to the host
- * (Spring parent chain), which would loop. Each forwarded event instance is
- * tracked for the whole synchronous forwarding round so the host-side
- * listener ignores every child re-publication. Independent publisher threads
- * retain independent rounds, even if they publish the same event instance.
+ * <p>Dispatch directly through each child's local multicaster. Using
+ * {@code child.publishEvent} would propagate back to the host and invoke its
+ * business listeners again. A per-thread identity guard also protects against
+ * child listeners explicitly re-publishing the same event; independent
+ * publisher threads retain independent rounds.
  *
  * <p>Forwarding happens synchronously at publish time — inside the host
  * transaction when one is active — so child-side
@@ -52,7 +54,8 @@ public class ApplicationModuleEventForwarder implements ApplicationListener<Comm
         }
         try {
             for (ApplicationContext child : moduleRegistry.childContexts()) {
-                child.publishEvent(event);
+                child.getBean(AbstractApplicationContext.APPLICATION_EVENT_MULTICASTER_BEAN_NAME,
+                        ApplicationEventMulticaster.class).multicastEvent(event);
             }
         } finally {
             currentRound.remove(event);

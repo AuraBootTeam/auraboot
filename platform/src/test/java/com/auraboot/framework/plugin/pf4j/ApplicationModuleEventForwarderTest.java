@@ -3,6 +3,13 @@ package com.auraboot.framework.plugin.pf4j;
 import com.auraboot.module.meta.event.CommandCompletedEvent;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationListener;
+import org.springframework.context.annotation.AnnotationConfigUtils;
+import org.springframework.transaction.event.TransactionalEventListener;
+import org.springframework.transaction.event.TransactionalEventListenerFactory;
+import org.springframework.transaction.support.AbstractPlatformTransactionManager;
+import org.springframework.transaction.support.DefaultTransactionStatus;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.context.support.GenericApplicationContext;
 import java.util.List;
 import java.util.Map;
@@ -21,9 +28,43 @@ class ApplicationModuleEventForwarderTest {
             ApplicationModuleRegistry registry=mock(ApplicationModuleRegistry.class);
             when(registry.childContexts()).thenReturn(List.of(first,second));
             host.addApplicationListener(new ApplicationModuleEventForwarder(registry));host.refresh();
-            first.setParent(host);second.setParent(host);first.addApplicationListener(a);second.addApplicationListener(b);first.refresh();second.refresh();
+            first.setParent(host);second.setParent(host);first.addApplicationListener(a);second.addApplicationListener(b);
+            for(GenericApplicationContext child:List.of(first,second)) {
+                AnnotationConfigUtils.registerAnnotationConfigProcessors(child);
+                child.registerBean(TransactionalEventListenerFactory.class);
+                child.registerBean(CommitListener.class);
+                child.refresh();
+            }
         }
         public void close(){second.close();first.close();host.close();}
+    }
+    static class CommitListener {
+        final AtomicInteger committed=new AtomicInteger();
+        @TransactionalEventListener void completed(CommandCompletedEvent event){committed.incrementAndGet();}
+    }
+    static class MemoryTransactionManager extends AbstractPlatformTransactionManager {
+        @Override protected Object doGetTransaction(){return new Object();}
+        @Override protected void doBegin(Object transaction,TransactionDefinition definition){}
+        @Override protected void doCommit(DefaultTransactionStatus status){}
+        @Override protected void doRollback(DefaultTransactionStatus status){}
+    }
+    @Test void childTransactionalListenersRemainBoundToHostCommitAndRollback() {
+        try(Fixture f=new Fixture(e->{},e->{})) {
+            CommitListener first=f.first.getBean(CommitListener.class),second=f.second.getBean(CommitListener.class);
+            TransactionTemplate tx=new TransactionTemplate(new MemoryTransactionManager());
+            tx.executeWithoutResult(status->{f.host.publishEvent(event());assertThat(first.committed).hasValue(0);assertThat(second.committed).hasValue(0);});
+            assertThat(first.committed).hasValue(1);assertThat(second.committed).hasValue(1);
+            tx.executeWithoutResult(status->{f.host.publishEvent(event());status.setRollbackOnly();});
+            assertThat(first.committed).hasValue(1);assertThat(second.committed).hasValue(1);
+            f.host.publishEvent(event());assertThat(first.committed).hasValue(1);assertThat(second.committed).hasValue(1);
+        }
+    }
+    @Test void forwardingDoesNotRepeatHostBusinessListeners() {
+        AtomicInteger host=new AtomicInteger(),first=new AtomicInteger(),second=new AtomicInteger();
+        try(Fixture f=new Fixture(e->first.incrementAndGet(),e->second.incrementAndGet())) {
+            f.host.addApplicationListener((ApplicationListener<CommandCompletedEvent>)e->host.incrementAndGet());
+            f.host.publishEvent(event());assertThat(host).hasValue(1);assertThat(first).hasValue(1);assertThat(second).hasValue(1);
+        }
     }
     @Test void bothChildrenReceiveEachHostPublicationExactlyOnce() {
         AtomicInteger first=new AtomicInteger(),second=new AtomicInteger();
