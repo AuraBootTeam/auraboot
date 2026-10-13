@@ -64,6 +64,23 @@
 - 处置建议:转给 #2258 作者/owner 修种子顺序或导入容错;验收 = reset 后
   "Import failed" 计数归零(或仅余与 gate 无关的插件)。
 
+> **UPDATE 2026-10-13(本条已解决,根因与上猜不同)**:真根因是 usage-index 的
+> 产品源 pull 在调用方事务内执行——workflow app 的 BPM application-module 以
+> staged jar 形态加载,fresh DB 上无 BPM 表(其迁移只在插件目录导入时跑,jar 形态
+> 不触发),`BpmDecisionUsagePublisher.republishSources` 的
+> `relation "ab_sla_config" does not exist` 毒化 PG 事务,凡是 publish governance
+> 触发 impact 重建的插件导入(platform-admin/page-manager/org-management/showcase/
+> core-dashboard)整体回滚;admin_webhook FK 与 25P02 均为级联,#2258 无责。
+> 修复:usage-index rebuild 核心走 REQUIRES_NEW,产品源 pull 延迟到 afterCommit
+> 且在虚拟线程执行(MetaContext snapshot 传播),贡献者失败仅告警。
+> 验收 = fresh reset Step 7.5 **10/10 OK** + Reference-integrity OK +
+> reconciliation OK (10 plugins) + activation OK (10 enabled)。
+> 遗留跟进:① jar 形态 BPM 模块在 fresh DB 无表(SLA scheduler 周期报错刷日志、
+> SLA 决策源缺位)——与 3.1 CI 化同根,owner 定夺;② metaDefinitionCacheService
+> 在导入回滚后缓存不回滚,重试报 "Model exists but cannot be loaded for update"
+> (误导性报错,自愈于重启/清缓存);③ publish governance 对每个零消费字段各触发
+> 一次 rebuild+pull(~千次级),可批量化。
+
 ### 3.3 多租户 posture 的 i18n 租户隔离测试(可选增强)
 
 - `i18n-admin-workflow.real.spec.ts:139` 现为 posture 门控 skip(403 探针)。
