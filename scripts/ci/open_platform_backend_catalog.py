@@ -156,6 +156,8 @@ def plan(root):
             "Invalid backend profile")
     test_root = root / "platform/src/test/java"
     classes = list(profile['classes'])
+    require('com.auraboot.framework.meta.service.impl.OutboxWorkerImplCoverageIT' in classes,
+            'Source outbox backlog regression class missing')
     required_import_classes = {
         'com.auraboot.framework.plugin.service.PluginDirectoryLoaderTest',
         'com.auraboot.framework.plugin.service.impl.PluginZipResourceReaderTest',

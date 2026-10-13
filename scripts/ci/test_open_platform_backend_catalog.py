@@ -58,6 +58,7 @@ class BackendCatalogTest(unittest.TestCase):
                 return json.dumps(broken) if path == profile_file else original_read(path, *args, **kwargs)
             with patch.object(Path, 'read_text', read), self.assertRaisesRegex(ValueError, 'Public plugin declaration'):
                 plan(self.root)
+        self.assertIn('com.auraboot.framework.meta.service.impl.OutboxWorkerImplCoverageIT', names)
         coverage_names = {row['class'] for row in self.expected['coverage']['sources']}
         all_open_sources = {'com.auraboot.framework.openplatform.' + folder + '.' + file.stem
                             for folder in ['service', 'security']

@@ -46,7 +46,8 @@
     "com.auraboot.framework.webhook.service.WebhookRequestTraceTest",
     "com.auraboot.framework.plugin.service.PluginDirectoryLoaderTest",
     "com.auraboot.framework.plugin.service.impl.PluginZipResourceReaderTest",
-    "com.auraboot.framework.plugin.service.PluginImportTwoPhaseReferenceIntegrationTest"
+    "com.auraboot.framework.plugin.service.PluginImportTwoPhaseReferenceIntegrationTest",
+    "com.auraboot.framework.meta.service.impl.OutboxWorkerImplCoverageIT"
   ],
   "coverage": {
     "minimumLinePercent": 80,
