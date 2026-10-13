@@ -19,6 +19,7 @@ import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /** Host-owned locator resolver. A locator is not an authorization token. */
@@ -29,8 +30,8 @@ public final class RegisteredSourcePlanResolver implements NotificationDeliveryP
     private final ImportedNotificationMetadataValidator validator;
     private final Clock clock;
     private List<SourceBindingTypes.Binding> registered = List.of();
-    @org
-    .springframework.beans.factory.annotation.Autowired RegisteredSourcePlanResolver(HostSourceBindingProperties p, ImportedNotificationMetadataReader r, ImportedNotificationMetadataValidator v) {
+    @Autowired
+    RegisteredSourcePlanResolver(HostSourceBindingProperties p, ImportedNotificationMetadataReader r, ImportedNotificationMetadataValidator v) {
         this(p,(SourceBindingReader) r, v);
     }
     RegisteredSourcePlanResolver(HostSourceBindingProperties p, SourceBindingReader r, ImportedNotificationMetadataValidator v) {

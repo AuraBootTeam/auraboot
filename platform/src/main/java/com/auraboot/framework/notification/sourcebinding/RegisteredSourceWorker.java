@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.Supplier;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -21,8 +22,8 @@ public final class RegisteredSourceWorker {
     private final SourceBindingReader reader;
     private final NotificationDeliveryAccessor delivery;
     private final TransactionTemplate transaction;
-    @org
-    .springframework.beans.factory.annotation.Autowired RegisteredSourceWorker(RegisteredSourcePlanResolver planner, ImportedNotificationMetadataReader reader, PluginNotificationDeliveryAccessorImpl delivery, PlatformTransactionManager manager) {
+    @Autowired
+    RegisteredSourceWorker(RegisteredSourcePlanResolver planner, ImportedNotificationMetadataReader reader, PluginNotificationDeliveryAccessorImpl delivery, PlatformTransactionManager manager) {
         this(planner,(SourceBindingReader) reader,(NotificationDeliveryAccessor) delivery, manager);
     }
     RegisteredSourceWorker(RegisteredSourcePlanResolver planner, SourceBindingReader reader, NotificationDeliveryAccessor delivery, PlatformTransactionManager manager) {
