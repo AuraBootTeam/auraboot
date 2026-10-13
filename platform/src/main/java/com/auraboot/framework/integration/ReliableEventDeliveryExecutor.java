@@ -17,6 +17,7 @@ public class ReliableEventDeliveryExecutor {
 
     private final OutboxEventMapper outboxEventMapper;
     private final AuraPluginManager pluginManager;
+    private final InventoryOwnerModelAuthority modelAuthority;
     private final ReliableIntegrationMetrics metrics;
     private final TransactionTemplate transaction;
     private final TransactionTemplate serializableTransaction;
@@ -24,14 +25,23 @@ public class ReliableEventDeliveryExecutor {
     public ReliableEventDeliveryExecutor(OutboxEventMapper outboxEventMapper,
                                          ReliableIntegrationMetrics metrics,
                                          PlatformTransactionManager transactionManager) {
-        this(outboxEventMapper, metrics, transactionManager, null);
+        this(outboxEventMapper, metrics, transactionManager, null, null);
+    }
+
+    public ReliableEventDeliveryExecutor(OutboxEventMapper outboxEventMapper,
+                                         ReliableIntegrationMetrics metrics,
+                                         PlatformTransactionManager transactionManager,
+                                         AuraPluginManager pluginManager) {
+        this(outboxEventMapper, metrics, transactionManager, pluginManager, null);
     }
 
     @Autowired
     public ReliableEventDeliveryExecutor(OutboxEventMapper outboxEventMapper,
                                          ReliableIntegrationMetrics metrics,
                                          PlatformTransactionManager transactionManager,
-                                         AuraPluginManager pluginManager) {
+                                         AuraPluginManager pluginManager,
+                                         InventoryOwnerModelAuthority modelAuthority) {
+        this.modelAuthority = modelAuthority;
         this.pluginManager = pluginManager;
         this.outboxEventMapper = outboxEventMapper;
         this.metrics = metrics;
@@ -58,7 +68,7 @@ public class ReliableEventDeliveryExecutor {
             MetaContext.runWithSnapshot(null, () -> {
                 MetaContext.setContext(envelope.tenantId(), 0L,
                         "integration-runtime", "integration-runtime");
-                InventoryOwnerCommandScope.consume(envelope, consumer, pluginManager,
+                InventoryOwnerCommandScope.consume(envelope, consumer, pluginManager, modelAuthority,
                         () -> consumer.consume(envelope));
                 int applied = outboxEventMapper.markReceiptApplied(
                         envelope.tenantId(), envelope.eventId(), consumer.consumerCode(), leaseToken);

@@ -5,6 +5,8 @@ import com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvel
 import com.auraboot.framework.plugin.extension.integration.ReliableEventConsumerExtension;
 import com.auraboot.framework.plugin.pf4j.AuraPluginManager;
 import java.util.Set;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.function.Supplier;
 
 /** Host-only authorization for the registered Inventory intake consumer, never request-selected. */
@@ -16,19 +18,20 @@ public final class InventoryOwnerCommandScope {
     private static final Set<String> WRITES = Set.of("inv_inbound", "inv_inbound_line");
     private static final Set<String> READS = Set.of("inv_inbound", "inv_inbound_line", "inv_warehouse",
             "inv_warehouse_location", "prod_product", "pe_product");
-    private record Permit(long tenantId, String eventId) {}
+    private record Permit(long tenantId, String eventId, InventoryOwnerModelAuthority authority,
+                          Map<String, InventoryOwnerModelAuthority.Binding> bindings) {}
     private static final ThreadLocal<Permit> CURRENT = new ThreadLocal<>();
     private InventoryOwnerCommandScope() {}
 
     static void consume(IntegrationEventEnvelope event, ReliableEventConsumerExtension consumer,
-                        AuraPluginManager plugins, Runnable work) {
+                        AuraPluginManager plugins, InventoryOwnerModelAuthority authority, Runnable work) {
         if (!CONSUMER.equals(consumer.consumerCode()) || !EVENT.equals(event.eventType())) {
             if (CURRENT.get() != null)
                 throw new SecurityException("Nested delivery cannot inherit Inventory owner authority");
             work.run();
             return;
         }
-        if (plugins == null || !IMPLEMENTATION.equals(consumer.getClass().getName())
+        if (plugins == null || authority == null || !IMPLEMENTATION.equals(consumer.getClass().getName())
                 || plugins.observeLoadedArtifact(consumer.getClass())
                     .filter(artifact -> "com.auraboot.inventory".equals(artifact.pluginId())).isEmpty()
                 || plugins.getExtensionsOfType(ReliableEventConsumerExtension.class).stream()
@@ -42,7 +45,7 @@ public final class InventoryOwnerCommandScope {
                     .contains(event.payload().get("sourceType"))
                 || event.payload().containsKey("tenantId") || CURRENT.get() != null)
             throw new SecurityException("Inventory intake envelope does not match its fixed owner contract");
-        CURRENT.set(new Permit(event.tenantId(), event.eventId()));
+        CURRENT.set(new Permit(event.tenantId(), event.eventId(), authority, new HashMap<>()));
         try { work.run(); } finally { CURRENT.remove(); }
     }
 
@@ -52,11 +55,20 @@ public final class InventoryOwnerCommandScope {
         if (permit == null) return work.get();
         boolean read = "read".equals(operation);
         if (tenantId != permit.tenantId() || !Long.valueOf(tenantId).equals(MetaContext.getCurrentTenantId())
-                || !(read ? READS.contains(model) : "create".equals(operation) && WRITES.contains(model)))
+                || model == null || !(read ? READS.contains(model) : "create".equals(operation) && WRITES.contains(model)))
             throw new SecurityException("Inventory owner intake access is outside its tenant/model/operation boundary");
+        InventoryOwnerModelAuthority.Binding observed = permit.authority().resolve(tenantId, model, !read);
+        InventoryOwnerModelAuthority.Binding approved = permit.bindings().putIfAbsent(model, observed);
+        if (approved == null) approved = observed;
+        InventoryOwnerModelAuthority.assertUnchanged(approved, observed);
+        InventoryOwnerModelAuthority.Binding lease = approved;
         // The fixed row grade applies only to this approved model, never a null/global target.
         return MetaContext.runWithCommandPermitPlan("ALL", null, model, null,
-                () -> MetaContext.runWithAuthorizedCommandCode(COMMAND, work));
+                () -> MetaContext.runWithAuthorizedCommandCode(COMMAND, () -> {
+                    T result = work.get();
+                    InventoryOwnerModelAuthority.assertUnchanged(lease, permit.authority().resolve(tenantId, model, !read));
+                    return result;
+                }));
     }
 
     public static boolean active() { return CURRENT.get() != null; }

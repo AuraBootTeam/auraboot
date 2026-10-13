@@ -2,6 +2,12 @@ package com.auraboot.framework.integration;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.mapper.OutboxEventMapper;
+import com.auraboot.framework.meta.mapper.MetaModelMapper;
+import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.meta.entity.Model;
+import com.auraboot.framework.meta.constant.SystemFieldConstants;
+import com.auraboot.framework.plugin.entity.PluginRecord;
+import com.auraboot.framework.plugin.mapper.PluginRecordMapper;
 import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.service.DynamicDataService;
@@ -15,6 +21,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -38,6 +45,13 @@ class InventoryOwnerCommandScopeTest {
     ReliableIntegrationMetrics metrics = mock(ReliableIntegrationMetrics.class);
     PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
     DynamicDataService data = mock(DynamicDataService.class);
+    MetaModelService definitions = mock(MetaModelService.class);
+    MetaModelMapper models = mock(MetaModelMapper.class);
+    PluginRecordMapper owners = mock(PluginRecordMapper.class);
+    InventoryOwnerModelAuthority authority = new InventoryOwnerModelAuthority(definitions, models, owners);
+    Map<String, Model> actualModels = new HashMap<>();
+    Map<String, ModelDefinition> effectiveModels = new HashMap<>();
+    Map<String, PluginRecord> actualOwners = new HashMap<>();
     BackgroundDataAccessorImpl accessor = new BackgroundDataAccessorImpl(data);
     ReliableEventConsumerExtension consumer;
     Consumer<IntegrationEventEnvelope> effect = event -> {};
@@ -70,6 +84,23 @@ class InventoryOwnerCommandScopeTest {
         when(plugins.observeLoadedArtifact(implementation)).thenReturn(Optional.of(
                 new AuraPluginManager.LoadedPluginArtifact("com.auraboot.inventory", directory, "verified-by-host")));
         when(plugins.getExtensionsOfType(ReliableEventConsumerExtension.class)).thenReturn(List.of(consumer));
+        for (String code : List.of("inv_inbound", "inv_inbound_line", "inv_warehouse", "inv_warehouse_location", "prod_product", "pe_product")) {
+            Model model = new Model(); model.setId((long) actualModels.size() + 1);
+            model.setPid(code + "-definition"); model.setTenantId(31L); model.setCode(code);
+            model.setPluginPid(code.startsWith("inv_") ? "inventory-owner" : "product-owner");
+            model.setStatus("published"); model.setIsCurrent(true); model.setDeletedFlag(false);
+            model.setVersion(1); model.setRowVersion(1); // Raw nullable table uses the production generator.
+            actualModels.put(code, model);
+            effectiveModels.put(code, ModelDefinition.builder().id(model.getId()).code(code).version(1)
+                    .status("published").sourceType("physical").tableName(SystemFieldConstants.generateTableName(code)).build());
+        }
+        actualOwners.put("inventory-owner", PluginRecord.builder().pid("inventory-owner").tenantId(31L)
+                .pluginId("com.auraboot.inventory").deletedFlag(false).status("installed").build());
+        actualOwners.put("product-owner", PluginRecord.builder().pid("product-owner").tenantId(31L)
+                .pluginId("com.auraboot.product-catalog").deletedFlag(false).status("installed").build());
+        when(models.findCurrentByCode(anyString())).thenAnswer(call -> actualModels.get(call.getArgument(0)));
+        when(definitions.getModelDefinition(anyString())).thenAnswer(call -> Optional.ofNullable(effectiveModels.get(call.getArgument(0))));
+        when(owners.findByPid(anyString())).thenAnswer(call -> actualOwners.get(call.getArgument(0)));
         when(transactions.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
         when(receipts.claimReceipt(anyLong(), anyString(), anyString(), anyString())).thenReturn(1);
         when(receipts.markReceiptApplied(anyLong(), anyString(), anyString(), anyString())).thenReturn(1);
@@ -170,7 +201,7 @@ class InventoryOwnerCommandScopeTest {
             public Set<String> subscribedEventTypes() { return Set.of(InventoryOwnerCommandScope.EVENT); }
             public void consume(IntegrationEventEnvelope e) { effect.accept(e); }
         };
-        new ReliableEventDeliveryExecutor(receipts, metrics, transactions, plugins)
+        new ReliableEventDeliveryExecutor(receipts, metrics, transactions, plugins, authority)
                 .deliver(event("procurement", "inv:receive_source_receipt"), other, "lease");
         var e = event("procurement", "inv:receive_source_receipt");
         var wrong = new IntegrationEventEnvelope(e.schemaVersion(),e.eventId(),"other.event",e.source(),e.subject(),
@@ -197,6 +228,80 @@ class InventoryOwnerCommandScopeTest {
         assertThat(InventoryOwnerCommandScope.active()).isFalse();
     }
 
+    @Test void wrongActualOwnerUnknownModelAndWrongPhysicalTableRejectBeforeDelegate() {
+        effect = event -> accessor.create(31, "inv_inbound", Map.of("origin", "value"));
+        actualOwners.get("inventory-owner").setPluginId("wrong.owner");
+        assertThatThrownBy(() -> deliver(event("procurement", "inv:receive_source_receipt")))
+                .isInstanceOf(SecurityException.class);
+        actualOwners.get("inventory-owner").setPluginId("com.auraboot.inventory");
+        Model original = actualModels.remove("inv_inbound");
+        assertThatThrownBy(() -> deliver(event("procurement", "inv:receive_source_receipt")))
+                .isInstanceOf(SecurityException.class);
+        actualModels.put("inv_inbound", original);
+        original.setTableName(SystemFieldConstants.generateTableName("pr_purchase_order_line"));
+        assertThatThrownBy(() -> deliver(event("procurement", "inv:receive_source_receipt")))
+                .isInstanceOf(SecurityException.class);
+        original.setTableName(null);
+        effectiveModels.get("inv_inbound").setTableName("unapproved_storage");
+        assertThatThrownBy(() -> deliver(event("procurement", "inv:receive_source_receipt")))
+                .isInstanceOf(SecurityException.class);
+        effectiveModels.get("inv_inbound").setTableName(SystemFieldConstants.generateTableName("inv_inbound"));
+        original.setSourceType("endpoint");
+        assertThatThrownBy(() -> deliver(event("procurement", "inv:receive_source_receipt")))
+                .isInstanceOf(SecurityException.class);
+        verifyNoInteractions(data);
+        verify(transactions, times(5)).rollback(any());
+    }
+
+    @Test void foreignTenantUnpublishedNonCurrentAndDeletedMetadataCannotAuthorizeTheName() {
+        effect = event -> accessor.create(31, "inv_inbound", Map.of("origin", "value"));
+        Model model = actualModels.get("inv_inbound");
+        model.setTenantId(32L);
+        assertThatThrownBy(() -> deliver(event("procurement", "inv:receive_source_receipt")))
+                .isInstanceOf(SecurityException.class);
+        model.setTenantId(31L); model.setStatus("draft");
+        assertThatThrownBy(() -> deliver(event("procurement", "inv:receive_source_receipt")))
+                .isInstanceOf(SecurityException.class);
+        model.setStatus("published"); model.setIsCurrent(false);
+        assertThatThrownBy(() -> deliver(event("procurement", "inv:receive_source_receipt")))
+                .isInstanceOf(SecurityException.class);
+        model.setIsCurrent(true); model.setDeletedFlag(true);
+        assertThatThrownBy(() -> deliver(event("procurement", "inv:receive_source_receipt")))
+                .isInstanceOf(SecurityException.class);
+        model.setDeletedFlag(false); actualOwners.get("inventory-owner").setTenantId(32L);
+        assertThatThrownBy(() -> deliver(event("procurement", "inv:receive_source_receipt")))
+                .isInstanceOf(SecurityException.class);
+        verifyNoInteractions(data);
+        verify(transactions, times(5)).rollback(any());
+    }
+
+    @Test void mutableEffectiveDefinitionDuringDelegateRollsBackRatherThanApplyingReceipt() {
+        when(data.create(anyString(), anyMap())).thenAnswer(call -> {
+            effectiveModels.get("inv_inbound").setTableName("unapproved_storage");
+            return Map.of("pid", "created-before-drift-observed");
+        });
+        effect = event -> accessor.create(31, "inv_inbound", Map.of("origin", "value"));
+        assertThatThrownBy(() -> deliver(event("procurement", "inv:receive_source_receipt")))
+                .isInstanceOf(SecurityException.class);
+        verify(data).create(eq("inv_inbound"), anyMap());
+        verify(transactions).rollback(any());
+        verify(receipts, never()).markReceiptApplied(anyLong(), anyString(), anyString(), anyString());
+        assertThat(InventoryOwnerCommandScope.active()).isFalse();
+    }
+
+    @Test void approvedImmutableLeaseRejectsAChangedCurrentModelRevisionBetweenAccesses() {
+        effect = event -> {
+            accessor.getById(31, "inv_inbound", "existing");
+            actualModels.get("inv_inbound").setRowVersion(2);
+            accessor.create(31, "inv_inbound", Map.of("origin", "value"));
+        };
+        assertThatThrownBy(() -> deliver(event("procurement", "inv:receive_source_receipt")))
+                .isInstanceOf(SecurityException.class);
+        verify(data).getById("inv_inbound", "existing");
+        verify(data, never()).create(anyString(), anyMap());
+        verify(transactions).rollback(any());
+    }
+
     @Test void nestedUnrelatedDeliveryCannotInheritTheOuterOwnerScope() {
         var other = new ReliableEventConsumerExtension() {
             public String consumerCode() { return "other"; }
@@ -205,7 +310,7 @@ class InventoryOwnerCommandScopeTest {
         };
         effect = event -> {
             assertThat(InventoryOwnerCommandScope.active()).isTrue();
-            assertThatThrownBy(() -> new ReliableEventDeliveryExecutor(receipts, metrics, transactions, plugins)
+            assertThatThrownBy(() -> new ReliableEventDeliveryExecutor(receipts, metrics, transactions, plugins, authority)
                     .deliver(event, other, "nested-lease")).isInstanceOf(SecurityException.class);
             assertThat(InventoryOwnerCommandScope.active()).isTrue();
         };
@@ -224,7 +329,7 @@ class InventoryOwnerCommandScopeTest {
                         case "subscribedEventTypes" -> Set.of(InventoryOwnerCommandScope.EVENT);
                         default -> throw new AssertionError("Foreign consumer must not execute");
                     });
-        assertThatThrownBy(() -> new ReliableEventDeliveryExecutor(receipts, metrics, transactions, plugins)
+        assertThatThrownBy(() -> new ReliableEventDeliveryExecutor(receipts, metrics, transactions, plugins, authority)
                 .deliver(event("procurement", "inv:receive_source_receipt"), forged, "lease"))
                 .isInstanceOf(SecurityException.class);
         verify(plugins, never()).observeLoadedArtifact(forged.getClass());
@@ -237,7 +342,7 @@ class InventoryOwnerCommandScopeTest {
         verifyNoInteractions(data);
     }
     private void deliver(IntegrationEventEnvelope event) {
-        new ReliableEventDeliveryExecutor(receipts, metrics, transactions, plugins).deliver(event, consumer, "lease");
+        new ReliableEventDeliveryExecutor(receipts, metrics, transactions, plugins, authority).deliver(event, consumer, "lease");
     }
     private static IntegrationEventEnvelope event(String source, String command) {
         return new IntegrationEventEnvelope("1.0", "event", InventoryOwnerCommandScope.EVENT, source, "receipt", Instant.EPOCH,
