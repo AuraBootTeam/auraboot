@@ -114,7 +114,7 @@ test.describe('AMOS lens coverage journeys (S12 batch-1)', () => {
     test(`coverage journey: ${lens.code}`, async ({ page }) => {
       await openSettledLens(page, lens.code);
       await expect(
-        page.getByRole('heading', { name: lens.heading }),
+        page.getByRole('heading', { name: lens.heading, level: 1 }),
         `${lens.heading} renders on ${lens.code}`,
       ).toBeVisible();
       writeFileSync(
