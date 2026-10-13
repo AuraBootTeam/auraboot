@@ -9,6 +9,7 @@ import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.auth.service.AuthService;
 import com.auraboot.framework.auth.dto.AuthenticationRequest;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.meta.constant.SystemFieldConstants;
 import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.constant.SystemFieldConstants;
 import com.auraboot.framework.notification.dto.NotificationRuleRequest;
@@ -101,6 +102,8 @@ final class ProductQuoteReminderNativeFacet {
     private String stage = "product-admission";
     private boolean completed;
     private Map<String, Object> protectedBaseline;
+    private JsonNode canonicalOrgManifest;
+    private Map<String, JsonNode> canonicalOrgFields;
 
     private ProductQuoteReminderNativeFacet(Services services, Path parent) throws Exception {
         s = services;
@@ -123,6 +126,7 @@ final class ProductQuoteReminderNativeFacet {
         trace.put("providerCalls", 0);
         try {
             JsonNode input = admission();
+            loadCanonicalNativeOrg(input);
             stage = "product-handler-admission";
             Map<String, Boolean> handlers = new LinkedHashMap<>();
             for (String command : List.of("customer_pcba_int:seed_default_kingdee_connection",
@@ -577,6 +581,73 @@ final class ProductQuoteReminderNativeFacet {
         return s.rules.createRule(rule).getId();
     }
 
+    private void loadCanonicalNativeOrg(JsonNode input) throws Exception {
+        List<Path> directories = new ArrayList<>();
+        for (JsonNode row : input.path("orderedImportDirectories")) {
+            Path path = Path.of(row.path("path").asText()).toRealPath();
+            if ("com.auraboot.org-management".equals(s.json.readTree(path.resolve("plugin.json").toFile()).path("pluginId").asText()))
+                directories.add(path);
+        }
+        assertThat(directories).hasSize(1);
+        Path org = directories.getFirst();
+        canonicalOrgManifest = s.json.readTree(org.resolve("plugin.json").toFile());
+        assertThat(canonicalOrgManifest.path("namespace").asText()).isEqualTo("org");
+        assertThat(canonicalOrgManifest.path("version").asText()).isNotBlank();
+        canonicalOrgFields = new LinkedHashMap<>();
+        var hashes = new LinkedHashMap<String, String>();
+        for (String code : List.of("created_at", "updated_at")) {
+            Path path = org.resolve("config/fields/" + code + ".json");
+            JsonNode field = s.json.readTree(path.toFile());
+            assertThat(field.path("code").asText()).isEqualTo(code);
+            assertThat(field.path("dataType").asText()).isEqualTo("datetime");
+            canonicalOrgFields.put(code, field);
+            hashes.put(code, sha(path));
+        }
+        trace.put("canonicalSystemFieldContribution", Map.of("directory", org.toString(),
+                "pluginJsonSha256", sha(org.resolve("plugin.json")), "fieldSha256", hashes,
+                "source", "exact already-sealed formal import directory; test-owned discovery only"));
+    }
+
+    /** Test-owned discovery for actual auto-bound infrastructure, never synthetic tracking or a Main exception. */
+    static Set<String> nativeSystemFieldPids(List<Map<String, Object>> rows, long tenantId,
+                                           JsonNode orgManifest, Map<String, JsonNode> orgFields) {
+        assertThat(orgManifest.path("pluginId").asText()).isEqualTo("com.auraboot.org-management");
+        assertThat(orgManifest.path("namespace").asText()).isEqualTo("org");
+        assertThat(orgManifest.path("version").asText()).isNotBlank();
+        assertThat(orgFields.keySet()).containsExactlyInAnyOrder("created_at", "updated_at");
+        var result = new LinkedHashSet<String>();
+        for (var row : rows) {
+            assertThat(row.get("is_system_binding")).isEqualTo(Boolean.TRUE);
+            assertThat(row.get("editable")).isEqualTo(Boolean.FALSE);
+            assertThat(row.get("binding_tenant_id")).isEqualTo(tenantId);
+            assertThat(row.get("field_tenant_id")).isEqualTo(tenantId);
+            String code = (String) row.get("code");
+            assertThat(SystemFieldConstants.AUTO_BIND).contains(code);
+            assertThat(row.get("alias_code") == null || code.equals(row.get("alias_code"))).isTrue();
+            if (row.get("field_plugin_pid") == null) {
+                String type = switch (code) { case "id" -> "bigint"; case "pid" -> "string"; default -> "datetime"; };
+                assertThat(row.get("data_type")).isEqualTo(type);
+            } else {
+                // Only these two actual canonical org fields are auto-bound without import tracking.
+                assertThat(orgFields).containsKey(code);
+                JsonNode field = orgFields.get(code);
+                assertThat(field.path("code").asText()).isEqualTo(code);
+                assertThat(field.path("dataType").asText()).isEqualTo("datetime");
+                assertThat(row.get("data_type")).isEqualTo(field.path("dataType").asText());
+                assertThat(row.get("plugin_tenant_id")).isEqualTo(tenantId);
+                assertThat(row.get("plugin_pid")).isEqualTo(row.get("field_plugin_pid"));
+                assertThat(row.get("plugin_id")).isEqualTo(orgManifest.path("pluginId").asText());
+                assertThat(row.get("namespace")).isEqualTo(orgManifest.path("namespace").asText());
+                assertThat(row.get("version")).isEqualTo(orgManifest.path("version").asText());
+            }
+            assertThat(row.get("pid")).isInstanceOf(String.class);
+            String pid = (String) row.get("pid");
+            assertThat(pid).isNotBlank();
+            assertThat(result.add(pid)).isTrue();
+        }
+        return Set.copyOf(result);
+    }
+
     private Binding approval(long rule) {
         return tx(() -> {
             List<Approval> approvals = new ArrayList<>();
@@ -601,11 +672,20 @@ final class ProductQuoteReminderNativeFacet {
                     var plugin = s.jdbc.queryForMap("SELECT pid,plugin_id,namespace,version FROM ab_plugin WHERE tenant_id=? AND pid=? AND deleted_flag=FALSE", tenant.getId(), pid);
                     owners.add(new Owner(pid, (String) plugin.get("plugin_id"), (String) plugin.get("namespace"), (String) plugin.get("version")));
                 }
-                List<String> nativeFields = s.jdbc.queryForList("""
-                        SELECT f.pid FROM ab_meta_model m JOIN ab_meta_model_field_binding b ON b.model_id=m.id JOIN ab_meta_field f ON f.id=b.field_id
-                        WHERE m.tenant_id=? AND m.code=? AND m.is_current=TRUE AND m.deleted_flag=FALSE AND b.tenant_id=? AND b.deleted_flag=FALSE
-                          AND b.is_system_binding=TRUE AND f.tenant_id=? AND f.deleted_flag=FALSE AND f.is_current=TRUE AND f.plugin_pid IS NULL
-                        """, String.class, tenant.getId(), model, tenant.getId(), tenant.getId());
+                List<Map<String, Object>> systemBindings = s.jdbc.queryForList("""
+                        SELECT f.pid,f.code,f.data_type,f.plugin_pid AS field_plugin_pid,
+                               f.tenant_id AS field_tenant_id,b.tenant_id AS binding_tenant_id,
+                               b.is_system_binding,b.editable,b.alias_code,p.pid AS plugin_pid,
+                               p.tenant_id AS plugin_tenant_id,p.plugin_id,p.namespace,p.version
+                        FROM ab_meta_model m JOIN ab_meta_model_field_binding b ON b.model_id=m.id
+                          JOIN ab_meta_field f ON f.id=b.field_id
+                          LEFT JOIN ab_plugin p ON p.pid=f.plugin_pid AND p.tenant_id=? AND p.deleted_flag=FALSE
+                        WHERE m.tenant_id=? AND m.code=? AND m.is_current=TRUE AND m.deleted_flag=FALSE
+                          AND b.tenant_id=? AND b.deleted_flag=FALSE AND b.is_system_binding=TRUE
+                          AND f.tenant_id=? AND f.deleted_flag=FALSE AND f.is_current=TRUE
+                        """, tenant.getId(), tenant.getId(), model, tenant.getId(), tenant.getId());
+                Set<String> nativeFields = nativeSystemFieldPids(systemBindings, tenant.getId(), canonicalOrgManifest, canonicalOrgFields);
+                trace.put("nativeSystemFieldPids:" + model, nativeFields);
                 Approval lookup = new Approval("METADATA_SHAPE_V1", model, "0".repeat(64), owners, Set.copyOf(nativeFields));
                 JsonNode graph = s.reader.metadata(tenant.getId(), lookup);
                 approvals.add(new Approval(lookup.mode(), model, SourceBindingCanonical.hash(graph), owners, lookup.nativeFieldPids()));
