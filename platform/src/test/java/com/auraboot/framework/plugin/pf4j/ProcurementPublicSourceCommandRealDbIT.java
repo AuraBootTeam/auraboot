@@ -1,0 +1,290 @@
+package com.auraboot.framework.plugin.pf4j;
+
+import com.auraboot.framework.application.TestApplication;
+import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.auth.service.AuthService;
+import com.auraboot.framework.auth.dto.AuthenticationRequest;
+import com.auraboot.framework.cloudconfig.dto.CloudConfigSaveRequest;
+import com.auraboot.framework.cloudconfig.service.CloudConfigService;
+import com.auraboot.framework.meta.service.CommandService;
+import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.plugin.extension.DataAccessor;
+import com.auraboot.framework.plugin.service.PluginImportService;
+import com.auraboot.framework.plugin.dto.imports.ImportRequest;
+import com.auraboot.framework.rbac.entity.Role;
+import com.auraboot.framework.rbac.service.RoleService;
+import com.auraboot.framework.rbac.service.UserRoleService;
+import com.auraboot.framework.permission.service.PermissionService;
+import com.auraboot.framework.tenant.dao.entity.Tenant;
+import com.auraboot.framework.tenant.service.TenantService;
+import com.auraboot.framework.tenant.service.TenantMemberService;
+import com.auraboot.framework.user.service.UserService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.sun.net.httpserver.HttpServer;
+import org.aspectj.lang.annotation.AfterReturning;
+import org.aspectj.lang.annotation.Aspect;
+import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.security.web.FilterChainProxy;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.context.WebApplicationContext;
+import java.lang.reflect.InvocationTargetException;
+import java.math.BigDecimal;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
+import java.time.*;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+
+/** Real registered PF4J handler/controller/security/PG transaction; only external ERP is loopback synthetic.
+ * Independent tenant imports authoritative DSL with an explicitly different local eligibility policy.
+ * Does not prove customer003 selection/callback, production ERP admission, or a browser journey.
+ */
+@SpringBootTest(classes=TestApplication.class,properties={
+    "spring.datasource.url=${TEST_DATABASE_URL}","spring.data.redis.database=${TEST_REDIS_DATABASE}",
+    "aura.plugins.dir=${PROCUREMENT_SOURCE_PLUGIN_DIR}",
+    "security.field-encryption.key=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="})
+@ActiveProfiles("integration-test")
+@Import(ProcurementPublicSourceCommandRealDbIT.IsolatedScheduling.class)
+@EnabledIfEnvironmentVariable(named="PROCUREMENT_PUBLIC_SOURCE_IT",matches="true")
+class ProcurementPublicSourceCommandRealDbIT {
+    private static final String SYNC="qo_procurement_task_common:sync_sources";
+    private static final String PASSWORD="public-source-local-fixture-123";
+    @Autowired WebApplicationContext application;
+    @Autowired FilterChainProxy springSecurityFilterChain;
+    @Autowired ExtensionRegistry extensions;
+    @Autowired CommandService commands;
+    @Autowired PluginImportService imports;
+    @Autowired ObjectMapper json;
+    @Autowired DynamicDataService data;
+    @Autowired UserService users;
+    @Autowired TenantService tenants;
+    @Autowired TenantMemberService members;
+    @Autowired RoleService roles;
+    @Autowired UserRoleService userRoles;
+    @Autowired PermissionService permissions;
+    @Autowired AuthService authentication;
+    @Autowired CloudConfigService configs;
+    @Autowired PlatformTransactionManager transactions;
+    @Autowired javax.sql.DataSource postgres;
+    @Autowired SourceWriteObservation observed;
+    private DynamicDataAccessorImpl db;
+    private MockMvc mvc;
+    private Long tenant,userId,memberId;
+    private String actor,provider,token,deniedToken,task,connection,procurementDirectory;
+    private HttpServer server;
+    private volatile String response;
+    private final AtomicInteger loginCount=new AtomicInteger(),queryCount=new AtomicInteger();
+
+    /** This separate test context disables scheduling entry points, not services or persistence. */
+    @TestConfiguration(proxyBeanMethods=false)
+    static class IsolatedScheduling {
+        @Bean static org.springframework.beans.factory.config.BeanFactoryPostProcessor preventPollers() {
+            return factory->{
+                var registry=(org.springframework.beans.factory.support.BeanDefinitionRegistry)factory;
+                String scheduled=org.springframework.scheduling.config.TaskManagementConfigUtils.SCHEDULED_ANNOTATION_PROCESSOR_BEAN_NAME;
+                if(registry.containsBeanDefinition(scheduled)) registry.removeBeanDefinition(scheduled);
+                Class<com.auraboot.framework.scheduler.service.SchedulerEngine> type=com.auraboot.framework.scheduler.service.SchedulerEngine.class;
+                String[] engines=factory.getBeanNamesForType(type,false,false);
+                if(engines.length!=1) throw new IllegalStateException("Exactly one scheduling entry point required");
+                var definition=new org.springframework.beans.factory.support.RootBeanDefinition(type);
+                definition.setInstanceSupplier(()->org.mockito.Mockito.mock(type));
+                registry.removeBeanDefinition(engines[0]);registry.registerBeanDefinition(engines[0],definition);
+            };
+        }
+        @Bean SourceWriteObservation sourceWriteObservation(){return new SourceWriteObservation();}
+    }
+    /** Observation after real create returns; it does not replace data access, return values, or exceptions. */
+    @Aspect static class SourceWriteObservation {
+        final AtomicReference<String> created=new AtomicReference<>();
+        volatile Long tenant;
+        @AfterReturning(pointcut="execution(* com.auraboot.framework.meta.service.DynamicDataService+.create(..)) && args(model,values)",returning="result")
+        public void record(String model,Map<String,Object> values,Object result) {
+            if(Objects.equals(tenant,MetaContext.getCurrentTenantId()) && "pr_purchase_request".equals(model)
+                    && result instanceof Map<?,?> row) created.set(String.valueOf(row.get("pid")));
+        }
+    }
+
+    @BeforeEach void prepare() throws Exception {
+        assertEquals("13",System.getenv("TEST_REDIS_DATABASE"));
+        try(var sql=postgres.getConnection()){assertEquals("enterprise_22",sql.getCatalog());}
+        assertTrue(extensions.getCommandHandler(SYNC).isPresent(),"Frozen production PF4J artifact must register source sync");
+        provider="ps_"+UUID.randomUUID().toString().replace("-","").substring(0,24);
+        var owner=users.signUp(provider+"@example.invalid",PASSWORD,"Public source local fixture",provider);
+        userId=owner.getId();actor=owner.getPid();
+        var organization=new Tenant();organization.setName(provider);organization.setDisplayName(provider);organization.setStatus("active");
+        organization.setPid(com.auraboot.framework.common.util.UniqueIdGenerator.generate());
+        tenant=tenants.createTenant(organization).getId();
+        assertNotEquals(Long.valueOf(System.getenv("TEST_TENANT_ID")),tenant,"Never alter the existing public tenant");
+        memberId=members.addMember(userId,tenant,"active").getId();context();
+        db=new DynamicDataAccessorImpl(data);
+        var directories=json.readTree(required("PROCUREMENT_SOURCE_IMPORT_DIRECTORIES"));
+        assertTrue(directories.isArray() && !directories.isEmpty(),"Explicit frozen ordered DSL directories required");
+        for(var directory:directories) {
+            Path path=Path.of(directory.asText()).toRealPath();assertTrue(Files.isDirectory(path));
+            if(Files.isRegularFile(path.resolve("config/commands/procurement.json"))) procurementDirectory=path.toString();
+            importDirectory(path);
+        }
+        assertNotNull(procurementDirectory,"Actual quote-procurement directory required");
+        imports.verifyImportReferenceIntegrity();
+        var definition=commands.findByCode(SYNC);assertEquals(tenant,definition.getTenantId());
+        var execution=json.readTree(definition.getExecutionConfig());
+        assertEquals("s2p_sourcing_event",definition.getModelCode());assertEquals(SYNC,execution.path("handler").asText());
+        assertEquals("qo.procurement.integrate",execution.path("permissions").get(0).asText());
+        assertTrue(execution.path("handlerParams").path("procurementSourceEligibilityPolicies").isArray());
+        assertEquals(0,execution.path("handlerParams").path("procurementSourceEligibilityPolicies").size());
+        token=actorToken(owner.getId(),owner.getPid(),memberId,provider+"@example.invalid",List.of("meta.command.execute","qo.procurement.integrate"));
+        context();var denied=users.signUp(provider+"-denied@example.invalid",PASSWORD,"No integration authority",provider+"_denied");
+        var deniedMember=members.addMember(denied.getId(),tenant,"active");
+        deniedToken=actorToken(denied.getId(),denied.getPid(),deniedMember.getId(),provider+"-denied@example.invalid",List.of("meta.command.execute"));
+        context();mvc=MockMvcBuilders.webAppContextSetup(application).addFilters(springSecurityFilterChain).build();
+        server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);response=row("11",1000,"C");
+        server.createContext("/K3Cloud/Kingdee.BOS.WebApi.ServicesStub.AuthService.LoginByAppSecret.common.kdsvc",http->{
+            var body=json.readTree(http.getRequestBody().readAllBytes());
+            assertEquals("local-test-secret",body.path("appSecret").asText());loginCount.incrementAndGet();
+            http.getResponseHeaders().add("Set-Cookie","public-source-local=authenticated; Path=/K3Cloud");
+            byte[] bytes="{\"LoginResultType\":1}".getBytes(StandardCharsets.UTF_8);http.sendResponseHeaders(200,bytes.length);http.getResponseBody().write(bytes);http.close();
+        });
+        server.createContext("/K3Cloud/Kingdee.BOS.WebApi.ServicesStub.DynamicFormService.ExecuteBillQuery.common.kdsvc",http->{
+            http.getRequestBody().readAllBytes();queryCount.incrementAndGet();
+            byte[] bytes=response.getBytes(StandardCharsets.UTF_8);http.sendResponseHeaders(200,bytes.length);http.getResponseBody().write(bytes);http.close();
+        });server.start();
+        var secret=new CloudConfigSaveRequest();secret.setConfigLevel("tenant");secret.setServiceType("integration");secret.setProviderCode(provider);secret.setEnabled(true);secret.setPriority(1);
+        secret.setConfig("{\"appSecret\":\"local-test-secret\"}");configs.saveConfig(secret);
+        fixture(SYNC,()->{
+            String product=pid(db.create("prod_product",Map.of("prod_code",provider,"prod_name","Public source material","prod_type","raw_material","prod_unit","pcs","prod_status","active")));
+            connection=pid(db.create("customer_pcba_int_kingdee_connection",Map.of("customer_pcba_kd_profile_name",provider,"customer_pcba_kd_status","active", "customer_pcba_kd_acct_id",provider,
+                    "customer_pcba_kd_base_url","http://127.0.0.1:"+server.getAddress().getPort(),"customer_pcba_kd_app_id","local-app","customer_pcba_kd_username","local-reader","customer_pcba_kd_app_secret_ref","cloud-config:"+provider,"customer_pcba_kd_auth_type","app-secret")));
+            db.create("customer_pcba_int_external_ref",Map.of("customer_pcba_ref_external_system","KINGDEE","customer_pcba_ref_instance_key",connection,"customer_pcba_ref_account_id",provider,"customer_pcba_ref_external_form_id","BD_MATERIAL","customer_pcba_ref_external_id","900","customer_pcba_ref_local_model_code","prod_product","customer_pcba_ref_local_pid",product));return null;
+        });
+        task=fixture("qo_procurement_task_common:create",()->pid((Map<?,?>)service("ProcurementTaskService",new Class<?>[]{DataAccessor.class},new Object[]{db},"create",new Class<?>[]{Object.class,String.class,Map.class},tenant,actor,Map.of("title",provider,"connectionPid",connection))));
+    }
+    @AfterEach void close(){observed.tenant=null;if(server!=null)server.stop(0);MetaContext.clear();}
+
+    private void importDirectory(Path directory) {
+        var preview=imports.parseDirectory(directory.toString(),true);assertTrue(preview.isValid(),"Actual DSL import preview must validate");
+        var request=ImportRequest.builder().importId(preview.getImportId()).conflictStrategy(ImportRequest.ConflictStrategy.OVERWRITE)
+            .autoPublishFields(true).autoPublishModels(true).autoPublishCommands(true).autoPublishPages(true).createResourcePermissions(true).build();
+        assertTrue(imports.execute(preview.getImportId(),request).isSuccess(),"Actual tenant DSL import must succeed");
+    }
+    private void configurePolicy() throws Exception {
+        context();Path original=Path.of(procurementDirectory);Path copy=Files.createTempDirectory("public-source-policy-");
+        try(var files=Files.walk(original)){for(Path path:files.toList()) {Path target=copy.resolve(original.relativize(path));if(Files.isDirectory(path))Files.createDirectories(target);else Files.copy(path,target);}}
+        Path commandsFile=copy.resolve("config/commands/procurement.json");var commandsNode=json.readTree(commandsFile.toFile());
+        int changed=0;for(var command:commandsNode) if(SYNC.equals(command.path("code").asText())) {
+            var policies=(ArrayNode)command.path("handlerParams").path("procurementSourceEligibilityPolicies");assertTrue(policies.isEmpty());
+            policies.add(json.valueToTree(Map.of("connectionPid",connection,"accountId",provider,"rules",List.of(Map.of("documentStatus","C","cancelStatus","A","closeStatus","A","eligible",true)))));changed++;
+        }
+        assertEquals(1,changed);json.writeValue(commandsFile.toFile(),commandsNode);importDirectory(copy);
+        assertEquals(tenant,commands.findByCode(SYNC).getTenantId());
+        assertEquals(connection,json.readTree(commands.findByCode(SYNC).getExecutionConfig()).path("handlerParams").path("procurementSourceEligibilityPolicies").get(0).path("connectionPid").asText());
+        // Keep the temporary test manifest as evidence; it contains only synthetic fixture configuration.
+    }
+    @Test void publicConfiguredReadCreatesThenReplaysWithoutDuplicatePgFacts() throws Exception {
+        configurePolicy();var first=call(token,selected("11"));assertEquals(200,first.status());assertEquals("added",first.body().path("data").path("data").path("items").get(0).path("status").asText());
+        var before=snapshot();assertEquals(1,sources().size());assertEquals(2,references().size());
+        var replay=call(token,selected("11"));assertEquals(200,replay.status());assertEquals(before,snapshot());assertTrue(loginCount.get()>0 && queryCount.get()>0);
+    }
+    @Test void publicRoleAndPayloadCannotGrantIntegrationOrSecretCapabilities() throws Exception {
+        configurePolicy();assertEquals(403,call(deniedToken,selected("11")).status());assertEquals(0,loginCount.get());assertEquals(0,queryCount.get());
+        var forged=new LinkedHashMap<>(selected("11"));forged.put("eligible",true);forged.put("tenantSecretRead",true);forged.put("appSecret","client-secret");
+        assertEquals(400,call(token,forged).status());assertEquals(0,loginCount.get());assertTrue(sources().isEmpty());assertEquals(1,references().size());
+    }
+    @Test void publicMissingPolicyAndLaterUnknownCodeRejectWholeReadWithoutWrites() throws Exception {
+        assertEquals(400,call(token,selected("11")).status());assertEquals(0,loginCount.get());assertTrue(sources().isEmpty());
+        configurePolicy();response=combine(row("11",1000,"C"),row("12",1000,"UNKNOWN"));
+        var before=snapshot();assertEquals(400,call(token,selected("11","12")).status());assertEquals(before,snapshot());assertTrue(queryCount.get()>0);
+    }
+
+    @Test void publicCriticalChangeInvalidatesWithPersistedSystemHistoryAndRetainsFormalOffer() throws Exception {
+        configurePolicy();assertEquals(200,call(token,selected("11")).status());
+        var quote=prepareSubmittedQuote();var formal=fixture(SYNC,()->db.query("qo_procurement_submission_common",Map.of("qo_pr_submission_quote_pid",quote.quote())));
+        response=row("11",900,"C");assertEquals(200,call(token,selected("11")).status());
+        fixture(SYNC,()->{assertEquals("invalidated",db.getById("s2p_bid",quote.quote()).get("s2p_bid_status"));
+            assertEquals("SOURCE_CHANGED",db.getById("s2p_bid",quote.quote()).get("qo_pr_quote_return_reason"));
+            assertEquals(formal,db.query("qo_procurement_submission_common",Map.of("qo_pr_submission_quote_pid",quote.quote())));
+            var history=db.query("qo_procurement_history_common",Map.of("qo_pr_history_target_pid",quote.quote()));
+            assertTrue(history.stream().anyMatch(event->"SOURCE_CHANGED".equals(event.get("qo_pr_history_reason")) && "system".equals(event.get("qo_pr_history_actor_pid"))));return null;});
+        var changed=snapshot();assertEquals(200,call(token,selected("11")).status());assertEquals(changed,snapshot());
+    }
+    @Test void publicBatchRollsBackAnActuallyWrittenFirstSourceWhenLaterAllocatedSourceChanges() throws Exception {
+        configurePolicy();assertEquals(200,call(token,selected("11")).status());var quote=prepareSubmittedQuote();
+        fixture("qo_procurement_task_common:allocate",()->new TransactionTemplate(transactions).execute(status->service("ProcurementAllocationService",new Class<?>[]{DataAccessor.class},new Object[]{db},"allocate",new Class<?>[]{String.class,Map.class},task,
+            Map.of("sourceDemands",List.of(Map.of("sourcePid",quote.source(),"sourceRevision",0,"quantity","300")),
+                "allocations",List.of(Map.of("quotePid",quote.quote(),"sourcePid",quote.source(),"submissionPid",quote.submission(),"quantity","300"))))));
+        String allocatedTask=task;
+        task=fixture("qo_procurement_task_common:create",()->pid((Map<?,?>)service("ProcurementTaskService",new Class<?>[]{DataAccessor.class},new Object[]{db},"create",new Class<?>[]{Object.class,String.class,Map.class},tenant,actor,Map.of("title",provider+" second draft inquiry","connectionPid",connection))));
+        assertNotEquals(allocatedTask,task,"Fresh row is admitted into a draft inquiry; duplicate retains original allocated inquiry");
+        var before=snapshot();observed.created.set(null);observed.tenant=tenant;
+        response=combine(row("12",1000,"C"),row("11",900,"C"));var result=call(token,selected("12","11"));
+        assertEquals(400,result.status());assertNotNull(observed.created.get(),"First source must actually be inserted before the later allocation conflict");
+        assertEquals(before,snapshot(),"Actual host transaction must roll back source/reference/quote/history/task and reservations");
+        assertTrue(sources().isEmpty());fixture(SYNC,()->{assertEquals(0,new BigDecimal("300").compareTo(new BigDecimal(db.getById("pr_purchase_request",quote.source()).get("qo_pr_source_reserved_qty").toString())));return null;});
+    }
+    private record Submitted(String source,String quote,String submission){}
+    /** Actual domain lifecycle preparation; no state SQL or fake confirmed allocation. */
+    private Submitted prepareSubmittedQuote() {
+        return fixture("qo_procurement_task_common:dispatch",()->new TransactionTemplate(transactions).execute(status->{
+            String source=pid(sources().getFirst());
+            String category=pid(db.create("pr_spend_category",Map.of("pr_spc_code",provider,"pr_spc_name","Local source category")));
+            String supplier=pid(db.create("pr_supplier_common",Map.of("pr_supplier_code",provider,"pr_supplier_name","Local source supplier","pr_supplier_status","enabled","qo_pr_supplier_account_id",provider)));
+            service("ProcurementCategoryPolicyService",new Class<?>[]{DataAccessor.class,Long.class},new Object[]{db,tenant},"createPolicy",new Class<?>[]{Map.class},Map.of("categoryPid",category,"connectionPid",connection,"supplierPids",List.of(supplier),"defaultSupplierPids",List.of(supplier)));
+            service("ProcurementPlanningService",new Class<?>[]{DataAccessor.class,Clock.class,Object.class},new Object[]{db,Clock.systemUTC(),tenant},"classify",new Class<?>[]{String.class,Long.class,Map.class},task,version(),Map.of("sourcePid",source,"sourceRevision",0,"categoryPid",category));
+            service("ProcurementDispatchService",new Class<?>[]{DataAccessor.class,Clock.class,Long.class},new Object[]{db,Clock.systemUTC(),tenant},"dispatch",new Class<?>[]{String.class,Long.class,Map.class},task,version(),Map.of("supplierPids",List.of(supplier),"cutoffAt","2066-11-15T08:00:00Z"));
+            String quote=pid(db.query("s2p_bid",Map.of("s2p_bid_sourcing_event_id",task)).getFirst());
+            String contact=pid(db.create("pr_supplier_pcba_contact",Map.of("pr_spc_supplier_id",supplier,"pr_spc_name","Local supplier contact","qo_pr_contact_state","active")));
+            db.create("qo_procurement_membership_common",Map.of("qo_pr_membership_key",provider,"qo_pr_membership_user_pid",actor,"qo_pr_membership_supplier_pid",supplier,"qo_pr_membership_contact_pid",contact,"qo_pr_membership_state","active"));
+            var line=Map.<String,Object>of("sourcePid",source,"sourceRevision",0,"unitPrice","1.25","currency","CNY","unit","PCS","taxRate","0.13","taxIncluded",true,"availableQty","600","deliveryDate","2066-12-01");
+            service("ProcurementQuoteService",new Class<?>[]{DataAccessor.class,Clock.class},new Object[]{db,Clock.systemUTC()},"execute",new Class<?>[]{String.class,String.class,String.class,Map.class},"save_draft",quote,actor,Map.of("revision",0,"lines",List.of(line),"paymentTerms","Net 30"));
+            var formal=(Map<?,?>)service("ProcurementQuoteService",new Class<?>[]{DataAccessor.class,Clock.class},new Object[]{db,Clock.systemUTC()},"execute",new Class<?>[]{String.class,String.class,String.class,Map.class},"submit",quote,actor,Map.of("revision",1));
+            return new Submitted(source,quote,formal.get("submissionPid").toString());
+        }));
+    }
+    private Long version(){return new BigDecimal(db.getById("s2p_sourcing_event",task).get("row_version").toString()).longValueExact();}
+
+    private record Result(int status,com.fasterxml.jackson.databind.JsonNode body){}
+    private Result call(String bearer,Map<String,Object> payload) throws Exception {
+        MetaContext.clear();var result=mvc.perform(post("/api/meta/commands/execute/"+SYNC).header("Authorization","Bearer "+bearer)
+            .header("X-Locale","en-US").contentType("application/json").content(json.writeValueAsBytes(Map.of("targetRecordPid",task,"payload",payload)))).andReturn();
+        context();return new Result(result.getResponse().getStatus(),json.readTree(result.getResponse().getContentAsByteArray()));
+    }
+    private String actorToken(Long id,String pid,Long member,String email,List<String> codes) {
+        context();var role=new Role();role.setPid(com.auraboot.framework.common.util.UniqueIdGenerator.generate());role.setCode(provider+"_"+id);role.setName(provider);role.setType("custom");role.setScopeType("tenant");role.setStatus("active");role.setTenantId(tenant);role.setIsDefault(false);role.setIsSystem(false);role.setDeletedFlag(false);role.setPriority(100);role.setCreatedAt(Instant.now());role.setUpdatedAt(Instant.now());role=roles.createRole(role);
+        var permissionIds=new ArrayList<Long>();for(String code:codes){var permission=permissions.findByCode(code);assertNotNull(permission);permissionIds.add(permission.getId());}
+        assertTrue(roles.assignPermissions(role.getId(),permissionIds));roles.setDefaultDataScopeType(role.getId(),"all");assertTrue(userRoles.assignRolesToMember(member,List.of(role.getId()),tenant,userId));
+        MetaContext.setContext(tenant,id,pid,provider);MetaContext.setMemberId(member);
+        var request=new AuthenticationRequest();request.setEmail(email);request.setPassword(PASSWORD);var authenticated=authentication.authenticate(request);
+        assertEquals(tenant,authenticated.getTenantId());assertEquals(id,authenticated.getUserId());assertNotNull(authenticated.getJwt());return authenticated.getJwt();
+    }
+    private void context(){MetaContext.setContext(tenant,userId,actor,provider);MetaContext.setMemberId(memberId);}
+    /** Preparation/read observation only; the public tested command never runs inside this synthetic permit. */
+    private <T>T fixture(String code,Supplier<T> work){context();return MetaContext.runWithCommandPermitPlan("ALL",userId,null,null,()->MetaContext.runWithAuthorizedCommandCode(code,work));}
+    private Object service(String name,Class<?>[] constructor,Object[] arguments,String method,Class<?>[] types,Object... values) {
+        try{Class<?> type=extensions.getCommandHandler(SYNC).orElseThrow().getClass().getClassLoader().loadClass("com.auraboot.quote.engine.procurement."+name);return type.getMethod(method,types).invoke(type.getConstructor(constructor).newInstance(arguments),values);}
+        catch(InvocationTargetException error){throw error.getCause() instanceof RuntimeException runtime?runtime:new IllegalStateException(error.getCause());}
+        catch(ReflectiveOperationException error){throw new IllegalStateException(error);}
+    }
+    private List<Map<String,Object>> sources(){return fixture(SYNC,()->db.query("pr_purchase_request",Map.of("qo_pr_source_task_pid",task)));}
+    private List<Map<String,Object>> references(){return fixture(SYNC,()->db.query("customer_pcba_int_external_ref",Map.of("customer_pcba_ref_instance_key",connection)));}
+    private Map<String,Object> snapshot(){return fixture(SYNC,()->Map.of("tasks",db.query("s2p_sourcing_event",Map.of()),"sources",db.query("pr_purchase_request",Map.of()),"references",references(),"quotes",db.query("s2p_bid",Map.of()),"history",db.query("qo_procurement_history_common",Map.of())));}
+    private static String pid(Map<?,?> row){Object value=row.containsKey("recordPid")?row.get("recordPid"):row.get("pid");assertNotNull(value);return value.toString();}
+    private static String required(String name){String value=System.getenv(name);assertNotNull(value,name+" required");assertFalse(value.isBlank());return value;}
+    private static Map<String,Object> selected(String... entries){return Map.of("selected",Arrays.stream(entries).map(entry->Map.of("requisitionId","100","entryId",entry)).toList(),"pageSize",20);}
+    private static String row(String entry,int remaining,String status){return "[[100,\"LOCAL-REQ\","+entry+",900,\"LOCAL-MATERIAL\",\"Local material\",\"local\",1500,1400,400,300,"+remaining+",\"PCS\",\"2066-12-01T00:00:00\",\"LOCAL-ORG\",\""+status+"\",\"A\",\"A\"]]";}
+    private static String combine(String first,String second){return first.substring(0,first.length()-1)+","+second.substring(1);}
+}
