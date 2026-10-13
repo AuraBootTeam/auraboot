@@ -56,6 +56,10 @@ final class ImportedNotificationMetadataValidator {
         type(result, b.source().entity().modelCode(), b.source().occurredAtField(), DataType.DATETIME.getCode());
         type(result, b.source().entity().modelCode(), b.source().targets().listField(), DataType.JSON.getCode());
         type(result, b.source().targets().entity().modelCode(), b.source().targets().ownerField(), DataType.STRING.getCode());
+        if (b.source().targets().deadline() != null) {
+            type(result, b.source().targets().entity().modelCode(),
+                    b.source().targets().deadline().fieldCode(), DataType.DATETIME.getCode());
+        }
         for (String field : List.of(b.principal().principalField(), b.principal().ownerField(), b.principal().verificationField())) {
             type(result, b.principal().entity().modelCode(), field, DataType.STRING.getCode());
         }

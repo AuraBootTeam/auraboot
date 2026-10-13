@@ -4,6 +4,7 @@ import com.auraboot.framework.notification.service.NotificationDeliveryPlanResol
 import com.auraboot.framework.plugin.extension.DataPage;
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.annotation.PostConstruct;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -26,15 +27,21 @@ public final class RegisteredSourcePlanResolver implements NotificationDeliveryP
     private final HostSourceBindingProperties properties;
     private final SourceBindingReader reader;
     private final ImportedNotificationMetadataValidator validator;
+    private final Clock clock;
     private List<SourceBindingTypes.Binding> registered = List.of();
     @org
     .springframework.beans.factory.annotation.Autowired RegisteredSourcePlanResolver(HostSourceBindingProperties p, ImportedNotificationMetadataReader r, ImportedNotificationMetadataValidator v) {
         this(p,(SourceBindingReader) r, v);
     }
     RegisteredSourcePlanResolver(HostSourceBindingProperties p, SourceBindingReader r, ImportedNotificationMetadataValidator v) {
+        this(p, r, v, Clock.systemUTC());
+    }
+    RegisteredSourcePlanResolver(HostSourceBindingProperties p, SourceBindingReader r,
+                                 ImportedNotificationMetadataValidator v, Clock clock) {
         properties = p;
         reader = r;
         validator = v;
+        this.clock = Objects.requireNonNull(clock);
     }
     @PostConstruct
     void initialize() {
@@ -95,6 +102,15 @@ public final class RegisteredSourcePlanResolver implements NotificationDeliveryP
             SourceBindingTypes.require(owner.equals(string(verified, b.verification().ownerField())));
             proofs.add(link);
             proofs.add(verified);
+        }
+        // The host clock is checked after resolving all facts, both for enqueue and delayed consume.
+        // Time itself is not part of the immutable envelope configuration hash.
+        var deadline = b.source().targets().deadline();
+        if (deadline != null) {
+            Instant now = clock.instant();
+            for (Map<String, Object> row : targets) {
+                SourceBindingTypes.require(instant(row.get(deadline.fieldCode())).isAfter(now));
+            }
         }
         JsonNode semanticRule = rule.deepCopy();
         ((com.fasterxml.jackson.databind.node.ObjectNode) semanticRule).remove(List.of("send_count", "last_evaluated_at", "created_at", "updated_at"));

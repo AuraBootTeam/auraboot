@@ -30,6 +30,12 @@ import com.auraboot.framework.plugin.extension.integration.ReliableIntegrationAc
 import com.fasterxml.jackson.databind.JsonNode;
 import java.lang.reflect.Proxy;
 import java.time.Instant;
+import java.time.Clock;
+import java.time.ZoneId;
+import java.util.concurrent.atomic.AtomicReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
@@ -387,6 +393,119 @@ class RegisteredSourcePlanResolverTest {
         assertThat(optInCalls).hasValue(0);
         assertThat(f.reads).isZero();
         verify(pipeline.notifications, never()).insert(any(Notification.class));
+    }
+    @Test
+    void approvedFutureQuoteDeadlineAllowsStablePlansBeforeExpiry() throws Exception {
+        var clock = deadlineFixture("2026-10-13T04:00:00Z");
+        var before = f.resolver.plan(f.binding, "src");
+        clock.now.set(Instant.parse("2026-10-13T03:30:00Z"));
+        assertThat(f.resolver.plan(f.binding, "src")).isEqualTo(before).hasSize(2);
+    }
+    @Test
+    void cutoffEqualBeforeMissingOrMalformedRejectsBeforeAnyQueue() throws Exception {
+        deadlineFixture("2026-10-13T04:00:00Z");
+        for (Object cutoff : List.of("2026-10-13T03:00:00Z", "2026-10-13T02:00:00Z",
+                "2026-10-13T04:00:00", "invalid")) {
+            f.records.get("target/t1").put("cutoff", cutoff);
+            assertThatThrownBy(() -> f.resolver.plan(f.binding, "src")).isInstanceOf(RuntimeException.class);
+        }
+        f.records.get("target/t1").remove("cutoff");
+        assertThatThrownBy(() -> f.resolver.plan(f.binding, "src")).isInstanceOf(IllegalArgumentException.class);
+        f.records.get("target/t1").put("cutoff", null);
+        assertThatThrownBy(() -> f.resolver.plan(f.binding, "src")).isInstanceOf(IllegalArgumentException.class);
+    }
+    @Test
+    void finalExpiredTargetPreventsFirstUserEnqueue() throws Exception {
+        deadlineFixture("2026-10-13T04:00:00Z");
+        f.put("target", "t2", Map.of("owner", "o1", "state", "open", "cutoff", "2026-10-13T03:00:00Z"));
+        f.records.get("source/src").put("targets", List.of("t1", "t2"));
+        var pipeline = new ComposedDelivery();
+        assertThatThrownBy(() -> pipeline.queue(SourceBindingCanonical.reference("notice", "src", 1)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(pipeline.queued).isEmpty();
+        verify(pipeline.notifications, never()).insert(any(Notification.class));
+    }
+    @Test
+    void delayedConsumeRechecksExpiryAndRollsBackReceiptBeforeInbox() throws Exception {
+        var clock = deadlineFixture("2026-10-13T04:00:00Z");
+        var pipeline = new ComposedDelivery();
+        var event = pipeline.queue(SourceBindingCanonical.reference("notice", "src", 1));
+        clock.now.set(Instant.parse("2026-10-13T04:00:00Z"));
+        assertThatThrownBy(() -> pipeline.deliver(event, pipeline.host)).isInstanceOf(IllegalArgumentException.class);
+        verify(pipeline.transactions).rollback(any());
+        verify(pipeline.receipts, never()).markReceiptApplied(anyLong(), anyString(), anyString(), anyString());
+        verify(pipeline.notifications, never()).insert(any(Notification.class));
+        assertThat(pipeline.queued).containsExactly(event);
+    }
+    @Test
+    void changedFutureDeadlineCannotConsumeOldEnvelope() throws Exception {
+        deadlineFixture("2026-10-13T04:00:00Z");
+        var pipeline = new ComposedDelivery();
+        var event = pipeline.queue(SourceBindingCanonical.reference("notice", "src", 1));
+        f.records.get("target/t1").put("cutoff", "2026-10-13T05:00:00Z");
+        assertThatThrownBy(() -> pipeline.deliver(event, pipeline.host))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("NOTIFICATION_ENVELOPE_CONFLICT");
+        verify(pipeline.notifications, never()).insert(any(Notification.class));
+    }
+    @Test
+    void deadlineRequiresBoundPhysicalDatetimeMetadataAndExplicitRelation() throws Exception {
+        deadlineFixture("2026-10-13T04:00:00Z");
+        JsonNode graph = f.graphs.get("target");
+        for (JsonNode field : graph.path("fields")) {
+            if ("cutoff".equals(field.path("code").asText())) ((ObjectNode) field).put("data_type", "string");
+        }
+        f.reapprove();
+        assertThatThrownBy(() -> f.resolver.plan(f.binding, "src")).isInstanceOf(IllegalArgumentException.class);
+        for (String descriptor : List.of("{}", "{\"fieldCode\":\"cutoff\"}",
+                "{\"fieldCode\":\"cutoff\",\"relation\":\"BEFORE_HOST_NOW\"}")) {
+            assertThatThrownBy(() -> deadlineTarget(descriptor)).isInstanceOf(Exception.class);
+        }
+    }
+    @Test
+    void absentDeadlineKeepsLegacyCanonicalBytesAndNonQuoteBehavior() {
+        Target target = f.binding.source().targets();
+        var oldShape = SourceBindingCanonical.tree(Map.of("listField", target.listField(),
+                "entity", target.entity(), "ownerField", target.ownerField()));
+        assertThat(SourceBindingCanonical.tree(target)).isEqualTo(oldShape);
+        assertThat(SourceBindingCanonical.hash(target)).isEqualTo(SourceBindingCanonical.hash(oldShape));
+        f.records.get("target/t1").put("cutoff", "already-expired-unconfigured-field");
+        assertThat(f.resolver.plan(f.binding, "src")).hasSize(2);
+    }
+    private MutableDeadlineClock deadlineFixture(String cutoff) throws Exception {
+        ObjectNode graph = (ObjectNode) f.graphs.get("target");
+        long modelId = graph.path("model").path("id").longValue();
+        ((ArrayNode) graph.path("fields")).add(SourceBindingCanonical.tree(Map.of(
+                "tenant_id", 1, "id", 9999, "pid", "cutoff-field", "code", "cutoff",
+                "plugin_pid", "plugin", "is_current", true, "deleted_flag", false,
+                "data_type", "datetime", "feature", Map.of())));
+        ((ArrayNode) graph.path("bindings")).add(SourceBindingCanonical.tree(Map.of(
+                "tenant_id", 1, "model_id", modelId, "field_id", 9999,
+                "pid", "cutoff-binding", "alias_code", "cutoff", "deleted_flag", false)));
+        ((ArrayNode) graph.path("tracking")).add(SourceBindingCanonical.tree(Map.of(
+                "tenant_id", 1, "plugin_pid", "plugin", "resource_pid", "cutoff-binding",
+                "resource_type", "model_field_binding")));
+        Binding b = f.binding;
+        Source source = b.source();
+        Target target = deadlineTarget("{\"fieldCode\":\"cutoff\",\"relation\":\"AFTER_HOST_NOW\"}");
+        f.binding = new Binding(b.schemaVersion(), b.code(), b.tenantId(), b.approvals(),
+                new Source(source.entity(), source.identityField(), source.ownerField(), source.occurredAtField(), target),
+                b.owner(), b.principal(), b.verification(), b.ruleId(), b.templateCode(), b.variableToSourceField());
+        f.reapprove();
+        f.records.get("target/t1").put("cutoff", cutoff);
+        var clock = new MutableDeadlineClock();
+        ReflectionTestUtils.setField(f.resolver, "clock", clock);
+        return clock;
+    }
+    private Target deadlineTarget(String descriptor) throws Exception {
+        ObjectNode target = (ObjectNode) SourceBindingCanonical.tree(f.binding.source().targets());
+        target.set("deadline", SourceBindingCanonical.parse(descriptor));
+        return new ObjectMapper().treeToValue(target, Target.class);
+    }
+    private static final class MutableDeadlineClock extends Clock {
+        final AtomicReference<Instant> now = new AtomicReference<>(Instant.parse("2026-10-13T03:00:00Z"));
+        @Override public ZoneId getZone() { return ZoneId.of("UTC"); }
+        @Override public Clock withZone(ZoneId zone) { return Clock.fixed(now.get(), zone); }
+        @Override public Instant instant() { return now.get(); }
     }
     /** Actual accessor/writer/executor composition with hermetic DB/transaction dependencies. */
     private final class ComposedDelivery {

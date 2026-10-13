@@ -1,5 +1,6 @@
 package com.auraboot.framework.notification.sourcebinding;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -76,7 +77,21 @@ public final class SourceBindingTypes {
             equals = exact(equals);
         }
     }
-    public record Target(String listField, Entity entity, String ownerField) {
+    /** Fixed host-clock relation; enabled only by an explicitly approved target descriptor. */
+    public enum DeadlineRelation {
+        AFTER_HOST_NOW
+    }
+    public record Deadline(String fieldCode, DeadlineRelation relation) {
+        public Deadline {
+            code(fieldCode);
+            require(relation == DeadlineRelation.AFTER_HOST_NOW);
+        }
+    }
+    public record Target(String listField, Entity entity, String ownerField,
+                         @JsonInclude(JsonInclude.Include.NON_NULL) Deadline deadline) {
+        public Target(String listField, Entity entity, String ownerField) {
+            this(listField, entity, ownerField, null);
+        }
         public Target {
             code(listField);
             Objects.requireNonNull(entity);
