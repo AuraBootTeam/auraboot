@@ -174,6 +174,7 @@ if [[ -n "$ACCEPTANCE_MIGRATIONS_REL" ]]; then
   FLYWAY_RUNTIME_LOCATIONS+=,filesystem:/flyway/acceptance
 fi
 CORPUS_PREFLIGHT_SPEC="${AURA_PRODUCT_CORPUS_PREFLIGHT_SPEC:-}"
+CORPUS_PREFLIGHT_SETUP_SPEC="${AURA_PRODUCT_CORPUS_PREFLIGHT_SETUP_SPEC:-}"
 CORPUS_PREFLIGHT_COUNT="${AURA_PRODUCT_CORPUS_PREFLIGHT_COUNT:-}"
 if [[ -n "$CORPUS_PREFLIGHT_SPEC" ]]; then
   [[ "$CORPUS_PREFLIGHT_COUNT" =~ ^[1-9][0-9]*$ ]] || fatal 'positive corpus preflight count required'
@@ -183,6 +184,16 @@ if [[ -n "$CORPUS_PREFLIGHT_SPEC" ]]; then
   [[ "$(git -C "$PRODUCT_ROOT" cat-file -t "$PRODUCT_SHA:$CORPUS_PREFLIGHT_SPEC" 2>/dev/null || true)" == blob ]] \
     || fatal 'corpus preflight spec must be tracked at the exact product commit'
 fi
+CORPUS_PREFLIGHT_ARGS=()
+if [[ -n "$CORPUS_PREFLIGHT_SETUP_SPEC" ]]; then
+  [[ -n "$CORPUS_PREFLIGHT_SPEC" && "$CORPUS_PREFLIGHT_SETUP_SPEC" != /* \
+    && "$CORPUS_PREFLIGHT_SETUP_SPEC" =~ ^[A-Za-z0-9._/-]+$ \
+    && "/$CORPUS_PREFLIGHT_SETUP_SPEC/" != *'/../'* && "/$CORPUS_PREFLIGHT_SETUP_SPEC/" != *'/./'* \
+    && "$(git -C "$PRODUCT_ROOT" cat-file -t "$PRODUCT_SHA:$CORPUS_PREFLIGHT_SETUP_SPEC" 2>/dev/null || true)" == blob ]] \
+    || fatal 'corpus preflight setup must be one safe exact-commit tracked spec'
+  CORPUS_PREFLIGHT_ARGS+=("$CORPUS_PREFLIGHT_SETUP_SPEC")
+fi
+CORPUS_PREFLIGHT_ARGS+=("$CORPUS_PREFLIGHT_SPEC")
 
 ARTIFACTS="$(cd "$AURA_REGRESSION_ARTIFACTS" && pwd)"
 mkdir -p "$ARTIFACTS/logs" "$ARTIFACTS/e2e"
@@ -550,7 +561,7 @@ if [[ -n "$CORPUS_CONFIG" ]]; then
     || fail 'business corpus collection failed'
   if [[ -n "$CORPUS_PREFLIGHT_SPEC" ]]; then
     env "${CORPUS_ENV[@]}" PLAYWRIGHT_JSON_OUTPUT_FILE="$ARTIFACTS/corpus/preflight-results.json" \
-      pnpm --dir "$PRODUCT_ROOT" exec playwright test --config "$CORPUS_CONFIG" "$CORPUS_PREFLIGHT_SPEC" \
+      pnpm --dir "$PRODUCT_ROOT" exec playwright test --config "$CORPUS_CONFIG" "${CORPUS_PREFLIGHT_ARGS[@]}" \
       --reporter=line,json --output "$ARTIFACTS/corpus/preflight-artifacts" \
       >"$ARTIFACTS/logs/corpus-preflight.log" 2>&1 || fail 'corpus dependency preflight failed before full business execution'
     node - "$ARTIFACTS/corpus/preflight-results.json" "$CORPUS_PREFLIGHT_COUNT" <<'NODE'
