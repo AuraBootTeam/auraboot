@@ -120,7 +120,7 @@ const sessionStorage = createCookieSessionStorage({
 
 // A supplied acceptance plan is materialized before any browser capture, including all unresolved rows.
 test.beforeAll(async () => {
-  if (UI_MUTATION && !['scope-label-clipping', 'publication-overflow', 'intro-word-break', 'publication-title-locale', 'query-compatibility-feedback', 'query-confirmation-stale', 'major-grant-alias', 'resource-compatibility-feedback', 'resource-confirmation-stale', 'resource-catalog-feedback', 'resource-validation-feedback', 'resource-catalog-empty', 'resource-publish-conflict', 'sdk-ui-projection', 'protocol-visible-leak'].includes(UI_MUTATION)) throw new Error('Unsupported Open Platform UI mutation');
+  if (UI_MUTATION && !['scope-label-clipping', 'publication-overflow', 'intro-word-break', 'publication-title-locale', 'query-compatibility-feedback', 'query-confirmation-stale', 'major-grant-alias', 'resource-compatibility-feedback', 'resource-confirmation-stale', 'resource-catalog-feedback', 'resource-validation-feedback', 'resource-catalog-empty', 'resource-publish-conflict', 'sdk-ui-projection', 'protocol-visible-leak', 'editor-tab-order'].includes(UI_MUTATION)) throw new Error('Unsupported Open Platform UI mutation');
   if (['intro-word-break', 'publication-title-locale'].includes(UI_MUTATION || '') && publicationLocale !== 'en-US') throw new Error('English locale mutation requires en-US');
   if (!process.env.AURA_UI_ACCEPTANCE_MATRIX) return;
   if (!process.env.AURA_EVIDENCE_ROOT) throw new Error('UI acceptance requires a registered evidence round');
@@ -237,6 +237,13 @@ test.describe('Dynamic resource publication journey', () => {
     expect(Array.isArray(realCatalog.data)).toBe(true);
     expect(realCatalog.data.some((entry: { code: string }) => entry.code === resourceCode)).toBe(false);
     await page.getByRole('button', { name: publicationText("新建公共资源"), exact: true }).click();
+    await verifyEditorTabOrder(page, [
+      [page.getByLabel(publicationText("公共资源地址"), { exact: true }), publicationText("公共资源地址")],
+      [page.getByLabel(publicationText("合同版本"), { exact: true }), publicationText("合同版本")],
+      [page.getByLabel(publicationText("查找业务模型"), { exact: true }), publicationText("查找业务模型")],
+      [page.getByRole('button', { name: publicationText("查找"), exact: true }), publicationText("查找")],
+      [page.getByLabel(publicationText("业务模型"), { exact: true }), publicationText("业务模型")],
+    ], 'publication-source-keyboard');
     await page.getByLabel(publicationText("公共资源地址"), { exact: true }).fill(resourceCode);
     await page.getByLabel(publicationText("查找业务模型"), { exact: true }).fill(modelName);
     await page.getByRole('button', { name: publicationText("查找"), exact: true }).click();
@@ -291,6 +298,7 @@ test.describe('Dynamic resource publication journey', () => {
     if (UI_MUTATION === 'resource-validation-feedback') await invalidScopeRegion.getByRole('alert').evaluate(element => { element.textContent = 'Please fill out this field.'; });
     await expect(invalidScopeRegion.getByRole('alert')).toHaveText(requiredMessage);
     await expect(requiredScope).toHaveAttribute('aria-describedby', await invalidScopeRegion.getByRole('alert').getAttribute('id') || '');
+    await expect(requiredScope).toHaveAccessibleDescription(requiredMessage);
     await invalidScopeRegion.evaluate(element => element.scrollIntoView({ block: 'center' }));
     await expect(invalidScopeRegion).toBeInViewport({ ratio: 1 }); await snapshot('publication-invalid');
     await invalidScopeRegion.screenshot({ path: path.join(screenshotRoot, 'publication-invalid-scope-region.png') });
@@ -716,6 +724,13 @@ test.describe('Dynamic query publication journey', () => {
     expect(Array.isArray(realQueryCatalog.data)).toBe(true);
     expect(realQueryCatalog.data.some((entry: { code: string }) => entry.code === publicCode)).toBe(false);
     await page.getByRole('button', { name: queryText("新建公共查询"), exact: true }).click();
+    await verifyEditorTabOrder(page, [
+      [page.getByLabel(queryText("公共查询地址"), { exact: true }), queryText("公共查询地址")],
+      [page.getByLabel(queryText("合同版本"), { exact: true }), queryText("合同版本")],
+      [page.getByLabel(queryText("查找命名查询"), { exact: true }), queryText("查找命名查询")],
+      [page.getByRole('button', { name: queryText("查找"), exact: true }), queryText("查找")],
+      [page.getByLabel(queryText("命名查询来源"), { exact: true }), queryText("命名查询来源")],
+    ], 'query-source-keyboard');
     await page.getByLabel(queryText("公共查询地址"), { exact: true }).fill(publicCode);
     await page.getByLabel(queryText("查找命名查询"), { exact: true }).fill(queryName); await page.getByRole('button', { name: queryText("查找"), exact: true }).click();
     await expect(page.getByLabel(queryText("命名查询来源"), { exact: true }).getByRole('option', { name: queryName, exact: true })).toHaveCount(1);
@@ -1139,6 +1154,35 @@ async function authenticate(page: import('@playwright/test').Page, locale = 'zh-
   ]);
   await page.addInitScript(value => localStorage.setItem('locale', value), locale);
 
+}
+
+async function verifyEditorTabOrder(page: import('@playwright/test').Page,
+  controls: [import('@playwright/test').Locator, string][], id: string) {
+  // Anchor once, then let the browser choose every forward and reverse tab stop.
+  for (const [control, name] of controls) {
+    await expect(control).toBeVisible();
+    await expect(control).toBeEnabled();
+    await expect(control).toHaveAccessibleName(name);
+  }
+  if (UI_MUTATION === 'editor-tab-order') {
+    await controls[1][0].evaluate(element => element.setAttribute('tabindex', '-1'));
+  }
+  await controls[0][0].focus();
+  for (let index = 0; index < controls.length; index++) {
+    if (index) await page.keyboard.press('Tab');
+    await expect(controls[index][0]).toBeFocused();
+  }
+  for (let index = controls.length - 2; index >= 0; index--) {
+    await page.keyboard.press('Shift+Tab');
+    await expect(controls[index][0]).toBeFocused();
+  }
+  const root = path.join(process.env.AURA_EVIDENCE_ROOT || '/tmp', 'ui-publication-r1');
+  await mkdir(root, { recursive: true });
+  await writeFile(path.join(root, `${id}.json`), JSON.stringify({
+    scope: 'Browser accessible names and anchored bidirectional native tab traversal; native screen reader not exercised',
+    controls: controls.map(([, name]) => name), forwardTransitions: controls.length - 1,
+    reverseTransitions: controls.length - 1,
+  }, null, 2));
 }
 
 async function activateWithEnter(control: import('@playwright/test').Locator) {
