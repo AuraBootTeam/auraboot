@@ -18,7 +18,7 @@ import path from 'node:path';
 import type { Page } from '@playwright/test';
 
 import { test, expect } from '../../fixtures';
-import { queryDynamicRecords } from './quote-e2e-helpers';
+import { cleanupTrackedFixtureRows, fixtureJournal, queryDynamicRecords } from './quote-e2e-helpers';
 
 const LIST = '/p/bom_material_master';
 
@@ -59,6 +59,7 @@ async function openMaterialForEdit(page: Page, pid: string, code: string): Promi
 
 /** Seeds through the command layer: the page has no create entry point. */
 async function seedMaterial(page: Page, code: string): Promise<string> {
+  const journal = fixtureJournal(page);
   const created = await page.request.post('/api/meta/commands/execute/bom:create_material', {
     data: {
       payload: {
@@ -77,6 +78,7 @@ async function seedMaterial(page: Page, code: string): Promise<string> {
   expect(created.status(), `seed material ${code} created`).toBe(200);
   const row = await materialByCode(page, code);
   expect(row, `seeded material ${code} is listed by the API`).toBeTruthy();
+  journal.track({ model: 'bom_material_master', pid: String(row.pid) });
   return String(row.pid || '');
 }
 
@@ -94,6 +96,10 @@ test.describe('BOM material library page @smoke', () => {
   test.setTimeout(180_000);
 
   const uid = String(Date.now()).slice(-7);
+
+  test.afterEach(async ({ page }) => {
+    await cleanupTrackedFixtureRows(page);
+  });
 
   test('the library page lists materials and offers the row actions the DSL declares', async ({
     page,

@@ -16,12 +16,19 @@ import {
   expectCommandDenied,
   dynamicCreate,
   cleanupRows,
+  fixtureJournal,
+  cleanupTrackedFixtureRows,
 } from './quote-e2e-helpers';
 
 test.use({ locale: 'zh-CN' });
 
+test.afterEach(async ({ page }) => {
+  await cleanupTrackedFixtureRows(page);
+});
+
 /** Creates an independent, recallable fixture through the production material writer. */
 async function createRecallableMaterial(page: Page, code: string, category: string, spec: string, packageCode: string, brand = '') {
+  const journal = fixtureJournal(page);
   const result = await executeCommand(page, 'bom:create_material', {
     bom_mm_material_code: code,
     bom_mm_material_name: category === 'resistor' ? '贴片电阻' : '贴片电容',
@@ -33,6 +40,7 @@ async function createRecallableMaterial(page: Page, code: string, category: stri
     { fieldName: 'bom_mm_material_code', operator: 'EQ', value: code },
   ]);
   expect(rows).toHaveLength(1);
+  journal.track({ model: 'bom_material_master', pid: String(rows[0].pid) });
   expect(String(rows[0].bom_mm_norm_text ?? '')).not.toBe('');
   expect(JSON.parse(String(rows[0].bom_mm_attributes_json))).toEqual(expect.objectContaining({ package: packageCode }));
   return rows[0];
