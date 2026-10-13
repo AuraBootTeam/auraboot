@@ -164,6 +164,7 @@ public final class RegisteredSourcePlanResolver implements NotificationDeliveryP
                 SourceBindingTypes.require(parentPid.equals(string(row, child.parentField())));
                 BigDecimal ordered = exactDecimal(row.get(child.orderedField()));
                 BigDecimal submitted = exactDecimal(row.get(child.submittedField()));
+                SourceBindingTypes.require(submitted.compareTo(ordered) <= 0);
                 remaining |= ordered.compareTo(submitted) > 0;
             }
             if (seen.size() == total) break;

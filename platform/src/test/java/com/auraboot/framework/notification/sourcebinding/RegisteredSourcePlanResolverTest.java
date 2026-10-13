@@ -534,7 +534,8 @@ class RegisteredSourcePlanResolverTest {
         f.put("child", "d002", Map.of("state", "active", "parent", "t1", "ordered", "10", "submitted", "10"));
         var clean = new HashMap<>(f.records.get("child/d002"));
         for (var bad : List.of(Map.of("parent", (Object) "foreign"), Map.of("tenant_id", (Object) 2L),
-                Map.of("ordered", (Object) 1.0d), Map.of("submitted", (Object) "NaN"))) {
+                Map.of("ordered", (Object) 1.0d), Map.of("submitted", (Object) "NaN"),
+                Map.of("submitted", (Object) "11"))) {
             f.records.put("child/d002", new HashMap<>(clean));
             f.records.get("child/d002").putAll(bad);
             // Keep the actual scanned PID present, then change the independent locked record proof.
