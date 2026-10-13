@@ -1023,6 +1023,20 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         }
 
         boolean exists = checkCommandExists(tenantId, dto.getCode());
+        if (!exists) {
+            // A previous uninstall leaves the command soft-deleted; the idempotent
+            // insert (ON CONFLICT (tenant_id, code, version) DO NOTHING) would then
+            // silently skip the insert and the auto-publish would fail on the
+            // never-persisted pid. Resurrect the retired row so the update path
+            // refreshes and republishes it in place.
+            String resurrectedPid = resurrectSoftDeleted("ab_command_definition", "code",
+                    dto.getCode(), tenantId, pluginPid, dto.getEffectiveExtension());
+            if (resurrectedPid != null) {
+                log.info("Resurrected soft-deleted command {} as {} for plugin reimport",
+                        logSafe(dto.getCode()), logSafe(resurrectedPid));
+                exists = checkCommandExists(tenantId, dto.getCode());
+            }
+        }
 
         if (exists && conflictStrategy == ImportRequest.ConflictStrategy.ERROR) {
             throw new PluginException("Command already exists: " + dto.getCode());
