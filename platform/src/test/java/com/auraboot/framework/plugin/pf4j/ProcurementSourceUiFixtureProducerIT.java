@@ -1,0 +1,572 @@
+package com.auraboot.framework.plugin.pf4j;
+
+import com.auraboot.framework.application.TestApplication;
+import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.auth.dto.AuthenticationRequest;
+import com.auraboot.framework.cloudconfig.dto.CloudConfigSaveRequest;
+import com.auraboot.framework.meta.dto.CommandExecuteRequest;
+import com.auraboot.framework.meta.service.CommandExecutor;
+import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.notification.sourcebinding.ProductQuoteNativeInitialization;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import java.math.BigDecimal;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+
+/** Synthetic retained prerequisites. Public browser journeys are separately required. */
+@SpringBootTest(classes = TestApplication.class, properties = {
+        "spring.datasource.url=${TEST_DATABASE_URL}", "spring.data.redis.database=${TEST_REDIS_DATABASE}",
+        "aura.plugins.dir=${PROCUREMENT_SOURCE_PLUGIN_DIR}",
+        "security.field-encryption.key=${PROCUREMENT_SOURCE_UI_FIELD_ENCRYPTION_KEY}",
+        "mybatis-plus.configuration.log-impl=org.apache.ibatis.logging.slf4j.Slf4jImpl",
+        "logging.level.com.auraboot.framework=INFO", "logging.level.org.mybatis=INFO",
+        "logging.level.org.springframework.security=WARN", "logging.level.org.springframework.cache=WARN"})
+@ActiveProfiles("integration-test")
+@Import(ProcurementPublicSourceNativeFixture.IsolatedScheduling.class)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@EnabledIfEnvironmentVariable(named = "PROCUREMENT_SOURCE_UI_FIXTURE_IT", matches = "true")
+class ProcurementSourceUiFixtureProducerIT extends ProcurementPublicSourceNativeFixture {
+    static final String CANDIDATES = "qo_procurement_task_common:source_candidates";
+    static final List<String> FIELDS = List.of("FID", "FBillNo", "FEntity_FEntryID", "FMaterialId",
+            "FMaterialId.FNumber", "FMaterialId.FName", "FMaterialId.FSpecification", "FReqQty", "FApproveQty",
+            "FOrderJoinQty", "FOrderQty", "FRemainQty", "FUnitID.FNumber", "FArrivalDate",
+            "FPurchaseOrgId.FNumber", "FDocumentStatus", "FCancelStatus", "FCloseStatus");
+    static final List<String> BUYER_PERMISSIONS = buyerPermissions();
+    static final List<String> MAKER_PERMISSIONS = makerPermissions();
+    @Autowired CommandExecutor actualCommands;
+    @Autowired MetaModelService actualMetadata;
+    @Autowired com.auraboot.framework.common.crypto.FieldEncryptionService actualEncryption;
+    private JsonNode input;
+    private String encryptionMode;
+    private String controlToken;
+    private URI controlBase;
+    private String makerToken;
+    private String buyerToken;
+    private String buyerPid;
+    private Map<String, Object> buyerIdentity;
+    private Map<String, Object> makerIdentity;
+    private final List<Map<String, Object>> stages = new ArrayList<>();
+    private final List<Map<String, Object>> publicActions = new ArrayList<>();
+    private final List<Map<String, Object>> initializationActions = new ArrayList<>();
+    private final List<Map<String, Object>> policies = new ArrayList<>();
+    private String activeStage = "admission";
+
+    static List<String> buyerPermissions() {
+        var permissions = new ArrayList<>(sourceActorPermissions(true));
+        permissions.addAll(List.of("qo.procurement.manage", "page.page.read", "model.pr_spend_category.read",
+                "model.pr_supplier_common.read", "model.qo_procurement_history_common.read"));
+        return List.copyOf(permissions);
+    }
+
+    static List<String> makerPermissions() {
+        var permissions = new ArrayList<>(BUYER_PERMISSIONS);
+        permissions.addAll(List.of("model.qo_procurement_submission_common.read",
+                "model.qo_procurement_submission_line_common.read", "model.qo_procurement_execution_common.read",
+                "model.qo_procurement_category_policy_common.read"));
+        return List.copyOf(permissions);
+    }
+
+    @Override protected void prepareEvidence(org.junit.jupiter.api.TestInfo test) throws Exception {
+        super.prepareEvidence(test);
+        Path sourceUiInput = Path.of(required("PROCUREMENT_SOURCE_UI_INPUT")).toRealPath();
+        assertEquals(required("PROCUREMENT_SOURCE_UI_INPUT_SHA256"), sha(sourceUiInput));
+        input = json.readTree(sourceUiInput.toFile());
+        assertEquals("procurement-source-ui-input-v1", input.path("kind").asText());
+        assertEquals(1, input.path("schemaVersion").asInt(-1));
+        assertEquals(ProcurementOrderUiFixtureProducerIT.canonicalSources(input.path("sourceSet")),
+                ProcurementOrderUiFixtureProducerIT.canonicalSources(json.readTree(caseEvidence.resolve("readiness.json").toFile()).path("sourceCommits")));
+        Path app = Path.of(input.path("applicationCoreRoot").asText()).toRealPath();
+        assertEquals(input.path("applicationCoreCommit").asText(), gitRead(app, "rev-parse", "HEAD").strip());
+        assertEquals("", gitRead(app, "status", "--porcelain").strip());
+        assertEquals("", gitRead(app, "diff", "ec8c370fbe2808f3d3e4c219a226d541d01087aa", "HEAD", "--", "platform/src/main").strip());
+        Path loaded = Path.of(getClass().getProtectionDomain().getCodeSource().getLocation().toURI()).toRealPath();
+        assertEquals(app.resolve("platform/build/classes/java/test").toRealPath(), loaded);
+        Path testRoot = app.resolve("platform/src/test/java/com/auraboot/framework");
+        assertEquals(input.path("nativeHostTestSha256").asText(), sha(testRoot.resolve("plugin/pf4j/ProcurementSourceUiFixtureProducerIT.java")));
+        assertEquals(input.path("nativeSharedFixtureSha256").asText(), sha(testRoot.resolve("plugin/pf4j/ProcurementPublicSourceNativeFixture.java")));
+        assertEquals(input.path("nativeInitializationFixtureSha256").asText(), sha(testRoot.resolve("notification/sourcebinding/ProductQuoteNativeInitialization.java")));
+        Path workspace = Path.of(input.path("workspaceRoot").asText()).toRealPath();
+        Path evidenceRoot = workspace.resolve(".workspace/evidence/procurement-web-stack-20261010").toRealPath();
+        assertTrue(sourceUiInput.startsWith(evidenceRoot));
+        Path proofPath = Path.of(input.path("encryptionConfigProofPath").asText()).toRealPath();
+        assertTrue(proofPath.startsWith(evidenceRoot));
+        assertEquals(input.path("encryptionConfigProofSha256").asText(), sha(proofPath));
+        JsonNode proof = json.readTree(proofPath.toFile());
+        assertEquals(input.path("sourceSet").path("oss").asText(), proof.path("sourceCommit").asText());
+        assertEquals(sha(app.resolve("platform/src/main/java/com/auraboot/framework/common/crypto/FieldEncryptionService.java")), proof.path("fieldEncryptionServiceSha256").asText());
+        assertEquals(sha(app.resolve("platform/src/main/resources/application.yml")), proof.path("applicationYmlSha256").asText());
+        assertTrue(System.getenv().containsKey("PROCUREMENT_SOURCE_UI_FIELD_ENCRYPTION_KEY"));
+        encryptionMode = ProcurementOrderUiFixtureProducerIT.validateEncryptionMode(proof,
+                System.getenv("PROCUREMENT_SOURCE_UI_FIELD_ENCRYPTION_KEY"));
+        assertEquals(input.path("encryptionMode").asText(), encryptionMode);
+        for (String stem : List.of("runtimeAdmission", "runtimeEnvironmentEvidence", "runtimeProfileEvidence")) {
+            Path artifact = Path.of(proof.path(stem + "Path").asText()).toRealPath();
+            assertTrue(artifact.startsWith(evidenceRoot));
+            assertEquals(proof.path(stem + "Sha256").asText(), sha(artifact));
+        }
+        JsonNode runtimeProof = json.readTree(Path.of(proof.path("runtimeAdmissionPath").asText()).toFile());
+        assertEquals("ok", runtimeProof.path("verdict").asText());
+        assertEquals("procurement-web-stack-20261010", runtimeProof.path("runtime").asText());
+        assertEquals(proof.path("runtimeMode").asText(), runtimeProof.path("metadata").path("mode").asText());
+        var actualCore = java.util.stream.StreamSupport.stream(runtimeProof.path("sources").spliterator(), false)
+                .filter(row -> row.path("key").asText().equals("oss")).toList();
+        assertEquals(1, actualCore.size());
+        assertEquals(proof.path("sourceCommit").asText(), actualCore.getFirst().path("actual").path("commit").asText());
+        JsonNode environment = json.readTree(Path.of(proof.path("runtimeEnvironmentEvidencePath").asText()).toFile());
+        assertEquals("procurement-web-stack-20261010", environment.path("runtime").asText());
+        assertEquals(proof.path("environmentKeyState").asText(), environment.path("fieldEncryptionKeyState").asText());
+        JsonNode profile = json.readTree(Path.of(proof.path("runtimeProfileEvidencePath").asText()).toFile());
+        assertEquals("procurement-web-stack-20261010", profile.path("runtime").asText());
+        assertEquals(proof.path("actualSpringProfiles").asText(), profile.path("actualSpringProfiles").asText());
+        String probe = "SyntheticSourceUiEncryptionProbe";
+        String encrypted = actualEncryption.encrypt(probe);
+        assertEquals(probe, actualEncryption.decrypt(encrypted));
+        if (encryptionMode.equals("dev-passthrough")) assertEquals(probe, encrypted);
+        else assertTrue(encrypted.startsWith("ENC:"));
+    }
+
+    @Test void produceSourceSelectionAndRefreshPrerequisites() throws Exception {
+        try {
+            admitProvider();
+            importInitializer();
+            makerToken = actor("maker", MAKER_PERMISSIONS);
+            makerIdentity = new LinkedHashMap<>(retainedActors.getLast());
+            buyerToken = actor("buyer", BUYER_PERMISSIONS);
+            buyerIdentity = new LinkedHashMap<>(retainedActors.getLast());
+            buyerPid = buyerIdentity.get("userPid").toString();
+            // The UI credential is solely this actual independent account, never the bootstrap/maker.
+            assertNotEquals(buyerPid, makerIdentity.get("userPid"));
+            var selection = createStage("selection", List.of(sourceRow("101", "11", "UI-SELECT"), sourceRow("101", "12", "UI-SELECT")));
+            assertEquals(2, candidates(selection).path("records").size());
+            assertTrue(sources().isEmpty());
+            var foreign = createStage("foreignAccount", List.of(sourceRow("101", "11", "UI-SELECT")));
+            sync(foreign, List.of(pair("101", "11")));
+            foreign.put("businessBefore", snapshot());
+            var critical = createStage("critical", List.of(sourceRow("102", "21", "UI-CRITICAL")));
+            sync(critical, List.of(pair("102", "21")));
+            critical.put("formal", submitQuote(critical, false));
+            var missing = createStage("missingUnselected", List.of(sourceRow("103", "31", "UI-MISSING"), sourceRow("103", "32", "UI-MISSING")));
+            sync(missing, List.of(pair("103", "31"), pair("103", "32")));
+            // Owned provider omissions are not cancellation facts. Both persisted sources remain.
+            control("/__control/source-scenario", Map.of("namespace", missing.get("namespace"),
+                    "sourceRows", List.of(sourceRow("103", "31", "UI-MISSING"))));
+            missing.put("businessBefore", snapshot());
+            var paginationRows = new ArrayList<List<Object>>();
+            var selected = new ArrayList<Map<String, String>>();
+            for (int index = 1; index <= 21; index++) {
+                paginationRows.add(sourceRow("104", Integer.toString(40 + index), "UI-PAGINATION"));
+                selected.add(pair("104", Integer.toString(40 + index)));
+            }
+            var pagination = createStage("factsPagination", paginationRows);
+            sync(pagination, selected);
+            pagination.put("formal", submitQuote(pagination, true));
+            assertEquals(21, sources().size());
+            for (var source : sources()) {
+                assertDecimal("1500", source.get("pr_preq_qty"));
+                assertDecimal("1000", source.get("qo_pr_source_remaining_qty"));
+                assertDecimal("125", source.get("qo_pr_source_reserved_qty"));
+            }
+            pagination.put("reservationAuthority", "actual public quote submit and task allocate; bootstrap is not UI");
+            for (var stage : stages) {
+                task = stage.get("taskPid").toString();
+                connection = stage.get("connectionPid").toString();
+                stage.put("sourceRows", sources());
+                stage.put("providerState", sourceState(stage.get("namespace").toString()));
+                stage.put("taskRecord", fixture(SYNC, () -> db.getById("s2p_sourcing_event", task)));
+                stage.put("externalReferences", references());
+                stage.put("expectedQuantities", sources().stream().map(source -> Map.of("sourcePid", pid(source),
+                        "requestedQty", source.get("pr_preq_qty").toString(), "remainingQty", source.get("qo_pr_source_remaining_qty").toString(),
+                        "reservedQty", source.get("qo_pr_source_reserved_qty").toString(),
+                        "unreservedQty", new BigDecimal(source.get("qo_pr_source_remaining_qty").toString()).subtract(new BigDecimal(source.get("qo_pr_source_reserved_qty").toString())).toPlainString())).toList());
+            }
+            var receipt = new LinkedHashMap<String, Object>();
+            receipt.put("kind", "procurement-source-ui-native-v1");
+            receipt.put("schemaVersion", 1);
+            receipt.put("sourceBindingPath", System.getenv("PROCUREMENT_PUBLIC_SOURCE_READINESS_INPUT"));
+            receipt.put("sourceBindingSha256", sha(Path.of(System.getenv("PROCUREMENT_PUBLIC_SOURCE_READINESS_INPUT"))));
+            receipt.put("encryptionMode", encryptionMode);
+            receipt.put("encryptionConfigProofPath", input.path("encryptionConfigProofPath").asText());
+            receipt.put("encryptionConfigProofSha256", input.path("encryptionConfigProofSha256").asText());
+            receipt.put("managedProviderReceiptPath", input.path("managedProviderReceiptPath").asText());
+            receipt.put("managedProviderReceiptSha256", input.path("managedProviderReceiptSha256").asText());
+            receipt.put("tenantId", tenant.toString());
+            receipt.put("applicationCoreRoot", input.path("applicationCoreRoot").asText());
+            receipt.put("applicationCoreCommit", input.path("applicationCoreCommit").asText());
+            receipt.put("nativeHostTestSha256", input.path("nativeHostTestSha256").asText());
+            receipt.put("nativeSharedFixtureSha256", input.path("nativeSharedFixtureSha256").asText());
+            receipt.put("nativeInitializationFixtureSha256", input.path("nativeInitializationFixtureSha256").asText());
+            receipt.put("sourceSet", ProcurementOrderUiFixtureProducerIT.canonicalSources(input.path("sourceSet")));
+            receipt.put("sourceCommits", ProcurementOrderUiFixtureProducerIT.canonicalSources(
+                    json.readTree(caseEvidence.resolve("readiness.json").toFile()).path("sourceCommits")));
+            receipt.put("productJarSha256", json.readTree(caseEvidence.resolve("readiness.json").toFile()).path("pluginJarSha256").asText());
+            receipt.put("nativeReadinessPath", caseEvidence.resolve("readiness.json").toString());
+            receipt.put("nativeReadinessSha256", sha(caseEvidence.resolve("readiness.json")));
+            receipt.put("buyer", buyerIdentity);
+            receipt.put("nativeLifecycleMaker", makerIdentity);
+            receipt.put("stages", stages);
+            receipt.put("publicActions", publicActions);
+            receipt.put("initializationActions", initializationActions);
+            receipt.put("serverPolicies", policies);
+            receipt.put("businessSnapshotTables", tableMap());
+            receipt.put("businessSnapshot", snapshot());
+            receipt.put("immutableBusinessBefore", snapshot());
+            receipt.put("testInitializationAppendixPath", caseEvidence.resolve("source-ui-initialization-appendix.json").toString());
+            receipt.put("testInitializationAppendixSha256", sha(caseEvidence.resolve("source-ui-initialization-appendix.json")));
+            receipt.put("membershipInitialFactsSynthetic", true);
+            receipt.put("bootstrapFactsAreBrowserAcceptance", false);
+            receipt.put("retainedAfterNative", true);
+            receipt.put("remarkFacetStatus", "blocked-contract; no server column configured");
+            receipt.put("actualCustomerERPVerified", false);
+            receipt.put("browserExecuted", 0);
+            writeArtifact("source-ui-fixture-receipt.json", receipt);
+            activeStage = "completed";
+        } finally {
+            writeArtifact("source-ui-producer-stage.json", Map.of("stage", activeStage,
+                    "completed", activeStage.equals("completed"), "browserExecuted", 0,
+                    "publicActionCount", publicActions.size(), "receiptExists", Files.exists(caseEvidence.resolve("source-ui-fixture-receipt.json"))));
+        }
+    }
+
+    static List<Object> sourceRow(String head, String entry, String bill) {
+        assertTrue(head.matches("[1-9][0-9]{0,29}"));
+        assertTrue(entry.matches("[1-9][0-9]{0,29}"));
+        return List.of(head, bill, entry, "900", "SRC-900", "Synthetic source material", "SYNTHETIC", "1500",
+                "1500", "0", "0", "1000", "PCS", "2066-12-01", "SYNTHETIC-ORG", "C", "A", "A");
+    }
+
+    static Map<String, String> pair(String head, String entry) {
+        sourceRow(head, entry, "validation-only");
+        return Map.of("requisitionId", head, "entryId", entry);
+    }
+
+    private void admitProvider() throws Exception {
+        activeStage = "managed-source-provider-admission";
+        Path path = Path.of(required("PROCUREMENT_SOURCE_UI_INPUT")).toRealPath();
+        assertEquals(required("PROCUREMENT_SOURCE_UI_INPUT_SHA256"), sha(path));
+        input = json.readTree(path.toFile());
+        Path receiptPath = Path.of(input.path("managedProviderReceiptPath").asText()).toRealPath();
+        assertEquals(input.path("managedProviderReceiptSha256").asText(), sha(receiptPath));
+        Path state = Path.of(required("PROCUREMENT_SOURCE_PLUGIN_DIR")).toRealPath().getParent().getParent();
+        Path expected = state.resolve("processes/erp-fixture-receipt.json").toRealPath();
+        assertTrue(Files.isSameFile(receiptPath, expected));
+        var receipt = json.readTree(receiptPath.toFile());
+        assertEquals("registered", receipt.path("status").asText());
+        assertEquals("procurement-web-stack-20261010", receipt.path("runtime").asText());
+        assertEquals(52169, receipt.path("port").asInt(-1));
+        assertEquals(receipt.path("scriptSha256").asText(), sha(Path.of(receipt.path("scriptPath").asText())));
+        Path tokenPath = Path.of(required("PROCUREMENT_ERP_CONTROL_TOKEN_FILE")).toRealPath();
+        assertTrue(Files.isSameFile(tokenPath, Path.of(receipt.path("controlTokenFile").asText())));
+        assertEquals(receipt.path("controlTokenFileSha256").asText(), sha(tokenPath));
+        controlToken = Files.readString(tokenPath).strip();
+        assertFalse(controlToken.isEmpty());
+        controlBase = URI.create("http://127.0.0.1:52169");
+    }
+
+    private String actor(String label, List<String> permissions) {
+        context();
+        String email = provider + "-source-" + label + "@example.invalid";
+        String password = required("PROCUREMENT_SOURCE_UI_FIXTURE_PASSWORD");
+        var user = users.signUp(email, password, "Synthetic source " + label, provider + "_" + label);
+        var member = members.addMember(user.getId(), tenant, "active");
+        String jwt = actorToken(user.getId(), user.getPid(), member.getId(), email, permissions, password);
+        var identity = retainedActors.getLast();
+        identity.put("credentialEnvironment", "PROCUREMENT_SOURCE_UI_FIXTURE_PASSWORD");
+        identity.put("dataScopeAuthority", "synthetic tenant only");
+        return jwt;
+    }
+
+    private void importInitializer() throws Exception {
+        activeStage = "test-only-initializer-import";
+        var appendix = ProductQuoteNativeInitialization.prepareSourceUi(Path.of(procurementDirectory),
+                caseEvidence.resolve("source-ui-initialization-appendix"), json);
+        writeArtifact("source-ui-initialization-appendix.json", appendix);
+        formalImport(Path.of(appendix.get("testDirectory").toString()), "source-ui-initializer");
+    }
+
+    private void formalImport(Path directory, String label) throws Exception {
+        var preview = imports.parseDirectory(directory.toString(), true);
+        writeArtifact(label + "-preview.json", preview);
+        assertTrue(preview.isValid(), "Actual Source UI preview: " + preview.getErrors());
+        var request = com.auraboot.framework.plugin.dto.imports.ImportRequest.builder().importId(preview.getImportId())
+                .conflictStrategy(com.auraboot.framework.plugin.dto.imports.ImportRequest.ConflictStrategy.OVERWRITE)
+                .autoPublishFields(true).autoPublishModels(true).autoPublishCommands(true).autoPublishPages(true)
+                .createResourcePermissions(true).build();
+        var result = imports.execute(preview.getImportId(), request);
+        writeArtifact(label + "-result.json", result);
+        assertTrue(result.isSuccess(), "Actual Source UI import: " + result.getErrorMessage());
+        assertEquals("com.auraboot.quote-procurement", result.getPluginId());
+        JsonNode expected = json.readTree(caseEvidence.resolve("source-ui-initialization-appendix.json").toFile()).path("exactWriterAppendix");
+        for (String model : ProductQuoteNativeInitialization.SOURCE_UI_FIELDS.keySet()) {
+            var command = commands.findByCode(ProductQuoteNativeInitialization.sourceUiCommand(model));
+            assertEquals(tenant, command.getTenantId());
+            assertEquals(model, command.getModelCode());
+            assertEquals("published", command.getStatus());
+            assertEquals(true, command.getIsCurrent());
+            var modelDefinition = actualMetadata.getModelDefinitionFromDb(model).orElseThrow();
+            for (String fieldCode : ProductQuoteNativeInitialization.SOURCE_UI_FIELDS.get(model)) {
+                var field = modelDefinition.getFields().stream().filter(row -> fieldCode.equals(row.getCode())).findFirst().orElseThrow();
+                if (expected.has(fieldCode)) assertEquals(expected.path(fieldCode).path("testWriters"), json.valueToTree(field.getAllowedWriterCommands()));
+            }
+        }
+    }
+
+    private String initialize(String model, Map<String, Object> values) throws Exception {
+        ProductQuoteNativeInitialization.validateSourceUiPayload(model, values);
+        var saved = MetaContext.snapshot();
+        try {
+            var initializer = users.findByPid(retainedBootstrapPrincipal.get("userPid").toString());
+            var member = members.findByTenantIdAndUserId(tenant, initializer.getId());
+            MetaContext.setContext(tenant, initializer.getId(), initializer.getPid(), provider);
+            MetaContext.setMemberId(member.getId());
+            var authenticationRequest = new AuthenticationRequest();
+            authenticationRequest.setEmail(initializer.getEmail());
+            authenticationRequest.setPassword(PASSWORD);
+            var authenticated = authentication.authenticate(authenticationRequest);
+            assertEquals(tenant, authenticated.getTenantId());
+            assertEquals(initializer.getId(), authenticated.getUserId());
+            var request = new CommandExecuteRequest();
+            request.setPayload(new LinkedHashMap<>(values));
+            request.setClientRequestId(provider + "-init-" + UUID.randomUUID());
+            var result = actualCommands.execute(ProductQuoteNativeInitialization.sourceUiCommand(model), request);
+            assertEquals("completed", result.getPhaseReached());
+            String pid = result.getData().get("recordPid").toString();
+            initializationActions.add(Map.of("command", ProductQuoteNativeInitialization.sourceUiCommand(model),
+                    "model", model, "recordPid", pid, "authenticationVerified", true,
+                    "syntheticInitialFactsOnly", true));
+            return pid;
+        } finally {
+            MetaContext.clear();
+            MetaContext.restore(saved);
+        }
+    }
+
+    private Map<String, Object> createStage(String name, List<List<Object>> rows) throws Exception {
+        activeStage = name;
+        String namespace = "su_" + UUID.randomUUID().toString().replace("-", "").substring(0, 20);
+        String secret = UUID.randomUUID().toString();
+        var cloud = new CloudConfigSaveRequest();
+        cloud.setConfigLevel("tenant");
+        cloud.setServiceType("integration");
+        cloud.setProviderCode(namespace);
+        cloud.setEnabled(true);
+        cloud.setPriority(1);
+        cloud.setConfig("{\"appSecret\":\"" + secret + "\"}");
+        context();
+        configs.saveConfig(cloud);
+        var registration = control("/__control/register-source", Map.of("namespace", namespace,
+                "account", Map.of("acctID", namespace, "username", namespace, "appId", namespace,
+                        "secretSha256", digest(secret.getBytes(java.nio.charset.StandardCharsets.UTF_8))), "sourceRows", rows));
+        connection = initialize("customer_pcba_int_kingdee_connection", Map.of(
+                "customer_pcba_kd_profile_name", namespace, "customer_pcba_kd_status", "active",
+                "customer_pcba_kd_acct_id", namespace, "customer_pcba_kd_base_url", controlBase.toString(),
+                "customer_pcba_kd_app_id", namespace, "customer_pcba_kd_username", namespace,
+                "customer_pcba_kd_app_secret_ref", "cloud-config:" + namespace, "customer_pcba_kd_auth_type", "app-secret"));
+        String material = fixture(SYNC, () -> pid(db.query("prod_product", Map.of("prod_code", provider)).getFirst()));
+        initialize("customer_pcba_int_external_ref", Map.of("customer_pcba_ref_external_system", "KINGDEE",
+                "customer_pcba_ref_instance_key", connection, "customer_pcba_ref_account_id", namespace,
+                "customer_pcba_ref_external_form_id", "BD_MATERIAL", "customer_pcba_ref_external_id", "900",
+                "customer_pcba_ref_local_model_code", "prod_product", "customer_pcba_ref_local_pid", material));
+        configureSourcePolicy(connection, namespace);
+        var result = action(makerToken, "qo_procurement_task_common:create", null,
+                Map.of("title", "Synthetic " + name, "connectionPid", connection));
+        task = result.path("recordPid").asText();
+        assertFalse(task.isBlank());
+        retainedTaskPids.add(task);
+        var stage = new LinkedHashMap<String, Object>();
+        stage.put("stage", name);
+        stage.put("namespace", namespace);
+        stage.put("accountId", namespace);
+        stage.put("connectionPid", connection);
+        stage.put("taskPid", task);
+        stage.put("billNo", rows.getFirst().get(1));
+        stage.put("initialProviderRows", rows);
+        stage.put("registration", registration);
+        stages.add(stage);
+        return stage;
+    }
+
+    private void configureSourcePolicy(String connectionPid, String account) throws Exception {
+        Path original = Path.of(procurementDirectory);
+        Path appendix = caseEvidence.resolve("source-ui-initialization-appendix");
+        Path copy = caseEvidence.resolve("source-policy-" + account);
+        try (var paths = Files.walk(appendix)) {
+            for (Path source : paths.toList()) {
+                assertFalse(Files.isSymbolicLink(source));
+                Path destination = copy.resolve(appendix.relativize(source));
+                if (Files.isDirectory(source)) Files.createDirectories(destination); else Files.copy(source, destination);
+            }
+        }
+        assertTrue(copy.toString().length() <= 256, "Actual import source_name bound");
+        var definitions = json.readTree(copy.resolve("config/commands/procurement.json").toFile());
+        int configuredCommands = 0;
+        for (var definition : definitions) {
+            if (!List.of(SYNC, CANDIDATES).contains(definition.path("code").asText())) continue;
+            configuredCommands++;
+            var catalog = (ArrayNode) definition.path("handlerParams").path("procurementSourceEligibilityPolicies");
+            assertTrue(catalog.isEmpty());
+            // Keep all prior exact account registrations admitted for the retained browser stages.
+            for (var prior : policies) catalog.add(json.valueToTree(prior));
+            catalog.add(json.valueToTree(policy(connectionPid, account)));
+        }
+        assertEquals(2, configuredCommands);
+        json.writeValue(copy.resolve("config/commands/procurement.json").toFile(), definitions);
+        formalImport(copy, "source-ui-policy-" + account);
+        policies.add(policy(connectionPid, account));
+        for (String code : List.of(SYNC, CANDIDATES)) {
+            var command = commands.findByCode(code);
+            assertEquals(tenant, command.getTenantId());
+            assertEquals("s2p_sourcing_event", command.getModelCode());
+            assertEquals(json.valueToTree(policies), json.readTree(command.getExecutionConfig()).path("handlerParams").path("procurementSourceEligibilityPolicies"));
+        }
+        writeArtifact("source-policy-" + account + ".json", Map.of("sourceCommandSha256", sha(original.resolve("config/commands/procurement.json")),
+                "configuredCommandSha256", sha(copy.resolve("config/commands/procurement.json")), "testOnlyPolicies", List.copyOf(policies)));
+    }
+
+    static Map<String, Object> policy(String connectionPid, String account) {
+        return Map.of("connectionPid", connectionPid, "accountId", account,
+                "rules", List.of(Map.of("documentStatus", "C", "cancelStatus", "A", "closeStatus", "A", "eligible", true)));
+    }
+
+    private JsonNode candidates(Map<String, Object> stage) throws Exception {
+        return action(buyerToken, CANDIDATES, stage.get("taskPid").toString(), Map.of("billNo", stage.get("billNo"), "pageSize", 2));
+    }
+
+    private void sync(Map<String, Object> stage, List<Map<String, String>> selected) throws Exception {
+        task = stage.get("taskPid").toString();
+        connection = stage.get("connectionPid").toString();
+        assertEquals(selected.size(), candidates(stage).path("records").size());
+        action(buyerToken, SYNC, task, Map.of("selected", selected, "pageSize", 2));
+        assertEquals(selected.size(), sources().size());
+    }
+
+    private JsonNode action(String jwt, String code, String target, Map<String, Object> payload) throws Exception {
+        var request = new LinkedHashMap<String, Object>();
+        if (target != null) {
+            request.put("targetRecordPid", target);
+            request.put("expectedVersion", fixture(SYNC, () -> db.getById(commands.findByCode(code).getModelCode(), target).get("row_version")));
+        }
+        request.put("clientRequestId", provider + "-public-" + UUID.randomUUID());
+        request.put("payload", payload);
+        MetaContext.clear();
+        org.springframework.test.web.servlet.MvcResult result;
+        try {
+            result = mvc.perform(post("/api/meta/commands/execute/" + code).header("Authorization", "Bearer " + jwt)
+                    .contentType("application/json").content(json.writeValueAsBytes(request))).andReturn();
+        } finally { context(); }
+        assertEquals(200, result.getResponse().getStatus(), "Actual public command " + code);
+        var body = json.readTree(result.getResponse().getContentAsByteArray());
+        assertEquals(200, body.path("code").asInt(-1));
+        publicActions.add(Map.of("command", code, "target", target == null ? "create" : target,
+                "httpStatus", 200, "payload", payload));
+        return body.path("data").path("data");
+    }
+
+    private Map<String, Object> submitQuote(Map<String, Object> stage, boolean allocate) throws Exception {
+        task = stage.get("taskPid").toString();
+        connection = stage.get("connectionPid").toString();
+        String category = initialize("pr_spend_category", Map.of("pr_spc_code", stage.get("namespace"), "pr_spc_name", "Synthetic source category"));
+        String supplier = initialize("pr_supplier_common", Map.of("pr_supplier_code", stage.get("namespace"),
+                "pr_supplier_name", "Synthetic source supplier", "pr_supplier_status", "enabled", "qo_pr_supplier_account_id", stage.get("accountId")));
+        action(makerToken, "qo_procurement_category_policy_common:create", null,
+                Map.of("categoryPid", category, "connectionPid", connection, "supplierPids", List.of(supplier), "defaultSupplierPids", List.of(supplier)));
+        for (var row : sources()) action(makerToken, "qo_procurement_task_common:classify_source", task,
+                Map.of("sourcePid", pid(row), "sourceRevision", row.get("qo_pr_source_revision"), "categoryPid", category));
+        action(makerToken, "qo_procurement_task_common:dispatch", task,
+                Map.of("supplierPids", List.of(supplier), "cutoffAt", "2066-11-15T08:00:00Z"));
+        String quote = fixture(SYNC, () -> pid(db.query("s2p_bid", Map.of("s2p_bid_sourcing_event_id", task)).getFirst()));
+        String email = stage.get("namespace") + "-supplier@example.invalid";
+        context();
+        var supplierUser = users.signUp(email, required("PROCUREMENT_SOURCE_UI_FIXTURE_PASSWORD"), "Synthetic supplier", stage.get("namespace").toString());
+        var supplierMember = members.addMember(supplierUser.getId(), tenant, "active");
+        String supplierJwt = actorToken(supplierUser.getId(), supplierUser.getPid(), supplierMember.getId(), email,
+                List.of("meta.command.execute", "qo.srm.use"), required("PROCUREMENT_SOURCE_UI_FIXTURE_PASSWORD"));
+        String contact = initialize("pr_supplier_pcba_contact", Map.of("pr_spc_supplier_id", supplier, "pr_spc_name", "Synthetic contact", "qo_pr_contact_state", "active"));
+        initialize("qo_procurement_membership_common", Map.of("qo_pr_membership_key", stage.get("namespace"),
+                "qo_pr_membership_user_pid", supplierUser.getPid(), "qo_pr_membership_supplier_pid", supplier,
+                "qo_pr_membership_contact_pid", contact, "qo_pr_membership_state", "active"));
+        var lines = new ArrayList<Map<String, Object>>();
+        for (var source : sources()) {
+            var line = new LinkedHashMap<String, Object>();
+            line.put("sourcePid", pid(source)); line.put("sourceRevision", source.get("qo_pr_source_revision"));
+            line.put("unitPrice", "1.25"); line.put("currency", "CNY"); line.put("unit", "PCS");
+            line.put("taxRate", "0.13"); line.put("taxIncluded", true); line.put("availableQty", "600");
+            line.put("deliveryDate", "2066-12-01"); lines.add(line);
+        }
+        action(supplierJwt, "qo_procurement_quote_common:save_draft", quote, Map.of("revision", 0, "lines", lines, "paymentTerms", "Net 30"));
+        var submitted = action(supplierJwt, "qo_procurement_quote_common:submit", quote, Map.of("revision", 1));
+        String submission = submitted.path("submissionPid").asText(); assertFalse(submission.isBlank());
+        if (allocate) {
+            var demands = new ArrayList<Map<String, Object>>(); var allocations = new ArrayList<Map<String, Object>>();
+            for (var source : sources()) {
+                demands.add(Map.of("sourcePid", pid(source), "sourceRevision", source.get("qo_pr_source_revision"), "quantity", "125"));
+                allocations.add(Map.of("quotePid", quote, "sourcePid", pid(source), "submissionPid", submission, "quantity", "125"));
+            }
+            action(makerToken, "qo_procurement_task_common:allocate", task, Map.of("sourceDemands", demands, "allocations", allocations));
+        }
+        return Map.of("quotePid", quote, "submissionPid", submission, "immutableSnapshot", formalSnapshot(submission));
+    }
+
+    private JsonNode control(String path, Map<String, Object> body) throws Exception {
+        var request = HttpRequest.newBuilder(controlBase.resolve(path)).timeout(java.time.Duration.ofSeconds(30)).header("X-Aura-ERP-Fixture-Token", controlToken)
+                .header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofByteArray(json.writeValueAsBytes(body))).build();
+        var response = HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(5)).build().send(request, HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, response.statusCode());
+        return json.readTree(response.body());
+    }
+
+    private JsonNode sourceState(String namespace) throws Exception {
+        var request = HttpRequest.newBuilder(controlBase.resolve("/__control/source-state?namespace=" + namespace)).timeout(java.time.Duration.ofSeconds(30))
+                .header("X-Aura-ERP-Fixture-Token", controlToken).GET().build();
+        var response = HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(5)).build().send(request, HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, response.statusCode());
+        return json.readTree(response.body());
+    }
+
+    private Map<String, Object> tableMap() {
+        var result = new LinkedHashMap<String, Object>();
+        for (String entity : List.of("task", "source", "quote", "quote_line", "history", "submission", "submission_line", "allocation", "execution", "order", "order_line", "externalReferences")) {
+            String model = entity.equals("externalReferences") ? "customer_pcba_int_external_ref" : domainModel(entity);
+            String table = actualMetadata.getTableName(model);
+            assertTrue(table.matches("[A-Za-z_][A-Za-z0-9_]{0,62}"));
+            var modelDefinition = actualMetadata.getModelDefinitionFromDb(model).orElseThrow();
+            assertEquals(table, modelDefinition.getTableName());
+            var row = new org.springframework.jdbc.core.JdbcTemplate(postgres).queryForMap("SELECT id,pid,code,tenant_id,plugin_pid,status FROM ab_meta_model WHERE tenant_id=? AND code=? AND is_current=TRUE AND deleted_flag=FALSE", tenant, model);
+            assertEquals(tenant, row.get("tenant_id"));
+            assertEquals(modelDefinition.getId(), row.get("id"));
+            assertEquals(model, row.get("code"));
+            assertEquals("published", row.get("status"));
+            assertTrue(row.get("plugin_pid") instanceof String && !row.get("plugin_pid").toString().isBlank());
+            assertEquals(table, new org.springframework.jdbc.core.JdbcTemplate(postgres).queryForObject("SELECT to_regclass(?)::text", String.class, table));
+            result.put(entity, Map.of("modelCode", model, "physicalTable", table, "actualTenantModel", row));
+        }
+        return result;
+    }
+
+    static void assertDecimal(String expected, Object value) {
+        assertNotNull(value);
+        assertEquals(0, new BigDecimal(expected).compareTo(new BigDecimal(value.toString())));
+    }
+
+    private static String digest(byte[] bytes) throws Exception {
+        return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+    }
+}

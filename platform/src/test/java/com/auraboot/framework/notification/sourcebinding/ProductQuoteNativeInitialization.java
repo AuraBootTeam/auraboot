@@ -66,6 +66,35 @@ public final class ProductQuoteNativeInitialization {
                 "s06-native-initialization.json");
     }
 
+    /** Exact test-only directory/material setup; domain task/quote/allocation lifecycle stays public. */
+    public static final Map<String, List<String>> SOURCE_UI_FIELDS = Map.of(
+            "pr_supplier_common", ORDER_UI_FIELDS.get("pr_supplier_common"),
+            "pr_supplier_pcba_contact", FIELDS.get("pr_supplier_pcba_contact"),
+            "qo_procurement_membership_common", FIELDS.get("qo_procurement_membership_common"),
+            "pr_spend_category", List.of("pr_spc_code", "pr_spc_name"),
+            "customer_pcba_int_kingdee_connection", List.of("customer_pcba_kd_profile_name", "customer_pcba_kd_status",
+                    "customer_pcba_kd_acct_id", "customer_pcba_kd_base_url", "customer_pcba_kd_app_id",
+                    "customer_pcba_kd_username", "customer_pcba_kd_app_secret_ref", "customer_pcba_kd_auth_type"),
+            "customer_pcba_int_external_ref", List.of("customer_pcba_ref_external_system", "customer_pcba_ref_instance_key",
+                    "customer_pcba_ref_account_id", "customer_pcba_ref_external_form_id", "customer_pcba_ref_external_id",
+                    "customer_pcba_ref_local_model_code", "customer_pcba_ref_local_pid"));
+
+    public static String sourceUiCommand(String model) {
+        if (!SOURCE_UI_FIELDS.containsKey(model)) throw new IllegalArgumentException("Unsupported source UI initialization model");
+        return model + ":initialize_source_ui_native_fixture";
+    }
+
+    public static void validateSourceUiPayload(String model, Map<String, Object> facts) {
+        if (!SOURCE_UI_FIELDS.containsKey(model) || !facts.keySet().equals(Set.copyOf(SOURCE_UI_FIELDS.get(model)))) {
+            throw new IllegalArgumentException("Source UI initialization requires exact declared fields");
+        }
+    }
+
+    public static Map<String, Object> prepareSourceUi(Path original, Path destination, ObjectMapper json) throws Exception {
+        return prepare(original, destination, json, SOURCE_UI_FIELDS, ProductQuoteNativeInitialization::sourceUiCommand,
+                "source-ui-native-initialization.json");
+    }
+
     /** Only S06 task/bid facts need this exact source owner appendix; order UI directory facts do not. */
     static Map<String, Object> prepareSourceToPay(Path original, Path destination, ObjectMapper json) throws Exception {
         JsonNode manifest = json.readTree(original.resolve("plugin.json").toFile());
