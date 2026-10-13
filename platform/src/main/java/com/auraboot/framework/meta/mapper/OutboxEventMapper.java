@@ -141,6 +141,12 @@ public interface OutboxEventMapper {
     int countActiveDeliveryLease(@Param("tenantId") Long tenantId, @Param("eventId") String eventId,
                                  @Param("leaseToken") String leaseToken);
 
+    /** Trusted counter holds this exact lease row until its effect and receipt transaction commits. */
+    @Select("SELECT id FROM ab_outbox WHERE tenant_id = #{tenantId} AND event_id = #{eventId} " +
+            "AND status = 'processing' AND lease_token = #{leaseToken} AND lease_until > NOW() FOR UPDATE")
+    Long lockActiveDeliveryLease(@Param("tenantId") Long tenantId, @Param("eventId") String eventId,
+                                  @Param("leaseToken") String leaseToken);
+
     @Insert("INSERT INTO ab_integration_receipt (tenant_id, event_id, consumer_code, status, " +
             "lease_token, received_at) VALUES (#{tenantId}, #{eventId}, #{consumerCode}, " +
             "'processing', #{leaseToken}, NOW()) ON CONFLICT (tenant_id, event_id, consumer_code) DO NOTHING")

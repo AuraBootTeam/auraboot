@@ -48,6 +48,13 @@ class OutboxKnownEventClaimContractTest {
         assertThat(actual.getParameterObject()).isSameAs(hostile);
         assertThat(actual.getParameterMappings().stream().map(p->p.getProperty()).toList()).doesNotContain("limit", "model", "command", "payload");
     }
+    @Test void trustedCounterLockBindsExactActiveLeaseAndRetainsItForTransaction() {
+        Configuration configuration=new Configuration();configuration.addMapper(OutboxEventMapper.class);
+        BoundSql lock=configuration.getMappedStatement(OutboxEventMapper.class.getName()+".lockActiveDeliveryLease").getBoundSql(parameters());
+        assertThat(lock.getSql()).contains("tenant_id = ? AND event_id = ?", "status = 'processing' AND lease_token = ? AND lease_until > NOW() FOR UPDATE");
+        assertThat(lock.getParameterMappings().stream().map(p->p.getProperty()).toList()).containsExactly("tenantId","eventId","leaseToken");
+        assertThat(lock.getSql()).doesNotContain("SKIP LOCKED", "UPDATE ab_outbox", "headers =", "payload =");
+    }
     @Test void globalClaimContractIsUnchangedAndExactClaimDoesNotFallBackToIt() {
         Configuration configuration=new Configuration();configuration.addMapper(OutboxEventMapper.class);
         String global=configuration.getMappedStatement(OutboxEventMapper.class.getName()+".claimReadyEvents")

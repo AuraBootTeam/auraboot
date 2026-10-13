@@ -81,6 +81,14 @@ public final class InventoryReceiptEnqueueProvenance {
         return copy(event, headers);
     }
 
+    /** Called only at trusted counter entry inside the host's independent delivery transaction. */
+    void lockPersistedDelivery(IntegrationEventEnvelope event, String leaseToken) {
+        if (!org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) throw denied();
+        assertPersistedDelivery(event, leaseToken);
+        if (outbox.lockActiveDeliveryLease(event.tenantId(), event.eventId(), leaseToken) == null) throw denied();
+        assertPersistedDelivery(event, leaseToken);
+    }
+
     /** Only the delivery host uses persisted evidence; header presence is never sufficient. */
     void assertPersistedDelivery(IntegrationEventEnvelope event, String leaseToken) {
         validateReceiptIdentity(event);

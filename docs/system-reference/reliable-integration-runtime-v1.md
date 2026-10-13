@@ -121,3 +121,15 @@ producer headers or command authority, and does not replace the global dispatche
 claim must commit independently before a consumer's `REQUIRES_NEW` effect transaction starts;
 holding that same outbox row lock in an outer transaction would self-block the inner delivery.
 The annotation/BoundSql contract tests are not PostgreSQL lease or ordering acceptance.
+
+The trusted receipt counter closes the lease-check/receipt-commit race by locking the exact
+`tenant_id/event_id/lease_token` processing outbox row with `lease_until > NOW() FOR UPDATE`
+inside its independent T01 effect transaction. It requires an active Spring transaction,
+checks the complete persisted envelope both before and after acquiring the row lock, and
+holds the lock through effect and receipt commit. Missing or replaced leases reject before
+plugin work. Per-access and post-effect envelope/metadata verification remains in place.
+Ordinary consumers and the global dispatcher do not acquire this new lock. Native two-transaction
+verification must prove that a competing exact claim skips the held row, and that a lease replaced
+before lock acquisition causes rollback with no plugin effect or applied receipt. The separate
+lease-claim transaction must already have committed; an outer held row lock followed by this
+`REQUIRES_NEW` delivery is explicitly forbidden.

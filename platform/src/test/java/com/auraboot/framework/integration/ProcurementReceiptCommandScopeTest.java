@@ -106,12 +106,19 @@ class ProcurementReceiptCommandScopeTest {
         when(receipts.countActiveDeliveryLease(anyLong(), anyString(), anyString())).thenReturn(1);
         when(data.getById("pr_purchase_order_line", "line")).thenReturn(row());
         when(data.compareAndSet(anyString(), anyString(), anyString(), any(), anyMap())).thenReturn(true);
-        when(transactions.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+        when(receipts.lockActiveDeliveryLease(anyLong(), anyString(), anyString())).thenReturn(1L);
+        // The memory transaction delegate exposes Spring's active-T01 marker, not PG atomicity.
+        when(transactions.getTransaction(any())).thenAnswer(call -> {
+            org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+            return new SimpleTransactionStatus();
+        });
+        doAnswer(call -> { org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(false); return null; }).when(transactions).commit(any());
+        doAnswer(call -> { org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(false); return null; }).when(transactions).rollback(any());
         when(receipts.claimReceipt(anyLong(), anyString(), anyString(), anyString())).thenReturn(1);
         when(receipts.markReceiptApplied(anyLong(), anyString(), anyString(), anyString())).thenReturn(1);
     }
 
-    @AfterEach void cleanup() throws Exception { MetaContext.clear(); loader.close(); }
+    @AfterEach void cleanup() throws Exception { MetaContext.clear(); org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(false); loader.close(); }
 
 
     @Test void exactCasAdvancesOnlyVerifiedLineAndRestoresCommandScope() {
@@ -178,6 +185,34 @@ class ProcurementReceiptCommandScopeTest {
         effect = event -> accessor.compareAndSet(31, "pr_purchase_order_line", "line", "row_version", 7, Map.of("pr_pol_received_qty", 25));
         assertThatThrownBy(this::deliver).isInstanceOf(SecurityException.class);
         verify(receipts, never()).markReceiptApplied(anyLong(), anyString(), anyString(), anyString());
+        verify(transactions).rollback(any());
+    }
+    @Test void missingExactLeaseRowRejectsBeforeConsumerOrDataEffect() {
+        when(receipts.lockActiveDeliveryLease(anyLong(),anyString(),anyString())).thenReturn(null);
+        effect = event -> accessor.compareAndSet(31,"pr_purchase_order_line","line","row_version",7,Map.of("pr_pol_received_qty",25));
+        assertThatThrownBy(this::deliver).isInstanceOf(SecurityException.class);
+        verifyNoInteractions(data);
+        verify(receipts,never()).markReceiptApplied(anyLong(),anyString(),anyString(),anyString());
+        verify(transactions).rollback(any());
+    }
+    @Test void fullEnvelopeMustBeRecheckedAfterLockBeforeAnyPluginCallback() {
+        when(receipts.lockActiveDeliveryLease(anyLong(),anyString(),anyString())).thenAnswer(call -> {
+            when(receipts.countMatchingEnvelope(any())).thenReturn(0); return 1L;
+        });
+        java.util.concurrent.atomic.AtomicBoolean called = new java.util.concurrent.atomic.AtomicBoolean();
+        effect = event -> called.set(true);
+        assertThatThrownBy(this::deliver).isInstanceOf(SecurityException.class);
+        assertThat(called).isFalse();verifyNoInteractions(data);
+        verify(receipts,never()).markReceiptApplied(anyLong(),anyString(),anyString(),anyString());
+        verify(transactions).rollback(any());
+    }
+    @Test void missingT01TransactionMarkerCannotAcquireLockOrAuthority() {
+        when(transactions.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(false);
+        effect = event -> accessor.compareAndSet(31,"pr_purchase_order_line","line","row_version",7,Map.of("pr_pol_received_qty",25));
+        assertThatThrownBy(this::deliver).isInstanceOf(SecurityException.class);
+        verify(receipts,never()).lockActiveDeliveryLease(anyLong(),anyString(),anyString());
+        verifyNoInteractions(data);
         verify(transactions).rollback(any());
     }
     @Test void metadataDriftDuringCasCannotMarkApplied() {
