@@ -2012,7 +2012,7 @@ function prepareDetailRuntimeBlock(
  * + dictCode) and datetime formatting — mirroring the list table's column conventions — so
  * detail sub-tables never leak raw field codes.
  */
-function DataPathTable({
+export function DataPathTable({
   title,
   columns,
   rows,
@@ -2036,7 +2036,8 @@ function DataPathTable({
   ) => Array<{ value: string; label: string; extension?: Record<string, any> }>;
 }) {
   const renderCell = (col: { field: string; renderType?: string; dictCode?: string }, row: any) => {
-    const raw = row?.[col.field];
+    const raw = row && Object.prototype.hasOwnProperty.call(row, col.field)
+      ? row[col.field] : getByDataPath(row, col.field);
     if (raw == null || raw === '') return <span className="text-text-3">—</span>;
     if (col.renderType === 'tag' && col.dictCode && getDictItems) {
       const items = getDictItems(col.dictCode) || [];
