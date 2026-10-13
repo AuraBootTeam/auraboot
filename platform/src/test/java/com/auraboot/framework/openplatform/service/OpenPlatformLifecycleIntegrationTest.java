@@ -536,7 +536,7 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void populatedOperationsQueriesAggregateSafelyAndReplayOnlyWithinInstallation() {
+    void populatedOperationsQueriesAggregateSafelyAndReplayOnlyWithinInstallation() throws Exception {
         var application = managementService.createApplication(
                 new CreateApplicationRequest("Operations fixture", null));
         var installation = managementService.install(application.pid(),
@@ -637,6 +637,51 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
         assertReplayClearsCooldownAndPreservesLease(tenantId, future);
         assertFalse(webhookService.replayDelivery("delivery-ops-1"));
         assertEquals(2, jdbcTemplate.queryForObject(
+                "SELECT replay_count FROM ab_webhook_delivery_log WHERE tenant_id=? AND pid=?",
+                Integer.class, tenantId, "delivery-ops-1"));
+        var otherRequest = new WebhookCreateRequest();
+        otherRequest.setName("Wrong replay parent");
+        otherRequest.setTargetUrl("https://other.example.invalid/hook");
+        otherRequest.setEventType("fixture.replay-parent");
+        var otherSubscription = webhookService.create(otherRequest);
+        jdbcTemplate.update("UPDATE ab_webhook_delivery_log SET delivery_status='dead_letter' WHERE tenant_id=? AND pid=?",
+                tenantId, "delivery-ops-1");
+        jdbcTemplate.update("UPDATE ab_webhook_receiver_lane SET ready_at=? WHERE tenant_id=? AND receiver_key=?",
+                java.sql.Timestamp.from(future), tenantId, "https://example.invalid:443");
+        sqlSessionTemplate.clearCache();
+        var beforeWrongParent = jdbcTemplate.queryForMap(
+                "SELECT * FROM ab_webhook_delivery_log WHERE tenant_id=? AND pid=?", tenantId, "delivery-ops-1");
+        var beforeWrongLane = jdbcTemplate.queryForMap(
+                "SELECT * FROM ab_webhook_receiver_lane WHERE tenant_id=? AND receiver_key=?",
+                tenantId, "https://example.invalid:443");
+        // Real controller/service/PG with a trusted fixture context; this does not exercise authentication filters.
+        var replayHttp = org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(
+                new com.auraboot.framework.webhook.controller.WebhookController(webhookService,
+                        applicationContext.getBean(com.auraboot.framework.common.crypto.FieldEncryptionService.class)))
+                .setMessageConverters(new org.springframework.http.converter.json.MappingJackson2HttpMessageConverter(
+                        applicationContext.getBean(com.fasterxml.jackson.databind.ObjectMapper.class))).build();
+        replayHttp.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                        "/api/webhooks/" + otherSubscription.getPid() + "/deliveries/delivery-ops-1/replay"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code")
+                        .value(org.hamcrest.Matchers.not("0")));
+        assertEquals(beforeWrongParent, jdbcTemplate.queryForMap(
+                "SELECT * FROM ab_webhook_delivery_log WHERE tenant_id=? AND pid=?", tenantId, "delivery-ops-1"));
+        assertEquals(beforeWrongLane, jdbcTemplate.queryForMap(
+                "SELECT * FROM ab_webhook_receiver_lane WHERE tenant_id=? AND receiver_key=?",
+                tenantId, "https://example.invalid:443"));
+        String correctRoute = "/api/webhooks/subscription-ops-1/deliveries/delivery-ops-1/replay";
+        replayHttp.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(correctRoute))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code").value("0"));
+        assertReplayClearsCooldownAndPreservesLease(tenantId, future);
+        assertEquals("pending", jdbcTemplate.queryForObject(
+                "SELECT delivery_status FROM ab_webhook_delivery_log WHERE tenant_id=? AND pid=?",
+                String.class, tenantId, "delivery-ops-1"));
+        replayHttp.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(correctRoute))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code")
+                        .value(org.hamcrest.Matchers.not("0")));
+        assertEquals(3, jdbcTemplate.queryForObject(
                 "SELECT replay_count FROM ab_webhook_delivery_log WHERE tenant_id=? AND pid=?",
                 Integer.class, tenantId, "delivery-ops-1"));
     }

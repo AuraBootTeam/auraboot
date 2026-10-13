@@ -98,7 +98,7 @@ public class WebhookController {
         if (subscription == null) {
             return ApiResponse.error("Webhook not found: " + pid);
         }
-        if (!webhookService.replayDelivery(deliveryPid)) {
+        if (!webhookService.replayDelivery(pid, deliveryPid)) {
             return ApiResponse.error("Delivery is not replayable: " + deliveryPid);
         }
         return ApiResponse.success();

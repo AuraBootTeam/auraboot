@@ -181,6 +181,12 @@ public class WebhookServiceImpl implements WebhookService {
         return replayed == 1;
     }
 
+    @Override
+    public boolean replayDelivery(String subscriptionPid, String deliveryPid) {
+        return deliveryLogMapper.replayForSubscription(MetaContext.getCurrentTenantId(), subscriptionPid,
+                deliveryPid, MetaContext.getCurrentUserPid()) == 1;
+    }
+
     private int validateTimeout(Integer timeout) {
         int value = timeout == null ? 10000 : timeout;
         if (value < 1000 || value > 60000)

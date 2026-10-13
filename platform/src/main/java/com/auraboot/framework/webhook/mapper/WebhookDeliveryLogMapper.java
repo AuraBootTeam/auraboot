@@ -157,6 +157,27 @@ public interface WebhookDeliveryLogMapper extends BaseMapper<WebhookDeliveryLog>
     int replay(@Param("tenantId") Long tenantId, @Param("pid") String pid,
                @Param("actorPid") String actorPid);
 
+    @Select(value = """
+            WITH replayed AS (UPDATE ab_webhook_delivery_log
+            SET delivery_status = 'pending', retry_count = 0, next_retry_at = NOW(),
+                response_status = NULL, response_body = NULL, error_message = NULL,
+                delivered_at = NULL, lease_owner = NULL, lease_token = NULL, lease_until = NULL,
+                replay_count = replay_count + 1, last_replayed_at = NOW(),
+                last_replayed_by_pid = #{actorPid}, updated_at = NOW()
+            WHERE tenant_id = #{tenantId} AND subscription_pid = #{subscriptionPid} AND pid = #{pid}
+              AND delivery_status IN ('dead_letter', 'failed')
+            RETURNING tenant_id,receiver_key), awakened AS (
+                UPDATE ab_webhook_receiver_lane l SET ready_at=clock_timestamp()
+                FROM replayed r WHERE l.tenant_id=r.tenant_id AND l.receiver_key=r.receiver_key
+                RETURNING l.receiver_key)
+            SELECT COUNT(*) FROM replayed
+            """, affectData = true)
+    @org.apache.ibatis.annotations.Options(flushCache = org.apache.ibatis.annotations.Options.FlushCachePolicy.TRUE,
+            useCache = false)
+    int replayForSubscription(@Param("tenantId") Long tenantId,
+               @Param("subscriptionPid") String subscriptionPid, @Param("pid") String pid,
+               @Param("actorPid") String actorPid);
+
     @Select("""
             SELECT d.pid, d.subscription_pid, s.name AS subscription_name,
                    d.event_id, d.request_id, d.delivery_status, d.retry_count, d.max_retries,
