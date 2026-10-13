@@ -50,6 +50,21 @@ class SoftDeleteColumnInitializerTest {
         when(jdbc.queryForList(anyString(), eq(String.class))).thenThrow(new IllegalStateException("unavailable"));
         assertThrows(IllegalStateException.class, init::onApplicationReady);
     }
+    @Test void softDeleteScanAcceptsNestedAndTopLevelShapes() {
+        // Import-created rows store the payload nested ({"extension": {...}}); the
+        // scan must match both that shape and the legacy top-level one, or the
+        // backfill is dead code for exactly the legacy tables it exists for.
+        List<String> sql = new java.util.ArrayList<>();
+        when(jdbc.queryForList(anyString(), eq(String.class))).thenAnswer(inv -> {
+            sql.add(inv.getArgument(0, String.class));
+            return List.of();
+        });
+        init.onApplicationReady();
+        assertEquals(1, sql.size());
+        org.assertj.core.api.Assertions.assertThat(sql.get(0))
+                .contains("extension ->> 'softDelete'")
+                .contains("extension #>> '{extension,softDelete}'");
+    }
     @Test void emptyInventoryIsReadOnly() {
         when(jdbc.queryForList(anyString(), eq(String.class))).thenReturn(List.of());
         init.onApplicationReady();
