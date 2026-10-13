@@ -102,7 +102,7 @@ test.describe('AMOS lens fault journeys (S12 batch-2)', () => {
       });
       await page.goto(`/dashboards/view/${lens.code}`, { waitUntil: 'domcontentloaded' });
       await expect(
-        page.getByRole('heading', { name: lens.heading }),
+        page.getByRole('heading', { name: lens.heading, level: 1 }),
         `${lens.code} shell still renders under query failure`,
       ).toBeVisible({ timeout: 20_000 });
       await expect(page.getByRole('alert').first(), 'the failed query must render an explicit error').toBeVisible();
@@ -131,7 +131,7 @@ test.describe('AMOS lens fault journeys (S12 batch-2)', () => {
       release!();
       await navigation;
       await expect(
-        page.getByRole('heading', { name: lens.heading }),
+        page.getByRole('heading', { name: lens.heading, level: 1 }),
         'content replaces the loading state',
       ).toBeVisible({ timeout: 20_000 });
       await page.screenshot({ path: `test-results/artifacts/amos-fault-${lens.code}-loading.png` });
@@ -172,7 +172,7 @@ test.describe('AMOS lens fault journeys (S12 batch-2)', () => {
       });
       await page.goto(`/dashboards/view/${lens.code}`, { waitUntil: 'domcontentloaded' });
       await expect(
-        page.getByRole('heading', { name: lens.heading }),
+        page.getByRole('heading', { name: lens.heading, level: 1 }),
       ).toBeVisible({ timeout: 20_000 });
       if (hasFreshnessSurface) {
         await expect
