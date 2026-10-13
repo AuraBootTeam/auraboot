@@ -611,10 +611,43 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
                 new InstallApplicationRequest("staging", Set.of("assets.read"), 600));
         assertThrows(IllegalStateException.class,
                 () -> managementService.replayWebhookDelivery(otherInstallation.pid(), "delivery-ops-1"));
+        // Manual replay overrides the receiver cooldown, but must preserve another in-flight lease.
+        Instant future = Instant.now().plusSeconds(3600);
+        jdbcTemplate.update("""
+                UPDATE ab_webhook_receiver_lane SET ready_at=?,lease_token=?,lease_until=?
+                WHERE tenant_id=? AND receiver_key=?
+                """, java.sql.Timestamp.from(future), "other-active-attempt", java.sql.Timestamp.from(future),
+                tenantId, "https://example.invalid:443");
+        assertThrows(IllegalStateException.class,
+                () -> managementService.replayWebhookDelivery(otherInstallation.pid(), "delivery-ops-1"));
+        assertEquals(future.toEpochMilli(), jdbcTemplate.queryForObject(
+                "SELECT ready_at FROM ab_webhook_receiver_lane WHERE tenant_id=? AND receiver_key=?",
+                java.sql.Timestamp.class, tenantId, "https://example.invalid:443").toInstant().toEpochMilli());
         managementService.replayWebhookDelivery(installation.pid(), "delivery-ops-1");
+        assertReplayClearsCooldownAndPreservesLease(tenantId, future);
         assertTrue(managementService.listWebhookDeliveries(installation.pid(), "dead_letter", 50).isEmpty());
         assertEquals("pending", managementService.listWebhookDeliveries(installation.pid(), null, 50)
                 .getFirst().status());
+        jdbcTemplate.update("UPDATE ab_webhook_delivery_log SET delivery_status='dead_letter' WHERE tenant_id=? AND pid=?",
+                tenantId, "delivery-ops-1");
+        jdbcTemplate.update("UPDATE ab_webhook_receiver_lane SET ready_at=? WHERE tenant_id=? AND receiver_key=?",
+                java.sql.Timestamp.from(future), tenantId, "https://example.invalid:443");
+        sqlSessionTemplate.clearCache();
+        assertTrue(webhookService.replayDelivery("delivery-ops-1"));
+        assertReplayClearsCooldownAndPreservesLease(tenantId, future);
+        assertFalse(webhookService.replayDelivery("delivery-ops-1"));
+        assertEquals(2, jdbcTemplate.queryForObject(
+                "SELECT replay_count FROM ab_webhook_delivery_log WHERE tenant_id=? AND pid=?",
+                Integer.class, tenantId, "delivery-ops-1"));
+    }
+
+    private void assertReplayClearsCooldownAndPreservesLease(Long tenantId, Instant leaseUntil) {
+        var lane = jdbcTemplate.queryForMap(
+                "SELECT ready_at,lease_token,lease_until FROM ab_webhook_receiver_lane WHERE tenant_id=? AND receiver_key=?",
+                tenantId, "https://example.invalid:443");
+        assertTrue(((java.sql.Timestamp) lane.get("ready_at")).toInstant().isBefore(Instant.now()));
+        assertEquals("other-active-attempt", lane.get("lease_token"));
+        assertEquals(leaseUntil.toEpochMilli(), ((java.sql.Timestamp) lane.get("lease_until")).toInstant().toEpochMilli());
     }
 
     @Test

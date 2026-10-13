@@ -137,8 +137,8 @@ public interface WebhookDeliveryLogMapper extends BaseMapper<WebhookDeliveryLog>
                       @Param("oldReceiverKey") String oldReceiverKey,@Param("receiverKey") String receiverKey,
                       @Param("targetUrl") String targetUrl);
 
-    @Update("""
-            UPDATE ab_webhook_delivery_log
+    @Select(value = """
+            WITH replayed AS (UPDATE ab_webhook_delivery_log
             SET delivery_status = 'pending', retry_count = 0, next_retry_at = NOW(),
                 response_status = NULL, response_body = NULL, error_message = NULL,
                 delivered_at = NULL, lease_owner = NULL, lease_token = NULL, lease_until = NULL,
@@ -146,7 +146,14 @@ public interface WebhookDeliveryLogMapper extends BaseMapper<WebhookDeliveryLog>
                 last_replayed_by_pid = #{actorPid}, updated_at = NOW()
             WHERE tenant_id = #{tenantId} AND pid = #{pid}
               AND delivery_status IN ('dead_letter', 'failed')
-            """)
+            RETURNING tenant_id,receiver_key), awakened AS (
+                UPDATE ab_webhook_receiver_lane l SET ready_at=clock_timestamp()
+                FROM replayed r WHERE l.tenant_id=r.tenant_id AND l.receiver_key=r.receiver_key
+                RETURNING l.receiver_key)
+            SELECT COUNT(*) FROM replayed
+            """, affectData = true)
+    @org.apache.ibatis.annotations.Options(flushCache = org.apache.ibatis.annotations.Options.FlushCachePolicy.TRUE,
+            useCache = false)
     int replay(@Param("tenantId") Long tenantId, @Param("pid") String pid,
                @Param("actorPid") String actorPid);
 
@@ -176,8 +183,8 @@ public interface WebhookDeliveryLogMapper extends BaseMapper<WebhookDeliveryLog>
                           @Param("installationPid") String installationPid,
                           @Param("since") Instant since);
 
-    @Update("""
-            UPDATE ab_webhook_delivery_log
+    @Select(value = """
+            WITH replayed AS (UPDATE ab_webhook_delivery_log
             SET delivery_status = 'pending', retry_count = 0, next_retry_at = NOW(),
                 response_status = NULL, response_body = NULL, error_message = NULL,
                 delivered_at = NULL, lease_owner = NULL, lease_token = NULL, lease_until = NULL,
@@ -185,7 +192,14 @@ public interface WebhookDeliveryLogMapper extends BaseMapper<WebhookDeliveryLog>
                 last_replayed_by_pid = #{actorPid}, updated_at = NOW()
             WHERE tenant_id = #{tenantId} AND installation_pid = #{installationPid} AND pid = #{pid}
               AND delivery_status IN ('dead_letter', 'failed')
-            """)
+            RETURNING tenant_id,receiver_key), awakened AS (
+                UPDATE ab_webhook_receiver_lane l SET ready_at=clock_timestamp()
+                FROM replayed r WHERE l.tenant_id=r.tenant_id AND l.receiver_key=r.receiver_key
+                RETURNING l.receiver_key)
+            SELECT COUNT(*) FROM replayed
+            """, affectData = true)
+    @org.apache.ibatis.annotations.Options(flushCache = org.apache.ibatis.annotations.Options.FlushCachePolicy.TRUE,
+            useCache = false)
     int replayForInstallation(@Param("tenantId") Long tenantId,
                               @Param("installationPid") String installationPid,
                               @Param("pid") String pid,
