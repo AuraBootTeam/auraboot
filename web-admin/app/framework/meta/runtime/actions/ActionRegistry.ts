@@ -1071,6 +1071,26 @@ actionRegistry.register('form.set', ({ stateManager, scopeId, args, expressionEv
   Object.entries(values).forEach(([key, value]) => stateManager.updateForm(scopeId, key, value));
 });
 
+/** Allocate one domain request key in the existing scoped state, never per click. */
+actionRegistry.register('state.ensureRequestKey', ({ stateManager, scopeId, args }) => {
+  if (!stateManager || !scopeId || !stateManager.getScope(scopeId) || !args
+    || Object.keys(args).length !== 1 || typeof args.field !== 'string'
+    || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(args.field)
+    || ['__proto__', 'prototype', 'constructor'].includes(args.field))
+    throw new Error('state.ensureRequestKey requires a scoped field');
+  const current = stateManager.getContext(scopeId).state[args.field];
+  if (current !== undefined && current !== null) {
+    if (typeof current !== 'string' || !current.length || current.length > 128
+      || current.trim() !== current || /[\x00-\x1f\x7f]/.test(current))
+      throw new Error('Invalid existing request key');
+    return;
+  }
+  if (typeof globalThis.crypto?.randomUUID !== 'function')
+    throw new Error('Secure request key generation is unavailable');
+  const key = globalThis.crypto.randomUUID();
+  stateManager.updateState(scopeId, args.field, key);
+});
+
 /**
  * state.set - 设置状态
  * 更新指定作用域的状态值

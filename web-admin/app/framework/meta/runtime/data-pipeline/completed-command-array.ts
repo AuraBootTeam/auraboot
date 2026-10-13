@@ -1,5 +1,5 @@
 import type { DataSourceConfig } from '../../schemas/types';
-import { boundedRecordRows, readOwnPath } from '../expression/row-projection';
+import { boundedRecordRows, readOwnPath, projectRows } from '../expression/row-projection';
 
 /** No phase, path or pagination fallback: incomplete commands cannot look empty. */
 export function completedCommandArray(
@@ -8,7 +8,13 @@ export function completedCommandArray(
 ): Record<string, unknown>[] {
   if (readOwnPath(command, 'phaseReached') !== 'completed')
     throw new Error('Expected completed command response');
-  return boundedRecordRows(readOwnPath(readOwnPath(command, 'data'), config.dataPath ?? ''));
+  const rows = boundedRecordRows(readOwnPath(readOwnPath(command, 'data'), config.dataPath ?? ''));
+  if (config.rowProjection !== undefined || config.rowIdentityField !== undefined) {
+    if (config.adaptor !== 'commandArray' || !config.rowProjection || typeof config.rowIdentityField !== 'string')
+      throw new Error('Command array projection requires an explicit identity');
+    return projectRows(rows, config.rowProjection, config.rowIdentityField);
+  }
+  return rows;
 }
 
 export function completedCommandOptions(command: unknown, config: DataSourceConfig) {

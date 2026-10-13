@@ -53,6 +53,8 @@ describe('CardGrid completed command arrays (hermetic mounted DOM)', () => {
       autoFetch: false,
       adaptor: 'commandArray',
       dataPath: 'lines',
+      rowProjection: {pid:'pid',name:'name',quantity:'quantity', taxIncluded:{paths:'taxIncluded',optional:true,omitWhen:['undefined','null','empty']}},
+      rowIdentityField:'pid',
       params: { targetRecordPid: 'p' },
     });
     const runtime = {
@@ -73,7 +75,7 @@ describe('CardGrid completed command arrays (hermetic mounted DOM)', () => {
       code: '0',
       data: {
         phaseReached: 'completed',
-        data: { lines: [{ pid: 'p', name: 'Item', quantity: qty }] },
+        data: { lines: [{ pid: 'p', name: 'Item', quantity: qty, taxIncluded:false, richDTO:{secret:'not-editable'} }] },
       },
     });
     vi.mocked(fetchResult).mockResolvedValueOnce(completed('100.000000000000001') as any);
@@ -98,6 +100,7 @@ describe('CardGrid completed command arrays (hermetic mounted DOM)', () => {
     await waitFor(() =>
       expect(screen.getByLabelText('Quantity')).toHaveValue('100.000000000000001'),
     );
+    expect(state.getFieldValue('edit','choices')).toEqual([{pid:'p',name:'Item',quantity:'100.000000000000001',taxIncluded:false}]);
     fireEvent.change(screen.getByLabelText('Quantity'), {
       target: { value: '60.000000000000001' },
     });

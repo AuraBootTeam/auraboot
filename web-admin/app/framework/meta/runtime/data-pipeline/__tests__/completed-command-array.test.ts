@@ -115,3 +115,30 @@ describe('PROJECT_ROWS boundary', () => {
     expect(() => projectRows([], { identity: 'pid' }, 'missing')).toThrow();
   });
 });
+
+describe('Declared optional command row projection', () => {
+  it('omits only declared unset scalars, keeps false/zero/exact decimals and strips rich DTOs', () => {
+    const optional = (paths: string) => ({ paths, optional: true as const, omitWhen: ['undefined','null','empty'] as const });
+    const projection = { sourcePid: 'pid', sourceRevision: { paths: ['revision','demand.revision'] },
+      price: optional('price'), included: optional('included'), tax: optional('tax'), remark: optional('remark') };
+    const rows = [{ pid: 'p', demand: { revision: 3, hidden: 'not-command-data' }, price: '0.000000000000001', included: false, tax: 0, remark: '' }];
+    expect(projectRows(rows, projection, 'sourcePid')).toEqual([{ sourcePid:'p', sourceRevision:3, price:'0.000000000000001', included:false, tax:0 }]);
+    expect(completedCommandArray(command(rows), { adaptor:'commandArray', dataPath:'items', rowProjection:projection, rowIdentityField:'sourcePid' } as any)).toEqual(projectRows(rows, projection, 'sourcePid'));
+    expect(projectRows([{pid:'p', tax:null}], {sourcePid:'pid', tax:optional('tax'), price:optional('price')}, 'sourcePid')).toEqual([{sourcePid:'p'}]);
+  });
+  it('requires identity and rejects ambiguous omission policy and nested values', () => {
+    for (const descriptor of [
+      {paths:'pid',optional:true,omitWhen:['undefined']},
+      {paths:'pid',optional:true}, {paths:'pid',optional:'true',omitWhen:['undefined']},
+      {paths:'pid',optional:true,omitWhen:['false']},
+      {paths:'pid',optional:true,omitWhen:['undefined','undefined']},
+    ]) expect(() => projectRows([{pid:'p'}], {sourcePid:descriptor} as any, 'sourcePid')).toThrow();
+    expect(() => projectRows([{pid:'p', tax:{value:1}}], {sourcePid:'pid',tax:{paths:'tax',optional:true,omitWhen:['undefined']} } as any,'sourcePid')).toThrow();
+    expect(() => projectRows([{pid:'p'}], {sourcePid:'pid',tax:{paths:'tax'} } as any,'sourcePid')).toThrow();
+    expect(projectRows([{pid:'p', tax:null}], {sourcePid:'pid',tax:{paths:'tax',optional:true,omitWhen:['undefined']} } as any,'sourcePid')).toEqual([{sourcePid:'p',tax:null}]);
+  });
+  it('refuses half-configured or wrong-adaptor row initialization even for empty arrays', () => {
+    for (const config of [{rowProjection:{pid:'pid'}},{rowIdentityField:'pid'},{adaptor:'commandOptions',rowProjection:{pid:'pid'},rowIdentityField:'pid'}])
+      expect(() => completedCommandArray(command([]),{dataPath:'items',...config} as any)).toThrow();
+  });
+});

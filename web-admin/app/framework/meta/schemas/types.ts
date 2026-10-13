@@ -1,3 +1,4 @@
+import type { RowProjection } from '../runtime/expression/row-projection';
 /**
  * 统一 DSL Schema 类型定义
  * 基于 final.v1.0 DSL 结构
@@ -105,6 +106,9 @@ export interface DataSourceConfig {
   adaptor?: string; // Default: 'optionList'
   /** Explicit path inside completed command data; no fallback. */
   dataPath?: string;
+  /** Optional safe projection before commandArray rows seed a scoped form. */
+  rowProjection?: RowProjection;
+  rowIdentityField?: string;
   /** Options require this total to equal the complete array length. */
   totalPath?: string;
   /** Optional boolean path; false disables the corresponding option. */

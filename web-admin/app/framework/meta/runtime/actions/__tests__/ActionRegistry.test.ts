@@ -1487,3 +1487,35 @@ describe('ActionRegistry dynamic choice load failure boundaries', () => {
     } finally { window.removeEventListener('dialog:form', dialog); }
   });
 });
+
+describe('Scoped stable request-key action and real flow transport', () => {
+  it('reuses the domain key after failed transport and refresh, clears only explicitly after success', async () => {
+    const manager = new ScopedStateManager({locale:'en',theme:'light'} as any);
+    manager.createScope('shipment', {form:{quantity:'250.0000'}});
+    const flow = new FlowRunner({evaluator:new ExpressionEvaluator(),actionRegistry,stateManager:manager,scopeId:'shipment',dataSourceManager:{} as any,schema:{} as any,getAllFormFields:()=>[]});
+    const fetchResult = vi.fn().mockResolvedValueOnce({code:'400',message:'Rejected'}).mockResolvedValue({code:'0',data:{ok:true}});
+    const steps = [{action:'state.ensureRequestKey',args:{field:'shipmentRequestKey'}},{action:'api.request',endpoint:'/api/example/ship',method:'post',body:{requestKey:'${state.shipmentRequestKey}',quantity:'${form.quantity}'}}];
+    await expect(flow.run(steps,{...manager.getContext('shipment'),fetchResult} as any)).rejects.toThrow();
+    const first = manager.getContext('shipment').state.shipmentRequestKey;
+    expect(first).toMatch(/^[a-f0-9-]{36}$/);
+    await actionRegistry.execute('refresh',{loadData:vi.fn().mockResolvedValue(undefined)});
+    await flow.run(steps,{...manager.getContext('shipment'),fetchResult} as any);
+    expect(fetchResult).toHaveBeenCalledTimes(2);
+    expect(fetchResult.mock.calls.map(call=>call[1].params)).toEqual([{requestKey:first,quantity:'250.0000'},{requestKey:first,quantity:'250.0000'}]);
+    await actionRegistry.execute('state.set',{stateManager:manager,scopeId:'shipment',args:{shipmentRequestKey:null}});
+    await flow.run(steps,{...manager.getContext('shipment'),fetchResult} as any);
+    expect(manager.getContext('shipment').state.shipmentRequestKey).not.toBe(first);
+  });
+  it('rejects invalid existing keys and missing scopes without replacing them or calling transport', async () => {
+    for (const value of ['',false,1,' bad ','a'.repeat(129),'bad\nkey']) {
+      const manager = new ScopedStateManager({} as any);manager.createScope('s',{state:{requestKey:value}});
+      await expect(actionRegistry.execute('state.ensureRequestKey',{stateManager:manager,scopeId:'s',args:{field:'requestKey'}})).rejects.toThrow();
+      expect(manager.getContext('s').state.requestKey).toBe(value);
+    }
+    const manager = new ScopedStateManager({} as any);
+    await expect(actionRegistry.execute('state.ensureRequestKey',{stateManager:manager,scopeId:'missing',args:{field:'requestKey'}})).rejects.toThrow();
+    manager.createScope('s');
+    for (const args of [{field:'__proto__'}, {field:'state.key'}, {field:'requestKey',value:'forced'}, {}])
+      await expect(actionRegistry.execute('state.ensureRequestKey',{stateManager:manager,scopeId:'s',args})).rejects.toThrow();
+  });
+});
