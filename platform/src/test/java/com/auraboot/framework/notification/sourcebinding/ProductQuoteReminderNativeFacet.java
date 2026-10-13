@@ -346,7 +346,7 @@ final class ProductQuoteReminderNativeFacet {
         }
         assertThat(s.imports.verifyImportReferenceIntegrity()).isEmpty();
         trace.put("formalImportedDirectories", 23);
-        trace.put("stage", "product-physical-model-admission");
+        stage = "product-physical-model-admission";
         List<Map<String, Object>> physicalModels = new ArrayList<>();
         trace.put("actualPhysicalModelDiagnostics", physicalModels);
         for (String model : BUSINESS_MODELS) {
