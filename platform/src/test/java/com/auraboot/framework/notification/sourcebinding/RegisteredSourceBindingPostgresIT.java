@@ -26,6 +26,7 @@ import com.auraboot.framework.tenant.dao.entity.Tenant;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.service.TenantMemberService;
 import com.auraboot.framework.tenant.service.TenantService;
+import com.auraboot.framework.tenant.service.TenantBootstrapService;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.service.UserService;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -37,6 +38,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -98,6 +100,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @SpringBootTest(classes = TestApplication.class, properties = {
         "spring.datasource.url=${TEST_DATABASE_URL}", "spring.data.redis.database=${TEST_REDIS_DATABASE}",
         "s06.native.source-binding.fixture=true",
+        "s06.native.product-quote-facet.enabled=${S06_NATIVE_PRODUCT_QUOTE_FACET:false}",
         "security.field-encryption.key=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="})
 @ActiveProfiles("integration-test")
 @Import(RegisteredSourceBindingPostgresIT.PollerIsolation.class)
@@ -127,6 +130,8 @@ class RegisteredSourceBindingPostgresIT {
     @Autowired ObjectMapper json;
     @Autowired PlatformTransactionManager manager;
     @Autowired TenantService tenants;
+    @Autowired TenantBootstrapService tenantBootstrap;
+    @Value("${s06.native.product-quote-facet.enabled:false}") private boolean productQuoteFacetEnabled;
     @Autowired UserService users;
     @Autowired TenantMemberService members;
     @Autowired PluginImportService imports;
@@ -535,7 +540,7 @@ class RegisteredSourceBindingPostgresIT {
     private void proved(String name) { checkpoints.add(name); stage = "business-checkpoints-completed"; }
 
     @Test
-    void actualImportedMetadataExplicitRecipientsReplayAndConsumePersistExactlyOnce() {
+    void actualImportedMetadataExplicitRecipientsReplayAndConsumePersistExactlyOnce() throws Exception {
         startBusiness();
         RegisteredSourcePollingAdapter adapter = nativePollingAdapter();
         Map<String, Object> expiryBefore = businessSnapshot();
@@ -597,6 +602,15 @@ class RegisteredSourceBindingPostgresIT {
         assertThat(events()).isEqualTo(sealedOriginal);
         proved("actual sixth approved child model: exact DECIMAL partial progress replays identical envelope; all101 rows scanned even after positive early row; oversubmitted later row and allfull zero new queue");
         proved("actual host adapter selected bounded source from approved registry; raw metadata approved; two explicit recipients; stable queue replay; receipt/inbox duplicate consume suppressed; immutable source");
+        trace.put("productQuoteFacetSelected", productQuoteFacetEnabled);
+        if (productQuoteFacetEnabled) {
+            ProductQuoteReminderNativeFacet.run(new ProductQuoteReminderNativeFacet.Services(dataSource, jdbc, json,
+                    manager, tenants, users, members, tenantBootstrap, imports, data, templates, rules,
+                    reader, validator, reliable, writer, executor, List.of(tenant.getId(), foreignTenant.getId())), evidence);
+            proved("actual full Product DSL import and ReminderService queue facet completed with test-owned station notification authority");
+        } else {
+            trace.put("productQuoteFacet", "not_selected; original seven-method baseline only");
+        }
     }
 
     @Test

@@ -1,0 +1,527 @@
+package com.auraboot.framework.notification.sourcebinding;
+
+import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.integration.ReliableEventDeliveryExecutor;
+import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.meta.constant.SystemFieldConstants;
+import com.auraboot.framework.notification.dto.NotificationRuleRequest;
+import com.auraboot.framework.notification.dto.NotificationTemplateCreateRequest;
+import com.auraboot.framework.notification.service.NotificationRuleService;
+import com.auraboot.framework.notification.service.NotificationTemplateService;
+import com.auraboot.framework.notification.service.impl.PluginNotificationDeliveryAccessorImpl;
+import com.auraboot.framework.notification.service.impl.StrictInAppDeliveryWriter;
+import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.Approval;
+import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.Binding;
+import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.Deadline;
+import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.DeadlineRelation;
+import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.Entity;
+import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.Exact;
+import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.Owner;
+import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.Principal;
+import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.Source;
+import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.Target;
+import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.Verification;
+import com.auraboot.framework.plugin.dto.imports.ImportRequest;
+import com.auraboot.framework.plugin.extension.DataAccessor;
+import com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelope;
+import com.auraboot.framework.plugin.extension.integration.ReliableIntegrationAccessor;
+import com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImpl;
+import com.auraboot.framework.plugin.service.PluginImportService;
+import com.auraboot.framework.tenant.dao.entity.Tenant;
+import com.auraboot.framework.tenant.service.TenantBootstrapService;
+import com.auraboot.framework.tenant.service.TenantMemberService;
+import com.auraboot.framework.tenant.service.TenantService;
+import com.auraboot.framework.user.dao.entity.User;
+import com.auraboot.framework.user.service.UserService;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.lang.reflect.InvocationTargetException;
+import java.net.URLClassLoader;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.security.MessageDigest;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.function.Supplier;
+import javax.sql.DataSource;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+/** An additional facet of the existing native method, not a suite, production authority or phone/consent proof. */
+final class ProductQuoteReminderNativeFacet {
+    record Services(DataSource dataSource, JdbcTemplate jdbc, ObjectMapper json,
+                    PlatformTransactionManager manager, TenantService tenants, UserService users,
+                    TenantMemberService members, TenantBootstrapService bootstrap, PluginImportService imports,
+                    DynamicDataService data, NotificationTemplateService templates, NotificationRuleService rules,
+                    ImportedNotificationMetadataReader reader, ImportedNotificationMetadataValidator validator,
+                    ReliableIntegrationAccessor reliable, StrictInAppDeliveryWriter writer,
+                    ReliableEventDeliveryExecutor executor, List<Long> protectedTenantIds) {}
+    private static final List<String> MODELS = List.of("qo_procurement_reminder_common", "s2p_bid",
+            "pr_supplier_common", "qo_procurement_membership_common", "pr_supplier_pcba_contact");
+    private static final List<String> BUSINESS_MODELS = List.of("pr_supplier_common", "pr_supplier_pcba_contact",
+            "qo_procurement_membership_common", "s2p_sourcing_event", "s2p_bid", "qo_procurement_reminder_common");
+    private static final Instant SLOT = Instant.parse("2026-10-13T01:30:00Z"); // Existing Tuesday 09:30 Beijing quote slot.
+    private final String namespace = "sn" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+    private final Services s;
+    private final Path evidence;
+    private final Map<String, Object> trace = new LinkedHashMap<>();
+    private final FacetClock clock = new FacetClock();
+    private final Map<String, String> tables = new LinkedHashMap<>();
+    private Tenant tenant;
+    private User first, second;
+    private Binding binding;
+    private String sourcePid;
+    private String stage = "product-admission";
+    private boolean completed;
+    private Map<String, Object> protectedBaseline;
+
+    private ProductQuoteReminderNativeFacet(Services services, Path parent) throws Exception {
+        s = services;
+        evidence = Files.createDirectory(parent.resolve("product-quote-facet"));
+    }
+
+    static void run(Services services, Path evidence) throws Exception {
+        MetaContext.Snapshot previous = MetaContext.snapshot();
+        try {
+            new ProductQuoteReminderNativeFacet(services, evidence).run();
+        } finally {
+            MetaContext.clear();
+            MetaContext.restore(previous);
+        }
+    }
+
+    private void run() throws Exception {
+        trace.put("namespace", namespace);
+        trace.put("authority", "test-owned Product metadata registration and explicit synthetic users; never formal policy approval");
+        trace.put("providerCalls", 0);
+        try {
+            JsonNode input = admission();
+            stage = "product-formal-bootstrap-import";
+            initializeTenant();
+            importProduct(input);
+            assertThat(s.protectedTenantIds).hasSize(2).doesNotContain(tenant.getId());
+            protectedBaseline = protectedSnapshot();
+            stage = "product-native-initial-facts";
+            String supplier = create("pr_supplier_common", "pr_supplier_pcba_contact:sync_directory", Map.of(
+                    "pr_supplier_code", namespace, "pr_supplier_name", "Synthetic S06 supplier", "pr_supplier_status", "enabled"));
+            String c1 = contact(supplier, "first");
+            String c2 = contact(supplier, "second");
+            membership(first, supplier, c1);
+            membership(second, supplier, c2);
+            String task = create("s2p_sourcing_event", "qo_procurement_task_common:create", Map.of(
+                    "s2p_se_code", namespace, "s2p_se_title", "Synthetic S06 quotation", "s2p_se_event_type", "rfq",
+                    "s2p_se_status", "bidding", "s2p_se_collaboration_managed", true));
+            String quote = create("s2p_bid", "qo_procurement_task_common:dispatch", Map.of(
+                    "s2p_bid_sourcing_event_id", task, "s2p_bid_supplier_id", supplier, "s2p_bid_status", "draft",
+                    "s2p_bid_collaboration_managed", true, "qo_pr_quote_cutoff_at", SLOT.plusSeconds(3600)));
+            trace.put("initialFacts", Map.of("tenantId", tenant.getId(), "users", List.of(first.getPid(), second.getPid()),
+                    "supplierPid", supplier, "contactPids", List.of(c1, c2), "taskPid", task, "quotePid", quote,
+                    "seedPurpose", "native API-created synthetic initial facts; not verified phone, task dispatch or subscription acceptance"));
+            stage = "product-actual-reminder-queue";
+            Path jar = Path.of(input.path("productJarPath").asText()).toRealPath();
+            try (var loader = new URLClassLoader(new java.net.URL[]{jar.toUri().toURL()}, getClass().getClassLoader())) {
+                Class<?> service = loader.loadClass("com.auraboot.quote.engine.procurement.ProcurementReminderService");
+                assertThat(service.getClassLoader()).isSameAs(loader);
+                assertThat(Files.isSameFile(Path.of(service.getProtectionDomain().getCodeSource().getLocation().toURI()), jar)).isTrue();
+                var method = service.getMethod("queue", DataAccessor.class, Instant.class, List.class);
+                Map<String, Object> supplierRecord = nativeRecord("pr_supplier_common", supplier);
+                assertThat(queue(method, List.of(supplierRecord))).isEqualTo(1);
+                assertThat(queue(method, List.of(supplierRecord))).isZero();
+            }
+            var sources = s.jdbc.queryForList("SELECT pid,qo_pr_reminder_targets FROM \"" + tables.get("qo_procurement_reminder_common") + "\" WHERE tenant_id=? ORDER BY pid", tenant.getId());
+            assertThat(sources).hasSize(1);
+            sourcePid = (String) sources.getFirst().get("pid");
+            Map<String, Object> reminder = nativeRecord("qo_procurement_reminder_common", sourcePid);
+            assertThat(reminder.get("qo_pr_reminder_kind")).isEqualTo("quote");
+            assertThat(reminder.get("qo_pr_reminder_state")).isEqualTo("pending");
+            Object targets = reminder.get("qo_pr_reminder_targets");
+            JsonNode targetList = targets instanceof String text ? s.json.readTree(text) : s.json.valueToTree(targets);
+            assertThat(targetList.isArray()).isTrue();
+            assertThat(targetList.size()).isEqualTo(1);
+            assertThat(targetList.get(0).asText()).isEqualTo(quote);
+            trace.put("reminderSourcePid", sourcePid);
+            stage = "product-test-only-registry";
+            long rule = ruleAndTemplate();
+            binding = approval(rule);
+            var properties = new HostSourceBindingProperties();
+            properties.setEnabled(true);
+            properties.setBindings(List.of(binding));
+            var planner = new RegisteredSourcePlanResolver(properties, s.reader, s.validator, clock);
+            planner.initialize();
+            var host = new PluginNotificationDeliveryAccessorImpl(List.of(planner), s.reliable, s.writer);
+            ReflectionTestUtils.setField(host, "enabled", true);
+            var worker = new RegisteredSourceWorker(planner, s.reader, host, s.manager);
+            trace.put("actualTestOwnedBinding", binding);
+            Map<String, Object> beforeBusiness = business();
+            stage = "product-business";
+            assertThat(worker.process(tenant.getId(), binding.code(), sourcePid)).isEqualTo(2);
+            List<IntegrationEventEnvelope> events = events();
+            assertThat(events).hasSize(2);
+            assertThat(worker.process(tenant.getId(), binding.code(), sourcePid)).isEqualTo(2);
+            assertThat(events()).isEqualTo(events);
+            clock.now = SLOT.plusSeconds(3600);
+            assertThatThrownBy(() -> worker.process(tenant.getId(), binding.code(), sourcePid)).isInstanceOf(IllegalArgumentException.class);
+            for (var event : events) {
+                assertThatThrownBy(() -> s.executor.deliver(event, host, UniqueIdGenerator.generate())).isInstanceOf(IllegalArgumentException.class);
+            }
+            assertThat(count("ab_notification")).isZero();
+            assertThat(count("ab_integration_receipt")).isZero();
+            assertThat(events()).isEqualTo(events);
+            clock.now = SLOT;
+            for (var event : events) s.executor.deliver(event, host, UniqueIdGenerator.generate());
+            var inbox = s.jdbc.queryForList("SELECT to_jsonb(r)::text AS row FROM ab_notification r WHERE tenant_id=? ORDER BY id", tenant.getId());
+            assertThat(inbox).hasSize(2);
+            assertThat(s.jdbc.queryForList("SELECT user_id FROM ab_notification WHERE tenant_id=? ORDER BY user_id", Long.class, tenant.getId()))
+                    .containsExactlyInAnyOrder(first.getId(), second.getId());
+            assertThat(count("ab_integration_receipt")).isEqualTo(2);
+            for (var event : events) s.executor.deliver(event, host, UniqueIdGenerator.generate());
+            assertThat(s.jdbc.queryForList("SELECT to_jsonb(r)::text AS row FROM ab_notification r WHERE tenant_id=? ORDER BY id", tenant.getId())).isEqualTo(inbox);
+            assertThat(count("ab_integration_receipt")).isEqualTo(2);
+            assertThat(business()).isEqualTo(beforeBusiness);
+            assertThat(protectedSnapshot()).isEqualTo(protectedBaseline);
+            trace.put("protectedTenantsUnchanged", true);
+            trace.put("protectedBaselineSha256", SourceBindingCanonical.hash(protectedBaseline));
+            trace.put("businessSnapshotSha256", SourceBindingCanonical.hash(beforeBusiness));
+            trace.put("inboxRows", inbox);
+            trace.put("checkpoints", List.of("actual ReminderService same-slot one fact", "complete actual Product metadata approval",
+                    "two explicit test users with supplier/contact membership", "same envelope replay", "deadline delayed consume zero inbox/receipt",
+                    "two committed inbox/receipt pairs and duplicate suppression", "Product business facts unchanged"));
+            completed = true;
+            stage = "product-business-completed";
+        } finally {
+            trace.put("stage", stage);
+            trace.put("completed", completed);
+            List<JsonNode> rows = tenant == null ? List.of() : s.jdbc.queryForList(
+                    "SELECT to_jsonb(r)::text FROM ab_outbox r WHERE tenant_id=? ORDER BY id", String.class, tenant.getId())
+                    .stream().map(SourceBindingCanonical::parse).toList();
+            trace.put("ownedOutboxRowsBeforeTeardown", rows);
+            Path sealed = evidence.resolve(namespace + ".json");
+            Files.writeString(sealed, s.json.writerWithDefaultPrettyPrinter().writeValueAsString(trace), StandardOpenOption.CREATE_NEW);
+            if (completed) {
+                Map<String, Object> business = business();
+                TestOwnedNotificationIntentTeardown.run(s.dataSource,
+                        new TestOwnedNotificationIntentTeardown.Scope(tenant.getId(), binding.code(), sourcePid,
+                                Set.of(SourceBindingCanonical.reference(binding.code(), sourcePid, first.getId()),
+                                        SourceBindingCanonical.reference(binding.code(), sourcePid, second.getId()))),
+                        rows, sealed, evidence.resolve(namespace + "-teardown.json"));
+                assertThat(business()).isEqualTo(business);
+                assertThat(protectedSnapshot()).isEqualTo(protectedBaseline);
+            }
+        }
+    }
+
+    private JsonNode admission() throws Exception {
+        Path file = Path.of(required("S06_NATIVE_PRODUCT_INPUT")).toRealPath();
+        assertThat(sha(file)).isEqualTo(required("S06_NATIVE_PRODUCT_INPUT_SHA256"));
+        JsonNode input = s.json.readTree(file.toFile());
+        assertThat(input.path("runtime").asText()).isEqualTo("procurement-web-stack-20261010");
+        assertThat(input.path("database").asText()).isEqualTo("enterprise_22");
+        assertThat(input.path("redisDatabase").asInt()).isEqualTo(13);
+        assertThat(input.path("orderedImportDirectories").isArray()).isTrue();
+        assertThat(input.path("orderedImportDirectories").size()).isEqualTo(23);
+        JsonNode identities = input.path("verifiedSourceIdentities");
+        assertThat(identities.size()).isEqualTo(5);
+        List<Path> roots = new ArrayList<>();
+        for (String component : List.of("oss", "quote", "enterprise", "crm", "plugins")) {
+            JsonNode identity = identities.path(component);
+            Path root = Path.of(identity.path("root").asText()).toRealPath();
+            assertThat(identity.path("status").asText()).isEqualTo("ok");
+            assertThat(identity.path("expectedCommit").asText()).matches("[a-f0-9]{40}");
+            assertThat(identity.path("actualCommit").asText()).isEqualTo(identity.path("expectedCommit").asText());
+            assertThat(identity.path("expectedDirtyFingerprint").asText()).isEqualTo("clean");
+            assertThat(identity.path("actualDirtyFingerprint").asText()).isEqualTo("clean");
+            assertThat(git(root, "rev-parse", "HEAD")).isEqualTo(identity.path("actualCommit").asText());
+            assertThat(git(root, "status", "--porcelain")).isEmpty();
+            roots.add(root);
+        }
+        Set<Path> seen = new LinkedHashSet<>();
+        boolean productPresent = false;
+        for (JsonNode row : input.path("orderedImportDirectories")) {
+            Path directory = Path.of(row.path("path").asText()).toRealPath();
+            assertThat(roots.stream().anyMatch(directory::startsWith)).isTrue();
+            assertThat(seen.add(directory)).isTrue();
+            assertThat(sha(directory.resolve("plugin.json"))).isEqualTo(row.path("pluginJsonSha256").asText());
+            JsonNode manifest = s.json.readTree(directory.resolve("plugin.json").toFile());
+            if ("com.auraboot.quote-procurement".equals(manifest.path("pluginId").asText())) productPresent = true;
+            Set<String> expectedFiles = new LinkedHashSet<>();
+            for (JsonNode config : row.path("configFiles")) {
+                String relative = config.path("relativePath").asText();
+                Path actual = directory.resolve(relative).toRealPath();
+                assertThat(actual.startsWith(directory.resolve("config").toRealPath())).isTrue();
+                assertThat(expectedFiles.add(relative)).isTrue();
+                assertThat(sha(actual)).isEqualTo(config.path("sha256").asText());
+            }
+            Set<String> actualFiles = new LinkedHashSet<>();
+            try (var files = Files.walk(directory.resolve("config"))) {
+                files.filter(Files::isRegularFile).forEach(p -> actualFiles.add(directory.relativize(p).toString()));
+            }
+            assertThat(actualFiles).isEqualTo(expectedFiles);
+        }
+        assertThat(productPresent).isTrue();
+        Path jar = Path.of(input.path("productJarPath").asText()).toRealPath();
+        assertThat(sha(jar)).isEqualTo(input.path("productJarSha256").asText());
+        assertThat(input.path("productJarSha256").asText()).matches("[a-f0-9]{64}");
+        trace.put("inputSha256", sha(file));
+        trace.put("sealedSourceIdentities", identities);
+        trace.put("orderedImportDirectories", input.path("orderedImportDirectories"));
+        trace.put("productJarPath", jar.toString());
+        trace.put("productJarSha256", sha(jar));
+        return input;
+    }
+
+    private void initializeTenant() {
+        tenant = new Tenant();
+        tenant.setPid(UniqueIdGenerator.generate());
+        tenant.setName(namespace + "-product");
+        tenant.setDisplayName(namespace + "-product");
+        tenant.setStatus("active");
+        tenant = s.tenants.createTenant(tenant);
+        first = user("first");
+        second = user("second");
+        User initializer = user("bootstrap");
+        bind();
+        assertThat(s.bootstrap.bootstrapTenant(tenant.getId(), initializer.getId()).isSuccess()).isTrue();
+        bind();
+    }
+
+    private User user(String name) {
+        User user = s.users.signUp(namespace + "-" + name + "@example.invalid", "S06-local-synthetic-password-123",
+                "Synthetic Product S06 " + name, namespace + "_" + name);
+        s.members.addMember(user.getId(), tenant.getId(), "active");
+        return user;
+    }
+
+    private void importProduct(JsonNode input) {
+        for (JsonNode row : input.path("orderedImportDirectories")) {
+            assertThat(row.path("path").asText().length()).isLessThanOrEqualTo(256);
+            var preview = s.imports.parseDirectory(row.path("path").asText(), true);
+            assertThat(preview.isValid()).isTrue();
+            var request = ImportRequest.builder().importId(preview.getImportId())
+                    .conflictStrategy(ImportRequest.ConflictStrategy.OVERWRITE).autoPublishFields(true)
+                    .autoPublishModels(true).autoPublishCommands(true).autoPublishPages(true).createResourcePermissions(true).build();
+            assertThat(s.imports.execute(preview.getImportId(), request).isSuccess()).isTrue();
+        }
+        assertThat(s.imports.verifyImportReferenceIntegrity()).isEmpty();
+        for (String model : BUSINESS_MODELS) {
+            var registered = s.jdbc.queryForMap("SELECT table_name,status FROM ab_meta_model WHERE tenant_id=? AND code=? AND is_current=TRUE AND deleted_flag=FALSE", tenant.getId(), model);
+            assertThat(registered.get("status")).isEqualTo("published");
+            assertThat(registered.get("table_name")).isEqualTo(SystemFieldConstants.generateTableName(model));
+            String table = (String) registered.get("table_name");
+            assertThat(s.jdbc.queryForObject("SELECT to_regclass(?)::text", String.class, table)).isEqualTo(table);
+            tables.put(model, table);
+        }
+        trace.put("formalImportedDirectories", 23);
+        trace.put("actualRegisteredTables", tables);
+    }
+
+    private String contact(String supplier, String label) {
+        return create("pr_supplier_pcba_contact", "pr_supplier_pcba_contact:sync_directory", Map.of(
+                "pr_spc_supplier_id", supplier, "pr_spc_name", "Synthetic " + label, "qo_pr_contact_state", "active"));
+    }
+
+    private void membership(User user, String supplier, String contact) {
+        create("qo_procurement_membership_common", "qo_procurement_membership_common:bind_verified_phone", Map.of(
+                "qo_pr_membership_key", namespace + "_" + user.getPid(), "qo_pr_membership_user_pid", user.getPid(),
+                "qo_pr_membership_supplier_pid", supplier, "qo_pr_membership_contact_pid", contact,
+                "qo_pr_membership_state", "active"));
+    }
+
+    private String create(String model, String command, Map<String, Object> facts) {
+        return MetaContext.runWithCommandPermitScope(command,
+                () -> (String) s.data.create(model, new LinkedHashMap<>(facts)).get("pid"));
+    }
+
+    private Map<String, Object> nativeRecord(String model, String pid) {
+        return MetaContext.runWithCommandPermitScope("ALL", () -> s.data.getById(model, pid));
+    }
+
+    private int queue(java.lang.reflect.Method method, List<Map<String, Object>> suppliers) throws Exception {
+        return tx(() -> MetaContext.runWithCommandPermitScope("ALL", () -> {
+            try {
+                return (Integer) method.invoke(null, new DynamicDataAccessorImpl(s.data), SLOT, suppliers);
+            } catch (InvocationTargetException error) {
+                // CATCH: unwrap the actual Product business failure, never fall back to synthetic queue data.
+                if (error.getCause() instanceof RuntimeException runtime) throw runtime;
+                throw new IllegalStateException("Product queue invocation failed", error.getCause());
+            } catch (ReflectiveOperationException error) {
+                throw new IllegalStateException("Product queue method contract unavailable", error);
+            }
+        }));
+    }
+
+    private long ruleAndTemplate() {
+        String code = namespace + "_template";
+        var template = new NotificationTemplateCreateRequest();
+        template.setCode(code);
+        template.setName("Synthetic Product source template");
+        template.setChannel("IN_APP");
+        template.setEnabled(true);
+        template.setSubjectTemplate("Synthetic Product quotation reminder");
+        template.setBodyTemplate("Synthetic Product pending quotation facts");
+        s.templates.create(template);
+        var rule = new NotificationRuleRequest();
+        rule.setCode(namespace + "_rule");
+        rule.setName("Synthetic Product explicit recipients");
+        rule.setEnabled(true);
+        rule.setTriggerType("EVENT");
+        rule.setTriggerConfig("{\"modelCode\":\"qo_procurement_reminder_common\",\"event\":\"created\"}");
+        rule.setConditionModelCode("qo_procurement_reminder_common");
+        rule.setConditionFilter("[{\"fieldName\":\"qo_pr_reminder_state\",\"operator\":\"EQ\",\"value\":\"pending\"}]");
+        rule.setActionChannel("IN_APP");
+        rule.setActionTemplateCode(code);
+        rule.setRecipientType("SPECIFIC_USERS");
+        rule.setRecipientField(first.getId() + "," + second.getId());
+        return s.rules.createRule(rule).getId();
+    }
+
+    private Binding approval(long rule) {
+        return tx(() -> {
+            List<Approval> approvals = new ArrayList<>();
+            for (String model : MODELS) {
+                // Only actual contributors of this imported model/binding/field graph are explicitly approved in this test.
+                List<String> contributors = s.jdbc.queryForList("""
+                        SELECT DISTINCT contributor FROM (
+                          SELECT m.plugin_pid AS contributor FROM ab_meta_model m WHERE m.tenant_id=? AND m.code=? AND m.is_current=TRUE AND m.deleted_flag=FALSE
+                          UNION ALL
+                          SELECT f.plugin_pid FROM ab_meta_model m JOIN ab_meta_model_field_binding b ON b.model_id=m.id JOIN ab_meta_field f ON f.id=b.field_id
+                            WHERE m.tenant_id=? AND m.code=? AND m.is_current=TRUE AND m.deleted_flag=FALSE AND b.tenant_id=? AND b.deleted_flag=FALSE
+                          UNION ALL
+                          SELECT r.plugin_pid FROM ab_meta_model m JOIN ab_meta_model_field_binding b ON b.model_id=m.id JOIN ab_plugin_resource r ON r.resource_pid=b.pid
+                            WHERE m.tenant_id=? AND m.code=? AND m.is_current=TRUE AND m.deleted_flag=FALSE AND b.tenant_id=? AND b.deleted_flag=FALSE
+                              AND r.tenant_id=? AND r.resource_type='model_field_binding'
+                        ) actual WHERE contributor IS NOT NULL ORDER BY contributor
+                        """, String.class, tenant.getId(), model, tenant.getId(), model, tenant.getId(),
+                        tenant.getId(), model, tenant.getId(), tenant.getId());
+                assertThat(contributors).isNotEmpty();
+                List<Owner> owners = new ArrayList<>();
+                for (String pid : contributors) {
+                    var plugin = s.jdbc.queryForMap("SELECT pid,plugin_id,namespace,version FROM ab_plugin WHERE tenant_id=? AND pid=? AND deleted_flag=FALSE", tenant.getId(), pid);
+                    owners.add(new Owner(pid, (String) plugin.get("plugin_id"), (String) plugin.get("namespace"), (String) plugin.get("version")));
+                }
+                List<String> nativeFields = s.jdbc.queryForList("""
+                        SELECT f.pid FROM ab_meta_model m JOIN ab_meta_model_field_binding b ON b.model_id=m.id JOIN ab_meta_field f ON f.id=b.field_id
+                        WHERE m.tenant_id=? AND m.code=? AND m.is_current=TRUE AND m.deleted_flag=FALSE AND b.tenant_id=? AND b.deleted_flag=FALSE
+                          AND b.is_system_binding=TRUE AND f.tenant_id=? AND f.deleted_flag=FALSE AND f.is_current=TRUE AND f.plugin_pid IS NULL
+                        """, String.class, tenant.getId(), model, tenant.getId(), tenant.getId());
+                Approval lookup = new Approval("METADATA_SHAPE_V1", model, "0".repeat(64), owners, Set.copyOf(nativeFields));
+                JsonNode graph = s.reader.metadata(tenant.getId(), lookup);
+                approvals.add(new Approval(lookup.mode(), model, SourceBindingCanonical.hash(graph), owners, lookup.nativeFieldPids()));
+            }
+            return new Binding(1, namespace + "_notice", tenant.getId(), approvals,
+                    new Source(new Entity("qo_procurement_reminder_common", List.of(new Exact("qo_pr_reminder_kind", "quote"), new Exact("qo_pr_reminder_state", "pending"))),
+                            "pid", "qo_pr_reminder_supplier_pid", "qo_pr_reminder_slot_at",
+                            new Target("qo_pr_reminder_targets", new Entity("s2p_bid", List.of(new Exact("s2p_bid_collaboration_managed", true), new Exact("s2p_bid_status", "draft"))),
+                                    "s2p_bid_supplier_id", new Deadline("qo_pr_quote_cutoff_at", DeadlineRelation.AFTER_HOST_NOW))),
+                    new Entity("pr_supplier_common", List.of(new Exact("pr_supplier_status", "enabled"))),
+                    new Principal(new Entity("qo_procurement_membership_common", List.of(new Exact("qo_pr_membership_state", "active"))),
+                            "qo_pr_membership_user_pid", "qo_pr_membership_supplier_pid", "qo_pr_membership_contact_pid"),
+                    new Verification(new Entity("pr_supplier_pcba_contact", List.of(new Exact("qo_pr_contact_state", "active"))), "pr_spc_supplier_id"),
+                    rule, namespace + "_template", Map.of());
+        });
+    }
+
+    private Map<String, Object> business() {
+        Map<String, Object> rows = new LinkedHashMap<>();
+        for (String model : BUSINESS_MODELS) {
+            rows.put(model, s.jdbc.queryForList("SELECT to_jsonb(r)::text FROM \"" + tables.get(model) + "\" r WHERE tenant_id=? ORDER BY pid", String.class, tenant.getId()));
+        }
+        return rows;
+    }
+
+    private Map<String, Object> protectedSnapshot() {
+        Map<String, Object> result = new LinkedHashMap<>();
+        for (long protectedTenant : s.protectedTenantIds) {
+            Map<String, Object> rows = new LinkedHashMap<>();
+            for (String model : BUSINESS_MODELS) {
+                rows.put(model, s.jdbc.queryForList("SELECT to_jsonb(r)::text FROM \"" + tables.get(model)
+                        + "\" r WHERE tenant_id=? ORDER BY pid", String.class, protectedTenant));
+            }
+            for (String table : List.of("ab_notification", "ab_integration_receipt", "ab_outbox")) {
+                rows.put(table, s.jdbc.queryForList("SELECT to_jsonb(r)::text FROM " + table
+                        + " r WHERE tenant_id=? ORDER BY id", String.class, protectedTenant));
+            }
+            result.put(Long.toString(protectedTenant), rows);
+        }
+        return result;
+    }
+
+    private List<IntegrationEventEnvelope> events() {
+        return s.jdbc.query("SELECT * FROM ab_outbox WHERE tenant_id=? ORDER BY event_id", (rs, n) -> {
+            try {
+                return new IntegrationEventEnvelope(rs.getString("schema_version"), rs.getString("event_id"),
+                        rs.getString("event_type"), rs.getString("event_source"), rs.getString("subject"),
+                        rs.getTimestamp("occurred_at").toInstant(), rs.getLong("tenant_id"),
+                        rs.getString("correlation_id"), rs.getString("causation_id"), rs.getString("ordering_key"),
+                        rs.getLong("event_sequence"), s.json.readValue(rs.getString("payload"), new TypeReference<Map<String, Object>>() {}),
+                        s.json.readValue(rs.getString("headers"), new TypeReference<Map<String, String>>() {}));
+            } catch (com.fasterxml.jackson.core.JsonProcessingException error) {
+                // CATCH: persisted envelope decoding failure is a real fixture failure, never a substituted envelope.
+                throw new IllegalStateException("Invalid persisted Product notification envelope", error);
+            }
+        }, tenant.getId());
+    }
+
+    private int count(String table) {
+        assertThat(Set.of("ab_notification", "ab_integration_receipt").contains(table)).isTrue();
+        return s.jdbc.queryForObject("SELECT count(*) FROM " + table + " WHERE tenant_id=?", Integer.class, tenant.getId());
+    }
+
+    private <T> T tx(Supplier<T> work) {
+        TransactionTemplate transaction = new TransactionTemplate(s.manager);
+        transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        transaction.setIsolationLevel(TransactionDefinition.ISOLATION_SERIALIZABLE);
+        return transaction.execute(status -> work.get());
+    }
+
+    private void bind() {
+        MetaContext.setContext(tenant.getId(), first.getId(), first.getPid(), "synthetic-product-notification");
+    }
+    private static String required(String name) {
+        String value = System.getenv(name);
+        assertThat(value).isNotBlank();
+        return value;
+    }
+    private static String sha(Path path) throws Exception {
+        return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(path)));
+    }
+    private static String git(Path root, String... args) throws Exception {
+        List<String> command = new ArrayList<>(List.of("git", "-C", root.toString()));
+        command.addAll(List.of(args));
+        Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
+        String result = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(process.waitFor()).isZero();
+        return result.strip();
+    }
+    private static final class FacetClock extends Clock {
+        private Instant now = SLOT;
+        @Override
+        public ZoneId getZone() {
+            return ZoneId.of("UTC");
+        }
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return Clock.fixed(now, zone);
+        }
+        @Override
+        public Instant instant() {
+            return now;
+        }
+    }
+}
