@@ -292,6 +292,8 @@ class ProcurementPlanDispatchUiFixtureProducerIT extends ProcurementPublicSource
             receipt.put("serverPolicies", policies);
             receipt.put("publicActions", publicActions);
             receipt.put("initializationActions", initializationActions);
+            receipt.put("categorySupplierMetadataPath", caseEvidence.resolve("category-supplier-metadata.json").toString());
+            receipt.put("categorySupplierMetadataSha256", sha(caseEvidence.resolve("category-supplier-metadata.json")));
             receipt.put("businessSnapshotTables", tableMap());
             receipt.put("businessSnapshot", snapshot());
             receipt.put("immutableBusinessBefore", snapshot());
