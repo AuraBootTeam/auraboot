@@ -59,6 +59,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 import javax.sql.DataSource;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.time.Clock;
@@ -85,6 +87,7 @@ import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.Enti
 import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.Exact;
 import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.Owner;
 import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.Principal;
+import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.RemainingChild;
 import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.Source;
 import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.Target;
 import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.Verification;
@@ -142,7 +145,7 @@ class RegisteredSourceBindingPostgresIT {
     @MockitoBean SchedulerEngine scheduler;
 
     private final String namespace = "sn" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
-    private final List<String> kinds = List.of("source", "target", "owner", "principal", "verification");
+    private final List<String> kinds = List.of("source", "target", "owner", "principal", "verification", "child");
     private final Map<String, String> modelPids = new LinkedHashMap<>();
     private final Map<String, String> tables = new LinkedHashMap<>();
     private final Map<String, Object> trace = new LinkedHashMap<>();
@@ -155,7 +158,7 @@ class RegisteredSourceBindingPostgresIT {
     private User first, second, foreign;
     private TenantMember secondMember;
     private String ownOwner, otherOwner, verification1, verification2, otherVerification;
-    private String link1, link2, target, foreignTarget, sourcePid, templatePid;
+    private String link1, link2, target, foreignTarget, sourcePid, templatePid, remainingChild, fullChild;
     private long ruleId;
     private Binding approved;
     private RegisteredSourcePlanResolver resolver;
@@ -230,6 +233,10 @@ class RegisteredSourceBindingPostgresIT {
         String foreignOwner = create("owner", Map.of(field("state"), "active"));
         foreignTarget = create("target", Map.of(field("state"), "ready", field("owner"), foreignOwner, field("cutoff"), TARGET_DEADLINE));
         bind(tenant, first);
+        remainingChild = create("child", Map.of(field("state"), "active", field("parent"), target,
+                field("ordered"), new BigDecimal("100"), field("submitted"), BigDecimal.ZERO));
+        fullChild = create("child", Map.of(field("state"), "active", field("parent"), target,
+                field("ordered"), new BigDecimal("10"), field("submitted"), new BigDecimal("10")));
         sourcePid = create("source", Map.of(field("state"), "pending", field("owner"), ownOwner,
                 field("occurred"), Instant.parse("2026-10-13T03:00:00.123456Z"), field("targets"), List.of(target)));
         NotificationTemplateCreateRequest template = templateRequest("Synthetic registered source body");
@@ -244,9 +251,9 @@ class RegisteredSourceBindingPostgresIT {
                        f.plugin_pid AS field_plugin,f.data_type,f.is_current,f.deleted_flag
                 FROM ab_meta_model m JOIN ab_meta_model_field_binding b ON b.model_id=m.id
                 JOIN ab_meta_field f ON f.id=b.field_id
-                WHERE m.tenant_id=? AND m.code IN (?,?,?,?,?) AND m.is_current=TRUE AND m.deleted_flag=FALSE
+                WHERE m.tenant_id=? AND m.code IN (?,?,?,?,?,?) AND m.is_current=TRUE AND m.deleted_flag=FALSE
                 ORDER BY m.code,b.field_order,b.id
-                """, tenant.getId(), model("source"), model("target"), model("owner"), model("principal"), model("verification")));
+                """, tenant.getId(), model("source"), model("target"), model("owner"), model("principal"), model("verification"), model("child")));
         approved = approveActualFixtureMetadata();
         connect(approved, reader);
         serializable(() -> {
@@ -256,6 +263,14 @@ class RegisteredSourceBindingPostgresIT {
             trace.put("actualDeadlineProjection", Map.of("field", field("cutoff"),
                     "declaredType", "datetime", "javaType", projectedCutoff == null ? "null" : projectedCutoff.getClass().getName(),
                     "value", String.valueOf(projectedCutoff), "controlledHostNow", clock.instant().toString()));
+            Map<String, Object> projectedChild = reader.record(approved, model("child"), remainingChild);
+            Object ordered = projectedChild.get(field("ordered"));
+            Object submitted = projectedChild.get(field("submitted"));
+            trace.put("actualChildQuantityProjection", Map.of("orderedJavaType", ordered.getClass().getName(),
+                    "submittedJavaType", submitted.getClass().getName(), "ordered", ordered.toString(),
+                    "submitted", submitted.toString(), "declaredType", "decimal", "approvedChildModel", model("child")));
+            assertThat(new BigDecimal(ordered.toString())).isEqualByComparingTo("100");
+            assertThat(new BigDecimal(submitted.toString())).isEqualByComparingTo("0");
             assertThat(resolver.plan(approved, sourcePid)).hasSize(2);
             return null;
         });
@@ -274,7 +289,7 @@ class RegisteredSourceBindingPostgresIT {
             trace.put("stage", stage);
             trace.put("businessStarted", businessStarted);
             trace.put("checkpoints", checkpoints);
-            trace.put("retention", "Only API-created unique tenant/namespace facts retained; no shared deletes, table drops or pollers");
+            trace.put("retention", "API-created model/business/identity facts and inbox/receipt retained; only explicitly sealed owned pending/failed notification intents torn down after trace");
             if (tenant != null && sourcePid != null) {
                 bind(tenant, first);
                 trace.put("finalCounts", counts());
@@ -284,7 +299,22 @@ class RegisteredSourceBindingPostgresIT {
                     assertThat(foreignSnapshot()).isEqualTo(foreignBaseline);
                 }
             }
-            Files.writeString(evidence.resolve(namespace + ".json"), json.writerWithDefaultPrettyPrinter().writeValueAsString(trace));
+            List<JsonNode> ownedRows = tenant == null ? List.of() : jdbc.queryForList(
+                    "SELECT to_jsonb(r)::text FROM ab_outbox r WHERE tenant_id=? ORDER BY id", String.class, tenant.getId())
+                    .stream().map(SourceBindingCanonical::parse).toList();
+            trace.put("finalOwnedOutboxRowsBeforeTeardown", ownedRows);
+            Path sealedTrace = evidence.resolve(namespace + ".json");
+            Files.writeString(sealedTrace, json.writerWithDefaultPrettyPrinter().writeValueAsString(trace), StandardOpenOption.CREATE_NEW);
+            if (tenant != null && sourcePid != null && approved != null) {
+                Map<String, Object> beforeBusiness = businessSnapshot();
+                TestOwnedNotificationIntentTeardown.run(dataSource,
+                        new TestOwnedNotificationIntentTeardown.Scope(tenant.getId(), approved.code(), sourcePid,
+                                Set.of(SourceBindingCanonical.reference(approved.code(), sourcePid, first.getId()),
+                                        SourceBindingCanonical.reference(approved.code(), sourcePid, second.getId()))),
+                        ownedRows, sealedTrace, evidence.resolve(namespace + "-teardown.json"));
+                assertThat(businessSnapshot()).isEqualTo(beforeBusiness);
+                if (foreignBaseline != null) assertThat(foreignSnapshot()).isEqualTo(foreignBaseline);
+            }
         }
         MetaContext.clear();
     }
@@ -309,11 +339,14 @@ class RegisteredSourceBindingPostgresIT {
 
     private void importFixture(Tenant selected) throws Exception {
         bind(selected, selected == foreignTenant ? foreign : first);
-        Map<String, String> types = Map.of("owner", "string", "state", "string", "principal", "string",
-                "verification", "string", "occurred", "datetime", "targets", "json", "cutoff", "datetime");
+        Map<String, String> types = Map.ofEntries(Map.entry("owner", "string"), Map.entry("state", "string"),
+                Map.entry("principal", "string"), Map.entry("verification", "string"), Map.entry("occurred", "datetime"),
+                Map.entry("targets", "json"), Map.entry("cutoff", "datetime"), Map.entry("parent", "string"),
+                Map.entry("ordered", "decimal"), Map.entry("submitted", "decimal"));
         Map<String, List<String>> bound = Map.of("source", List.of("owner", "state", "occurred", "targets"),
                 "target", List.of("owner", "state", "cutoff"), "owner", List.of("state"),
-                "principal", List.of("owner", "state", "principal", "verification"), "verification", List.of("owner", "state"));
+                "principal", List.of("owner", "state", "principal", "verification"), "verification", List.of("owner", "state"),
+                "child", List.of("state", "parent", "ordered", "submitted"));
         List<Map<String, Object>> fields = new ArrayList<>(), models = new ArrayList<>(), bindings = new ArrayList<>();
         types.forEach((name, type) -> fields.add(Map.of("code", field(name), "displayName", name, "dataType", type)));
         for (String kind : kinds) {
@@ -366,7 +399,8 @@ class RegisteredSourceBindingPostgresIT {
             }
             return new Binding(1, namespace + "_notice", tenant.getId(), approvals,
                     new Source(entity("source", "pending"), "pid", field("owner"), field("occurred"), new Target(field("targets"), entity("target", "ready"), field("owner"),
-                            new Deadline(field("cutoff"), DeadlineRelation.AFTER_HOST_NOW))),
+                            new Deadline(field("cutoff"), DeadlineRelation.AFTER_HOST_NOW),
+                            new RemainingChild(entity("child", "active"), field("parent"), field("ordered"), field("submitted"), 1000))),
                     entity("owner", "active"), new Principal(entity("principal", "active"), field("principal"), field("owner"), field("verification")),
                     new Verification(entity("verification", "active"), field("owner")), ruleId, namespace + "_template", Map.of());
         });
@@ -521,6 +555,24 @@ class RegisteredSourceBindingPostgresIT {
         original.forEach(event -> executor.deliver(event, host, UniqueIdGenerator.generate()));
         assertThat(jdbc.queryForList("SELECT id,user_id,source_id,title,content,created_at FROM ab_notification WHERE tenant_id=? ORDER BY user_id", tenant.getId())).isEqualTo(inbox);
         assertThat(businessSnapshot()).isEqualTo(before);
+        List<IntegrationEventEnvelope> sealedOriginal = events();
+        update("child", remainingChild, Map.of(field("submitted"), new BigDecimal("60.000001")));
+        assertThat(worker.process(tenant.getId(), approved.code(), sourcePid)).isEqualTo(2);
+        assertThat(events()).isEqualTo(sealedOriginal);
+        String finalChild = null;
+        for (int index = 3; index <= 101; index++) {
+            finalChild = create("child", Map.of(field("state"), "active", field("parent"), target,
+                    field("ordered"), new BigDecimal("10"), field("submitted"), new BigDecimal("10")));
+        }
+        assertThat(worker.process(tenant.getId(), approved.code(), sourcePid)).isEqualTo(2);
+        assertThat(events()).isEqualTo(sealedOriginal);
+        update("child", finalChild, Map.of(field("submitted"), new BigDecimal("11")));
+        rejectWithoutEffects();
+        update("child", finalChild, Map.of(field("submitted"), new BigDecimal("10")));
+        update("child", remainingChild, Map.of(field("submitted"), new BigDecimal("100")));
+        rejectWithoutEffects();
+        assertThat(events()).isEqualTo(sealedOriginal);
+        proved("actual sixth approved child model: exact DECIMAL partial progress replays identical envelope; all101 rows scanned even after positive early row; oversubmitted later row and allfull zero new queue");
         proved("actual host adapter selected bounded source from approved registry; raw metadata approved; two explicit recipients; stable queue replay; receipt/inbox duplicate consume suppressed; immutable source");
     }
 
@@ -564,6 +616,17 @@ class RegisteredSourceBindingPostgresIT {
         proved("delayed actual consume rechecks approved DATETIME expiry; both original envelopes immutable; zero inbox/receipt and unchanged source facts");
         // Reset the synthetic clock for the remaining independent existing configuration facets.
         clock.now = BEFORE_DEADLINE;
+        update("child", remainingChild, Map.of(field("submitted"), new BigDecimal("100")));
+        for (IntegrationEventEnvelope event : original) {
+            assertThatThrownBy(() -> executor.deliver(event, host, UniqueIdGenerator.generate()))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+        assertThat(events()).isEqualTo(original);
+        assertThat(counts()).isEqualTo(Map.of("outbox", 2, "receipt", 0, "inbox", 0));
+        update("child", remainingChild, Map.of(field("submitted"), new BigDecimal("60.000001")));
+        assertThat(worker.process(tenant.getId(), approved.code(), sourcePid)).isEqualTo(2);
+        assertThat(events()).isEqualTo(original);
+        proved("delayed consume rechecks complete child eligibility; allfull zero receipt/inbox; partial progress restores eligibility without changing immutable queued envelopes");
         templates.update(templatePid, templateRequest("Changed current configuration"));
         assertThatThrownBy(() -> worker.process(tenant.getId(), approved.code(), sourcePid)).hasMessage("RELIABLE_ENVELOPE_CONFLICT");
         assertThatThrownBy(() -> executor.deliver(original.getFirst(), host, "changed-template"))
@@ -644,6 +707,8 @@ class RegisteredSourceBindingPostgresIT {
         rejectWithoutEffects();
         target = create("target", Map.of(field("state"), "ready", field("owner"), ownOwner, field("cutoff"), TARGET_DEADLINE));
         update("source", sourcePid, Map.of(field("targets"), List.of(target)));
+        update("child", remainingChild, Map.of(field("parent"), target));
+        update("child", fullChild, Map.of(field("parent"), target));
         proved("official softDelete=true target: physical flag false eligible; native delete retains true row and typed reader rejects without queue; remaining models retain hard-delete defaults");
         String fieldPid = jdbc.queryForObject("SELECT pid FROM ab_meta_field WHERE tenant_id=? AND code=? AND is_current=TRUE AND deleted_flag=FALSE", String.class, tenant.getId(), field("state"));
         bindings.updateFieldConfig(modelPids.get("source"), fieldPid, true, false, true);
@@ -695,6 +760,53 @@ class RegisteredSourceBindingPostgresIT {
             connect(approved, reader);
             rejectWithoutEffects();
             proved("two real SERIALIZABLE transactions: active-link predicate/outbox predicate dangerous cycle; PG 40001, zero enqueue, no automatic retry; fresh ambiguous link refused");
+            String ambiguous = inserted.get(30, TimeUnit.SECONDS);
+            MetaContext.runWithCommandPermitScope("ALL", () -> data.delete(model("principal"), ambiguous));
+            connect(approved, reader);
+            CountDownLatch childRead = new CountDownLatch(1), childCommitted = new CountDownLatch(1);
+            AtomicBoolean childBarrierUsed = new AtomicBoolean();
+            SourceBindingReader childBarrier = new DelegatingReader(reader) {
+                @Override
+                public DataPage page(Binding binding, String model, Map<String, Object> filters, int page, int size) {
+                    DataPage result = super.page(binding, model, filters, page, size);
+                    if (model.equals(model("child")) && childBarrierUsed.compareAndSet(false, true)) {
+                        assertThat(TransactionSynchronizationManager.getCurrentTransactionIsolationLevel())
+                                .isEqualTo(TransactionDefinition.ISOLATION_SERIALIZABLE);
+                        assertThat(result.total()).isEqualTo(2);
+                        childRead.countDown();
+                        await(childCommitted);
+                    }
+                    return result;
+                }
+            };
+            connect(approved, childBarrier);
+            var childInsert = pool.submit(() -> {
+                bind(tenant, first);
+                try {
+                    await(childRead);
+                    String pid = serializable(() -> {
+                        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ab_outbox WHERE tenant_id=?", Integer.class, tenant.getId())).isZero();
+                        return create("child", Map.of(field("state"), "active", field("parent"), target,
+                                field("ordered"), new BigDecimal("10"), field("submitted"), new BigDecimal("11")));
+                    });
+                    childCommitted.countDown();
+                    return pid;
+                } finally {
+                    childCommitted.countDown();
+                    MetaContext.clear();
+                }
+            });
+            Throwable childFailure = org.assertj.core.api.Assertions.catchThrowable(
+                    () -> worker.process(tenant.getId(), approved.code(), sourcePid));
+            assertThat(childFailure).isNotNull();
+            assertThat(sqlState(childFailure)).isEqualTo("40001");
+            assertThat(childInsert.get(30, TimeUnit.SECONDS)).isNotBlank();
+            trace.put("actualChildPhantomSqlState", sqlState(childFailure));
+            assertThat(childBarrierUsed).isTrue();
+            assertThat(counts()).isEqualTo(Map.of("outbox", 0, "receipt", 0, "inbox", 0));
+            connect(approved, reader);
+            rejectWithoutEffects();
+            proved("actual child predicate/outbox predicate SSI cycle: PG40001 and zero queue without retry; fresh full relation sees invalid phantom child and refuses eligibility");
         } finally {
             foreignCommitted.countDown();
             pool.shutdownNow();
