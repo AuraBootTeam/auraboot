@@ -145,3 +145,12 @@ lifecycle changes invalidate prior discovery; unload/reload and changed physical
 closed. Other extension types and the global factory's creation semantics remain unchanged.
 Real PF4J factory tests with synthetic local JARs prove this primitive, not full business PG/Auth
 or Inventory/Procurement artifact admission.
+
+The receipt counter's five PR reads (`pr_purchase_order`, `pr_purchase_order_line`,
+`pr_purchase_receipt`, `pr_purchase_receipt_line`, `pr_inventory_operation_request`) require
+the exact `com.auraboot.procurement` owner declared by the canonical Procurement manifest
+and models. No prefix grants ownership. Ambiguous, deleted, unpublished or mismatched effective
+metadata cannot authorize these reads. Product reads retain their actual legitimate owners;
+this change does not require product models to belong to Procurement. Standalone counterexamples
+cover wrong PR ownership and invalid current definitions; assembled tenant metadata and PG
+permission acceptance still require native verification.

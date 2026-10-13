@@ -9,11 +9,21 @@ import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.plugin.entity.PluginRecord;
 import com.auraboot.framework.plugin.mapper.PluginRecordMapper;
 import java.util.Objects;
+import java.util.Map;
+import java.util.Set;
 import org.springframework.stereotype.Component;
 
 /** Resolves actual tenant metadata before granting the fixed intake model boundary. */
 @Component
 public final class InventoryOwnerModelAuthority {
+    // Exact canonical procurement/plugin.json + procurement/config/models.json ownership.
+    private static final Map<String,String> RECEIPT_READ_OWNERS = Map.of(
+            "pr_purchase_order", "com.auraboot.procurement",
+            "pr_purchase_order_line", "com.auraboot.procurement",
+            "pr_purchase_receipt", "com.auraboot.procurement",
+            "pr_purchase_receipt_line", "com.auraboot.procurement",
+            "pr_inventory_operation_request", "com.auraboot.procurement");
+    private static final Set<String> PRODUCT_READS = Set.of("prod_product", "pe_product");
     private final MetaModelService definitions;
     private final MetaModelMapper models;
     private final PluginRecordMapper plugins;
@@ -33,7 +43,9 @@ public final class InventoryOwnerModelAuthority {
     }
 
     Binding resolveProcurement(long tenantId, String modelCode, boolean write) {
-        return resolveOwned(tenantId, modelCode, write ? "com.auraboot.procurement" : null);
+        if (write && !"pr_purchase_order_line".equals(modelCode)) throw denied();
+        if (!RECEIPT_READ_OWNERS.containsKey(modelCode) && !PRODUCT_READS.contains(modelCode)) throw denied();
+        return resolveOwned(tenantId, modelCode, RECEIPT_READ_OWNERS.get(modelCode));
     }
 
     private Binding resolveOwned(long tenantId, String modelCode, String writeOwner) {

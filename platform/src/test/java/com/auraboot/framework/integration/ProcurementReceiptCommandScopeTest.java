@@ -216,6 +216,34 @@ class ProcurementReceiptCommandScopeTest {
         verifyNoInteractions(data);
         verify(transactions).rollback(any());
     }
+    @Test void everyCanonicalPrReadRejectsWrongActualOwnerBeforeDelegate() {
+        actualOwners.get("procurement-owner").setPluginId("com.auraboot.inventory");
+        for (String code:List.of("pr_purchase_order","pr_purchase_order_line","pr_purchase_receipt","pr_purchase_receipt_line","pr_inventory_operation_request")) {
+            effect=event->accessor.getById(31,code,"source");
+            assertThatThrownBy(this::deliver).isInstanceOf(SecurityException.class);
+        }
+        verifyNoInteractions(data);
+    }
+    @Test void ambiguousRawOrUnpublishedDeletedReadCannotBecomeOriginalRequestAuthority() {
+        String code="pr_inventory_operation_request";
+        effect=event->accessor.getById(31,code,"source");
+        actualModels.get(code).setStatus("draft");assertThatThrownBy(this::deliver).isInstanceOf(SecurityException.class);
+        actualModels.get(code).setStatus("published");actualModels.get(code).setDeletedFlag(true);
+        assertThatThrownBy(this::deliver).isInstanceOf(SecurityException.class);
+        actualModels.get(code).setDeletedFlag(false);
+        actualOwners.get("procurement-owner").setDeletedFlag(true);assertThatThrownBy(this::deliver).isInstanceOf(SecurityException.class);
+        actualOwners.get("procurement-owner").setDeletedFlag(false);
+        effectiveModels.put(code,ModelDefinition.builder().id(999L).code(code).version(1).status("published")
+            .tableName(SystemFieldConstants.generateTableName(code)).build());
+        assertThatThrownBy(this::deliver).isInstanceOf(SecurityException.class);
+        when(models.findCurrentByCode(code)).thenThrow(new org.apache.ibatis.exceptions.TooManyResultsException("Synthetic ambiguous current model"));
+        assertThatThrownBy(this::deliver).isInstanceOf(org.apache.ibatis.exceptions.TooManyResultsException.class);
+        verifyNoInteractions(data);
+    }
+    @Test void productReadsKeepTheirActualLegitimateOwnerRatherThanUsingPrPrefixInference() {
+        effect=event->{accessor.getById(31,"prod_product","product");accessor.getById(31,"pe_product","legacy");};
+        deliver();verify(data).getById("prod_product","product");verify(data).getById("pe_product","legacy");
+    }
     @Test void metadataDriftDuringCasCannotMarkApplied() {
         when(data.compareAndSet(anyString(), anyString(), anyString(), any(), anyMap())).thenAnswer(call -> {
             actualModels.get("pr_purchase_order_line").setRowVersion(2);
