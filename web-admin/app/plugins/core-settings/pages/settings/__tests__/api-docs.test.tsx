@@ -413,6 +413,9 @@ describe('OpenPlatformPage', () => {
 
     render(<OpenPlatformPage />, { wrapper: MemoryRouter });
     await user.click(await screen.findByRole('button', { name: 'Manage members' }));
+    const soleOwnerRemove = screen.getByRole('button', { name: 'Remove member Application Owner' });
+    expect(soleOwnerRemove).toBeDisabled();
+    expect(soleOwnerRemove).toHaveAccessibleDescription('Add another owner before removing the last owner.');
     await user.click(screen.getByRole('button', { name: 'Select collaborator' }));
     await user.selectOptions(screen.getByRole('combobox', { name: 'Role' }), 'maintainer');
     await user.click(screen.getByRole('button', { name: 'Save' }));

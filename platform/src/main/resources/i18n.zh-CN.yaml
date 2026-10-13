@@ -1968,6 +1968,7 @@ openPlatform:
   memberRole: 角色
   manageMembers: 管理成员
   removeMember: 移除成员
+  lastOwnerGuidance: 先添加另一位所有者，再移除最后一位所有者。
   memberSaved: 应用成员已保存
   memberSaveFailed: 应用成员保存失败
   memberRemoved: 应用成员已移除

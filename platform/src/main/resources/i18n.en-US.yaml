@@ -1671,6 +1671,7 @@ openPlatform:
   memberRole: Role
   manageMembers: Manage members
   removeMember: Remove member
+  lastOwnerGuidance: Add another owner before removing the last owner.
   memberSaved: Application member saved
   memberSaveFailed: Unable to save application member
   memberRemoved: Application member removed

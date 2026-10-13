@@ -852,7 +852,11 @@ export default function OpenPlatformPage() {
           }
         >
           <div className="space-y-2">
-            {managingMembers.members.map((member) => (
+            {managingMembers.members.map((member) => {
+              const isSoleOwner = member.role === 'owner' &&
+                managingMembers.members.filter((candidate) => candidate.role === 'owner').length === 1;
+              const guidanceId = `member-owner-guidance-${member.userPid}`;
+              return (
               <div
                 key={member.userPid}
                 className="flex items-center justify-between rounded-lg border border-gray-200 p-3 dark:border-gray-700"
@@ -864,22 +868,25 @@ export default function OpenPlatformPage() {
                   <p className="text-xs text-gray-500">
                     {t(`openPlatform.role.${member.role}`, undefined, member.role)}
                   </p>
+                  {isSoleOwner && (
+                    <p id={guidanceId} className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      {t('openPlatform.lastOwnerGuidance', undefined, 'Add another owner before removing the last owner.')}
+                    </p>
+                  )}
                 </div>
                 <button
                   type="button"
                   onClick={() => void removeMember(managingMembers, member)}
-                  disabled={
-                    member.role === 'owner' &&
-                    managingMembers.members.filter((candidate) => candidate.role === 'owner')
-                      .length === 1
-                  }
+                  disabled={isSoleOwner}
+                  aria-describedby={isSoleOwner ? guidanceId : undefined}
                   className="rounded p-2 text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-30"
                   aria-label={`${t('openPlatform.removeMember', undefined, 'Remove member')} ${member.displayName}`}
                 >
                   <TrashIcon className="h-4 w-4" />
                 </button>
               </div>
-            ))}
+              );
+            })}
           </div>
           <div className="mt-5 border-t border-gray-200 pt-4 dark:border-gray-700">
             <MemberPicker
