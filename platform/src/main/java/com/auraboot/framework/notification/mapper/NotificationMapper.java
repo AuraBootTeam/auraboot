@@ -14,6 +14,18 @@ import java.util.List;
 @Mapper
 public interface NotificationMapper extends BaseMapper<Notification> {
 
+    /** Explicit tenant membership and current account validity; never accept global numeric IDs. */
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true")
+    @Select("""
+        SELECT u.id FROM ab_user u JOIN ab_tenant_member tm ON tm.user_id = u.id
+        WHERE tm.tenant_id = #{tenantId} AND tm.status = 'active' AND tm.deleted_flag = FALSE
+          AND u.pid = #{userPid} AND u.deleted_flag = FALSE
+          AND u.is_enabled = TRUE AND u.is_account_non_expired = TRUE
+          AND u.is_account_non_locked = TRUE AND u.is_credentials_non_expired = TRUE
+          AND u.deactivation_status IS NULL
+        """)
+    Long findActiveRecipient(@Param("tenantId") long tenantId, @Param("userPid") String userPid);
+
     @Select("""
         SELECT * FROM ab_notification
         WHERE tenant_id = #{tenantId} AND user_id = #{userId}
