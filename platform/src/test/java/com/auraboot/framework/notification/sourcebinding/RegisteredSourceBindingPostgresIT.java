@@ -61,6 +61,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.time.Clock;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -77,6 +79,8 @@ import java.util.function.Supplier;
 import com.auraboot.framework.meta.constant.SystemFieldConstants;
 import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.Approval;
 import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.Binding;
+import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.Deadline;
+import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.DeadlineRelation;
 import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.Entity;
 import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.Exact;
 import com.auraboot.framework.notification.sourcebinding.SourceBindingTypes.Owner;
@@ -143,6 +147,9 @@ class RegisteredSourceBindingPostgresIT {
     private final Map<String, String> tables = new LinkedHashMap<>();
     private final Map<String, Object> trace = new LinkedHashMap<>();
     private final List<String> checkpoints = new ArrayList<>();
+    private static final Instant BEFORE_DEADLINE = Instant.parse("2026-10-13T03:00:00Z");
+    private static final Instant TARGET_DEADLINE = Instant.parse("2026-10-13T04:00:00Z");
+    private final NativeDeadlineClock clock = new NativeDeadlineClock();
     private Tenant tenant, foreignTenant;
     private User first, second, foreign;
     private TenantMember secondMember;
@@ -208,10 +215,10 @@ class RegisteredSourceBindingPostgresIT {
         otherVerification = create("verification", Map.of(field("state"), "active", field("owner"), otherOwner));
         link1 = principal(first, ownOwner, verification1);
         link2 = principal(second, ownOwner, verification2);
-        target = create("target", Map.of(field("state"), "ready", field("owner"), ownOwner));
+        target = create("target", Map.of(field("state"), "ready", field("owner"), ownOwner, field("cutoff"), TARGET_DEADLINE));
         bind(foreignTenant, foreign);
         String foreignOwner = create("owner", Map.of(field("state"), "active"));
-        foreignTarget = create("target", Map.of(field("state"), "ready", field("owner"), foreignOwner));
+        foreignTarget = create("target", Map.of(field("state"), "ready", field("owner"), foreignOwner, field("cutoff"), TARGET_DEADLINE));
         bind(tenant, first);
         sourcePid = create("source", Map.of(field("state"), "pending", field("owner"), ownOwner,
                 field("occurred"), Instant.parse("2026-10-13T03:00:00.123456Z"), field("targets"), List.of(target)));
@@ -234,6 +241,11 @@ class RegisteredSourceBindingPostgresIT {
         connect(approved, reader);
         serializable(() -> {
             validator.validate(approved, reader);
+            Map<String, Object> projectedTarget = reader.record(approved, model("target"), target);
+            Object projectedCutoff = projectedTarget.get(field("cutoff"));
+            trace.put("actualDeadlineProjection", Map.of("field", field("cutoff"),
+                    "declaredType", "datetime", "javaType", projectedCutoff == null ? "null" : projectedCutoff.getClass().getName(),
+                    "value", String.valueOf(projectedCutoff), "controlledHostNow", clock.instant().toString()));
             assertThat(resolver.plan(approved, sourcePid)).hasSize(2);
             return null;
         });
@@ -288,9 +300,9 @@ class RegisteredSourceBindingPostgresIT {
     private void importFixture(Tenant selected) throws Exception {
         bind(selected, selected == foreignTenant ? foreign : first);
         Map<String, String> types = Map.of("owner", "string", "state", "string", "principal", "string",
-                "verification", "string", "occurred", "datetime", "targets", "json");
+                "verification", "string", "occurred", "datetime", "targets", "json", "cutoff", "datetime");
         Map<String, List<String>> bound = Map.of("source", List.of("owner", "state", "occurred", "targets"),
-                "target", List.of("owner", "state"), "owner", List.of("state"),
+                "target", List.of("owner", "state", "cutoff"), "owner", List.of("state"),
                 "principal", List.of("owner", "state", "principal", "verification"), "verification", List.of("owner", "state"));
         List<Map<String, Object>> fields = new ArrayList<>(), models = new ArrayList<>(), bindings = new ArrayList<>();
         types.forEach((name, type) -> fields.add(Map.of("code", field(name), "displayName", name, "dataType", type)));
@@ -341,7 +353,8 @@ class RegisteredSourceBindingPostgresIT {
                 approvals.add(new Approval(lookup.mode(), lookup.modelCode(), SourceBindingCanonical.hash(actual), lookup.owners(), lookup.nativeFieldPids()));
             }
             return new Binding(1, namespace + "_notice", tenant.getId(), approvals,
-                    new Source(entity("source", "pending"), "pid", field("owner"), field("occurred"), new Target(field("targets"), entity("target", "ready"), field("owner"))),
+                    new Source(entity("source", "pending"), "pid", field("owner"), field("occurred"), new Target(field("targets"), entity("target", "ready"), field("owner"),
+                            new Deadline(field("cutoff"), DeadlineRelation.AFTER_HOST_NOW))),
                     entity("owner", "active"), new Principal(entity("principal", "active"), field("principal"), field("owner"), field("verification")),
                     new Verification(entity("verification", "active"), field("owner")), ruleId, namespace + "_template", Map.of());
         });
@@ -351,7 +364,7 @@ class RegisteredSourceBindingPostgresIT {
         HostSourceBindingProperties properties = new HostSourceBindingProperties();
         properties.setEnabled(true);
         properties.setBindings(List.of(binding));
-        resolver = new RegisteredSourcePlanResolver(properties, selectedReader, validator);
+        resolver = new RegisteredSourcePlanResolver(properties, selectedReader, validator, clock);
         resolver.initialize();
         host = new PluginNotificationDeliveryAccessorImpl(List.of(resolver), reliable, writer);
         ReflectionTestUtils.setField(host, "enabled", true);
@@ -373,6 +386,26 @@ class RegisteredSourceBindingPostgresIT {
         request.setCode(namespace + "_template"); request.setName("Native source template"); request.setChannel("IN_APP");
         request.setEnabled(true); request.setSubjectTemplate("Native source approval proof"); request.setBodyTemplate(body);
         return request;
+    }
+
+    /** Test-only deterministic host clock. No sleep, production time change or subscription grant. */
+    private static final class NativeDeadlineClock extends Clock {
+        private volatile Instant now = BEFORE_DEADLINE;
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneId.of("UTC");
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return Clock.fixed(now, zone);
+        }
+
+        @Override
+        public Instant instant() {
+            return now;
+        }
     }
 
     private <T> T serializable(Supplier<T> work) {
@@ -420,6 +453,11 @@ class RegisteredSourceBindingPostgresIT {
     @Test
     void actualImportedMetadataExplicitRecipientsReplayAndConsumePersistExactlyOnce() {
         startBusiness();
+        clock.now = TARGET_DEADLINE;
+        rejectWithoutEffects();
+        assertThat(counts()).isEqualTo(Map.of("outbox", 0, "receipt", 0, "inbox", 0));
+        proved("approved physical DATETIME cutoff equal to host now rejects enqueue before any outbox/inbox/receipt");
+        clock.now = BEFORE_DEADLINE;
         Map<String, Object> before = businessSnapshot();
         assertThat(worker.process(tenant.getId(), approved.code(), sourcePid)).isEqualTo(2);
         assertThat(counts()).isEqualTo(Map.of("outbox", 2, "receipt", 0, "inbox", 0));
@@ -472,6 +510,20 @@ class RegisteredSourceBindingPostgresIT {
         startBusiness();
         assertThat(worker.process(tenant.getId(), approved.code(), sourcePid)).isEqualTo(2);
         List<IntegrationEventEnvelope> original = events();
+        Map<String, Object> beforeExpiry = businessSnapshot();
+        clock.now = TARGET_DEADLINE;
+        assertThatThrownBy(() -> worker.process(tenant.getId(), approved.code(), sourcePid))
+                .isInstanceOf(IllegalArgumentException.class);
+        for (IntegrationEventEnvelope event : original) {
+            assertThatThrownBy(() -> executor.deliver(event, host, UniqueIdGenerator.generate()))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+        assertThat(events()).isEqualTo(original);
+        assertThat(counts()).isEqualTo(Map.of("outbox", 2, "receipt", 0, "inbox", 0));
+        assertThat(businessSnapshot()).isEqualTo(beforeExpiry);
+        proved("delayed actual consume rechecks approved DATETIME expiry; both original envelopes immutable; zero inbox/receipt and unchanged source facts");
+        // Reset the synthetic clock for the remaining independent existing configuration facets.
+        clock.now = BEFORE_DEADLINE;
         templates.update(templatePid, templateRequest("Changed current configuration"));
         assertThatThrownBy(() -> worker.process(tenant.getId(), approved.code(), sourcePid)).hasMessage("RELIABLE_ENVELOPE_CONFLICT");
         assertThatThrownBy(() -> executor.deliver(original.getFirst(), host, "changed-template"))
