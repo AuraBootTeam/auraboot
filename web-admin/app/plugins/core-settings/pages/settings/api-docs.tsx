@@ -1216,6 +1216,7 @@ function CredentialList({
           {credentials.map((credential) => (
             <div
               key={credential.pid}
+              data-testid={`open-platform-credential-${credential.pid}`}
               className="flex items-center justify-between rounded bg-gray-50 px-3 py-2 dark:bg-gray-950"
             >
               <div>
@@ -1231,6 +1232,14 @@ function CredentialList({
                     </span>
                   )}
                 </div>
+                {credential.expiresAt && (
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    <span>{t('openPlatform.credentialExpires', undefined, 'Expires')}</span>{' '}
+                    <time dateTime={credential.expiresAt}>
+                      {new Date(credential.expiresAt).toLocaleString()}
+                    </time>
+                  </p>
+                )}
               </div>
               {credential.status === 'active' && (
                 <div className="flex items-center gap-1">

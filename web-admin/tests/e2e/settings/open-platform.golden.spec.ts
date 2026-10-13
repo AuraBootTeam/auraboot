@@ -1707,7 +1707,7 @@ test.describe('Open Platform golden journey', () => {
     await expect(operations).toContainText('调用审计');
     await expect(operations).toContainText('open-platform-golden-whoami');
     await capture(page, 'OP-OPS-02');
-    await capture(page, 'OP-OPS-03');
+    await captureLocator(operations.getByTestId('open-platform-call-audit'), 'OP-OPS-03');
 
     await page.route('**/api/open-platform/event-catalog', async (route) => {
       await route.fulfill({
@@ -2111,6 +2111,27 @@ test.describe('Open Platform golden journey', () => {
       });
     await capture(page, 'OP-OPS-11');
     await rotatedSecretDialog.getByRole('button', { name: '我已保存' }).click();
+    const rotatedCredentialsResponse = await page.request.get(
+      `${WEB_BASE_URL}/api/open-platform/installations/${principal.installationPid}/credentials`,
+    );
+    expect(rotatedCredentialsResponse.status()).toBe(200);
+    const rotatedCredentials = await rotatedCredentialsResponse.json();
+    expect(String(rotatedCredentials.code)).toBe('0');
+    const previousCredential = rotatedCredentials.data.find(
+      (credential: { clientId: string }) => credential.clientId === clientId,
+    );
+    expect(previousCredential.expiresAt).toEqual(expect.any(String));
+    expect(Date.parse(previousCredential.expiresAt)).toBeGreaterThan(Date.now());
+    const previousCredentialRow = credentialList.getByTestId(
+      `open-platform-credential-${previousCredential.pid}`,
+    );
+    await expect(previousCredentialRow).toContainText('到期时间');
+    await expect(previousCredentialRow.locator('time')).toHaveAttribute(
+      'datetime', previousCredential.expiresAt,
+    );
+    await expect(previousCredentialRow.locator('time')).toBeVisible();
+    await captureLocator(previousCredentialRow, 'OP-OPS-11-expiry');
+
 
     const rotatedTokenResponse = await page.request.post(`${BACKEND_URL}/oauth2/token`, {
       form: {

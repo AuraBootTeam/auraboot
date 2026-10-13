@@ -1715,6 +1715,7 @@ openPlatform:
   secretWarning: The client secret is shown once. AuraBoot stores only its hash.
   saved: I saved it
   lastUsed: Last used
+  credentialExpires: Expires
   revoke: Revoke
   revokeTitle: Revoke credential?
   revokeWarning: Existing access tokens issued by this credential will stop working immediately.

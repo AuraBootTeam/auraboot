@@ -206,6 +206,8 @@ describe('OpenPlatformPage', () => {
   });
 
   it('loads operations, filters audit, confirms replay, and rotates a credential', async () => {
+    let credentialRotated = false;
+    const expiry = '2026-09-15T00:00:00Z';
     const installation = {
       pid: 'inst-ops',
       environment: 'production',
@@ -244,6 +246,7 @@ describe('OpenPlatformPage', () => {
               pid: 'cred-ops',
               clientId: 'ab_client_ops',
               status: 'active',
+              expiresAt: credentialRotated ? expiry : undefined,
               createdAt: '2026-09-14T00:00:00Z',
             },
           ]);
@@ -282,7 +285,8 @@ describe('OpenPlatformPage', () => {
             },
           ]);
         if (url.includes('/webhook-deliveries/delivery-1/replay')) return response(undefined);
-        if (url.includes('/credentials/cred-ops/rotate'))
+        if (url.includes('/credentials/cred-ops/rotate')) {
+          credentialRotated = true;
           return response({
             credential: {
               credentialPid: 'cred-new',
@@ -291,6 +295,7 @@ describe('OpenPlatformPage', () => {
               createdAt: '2026-09-14T00:00:00Z',
             },
           });
+        }
         return response(undefined);
       }),
     );
@@ -313,11 +318,16 @@ describe('OpenPlatformPage', () => {
 
     await user.click(screen.getByRole('button', { name: 'View credentials' }));
     expect(await screen.findByText('ab_client_ops')).toBeVisible();
+    expect(screen.queryByText('Expires')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Rotate' }));
     expect(screen.getByText(/previous credential can issue tokens/)).toBeVisible();
     const rotateButtons = screen.getAllByRole('button', { name: 'Rotate' });
     await user.click(rotateButtons[rotateButtons.length - 1]);
     expect(await screen.findByText('secret-new')).toBeVisible();
+    const expiryLabel = await screen.findByText('Expires');
+    const expiryTime = expiryLabel.parentElement?.querySelector('time');
+    expect(expiryTime).toHaveAttribute('datetime', expiry);
+    expect(expiryTime).toHaveTextContent(new Date(expiry).toLocaleString());
   });
 
   it('projects viewer access as operations-only and hides administrator actions', async () => {

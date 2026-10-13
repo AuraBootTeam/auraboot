@@ -2012,6 +2012,7 @@ openPlatform:
   secretWarning: Client Secret 仅显示一次；AuraBoot 只保存它的哈希值。
   saved: 我已保存
   lastUsed: 最近使用
+  credentialExpires: 到期时间
   revoke: 吊销
   revokeTitle: 确认吊销凭据？
   revokeWarning: 此凭据签发的现有 Access Token 将立即失效。
