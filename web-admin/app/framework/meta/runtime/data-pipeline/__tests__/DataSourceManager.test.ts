@@ -126,6 +126,98 @@ describe('DataSourceManager', () => {
     expect(mockedFetchResult).toHaveBeenCalledTimes(1);
   });
 
+  it('extracts exact completed command rows without changing decimal strings', async () => {
+    mockedFetchResult.mockResolvedValueOnce({
+      code: '0',
+      data: {
+        phaseReached: 'completed',
+        data: { lines: [{ pid: 'a', quantity: '100.000000000000001', included: false }] },
+      },
+    } as any);
+    const manager = commandTableManager();
+    manager.register('lines', {
+      type: 'api',
+      method: 'post',
+      endpoint: '/api/meta/commands/execute/example:view',
+      adaptor: 'commandArray',
+      dataPath: 'lines',
+      params: { targetRecordPid: 'a' },
+    } as any);
+    expect(await manager.fetch('lines')).toEqual([
+      { pid: 'a', quantity: '100.000000000000001', included: false },
+    ]);
+    expect(mockedFetchResult.mock.calls[0][1]?.method).toBe('post');
+  });
+
+  it.each(['handler', 'failed'])('refuses incomplete command arrays (%s)', async (phaseReached) => {
+    mockedFetchResult.mockResolvedValueOnce({
+      code: '0',
+      data: { phaseReached, data: { lines: [] } },
+    } as any);
+    const manager = commandTableManager();
+    manager.register('lines', {
+      type: 'api',
+      endpoint: '/x',
+      adaptor: 'commandArray',
+      dataPath: 'lines',
+    } as any);
+    expect(await manager.fetch('lines')).toBeNull();
+    expect(manager.getState('lines')?.error).not.toBeNull();
+  });
+
+  it('refuses a truncated command options collection', async () => {
+    mockedFetchResult.mockResolvedValueOnce({
+      code: '0',
+      data: {
+        phaseReached: 'completed',
+        data: { items: [{ pid: 'a', label: 'A', selectable: true }], total: 2 },
+      },
+    } as any);
+    const manager = commandTableManager();
+    manager.register('options', {
+      type: 'api',
+      endpoint: '/x',
+      adaptor: 'commandOptions',
+      dataPath: 'items',
+      valueField: 'pid',
+      labelField: 'label',
+      selectableField: 'selectable',
+    } as any);
+    expect(await manager.fetch('options')).toBeNull();
+  });
+
+  it('retains typed permission denial after real manager option reload', async () => {
+    const manager = commandTableManager();
+    manager.register('options', {
+      type: 'api',
+      method: 'post',
+      endpoint: '/x',
+      autoFetch: false,
+      adaptor: 'commandOptions',
+      dataPath: 'items',
+      valueField: 'pid',
+      labelField: 'label',
+      selectableField: 'selectable',
+    });
+    mockedFetchResult.mockResolvedValueOnce({
+      code: '0',
+      data: {
+        phaseReached: 'completed',
+        data: { items: [{ pid: 'p', label: 'P', selectable: false }], total: 1 },
+      },
+    } as any);
+    expect(await manager.fetch('options')).toEqual([{ value: 'p', label: 'P', disabled: true }]);
+    mockedFetchResult.mockResolvedValueOnce({
+      code: '403',
+      data: null,
+      message: 'Forbidden',
+    } as any);
+    await manager.reload('options');
+    expect(manager.getState('options')?.data).toEqual([{value:'p',label:'P',disabled:true}]);
+    expect((manager.getState('options')?.error as any)?.code).toBe('403');
+    expect(mockedFetchResult).toHaveBeenCalledTimes(2);
+  });
+
   it('defers detail child data sources until form.pid is available', async () => {
     mockedFetchResult.mockResolvedValue({
       code: '0',

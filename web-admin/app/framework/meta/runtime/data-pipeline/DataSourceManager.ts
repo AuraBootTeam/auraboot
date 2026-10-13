@@ -3,6 +3,7 @@
  * 支持 API、字典、静态数据源，以及依赖追踪和自动刷新
  */
 
+import { completedCommandArray, completedCommandOptions } from './completed-command-array';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import type { DataSourceConfig } from '~/framework/meta/schemas/types';
@@ -742,6 +743,10 @@ export class DataSourceManager {
     }
 
     switch (config.adaptor) {
+      case 'commandArray':
+        return completedCommandArray(data, config);
+      case 'commandOptions':
+        return completedCommandOptions(data, config);
       case 'commandTable': {
         // Command execution has one additional envelope after ResultData.
         // A failed or incomplete command must never become an empty table.

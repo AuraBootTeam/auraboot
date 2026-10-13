@@ -542,3 +542,35 @@ describe('Exact decimal expressions', () => {
     expect(parser.evaluate('${fn.DECIMAL_SUBTRACT("0.3", fn.DECIMAL_SUM_BY(form.rows, "quantity"))}')).toBe('0');
   });
 });
+
+describe('PROJECT_ROWS exact payload projection', () => {
+  it('evaluates a declarative whitelist through the actual DSL expression parser', () => {
+    const parser = new ExpressionParser(createExpressionContext({form:{rows:[{pid:'p',quantity:'0.000000000000001',included:false,hidden:'secret'}]}} as any));
+    expect(parser.evaluate('${fn.PROJECT_ROWS(form.rows, {sourcePid:"pid",quantity:"quantity",included:"included"}, "sourcePid")}')).toEqual([{sourcePid:'p',quantity:'0.000000000000001',included:false}]);
+  });
+  it('keeps decimal strings and booleans and drops rich read DTO fields', () => {
+    const rows = [
+      { pid: 'a', qty: '100.000000000000001', included: false, private: { secret: 'x' } },
+    ];
+    expect(
+      (businessFunctions as any).PROJECT_ROWS(
+        rows,
+        { identity: 'pid', quantity: 'qty', included: 'included' },
+        'identity',
+      ),
+    ).toEqual([{ identity: 'a', quantity: '100.000000000000001', included: false }]);
+    expect(rows[0].private.secret).toBe('x');
+  });
+  it('refuses missing identity and prototype paths', () => {
+    expect(() =>
+      (businessFunctions as any).PROJECT_ROWS([{}], { identity: 'pid' }, 'identity'),
+    ).toThrow();
+    expect(() =>
+      (businessFunctions as any).PROJECT_ROWS(
+        [{ pid: 'a' }],
+        { identity: 'constructor.name' },
+        'identity',
+      ),
+    ).toThrow();
+  });
+});

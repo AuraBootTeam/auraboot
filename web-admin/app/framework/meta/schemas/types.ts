@@ -103,6 +103,12 @@ export interface DataSourceConfig {
   autoFetch?: boolean; // Default: true
   pagination?: boolean;
   adaptor?: string; // Default: 'optionList'
+  /** Explicit path inside completed command data; no fallback. */
+  dataPath?: string;
+  /** Options require this total to equal the complete array length. */
+  totalPath?: string;
+  /** Optional boolean path; false disables the corresponding option. */
+  selectableField?: string;
   valueField?: string; // Default: 'value'
   labelField?: string; // Default: 'name'
   data?: any[]; // For static type only
