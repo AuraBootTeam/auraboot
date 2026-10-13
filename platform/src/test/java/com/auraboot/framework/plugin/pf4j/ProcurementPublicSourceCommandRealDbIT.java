@@ -152,7 +152,7 @@ class ProcurementPublicSourceCommandRealDbIT {
     @BeforeEach void prepare(TestInfo test) throws Exception {
         retainedActors.clear();retainedTaskPids.clear();retainedBootstrapPrincipal=null;priorCaseFacts=null;
         caseEvidence=null;tenant=null;userId=null;memberId=null;actor=null;provider=null;token=null;deniedToken=null;
-        loginCount.set(0);queryCount.set(0);orderSaveCount.set(0);orderLookupCount.set(0);savedOrder=null;ambiguousOrderSave=false;publicRequestSequence=0;server=null;task=null;connection=null;observed.tenant=null;observed.missingTargetPid=null;observed.missingTargetModel="s2p_sourcing_event";observed.targetNotFound.set(false);
+        loginCount.set(0);queryCount.set(0);orderSaveCount.set(0);orderLookupCount.set(0);orderReadCount.set(0);readClosedStatus="LOCAL_OPEN";readQuantity="300.000001";savedOrder=null;ambiguousOrderSave=false;publicRequestSequence=0;server=null;task=null;connection=null;observed.tenant=null;observed.missingTargetPid=null;observed.missingTargetModel="s2p_sourcing_event";observed.targetNotFound.set(false);
         prepareEvidence(test);
         assertEquals("13",System.getenv("TEST_REDIS_DATABASE"));
         try(var sql=postgres.getConnection()){assertEquals("enterprise_22",sql.getCatalog());}
@@ -221,11 +221,18 @@ class ProcurementPublicSourceCommandRealDbIT {
         server.createContext("/K3Cloud/Kingdee.BOS.WebApi.ServicesStub.DynamicFormService.ExecuteBillQuery.common.kdsvc",http->{
             var request=json.readTree(http.getRequestBody().readAllBytes());String content=response;
             if("FixturePurchase".equals(request.path("data").path("FormId").asText())) {
-                orderLookupCount.incrementAndGet();assertNotNull(savedOrder);
-                assertEquals(Set.of("data"),json.convertValue(request,Map.class).keySet());assertEquals("OrderId,BillNo,Marker",request.path("data").path("FieldKeys").asText());assertEquals(0,request.path("data").path("StartRow").asInt(-1));
-                assertEquals("Marker = '"+savedOrder.path("Marker").asText()+"'",request.path("data").path("FilterString").asText());
-                assertEquals(2,request.path("data").path("Limit").asInt());
-                content=json.writeValueAsString(List.of(List.of("local-order-1","LOCAL-PO-1",savedOrder.path("Marker").asText())));
+                assertNotNull(savedOrder);assertEquals(Set.of("data"),json.convertValue(request,Map.class).keySet());var query=request.path("data");
+                assertEquals(0,query.path("StartRow").asInt(-1));assertEquals(2,query.path("Limit").asInt(-1));
+                if("OrderId,BillNo,Marker".equals(query.path("FieldKeys").asText())) {
+                    orderLookupCount.incrementAndGet();assertEquals("Marker = '"+savedOrder.path("Marker").asText()+"'",query.path("FilterString").asText());
+                    content=json.writeValueAsString(List.of(List.of("local-order-1","LOCAL-PO-1",savedOrder.path("Marker").asText())));
+                } else {
+                    orderReadCount.incrementAndGet();assertEquals(String.join(",",READ_COLUMNS.stream().map(column->"Read_"+column).toList()),query.path("FieldKeys").asText());
+                    String filter=query.path("FilterString").asText();assertTrue(filter.equals("Read_erp_id = 'local-order-1'") || filter.equals(""));
+                    assertEquals("Read_erp_id ASC,Read_erp_entry_id ASC",query.path("OrderString").asText());assertEquals(0,query.path("TopRowCount").asInt(-1));
+                    var line=savedOrder.path("Lines").get(0);
+                    content=json.writeValueAsString(List.of(List.of("local-order-1","LOCAL-PO-1","local-entry-1",savedOrder.path("Supplier").path("Id").asText(),line.path("Material").path("Id").asText(),savedOrder.path("Date").asText(),"LOCAL_APPROVED",readClosedStatus,readQuantity,"0","250","LOCAL-MATERIAL","Local material","local","PCS",line.path("DeliveryDate").asText(),line.path("Source").path("Head").asText(),line.path("Source").path("Entry").asText())));
+                }
             } else queryCount.incrementAndGet();
             byte[] bytes=content.getBytes(StandardCharsets.UTF_8);http.sendResponseHeaders(200,bytes.length);http.getResponseBody().write(bytes);http.close();
         });
@@ -459,6 +466,76 @@ class ProcurementPublicSourceCommandRealDbIT {
     private Long version(){return new BigDecimal(db.getById("s2p_sourcing_event",task).get("row_version").toString()).longValueExact();}
 
     private record Result(int status,com.fasterxml.jackson.databind.JsonNode body){}
+    private static final String SYNC_ORDERS="qo_procurement_order_common:sync_orders",SYNC_CLOSURES="qo_procurement_order_common:sync_closures";
+    private static final List<String> READ_COLUMNS=List.of("erp_id","bill_no","erp_entry_id","supplier_external_id","material_id","order_date","business_status","closed_status","ordered_qty","submitted_qty","received_qty","material_code","material_name","specification","unit","delivery_date","requisition_id","entry_id");
+    private String readClosedStatus="LOCAL_OPEN",readQuantity="300.000001";
+    private final AtomicInteger orderReadCount=new AtomicInteger();
+    private void verifyPublicOrderSynchronization(PreparedOrder order,Map<String,Object> source,List<Map<String,Object>> allocations,Map<String,Object> formal) throws Exception {
+        assertTrue(extensions.getCommandHandler(SYNC_ORDERS).isPresent());assertTrue(extensions.getCommandHandler(SYNC_CLOSURES).isPresent());
+        String bearer=orderSyncActor();var before=snapshot();int loginBefore=loginCount.get();
+        assertEquals(400,orderSyncCall(bearer,SYNC_ORDERS,order.execution()).status());assertEquals(before,snapshot());assertEquals(loginBefore,loginCount.get());assertEquals(0,orderReadCount.get());
+        configureOrderReadPolicy();readClosedStatus="UNCONFIRMED";before=snapshot();
+        assertEquals(400,orderSyncCall(bearer,SYNC_ORDERS,order.execution()).status());assertEquals(before,snapshot(),"Unknown external status must reject the whole read before publication");
+        readClosedStatus="LOCAL_OPEN";var published=orderSyncCall(bearer,SYNC_ORDERS,order.execution());assertEquals(200,published.status());assertEquals("published",published.body().path("data").path("data").path("status").asText());
+        var orders=fixture(SYNC,()->db.query(domainModel("order"),Map.of("qo_pr_order_account_id",provider,"qo_pr_order_erp_id","local-order-1")));assertEquals(1,orders.size());String orderPid=pid(orders.getFirst());
+        var original=fixture(SYNC,()->db.getById(domainModel("order"),orderPid));assertEquals("LOCAL-PO-1",original.get("pr_po_code"));assertEquals(order.supplier(),original.get("pr_po_supplier"));
+        var lines=fixture(SYNC,()->db.query(domainModel("order_line"),Map.of("pr_pol_order_id",orderPid)));assertEquals(1,lines.size());var line=lines.getFirst();
+        assertEquals(order.quote().source(),line.get("qo_pr_order_line_source_pid"));assertEquals(source.get("pr_preq_product_id"),line.get("pr_pol_product_id"));
+        assertEquals("LOCAL-MATERIAL",line.get("qo_pr_order_line_material_code"));assertEquals("Local material",line.get("qo_pr_order_line_material_name"));assertEquals("local",line.get("qo_pr_order_line_specification"));assertEquals("PCS",line.get("qo_pr_order_line_unit"));
+        assertEquals(0,new BigDecimal("300.000001").compareTo(new BigDecimal(line.get("pr_pol_qty").toString())));
+        assertEquals(0,new BigDecimal(line.get("qo_pr_order_line_submitted_qty").toString()).signum());assertEquals(0,new BigDecimal("250").compareTo(new BigDecimal(line.get("pr_pol_received_qty").toString())));
+        before=snapshot();assertEquals(200,orderSyncCall(bearer,SYNC_ORDERS,order.execution()).status());assertExactOrderCasReplay(orderPid,before,snapshot());
+        readQuantity="400.000001";var reviewed=orderSyncCall(bearer,SYNC_ORDERS,order.execution());assertEquals(200,reviewed.status());assertEquals("manual_review_required",reviewed.body().path("data").path("data").path("status").asText());
+        var changed=fixture(SYNC,()->db.getById(domainModel("order"),orderPid));assertEquals(Boolean.TRUE,changed.get("qo_pr_order_change_pending"));
+        for(String field:List.of("pid","qo_pr_order_key","qo_pr_order_account_id","qo_pr_order_erp_id","pr_po_code","pr_po_supplier","pr_po_date","pr_po_status","qo_pr_order_content_hash","qo_pr_order_published_at","qo_pr_order_state"))assertEquals(original.get(field),changed.get(field),"Published identity and content remain immutable: "+field);
+        assertEquals(lines,fixture(SYNC,()->db.query(domainModel("order_line"),Map.of("pr_pol_order_id",orderPid))));
+        assertOrderDomainRetained(order,source,allocations,formal);
+        readClosedStatus="UNCONFIRMED";before=snapshot();assertEquals(400,orderSyncCall(bearer,SYNC_CLOSURES,order.execution()).status());assertEquals(before,snapshot());
+        readClosedStatus="LOCAL_CLOSED";assertEquals(200,orderSyncCall(bearer,SYNC_CLOSURES,order.execution()).status());assertEquals("closed",fixture(SYNC,()->db.getById(domainModel("order"),orderPid)).get("qo_pr_order_state"));
+        readClosedStatus="LOCAL_OPEN";before=snapshot();assertEquals(200,orderSyncCall(bearer,SYNC_CLOSURES,order.execution()).status());assertEquals(before,snapshot(),"Explicit false observations do not reopen or rewrite closed orders");
+        assertEquals(lines,fixture(SYNC,()->db.query(domainModel("order_line"),Map.of("pr_pol_order_id",orderPid))));assertOrderDomainRetained(order,source,allocations,formal);
+        writeArtifact("public-p12-order-facts.json",Map.of("orderPid",orderPid,"executionPid",order.execution(),"orderedQty","300.000001","incomingChangedQty","400.000001","submittedQty","0","receivedQty","250","initialReceivedSynthetic",true,"trustedReceiptWriterVerified",false,"customer007Verified",false,"readCount",orderReadCount.get()));
+    }
+    private void assertOrderDomainRetained(PreparedOrder order,Map<String,Object> source,List<Map<String,Object>> allocations,Map<String,Object> formal) {
+        assertEquals(source,fixture(SYNC,()->db.getById(domainModel("source"),order.quote().source())));
+        assertEquals(allocations,fixture(SYNC,()->db.query(domainModel("allocation"),Map.of("qo_pr_allocation_execution_pid",order.execution()))));assertEquals(formal,formalSnapshot(order.quote().submission()));
+    }
+    private String orderSyncActor() {
+        context();String email=provider+"-order-sync@example.invalid";var user=users.signUp(email,PASSWORD,"Public order sync local fixture",provider);var member=members.addMember(user.getId(),tenant,"active");
+        var codes=new ArrayList<>(ORDER_PERMISSIONS);codes.add("model.pr_purchase_order.read");codes.add("model.pr_purchase_order_line.read");assertEquals(15,codes.size());return actorToken(user.getId(),user.getPid(),member.getId(),email,codes);
+    }
+    private Map<String,Object> orderReadContract() {
+        var fields=new LinkedHashMap<String,String>();for(String column:READ_COLUMNS)fields.put(column,"Read_"+column);
+        return Map.of("connectionPid",connection,"accountId",provider,"formId","FixturePurchase","supplierReferenceFormId","FixtureSupplier","fields",fields,"businessStatusValues",Map.of("LOCAL_APPROVED","approved"),"closedStatusValues",Map.of("LOCAL_OPEN",false,"LOCAL_CLOSED",true),"pageSize",2,"maxRows",20,"stableCompleteRead",true);
+    }
+    private void configureOrderReadPolicy() throws Exception {
+        context();Path original=Path.of(procurementDirectory);Path copy=Files.createDirectory(caseEvidence.resolve("read-dsl"));
+        try(var files=Files.walk(original)){for(Path path:files.toList()){Path target=copy.resolve(original.relativize(path));if(Files.isDirectory(path))Files.createDirectories(target);else Files.copy(path,target);}}
+        Path commandFile=copy.resolve("config/commands/procurement.json");Files.copy(commandFile,caseEvidence.resolve("read-production-default-command.json"));var definitions=json.readTree(commandFile.toFile());int changed=0;
+        for(var definition:definitions)if(Set.of(SYNC_ORDERS,SYNC_CLOSURES).contains(definition.path("code").asText())){
+            var policies=(ArrayNode)definition.path("handlerParams").path("procurementOrderReadContracts");assertTrue(policies.isEmpty());policies.add(json.valueToTree(orderReadContract()));changed++;
+            assertEquals("qo_procurement_execution_common",definition.path("modelCode").asText());assertEquals("qo.procurement.integrate",definition.path("permissions").get(0).asText());
+            assertEquals(SYNC_CLOSURES.equals(definition.path("code").asText()),definition.path("handlerParams").path("tenantProjectionRead").asBoolean());
+        }
+        assertEquals(2,changed);Files.write(commandFile,json.writerWithDefaultPrettyPrinter().writeValueAsBytes(definitions));importDirectory(copy);
+        for(String code:List.of(SYNC_ORDERS,SYNC_CLOSURES)){var definition=commands.findByCode(code);assertEquals(tenant,definition.getTenantId());var config=json.readTree(definition.getExecutionConfig());assertEquals(code,config.path("handler").asText());assertEquals(1,config.path("handlerParams").path("procurementOrderReadContracts").size());assertEquals(SYNC_CLOSURES.equals(code),config.path("handlerParams").path("tenantProjectionRead").asBoolean());}
+        writeArtifact("p12-read-server-policy.json",Map.of("originCommandSha256",sha(original.resolve("config/commands/procurement.json")),"configuredCommandSha256",sha(commandFile),"metadataDiffersFromProductionDefault",true,"tenantId",tenant.toString(),"contract",orderReadContract(),"customer007Verified",false));
+    }
+    private Result orderSyncCall(String bearer,String command,String execution) throws Exception {
+        assertTrue(Set.of(SYNC_ORDERS,SYNC_CLOSURES).contains(command));MetaContext.clear();org.springframework.test.web.servlet.MvcResult result;observed.publicRequestActive=true;
+        try {result=mvc.perform(post("/api/meta/commands/execute/"+command).header("Authorization","Bearer "+bearer).header("X-Locale","en-US").contentType("application/json").content(json.writeValueAsBytes(Map.of("targetRecordPid",execution,"payload",Map.of())))).andReturn();}
+        finally {observed.publicRequestActive=false;}context();var body=json.readTree(result.getResponse().getContentAsByteArray());
+        var diagnostic=new LinkedHashMap<String,Object>();diagnostic.put("commandCode",command);diagnostic.put("targetRecordPid",execution);diagnostic.put("httpStatus",result.getResponse().getStatus());diagnostic.put("businessCode",safeNumericCode(body.path("code")));diagnostic.put("contextBusinessCode",safeNumericCode(body.path("context").path("code")));diagnostic.put("typedTargetNotFoundObserved",observed.targetNotFound.get());diagnostic.put("readCount",orderReadCount.get());diagnostic.put("rawResponseOrCredentialsPersisted",false);writeArtifact("public-p12-request-"+(++publicRequestSequence)+".json",diagnostic);return new Result(result.getResponse().getStatus(),body);
+    }
+    /** Only the matched native order's proven CAS metadata changes; every other order/domain stays exact. */
+    @SuppressWarnings("unchecked")
+    private static void assertExactOrderCasReplay(String pid,Map<String,Object> before,Map<String,Object> after) {
+        var oldRows=(List<Map<String,Object>>)before.get("order");var newRows=(List<Map<String,Object>>)after.get("order");var oldTargets=oldRows.stream().filter(row->pid.equals(row.get("pid"))).toList();var newTargets=newRows.stream().filter(row->pid.equals(row.get("pid"))).toList();assertEquals(1,oldTargets.size());assertEquals(1,newTargets.size());
+        var old=oldTargets.getFirst();var fresh=newTargets.getFirst();assertEquals(new BigDecimal(old.get("row_version").toString()).longValueExact()+1,new BigDecimal(fresh.get("row_version").toString()).longValueExact());
+        assertFalse(LocalDateTime.parse(fresh.get("updated_at").toString().replace(' ','T')).isBefore(LocalDateTime.parse(old.get("updated_at").toString().replace(' ','T'))));
+        var a=new LinkedHashMap<>(before);var b=new LinkedHashMap<>(after);a.put("order",oldRows.stream().map(row->replayRow(pid,row)).toList());b.put("order",newRows.stream().map(row->replayRow(pid,row)).toList());assertEquals(a,b);
+    }
+
     private static final String GENERATE="qo_procurement_execution_common:generate_orders";
     private static final List<String> ORDER_PERMISSIONS=List.of("meta.command.execute","qo.procurement.integrate",
         "model.qo_procurement_execution_common.read","model.s2p_sourcing_event.read","model.pr_supplier_common.read",
@@ -492,6 +569,7 @@ class ProcurementPublicSourceCommandRealDbIT {
         assertEquals(formal,formalSnapshot(order.quote().submission()));
         assertEquals(allocations,fixture(SYNC,()->db.query(domainModel("allocation"),Map.of("qo_pr_allocation_execution_pid",order.execution()))));
         assertEquals(source,fixture(SYNC,()->db.getById(domainModel("source"),order.quote().source())));
+        verifyPublicOrderSynchronization(order,source,allocations,formal);
         writeArtifact("public-order-outcome.json",Map.of("executionPid",order.execution(),"sourcePid",order.quote().source(),"submissionPid",order.quote().submission(),"saveCount",orderSaveCount.get(),"lookupCount",orderLookupCount.get(),"externalErpSynthetic",true,"customer006Verified",false));
     }
     @Test @Order(7) void publicUnknownSaveKeepsIndependentCheckpointUntilMarkerLookupWithoutResending() throws Exception {
@@ -516,6 +594,10 @@ class ProcurementPublicSourceCommandRealDbIT {
         observed.tenant=tenant;observed.missingTargetPid=baselineOrderExecution;observed.missingTargetModel="qo_procurement_execution_common";observed.targetNotFound.set(false);
         try {
             assertEquals(400,orderCall(bearer,baselineOrderExecution,Map.of()).status());assertTrue(observed.targetNotFound.get());
+            String syncBearer=orderSyncActor();
+            for(String command:List.of(SYNC_ORDERS,SYNC_CLOSURES)){
+                observed.targetNotFound.set(false);assertEquals(400,orderSyncCall(syncBearer,command,baselineOrderExecution).status());assertTrue(observed.targetNotFound.get());
+            }
         } finally {observed.missingTargetModel="s2p_sourcing_event";observed.missingTargetPid=null;}
         assertEquals(primaryBefore,snapshotTenant(baselineTenant));assertEquals(secondaryBefore,snapshot());
         assertEquals(0,orderSaveCount.get());assertEquals(0,orderLookupCount.get());assertEquals(0,loginCount.get());
