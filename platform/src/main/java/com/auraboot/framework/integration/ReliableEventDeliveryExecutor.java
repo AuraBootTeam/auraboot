@@ -5,6 +5,8 @@ import com.auraboot.framework.meta.mapper.OutboxEventMapper;
 import com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelope;
 import com.auraboot.framework.plugin.extension.integration.ReliableEventConsumerExtension;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
+import com.auraboot.framework.plugin.pf4j.AuraPluginManager;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -14,6 +16,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class ReliableEventDeliveryExecutor {
 
     private final OutboxEventMapper outboxEventMapper;
+    private final AuraPluginManager pluginManager;
     private final ReliableIntegrationMetrics metrics;
     private final TransactionTemplate transaction;
     private final TransactionTemplate serializableTransaction;
@@ -21,6 +24,15 @@ public class ReliableEventDeliveryExecutor {
     public ReliableEventDeliveryExecutor(OutboxEventMapper outboxEventMapper,
                                          ReliableIntegrationMetrics metrics,
                                          PlatformTransactionManager transactionManager) {
+        this(outboxEventMapper, metrics, transactionManager, null);
+    }
+
+    @Autowired
+    public ReliableEventDeliveryExecutor(OutboxEventMapper outboxEventMapper,
+                                         ReliableIntegrationMetrics metrics,
+                                         PlatformTransactionManager transactionManager,
+                                         AuraPluginManager pluginManager) {
+        this.pluginManager = pluginManager;
         this.outboxEventMapper = outboxEventMapper;
         this.metrics = metrics;
         this.transaction = new TransactionTemplate(transactionManager);
@@ -43,21 +55,18 @@ public class ReliableEventDeliveryExecutor {
                 metrics.record("duplicate_suppressed");
                 return;
             }
-            MetaContext.Snapshot previous = MetaContext.snapshot();
-            try {
+            MetaContext.runWithSnapshot(null, () -> {
                 MetaContext.setContext(envelope.tenantId(), 0L,
                         "integration-runtime", "integration-runtime");
-                consumer.consume(envelope);
+                InventoryOwnerCommandScope.consume(envelope, consumer, pluginManager,
+                        () -> consumer.consume(envelope));
                 int applied = outboxEventMapper.markReceiptApplied(
                         envelope.tenantId(), envelope.eventId(), consumer.consumerCode(), leaseToken);
                 if (applied != 1) {
                     throw new IllegalStateException("Reliable integration receipt fence was lost");
                 }
                 metrics.record("receipt_applied");
-            } finally {
-                MetaContext.clear();
-                MetaContext.restore(previous);
-            }
+            });
         });
     }
 }

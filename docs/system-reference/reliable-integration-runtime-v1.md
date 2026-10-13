@@ -73,6 +73,14 @@ for Quality Hold contracts after T04 freezes those event types. Until those PR h
 the Core pilot proves the runtime contract and PostgreSQL lifecycle, not the assembled business
 journey.
 
+## Registered Inventory intake writer authority
+
+The host binds the started PF4J `com.auraboot.inventory` artifact, exact implementation class and registered consumer instance `inventory.public-command-adapter.v1` to the sole purchase event `procurement.purchase-order.receipt-requested.v1` from `procurement`. The body command is a consistency check; it cannot choose a command, plugin, row scope or model authority. Artifact observation retains the existing STARTED/classloader/JAR-drift checks.
+
+For this callback only, the claimed envelope tenant and fixed owner command `inv:receive_source_receipt` authorize create operations on `inv_inbound` and `inv_inbound_line`. Reads are limited to those two models and `inv_warehouse`, `inv_warehouse_location`, `prod_product`, `pe_product`, matching current intake prerequisites. Update, delete, batch claim and cross-owner/foreign-tenant access are rejected. The existing `ALL` row grade is bound to each approved model rather than a null/global target; normal tenant enforcement and exact metadata field-writer guards still run. Other reliable consumers retain their prior behavior and receive no new owner authority.
+
+Effect and receipt remain in the existing independent transaction. Duplicate receipt claims skip the consumer. The host restores prior identity and command permit state on success/failure; nested unrelated delivery cannot borrow the private owner scope. `InventoryOwnerCommandScopeTest` provides hermetic scope/guard counterexamples, alongside the existing delivery isolation, background accessor, MetaContext and field-writer tests. Assembled PF4J, PostgreSQL delivery and posted receipt lineage require separate native evidence; these tests alone do not prove the Procurement received-quantity consumer or customer ERP contracts.
+
 ## Observability and rollback
 
 Micrometer counter `auraboot_integration_events_total{outcome=...}` exposes enqueue, claim, receipt,
