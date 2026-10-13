@@ -11,7 +11,6 @@ import com.auraboot.framework.auth.dto.AuthenticationRequest;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.constant.SystemFieldConstants;
 import com.auraboot.framework.meta.dto.ModelDefinition;
-import com.auraboot.framework.meta.constant.SystemFieldConstants;
 import com.auraboot.framework.notification.dto.NotificationRuleRequest;
 import com.auraboot.framework.notification.dto.NotificationTemplateCreateRequest;
 import com.auraboot.framework.notification.service.NotificationRuleService;
