@@ -32,7 +32,7 @@ import com.auraboot.framework.plugin.dto.imports.ImportRequest;
 import com.auraboot.framework.plugin.extension.DataAccessor;
 import com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelope;
 import com.auraboot.framework.plugin.extension.integration.ReliableIntegrationAccessor;
-import com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImpl;
+import com.auraboot.framework.plugin.extension.BackgroundDataAccessor;
 import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
 import com.auraboot.framework.plugin.service.PluginImportService;
 import com.auraboot.framework.tenant.dao.entity.Tenant;
@@ -78,7 +78,8 @@ final class ProductQuoteReminderNativeFacet {
     record Services(DataSource dataSource, JdbcTemplate jdbc, ObjectMapper json,
                     PlatformTransactionManager manager, TenantService tenants, UserService users,
                     TenantMemberService members, TenantBootstrapService bootstrap, PluginImportService imports,
-                    DynamicDataService data, MetaModelService metadata, CommandExecutor commands, AuthService authentication, NotificationTemplateService templates, NotificationRuleService rules,
+                    DynamicDataService data, MetaModelService metadata, CommandExecutor commands, AuthService authentication,
+                    BackgroundDataAccessor background, NotificationTemplateService templates, NotificationRuleService rules,
                     ImportedNotificationMetadataReader reader, ImportedNotificationMetadataValidator validator,
                     ReliableIntegrationAccessor reliable, StrictInAppDeliveryWriter writer,
                     ReliableEventDeliveryExecutor executor, ExtensionRegistry extensions, List<Long> protectedTenantIds) {}
@@ -162,10 +163,15 @@ final class ProductQuoteReminderNativeFacet {
                 Class<?> service = loader.loadClass("com.auraboot.quote.engine.procurement.ProcurementReminderService");
                 assertThat(service.getClassLoader()).isSameAs(loader);
                 assertThat(Files.isSameFile(Path.of(service.getProtectionDomain().getCodeSource().getLocation().toURI()), jar)).isTrue();
+                DataAccessor actualSchedulerData = actualSchedulerData(loader, jar, tenant.getId(), s.background);
+                Class<?> adapter = actualSchedulerData.getClass();
+                trace.put("reminderQueueAdapter", Map.of("adapterClass", adapter.getName(),
+                        "sameActualProductJarAndLoader", true, "backgroundBeanClass", s.background.getClass().getName(),
+                        "actualAutowiredBackgroundCapability", true, "nativeTickExecuted", false));
                 var method = service.getMethod("queue", DataAccessor.class, Instant.class, List.class);
                 Map<String, Object> supplierRecord = nativeRecord("pr_supplier_common", supplier);
-                assertThat(queue(method, List.of(supplierRecord))).isEqualTo(1);
-                assertThat(queue(method, List.of(supplierRecord))).isZero();
+                assertThat(queue(method, actualSchedulerData, List.of(supplierRecord))).isEqualTo(1);
+                assertThat(queue(method, actualSchedulerData, List.of(supplierRecord))).isZero();
             }
             var sources = s.jdbc.queryForList("SELECT pid,qo_pr_reminder_targets FROM \"" + tables.get("qo_procurement_reminder_common") + "\" WHERE tenant_id=? ORDER BY pid", tenant.getId());
             assertThat(sources).hasSize(1);
@@ -516,10 +522,26 @@ final class ProductQuoteReminderNativeFacet {
         return MetaContext.runWithCommandPermitScope("ALL", () -> s.data.getById(model, pid));
     }
 
-    private int queue(java.lang.reflect.Method method, List<Map<String, Object>> suppliers) throws Exception {
+    /** Instantiate only the actual artifact's scheduler adapter; never substitute request-side access. */
+    static DataAccessor actualSchedulerData(URLClassLoader loader, Path jar, long tenant,
+                                           BackgroundDataAccessor background) throws Exception {
+        if (loader == null || jar == null || tenant <= 0 || background == null) {
+            throw new IllegalArgumentException("Actual Product loader, tenant and Spring background bean required");
+        }
+        assertThat(background.transactionResourceId()).isNotBlank();
+        Class<?> adapter = loader.loadClass("com.auraboot.quote.engine.procurement.ProcurementReminderScheduler$TenantData");
+        assertThat(adapter.getClassLoader()).isSameAs(loader);
+        assertThat(Files.isSameFile(Path.of(adapter.getProtectionDomain().getCodeSource().getLocation().toURI()), jar)).isTrue();
+        assertThat(DataAccessor.class.isAssignableFrom(adapter)).isTrue();
+        var constructor = adapter.getDeclaredConstructor(long.class, BackgroundDataAccessor.class);
+        constructor.setAccessible(true);
+        return (DataAccessor) constructor.newInstance(tenant, background);
+    }
+
+    private int queue(java.lang.reflect.Method method, DataAccessor actualSchedulerData, List<Map<String, Object>> suppliers) throws Exception {
         return tx(() -> MetaContext.runWithCommandPermitScope("ALL", () -> {
             try {
-                return (Integer) method.invoke(null, new DynamicDataAccessorImpl(s.data), SLOT, suppliers);
+                return (Integer) method.invoke(null, actualSchedulerData, SLOT, suppliers);
             } catch (InvocationTargetException error) {
                 // CATCH: unwrap the actual Product business failure, never fall back to synthetic queue data.
                 if (error.getCause() instanceof RuntimeException runtime) throw runtime;
