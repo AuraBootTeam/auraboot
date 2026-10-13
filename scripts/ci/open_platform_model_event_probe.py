@@ -238,7 +238,7 @@ def run_model_event_probe(request, admin, infrastructure, *, evidence_path, rece
     def call(*args, **kwargs):
         with request_lock:
             report["requests"] += 1
-            require(report["requests"] <= 200, "model event request budget exhausted")
+            require(report["requests"] <= (500 if measure_sustained else 200), "model event request budget exhausted")
         return request(*args, **kwargs)
 
     def human(path, method="GET", body=None):

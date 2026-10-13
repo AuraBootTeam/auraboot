@@ -135,7 +135,7 @@ def run_static_probe(request, admin):
 
 
 def main():
-    request = Client(BASE, max_requests=350, allow_expected_rate_limit=True).request
+    request = Client(BASE, max_requests=650, allow_expected_rate_limit=True).request
     admin = bootstrap_module.bootstrap_admin(request)
     static = run_static_probe(request, admin)
     credential = static["credential"]
