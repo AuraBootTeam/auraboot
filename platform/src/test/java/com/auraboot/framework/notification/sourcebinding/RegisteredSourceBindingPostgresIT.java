@@ -104,6 +104,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @SpringBootTest(classes = TestApplication.class, properties = {
         "spring.datasource.url=${TEST_DATABASE_URL}", "spring.data.redis.database=${TEST_REDIS_DATABASE}",
         "s06.native.source-binding.fixture=true",
+        "mybatis-plus.configuration.log-impl=org.apache.ibatis.logging.slf4j.Slf4jImpl",
+        "logging.level.com.auraboot.framework=INFO",
+        "logging.level.org.mybatis=INFO",
+        "logging.level.org.springframework.security=WARN",
+        "logging.level.org.springframework.cache=WARN",
         "s06.native.product-quote-facet.enabled=${S06_NATIVE_PRODUCT_QUOTE_FACET:false}",
         "security.field-encryption.key=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="})
 @ActiveProfiles("integration-test")
