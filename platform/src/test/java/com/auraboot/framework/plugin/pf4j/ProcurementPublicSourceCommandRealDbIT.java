@@ -79,6 +79,8 @@ class ProcurementPublicSourceCommandRealDbIT {
     @Autowired DynamicDataService data;
     @Autowired UserService users;
     @Autowired TenantService tenants;
+    @Autowired com.auraboot.framework.tenant.service.TenantBootstrapService tenantBootstrap;
+    @Autowired com.auraboot.framework.permission.service.UserPermissionService userPermissions;
     @Autowired TenantMemberService members;
     @Autowired RoleService roles;
     @Autowired UserRoleService userRoles;
@@ -94,6 +96,7 @@ class ProcurementPublicSourceCommandRealDbIT {
     private String actor,provider,token,deniedToken,task,connection,procurementDirectory;
     private HttpServer server;
     private Path caseEvidence;
+    private Map<String,Object> retainedBootstrapPrincipal;
     private final List<Map<String,Object>> retainedActors=new ArrayList<>();
     private final List<String> retainedTaskPids=new ArrayList<>();
     private volatile String response;
@@ -141,6 +144,15 @@ class ProcurementPublicSourceCommandRealDbIT {
         tenant=tenants.createTenant(organization).getId();
         assertNotEquals(Long.valueOf(System.getenv("TEST_TENANT_ID")),tenant,"Never alter the existing public tenant");
         memberId=members.addMember(userId,tenant,"active").getId();context();
+        // The formal cold-tenant permission template belongs to a separate bootstrap principal.
+        // Its canonical tenant_admin role is never used by the public positive or denial requests.
+        var bootstrap=users.signUp(provider+"-bootstrap@example.invalid",PASSWORD,"Local bootstrap principal",provider+"_bootstrap");
+        var bootstrapMember=members.addMember(bootstrap.getId(),tenant,"active");
+        assertNotEquals(actor,bootstrap.getPid());assertNotEquals(memberId,bootstrapMember.getId());
+        retainedBootstrapPrincipal=Map.of("tenantId",tenant.toString(),"userPid",bootstrap.getPid(),"memberPid",bootstrapMember.getPid(),
+            "purpose","Formal TenantBootstrapService initialization only","usedForTestedPublicRequest",false,"authenticatedForPublicRequest",false);
+        assertTrue(tenantBootstrap.bootstrapTenant(tenant,bootstrap.getId()).isSuccess());context();
+        assertNotNull(permissions.findByCode("report.definition.view"),"Canonical default bootstrap permission must exist before core-meta menu import");
         db=new DynamicDataAccessorImpl(data);
         var directories=json.readTree(required("PROCUREMENT_SOURCE_IMPORT_DIRECTORIES"));
         assertTrue(directories.isArray() && !directories.isEmpty(),"Explicit frozen ordered DSL directories required");
@@ -191,7 +203,7 @@ class ProcurementPublicSourceCommandRealDbIT {
                 identities.put("retention","Retained exact independent tenant namespace; no database cleanup was performed");
                 identities.put("tenantId",tenant==null?null:tenant.toString());identities.put("ownerUserPid",actor);
                 identities.put("ownerMemberId",memberId==null?null:memberId.toString());identities.put("namespace",provider);
-                identities.put("taskPids",retainedTaskPids);identities.put("actors",retainedActors);identities.put("connectionPid",connection);identities.put("accountId",provider);identities.put("targetTaskPid",task);
+                identities.put("taskPids",retainedTaskPids);identities.put("bootstrapPrincipal",retainedBootstrapPrincipal);identities.put("actors",retainedActors);identities.put("connectionPid",connection);identities.put("accountId",provider);identities.put("targetTaskPid",task);
                 identities.put("externalErpSynthetic",true);identities.put("customer003AdmissionVerified",false);
                 writeArtifact("retained-identities.json",identities);
             }
@@ -387,11 +399,24 @@ class ProcurementPublicSourceCommandRealDbIT {
         var permissionIds=new ArrayList<Long>();for(String code:codes){var permission=permissions.findByCode(code);assertNotNull(permission);permissionIds.add(permission.getId());}
         assertTrue(roles.assignPermissions(role.getId(),permissionIds));roles.setDefaultDataScopeType(role.getId(),"all");assertTrue(userRoles.assignRolesToMember(member,List.of(role.getId()),tenant,userId));
         MetaContext.setContext(tenant,id,pid,provider);MetaContext.setMemberId(member);
+        userPermissions.evictUserPermissions(tenant,id);
+        var assignments=userRoles.findByMemberIdAndTenantId(member,tenant);
+        validateActorRoleIsolation(assignments.stream().map(com.auraboot.framework.rbac.entity.UserRole::getRoleId).toList(),role.getId(),
+            userPermissions.hasPermission(tenant,id,member,"*"),userPermissions.hasPermission(tenant,id,member,"qo.procurement.integrate"),codes.contains("qo.procurement.integrate"));
         var request=new AuthenticationRequest();request.setEmail(email);request.setPassword(PASSWORD);var authenticated=authentication.authenticate(request);
         assertEquals(tenant,authenticated.getTenantId());assertEquals(id,authenticated.getUserId());assertNotNull(authenticated.getJwt());
-        retainedActors.add(Map.of("userPid",pid,"memberId",member.toString(),"email",email,"roleCode",role.getCode(),"permissionCodes",codes,
-            "authenticationVerified",true,"dataScopeType","all","dataScopeAuthority","Synthetic fixture role only inside the newly created independent tenant; not a production default policy"));
+        var identity=new LinkedHashMap<String,Object>();identity.put("userPid",pid);identity.put("memberId",member.toString());identity.put("email",email);
+        identity.put("roleCode",role.getCode());identity.put("permissionCodes",codes);identity.put("authenticationVerified",true);
+        identity.put("exactCustomRoleOnlyVerified",true);identity.put("wildcardDeniedVerified",true);identity.put("dataScopeType","all");
+        identity.put("dataScopeAuthority","Synthetic fixture role only inside the newly created independent tenant; not a production default policy");
+        retainedActors.add(identity);
         return authenticated.getJwt();
+    }
+    /** Extra bootstrap role or wildcard must never become a hidden public-request authority. */
+    static void validateActorRoleIsolation(List<Long> actualRoles,Long expectedRole,boolean wildcard,boolean integration,boolean expectedIntegration) {
+        assertEquals(List.of(expectedRole),actualRoles,"Public actor must have only its exact newly created custom role");
+        assertFalse(wildcard,"Public actor must not inherit bootstrap wildcard authority");
+        assertEquals(expectedIntegration,integration,"Denial actor differs only by integration permission");
     }
     private void context(){MetaContext.setContext(tenant,userId,actor,provider);MetaContext.setMemberId(memberId);}
     /** Preparation/read observation only; the public tested command never runs inside this synthetic permit. */

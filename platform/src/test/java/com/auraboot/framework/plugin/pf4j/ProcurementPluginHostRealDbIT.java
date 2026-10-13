@@ -1905,7 +1905,7 @@ class ProcurementPluginHostRealDbIT {
         assertTrue(node.path("productJarSha256").asText().matches("[a-f0-9]{64}"));
         Path testSource=Path.of(fixtureEnv("PROCUREMENT_FIXTURE_TEST_SOURCE")).toRealPath();
         assertEquals(node.path("nativeHostTestSha256").asText(),fixtureSha(testSource));
-        assertEquals("7b0bbdd18d2dd87a535a6f171255209a01539cdd",node.path("nativeHostBaseCommit").asText());
+        assertEquals("5b8766af141c29079713945f55b29a1ede37a96a",node.path("nativeHostBaseCommit").asText());
         // Copy only declared nonsecret identity fields, never arbitrary input diagnostic/configuration data.
         fixtureBinding=new LinkedHashMap<>();
         for(String key:List.of("runtime","database","tenantId","productJarSha256","nativeHostTestSha256","nativeHostBaseCommit"))
@@ -1983,8 +1983,15 @@ class ProcurementPluginHostRealDbIT {
                 "bill_no",bill,"order_date","2026-10-13","business_status","approved");
         // Closed-stage initial balances are trusted synthetic reader fixtures, not receipt-writer proof.
         String initialBalance=closed?"250":"0";
+        var materialFacts=new LinkedHashMap<String,String>();
+        for(String field:List.of("material_code","material_name","specification","unit")) {
+            Object fact=sourceRow.get("qo_pr_source_"+field);assertNotNull(fact,"Native source material snapshot required: "+field);
+            assertFalse(fact.toString().isBlank(),"Native source material snapshot must be visible: "+field);materialFacts.put(field,fact.toString());
+        }
         var orderLines=List.of(Map.<String,Object>of("erp_entry_id","1","product_pid",product,"source_pid",sourcePid,
-                "ordered_qty","300.000001","submitted_qty",initialBalance,"received_qty",initialBalance));
+                "ordered_qty","300.000001","submitted_qty",initialBalance,"received_qty",initialBalance,
+                "material_code",materialFacts.get("material_code"),"material_name",materialFacts.get("material_name"),
+                "specification",materialFacts.get("specification"),"unit",materialFacts.get("unit")));
         assertEquals("published",tx.execute(status->scope(publish,()->invokeService("ProcurementOrderService","publish",new Class<?>[]{Map.class,List.class},header,orderLines))));
         var orders=scope(publish,()->nativeRows("pr_purchase_order","qo_pr_order_erp_id",erpId));assertEquals(1,orders.size());
         String order=(String)orders.getFirst().get("pid");
@@ -1993,6 +2000,7 @@ class ProcurementPluginHostRealDbIT {
         var nativeLines=scope(publish,()->nativeRows("pr_purchase_order_line","pr_pol_order_id",order));assertEquals(1,nativeLines.size());
         String orderLine=(String)nativeLines.getFirst().get("pid");
         assertEquals(sourcePid,nativeLines.getFirst().get("qo_pr_order_line_source_pid"));
+        for(var fact:materialFacts.entrySet()) assertEquals(fact.getValue(),nativeLines.getFirst().get("qo_pr_order_line_"+fact.getKey()),"Formal line preserves actual native source fact: "+fact.getKey());
         var addresses=new ArrayList<String>();
         for(String label:List.of("A","B")) addresses.add(scope("qo_procurement_address_common:maintain",()->(String)db.create("qo_procurement_address_common",Map.of(
                 "qo_pr_address_supplier_pid",dispatch.supplier(),"qo_pr_address_state","active","qo_pr_address_address","Buyer fixture warehouse "+label,
@@ -2022,6 +2030,8 @@ class ProcurementPluginHostRealDbIT {
             assertNotEquals(buyer.get("userPid"),buyerMissingSupplierRead.get("userPid"));
             assertNotEquals(buyer.get("memberPid"),buyerMissingSupplierRead.get("memberPid"));}
         receipt.put("supplierActor",supplierActor);receipt.put("orderState",closed?"closed":"open");
+        receipt.put("orderLineMaterialFacts",materialFacts);
+        receipt.put("orderLineMaterialFactsOrigin","Synthetic loopback source read persisted by native domain lifecycle; copied into formal order-line snapshot, not customer ERP006/007 evidence");
         receipt.put("orderedQty","300.000001");receipt.put("submittedQty",initialBalance);receipt.put("receivedQty",initialBalance);
         receipt.put("initialReceivedSynthetic",closed);receipt.put("receiptWriterVerified",false);
         return receipt;

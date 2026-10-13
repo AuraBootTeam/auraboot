@@ -55,4 +55,13 @@ class ProcurementPublicSourceReadinessTest {
             assertThrows(AssertionError.class,()->verify(changed,"oss"),field+" must be verified");
         }
     }
+    @Test void exactCustomRoleActorsKeepTheirDifferentIntegrationAuthority() {
+        ProcurementPublicSourceCommandRealDbIT.validateActorRoleIsolation(List.of(11L),11L,false,true,true);
+        ProcurementPublicSourceCommandRealDbIT.validateActorRoleIsolation(List.of(12L),12L,false,false,false);
+    }
+    @Test void bootstrapAdminWildcardOrLeakedIntegrationCannotPassRoleIsolation() {
+        assertThrows(AssertionError.class,()->ProcurementPublicSourceCommandRealDbIT.validateActorRoleIsolation(List.of(11L,99L),11L,false,true,true));
+        assertThrows(AssertionError.class,()->ProcurementPublicSourceCommandRealDbIT.validateActorRoleIsolation(List.of(11L),11L,true,true,true));
+        assertThrows(AssertionError.class,()->ProcurementPublicSourceCommandRealDbIT.validateActorRoleIsolation(List.of(12L),12L,false,true,false));
+    }
 }
