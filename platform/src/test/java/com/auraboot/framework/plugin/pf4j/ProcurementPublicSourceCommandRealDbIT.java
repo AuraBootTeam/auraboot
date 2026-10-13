@@ -131,6 +131,16 @@ class ProcurementPublicSourceCommandRealDbIT {
     @Aspect static class SourceWriteObservation {
         final AtomicReference<String> created=new AtomicReference<>();
         volatile Long tenant;
+        volatile String missingTargetPid;
+        volatile boolean publicRequestActive;
+        final java.util.concurrent.atomic.AtomicBoolean targetNotFound=new java.util.concurrent.atomic.AtomicBoolean();
+        @org.aspectj.lang.annotation.AfterThrowing(pointcut="execution(* com.auraboot.framework.meta.service.DynamicDataService+.getById(..)) && args(model,recordPid)",throwing="failure")
+        public void recordMissingTarget(String model,String recordPid,RuntimeException failure) {
+            if(publicRequestActive && Objects.equals(tenant,MetaContext.getCurrentTenantId()) && "s2p_sourcing_event".equals(model)
+                    && Objects.equals(missingTargetPid,recordPid)
+                    && failure instanceof com.auraboot.framework.meta.exception.MetaRecordNotFoundException)
+                targetNotFound.set(true);
+        }
         @AfterReturning(pointcut="execution(* com.auraboot.framework.meta.service.DynamicDataService+.create(..)) && args(model,values)",returning="result")
         public void record(String model,Map<String,Object> values,Object result) {
             if(Objects.equals(tenant,MetaContext.getCurrentTenantId()) && "pr_purchase_request".equals(model)
@@ -141,7 +151,7 @@ class ProcurementPublicSourceCommandRealDbIT {
     @BeforeEach void prepare(TestInfo test) throws Exception {
         retainedActors.clear();retainedTaskPids.clear();retainedBootstrapPrincipal=null;priorCaseFacts=null;
         caseEvidence=null;tenant=null;userId=null;memberId=null;actor=null;provider=null;token=null;deniedToken=null;
-        loginCount.set(0);queryCount.set(0);publicRequestSequence=0;server=null;task=null;connection=null;observed.tenant=null;
+        loginCount.set(0);queryCount.set(0);publicRequestSequence=0;server=null;task=null;connection=null;observed.tenant=null;observed.missingTargetPid=null;observed.targetNotFound.set(false);
         prepareEvidence(test);
         assertEquals("13",System.getenv("TEST_REDIS_DATABASE"));
         try(var sql=postgres.getConnection()){assertEquals("enterprise_22",sql.getCatalog());}
@@ -357,21 +367,26 @@ class ProcurementPublicSourceCommandRealDbIT {
     @Test @Order(1) void publicConfiguredReadCreatesThenReplaysWithoutDuplicatePgFacts() throws Exception {
         configurePolicy();var first=call(token,selected("11"));assertEquals(200,first.status());assertEquals("added",first.body().path("data").path("data").path("items").get(0).path("status").asText());
         var before=snapshot();assertEquals(1,sources().size());assertEquals(2,references().size());
-        var replay=call(token,selected("11"));assertEquals(200,replay.status());assertEquals(before,snapshot());assertTrue(loginCount.get()>0 && queryCount.get()>0);
+        String sourcePid=pid(sources().getFirst());
+        var replay=call(token,selected("11"));assertEquals(200,replay.status());
+        assertEquals("unchanged",replay.body().path("data").path("data").path("items").get(0).path("status").asText());
+        var after=snapshot();assertReplaySnapshot(sourcePid,before,after);
+        writeArtifact("replay-snapshots.json",Map.of("sourcePid",sourcePid,"before",before,"after",after));
+        assertTrue(loginCount.get()>0 && queryCount.get()>0);
     }
     @Test @Order(5) void publicRoleAndPayloadCannotGrantIntegrationOrSecretCapabilities() throws Exception {
         assertNotNull(baselineTenant);assertNotEquals(baselineTenant,tenant);assertNotNull(baselineTargetTask);
-        var primaryBefore=snapshotTenant(baselineTenant);var isolatedBefore=snapshot();
-        String ownTask=task;task=baselineTargetTask;
-        try {assertEquals(404,call(token,selected("11")).status(),"Ordinary target missing from this tenant retains not-found semantics");}
-        finally {task=ownTask;}
-        assertEquals(primaryBefore,snapshotTenant(baselineTenant));assertEquals(isolatedBefore,snapshot());
-        assertEquals(0,loginCount.get());assertEquals(0,queryCount.get());
-        writeArtifact("cross-tenant-denial.json",Map.of("foreignTenantId",baselineTenant.toString(),"actorTenantId",tenant.toString(),
-            "foreignTaskPid",baselineTargetTask,"httpStatus",404,"bothTenantBusinessSnapshotsUnchanged",true));
         configurePolicy();assertEquals(403,call(deniedToken,selected("11")).status());assertEquals(0,loginCount.get());assertEquals(0,queryCount.get());
         var forged=new LinkedHashMap<>(selected("11"));forged.put("eligible",true);forged.put("tenantSecretRead",true);forged.put("appSecret","client-secret");
         assertEquals(400,call(token,forged).status());assertEquals(0,loginCount.get());assertTrue(sources().isEmpty());assertEquals(1,references().size());
+        var primaryBefore=snapshotTenant(baselineTenant);var isolatedBefore=snapshot();
+        String ownTask=task;task=baselineTargetTask;observed.tenant=tenant;observed.missingTargetPid=baselineTargetTask;observed.targetNotFound.set(false);
+        try {assertEquals(400,call(token,selected("11")).status(),"Current public command wrapper maps this typed missing target to BadParam");assertTrue(observed.targetNotFound.get(),"Actual governed target lookup must throw typed MetaRecordNotFoundException");}
+        finally {task=ownTask;observed.missingTargetPid=null;}
+        assertEquals(primaryBefore,snapshotTenant(baselineTenant));assertEquals(isolatedBefore,snapshot());
+        assertEquals(0,loginCount.get());assertEquals(0,queryCount.get());
+        writeArtifact("cross-tenant-denial.json",Map.of("foreignTenantId",baselineTenant.toString(),"actorTenantId",tenant.toString(),
+            "foreignTaskPid",baselineTargetTask,"httpStatus",400,"typedMetaRecordNotFoundObserved",true,"bothTenantBusinessSnapshotsUnchanged",true));
     }
     @Test @Order(2) void publicMissingPolicyAndLaterUnknownCodeRejectWholeReadWithoutWrites() throws Exception {
         assertEquals(400,call(token,selected("11")).status());assertEquals(0,loginCount.get());assertTrue(sources().isEmpty());
@@ -411,7 +426,7 @@ class ProcurementPublicSourceCommandRealDbIT {
         return fixture("qo_procurement_task_common:dispatch",()->new TransactionTemplate(transactions).execute(status->{
             String source=pid(sources().getFirst());
             String category=pid(db.create("pr_spend_category",Map.of("pr_spc_code",provider,"pr_spc_name","Local source category")));
-            String supplier=pid(db.create("pr_supplier_common",Map.of("pr_supplier_code",provider,"pr_supplier_name","Local source supplier","pr_supplier_status","enabled","qo_pr_supplier_account_id",provider)));
+            String supplier=fixture("pr_supplier_common:sync_directory",()->pid(db.create("pr_supplier_common",Map.of("pr_supplier_code",provider,"pr_supplier_name","Local source supplier","pr_supplier_status","enabled","qo_pr_supplier_account_id",provider))));
             service("ProcurementCategoryPolicyService",new Class<?>[]{DataAccessor.class,Long.class},new Object[]{db,tenant},"createPolicy",new Class<?>[]{Map.class},Map.of("categoryPid",category,"connectionPid",connection,"supplierPids",List.of(supplier),"defaultSupplierPids",List.of(supplier)));
             service("ProcurementPlanningService",new Class<?>[]{DataAccessor.class,Clock.class,Object.class},new Object[]{db,Clock.systemUTC(),tenant},"classify",new Class<?>[]{String.class,Long.class,Map.class},task,version(),Map.of("sourcePid",source,"sourceRevision",0,"categoryPid",category));
             service("ProcurementDispatchService",new Class<?>[]{DataAccessor.class,Clock.class,Long.class},new Object[]{db,Clock.systemUTC(),tenant},"dispatch",new Class<?>[]{String.class,Long.class,Map.class},task,version(),Map.of("supplierPids",List.of(supplier),"cutoffAt","2066-11-15T08:00:00Z"));
@@ -428,13 +443,18 @@ class ProcurementPublicSourceCommandRealDbIT {
 
     private record Result(int status,com.fasterxml.jackson.databind.JsonNode body){}
     private Result call(String bearer,Map<String,Object> payload) throws Exception {
-        MetaContext.clear();var result=mvc.perform(post("/api/meta/commands/execute/"+SYNC).header("Authorization","Bearer "+bearer)
-            .header("X-Locale","en-US").contentType("application/json").content(json.writeValueAsBytes(Map.of("targetRecordPid",task,"payload",payload)))).andReturn();
+        MetaContext.clear();org.springframework.test.web.servlet.MvcResult result;observed.publicRequestActive=true;
+        try {result=mvc.perform(post("/api/meta/commands/execute/"+SYNC).header("Authorization","Bearer "+bearer)
+            .header("X-Locale","en-US").contentType("application/json").content(json.writeValueAsBytes(Map.of("targetRecordPid",task,"payload",payload)))).andReturn();}
+        finally {observed.publicRequestActive=false;}
         context();var body=json.readTree(result.getResponse().getContentAsByteArray());
         var diagnostic=new LinkedHashMap<String,Object>();diagnostic.put("commandCode",SYNC);diagnostic.put("targetRecordPid",task);
         diagnostic.put("tenantId",tenant.toString());diagnostic.put("httpStatus",result.getResponse().getStatus());
-        diagnostic.put("businessCode",body.path("code").isIntegralNumber()?body.path("code").longValue():null);
-        diagnostic.put("contextBusinessCode",body.path("context").path("code").isIntegralNumber()?body.path("context").path("code").longValue():null);
+        diagnostic.put("businessCode",safeNumericCode(body.path("code")));
+        diagnostic.put("contextBusinessCode",safeNumericCode(body.path("context").path("code")));
+        diagnostic.put("loginCount",loginCount.get());diagnostic.put("queryCount",queryCount.get());
+        diagnostic.put("typedTargetNotFoundObserved",observed.targetNotFound.get());
+        diagnostic.put("safeTypedClassName",observed.targetNotFound.get()?com.auraboot.framework.meta.exception.MetaRecordNotFoundException.class.getName():null);
         diagnostic.put("responseShape",body.isObject()?"object":body.getNodeType().name());
         String internalResponse=body.toString();
         diagnostic.put("targetBoundaryReadDeniedObserved",internalResponse.contains("Access denied: you do not have permission to view this record"));
@@ -444,6 +464,36 @@ class ProcurementPublicSourceCommandRealDbIT {
         diagnostic.put("rawResponsePersisted",false);diagnostic.put("credentialsOrHeadersPersisted",false);
         writeArtifact("public-request-"+(++publicRequestSequence)+".json",diagnostic);
         return new Result(result.getResponse().getStatus(),body);
+    }
+    static String safeNumericCode(com.fasterxml.jackson.databind.JsonNode value) {
+        return (value.isIntegralNumber() || value.isTextual()) && value.asText().matches("[0-9]{1,12}")?value.asText():null;
+    }
+    /** Only the exact duplicate source's proven CAS lock metadata may differ; every other field/row stays strict. */
+    @SuppressWarnings("unchecked")
+    static void assertReplaySnapshot(String sourcePid,Map<String,Object> before,Map<String,Object> after) {
+        var oldRows=(List<Map<String,Object>>)before.get("source");var newRows=(List<Map<String,Object>>)after.get("source");
+        assertNotNull(oldRows);assertNotNull(newRows);
+        var oldTargets=oldRows.stream().filter(row->sourcePid.equals(row.get("pid"))).toList();
+        var newTargets=newRows.stream().filter(row->sourcePid.equals(row.get("pid"))).toList();
+        assertEquals(1,oldTargets.size());assertEquals(1,newTargets.size());
+        var oldRow=oldTargets.getFirst();var newRow=newTargets.getFirst();
+        assertNotNull(oldRow.get("row_version"));assertNotNull(newRow.get("row_version"));
+        long oldVersion=new BigDecimal(oldRow.get("row_version").toString()).longValueExact();
+        long newVersion=new BigDecimal(newRow.get("row_version").toString()).longValueExact();
+        assertEquals(Math.addExact(oldVersion,1),newVersion,"Exactly one source CAS lock must increment the native row version once");
+        assertNotNull(oldRow.get("updated_at"));assertNotNull(newRow.get("updated_at"));
+        var oldTime=LocalDateTime.parse(oldRow.get("updated_at").toString().replace(' ','T'));
+        var newTime=LocalDateTime.parse(newRow.get("updated_at").toString().replace(' ','T'));
+        assertFalse(newTime.isBefore(oldTime),"Source lock timestamp cannot move backwards");
+        var normalizedBefore=new LinkedHashMap<>(before);var normalizedAfter=new LinkedHashMap<>(after);
+        normalizedBefore.put("source",oldRows.stream().map(row->replayRow(sourcePid,row)).toList());
+        normalizedAfter.put("source",newRows.stream().map(row->replayRow(sourcePid,row)).toList());
+        assertEquals(normalizedBefore,normalizedAfter,"No other metadata, business field, row identity/order or domain may differ");
+    }
+    private static Map<String,Object> replayRow(String sourcePid,Map<String,Object> row) {
+        var copy=new LinkedHashMap<>(row);
+        if(sourcePid.equals(copy.get("pid"))) {copy.remove("row_version");copy.remove("updated_at");}
+        return copy;
     }
     private static List<String> sourceActorPermissions(boolean integration) {
         var codes=new ArrayList<String>();codes.add("meta.command.execute");codes.addAll(RELATED_READ_PERMISSIONS);
