@@ -42,6 +42,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @EnabledIfEnvironmentVariable(named="PROCUREMENT_TRUSTED_RECEIPT_IT",matches="true")
 @org.junit.jupiter.api.TestInstance(org.junit.jupiter.api.TestInstance.Lifecycle.PER_CLASS)
 class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeFixture {
+    private static final String INITIALIZE_LINE="pr:fixture_initialize_receipt_line",COMPETE_LINE="pr:fixture_compete_receipt_line";
     private static final String REQUEST="pr:confirm_purchase_receipt",CONFIRM="inv:confirm_warehouse_in";
     private static final String POSTED="inventory.receipt.confirmed.v1";
     private static final String COUNTER="procurement.confirmed-receipt-counter.v1";
@@ -69,7 +70,10 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
         PreparedOrder order=prepareAllocatedOrder();configureOrderPolicy();
         assertEquals(200,orderCall(orderActor(true),order.execution(),Map.of()).status());
         readReceivedQuantity="0";configureOrderReadPolicy();
-        assertEquals(200,orderSyncCall(orderSyncActor(),SYNC_ORDERS,order.execution()).status());
+        String syncActor=orderSyncActor();
+        assertEquals(200,orderSyncCall(syncActor,SYNC_ORDERS,order.execution()).status());
+        configureReceiptFixtureAppendix();
+        String initializer=initializationActor();
         Map<String,Object> po=only("pr_purchase_order",Map.of("qo_pr_order_erp_id","local-order-1","qo_pr_order_account_id",provider));
         String poPid=pid(po);var orderLines=new ArrayList<>(records("pr_purchase_order_line",Map.of("pr_pol_order_id",poPid)));
         orderLines.sort(java.util.Comparator.comparing(ProcurementPublicSourceNativeFixture::pid));
@@ -79,20 +83,19 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
         String linePid=pid(line);assertDecimal("0",line.get("pr_pol_received_qty"));
         assertEquals("approved",po.get("pr_po_status"));assertEquals(Boolean.TRUE,line.get("pr_pol_collaboration_managed"));
         Map<String,Object> upstream=snapshot();Map<String,Object> formal=formalSnapshot(order.quote().submission());
-        String warehouse=fixture("inv:create_warehouse",()->pid(db.create("inv_warehouse",Map.of(
-            "inv_warehouse_code",provider,"inv_warehouse_name",provider,"inv_warehouse_type","raw_material",
-            "inv_warehouse_status","enabled","inv_wh_lot_tracking",false,"inv_wh_sn_tracking",false))));
-        String location=fixture("inv:create_warehouse_location",()->pid(db.create("inv_warehouse_location",Map.of(
+        String warehouse=createRegistered(initializer,"inv:create_warehouse",Map.of(
+            "inv_warehouse_name",provider,"inv_warehouse_type","raw_material",
+            "inv_wh_lot_tracking",false,"inv_wh_sn_tracking",false));
+        String location=createRegistered(initializer,"inv:create_warehouse_location",Map.of(
             "inv_wl_name",provider,"inv_wl_code",provider,"inv_wl_warehouse_id",warehouse,
-            "inv_loc_type","shelving","inv_loc_status","active","inv_wl_status","enabled"))));
-        String prReceipt=fixture("pr:create_purchase_receipt",()->pid(db.create("pr_purchase_receipt",Map.of(
-            "pr_rcpt_code",provider,"pr_rcpt_po_id",poPid,"pr_rcpt_date","2066-12-01",
-            "pr_rcpt_warehouse_id",warehouse,"pr_rcpt_status","draft"))));
+            "inv_loc_type","shelving","inv_loc_status","active"));
+        String prReceipt=createRegistered(initializer,"pr:create_purchase_receipt",Map.of(
+            "pr_rcpt_po_id",poPid,"pr_rcpt_date","2066-12-01","pr_rcpt_warehouse_id",warehouse));
         var prLines=new ArrayList<String>();
-        for(var orderedLine:orderLines)prLines.add(fixture("pr:create_purchase_receipt",()->pid(db.create("pr_purchase_receipt_line",Map.of(
+        for(var orderedLine:orderLines)prLines.add(createRegistered(initializer,INITIALIZE_LINE,Map.of(
             "pr_rcptl_receipt_id",prReceipt,"pr_rcptl_po_line_id",pid(orderedLine),
             "pr_rcptl_product_id",orderedLine.get("pr_pol_product_id"),"pr_rcptl_qty",new BigDecimal(receiptQuantity),
-            "pr_rcptl_price",BigDecimal.ONE,"pr_rcptl_amount",new BigDecimal(receiptQuantity))))));
+            "pr_rcptl_price",BigDecimal.ONE,"pr_rcptl_amount",new BigDecimal(receiptQuantity))));
         String prActor=receiptActor("request","pr.purchase.manage",PR_READS);
         Map<String,Object> requestPayload=Map.of("warehouseId",warehouse,"receivingLocationId",location);
         Map<String,Object> prBefore=record("pr_purchase_receipt",prReceipt);
@@ -129,7 +132,7 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
         assertTrue(headers.path("core.inventory.producer.artifact").asText().matches("[a-f0-9]{64}"));
         Map<String,Object> stockBefore=stockSnapshot(warehouse);
         assertStockPosted(warehouse,orderLines.size());
-        if(scenario==Scenario.LATE_CAS || scenario==Scenario.HELD_LEASE)postedClaim=assertConcurrentReceiverRollback(scenario,postedClaim,originalLines,stockBefore,warehouse);
+        if(scenario==Scenario.LATE_CAS || scenario==Scenario.HELD_LEASE)postedClaim=assertConcurrentReceiverRollback(scenario,postedClaim,originalLines,stockBefore,warehouse,syncActor);
         else if(scenario==Scenario.LOST_LEASE){
             waitUntilExpired(postedClaim);var replacement=claimExact(postedEvent);
             OutboxEvent stale=postedClaim;assertThrows(SecurityException.class,()->dispatchActualWorker(stale));assertNoReceiverReceipt(postedEvent);
@@ -178,16 +181,22 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
             }
         }
     }
-    private OutboxEvent assertConcurrentReceiverRollback(Scenario scenario,OutboxEvent event,List<LinkedHashMap<String,Object>> originals,Map<String,Object> postedStock,String warehouse) throws Exception {
+    private OutboxEvent assertConcurrentReceiverRollback(Scenario scenario,OutboxEvent event,List<LinkedHashMap<String,Object>> originals,Map<String,Object> postedStock,String warehouse,String competitor) throws Exception {
         assertEquals(2,originals.size());String first=pid(originals.getFirst()),second=pid(originals.getLast());
         casObservation.arm(tenant,first);var executor=java.util.concurrent.Executors.newSingleThreadExecutor();
         var delivery=executor.submit(()->{try {dispatchActualWorker(event);return null;}finally {com.auraboot.framework.application.tenant.MetaContext.clear();}});
         try {
             assertTrue(casObservation.entered.await(10,java.util.concurrent.TimeUnit.SECONDS),"Actual first PG CAS must happen before counterexample");
             if(scenario==Scenario.LATE_CAS){
-                Boolean won=fixture("qo_procurement_order_line_common:sync_orders",()->new TransactionTemplate(transactions).execute(status->db.compareAndSet(
-                    "pr_purchase_order_line",second,"row_version",originals.getLast().get("row_version"),Map.of("pr_pol_received_qty",new BigDecimal("0")))));
-                assertEquals(Boolean.TRUE,won,"The independent real PG competitor must advance only the second line version");
+                assertFalse(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive(),"The public competitor must not share the receiver transaction");
+                assertEquals(200,receiptCommand(competitor,COMPETE_LINE,second,originals.getLast(),provider+"-competitor",Map.of("pr_pol_received_qty","0")),
+                    "Actual Auth/registered fixture command must independently advance only the second line version");
+                var committed=record("pr_purchase_order_line",second);
+                assertEquals(new BigDecimal(originals.getLast().get("row_version").toString()).longValueExact()+1,new BigDecimal(committed.get("row_version").toString()).longValueExact());
+                assertDecimal("0",committed.get("pr_pol_received_qty"));
+                writeArtifact("receipt-competitor-authority.json",Map.of("commandCode",COMPETE_LINE,"targetRecordPid",second,
+                    "actorSource","Same in-memory authenticated P12 actor that performed the actual sync_orders call; original 15 permissions unchanged",
+                    "newRoleOrAllScopeAssigned",false,"publicCommandExecutorVerified",true,"independentCommittedTransactionVerified",true));
             }else {
                 waitUntilExpired(event);var tx=new TransactionTemplate(transactions);tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
                 var skipped=tx.execute(status->outbox.claimKnownEvent(tenant,event.getEventId(),provider+"-contender",UUID.randomUUID().toString(),java.time.Instant.now().plusSeconds(120)));
@@ -246,6 +255,82 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
         } finally {tenant=ownTenant;userId=ownUser;actor=ownActor;memberId=ownMember;context();}
     }
 
+    /** Append only test-owned commands in an evidence-owned copy for this synthetic tenant. */
+    private void configureReceiptFixtureAppendix() throws Exception {
+        var directories=json.readTree(required("PROCUREMENT_SOURCE_IMPORT_DIRECTORIES"));
+        var originals=new ArrayList<Path>();
+        for(var directory:directories){Path candidate=Path.of(directory.asText());
+            if("com.auraboot.procurement".equals(json.readTree(candidate.resolve("plugin.json").toFile()).path("pluginId").asText()))originals.add(candidate);}
+        assertEquals(1,originals.size());Path original=originals.getFirst(),copy=java.nio.file.Files.createDirectory(caseEvidence.resolve("rf"));
+        assertTrue(copy.toString().length()<=256,"Fixture import history path must remain bounded");
+        try(var files=java.nio.file.Files.walk(original)){for(Path source:files.toList()){
+            Path target=copy.resolve(original.relativize(source));if(java.nio.file.Files.isDirectory(source))java.nio.file.Files.createDirectories(target);else java.nio.file.Files.copy(source,target);}}
+        String originalModelsSha=sha(original.resolve("config/models.json"));
+        var modelRows=json.readTree(copy.resolve("config/models.json").toFile());var originalModelRows=modelRows.deepCopy();int matches=0;
+        for(var definition:modelRows)if("pr_purchase_order_line".equals(definition.path("code").asText())){
+            var updates=(com.fasterxml.jackson.databind.node.ArrayNode)definition.path("extension").path("recordCommandWriters").path("commands").path("update");
+            assertFalse(updates.toString().contains(COMPETE_LINE));updates.add(COMPETE_LINE);matches++;}
+        assertEquals(1,matches);
+        var restoredModelRows=modelRows.deepCopy();
+        for(var definition:restoredModelRows)if("pr_purchase_order_line".equals(definition.path("code").asText())){
+            var updates=(com.fasterxml.jackson.databind.node.ArrayNode)definition.path("extension").path("recordCommandWriters").path("commands").path("update");updates.remove(updates.size()-1);}
+        assertEquals(originalModelRows,restoredModelRows,"Only the exact test-owned writer may be appended; model owner/table and all production operations remain unchanged");
+        java.nio.file.Files.write(copy.resolve("config/models.json"),json.writerWithDefaultPrettyPrinter().writeValueAsBytes(modelRows));
+        var initialize=Map.of("code",INITIALIZE_LINE,"displayName:en","Native Receipt Line Initializer","type","create","modelCode","pr_purchase_receipt_line",
+            "inputFields",List.of("pr_rcptl_receipt_id","pr_rcptl_po_line_id","pr_rcptl_product_id","pr_rcptl_qty","pr_rcptl_price","pr_rcptl_amount"),"permissions",List.of("pr.purchase.manage"));
+        var compete=Map.of("code",COMPETE_LINE,"displayName:en","Native Receipt Line Version Competitor","type","update","modelCode","pr_purchase_order_line",
+            "inputFields",List.of("pr_pol_received_qty"),"permissions",List.of("qo.procurement.integrate"),"preconditions",List.of(Map.of("field","pr_pol_collaboration_managed","operator","EQ","value",true)));
+        Path initializerFile=copy.resolve("config/commands/pr_fixture_initialize_receipt_line.json"),competitorFile=copy.resolve("config/commands/pr_fixture_compete_receipt_line.json");
+        java.nio.file.Files.write(initializerFile,json.writerWithDefaultPrettyPrinter().writeValueAsBytes(initialize));
+        java.nio.file.Files.write(competitorFile,json.writerWithDefaultPrettyPrinter().writeValueAsBytes(compete));
+        importDirectory(copy);
+        assertEquals(originalModelsSha,sha(original.resolve("config/models.json")),"Production managed writer metadata remains byte-identical");
+        assertEquals("pr_purchase_receipt_line",commands.findByCode(INITIALIZE_LINE).getModelCode());
+        assertEquals("pr_purchase_order_line",commands.findByCode(COMPETE_LINE).getModelCode());
+        assertEquals(tenant,commands.findByCode(COMPETE_LINE).getTenantId());
+        writeArtifact("receipt-test-owned-command-appendix.json",Map.of("tenantId",tenant.toString(),"metadataDiffersFromProduction",true,
+            "canonicalPluginId","com.auraboot.procurement","originalModelsSha256",originalModelsSha,
+            "configuredModelsSha256",sha(copy.resolve("config/models.json")),"initializerSha256",sha(initializerFile),"competitorSha256",sha(competitorFile),
+            "productionWriterListChanged",false,"fixtureManagedUpdateWriterAppended",COMPETE_LINE));
+    }
+
+    /** Exact functional three-code/self fixture actor. No bootstrap, buyer or ALL authority. */
+    private String initializationActor() throws Exception {
+        context();String username=provider+"-initializer",email=username+"@example.invalid";
+        var user=users.signUp(email,PASSWORD,"Receipt fixture initializer",username);var member=members.addMember(user.getId(),tenant,"active");
+        var role=new com.auraboot.framework.rbac.entity.Role();role.setPid(com.auraboot.framework.common.util.UniqueIdGenerator.generate());
+        role.setCode(username);role.setName(username);role.setType("custom");role.setScopeType("tenant");role.setStatus("active");role.setTenantId(tenant);
+        role.setIsDefault(false);role.setIsSystem(false);role.setDeletedFlag(false);role.setPriority(100);role.setCreatedAt(java.time.Instant.now());role.setUpdatedAt(java.time.Instant.now());role=roles.createRole(role);
+        var codes=List.of("meta.command.execute","pr.purchase.manage","inv.warehouse.manage");var ids=new ArrayList<Long>();
+        for(String code:codes){var permission=permissions.findByCode(code);assertNotNull(permission);ids.add(permission.getId());}
+        assertTrue(roles.assignPermissions(role.getId(),ids));roles.setDefaultDataScopeType(role.getId(),"self");
+        assertTrue(userRoles.assignRolesToMember(member.getId(),List.of(role.getId()),tenant,userId));
+        com.auraboot.framework.application.tenant.MetaContext.setContext(tenant,user.getId(),user.getPid(),provider);
+        com.auraboot.framework.application.tenant.MetaContext.setMemberId(member.getId());userPermissions.evictUserPermissions(tenant,user.getId());
+        assertEquals(List.of(role.getId()),userRoles.findByMemberIdAndTenantId(member.getId(),tenant).stream().map(com.auraboot.framework.rbac.entity.UserRole::getRoleId).toList());
+        assertFalse(userPermissions.hasPermission(tenant,user.getId(),member.getId(),"*"));
+        for(String code:codes)assertTrue(userPermissions.hasPermission(tenant,user.getId(),member.getId(),code));
+        assertFalse(userPermissions.hasPermission(tenant,user.getId(),member.getId(),"qo.procurement.manage"));
+        var request=new com.auraboot.framework.auth.dto.AuthenticationRequest();request.setEmail(email);request.setPassword(PASSWORD);var authenticated=authentication.authenticate(request);
+        assertEquals(tenant,authenticated.getTenantId());assertEquals(user.getId(),authenticated.getUserId());assertNotNull(authenticated.getJwt());
+        writeArtifact("receipt-initializer-auth.json",Map.of("tenantId",tenant.toString(),"userPid",user.getPid(),"memberPid",member.getPid(),
+            "roleCode",role.getCode(),"permissionCodes",codes,"dataScopeType","self","authenticationVerified",true,"bootstrapPrincipalUsedForPublicRequest",false));
+        context();return authenticated.getJwt();
+    }
+
+    private String createRegistered(String bearer,String code,Map<String,Object> payload) throws Exception {
+        com.auraboot.framework.application.tenant.MetaContext.clear();org.springframework.test.web.servlet.MvcResult result;
+        try {result=mvc.perform(post("/api/meta/commands/execute/"+code).header("Authorization","Bearer "+bearer).header("X-Locale","en-US")
+            .contentType("application/json").content(json.writeValueAsBytes(Map.of("payload",payload,"clientRequestId",provider+"-create-"+(++publicRequestSequence))))).andReturn();}
+        finally {context();}
+        var response=json.readTree(result.getResponse().getContentAsByteArray());
+        writeArtifact("receipt-public-create-"+publicRequestSequence+".json",Map.of("commandCode",code,"httpStatus",result.getResponse().getStatus(),
+            "businessCode",safeNumericCode(response.path("code")),"rawResponseOrCredentialsPersisted",false));
+        assertEquals(200,result.getResponse().getStatus());assertEquals("0",response.path("code").asText());
+        assertEquals("completed",response.path("data").path("phaseReached").asText());
+        String created=response.path("data").path("data").path("recordPid").asText();assertFalse(created.isBlank(),"Registered create must return actual public recordPid");return created;
+    }
+
     private String receiptActor(String suffix,String capability,List<String> readModels) {
         context();String username=provider+"-receipt-"+suffix,email=username+"@example.invalid";
         var user=users.signUp(email,PASSWORD,"Trusted receipt local fixture",username);
@@ -256,6 +341,7 @@ class ProcurementInventoryReceiptRealDbIT extends ProcurementPublicSourceNativeF
     private int receiptCommand(String bearer,String code,String target,Map<String,Object> before,String key,Map<String,Object> payload) throws Exception {
         var input=new LinkedHashMap<String,Object>();input.put("targetRecordPid",target);input.put("expectedVersion",before.get("row_version"));
         input.put("clientRequestId",key);input.put("payload",payload);
+        com.auraboot.framework.application.tenant.MetaContext.clear();
         org.springframework.test.web.servlet.MvcResult result;observed.publicRequestActive=true;
         try {result=mvc.perform(post("/api/commands/"+code).header("Authorization","Bearer "+bearer).header("X-Locale","en-US")
             .contentType("application/json").content(json.writeValueAsBytes(input))).andReturn();}
