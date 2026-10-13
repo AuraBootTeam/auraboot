@@ -119,6 +119,18 @@
 - stub 已覆盖 gate 面;真实凭证到位后在 provider profile 注入,再评估
   生成级用例是否入 gate(属增强,非欠账)。
 
+> **✅ 2026-10-13 深夜终态增补(goal 收口)**:
+> - 跟进②的残余(幻影缓存条目本身)由 #2271 闭合(import 回滚时驱逐模型定义缓存);
+>   跟进③由 #2270 闭合(publish governance 每模型一次懒重建,冷库导入 ~10³→≤1);
+> - 昨晚 gate 期间两度 fail-fast 的孤儿菜单 `e2e.ios-handover.*.member-models`
+>   真根因=#2269:清理代码自带双缺陷(try 作用域 ReferenceError + 雪花 id 被
+>   JSON.parse 舍入后 DELETE 打空),自落地起从未删成过;现已按 fixture pid 锚定
+>   无损提取字符串 id,跑后清零实证;
+> - BPM jar 已按 aura-bpm#46 构建链从 main(ada4526)重建并 re-stage
+>   (`bpm-plugin-1.0.0+platform.c01c7df1f.jar`,溯源 SHA256 落 dist/),缺表容忍
+>   随之生效;终验 fresh reset:Step 3.5 三迁移 + 10/10 导入 + 三闸全绿 +
+>   调度器/usage 零错误 + 零孤儿 + spot(i18n/capability/deep-ops)21 过 1 正确 skip。
+
 ## 4. 验证入口
 
 ```bash
