@@ -125,6 +125,75 @@ class RegisteredSourcePlanResolverTest {
         assertThat(plans.getFirst().reference()).isEqualTo(SourceBindingCanonical.reference("notice", "src", 1));
     }
     @Test
+    void approvedPhysicalPidReferencesResolveEveryDeclaredModelEdge() throws Exception {
+        remainingFixture(1000);
+        for (String[] edge : List.of(new String[]{"source", "owner", "owner"},
+                new String[]{"target", "owner", "owner"}, new String[]{"link", "owner", "owner"},
+                new String[]{"link", "contact", "contact"}, new String[]{"contact", "owner", "owner"},
+                new String[]{"child", "parent", "target"})) {
+            referenceField(edge[0], edge[1], Map.of("targetEntity", edge[2], "valueField", "pid"));
+        }
+        f.reapprove();
+        assertThat(f.resolver.plan(f.binding, "src")).hasSize(2);
+        referenceField("target", "owner", Map.of("targetModel", "owner", "valueField", "pid"));
+        f.reapprove();
+        assertThat(f.resolver.plan(f.binding, "src")).hasSize(2);
+        metadataField("child", "parent").put("ref_target", "{\"targetEntity\":\"target\",\"valueField\":\"pid\"}");
+        f.reapprove();
+        assertThat(f.resolver.plan(f.binding, "src")).hasSize(2);
+    }
+
+    @Test
+    void reapprovedReferenceCannotChangeDeclaredTargetOrPidValueSemantics() {
+        for (Map<String, Object> invalid : List.<Map<String, Object>>of(
+                Map.of("targetEntity", "other", "valueField", "pid"),
+                Map.of("targetEntity", "owner", "valueField", "code"),
+                Map.of("targetEntity", "owner"), Map.of("valueField", "pid"),
+                Map.of("targetEntity", "owner", "targetModel", "other", "valueField", "pid"),
+                Map.of("targetEntity", "owner", "valueField", "pid", "refType", "api"),
+                Map.of("targetEntity", "owner", "valueField", "pid", "targetTable", "external_table"),
+                Map.of("targetEntity", "owner", "valueField", "pid", "apiConfig", Map.of("url", "https://example.invalid")),
+                Map.of("targetEntity", "owner", "valueField", "pid", "unknownSource", "lookup"))) {
+            referenceField("target", "owner", invalid);
+            f.reapprove();
+            assertThatThrownBy(() -> f.resolver.plan(f.binding, "src")).isInstanceOf(IllegalArgumentException.class);
+        }
+    }
+
+    @Test
+    void referenceRawMetadataChangesStillRequireExactApprovalAndPhysicalStorage() {
+        referenceField("target", "owner", Map.of("targetEntity", "owner", "valueField", "pid"));
+        assertThatThrownBy(() -> f.resolver.plan(f.binding, "src")).isInstanceOf(IllegalArgumentException.class);
+        f.reapprove();
+        assertThat(f.resolver.plan(f.binding, "src")).hasSize(2);
+        metadataField("target", "owner").set("feature", SourceBindingCanonical.tree(Map.of("computeExpression", "1")));
+        f.reapprove();
+        assertThatThrownBy(() -> f.resolver.plan(f.binding, "src")).isInstanceOf(IllegalArgumentException.class);
+        metadataField("target", "owner").set("feature", SourceBindingCanonical.tree(Map.of()));
+        metadataField("target", "owner").remove("ref_target");
+        f.reapprove();
+        assertThatThrownBy(() -> f.resolver.plan(f.binding, "src")).isInstanceOf(IllegalArgumentException.class);
+        referenceField("target", "owner", Map.of("targetEntity", "owner", "valueField", "pid"));
+        f.reapprove();
+        assertThat(f.resolver.plan(f.binding, "src")).hasSize(2);
+        referenceField("link", "user", Map.of("targetEntity", "owner", "valueField", "pid"));
+        f.reapprove();
+        assertThatThrownBy(() -> f.resolver.plan(f.binding, "src")).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    private ObjectNode metadataField(String model, String code) {
+        for (JsonNode field : f.graphs.get(model).path("fields")) {
+            if (code.equals(field.path("code").asText())) return (ObjectNode) field;
+        }
+        throw new AssertionError("Missing metadata fixture field");
+    }
+
+    private void referenceField(String model, String code, Map<String, Object> target) {
+        metadataField(model, code).put("data_type", "reference")
+                .set("ref_target", SourceBindingCanonical.tree(target));
+    }
+
+    @Test
     void everySelectedUserIsCheckedWithoutOwnerFilter() {
         f.links = 2;
         assertThatThrownBy(() -> f.resolver.plan(f.binding, "src")).isInstanceOf(IllegalArgumentException.class);

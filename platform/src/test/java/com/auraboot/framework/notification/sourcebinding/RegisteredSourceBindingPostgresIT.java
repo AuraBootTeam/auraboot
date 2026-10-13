@@ -154,6 +154,7 @@ class RegisteredSourceBindingPostgresIT {
     private static final Instant TARGET_DEADLINE = Instant.parse("2026-10-13T04:00:00Z");
     private final NativeDeadlineClock clock = new NativeDeadlineClock();
     private boolean softTargetFixture;
+    private boolean referenceRelationFixture;
     private Tenant tenant, foreignTenant;
     private User first, second, foreign;
     private TenantMember secondMember;
@@ -183,6 +184,8 @@ class RegisteredSourceBindingPostgresIT {
         assertThat(ReflectionTestUtils.getField(defaultAdapter, "settings")).isNull();
         trace.put("defaultPollingResourceAdmission", Map.of("workerEnabled", false,
                 "schedulerCreated", false, "settingsAdmitted", false));
+        referenceRelationFixture = info.getTestMethod().orElseThrow().getName()
+                .equals("actualImportedMetadataExplicitRecipientsReplayAndConsumePersistExactlyOnce");
         softTargetFixture = info.getTestMethod().orElseThrow().getName()
                 .equals("actualBindingMutationCannotBeAuthorizedByCachedMetadataOrOldApproval");
         try (var connection = dataSource.getConnection()) {
@@ -193,6 +196,7 @@ class RegisteredSourceBindingPostgresIT {
         trace.put("test", info.getTestMethod().orElseThrow().getName());
         trace.put("namespace", namespace);
         trace.put("authority", "test-owned host deployment descriptor; never Product/package self-approval");
+        trace.put("referenceRelationFixture", referenceRelationFixture);
         trace.put("externalProviderCalls", 0);
         stage = "fixture-native-identity-apis";
         MetaContext.clear();
@@ -219,6 +223,16 @@ class RegisteredSourceBindingPostgresIT {
             assertThat(table).isEqualTo(SystemFieldConstants.generateTableName(model(kind)));
             assertThat(jdbc.queryForObject("SELECT to_regclass(?)::text", String.class, table)).isEqualTo(table);
             tables.put(kind, table);
+        }
+        if (referenceRelationFixture) {
+            var relationFacts = jdbc.queryForList("""
+                    SELECT code,data_type,ref_target FROM ab_meta_field
+                    WHERE tenant_id=? AND code IN (?,?,?) AND is_current=TRUE AND deleted_flag=FALSE
+                    ORDER BY code
+                    """, tenant.getId(), field("owner"), field("verification"), field("parent"));
+            assertThat(relationFacts).hasSize(3);
+            assertThat(relationFacts).allSatisfy(row -> assertThat(row.get("data_type")).isEqualTo("reference"));
+            trace.put("actualImportedReferenceMetadata", relationFacts);
         }
         stage = "fixture-native-data-apis";
         ownOwner = create("owner", Map.of(field("state"), "active"));
@@ -348,7 +362,16 @@ class RegisteredSourceBindingPostgresIT {
                 "principal", List.of("owner", "state", "principal", "verification"), "verification", List.of("owner", "state"),
                 "child", List.of("state", "parent", "ordered", "submitted"));
         List<Map<String, Object>> fields = new ArrayList<>(), models = new ArrayList<>(), bindings = new ArrayList<>();
-        types.forEach((name, type) -> fields.add(Map.of("code", field(name), "displayName", name, "dataType", type)));
+        types.forEach((name, type) -> {
+            Map<String, Object> definition = new LinkedHashMap<>(Map.of("code", field(name),
+                    "displayName", name, "dataType", type));
+            if (referenceRelationFixture && Set.of("owner", "verification", "parent").contains(name)) {
+                String targetKind = name.equals("parent") ? "target" : name;
+                definition.put("dataType", "reference");
+                definition.put("refTarget", Map.of("targetModel", model(targetKind), "valueField", "pid"));
+            }
+            fields.add(definition);
+        });
         for (String kind : kinds) {
             Map<String, Object> declaredModel = new LinkedHashMap<>(Map.of("code", model(kind),
                     "displayName", kind, "modelType", "entity", "tableName", SystemFieldConstants.generateTableName(model(kind))));

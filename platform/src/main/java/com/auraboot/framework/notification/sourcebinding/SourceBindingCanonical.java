@@ -1,6 +1,7 @@
 package com.auraboot.framework.notification.sourcebinding;
 
 import com.auraboot.framework.meta.entity.payload.FieldFeatureBean;
+import com.auraboot.framework.meta.entity.payload.FieldRefTargetBean;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -63,6 +64,14 @@ final class SourceBindingCanonical {
         } catch (JsonProcessingException e) {
             /* CATCH: expected typed metadata validation error; never permit fallback or expose raw JSON. */
             throw new IllegalArgumentException("NOTIFICATION_SOURCE_FEATURE_INVALID");
+        }
+    }
+    static FieldRefTargetBean refTarget(JsonNode node) {
+        try {
+            return JSON.treeToValue(node, FieldRefTargetBean.class);
+        } catch (JsonProcessingException e) {
+            /* CATCH: expected typed relation metadata validation error; no reference fallback is allowed. */
+            throw new IllegalArgumentException("NOTIFICATION_SOURCE_REFERENCE_INVALID");
         }
     }
     static String hash(Object value) {
