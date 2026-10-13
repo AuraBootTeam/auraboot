@@ -45,6 +45,8 @@ final class TestOwnedNotificationIntentTeardown {
     }
     static void identity(Scope scope, JsonNode row) throws Exception {
         assertThat(row.path("tenant_id").longValue()).isEqualTo(scope.tenant());
+        assertThat(row.path("schema_version").isTextual()).isTrue();
+        assertThat(row.path("schema_version").asText()).isEqualTo("1.0");
         assertThat(row.path("event_source").asText()).isEqualTo("core.notification");
         assertThat(row.path("event_type").asText()).isEqualTo(RegisteredSourceNativeFixtureCleanupIT.TYPE);
         assertThat(row.path("subject").asText()).isEqualTo(scope.source());
@@ -57,9 +59,25 @@ final class TestOwnedNotificationIntentTeardown {
     static void check(Scope scope, JsonNode row) throws Exception {
         identity(scope, row);
         assertThat(row.path("status").asText()).isIn("pending", "failed");
+        idle(row);
+    }
+    static void idle(JsonNode row) {
+        assertThat(row.path("replay_count").isIntegralNumber()).isTrue();
         assertThat(row.path("replay_count").intValue()).isZero();
         for (String field : List.of("lease_owner", "lease_token", "lease_until")) {
             assertThat(row.has(field) && row.path(field).isNull()).isTrue();
+        }
+    }
+    static void validateSealedRows(Scope scope, List<JsonNode> rows) throws Exception {
+        assertThat(rows.size()).isLessThanOrEqualTo(scope.references().size());
+        Set<String> events = new java.util.HashSet<>();
+        Set<String> references = new java.util.HashSet<>();
+        for (JsonNode row : rows) {
+            identity(scope, row);
+            idle(row);
+            assertThat(row.path("status").asText()).isIn("pending", "failed", "delivered");
+            assertThat(events.add(row.path("event_id").asText())).isTrue();
+            assertThat(references.add(row.path("payload").path("resolutionReference").asText())).isTrue();
         }
     }
     /** Source/class qualification and pre-pause identity belong to the granted runner, not fabricated HTTP here. */
@@ -67,6 +85,7 @@ final class TestOwnedNotificationIntentTeardown {
                     Path sealedTrace, Path receipt) throws Exception {
         assertThat(Files.isRegularFile(sealedTrace)).isTrue();
         assertThat(Files.exists(receipt)).isFalse();
+        validateSealedRows(scope, sealedRows);
         var config = new Configuration(new Environment("owned-notification-teardown", new JdbcTransactionFactory(), dataSource));
         config.addMapper(OwnedMapper.class);
         var sessions = new SqlSessionFactoryBuilder().build(config);
@@ -74,20 +93,19 @@ final class TestOwnedNotificationIntentTeardown {
         Map<String, List<JsonNode>> after;
         int removedDeadLetters = 0;
         List<JsonNode> removable = sealedRows.stream().filter(row -> !"delivered".equals(row.path("status").asText())).toList();
-        for (JsonNode row : sealedRows) {
-            identity(scope, row);
-            if (!"delivered".equals(row.path("status").asText())) check(scope, row);
-        }
         try (var session = sessions.openSession(TransactionIsolationLevel.SERIALIZABLE)) {
             var mapper = session.getMapper(OwnedMapper.class);
             before = RegisteredSourceNativeFixtureCleanupIT.snapshot(mapper);
             List<JsonNode> actualOwned = before.get("outbox").stream().filter(r -> r.path("tenant_id").longValue() == scope.tenant()).toList();
             assertThat(actualOwned).isEqualTo(sealedRows);
-            for (JsonNode row : removable) {
+            for (JsonNode row : sealedRows) {
                 long id = row.path("id").longValue();
                 String event = row.path("event_id").asText();
                 JsonNode locked = SourceBindingCanonical.parse(mapper.lockOutbox(scope.tenant(), id, event));
-                check(scope, locked);
+                identity(scope, locked);
+                idle(locked);
+                assertThat(locked.path("status").asText()).isEqualTo(row.path("status").asText());
+                assertThat(locked.path("status").asText()).isIn("pending", "failed", "delivered");
                 assertThat(RegisteredSourceNativeFixtureCleanupIT.envelopeHash(locked))
                         .isEqualTo(RegisteredSourceNativeFixtureCleanupIT.envelopeHash(row));
                 assertThat(mapper.replays(scope.tenant(), event)).isZero();

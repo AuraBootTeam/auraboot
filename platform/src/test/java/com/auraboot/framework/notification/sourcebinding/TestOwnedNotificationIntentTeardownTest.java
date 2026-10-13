@@ -3,12 +3,20 @@ package com.auraboot.framework.notification.sourcebinding;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.Set;
+import java.util.List;
+import java.nio.file.Path;
+import java.nio.file.Files;
+import javax.sql.DataSource;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 /** Pure identity and terminal-state refusal, without creating a datasource or invoking teardown. */
 class TestOwnedNotificationIntentTeardownTest {
+    @TempDir Path directory;
     private final String binding = "sn123456abcdef_notice";
     private final String source = "source";
     private final String reference = SourceBindingCanonical.reference(binding, source, 1);
@@ -62,5 +70,38 @@ class TestOwnedNotificationIntentTeardownTest {
         TestOwnedNotificationIntentTeardown.identity(scope, delivered);
         assertThatThrownBy(() -> TestOwnedNotificationIntentTeardown.check(scope, delivered)).isInstanceOf(AssertionError.class);
         assertThat(delivered.path("status").asText()).isEqualTo("delivered");
+        TestOwnedNotificationIntentTeardown.validateSealedRows(scope, List.of(delivered));
+        ObjectNode leasedDelivered = (ObjectNode) delivered.deepCopy();
+        leasedDelivered.put("lease_until", "2026-10-13T00:00:00Z");
+        assertThatThrownBy(() -> TestOwnedNotificationIntentTeardown.validateSealedRows(scope, List.of(leasedDelivered)))
+                .isInstanceOf(AssertionError.class);
+        ObjectNode replayedDelivered = (ObjectNode) delivered.deepCopy();
+        replayedDelivered.put("replay_count", 1);
+        assertThatThrownBy(() -> TestOwnedNotificationIntentTeardown.validateSealedRows(scope, List.of(replayedDelivered)))
+                .isInstanceOf(AssertionError.class);
     }
+    @Test
+    void missingOrLegacySchemaCannotBeAdmitted() throws Exception {
+        for (String schema : List.of("legacy", "1", "2.0")) {
+            ObjectNode row = (ObjectNode) row();
+            row.put("schema_version", schema);
+            assertThatThrownBy(() -> TestOwnedNotificationIntentTeardown.identity(scope, row)).isInstanceOf(AssertionError.class);
+        }
+        ObjectNode missing = (ObjectNode) row();
+        missing.remove("schema_version");
+        assertThatThrownBy(() -> TestOwnedNotificationIntentTeardown.identity(scope, missing)).isInstanceOf(AssertionError.class);
+    }
+    @Test
+    void excessOrDuplicateEnumeratedRowsRefusedBeforeDatasourceUse() throws Exception {
+        Path trace = directory.resolve("sealed.json");
+        Files.writeString(trace, "{}");
+        DataSource datasource = mock(DataSource.class);
+        JsonNode row = row();
+        for (List<JsonNode> rows : List.of(List.of(row, row), List.of(row, row, row))) {
+            assertThatThrownBy(() -> TestOwnedNotificationIntentTeardown.run(datasource, scope, rows,
+                    trace, directory.resolve("receipt.json"))).isInstanceOf(AssertionError.class);
+            verifyNoInteractions(datasource);
+        }
+    }
+
 }
