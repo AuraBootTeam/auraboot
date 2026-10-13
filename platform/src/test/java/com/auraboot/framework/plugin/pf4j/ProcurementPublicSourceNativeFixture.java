@@ -619,6 +619,9 @@ abstract class ProcurementPublicSourceNativeFixture {
         if(integration) codes.add("qo.procurement.integrate");return List.copyOf(codes);
     }
     protected String actorToken(Long id,String pid,Long member,String email,List<String> codes) {
+        return actorToken(id,pid,member,email,codes,PASSWORD);
+    }
+    protected String actorToken(Long id,String pid,Long member,String email,List<String> codes,String password) {
         context();var role=new Role();role.setPid(com.auraboot.framework.common.util.UniqueIdGenerator.generate());role.setCode(provider+"_"+id);role.setName(provider);role.setType("custom");role.setScopeType("tenant");role.setStatus("active");role.setTenantId(tenant);role.setIsDefault(false);role.setIsSystem(false);role.setDeletedFlag(false);role.setPriority(100);role.setCreatedAt(Instant.now());role.setUpdatedAt(Instant.now());role=roles.createRole(role);
         var permissionIds=new ArrayList<Long>();for(String code:codes){var permission=permissions.findByCode(code);assertNotNull(permission);permissionIds.add(permission.getId());}
         assertTrue(roles.assignPermissions(role.getId(),permissionIds));roles.setDefaultDataScopeType(role.getId(),"all");assertTrue(userRoles.assignRolesToMember(member,List.of(role.getId()),tenant,userId));
@@ -627,7 +630,7 @@ abstract class ProcurementPublicSourceNativeFixture {
         var assignments=userRoles.findByMemberIdAndTenantId(member,tenant);
         validateActorRoleIsolation(assignments.stream().map(com.auraboot.framework.rbac.entity.UserRole::getRoleId).toList(),role.getId(),
             userPermissions.hasPermission(tenant,id,member,"*"),userPermissions.hasPermission(tenant,id,member,"qo.procurement.integrate"),codes.contains("qo.procurement.integrate"));
-        var request=new AuthenticationRequest();request.setEmail(email);request.setPassword(PASSWORD);var authenticated=authentication.authenticate(request);
+        var request=new AuthenticationRequest();request.setEmail(email);request.setPassword(password);var authenticated=authentication.authenticate(request);
         assertEquals(tenant,authenticated.getTenantId());assertEquals(id,authenticated.getUserId());assertNotNull(authenticated.getJwt());
         var identity=new LinkedHashMap<String,Object>();identity.put("userPid",pid);identity.put("memberId",member.toString());identity.put("email",email);
         identity.put("roleCode",role.getCode());identity.put("permissionCodes",codes);identity.put("authenticationVerified",true);

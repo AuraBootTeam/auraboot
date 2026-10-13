@@ -64,4 +64,21 @@ class ProductQuoteNativeInitializationTest {
         Files.writeString(source.resolve("config/fields/contact.json"), "{\"code\":\"qo_pr_contact_state\",\"allowedWriterCommands\":[\"pr_supplier_pcba_contact:initialize_s06_native_fixture\"]}");
         assertThatThrownBy(() -> ProductQuoteNativeInitialization.prepare(source, root.resolve("already"), json)).isInstanceOf(IllegalArgumentException.class);
     }
+    @Test void orderUiAppendixUsesIndependentCommandsWithoutClaimingVerifiedPhone() throws Exception {
+        Path source = original();
+        Path copy = root.resolve("order-ui");
+        ProductQuoteNativeInitialization.prepareOrderUi(source, copy, json);
+        var commands = json.readTree(copy.resolve("config/commands/order-ui-native-initialization.json").toFile());
+        assertThat(commands).hasSize(3);
+        for (var command : commands) {
+            assertThat(command.path("code").asText()).endsWith(":initialize_order_ui_native_fixture")
+                    .doesNotContain("bind_verified_phone", "sync_directory");
+        }
+        assertThatThrownBy(() -> ProductQuoteNativeInitialization.validateOrderUiPayload("pr_supplier_common", Map.of(
+                "pr_supplier_code", "x", "pr_supplier_name", "x", "pr_supplier_status", "enabled")))
+                .isInstanceOf(IllegalArgumentException.class);
+        ProductQuoteNativeInitialization.validateOrderUiPayload("pr_supplier_common", Map.of(
+                "pr_supplier_code", "x", "pr_supplier_name", "x", "pr_supplier_status", "enabled", "qo_pr_supplier_account_id", "x"));
+    }
+
 }

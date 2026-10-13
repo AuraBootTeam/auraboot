@@ -12,7 +12,7 @@ import java.util.Map;
 import java.util.Set;
 
 /** Test-only additive command appendix. Never modifies a sealed Product source directory. */
-final class ProductQuoteNativeInitialization {
+public final class ProductQuoteNativeInitialization {
     static final Map<String, List<String>> FIELDS = Map.of(
             "pr_supplier_common", List.of("pr_supplier_code", "pr_supplier_name", "pr_supplier_status"),
             "pr_supplier_pcba_contact", List.of("pr_spc_supplier_id", "pr_spc_name", "qo_pr_contact_state"),
@@ -40,7 +40,35 @@ final class ProductQuoteNativeInitialization {
         }
     }
 
+    public static final Map<String, List<String>> ORDER_UI_FIELDS = Map.of(
+            "pr_supplier_common", List.of("pr_supplier_code", "pr_supplier_name", "pr_supplier_status", "qo_pr_supplier_account_id"),
+            "pr_supplier_pcba_contact", FIELDS.get("pr_supplier_pcba_contact"),
+            "qo_procurement_membership_common", FIELDS.get("qo_procurement_membership_common"));
+
+    public static String orderUiCommand(String model) {
+        if (!ORDER_UI_FIELDS.containsKey(model)) throw new IllegalArgumentException("Unsupported order UI initialization model");
+        return model + ":initialize_order_ui_native_fixture";
+    }
+
+    public static void validateOrderUiPayload(String model, Map<String, Object> facts) {
+        if (!ORDER_UI_FIELDS.containsKey(model) || !facts.keySet().equals(Set.copyOf(ORDER_UI_FIELDS.get(model)))) {
+            throw new IllegalArgumentException("Order UI initialization requires exact declared fields");
+        }
+    }
+
+    public static Map<String, Object> prepareOrderUi(Path original, Path destination, ObjectMapper json) throws Exception {
+        return prepare(original, destination, json, ORDER_UI_FIELDS, ProductQuoteNativeInitialization::orderUiCommand,
+                "order-ui-native-initialization.json");
+    }
+
     static Map<String, Object> prepare(Path original, Path destination, ObjectMapper json) throws Exception {
+        return prepare(original, destination, json, FIELDS, ProductQuoteNativeInitialization::command,
+                "s06-native-initialization.json");
+    }
+
+    private static Map<String, Object> prepare(Path original, Path destination, ObjectMapper json,
+            Map<String, List<String>> fields, java.util.function.Function<String, String> commandCode,
+            String appendixName) throws Exception {
         if (Files.exists(destination)) throw new IllegalArgumentException("S06 appendix directory must be fresh");
         Files.createDirectory(destination);
         Map<String, String> originals = new LinkedHashMap<>();
@@ -62,14 +90,14 @@ final class ProductQuoteNativeInitialization {
                 JsonNode definition = json.readTree(file.toFile());
                 if (!(definition instanceof ObjectNode object)) throw new IllegalArgumentException("S06 field resource must be an object");
                 String code = object.path("code").asText();
-                List<String> models = FIELDS.entrySet().stream().filter(e -> e.getValue().contains(code))
+                List<String> models = fields.entrySet().stream().filter(e -> e.getValue().contains(code))
                         .map(Map.Entry::getKey).toList();
                 if (models.isEmpty() || !object.has("allowedWriterCommands")) continue;
                 JsonNode previous = object.get("allowedWriterCommands").deepCopy();
                 if (!previous.isArray()) throw new IllegalArgumentException("S06 protected field writers must be explicit array");
                 ArrayNode next = (ArrayNode) previous.deepCopy();
                 for (String model : models) {
-                    String command = command(model);
+                    String command = commandCode.apply(model);
                     for (JsonNode writer : next) {
                         if (!writer.isTextual() || writer.asText().equals(command)) throw new IllegalArgumentException("Invalid S06 existing writer");
                     }
@@ -81,17 +109,17 @@ final class ProductQuoteNativeInitialization {
             }
         }
         ArrayNode commands = json.createArrayNode();
-        for (String model : FIELDS.keySet().stream().sorted().toList()) {
+        for (String model : fields.keySet().stream().sorted().toList()) {
             ObjectNode command = commands.addObject();
-            command.put("code", command(model));
+            command.put("code", commandCode.apply(model));
             command.put("modelCode", model);
             command.put("displayName", "Synthetic S06 initialization only");
             command.put("type", "create");
-            command.set("inputFields", json.valueToTree(FIELDS.get(model)));
+            command.set("inputFields", json.valueToTree(fields.get(model)));
             command.set("permissions", json.valueToTree(List.of("qo.procurement.integrate")));
             command.put("cmd_risk_level", "L1");
         }
-        Path appendix = destination.resolve("config/commands/s06-native-initialization.json");
+        Path appendix = destination.resolve("config/commands/" + appendixName);
         if (Files.exists(appendix)) throw new IllegalArgumentException("S06 appendix must not replace production commands");
         Files.writeString(appendix, json.writerWithDefaultPrettyPrinter().writeValueAsString(commands));
         for (var source : originals.entrySet()) {

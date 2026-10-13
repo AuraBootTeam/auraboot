@@ -1,0 +1,81 @@
+package com.auraboot.framework.plugin.pf4j;
+
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import static org.assertj.core.api.Assertions.assertThat;
+
+/** Fixture contracts only: actual preparation and browser business behavior remain unexecuted. */
+class ProcurementOrderUiFixtureContractTest {
+    @Test void browserActorAddsOnlyPageManageAndTheExistingP12ReadRequirements() {
+        var expected = new HashSet<>(ProcurementPublicSourceNativeFixture.ORDER_PERMISSIONS);
+        expected.addAll(List.of("qo.procurement.manage", "page.page.read", "model.pr_purchase_order.read", "model.pr_purchase_order_line.read", "model.qo_procurement_shipment_common.read",
+                "model.qo_procurement_shipment_line_common.read", "model.pr_spend_category.read"));
+        assertThat(ProcurementOrderUiFixtureProducerIT.uiPermissionCodes(true)).hasSize(20).containsExactlyInAnyOrderElementsOf(expected);
+        assertThat(expected).noneMatch(code -> code.equals("*") || code.endsWith(".write") || code.contains("admin"));
+    }
+
+    @Test void independentDenialActorDiffersOnlyByIntegrationPermission() {
+        var allowed = new HashSet<>(ProcurementOrderUiFixtureProducerIT.uiPermissionCodes(true));
+        var denied = new HashSet<>(ProcurementOrderUiFixtureProducerIT.uiPermissionCodes(false));
+        allowed.removeAll(denied);
+        assertThat(allowed).containsExactly("qo.procurement.integrate");
+        assertThat(denied).hasSize(19).contains("qo.procurement.manage", "page.page.read");
+    }
+
+    @Test void producerDeclaresOneExplicitlySelectedMethodAndCannotInheritSourceEight() {
+        assertThat(Arrays.stream(ProcurementOrderUiFixtureProducerIT.class.getDeclaredMethods())
+                .filter(method -> method.isAnnotationPresent(Test.class)).map(method -> method.getName()))
+                .containsExactly("producePendingFailedUnknownAndMixedSupplierExecutionPrerequisites");
+        assertThat(ProcurementOrderUiFixtureProducerIT.class.getSuperclass()).isEqualTo(ProcurementPublicSourceNativeFixture.class);
+        assertThat(Arrays.stream(ProcurementPublicSourceNativeFixture.class.getDeclaredMethods())
+                .filter(method -> method.isAnnotationPresent(Test.class))).isEmpty();
+        var flag = ProcurementOrderUiFixtureProducerIT.class.getAnnotation(EnabledIfEnvironmentVariable.class);
+        assertThat(flag.named()).isEqualTo("PROCUREMENT_ORDER_UI_FIXTURE_IT");
+        assertThat(flag.matches()).isEqualTo("true");
+    }
+    @Test void receiptSourcesRequireAllFiveExactManagedKeysAndFullCommits() {
+        var json = new com.fasterxml.jackson.databind.ObjectMapper();
+        var sources = json.createObjectNode();
+        for (String key : List.of("oss", "quote", "enterprise", "crm", "plugins")) sources.put(key, "a".repeat(40));
+        assertThat(ProcurementOrderUiFixtureProducerIT.canonicalSources(sources).keySet())
+                .containsExactlyInAnyOrder("core", "product", "enterprise", "crm", "plugins");
+        sources.put("quote", "a".repeat(39));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> ProcurementOrderUiFixtureProducerIT.canonicalSources(sources))
+                .isInstanceOf(AssertionError.class);
+        sources.put("quote", "a".repeat(40));
+        sources.remove("plugins");
+        sources.put("unknown", "a".repeat(40));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> ProcurementOrderUiFixtureProducerIT.canonicalSources(sources))
+                .isInstanceOf(AssertionError.class);
+    }
+
+    @Test void explicitAsciiCredentialsCannotSilentlyBecomeFallbackOrNewlineSecrets() {
+        assertThat(ProcurementOrderUiFixtureProducerIT.validSyntheticCredential("Safe!UniqueFixture23", 16)).isTrue();
+        assertThat(ProcurementOrderUiFixtureProducerIT.validSyntheticCredential(null, 12)).isFalse();
+        assertThat(ProcurementOrderUiFixtureProducerIT.validSyntheticCredential("short", 12)).isFalse();
+        assertThat(ProcurementOrderUiFixtureProducerIT.validSyntheticCredential("Unsafe secret value", 12)).isFalse();
+        assertThat(ProcurementOrderUiFixtureProducerIT.validSyntheticCredential("UnsafeFixtureSecret\n", 12)).isFalse();
+    }
+
+    @Test void nativeConsumedStagesAndBrowserUnconsumedStagesHaveDistinctExpectedStateAndProtocol() {
+        assertThat(ProcurementOrderUiFixtureProducerIT.initialState("unknown", 0)).isEqualTo("unknown");
+        assertThat(ProcurementOrderUiFixtureProducerIT.initialState("unknownCreation", 0)).isEqualTo("pending");
+        assertThat(ProcurementOrderUiFixtureProducerIT.responseMode("unknownCreation", 0)).isEqualTo("unknown");
+        assertThat(ProcurementOrderUiFixtureProducerIT.initialState("mixed", 0)).isEqualTo("succeeded");
+        assertThat(ProcurementOrderUiFixtureProducerIT.initialState("mixed", 1)).isEqualTo("failed");
+        assertThat(ProcurementOrderUiFixtureProducerIT.initialState("partialCreation", 1)).isEqualTo("pending");
+        assertThat(ProcurementOrderUiFixtureProducerIT.responseMode("partialCreation", 1)).isEqualTo("failed");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> ProcurementOrderUiFixtureProducerIT.initialState("arbitrary", 0))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test void managedReadProtocolKeepsCanonicalSpecificationWithAnExplicitProviderColumnMapping() {
+        assertThat(ProcurementPublicSourceNativeFixture.READ_COLUMNS).contains("specification").doesNotContain("material_spec");
+        assertThat(ProcurementOrderUiFixtureProducerIT.ERP_COLUMNS).hasSize(18).contains("Read_material_spec").doesNotContain("Read_specification");
+        assertThat(ProcurementOrderUiFixtureProducerIT.ERP_COLUMNS.stream().distinct()).hasSize(18);
+    }
+
+}
