@@ -1734,6 +1734,24 @@ test.describe('Open Platform golden journey', () => {
         }),
       });
     });
+    const healthFixtureNow = Date.now();
+    const fixtureDayMs = 24 * 60 * 60 * 1000;
+    const rotationDueDates = {
+      healthy: new Date(healthFixtureNow + 30 * fixtureDayMs).toISOString(),
+      due: new Date(healthFixtureNow + 7 * fixtureDayMs).toISOString(),
+      overdue: new Date(healthFixtureNow - 7 * fixtureDayMs).toISOString(),
+    };
+    expect(Date.parse(rotationDueDates.healthy) - healthFixtureNow).toBeGreaterThan(14 * fixtureDayMs);
+    expect(Date.parse(rotationDueDates.due) - healthFixtureNow).toBeGreaterThan(0);
+    expect(Date.parse(rotationDueDates.due) - healthFixtureNow).toBeLessThanOrEqual(14 * fixtureDayMs);
+    expect(Date.parse(rotationDueDates.overdue)).toBeLessThan(healthFixtureNow);
+    const displayedRotationDates = await page.evaluate((dates) => {
+      const format = new Intl.DateTimeFormat('zh-CN', {
+        month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+      });
+      return Object.fromEntries(Object.entries(dates).map(([status, date]) =>
+        [status, format.format(new Date(date))]));
+    }, rotationDueDates);
     await page.route('**/api/open-platform/installations/*/webhook-health', async (route) => {
       await route.fulfill({
         status: 200,
@@ -1749,7 +1767,7 @@ test.describe('Open Platform golden journey', () => {
               catalogCurrentVersion: 1,
               compatible: true,
               rotationStatus: 'healthy',
-              rotationDueAt: '2026-12-01T08:00:00Z',
+              rotationDueAt: rotationDueDates.healthy,
               enabled: true,
             },
             {
@@ -1760,7 +1778,7 @@ test.describe('Open Platform golden journey', () => {
               catalogCurrentVersion: 1,
               compatible: true,
               rotationStatus: 'due',
-              rotationDueAt: '2026-09-20T08:00:00Z',
+              rotationDueAt: rotationDueDates.due,
               enabled: true,
             },
             {
@@ -1771,7 +1789,7 @@ test.describe('Open Platform golden journey', () => {
               catalogCurrentVersion: 1,
               compatible: true,
               rotationStatus: 'overdue',
-              rotationDueAt: '2026-08-01T08:00:00Z',
+              rotationDueAt: rotationDueDates.overdue,
               enabled: true,
             },
             {
@@ -1823,10 +1841,10 @@ test.describe('Open Platform golden journey', () => {
       '目录版本 v1',
     );
     await expect(webhookHealth.locator('[data-rotation-status="healthy"]').first()).toContainText(
-      '12/01',
+      displayedRotationDates.healthy,
     );
-    await expect(webhookHealth.locator('[data-rotation-status="due"]')).toContainText('09/20');
-    await expect(webhookHealth.locator('[data-rotation-status="overdue"]')).toContainText('08/01');
+    await expect(webhookHealth.locator('[data-rotation-status="due"]')).toContainText(displayedRotationDates.due);
+    await expect(webhookHealth.locator('[data-rotation-status="overdue"]')).toContainText(displayedRotationDates.overdue);
     await expect(webhookHealth.locator('[data-compatible="false"]')).toContainText('目录版本 v1');
     await captureLocator(eventCatalog, 'OP-PROTO-01');
     await captureLocator(
@@ -2353,7 +2371,7 @@ test.describe('Open Platform golden journey', () => {
               catalogCurrentVersion: 1,
               compatible: false,
               rotationStatus: 'overdue',
-              rotationDueAt: '2026-08-01T08:00:00Z',
+              rotationDueAt: rotationDueDates.overdue,
               enabled: false,
             },
           ],
