@@ -75,4 +75,29 @@ class ProcurementSourceUiFixtureContractTest {
         assertEquals("connection", policy.get("connectionPid")); assertEquals("account", policy.get("accountId"));
         assertThrows(AssertionError.class, () -> ProcurementSourceUiFixtureProducerIT.assertDecimal("125", "0"));
     }
+    @Test void optionalControlledRemarkIsSeparateNineteenthFieldAndNeverAnExternalCustomerAlias() throws Exception {
+        var type = ProcurementSourceUiFixtureProducerIT.class;
+        var method = type.getDeclaredMethod("remarkRow", String.class, String.class, String.class, String.class);
+        @SuppressWarnings("unchecked")
+        var initial = (List<Object>) method.invoke(null, "105", "71", "UI-REMARK", "Initial controlled remark");
+        assertEquals(19, initial.size());
+        assertEquals(ProcurementSourceUiFixtureProducerIT.sourceRow("105", "71", "UI-REMARK"), initial.subList(0, 18));
+        assertEquals("Initial controlled remark", initial.get(18));
+        @SuppressWarnings("unchecked")
+        var cleared = (List<Object>) method.invoke(null, "105", "71", "UI-REMARK", null);
+        assertEquals(19, cleared.size());
+        assertNull(cleared.get(18));
+        @SuppressWarnings("unchecked")
+        var empty = (List<Object>) method.invoke(null, "105", "71", "UI-REMARK", "");
+        assertEquals("", empty.get(18));
+        var policyMethod = type.getDeclaredMethod("policy", String.class, String.class, String.class);
+        @SuppressWarnings("unchecked")
+        var configured = (Map<String, Object>) policyMethod.invoke(null, "connection", "account", "FControlledRemark");
+        assertEquals(Set.of("connectionPid", "accountId", "rules", "remarkField"), configured.keySet());
+        assertEquals("FControlledRemark", configured.get("remarkField"));
+        assertFalse(ProcurementSourceUiFixtureProducerIT.policy("connection", "account").containsKey("remarkField"));
+        assertThrows(java.lang.reflect.InvocationTargetException.class,
+                () -> policyMethod.invoke(null, "connection", "account", "FNote"));
+    }
+
 }

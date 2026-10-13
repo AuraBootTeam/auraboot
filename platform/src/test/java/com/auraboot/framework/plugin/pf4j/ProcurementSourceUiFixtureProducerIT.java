@@ -57,6 +57,8 @@ class ProcurementSourceUiFixtureProducerIT extends ProcurementPublicSourceNative
     @Autowired com.auraboot.framework.common.crypto.FieldEncryptionService actualEncryption;
     private JsonNode input;
     private String encryptionMode;
+    private boolean remarkFacetEnabled;
+    private final List<Map<String, Object>> sourceCommandProofs = new ArrayList<>();
     private String controlToken;
     private URI controlBase;
     private String makerToken;
@@ -90,6 +92,8 @@ class ProcurementSourceUiFixtureProducerIT extends ProcurementPublicSourceNative
         Path sourceUiInput = Path.of(required("PROCUREMENT_SOURCE_UI_INPUT")).toRealPath();
         assertEquals(required("PROCUREMENT_SOURCE_UI_INPUT_SHA256"), sha(sourceUiInput));
         input = json.readTree(sourceUiInput.toFile());
+        if (input.has("remarkFacetEnabled")) assertTrue(input.path("remarkFacetEnabled").isBoolean());
+        remarkFacetEnabled = input.path("remarkFacetEnabled").asBoolean(false);
         assertEquals("procurement-source-ui-input-v1", input.path("kind").asText());
         assertEquals(1, input.path("schemaVersion").asInt(-1));
         assertEquals(ProcurementOrderUiFixtureProducerIT.canonicalSources(input.path("sourceSet")),
@@ -142,6 +146,9 @@ class ProcurementSourceUiFixtureProducerIT extends ProcurementPublicSourceNative
         assertEquals(probe, actualEncryption.decrypt(encrypted));
         if (encryptionMode.equals("dev-passthrough")) assertEquals(probe, encrypted);
         else assertTrue(encrypted.startsWith("ENC:"));
+        writeArtifact("encryption-mode-admission.json", Map.of("mode", encryptionMode,
+                "proofPath", proofPath.toString(), "proofSha256", sha(proofPath),
+                "actualSpringProfiles", proof.path("actualSpringProfiles").asText(), "nonSecretBeanProbeMatched", true));
     }
 
     @Test void produceSourceSelectionAndRefreshPrerequisites() throws Exception {
@@ -186,6 +193,24 @@ class ProcurementSourceUiFixtureProducerIT extends ProcurementPublicSourceNative
                 assertDecimal("125", source.get("qo_pr_source_reserved_qty"));
             }
             pagination.put("reservationAuthority", "actual public quote submit and task allocate; bootstrap is not UI");
+            if (remarkFacetEnabled) {
+                var remark = createStage("remark", List.of(remarkRow("105", "71", "UI-REMARK", "Initial controlled remark")), "FControlledRemark");
+                sync(remark, List.of(pair("105", "71")));
+                assertEquals("Initial controlled remark", sources().getFirst().get("pr_preq_remark"));
+                remark.put("formal", submitQuote(remark, false));
+                var sourceBefore = sources().getFirst();
+                assertNotNull(sourceBefore.get("row_version"));
+                assertNotNull(sourceBefore.get("qo_pr_source_revision"));
+                remark.put("sourceBusinessRevisionBefore", sourceBefore.get("qo_pr_source_revision"));
+                remark.put("sourceAuditVersionBefore", sourceBefore.get("row_version"));
+                remark.put("sourceRecordBefore", new LinkedHashMap<>(sourceBefore));
+                remark.put("businessBefore", snapshot());
+                remark.put("expectedRemarkTransitions", java.util.Arrays.asList("Updated controlled remark", null));
+                // Only the controlled provider changes here. Both public refreshes belong to the browser.
+                control("/__control/source-scenario", Map.of("namespace", remark.get("namespace"),
+                        "sourceRows", List.of(remarkRow("105", "71", "UI-REMARK", "Updated controlled remark"))));
+                assertEquals("Initial controlled remark", sources().getFirst().get("pr_preq_remark"));
+            }
             for (var stage : stages) {
                 task = stage.get("taskPid").toString();
                 connection = stage.get("connectionPid").toString();
@@ -201,6 +226,9 @@ class ProcurementSourceUiFixtureProducerIT extends ProcurementPublicSourceNative
             var receipt = new LinkedHashMap<String, Object>();
             receipt.put("kind", "procurement-source-ui-native-v1");
             receipt.put("schemaVersion", 1);
+            receipt.put("runtime", "procurement-web-stack-20261010");
+            receipt.put("database", "enterprise_22");
+            receipt.put("redisDatabase", 13);
             receipt.put("sourceBindingPath", System.getenv("PROCUREMENT_PUBLIC_SOURCE_READINESS_INPUT"));
             receipt.put("sourceBindingSha256", sha(Path.of(System.getenv("PROCUREMENT_PUBLIC_SOURCE_READINESS_INPUT"))));
             receipt.put("encryptionMode", encryptionMode);
@@ -226,6 +254,9 @@ class ProcurementSourceUiFixtureProducerIT extends ProcurementPublicSourceNative
             receipt.put("publicActions", publicActions);
             receipt.put("initializationActions", initializationActions);
             receipt.put("serverPolicies", policies);
+            receipt.put("sourceCommandProofs", sourceCommandProofs);
+            receipt.put("encryptionModeAdmissionPath", caseEvidence.resolve("encryption-mode-admission.json").toString());
+            receipt.put("encryptionModeAdmissionSha256", sha(caseEvidence.resolve("encryption-mode-admission.json")));
             receipt.put("businessSnapshotTables", tableMap());
             receipt.put("businessSnapshot", snapshot());
             receipt.put("immutableBusinessBefore", snapshot());
@@ -234,14 +265,14 @@ class ProcurementSourceUiFixtureProducerIT extends ProcurementPublicSourceNative
             receipt.put("membershipInitialFactsSynthetic", true);
             receipt.put("bootstrapFactsAreBrowserAcceptance", false);
             receipt.put("retainedAfterNative", true);
-            receipt.put("remarkFacetStatus", "blocked-contract; no server column configured");
+            receipt.put("remarkFacetStatus", remarkFacetEnabled ? "prepared-controlled-server-remark" : "blocked-contract; no server column configured");
             receipt.put("actualCustomerERPVerified", false);
             receipt.put("browserExecuted", 0);
             writeArtifact("source-ui-fixture-receipt.json", receipt);
-            activeStage = "completed";
+            activeStage = "native-fixture-completed";
         } finally {
             writeArtifact("source-ui-producer-stage.json", Map.of("stage", activeStage,
-                    "completed", activeStage.equals("completed"), "browserExecuted", 0,
+                    "completed", activeStage.equals("native-fixture-completed"), "browserExecuted", 0,
                     "publicActionCount", publicActions.size(), "receiptExists", Files.exists(caseEvidence.resolve("source-ui-fixture-receipt.json"))));
         }
     }
@@ -251,6 +282,13 @@ class ProcurementSourceUiFixtureProducerIT extends ProcurementPublicSourceNative
         assertTrue(entry.matches("[1-9][0-9]{0,29}"));
         return List.of(head, bill, entry, "900", "SRC-900", "Synthetic source material", "SYNTHETIC", "1500",
                 "1500", "0", "0", "1000", "PCS", "2066-12-01", "SYNTHETIC-ORG", "C", "A", "A");
+    }
+
+    static List<Object> remarkRow(String head, String entry, String bill, String remark) {
+        assertTrue(remark == null || remark.length() <= 500);
+        var row = new ArrayList<>(sourceRow(head, entry, bill));
+        row.add(remark);
+        return row;
     }
 
     static Map<String, String> pair(String head, String entry) {
@@ -302,7 +340,7 @@ class ProcurementSourceUiFixtureProducerIT extends ProcurementPublicSourceNative
         formalImport(Path.of(appendix.get("testDirectory").toString()), "source-ui-initializer");
     }
 
-    private void formalImport(Path directory, String label) throws Exception {
+    private String formalImport(Path directory, String label) throws Exception {
         var preview = imports.parseDirectory(directory.toString(), true);
         writeArtifact(label + "-preview.json", preview);
         assertTrue(preview.isValid(), "Actual Source UI preview: " + preview.getErrors());
@@ -327,6 +365,7 @@ class ProcurementSourceUiFixtureProducerIT extends ProcurementPublicSourceNative
                 if (expected.has(fieldCode)) assertEquals(expected.path(fieldCode).path("testWriters"), json.valueToTree(field.getAllowedWriterCommands()));
             }
         }
+        return result.getPluginPid();
     }
 
     private String initialize(String model, Map<String, Object> values) throws Exception {
@@ -360,6 +399,10 @@ class ProcurementSourceUiFixtureProducerIT extends ProcurementPublicSourceNative
     }
 
     private Map<String, Object> createStage(String name, List<List<Object>> rows) throws Exception {
+        return createStage(name, rows, null);
+    }
+
+    private Map<String, Object> createStage(String name, List<List<Object>> rows, String remarkField) throws Exception {
         activeStage = name;
         String namespace = "su_" + UUID.randomUUID().toString().replace("-", "").substring(0, 20);
         String secret = UUID.randomUUID().toString();
@@ -372,9 +415,13 @@ class ProcurementSourceUiFixtureProducerIT extends ProcurementPublicSourceNative
         cloud.setConfig("{\"appSecret\":\"" + secret + "\"}");
         context();
         configs.saveConfig(cloud);
-        var registration = control("/__control/register-source", Map.of("namespace", namespace,
-                "account", Map.of("acctID", namespace, "username", namespace, "appId", namespace,
-                        "secretSha256", digest(secret.getBytes(java.nio.charset.StandardCharsets.UTF_8))), "sourceRows", rows));
+        var registrationPayload = new LinkedHashMap<String, Object>();
+        registrationPayload.put("namespace", namespace);
+        registrationPayload.put("account", Map.of("acctID", namespace, "username", namespace, "appId", namespace,
+                "secretSha256", digest(secret.getBytes(java.nio.charset.StandardCharsets.UTF_8))));
+        registrationPayload.put("sourceRows", rows);
+        if (remarkField != null) registrationPayload.put("remarkField", remarkField);
+        var registration = control("/__control/register-source", registrationPayload);
         connection = initialize("customer_pcba_int_kingdee_connection", Map.of(
                 "customer_pcba_kd_profile_name", namespace, "customer_pcba_kd_status", "active",
                 "customer_pcba_kd_acct_id", namespace, "customer_pcba_kd_base_url", controlBase.toString(),
@@ -385,7 +432,7 @@ class ProcurementSourceUiFixtureProducerIT extends ProcurementPublicSourceNative
                 "customer_pcba_ref_instance_key", connection, "customer_pcba_ref_account_id", namespace,
                 "customer_pcba_ref_external_form_id", "BD_MATERIAL", "customer_pcba_ref_external_id", "900",
                 "customer_pcba_ref_local_model_code", "prod_product", "customer_pcba_ref_local_pid", material));
-        configureSourcePolicy(connection, namespace);
+        configureSourcePolicy(connection, namespace, remarkField);
         var result = action(makerToken, "qo_procurement_task_common:create", null,
                 Map.of("title", "Synthetic " + name, "connectionPid", connection));
         task = result.path("recordPid").asText();
@@ -400,11 +447,12 @@ class ProcurementSourceUiFixtureProducerIT extends ProcurementPublicSourceNative
         stage.put("billNo", rows.getFirst().get(1));
         stage.put("initialProviderRows", rows);
         stage.put("registration", registration);
+        if (remarkField != null) stage.put("remarkField", remarkField);
         stages.add(stage);
         return stage;
     }
 
-    private void configureSourcePolicy(String connectionPid, String account) throws Exception {
+    private void configureSourcePolicy(String connectionPid, String account, String remarkField) throws Exception {
         Path original = Path.of(procurementDirectory);
         Path appendix = caseEvidence.resolve("source-ui-initialization-appendix");
         Path copy = caseEvidence.resolve("source-policy-" + account);
@@ -425,17 +473,47 @@ class ProcurementSourceUiFixtureProducerIT extends ProcurementPublicSourceNative
             assertTrue(catalog.isEmpty());
             // Keep all prior exact account registrations admitted for the retained browser stages.
             for (var prior : policies) catalog.add(json.valueToTree(prior));
-            catalog.add(json.valueToTree(policy(connectionPid, account)));
+            catalog.add(json.valueToTree(policy(connectionPid, account, remarkField)));
         }
         assertEquals(2, configuredCommands);
         json.writeValue(copy.resolve("config/commands/procurement.json").toFile(), definitions);
-        formalImport(copy, "source-ui-policy-" + account);
-        policies.add(policy(connectionPid, account));
+        String importLabel = "source-ui-policy-" + account;
+        String ownerPlugin = formalImport(copy, importLabel);
+        sourceCommandProofs.clear();
+        policies.add(policy(connectionPid, account, remarkField));
         for (String code : List.of(SYNC, CANDIDATES)) {
             var command = commands.findByCode(code);
             assertEquals(tenant, command.getTenantId());
             assertEquals("s2p_sourcing_event", command.getModelCode());
             assertEquals(json.valueToTree(policies), json.readTree(command.getExecutionConfig()).path("handlerParams").path("procurementSourceEligibilityPolicies"));
+            assertEquals("published", command.getStatus());
+            assertEquals(Boolean.TRUE, command.getIsCurrent());
+            var raw = new org.springframework.jdbc.core.JdbcTemplate(postgres).queryForMap(
+                    "SELECT id,pid,code,model_code,tenant_id,plugin_pid,status,is_current,version,execution_config::text AS execution_config FROM ab_command_definition WHERE tenant_id=? AND pid=? AND code=? AND is_current=TRUE AND deleted_flag=FALSE",
+                    tenant, command.getPid(), code);
+            assertEquals(command.getId(), raw.get("id"));
+            assertEquals(ownerPlugin, raw.get("plugin_pid"));
+            assertEquals(json.readTree(command.getExecutionConfig()), json.readTree(raw.get("execution_config").toString()));
+            String artifactLabel = "source-ui-command-" + account + "-" + (code.equals(SYNC) ? "sync" : "candidates");
+            writeArtifact(artifactLabel + ".json", raw);
+            var proof = new LinkedHashMap<String, Object>();
+            proof.put("id", command.getId());
+            proof.put("pid", command.getPid());
+            proof.put("code", code);
+            proof.put("modelCode", command.getModelCode());
+            proof.put("tenantId", tenant.toString());
+            proof.put("pluginPid", raw.get("plugin_pid"));
+            proof.put("status", command.getStatus());
+            proof.put("isCurrent", command.getIsCurrent());
+            proof.put("version", command.getVersion());
+            proof.put("metadataPath", caseEvidence.resolve(artifactLabel + ".json").toString());
+            proof.put("metadataSha256", sha(caseEvidence.resolve(artifactLabel + ".json")));
+            proof.put("actualExecutionConfigSha256", digest(raw.get("execution_config").toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+            proof.put("importPreviewPath", caseEvidence.resolve(importLabel + "-preview.json").toString());
+            proof.put("importPreviewSha256", sha(caseEvidence.resolve(importLabel + "-preview.json")));
+            proof.put("importResultPath", caseEvidence.resolve(importLabel + "-result.json").toString());
+            proof.put("importResultSha256", sha(caseEvidence.resolve(importLabel + "-result.json")));
+            sourceCommandProofs.add(proof);
         }
         writeArtifact("source-policy-" + account + ".json", Map.of("sourceCommandSha256", sha(original.resolve("config/commands/procurement.json")),
                 "configuredCommandSha256", sha(copy.resolve("config/commands/procurement.json")), "testOnlyPolicies", List.copyOf(policies)));
@@ -444,6 +522,14 @@ class ProcurementSourceUiFixtureProducerIT extends ProcurementPublicSourceNative
     static Map<String, Object> policy(String connectionPid, String account) {
         return Map.of("connectionPid", connectionPid, "accountId", account,
                 "rules", List.of(Map.of("documentStatus", "C", "cancelStatus", "A", "closeStatus", "A", "eligible", true)));
+    }
+
+    static Map<String, Object> policy(String connectionPid, String account, String remarkField) {
+        if (remarkField == null) return policy(connectionPid, account);
+        assertEquals("FControlledRemark", remarkField, "Only this synthetic provider's declared nineteenth column is admitted");
+        var result = new LinkedHashMap<>(policy(connectionPid, account));
+        result.put("remarkField", remarkField);
+        return result;
     }
 
     private JsonNode candidates(Map<String, Object> stage) throws Exception {
