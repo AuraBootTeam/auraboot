@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import test from 'node:test';
 
 const root = resolve(import.meta.dirname, '../..');
@@ -25,6 +26,28 @@ test('product runtime argument guard accepts role lists and rejects shell syntax
   for (const argument of ['--x=a b', '--x=$(id)', '--x=`id`', '--x=a;b', '--x=a\nb', '--x=', '-x=a']) {
     assert.equal(check(argument), 1, argument);
   }
+});
+
+test('image verification creates a private per-attempt encryption key and refuses overwrite', t => {
+  const directory = mkdtempSync(join(tmpdir(), 'release-image-crypto-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const fn = productImageGate.match(/create_verification_crypto_env\(\) \{[\s\S]*?\n\}/)?.[0];
+  assert.ok(fn);
+  const create = file => spawnSync('bash', ['-c', `${fn}\ncreate_verification_crypto_env "$1"`, 'crypto-env', file], { encoding: 'utf8' });
+  const files = [join(directory, 'publication-and-runtime.env'), join(directory, 'next-attempt.env')];
+  for (const file of files) {
+    const result = create(file); assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, '', 'the generated key is never printed');
+    assert.equal(statSync(file).mode & 0o777, 0o600);
+    const value = readFileSync(file, 'utf8').trim().split('=');
+    assert.equal(value[0], 'FIELD_ENCRYPTION_KEY');
+    assert.equal(Buffer.from(value.slice(1).join('='), 'base64').length, 32);
+  }
+  assert.notEqual(readFileSync(files[0], 'utf8'), readFileSync(files[1], 'utf8'));
+  const original = readFileSync(files[0]); assert.notEqual(create(files[0]).status, 0);
+  assert.deepEqual(readFileSync(files[0]), original);
+  assert.notEqual(create('relative').status, 0);
+  assert.match(productImageGate, /--env-file "\$RUNTIME_CRYPTO_ENV_FILE"/);
 });
 
 test('core release stages a compiled Web shell and a self-contained deployment driver', () => {

@@ -12,6 +12,15 @@ create_isolated_network() {
     || fatal 'isolated release network unavailable'
 }
 
+# Verification-only key: generated per attempt, kept outside the artifact archive.
+create_verification_crypto_env() {
+  local file="$1" key
+  [[ "$file" == /* && ! -e "$file" && ! -L "$file" ]] || return 2
+  key="$(openssl rand -base64 32)" || return 2
+  [[ "$key" =~ ^[A-Za-z0-9+/]{43}=$ ]] || return 2
+  (umask 077; set -o noclobber; printf 'FIELD_ENCRYPTION_KEY=%s\n' "$key" > "$file")
+}
+
 wait_for_final_postgres() {
   local container="$1" database="$2" label="$3" attempt
   # The official image briefly exposes its temporary init server before
@@ -373,6 +382,8 @@ APP_VERSION="$(node -e "const fs=require('node:fs');process.stdout.write(JSON.pa
 LAYOUT_DIGEST="$(node -e "const r=require(process.argv[1]);process.stdout.write((r.image&&r.image.digest)||'')" "$PRODUCT_RELEASE/release-receipt.json")"
 JWT_SECRET="$(openssl rand -hex 32)"; SESSION_SECRET="$(openssl rand -hex 32)"; ADMIN_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')Aa1!"
 OPEN_PLATFORM_SIGNING_KEY="$(openssl rand -hex 32)"
+RUNTIME_CRYPTO_ENV_FILE="$WORK_ROOT/runtime-crypto.env"
+create_verification_crypto_env "$RUNTIME_CRYPTO_ENV_FILE" || fatal 'private verification encryption configuration failed'
 WEB_PORT="$(python3 -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));print(s.getsockname()[1]);s.close()')"
 REGISTRATION_PASSWORD_FILE="$WORK_ROOT/registry-registration-password"
 printf '%s\n' "$REGISTRATION_DB_PASSWORD" >"$REGISTRATION_PASSWORD_FILE"
@@ -381,6 +392,7 @@ printf '%s\n' "$REGISTRATION_DB_PASSWORD" >"$REGISTRATION_PASSWORD_FILE"
 start_application_phase() {
   local container="$1" db_role="$2" db_password="$3" phase="$4"
   docker run -d --name "$container" --network "$NETWORK" -p 127.0.0.1::6443 \
+    --env-file "$RUNTIME_CRYPTO_ENV_FILE" \
     -v "$REGISTRATION_PASSWORD_FILE":/run/secrets/aura-registry-password:ro \
     -e SERVER_PORT=6443 -e SPRING_PROFILES_ACTIVE=community \
     -e SPRING_DATASOURCE_URL="jdbc:postgresql://$PG_CONTAINER:5432/aura_product_ci" \
