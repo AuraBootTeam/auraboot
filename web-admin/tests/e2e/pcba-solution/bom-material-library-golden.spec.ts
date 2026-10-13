@@ -119,7 +119,8 @@ import { readFileSync } from 'node:fs';
 import { request } from '@playwright/test';
 const input = JSON.parse(readFileSync(0, 'utf8'));
 const { FixtureCleanupJournal } = await import(input.journalModule);
-const client = await request.newContext({ baseURL: input.origin, storageState: input.storageState });
+const client = await request.newContext({ baseURL: input.origin, storageState: input.storageState,
+  extraHTTPHeaders: { Origin: input.origin, Referer: input.origin + '/' } });
 const created = await client.post('/api/meta/commands/execute/bom:create_material', {
   data: { operationType: 'create', payload: { bom_mm_material_code: input.code,
     bom_mm_material_name: 'Pipeline interruption resistor', bom_mm_spec_model: '10kΩ ±1% 0603',
@@ -162,6 +163,10 @@ process.exit(23);
       expect(afterResponse.ok()).toBe(true);
       expect(String(after.code)).toBe('0');
       expect(after.data.total, 'interruption recovery preserves the original material population').toBe(before.data.total);
+      await test.info().attach('material-interruption-recovery', {
+        contentType: 'application/json', body: JSON.stringify({ creatorExitCode: result.status,
+          origin, beforeTotal: before.data.total, afterTotal: after.data.total, journal: completed }),
+      });
     } finally {
       if (existsSync(file)) await FixtureCleanupJournal.resume(file, origin).cleanup(page.request);
     }
