@@ -215,16 +215,67 @@ class ProcurementPublicSourceCommandRealDbIT {
         Path evidenceRoot=workspace.resolve(".workspace/evidence").resolve(runtime).toRealPath();
         Path attempt=Path.of(required("PROCUREMENT_PUBLIC_SOURCE_EVIDENCE_DIR")).toRealPath();
         assertTrue(Files.isDirectory(attempt) && attempt.startsWith(evidenceRoot) && !attempt.equals(evidenceRoot),"Attempt evidence must belong to this workspace/runtime");
+        Path inputPath=Path.of(required("PROCUREMENT_PUBLIC_SOURCE_READINESS_INPUT")).toRealPath();
+        assertEquals(attempt,inputPath.getParent(),"Readiness must belong to the same owned attempt");
+        assertEquals("readiness-input.json",inputPath.getFileName().toString());
+        String inputSha=required("PROCUREMENT_PUBLIC_SOURCE_READINESS_SHA256");assertTrue(inputSha.matches("[a-f0-9]{64}"));
+        assertEquals(inputSha,sha(inputPath),"Runner input must remain sealed");
+        var input=json.readTree(Files.readAllBytes(inputPath));assertEquals(runtime,input.path("runtime").asText());
+        assertEquals(workspace.toString(),input.path("workspaceRoot").asText());
+        assertEquals(pluginDirectory.toString(),input.path("pluginDir").asText());
+        assertEquals(sha(runtimeManifest),input.path("publicationSha256").asText());
+        assertEquals(sha(sourceManifest),input.path("sourceManifestSha256").asText());
+        assertEquals(published.path("sourceManifestHash").asText(),input.path("sourceManifestHash").asText());
+        assertEquals(sha(pluginDirectory.resolve("quote-engine-plugin-0.1.0.jar")),input.path("productJarSha256").asText());
+        var directories=json.readTree(required("PROCUREMENT_SOURCE_IMPORT_DIRECTORIES"));
+        var configured=input.path("orderedImportDirectories");assertTrue(configured.isArray());assertEquals(23,configured.size());
+        assertTrue(directories.isArray());assertEquals(configured.size(),directories.size());
+        for(int index=0;index<configured.size();index++) {
+            var row=configured.get(index);Path directory=Path.of(row.path("path").asText()).toRealPath();
+            assertEquals(directory.toString(),directories.get(index).asText());
+            assertEquals(sha(directory.resolve("plugin.json")),row.path("pluginJsonSha256").asText());
+            assertTrue(row.path("configFiles").isArray());
+            for(var file:row.path("configFiles")) {
+                Path actual=directory.resolve(file.path("relativePath").asText()).toRealPath();
+                assertTrue(actual.startsWith(directory.resolve("config").toRealPath()),"Only frozen plugin configuration may be bound");
+                assertEquals(file.path("sha256").asText(),sha(actual));
+            }
+        }
         caseEvidence=Files.createDirectory(attempt.resolve(test.getTestMethod().orElseThrow().getName()+"-"+UUID.randomUUID()));
         var readiness=new LinkedHashMap<String,Object>();readiness.put("runtime",runtime);readiness.put("workspaceRoot",workspace.toString());
         readiness.put("runtimeManifestSha256",sha(runtimeManifest));readiness.put("sourceManifestSha256",sha(sourceManifest));
         readiness.put("sourceManifestHash",published.path("sourceManifestHash").asText());
         readiness.put("pluginJarSha256",sha(pluginDirectory.resolve("quote-engine-plugin-0.1.0.jar")));
         readiness.put("database","enterprise_22");readiness.put("redisDatabase","13");readiness.put("publicTransport","MockMvc with actual Spring security filters; no HTTP socket");
-        var commits=new LinkedHashMap<String,String>();for(String component:List.of("oss","quote","enterprise","crm","plugins")) {
-            String commit=source.path("commits").path(component).asText();assertTrue(commit.matches("[a-f0-9]{40}"),"Manifest source identity required: "+component);commits.put(component,commit);
+        var commits=new LinkedHashMap<String,String>();
+        var sourcePaths=Map.of("oss","ossRoot","quote","quoteRoot","enterprise","enterpriseRoot","crm","crmRoot","plugins","pluginsRoot");
+        for(String component:List.of("oss","quote","enterprise","crm","plugins")) {
+            Path frozen=Path.of(source.path("paths").path(sourcePaths.get(component)).asText()).toRealPath();
+            String full=gitRead(frozen,"rev-parse","HEAD").strip();
+            assertEquals("",gitRead(frozen,"status","--porcelain").strip(),"Frozen source must remain clean");
+            assertEquals(frozen.toString(),input.path("verifiedSourceIdentities").path(component).path("root").asText());
+            validateSourceIdentity(component,source.path("commits").path(component).asText(),full,input);
+            commits.put(component,full);
         }
+        readiness.put("runnerReadinessSha256",inputSha);
         readiness.put("sourceCommits",commits);writeArtifact("readiness.json",readiness);
+    }
+    /** Pure identity contract, shared with hermetic counterexamples; canonical manifest uses exactly 12 digits. */
+    static void validateSourceIdentity(String component,String manifestShort,String full,com.fasterxml.jackson.databind.JsonNode input) {
+        assertTrue(manifestShort.matches("[a-f0-9]{12}"),"Canonical manifest must carry exactly 12 commit digits");
+        assertTrue(full.matches("[a-f0-9]{40}"),"Actual frozen git commit must be full length");
+        assertEquals(full.substring(0,12),manifestShort,"Manifest short commit must exactly match actual frozen git");
+        assertEquals(full,input.path("sourceSet").path(component).asText(),"Sealed runner source must match actual git");
+        var verified=input.path("verifiedSourceIdentities").path(component);
+        assertEquals("ok",verified.path("status").asText());
+        assertEquals(full,verified.path("expectedCommit").asText());assertEquals(full,verified.path("actualCommit").asText());
+        assertEquals("clean",verified.path("expectedDirtyFingerprint").asText());assertEquals("clean",verified.path("actualDirtyFingerprint").asText());
+    }
+    private static String gitRead(Path root,String... arguments) throws Exception {
+        var command=new ArrayList<String>();command.add("git");command.add("-C");command.add(root.toString());command.addAll(List.of(arguments));
+        var process=new ProcessBuilder(command).redirectErrorStream(true).start();
+        String value=new String(process.getInputStream().readAllBytes(),StandardCharsets.UTF_8);
+        assertEquals(0,process.waitFor(),"Read-only frozen source identity command must succeed");return value;
     }
     private static String sha(Path path) throws Exception {
         return HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(path)));
