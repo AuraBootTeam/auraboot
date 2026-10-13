@@ -1368,7 +1368,7 @@ def run_dynamic_probe(request, admin, *, evidence_path=None, consumer=None, audi
             "writableFields": ["name", "zone"], "rowConstraints": [{"field": "zone", "values": ["A"]}]})
         from open_platform_authentication_probe import run as run_authentication
         report["authenticationFailures"] = run_authentication(request, human, report, credentials,
-                token["access_token"], path, audit_reader)
+                token["access_token"], path, audit_reader, model=model_code, record_pid=a["pid"], query_path=query_path)
         _, page, _ = audited("resource-row-field-projection", path, headers=machine)
         record("resource-row-field-projection", page.get("items") == [{"pid": a["pid"], "name": "Allowed A", "zone": "A"}])
         request(path + "/" + b["pid"], headers=machine, expected=(404,)); record("hidden-record")

@@ -165,15 +165,13 @@ def passed():
         proof["requests"].append({"id": identifier, "operation": operation, "query": query, "status": status,
             "requestId": marker, "body": body, "etag": '"'+"c"*64+'"' if status == 200 else None, "audit": audit})
     virtual["nullIdentity"] = proof
-    from open_platform_authentication_probe import CASES as AUTH_CASES
+    from open_platform_authentication_probe import CASES as AUTH_CASES, route_spec
     before = {"database": "hermetic-fixture", "installationFound": 1, "tokenCount": 1,
               "credentialLastUsed": "2026-10-12T00:00:00Z", "tokenLastUsed": None, "quotaCount": 0, "audits": []}
     denied = copy.deepcopy(before)
     requests = []
     for index, (name, status, code, known, token) in enumerate(AUTH_CASES):
-        method = "POST" if name.startswith("oauth") else "GET"
-        path = "/oauth2/token" if method == "POST" else "/api/open/v1/resources/release.dynamic.parts" if name == "bearer-expired" else "/api/open/v1/whoami"
-        audit_path = "/api/open/v1/resources/{resource}" if name == "bearer-expired" else path
+        method, path, audit_path = route_spec(name, "/api/open/v1/resources/release.dynamic.parts", "allowed-pid", "/api/open/v1/queries/release.dynamic.by-zone:execute")
         identifier = "fixture-auth-" + str(index)
         audit = {"requestId": identifier, "method": method, "path": audit_path, "status": status, "durationMs": 1,
                  "occurredAt": "2026-10-12T00:00:00Z", "applicationPid": "app-pid" if known else None,
@@ -183,8 +181,8 @@ def passed():
         visible = [{"requestId": identifier, "method": method, "path": audit_path, "status": status,
                     "actorKind": "unauthenticated", "applicationPid": "app-pid", "installationPid": "install-pid",
                     "capability": None, "resource": None, "operation": None, "recordPid": None, "idempotentReplay": None}] if known else []
-        requests.append({"id": name, "status": status, "body": {"error": code} if method == "POST" else {"success": False, "code": code, "message": code},
-                         "requestId": identifier, "callerIdReplaced": method == "POST", "visibleAudits": visible, "method":method,"path":path})
+        requests.append({"id": name, "status": status, "body": {"error": code} if name.startswith("oauth") else {"success": False, "code": code, "message": code},
+                         "requestId": identifier, "callerIdReplaced": name.startswith("oauth"), "visibleAudits": visible, "method":method,"path":path})
     allowed = dict(before, tokenLastUsed="2026-10-12T00:00:01Z", quotaCount=1)
     report["authenticationFailures"] = {"applicationPid": "app-pid", "installationPid": "install-pid", "before": before,
                                          "afterDenied": denied, "afterAllowed": allowed, "requests": requests, "normalStatus": 200, "resourcePath":"/api/open/v1/resources/release.dynamic.parts"}
@@ -194,6 +192,11 @@ def passed():
                'originalExpiresAt':'2026-10-12T00:10:00Z','effectiveExpiresAt':'2026-10-11T23:59:00Z','observedAt':'2026-10-12T00:00:00Z'}
     restored = dict(expired, originalExpiresAt=expired['effectiveExpiresAt'], effectiveExpiresAt=expired['originalExpiresAt'], observedAt='2026-10-12T00:00:01Z')
     auth['tokenExpiry'] = {'expired':expired,'restored':restored,'requestId':expired_request['requestId']}
+    auth.update(recordPid='allowed-pid', queryPath='/api/open/v1/queries/release.dynamic.by-zone:execute',
+                routeExpiries={row['id']: dict(auth['tokenExpiry'], requestId=row['requestId']) for row in requests if row['id'].startswith('bearer-expired-')},
+                businessBefore={'database':'hermetic-fixture','installationFound':1,
+                  **{key:{'count':2 if key=='records' else 0,'sha256':'a'*64} for key in ['records','idempotency','events']}})
+    auth['businessAfterDenied'] = copy.deepcopy(auth['businessBefore'])
     resource = "release.dynamic.parts.revocation"
     state = {"database":"hermetic-fixture","installationFound":1,"credentialStatus":"active","tokenRevoked":False,
              "records":[{"pid":"create-pid","name":"Revocation create","zone":"A","version":1},
@@ -685,6 +688,21 @@ class DynamicProbeTests(unittest.TestCase):
                                 ('restored','effectiveExpiresAt','2026-10-12T00:20:00Z'),('restored','observedAt','2026-10-11T00:00:00Z')]:
             report = copy.deepcopy(baseline); report['authenticationFailures']['tokenExpiry'][stage][key]=value
             with self.subTest(expiry_stage=stage,changed=key), self.assertRaises(ProtocolError): verify_report(report)
+        for name in baseline['authenticationFailures']['routeExpiries']:
+            for mutation in ['missing', 'request-id', 'not-expired', 'not-restored']:
+                report = copy.deepcopy(baseline); routes = report['authenticationFailures']['routeExpiries']
+                if mutation == 'missing': routes.pop(name)
+                elif mutation == 'request-id': routes[name]['requestId'] = 'unrelated'
+                elif mutation == 'not-expired': routes[name]['expired']['effectiveExpiresAt'] = '2026-10-12T00:20:00Z'
+                else: routes[name]['restored']['effectiveExpiresAt'] = '2026-10-12T00:20:00Z'
+                with self.subTest(expired_route=name, mutation=mutation), self.assertRaises(ProtocolError): verify_report(report)
+        for key in ['records', 'idempotency', 'events']:
+            for field in ['count', 'sha256']:
+                report = copy.deepcopy(baseline); report['authenticationFailures']['businessAfterDenied'][key][field] = 'changed'
+                with self.subTest(expired_business=key, mutation=field), self.assertRaises(ProtocolError): verify_report(report)
+        report = copy.deepcopy(baseline); report['authenticationFailures']['businessBefore']['records']['count'] = 0
+        report['authenticationFailures']['businessAfterDenied'] = copy.deepcopy(report['authenticationFailures']['businessBefore'])
+        with self.assertRaises(ProtocolError): verify_report(report)
         for field in ["tokenCount", "credentialLastUsed", "tokenLastUsed", "quotaCount"]:
             report = copy.deepcopy(baseline); report["authenticationFailures"]["afterDenied"][field] = "changed"
             with self.subTest(auth_state=field), self.assertRaises(ProtocolError): verify_report(report)

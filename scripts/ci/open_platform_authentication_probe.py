@@ -12,6 +12,8 @@ CASES = [("bearer-missing", 401, "invalid_token", False, False),
          ("bearer-unknown", 401, "invalid_token", False, False),
          ("bearer-scope", 403, "insufficient_scope", True, True),
          ("bearer-expired", 401, "invalid_token", True, True),
+         *[("bearer-expired-" + operation, 401, "invalid_token", True, True)
+           for operation in ["get", "create", "update", "delete", "query"]],
          ("oauth-unknown", 401, "invalid_client", False, False),
          ("oauth-wrong", 401, "invalid_client", False, False),
          ("oauth-basic", 401, "invalid_client", False, False),
@@ -57,6 +59,24 @@ class PsqlAuditReader:
             'anonymous',a.tenant_id IS NULL AND a.application_pid IS NULL AND a.installation_pid IS NULL AND a.token_pid IS NULL,
             'secretFree',({safe}))) FROM ab_open_api_call_audit a WHERE a.request_id IN ({wanted})), '[]'::json));"""
         return self.query(sql)
+
+    def business_state(self, installation, model, resource):
+        require(re.fullmatch(r'[a-z][a-z0-9_]{0,62}', model)
+                and re.fullmatch(r'[A-Za-z0-9_.:-]{1,128}', installation)
+                and re.fullmatch(r'[a-z][a-z0-9.-]{1,99}', resource), 'expiry business fixture invalid')
+        sql = f"""WITH i AS (SELECT * FROM ab_application_installation WHERE pid='{installation}')
+        SELECT json_build_object('database',current_database(),'installationFound',(SELECT COUNT(*) FROM i),
+          'records',COALESCE((SELECT json_agg(to_jsonb(r) ORDER BY r.pid) FROM {model} r
+            WHERE r.tenant_id=(SELECT tenant_id FROM i)),'[]'::json),
+          'idempotency',COALESCE((SELECT json_agg(to_jsonb(k) ORDER BY k.id) FROM ab_open_api_idempotency k
+            JOIN i ON i.id=k.installation_id WHERE k.route_code LIKE 'resource:{resource}:%'),'[]'::json),
+          'events',COALESCE((SELECT json_agg(json_build_object('eventId',event_id,'payload',payload) ORDER BY event_id)
+            FROM ab_outbox WHERE tenant_id=(SELECT tenant_id FROM i) AND ordering_key LIKE 'open.resource:{resource}:%'),'[]'::json));"""
+        state = self.query(sql)
+        return dict(database=state['database'], installationFound=state['installationFound'],
+                    **{key: {'count': len(state[key]), 'sha256': hashlib.sha256(
+                        json.dumps(state[key], sort_keys=True, separators=(',', ':')).encode()).hexdigest()}
+                       for key in ['records', 'idempotency', 'events']})
 
     def token_clock(self, installation, token, original=None):
         """Construct expiry only for an explicitly authorized, isolated token fixture."""
@@ -127,11 +147,37 @@ def verify_expiry(expiry, database, request_id):
             and restored['effectiveExpiresAt'] == expired['originalExpiresAt'], 'token expiry or exact restoration unproven')
 
 
+def route_spec(name, resource_path, record_pid, query_path):
+    if name.startswith('oauth'):
+        return 'POST', '/oauth2/token', '/oauth2/token'
+    operation = name.removeprefix('bearer-expired-')
+    if operation in ['get', 'update', 'delete']:
+        return {'get': 'GET', 'update': 'PATCH', 'delete': 'DELETE'}[operation], resource_path + '/' + record_pid, '/api/open/v1/resources/{resource}/{pid}'
+    if operation == 'create':
+        return 'POST', resource_path, '/api/open/v1/resources/{resource}'
+    if operation == 'query':
+        return 'POST', query_path, '/api/open/v1/queries/{query}:execute'
+    if name == 'bearer-expired':
+        return 'GET', resource_path, '/api/open/v1/resources/{resource}'
+    return 'GET', '/api/open/v1/whoami', '/api/open/v1/whoami'
+
+
 def verify(proof, application, installation, resource_path):
-    require(isinstance(proof, dict) and set(proof) == {'applicationPid','installationPid','before','afterDenied','afterAllowed','requests','normalStatus','tokenExpiry','resourcePath'} and proof.get('applicationPid') == application
+    require(isinstance(proof, dict) and set(proof) == {'applicationPid','installationPid','before','afterDenied','afterAllowed','requests','normalStatus','tokenExpiry','resourcePath','recordPid','queryPath','routeExpiries','businessBefore','businessAfterDenied'} and proof.get('applicationPid') == application
             and proof.get('installationPid') == installation, "authentication proof identity missing")
     require(isinstance(resource_path, str) and re.fullmatch(r'/api/open/v1/resources/[a-z][a-z0-9.-]{1,99}', resource_path)
             and proof.get('resourcePath') == resource_path, 'authentication resource path missing')
+    require(isinstance(proof.get('recordPid'), str) and re.fullmatch(r'[A-Za-z0-9_.:-]{1,128}', proof['recordPid'])
+            and proof.get('queryPath') == '/api/open/v1/queries/release.dynamic.by-zone:execute', 'expiry route fixture missing')
+    business = proof.get('businessBefore')
+    require(isinstance(business, dict) and set(business) == {'database','installationFound','records','idempotency','events'}
+            and business.get('installationFound') == 1 and business.get('database') == proof.get('before', {}).get('database')
+            and all(isinstance(business.get(key), dict) and set(business[key]) == {'count','sha256'}
+                and type(business[key]['count']) is int and business[key]['count'] >= 0
+                and isinstance(business[key]['sha256'], str) and re.fullmatch(r'[a-f0-9]{64}', business[key]['sha256'])
+                for key in ['records','idempotency','events'])
+            and business['records']['count'] >= 2 and business == proof.get('businessAfterDenied'),
+            'expired denial changed or omitted populated business state')
     before, denied, allowed = [proof.get(k) for k in ['before', 'afterDenied', 'afterAllowed']]
     for state in [before, denied, allowed]:
         require(isinstance(state, dict) and set(state) == {'database','installationFound','tokenCount','credentialLastUsed','tokenLastUsed','quotaCount','audits'}
@@ -160,12 +206,10 @@ def verify(proof, application, installation, resource_path):
     indexed = {a.get('requestId'): a for a in audits}
     require(set(indexed) == set(ids), "authentication audit missing or duplicated")
     for row, (name, status, code, known, token) in zip(rows, CASES):
-        path = '/oauth2/token' if name.startswith('oauth') else resource_path if name == 'bearer-expired' else '/api/open/v1/whoami'
-        method = 'POST' if name.startswith('oauth') else 'GET'
-        audit_path = '/api/open/v1/resources/{resource}' if name == 'bearer-expired' else path
-        expected_body = {'error': code} if method == 'POST' else {'success': False, 'code': code, 'message': code}
+        method, path, audit_path = route_spec(name, resource_path, proof['recordPid'], proof['queryPath'])
+        expected_body = {'error': code} if name.startswith('oauth') else {'success': False, 'code': code, 'message': code}
         require(set(row) == {'id','status','body','requestId','callerIdReplaced','visibleAudits','method','path'} and row.get('method') == method and row.get('path') == path and row.get('id') == name and row.get('status') == status and row.get('body') == expected_body
-                and row.get('callerIdReplaced') is (method == 'POST'), "authentication response contract invalid")
+                and row.get('callerIdReplaced') is name.startswith('oauth'), "authentication response contract invalid")
         audit = indexed[row['requestId']]
         require(set(audit) == {'requestId','method','path','status','durationMs','occurredAt','applicationPid','installationPid','businessDetails','tokenPresent','tenantMatches','anonymous','secretFree'} and audit.get('method') == method and audit.get('path') == audit_path and audit.get('status') == status
                 and type(audit.get('durationMs')) is int and audit['durationMs'] >= 0
@@ -187,15 +231,23 @@ def verify(proof, application, installation, resource_path):
                     "authentication management view forged business authority")
     expired_request = next(row for row in rows if row['id'] == 'bearer-expired')
     verify_expiry(proof.get('tokenExpiry'), before['database'], expired_request['requestId'])
+    route_expiries = proof.get('routeExpiries')
+    require(isinstance(route_expiries, dict) and set(route_expiries) == {name for name, *_ in CASES if name.startswith('bearer-expired-')}, 'expired route proof missing')
+    for name, expiry in route_expiries.items():
+        verify_expiry(expiry, before['database'], next(row['requestId'] for row in rows if row['id'] == name))
     require(proof.get('normalStatus') == 200, "authentication normal recovery missing")
     return proof
 
 
-def run(request, human, report, credential, token, path, reader):
+def run(request, human, report, credential, token, path, reader, *, model, record_pid, query_path):
     require(reader is not None, "owned authentication audit reader is required")
     installation = report['installationPid']
+    _, _, current_headers = request(path + '/' + record_pid, headers={'Authorization': 'Bearer ' + token})
+    etag = next((v for k, v in current_headers.items() if k.lower() == 'etag'), None)
+    require(isinstance(etag, str) and etag, 'expiry fixture ETag missing')
     proof = {'applicationPid': report['applicationPid'], 'installationPid': installation,
-             'before': reader.read(installation, credential, token), 'requests': [], 'resourcePath': path}
+             'before': reader.read(installation, credential, token), 'requests': [], 'resourcePath': path, 'recordPid': record_pid, 'queryPath': query_path,
+             'routeExpiries': {}, 'businessBefore': reader.business_state(installation, model, path.rsplit('/', 1)[1])}
     for name, status, code, known, token_present in CASES:
         oauth = name.startswith('oauth')
         supplied = credential['clientSecret'] if oauth else 'release-auth-' + uuid.uuid4().hex
@@ -209,12 +261,18 @@ def run(request, human, report, credential, token, path, reader):
                 headers['Authorization'] = 'Basic !invalid!'; form = {'grant_type': 'client_credentials'}
             if name == 'oauth-scope': form['scope'] = 'ungranted.' + uuid.uuid4().hex
         elif name == 'bearer-unknown': headers['Authorization'] = 'Bearer unknown-' + uuid.uuid4().hex
-        elif name in ['bearer-scope', 'bearer-expired']: headers['Authorization'] = 'Bearer ' + token
-        request_path = '/oauth2/token' if oauth else path if name == 'bearer-expired' else '/api/open/v1/whoami'
-        clock = reader.token_clock(installation, token) if name == 'bearer-expired' else None
+        elif name == 'bearer-scope' or name.startswith('bearer-expired'): headers['Authorization'] = 'Bearer ' + token
+        method, request_path, _ = route_spec(name, path, record_pid, query_path)
+        body = None
+        if name in ['bearer-expired-create', 'bearer-expired-update', 'bearer-expired-delete']:
+            headers['Idempotency-Key'] = 'expiry-' + uuid.uuid4().hex
+            if name != 'bearer-expired-create': headers['If-Match'] = etag
+            if name != 'bearer-expired-delete': body = {'name': 'Expired write', 'zone': 'A'}
+        if name == 'bearer-expired-query': body = {'parameters': {'zone': 'A'}, 'limit': 10}
+        clock = reader.token_clock(installation, token) if name.startswith('bearer-expired') else None
         try:
             response_status, body, response_headers = request(request_path,
-                    method='POST' if oauth else 'GET', form=form, headers=headers, expected=(status,))
+                    method=method, body=body, form=form, headers=headers, expected=(status,))
         finally:
             if clock is not None:
                 restored_clock = reader.token_clock(installation, token, clock)
@@ -222,13 +280,16 @@ def run(request, human, report, credential, token, path, reader):
         require(isinstance(identifier, str) and credential['clientSecret'] not in identifier and token not in identifier
                 and (not oauth or identifier != supplied), "authentication response request ID missing or contains credentials")
         if clock is not None:
-            proof['tokenExpiry'] = {'expired': clock, 'restored': restored_clock, 'requestId': identifier}
+            expiry = {'expired': clock, 'restored': restored_clock, 'requestId': identifier}
+            if name == 'bearer-expired': proof['tokenExpiry'] = expiry
+            else: proof['routeExpiries'][name] = expiry
         visible = human(f'/api/open-platform/installations/{installation}/audits?requestId={identifier}')
         proof['requests'].append({'id': name, 'status': response_status, 'body': body, 'requestId': identifier,
                                  'callerIdReplaced': identifier != supplied, 'visibleAudits': visible,
-                                 'method': 'POST' if oauth else 'GET', 'path': request_path})
+                                 'method': method, 'path': request_path})
     ids = [r['requestId'] for r in proof['requests']]
     proof['afterDenied'] = reader.read(installation, credential, token, ids)
+    proof['businessAfterDenied'] = reader.business_state(installation, model, path.rsplit('/', 1)[1])
     proof['normalStatus'], _, _ = request(path, headers={'Authorization': 'Bearer ' + token})
     proof['afterAllowed'] = reader.read(installation, credential, token)
     return verify(proof, report['applicationPid'], installation, path)
