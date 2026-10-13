@@ -23,7 +23,9 @@ import java.util.Set;
  *
  * <p>Re-publishing in a child propagates the event back UP to the host
  * (Spring parent chain), which would loop. Each forwarded event instance is
- * tracked so the host-side listener ignores its own re-publications.
+ * tracked for the whole synchronous forwarding round so the host-side
+ * listener ignores every child re-publication. Independent publisher threads
+ * retain independent rounds, even if they publish the same event instance.
  *
  * <p>Forwarding happens synchronously at publish time — inside the host
  * transaction when one is active — so child-side
@@ -35,8 +37,8 @@ import java.util.Set;
 public class ApplicationModuleEventForwarder implements ApplicationListener<CommandCompletedEvent> {
 
     private final ApplicationModuleRegistry moduleRegistry;
-    private final Set<CommandCompletedEvent> forwarded =
-            Collections.synchronizedSet(Collections.newSetFromMap(new IdentityHashMap<>()));
+    private final ThreadLocal<Set<CommandCompletedEvent>> forwarded =
+            ThreadLocal.withInitial(() -> Collections.newSetFromMap(new IdentityHashMap<>()));
 
     public ApplicationModuleEventForwarder(ApplicationModuleRegistry moduleRegistry) {
         this.moduleRegistry = moduleRegistry;
@@ -44,12 +46,19 @@ public class ApplicationModuleEventForwarder implements ApplicationListener<Comm
 
     @Override
     public void onApplicationEvent(CommandCompletedEvent event) {
-        if (forwarded.remove(event)) {
-            return; // our own child re-publication bubbled back up — stop the cycle
+        Set<CommandCompletedEvent> currentRound = forwarded.get();
+        if (!currentRound.add(event)) {
+            return; // this round's child re-publication bubbled back up
         }
-        forwarded.add(event);
-        for (ApplicationContext child : moduleRegistry.childContexts()) {
-            child.publishEvent(event);
+        try {
+            for (ApplicationContext child : moduleRegistry.childContexts()) {
+                child.publishEvent(event);
+            }
+        } finally {
+            currentRound.remove(event);
+            if (currentRound.isEmpty()) {
+                forwarded.remove();
+            }
         }
     }
 }
