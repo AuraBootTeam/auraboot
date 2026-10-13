@@ -1,4 +1,6 @@
 import copy
+import json
+from unittest.mock import patch
 import tempfile
 import unittest
 from pathlib import Path
@@ -45,6 +47,17 @@ class BackendCatalogTest(unittest.TestCase):
         self.assertIn('com.auraboot.framework.meta.service.impl.AggregateQueryFilterTreeTest', names)
         self.assertIn('com.auraboot.framework.meta.service.impl.AggregateQueryServiceImplDataScopeTest', names)
         self.assertIn('com.auraboot.framework.integration.agent.NamedQueryShadowInvokerIntegrationTest', names)
+        for name in ['com.auraboot.framework.plugin.service.PluginDirectoryLoaderTest',
+                     'com.auraboot.framework.plugin.service.impl.PluginZipResourceReaderTest',
+                     'com.auraboot.framework.plugin.service.PluginImportTwoPhaseReferenceIntegrationTest']:
+            self.assertIn(name, names)
+            profile_file = self.root / 'scripts/ci/open-platform-backend.profile.json'
+            broken = json.loads(profile_file.read_text()); broken['classes'].remove(name)
+            original_read = Path.read_text
+            def read(path, *args, **kwargs):
+                return json.dumps(broken) if path == profile_file else original_read(path, *args, **kwargs)
+            with patch.object(Path, 'read_text', read), self.assertRaisesRegex(ValueError, 'Public plugin declaration'):
+                plan(self.root)
         coverage_names = {row['class'] for row in self.expected['coverage']['sources']}
         all_open_sources = {'com.auraboot.framework.openplatform.' + folder + '.' + file.stem
                             for folder in ['service', 'security']
@@ -134,6 +147,11 @@ class BackendCatalogTest(unittest.TestCase):
         source = '''@ParameterizedTest @ValueSource(strings = {"en-US", "tr-TR"})
                     void locales(String localeTag) {} @Test void simple() {}'''
         self.assertEqual(['[1] localeTag=en-US', '[2] localeTag=tr-TR', 'simple()'], cases(source))
+        booleans = '@ParameterizedTest(name = "source {0}") @ValueSource(booleans={false, true}) void sources(boolean source) {}'
+        self.assertEqual(['source false', 'source true'], cases(booleans))
+        for invalid in [booleans.replace('false, true', 'false, 1'), booleans.replace('boolean source', 'String source'),
+                        booleans.replace('false, true', '"false", "true"')]:
+            with self.assertRaises(ValueError): cases(invalid)
 
     def test_unsupported_or_disabled_declarations_fail_closed(self):
         for source in ['@Disabled @Test void test() {}', '@TestFactory void tests() {}',

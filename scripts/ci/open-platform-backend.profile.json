@@ -43,7 +43,10 @@
     "com.auraboot.framework.meta.service.impl.SemanticAggregateAdapterTest",
     "com.auraboot.framework.meta.cache.AggregateQueryCacheInterceptorTest",
     "com.auraboot.framework.webhook.service.WebhookSignatureTest",
-    "com.auraboot.framework.webhook.service.WebhookRequestTraceTest"
+    "com.auraboot.framework.webhook.service.WebhookRequestTraceTest",
+    "com.auraboot.framework.plugin.service.PluginDirectoryLoaderTest",
+    "com.auraboot.framework.plugin.service.impl.PluginZipResourceReaderTest",
+    "com.auraboot.framework.plugin.service.PluginImportTwoPhaseReferenceIntegrationTest"
   ],
   "coverage": {
     "minimumLinePercent": 80,

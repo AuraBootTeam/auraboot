@@ -33,7 +33,7 @@ class PluginDirectoryLoaderTest {
         }
     }
 
-    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.ParameterizedTest(name = "public contracts via source={0}")
     @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
     void publicContractsLoadThroughDirectoryAndPluginSource(boolean source) throws IOException {
         Files.createDirectories(tempDir.resolve("config"));
@@ -61,7 +61,7 @@ class PluginDirectoryLoaderTest {
         assertThat(manifest.getValidationErrors()).contains("publicResources: unique non-null contracts required");
     }
 
-    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.ParameterizedTest(name = "invalid contracts via source={0}")
     @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
     void malformedOrMissingPublicContractsCannotBeDropped(boolean source) throws IOException {
         Files.createDirectories(tempDir.resolve("config"));

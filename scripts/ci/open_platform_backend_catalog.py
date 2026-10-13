@@ -41,25 +41,30 @@ def cases(source):
             require(len(labels) <= 1, "Duplicate display names")
             result.append(json.loads(labels[0]) if labels else name + "()")
         else:
-            # Only existing string ValueSource formats are admitted. New generators
+            # Only explicit string/boolean ValueSource formats are admitted. New generators
             # must get an explicit expansion rather than silently passing by count.
             values = re.fullmatch(r'\s*(?:\(name\s*=\s*"((?:\\.|[^"\\])*)"\)\s*)?'
-                                  r'@(?:[\w]+\.)*ValueSource\(strings\s*=\s*\{(.*?)\}\)\s*', header, re.S)
+                                  r'@(?:[\w]+\.)*ValueSource\((strings|booleans)\s*=\s*\{(.*?)\}\)\s*', header, re.S)
             require(values is not None, "Unsupported parameterized source/display name")
-            display, arguments = values.groups()
-            strings = re.findall(r'"((?:\\.|[^"\\])*)"', arguments)
-            require(strings and re.fullmatch(r'\s*String\s+\w+\s*'
+            display, kind, arguments = values.groups()
+            if kind == 'strings':
+                strings = re.findall(r'"((?:\\.|[^"\\])*)"', arguments)
+                parameter_type = 'String'
+                require(re.sub(r'"(?:\\.|[^"\\])*"|[\s,]', '', arguments) == '', "Invalid ValueSource")
+            else:
+                strings = [value.strip() for value in arguments.split(',')]
+                parameter_type = 'boolean'
+                require(strings and all(value in ['false', 'true'] for value in strings), "Invalid boolean ValueSource")
+            require(strings and re.fullmatch(r'\s*' + parameter_type + r'\s+\w+\s*'
                                             r'(?:,\s*@(?:[\w]+\.)*TempDir\s+(?:java\.nio\.file\.)?Path\s+\w+\s*)?', parameters),
                     "Unsupported parameterized arguments")
-            require(re.sub(r'"(?:\\.|[^"\\])*"|[\s,]', '', arguments) == '',
-                    "Invalid ValueSource")
             parameter = parameters.split(',')[0].strip().split()[-1]
             if display is not None:
                 display = json.loads(chr(34) + display + chr(34))
                 require(display.count('{0}') == 1 and not re.search(r'[{}]', display.replace('{0}', '')),
                         "Unsupported parameterized display placeholders")
             for i, value in enumerate(strings, 1):
-                value = json.loads(chr(34) + value + chr(34))
+                if kind == 'strings': value = json.loads(chr(34) + value + chr(34))
                 result.append(display.replace('{0}', value) if display is not None
                               else f"[{i}] {parameter}={value}")
     require(result and len(result) == len(set(result)), "Empty or duplicate declared cases")
@@ -151,6 +156,12 @@ def plan(root):
             "Invalid backend profile")
     test_root = root / "platform/src/test/java"
     classes = list(profile['classes'])
+    required_import_classes = {
+        'com.auraboot.framework.plugin.service.PluginDirectoryLoaderTest',
+        'com.auraboot.framework.plugin.service.impl.PluginZipResourceReaderTest',
+        'com.auraboot.framework.plugin.service.PluginImportTwoPhaseReferenceIntegrationTest',
+    }
+    require(required_import_classes.issubset(classes), "Public plugin declaration regression classes missing")
     for package in profile['packages']:
         directory = test_root / package.replace('.', '/')
         require(directory.is_dir(), "Missing blocking package")
