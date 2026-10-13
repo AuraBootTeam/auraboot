@@ -41,6 +41,7 @@ import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
@@ -88,15 +89,18 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /** Real host source authority over officially imported, synthetic DSL data. No human policy or external delivery. */
 @SpringBootTest(classes = TestApplication.class, properties = {
         "spring.datasource.url=${TEST_DATABASE_URL}", "spring.data.redis.database=${TEST_REDIS_DATABASE}",
+        "s06.native.source-binding.fixture=true",
         "security.field-encryption.key=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="})
 @ActiveProfiles("integration-test")
 @Import(RegisteredSourceBindingPostgresIT.PollerIsolation.class)
 @EnabledIfEnvironmentVariable(named = "S06_NATIVE_SOURCE_BINDING", matches = "true")
 class RegisteredSourceBindingPostgresIT {
     @TestConfiguration(proxyBeanMethods = false)
+    @ConditionalOnProperty(
+            name = "s06.native.source-binding.fixture", havingValue = "true")
     static class PollerIsolation {
         @Bean
-        static BeanFactoryPostProcessor preventTestAppAutomaticPollers() {
+        static BeanFactoryPostProcessor preventRegisteredSourceFixtureAutomaticPollers() {
             return factory -> {
                 if (!(factory instanceof BeanDefinitionRegistry registry)) {
                     throw new IllegalStateException("Native source fixture cannot isolate scheduling");
