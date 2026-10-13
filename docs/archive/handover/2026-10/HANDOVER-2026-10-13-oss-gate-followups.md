@@ -40,6 +40,26 @@
 
 ## 3. 剩余任务(按优先级)
 
+> **📋 2026-10-13 晚间收口:§3 全部处置完毕**(详细证据在各 PR):
+>
+> - **3.1 → 仓内交付完成,余 owner 准入**:aura-bpm#46 落地
+>   `scripts/build-plugin-against-platform.sh`(钉定输入→artifact-mode 构建→
+>   三产物 SHA256 溯源,产物名内嵌平台 SHA=bpm-plugin-1.0.0+platform.<sha>.jar)
+>   + `docs/plugin-jar-ci-admission.md`(job 定义/保证/三项准入决策)。已本地
+>   端到端验证(平台 6c8b7779f 输入)。剩余=Jenkins 侧准入(外部)。
+> - **3.2 → 已根治**:#2260(事务毒化真根因)+ #2261(exists 探针 DB 口径)+
+>   #2262(reset 态势自洽:BPM 迁移 Step 3.5 + BE stub env + SYSTEM_MODE 透传)
+>   + #2264(seed 只读提示文案漂移)。fresh reset 10/10,调度器静默。
+> - **3.3 → 已完成**:#2266(探针 60s 预算)+ 专用多租户栈
+>   `auraboot_oss_mt`(6458/5258/6258,`SYSTEM_MODE=multi` 一键重建),i18n
+>   全 spec 串行 6/6 绿,租户隔离旅程首次真跑(非 posture-skip)。
+> - **3.4 → 维持不追零**:晚间全量 858/34(59.9m,机器高载,基线 ~31m),
+>   逐例分类=唯一确定性项即上列 seed 漂移(已修),其余全部命中在册轮转家族
+>   且串行抽样复绿(PD-009/role-default-scope 等)。
+> - **3.5 → 维持外部项**:真实 LLM 凭证未到位。
+> - 原 §3.2 UPDATE 的跟进①②④随 #2262/#2261/#46 全部落地;跟进③(governance
+>   逐字段 rebuild ~千次/导入)仍为性能优化待办。
+
 ### 3.1 bpm-plugin jar CI 化(需 CI 准入,构建基建)
 
 - 现状:jar 为本地 artifact-mode 构建:
@@ -98,6 +118,18 @@
 
 - stub 已覆盖 gate 面;真实凭证到位后在 provider profile 注入,再评估
   生成级用例是否入 gate(属增强,非欠账)。
+
+> **✅ 2026-10-13 深夜终态增补(goal 收口)**:
+> - 跟进②的残余(幻影缓存条目本身)由 #2271 闭合(import 回滚时驱逐模型定义缓存);
+>   跟进③由 #2270 闭合(publish governance 每模型一次懒重建,冷库导入 ~10³→≤1);
+> - 昨晚 gate 期间两度 fail-fast 的孤儿菜单 `e2e.ios-handover.*.member-models`
+>   真根因=#2269:清理代码自带双缺陷(try 作用域 ReferenceError + 雪花 id 被
+>   JSON.parse 舍入后 DELETE 打空),自落地起从未删成过;现已按 fixture pid 锚定
+>   无损提取字符串 id,跑后清零实证;
+> - BPM jar 已按 aura-bpm#46 构建链从 main(ada4526)重建并 re-stage
+>   (`bpm-plugin-1.0.0+platform.c01c7df1f.jar`,溯源 SHA256 落 dist/),缺表容忍
+>   随之生效;终验 fresh reset:Step 3.5 三迁移 + 10/10 导入 + 三闸全绿 +
+>   调度器/usage 零错误 + 零孤儿 + spot(i18n/capability/deep-ops)21 过 1 正确 skip。
 
 ## 4. 验证入口
 

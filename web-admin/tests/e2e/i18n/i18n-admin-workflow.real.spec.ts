@@ -148,6 +148,10 @@ test.describe('i18n admin real workflow', () => {
     const postureProbe = await admin.page.request.post('/api/tenant-selection/process', {
       data: { action: 'create', tenantName: `${prefix}posture-probe`.replaceAll('.', '-'), displayName: 'Posture probe' },
       failOnStatusCode: false,
+      // Tenant provisioning takes ~10 s per create (member/role/permission
+      // seeding) — the request default of 5 s reads as a timeout before the
+      // posture answer arrives. Same budget as the real creates below.
+      timeout: 60_000,
     });
     test.skip(postureProbe.status() === 403, 'requires the multi-tenant posture (tenant self-provisioning enabled)');
     expect(postureProbe.status(), `unexpected tenant create failure: ${postureProbe.status()}`).toBeLessThan(400);
@@ -264,6 +268,22 @@ test.describe('i18n admin real workflow', () => {
     const suffix = `${Date.now()}-${info.workerIndex}`;
     const user = makeRoleUser(`ios-i18n-member-${suffix}`, ['tenant_member']);
     let member: Awaited<ReturnType<typeof openAsRole>> | undefined;
+    // Declared out here on purpose: the finally below cleans the provisioned
+    // menu up, and a try-scoped binding would throw a ReferenceError there —
+    // swallowed by the cleanup catch — so the menu row survived every run and
+    // tripped OrphanMenuCheckRunner at the next backend restart.
+    const memberMenuPid = `m${Date.now()}${info.workerIndex}membermenu`.padEnd(26, '0').slice(0, 26);
+    // Snowflake ids exceed Number.MAX_SAFE_INTEGER, so every JSON.parse rounds
+    // them and a delete by the parsed number hits no row (HTTP 200, data:false,
+    // silently). The row id is therefore kept as the exact digit string lifted
+    // from the raw payload, anchored on the fixture pid that serialization
+    // echoes verbatim.
+    let memberMenuRowId: string | null = null;
+    const rowIdByPid = async (response: { text(): Promise<string> }): Promise<string | null> => {
+      const match = (await response.text().catch(() => '')).match(
+          new RegExp('"id":(\\d+),"tenantId":[^,}]*,"pid":"' + memberMenuPid + '"'));
+      return match ? match[1] : null;
+    };
     try {
       await ensureRoleUser(admin.page, user);
       // A fresh runtime seeds no menu for the member's L1 read codes, which renders no
@@ -274,8 +294,7 @@ test.describe('i18n admin real workflow', () => {
       const memberMenuPath = '/meta/models';
       // ab_menu.pid is NOT NULL UNIQUE with no generator on the create path, so the
       // fixture supplies its own 26-character identifier; the create envelope echoes it.
-      const memberMenuPid = `m${Date.now()}${info.workerIndex}membermenu`.padEnd(26, '0').slice(0, 26);
-      const memberMenu = await accepted<{ pid: string; id?: number }>(await admin.page.request.post('/api/menu/create', { data: {
+      const memberMenuPost = await admin.page.request.post('/api/menu/create', { data: {
         pid: memberMenuPid,
         code: `e2e.ios-handover.${suffix}.member-models`,
         name: 'Member Baseline Models',
@@ -284,9 +303,10 @@ test.describe('i18n admin real workflow', () => {
         permissionCode: 'meta.model.read',
         visible: true,
         orderNo: 900,
-      } }));
+      } });
+      const memberMenu = await accepted<{ pid: string }>(memberMenuPost);
       expect(memberMenu.pid).toBeTruthy();
-      const memberMenuRowId = memberMenu.id ?? null;
+      memberMenuRowId = await rowIdByPid(memberMenuPost);
       const resource = await accepted<Resource>(await admin.page.request.post('/api/admin/i18n/resources', { data: {
         key: `e2e.ios-handover.${suffix}.permission`, lang: 'zh-CN', value: 'Permission fixture',
       } }));
@@ -356,27 +376,19 @@ test.describe('i18n admin real workflow', () => {
       try {
         let menuRowId = memberMenuRowId;
         if (menuRowId == null) {
-          // Fall back to resolving the numeric id from the flat menu listing.
+          // Fall back to the flat menu listing, again on raw text: the listing
+          // embeds the row among plugin-owned ones, and parsing would round the id.
           const allMenus = await admin.page.request.get('/api/menu/all');
           if (allMenus.ok()) {
-            const body = await allMenus.json().catch(() => ({}));
-            const roots = Array.isArray(body?.data) ? body.data : [];
-            const walk = (nodes: Array<Record<string, unknown>>): void => {
-              for (const node of nodes ?? []) {
-                if (String(node.code ?? '') === `e2e.ios-handover.${suffix}.member-models`
-                    && node.id != null) {
-                  menuRowId = Number(node.id);
-                }
-                walk((node.children ?? []) as Array<Record<string, unknown>>);
-              }
-            };
-            walk(roots);
+            memberMenuRowId = await rowIdByPid(allMenus);
           }
         }
         if (menuRowId != null) {
           const deleted = await admin.page.request.delete(`/api/menu/${menuRowId}`);
           if (!deleted.ok()) {
             console.warn(`[i18n-admin] member menu cleanup failed: HTTP ${deleted.status()}`);
+          } else {
+            memberMenuRowId = null;
           }
         }
       } catch (cleanupError) {

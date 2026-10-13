@@ -46,6 +46,7 @@ public class PluginManagerServiceImpl implements PluginManagerService {
     private final ExtensionRegistry extensionRegistry;
     private final BackgroundComponentRegistry backgroundComponentRegistry;
     private final ApplicationModuleRegistry applicationModuleRegistry;
+    private final PluginResourceImporter pluginResourceImporter;
     private final com.auraboot.framework.audit.service.AdminEventLogService adminEventLogService;
 
     /**
@@ -313,6 +314,15 @@ public class PluginManagerServiceImpl implements PluginManagerService {
 
             // Soft delete the record
             pluginRecordMapper.softDelete(record.getPid());
+
+            // The uninstall contract includes the plugin's imported surface: sidebar
+            // entries pointing at pages that no longer resolve must not survive the
+            // plugin. Failure here fails the uninstall (transactional) — never silently.
+            int deactivatedMenus = pluginResourceImporter.deactivateAllPluginMenus(record.getPid(), tenantId);
+            if (deactivatedMenus > 0) {
+                log.info("Deactivated {} menu row(s) owned by uninstalled plugin {}",
+                        deactivatedMenus, pluginId);
+            }
 
             // Unregister plugin instance
             pluginInstances.remove(pluginId);

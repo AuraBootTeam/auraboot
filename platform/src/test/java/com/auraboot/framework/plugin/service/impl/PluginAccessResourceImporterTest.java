@@ -132,4 +132,30 @@ class PluginAccessResourceImporterTest {
         verify(masks).saveConfig(argThat(c -> c.getModelCode().equals("invoice") && c.getFieldCode().equals("amount") && c.getReplacementChar().equals("#") && !c.getApplyToExport() && c.getExemptRoles().equals("finance_admin") && c.getExemptPermissionCodes().equals("invoice.unmask")));
         verify(capabilities).saveDefinition(capability);
     }
+
+    @Test void importMenusPrunesStaleCodesNoLongerDeclared() {
+        var m=new PluginManifestExtended();
+        m.setMenus(List.of(MenuDefinitionDTO.builder().code("kept").build()));
+        when(resources.importMenu(any(),eq("p"),eq("i"),eq(42L),any()))
+                .thenReturn(trackedResource("CREATE",301L,"kept"));
+        when(resources.pruneStaleMenus(eq("p"),eq("i"),eq(42L),any())).thenReturn(2);
+        var result=new ImportExecuteResult();
+        importer.importMenus(m,new ImportRequest(),result,"p","i",42L);
+        verify(resources).pruneStaleMenus("p","i",42L,List.of("kept"));
+        assertThat(result.getResourceCounts()).containsEntry("MENU",Map.of("CREATE",1,"DELETE",2));
+    }
+    @Test void importMenusWithoutMenuDeclarationNeverPrunes() {
+        importer.importMenus(new PluginManifestExtended(), new ImportRequest(), new ImportExecuteResult(), "p", "i", 42L);
+        verify(resources, never()).pruneStaleMenus(any(), any(), any(), any());
+    }
+    @Test void importMenusWithZeroPruneDoesNotCountDeletes() {
+        var m=new PluginManifestExtended();
+        m.setMenus(List.of(MenuDefinitionDTO.builder().code("kept").build()));
+        when(resources.importMenu(any(),eq("p"),eq("i"),eq(42L),any()))
+                .thenReturn(trackedResource("UPDATE",301L,"kept"));
+        when(resources.pruneStaleMenus(eq("p"),eq("i"),eq(42L),any())).thenReturn(0);
+        var result=new ImportExecuteResult();
+        importer.importMenus(m,new ImportRequest(),result,"p","i",42L);
+        assertThat(result.getResourceCounts()).containsEntry("MENU",Map.of("UPDATE",1));
+    }
 }

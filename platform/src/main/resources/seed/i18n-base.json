@@ -6078,7 +6078,7 @@
   },
   {
     "key": "admin.permission.editor.readOnlyHint",
-    "zh-CN": "当前为角色只读访问，修改需具备对应管理权限。",
+    "zh-CN": "当前仅可查看角色；修改需具备对应的管理权限。",
     "en-US": "Read-only role access. Changes require the corresponding administration permission."
   },
   {
