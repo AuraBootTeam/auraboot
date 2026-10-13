@@ -5,7 +5,9 @@ import com.auraboot.framework.notification.service.NotificationDeliveryPlanResol
 import com.auraboot.framework.notification.service.NotificationDeliveryPlanResolver.Plan;
 import com.auraboot.framework.plugin.extension.NotificationDeliveryAccessor;
 import com.auraboot.framework.plugin.extension.integration.*;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import com.auraboot.framework.notification.wechat.WechatSubscriptionDeliveryJournal;
+import com.auraboot.framework.notification.wechat.WechatSubscriptionMessageSender;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -16,12 +18,19 @@ import java.util.*;
 
 /** Default-off host bridge. Only host-resolved in-app plans can enter the reliable delivery plane. */
 @Service
-@RequiredArgsConstructor
 public class PluginNotificationDeliveryAccessorImpl implements NotificationDeliveryAccessor, ReliableEventConsumerExtension {
     public static final String EVENT_TYPE = "notification.in-app.delivery-requested.v1";
     private final List<NotificationDeliveryPlanResolver> resolvers;
     private final ReliableIntegrationAccessor reliable;
     private final StrictInAppDeliveryWriter writer;
+    private final WechatSubscriptionDeliveryJournal wechat;
+    public PluginNotificationDeliveryAccessorImpl(List<NotificationDeliveryPlanResolver> resolvers,ReliableIntegrationAccessor reliable,
+            StrictInAppDeliveryWriter writer) {this(resolvers,reliable,writer,null);}
+    @Autowired
+    public PluginNotificationDeliveryAccessorImpl(List<NotificationDeliveryPlanResolver> resolvers,ReliableIntegrationAccessor reliable,
+            StrictInAppDeliveryWriter writer,WechatSubscriptionDeliveryJournal wechat) {
+        this.resolvers=resolvers;this.reliable=reliable;this.writer=writer;this.wechat=wechat;
+    }
     @Value("${aura.notification.plugin-delivery.enabled:false}") private boolean enabled;
 
     @Override public Result enqueue(Request request) {
@@ -30,8 +39,12 @@ public class PluginNotificationDeliveryAccessorImpl implements NotificationDeliv
             return Result.blocked(Reason.INVALID_REQUEST);
         if (!Objects.equals(MetaContext.getCurrentTenantId(), request.tenantId()))
             return Result.blocked(Reason.TENANT_MISMATCH);
-        if (request.channel() == Channel.WECHAT_SUBSCRIPTION)
-            return Result.blocked(Reason.WECHAT_NOT_CONFIGURED);
+        if (request.channel() == Channel.WECHAT_SUBSCRIPTION) {
+            if(wechat==null)return Result.blocked(Reason.WECHAT_NOT_CONFIGURED);
+            var result=wechat.enqueue(new WechatSubscriptionMessageSender.Request(request.tenantId(),request.resolutionReference()));
+            if(result.status()==WechatSubscriptionDeliveryJournal.Status.BLOCKED)return Result.blocked(Reason.WECHAT_NOT_CONFIGURED);
+            return new Result(result.status()==WechatSubscriptionDeliveryJournal.Status.QUEUED?Status.QUEUED:Status.REPLAYED,null,result.deliveryKey());
+        }
         Optional<Plan> resolved = resolve(request.tenantId(), request.resolutionReference());
         if (resolved.isEmpty()) return Result.blocked(Reason.RESOLUTION_UNAVAILABLE);
         Plan plan = resolved.get();
