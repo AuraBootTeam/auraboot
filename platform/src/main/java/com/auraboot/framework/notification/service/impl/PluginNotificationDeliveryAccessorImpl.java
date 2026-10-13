@@ -18,7 +18,7 @@ import java.util.*;
 
 /** Default-off host bridge. Only host-resolved in-app plans can enter the reliable delivery plane. */
 @Service
-public class PluginNotificationDeliveryAccessorImpl implements NotificationDeliveryAccessor, ReliableEventConsumerExtension {
+public class PluginNotificationDeliveryAccessorImpl implements NotificationDeliveryAccessor, ReliableEventConsumerExtension, com.auraboot.framework.integration.HostSerializableEventConsumer {
     public static final String EVENT_TYPE = "notification.in-app.delivery-requested.v1";
     private final List<NotificationDeliveryPlanResolver> resolvers;
     private final ReliableIntegrationAccessor reliable;

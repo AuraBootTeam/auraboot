@@ -16,6 +16,7 @@ public class ReliableEventDeliveryExecutor {
     private final OutboxEventMapper outboxEventMapper;
     private final ReliableIntegrationMetrics metrics;
     private final TransactionTemplate transaction;
+    private final TransactionTemplate serializableTransaction;
 
     public ReliableEventDeliveryExecutor(OutboxEventMapper outboxEventMapper,
                                          ReliableIntegrationMetrics metrics,
@@ -24,12 +25,17 @@ public class ReliableEventDeliveryExecutor {
         this.metrics = metrics;
         this.transaction = new TransactionTemplate(transactionManager);
         this.transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        this.serializableTransaction = new TransactionTemplate(transactionManager);
+        this.serializableTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        this.serializableTransaction.setIsolationLevel(TransactionDefinition.ISOLATION_SERIALIZABLE);
     }
 
     public void deliver(IntegrationEventEnvelope envelope,
                         ReliableEventConsumerExtension consumer,
                         String leaseToken) {
-        transaction.executeWithoutResult(status -> {
+        boolean hostSerializable = consumer instanceof HostSerializableEventConsumer
+                && consumer.getClass().getClassLoader() == getClass().getClassLoader();
+        (hostSerializable ? serializableTransaction : transaction).executeWithoutResult(status -> {
             int claimed = outboxEventMapper.claimReceipt(
                     envelope.tenantId(), envelope.eventId(), consumer.consumerCode(), leaseToken);
             if (claimed == 0) {
