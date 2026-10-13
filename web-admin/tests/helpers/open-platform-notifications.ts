@@ -59,6 +59,7 @@ export async function verifyModelNotifications({ page, card, installationPid, re
     await expect(editor.getByRole('alert')).toHaveCount(0); await image('publication-subscribe-empty');
     const loadingText = locale.startsWith('zh') ? '正在读取事件合同与订阅…' : 'Loading event contracts and subscriptions…';
     const failedText = locale.startsWith('zh') ? '通知配置请求失败，请检查合同、授权及接收地址后重试。' : 'Notification request failed. Check the contract, authority and receiver address before retrying.';
+    const invalidText = locale.startsWith('zh') ? '通知配置未通过校验，请检查订阅名称、事件版本和接收配置后重试。' : 'Notification validation failed. Check the subscription name, event version and receiver settings before retrying.';
     const deniedText = locale.startsWith('zh') ? '需要当前租户的开放平台管理与 Webhook 管理权限。' : 'Open Platform and Webhook administrator permissions in this tenant are required.';
     const cdp = await page.context().newCDPSession(page);
     try {
@@ -96,17 +97,44 @@ export async function verifyModelNotifications({ page, card, installationPid, re
     await recover('publication-notification-permission-restored');
     const name = `ERP model notifications ${runId}`; const eventType = `open.resource.${resourceCode}.created`;
     await editor.getByLabel(text('订阅名称'), { exact: true }).fill(name);
-    await editor.getByLabel(text('模型事件'), { exact: true }).selectOption(eventType);
+    await editor.getByLabel(text('订阅名称'), { exact: true }).press('Tab');
+    const eventSelect = editor.getByLabel(text('模型事件'), { exact: true }); await expect(eventSelect).toBeFocused();
+    await eventSelect.pressSequentially(resourceCode); await expect(eventSelect).toHaveValue(eventType);
+    await eventSelect.press('Tab'); await expect(editor.getByLabel(text('事件版本'), { exact: true })).toBeFocused();
     await expect(editor.getByLabel(text('事件版本'), { exact: true })).toHaveValue('1');
     await editor.getByLabel(text('接收地址'), { exact: true }).fill(accepting.url);
     await editor.getByLabel(text('最大尝试次数'), { exact: true }).fill('1');
-    await editor.getByRole('button', { name: text('保存通知订阅'), exact: true }).click();
+    const tabOrder = ['事件版本', '接收地址', '签名密钥', '最大尝试次数'];
+    await editor.getByLabel(text('事件版本'), { exact: true }).focus();
+    for (let index = 0; index < tabOrder.length - 1; index++) { await editor.getByLabel(text(tabOrder[index]), { exact: true }).press('Tab'); await expect(editor.getByLabel(text(tabOrder[index + 1]), { exact: true })).toBeFocused(); }
+    await editor.getByLabel(text('最大尝试次数'), { exact: true }).press('Tab');
+    const timeout = editor.getByLabel(locale.startsWith('zh') ? '接收超时（毫秒）' : 'Receiver timeout (ms)', { exact: true }); await expect(timeout).toBeFocused();
+    await timeout.press('Tab'); const saveButton = editor.getByRole('button', { name: text('保存通知订阅'), exact: true }); await expect(saveButton).toBeFocused();
+    await image('publication-notification-keyboard-contract', editor.getByTestId('notification-contract-fields'));
+    await saveButton.press('Enter'); await expect(editor.getByLabel(text('签名密钥'), { exact: true })).toBeFocused();
     expect(await editor.getByLabel(text('签名密钥'), { exact: true }).evaluate((element: HTMLInputElement) => element.validity.valueMissing)).toBe(true);
     expect((await human('/api/webhooks')).filter((row: { name: string }) => row.name === name)).toEqual([]);
     await image('publication-subscribe-validation', editor.getByTestId('notification-receiver-fields'));
     await editor.getByLabel(text('签名密钥'), { exact: true }).fill(secret);
+    const urlField = editor.getByLabel(text('接收地址'), { exact: true }); const attempts = editor.getByLabel(text('最大尝试次数'), { exact: true });
+    await urlField.fill('not a URL'); await saveButton.press('Enter');
+    expect(await urlField.evaluate((input: HTMLInputElement) => input.validity.typeMismatch)).toBe(true); await expect(urlField).toBeFocused();
+    expect((await human('/api/webhooks')).filter((item: { installationPid: string }) => item.installationPid === installationPid)).toEqual([]);
+    await image('publication-notification-native-url', editor.getByTestId('notification-receiver-fields')); await urlField.fill(accepting.url);
+    await attempts.fill('0'); await saveButton.press('Enter'); expect(await attempts.evaluate((input: HTMLInputElement) => input.validity.rangeUnderflow)).toBe(true);
+    await attempts.fill('1'); await timeout.fill('999'); await saveButton.press('Enter'); expect(await timeout.evaluate((input: HTMLInputElement) => input.validity.rangeUnderflow)).toBe(true);
+    expect((await human('/api/webhooks')).filter((item: { installationPid: string }) => item.installationPid === installationPid)).toEqual([]);
+    await image('publication-notification-native-range', editor.getByTestId('notification-receiver-fields')); await timeout.fill('10000');
+    await editor.getByLabel(text('订阅名称'), { exact: true }).fill(' ');
+    const rejectedResponse = page.waitForResponse(response => response.url().endsWith('/api/webhooks') && response.request().method() === 'POST');
+    await saveButton.press('Enter'); expect((await rejectedResponse).status()).toBe(400); await expect(editor.getByRole('alert')).toHaveText(invalidText);
+    await expect(editor.getByLabel(text('订阅名称'), { exact: true })).toHaveValue(' '); await expect(urlField).toHaveValue(accepting.url);
+    expect(await editor.getByLabel(text('签名密钥'), { exact: true }).evaluate((input: HTMLInputElement, expected) => input.value === expected, secret)).toBe(true);
+    expect((await human('/api/webhooks')).filter((item: { installationPid: string }) => item.installationPid === installationPid)).toEqual([]);
+    await image('publication-notification-server-save-rejected', editor.getByTestId('notification-contract-fields')); await image('publication-notification-server-save-error', editor.getByRole('alert'));
+    await editor.getByLabel(text('订阅名称'), { exact: true }).fill(name);
     const savedResponse = page.waitForResponse(response => response.url().endsWith('/api/webhooks') && response.request().method() === 'POST');
-    await editor.getByRole('button', { name: text('保存通知订阅'), exact: true }).click();
+    await saveButton.press('Enter');
     const saved = await savedResponse; expect(saved.status()).toBe(200);
     const payload = saved.request().postDataJSON(); expect(payload.installationPid).toBe(installationPid); expect(payload.eventType).toBe(eventType);
     expect(payload.eventVersion).toBe(1); expect(payload.targetUrl).toBe(accepting.url); expect(payload.secret === secret, 'The UI must send the agreed signing secret').toBe(true);
@@ -122,6 +150,17 @@ export async function verifyModelNotifications({ page, card, installationPid, re
     const row = editor.getByTestId(`notification-${subscription.pid}`); await expect(row).toContainText(name); await expect(row).toContainText(accepting.url);
     await row.getByRole('button', { name: text('编辑订阅'), exact: true }).click();
     await expect(editor.getByLabel(text('接收地址'), { exact: true })).toHaveValue(accepting.url); await image('publication-subscribe-reloaded');
+    const beforeRejectedUpdate = await human(`/api/webhooks/${subscription.pid}`);
+    await editor.getByLabel(text('订阅名称'), { exact: true }).fill(' ');
+    const updateRejectedResponse = page.waitForResponse(response => response.url().endsWith(`/api/webhooks/${subscription.pid}`) && response.request().method() === 'PUT');
+    await saveButton.press('Enter'); expect((await updateRejectedResponse).status()).toBe(400); await expect(editor.getByRole('alert')).toHaveText(invalidText);
+    await expect(editor.getByLabel(text('订阅名称'), { exact: true })).toHaveValue(' ');
+    expect(await human(`/api/webhooks/${subscription.pid}`)).toEqual(beforeRejectedUpdate);
+    await image('publication-notification-server-update-rejected', editor.getByTestId('notification-contract-fields'));
+    await editor.getByLabel(text('订阅名称'), { exact: true }).fill(name);
+    const updateRestoredResponse = page.waitForResponse(response => response.url().endsWith(`/api/webhooks/${subscription.pid}`) && response.request().method() === 'PUT');
+    await saveButton.press('Enter'); expect((await updateRestoredResponse).status()).toBe(200); await expect(editor.getByRole('alert')).toHaveCount(0);
+    expect((await human(`/api/webhooks/${subscription.pid}`)).name).toBe(name);
     const reload = page.waitForResponse(response => response.url().endsWith('/api/webhooks') && response.request().method() === 'GET');
     await editor.getByRole('button', { name: text('刷新通知'), exact: true }).click(); expect((await reload).status()).toBe(200);
     await expect(row).toContainText(name); await image('publication-subscribe-explicit-reload');
@@ -130,7 +169,14 @@ export async function verifyModelNotifications({ page, card, installationPid, re
     await editor.getByRole('button', { name: text('关闭通知编辑'), exact: true }).click();
     const discard = editor.getByRole('group', { name: text('通知操作确认'), exact: true });
     await image('publication-subscribe-discard-confirm', discard);
-    await discard.getByRole('button', { name: text('取消'), exact: true }).click();
+    await expect(discard.getByRole('button', { name: text('确认'), exact: true })).toBeFocused(); await page.keyboard.press('Escape');
+    await expect(discard).toHaveCount(0); await expect(editor.getByRole('button', { name: text('关闭通知编辑'), exact: true })).toBeFocused();
+    await image('publication-notification-keyboard-escape-return', editor.getByTestId('notification-header'));
+    await editor.getByRole('button', { name: text('关闭通知编辑'), exact: true }).press('Enter');
+    await expect(discard.getByRole('button', { name: text('确认'), exact: true })).toBeFocused();
+    await discard.getByRole('button', { name: text('取消'), exact: true }).press('Enter');
+    await expect(editor.getByRole('button', { name: text('关闭通知编辑'), exact: true })).toBeFocused();
+    await image('publication-notification-keyboard-cancel-return', editor.getByTestId('notification-header'));
     await expect(editor.getByLabel(text('订阅名称'), { exact: true })).toHaveValue(name + ' unsaved');
     expect((await human(`/api/webhooks/${subscription.pid}`)).name).toBe(name);
     await editor.getByRole('button', { name: text('关闭通知编辑'), exact: true }).click();
@@ -297,7 +343,7 @@ export async function verifyModelNotifications({ page, card, installationPid, re
       cases: ['ui-subscription-persisted', 'signed-real-delivery', 'real-dead-letter', 'confirmed-same-event-replay', 'revoked-authority-no-send', 'ui-subscription-disabled'],
       deliveryProofs: [successProof, deadProof, replayProof, beforeRevocation], revokedReplay: { ...denied, acceptingReceiverAttempts: 0 },
       fixture: 'original-installation-ui-authored-grant', routeMocks: false };
-    Object.assign(receipt, { editorStates: ['real-latency-loading', 'offline-no-false-empty-restored', 'real-principal-403-restored', 'ui-inactive-read-only-reopened'], eventVariants: ['second-ui-subscription', 'updated-signed-delivery', 'edited-deleted-signed-delivery', 'second-ui-disabled'], variantProofs: [updatedProof, deletedProof], editorActions: ['reload-real-GET', 'dirty-cancel-discard-no-write', 'new-form-reset-no-write', 'disable-enable-signed-send'] });
+    Object.assign(receipt, { keyboardSave: ['native-tab-submit-validation', 'real-create-400-no-write-corrected', 'real-update-400-unchanged-corrected-signed', 'escape-cancel-focus-return'], editorStates: ['real-latency-loading', 'offline-no-false-empty-restored', 'real-principal-403-restored', 'ui-inactive-read-only-reopened'], eventVariants: ['second-ui-subscription', 'updated-signed-delivery', 'edited-deleted-signed-delivery', 'second-ui-disabled'], variantProofs: [updatedProof, deletedProof], editorActions: ['reload-real-GET', 'dirty-cancel-discard-no-write', 'new-form-reset-no-write', 'disable-enable-signed-send'] });
     const receiptPath = path.join(directory, 'receipt.json'); await writeFile(receiptPath, JSON.stringify(receipt, null, 2));
     await testInfo.attach('dynamic-model-notifications', { path: receiptPath, contentType: 'application/json' });
   } finally {

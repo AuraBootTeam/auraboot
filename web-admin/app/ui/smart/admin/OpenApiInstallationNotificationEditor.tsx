@@ -24,9 +24,10 @@ export function OpenApiInstallationNotificationEditor({ installationPid, active,
   const [dirty, setDirty] = useState(false); const [error, setError] = useState(''); const [notice, setNotice] = useState('');
   const [denied, setDenied] = useState(false); const [confirm, setConfirm] = useState<'discard' | 'disable' | null>(null);
   const [pendingDisable, setPendingDisable] = useState<Subscription | null>(null);
-  const requestId = useRef(0); const confirmRef = useRef<HTMLDivElement>(null);
+  const requestId = useRef(0); const confirmRef = useRef<HTMLDivElement>(null); const returnFocus = useRef<HTMLElement | null>(null);
   const fail = (cause: unknown) => {
     if (cause instanceof PublicationApiError && cause.status === 403) { setDenied(true); setError(label('denied', '需要当前租户的开放平台管理与 Webhook 管理权限。', 'Open Platform and Webhook administrator permissions in this tenant are required.')); }
+    else if (cause instanceof PublicationApiError && cause.status === 400) setError(label('invalid', '通知配置未通过校验，请检查订阅名称、事件版本和接收配置后重试。', 'Notification validation failed. Check the subscription name, event version and receiver settings before retrying.'));
     else setError(label('failed', '通知配置请求失败，请检查合同、授权及接收地址后重试。', 'Notification request failed. Check the contract, authority and receiver address before retrying.'));
   };
   const load = async () => {
@@ -49,7 +50,15 @@ export function OpenApiInstallationNotificationEditor({ installationPid, active,
   useEffect(() => { void load(); return () => { requestId.current++; }; }, [installationPid]);
   useEffect(() => { const listener = (event: BeforeUnloadEvent) => { if (dirty) { event.preventDefault(); event.returnValue = ''; } };
     window.addEventListener('beforeunload', listener); return () => window.removeEventListener('beforeunload', listener); }, [dirty]);
-  useEffect(() => { if (confirm) { confirmRef.current?.scrollIntoView({ block: 'nearest' }); confirmRef.current?.querySelector<HTMLButtonElement>('button')?.focus(); } }, [confirm]);
+  useEffect(() => {
+    if (confirm) {
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && !confirmRef.current?.contains(active)) returnFocus.current = active;
+      confirmRef.current?.scrollIntoView({ block: 'nearest' }); confirmRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    } else if (returnFocus.current) {
+      if (returnFocus.current.isConnected) returnFocus.current.focus(); returnFocus.current = null;
+    }
+  }, [confirm]);
   const change = (next: Partial<Form>) => { setForm(current => ({ ...current, ...next })); setDirty(true); setError(''); setNotice(''); };
   const edit = (row: Subscription | null) => { setSelected(row); setForm(row ? { name: row.name, targetUrl: row.targetUrl, eventType: row.eventType,
     eventVersion: row.eventVersion, secret: '', maxRetries: row.maxRetries, timeoutMs: row.timeoutMs } : empty()); setDirty(false); setError(''); setNotice(''); };
@@ -73,7 +82,7 @@ export function OpenApiInstallationNotificationEditor({ installationPid, active,
     ({ created: '新增记录', updated: '修改记录', deleted: '删除记录' } as Record<string, string>)[event.type.split('.').at(-1)!] ?? '模型事件',
     ({ created: 'Record created', updated: 'Record updated', deleted: 'Record deleted' } as Record<string, string>)[event.type.split('.').at(-1)!] ?? 'Model event')}`;
   return <section data-testid="installation-notification-editor" className="mt-4 min-w-0 space-y-4 rounded-card border border-border bg-panel p-4 text-text">
-    <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-semibold">{label('title', '动态模型通知', 'Dynamic model notifications')}</h3>
+    <div data-testid="notification-header" className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-semibold">{label('title', '动态模型通知', 'Dynamic model notifications')}</h3>
       <div className="flex flex-wrap gap-2"><button type="button" className={BUTTON} disabled={busy || loading || dirty} onClick={() => void load()}>{label('reload', '刷新通知', 'Reload notifications')}</button>
         <button type="button" className={BUTTON} disabled={busy} onClick={() => dirty ? setConfirm('discard') : onClose()}>{label('close', '关闭通知编辑', 'Close notification editor')}</button></div></div>
     <p className="text-sm text-text-secondary">{label('help', '订阅自动关联当前安装。只可选择已发布且此安装有读取授权与 Scope 的动态模型事件。接收方需校验原始请求签名，并按事件标识去重。', 'Subscriptions inherit this installation. Choose published model events with current read authority and scopes. Receivers must verify the raw request signature and deduplicate by event identity.')}</p>
@@ -114,7 +123,7 @@ export function OpenApiInstallationNotificationEditor({ installationPid, active,
           {selected && <button type="button" className={BUTTON} disabled={busy || dirty} onClick={() => edit(null)}>{label('new', '新建通知订阅', 'New notification subscription')}</button>}</div>
       </form>
     </>}
-    {confirm && <div ref={confirmRef} role="group" aria-label={label('confirmation', '通知操作确认', 'Notification confirmation')} className="space-y-3 rounded-control border border-border bg-canvas p-3">
+    {confirm && <div ref={confirmRef} onKeyDown={event => { if (event.key === 'Escape' && !busy) { event.preventDefault(); event.stopPropagation(); setConfirm(null); } }} role="group" aria-label={label('confirmation', '通知操作确认', 'Notification confirmation')} className="space-y-3 rounded-control border border-border bg-canvas p-3">
       <p>{confirm === 'disable' ? label('disableHelp', '确认停用此订阅？后续通知及重放将停止发送。', 'Disable this subscription? Subsequent notifications and replays will not be sent.') : label('discardHelp', '放弃未保存的通知修改并关闭？', 'Discard unsaved notification changes and close?')}</p>
       <div className="flex flex-wrap gap-2"><button type="button" className={BUTTON} disabled={busy} onClick={() => confirm === 'disable' && pendingDisable ? void enable(pendingDisable) : onClose()}>{label('confirm', '确认', 'Confirm')}</button>
         <button type="button" className={BUTTON} disabled={busy} onClick={() => setConfirm(null)}>{label('cancel', '取消', 'Cancel')}</button></div>

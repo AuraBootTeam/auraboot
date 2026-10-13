@@ -140,6 +140,12 @@
               "offline-no-false-empty-restored",
               "real-principal-403-restored",
               "ui-inactive-read-only-reopened"
+            ],
+            "keyboardSave": [
+              "native-tab-submit-validation",
+              "real-create-400-no-write-corrected",
+              "real-update-400-unchanged-corrected-signed",
+              "escape-cancel-focus-return"
             ]
           }
         }
