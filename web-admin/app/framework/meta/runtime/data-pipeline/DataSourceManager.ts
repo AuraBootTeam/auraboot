@@ -742,6 +742,33 @@ export class DataSourceManager {
     }
 
     switch (config.adaptor) {
+      case 'commandTable': {
+        // Command execution has one additional envelope after ResultData.
+        // A failed or incomplete command must never become an empty table.
+        const page = data?.data;
+        if (
+          data?.phaseReached !== 'completed' ||
+          !page ||
+          !Array.isArray(page.records) ||
+          !Number.isSafeInteger(page.total) ||
+          page.total < 0 ||
+          !Number.isSafeInteger(page.current) ||
+          page.current < 1 ||
+          !Number.isSafeInteger(page.size) ||
+          page.size < 1 ||
+          page.records.length > page.size ||
+          page.records.length > page.total ||
+          page.records.some((row: unknown) => !row || typeof row !== 'object' || Array.isArray(row))
+        ) {
+          throw new Error('Invalid completed command table response');
+        }
+        return {
+          records: page.records,
+          total: page.total,
+          current: page.current,
+          pageSize: page.size,
+        };
+      }
       case 'optionList':
         // 转换为 { value, label } 格式
         if (Array.isArray(data)) {

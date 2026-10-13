@@ -16,6 +16,116 @@ describe('DataSourceManager', () => {
     mockedFetchResult.mockReset();
   });
 
+  const commandTableManager = () => {
+    const manager = new DataSourceManager(
+      createExpressionContext({
+        form: { billNo: 'REQ-100' },
+        state: { routeContext: { taskPid: 'task-1' } },
+      } as any),
+    );
+    manager.register('candidates', {
+      type: 'api',
+      method: 'post',
+      autoFetch: false,
+      adaptor: 'commandTable',
+      endpoint: '/api/meta/commands/execute/example:read_candidates',
+      params: {
+        targetRecordPid: '${state.routeContext.taskPid}',
+        payload: { billNo: '${form.billNo}', pageSize: 20 },
+      },
+    });
+    return manager;
+  };
+
+  it('adapts completed command pages and preserves evaluated command input', async () => {
+    const records = [{ pid: 'candidate-1', quantity: 30 }];
+    mockedFetchResult.mockResolvedValueOnce({
+      code: '0',
+      data: {
+        phaseReached: 'completed',
+        data: { records, total: 1, current: 1, size: 20 },
+      },
+    } as any);
+    const manager = commandTableManager();
+    expect(await manager.fetch('candidates')).toEqual({
+      records,
+      total: 1,
+      current: 1,
+      pageSize: 20,
+    });
+    expect(mockedFetchResult).toHaveBeenCalledExactlyOnceWith(
+      '/api/meta/commands/execute/example:read_candidates',
+      {
+        method: 'post',
+        params: { targetRecordPid: 'task-1', payload: { billNo: 'REQ-100', pageSize: 20 } },
+      },
+    );
+    expect(manager.getState('candidates')?.error).toBeNull();
+  });
+
+  it('accepts an explicitly completed empty command page', async () => {
+    mockedFetchResult.mockResolvedValueOnce({
+      code: '0',
+      data: {
+        phaseReached: 'completed',
+        data: { records: [], total: 0, current: 1, size: 1 },
+      },
+    } as any);
+    expect(await commandTableManager().fetch('candidates')).toEqual({
+      records: [],
+      total: 0,
+      current: 1,
+      pageSize: 1,
+    });
+  });
+
+  it.each([
+    { phaseReached: 'handler', data: { records: [], total: 0, current: 1, size: 1 } },
+    { phaseReached: 'completed', records: [], total: 0, current: 1, size: 1 },
+    { phaseReached: 'completed', data: { list: [], total: 0, current: 1, size: 1 } },
+    ...[
+      { total: '1' },
+      { total: -1 },
+      { total: 0 },
+      { current: 0 },
+      { current: 1.5 },
+      { size: 0 },
+      { size: '20' },
+      { records: [null] },
+      { records: [['nested']] },
+      { records: [{}, {}], size: 1 },
+    ].map((invalid) => ({
+      phaseReached: 'completed',
+      data: {
+        records: [{ pid: 'candidate-1' }],
+        total: 1,
+        current: 1,
+        size: 20,
+        ...invalid,
+      },
+    })),
+  ])('reports invalid command pages instead of presenting an empty table: %j', async (data) => {
+    mockedFetchResult.mockResolvedValueOnce({ code: '0', data } as any);
+    const manager = commandTableManager();
+    expect(await manager.fetch('candidates')).toBeNull();
+    expect(manager.getState('candidates')?.error?.message).toBe(
+      'Invalid completed command table response',
+    );
+    expect(mockedFetchResult).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves permission errors before command table adaptation', async () => {
+    mockedFetchResult.mockResolvedValueOnce({
+      code: '403',
+      message: 'Forbidden',
+      data: null,
+    } as any);
+    const manager = commandTableManager();
+    expect(await manager.fetch('candidates')).toBeNull();
+    expect(manager.getState('candidates')?.error).not.toBeNull();
+    expect(mockedFetchResult).toHaveBeenCalledTimes(1);
+  });
+
   it('defers detail child data sources until form.pid is available', async () => {
     mockedFetchResult.mockResolvedValue({
       code: '0',
