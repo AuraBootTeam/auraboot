@@ -4,6 +4,8 @@ The infrastructure adapter owns exact-identity process recovery and read-only
 database observations. Fixture writes use production HTTP routes exclusively.
 """
 import ipaddress
+import hashlib
+import re
 import base64
 import copy
 import json
@@ -118,6 +120,8 @@ def verify_report(report, *, secret=None):
         require(all(json.loads(row["raw_body"])["recordVersion"] == 1
                     and json.loads(row["raw_body"])["correlationId"] == origin for row in actual),
                 "model event raw source metadata invalid")
+    if "genericReplay" in report:
+        verify_generic_replay(report["genericReplay"], secret=secret)
     if "receiverIsolation" in report:
         verify_receiver_isolation(report["receiverIsolation"], secret=secret)
     if "loadMeasurement" in report:
@@ -249,7 +253,133 @@ def observe(callback, seconds=75):
     raise ProtocolError("model event bounded observation expired")
 
 
-def run_model_event_probe(request, admin, infrastructure, *, evidence_path, receiver_host, secret_file, measure_load=False, measure_sustained=False, measure_isolation=False):
+def verify_generic_replay(group, *, secret):
+    require(isinstance(group, dict) and group.get("status") == "complete", "generic replay proof incomplete")
+    sub, other = group.get("subscriptionPid"), group.get("wrongSubscriptionPid")
+    require(isinstance(sub, str) and sub and isinstance(other, str) and other and sub != other,
+            "generic replay subscription identities invalid")
+    failed, accepted = group.get("failedProof"), group.get("acceptedProof")
+    require(isinstance(failed, dict) and isinstance(accepted, dict)
+            and all(failed.get(k) == accepted.get(k) and isinstance(failed.get(k), str) and failed[k]
+                    for k in ["deliveryPid", "eventId", "subjectPid"]), "generic replay source identity changed")
+    route = f"/api/webhooks/{sub}/deliveries/{failed['deliveryPid']}/replay"
+    denials = group.get("denials")
+    require(isinstance(denials, dict) and set(denials) == {"anonymous", "machine", "limitedHuman", "wrongParent", "repeated"},
+            "generic replay denial denominator invalid")
+    for kind, row in denials.items():
+        expected = (401, 403) if kind in {"anonymous", "machine"} else (403,) if kind == "limitedHuman" else (200,)
+        path = route if kind != "wrongParent" else f"/api/webhooks/{other}/deliveries/{failed['deliveryPid']}/replay"
+        require(isinstance(row, dict) and type(row.get("httpStatus")) is int and row["httpStatus"] in expected
+                and ((row.get("code") is None and row["httpStatus"] != 200)
+                     or (isinstance(row.get("code"), str) and row["code"] and row["code"] != "0")) and row.get("path") == path,
+                "generic replay denial response invalid")
+        require(isinstance(row.get("beforeDigest"), str) and re.fullmatch(r"[a-f0-9]{64}", row["beforeDigest"])
+                and row.get("afterDigest") == row["beforeDigest"]
+                and type(row.get("attemptsBefore")) is int and type(row.get("attemptsAfter")) is int
+                and row["attemptsBefore"] == row["attemptsAfter"] == (4 if kind == "repeated" else 3),
+                "generic replay denial changed durable state or sent HTTP")
+    require(group.get("correctResponse") == {"httpStatus": 200, "code": "0", "path": route},
+            "generic replay correct response invalid")
+    require(group.get("finalState") == {"deliveryStatus": "success", "retryCount": 0, "replayCount": 1, "responseStatus": 200}
+            and all(type(v) is int for k, v in group["finalState"].items() if k != "deliveryStatus"),
+            "generic replay final state invalid")
+    require(group.get("counts") == {"events": 1, "receipts": 1, "deliveries": 1}
+            and all(type(v) is int for v in group["counts"].values()), "generic replay durable cardinality invalid")
+    for proof, statuses in [(failed, [503, 503, 503]), (accepted, [200])]:
+        require(proof.get("statuses") == statuses and type(proof.get("attempts")) is int
+                and proof["attempts"] == len(statuses) and len(proof.get("rawEvidence", [])) == len(statuses),
+                "generic replay raw attempt denominator invalid")
+        actual = []
+        for row in proof["rawEvidence"]:
+            require(type(row.get("responseStatus")) is int and type(row.get("sequence")) is int
+                    and row["sequence"] >= 1 and type(row.get("duplicate")) is bool, "generic replay raw receipt types invalid")
+            try:
+                raw = base64.b64decode(row.get("rawBodyBase64"), validate=True)
+            except (ValueError, TypeError):
+                raise ProtocolError("generic replay raw encoding invalid") from None
+            actual.append({"raw_body": raw, "timestamp_text": row.get("timestamp"), "received_at": row.get("receivedAt"),
+                "signature": row.get("signature"), "signature_valid": 1, "delivery_id": proof["deliveryPid"],
+                "event_id": proof["eventId"], "response_status": row.get("responseStatus"), "request_id": row.get("requestId"),
+                "body_sha": row.get("bodySha256"), "sequence": row.get("sequence"), "duplicate": row.get("duplicate")})
+        derived = verify_delivery(actual, secret=secret, delivery_pid=proof["deliveryPid"], event_id=proof["eventId"],
+            subject_pid=proof["subjectPid"], statuses=statuses, originating_request_id="release-model-generic-replay",
+            event_type="open.resource.release.model-event.parts.created", subject_type="release.model-event.parts", schema_version=1,
+            projections=[{"pid": proof["subjectPid"], "name": "Generic replay boundary", "zone": "A"}] * len(statuses))
+        for row, checked in zip(proof["rawEvidence"], derived["rawEvidence"]):
+            require(row.get("occurredAt") == checked["occurredAt"] and type(row.get("eventAgeAtReceiptMs")) in (int, float)
+                    and math.isfinite(row["eventAgeAtReceiptMs"]) and row["eventAgeAtReceiptMs"] == checked["eventAgeAtReceiptMs"],
+                    "generic replay source age invalid")
+        require(all(json.loads(r["raw_body"]).get("recordVersion") == 1 for r in actual), "generic replay record version invalid")
+    require(failed["rawEvidence"][0]["rawBodyBase64"] == accepted["rawEvidence"][0]["rawBodyBase64"],
+            "generic replay source payload changed")
+    return group
+
+
+def collect_generic_replay(call, human, infrastructure, admin, machine, tenant, subscription, body, dead, replay, delivery, counts, secret):
+    body["targetUrl"] = dead["url"]
+    human("/api/webhooks/" + subscription["pid"], "PUT", body)
+    _, created, _ = call("/api/open/v1/resources/release.model-event.parts", "POST",
+        body={"name": "Generic replay boundary", "zone": "A"},
+        headers=dict(machine, **{"Idempotency-Key": "release-model-generic-create", "X-Request-Id": "release-model-generic-replay"}), expected=(201,))
+    log = delivery(created["pid"], "dead_letter")
+    require(log["retryCount"] == 3 and log["replayCount"] == 0, "generic replay failure fixture invalid")
+    other = human("/api/webhooks", "POST", {"name": "Unrelated replay parent", "eventType": "release.fixture.replay-parent",
+        "targetUrl": "https://example.invalid/no-delivery", "enabled": False})
+    require(re.fullmatch(r"[A-Za-z0-9_-]{1,64}", log["pid"]) and type(tenant) is int, "generic replay SQL identity invalid")
+    def digest():
+        value = infrastructure.sql(f"SELECT json_build_object('delivery',row_to_json(d),'lane',row_to_json(l)) FROM ab_webhook_delivery_log d JOIN ab_webhook_receiver_lane l ON l.tenant_id=d.tenant_id AND l.receiver_key=d.receiver_key WHERE d.tenant_id={tenant} AND d.pid='{log['pid']}'")
+        require(isinstance(value, dict) and value.get("delivery") and value.get("lane"), "generic replay state observation missing")
+        return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    def attempts():
+        return sum(len(read_delivery(sink["store"], log["pid"], secret=secret, run_id=sink["runId"],
+                                    mode=sink["mode"], failures=1)) for sink in [dead, replay])
+    route = f"/api/webhooks/{subscription['pid']}/deliveries/{log['pid']}/replay"
+    group = {"status": "started", "subscriptionPid": subscription["pid"], "wrongSubscriptionPid": other["pid"], "denials": {}}
+    def deny(kind, path, headers, expected):
+        before, total = digest(), attempts()
+        status, response, _ = call(path, "POST", body={}, headers=headers, expected=expected)
+        require(isinstance(response, dict) and response.get("code") != "0", "generic replay denial returned success")
+        row = {"path": path, "httpStatus": status, "code": response.get("code"), "beforeDigest": before,
+               "afterDigest": digest(), "attemptsBefore": total, "attemptsAfter": attempts()}
+        require(row["beforeDigest"] == row["afterDigest"] and row["attemptsBefore"] == row["attemptsAfter"],
+                "generic replay denial mutated state or delivered HTTP")
+        group["denials"][kind] = row
+    deny("anonymous", route, {}, (401, 403))
+    deny("machine", route, machine, (401, 403))
+    account = {"email": "replay-denied-" + secrets.token_hex(8) + "@example.invalid", "password": "Replay2026x!" + secrets.token_hex(8)}
+    human("/api/meta/commands/execute/admin:create_member", "POST", {"payload": dict(account, name="Replay denied actor")})
+    _, auth, _ = call("/api/auth/login", "POST", body=account)
+    require(isinstance(auth, dict) and str(auth.get("code")) == "0", "generic replay limited login failed")
+    limited = {"Authorization": "Bearer " + auth["data"]["jwt"]}
+    _, selected, _ = call("/api/tenant-selection/process", "POST", body={"action": "select", "tenantId": tenant}, headers=limited)
+    require(isinstance(selected, dict) and str(selected.get("code")) == "0", "generic replay limited tenant selection failed")
+    limited = {"Authorization": "Bearer " + selected["data"]["jwt"]}
+    deny("limitedHuman", route, limited, (403,))
+    human("/api/webhooks/" + other["pid"])
+    deny("wrongParent", f"/api/webhooks/{other['pid']}/deliveries/{log['pid']}/replay", admin, (200,))
+    def proof(sink, statuses):
+        raw = read_delivery(sink["store"], log["pid"], secret=secret, run_id=sink["runId"], mode=sink["mode"], failures=1)
+        return verify_delivery(raw, secret=secret, delivery_pid=log["pid"], event_id=log["eventId"], subject_pid=created["pid"],
+            statuses=statuses, originating_request_id="release-model-generic-replay",
+            event_type="open.resource.release.model-event.parts.created", subject_type="release.model-event.parts", schema_version=1,
+            projections=[{"pid": created["pid"], "name": "Generic replay boundary", "zone": "A"}] * len(statuses))
+    group["failedProof"] = proof(dead, [503, 503, 503])
+    body["targetUrl"] = replay["url"]
+    human("/api/webhooks/" + subscription["pid"], "PUT", body)
+    status, response, _ = call(route, "POST", body={}, headers=admin)
+    require(isinstance(response, dict) and str(response.get("code")) == "0", "generic replay correct path failed")
+    group["correctResponse"] = {"httpStatus": status, "code": str(response["code"]), "path": route}
+    done = delivery(created["pid"], "success")
+    group["finalState"] = {k: done[k] for k in ["deliveryStatus", "retryCount", "replayCount", "responseStatus"]}
+    group["acceptedProof"] = proof(replay, [200])
+    group["counts"] = counts(log["eventId"])
+    deny("repeated", route, admin, (200,))
+    group["status"] = "complete"
+    return verify_generic_replay(group, secret=secret)
+
+
+def run_model_event_probe(request, admin, infrastructure, *, evidence_path, receiver_host, secret_file, measure_load=False, measure_sustained=False, measure_isolation=False, qualify_replay_scope=False):
+    require(type(qualify_replay_scope) is bool, "generic replay qualification opt-in must be boolean")
     require(type(measure_isolation) is bool, "receiver isolation opt-in must be boolean")
     require(type(measure_sustained) is bool, "sustained measurement opt-in must be boolean")
     require(type(measure_load) is bool, "model load measurement opt-in must be boolean")
@@ -426,6 +556,15 @@ def run_model_event_probe(request, admin, infrastructure, *, evidence_path, rece
             record("tampered-real-evidence-rejected")
         else:
             record("tampered-real-evidence-rejected", False)
+        if qualify_replay_scope:
+            report["genericReplay"] = {"status": "started"}
+            try:
+                report["genericReplay"] = collect_generic_replay(call, human, infrastructure, admin, machine, tenant,
+                    subscription, subscription_body, dead, replay, delivery, counts, secret)
+            finally:
+                if subscription_body["targetUrl"] != replay["url"]:
+                    subscription_body["targetUrl"] = replay["url"]
+                    human("/api/webhooks/" + subscription["pid"], "PUT", subscription_body)
         if measure_isolation:
             report['receiverIsolation'] = {'status': 'started'}
             report['receiverIsolation'] = collect_receiver_isolation(call, human, infrastructure, machine,

@@ -1186,6 +1186,8 @@ def verify_release_report(report, *, model_event_secret=None):
         raise ProtocolError("fixed sustained notification measurement missing")
     if "receiverIsolation" not in report["modelEvents"]:
         raise ProtocolError("fixed receiver isolation proof missing")
+    if "genericReplay" not in report["modelEvents"]:
+        raise ProtocolError("fixed generic replay authentication and tuple proof missing")
     verify_command_audits(report.get("commandAudits"))
     return report
 

@@ -46,6 +46,32 @@ def passed():
             "receiverAttemptsBefore": 0, "receiverAttemptsAfter": 0, "restoredStatus": "success", "restoredReplayCount": 2}}
 
 
+
+def generic_replay_passed():
+    originals = passed()["deliveryProofs"]
+    proofs = [copy.deepcopy(originals[1]), copy.deepcopy(originals[2])]
+    for proof in proofs:
+        proof.update(deliveryPid="generic_delivery", eventId="generic_event", subjectPid="generic_subject")
+        for row in proof["rawEvidence"]:
+            payload = json.loads(base64.b64decode(row["rawBodyBase64"]))
+            payload.update(id="generic_event", subject={"type": "release.model-event.parts", "pid": "generic_subject"},
+                correlationId="release-model-generic-replay", data={"pid": "generic_subject", "name": "Generic replay boundary", "zone": "A"})
+            raw = json.dumps(payload).encode()
+            row.update(requestId="release-model-generic-replay", rawBodyBase64=base64.b64encode(raw).decode(),
+                bodySha256=hashlib.sha256(raw).hexdigest(),
+                signature="sha256="+hmac.new(SECRET,row["timestamp"].encode()+b"."+raw,hashlib.sha256).hexdigest())
+    route="/api/webhooks/generic_sub/deliveries/generic_delivery/replay"
+    denials={}
+    for key, status in [("anonymous",401),("machine",401),("limitedHuman",403),("wrongParent",200),("repeated",200)]:
+        denials[key]={"path":route if key!="wrongParent" else route.replace("generic_sub","other_sub"),
+            "httpStatus":status,"code":"500" if status==200 else str(status),"beforeDigest":"a"*64,"afterDigest":"a"*64,
+            "attemptsBefore":4 if key=="repeated" else 3,"attemptsAfter":4 if key=="repeated" else 3}
+    return {"status":"complete","subscriptionPid":"generic_sub","wrongSubscriptionPid":"other_sub","denials":denials,
+        "correctResponse":{"httpStatus":200,"code":"0","path":route},
+        "finalState":{"deliveryStatus":"success","retryCount":0,"replayCount":1,"responseStatus":200},
+        "counts":{"events":1,"receipts":1,"deliveries":1},"failedProof":proofs[0],"acceptedProof":proofs[1]}
+
+
 def load_passed(count=32):
     measurement = {"profile": "burst-32x4", "authority": "recorded", "sloVerdict": "unqualified", "status": "complete",
         "planned": count, "concurrency": 4, "startedAt": 1700000000.0, "producedAt": 1700000000.1,
@@ -133,6 +159,17 @@ def isolation_passed():
 
 class ModelEventTests(unittest.TestCase):
     def test_source_binding_proof_is_mandatory_and_linked_to_signed_restoration(self):
+        qualified=passed();qualified["genericReplay"]=generic_replay_passed()
+        self.assertEqual(verify_report(qualified,secret=SECRET),qualified)
+        for change in [lambda g:g.pop("denials"), lambda g:g["denials"].pop("limitedHuman"),
+            lambda g:g["denials"]["wrongParent"].update(code="0"),
+            lambda g:g["denials"]["machine"].update(afterDigest="b"*64),
+            lambda g:g["denials"]["anonymous"].update(attemptsAfter=4),
+            lambda g:g["denials"]["limitedHuman"].update(httpStatus=200),
+            lambda g:g["finalState"].update(replayCount=2),
+            lambda g:g["acceptedProof"]["rawEvidence"][0].update(signature="sha256="+"0"*64)]:
+            altered=copy.deepcopy(qualified);change(altered["genericReplay"])
+            with self.assertRaises(ProtocolError):verify_report(altered,secret=SECRET)
         for key in passed()["sourceBindingProof"]:
             report = passed(); del report["sourceBindingProof"][key]
             with self.assertRaises(ProtocolError): verify_report(report, secret=SECRET)

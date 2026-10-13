@@ -88,6 +88,7 @@ assert.match(gate, /-e AURA_SSRF_ALLOWED_PRIVATE_HOSTS="\$NETWORK_GATEWAY"/);
 assert.match(probe, /model_events = run_model_event_probe/);
 assert.match(probe, /max_requests=1000/);
 assert.match(probe, /measure_load=True, measure_sustained=True, measure_isolation=True/);
+assert.match(probe, /qualify_replay_scope=True/);
 const modelProbe = fs.readFileSync(new URL('./ci/open_platform_model_event_probe.py', import.meta.url), 'utf8');
 assert.match(modelProbe, /500 if measure_sustained else 200/);
 assert.match(gate, /open_platform_dynamic_probe\.py.*--verify-release-report/);

@@ -163,7 +163,7 @@ def main():
         base_url=BASE, receiver_host=os.environ["MODEL_RECEIVER_HOST"])
     model_events = run_model_event_probe(request, admin, infrastructure,
         evidence_path=Path(ARTIFACT).parent / "model-events" / "result.json",
-        receiver_host=os.environ["MODEL_RECEIVER_HOST"], secret_file=os.environ["MODEL_EVENT_SECRET_FILE"], measure_load=True, measure_sustained=True, measure_isolation=True)
+        receiver_host=os.environ["MODEL_RECEIVER_HOST"], secret_file=os.environ["MODEL_EVENT_SECRET_FILE"], measure_load=True, measure_sustained=True, measure_isolation=True, qualify_replay_scope=True)
 
     slo_fixture = prepare_slo_fixture(request, admin, dynamic, load_input,
         fixture_path=os.environ.get("SLO_FIXTURE_ARTIFACT", str(Path(ARTIFACT).with_name("slo-fixture.json"))))

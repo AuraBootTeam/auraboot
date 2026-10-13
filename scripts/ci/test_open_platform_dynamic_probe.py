@@ -871,7 +871,7 @@ class SdkReportTests(unittest.TestCase):
         with self.assertRaises(ProtocolError): self.verify(report)
 
     def test_release_requires_sdk_in_addition_to_dynamic_http(self):
-        from test_open_platform_model_event_probe import passed as model_passed, load_passed, sustained_passed, isolation_passed, SECRET
+        from test_open_platform_model_event_probe import passed as model_passed, load_passed, sustained_passed, isolation_passed, generic_replay_passed, SECRET
         sdk = self.report()
         with self.assertRaises(ProtocolError): verify_release_report({"dynamic": passed()})
         with self.assertRaises(ProtocolError):
@@ -881,10 +881,10 @@ class SdkReportTests(unittest.TestCase):
         with self.assertRaises(ProtocolError):
             verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": model_passed(), "commandAudits": command_passed()},
                                   model_event_secret=SECRET)
-        measured = model_passed(); measured["loadMeasurement"] = load_passed(); measured["sustainedMeasurement"] = sustained_passed(); measured["receiverIsolation"] = isolation_passed()
+        measured = model_passed(); measured["loadMeasurement"] = load_passed(); measured["sustainedMeasurement"] = sustained_passed(); measured["receiverIsolation"] = isolation_passed(); measured["genericReplay"] = generic_replay_passed()
         self.assertEqual(verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": measured, "commandAudits": command_passed()},
                                               model_event_secret=SECRET)["sdk"], sdk)
-        for field in ['loadMeasurement', 'sustainedMeasurement', 'receiverIsolation']:
+        for field in ['loadMeasurement', 'sustainedMeasurement', 'receiverIsolation', 'genericReplay']:
             omitted = dict(measured); omitted.pop(field)
             with self.assertRaises(ProtocolError):
                 verify_release_report({"dynamic": passed(), "sdk": sdk, "modelEvents": omitted,
