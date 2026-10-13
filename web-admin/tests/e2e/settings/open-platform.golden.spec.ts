@@ -893,7 +893,7 @@ test.describe('Dynamic installation authority journey', () => {
     // Model/publication/app/token setup are fixtures; all tested installation policy writes and revocations below use the UI.
     const resource = { code: resourceCode, modelCode, schemaVersion: 1, operations, scopes: Object.fromEntries(operations.map((operation, index) => [operation, scopes[index]])), dataPolicy: 'installation_filter',
       fields: { pid: { ...field('pid'), type: 'pid', nullable: false }, name: field('dop_g_name', true, true), zone: { ...field('dop_g_zone', true, true), operators: ['EQ'] }, secret: field('dop_g_secret') },
-      maxPageSize: 50, maxConditions: 8, timeoutMs: 5000, events: ['created'] };
+      maxPageSize: 50, maxConditions: 8, timeoutMs: 5000, events: ['created', 'updated', 'deleted'] };
     await human('PUT', `/api/open-platform/publications/${resourceCode}/draft`, { expectedRevision: 0, definition: resource });
     await human('POST', `/api/open-platform/publications/${resourceCode}/publish`, { expectedRevision: 1 });
     const named = await human('POST', '/api/meta/named-queries', { code: namedCode, title: `授权查询 ${suffix}`, resourceCode: modelCode, actionCode: 'read',

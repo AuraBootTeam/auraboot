@@ -16,37 +16,37 @@
     {
       "id": "OSS-BASELINE-03",
       "file": "tests/e2e/saved-view/saved-view-gantt.spec.ts",
-      "title": "SV-040: GANTT — timeline renders @smoke",
+      "title": "SV-040: GANTT \u2014 timeline renders @smoke",
       "project": "oss"
     },
     {
       "id": "OSS-BASELINE-04",
       "file": "tests/e2e/saved-view/saved-view-gantt.spec.ts",
-      "title": "SV-041: GANTT — time zoom (day/week/month)",
+      "title": "SV-041: GANTT \u2014 time zoom (day/week/month)",
       "project": "oss"
     },
     {
       "id": "OSS-BASELINE-05",
       "file": "tests/e2e/saved-view/saved-view-kanban.spec.ts",
-      "title": "SV-010: KANBAN — board renders with status columns @smoke",
+      "title": "SV-010: KANBAN \u2014 board renders with status columns @smoke",
       "project": "oss"
     },
     {
       "id": "OSS-BASELINE-06",
       "file": "tests/e2e/saved-view/saved-view-kanban.spec.ts",
-      "title": "SV-011: KANBAN — drag card changes status @smoke",
+      "title": "SV-011: KANBAN \u2014 drag card changes status @smoke",
       "project": "oss"
     },
     {
       "id": "OSS-BASELINE-07",
       "file": "tests/e2e/saved-view/saved-view-kanban.spec.ts",
-      "title": "SV-012: KANBAN — click card opens detail",
+      "title": "SV-012: KANBAN \u2014 click card opens detail",
       "project": "oss"
     },
     {
       "id": "OSS-BASELINE-08",
       "file": "tests/e2e/saved-view/saved-view-kanban.spec.ts",
-      "title": "SV-013: KANBAN — empty column shows placeholder",
+      "title": "SV-013: KANBAN \u2014 empty column shows placeholder",
       "project": "oss"
     },
     {
@@ -128,6 +128,12 @@
               "dirty-cancel-discard-no-write",
               "new-form-reset-no-write",
               "disable-enable-signed-send"
+            ],
+            "eventVariants": [
+              "second-ui-subscription",
+              "updated-signed-delivery",
+              "edited-deleted-signed-delivery",
+              "second-ui-disabled"
             ]
           }
         }

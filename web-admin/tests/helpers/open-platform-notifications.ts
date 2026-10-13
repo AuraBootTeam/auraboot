@@ -145,10 +145,10 @@ export async function verifyModelNotifications({ page, card, installationPid, re
       }, { timeout: 45000, intervals: [100, 250, 500, 1000] }).toBe(true);
       return found!;
     };
-    const verify = (receiver: typeof accepting, log: Delivery, source: Awaited<ReturnType<typeof create>>, statuses: number[], tamper = false) => {
+    const verify = (receiver: typeof accepting, log: Delivery, source: Awaited<ReturnType<typeof create>>, statuses: number[], tamper = false, expectedEventType = eventType) => {
       const result = spawnSync('python3', ['-B', '-c', `import json,sys\nsys.path.insert(0,sys.argv[1])\nfrom open_platform_webhook_evidence import read_delivery,verify_delivery\nx=json.load(sys.stdin); key=x.pop('secret').encode(); tamper=x.pop('tamper'); rows=read_delivery(x.pop('store'),x['delivery_pid'],secret=key,run_id=x.pop('run_id'),mode=x.pop('mode'),failures=1)\nif tamper: rows[0]['signature']='sha256='+'0'*64\nproof=verify_delivery(rows,secret=key,**x)\nprint(json.dumps(proof))`, path.join(coreRoot, 'scripts/ci')], {
         input: JSON.stringify({ secret, tamper, store: receiver.store, run_id: receiver.runId, mode: receiver.mode, delivery_pid: log.pid, event_id: log.eventId,
-          subject_pid: source.subject, statuses, originating_request_id: source.origin, event_type: eventType, subject_type: resourceCode, schema_version: 1,
+          subject_pid: source.subject, statuses, originating_request_id: source.origin, event_type: expectedEventType, subject_type: resourceCode, schema_version: 1,
           projections: statuses.map(() => source.projection) }), encoding: 'utf8', timeout: 10000,
       });
       if (tamper) { expect(result.status, 'A modified raw signature must be rejected').toBe(1);
@@ -161,6 +161,51 @@ export async function verifyModelNotifications({ page, card, installationPid, re
     verify(accepting, success, successSource, [200], true);
     await card.getByRole('button', { name: text('运维'), exact: true }).click();
     await expect(panel).toContainText(success.eventId); await image('publication-delivery', panel.getByTestId(`webhook-delivery-${success.pid}`));
+    await editor.getByRole('button', { name: text('新建通知订阅'), exact: true }).click();
+    const secondName = `ERP change notifications ${runId}`;
+    const updatedType = `open.resource.${resourceCode}.updated`; const deletedType = `open.resource.${resourceCode}.deleted`;
+    await editor.getByLabel(text('订阅名称'), { exact: true }).fill(secondName);
+    await editor.getByLabel(text('模型事件'), { exact: true }).selectOption(updatedType);
+    await editor.getByLabel(text('接收地址'), { exact: true }).fill(accepting.url);
+    await editor.getByLabel(text('签名密钥'), { exact: true }).fill(secret);
+    await editor.getByLabel(text('最大尝试次数'), { exact: true }).fill('1');
+    const secondSavedResponse = page.waitForResponse(response => response.url().endsWith('/api/webhooks') && response.request().method() === 'POST');
+    await editor.getByRole('button', { name: text('保存通知订阅'), exact: true }).click(); const secondSaved = await secondSavedResponse;
+    expect(secondSaved.status()).toBe(200); expect(secondSaved.request().postDataJSON()).toMatchObject({ installationPid, name: secondName, eventType: updatedType, eventVersion: 1, targetUrl: accepting.url });
+    const second = (await secondSaved.json()).data; expect(second.pid).not.toBe(subscription.pid);
+    const secondRow = editor.getByTestId(`notification-${second.pid}`); await expect(secondRow).toContainText(secondName);
+    expect((await human('/api/webhooks')).filter((item: { installationPid: string }) => item.installationPid === installationPid)).toHaveLength(2);
+    await expect(editor.getByTestId('notification-current-event')).toContainText(locale.startsWith('zh') ? '修改记录' : 'Record updated');
+    await image('publication-subscribe-second', secondRow); await image('publication-subscribe-updated-contract', editor.getByTestId('notification-contract-fields'));
+    const originalRecord = await page.request.get(`${resourcePath}/${successSource.subject}`, { headers: machineHeaders }); expect(originalRecord.status()).toBe(200);
+    const updatedOrigin = `${runId}-updated`; const changedName = 'Updated notification record';
+    const updatedResponse = await page.request.patch(`${resourcePath}/${successSource.subject}`, {
+      headers: { ...machineHeaders, 'Idempotency-Key': updatedOrigin, 'X-Request-Id': updatedOrigin, 'If-Match': originalRecord.headers().etag }, data: { name: changedName } });
+    expect(updatedResponse.status()).toBe(200); expect(await updatedResponse.json()).toEqual({ pid: successSource.subject, name: changedName, zone: 'A' });
+    const changedSource = { subject: successSource.subject, origin: updatedOrigin, projection: { pid: successSource.subject, name: changedName, zone: 'A' } };
+    const updatedDelivery = await delivery(updatedOrigin, 'success'); const updatedProof = verify(accepting, updatedDelivery, changedSource, [200], false, updatedType);
+    await panel.getByTestId('open-platform-operations-refresh').click(); await expect(panel).toContainText(updatedDelivery.eventId);
+    await image('publication-delivery-updated', panel.getByTestId(`webhook-delivery-${updatedDelivery.pid}`));
+    await secondRow.getByRole('button', { name: text('编辑订阅'), exact: true }).click();
+    await editor.getByLabel(text('模型事件'), { exact: true }).selectOption(deletedType);
+    const deletedSavedResponse = page.waitForResponse(response => response.url().endsWith(`/api/webhooks/${second.pid}`) && response.request().method() === 'PUT');
+    await editor.getByRole('button', { name: text('保存通知订阅'), exact: true }).click(); expect((await deletedSavedResponse).status()).toBe(200);
+    const persistedSecond = await human(`/api/webhooks/${second.pid}`); expect(persistedSecond).toMatchObject({ installationPid, eventType: deletedType, eventVersion: 1, name: secondName, enabled: true });
+    await expect(editor.getByTestId('notification-current-event')).toContainText(locale.startsWith('zh') ? '删除记录' : 'Record deleted');
+    await image('publication-subscribe-deleted', secondRow); await image('publication-subscribe-deleted-contract', editor.getByTestId('notification-contract-fields'));
+    const deletedOrigin = `${runId}-deleted`;
+    const deletedResponse = await page.request.delete(`${resourcePath}/${successSource.subject}`, {
+      headers: { ...machineHeaders, 'Idempotency-Key': deletedOrigin, 'X-Request-Id': deletedOrigin, 'If-Match': updatedResponse.headers().etag } });
+    expect(deletedResponse.status()).toBe(204); expect((await page.request.get(`${resourcePath}/${successSource.subject}`, { headers: machineHeaders })).status()).toBe(404);
+    const deletedSource = { ...changedSource, origin: deletedOrigin }; const deletedDelivery = await delivery(deletedOrigin, 'success');
+    const deletedProof = verify(accepting, deletedDelivery, deletedSource, [200], false, deletedType);
+    expect(deletedDelivery.eventId).not.toBe(updatedDelivery.eventId);
+    await panel.getByTestId('open-platform-operations-refresh').click(); await expect(panel).toContainText(deletedDelivery.eventId);
+    await image('publication-delivery-deleted', panel.getByTestId(`webhook-delivery-${deletedDelivery.pid}`));
+    await secondRow.getByRole('button', { name: text('停用订阅'), exact: true }).click();
+    await editor.getByRole('group', { name: text('通知操作确认'), exact: true }).getByRole('button', { name: text('确认'), exact: true }).click();
+    await expect.poll(async () => (await human(`/api/webhooks/${second.pid}`)).enabled).toBe(false);
+    await row.getByRole('button', { name: text('编辑订阅'), exact: true }).click();
     await retarget(failing.url); const failedSource = await create('UI dead letter'); const dead = await delivery(failedSource.origin, 'dead_letter');
     expect(dead.responseStatus).toBe(503); const deadProof = verify(failing, dead, failedSource, [503]);
     await panel.getByTestId('open-platform-operations-refresh').click(); await expect(panel).toContainText(dead.eventId); await image('publication-dead-letter', panel.getByTestId(`webhook-delivery-${dead.pid}`));
@@ -197,7 +242,7 @@ export async function verifyModelNotifications({ page, card, installationPid, re
       cases: ['ui-subscription-persisted', 'signed-real-delivery', 'real-dead-letter', 'confirmed-same-event-replay', 'revoked-authority-no-send', 'ui-subscription-disabled'],
       deliveryProofs: [successProof, deadProof, replayProof, beforeRevocation], revokedReplay: { ...denied, acceptingReceiverAttempts: 0 },
       fixture: 'original-installation-ui-authored-grant', routeMocks: false };
-    Object.assign(receipt, { editorActions: ['reload-real-GET', 'dirty-cancel-discard-no-write', 'new-form-reset-no-write', 'disable-enable-signed-send'] });
+    Object.assign(receipt, { eventVariants: ['second-ui-subscription', 'updated-signed-delivery', 'edited-deleted-signed-delivery', 'second-ui-disabled'], variantProofs: [updatedProof, deletedProof], editorActions: ['reload-real-GET', 'dirty-cancel-discard-no-write', 'new-form-reset-no-write', 'disable-enable-signed-send'] });
     const receiptPath = path.join(directory, 'receipt.json'); await writeFile(receiptPath, JSON.stringify(receipt, null, 2));
     await testInfo.attach('dynamic-model-notifications', { path: receiptPath, contentType: 'application/json' });
   } finally {
