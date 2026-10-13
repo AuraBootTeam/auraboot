@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -68,6 +69,9 @@ class PluginResourceImporterMenuPruneTest {
     void prunesStaleCodesAndWritesAuditRows() {
         trackedCodes("jiejia_api_errors", "kept_menu");
         activeMenu("jiejia_api_errors", 11L, "menu-pid-1");
+        when(pluginResourceMapper.findByTenantPluginAndResource(42L, "plugin-pid", "menu", "jiejia_api_errors"))
+                .thenReturn(null);
+        when(pluginResourceMapper.findByTypeAndCode(42L, "menu", "jiejia_api_errors")).thenReturn(null);
 
         int pruned = importer.pruneStaleMenus("plugin-pid", "import-1", 42L, List.of("kept_menu"));
 
@@ -79,6 +83,23 @@ class PluginResourceImporterMenuPruneTest {
                         && "delete".equals(r.getAction())
                         && "plugin-pid".equals(r.getPluginPid())
                         && "import-1".equals(r.getImportId())));
+    }
+
+    @Test
+    @DisplayName("prune audit re-homes the existing tracking row instead of inserting a duplicate")
+    void pruneAuditUpdatesExistingTrackingRow() {
+        trackedCodes("jiejia_api_errors");
+        activeMenu("jiejia_api_errors", 11L, "menu-pid-1");
+        PluginResource tracked = new PluginResource();
+        when(pluginResourceMapper.findByTenantPluginAndResource(42L, "plugin-pid", "menu", "jiejia_api_errors"))
+                .thenReturn(tracked);
+
+        int pruned = importer.pruneStaleMenus("plugin-pid", "import-1", 42L, List.of());
+
+        assertThat(pruned).isEqualTo(1);
+        verify(pluginResourceMapper).updateById(argThat((PluginResource r) ->
+                r == tracked && "delete".equals(r.getAction()) && "menu-pid-1".equals(r.getResourcePid())));
+        verify(pluginResourceMapper, never()).insert(any(PluginResource.class));
     }
 
     @Test
@@ -106,18 +127,22 @@ class PluginResourceImporterMenuPruneTest {
     }
 
     @Test
-    @DisplayName("uninstall deactivation removes the whole imported surface without audit rows")
+    @DisplayName("uninstall deactivation removes the whole imported surface and audits under the plugin")
     void deactivateAllRemovesEveryTrackedMenu() {
         trackedCodes("jiejia_api_errors", "jiejia_sync_tasks");
         activeMenu("jiejia_api_errors", 11L, "menu-pid-1");
         activeMenu("jiejia_sync_tasks", 12L, "menu-pid-2");
+        when(pluginResourceMapper.findByTenantPluginAndResource(any(), any(), any(), any()))
+                .thenReturn(null);
+        when(pluginResourceMapper.findByTypeAndCode(any(), any(), any())).thenReturn(null);
 
         int deactivated = importer.deactivateAllPluginMenus("plugin-pid", 42L);
 
         assertThat(deactivated).isEqualTo(2);
         verify(menuService).deleteMenu(11L);
         verify(menuService).deleteMenu(12L);
-        verify(pluginResourceMapper, never()).insert(any(PluginResource.class));
+        verify(pluginResourceMapper, times(2)).insert(argThat((PluginResource r) ->
+                "delete".equals(r.getAction()) && "plugin-pid".equals(r.getPluginPid())));
     }
 
     @Test

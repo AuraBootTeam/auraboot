@@ -2736,7 +2736,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         if (codes.isEmpty()) {
             return 0;
         }
-        int deactivated = deleteTrackedMenus(null, null, tenantId, codes);
+        int deactivated = deleteTrackedMenus(pluginPid, null, tenantId, codes);
         log.info("Deactivated {} imported menu(s) of uninstalled plugin {}: {}",
                 deactivated, logSafe(pluginPid), codes);
         return deactivated;
@@ -2792,12 +2792,44 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             }
             pruned++;
             if (pluginPid != null) {
-                pluginResourceMapper.insert(createResourceRecord(pluginPid, importId, tenantId,
+                upsertResourceRecord(createResourceRecord(pluginPid, importId, tenantId,
                         ResourceType.MENU, record.getResourcePid(), menuId, code, null,
                         ResourceAction.DELETE, null, null));
             }
         }
         return pruned;
+    }
+
+    /**
+     * ab_plugin_resource enforces one tracking row per (tenant, plugin, type, code), so
+     * prune audits follow the import chain's persistence contract: update the existing
+     * row in place (re-homing it to the current plugin install), insert only when the
+     * code was never tracked.
+     */
+    private void upsertResourceRecord(PluginResource record) {
+        PluginResource existing = pluginResourceMapper.findByTenantPluginAndResource(
+                record.getTenantId(), record.getPluginPid(), record.getResourceType(), record.getResourceCode());
+        if (existing == null) {
+            existing = pluginResourceMapper.findByTypeAndCode(
+                    record.getTenantId(), record.getResourceType(), record.getResourceCode());
+        }
+        if (existing == null) {
+            pluginResourceMapper.insert(record);
+            return;
+        }
+        existing.setPluginPid(record.getPluginPid());
+        existing.setImportId(record.getImportId());
+        existing.setResourcePid(record.getResourcePid());
+        existing.setResourceId(record.getResourceId());
+        existing.setResourceName(record.getResourceName());
+        existing.setAction(record.getAction());
+        existing.setPreviousState(record.getPreviousState());
+        existing.setCurrentState(record.getCurrentState());
+        existing.setImportSnapshot(record.getImportSnapshot());
+        existing.setUserModified(false);
+        existing.setUserModifiedAt(null);
+        existing.setUpdatedAt(record.getUpdatedAt());
+        pluginResourceMapper.updateById(existing);
     }
 
     // ==================== Helper Methods ====================
