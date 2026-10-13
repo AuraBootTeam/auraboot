@@ -46,6 +46,29 @@ public interface OutboxEventMapper {
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insertEnvelope(OutboxEvent event);
 
+    @Insert("INSERT INTO ab_outbox (tenant_id, event_id, event_type, command_code, schema_version, " +
+            "event_source, subject, occurred_at, correlation_id, causation_id, ordering_key, event_sequence, " +
+            "payload, headers, status, retry_count, max_retries, next_retry_at, created_at) " +
+            "VALUES (#{tenantId}, #{eventId}, #{eventType}, #{commandCode}, #{schemaVersion}, " +
+            "#{eventSource}, #{subject}, #{occurredAt}, #{correlationId}, #{causationId}, #{orderingKey}, " +
+            "#{eventSequence}, #{payload, jdbcType=OTHER, " +
+            "typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler}::jsonb, " +
+            "#{headers, jdbcType=OTHER, " +
+            "typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler}::jsonb, " +
+            "#{status}, #{retryCount}, #{maxRetries}, #{nextRetryAt}, #{createdAt}) ON CONFLICT (tenant_id, event_id) WHERE schema_version IS NOT NULL DO NOTHING")
+    @Options(useGeneratedKeys = true, keyProperty = "id")
+    int insertEnvelopeIfAbsent(OutboxEvent event);
+
+    @Select("SELECT COUNT(*) FROM ab_outbox WHERE tenant_id = #{tenantId} AND event_id = #{eventId} " +
+            "AND event_type = #{eventType} AND command_code IS NOT DISTINCT FROM #{commandCode} " +
+            "AND schema_version = #{schemaVersion} AND event_source = #{eventSource} " +
+            "AND subject = #{subject} AND occurred_at = #{occurredAt} " +
+            "AND correlation_id = #{correlationId} AND causation_id IS NOT DISTINCT FROM #{causationId} " +
+            "AND ordering_key = #{orderingKey} AND event_sequence = #{eventSequence} " +
+            "AND payload = #{payload, jdbcType=OTHER, typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler}::jsonb " +
+            "AND headers = #{headers, jdbcType=OTHER, typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler}::jsonb")
+    int countMatchingEnvelope(OutboxEvent event);
+
     @Select("SELECT * FROM ab_outbox WHERE status IN ('pending', 'processing') " +
             "AND next_retry_at <= NOW() ORDER BY created_at LIMIT #{limit}")
     List<OutboxEvent> findReadyEvents(@Param("limit") int limit);

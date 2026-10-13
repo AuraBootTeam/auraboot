@@ -31,6 +31,29 @@ public class ReliableIntegrationAccessorImpl implements ReliableIntegrationAcces
         if (!TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new IllegalStateException("Reliable integration events require an active business transaction");
         }
+        OutboxEvent event = toEvent(envelope);
+        outboxEventMapper.insertEnvelope(event);
+        recordEnqueuedAfterCommit();
+    }
+
+    @Override
+    public boolean enqueueIdempotent(IntegrationEventEnvelope envelope) {
+        if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new IllegalStateException("Reliable integration events require an active business transaction");
+        }
+        OutboxEvent event = toEvent(envelope);
+        int inserted = outboxEventMapper.insertEnvelopeIfAbsent(event);
+        if (inserted == 1) {
+            recordEnqueuedAfterCommit();
+            return true;
+        }
+        if (inserted != 0 || outboxEventMapper.countMatchingEnvelope(event) != 1) {
+            throw new IllegalArgumentException("RELIABLE_ENVELOPE_CONFLICT");
+        }
+        return false;
+    }
+
+    private OutboxEvent toEvent(IntegrationEventEnvelope envelope) {
         OutboxEvent event = new OutboxEvent();
         event.setTenantId(envelope.tenantId());
         event.setEventId(envelope.eventId());
@@ -51,7 +74,10 @@ public class ReliableIntegrationAccessorImpl implements ReliableIntegrationAcces
         event.setNextRetryAt(Instant.now());
         event.setCreatedAt(Instant.now());
         event.setReplayCount(0);
-        outboxEventMapper.insertEnvelope(event);
+        return event;
+    }
+
+    private void recordEnqueuedAfterCommit() {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
