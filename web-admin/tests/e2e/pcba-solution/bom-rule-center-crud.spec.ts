@@ -222,6 +222,7 @@ for (const c of cases) {
     if (c.enabled) expect(payload.payload[c.enabled]).toBe(false);
     await expect.poll(async () => (await records()).length).toBe(1);
     const saved = (await records())[0];
+    fixtureJournal(page).track({ model: c.model, pid: String(saved.pid) });
     if (c.enabled) expect(saved[c.enabled]).toBe(false);
     for (const choice of [c.select, c.extraSelect, ...(c.choices || [])].filter(Boolean))
       expect(saved[choice!.field]).toBe(choice!.value);
@@ -243,6 +244,7 @@ for (const c of cases) {
       await field(c.remark).getByRole('textbox').fill('second-part-for-same-customer');
       await submit(page, `bom:create_${c.command}`);
       await expect.poll(async () => (await records()).length).toBe(2);
+      for (const created of await records()) fixtureJournal(page).track({ model: c.model, pid: String(created.pid) });
       expect((await records()).map((r) => r.bom_cpm_customer_pn_norm).sort())
         .toEqual([fixtureText('GATE-PN-NORM'), fixtureText('GATE-PN-NORM-SECOND')]);
       await searchBusinessList(page, `/p/${c.model}`, marker);
@@ -615,6 +617,7 @@ test('header alias enabled/disabled affects new BOM conversions and preserves pr
   await submit(page, 'bom:create_header_alias');
   const aliasRows = () => queryDynamicRecords(page, 'bom_header_alias', [{ fieldName: 'bom_ha_alias', operator: 'EQ', value: marker }]);
   expect(await aliasRows()).toHaveLength(1);
+  fixtureJournal(page).track({ model: 'bom_header_alias', pid: String((await aliasRows())[0].pid) });
   expect((await aliasRows())[0].bom_ha_enabled).toBe(false);
 
   async function setEnabled(enabled: boolean) {
@@ -740,6 +743,7 @@ test('header alias enabled/disabled affects new BOM conversions and preserves pr
   const profiles = () => queryDynamicRecords(page, 'bom_source_format_profile', [{ fieldName: 'bom_sfp_customer_id', operator: 'EQ', value: customerId }]);
   expect(await profiles()).toHaveLength(1);
   let profile = (await profiles())[0];
+  fixtureJournal(page).track({ model: 'bom_source_format_profile', pid: String(profile.pid) });
   let profileId = String(profile.pid);
   expect(profile.bom_sfp_status).toBe('candidate');
   expect(profile.bom_sfp_enabled).toBe(false);
@@ -782,6 +786,7 @@ test('header alias enabled/disabled affects new BOM conversions and preserves pr
   await profileAction('保存此格式供后续复用', 'bom:save_applied_parse_plan_profile', null, true);
   expect(await profiles()).toHaveLength(1);
   profile = (await profiles())[0];
+  fixtureJournal(page).track({ model: 'bom_source_format_profile', pid: String(profile.pid) });
   expect(String(profile.pid)).not.toBe(profileId);
   profileId = String(profile.pid);
   await searchBusinessList(page, '/p/bom_source_format_profile', String(profile.bom_sfp_code));
@@ -954,6 +959,7 @@ test(`${kind} rule enabled/disabled changes extracted attributes in real BOM con
   await submit(page, `bom:create_${kind}_rule`);
   const aliasRows = () => queryDynamicRecords(page, model, [{ fieldName: key, operator: 'EQ', value: marker }]);
   expect(await aliasRows()).toHaveLength(1);
+  fixtureJournal(page).track({ model, pid: String((await aliasRows())[0].pid) });
   expect((await aliasRows())[0][enabledField]).toBe(false);
 
   async function setEnabled(enabled: boolean) {
@@ -1079,6 +1085,7 @@ for (const kind of ['aml', 'avl'] as const) {
       expect(rows).toHaveLength(snapshots.length + 1);
       const created = rows.find(r => !snapshots.some(s => s.pid === r.pid))!;
       expect(created).toBeTruthy();
+      fixtureJournal(page).track({ model, pid: String(created.pid) });
       expect(created[`${prefix}status`]).toBe('pending');
       snapshots.push(created);
       return String(created.pid);
@@ -1369,6 +1376,7 @@ test('B18-03 part map: mapping applies to a new conversion, prior snapshots stay
     { fieldName: 'bom_cpm_customer_pn_norm', operator: 'EQ', value: customerPn },
   ]);
   expect(mappings, 'mapping persisted').toHaveLength(1);
+  fixtureJournal(page).track({ model: 'bom_customer_part_map', pid: String(mappings[0].pid) });
   // Refresh after mapping so K1 sees the new customer-part relation.
   await executeCommand(page, 'bom:refresh_material_snapshot', {});
 

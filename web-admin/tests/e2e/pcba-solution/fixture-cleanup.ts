@@ -91,21 +91,27 @@ export class FixtureCleanupJournal {
       }
       try {
         const prefix = `${this.origin}/api/dynamic/${entry.model}`;
-        const deletion = await request.delete(`${prefix}/${entry.pid}`, {
-          timeout: 15_000, headers: { Origin: this.origin },
-        });
-        const deleted = await deletion.json();
-        if (!deletion.ok() || String(deleted.code) !== '0') {
-          throw new Error(`Delete rejected: HTTP ${deletion.status()}, code=${deleted.code}`);
-        }
         const filters = encodeURIComponent(JSON.stringify([{ fieldName: 'pid', operator: 'EQ', value: entry.pid }]));
-        const check = await request.get(`${prefix}/list?pageNum=1&pageSize=2&filters=${filters}`, { timeout: 15_000 });
-        const body = await check.json();
-        const records = body?.data?.records;
-        if (!check.ok() || String(body.code) !== '0' || !Array.isArray(records)) {
-          throw new Error('Fixture absence query failed');
+        const query = async () => {
+          const check = await request.get(`${prefix}/list?pageNum=1&pageSize=2&filters=${filters}`, { timeout: 15_000 });
+          const body = await check.json();
+          const records = body?.data?.records;
+          if (!check.ok() || String(body.code) !== '0' || !Array.isArray(records)) {
+            throw new Error('Fixture absence query failed');
+          }
+          return records;
+        };
+        // A UI deletion or an interrupted cleanup may already have removed this exact fixture.
+        if ((await query()).length !== 0) {
+          const deletion = await request.delete(`${prefix}/${entry.pid}`, {
+            timeout: 15_000, headers: { Origin: this.origin },
+          });
+          const deleted = await deletion.json();
+          if (!deletion.ok() || String(deleted.code) !== '0') {
+            throw new Error(`Delete rejected: HTTP ${deletion.status()}, code=${deleted.code}`);
+          }
+          if ((await query()).length !== 0) throw new Error('Fixture remains visible after deletion');
         }
-        if (records.length !== 0) throw new Error('Fixture remains visible after deletion');
         entry.status = 'removed';
         delete entry.error;
       } catch (error) {
