@@ -39,7 +39,7 @@ public final class ProcurementReceiptCommandScope {
                 || !InventoryReceiptEnqueueProvenance.EVENT.equals(event.eventType())
                 || !Long.valueOf(event.tenantId()).equals(MetaContext.getCurrentTenantId())
                 || plugins.observeLoadedArtifact(consumer.getClass()).filter(a -> "com.auraboot.procurement".equals(a.pluginId())).isEmpty()
-                || plugins.getExtensionsOfType(ReliableEventConsumerExtension.class).stream().noneMatch(c -> c == consumer)) throw denied();
+                || !plugins.isDiscoveredExtensionInstance(ReliableEventConsumerExtension.class, consumer)) throw denied();
         provenance.lockPersistedDelivery(event, lease);
         Object raw = event.payload().get("lines");
         if (!(raw instanceof List<?> lines) || lines.isEmpty() || lines.size() > 4096) throw denied();

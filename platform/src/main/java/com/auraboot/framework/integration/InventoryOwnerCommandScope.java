@@ -34,8 +34,7 @@ public final class InventoryOwnerCommandScope {
         if (plugins == null || authority == null || !IMPLEMENTATION.equals(consumer.getClass().getName())
                 || plugins.observeLoadedArtifact(consumer.getClass())
                     .filter(artifact -> "com.auraboot.inventory".equals(artifact.pluginId())).isEmpty()
-                || plugins.getExtensionsOfType(ReliableEventConsumerExtension.class).stream()
-                    .noneMatch(registered -> registered == consumer))
+                || !plugins.isDiscoveredExtensionInstance(ReliableEventConsumerExtension.class, consumer))
             throw new SecurityException("Inventory intake consumer is not its registered started plugin");
         if (!"1.0".equals(event.schemaVersion()) || !"procurement".equals(event.source())
                 || event.tenantId() <= 0 || !Long.valueOf(event.tenantId()).equals(MetaContext.getCurrentTenantId())

@@ -133,3 +133,15 @@ verification must prove that a competing exact claim skips the held row, and tha
 before lock acquisition causes rollback with no plugin effect or applied receipt. The separate
 lease-claim transaction must already have committed; an outer held row lock followed by this
 `REQUIRES_NEW` delivery is explicitly forbidden.
+
+The fixed Inventory handler/intake consumer and Procurement receipt counter use a host-discovered
+instance proof. PF4J's current Spring factory creates fresh objects on repeated enumeration;
+re-enumerating and comparing with a registry-cached object is not a registration proof. The
+existing AuraPluginManager discovery methods record only returned applicable extensions in a
+weak **identity** ledger, bound to the actual implementation Class, current STARTED wrapper,
+classloader and observed JAR artifact. Read-only lookup cannot register an object. Arbitrary
+same-Class instances (including objects with permissive equals/hashCode) have no proof. Plugin
+lifecycle changes invalidate prior discovery; unload/reload and changed physical artifacts fail
+closed. Other extension types and the global factory's creation semantics remain unchanged.
+Real PF4J factory tests with synthetic local JARs prove this primitive, not full business PG/Auth
+or Inventory/Procurement artifact admission.

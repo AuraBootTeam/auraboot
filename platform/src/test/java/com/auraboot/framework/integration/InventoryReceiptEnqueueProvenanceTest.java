@@ -71,6 +71,7 @@ class InventoryReceiptEnqueueProvenanceTest {
                 .getConstructor(Runnable.class).newInstance((Runnable) () -> effect.run());
         artifact = new AuraPluginManager.LoadedPluginArtifact("com.auraboot.inventory",directory,"a".repeat(64));
         when(plugins.getExtensionsOfType(CommandHandlerExtension.class)).thenReturn(List.of(producer));
+        when(plugins.isDiscoveredExtensionInstance(CommandHandlerExtension.class,producer)).thenReturn(true);
         when(plugins.observeLoadedArtifact(producer.getClass())).thenReturn(Optional.of(artifact));
         model = new Model(); model.setId(1L); model.setPid("model"); model.setCode("inv_inbound"); model.setTenantId(31L);
         model.setIsCurrent(true); model.setStatus("published"); model.setDeletedFlag(false); model.setVersion(1);

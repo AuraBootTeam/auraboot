@@ -17,6 +17,10 @@ import java.util.*;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
 import java.util.Locale;
+import java.lang.ref.ReferenceQueue;
+import java.lang.ref.WeakReference;
+import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
+import com.auraboot.framework.plugin.extension.integration.ReliableEventConsumerExtension;
 
 /**
  * AuraBoot plugin manager extending SpringPluginManager.
@@ -35,6 +39,21 @@ public class AuraPluginManager extends SpringPluginManager {
     private final Path pluginsRoot;
     private final Map<ClassLoader, LoadedPluginArtifact> loadedArtifacts = Collections.synchronizedMap(new WeakHashMap<>());
 
+    private final ReferenceQueue<Object> discoveredQueue = new ReferenceQueue<>();
+    private final Map<IdentityReference, DiscoveredExtension> discovered = new HashMap<>();
+    private final Map<String, Long> discoveryGenerations = new HashMap<>();
+    private record DiscoveredExtension(Class<?> type, Class<?> implementation, PluginWrapper wrapper,
+                                       LoadedPluginArtifact artifact, long generation) {}
+    private static final class IdentityReference extends WeakReference<Object> {
+        private final int hash;
+        IdentityReference(Object value, ReferenceQueue<Object> queue) { super(value, queue); hash = System.identityHashCode(value); }
+        @Override public int hashCode() { return hash; }
+        @Override public boolean equals(Object value) {
+            if (this == value) return true;
+            return value instanceof IdentityReference other && get() != null && get() == other.get();
+        }
+    }
+
     public record LoadedPluginArtifact(String pluginId, Path path, String digest) {}
 
     /**
@@ -45,6 +64,14 @@ public class AuraPluginManager extends SpringPluginManager {
     public AuraPluginManager(@Value("${aura.plugins.dir:plugins}") String pluginsDir) {
         super(resolvePluginsPath(pluginsDir));
         this.pluginsRoot = resolvePluginsPath(pluginsDir);
+        addPluginStateListener(event -> {
+            String id = event.getPlugin().getPluginId();
+            synchronized (discovered) {
+                cleanDiscovered();
+                discoveryGenerations.merge(id, 1L, Long::sum);
+                discovered.values().removeIf(value -> id.equals(value.artifact().pluginId()));
+            }
+        });
         log.info("AuraPluginManager initialized with plugins directory: {}", this.pluginsRoot);
     }
 
@@ -359,7 +386,9 @@ public class AuraPluginManager extends SpringPluginManager {
      * @return list of extensions
      */
     public <T> List<T> getExtensionsOfType(Class<T> extensionType) {
-        return getExtensions(extensionType);
+        List<T> instances = getExtensions(extensionType);
+        instances.forEach(instance -> recordDiscovered(extensionType, instance));
+        return instances;
     }
 
     /**
@@ -371,7 +400,60 @@ public class AuraPluginManager extends SpringPluginManager {
      * @return list of extensions from the plugin
      */
     public <T> List<T> getExtensionsOfType(Class<T> extensionType, String pluginId) {
-        return getExtensions(extensionType, pluginId);
+        List<T> instances = getExtensions(extensionType, pluginId);
+        instances.forEach(instance -> recordDiscovered(extensionType, instance));
+        return instances;
+    }
+
+    /** Read-only proof of an actual object returned by host discovery, not a Class/name alias. */
+    public boolean isDiscoveredExtensionInstance(Class<?> type, Object instance) {
+        if (instance == null || fixedDiscoveryOwner(type, instance) == null) return false;
+        DiscoveredExtension approved;
+        synchronized (discovered) {
+            cleanDiscovered(); approved = discovered.get(new IdentityReference(instance, null));
+        }
+        if (approved == null || approved.type() != type || approved.implementation() != instance.getClass()) return false;
+        var current = observeLoadedArtifact(instance.getClass());
+        if (current.isEmpty() || !approved.artifact().equals(current.get())
+                || approved.wrapper() != getPlugin(approved.artifact().pluginId())) return false;
+        synchronized (discovered) {
+            return discovered.get(new IdentityReference(instance, null)) == approved
+                    && discoveryGenerations.getOrDefault(approved.artifact().pluginId(), 0L) == approved.generation();
+        }
+    }
+
+    private void recordDiscovered(Class<?> type, Object instance) {
+        String expectedOwner = fixedDiscoveryOwner(type, instance);
+        if (expectedOwner == null) return;
+        long generation;
+        synchronized (discovered) { generation = discoveryGenerations.getOrDefault(expectedOwner, 0L); }
+        var artifact = observeLoadedArtifact(instance.getClass());
+        if (artifact.isEmpty() || !expectedOwner.equals(artifact.get().pluginId())) return;
+        PluginWrapper wrapper = getPlugin(expectedOwner);
+        if (wrapper == null || wrapper.getPluginState() != PluginState.STARTED) return;
+        synchronized (discovered) {
+            cleanDiscovered();
+            if (discoveryGenerations.getOrDefault(expectedOwner, 0L) != generation) return;
+            discovered.put(new IdentityReference(instance, discoveredQueue), new DiscoveredExtension(type,
+                    instance.getClass(), wrapper, artifact.get(), discoveryGenerations.getOrDefault(expectedOwner, 0L)));
+        }
+    }
+
+    private static String fixedDiscoveryOwner(Class<?> type, Object instance) {
+        if (type == null || instance == null || !type.isInstance(instance)) return null;
+        String name = instance.getClass().getName();
+        if (type == CommandHandlerExtension.class && name.equals("com.auraboot.plugins.inventory.handler.ConfirmWarehouseInHandler"))
+            return "com.auraboot.inventory";
+        if (type == ReliableEventConsumerExtension.class) {
+            if (name.equals("com.auraboot.plugins.inventory.ReliableInventoryEventConsumer")) return "com.auraboot.inventory";
+            if (name.equals("com.auraboot.plugins.procurement.ReliableProcurementReceiptConsumer")) return "com.auraboot.procurement";
+        }
+        return null;
+    }
+
+    private void cleanDiscovered() {
+        IdentityReference stale;
+        while ((stale = (IdentityReference) discoveredQueue.poll()) != null) discovered.remove(stale);
     }
 
     /**

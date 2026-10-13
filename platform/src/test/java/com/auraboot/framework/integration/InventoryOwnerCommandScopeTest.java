@@ -84,6 +84,7 @@ class InventoryOwnerCommandScopeTest {
         when(plugins.observeLoadedArtifact(implementation)).thenReturn(Optional.of(
                 new AuraPluginManager.LoadedPluginArtifact("com.auraboot.inventory", directory, "verified-by-host")));
         when(plugins.getExtensionsOfType(ReliableEventConsumerExtension.class)).thenReturn(List.of(consumer));
+        when(plugins.isDiscoveredExtensionInstance(ReliableEventConsumerExtension.class,consumer)).thenReturn(true);
         for (String code : List.of("inv_inbound", "inv_inbound_line", "inv_warehouse", "inv_warehouse_location", "prod_product", "pe_product")) {
             Model model = new Model(); model.setId((long) actualModels.size() + 1);
             model.setPid(code + "-definition"); model.setTenantId(31L); model.setCode(code);
@@ -174,7 +175,7 @@ class InventoryOwnerCommandScopeTest {
         assertDeniedBeforeEffect(event("procurement", "inv:receive_source_receipt"));
         when(plugins.observeLoadedArtifact(type)).thenReturn(Optional.of(
                 new AuraPluginManager.LoadedPluginArtifact("com.auraboot.inventory", directory, "digest")));
-        when(plugins.getExtensionsOfType(ReliableEventConsumerExtension.class)).thenReturn(List.of());
+        when(plugins.isDiscoveredExtensionInstance(ReliableEventConsumerExtension.class,consumer)).thenReturn(false);
         assertDeniedBeforeEffect(event("procurement", "inv:receive_source_receipt"));
     }
 

@@ -85,6 +85,7 @@ class ProcurementReceiptCommandScopeTest {
         when(plugins.observeLoadedArtifact(implementation)).thenReturn(Optional.of(
                 new AuraPluginManager.LoadedPluginArtifact("com.auraboot.procurement", directory, "verified-by-host")));
         when(plugins.getExtensionsOfType(ReliableEventConsumerExtension.class)).thenReturn(List.of(consumer));
+        when(plugins.isDiscoveredExtensionInstance(ReliableEventConsumerExtension.class,consumer)).thenReturn(true);
         for (String code : List.of("pr_purchase_order_line", "pr_purchase_order", "pr_purchase_receipt", "pr_purchase_receipt_line", "pr_inventory_operation_request", "prod_product", "pe_product")) {
             Model model = new Model(); model.setId((long) actualModels.size() + 1);
             model.setPid(code + "-definition"); model.setTenantId(31L); model.setCode(code);
@@ -231,7 +232,7 @@ class ProcurementReceiptCommandScopeTest {
             accessor.compareAndSet(31, "pr_purchase_order_line", "line", "row_version", 7, Map.of("pr_pol_received_qty", 25));
         };
         assertThatThrownBy(this::deliver).isInstanceOf(SecurityException.class);
-        when(plugins.getExtensionsOfType(ReliableEventConsumerExtension.class)).thenReturn(List.of());
+        when(plugins.isDiscoveredExtensionInstance(ReliableEventConsumerExtension.class,consumer)).thenReturn(false);
         assertThatThrownBy(this::deliver).isInstanceOf(SecurityException.class);
     }
     private void deliver() {

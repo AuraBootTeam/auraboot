@@ -40,7 +40,7 @@ public final class InventoryReceiptEnqueueProvenance {
     public Object invoke(CommandHandlerExtension handler, CommandHandlerExtension.CommandContext context) throws Exception {
         if (!COMMAND.equals(handler.getCommandType())) return handler.execute(context);
         if (current.get() != null || !IMPLEMENTATION.equals(handler.getClass().getName())
-                || plugins.getExtensionsOfType(CommandHandlerExtension.class).stream().noneMatch(registered -> registered == handler)
+                || !plugins.isDiscoveredExtensionInstance(CommandHandlerExtension.class, handler)
                 || !COMMAND.equals(context.commandType()) || !"inv_inbound".equals(context.modelCode())
                 || context.tenantId() == null || !context.tenantId().equals(MetaContext.getCurrentTenantId())
                 || !COMMAND.equals(MetaContext.getAuthorizedCommandCode())
