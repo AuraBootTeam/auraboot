@@ -65,6 +65,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 class ProcurementPublicSourceCommandRealDbIT {
     private static final String SYNC="qo_procurement_task_common:sync_sources";
     private static final String PASSWORD="public-source-local-fixture-123";
+    // The target command permit is s2p-only. Related reads still require actual Rule Center permissions.
+    private static final List<String> RELATED_READ_PERMISSIONS=List.of(
+        "model.customer_pcba_int_kingdee_connection.read","model.customer_pcba_int_external_ref.read",
+        "model.prod_product.read","model.pr_purchase_request.read","model.s2p_bid.read",
+        "model.qo_procurement_allocation_common.read","model.qo_procurement_quote_line_common.read");
     @Autowired WebApplicationContext application;
     @Autowired FilterChainProxy springSecurityFilterChain;
     @Autowired ExtensionRegistry extensions;
@@ -152,10 +157,10 @@ class ProcurementPublicSourceCommandRealDbIT {
         assertEquals("qo.procurement.integrate",execution.path("permissions").get(0).asText());
         assertTrue(execution.path("handlerParams").path("procurementSourceEligibilityPolicies").isArray());
         assertEquals(0,execution.path("handlerParams").path("procurementSourceEligibilityPolicies").size());
-        token=actorToken(owner.getId(),owner.getPid(),memberId,provider+"@example.invalid",List.of("meta.command.execute","qo.procurement.integrate"));
+        token=actorToken(owner.getId(),owner.getPid(),memberId,provider+"@example.invalid",sourceActorPermissions(true));
         context();var denied=users.signUp(provider+"-denied@example.invalid",PASSWORD,"No integration authority",provider+"_denied");
         var deniedMember=members.addMember(denied.getId(),tenant,"active");
-        deniedToken=actorToken(denied.getId(),denied.getPid(),deniedMember.getId(),provider+"-denied@example.invalid",List.of("meta.command.execute"));
+        deniedToken=actorToken(denied.getId(),denied.getPid(),deniedMember.getId(),provider+"-denied@example.invalid",sourceActorPermissions(false));
         context();mvc=MockMvcBuilders.webAppContextSetup(application).addFilters(springSecurityFilterChain).build();
         server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);response=row("11",1000,"C");
         server.createContext("/K3Cloud/Kingdee.BOS.WebApi.ServicesStub.AuthService.LoginByAppSecret.common.kdsvc",http->{
@@ -321,6 +326,10 @@ class ProcurementPublicSourceCommandRealDbIT {
         MetaContext.clear();var result=mvc.perform(post("/api/meta/commands/execute/"+SYNC).header("Authorization","Bearer "+bearer)
             .header("X-Locale","en-US").contentType("application/json").content(json.writeValueAsBytes(Map.of("targetRecordPid",task,"payload",payload)))).andReturn();
         context();return new Result(result.getResponse().getStatus(),json.readTree(result.getResponse().getContentAsByteArray()));
+    }
+    private static List<String> sourceActorPermissions(boolean integration) {
+        var codes=new ArrayList<String>();codes.add("meta.command.execute");codes.addAll(RELATED_READ_PERMISSIONS);
+        if(integration) codes.add("qo.procurement.integrate");return List.copyOf(codes);
     }
     private String actorToken(Long id,String pid,Long member,String email,List<String> codes) {
         context();var role=new Role();role.setPid(com.auraboot.framework.common.util.UniqueIdGenerator.generate());role.setCode(provider+"_"+id);role.setName(provider);role.setType("custom");role.setScopeType("tenant");role.setStatus("active");role.setTenantId(tenant);role.setIsDefault(false);role.setIsSystem(false);role.setDeletedFlag(false);role.setPriority(100);role.setCreatedAt(Instant.now());role.setUpdatedAt(Instant.now());role=roles.createRole(role);
