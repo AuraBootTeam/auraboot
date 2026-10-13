@@ -81,4 +81,82 @@ class ProductQuoteNativeInitializationTest {
                 "pr_supplier_code", "x", "pr_supplier_name", "x", "pr_supplier_status", "enabled", "qo_pr_supplier_account_id", "x"));
     }
 
+    private Path sourceOwner() throws Exception {
+        Path source = Files.createDirectory(root.resolve("owner"));
+        Files.createDirectories(source.resolve("config/fields"));
+        Files.createDirectories(source.resolve("config/commands"));
+        Files.writeString(source.resolve("plugin.json"), "{\"pluginId\":\"com.auraboot.source-to-pay\",\"namespace\":\"s2p\"}");
+        var definitions = json.createArrayNode();
+        for (String model : java.util.List.of("s2p_sourcing_event", "s2p_bid")) {
+            String marker = model.equals("s2p_bid") ? "s2p_bid_collaboration_managed" : "s2p_se_collaboration_managed";
+            var fields = json.createArrayNode();
+            var field = fields.addObject();
+            field.put("code", marker).put("dataType", "boolean").put("immutable", true).put("defaultValue", false);
+            field.putObject("extension").put("systemManaged", true);
+            field.putArray("allowedWriterCommands").add("formal:create");
+            Files.writeString(source.resolve("config/fields/" + model + ".json"), fields.toString());
+            var definition = definitions.addObject();
+            definition.put("code", model);
+            var policy = definition.putObject("extension").putObject("recordCommandWriters");
+            policy.put("field", marker);
+            var operations = policy.putObject("commands");
+            operations.putArray("create").add("formal:create");
+            operations.putArray("update").add("formal:update");
+            operations.putArray("delete");
+        }
+        Files.writeString(source.resolve("config/models.json"), definitions.toString());
+        Files.writeString(source.resolve("config/commands/formal.json"), "[]");
+        return source;
+    }
+
+    @Test void exactOwnerCopyAddsOnlyItsTwoFieldAndCreatePermits() throws Exception {
+        Path source = sourceOwner();
+        String original = Files.readString(source.resolve("config/models.json"));
+        Path copy = root.resolve("owner-copy");
+        var proof = ProductQuoteNativeInitialization.prepareSourceToPay(source, copy, json);
+        assertThat(Files.readString(source.resolve("config/models.json"))).isEqualTo(original);
+        var models = json.readTree(copy.resolve("config/models.json").toFile());
+        for (var model : models) {
+            var operations = model.path("extension").path("recordCommandWriters").path("commands");
+            assertThat(operations.path("create").toString()).isEqualTo("[\"formal:create\",\"" +
+                    ProductQuoteNativeInitialization.command(model.path("code").asText()) + "\"]");
+            assertThat(operations.path("update").toString()).isEqualTo("[\"formal:update\"]");
+            assertThat(operations.path("delete").toString()).isEqualTo("[]");
+            var field = json.readTree(copy.resolve("config/fields/" + model.path("code").asText() + ".json").toFile()).get(0);
+            assertThat(field.path("allowedWriterCommands")).hasSize(2);
+            assertThat(field.path("immutable").booleanValue()).isTrue();
+            assertThat(field.path("extension").path("systemManaged").booleanValue()).isTrue();
+            assertThat(field.path("defaultValue").booleanValue()).isFalse();
+        }
+        assertThat(Files.readAllBytes(copy.resolve("config/commands/formal.json")))
+                .isEqualTo(Files.readAllBytes(source.resolve("config/commands/formal.json")));
+        assertThat(proof).containsKeys("exactWriterAppendix", "exactModelAppendix", "sourceResourceHashes", "generatedResourceHashes");
+    }
+
+    @Test void wrongOwnerMissingProtectionAndMissingModelPolicyFailClosed() throws Exception {
+        Path source = sourceOwner();
+        Files.writeString(source.resolve("plugin.json"), "{\"pluginId\":\"other\",\"namespace\":\"s2p\"}");
+        assertThatThrownBy(() -> ProductQuoteNativeInitialization.prepareSourceToPay(source, root.resolve("wrong"), json))
+                .isInstanceOf(IllegalArgumentException.class);
+        Files.writeString(source.resolve("plugin.json"), "{\"pluginId\":\"com.auraboot.source-to-pay\",\"namespace\":\"s2p\"}");
+        String fields = Files.readString(source.resolve("config/fields/s2p_bid.json"));
+        Files.writeString(source.resolve("config/fields/s2p_bid.json"), fields.replace("\"immutable\":true", "\"immutable\":false"));
+        assertThatThrownBy(() -> ProductQuoteNativeInitialization.prepareSourceToPay(source, root.resolve("unprotected"), json))
+                .isInstanceOf(IllegalArgumentException.class);
+        Files.writeString(source.resolve("config/fields/s2p_bid.json"), "[]");
+        assertThatThrownBy(() -> ProductQuoteNativeInitialization.prepareSourceToPay(source, root.resolve("missing-marker"), json))
+                .isInstanceOf(IllegalArgumentException.class);
+        Files.writeString(source.resolve("config/fields/s2p_bid.json"), fields.replace("allowedWriterCommands", "missingWriters"));
+        assertThatThrownBy(() -> ProductQuoteNativeInitialization.prepareSourceToPay(source, root.resolve("missing-writers"), json))
+                .isInstanceOf(IllegalArgumentException.class);
+        Files.writeString(source.resolve("config/fields/s2p_bid.json"), fields);
+        String models = Files.readString(source.resolve("config/models.json"));
+        Files.writeString(source.resolve("config/models.json"), models.replace("recordCommandWriters", "missingPolicy"));
+        assertThatThrownBy(() -> ProductQuoteNativeInitialization.prepareSourceToPay(source, root.resolve("missing-policy"), json))
+                .isInstanceOf(IllegalArgumentException.class);
+        Files.writeString(source.resolve("config/models.json"), models.replace("formal:create", "s2p_bid:initialize_s06_native_fixture"));
+        assertThatThrownBy(() -> ProductQuoteNativeInitialization.prepareSourceToPay(source, root.resolve("injected"), json))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
 }

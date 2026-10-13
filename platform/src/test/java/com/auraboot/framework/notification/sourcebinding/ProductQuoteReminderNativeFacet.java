@@ -42,6 +42,7 @@ import com.auraboot.framework.tenant.service.TenantService;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.service.UserService;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.lang.reflect.InvocationTargetException;
@@ -416,12 +417,30 @@ final class ProductQuoteReminderNativeFacet {
 
     private void importInitializationAppendix(JsonNode input) throws Exception {
         List<Path> productDirectories = new ArrayList<>();
+        List<Path> ownerDirectories = new ArrayList<>();
         for (JsonNode directory : input.path("orderedImportDirectories")) {
             Path path = Path.of(directory.path("path").asText()).toRealPath();
             if (s.json.readTree(path.resolve("plugin.json").toFile()).path("pluginId").asText()
                     .equals("com.auraboot.quote-procurement")) productDirectories.add(path);
+            if (s.json.readTree(path.resolve("plugin.json").toFile()).path("pluginId").asText()
+                    .equals("com.auraboot.source-to-pay")) ownerDirectories.add(path);
         }
         assertThat(productDirectories).hasSize(1);
+        assertThat(ownerDirectories).hasSize(1);
+        Map<String, Object> ownerAppendix = ProductQuoteNativeInitialization.prepareSourceToPay(ownerDirectories.getFirst(),
+                evidence.resolve("source-to-pay-initialization-appendix"), s.json);
+        trace.put("sourceToPayInitializationAppendix", ownerAppendix);
+        var ownerPreview = s.imports.parseDirectory((String) ownerAppendix.get("testDirectory"), true);
+        trace.put("sourceToPayInitializationPreviewErrors", ownerPreview.getErrors());
+        assertThat(ownerPreview.isValid()).as("Exact source owner appendix: %s", ownerPreview.getErrors()).isTrue();
+        var ownerRequest = ImportRequest.builder().importId(ownerPreview.getImportId())
+                .conflictStrategy(ImportRequest.ConflictStrategy.OVERWRITE).autoPublishFields(true)
+                .autoPublishModels(true).autoPublishCommands(true).autoPublishPages(true)
+                .createResourcePermissions(true).build();
+        var ownerResult = s.imports.execute(ownerPreview.getImportId(), ownerRequest);
+        trace.put("sourceToPayInitializationImportId", ownerPreview.getImportId());
+        trace.put("sourceToPayInitializationImportSuccess", ownerResult.isSuccess());
+        assertThat(ownerResult.isSuccess()).as("Exact source owner import: %s", ownerResult.getErrorMessage()).isTrue();
         Map<String, Object> appendix = ProductQuoteNativeInitialization.prepare(productDirectories.getFirst(),
                 evidence.resolve("initialization-appendix"), s.json);
         trace.put("testInitializationAppendix", appendix);
@@ -436,9 +455,16 @@ final class ProductQuoteReminderNativeFacet {
         trace.put("initializationImportId", preview.getImportId());
         trace.put("initializationImportSuccess", result.isSuccess());
         assertThat(result.isSuccess()).as("Explicit test-only initialization import: %s", result.getErrorMessage()).isTrue();
-        JsonNode expectedWriters = s.json.valueToTree(appendix.get("exactWriterAppendix"));
+        ObjectNode expectedWriters = s.json.valueToTree(appendix.get("exactWriterAppendix"));
+        expectedWriters.setAll((ObjectNode) s.json.valueToTree(ownerAppendix.get("exactWriterAppendix")));
+        assertThat(expectedWriters.size()).isEqualTo(9);
+        JsonNode expectedPolicies = s.json.valueToTree(ownerAppendix.get("exactModelAppendix"));
         for (String model : ProductQuoteNativeInitialization.FIELDS.keySet()) {
             var definition = s.metadata.getModelDefinitionFromDb(model).orElseThrow();
+            if (expectedPolicies.has(model)) {
+                assertThat((JsonNode) s.json.valueToTree(definition.getExtension().get("recordCommandWriters")))
+                        .isEqualTo(expectedPolicies.path(model).path("testPolicy"));
+            }
             for (String code : ProductQuoteNativeInitialization.FIELDS.get(model)) {
                 var field = definition.getFields().stream().filter(f -> code.equals(f.getCode())).findFirst().orElseThrow();
                 if (expectedWriters.has(code)) {
@@ -448,6 +474,8 @@ final class ProductQuoteReminderNativeFacet {
             }
         }
         trace.put("actualImportedInitializationWritersVerified", true);
+        trace.put("actualImportedSourceOwnerPoliciesVerified", true);
+        trace.put("actualImportedInitializationProtectedFields", 9);
     }
 
     private void authenticateInitializer() {
