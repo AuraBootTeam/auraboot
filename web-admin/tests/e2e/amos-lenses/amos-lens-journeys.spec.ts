@@ -110,7 +110,7 @@ async function openSettledLens(page: Page, code: string) {
   const pending = journey.queries.map(queryCode => page.waitForResponse(response =>
     new URL(response.url()).pathname === '/api/meta/chart-data'
       && response.request().method() === 'POST'
-      && response.request().postDataJSON()?.queryCode === queryCode));
+      && response.request().postDataJSON()?.queryCode === queryCode, { timeout: 20_000 }));
   await menu.click();
   await expect(page).toHaveURL(new RegExp(`/dashboards/view/${code}$`));
   const responses = await Promise.all(pending);
