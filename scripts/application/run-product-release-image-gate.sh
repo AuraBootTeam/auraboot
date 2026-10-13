@@ -128,7 +128,7 @@ if [[ -n "$RUNTIME_ARGS_REL" ]]; then
     || fatal 'product runtime args file must be tracked at the exact product commit'
   while IFS= read -r runtime_arg || [[ -n "$runtime_arg" ]]; do
     [[ -n "$runtime_arg" && "$runtime_arg" != \#* ]] || continue
-    [[ "$runtime_arg" =~ ^--[a-z0-9.-]+=[A-Za-z0-9._/:=-]+$ ]] \
+    [[ "$runtime_arg" =~ ^--[a-z0-9.-]+=[A-Za-z0-9._/:=,-]+$ ]] \
       || fatal "invalid product runtime argument: $runtime_arg"
     RUNTIME_ARGS+=("$runtime_arg")
   done <"$PRODUCT_ROOT/$RUNTIME_ARGS_REL"

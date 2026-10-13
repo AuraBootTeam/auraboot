@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
@@ -13,6 +14,18 @@ const deploy = readFileSync(resolve(root, 'scripts/application/auraboot-core-env
 const audit = readFileSync(resolve(root, 'scripts/application/audit-core-only-schema.sh'), 'utf8');
 const oci = readFileSync(resolve(root, 'scripts/application/oci-layout.mjs'), 'utf8');
 const productImageGate = readFileSync(resolve(root, 'scripts/application/run-product-release-image-gate.sh'), 'utf8');
+
+test('product runtime argument guard accepts role lists and rejects shell syntax', () => {
+  const guard = productImageGate.split('\n').find(line => line.includes('[[ "$runtime_arg" =~'));
+  assert.ok(guard);
+  const expression = guard.trim().replace(/\\$/, '').trim();
+  const check = argument => spawnSync('bash', ['-c', `runtime_arg="$1"\n${expression}`, 'argument-guard', argument]).status;
+  assert.equal(check('--aura.tenant.creator-roles=xy_school_admin,xy_teacher'), 0);
+  assert.equal(check('--aura.application.bundle-root=/opt/auraboot'), 0);
+  for (const argument of ['--x=a b', '--x=$(id)', '--x=`id`', '--x=a;b', '--x=a\nb', '--x=', '-x=a']) {
+    assert.equal(check(argument), 1, argument);
+  }
+});
 
 test('core release stages a compiled Web shell and a self-contained deployment driver', () => {
   assert.match(stage, /platform\/gradlew/);
