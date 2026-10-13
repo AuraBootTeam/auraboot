@@ -1905,7 +1905,7 @@ class ProcurementPluginHostRealDbIT {
         assertTrue(node.path("productJarSha256").asText().matches("[a-f0-9]{64}"));
         Path testSource=Path.of(fixtureEnv("PROCUREMENT_FIXTURE_TEST_SOURCE")).toRealPath();
         assertEquals(node.path("nativeHostTestSha256").asText(),fixtureSha(testSource));
-        assertEquals("ec4554c3c617415d37cdaff3550123b2bc2e1e03",node.path("nativeHostBaseCommit").asText());
+        assertEquals("9d9685a62c577d98052681e2aff6c64135ddf93e",node.path("nativeHostBaseCommit").asText());
         // Copy only declared nonsecret identity fields, never arbitrary input diagnostic/configuration data.
         fixtureBinding=new LinkedHashMap<>();
         for(String key:List.of("runtime","database","tenantId","productJarSha256","nativeHostTestSha256","nativeHostBaseCommit"))
