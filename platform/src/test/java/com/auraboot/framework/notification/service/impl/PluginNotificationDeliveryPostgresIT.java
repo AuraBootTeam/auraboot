@@ -181,6 +181,17 @@ class PluginNotificationDeliveryPostgresIT {
         assertThat(results).extracting(Result::deliveryKey).containsOnly(results.getFirst().deliveryKey());
         assertThat(counts()).isEqualTo(Map.of("outbox",1,"receipt",0,"inbox",0));
         assertThat(queue(plan).status()).isEqualTo(Status.REPLAYED);
+        assertThat(readEvent(results.getFirst().deliveryKey()).occurredAt())
+                .isEqualTo(plan.occurredAt().truncatedTo(java.time.temporal.ChronoUnit.MICROS));
+        // The notification envelope intentionally discards sub-microsecond digits, not the source fact timestamp.
+        plans.put(plan.reference(), new Plan(tenant,plan.reference(),userPid,plan.configurationVersion(),plan.sourceType(),
+                plan.sourceId(),plan.occurredAt().minusNanos(500),plan.title(),plan.content()));
+        assertThat(queue(plan).status()).isEqualTo(Status.REPLAYED);
+        var beforeTimeChange = jdbc.queryForMap("SELECT * FROM ab_outbox WHERE tenant_id = ?",tenant);
+        plans.put(plan.reference(), new Plan(tenant,plan.reference(),userPid,plan.configurationVersion(),plan.sourceType(),
+                plan.sourceId(),plan.occurredAt().plusNanos(1000),plan.title(),plan.content()));
+        assertThatThrownBy(() -> queue(plan)).hasMessage("RELIABLE_ENVELOPE_CONFLICT");
+        assertThat(jdbc.queryForMap("SELECT * FROM ab_outbox WHERE tenant_id = ?",tenant)).isEqualTo(beforeTimeChange);
         plans.put(plan.reference(), new Plan(tenant,plan.reference(),userPid,plan.configurationVersion(),plan.sourceType(),
                 plan.sourceId(),plan.occurredAt(),plan.title(),"Changed content"));
         var before = jdbc.queryForMap("SELECT * FROM ab_outbox WHERE tenant_id = ?", tenant);
