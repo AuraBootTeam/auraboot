@@ -148,6 +148,10 @@ test.describe('i18n admin real workflow', () => {
     const postureProbe = await admin.page.request.post('/api/tenant-selection/process', {
       data: { action: 'create', tenantName: `${prefix}posture-probe`.replaceAll('.', '-'), displayName: 'Posture probe' },
       failOnStatusCode: false,
+      // Tenant provisioning takes ~10 s per create (member/role/permission
+      // seeding) — the request default of 5 s reads as a timeout before the
+      // posture answer arrives. Same budget as the real creates below.
+      timeout: 60_000,
     });
     test.skip(postureProbe.status() === 403, 'requires the multi-tenant posture (tenant self-provisioning enabled)');
     expect(postureProbe.status(), `unexpected tenant create failure: ${postureProbe.status()}`).toBeLessThan(400);
