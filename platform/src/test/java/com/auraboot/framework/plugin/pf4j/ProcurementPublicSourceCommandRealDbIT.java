@@ -424,7 +424,7 @@ class ProcurementPublicSourceCommandRealDbIT {
             assertEquals(formal,formalSnapshot(quote.submission()),"Both formal headers and complete formal lines remain immutable");
             var history=db.query("qo_procurement_history_common",Map.of("qo_pr_history_target_pid",quote.quote()));
             assertTrue(history.stream().anyMatch(event->"SOURCE_CHANGED".equals(event.get("qo_pr_history_reason")) && "system".equals(event.get("qo_pr_history_actor_pid"))));return null;});
-        var changed=snapshot();assertEquals(200,call(token,selected("11")).status());assertReplaySnapshot(quote.source(),changed,snapshot());
+        var changed=snapshot();assertEquals(200,call(token,selected("11")).status());assertCriticalReplaySnapshot(quote.source(),quote.quote(),changed,snapshot());
     }
     @Test @Order(4) void publicBatchRollsBackAnActuallyWrittenFirstSourceWhenLaterAllocatedSourceChanges() throws Exception {
         configurePolicy();assertEquals(200,call(token,selected("11")).status());var quote=prepareSubmittedQuote();
@@ -701,6 +701,26 @@ class ProcurementPublicSourceCommandRealDbIT {
         normalizedBefore.put("source",oldRows.stream().map(row->replayRow(sourcePid,row)).toList());
         normalizedAfter.put("source",newRows.stream().map(row->replayRow(sourcePid,row)).toList());
         assertEquals(normalizedBefore,normalizedAfter,"No other metadata, business field, row identity/order or domain may differ");
+    }
+    /** Critical-source replay locks the exact associated quote before returning unchanged. */
+    @SuppressWarnings("unchecked")
+    static void assertCriticalReplaySnapshot(String sourcePid,String quotePid,Map<String,Object> before,Map<String,Object> after) {
+        var oldRows=(List<Map<String,Object>>)before.get("quote");var newRows=(List<Map<String,Object>>)after.get("quote");
+        assertNotNull(oldRows);assertNotNull(newRows);
+        var oldTargets=oldRows.stream().filter(row->quotePid.equals(row.get("pid"))).toList();
+        var newTargets=newRows.stream().filter(row->quotePid.equals(row.get("pid"))).toList();
+        assertEquals(1,oldTargets.size());assertEquals(1,newTargets.size());
+        var oldRow=oldTargets.getFirst();var newRow=newTargets.getFirst();
+        long oldVersion=new BigDecimal(oldRow.get("row_version").toString()).longValueExact();
+        long newVersion=new BigDecimal(newRow.get("row_version").toString()).longValueExact();
+        assertEquals(Math.addExact(oldVersion,1),newVersion,"Exactly the associated quote CAS lock must increment once");
+        var oldTime=LocalDateTime.parse(oldRow.get("updated_at").toString().replace(' ','T'));
+        var newTime=LocalDateTime.parse(newRow.get("updated_at").toString().replace(' ','T'));
+        assertFalse(newTime.isBefore(oldTime),"Associated quote lock timestamp cannot move backwards");
+        var normalizedBefore=new LinkedHashMap<>(before);var normalizedAfter=new LinkedHashMap<>(after);
+        normalizedBefore.put("quote",oldRows.stream().map(row->replayRow(quotePid,row)).toList());
+        normalizedAfter.put("quote",newRows.stream().map(row->replayRow(quotePid,row)).toList());
+        assertReplaySnapshot(sourcePid,normalizedBefore,normalizedAfter);
     }
     private static Map<String,Object> replayRow(String sourcePid,Map<String,Object> row) {
         var copy=new LinkedHashMap<>(row);

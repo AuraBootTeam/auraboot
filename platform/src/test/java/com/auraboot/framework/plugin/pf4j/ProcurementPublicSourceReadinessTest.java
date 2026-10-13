@@ -103,6 +103,41 @@ class ProcurementPublicSourceReadinessTest {
             assertThrows(AssertionError.class,()->ProcurementPublicSourceCommandRealDbIT.assertReplaySnapshot("source-A",before,changed),"Non-target "+field+" must remain exact");
         }
     }
+    private Map<String,Object> criticalReplayFixture(long quoteVersion,String quoteTime) {
+        var result=replayFixture(2,"2066-01-01T00:00:01");
+        result.put("quote",List.of(new LinkedHashMap<>(Map.of("pid","quote-A","row_version",quoteVersion,"updated_at",quoteTime,
+            "state","invalidated","reason","SOURCE_CHANGED","revision",2)),
+            new LinkedHashMap<>(Map.of("pid","quote-B","row_version",1,"updated_at","2066-01-01T00:00:00","state","draft"))));
+        return result;
+    }
+    private Map<String,Object> criticalReplayBefore() {
+        var result=criticalReplayFixture(8,"2066-01-01T00:00:00");result.put("source",replayFixture(1,"2066-01-01T00:00:00").get("source"));return result;
+    }
+    @Test void criticalReplayAcceptsOnlyDeclaredSourceAndQuoteCasAuditChanges() {
+        ProcurementPublicSourceCommandRealDbIT.assertCriticalReplaySnapshot("source-A","quote-A",criticalReplayBefore(),criticalReplayFixture(9,"2066-01-01T00:00:01"));
+        ProcurementPublicSourceCommandRealDbIT.assertCriticalReplaySnapshot("source-A","quote-A",criticalReplayBefore(),criticalReplayFixture(9,"2066-01-01T00:00:00"));
+    }
+    @Test void criticalReplayRejectsChangedBusinessWrongQuoteOtherRowsAndInvalidAuditProgress() {
+        var before=criticalReplayBefore();
+        for(String field:List.of("state","reason","revision")) {
+            var changed=criticalReplayFixture(9,"2066-01-01T00:00:01");
+            @SuppressWarnings("unchecked") var row=((List<Map<String,Object>>)changed.get("quote")).getFirst();row.put(field,"unexpected");
+            assertThrows(AssertionError.class,()->ProcurementPublicSourceCommandRealDbIT.assertCriticalReplaySnapshot("source-A","quote-A",before,changed),field);
+        }
+        assertThrows(AssertionError.class,()->ProcurementPublicSourceCommandRealDbIT.assertCriticalReplaySnapshot("source-A","quote-B",before,criticalReplayFixture(9,"2066-01-01T00:00:01")));
+        for(String field:List.of("row_version","updated_at")) {
+            var changed=criticalReplayFixture(9,"2066-01-01T00:00:01");
+            @SuppressWarnings("unchecked") var sibling=((List<Map<String,Object>>)changed.get("quote")).get(1);sibling.put(field,field.equals("row_version")?2:"2066-01-01T00:00:02");
+            assertThrows(AssertionError.class,()->ProcurementPublicSourceCommandRealDbIT.assertCriticalReplaySnapshot("source-A","quote-A",before,changed),"Other quote "+field);
+        }
+        assertThrows(AssertionError.class,()->ProcurementPublicSourceCommandRealDbIT.assertCriticalReplaySnapshot("source-A","quote-A",before,criticalReplayFixture(10,"2066-01-01T00:00:01")));
+        assertThrows(AssertionError.class,()->ProcurementPublicSourceCommandRealDbIT.assertCriticalReplaySnapshot("source-A","quote-A",before,criticalReplayFixture(9,"2065-12-31T23:59:59")));
+        var other=criticalReplayFixture(9,"2066-01-01T00:00:01");other.put("task",List.of(Map.of("pid","task-A","row_version",2)));
+        assertThrows(AssertionError.class,()->ProcurementPublicSourceCommandRealDbIT.assertCriticalReplaySnapshot("source-A","quote-A",before,other));
+    }
+    @Test void ordinaryReplayStillRejectsAnyQuoteAuditChange() {
+        assertThrows(AssertionError.class,()->ProcurementPublicSourceCommandRealDbIT.assertReplaySnapshot("source-A",criticalReplayBefore(),criticalReplayFixture(9,"2066-01-01T00:00:01")));
+    }
     @Test void safeNumericCodeAcceptsActualStringWireAndNeverPersistsFreeDiagnosticText() {
         assertEquals("35000",ProcurementPublicSourceCommandRealDbIT.safeNumericCode(JSON.getNodeFactory().textNode("35000")));
         assertEquals("403",ProcurementPublicSourceCommandRealDbIT.safeNumericCode(JSON.getNodeFactory().numberNode(403)));
