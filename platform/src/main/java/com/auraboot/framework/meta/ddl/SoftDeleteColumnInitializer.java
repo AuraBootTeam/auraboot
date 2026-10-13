@@ -19,7 +19,10 @@ public class SoftDeleteColumnInitializer {
             SELECT DISTINCT table_name FROM public.ab_meta_model
             WHERE is_current = TRUE AND deleted_flag = FALSE
               AND source_type = 'physical'
-              AND lower(extension ->> 'softDelete') = 'true'
+              AND (
+                    lower(extension ->> 'softDelete') = 'true'
+                    OR lower(extension #>> '{extension,softDelete}') = 'true'
+                  )
               AND table_name IS NOT NULL
             ORDER BY table_name
             """;
